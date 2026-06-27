@@ -1,10 +1,18 @@
 # Executive Takeout — architecture & build plan
 
-Status: v1 BUILT · branch `feature/tabs-executive-takeout` · 2026-06-27
-Engine + both views + curation + tests complete (node 18/18, bundler 25/25).
-Awaiting Duncan's launch_turas verification on a real report. Posture-score
-balance (levels vs subgroup standouts) is the most likely tuning point once
-seen on live data — see `rankLevel` / `scoreFinding` in 27e.
+Status: v1 BUILT + review pass 1 · branch `feature/tabs-executive-takeout` · 2026-06-27
+Engine + both views + curation + tests complete (node 20/20, bundler 25/25).
+Review pass (Duncan, on real SACS data): apex now leads with overall
+satisfaction (detected by title) + the composite indices, each with a wave
+delta; satisfaction/composites are pulled OUT of the lanes. Lanes speak the
+INDEX consistently (index standouts preferred over top-box); every card names
+its question; levels use a single gauge bar (no scale-max bar). Protect/Act now
+rank RELATIVE to the median (real scales sit mid-band, so absolute bands hid the
+weakest items), and level scores are normalised to the same 0..1 effect footing
+so subgroup standouts (e.g. Cape Town vs Durban satisfaction) compete with
+touchpoint levels. Battery consistency is suppressed when category is blank
+(SACS carries no categories) — tagging categories would re-enable the Decide
+fork. Awaiting Duncan's launch_turas verification on the live report.
 
 ## The problem it solves
 

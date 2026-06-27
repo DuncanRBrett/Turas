@@ -44,31 +44,44 @@
   takeout._touchpointBand = touchpointBand;
 
   /** A composite index (Q_Engage / Q_Value): rated touchpoint that maps to a
-   *  "single" type — it summarises the others, so it leads the apex answer. */
+   *  "single" type — it summarises the others, so it belongs in the apex. */
   function isComposite(q) {
     return q.type !== "scale" && q.type !== "nps" &&
       typeof q.scale_max === "number" && q.scale_max > 0;
   }
 
-  /** Touchpoint levels + composites from the dashboard's rated questions. */
+  /** The overall-satisfaction headline metric, detected by title. */
+  var SATISFACTION_RE = /satisf/i;
+
+  /**
+   * Split the rated questions into driver LEVELS (which feed the lanes) and
+   * APEX metrics (overall satisfaction first, then composite indices). Apex
+   * metrics are pulled OUT of the lanes so the headline numbers lead the page
+   * rather than repeating inside it. Their subgroup standouts still surface in
+   * the lanes (e.g. "Cape Town least satisfied") via _collectFindings.
+   */
   function gatherLevels(views) {
-    var levels = [], composites = [];
+    var levels = [], satisfaction = [], composites = [];
     views.indexQuestions().forEach(function (q) {
       var model = views._modelFor(q.code);
       var row = views._meanRow(model);
       var value = row ? row.cells[0].mean : null;
       if (value === null || value === undefined) return;
       var max = touchpointMax(q), band = touchpointBand(value, q);
-      var level = { code: q.code, title: q.title, category: q.category,
+      var item = { code: q.code, title: q.title, category: q.category || "",
         value: value, band: band, delta: row.delta || null,
         base: model.columns[0].base, scaleMin: 0, scaleMax: max };
-      levels.push(level);
-      if (isComposite(q)) {
-        composites.push({ code: q.code, title: q.title, value: value,
-          band: band, scaleMax: max });
+      if (SATISFACTION_RE.test(q.title || "")) {
+        item.label = "Satisfaction";   // short apex label; the full question is long
+        satisfaction.push(item);
+      } else if (isComposite(q)) {
+        item.label = q.title;          // composites already have a short title
+        composites.push(item);
+      } else {
+        levels.push(item);
       }
     });
-    return { levels: levels, composites: composites };
+    return { levels: levels, apex: satisfaction.concat(composites) };
   }
 
   /** Overall sample size + worst-case precision for the reliability stamp. */
@@ -101,11 +114,11 @@
     try {
       if (typeof views._collectFindings === "function") standouts = views._collectFindings(b);
     } catch (e) { standouts = []; }
-    var lv = { levels: [], composites: [] };
-    try { lv = gatherLevels(views); } catch (e) { lv = { levels: [], composites: [] }; }
-    var reliability = gatherReliability(lv.levels);
+    var lv = { levels: [], apex: [] };
+    try { lv = gatherLevels(views); } catch (e) { lv = { levels: [], apex: [] }; }
+    var reliability = gatherReliability(lv.levels.concat(lv.apex));
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
-    return { standouts: standouts, levels: lv.levels, composites: lv.composites,
+    return { standouts: standouts, levels: lv.levels, apex: lv.apex,
       reliability: reliability, lowBaseThreshold: lowBase, banner: b };
   };
 

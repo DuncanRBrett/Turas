@@ -557,6 +557,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-kpi-val { font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1; }
 .tko-kpi-band { font-size: 11px; font-weight: 700; margin-top: 7px; text-transform: capitalize; }
 .tko-band-strong { color: var(--tko-protect); } .tko-band-moderate { color: var(--tko-act); } .tko-band-weak { color: var(--red); } .tko-band-na { color: var(--faint); }
+.tko-kpi-foot { display: flex; align-items: center; gap: 9px; margin-top: 7px; }
+.tko-kpi-foot .tko-kpi-band { margin-top: 0; }
+.tko-kpi-delta { font-size: 11px; font-weight: 700; }
+.tko-kpi-delta.up { color: var(--tko-protect); } .tko-kpi-delta.down { color: var(--red); }
 .tko-reliability { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); font: 11.5px var(--font); color: var(--muted); }
 
 /* posture lanes */
@@ -578,6 +582,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-mlabel { font-size: 12px; color: var(--muted); }
 .tko-gap { margin-left: auto; font-size: 12.5px; font-weight: 700; }
 .tko-gap.tko-protect { color: var(--tko-protect); } .tko-gap.tko-act { color: var(--tko-act); } .tko-gap.tko-watch { color: var(--tko-watch); } .tko-gap.tko-decide { color: var(--tko-decide); }
+.tko-qline { font-size: 11px; color: var(--faint); margin: 1px 0 8px; }
+.tko-gauge { height: 10px; background: #eef0f7; border-radius: 5px; overflow: hidden; margin: 2px 0; max-width: 320px; }
+.tko-gauge-fill { height: 100%; border-radius: 5px; background: var(--brand); }
+.tko-gauge-fill.tko-protect { background: var(--tko-protect); } .tko-gauge-fill.tko-act { background: var(--tko-act); } .tko-gauge-fill.tko-watch { background: var(--tko-watch); } .tko-gauge-fill.tko-decide { background: var(--tko-decide); }
 .tko-bars { max-width: none; margin: 4px 0 2px; }
 .tko-bars .dfb-bar.tko-protect { background: var(--tko-protect); } .tko-bars .dfb-bar.tko-act { background: var(--tko-act); } .tko-bars .dfb-bar.tko-watch { background: var(--tko-watch); } .tko-bars .dfb-bar.tko-decide { background: var(--tko-decide); }
 .tko-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }

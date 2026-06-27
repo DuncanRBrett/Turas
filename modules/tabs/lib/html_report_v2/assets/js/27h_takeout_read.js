@@ -25,9 +25,8 @@
 
   /** The big number + its label + the signed gap chip. */
   function metricLine(f) {
-    var label = f.kind === "level" ? "/ " + f.scaleMax : (f.label || "");
     return '<div class="tko-metric"><span class="tko-big">' + ui.fmtVal(f, f.value) +
-      '</span> <span class="tko-mlabel">' + fmt.escapeHtml(label) + "</span>" +
+      '</span> <span class="tko-mlabel">' + fmt.escapeHtml(ui.metricLabel(f)) + "</span>" +
       (gapText(f) ? '<span class="tko-gap tko-' + f.posture + '">' + gapText(f) + "</span>" : "") +
       "</div>";
   }
@@ -36,10 +35,11 @@
   function cardHtml(f, lowThreshold) {
     var claim = takeout.state.getText(f.id, "claim", ui.seedClaim(f));
     var soWhat = takeout.state.getText(f.id, "soWhat", ui.seedSoWhat(f));
+    var visual = f.kind === "level" ? ui.gaugeBar(f) : ui.twoBar(f);
     return '<article class="tko-card tko-edge-' + f.posture + '" data-id="' +
       fmt.escapeHtml(f.id) + '">' +
       ui.editable(f.id, "claim", claim, "tko-claim", "Finding headline — editable") +
-      metricLine(f) + ui.twoBar(f) +
+      ui.questionLine(f) + metricLine(f) + visual +
       '<div class="tko-chips">' + ui.baseChip(f, lowThreshold) + ui.softTag(f) +
       ui.deltaChip(f) + "</div>" +
       ui.editable(f.id, "soWhat", soWhat, "tko-sowhat", "Implication — editable") +
@@ -64,15 +64,17 @@
       "</div></section>";
   }
 
-  /** The apex band: kicker, the editable answer, the composite indices. */
+  /** The apex band: kicker, the editable answer, the headline indices. */
   function apexHtml(t) {
     var project = (TR.AGG && TR.AGG.project && TR.AGG.project.name) || "This study";
-    var apex = takeout.state.getApex(ui.apexSeed(t.answer.composites));
-    var metrics = (t.answer.composites || []).slice(0, 2).map(function (c) {
-      return '<div class="tko-kpi"><div class="tko-kpi-label">' + fmt.escapeHtml(c.title) +
+    var apex = takeout.state.getApex(ui.apexSeed(t.answer.metrics));
+    var metrics = (t.answer.metrics || []).slice(0, 3).map(function (c) {
+      return '<div class="tko-kpi"><div class="tko-kpi-label">' +
+        fmt.escapeHtml(c.label || c.title) +
         '</div><div class="tko-kpi-val">' + Number(c.value).toFixed(1) +
-        '</div><div class="tko-kpi-band tko-band-' + (c.band || "na") + '">' +
-        fmt.escapeHtml(c.band || "—") + "</div></div>";
+        '</div><div class="tko-kpi-foot"><span class="tko-kpi-band tko-band-' +
+        (c.band || "na") + '">' + fmt.escapeHtml(c.band || "—") + "</span>" +
+        ui.apexDelta(c) + "</div></div>";
     }).join("");
     return '<div class="tko-apex"><div class="tko-kicker">Executive takeout · ' +
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +

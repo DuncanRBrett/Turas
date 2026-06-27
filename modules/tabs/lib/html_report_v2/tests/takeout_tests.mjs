@@ -74,15 +74,36 @@ run("battery multiplier rewards consistency", () => {
   close(takeout.batteryMultiplier(3), 1 + C.BATTERY_BONUS_PER_ITEM * 2, 1e-9, "k=3 bonus");
 });
 
-run("routing: levels to one posture each", () => {
-  const lvl = (band, delta) => ({ kind: "level", band, delta });
-  assert(takeout.routePosture(lvl("strong", null), 1) === "protect", "strong -> protect");
-  assert(takeout.routePosture(lvl("strong", { sig: true, diff: -0.6 }), 1) === "decide",
+run("routing: levels to one posture each, relative to the median", () => {
+  const median = 3.5;
+  const lvl = (band, value, delta) => ({ band, value, delta, scaleMin: 0, scaleMax: 5 });
+  assert(takeout.routeLevel(lvl("strong", 4.5, { sig: true, diff: -0.6 }), median) === "decide",
     "strong + declining -> decide");
-  assert(takeout.routePosture(lvl("weak", null), 1) === "act", "weak -> act");
-  assert(takeout.routePosture(lvl("moderate", { sig: true, diff: 0.4 }), 1) === "watch",
-    "moderate + move -> watch");
-  assert(takeout.routePosture(lvl("moderate", null), 1) === null, "moderate, flat -> dropped");
+  assert(takeout.routeLevel(lvl("moderate", 3.2, { sig: true, diff: 0.4 }), median) === "watch",
+    "any significant mover -> watch");
+  assert(takeout.routeLevel(lvl("strong", 4.2, null), median) === "protect",
+    "above median, not moving -> protect");
+  assert(takeout.routeLevel(lvl("weak", 2.8, null), median) === "act",
+    "below median, not moving -> act");
+  assert(takeout.medianValue([{ value: 1 }, { value: 3 }, { value: 5 }]) === 3, "median of 1,3,5");
+});
+
+run("index standout is preferred over a top-box standout (same Q + column)", () => {
+  const both = takeout._preferIndexStandouts([
+    { code: "Q1", column: "Seg", metric: "pct" },
+    { code: "Q1", column: "Seg", metric: "mean" },
+    { code: "Q2", column: "Seg", metric: "pct" }
+  ]);
+  assert(both.length === 2, "the duplicate top-box is dropped");
+  assert(both.some((f) => f.code === "Q1" && f.metric === "mean"), "index kept for Q1");
+  assert(both.some((f) => f.code === "Q2" && f.metric === "pct"), "lone top-box kept for Q2");
+});
+
+run("battery grouping is suppressed when category is blank", () => {
+  const f = (label) => ({ code: "Q" + label, category: "", label, column: "Seg", direction: "behind" });
+  const counts = takeout._batteryCounts([f("a"), f("b"), f("c")]);
+  assert(Object.keys(counts).length === 3, "no category -> each finding its own battery");
+  Object.values(counts).forEach((k) => assert(k === 1, "k=1 with no category"));
 });
 
 run("routing: standouts by direction and battery", () => {
@@ -183,22 +204,31 @@ run("gather + build + both views render end-to-end (stubbed live surfaces)", () 
   TR.AGG = { project: { name: "SACAP staff 2025", low_base_threshold: 30 },
     banner_groups: [{ id: "Q002", name: "Campus" }] };
   TR.d2 = { state: { banner: "Q002" }, firstBanner: () => "Q002" };
+  const LV = {
+    Q28: { mean: 3.9, delta: { sig: true, diff: 0.1, year: 2024 } },
+    Q_Engage: { mean: 4.08, delta: { sig: true, diff: -0.08, year: 2024 } },
+    Q_Value: { mean: 3.7, delta: null },
+    Q08: { mean: 3.44, delta: null },
+    Q12: { mean: 4.51, delta: null }
+  };
   TR.views = {
     _collectFindings: () => ([
-      { code: "Q1", title: "Mission", category: "Belief", column: "Under 2yr", label: "matters",
-        isMean: false, soft: false, value: 41, rest: 63, overall: 55, gap: -22, beaten: ["A"], base: 54 },
-      { code: "Q9", title: "Pride", category: "Belief", column: "Cape Town", label: "proud",
-        isMean: false, soft: false, value: 86, rest: 74, overall: 80, gap: 12, beaten: ["B"], base: 38 }
+      { code: "Q08", title: "Recognition for good work", category: "", column: "Cape Town",
+        label: "Index", isMean: true, soft: false, value: 3.0, rest: 3.6, overall: 3.44, gap: -0.6,
+        direction: "behind", decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: 38 },
+      { code: "Q12", title: "Mission makes work feel important", category: "", column: "Durban",
+        label: "Index", isMean: true, soft: false, value: 4.8, rest: 4.4, overall: 4.51, gap: 0.4,
+        direction: "ahead", decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: 33 }
     ]),
     indexQuestions: () => ([
-      { code: "Q_Engage", title: "Engagement", category: "Index", type: "single",
-        scale_max: 10, gauge_green: 7, gauge_amber: 5 },
-      { code: "Q8", title: "Workload", category: "Day", type: "scale",
-        scale_max: 10, gauge_green: 7, gauge_amber: 5 }
+      { code: "Q28", title: "Overall satisfaction with SACAP as a place to work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
+      { code: "Q_Engage", title: "Engagement", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
+      { code: "Q_Value", title: "Values", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
+      { code: "Q08", title: "Recognition for good work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
+      { code: "Q12", title: "Mission makes work feel important", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3 }
     ]),
-    _modelFor: (code) => ({ columns: [{ base: 220 }],
-      rows: [{ kind: "mean", cells: [{ mean: code === "Q_Engage" ? 7.4 : 4.7 }],
-        delta: code === "Q8" ? { sig: true, diff: -0.6, year: 2024 } : null }] }),
+    _modelFor: (code) => ({ columns: [{ base: 167 }],
+      rows: [{ kind: "mean", cells: [{ mean: LV[code].mean }], delta: LV[code].delta }] }),
     _meanRow: (m) => m.rows[0]
   };
   TR.model = { forQuestion: (code) => TR.views._modelFor(code) };
@@ -208,7 +238,10 @@ run("gather + build + both views render end-to-end (stubbed live surfaces)", () 
   const read = takeout.readView.html(t, { lowThreshold: 30 });
   const present = takeout.presentView.html(t, { lowThreshold: 30 });
   assert(read.indexOf("tko-apex") !== -1 && read.indexOf("tko-card") !== -1, "read renders apex + cards");
-  assert(read.indexOf("Engagement") !== -1, "composite index leads the apex");
+  assert(read.indexOf("Satisfaction") !== -1, "overall satisfaction leads the apex");
+  assert(read.indexOf("Engagement") !== -1, "engagement index in the apex");
+  assert(read.indexOf("tko-gauge") !== -1, "level cards use a single gauge bar (no scale-max bar)");
+  assert(read.indexOf("tko-qline") !== -1, "every card names its question");
   assert(read.indexOf('data-edit="') !== -1, "editable hooks are present");
   assert(present.indexOf("tko-slide") !== -1, "present renders slides");
   assert(present.indexOf("tko-slide-hero") !== -1, "present has hero numbers");

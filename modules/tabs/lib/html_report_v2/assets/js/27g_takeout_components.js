@@ -87,18 +87,52 @@
   };
 
   /** Templated draft headline (conclusion-first). The researcher rewrites it.
-   *  Em-dash form reads cleanly even when a question title is a full statement. */
+   *  The question itself is named on its own line, so a standout headline talks
+   *  about the segment, not the metric. */
   ui.seedClaim = function (f) {
-    var col = f.column, label = f.label || f.title;
+    var col = f.column;
     if (f.kind === "level") {
       if (f.posture === "protect") return f.title + " — a genuine strength";
       if (f.posture === "act") return f.title + " — among the weakest";
       if (f.posture === "watch") return f.title + " — on the move";
       return f.title + " — strong but slipping";
     }
-    if (f.posture === "decide") return col + " — answers differently across " + f.category;
-    if (f.posture === "protect") return col + " — stands out on " + label;
-    return col + " — exposed on " + label;
+    if (f.posture === "decide") return col + " — answers differently across the battery";
+    if (f.posture === "protect") return col + " — ahead of the rest";
+    if (f.posture === "watch") return col + " — on the move";
+    return col + " — behind the rest";
+  };
+
+  /** Label for the metric line: the scale for a level, "index" for a mean
+   *  standout, the answer category for a top-box standout. */
+  ui.metricLabel = function (f) {
+    if (f.kind === "level") return "out of " + f.scaleMax;
+    if (f.metric === "mean") return "index";
+    return f.label || "";
+  };
+
+  /** Single gauge bar for a level (value as a share of its scale) — no separate
+   *  "scale max" bar, which carried no information. Coloured by posture. */
+  ui.gaugeBar = function (f) {
+    var pct = f.scaleMax ? Math.min(100, Math.max(0, f.value / f.scaleMax * 100)) : 0;
+    return '<div class="tko-gauge" role="img" aria-label="' + ui.fmtVal(f, f.value) +
+      " out of " + f.scaleMax + '"><div class="tko-gauge-fill tko-' + f.posture +
+      '" style="width:' + pct.toFixed(1) + '%"></div></div>';
+  };
+
+  /** A small factual source line that always names the question behind a card,
+   *  so an edited headline never loses what was actually asked. */
+  ui.questionLine = function (f) {
+    return '<div class="tko-qline" title="' + fmt.escapeHtml(f.title) + '">' +
+      fmt.escapeHtml(f.code) + " · " + fmt.escapeHtml(TR.charts.clip(f.title, 70)) + "</div>";
+  };
+
+  /** Apex KPI wave-delta chip (shown whenever a prior wave is attached). */
+  ui.apexDelta = function (m) {
+    if (!m.delta || m.delta.diff === null || m.delta.diff === undefined) return "";
+    var up = m.delta.diff >= 0;
+    return '<span class="tko-kpi-delta ' + (up ? "up" : "down") + '">' +
+      (up ? "▲" : "▼") + " " + Math.abs(m.delta.diff).toFixed(1) + "</span>";
   };
 
   /** Templated neutral implication (the "so what"). The researcher rewrites it. */
@@ -115,7 +149,8 @@
       return "Write the one-sentence answer your client should walk away with.";
     }
     var bits = composites.slice(0, 2).map(function (c) {
-      return c.title + " sits at " + Number(c.value).toFixed(1) + " (" + (c.band || "—") + ")";
+      return (c.label || c.title) + " sits at " + Number(c.value).toFixed(1) +
+        " (" + (c.band || "—") + ")";
     });
     return bits.join("; ") + " — but the fault lines below are where the story is.";
   };

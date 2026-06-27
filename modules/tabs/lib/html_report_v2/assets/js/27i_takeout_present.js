@@ -28,9 +28,9 @@
   /** Cover — the two composite indices in one breath. */
   function coverCard(t, total) {
     var project = (TR.AGG && TR.AGG.project && TR.AGG.project.name) || "This study";
-    var nums = (t.answer.composites || []).slice(0, 2).map(function (c) {
+    var nums = (t.answer.metrics || []).slice(0, 3).map(function (c) {
       return '<div class="tko-cover-kpi"><div class="tko-hero">' + Number(c.value).toFixed(1) +
-        '</div><div class="tko-cover-lab">' + fmt.escapeHtml(c.title) + " · " +
+        '</div><div class="tko-cover-lab">' + fmt.escapeHtml(c.label || c.title) + " · " +
         '<span class="tko-band-' + (c.band || "na") + '">' + fmt.escapeHtml(c.band || "—") +
         "</span></div></div>";
     }).join("");
@@ -42,9 +42,9 @@
       "</div></section>";
   }
 
-  /** A two-bar (standout) or a scale gauge (level) — one micro-visual per card. */
+  /** A two-bar (standout) or a single scale gauge (level) per card. */
   function visual(f) {
-    return ui.twoBar(f);
+    return f.kind === "level" ? ui.gaugeBar(f) : ui.twoBar(f);
   }
 
   /** One finding as a full-screen slide. */
@@ -58,6 +58,7 @@
       "<span>" + fmt.escapeHtml(meta.label) + "</span></div>" +
       '<div class="tko-slide-hero">' + ui.fmtVal(f, f.value) + "</div>" +
       ui.editable(f.id, "claim", claim, "tko-claim tko-claim-lg", "Finding headline — editable") +
+      ui.questionLine(f) +
       '<div class="tko-slide-visual">' + visual(f) + "</div>" +
       ui.editable(f.id, "soWhat", soWhat, "tko-sowhat tko-sowhat-lg", "Implication — editable") +
       '<div class="tko-slide-foot">' + ui.baseChip(f, lowThreshold) + ui.softTag(f) +

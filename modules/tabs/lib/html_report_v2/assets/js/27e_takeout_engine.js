@@ -8,8 +8,8 @@
  * tests/takeout_tests.mjs and the in-browser #selftest.
  *
  * Inputs (assembled by 27f_takeout_data.js):
- *   { standouts:[finding], levels:[finding], composites:[level],
- *     reliability:{...}, lowBaseThreshold:int }
+ *   { standouts:[finding], levels:[finding], apex:[metric],
+ *     reliability:{...}, vetoes:{id:true} }
  * Output: the takeout object documented in docs/EXECUTIVE_TAKEOUT_PLAN.md.
  */
 (function (global) {
@@ -40,8 +40,8 @@
 
   /**
    * Cohen's h for two proportions — the effect-size measure for a percentage
-   * gap. Down-weights gaps near 0% or 100% (where a few points mean less) and
-   * up-weights gaps around 50%. p1, p2 are proportions in [0, 1].
+   * gap. Down-weights gaps near 0% or 100% and up-weights gaps around 50%.
+   * p1, p2 are proportions in [0, 1].
    */
   function cohenH(p1, p2) {
     var clamp = function (p) { return Math.min(1, Math.max(0, p)); };
@@ -75,32 +75,36 @@
   /**
    * Base interestingness score (0..100) before the battery bonus:
    * effect size x significance tier. Significance is a GATE applied upstream;
-   * ranking is by effect, never by p-value (large samples must not flood the
-   * page with trivially-significant findings).
+   * ranking is by effect, never by p-value.
    */
   function scoreFinding(f) {
     return effectSize(f) * tierWeight(f.soft) * 100;
   }
   takeout.scoreFinding = scoreFinding;
 
+  /** Stable battery key. Without a category we cannot tell related items from
+   *  unrelated ones, so each finding is its own battery (k=1) — never the whole
+   *  survey collapsed into one. "::" cannot occur in the parts. */
+  function batteryKeyFor(f) {
+    if (!f.category) return "solo::" + f.code + "::" + f.label + "::" + f.column;
+    return f.column + "::" + f.category + "::" + f.direction;
+  }
+  takeout._batteryKeyFor = batteryKeyFor;
+
   /**
    * Battery-consistency count for a subgroup standout: how many findings share
    * its column, category and direction (the same segment running the same way
-   * across a battery of related items). A segment low on 7 of 9 items is a far
-   * stronger story than a lone significant cell.
+   * across a battery of related items).
    */
   function batteryCounts(standouts) {
     var tally = {};
     standouts.forEach(function (f) {
-      var key = f.column + "" + f.category + "" + f.direction;
+      var key = batteryKeyFor(f);
       tally[key] = (tally[key] || 0) + 1;
     });
     return tally;
   }
-
-  function batteryKeyFor(f) {
-    return f.column + "" + f.category + "" + f.direction;
-  }
+  takeout._batteryCounts = batteryCounts;
 
   /** Score multiplier for a finding given its battery-consistency count k. */
   function batteryMultiplier(k) {
@@ -108,22 +112,64 @@
   }
   takeout.batteryMultiplier = batteryMultiplier;
 
-  /**
-   * Route one candidate to exactly one posture, or null to drop it. Levels are
-   * a touchpoint's Total figure (carrying its wave delta); standouts are a
-   * subgroup vs the rest. Rules are disclosed to the reader in the UI.
-   */
+  /** Route a subgroup standout to one posture: a systemic same-direction
+   *  pattern across a battery is a fork; otherwise ahead -> Protect, behind ->
+   *  Act. (Significance + base are gated upstream.) */
   function routePosture(c, batteryK) {
-    if (c.kind === "level") {
-      var declining = !!(c.delta && c.delta.sig && c.delta.diff < 0);
-      if (c.band === "strong") return declining ? "decide" : "protect";
-      if (c.band === "weak") return "act";
-      return (c.delta && c.delta.sig) ? "watch" : null;   // moderate: only if moving
-    }
-    if (batteryK >= CONST.BATTERY_FORK_MIN) return "decide";  // systemic segment pattern
+    if (batteryK >= CONST.BATTERY_FORK_MIN) return "decide";
     return c.gap >= 0 ? "protect" : "act";
   }
   takeout.routePosture = routePosture;
+
+  /** Median touchpoint value — the line between relatively strong and weak, so
+   *  Protect/Act surface the genuine top/bottom touchpoints rather than only
+   *  those past an absolute band (most items sit mid-band on a tight scale). */
+  function medianValue(levels) {
+    var v = levels.map(function (l) { return l.value; })
+      .filter(function (x) { return x !== null && x !== undefined; })
+      .sort(function (a, b) { return a - b; });
+    if (!v.length) return 0;
+    var m = Math.floor(v.length / 2);
+    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  }
+  takeout.medianValue = medianValue;
+
+  /** Route a touchpoint level: strong-but-declining is a fork; a significant
+   *  mover is a Watch story; otherwise Protect/Act by rank vs the median. */
+  function routeLevel(f, median) {
+    var declining = !!(f.delta && f.delta.sig && f.delta.diff < 0);
+    if (f.band === "strong" && declining) return "decide";
+    if (f.delta && f.delta.sig) return "watch";
+    return f.value >= median ? "protect" : "act";
+  }
+  takeout.routeLevel = routeLevel;
+
+  /** Within-lane rank score for a level, normalised to the same 0..100 footing
+   *  as a standout's effect size (so a touchpoint level and a subgroup gap
+   *  compete fairly). Distance from the median as a fraction of the scale for
+   *  Protect/Act; movement (with a touch of extremeness) for Watch/Decide. */
+  function scoreLevel(f, median) {
+    var range = (f.scaleMax - f.scaleMin) || 1;
+    var extremeness = Math.abs(f.value - median) / range;
+    if (f.posture === "watch" || f.posture === "decide") {
+      var move = f.delta ? Math.abs(f.delta.diff) / range : 0;
+      return (move + extremeness * 0.25) * 100;
+    }
+    return extremeness * 100;
+  }
+
+  /** Prefer the index (mean) standout over a top-box (%) standout for the same
+   *  question + column, so the takeout speaks one metric — the index — wherever
+   *  a question has one. Categorical standouts with no index are kept. */
+  function preferIndexStandouts(standouts) {
+    var hasMean = {};
+    standouts.forEach(function (f) {
+      if (f.metric === "mean") hasMean[f.code + "::" + f.column] = true;
+    });
+    return standouts.filter(function (f) {
+      return f.metric === "mean" || !hasMean[f.code + "::" + f.column];
+    });
+  }
 
   /** Stable id so a researcher's text edits survive report regeneration. */
   function findingId(f) {
@@ -131,31 +177,11 @@
   }
   takeout.findingId = findingId;
 
-  /** A level's distance from its scale midpoint, 0..1 — how extreme a touchpoint
-   *  sits (the weakest rank first in Act, the strongest first in Protect). */
-  function levelExtremeness(c) {
-    var range = (c.scaleMax - c.scaleMin) || 1;
-    var mid = (c.scaleMin + c.scaleMax) / 2;
-    var v = (c.value === null || c.value === undefined) ? mid : c.value;
-    return Math.min(1, Math.abs(v - mid) / (range / 2));
-  }
-
-  /** Within-posture rank score for a level (touchpoint). Movement-led for
-   *  Watch/Decide (it is the move that matters there), extremeness elsewhere. */
-  function rankLevel(c) {
-    var range = (c.scaleMax - c.scaleMin) || 1;
-    if (c.posture === "watch" || c.posture === "decide") {
-      var move = c.delta ? Math.abs(c.delta.diff) / range : 0;
-      return Math.max(move, levelExtremeness(c)) * 100;
-    }
-    return levelExtremeness(c) * 100;
-  }
-
   /** Normalize a _collectFindings standout into the engine's Finding shape. */
   function normalizeStandout(f) {
     var metric = f.isMean ? "mean" : "pct";
     var out = {
-      code: f.code, title: f.title, category: f.category, column: f.column,
+      code: f.code, title: f.title, category: f.category || "", column: f.column,
       kind: "standout", metric: metric, value: f.value, rest: f.rest,
       overall: f.overall, gap: f.gap, soft: !!f.soft,
       direction: f.isMean ? f.direction : (f.gap >= 0 ? "ahead" : "behind"),
@@ -170,7 +196,7 @@
   /** Normalize a touchpoint level (Total figure + wave delta) into a Finding. */
   function normalizeLevel(l) {
     var out = {
-      code: l.code, title: l.title, category: l.category, column: "Total",
+      code: l.code, title: l.title, category: l.category || "", column: "Total",
       kind: "level", metric: "mean", value: l.value, rest: null, overall: l.value,
       gap: null, soft: false,
       direction: (l.delta && l.delta.diff < 0) ? "behind" : "ahead",
@@ -202,16 +228,17 @@
     });
     return groups;
   }
+  takeout._selectByPosture = selectByPosture;
 
   /**
    * Build the takeout object from gathered candidates. Pure: same inputs always
-   * yield the same takeout. Scores standouts by effect x significance-tier x
-   * battery bonus, levels by extremeness/movement, routes each to one posture,
-   * then ranks, dedupes and caps. See docs/EXECUTIVE_TAKEOUT_PLAN.md.
+   * yield the same takeout. Standouts score by effect x tier x battery and route
+   * by direction; levels route by rank relative to the median (with movers ->
+   * Watch, strong-decliners -> Decide); then rank, dedupe and cap.
    */
   function buildTakeout(inputs) {
     inputs = inputs || {};
-    var standouts = (inputs.standouts || []).map(normalizeStandout);
+    var standouts = preferIndexStandouts((inputs.standouts || []).map(normalizeStandout));
     var levels = (inputs.levels || []).map(normalizeLevel);
     var tally = batteryCounts(standouts);
     standouts.forEach(function (f) {
@@ -219,9 +246,10 @@
       f.score = scoreFinding(f) * batteryMultiplier(f.batteryK);
       f.posture = routePosture(f, f.batteryK);
     });
+    var median = medianValue(levels);
     levels.forEach(function (f) {
-      f.posture = routePosture(f, 1);
-      f.score = rankLevel(f);
+      f.posture = routeLevel(f, median);
+      f.score = scoreLevel(f, median);
     });
     var routed = standouts.concat(levels).filter(function (f) { return f.posture; });
     var byPosture = selectByPosture(routed, inputs.vetoes || {});
@@ -230,7 +258,7 @@
     });
     var promoted = postures.reduce(function (s, p) { return s + p.items.length; }, 0);
     return {
-      answer: { composites: inputs.composites || [] },
+      answer: { metrics: inputs.apex || [] },
       reliability: inputs.reliability || null,
       postures: postures,
       candidateCount: standouts.length + levels.length,
@@ -239,9 +267,7 @@
   }
   takeout.buildTakeout = buildTakeout;
 
-  takeout._batteryCounts = batteryCounts;
-  takeout._batteryKeyFor = batteryKeyFor;
   takeout._normalizeStandout = normalizeStandout;
-  takeout._selectByPosture = selectByPosture;
+  takeout._preferIndexStandouts = preferIndexStandouts;
 
 })(typeof window !== "undefined" ? window : globalThis);
