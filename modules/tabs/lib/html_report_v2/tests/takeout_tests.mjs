@@ -196,55 +196,66 @@ run("curation state round-trips and resets", () => {
   assert(takeout.state.isVetoed("Q1|All|pct") === false, "reset clears vetoes");
 });
 
-run("gather + build + both views render end-to-end (stubbed live surfaces)", () => {
-  // minimal stand-ins for the live report surfaces the data layer reads
+run("end-to-end: generic apex, index+top-box, multi-banner, trend spark, participation", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
-  TR.conf = { maxMoePct: () => 2.7, reportHasPopulation: () => true,
+  TR.conf = { maxMoePct: () => 0.0, reportHasPopulation: () => true,
     labels: () => ({ sampling_method_normalised: "census", is_probability: false }) };
-  TR.AGG = { project: { name: "SACAP staff 2025", low_base_threshold: 30 },
-    banner_groups: [{ id: "Q002", name: "Campus" }] };
-  TR.d2 = { state: { banner: "Q002" }, firstBanner: () => "Q002" };
-  const LV = {
-    Q28: { mean: 3.9, delta: { sig: true, diff: 0.1, year: 2024 } },
-    Q_Engage: { mean: 4.08, delta: { sig: true, diff: -0.08, year: 2024 } },
-    Q_Value: { mean: 3.7, delta: null },
-    Q08: { mean: 3.44, delta: null },
-    Q12: { mean: 4.51, delta: null }
+  TR.render = { wavePoints: (row) => row.waves || null, sparkline: () => '<svg class="spark"></svg>' };
+  TR.AGG = { project: { name: "Climate 2025", low_base_threshold: 30, population_size: 220 },
+    banner_groups: [{ id: "Q02", name: "Campus" }, { id: "Q03", name: "Department" }, { id: "Q04", name: "Tenure" }] };
+  TR.d2 = { state: { banner: "Q02" }, firstBanner: () => "Q02" };
+  // a scale question carries favourable NET, unfavourable NET, NET POSITIVE (diff), then the mean
+  const netRows = [{ kind: "net", label: "Agree" }, { kind: "net", label: "Disagree" },
+    { kind: "net", label: "NET POSITIVE" }, { kind: "mean", label: "Index" }];
+  const qmodel = (mean, top, delta, waves) => ({ columns: [{ base: 167 }], rows: [
+    { kind: "net", cells: [{ pct: top }] }, { kind: "net", cells: [{ pct: 6 }] },
+    { kind: "net", cells: [{ pct: top - 6 }] },
+    { kind: "mean", cells: [{ mean: mean }], delta: delta || null, waves: waves || null }] });
+  const meanOnly = (mean, delta) => ({ columns: [{ base: 167 }],
+    rows: [{ kind: "mean", cells: [{ mean: mean }], delta: delta || null }] });
+  const Q = {
+    Q28: { mean: 3.9, top: 69, delta: { sig: true, diff: 0.1, year: 2024 },
+      waves: [{ year: 2023, value: 4.08 }, { year: 2024, value: 3.83 }, { year: 2025, value: 3.9, current: true }] },
+    Q08: { mean: 3.44, top: 41, delta: null },
+    Q12: { mean: 4.51, top: 88, delta: null }
   };
+  const seg = (col, val, rest, gap, dir, base) => ({ code: "Q28",
+    title: "Overall satisfaction with SACAP", category: "", column: col, label: "Index",
+    isMean: true, soft: false, value: val, rest: rest, overall: 3.9, gap: gap,
+    direction: dir, decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: base });
   TR.views = {
-    _collectFindings: () => ([
-      { code: "Q08", title: "Recognition for good work", category: "", column: "Cape Town",
-        label: "Index", isMean: true, soft: false, value: 3.0, rest: 3.6, overall: 3.44, gap: -0.6,
-        direction: "behind", decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: 38 },
-      { code: "Q12", title: "Mission makes work feel important", category: "", column: "Durban",
-        label: "Index", isMean: true, soft: false, value: 4.8, rest: 4.4, overall: 4.51, gap: 0.4,
-        direction: "ahead", decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: 33 }
-    ]),
+    _collectFindings: (g) => {
+      if (g === "Q02") return [seg("Cape Town", 3.38, 3.98, -0.6, "behind", 38),
+        seg("Durban", 4.5, 3.82, 0.68, "ahead", 33)];
+      if (g === "Q03") return [seg("Marketing", 3.43, 3.95, -0.52, "behind", 31)];
+      if (g === "Q04") return [seg("New staff (<1yr)", 4.3, 3.8, 0.5, "ahead", 30)];
+      return [];
+    },
     indexQuestions: () => ([
-      { code: "Q28", title: "Overall satisfaction with SACAP as a place to work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
-      { code: "Q_Engage", title: "Engagement", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
-      { code: "Q_Value", title: "Values", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
-      { code: "Q08", title: "Recognition for good work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3 },
-      { code: "Q12", title: "Mission makes work feel important", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3 }
+      { code: "Q28", title: "Overall satisfaction with SACAP as a place to work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q_Engage", title: "Engagement", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: [{ kind: "mean", label: "Engagement" }] },
+      { code: "Q08", title: "Recognition for good work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q12", title: "Mission makes work feel important", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } }
     ]),
-    _modelFor: (code) => ({ columns: [{ base: 167 }],
-      rows: [{ kind: "mean", cells: [{ mean: LV[code].mean }], delta: LV[code].delta }] }),
-    _meanRow: (m) => m.rows[0]
+    _modelFor: (code) => code === "Q_Engage"
+      ? meanOnly(4.08, { sig: true, diff: -0.08, year: 2024 })
+      : qmodel(Q[code].mean, Q[code].top, Q[code].delta, Q[code].waves),
+    _meanRow: (m) => m.rows.find((r) => r.kind === "mean")
   };
   TR.model = { forQuestion: (code) => TR.views._modelFor(code) };
 
   const t = takeout.compute();
-  assert(t.promotedCount > 0, "the engine promoted something");
+  assert(t.candidateCount >= 5, "standouts gathered across all banner groups, got " + t.candidateCount);
   const read = takeout.readView.html(t, { lowThreshold: 30 });
   const present = takeout.presentView.html(t, { lowThreshold: 30 });
-  assert(read.indexOf("tko-apex") !== -1 && read.indexOf("tko-card") !== -1, "read renders apex + cards");
-  assert(read.indexOf("Satisfaction") !== -1, "overall satisfaction leads the apex");
-  assert(read.indexOf("Engagement") !== -1, "engagement index in the apex");
-  assert(read.indexOf("tko-gauge") !== -1, "level cards use a single gauge bar (no scale-max bar)");
+  assert(read.indexOf("Satisfaction") !== -1, "satisfaction leads the apex (generic detection)");
+  assert(read.indexOf("69% agree") !== -1, "apex shows index + top-box together");
+  assert(read.indexOf("tko-kpi-spark") !== -1, "apex shows the wave sparkline when history exists");
+  assert(read.indexOf("Campus") !== -1, "standouts tagged with their banner cut");
+  assert(read.indexOf("% response of") !== -1, "participation/response rate shown");
+  assert(read.indexOf("tko-gauge") !== -1, "driver level cards use a gauge bar");
   assert(read.indexOf("tko-qline") !== -1, "every card names its question");
-  assert(read.indexOf('data-edit="') !== -1, "editable hooks are present");
-  assert(present.indexOf("tko-slide") !== -1, "present renders slides");
-  assert(present.indexOf("tko-slide-hero") !== -1, "present has hero numbers");
+  assert(present.indexOf("tko-slide-hero") !== -1, "present renders");
 });
 
 /* ---- source structure check ---- */

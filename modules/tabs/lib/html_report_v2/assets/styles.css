@@ -561,6 +561,13 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-kpi-foot .tko-kpi-band { margin-top: 0; }
 .tko-kpi-delta { font-size: 11px; font-weight: 700; }
 .tko-kpi-delta.up { color: var(--tko-protect); } .tko-kpi-delta.down { color: var(--red); }
+.tko-tb { font-size: 12px; color: var(--muted); font-weight: 600; }
+.tko-metric .tko-tb { margin-left: 4px; }
+.tko-kpi-val .tko-tb { display: block; font-size: 12px; margin-top: 3px; }
+.tko-chip.tko-bg { color: var(--brand); background: #eef0f7; }
+.tko-kpi-spark { display: inline-flex; align-items: center; line-height: 0; }
+.tko-kpi-spark svg { height: 20px; width: auto; }
+.tko-slide-tb { font-size: 15px; color: var(--muted); font-weight: 600; margin-left: 8px; }
 .tko-reliability { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); font: 11.5px var(--font); color: var(--muted); }
 
 /* posture lanes */

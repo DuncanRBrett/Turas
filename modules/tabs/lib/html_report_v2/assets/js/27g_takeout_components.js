@@ -135,6 +135,31 @@
       (up ? "▲" : "▼") + " " + Math.abs(m.delta.diff).toFixed(1) + "</span>";
   };
 
+  /** The "how many" companion to the index: the favourable top-box %, in its
+   *  own words ("· 69% satisfied"). Empty when the question carries no NET. */
+  ui.topBox = function (f) {
+    if (!f.topBox || f.topBox.pct === null || f.topBox.pct === undefined) return "";
+    return '<span class="tko-tb">· ' + Math.round(f.topBox.pct) + "% " +
+      fmt.escapeHtml(String(f.topBox.label || "").toLowerCase()) + "</span>";
+  };
+
+  /** Which banner cut a standout came from (Campus / Department / Tenure / …). */
+  ui.bannerChip = function (f) {
+    return f.bannerGroup
+      ? '<span class="tko-chip tko-bg">' + fmt.escapeHtml(f.bannerGroup) + "</span>" : "";
+  };
+
+  /** Apex trend: a wave sparkline when history exists, else the single delta. */
+  ui.apexSpark = function (m) {
+    if (m.waves && TR.render && typeof TR.render.sparkline === "function") {
+      try {
+        return '<span class="tko-kpi-spark">' +
+          TR.render.sparkline(m.waves, false, { w: 60, h: 20 }) + "</span>";
+      } catch (e) { /* fall back to the delta chip */ }
+    }
+    return ui.apexDelta(m);
+  };
+
   /** Templated neutral implication (the "so what"). The researcher rewrites it. */
   ui.seedSoWhat = function (f) {
     if (f.posture === "protect") return "Protect what's driving this — lead with it.";
@@ -167,6 +192,9 @@
   ui.reliabilityRibbon = function (rel) {
     if (!rel || !rel.n) return "";
     var parts = [(rel.census ? "Census" : "Sample"), "n = " + fmt.base(rel.n)];
+    if (rel.responseRate) {
+      parts.push(rel.responseRate + "% response of " + fmt.base(rel.population));
+    }
     if (rel.moePct !== null && rel.moePct !== undefined) {
       parts.push("±" + Number(rel.moePct).toFixed(1) + "pp worst-case");
     }

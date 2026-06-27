@@ -187,7 +187,8 @@
       direction: f.isMean ? f.direction : (f.gap >= 0 ? "ahead" : "behind"),
       decimals: f.decimals, scaleMin: f.scaleMin, scaleMax: f.scaleMax,
       base: (f.base === undefined ? null : f.base), beaten: f.beaten || [],
-      label: f.label, band: null, delta: null, batteryK: 1, score: 0, posture: null
+      label: f.label, band: null, delta: null, batteryK: 1, score: 0, posture: null,
+      bannerGroup: f.bannerGroup || "", topBox: null
     };
     out.id = findingId(out);
     return out;
@@ -202,7 +203,8 @@
       direction: (l.delta && l.delta.diff < 0) ? "behind" : "ahead",
       decimals: 1, scaleMin: l.scaleMin, scaleMax: l.scaleMax,
       base: (l.base === undefined ? null : l.base), beaten: [], label: l.title,
-      band: l.band, delta: l.delta || null, batteryK: 1, score: 0, posture: null
+      band: l.band, delta: l.delta || null, batteryK: 1, score: 0, posture: null,
+      bannerGroup: "", topBox: l.topBox || null, waves: l.waves || null
     };
     out.id = findingId(out);
     return out;

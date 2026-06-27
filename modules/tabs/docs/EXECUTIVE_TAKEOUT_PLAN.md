@@ -1,6 +1,21 @@
 # Executive Takeout — architecture & build plan
 
-Status: v1 BUILT + review pass 1 · branch `feature/tabs-executive-takeout` · 2026-06-27
+Status: v1 BUILT + review passes 1-2 · branch `feature/tabs-executive-takeout` · 2026-06-27
+
+Review pass 2 (aligned to the real SACS PowerPoint deck, kept GENERIC):
+- Index + Top-Box dual ("how much / how many") on apex metrics and driver cards.
+  Top-box = first favourable NET row (Turas builds NETs favourable-first; keyed
+  off row.kind + net_diffs, never labels); no NET -> index/score alone.
+- Standouts gathered across ALL banner_groups (campus + dept + tenure + any),
+  each tagged with its cut; the sharpest difference surfaces wherever it lives.
+- Apex trend sparkline from wave history (any #waves), falling back to the delta.
+- Participation line (response = base/population) when a population is set.
+- Headline detection is generic: composites always + keyword set
+  (satisf|overall|recommend|nps|csat) + optional config override
+  project.takeout_headline = [codes]. No SACS-specific hardcoding anywhere —
+  every feature keys off data-layer STRUCTURE with graceful fallback.
+node suite 20/20, bundler 25/25.
+
 Engine + both views + curation + tests complete (node 20/20, bundler 25/25).
 Review pass (Duncan, on real SACS data): apex now leads with overall
 satisfaction (detected by title) + the composite indices, each with a wave

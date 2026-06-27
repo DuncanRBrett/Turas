@@ -27,6 +27,7 @@
   function metricLine(f) {
     return '<div class="tko-metric"><span class="tko-big">' + ui.fmtVal(f, f.value) +
       '</span> <span class="tko-mlabel">' + fmt.escapeHtml(ui.metricLabel(f)) + "</span>" +
+      ui.topBox(f) +
       (gapText(f) ? '<span class="tko-gap tko-' + f.posture + '">' + gapText(f) + "</span>" : "") +
       "</div>";
   }
@@ -40,8 +41,8 @@
       fmt.escapeHtml(f.id) + '">' +
       ui.editable(f.id, "claim", claim, "tko-claim", "Finding headline — editable") +
       ui.questionLine(f) + metricLine(f) + visual +
-      '<div class="tko-chips">' + ui.baseChip(f, lowThreshold) + ui.softTag(f) +
-      ui.deltaChip(f) + "</div>" +
+      '<div class="tko-chips">' + ui.bannerChip(f) + ui.baseChip(f, lowThreshold) +
+      ui.softTag(f) + ui.deltaChip(f) + "</div>" +
       ui.editable(f.id, "soWhat", soWhat, "tko-sowhat", "Implication — editable") +
       '<div class="tko-card-foot">' +
       '<button class="linklike" data-goq="' + fmt.escapeHtml(f.code) +
@@ -71,10 +72,10 @@
     var metrics = (t.answer.metrics || []).slice(0, 3).map(function (c) {
       return '<div class="tko-kpi"><div class="tko-kpi-label">' +
         fmt.escapeHtml(c.label || c.title) +
-        '</div><div class="tko-kpi-val">' + Number(c.value).toFixed(1) +
+        '</div><div class="tko-kpi-val">' + Number(c.value).toFixed(1) + ui.topBox(c) +
         '</div><div class="tko-kpi-foot"><span class="tko-kpi-band tko-band-' +
         (c.band || "na") + '">' + fmt.escapeHtml(c.band || "—") + "</span>" +
-        ui.apexDelta(c) + "</div></div>";
+        ui.apexSpark(c) + "</div></div>";
     }).join("");
     return '<div class="tko-apex"><div class="tko-kicker">Executive takeout · ' +
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +

@@ -32,7 +32,7 @@
       return '<div class="tko-cover-kpi"><div class="tko-hero">' + Number(c.value).toFixed(1) +
         '</div><div class="tko-cover-lab">' + fmt.escapeHtml(c.label || c.title) + " · " +
         '<span class="tko-band-' + (c.band || "na") + '">' + fmt.escapeHtml(c.band || "—") +
-        "</span></div></div>";
+        "</span> " + ui.topBox(c) + "</div></div>";
     }).join("");
     var rel = t.reliability || {};
     return '<section class="tko-slide tko-slide-cover">' + kicker(1, total, "this study, in one breath") +
@@ -56,13 +56,14 @@
       kicker(idx, total, meta.label) +
       '<div class="tko-slide-pill tko-on-' + f.posture + '">' + ui.glyph(f.posture) +
       "<span>" + fmt.escapeHtml(meta.label) + "</span></div>" +
-      '<div class="tko-slide-hero">' + ui.fmtVal(f, f.value) + "</div>" +
+      '<div class="tko-slide-hero">' + ui.fmtVal(f, f.value) +
+      '<span class="tko-slide-tb">' + ui.topBox(f) + "</span></div>" +
       ui.editable(f.id, "claim", claim, "tko-claim tko-claim-lg", "Finding headline — editable") +
       ui.questionLine(f) +
       '<div class="tko-slide-visual">' + visual(f) + "</div>" +
       ui.editable(f.id, "soWhat", soWhat, "tko-sowhat tko-sowhat-lg", "Implication — editable") +
-      '<div class="tko-slide-foot">' + ui.baseChip(f, lowThreshold) + ui.softTag(f) +
-      ui.deltaChip(f) +
+      '<div class="tko-slide-foot">' + ui.bannerChip(f) + ui.baseChip(f, lowThreshold) +
+      ui.softTag(f) + ui.deltaChip(f) +
       '<button class="linklike" data-goq="' + fmt.escapeHtml(f.code) + '">see the table →</button>' +
       "</div></section>";
   }
