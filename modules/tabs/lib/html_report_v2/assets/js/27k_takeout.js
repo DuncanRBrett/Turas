@@ -31,7 +31,9 @@
         '">' + label + "</button>";
     };
     var reset = takeout.state.hasCuration()
-      ? '<button class="tko-reset" data-tko-reset>Reset to engine</button>' : "";
+      ? '<button class="tko-reset" data-tko-reset title="Throw away your edits, ' +
+        'vetoes and apex answer — restore exactly what the engine produced">' +
+        "Discard my edits</button>" : "";
     return '<div class="tko-head"><div class="tko-viewtoggle" role="radiogroup" ' +
       'aria-label="Takeout view">' + btn("read", "Read") + btn("present", "Present") +
       '</div><div class="tko-head-actions">' + reset +
@@ -116,7 +118,7 @@
       }
       if (e.target.closest("[data-tko-reset]")) {
         takeout.state.reset();
-        announce(host, "Reset to the engine's selection");
+        announce(host, "Edits discarded — back to the engine's selection");
         takeout.render(host);
       }
     });
