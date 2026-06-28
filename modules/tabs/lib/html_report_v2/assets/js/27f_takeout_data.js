@@ -146,8 +146,20 @@
    * and reads intuitively in the evidence. Low-base columns are dropped. Returns
    * [{column, group, gaps:[{title, value, total, scaleMax}]}].
    */
+  // Minimum responses to report a subgroup in a census (anonymity / meaning),
+  // when the n>=30 sample-error floor doesn't apply. Override per study with
+  // project.min_report_base.
+  var MIN_CENSUS_BASE = 5;
+
   function gatherColumnStrain(views) {
-    var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
+    var proj = (TR.AGG && TR.AGG.project) || {};
+    var conf = TR.conf || {};
+    // In a near-census of a small finite population the sample-error floor (30)
+    // is the wrong frame — a small subgroup is most of its own population, so the
+    // finite-population correction makes it reliable. Use the analyst's reporting
+    // floor there; keep the low-base threshold only for true samples.
+    var census = typeof conf.reportHasPopulation === "function" && conf.reportHasPopulation();
+    var floor = census ? (proj.min_report_base || MIN_CENSUS_BASE) : (proj.low_base_threshold || 30);
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
     var cols = {};
     var qs = views.indexQuestions();
@@ -162,10 +174,11 @@
           if (i === 0) return;                              // skip the Total column
           var v = row.cells[i] && row.cells[i].mean;
           if (v === null || v === undefined) return;
-          if (!col.base || col.base < lowBase) return;      // ignore small, noisy cuts
+          if (!col.base || col.base < floor) return;        // below the reporting floor
           var key = g.name + "::" + col.label;
-          (cols[key] || (cols[key] = { column: col.label, group: g.name, gaps: [] }))
-            .gaps.push({ title: q.title, value: v, total: total, scaleMax: max });
+          var c = cols[key] || (cols[key] = { column: col.label, group: g.name, base: 0, gaps: [] });
+          if (col.base > c.base) c.base = col.base;   // largest base seen — for reliability weighting
+          c.gaps.push({ title: q.title, value: v, total: total, scaleMax: max });
         });
       });
     });

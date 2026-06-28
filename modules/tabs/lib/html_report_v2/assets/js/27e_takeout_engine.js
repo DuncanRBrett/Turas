@@ -22,7 +22,9 @@
   /* Tunable thresholds — no magic numbers in the logic below. */
   var CONST = takeout.CONST = {
     MIN_GROUP_HITS: 2,        // a column must be below the overall on >=N questions
-    MIN_STRAIN_GAP: 0.02,     // ...and average >=2% of the scale below it, to be "the group"
+    MIN_STRAIN_GAP: 0.02,     // ...and (reliability-weighted) >=2% of the scale below it
+    STRAIN_RELIABLE_BASE: 30, // base at which a group's gap is fully trusted; smaller groups'
+                              //   gaps are discounted so a sharp gap on n=5 doesn't outrank a solid n=40
     MIN_AREA_MEMBERS: 2,      // a theme needs >=N questions to count as an "area"
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
@@ -76,18 +78,20 @@
         net += frac;
         if (frac < 0) behind.push(gp);
       });
-      // Rank by the AVERAGE gap to the overall, not the sum — "worst off" means
-      // furthest below per question (depth), so a large group that is mildly
-      // below on many questions doesn't outrank a group that is sharply below.
-      return { column: c.column, group: c.group, avg: c.gaps.length ? net / c.gaps.length : 0,
+      // Rank by the AVERAGE gap to the overall (depth, not breadth), discounted
+      // by reliability so a sharp gap on a tiny group doesn't outrank a solid one
+      // on a large group. A group at >= STRAIN_RELIABLE_BASE counts in full.
+      var avg = c.gaps.length ? net / c.gaps.length : 0;
+      var weight = Math.min(1, (c.base || 0) / CONST.STRAIN_RELIABLE_BASE);
+      return { column: c.column, group: c.group, avg: avg, weighted: avg * weight,
         behind: behind, count: c.gaps.length };
     });
     var strain = null, thrive = null;
     scored.forEach(function (s) {
-      if (!strain || s.avg < strain.avg) strain = s;
-      if (!thrive || s.avg > thrive.avg) thrive = s;
+      if (!strain || s.weighted < strain.weighted) strain = s;
+      if (!thrive || s.weighted > thrive.weighted) thrive = s;
     });
-    if (!strain || strain.behind.length < CONST.MIN_GROUP_HITS || strain.avg > -CONST.MIN_STRAIN_GAP) {
+    if (!strain || strain.behind.length < CONST.MIN_GROUP_HITS || strain.weighted > -CONST.MIN_STRAIN_GAP) {
       return null;
     }
     var evidence = strain.behind.slice()
@@ -97,7 +101,7 @@
       });
     return { id: "group", kind: "group", subject: strain.column, group: strain.group,
       hits: strain.behind.length, total: strain.count, evidence: evidence,
-      secondary: (thrive && thrive !== strain && thrive.avg > 0) ? thrive.column : null };
+      secondary: (thrive && thrive !== strain && thrive.weighted > 0) ? thrive.column : null };
   }
 
   /** Group levels into themes (theme, else section, else "(untagged)"). */

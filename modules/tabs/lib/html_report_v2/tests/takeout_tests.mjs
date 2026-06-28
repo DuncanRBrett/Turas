@@ -54,7 +54,7 @@ run("effect size is comparable across metrics", () => {
 
 run("GROUP pattern: the column most below the overall is under strain", () => {
   const g = (value, total) => ({ title: "Q", value: value, total: total, scaleMax: 5 });
-  const col = (column, group, gaps) => ({ column: column, group: group, gaps: gaps });
+  const col = (column, group, gaps) => ({ column: column, group: group, base: 40, gaps: gaps });
   const columns = [
     col("Cape Town", "Campus", [g(3.2, 3.9), g(3.4, 4.1), g(3.0, 3.8)]),  // consistently below overall
     col("Durban", "Campus", [g(4.5, 3.9), g(4.4, 4.1), g(4.3, 3.8)]),     // consistently above
@@ -70,11 +70,21 @@ run("GROUP pattern: the column most below the overall is under strain", () => {
 });
 
 run("GROUP pattern: null when no column is materially below the overall", () => {
-  const flat = [{ column: "A", group: "G", gaps: [{ title: "Q", value: 3.95, total: 4.0, scaleMax: 5 }] }];
+  const flat = [{ column: "A", group: "G", base: 40, gaps: [{ title: "Q", value: 3.95, total: 4.0, scaleMax: 5 }] }];
   assert(takeout._groupPattern(flat) === null, "one near-average gap is not a pattern");
-  const slightly = [{ column: "B", group: "G",
+  const slightly = [{ column: "B", group: "G", base: 40,
     gaps: [{ title: "Q1", value: 3.98, total: 4.0, scaleMax: 5 }, { title: "Q2", value: 3.97, total: 4.0, scaleMax: 5 }] }];
   assert(takeout._groupPattern(slightly) === null, "below by <2% of scale is not 'under strain'");
+});
+
+run("GROUP pattern down-weights tiny groups by reliability", () => {
+  const g = (value, total) => ({ title: "Q", value: value, total: total, scaleMax: 5 });
+  const columns = [
+    { column: "Tiny", group: "Dept", base: 5, gaps: [g(2.5, 4.0), g(2.6, 4.0)] },    // -35% avg but n=5
+    { column: "Solid", group: "Dept", base: 60, gaps: [g(3.5, 4.0), g(3.4, 4.0)] }   // -12% avg, n=60
+  ];
+  const p = takeout._groupPattern(columns);
+  assert(p && p.subject === "Solid", "the reliable group leads despite the tiny group's larger raw gap");
 });
 
 run("AREA patterns rank weakest and strongest theme", () => {
@@ -108,10 +118,10 @@ run("buildPatterns assembles group + areas + movement, and degrades gracefully",
   assert(empty.patterns.length === 0, "nothing in, nothing out — no crash");
   const t = takeout.buildPatterns({
     columns: [
-      { column: "Cape Town", group: "Campus", gaps: [
+      { column: "Cape Town", group: "Campus", base: 40, gaps: [
         { title: "Recognition", value: 3.0, total: 3.8, scaleMax: 5 },
         { title: "Opinions", value: 3.1, total: 3.9, scaleMax: 5 }] },
-      { column: "Durban", group: "Campus", gaps: [
+      { column: "Durban", group: "Campus", base: 40, gaps: [
         { title: "Recognition", value: 4.4, total: 3.8, scaleMax: 5 },
         { title: "Opinions", value: 4.3, total: 3.9, scaleMax: 5 }] }
     ],
