@@ -1,8 +1,8 @@
 /**
- * Executive Takeout — shared render atoms for the Patterns view, used by both
- * the Read and Present layouts so a row, a chip or an editable line is defined
- * once. All user-editable text is stored raw and ESCAPED HERE on render
- * (fmt.escapeHtml) — user content is never written as raw HTML.
+ * Pattern recognition — shared render atoms for the Read view, so a row, a chip
+ * or an editable line is defined once. All user-editable text is stored raw and
+ * ESCAPED HERE on render (fmt.escapeHtml) — user content is never written as raw
+ * HTML.
  */
 (function (global) {
   "use strict";
@@ -28,28 +28,29 @@
     return isMean ? Number(v).toFixed(decimals || 1) : Math.round(v) + "%";
   };
 
-  /** One member row inside an AREA card: question, a scale bar, its value, and a
+  /** One member row inside an AREA card: the question label on its own line (full,
+   *  always wraps — never truncated), then a scale bar + value beneath, plus a
    *  move chip when it shifted. cls colours the bar by pattern kind. */
   ui.areaRow = function (m, cls) {
     var pct = m.scaleMax ? Math.min(100, Math.max(0, m.value / m.scaleMax * 100)) : 0;
-    return '<div class="tko-row"><span class="tko-rl" title="' + fmt.escapeHtml(m.label) +
-      '">' + fmt.escapeHtml(TR.charts.clip(m.label, 28)) + "</span>" +
-      '<span class="tko-track"><span class="tko-fill tko-' + cls + '" style="width:' +
-      pct.toFixed(1) + '%"></span></span>' +
-      '<span class="tko-rv">' + Number(m.value).toFixed(1) + ui.moveChip(m.delta) + "</span></div>";
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(m.label) + "</div>" +
+      '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' + cls +
+      '" style="width:' + pct.toFixed(1) + '%"></span></span>' +
+      '<span class="tko-rv">' + Number(m.value).toFixed(1) + ui.moveChip(m.delta) + "</span></div></div>";
   };
 
-  /** One row inside the GROUP card: the column's standing on a question vs the
-   *  rest (its bar in the pattern colour, the rest shown faintly alongside). */
+  /** One row inside the GROUP card: the question label on its own line (full,
+   *  always wraps), then the column's standing vs the rest beneath — its bar in
+   *  the pattern colour, the rest shown faintly in the value. */
   ui.groupRow = function (e, cls) {
     var max = e.isMean ? (e.scaleMax || 5) : 100;
     var baseline = (e.rest === null || e.rest === undefined) ? e.overall : e.rest;
     var w = Math.min(100, Math.max(0, (e.value || 0) / max * 100)).toFixed(1);
-    return '<div class="tko-row"><span class="tko-rl" title="' + fmt.escapeHtml(e.label) +
-      '">' + fmt.escapeHtml(TR.charts.clip(e.label, 24)) + "</span>" +
-      '<span class="tko-track"><span class="tko-fill tko-' + cls + '" style="width:' +
-      w + '%"></span></span><span class="tko-rv">' + ui.fmtVal(e.isMean, e.value, e.decimals) +
-      '<span class="tko-rest"> / ' + ui.fmtVal(e.isMean, baseline, e.decimals) + "</span></span></div>";
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(e.label) + "</div>" +
+      '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' + cls +
+      '" style="width:' + w + '%"></span></span><span class="tko-rv">' +
+      ui.fmtVal(e.isMean, e.value, e.decimals) +
+      '<span class="tko-rest"> / ' + ui.fmtVal(e.isMean, baseline, e.decimals) + "</span></span></div></div>";
   };
 
   /** A small ▲/▼ move chip for a member that shifted significantly, else "". */
@@ -130,21 +131,29 @@
     return "";
   };
 
-  /** Draft for the one-line big-picture answer, from the patterns found. */
+  /** Draft for the one-line big-picture answer, from the patterns found. Leads
+   *  with the split that matters and the group under strain (the two cross-cutting
+   *  reads), then the strongest / weakest areas when a study is tagged. */
   ui.answerSeed = function (patterns) {
     var by = {};
     (patterns || []).forEach(function (p) { by[p.id] = p; });
     var bits = [];
+    if (by.split) bits.push("Differences run most by " + by.split.subject);
+    if (by.group) bits.push(by.group.subject + " is the group under strain");
     if (by.strong) bits.push(by.strong.subject + " carries the study");
     if (by.weak) bits.push(by.weak.subject + " is the soft spot");
-    if (by.group) bits.push(by.group.subject + " is the group under strain");
     return bits.length ? bits.join("; ") + "."
       : "Write the one-sentence answer your client should walk away with.";
   };
 
-  /** An accessible, inline-editable plaintext field. Saved by 27k on focusout. */
-  ui.editable = function (id, field, text, cls, label) {
+  /** An accessible, inline-editable plaintext field. Carries data-seed (the
+   *  engine's current wording) so the controller can drop an edit that matches the
+   *  seed and never let an unedited line go stale across a re-run. Saved by 27k on
+   *  focusout. seed defaults to text when omitted. */
+  ui.editable = function (id, field, text, cls, label, seed) {
+    var s = (seed === undefined || seed === null) ? text : seed;
     return '<div class="tko-ed ' + cls + '" data-edit="' + fmt.escapeHtml(id + "::" + field) +
+      '" data-seed="' + fmt.escapeHtml(s) +
       '" contenteditable="plaintext-only" role="textbox" aria-multiline="false" spellcheck="false" ' +
       'aria-label="' + fmt.escapeHtml(label) + '" title="Click to edit — your wording is saved">' +
       fmt.escapeHtml(text) + "</div>";

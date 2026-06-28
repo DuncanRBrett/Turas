@@ -1,14 +1,14 @@
 /**
- * Executive Takeout — controller / tab. Orchestrates the deterministic engine
- * and the two views, and owns all interaction wiring (the Read/Present toggle,
- * inline editing, deep-links, vetoes, reset). Thin by design: gather -> build
- * -> render -> wire. Registered as a top-level tab in 24_shell.js.
+ * Pattern recognition — controller / tab. Orchestrates the deterministic engine
+ * and the single Read layout, and owns all interaction wiring (inline editing,
+ * deep-links, the "how sure" explainer, and reset-to-engine). Thin by design:
+ * gather -> build -> render -> wire. Registered as a top-level tab in 24_shell.js
+ * (id stays "takeout"; the visible label is "Patterns").
  */
 (function (global) {
   "use strict";
   var TR = global.TR = global.TR || {};
   var takeout = TR.takeout = TR.takeout || {};
-  var fmt = TR.fmt;
 
   var APEX_ID = "__apex__";
 
@@ -17,24 +17,13 @@
     return takeout.buildPatterns(takeout.gather());
   };
 
-  function currentView() {
-    return (TR.d2 && TR.d2.state.takeoutView === "present") ? "present" : "read";
-  }
-
-  /** The view toggle + reset controls. */
-  function headHtml(view) {
-    var btn = function (id, label) {
-      return '<button role="radio" class="tko-vbtn" data-view="' + id + '" aria-checked="' +
-        (view === id ? "true" : "false") + '" tabindex="' + (view === id ? "0" : "-1") +
-        '">' + label + "</button>";
-    };
+  /** The reset control + edit hint (no view toggle — Read is the only view). */
+  function headHtml() {
     var reset = takeout.state.hasCuration()
       ? '<button class="tko-reset" data-tko-reset title="Throw away your edits, ' +
         'vetoes and apex answer — restore exactly what the engine produced">' +
         "Discard my edits</button>" : "";
-    return '<div class="tko-head"><div class="tko-viewtoggle" role="radiogroup" ' +
-      'aria-label="Takeout view">' + btn("read", "Read") + btn("present", "Present") +
-      '</div><div class="tko-head-actions">' + reset +
+    return '<div class="tko-head"><div class="tko-head-actions">' + reset +
       '<span class="tko-edithint"><svg class="tko-glyph" viewBox="0 0 24 24" aria-hidden="true">' +
       '<path d="M4 20h4L18 10l-4-4L4 16z" fill="none" stroke="currentColor" stroke-width="1.6" ' +
       'stroke-linejoin="round"></path></svg> Click any line to edit</span></div></div>';
@@ -42,11 +31,9 @@
 
   /** Render the takeout tab into the host element. */
   takeout.render = function (host) {
-    var view = currentView();
     var t = takeout.compute();
-    var body = view === "present" ? takeout.presentView.html(t) : takeout.readView.html(t);
-    host.innerHTML = '<div class="page tko-page">' + headHtml(view) +
-      '<div class="tko-body tko-view-' + view + '">' + body + "</div>" +
+    host.innerHTML = '<div class="page tko-page">' + headHtml() +
+      '<div class="tko-body tko-view-read">' + takeout.readView.html(t) + "</div>" +
       '<div class="tko-howsure-panel" hidden></div>' +
       '<div class="tko-live" aria-live="polite"></div></div>';
     wire(host);
@@ -59,42 +46,23 @@
   }
 
   /** Persist one edited field; "__apex__" is the answer, everything else is a
-   *  finding's claim / so-what keyed by id::field. Stored as plain text. */
+   *  pattern's takeaway keyed by id::field. An edit equal to the engine's seed
+   *  (or empty) is NOT stored — that keeps an unedited seed from going stale when
+   *  the engine's wording changes on a re-run. Stored as plain text. */
   function saveEdit(el, host) {
     var key = el.getAttribute("data-edit");
     var sep = key.indexOf("::");
     var id = key.slice(0, sep), field = key.slice(sep + 2);
     var text = (el.textContent || "").trim();
-    if (id === APEX_ID) takeout.state.setApex(text);
-    else takeout.state.setText(id, field, text);
-    announce(host, "Saved");
-  }
-
-  /** Move focus between the two view radios with the arrow keys. */
-  function wireToggleKeys(host) {
-    var radios = [].slice.call(host.querySelectorAll(".tko-vbtn"));
-    radios.forEach(function (btn, i) {
-      btn.addEventListener("keydown", function (e) {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        var next = radios[(i + (e.key === "ArrowRight" ? 1 : radios.length - 1)) % radios.length];
-        setView(host, next.getAttribute("data-view"));
-      });
-    });
-  }
-
-  function setView(host, view) {
-    TR.d2.state.takeoutView = view;
-    if (TR.d2.pushHash) TR.d2.pushHash();
-    takeout.render(host);
+    var seed = (el.getAttribute("data-seed") || "").trim();
+    var value = (text === seed) ? "" : text;   // unchanged from seed -> drop, never persist
+    if (id === APEX_ID) takeout.state.setApex(value);
+    else takeout.state.setText(id, field, value);
+    announce(host, value ? "Saved" : "Reset to the engine's wording");
   }
 
   /** Attach all interaction handlers (idempotent per render). */
   function wire(host) {
-    host.querySelectorAll(".tko-vbtn").forEach(function (btn) {
-      btn.addEventListener("click", function () { setView(host, btn.getAttribute("data-view")); });
-    });
-    wireToggleKeys(host);
     // inline editing — save on blur so we never lose the caret mid-edit
     host.addEventListener("focusout", function (e) {
       if (e.target && e.target.getAttribute && e.target.getAttribute("data-edit")) {

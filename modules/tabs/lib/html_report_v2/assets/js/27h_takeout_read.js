@@ -1,8 +1,8 @@
 /**
- * Executive Takeout — Read view (Patterns). One editable big-picture answer, the
- * headline indices, then the cross-question patterns: the group under strain,
- * the weakest and strongest areas, and what moved. Each takeaway is editable so
- * the message lands in the client's language.
+ * Pattern recognition — Read view. One editable big-picture answer, the headline
+ * indices, then the cross-question patterns: the group under strain, which split
+ * matters most, the weakest and strongest areas, and what moved. Each takeaway is
+ * editable so the message lands in the client's language.
  *
  * Pure HTML builder: takes the patterns object, returns a string. The controller
  * (27k) injects it and wires editing, deep-links and the "how sure" panel.
@@ -17,17 +17,18 @@
   /** The apex band: kicker, the editable answer, the headline indices. */
   function apexHtml(t) {
     var project = (TR.AGG && TR.AGG.project && TR.AGG.project.name) || "This study";
-    var answer = takeout.state.getApex(ui.answerSeed(t.patterns));
+    var seed = ui.answerSeed(t.patterns);
+    var answer = takeout.state.getApex(seed);
     var kpis = (t.answer.metrics || []).slice(0, 3).map(function (m) {
       return '<div class="tko-kpi"><div class="tko-kpi-label">' + fmt.escapeHtml(m.label || m.title) +
         '</div><div class="tko-kpi-val">' + ui.fmtVal(true, m.value) + ui.topBox(m) +
         '</div><div class="tko-kpi-foot"><span class="tko-kpi-band tko-band-' + (m.band || "na") +
         '">' + fmt.escapeHtml(m.band || "—") + "</span>" + ui.apexTrend(m) + "</div></div>";
     }).join("");
-    return '<div class="tko-apex"><div class="tko-kicker">Executive takeout · patterns · ' +
+    return '<div class="tko-apex"><div class="tko-kicker">Pattern recognition · ' +
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +
       '<div class="tko-eyebrow">The big picture</div>' +
-      ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer — editable") +
+      ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer — editable", seed) +
       "</div>" + (kpis ? '<div class="tko-apex-metrics">' + kpis + "</div>" : "") + "</div>" +
       ui.reliabilityRibbon(t.reliability) + "</div>";
   }
@@ -58,8 +59,11 @@
       return arows + an;
     }
     if (p.kind === "split") {
+      var scaleMax = p.high.scaleMax || p.low.scaleMax || 5;
       return ui.areaRow({ label: p.high.label, value: p.high.value, scaleMax: p.high.scaleMax }, "strong") +
         ui.areaRow({ label: p.low.label, value: p.low.value, scaleMax: p.low.scaleMax }, "strain") +
+        '<div class="tko-cap">Each row is that group’s average index across all rated questions, out of ' +
+        scaleMax + ".</div>" +
         '<div class="tko-note">The widest, most consistent gaps run by ' + fmt.escapeHtml(p.subject) +
         " — look there first.</div>";
     }
@@ -80,14 +84,17 @@
       go[1] + "</button></div>";
   }
 
-  /** One pattern as an editable card. */
+  /** One pattern as an editable card. The takeaway is keyed by id + subject so a
+   *  saved edit can never resurface under a different subject after a re-run. */
   function cardHtml(p) {
     var meta = ui.patternMeta(p.id);
-    var take = takeout.state.getText(p.id, "takeaway", ui.patternSeed(p));
+    var seed = ui.patternSeed(p);
+    var key = p.id + "|" + (p.subject || "");
+    var take = takeout.state.getText(key, "takeaway", seed);
     return '<article class="tko-pcard tko-edge-' + meta.cls + '">' +
       '<div class="tko-ptag tko-on-' + meta.cls + '">' + fmt.escapeHtml(meta.tag) + "</div>" +
       headHtml(p) +
-      ui.editable(p.id, "takeaway", take, "tko-take", "Takeaway — editable") +
+      ui.editable(key, "takeaway", take, "tko-take", "Takeaway — editable", seed) +
       bodyHtml(p, meta.cls) + footHtml(p) + "</article>";
   }
 

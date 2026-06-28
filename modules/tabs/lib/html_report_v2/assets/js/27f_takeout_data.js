@@ -1,5 +1,5 @@
 /**
- * Executive Takeout — data layer. Two responsibilities, kept separate:
+ * Pattern recognition — data layer. Two responsibilities, kept separate:
  *   GATHER (I/O boundary): assemble the engine's inputs from the already-
  *     computed report objects (views._collectFindings, views.indexQuestions,
  *     wave deltas, TR.conf reliability). Every source is wrapped so a missing
@@ -225,21 +225,29 @@
   /* ---------------- state (curation, persisted) ---------------- */
 
   var KEY = "turas_v2_takeout";
+  // Curation-state schema version. BUMP this whenever the engine's seeds change
+  // shape/meaning so edits saved under an older engine are dropped rather than
+  // shown beside a new subject (the "stale curation" bug). v1 = posture lanes;
+  // v2 = patterns view (subject-keyed takeaways, seed-aware persistence).
+  var VERSION = 2;
   var cache = null;
 
   function store() {
     if (cache) return cache;
-    cache = { text: {}, veto: {}, apex: null };
-    if (TR.userState && TR.userState.takeout) merge(cache, TR.userState.takeout);
+    cache = { version: VERSION, text: {}, veto: {}, apex: null };
+    if (TR.userState && TR.userState.takeout) merge(cache, TR.userState.takeout, VERSION);
     try {
       var raw = global.localStorage && localStorage.getItem(KEY);
-      if (raw) merge(cache, JSON.parse(raw) || {});
+      if (raw) merge(cache, JSON.parse(raw) || {}, VERSION);
     } catch (e) { /* island-only context */ }
     return cache;
   }
 
-  function merge(target, src) {
+  function merge(target, src, expectVersion) {
     if (!src) return;
+    // Ignore curation saved under an older engine — its seeds/subjects no longer
+    // match, so honouring it is exactly what produced stale, contradictory cards.
+    if (src.version !== expectVersion) return;
     if (src.text) Object.keys(src.text).forEach(function (k) { target.text[k] = src.text[k]; });
     if (src.veto) Object.keys(src.veto).forEach(function (k) { target.veto[k] = src.veto[k]; });
     if (src.apex !== undefined && src.apex !== null) target.apex = src.apex;
@@ -281,7 +289,7 @@
       var s = store();
       return !!s.apex || Object.keys(s.text).length > 0 || Object.keys(s.veto).length > 0;
     },
-    reset: function () { cache = { text: {}, veto: {}, apex: null }; persist(); }
+    reset: function () { cache = { version: VERSION, text: {}, veto: {}, apex: null }; persist(); }
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

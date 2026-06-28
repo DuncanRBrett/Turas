@@ -519,7 +519,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .qlink .qt { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
 
 /* ============================================================================
- * Executive Takeout — the one-page argument (Read) and the sequence (Present).
+ * Pattern recognition — the one-page Read view (apex answer + pattern cards).
  * Posture colours are AA-contrast on white and always paired with a glyph and a
  * text label, so colour is never the sole signal. Editorial serif for the voice.
  * ==========================================================================*/
@@ -567,7 +567,6 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-chip.tko-bg { color: var(--brand); background: #eef0f7; }
 .tko-kpi-spark { display: inline-flex; align-items: center; line-height: 0; }
 .tko-kpi-spark svg { height: 20px; width: auto; }
-.tko-slide-tb { font-size: 15px; color: var(--muted); font-weight: 600; margin-left: 8px; }
 .tko-reliability { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); font: 11.5px var(--font); color: var(--muted); }
 
 /* posture lanes */
@@ -614,33 +613,13 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-ed:focus { background: #fff; outline: 2px solid var(--accent); outline-offset: 0; }
 .tko-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-/* Present view — one big idea per screen */
-.tko-deck { display: flex; flex-direction: column; gap: 16px; }
-.tko-slide { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 44px 48px; min-height: 64vh; display: flex; flex-direction: column; justify-content: center; scroll-snap-align: start; scroll-margin-top: 12px; }
-.tko-slide-cover { border-left: 5px solid var(--brand); }
-.tko-slide-finding.tko-edge-protect { border-left: 5px solid var(--tko-protect); } .tko-slide-finding.tko-edge-act { border-left: 5px solid var(--tko-act); } .tko-slide-finding.tko-edge-watch { border-left: 5px solid var(--tko-watch); } .tko-slide-finding.tko-edge-decide { border-left: 5px solid var(--tko-decide); }
-.tko-slide-kicker { font-family: var(--font); font-size: 11px; letter-spacing: .05em; color: var(--faint); margin-bottom: 22px; }
-.tko-cover-nums { display: flex; gap: 56px; flex-wrap: wrap; }
-.tko-hero { font-size: clamp(3.4rem, 11vw, 6rem); font-weight: 800; line-height: .9; color: var(--ink); font-variant-numeric: tabular-nums; }
-.tko-cover-lab { font-size: 13px; color: var(--muted); margin-top: 10px; }
-.tko-cover-foot { font-size: 13px; color: var(--faint); margin-top: 30px; }
-.tko-slide-pill { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: var(--soft); margin-bottom: 18px; }
-.tko-slide-hero { font-size: clamp(3.4rem, 13vw, 6.5rem); font-weight: 800; line-height: .85; color: var(--ink); font-variant-numeric: tabular-nums; }
-.tko-claim-lg { font-size: clamp(18px, 3vw, 22px); line-height: 1.32; color: var(--ink); margin: 18px 0 0; max-width: 34ch; }
-.tko-slide-visual { margin: 20px 0; max-width: 460px; }
-.tko-sowhat-lg { font-size: 15px; margin-top: 4px; }
-.tko-slide-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
-.tko-slide-fine { min-height: 40vh; }
-.tko-view-present { scroll-snap-type: y proximity; }
-
 @media print {
   .tko-head, .tko-veto, .tko-edithint, .tko-reset, .tko-howsure { display: none !important; }
-  .tko-slide { min-height: auto; page-break-inside: avoid; box-shadow: none; }
   .tko-card, .tko-apex, .tko-pcard { box-shadow: none; }
   .tko-ed:hover, .tko-ed:focus { background: none; outline: none; }
 }
 
-/* ---------- Patterns view (group / weakest area / strongest area / moved) ---------- */
+/* ---------- Pattern recognition cards (group / split / area / moved) ---------- */
 .tko-howsure { border: none; background: none; color: var(--brand); font: 600 11.5px var(--font); cursor: pointer; padding: 0; margin-left: auto; }
 .tko-howsure:hover { text-decoration: underline; }
 .tko-reliability { justify-content: flex-start; }
@@ -653,8 +632,11 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-ph { font-size: 16px; font-weight: 700; color: var(--ink); margin: 3px 0 0; display: inline-block; }
 .tko-pscore { font-size: 13px; font-weight: 600; color: var(--muted); }
 .tko-take { font-family: var(--tko-serif); font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 11px; }
-.tko-row { display: grid; grid-template-columns: 120px 1fr 56px; align-items: center; gap: 9px; margin: 5px 0; }
-.tko-rl { font-size: 11.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Rows: the question label sits on its own line and ALWAYS wraps in full — never
+   truncated (see PATTERN_RECOGNITION.md "wrap, never ellipsis"); bar + value beneath. */
+.tko-row { margin: 8px 0; }
+.tko-rl { display: block; font-size: 11.5px; color: var(--ink); white-space: normal; overflow-wrap: anywhere; line-height: 1.35; margin-bottom: 4px; }
+.tko-rmeter { display: grid; grid-template-columns: 1fr 64px; align-items: center; gap: 9px; }
 .tko-track { height: 9px; background: #eef0f7; border-radius: 5px; overflow: hidden; }
 .tko-fill { display: block; height: 100%; border-radius: 5px; background: var(--brand); }
 .tko-fill.tko-strain { background: var(--red); } .tko-fill.tko-weak { background: var(--tko-act); } .tko-fill.tko-strong { background: var(--tko-protect); } .tko-fill.tko-moved { background: var(--tko-watch); }
@@ -663,10 +645,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-move { font-size: 10px; font-weight: 700; margin-left: 3px; }
 .tko-move.up { color: var(--tko-protect); } .tko-move.down { color: var(--red); }
 .tko-note { font-size: 11.5px; color: var(--muted); margin-top: 9px; }
+.tko-cap { font-size: 11px; color: var(--faint); margin-top: 8px; font-style: italic; }
 .tko-mspark { margin: 8px 0 2px; }
 .tko-mspark svg { width: 100%; height: auto; display: block; }
 .tko-mrow { font-size: 13px; font-weight: 600; margin: 3px 0; }
 .tko-mrow.tko-mv-up { color: var(--tko-protect); } .tko-mrow.tko-mv-down { color: var(--red); }
 .tko-pfoot { margin-top: 11px; }
 .tko-pfoot .linklike { font-size: 12px; font-weight: 600; }
-.tko-slide-sub { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }

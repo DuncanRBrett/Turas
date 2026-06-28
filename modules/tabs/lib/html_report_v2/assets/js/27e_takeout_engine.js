@@ -1,5 +1,5 @@
 /**
- * Executive Takeout — Patterns engine (pure; no DOM, no LLM).
+ * Pattern recognition — engine (pure; no DOM, no LLM).
  *
  * Answers "what's the big picture?" by stepping back from individual questions:
  *   - GROUP   — the breakout column that is consistently off across the survey

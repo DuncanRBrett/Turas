@@ -11,8 +11,7 @@
 
   /** Report state (single source of truth; UI re-renders from this). */
   d2.state = {
-    tab: "takeout",         // Executive Takeout is the landing tab
-    takeoutView: "read",    // takeout shape: "read" (pyramid) | "present" (sequence)
+    tab: "takeout",         // Pattern recognition is the landing tab (id stays "takeout")
     banner: null,           // banner group id ("Q002") or "custom:<qcode>"
     filters: [],            // [{q: "Q006", rows: [9, 10]}]
     showCounts: false,
@@ -210,7 +209,6 @@
 
   d2.encodeHash = function () {
     var s = d2.state, parts = ["tab=" + s.tab];
-    if (s.takeoutView !== "read") parts.push("tv=" + s.takeoutView);
     if (s.activeQ) parts.push("q=" + s.activeQ);
     if (s.banner) parts.push("banner=" + s.banner);
     if (s.showCounts) parts.push("count=1");
@@ -232,7 +230,6 @@
       if (eq < 0) return;
       var k = kv.slice(0, eq), v = decodeURIComponent(kv.slice(eq + 1));
       if (k === "tab") s.tab = v;
-      if (k === "tv") s.takeoutView = v === "present" ? "present" : "read";
       if (k === "q") s.activeQ = v;
       if (k === "banner") s.banner = v;
       if (k === "count") s.showCounts = v === "1";

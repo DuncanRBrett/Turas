@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Verification gate for the Executive Takeout Patterns engine. Runs:
+ * Verification gate for the Pattern recognition engine. Runs:
  *   1. known-answer tests for the pure engine (Cohen's h, effect size, the group
  *      / area / movement patterns, build + graceful fallback) and the curation
  *      state — hand-verifiable expected values.
- *   2. an end-to-end render over stubbed live surfaces (gather -> build -> both
- *      views) exercising tagging, index+top-box, multi-banner and participation.
+ *   2. an end-to-end render over stubbed live surfaces (gather -> build -> read
+ *      view) exercising tagging, index+top-box, multi-banner and participation.
  *   3. a source structure check (no takeout JS file over 300 active lines).
  * Exit 0 = everything passed. No dependencies beyond node.
  *
@@ -39,7 +39,7 @@ function run(name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function close(a, e, tol, msg) { if (Math.abs(a - e) > tol) throw new Error(msg + ": expected ~" + e + ", got " + a); }
 
-console.log("Executive Takeout — Patterns engine known-answer suite:");
+console.log("Pattern recognition — engine known-answer suite:");
 
 run("Cohen's h known answers", () => {
   close(takeout.cohenH(0.5, 0.5), 0, 1e-9, "h(.5,.5)=0");
@@ -194,10 +194,9 @@ run("every takeout module loaded and exposes its API", () => {
     assert(typeof takeout[fn] === "function", fn + " is a function"));
   assert(takeout.ui && typeof takeout.ui.areaRow === "function", "ui atoms present");
   assert(takeout.readView && typeof takeout.readView.html === "function", "read view present");
-  assert(takeout.presentView && typeof takeout.presentView.html === "function", "present view present");
 });
 
-run("end-to-end: tagging, index+top-box, multi-banner, participation, both views", () => {
+run("end-to-end: tagging, index+top-box, multi-banner, participation, read view", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   TR.conf = { maxMoePct: () => 0.0, reportHasPopulation: () => true,
     labels: () => ({ sampling_method_normalised: "census", is_probability: false }),
@@ -244,7 +243,6 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, both views
   assert(t.patterns.some((p) => p.id === "group"), "group pattern built");
   assert(t.patterns.some((p) => p.id === "weak"), "weakest-area pattern built");
   const read = takeout.readView.html(t);
-  const present = takeout.presentView.html(t);
   assert(read.indexOf("Recognition &amp; voice") !== -1, "weakest area named");
   assert(read.indexOf("Belonging &amp; purpose") !== -1, "strongest area named");
   assert(read.indexOf("Cape Town") !== -1, "group under strain named");
@@ -252,7 +250,6 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, both views
   assert(read.indexOf("69% agree") !== -1, "apex shows index + top-box");
   assert(read.indexOf("% response of") !== -1, "participation shown");
   assert(read.indexOf('data-edit="') !== -1, "editable hooks present");
-  assert(present.indexOf("tko-slide") !== -1, "present renders");
 });
 
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");

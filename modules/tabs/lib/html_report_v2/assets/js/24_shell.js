@@ -12,7 +12,7 @@
   /** Tab list; Tracking only appears when a prior wave is configured. */
   function tabList() {
     var tabs = [
-      ["takeout", "Executive takeout"],
+      ["takeout", "Patterns"],
       ["dashboard", "Dashboard"],
       ["crosstabs", "Crosstabs"],
       ["findings", "Differences"]

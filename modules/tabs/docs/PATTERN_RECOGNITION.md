@@ -48,7 +48,7 @@ it finds, how it is computed, and the rule that stops it firing on noise.
 - **Guard:** must be both statistically real AND a meaningful size (a 0.1 is not a
   move); otherwise reports "broadly stable".
 
-### 4. Which split matters most  ·  TO BUILD
+### 4. Which split matters most  ·  BUILT
 - **Finds:** whether the real differences run by campus, department or tenure — so
   you look at the breakdown that matters instead of all of them.
 - **How:** for each breakout, how spread out its groups are around the overall,
@@ -110,6 +110,23 @@ These apply to every pattern above.
 
 The page always shows its working: "no AI · scanned N breakouts and M questions ·
 only what survives the tests."
+
+---
+
+## Presentation rules
+
+- **Wrap, never ellipsis.** Question and group labels are shown in full and always
+  wrap; they are never clipped to "…". A truncated label hides which question a
+  pattern rests on, which is exactly the evidence the reader needs to trust it.
+  Implemented by putting the label on its own line above the bar/value
+  (`.tko-rl { white-space: normal; overflow-wrap: anywhere; }`), not in a fixed-
+  width nowrap cell. Applies to every row in the tab.
+- **One Read view.** The tab is a single scannable page (the "Present"/Wrapped
+  sequence was removed — it added nothing over the Read view). The id stays
+  `takeout`; the visible tab label is "Patterns".
+- **Caption every number whose units aren't obvious.** E.g. the split card states
+  that its rows are each group's average index across all rated questions, out of
+  the scale maximum.
 
 ---
 

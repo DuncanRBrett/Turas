@@ -243,12 +243,10 @@
           eq(typeof p.id === "string" && !!p.kind, true, "every pattern has an id and kind");
         });
       } },
-      { name: "takeout renders both views; editable text is escaped", fn: function () {
+      { name: "takeout renders the read view; editable text is escaped", fn: function () {
         var t = TR.takeout.compute();
         var read = TR.takeout.readView.html(t);
-        var present = TR.takeout.presentView.html(t);
         eq(read.indexOf("tko-apex") !== -1, true, "read view has the apex band");
-        eq(present.indexOf("tko-slide") !== -1, true, "present view has slides");
         // a hostile edit must never reach the DOM as live HTML (XSS guard)
         var hostile = TR.takeout.ui.editable("x", "takeaway",
           '<img src=x onerror=alert(1)>', "tko-take", "label");
