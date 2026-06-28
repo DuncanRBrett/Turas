@@ -336,17 +336,26 @@
     var fmt = TR.fmt;
     var bullets = [];
     if (ex) {
-      // "a NN%" (not "this NN%") so it reads as a worked example, not a pointer
-      // at one cell. Tail matches the inference: FPC ranges describe the whole
-      // group; uncorrected ranges describe a re-run.
+      // worked example with real numbers, and it NAMES the concept (so the
+      // CI/SI/MOE jargon elsewhere has an anchor). Tail matches the inference:
+      // FPC ranges describe the whole group; uncorrected ranges describe a re-run.
       var tail = ex.fpc
-        ? "% for the group as a whole.</li>"
-        : "% if we ran the survey again.</li>";
-      bullets.push("<li><strong>Every number comes from a sample.</strong> " +
+        ? "% for the group as a whole"
+        : "% if we ran the survey again";
+      bullets.push("<li><strong>Every number is an estimate, not an exact count.</strong> " +
         "For example, a " + Math.round(ex.pct) + "% based on " +
         fmt.base(ex.n) + " answers would sit between " + Math.round(ex.lo) +
-        "% and " + Math.round(ex.hi) + tail);
+        "% and " + Math.round(ex.hi) + tail + " — that band is the 95% " +
+        fmt.escapeHtml(labels.interval_name) + " (" +
+        fmt.escapeHtml(labels.interval_abbrev) + ").</li>");
     }
+    // what the "95%" actually means — kept honest for non-probability designs,
+    // where a wobble band is not a formal coverage guarantee
+    bullets.push(labels.is_probability
+      ? "<li><strong>What “95%” means:</strong> if we repeated the survey, the true " +
+        "figure would fall inside the range about 19 times out of 20.</li>"
+      : "<li><strong>Reading the ranges:</strong> they show how far a number would " +
+        "likely wobble if you measured again — a wider range means less certainty.</li>");
     if (small) {
       // FPC-consistent ±pp when the group's universe is known (matches the
       // table's corrected margin rather than the raw-base one).
@@ -358,6 +367,8 @@
         conf.maxMoePct(sBase).toFixed(0) +
         "pp — treat them as indicative.</li>");
     }
+    bullets.push("<li><strong>Comparing two numbers:</strong> if two groups’ ranges " +
+      "overlap, treat the difference as noise rather than a real gap.</li>");
     bullets.push("<li><strong>“Significant”</strong> means a difference too " +
       "large to be explained by sampling wobble alone — not necessarily " +
       "an important one.</li>");
