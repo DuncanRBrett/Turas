@@ -23,7 +23,15 @@
     strong: { tag: "Strongest area", cls: "strong" },
     moved: { tag: "What moved", cls: "moved" }
   };
-  ui.patternMeta = function (id) { return PATTERN_META[id] || { tag: "", cls: "" }; };
+  ui.patternMeta = function (id) {
+    // Portraits carry a per-group id ("portrait:Campus::Cape Town"); they share one
+    // neutral tag — the lean shows in the card's balanced lows/highs, not the tag,
+    // so the tab no longer leads negative.
+    if (typeof id === "string" && id.indexOf("portrait:") === 0) {
+      return { tag: "In focus", cls: "focus" };
+    }
+    return PATTERN_META[id] || { tag: "", cls: "" };
+  };
 
   /** A value in its own units: "3.9" for a mean/index, "69%" for a proportion. */
   ui.fmtVal = function (isMean, v, decimals) {
@@ -55,6 +63,53 @@
       '" style="width:' + w + '%"></span></span><span class="tko-rv">' +
       ui.fmtVal(e.isMean, e.value, e.decimals) +
       '<span class="tko-rest"> / ' + ui.fmtVal(e.isMean, baseline, e.decimals) + "</span></span></div></div>";
+  };
+
+  /** Capitalise the first letter (for a stitched-together sentence). */
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  /** One row inside a PORTRAIT card — a low or a high. Question label on its own
+   *  line (full, always wraps), then the group's value vs the overall beneath, the
+   *  bar coloured by direction (strain = below, strong = above). A peer note marks
+   *  where the group is the highest / lowest of its banner siblings ("highest of 3
+   *  campuses"). Both value and baseline are real cells — no synthetic aggregate. */
+  ui.portraitRow = function (e, dir) {
+    var max = e.scaleMax || 5;
+    var w = Math.min(100, Math.max(0, (e.value || 0) / max * 100)).toFixed(1);
+    var peer = "";
+    if (dir === "high" && e.peerTop && e.peerCount > 1) {
+      peer = ' <span class="tko-peer">highest of ' + e.peerCount + "</span>";
+    } else if (dir === "low" && e.peerBottom && e.peerCount > 1) {
+      peer = ' <span class="tko-peer">lowest of ' + e.peerCount + "</span>";
+    }
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(e.label) + peer + "</div>" +
+      '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' +
+      (dir === "high" ? "strong" : "strain") + '" style="width:' + w + '%"></span></span>' +
+      '<span class="tko-rv">' + Number(e.value).toFixed(1) +
+      '<span class="tko-rest"> / ' + Number(e.rest).toFixed(1) + "</span></span></div></div>";
+  };
+
+  /** The editable takeaway seed for a portrait — the tension in one sentence:
+   *  the group's lean and, against it, its sharpest counter-spike (or its dip when
+   *  thriving). Quotes the real question; cites the two real cells. */
+  ui.portraitTension = function (p) {
+    var strained = p.lean === "strained";
+    var hi = p.highs && p.highs[0], lo = p.lows && p.lows[0];
+    var majCount = strained ? p.hits : p.gains;
+    var lead = p.subject + (strained ? " is under strain — below the overall on "
+      : " is the strong group — above the overall on ") + majCount + " of " + p.total +
+      " rated questions";
+    if (strained && hi) {
+      return lead + " — yet rates “" + hi.label + "” highest" +
+        (hi.peerTop && hi.peerCount > 1 ? " of any " + p.group.toLowerCase() : "") +
+        " (" + Number(hi.value).toFixed(1) + " vs " + Number(hi.rest).toFixed(1) +
+        " overall). The tension worth explaining.";
+    }
+    if (!strained && lo) {
+      return lead + " — yet dips on “" + lo.label + "” (" + Number(lo.value).toFixed(1) +
+        " vs " + Number(lo.rest).toFixed(1) + " overall). The one to watch.";
+    }
+    return lead + (strained && lo ? ", most on “" + lo.label + "”." : ".");
   };
 
   /** A "survives correction" chip on an evidence row whose single-cell difference
@@ -156,14 +211,18 @@
 
   /** Templated takeaway for a pattern (the one editable line per card). */
   ui.patternSeed = function (p) {
+    if (p.kind === "portrait") return ui.portraitTension(p);
     if (p.id === "group") {
       return p.subject + " scores below the overall on " + p.hits + " of " + p.total +
         " rated questions — the group most under strain.";
     }
     if (p.id === "split") {
-      return "Differences run most by " + p.subject + " — " + p.high.label +
-        " sits highest, " + p.low.label + " lowest. Read this study through " +
-        p.subject.toLowerCase() + ".";
+      // Navigation pointer — no synthetic average. (sigGaps = directionally-
+      // consistent groups under this cut, when the FDR family is present.)
+      return "Differences run most by " + p.subject +
+        (p.sigGaps ? " — " + p.sigGaps + " group" + (p.sigGaps === 1 ? "" : "s") +
+          " stand clearly apart" : "") + ". Read this study through " +
+        p.subject.toLowerCase() + " first.";
     }
     if (p.id === "comove") {
       var b0 = (p.bundles && p.bundles[0]) || null;
@@ -208,14 +267,20 @@
    *  with the split that matters and the group under strain (the two cross-cutting
    *  reads), then the strongest / weakest areas when a study is tagged. */
   ui.answerSeed = function (patterns) {
-    var by = {};
-    (patterns || []).forEach(function (p) { by[p.id] = p; });
+    var list = patterns || [];
+    var port = list.filter(function (p) { return p.kind === "portrait"; })[0];
+    var split = list.filter(function (p) { return p.kind === "split"; })[0];
     var bits = [];
-    if (by.split) bits.push("Differences run most by " + by.split.subject);
-    if (by.group) bits.push(by.group.subject + " is the group under strain");
-    if (by.strong) bits.push(by.strong.subject + " carries the study");
-    if (by.weak) bits.push(by.weak.subject + " is the soft spot");
-    return bits.length ? bits.join("; ") + "."
+    if (port) {
+      var strained = port.lean === "strained";
+      var hi = port.highs && port.highs[0], lo = port.lows && port.lows[0];
+      if (strained && hi) bits.push(port.subject + " carries a tension — strained overall but strongest on “" + hi.label + "”");
+      else if (!strained && lo) bits.push(port.subject + " is strong overall but dips on “" + lo.label + "”");
+      else if (strained) bits.push(port.subject + " is under strain almost everywhere — below the overall on " + port.hits + " of " + port.total);
+      else bits.push(port.subject + " leads almost everywhere — above the overall on " + port.gains + " of " + port.total);
+    }
+    if (split) bits.push("differences run most by " + split.subject);
+    return bits.length ? cap(bits.join("; ")) + "."
       : "Write the one-sentence answer your client should walk away with.";
   };
 

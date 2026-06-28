@@ -141,7 +141,7 @@ run("AREA patterns: single-question themes don't count; untagged falls back", ()
   assert(takeout._areaPatterns(lone).length === 0, "a one-question theme is not an area");
 });
 
-run("buildPatterns assembles group + areas + movement, and degrades gracefully", () => {
+run("buildPatterns assembles portraits + areas + movement, and degrades gracefully", () => {
   const empty = takeout.buildPatterns({});
   assert(empty.patterns.length === 0, "nothing in, nothing out — no crash");
   const t = takeout.buildPatterns({
@@ -163,7 +163,7 @@ run("buildPatterns assembles group + areas + movement, and degrades gracefully",
     reliability: { n: 167 }
   });
   const ids = t.patterns.map((p) => p.id);
-  assert(ids.indexOf("group") !== -1, "group pattern present");
+  assert(t.patterns.some((p) => p.kind === "portrait"), "portrait present");
   assert(ids.indexOf("weak") !== -1 && ids.indexOf("strong") !== -1, "weak + strong areas present");
   assert(ids.indexOf("moved") !== -1, "movement pattern present");
 });
@@ -288,37 +288,6 @@ run("BIMODALITY: flags a two-camp split, rejects ceiling / central-peak / unifor
   assert(takeout._bimodalStat([1, 1, 0, 0, 0], 5) === null, "n<4 -> null, no crash");
 });
 
-run("CO-MOVEMENT: finds bundles above the acquiescence floor, not the global blob", () => {
-  // 4 questions: A-B and C-D genuinely co-move (raw 0.8); every cross pair is
-  // exactly the global-factor product (0.6*0.6=0.36) so its partial is 0.
-  const base = (n) => [[0, n, n, n], [n, 0, n, n], [n, n, 0, n], [n, n, n, 0]];
-  const r = [[0, 0.8, 0.36, 0.36], [0.8, 0, 0.36, 0.36],
-    [0.36, 0.36, 0, 0.8], [0.36, 0.36, 0.8, 0]];
-  const floor = (0.8 + 0.8 + 0.36 * 4) / 6;             // mean inter-item raw r
-  const cm = { questions: [{ code: "A", title: "A" }, { code: "B", title: "B" },
-    { code: "C", title: "C" }, { code: "D", title: "D" }],
-    r: r, base: base(150), rGlobal: [0.6, 0.6, 0.6, 0.6], floor: floor };
-  const p = takeout._comovementPattern(cm);
-  assert(p && p.id === "comove", "a co-movement pattern is built");
-  assert(p.bundles.length === 2, "two distinct bundles, got " + p.bundles.length);
-  assert(p.bundles.every((b) => b.size === 2), "each bundle is the genuine pair, not the blob");
-  assert(p.bundles.every((b) => b.meanRaw > p.floor), "every bundle coheres above the floor");
-  assert(p.pairCount === 6, "reports all C(4,2)=6 pairs scanned");
-});
-
-run("CO-MOVEMENT: confident null when everything is just the global factor", () => {
-  // every raw pair equals the global-factor product -> all partials 0 -> no bundle
-  const r = [[0, 0.36, 0.36, 0.36], [0.36, 0, 0.36, 0.36],
-    [0.36, 0.36, 0, 0.36], [0.36, 0.36, 0.36, 0]];
-  const cm = { questions: [{ code: "A", title: "A" }, { code: "B", title: "B" },
-    { code: "C", title: "C" }, { code: "D", title: "D" }],
-    r: r, base: [[0, 150, 150, 150], [150, 0, 150, 150], [150, 150, 0, 150], [150, 150, 150, 0]],
-    rGlobal: [0.6, 0.6, 0.6, 0.6], floor: 0.36 };
-  assert(takeout._comovementPattern(cm) === null, "pure acquiescence -> no pattern (confident null)");
-  assert(takeout._comovementPattern({ questions: [{ code: "A", title: "A" }] }) === null,
-    "fewer than three rated questions -> null");
-});
-
 run("curation state round-trips and resets", () => {
   takeout.state.setText("weak", "takeaway", "Client wording");
   assert(takeout.state.getText("weak", "takeaway", "seed") === "Client wording", "edit wins");
@@ -380,7 +349,7 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, read view"
   TR.model = { forQuestion: (code) => TR.views._modelFor(code) };
 
   const t = takeout.compute();
-  assert(t.patterns.some((p) => p.id === "group"), "group pattern built");
+  assert(t.patterns.some((p) => p.kind === "portrait"), "portrait built");
   assert(t.patterns.some((p) => p.id === "weak"), "weakest-area pattern built");
   const read = takeout.readView.html(t);
   assert(read.indexOf("Recognition &amp; voice") !== -1, "weakest area named");

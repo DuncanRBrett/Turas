@@ -686,6 +686,16 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-seg-low { background: var(--red); } .tko-seg-mid { background: #d7dae3; color: var(--muted); } .tko-seg-high { background: var(--tko-protect); }
 .tko-rv { font-size: 11.5px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .tko-rest { color: var(--faint); font-weight: 400; }
+/* portrait card (rebuild): lows and highs side by side, equal billing */
+.tko-edge-focus { border-left-color: var(--brand); }
+.tko-on-focus { color: var(--brand); }
+.tko-portrait { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; }
+@media (max-width: 720px) { .tko-portrait { grid-template-columns: 1fr; } }
+.tko-side { min-width: 0; }
+.tko-sidehd { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; margin-bottom: 6px; }
+.tko-sidehd-low { color: var(--red); }
+.tko-sidehd-high { color: var(--tko-protect); }
+.tko-peer { font-size: 10px; font-weight: 700; color: var(--muted); background: var(--soft); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
 .tko-move { font-size: 10px; font-weight: 700; margin-left: 3px; }
 .tko-move.up { color: var(--tko-protect); } .tko-move.down { color: var(--red); }
 .tko-note { font-size: 11.5px; color: var(--muted); margin-top: 9px; }

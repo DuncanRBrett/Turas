@@ -35,9 +35,13 @@
 
   /** Heading line for a pattern card (subject + context). */
   function headHtml(p) {
+    if (p.kind === "portrait") {
+      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
+    }
     if (p.kind === "area") {
-      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) +
-        '<span class="tko-pscore"> · ' + Number(p.avg).toFixed(1) + "</span></div>";
+      // No synthetic cross-question average in the heading — the member rows below
+      // carry the real numbers (the "where does 40.8 come from?" fix).
+      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>";
     }
     if (p.kind === "group") {
       return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
@@ -58,6 +62,16 @@
 
   /** Evidence + note for a pattern card. */
   function bodyHtml(p, cls) {
+    if (p.kind === "portrait") {
+      // Balanced by construction: where the group lags AND where it leads, equal
+      // billing. One side may be empty (a uniformly strong/weak group).
+      var lo = (p.lows || []).map(function (e) { return ui.portraitRow(e, "low"); }).join("");
+      var hi = (p.highs || []).map(function (e) { return ui.portraitRow(e, "high"); }).join("");
+      var blocks = "";
+      if (lo) blocks += '<div class="tko-side"><div class="tko-sidehd tko-sidehd-low">Where it lags</div>' + lo + "</div>";
+      if (hi) blocks += '<div class="tko-side"><div class="tko-sidehd tko-sidehd-high">Where it leads</div>' + hi + "</div>";
+      return '<div class="tko-portrait">' + blocks + "</div>";
+    }
     if (p.kind === "group") {
       var rows = (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
       var note = p.secondary
@@ -70,13 +84,12 @@
       return arows + an;
     }
     if (p.kind === "split") {
-      var scaleMax = p.high.scaleMax || p.low.scaleMax || 5;
-      return ui.areaRow({ label: p.high.label, value: p.high.value, scaleMax: p.high.scaleMax }, "strong") +
-        ui.areaRow({ label: p.low.label, value: p.low.value, scaleMax: p.low.scaleMax }, "strain") +
-        '<div class="tko-cap">Each row is that group’s average index across all rated questions, out of ' +
-        scaleMax + ".</div>" +
-        '<div class="tko-note">The widest, most consistent gaps run by ' + fmt.escapeHtml(p.subject) +
-        " — look there first.</div>";
+      // Navigation pointer only — no synthetic average-index rows (the "4.4 / 3.7
+      // that's nowhere else" fix). Names the cut; the portraits carry the detail.
+      return '<div class="tko-note">The widest, most consistent differences run by ' +
+        fmt.escapeHtml(p.subject) +
+        (p.sigGaps ? " — " + p.sigGaps + " group" + (p.sigGaps === 1 ? "" : "s") +
+          " stand clearly apart" : "") + ". Start here, then read the rest through it.</div>";
     }
     if (p.kind === "comove") {
       var bundles = (p.bundles || []).map(function (b, i) { return ui.comoveBundle(b, p.floor, i); }).join("");
@@ -108,7 +121,8 @@
       bimodal: ["crosstabs", "see the distributions →"],
       weak: ["dashboard", "see the questions →"], strong: ["dashboard", "see the questions →"],
       moved: ["moved", "see tracking →"] };
-    var go = map[p.id] || ["dashboard", "see detail →"];
+    var go = (p.kind === "portrait" ? ["findings", "see the breakouts →"] : map[p.id]) ||
+      ["dashboard", "see detail →"];
     return '<div class="tko-pfoot"><button class="linklike" data-goto="' + go[0] + '">' +
       go[1] + "</button></div>";
   }
@@ -160,10 +174,17 @@
     if (t.fdr) {
       var f = t.fdr, scan = "scanned " + f.groupCount + " groups × " + f.questionCount +
         " questions = " + f.K + " cells · corrected for multiplicity (" + f.method + ")";
-      base = "no AI · " + scan + " · " + (f.badge.count
-        ? f.badge.count + " stand-alone difference" + (f.badge.count === 1 ? "" : "s") +
-          " survive — the rest is consistency, not single cells"
-        : "nothing survives correction — and that's the headline");
+      base = "no AI · " + scan;
+    }
+    // Rigor footer: the demoted never-cry-wolf checks (odd-one-out + hidden
+    // disagreement) report as one honest line instead of empty cards.
+    var rg = t.rigor || {}, checks = [];
+    if (rg.odd) checks.push("every group for a true exception");
+    if (rg.bimodal) checks.push("every question for a hidden two-camp split");
+    if (checks.length) {
+      var found = (rg.odd && rg.odd.found) || (rg.bimodal && rg.bimodal.found);
+      base += " · also checked " + checks.join(" and ") +
+        (found ? " — flagged on the cards above" : " — nothing held up beyond chance");
     }
     return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + " · curated by the researcher.</div>";
   }

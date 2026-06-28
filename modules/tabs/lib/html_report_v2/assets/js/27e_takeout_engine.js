@@ -29,20 +29,12 @@
     MIN_SPLIT_DIFF: 0.02,     // a breakout must differentiate groups by >=2% of scale to "matter"
     SPLIT_LEAD_RATIO: 1.25,   // ...and lead the next breakout by this much to be THE split (else none dominates)
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
+    PORTRAIT_MAX: 3,          // group portraits shown on the page (ranked by tension)
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
     MIN_MOVE_FRACTION: 0.03,  // a wave change must be >=N of the scale to count as a "move"
                               //   (0.03 -> 0.15 on a 5-pt scale, 3pp on a 0-100 metric);
                               //   significance alone is not enough — a tiny change can test
                               //   significant on a large base yet mean nothing.
-    // "Questions that move together" (co-movement). On a climate/CX survey
-    // acquiescence makes EVERY question correlate positively, so a naive r
-    // threshold merges the whole survey into one meaningless bundle. We therefore
-    // work on PARTIAL correlation (controlling for each respondent's overall mean)
-    // and require a bundle to cohere ABOVE the survey's own acquiescence floor.
-    COMOVE_MIN_PARTIAL: 0.20, // an edge needs partial r >= this (after removing the global factor)
-    COMOVE_MIN_BASE: 30,      // ...on at least this many complete pairwise responses
-    COMOVE_ALPHA: 0.05,       // Benjamini-Hochberg FDR level across all question pairs
-    COMOVE_MAX_BUNDLES: 3,    // bundles shown on the card (largest / most cohesive first)
     // Multiple-comparison trust-gate. Scanning every breakout group x rated
     // question is hundreds of cells; ~5% look striking by luck, and tiny
     // homogeneous census cells produce absurd t-stats. Two guards: per-cell BH on
@@ -98,89 +90,7 @@
   /* ---------------- statistical primitives ---------------- */
   // The pure number-crunching lives in 27da_takeout_stats.js (loaded first);
   // alias the few this engine uses so the pattern logic below reads cleanly.
-  var partialCorr = takeout._partialCorr, corrPValue = takeout._corrPValue,
-    bhFDR = takeout._bhFDR, signTest = takeout._signTest, bimodalStat = takeout._bimodalStat;
-
-  /**
-   * CO-MOVEMENT pattern: groups of questions that rise and fall together across
-   * PEOPLE — a shared underlying driver you can act on once, not question by
-   * question. The hard part is NOT finding correlation (on an attitude survey
-   * everything correlates — acquiescence); it is finding structure ABOVE that
-   * halo. So we work on the PARTIAL correlation that removes each respondent's
-   * overall level, keep only edges that (a) clear COMOVE_MIN_PARTIAL, (b) survive
-   * Benjamini-Hochberg FDR across all pairs, on (c) an adequate base; then group
-   * the survivors into connected bundles and keep only bundles whose within-bundle
-   * RAW correlation sits above the survey's own acquiescence floor. Returns null
-   * (a confident null) when no bundle clears the bar.
-   *
-   * Input (from gather): { questions:[{code,title}], r:[][], base:[][],
-   *   rGlobal:[], floor:Number } where r/base are symmetric n x n matrices of the
-   *   zero-order weighted correlation and complete-pair base, rGlobal[i] is item
-   *   i's correlation with the per-respondent overall mean, floor is the mean
-   *   inter-item raw r (the acquiescence baseline).
-   */
-  function comovementPattern(cm) {
-    if (!cm || !cm.questions || cm.questions.length < 3) return null;
-    var qs = cm.questions, n = qs.length, floor = cm.floor || 0;
-    var totalPairs = n * (n - 1) / 2;
-    var edges = [];                                   // candidate pairs with adequate base
-    for (var i = 0; i < n; i++) {
-      for (var j = i + 1; j < n; j++) {
-        var base = cm.base[i][j];
-        if (!base || base < CONST.COMOVE_MIN_BASE) continue;
-        var pr = partialCorr(cm.r[i][j], cm.rGlobal[i], cm.rGlobal[j]);
-        edges.push({ i: i, j: j, partial: pr, raw: cm.r[i][j], base: base,
-          p: corrPValue(pr, base, 1) });
-      }
-    }
-    if (!edges.length) return null;
-    // FDR across all candidate pairs, then keep positive partial edges above the floor strength
-    var survive = {};
-    bhFDR(edges.map(function (e) { return e.p; }), CONST.COMOVE_ALPHA)
-      .forEach(function (k) { survive[k] = true; });
-    var kept = edges.filter(function (e, k) {
-      return survive[k] && e.partial >= CONST.COMOVE_MIN_PARTIAL;
-    });
-    if (!kept.length) return null;
-    // connected components over the surviving edges (union-find)
-    var parent = qs.map(function (_, idx) { return idx; });
-    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
-    kept.forEach(function (e) { parent[find(e.i)] = find(e.j); });
-    var comp = {};
-    kept.forEach(function (e) {
-      var root = find(e.i);
-      (comp[root] || (comp[root] = { nodes: {}, edges: [] }));
-      comp[root].nodes[e.i] = true; comp[root].nodes[e.j] = true;
-      comp[root].edges.push(e);
-    });
-    var bundles = [];
-    Object.keys(comp).forEach(function (root) {
-      var members = Object.keys(comp[root].nodes).map(Number);
-      if (members.length < 2) return;
-      // within-bundle mean RAW r over every internal pair -> must beat the floor
-      var sum = 0, cnt = 0;
-      for (var a = 0; a < members.length; a++) {
-        for (var b = a + 1; b < members.length; b++) {
-          var rr = cm.r[members[a]][members[b]];
-          if (rr !== null && rr !== undefined) { sum += rr; cnt++; }
-        }
-      }
-      var meanRaw = cnt ? sum / cnt : 0;
-      if (meanRaw <= floor) return;                   // cohesion not above the acquiescence baseline
-      var anchor = comp[root].edges.slice().sort(function (x, y) { return y.partial - x.partial; })[0];
-      bundles.push({
-        members: members.map(function (m) { return { code: qs[m].code, title: qs[m].title }; }),
-        size: members.length, meanRaw: meanRaw, lift: meanRaw - floor,
-        anchor: { a: qs[anchor.i].title, b: qs[anchor.j].title, partial: anchor.partial }
-      });
-    });
-    if (!bundles.length) return null;
-    bundles.sort(function (x, y) { return (y.size - x.size) || (y.meanRaw - x.meanRaw); });
-    return { id: "comove", kind: "comove", subject: "Questions that move together",
-      floor: floor, pairCount: totalPairs, bundleCount: bundles.length,
-      bundles: bundles.slice(0, CONST.COMOVE_MAX_BUNDLES) };
-  }
-  takeout._comovementPattern = comovementPattern;
+  var bhFDR = takeout._bhFDR, signTest = takeout._signTest, bimodalStat = takeout._bimodalStat;
 
   /**
    * GROUP pattern: which breakout column sits consistently below the overall
@@ -226,6 +136,100 @@
       hits: strain.behind.length, total: strain.count, evidence: evidence,
       secondary: (thrive && thrive !== strain && thrive.weighted > 0) ? thrive.column : null };
   }
+
+  /**
+   * Per (banner, question) extremes across every breakout column, so a portrait
+   * can say a group is the highest / lowest of its peers (e.g. "the highest of any
+   * campus"). Cheap peer-relative annotation, no config — the §9 sharpening.
+   */
+  function peerExtremes(columns) {
+    var by = {};
+    (columns || []).forEach(function (c) {
+      c.gaps.forEach(function (gp) {
+        var key = c.group + "||" + gp.title;
+        var e = by[key] || (by[key] = { count: 0, hi: null, lo: null });
+        e.count++;
+        if (e.hi === null || gp.value > e.hi.value) e.hi = { col: c.column, value: gp.value };
+        if (e.lo === null || gp.value < e.lo.value) e.lo = { col: c.column, value: gp.value };
+      });
+    });
+    return by;
+  }
+
+  /**
+   * GROUP PORTRAITS — the centrepiece (rebuild). For every breakout column, read
+   * its INDEX gap to the overall on each rated question and assemble a BALANCED
+   * portrait: the questions where it sits LOW and the questions where it sits HIGH
+   * in one card. A group is worth calling out for EITHER reason: a sharp TENSION
+   * (it leans one way yet breaks its own pattern the other — Cape Town strained on
+   * engagement but proudest of co-worker quality), OR sheer uniform extremeness
+   * (top, or bottom, on nearly everything — 20 of 21 metrics). So ranking is by
+   * storyScore = how much the group stands out overall (character, base-weighted)
+   * PLUS a tension boost — a uniformly extreme group is never buried beneath a
+   * minor tension, and a genuine tension still rises among equally-extreme groups.
+   * Gated on directional consistency when the FDR family is present (never-cry-wolf
+   * — a mixed, lean-less group is not a story), else on a materiality floor. Every
+   * number shown is a real cell: the group's value and the overall, both visible in
+   * the crosstabs (no synthetic aggregate). Returns a ranked array; the caller
+   * takes the top few and seeds the GPS line from #1.
+   * Input: same columns as groupPattern — [{column, group, base, gaps:[{title,
+   * value, total, scaleMax}]}].
+   */
+  function portraits(columns, gate) {
+    if (!columns || !columns.length) return [];
+    var cons = {};
+    if (gate) gate.groups.forEach(function (g) { cons[g.banner + "::" + g.group] = g; });
+    var peers = peerExtremes(columns);
+    var made = columns.map(function (c) {
+      var lows = [], highs = [];
+      c.gaps.forEach(function (gp) {
+        var frac = (gp.value - gp.total) / (gp.scaleMax || 1);
+        var peer = peers[c.group + "||" + gp.title] || { count: 0 };
+        var row = { label: gp.title, value: gp.value, rest: gp.total, scaleMax: gp.scaleMax,
+          frac: frac, isMean: true, peerCount: peer.count,
+          peerTop: !!(peer.hi && peer.hi.col === c.column),
+          peerBottom: !!(peer.lo && peer.lo.col === c.column) };
+        if (frac <= -CONST.MIN_STRAIN_GAP) lows.push(row);
+        else if (frac >= CONST.MIN_STRAIN_GAP) highs.push(row);
+      });
+      lows.sort(function (a, b) { return a.frac - b.frac; });    // most below first
+      highs.sort(function (a, b) { return b.frac - a.frac; });   // most above first
+      var sumLow = lows.reduce(function (s, r) { return s - r.frac; }, 0);   // positive magnitude
+      var sumHigh = highs.reduce(function (s, r) { return s + r.frac; }, 0);
+      var tot = sumLow + sumHigh;
+      var leanScore = tot ? Math.abs(sumLow - sumHigh) / tot : 0;
+      var strained = sumLow >= sumHigh;
+      var minority = strained ? highs : lows;
+      var counterSpike = minority.length ? Math.abs(minority[0].frac) : 0;
+      var weight = Math.min(1, (c.base || 0) / CONST.STRAIN_RELIABLE_BASE);
+      var g = cons[c.group + "::" + c.column];
+      // character = how much the group stands out overall (its dominant direction's
+      // average gap, base-weighted) — high for a uniformly extreme group AND for a
+      // strong-leaning one. tension = the counter-spike against that lean.
+      var tensionScore = leanScore * counterSpike * weight;
+      var characterScore = Math.max(sumLow, sumHigh) / (c.gaps.length || 1) * weight;
+      return { id: "portrait:" + c.group + "::" + c.column, kind: "portrait",
+        subject: c.column, group: c.group, base: c.base,
+        lean: strained ? "strained" : "thriving",
+        lows: lows.slice(0, CONST.EVIDENCE_MAX), highs: highs.slice(0, CONST.EVIDENCE_MAX),
+        hits: lows.length, gains: highs.length, total: c.gaps.length,
+        counterSpike: counterSpike, tensionScore: tensionScore, characterScore: characterScore,
+        storyScore: characterScore + tensionScore,   // notable for tension OR extremeness
+        uniform: counterSpike === 0,                  // top/bottom on (nearly) everything
+        consistent: g ? g.consistent : null, signP: g ? g.signP : null, dir: g ? g.dir : null };
+    });
+    var eligible = made.filter(function (p) {
+      if ((p.hits + p.gains) < CONST.MIN_GROUP_HITS) return false;     // too few standouts
+      if (p.characterScore < CONST.MIN_STRAIN_GAP) return false;       // not materially standing out
+      if (p.consistent === false) return false;   // gate present and group not directionally consistent
+      return true;
+    });
+    eligible.sort(function (a, b) {
+      return (b.storyScore - a.storyScore) || (b.characterScore - a.characterScore);
+    });
+    return eligible;
+  }
+  takeout._portraits = portraits;
 
   /**
    * SPLIT pattern: which breakout (campus / department / tenure / …) differentiates
@@ -302,10 +306,21 @@
     });
   }
 
-  /** WEAKEST and STRONGEST area patterns from multi-question themes. */
+  /** An area can only be summarised when its questions share a scale family —
+   *  otherwise rolling them up (e.g. an NPS 0–100 with a 1–5 index) averages
+   *  apples and oranges, the exact fault Duncan flagged. Same scaleMax = same
+   *  family. (Later: a config Scale_Family tag overrides this auto-detection.) */
+  function commensurable(members) {
+    var sm = members[0] && members[0].scaleMax;
+    return members.every(function (m) { return m.scaleMax === sm; });
+  }
+
+  /** WEAKEST and STRONGEST area patterns from multi-question themes — only themes
+   *  whose questions share a scale (commensurable), so no cross-scale average. */
   function areaPatterns(levels) {
     var themes = groupByTheme(levels).filter(function (t) {
-      return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
+      return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS &&
+        commensurable(t.members);
     });
     if (themes.length < 1) return [];
     var ranked = themes.slice().sort(function (a, b) { return a.score - b.score; });
@@ -495,41 +510,48 @@
     var patterns = [];
     var gate = fdrGate(inputs.fdr);
 
-    var group = groupPattern(inputs.columns);
-    if (group) {
-      if (gate) {
-        var gc = gate.groups.filter(function (x) { return x.group === group.subject; })[0];
-        group.consistent = !!(gc && gc.consistent && gc.dir === "below");
-        group.signP = gc ? gc.signP : null;
-        (group.evidence || []).forEach(function (e) { e.survives = badgeHas(gate, group.subject, e.label); });
-      }
-      if (!gate || group.consistent) patterns.push(group);   // gate is an additive veto, never a deletion of fallback behaviour
-    }
+    // Centrepiece: ranked group portraits (tension-led). The top few become cards;
+    // #1 seeds the GPS line. Replaces the one-group "under strain" card and folds
+    // the old "most positive group" line into each portrait's highs.
+    var ports = portraits(inputs.columns, gate);
+    ports.slice(0, CONST.PORTRAIT_MAX).forEach(function (p) { patterns.push(p); });
 
+    // Which cut divides the data most — a navigation pointer, NO synthetic average.
     var split = splitPattern(inputs.columns);
     if (split) {
-      if (gate) {
-        split.consistent = gate.groups.filter(function (x) {
-          return x.banner === split.subject && x.consistent;
-        }).length >= CONST.SPLIT_MIN_CONSISTENT;
-      }
-      if (!gate || split.consistent) patterns.push(split);
+      var consistentGroups = gate ? gate.groups.filter(function (x) {
+        return x.banner === split.subject && x.consistent;
+      }).length : null;
+      if (gate) split.consistent = consistentGroups >= CONST.SPLIT_MIN_CONSISTENT;
+      if (!gate || split.consistent) { split.sigGaps = consistentGroups; patterns.push(split); }
     }
 
-    var comove = comovementPattern(inputs.comove);
-    if (comove) patterns.push(comove);
-    var odd = oddOnePattern(inputs.fdr, gate);
-    if (odd) patterns.push(odd);
-    var bimodal = bimodalityPattern(inputs.bimodal);
-    if (bimodal) patterns.push(bimodal);
+    // Weakest / strongest AREA — only commensurable themes (same scale family).
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
+
+    // Movement (trackers) — unchanged.
     var moved = movementPattern(inputs.apex || []);
     if (moved) patterns.push(moved);
+
+    // Co-moving RETIRED (the acquiescence halo, not a pattern). Odd-one-out and
+    // hidden disagreement DEMOTED to the rigor footer — still computed (the
+    // never-cry-wolf check), but no empty cards: the footer reports they were run.
+    var odd = oddOnePattern(inputs.fdr, gate);
+    var bimodal = bimodalityPattern(inputs.bimodal);
+    var rigor = {
+      odd: odd ? { scanned: odd.familyCells || (gate ? gate.K : 0),
+        survivors: odd.survivors || 0, found: !odd.nullResult } : null,
+      bimodal: bimodal ? { scanned: bimodal.scanned || 0,
+        flagged: bimodal.flaggedCount || 0, found: !bimodal.nullResult } : null
+    };
+
     return {
       answer: { metrics: inputs.apex || [] },
       reliability: inputs.reliability || null,
       patterns: patterns,
+      portraitCount: ports.length,
       fdr: gate,
+      rigor: rigor,
       themeCount: groupByTheme(inputs.levels || []).filter(function (t) {
         return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
       }).length,

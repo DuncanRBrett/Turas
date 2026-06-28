@@ -80,11 +80,16 @@ the Differences tab — see §9). From that set of findings:
 - **tensionScore** = `leanScore × counterSpike`. High when a group leans hard one
   way **and** breaks its own pattern sharply the other way — that contrast is the
   story.
-- **characterScore** = `max(Σe_low, Σe_high)` — so a group that's uniformly low
-  (no counter-spike, tensionScore≈0) still earns a portrait, just ranked below the
-  tension stories.
+- **characterScore** = `max(Σe_low, Σe_high)`, base-weighted — how much the group
+  stands out overall, in its dominant direction. High for a uniformly extreme group
+  (top, or bottom, on nearly everything) AND for a strong-leaning one.
+- **storyScore** = `characterScore + tensionScore`. A group is worth calling out for
+  EITHER reason — a sharp tension OR sheer uniform extremeness (e.g. top on 20 of
+  21 metrics, bottom-3 on everything). Ranking on character-plus-tension means a
+  uniformly extreme group is never buried beneath a minor tension, while a genuine
+  tension still rises among equally-extreme groups.
 
-Rank groups by tensionScore, then characterScore. The card shows: the subject, a
+Rank groups by storyScore, then characterScore. The card shows: the subject, a
 plain tension sentence, its top ~3 lows and top ~3 highs (balanced), a one-line
 "why this group" (the selection rule, stated), and the most-positive/most-negative
 framing folded in (this replaces both the old "group under strain" and the grey
@@ -222,7 +227,8 @@ A `vm` harness over a hand-built fixture:
 - A planted group with a clear lean + a sharp counter-spike → assert the tension
   is detected, the right lows/highs surface, the tension sentence names both
   sides, and **every displayed value equals a real cell** (no synthetic numbers).
-- A uniformly-low group → portrait with no tension, ranked below a tension group.
+- A uniformly-extreme group (top/bottom on nearly everything) → surfaced on
+  character, NOT buried beneath a minor tension; a flat group is excluded.
 - A commensurable theme renders an area; a mixed-scale theme does **not**.
 - Tier 1.5: a standout on a non-banner categorical variable is found and carries a
   real base; an outcome variable is excluded as a cut.
