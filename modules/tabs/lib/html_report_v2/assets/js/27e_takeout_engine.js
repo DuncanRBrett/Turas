@@ -24,8 +24,11 @@
     MIN_GROUP_HITS: 2,        // a column must be off on >=N questions to be "the group"
     MIN_AREA_MEMBERS: 2,      // a theme needs >=N questions to count as an "area"
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
-    COHEN_H_REFERENCE: 0.8    // Cohen's "large" effect -> full weight
-  };
+    COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
+    MIN_MOVE_FRACTION: 0.03   // a wave change must be >=N of the scale to count as a "move"
+  };                          //   (0.03 -> 0.15 on a 5-pt scale, 3pp on a 0-100 metric);
+                              //   significance alone is not enough — a tiny change can test
+                              //   significant on a large base yet mean nothing.
 
   /** Cohen's h for two proportions (effect size for a percentage gap). */
   function cohenH(p1, p2) {
@@ -145,27 +148,33 @@
     return out;
   }
 
-  /** MOVEMENT pattern: the headline metric (or theme) with the biggest
-   *  significant wave change. Returns null when there is no wave history. */
-  function movementPattern(apex, levels) {
-    var movers = [];
-    (apex || []).forEach(function (m) {
-      if (m.delta && m.delta.sig) {
-        movers.push({ subject: m.label || m.title, diff: m.delta.diff, waves: m.waves || null,
-          year: m.delta.year, scaleMax: m.scaleMax });
-      }
+  /**
+   * MOVEMENT pattern: the headline metrics that moved since last wave — biggest
+   * riser AND biggest faller (two-sided). A move must be both significant AND
+   * material (>= MIN_MOVE_FRACTION of the scale); a significant-but-trivial shift
+   * is reported as "broadly stable", not dressed up as a move. Returns null only
+   * when there is no significant change at all (e.g. no wave history).
+   */
+  function movementPattern(apex) {
+    var sig = (apex || []).filter(function (m) { return m.delta && m.delta.sig; });
+    if (!sig.length) return null;
+    var material = sig.filter(function (m) {
+      return Math.abs(m.delta.diff) / ((m.scaleMax || 0) || 1) >= CONST.MIN_MOVE_FRACTION;
+    }).map(function (m) {
+      return { subject: m.label || m.title, diff: m.delta.diff, year: m.delta.year, waves: m.waves || null };
     });
-    if (!movers.length) return null;   // headline movers lead; themes are the driver note
-    movers.sort(function (a, b) { return Math.abs(b.diff) - Math.abs(a.diff); });
-    var top = movers[0];
-    var themes = groupByTheme(levels);
-    var driver = null;
-    themes.forEach(function (t) {
-      if (t.moving < 0 && (!driver || t.moving < driver.moving)) driver = t;
-    });
+    if (!material.length) {
+      return { id: "moved", kind: "movement", stable: true, subject: "Broadly stable",
+        year: (sig[0].delta || {}).year || null };
+    }
+    material.sort(function (a, b) { return Math.abs(b.diff) - Math.abs(a.diff); });
+    var up = material.filter(function (x) { return x.diff >= 0; })[0] || null;
+    var down = material.filter(function (x) { return x.diff < 0; })[0] || null;
+    var top = material[0];
     return { id: "moved", kind: "movement", subject: top.subject, diff: top.diff,
-      year: top.year, waves: top.waves, driver: driver ? driver.name : null };
+      year: top.year, waves: top.waves, up: up, down: down };
   }
+  takeout._movementPattern = movementPattern;
 
   /**
    * Build the patterns object from gathered inputs. Pure: same inputs always
@@ -178,7 +187,7 @@
     var group = groupPattern(inputs.standouts);
     if (group) patterns.push(group);
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
-    var moved = movementPattern(inputs.apex || [], inputs.levels || []);
+    var moved = movementPattern(inputs.apex || []);
     if (moved) patterns.push(moved);
     return {
       answer: { metrics: inputs.apex || [] },

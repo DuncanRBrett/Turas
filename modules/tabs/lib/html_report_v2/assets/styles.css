@@ -665,6 +665,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-note { font-size: 11.5px; color: var(--muted); margin-top: 9px; }
 .tko-mspark { margin: 8px 0 2px; }
 .tko-mspark svg { width: 100%; height: auto; display: block; }
+.tko-mrow { font-size: 13px; font-weight: 600; margin: 3px 0; }
+.tko-mrow.tko-mv-up { color: var(--tko-protect); } .tko-mrow.tko-mv-down { color: var(--red); }
 .tko-pfoot { margin-top: 11px; }
 .tko-pfoot .linklike { font-size: 12px; font-weight: 600; }
 .tko-slide-sub { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }

@@ -59,6 +59,12 @@
       (up ? " ▲" : " ▼") + Math.abs(delta.diff).toFixed(1) + "</span>";
   };
 
+  /** A two-sided mover line for the "what moved" card (▲ riser / ▼ faller). */
+  ui.moverRow = function (m, dir) {
+    return '<div class="tko-mrow tko-mv-' + dir + '">' + (dir === "up" ? "▲ " : "▼ ") +
+      fmt.escapeHtml(m.subject) + " " + (m.diff >= 0 ? "+" : "−") + Math.abs(m.diff).toFixed(1) + "</div>";
+  };
+
   /** Movement sparkline (bigger than the KPI one) for the "what moved" card. */
   ui.movementSpark = function (waves) {
     if (waves && TR.render && typeof TR.render.sparkline === "function") {
@@ -109,9 +115,11 @@
       return p.subject + " is the strongest area — what is holding things together.";
     }
     if (p.id === "moved") {
-      return p.subject + " moved " + (p.diff >= 0 ? "up " : "down ") +
-        Math.abs(p.diff).toFixed(1) + (p.year ? " since " + p.year : "") +
-        (p.driver ? ", led by " + p.driver + "." : ".");
+      if (p.stable) return "Broadly stable — nothing shifted materially since the last wave.";
+      var ph = function (x) { return x.subject + " " + (x.diff >= 0 ? "up " : "down ") + Math.abs(x.diff).toFixed(1); };
+      var when = p.year ? " since " + p.year : "";
+      if (p.up && p.down) return ph(p.down) + ", " + ph(p.up) + when + ".";
+      return ph(p.up || p.down) + when + ".";
     }
     return "";
   };

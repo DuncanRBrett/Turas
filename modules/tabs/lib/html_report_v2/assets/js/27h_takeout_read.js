@@ -58,11 +58,10 @@
       return arows + an;
     }
     // movement
+    if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
+    var rows = (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "");
     var spark = ui.movementSpark(p.waves);
-    var mv = spark
-      ? '<div class="tko-mspark">' + spark + "</div>"
-      : '<div class="tko-note">' + (p.diff >= 0 ? "Up " : "Down ") + Math.abs(p.diff).toFixed(1) + ".</div>";
-    return mv + (p.driver ? '<div class="tko-note">Led by ' + fmt.escapeHtml(p.driver) + ".</div>" : "");
+    return rows + (spark ? '<div class="tko-mspark">' + spark + "</div>" : "");
   }
 
   /** Deep-link target per pattern kind. */

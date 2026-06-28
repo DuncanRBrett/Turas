@@ -36,7 +36,9 @@
   function evidence(p, cls) {
     if (p.kind === "group") return (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
     if (p.kind === "area") return (p.evidence || []).map(function (m) { return ui.areaRow(m, cls); }).join("");
-    return ui.movementSpark(p.waves);
+    if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
+    return (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "") +
+      ui.movementSpark(p.waves);
   }
 
   function patternSlide(p, idx, total) {
@@ -49,9 +51,7 @@
       kicker(idx, total, meta.tag) +
       '<div class="tko-slide-sub">' + sub + (p.kind === "group" ? " " + ui.bannerChip(p.group) : "") + "</div>" +
       ui.editable(p.id, "takeaway", take, "tko-claim tko-claim-lg", "Takeaway — editable") +
-      '<div class="tko-slide-visual">' + evidence(p, meta.cls) + "</div>" +
-      (p.kind === "movement" && p.driver ? '<div class="tko-note">Led by ' + fmt.escapeHtml(p.driver) + ".</div>" : "") +
-      "</section>";
+      '<div class="tko-slide-visual">' + evidence(p, meta.cls) + "</div></section>";
   }
 
   function finePrint(t, total) {

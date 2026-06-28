@@ -119,13 +119,30 @@ run("buildPatterns assembles group + areas + movement, and degrades gracefully",
       { code: "Q12", title: "Mission", section: "Engagement", theme: "Belonging", value: 4.4, scaleMax: 5, delta: null },
       { code: "Q13", title: "Co-workers", section: "Engagement", theme: "Belonging", value: 4.2, scaleMax: 5, delta: null }
     ],
-    apex: [{ label: "Engagement", value: 4.08, delta: { sig: true, diff: -0.6, year: 2024 }, waves: [{ year: 2023, value: 4.3 }, { year: 2025, value: 4.08, current: true }] }],
+    apex: [{ label: "Engagement", value: 4.08, scaleMax: 5, delta: { sig: true, diff: -0.6, year: 2024 }, waves: [{ year: 2023, value: 4.3 }, { year: 2025, value: 4.08, current: true }] }],
     reliability: { n: 167 }
   });
   const ids = t.patterns.map((p) => p.id);
   assert(ids.indexOf("group") !== -1, "group pattern present");
   assert(ids.indexOf("weak") !== -1 && ids.indexOf("strong") !== -1, "weak + strong areas present");
   assert(ids.indexOf("moved") !== -1, "movement pattern present");
+});
+
+run("MOVEMENT is two-sided and ignores trivial moves", () => {
+  const mv = (label, diff) => ({ label, value: 4, scaleMax: 5,
+    delta: { sig: true, diff: diff, year: 2024 }, waves: [{ year: 2023, value: 4 }, { year: 2024, value: 4 + diff, current: true }] });
+  // 0.1 / 0.08 on a 5-point scale is within noise -> broadly stable, not "a move"
+  const stable = takeout._movementPattern([mv("A", 0.1), mv("B", -0.08)]);
+  assert(stable && stable.stable === true, "trivial moves report as broadly stable");
+  // material moves both ways -> two-sided, biggest absolute leads
+  const t = takeout._movementPattern([mv("Risen", 0.4), mv("Fallen", -0.6)]);
+  assert(t && !t.stable, "material moves surface");
+  assert(t.up && t.up.subject === "Risen", "biggest riser captured");
+  assert(t.down && t.down.subject === "Fallen", "biggest faller captured");
+  assert(t.subject === "Fallen", "the bigger absolute move leads the card");
+  // no significant movers at all -> no movement pattern
+  assert(takeout._movementPattern([{ label: "Z", scaleMax: 5, delta: { sig: false, diff: -1 } }]) === null,
+    "no significant change -> no movement pattern");
 });
 
 run("curation state round-trips and resets", () => {
