@@ -42,6 +42,10 @@
     if (p.kind === "group") {
       return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
     }
+    if (p.kind === "comove") {
+      return '<div class="tko-ph">' + p.bundleCount + (p.bundleCount === 1 ? " set" : " sets") +
+        " of co-moving questions</div>";
+    }
     return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>";
   }
 
@@ -67,6 +71,12 @@
         '<div class="tko-note">The widest, most consistent gaps run by ' + fmt.escapeHtml(p.subject) +
         " — look there first.</div>";
     }
+    if (p.kind === "comove") {
+      var bundles = (p.bundles || []).map(function (b, i) { return ui.comoveBundle(b, p.floor, i); }).join("");
+      return bundles +
+        '<div class="tko-note">Scanned ' + p.pairCount + " question pairs · controlled for the " +
+        "survey-wide tendency to agree · only sets that cohere beyond that baseline survive.</div>";
+    }
     // movement
     if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
     var rows = (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "");
@@ -77,6 +87,7 @@
   /** Deep-link target per pattern kind. */
   function footHtml(p) {
     var map = { group: ["findings", "see the breakouts →"], split: ["findings", "see the breakdown →"],
+      comove: ["crosstabs", "see the questions →"],
       weak: ["dashboard", "see the questions →"], strong: ["dashboard", "see the questions →"],
       moved: ["moved", "see tracking →"] };
     var go = map[p.id] || ["dashboard", "see detail →"];

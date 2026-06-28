@@ -528,6 +528,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
   --tko-act:     #9a5410;     /* exposed — amber */
   --tko-watch:   #245a94;     /* moving — blue   */
   --tko-decide:  #5b4296;     /* fork — violet   */
+  --tko-comove:  #0f766e;     /* co-movement — teal */
   --tko-serif: Georgia, "Times New Roman", "Iowan Old Style", serif;
 }
 .tko-page { gap: 18px; }
@@ -626,9 +627,9 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-howsure-panel { margin-top: -6px; }
 .tko-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tko-pcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 15px 18px; }
-.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); } .tko-edge-split { border-left-color: var(--tko-decide); }
+.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); } .tko-edge-split { border-left-color: var(--tko-decide); } .tko-edge-comove { border-left-color: var(--tko-comove); }
 .tko-ptag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); } .tko-on-split { color: var(--tko-decide); }
+.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); } .tko-on-split { color: var(--tko-decide); } .tko-on-comove { color: var(--tko-comove); }
 .tko-ph { font-size: 16px; font-weight: 700; color: var(--ink); margin: 3px 0 0; display: inline-block; }
 .tko-pscore { font-size: 13px; font-weight: 600; color: var(--muted); }
 .tko-take { font-family: var(--tko-serif); font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 11px; }
@@ -646,6 +647,16 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-move.up { color: var(--tko-protect); } .tko-move.down { color: var(--red); }
 .tko-note { font-size: 11.5px; color: var(--muted); margin-top: 9px; }
 .tko-cap { font-size: 11px; color: var(--faint); margin-top: 8px; font-style: italic; }
+/* Co-movement bundles */
+.tko-bundle { margin: 10px 0 4px; padding: 10px 12px; background: var(--soft); border-radius: 9px; }
+.tko-bundle + .tko-bundle { margin-top: 8px; }
+.tko-bundle-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.tko-bundle-n { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--tko-comove); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.tko-bundle-anchor { font-size: 12.5px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.tko-bundle-tie { color: var(--tko-comove); }
+.tko-bundle-size { margin-left: auto; flex: none; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.tko-bundle-list { margin: 0; padding-left: 18px; }
+.tko-bundle-list li { font-size: 11.5px; color: var(--ink); line-height: 1.4; overflow-wrap: anywhere; }
 .tko-mspark { margin: 8px 0 2px; }
 .tko-mspark svg { width: 100%; height: auto; display: block; }
 .tko-mrow { font-size: 13px; font-weight: 600; margin: 3px 0; }

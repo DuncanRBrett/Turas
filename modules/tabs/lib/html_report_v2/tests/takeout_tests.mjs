@@ -179,6 +179,56 @@ run("MOVEMENT is two-sided and ignores trivial moves", () => {
     "no significant change -> no movement pattern");
 });
 
+run("statistical primitives: normal CDF, partial correlation, Fisher-z p, BH-FDR", () => {
+  close(takeout._normalCdf(0), 0.5, 1e-9, "Phi(0)");
+  close(takeout._normalCdf(1.96), 0.975, 1e-3, "Phi(1.96)");
+  close(takeout._normalCdf(-1.96), 0.025, 1e-3, "Phi(-1.96)");
+  // partial r: (rab - rag*rbg)/sqrt((1-rag^2)(1-rbg^2)); 0.5,0.6,0.6 -> 0.21875
+  close(takeout._partialCorr(0.5, 0.6, 0.6), 0.21875, 1e-9, "partial r");
+  close(takeout._partialCorr(0.36, 0.6, 0.6), 0, 1e-9, "all shared variance -> partial 0");
+  // p-value: r=0 -> p~1; strong r on a big base -> tiny p
+  close(takeout._corrPValue(0, 100, 1), 1, 1e-6, "r=0 -> p=1");  // CDF approx ~7.5e-8
+  assert(takeout._corrPValue(0.5, 150, 1) < 1e-6, "strong partial on n=150 -> tiny p");
+  // Benjamini-Hochberg 1995 worked example: 15 p-values @ .05 reject the first 4
+  const bh = [0.0001, 0.0004, 0.0019, 0.0095, 0.0201, 0.0278, 0.0298, 0.0344,
+    0.0459, 0.3240, 0.4262, 0.5719, 0.6528, 0.7590, 1.000];
+  const surv = takeout._bhFDR(bh, 0.05);
+  assert(surv.length === 4, "BH rejects 4, got " + surv.length);
+  assert(surv.slice().sort((a, b) => a - b).join(",") === "0,1,2,3", "the four smallest survive");
+  assert(takeout._bhFDR([0.9, 0.8, 0.7], 0.05).length === 0, "nothing survives when all p are large");
+});
+
+run("CO-MOVEMENT: finds bundles above the acquiescence floor, not the global blob", () => {
+  // 4 questions: A-B and C-D genuinely co-move (raw 0.8); every cross pair is
+  // exactly the global-factor product (0.6*0.6=0.36) so its partial is 0.
+  const base = (n) => [[0, n, n, n], [n, 0, n, n], [n, n, 0, n], [n, n, n, 0]];
+  const r = [[0, 0.8, 0.36, 0.36], [0.8, 0, 0.36, 0.36],
+    [0.36, 0.36, 0, 0.8], [0.36, 0.36, 0.8, 0]];
+  const floor = (0.8 + 0.8 + 0.36 * 4) / 6;             // mean inter-item raw r
+  const cm = { questions: [{ code: "A", title: "A" }, { code: "B", title: "B" },
+    { code: "C", title: "C" }, { code: "D", title: "D" }],
+    r: r, base: base(150), rGlobal: [0.6, 0.6, 0.6, 0.6], floor: floor };
+  const p = takeout._comovementPattern(cm);
+  assert(p && p.id === "comove", "a co-movement pattern is built");
+  assert(p.bundles.length === 2, "two distinct bundles, got " + p.bundles.length);
+  assert(p.bundles.every((b) => b.size === 2), "each bundle is the genuine pair, not the blob");
+  assert(p.bundles.every((b) => b.meanRaw > p.floor), "every bundle coheres above the floor");
+  assert(p.pairCount === 6, "reports all C(4,2)=6 pairs scanned");
+});
+
+run("CO-MOVEMENT: confident null when everything is just the global factor", () => {
+  // every raw pair equals the global-factor product -> all partials 0 -> no bundle
+  const r = [[0, 0.36, 0.36, 0.36], [0.36, 0, 0.36, 0.36],
+    [0.36, 0.36, 0, 0.36], [0.36, 0.36, 0.36, 0]];
+  const cm = { questions: [{ code: "A", title: "A" }, { code: "B", title: "B" },
+    { code: "C", title: "C" }, { code: "D", title: "D" }],
+    r: r, base: [[0, 150, 150, 150], [150, 0, 150, 150], [150, 150, 0, 150], [150, 150, 150, 0]],
+    rGlobal: [0.6, 0.6, 0.6, 0.6], floor: 0.36 };
+  assert(takeout._comovementPattern(cm) === null, "pure acquiescence -> no pattern (confident null)");
+  assert(takeout._comovementPattern({ questions: [{ code: "A", title: "A" }] }) === null,
+    "fewer than three rated questions -> null");
+});
+
 run("curation state round-trips and resets", () => {
   takeout.state.setText("weak", "takeaway", "Client wording");
   assert(takeout.state.getText("weak", "takeaway", "seed") === "Client wording", "edit wins");

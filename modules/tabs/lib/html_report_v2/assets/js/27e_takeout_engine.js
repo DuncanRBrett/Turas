@@ -30,10 +30,20 @@
     SPLIT_LEAD_RATIO: 1.25,   // ...and lead the next breakout by this much to be THE split (else none dominates)
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
-    MIN_MOVE_FRACTION: 0.03   // a wave change must be >=N of the scale to count as a "move"
-  };                          //   (0.03 -> 0.15 on a 5-pt scale, 3pp on a 0-100 metric);
+    MIN_MOVE_FRACTION: 0.03,  // a wave change must be >=N of the scale to count as a "move"
+                              //   (0.03 -> 0.15 on a 5-pt scale, 3pp on a 0-100 metric);
                               //   significance alone is not enough — a tiny change can test
                               //   significant on a large base yet mean nothing.
+    // "Questions that move together" (co-movement). On a climate/CX survey
+    // acquiescence makes EVERY question correlate positively, so a naive r
+    // threshold merges the whole survey into one meaningless bundle. We therefore
+    // work on PARTIAL correlation (controlling for each respondent's overall mean)
+    // and require a bundle to cohere ABOVE the survey's own acquiescence floor.
+    COMOVE_MIN_PARTIAL: 0.20, // an edge needs partial r >= this (after removing the global factor)
+    COMOVE_MIN_BASE: 30,      // ...on at least this many complete pairwise responses
+    COMOVE_ALPHA: 0.05,       // Benjamini-Hochberg FDR level across all question pairs
+    COMOVE_MAX_BUNDLES: 3     // bundles shown on the card (largest / most cohesive first)
+  };
 
   /** Cohen's h for two proportions (effect size for a percentage gap). */
   function cohenH(p1, p2) {
@@ -60,6 +70,139 @@
     var max = level.scaleMax || 0;
     return max > 0 ? Math.min(1, Math.max(0, level.value / max)) : 0;
   }
+
+  /* ---------------- statistical primitives (pure) ---------------- */
+
+  /** Standard normal CDF Φ(x) — Zelen & Severo (A&S 26.2.17), |error| < 7.5e-8.
+   *  Used to turn a Fisher-z statistic into a p-value for the FDR step. */
+  function normalCdf(x) {
+    var t = 1 / (1 + 0.2316419 * Math.abs(x));
+    var d = 0.3989422804014327 * Math.exp(-x * x / 2);
+    var p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
+      t * (-1.821255978 + t * 1.330274429))));
+    return x > 0 ? 1 - p : p;
+  }
+  takeout._normalCdf = normalCdf;
+
+  /** Partial correlation of a,b controlling for one variable g, from the three
+   *  zero-order correlations. Returns 0 when a controlled variance vanishes. */
+  function partialCorr(rab, rag, rbg) {
+    var d = Math.sqrt((1 - rag * rag) * (1 - rbg * rbg));
+    return d > 1e-12 ? Math.max(-1, Math.min(1, (rab - rag * rbg) / d)) : 0;
+  }
+  takeout._partialCorr = partialCorr;
+
+  /** Two-sided p-value for a (partial) correlation r on base n, controlling k
+   *  covariates, via Fisher's z (se = 1/sqrt(n-k-3)). n too small -> p=1. */
+  function corrPValue(r, n, k) {
+    var df = n - (k || 0) - 3;
+    if (df <= 0) return 1;
+    var rc = Math.max(-0.999999, Math.min(0.999999, r));
+    var z = Math.abs(0.5 * Math.log((1 + rc) / (1 - rc))) * Math.sqrt(df);  // atanh(rc)*sqrt(df)
+    return 2 * normalCdf(-z);
+  }
+  takeout._corrPValue = corrPValue;
+
+  /** Benjamini-Hochberg FDR. Given p-values, returns the indices that survive at
+   *  level alpha: the largest rank k with p(k) <= (k/m)*alpha rejects all p ranked
+   *  <= k. Valid under positive dependence (PRDS) — which inter-question
+   *  correlations on an attitude survey satisfy (all-positive), so BH (not the
+   *  far more conservative Benjamini-Yekutieli) is the right correction here. */
+  function bhFDR(pvals, alpha) {
+    var m = pvals.length;
+    if (!m) return [];
+    var order = pvals.map(function (p, i) { return { p: p, i: i }; })
+      .sort(function (a, b) { return a.p - b.p; });
+    var kMax = -1;
+    for (var k = 0; k < m; k++) {
+      if (order[k].p <= ((k + 1) / m) * alpha) kMax = k;
+    }
+    var out = [];
+    for (var j = 0; j <= kMax; j++) out.push(order[j].i);
+    return out;
+  }
+  takeout._bhFDR = bhFDR;
+
+  /**
+   * CO-MOVEMENT pattern: groups of questions that rise and fall together across
+   * PEOPLE — a shared underlying driver you can act on once, not question by
+   * question. The hard part is NOT finding correlation (on an attitude survey
+   * everything correlates — acquiescence); it is finding structure ABOVE that
+   * halo. So we work on the PARTIAL correlation that removes each respondent's
+   * overall level, keep only edges that (a) clear COMOVE_MIN_PARTIAL, (b) survive
+   * Benjamini-Hochberg FDR across all pairs, on (c) an adequate base; then group
+   * the survivors into connected bundles and keep only bundles whose within-bundle
+   * RAW correlation sits above the survey's own acquiescence floor. Returns null
+   * (a confident null) when no bundle clears the bar.
+   *
+   * Input (from gather): { questions:[{code,title}], r:[][], base:[][],
+   *   rGlobal:[], floor:Number } where r/base are symmetric n x n matrices of the
+   *   zero-order weighted correlation and complete-pair base, rGlobal[i] is item
+   *   i's correlation with the per-respondent overall mean, floor is the mean
+   *   inter-item raw r (the acquiescence baseline).
+   */
+  function comovementPattern(cm) {
+    if (!cm || !cm.questions || cm.questions.length < 3) return null;
+    var qs = cm.questions, n = qs.length, floor = cm.floor || 0;
+    var totalPairs = n * (n - 1) / 2;
+    var edges = [];                                   // candidate pairs with adequate base
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        var base = cm.base[i][j];
+        if (!base || base < CONST.COMOVE_MIN_BASE) continue;
+        var pr = partialCorr(cm.r[i][j], cm.rGlobal[i], cm.rGlobal[j]);
+        edges.push({ i: i, j: j, partial: pr, raw: cm.r[i][j], base: base,
+          p: corrPValue(pr, base, 1) });
+      }
+    }
+    if (!edges.length) return null;
+    // FDR across all candidate pairs, then keep positive partial edges above the floor strength
+    var survive = {};
+    bhFDR(edges.map(function (e) { return e.p; }), CONST.COMOVE_ALPHA)
+      .forEach(function (k) { survive[k] = true; });
+    var kept = edges.filter(function (e, k) {
+      return survive[k] && e.partial >= CONST.COMOVE_MIN_PARTIAL;
+    });
+    if (!kept.length) return null;
+    // connected components over the surviving edges (union-find)
+    var parent = qs.map(function (_, idx) { return idx; });
+    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    kept.forEach(function (e) { parent[find(e.i)] = find(e.j); });
+    var comp = {};
+    kept.forEach(function (e) {
+      var root = find(e.i);
+      (comp[root] || (comp[root] = { nodes: {}, edges: [] }));
+      comp[root].nodes[e.i] = true; comp[root].nodes[e.j] = true;
+      comp[root].edges.push(e);
+    });
+    var bundles = [];
+    Object.keys(comp).forEach(function (root) {
+      var members = Object.keys(comp[root].nodes).map(Number);
+      if (members.length < 2) return;
+      // within-bundle mean RAW r over every internal pair -> must beat the floor
+      var sum = 0, cnt = 0;
+      for (var a = 0; a < members.length; a++) {
+        for (var b = a + 1; b < members.length; b++) {
+          var rr = cm.r[members[a]][members[b]];
+          if (rr !== null && rr !== undefined) { sum += rr; cnt++; }
+        }
+      }
+      var meanRaw = cnt ? sum / cnt : 0;
+      if (meanRaw <= floor) return;                   // cohesion not above the acquiescence baseline
+      var anchor = comp[root].edges.slice().sort(function (x, y) { return y.partial - x.partial; })[0];
+      bundles.push({
+        members: members.map(function (m) { return { code: qs[m].code, title: qs[m].title }; }),
+        size: members.length, meanRaw: meanRaw, lift: meanRaw - floor,
+        anchor: { a: qs[anchor.i].title, b: qs[anchor.j].title, partial: anchor.partial }
+      });
+    });
+    if (!bundles.length) return null;
+    bundles.sort(function (x, y) { return (y.size - x.size) || (y.meanRaw - x.meanRaw); });
+    return { id: "comove", kind: "comove", subject: "Questions that move together",
+      floor: floor, pairCount: totalPairs, bundleCount: bundles.length,
+      bundles: bundles.slice(0, CONST.COMOVE_MAX_BUNDLES) };
+  }
+  takeout._comovementPattern = comovementPattern;
 
   /**
    * GROUP pattern: which breakout column sits consistently below the overall
@@ -239,6 +382,8 @@
     if (group) patterns.push(group);
     var split = splitPattern(inputs.columns);
     if (split) patterns.push(split);
+    var comove = comovementPattern(inputs.comove);
+    if (comove) patterns.push(comove);
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
     var moved = movementPattern(inputs.apex || []);
     if (moved) patterns.push(moved);

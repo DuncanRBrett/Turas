@@ -205,6 +205,74 @@
     };
   }
 
+  /** Weighted Pearson between two per-respondent vectors, pairwise-complete.
+   *  Returns { r, base } where base is the count of complete pairs. */
+  function weightedPearson(x, y, w) {
+    var sw = 0, sx = 0, sy = 0, base = 0;
+    for (var r = 0; r < x.length; r++) {
+      var a = x[r], b = y[r];
+      if (a === null || a === undefined || b === null || b === undefined) continue;
+      var wr = w ? w[r] : 1;
+      sw += wr; sx += wr * a; sy += wr * b; base++;
+    }
+    if (!sw || base < 2) return { r: 0, base: base };
+    var mx = sx / sw, my = sy / sw, cxy = 0, cxx = 0, cyy = 0;
+    for (var s = 0; s < x.length; s++) {
+      var av = x[s], bv = y[s];
+      if (av === null || av === undefined || bv === null || bv === undefined) continue;
+      var ws = w ? w[s] : 1, dx = av - mx, dy = bv - my;
+      cxy += ws * dx * dy; cxx += ws * dx * dx; cyy += ws * dy * dy;
+    }
+    var den = Math.sqrt(cxx * cyy);
+    return { r: den > 1e-12 ? cxy / den : 0, base: base };
+  }
+
+  /**
+   * For "questions that move together": from per-respondent index scores
+   * (TR.MICRO.scores) build the zero-order weighted correlation matrix across
+   * rated questions, each question's correlation with the per-respondent overall
+   * mean (the global factor the engine partials out), the complete-pair bases, and
+   * the survey's acquiescence floor (mean inter-item raw r). Returns null when
+   * microdata is absent or fewer than three rated questions carry scores.
+   */
+  function gatherComovement(views) {
+    var micro = TR.MICRO;
+    if (!micro || !micro.scores) return null;
+    var weights = micro.weights || null;
+    // rated questions that carry per-respondent scores, in questionnaire order
+    var qs = views.indexQuestions().filter(function (q) {
+      return micro.scores[q.code] && micro.scores[q.code].length;
+    }).map(function (q) { return { code: q.code, title: q.title }; });
+    var n = qs.length;
+    if (n < 3) return null;
+    var nResp = micro.n || (micro.scores[qs[0].code] || []).length;
+    // per-respondent global factor = mean of that respondent's answered rated scores
+    var global = new Array(nResp);
+    for (var r = 0; r < nResp; r++) {
+      var sum = 0, cnt = 0;
+      for (var qi = 0; qi < n; qi++) {
+        var v = micro.scores[qs[qi].code][r];
+        if (v !== null && v !== undefined) { sum += v; cnt++; }
+      }
+      global[r] = cnt ? sum / cnt : null;
+    }
+    // matrices
+    var R = [], B = [], rGlobal = [];
+    for (var i = 0; i < n; i++) { R.push(new Array(n).fill(0)); B.push(new Array(n).fill(0)); }
+    var floorSum = 0, floorCnt = 0;
+    for (var a = 0; a < n; a++) {
+      var xa = micro.scores[qs[a].code];
+      rGlobal[a] = weightedPearson(xa, global, weights).r;
+      for (var b = a + 1; b < n; b++) {
+        var pr = weightedPearson(xa, micro.scores[qs[b].code], weights);
+        R[a][b] = R[b][a] = pr.r; B[a][b] = B[b][a] = pr.base;
+        floorSum += pr.r; floorCnt++;
+      }
+    }
+    return { questions: qs, r: R, base: B, rGlobal: rGlobal,
+      floor: floorCnt ? floorSum / floorCnt : 0 };
+  }
+
   /**
    * Assemble all engine inputs. Defensive: each source is isolated so a report
    * without microdata (no standouts) or without waves still produces a valid,
@@ -216,9 +284,11 @@
     try { columns = gatherColumnStrain(views); } catch (e) { columns = []; }
     var lv = { levels: [], apex: [] };
     try { lv = gatherLevels(views); } catch (e) { lv = { levels: [], apex: [] }; }
+    var comove = null;
+    try { comove = gatherComovement(views); } catch (e) { comove = null; }
     var reliability = gatherReliability(lv.levels.concat(lv.apex));
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
-    return { columns: columns, levels: lv.levels, apex: lv.apex,
+    return { columns: columns, levels: lv.levels, apex: lv.apex, comove: comove,
       reliability: reliability, lowBaseThreshold: lowBase };
   };
 

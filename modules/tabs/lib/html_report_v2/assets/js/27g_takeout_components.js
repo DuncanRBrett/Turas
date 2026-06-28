@@ -16,6 +16,7 @@
   var PATTERN_META = {
     group: { tag: "The group under strain", cls: "strain" },
     split: { tag: "Which split matters most", cls: "split" },
+    comove: { tag: "Questions that move together", cls: "comove" },
     weak: { tag: "Weakest area", cls: "weak" },
     strong: { tag: "Strongest area", cls: "strong" },
     moved: { tag: "What moved", cls: "moved" }
@@ -59,6 +60,22 @@
     var up = delta.diff >= 0;
     return '<span class="tko-move ' + (up ? "up" : "down") + '">' +
       (up ? " ▲" : " ▼") + Math.abs(delta.diff).toFixed(1) + "</span>";
+  };
+
+  /** One co-movement bundle: the anchor pair, the cohesion vs the survey floor,
+   *  then every member question in full (labels always wrap, never clipped). */
+  ui.comoveBundle = function (bundle, floor, idx) {
+    var heading = '<div class="tko-bundle-head"><span class="tko-bundle-n">' + (idx + 1) +
+      '</span><span class="tko-bundle-anchor">' + fmt.escapeHtml(bundle.anchor.a) +
+      ' <span class="tko-bundle-tie">↔</span> ' + fmt.escapeHtml(bundle.anchor.b) +
+      '</span><span class="tko-bundle-size">' + bundle.size + " move together</span></div>";
+    var cohesion = '<div class="tko-cap">Average correlation ' + bundle.meanRaw.toFixed(2) +
+      " — above the survey's " + floor.toFixed(2) + " baseline (they cohere beyond the " +
+      "general tendency to agree).</div>";
+    var members = '<ul class="tko-bundle-list">' + bundle.members.map(function (m) {
+      return "<li>" + fmt.escapeHtml(m.title) + "</li>";
+    }).join("") + "</ul>";
+    return '<div class="tko-bundle">' + heading + members + cohesion + "</div>";
   };
 
   /** A two-sided mover line for the "what moved" card (▲ riser / ▼ faller). */
@@ -113,6 +130,14 @@
       return "Differences run most by " + p.subject + " — " + p.high.label +
         " sits highest, " + p.low.label + " lowest. Read this study through " +
         p.subject.toLowerCase() + ".";
+    }
+    if (p.id === "comove") {
+      var b0 = (p.bundles && p.bundles[0]) || null;
+      var more = p.bundleCount > 1 ? " (" + p.bundleCount + " such groups found)" : "";
+      if (!b0) return "Some questions move together as a set" + more + ".";
+      return b0.size + " questions move together as one — " + b0.anchor.a + " and " +
+        b0.anchor.b + " anchor them" + more + ". Treat the shared driver once, not " +
+        "question by question.";
     }
     if (p.id === "weak") {
       return p.subject + " is the weakest area — its questions cluster low" +
