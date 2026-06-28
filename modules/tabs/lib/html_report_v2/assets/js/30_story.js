@@ -185,6 +185,19 @@
     TR.shell.toast("Heatmap pinned to story (" + load().length + ")");
   };
 
+  /** Pin any on-screen card (patterns / dashboard / differences) exactly as it
+   *  looks: its own HTML is stored and re-shown in the story and present mode.
+   *  `lines` is the card's plain text, used only for the deck export (an HTML
+   *  card has no chart/table to rasterise, so the slide shows the same content
+   *  rendered as a card). */
+  story2.pinSnapshot = function (snap) {
+    load().push({ kind: "snapshot", source: snap.source || "card",
+      title: snap.title || "Pinned card", context: snap.context || "",
+      html: snap.html || "", lines: (snap.lines || []).slice(), note: "" });
+    persist();
+    TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
+  };
+
   story2.addDivider = function () {
     var title = prompt("Section title for the divider:");
     if (!title) return;
@@ -275,6 +288,14 @@
         })) };
     });
     return { head: head, body: body, models: models };
+  }
+
+  /** A snapshot's plain text as a one-column matrix for the deck export. */
+  function snapshotMatrix(item) {
+    var lines = (item.lines && item.lines.length) ? item.lines : [item.title || ""];
+    return { head: [item.context ? TR.charts.clip(item.context, 60)
+        : (item.source || "Pinned card")],
+      body: lines.map(function (l) { return { kind: "row", cells: [l] }; }) };
   }
 
   function heatmapMatrix(item) {
@@ -378,6 +399,18 @@
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
             fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
+    }
+    if (item.kind === "snapshot") {
+      // pinned "as it looks" — the card's own HTML, re-shown verbatim
+      return '<div class="card story-item story-snapshot" data-i="' + i + '">' +
+        '<div class="si-head"><span class="qcode">' + (i + 1) + ". " +
+        fmt.escapeHtml((item.source || "PIN").toUpperCase()) + "</span><strong>" +
+        fmt.escapeHtml(TR.charts.clip(item.title || "Pinned card", 90)) + "</strong>" +
+        (item.context ? '<span class="si-ctx">' + fmt.escapeHtml(item.context) + "</span>" : "") +
+        buttons + "</div>" +
+        '<div class="snap-body">' + (item.html || "") + "</div>" +
+        '<textarea class="si-note" placeholder="Commentary for this slide…">' +
+        fmt.escapeHtml(item.note || "") + "</textarea></div>";
     }
     if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
@@ -504,6 +537,12 @@
           compositeMatrix(item)));
         return;
       }
+      if (item.kind === "snapshot") {
+        slides.push(TR.exporter.matrixSlide(item.title || "Pinned card",
+          (item.context || "") + (item.note ? " · " + item.note : ""),
+          snapshotMatrix(item)));
+        return;
+      }
       var model = modelFor(item);
       if (model) {
         var flags = item.flags || { chart: false, table: true, insight: true };
@@ -532,6 +571,10 @@
     if (item.kind === "composite") {
       return TR.exporter.cardSvgRaw("Composite — " + item.category,
         contextLine(item) + (item.note ? " · " + item.note : ""), null, compositeMatrix(item));
+    }
+    if (item.kind === "snapshot") {
+      return TR.exporter.cardSvgRaw(item.title || "Pinned card",
+        (item.context || "") + (item.note ? " · " + item.note : ""), null, snapshotMatrix(item));
     }
     if (item.kind === "exhibit") {
       var models = TR.exhibit.models(item);
@@ -627,6 +670,11 @@
         fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</p>" +
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
         '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>";
+    } else if (item.kind === "snapshot") {
+      body = "<h1>" + fmt.escapeHtml(item.title || "Pinned card") + "</h1>" +
+        (item.context ? '<p class="pr-ctx">' + fmt.escapeHtml(item.context) + "</p>" : "") +
+        (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
+        '<div class="pr-table snap-body">' + (item.html || "") + "</div>";
     } else if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
       body = "<h1>" + (item.kind === "heatmap" ? "Index heatmap"

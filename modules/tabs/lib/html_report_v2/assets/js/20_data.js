@@ -13,6 +13,9 @@
   d2.state = {
     tab: "takeout",         // Pattern recognition is the landing tab (id stays "takeout")
     banner: null,           // banner group id ("Q002") or "custom:<qcode>"
+    customBanner: null,     // the live (unsaved) custom banner id — kept as a tab
+                            // across navigation so it is not lost when you look at
+                            // another banner (★ save promotes it to savedBanners)
     filters: [],            // [{q: "Q006", rows: [9, 10]}]
     showCounts: false,
     showIntervals: false,   // 95% interval ranges under every value

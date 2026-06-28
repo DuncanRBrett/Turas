@@ -159,7 +159,8 @@
         var barPct = hasVal ? Math.max(0, Math.min(value / max, 1)) * 100 : 0;
         var pts = row ? TR.render.wavePoints(row) : null;
         var spark = (pts && pts.length > 1) ? TR.render.sparkline(pts, true, { w: 212, h: 28 }) : "";
-        html.push('<button class="gauge" data-goq="' + q.code + '" title="' +
+        html.push('<div class="gauge-wrap" data-snap-card>' +
+          '<button class="gauge" data-goq="' + q.code + '" title="' +
           fmt.escapeHtml(q.title) +
           (row ? intervalTip(row.cells[0], models[q.code].columns[0].base) : "") +
           '" style="--gc:' + gc + '">' +
@@ -172,7 +173,11 @@
           (hasVal ? '<span class="gbar"><span class="gbf" style="width:' +
             barPct.toFixed(0) + '%"></span></span>' : "") +
           (spark ? '<span class="gspark">' + spark + "</span>" : "") +
-          '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(q.title, 64)) + "</span></button>");
+          '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(q.title, 64)) + "</span></button>" +
+          '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
+          fmt.escapeHtml(q.code + " — " + q.title) + '" data-snap-context="' +
+          fmt.escapeHtml((q.category || "") + " · index") +
+          '" title="Pin this card to the story" aria-label="Pin card to story">📌</button></div>');
       });
       html.push("</div></div>");
     });

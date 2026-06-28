@@ -124,7 +124,7 @@
       if (soft && !dual) return;                  // soft findings only when 95%+80% is on
       var gap = means[i].mean - rm.mean;
       out.push({ code: q.code, title: q.title, category: q.category,
-        label: row.label, column: col.label, isMean: true, soft: soft,
+        label: row.label, column: col.label, isMean: true, kind: "mean", soft: soft,
         direction: gap >= 0 ? "ahead" : "behind",
         value: means[i].mean, rest: rm.mean, overall: means[0].mean,
         gap: gap, decimals: decimals, scaleMin: scaleMin, scaleMax: scaleMax,
@@ -185,6 +185,7 @@
           var letters = is95 ? solid : solid + soft80;
           findings.push({ code: q.code, title: q.title, category: q.category,
             label: row.label, column: model.columns[i].label, isMean: false,
+            kind: row.kind,
             soft: is80, value: cell.pct, rest: rest, overall: overall,
             gap: cell.pct - baseline,
             beaten: letters.split("").map(function (l) {
@@ -247,6 +248,20 @@
         hasRest ? "The rest" : "Everyone") + "</div>";
   }
 
+  /** Small tag marking whether the standout row is a DEFINED CATEGORY (a NET
+   *  grouping such as a top-box) or an individual DETAIL option — so a label like
+   *  "Agree" reads unambiguously as one or the other. Mean / index / NPS rows name
+   *  their metric in the sentence already, so they carry no tag. */
+  function rowKindTag(f) {
+    if (f.kind === "net") {
+      return ' <span class="df-rowkind net" title="A defined category — a NET grouping of options (e.g. a top-box)">category</span>';
+    }
+    if (f.kind === "category") {
+      return ' <span class="df-rowkind" title="An individual response option (a detail row)">detail</span>';
+    }
+    return "";
+  }
+
   /** One finding as a plain-English line inside its question card. The headline
    *  compares the group with the REST (everyone except it) and carries the
    *  whole-sample figure in brackets. Proportions read "X% say "label""; a
@@ -272,7 +287,8 @@
       : "statistically " + tail;
     return '<div class="df-line' + (f.soft ? " soft" : "") + '">' +
       '<div class="df-sentence"><strong>' + fmt.escapeHtml(f.column) +
-      "</strong> — " + lead + " vs " + baseline + " · " + direction + gapTxt +
+      "</strong> — " + lead + rowKindTag(f) + " vs " + baseline + " · " +
+      direction + gapTxt +
       "</div>" + barsHtml(f) +
       '<div class="df-beats">' + verdict + "</div></div>";
   }
@@ -285,13 +301,17 @@
     var search = (group.code + " " + group.title + " " +
       group.items.map(function (f) { return f.label + " " + f.column; })
         .join(" ")).toLowerCase();
-    return '<div class="card df-card" data-search="' +
+    var pin = '<button class="snap-pin" data-snap-pin data-snap-source="differences" ' +
+      'data-snap-title="' + fmt.escapeHtml(group.code + " — " + group.title) + '" ' +
+      'data-snap-context="' + fmt.escapeHtml("Where groups differ · " + (group.category || "")) +
+      '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>';
+    return '<div class="card df-card" data-snap-card data-search="' +
       fmt.escapeHtml(search) + '">' +
       '<div class="df-qhead"><button class="linklike" data-goq="' +
       group.code + '">' + group.code + " · " +
       fmt.escapeHtml(group.title) + "</button>" +
       '<span class="kindtag">' + fmt.escapeHtml(group.category) +
-      "</span></div>" +
+      "</span>" + pin + "</div>" +
       group.items.map(lineHtml).join("") + "</div>";
   }
 

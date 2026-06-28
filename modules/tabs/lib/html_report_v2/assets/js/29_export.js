@@ -548,7 +548,7 @@
     var rows = cr.rows;
     if (!rows.length || !cols.length) return null;
     if (type === "pie") cols = [cols[0]];
-    var series = type === "stacked"
+    var series = (type === "stacked" || type === "stackedcol")
       ? chartSeriesStacked(model, rows, cols)
       : chartSeries(model, rows, cols, type);
     // A composite of 0–10 means charts RATINGS: one-decimal labels on a fixed
@@ -571,6 +571,14 @@
       // meaningless (and the pin shows none) — hide it; the segment labels carry
       // the %s.
       axesXml = chartAxes("l", "b", null, true);
+    } else if (type === "stackedcol") {
+      // Vertical twin of stacked: percent-stacked COLUMNS (barDir col), category
+      // axis on the bottom and the normalised value axis on the left, hidden.
+      plot = '<c:barChart><c:barDir val="col"/><c:grouping val="percentStacked"/>' +
+        '<c:varyColors val="0"/>' + series + dataLabels("ctr", "FFFFFF") +
+        '<c:overlap val="100"/>' +
+        '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
+      axesXml = chartAxes("b", "l", null, true);
     } else if (type === "pie") {
       // Labels OUTSIDE the pie with leader lines so they read on any slice
       // colour, formatted as %.
@@ -597,7 +605,7 @@
     var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       "<c:chartSpace " + C_NS + "><c:chart><c:plotArea><c:layout/>" +
       plot + axesXml + "</c:plotArea>" +
-      ((cols.length > 1 || type === "pie" || type === "stacked")
+      ((cols.length > 1 || type === "pie" || type === "stacked" || type === "stackedcol")
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
       // Default chart font — clean Arial in the report ink so axis/legend text
@@ -611,7 +619,7 @@
     var num = function (v) {
       return v === null || v === undefined ? "" : Math.round(v * 10) / 10;
     };
-    var workbookRows = type === "stacked"
+    var workbookRows = (type === "stacked" || type === "stackedcol")
       ? [[""].concat(rows.map(function (r) { return r.label; }))].concat(
           cols.map(function (ci) {
             return [model.columns[ci] ? model.columns[ci].label : "Series"]

@@ -1,10 +1,10 @@
 /**
- * Chart-type library — bar (grouped), column, stacked, pie/donut and dot
- * plot, all pure SVG strings over the same view model so any of them can
- * back the crosstab chart, pins and PNG export. PPTX keeps editable
- * shapes for bar/column and falls back to bar for the other types.
+ * Chart-type library — bar (grouped), column, stacked (100% bar & column),
+ * pie/donut and dot plot, all pure SVG strings over the same view model so any
+ * of them can back the crosstab chart, pins and PNG export. PPTX keeps editable
+ * shapes for bar/column/stacked and falls back to bar for the other types.
  *
- * SIZE-EXCEPTION: five sibling chart builders sharing geometry helpers.
+ * SIZE-EXCEPTION: six sibling chart builders sharing geometry helpers.
  */
 (function (global) {
   "use strict";
@@ -14,7 +14,7 @@
 
   render.CHART_TYPES = [
     ["bar", "Bar"], ["column", "Column"], ["stacked", "Stacked"],
-    ["pie", "Pie"], ["dot", "Dot plot"]
+    ["stackedcol", "Stacked column"], ["pie", "Pie"], ["dot", "Dot plot"]
   ];
 
   function fmtPct(v) {
@@ -59,6 +59,7 @@
     if (model.valueKind === "mean" && type !== "column" && type !== "bar") type = "bar";
     if (type === "column") return render.columnChart(model, cols);
     if (type === "stacked") return render.stackedChart(model, cols);
+    if (type === "stackedcol") return render.stackedColumnChart(model, cols);
     if (type === "pie") return render.pieChart(model, cols[0] || 0);
     if (type === "dot") return render.dotChart(model, cols);
     if (type === "line") return render.trendChart(model);
@@ -183,6 +184,56 @@
     body.push(legend.body);
     return S.root(W, y + legend.height + 12,
       model.code + " — stacked", body.join(""));
+  };
+
+  /**
+   * Vertical 100%-stacked column per selected column (segments = rows). The
+   * column twin of stackedChart: one column per cut, split top-to-bottom into
+   * the question's category rows and normalised to 100%. Segments label inside
+   * when tall enough; thin slices are left to the legend so nothing overlaps.
+   */
+  render.stackedColumnChart = function (model, cols) {
+    if (!Array.isArray(cols)) cols = [cols || 0];
+    var data = render.chartRows(model);
+    if (!data.rows.length) return "";
+    var W = 660, plotH = 210, padT = 14, padB = 30, padL = 12;
+    var ramp = render.categoryColours(data.rows);
+    var slot = (W - padL * 2) / cols.length;
+    var colW = Math.min(slot - 14, 90);
+    var body = [];
+    cols.forEach(function (ci, k) {
+      var col = model.columns[ci];
+      // Each column normalises to its own total so the stack always fills 100%
+      // (negatives floor at 0 — a backwards segment is invalid and would hide).
+      var total = 0;
+      data.rows.forEach(function (r) {
+        total += Math.max((r.cells[ci] ? r.cells[ci].pct : 0) || 0, 0);
+      });
+      var cx = padL + k * slot + slot / 2;
+      var x0 = cx - colW / 2, yTop = padT;
+      data.rows.forEach(function (r, riIdx) {
+        var v = Math.max((r.cells[ci] ? r.cells[ci].pct : 0) || 0, 0);
+        var h = total > 0 ? v / total * plotH : 0;
+        body.push(S.el("rect", { x: x0, y: yTop, width: colW, height: h,
+          fill: ramp[riIdx] }));
+        if (v / Math.max(total, 1) >= 0.07 && h >= 12) {
+          body.push(S.text(cx, yTop + h / 2 + 3.5, Math.round(v) + "%",
+            { "text-anchor": "middle", "font-size": 10,
+              fill: riIdx / data.rows.length > 0.5 ? "#fff" : "#1c2333" }));
+        }
+        yTop += h;
+      });
+      wrapLabel(body, col ? col.label : "?", cx, padT + plotH + 12, slot);
+    });
+    body.push(S.el("line", { x1: padL, y1: padT + plotH, x2: W - padL,
+      y2: padT + plotH, stroke: "#d8dcea" }));
+    var y = padT + plotH + padB;
+    var legend = S.legend(data.rows.map(function (r, i) {
+      return { label: TR.charts.clip(r.label, 80), colour: ramp[i] };
+    }), padL, y, W - padL * 2);
+    body.push(legend.body);
+    return S.root(W, y + legend.height + 12,
+      model.code + " — stacked column", body.join(""));
   };
 
   /** Donut of one column's category rows. */

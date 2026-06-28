@@ -156,6 +156,24 @@
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-savecopy]")) TR.report.saveCopy();
     });
+    // Pin any on-screen card to the story "as it looks on the page". One
+    // delegated listener serves every surface (patterns / dashboard /
+    // differences) — each card carries data-snap-card and a data-snap-pin
+    // control with the title / source / context to record.
+    document.addEventListener("click", function (e) {
+      var pin = e.target.closest("[data-snap-pin]");
+      if (!pin) return;
+      var card = pin.closest("[data-snap-card]");
+      if (!card) return;
+      e.preventDefault();
+      TR.story2.pinSnapshot({
+        source: pin.getAttribute("data-snap-source") || "card",
+        title: pin.getAttribute("data-snap-title") || "Pinned card",
+        context: pin.getAttribute("data-snap-context") || "",
+        html: shell.snapshotCard(card),
+        lines: shell.snapshotLines(card)
+      });
+    });
     global.addEventListener("hashchange", function () {
       TR.d2.decodeHash(location.hash);
       TR.filterBar.render();
@@ -185,6 +203,42 @@
       });
       onPin(flags);
     });
+  };
+
+  /**
+   * Capture a card "as it looks on the page" for a story snapshot: clone it,
+   * drop the pin control itself, and freeze any editable field to static text so
+   * the pinned copy renders identically but inert. Returns an HTML string.
+   */
+  shell.snapshotCard = function (cardEl) {
+    var clone = cardEl.cloneNode(true);
+    clone.querySelectorAll(".snap-pin").forEach(function (el) { el.remove(); });
+    clone.querySelectorAll("textarea").forEach(function (ta) {
+      var d = document.createElement("div");
+      d.className = "snap-frozen-note";
+      d.textContent = ta.value || ta.textContent || "";
+      ta.replaceWith(d);
+    });
+    clone.querySelectorAll("[contenteditable]").forEach(function (el) {
+      el.removeAttribute("contenteditable");
+    });
+    clone.removeAttribute("data-snap-card");
+    return clone.outerHTML;
+  };
+
+  /** Plain-text lines from a card — used only for the deck export of a snapshot
+   *  pin (the on-screen story keeps the exact HTML; the SVG/PPTX path has no way
+   *  to rasterise arbitrary HTML, so it renders the same content as a card). */
+  shell.snapshotLines = function (cardEl) {
+    var out = [];
+    cardEl.querySelectorAll(
+      "h1,h2,h3,h4,strong,p,li,.tko-take,.tko-note,.tko-cap,.df-sentence,.df-beats,.gv,.gt"
+    ).forEach(function (el) {
+      if (el.closest(".snap-pin")) return;
+      var t = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (t && out.indexOf(t) === -1) out.push(t);
+    });
+    return out.slice(0, 14);
   };
 
   shell.toast = function (message) {

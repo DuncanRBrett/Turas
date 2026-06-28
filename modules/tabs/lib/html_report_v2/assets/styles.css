@@ -125,7 +125,13 @@ button.primary:hover { filter: brightness(1.18); }
 .btab:hover { border-color: var(--brand); color: var(--brand); }
 .btab.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btab.custom { background: var(--accent); border-color: var(--accent); }
+.btab.saved { border-color: var(--accent); }
+.btab.saved.on { background: var(--brand); border-color: var(--brand); }
 .btab.add { border-style: dashed; }
+.btab-x { margin-left: 7px; opacity: .7; font-size: 10.5px; font-weight: 700; }
+.btab-x:hover { opacity: 1; }
+.btab-x.save { margin-left: 8px; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.25); }
+.btab.on .btab-x.save { background: rgba(255,255,255,.3); }
 .chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 10px 0 2px; }
 .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 3px 11px; font-size: 11.5px; cursor: pointer; color: var(--muted); }
 .chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
@@ -197,6 +203,16 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .gauge .gbf { display: block; height: 100%; background: var(--gc); border-radius: 3px; }
 .gauge .gspark { display: block; margin-top: 8px; line-height: 0; }
 .gauge .gspark svg { width: 100%; height: auto; display: block; }
+.gauge-wrap { display: block; }
+.gauge-wrap > .gauge { width: 100%; box-sizing: border-box; }
+/* Pin-to-story control on any pinnable card (patterns / dashboard / differences). */
+[data-snap-card] { position: relative; }
+.snap-pin { position: absolute; top: 7px; right: 8px; z-index: 3; border: none; background: rgba(255,255,255,.82); border-radius: 6px; padding: 1px 5px; font-size: 12px; line-height: 1.25; cursor: pointer; opacity: .45; }
+[data-snap-card]:hover .snap-pin { opacity: 1; box-shadow: var(--shadow); }
+.gauge-wrap .snap-pin { top: auto; bottom: 7px; }
+.story-snapshot .snap-body { margin-top: 6px; }
+.story-snapshot .snap-body .gauge-wrap { max-width: 280px; }
+.snap-frozen-note { font-size: 12px; color: var(--muted); white-space: pre-wrap; margin-top: 4px; }
 .gl { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 .gl.g { background: #e8f0eb; color: var(--green); }
 .gl.a { background: #fdf3df; color: #8a6d1f; }
@@ -436,6 +452,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .dfb-bar.dfb-group { background: var(--brand); }
 .dfb-bar.dfb-total { background: #b8bdcf; }
 .dfb-val { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.df-rowkind { font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; background: var(--soft); color: var(--muted); border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+.df-rowkind.net { background: #e7eefc; color: #2f5bbf; }
 .df-beats { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
 .df-line.soft { border-left: 2px dashed var(--line); padding-left: 10px; }
 .df-line.soft .df-beats { font-style: italic; }

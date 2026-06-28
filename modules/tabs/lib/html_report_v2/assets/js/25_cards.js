@@ -145,6 +145,7 @@
 
   function renderControls() {
     var s = TR.d2.state;
+    var rowScope = TR.d2.rowScope();
     var toggle = function (key, label, title) {
       return '<label class="tg" title="' + (title || "") +
         '"><input type="checkbox" data-ctl="' + key + '"' +
@@ -161,8 +162,17 @@
         "Show the 95% " + TR.conf.labels().interval_term +
         " under every value — the range the number would likely land in " +
         "if the survey were repeated") +
-      toggle("showDetail", "Detail rows", "Show the detailed category rows") +
-      toggle("showSummary", "Summary rows", "Show NET and Index rows") +
+      // Row scope is one explicit pick (not two checkboxes that can both go off
+      // and empty the table). Global state, so it persists question to question.
+      '<label class="tg" title="Which rows show in the table — persists as you ' +
+      'move between questions">Rows ' +
+      '<select data-rowscope>' +
+      '<option value="all"' + (rowScope === "all" ? " selected" : "") + ">All rows</option>" +
+      '<option value="summary"' + (rowScope === "summary" ? " selected" : "") +
+      ">NETs &amp; index only</option>" +
+      '<option value="detail"' + (rowScope === "detail" ? " selected" : "") +
+      ">Detail only</option>" +
+      "</select></label>" +
       '<label class="tg" title="Show/hide significance letters and choose the confidence level(s)">Sig ' +
       '<select data-sigmode>' +
       '<option value="off"' + (s.sigMode === "off" ? " selected" : "") + ">Off</option>" +
@@ -355,10 +365,34 @@
       out.unshift('<button class="btab' + (s.banner === "" ? " on" : "") +
         '" data-banner="">Total</button>');
     }
-    if (s.banner && s.banner.indexOf("custom:") === 0) {
-      var q = TR.d2.questionByCode(s.banner.split(":")[1]);
-      out.push('<button class="btab on custom" data-banner="' + s.banner + '">⚒ ' +
-        fmt.escapeHtml(TR.charts.clip(q ? q.title : s.banner, 28)) + "</button>");
+    // Saved custom banners — persistent tabs (survive reload, travel in saved
+    // copies). Each is selectable and removable; the active one shows "on".
+    TR.savedBanners.all().forEach(function (b) {
+      var id = TR.savedBanners.id(b);
+      out.push('<button class="btab saved' + (s.banner === id ? " on" : "") +
+        '" data-banner="' + id + '" title="Saved custom banner">★ ' +
+        fmt.escapeHtml(TR.charts.clip(b.name || b.code, 26)) +
+        '<span class="btab-x" data-banner-remove="' + id +
+        '" role="button" aria-label="Remove saved banner">✕</span></button>');
+    });
+    // The live (unsaved) custom banner — kept as a tab across navigation so it is
+    // not lost when you switch to another banner. Lazy-capture an active custom
+    // banner (e.g. restored from the URL hash) into customBanner. ★ save promotes
+    // it to a permanent saved tab above.
+    var live = s.customBanner;
+    if (!live && s.banner && s.banner.indexOf("custom:") === 0 &&
+        !TR.savedBanners.has(s.banner)) {
+      live = s.customBanner = s.banner;
+    }
+    if (live && !TR.savedBanners.has(live)) {
+      var q = TR.d2.questionByCode(live.split(":")[1]);
+      out.push('<button class="btab custom' + (s.banner === live ? " on" : "") +
+        '" data-banner="' + live + '" title="Live custom banner — ★ save to keep it">⚒ ' +
+        fmt.escapeHtml(TR.charts.clip(q ? q.title : live, 24)) +
+        '<span class="btab-x save" data-act="save-banner" role="button" ' +
+        'title="Save this custom banner" aria-label="Save this custom banner">★ save</span>' +
+        '<span class="btab-x" data-banner-dismiss="' + live +
+        '" role="button" aria-label="Dismiss this custom banner">✕</span></button>');
     }
     if (TR.d2.hasMicrodata()) {
       out.push('<button class="btab add" data-act="custom-banner" ' +
@@ -623,6 +657,37 @@
         cards2.renderActive();
         return;
       }
+      // Remove / save a custom banner — intercept BEFORE the generic banner
+      // selection so the ✕ / ★ pills inside a tab don't double as "select".
+      var brem = e.target.closest("[data-banner-remove]");
+      if (brem) {
+        e.stopPropagation();
+        var rid = brem.getAttribute("data-banner-remove");
+        TR.savedBanners.remove(rid);
+        if (TR.d2.state.banner === rid) TR.d2.state.banner = TR.d2.firstBanner();
+        cards2.renderActive();
+        return;
+      }
+      var bdis = e.target.closest("[data-banner-dismiss]");
+      if (bdis) {
+        e.stopPropagation();
+        var did = bdis.getAttribute("data-banner-dismiss");
+        if (TR.d2.state.customBanner === did) TR.d2.state.customBanner = null;
+        if (TR.d2.state.banner === did) TR.d2.state.banner = TR.d2.firstBanner();
+        cards2.renderActive();
+        return;
+      }
+      var bsave = e.target.closest('[data-act="save-banner"]');
+      if (bsave) {
+        e.stopPropagation();
+        var liveId = TR.d2.state.customBanner || TR.d2.state.banner;
+        if (TR.savedBanners.add(liveId)) {
+          TR.d2.state.customBanner = null;   // promoted to a saved (★) tab
+          TR.shell.toast("Custom banner saved — kept across reloads and in saved copies");
+        }
+        cards2.renderActive();
+        return;
+      }
       var btab = e.target.closest(".btab[data-banner]");
       if (btab) {
         TR.d2.state.banner = btab.getAttribute("data-banner");
@@ -807,6 +872,15 @@
         TR.d2.state.chartKind = e.target.value;
         cards2.renderActive();
         buildColumnsPanel();   // chartable rows changed — refresh the row checkboxes
+        return;
+      }
+      if (e.target.hasAttribute && e.target.hasAttribute("data-rowscope")) {
+        // "all" both on · "summary" = NETs + index only · "detail" = categories
+        // only. Writes the two global flags so it persists across questions.
+        var v = e.target.value;
+        TR.d2.state.showDetail = v === "all" || v === "detail";
+        TR.d2.state.showSummary = v === "all" || v === "summary";
+        cards2.renderActive();
         return;
       }
       if (e.target.hasAttribute && e.target.hasAttribute("data-sigmode")) {

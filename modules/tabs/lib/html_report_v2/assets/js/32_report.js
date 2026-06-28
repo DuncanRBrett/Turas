@@ -220,6 +220,7 @@
       insights: TR.insights.all(),
       annotations: TR.notes.all(),
       story: TR.story2.items(),
+      banners: TR.savedBanners.all(),
       report: store()
     };
     var json = JSON.stringify(state).replace(/<\//g, "<\\/");

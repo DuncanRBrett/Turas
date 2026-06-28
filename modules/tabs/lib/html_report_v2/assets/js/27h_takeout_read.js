@@ -139,9 +139,13 @@
     var seed = ui.patternSeed(p);
     var key = p.id + "|" + (p.subject || "");
     var take = takeout.state.getText(key, "takeaway", seed);
-    return '<article class="tko-pcard tko-edge-' + meta.cls + '">' +
+    var pin = '<button class="snap-pin" data-snap-pin data-snap-source="patterns" ' +
+      'data-snap-title="' + fmt.escapeHtml(TR.charts.clip(seed, 90)) + '" ' +
+      'data-snap-context="' + fmt.escapeHtml("Pattern · " + meta.tag) +
+      '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>';
+    return '<article class="tko-pcard tko-edge-' + meta.cls + '" data-snap-card>' +
       '<div class="tko-ptag tko-on-' + meta.cls + '">' + fmt.escapeHtml(meta.tag) + "</div>" +
-      headHtml(p) +
+      pin + headHtml(p) +
       ui.editable(key, "takeaway", take, "tko-take", "Takeaway — editable", seed) +
       bodyHtml(p, meta.cls) + footHtml(p) + "</article>";
   }

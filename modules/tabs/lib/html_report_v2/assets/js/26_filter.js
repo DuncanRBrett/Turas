@@ -132,10 +132,14 @@
   }
 
   function applyCustomBanner(code, mode, holder) {
-    TR.d2.state.banner = "custom:" + code + ":" + mode;
+    var id = "custom:" + code + ":" + mode;
+    TR.d2.state.banner = id;
+    // Remember it as the live custom banner so switching to another banner does
+    // not lose it — it stays available as a tab until replaced or ★ saved.
+    if (!TR.savedBanners.has(id)) TR.d2.state.customBanner = id;
     holder.hidden = true;
     TR.shell.route();
-    TR.shell.toast("Custom banner applied — labelled on the table, pins and exports");
+    TR.shell.toast("Custom banner applied — kept as a tab · ★ save to keep it for good");
   }
 
   /**
