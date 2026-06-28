@@ -24,6 +24,24 @@
   var diffBanner = null;        // banner override (default: report banner)
   var diffSort = "standout";    // "standout" (top score) | "question"
 
+  // CLASSIFICATION questions — demographics, and corpographics / firmographics
+  // (sales office, channel, region, etc.) — describe WHO or WHAT the groups are.
+  // They are the cuts, not the outcomes, so a "difference" on them is tautological
+  // (a campus is full of its own city; a sales region is full of its own offices).
+  // Excluded as difference TARGETS, detected from the category tag the config
+  // already carries. A study whose labels don't match can extend the list via
+  // project.insight_exclude_categories (case-insensitive category names).
+  var CLASSIFICATION_RE = /demograph|corpograph|firmograph|classif/i;
+  function isClassification(q) {
+    var cat = String((q && q.category) || "");
+    if (!cat) return false;
+    if (CLASSIFICATION_RE.test(cat)) return true;
+    var extra = (TR.AGG && TR.AGG.project && TR.AGG.project.insight_exclude_categories) || [];
+    var lc = cat.toLowerCase();
+    return extra.some(function (c) { return String(c).toLowerCase() === lc; });
+  }
+  views._isClassification = isClassification;   // exposed for the gate test
+
   /**
    * "The rest" — everyone EXCEPT this group — for one question row, as a
    * percentage on the table's own base logic. Recomputed from microdata so it
@@ -148,6 +166,7 @@
     var findings = [];
     TR.AGG.questions.forEach(function (q) {
       if (q.code === bannerSource) return;   // a banner never "beats" itself
+      if (isClassification(q)) return;       // demographics / corpographics: tautological cuts, not outcomes
       var model = TR.model.forQuestion(q.code, banner, TR.d2.state.filters,
         { hiddenCols: [], dual: dual });
       var labelByLetter = {};
@@ -343,7 +362,9 @@
       "the rest (the whole-sample figure is in brackets). Percentages name the " +
       "groups they beat; averages show whether they sit above or below the rest " +
       "(" + (dual ? "95%, plus nearly-significant differences at 80%" : "95% level") +
-      ", this wave; year-on-year changes live in Tracking).</p>" +
+      ", this wave; year-on-year changes live in Tracking). Classification questions " +
+      "— demographics, firmographics — are left out: they describe the groups, not " +
+      "what they think.</p>" +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' +
       '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +
