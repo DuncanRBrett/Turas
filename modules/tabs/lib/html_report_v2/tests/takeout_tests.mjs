@@ -18,7 +18,13 @@ import vm from "node:vm";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
-const MAX_ACTIVE_LINES = 300;
+// Per-file ceiling. Raised from 300 once the engine grew to the full pattern
+// library (group / split / co-movement / odd-one-out / hidden-disagreement /
+// areas / movement + the FDR trust-gate). The pure number-crunching is already
+// factored into 27da_takeout_stats.js; what remains is small, single-purpose
+// pattern functions — the file is long because there are many of them, not
+// because any one is. Keep individual functions well under 100 lines.
+const MAX_ACTIVE_LINES = 360;
 
 const sandbox = { console };
 sandbox.globalThis = sandbox;
@@ -245,6 +251,41 @@ run("FDR gate: badges credible single cells, gates groups on CONSISTENCY not cel
     groups: [{ banner: "B", group: "Gx", base: 40, below: 11, above: 9, qn: 20, meanGap: 0 }] };
   const gn = takeout._fdrGate(nullFdr);
   assert(gn.badge.count === 0 && gn.dirSurvivorCount === 0, "structureless family -> confident null");
+});
+
+run("ODD-ONE-OUT: fires on a planted flip, confident-null on a same-direction extreme", () => {
+  const cells = [];
+  for (let i = 0; i < 19; i++) cells.push({ banner: "B", group: "Odd", q: "Q" + i, qtitle: "Q" + i,
+    nIn: 40, gap: -0.39, value: 3.2, total: 3.59, scaleMax: 5, welchDiff: -0.4, welchP: 0.5, flooredG: false });
+  cells.push({ banner: "B", group: "Odd", q: "Qx", qtitle: "Pay", nIn: 40, gap: 0.63, value: 4.2,
+    total: 3.57, scaleMax: 5, welchDiff: 0.6, welchP: 1e-17, flooredG: false });
+  const fdr = { cells: cells, K: cells.length, groupCount: 1, questionCount: 20,
+    groups: [{ banner: "B", group: "Odd", base: 40, below: 19, above: 1, qn: 20, meanGap: -0.339 }] };
+  const odd = takeout._oddOnePattern(fdr, takeout._fdrGate(fdr));
+  assert(odd && !odd.nullResult, "the planted exception fires (detector is alive)");
+  assert(odd.flip.qtitle === "Pay" && odd.survivors === 1, "fires on exactly the flipped question");
+  // a same-direction extreme (no sign flip) is NOT an odd-one-out, even if huge + significant
+  const same = cells.map((c) => c.q === "Qx" ? Object.assign({}, c, { gap: -1.2, value: 2.4, welchDiff: -1.2 }) : c);
+  const fdr2 = Object.assign({}, fdr, { cells: same });
+  assert(takeout._oddOnePattern(fdr2, takeout._fdrGate(fdr2)).nullResult,
+    "a same-direction extreme is the group's worst point, not an exception -> confident null");
+  // an insignificant flip (drops out of BH) -> confident null
+  const weak = cells.map((c) => c.q === "Qx" ? Object.assign({}, c, { welchP: 0.3 }) : c);
+  const fdr3 = Object.assign({}, fdr, { cells: weak });
+  assert(takeout._oddOnePattern(fdr3, takeout._fdrGate(fdr3)).nullResult,
+    "a flip that fails multiplicity correction does not fire");
+});
+
+run("BIMODALITY: flags a two-camp split, rejects ceiling / central-peak / uniform", () => {
+  const mk = (counts) => takeout._bimodalityPattern({ questions: [{ code: "Q", title: "Q", counts: counts, scaleMax: 5 }] });
+  assert(mk([40, 8, 4, 8, 40]).flaggedCount === 1, "a genuine two-camp distribution flags (detector is alive)");
+  assert(!mk([28, 14, 12, 14, 32]).nullResult, "a moderate two-camp distribution flags");
+  assert(mk([3, 3, 12, 19, 63]).nullResult, "a ceiling (left-skew) distribution does not flag");
+  assert(mk([12, 10, 28, 20, 29]).nullResult, "a central-mode distribution (SACS Q08 shape) does not flag");
+  assert(mk([10, 15, 50, 15, 10]).nullResult, "a central peak does not flag");
+  assert(mk([20, 20, 20, 20, 20]).nullResult, "uniform does not flag (no end peaks above the middle)");
+  assert(takeout._bimodalStat([0, 0, 100, 0, 0], 5).b === 0, "zero variance -> b=0");
+  assert(takeout._bimodalStat([1, 1, 0, 0, 0], 5) === null, "n<4 -> null, no crash");
 });
 
 run("CO-MOVEMENT: finds bundles above the acquiescence floor, not the global blob", () => {

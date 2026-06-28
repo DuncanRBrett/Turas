@@ -271,7 +271,8 @@
           }
           if (gx.length < floor || rx.length < floor) return;    // both arms must clear the floor
           var wt = takeout._welchTest(gx, gw, rx, rw, vfloor);
-          var gap = wMean(gx, gw) - wMean(all, allw);            // vs the overall (for the strain/flip read)
+          var gMean = wMean(gx, gw), oMean = wMean(all, allw);
+          var gap = gMean - oMean;                                // vs the overall (for the strain/flip read)
           var gkey = g.name + "::" + label;
           var ga = groupAgg[gkey] || (groupAgg[gkey] = { banner: g.name, group: label,
             base: 0, below: 0, above: 0, qn: 0, gapSum: 0 });
@@ -280,7 +281,8 @@
           ga.qn++; ga.gapSum += gap;
           if (wt.diff < 0) ga.below++; else if (wt.diff > 0) ga.above++;
           cells.push({ banner: g.name, group: label, q: q.code, qtitle: q.title, nIn: gx.length,
-            gap: gap, welchDiff: wt.diff, welchP: wt.p, flooredG: wt.flooredG, gkey: gkey });
+            gap: gap, value: gMean, total: oMean, scaleMax: touchpointMax(q),
+            welchDiff: wt.diff, welchP: wt.p, flooredG: wt.flooredG, gkey: gkey });
         });
       });
     });
@@ -364,6 +366,33 @@
   }
 
   /**
+   * For "hidden disagreement": each rated question's weighted category-count
+   * distribution on its own 1..K ordinal scale, from per-respondent scores. The
+   * bimodality test runs only on the overall distribution (never subgroup cuts),
+   * so the base is the full answered n. Null when microdata is absent.
+   */
+  function gatherBimodality(views) {
+    var micro = TR.MICRO;
+    if (!micro || !micro.scores) return null;
+    var weights = micro.weights || null;
+    var qs = views.indexQuestions().filter(function (q) {
+      return micro.scores[q.code] && micro.scores[q.code].length;
+    });
+    if (!qs.length) return null;
+    var nResp = micro.n || micro.scores[qs[0].code].length;
+    var out = qs.map(function (q) {
+      var K = touchpointMax(q), sc = micro.scores[q.code], counts = new Array(K).fill(0);
+      for (var r = 0; r < nResp; r++) {
+        var v = sc[r]; if (v === null || v === undefined) continue;
+        var idx = Math.round(v) - 1;                      // scores run 1..K
+        if (idx >= 0 && idx < K) counts[idx] += weights ? weights[r] : 1;
+      }
+      return { code: q.code, title: q.title, counts: counts, scaleMax: K };
+    });
+    return { questions: out };
+  }
+
+  /**
    * Assemble all engine inputs. Defensive: each source is isolated so a report
    * without microdata (no standouts) or without waves still produces a valid,
    * smaller takeout rather than failing.
@@ -378,10 +407,12 @@
     try { comove = gatherComovement(views); } catch (e) { comove = null; }
     var fdr = null;
     try { fdr = gatherCellFamily(views); } catch (e) { fdr = null; }
+    var bimodal = null;
+    try { bimodal = gatherBimodality(views); } catch (e) { bimodal = null; }
     var reliability = gatherReliability(lv.levels.concat(lv.apex));
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
     return { columns: columns, levels: lv.levels, apex: lv.apex, comove: comove, fdr: fdr,
-      reliability: reliability, lowBaseThreshold: lowBase };
+      bimodal: bimodal, reliability: reliability, lowBaseThreshold: lowBase };
   };
 
   /* ---------------- state (curation, persisted) ---------------- */

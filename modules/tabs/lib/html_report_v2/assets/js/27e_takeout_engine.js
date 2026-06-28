@@ -397,6 +397,92 @@
   }
 
   /**
+   * THE ODD ONE OUT: a group that runs below (above) the overall almost everywhere
+   * yet is unexpectedly the reverse on ONE question — a sign-flip against its OWN
+   * direction, large and real. Reads the SHARED cell family + the gate's per-cell
+   * BH survivor set (no second family). A candidate must (1) flip against the
+   * group's mean-gap direction, (2) clear an absolute gap floor AND a residual
+   * floor (the break from the group's own pattern), (3) agree in sign with the
+   * group-vs-rest Welch difference, (4) survive multiple-comparison correction, and
+   * (5) sit on a credible base. Returns a typed confident-null marker when none
+   * survive (on real SACS, none do — every striking cell is a same-direction
+   * extreme, not an exception).
+   */
+  function oddOnePattern(fdr, gate) {
+    if (!fdr || !fdr.cells || !gate) return null;
+    var mg = {};
+    gate.groups.forEach(function (g) { mg[g.banner + "::" + g.group] = g.meanGap; });
+    var cand = [];
+    fdr.cells.forEach(function (c, idx) {
+      var meanGap = mg[c.banner + "::" + c.group];
+      if (meanGap === undefined) return;
+      var dir = meanGap < 0 ? -1 : 1, gapSign = c.gap < 0 ? -1 : 1;
+      if (c.gap === 0 || gapSign === dir) return;                       // (1) must flip the group's direction
+      if (Math.abs(c.gap) < CONST.ODD_MIN_GAP) return;                  // (2a) absolute materiality
+      var resid = c.gap - meanGap;
+      if (Math.abs(resid) < CONST.ODD_MIN_RESID) return;                // (2b) breaks the group's OWN pattern
+      if ((c.welchDiff < 0 ? -1 : 1) !== gapSign) return;               // (3) Welch agrees in sign (no base-composition reversal)
+      if (!gate.survivorSet[idx]) return;                               // (4) survives the shared per-cell BH pass
+      if (c.nIn < CONST.ODD_MIN_TEST_BASE) return;                      // (5) credible base
+      cand.push({ banner: c.banner, group: c.group, q: c.q, qtitle: c.qtitle, gap: c.gap,
+        meanGap: meanGap, resid: resid, value: c.value, total: c.total, scaleMax: c.scaleMax,
+        welchDiff: c.welchDiff, welchP: c.welchP, nIn: c.nIn });
+    });
+    if (!cand.length) return { id: "odd", kind: "odd", nullResult: true, familyCells: fdr.K, survivors: 0 };
+    cand.sort(function (a, b) { return Math.abs(b.resid) - Math.abs(a.resid); });
+    var top = cand[0];
+    return { id: "odd", kind: "odd", subject: top.group, group: top.banner, column: top.group,
+      flip: top, direction: top.meanGap < 0 ? "low-but-high" : "high-but-low",
+      secondary: cand.slice(1, CONST.EVIDENCE_MAX), familyCells: fdr.K, survivors: cand.length };
+  }
+  takeout._oddOnePattern = oddOnePattern;
+
+  /**
+   * HIDDEN DISAGREEMENT (bimodality): a question whose AVERAGE looks calm yet the
+   * distribution splits into two end-camps with a middle trough — a split the mean
+   * hides. Each question must clear ALL of: a moment-form Sarle coefficient above
+   * the uniform reference (gB); a peak in each end band above the middle (gShape);
+   * a real central dip (gDip); a calm mean (gCalm); real mass in each camp (gCamp);
+   * an adequate base (gBase). The structural conjunction IS the multiplicity-safe
+   * correction here (the false positives are systematic ceiling-skew, not random),
+   * so this does NOT route through BH. Confident-null marker when none flag (on
+   * real SACS, every distribution is single-peaked — none do).
+   */
+  function bimodalityPattern(bm) {
+    if (!bm || !bm.questions || !bm.questions.length) return null;
+    var flagged = [];
+    bm.questions.forEach(function (q) {
+      var counts = q.counts, K = q.scaleMax, st = bimodalStat(counts, K);
+      if (!st) return;
+      var n = st.n, h = Math.floor(K / 2), bMax = 0, tMax = 0, mMax = 0;
+      for (var c = 0; c < K; c++) {
+        var frac = (counts[c] || 0) / n;
+        if (c < h) { if (frac > bMax) bMax = frac; }
+        else if (c >= K - h) { if (frac > tMax) tMax = frac; }
+        else if (frac > mMax) mMax = frac;
+      }
+      var bottomTwo = ((counts[0] || 0) + (counts[1] || 0)) / n;
+      var topTwo = ((counts[K - 1] || 0) + (counts[K - 2] || 0)) / n;
+      var minCamp = Math.min(bottomTwo, topTwo);
+      var calmFrac = Math.abs(st.mean - (K + 1) / 2) / ((K - 1) / 2);
+      var dipFrac = Math.min(bMax, tMax) - mMax;
+      if (st.bMoment > CONST.BIMODAL_B && bMax > mMax && tMax > mMax &&
+          dipFrac >= CONST.BIMODAL_MIN_DIP && calmFrac <= CONST.BIMODAL_CALM_FRAC &&
+          minCamp >= CONST.BIMODAL_MIN_CAMP && n >= CONST.BIMODAL_MIN_BASE) {
+        var dist = [];
+        for (var d = 0; d < K; d++) dist.push(Math.round((counts[d] || 0) / n * 100));
+        flagged.push({ code: q.code, title: q.title, b: st.b, mean: st.mean, scaleMax: K,
+          dipFrac: dipFrac, camps: { bottom: bottomTwo, top: topTwo }, dist: dist });
+      }
+    });
+    if (!flagged.length) return { id: "bimodal", kind: "bimodal", nullResult: true, scanned: bm.questions.length };
+    flagged.sort(function (a, b) { return b.dipFrac - a.dipFrac; });
+    return { id: "bimodal", kind: "bimodal", subject: "Hidden disagreement",
+      scanned: bm.questions.length, flaggedCount: flagged.length, questions: flagged };
+  }
+  takeout._bimodalityPattern = bimodalityPattern;
+
+  /**
    * Build the patterns object from gathered inputs. Pure: same inputs always give
    * the same patterns. Assembles GROUP + SPLIT + CO-MOVEMENT + WEAK/STRONG AREA +
    * MOVEMENT, omitting any that cannot be computed (graceful degradation). When the
@@ -432,6 +518,10 @@
 
     var comove = comovementPattern(inputs.comove);
     if (comove) patterns.push(comove);
+    var odd = oddOnePattern(inputs.fdr, gate);
+    if (odd) patterns.push(odd);
+    var bimodal = bimodalityPattern(inputs.bimodal);
+    if (bimodal) patterns.push(bimodal);
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
     var moved = movementPattern(inputs.apex || []);
     if (moved) patterns.push(moved);

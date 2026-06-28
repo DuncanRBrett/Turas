@@ -46,6 +46,13 @@
       return '<div class="tko-ph">' + p.bundleCount + (p.bundleCount === 1 ? " set" : " sets") +
         " of co-moving questions</div>";
     }
+    if (p.kind === "odd") {
+      return '<div class="tko-ph">' + fmt.escapeHtml(p.column) + "</div>" + ui.bannerChip(p.group);
+    }
+    if (p.kind === "bimodal") {
+      return '<div class="tko-ph">' + p.flaggedCount + (p.flaggedCount === 1 ? " question" : " questions") +
+        " split into two camps</div>";
+    }
     return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>";
   }
 
@@ -77,6 +84,16 @@
         '<div class="tko-note">Scanned ' + p.pairCount + " question pairs · controlled for the " +
         "survey-wide tendency to agree · only sets that cohere beyond that baseline survive.</div>";
     }
+    if (p.kind === "odd") {
+      var rows = ui.oddRow(p.flip) + (p.secondary || []).map(function (s) { return ui.oddRow(s); }).join("");
+      return rows + '<div class="tko-cap">Out of ' + p.familyCells + " group × question cells, this one " +
+        "opposes the group’s own direction and survives multiplicity correction.</div>";
+    }
+    if (p.kind === "bimodal") {
+      var qrows = (p.questions || []).map(function (q) { return ui.bimodalRow(q); }).join("");
+      return qrows + '<div class="tko-note">The average sits mid-scale, but the answers pile up at both ' +
+        "ends — read the split, not the mean.</div>";
+    }
     // movement
     if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
     var rows = (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "");
@@ -87,7 +104,8 @@
   /** Deep-link target per pattern kind. */
   function footHtml(p) {
     var map = { group: ["findings", "see the breakouts →"], split: ["findings", "see the breakdown →"],
-      comove: ["crosstabs", "see the questions →"],
+      comove: ["crosstabs", "see the questions →"], odd: ["findings", "see the breakouts →"],
+      bimodal: ["crosstabs", "see the distributions →"],
       weak: ["dashboard", "see the questions →"], strong: ["dashboard", "see the questions →"],
       moved: ["moved", "see tracking →"] };
     var go = map[p.id] || ["dashboard", "see detail →"];
@@ -95,10 +113,29 @@
       go[1] + "</button></div>";
   }
 
+  /** Caption under a confident-null card — the working that shows it was a real
+   *  test, not a pattern that simply wasn't computed. */
+  function nullCaption(p) {
+    if (p.id === "odd") {
+      return '<div class="tko-cap">Scanned ' + p.familyCells + " group × question cells · an exception " +
+        "must oppose the group’s own direction, clear a real gap, and survive multiplicity correction · 0 survive.</div>";
+    }
+    return '<div class="tko-cap">Scanned ' + p.scanned + " questions for a two-camp split (peaks at both " +
+      "ends, a calm average, real mass in each camp) · none found — not mere spread or skew.</div>";
+  }
+
   /** One pattern as an editable card. The takeaway is keyed by id + subject so a
-   *  saved edit can never resurface under a different subject after a re-run. */
+   *  saved edit can never resurface under a different subject after a re-run.
+   *  A confident-null pattern renders a compact, non-editable "we checked, nothing
+   *  real" card — the visible proof of the never-cry-wolf discipline. */
   function cardHtml(p) {
     var meta = ui.patternMeta(p.id);
+    if (p.nullResult) {
+      return '<article class="tko-pcard tko-null tko-edge-' + meta.cls + '">' +
+        '<div class="tko-ptag tko-on-' + meta.cls + '">' + fmt.escapeHtml(meta.tag) + "</div>" +
+        '<div class="tko-take tko-take-null">' + fmt.escapeHtml(ui.patternSeed(p)) + "</div>" +
+        nullCaption(p) + "</article>";
+    }
     var seed = ui.patternSeed(p);
     var key = p.id + "|" + (p.subject || "");
     var take = takeout.state.getText(key, "takeaway", seed);

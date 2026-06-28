@@ -529,6 +529,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
   --tko-watch:   #245a94;     /* moving — blue   */
   --tko-decide:  #5b4296;     /* fork — violet   */
   --tko-comove:  #0f766e;     /* co-movement — teal */
+  --tko-odd:     #be185d;     /* odd one out — rose */
+  --tko-bimodal: #4f46e5;     /* hidden disagreement — indigo */
   --tko-serif: Georgia, "Times New Roman", "Iowan Old Style", serif;
 }
 .tko-page { gap: 18px; }
@@ -627,9 +629,9 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-howsure-panel { margin-top: -6px; }
 .tko-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tko-pcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 15px 18px; }
-.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); } .tko-edge-split { border-left-color: var(--tko-decide); } .tko-edge-comove { border-left-color: var(--tko-comove); }
+.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); } .tko-edge-split { border-left-color: var(--tko-decide); } .tko-edge-comove { border-left-color: var(--tko-comove); } .tko-edge-odd { border-left-color: var(--tko-odd); } .tko-edge-bimodal { border-left-color: var(--tko-bimodal); }
 .tko-ptag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); } .tko-on-split { color: var(--tko-decide); } .tko-on-comove { color: var(--tko-comove); }
+.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); } .tko-on-split { color: var(--tko-decide); } .tko-on-comove { color: var(--tko-comove); } .tko-on-odd { color: var(--tko-odd); } .tko-on-bimodal { color: var(--tko-bimodal); }
 .tko-ph { font-size: 16px; font-weight: 700; color: var(--ink); margin: 3px 0 0; display: inline-block; }
 .tko-pscore { font-size: 13px; font-weight: 600; color: var(--muted); }
 .tko-take { font-family: var(--tko-serif); font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 11px; }
@@ -640,7 +642,14 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-rmeter { display: grid; grid-template-columns: 1fr 64px; align-items: center; gap: 9px; }
 .tko-track { height: 9px; background: #eef0f7; border-radius: 5px; overflow: hidden; }
 .tko-fill { display: block; height: 100%; border-radius: 5px; background: var(--brand); }
-.tko-fill.tko-strain { background: var(--red); } .tko-fill.tko-weak { background: var(--tko-act); } .tko-fill.tko-strong { background: var(--tko-protect); } .tko-fill.tko-moved { background: var(--tko-watch); }
+.tko-fill.tko-strain { background: var(--red); } .tko-fill.tko-weak { background: var(--tko-act); } .tko-fill.tko-strong { background: var(--tko-protect); } .tko-fill.tko-moved { background: var(--tko-watch); } .tko-fill.tko-odd { background: var(--tko-odd); }
+/* confident-null cards — the visible never-cry-wolf proof */
+.tko-null { background: #fbfbfd; }
+.tko-take-null { font-style: italic; color: var(--muted); }
+/* two-camp distribution bar (hidden disagreement) */
+.tko-bimobar { display: flex; height: 16px; border-radius: 5px; overflow: hidden; margin: 5px 0 2px; background: #eef0f7; }
+.tko-seg { display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; white-space: nowrap; min-width: 0; }
+.tko-seg-low { background: var(--red); } .tko-seg-mid { background: #d7dae3; color: var(--muted); } .tko-seg-high { background: var(--tko-protect); }
 .tko-rv { font-size: 11.5px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .tko-rest { color: var(--faint); font-weight: 400; }
 .tko-move { font-size: 10px; font-weight: 700; margin-left: 3px; }

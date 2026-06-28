@@ -17,6 +17,8 @@
     group: { tag: "The group under strain", cls: "strain" },
     split: { tag: "Which split matters most", cls: "split" },
     comove: { tag: "Questions that move together", cls: "comove" },
+    odd: { tag: "The odd one out", cls: "odd" },
+    bimodal: { tag: "Hidden disagreement", cls: "bimodal" },
     weak: { tag: "Weakest area", cls: "weak" },
     strong: { tag: "Strongest area", cls: "strong" },
     moved: { tag: "What moved", cls: "moved" }
@@ -86,6 +88,30 @@
     return '<div class="tko-bundle">' + heading + members + cohesion + "</div>";
   };
 
+  /** The exception row for the odd-one-out: the question, the group's value vs the
+   *  overall, and how far it breaks the group's own usual gap. */
+  ui.oddRow = function (f) {
+    var max = f.scaleMax || 5, w = Math.min(100, Math.max(0, (f.value || 0) / max * 100)).toFixed(1);
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(f.qtitle) +
+      ' <span class="tko-badge tko-survives">survives correction</span></div>' +
+      '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-odd" style="width:' +
+      w + '%"></span></span><span class="tko-rv">' + Number(f.value).toFixed(1) +
+      '<span class="tko-rest"> / ' + Number(f.total).toFixed(1) + "</span></span></div></div>";
+  };
+
+  /** A two-camp distribution bar (low | middle | high) for hidden disagreement. */
+  ui.bimodalRow = function (q) {
+    var K = q.scaleMax, h = Math.floor(K / 2);
+    var low = 0, mid = 0, high = 0;
+    q.dist.forEach(function (pct, i) { if (i < h) low += pct; else if (i >= K - h) high += pct; else mid += pct; });
+    var seg = function (cls, v) { return v > 0 ? '<span class="tko-seg tko-seg-' + cls +
+      '" style="width:' + v + '%">' + (v >= 12 ? v + "%" : "") + "</span>" : ""; };
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(q.title) + "</div>" +
+      '<div class="tko-bimobar">' + seg("low", low) + seg("mid", mid) + seg("high", high) + "</div>" +
+      '<div class="tko-cap">' + low + "% low · " + high + "% high · mean " + Number(q.mean).toFixed(1) +
+      " (looks calm)</div></div>";
+  };
+
   /** A two-sided mover line for the "what moved" card (▲ riser / ▼ faller). */
   ui.moverRow = function (m, dir) {
     return '<div class="tko-mrow tko-mv-' + dir + '">' + (dir === "up" ? "▲ " : "▼ ") +
@@ -146,6 +172,20 @@
       return b0.size + " questions move together as one — " + b0.anchor.a + " and " +
         b0.anchor.b + " anchor them" + more + ". Treat the shared driver once, not " +
         "question by question.";
+    }
+    if (p.id === "odd") {
+      if (p.nullResult) return "No group breaks its own pattern — every exception is too small to matter " +
+        "or sits on a base too thin to trust.";
+      var f = p.flip, low = p.direction === "low-but-high";
+      return p.column + " runs " + (low ? "below" : "above") + " the overall almost everywhere — yet on " +
+        "“" + f.qtitle + "” it is unexpectedly " + (low ? "higher" : "lower") + " (" +
+        Number(f.value).toFixed(1) + " vs " + Number(f.total).toFixed(1) + ", against its usual " +
+        (f.meanGap >= 0 ? "+" : "−") + Math.abs(f.meanGap).toFixed(2) + "). The exception worth explaining.";
+    }
+    if (p.id === "bimodal") {
+      if (p.nullResult) return "No hidden disagreement — every question's average reflects a single camp, not two.";
+      return p.flaggedCount + (p.flaggedCount === 1 ? " question splits" : " questions split") +
+        " the room into two camps the average hides — read the distribution, not the mean.";
     }
     if (p.id === "weak") {
       return p.subject + " is the weakest area — its questions cluster low" +
