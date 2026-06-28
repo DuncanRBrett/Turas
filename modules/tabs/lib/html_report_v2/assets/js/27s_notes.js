@@ -22,7 +22,7 @@
       });
     }
     try {
-      var raw = global.localStorage && localStorage.getItem(KEY);
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
       if (raw) {
         var own = JSON.parse(raw) || {};
         Object.keys(own).forEach(function (k) { cache[k] = own[k]; });
@@ -33,7 +33,7 @@
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(KEY, JSON.stringify(store()));
+      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
     } catch (e) { /* in-memory only */ }
   }
 

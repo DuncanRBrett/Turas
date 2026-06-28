@@ -24,7 +24,7 @@
       items = JSON.parse(JSON.stringify(TR.userState.story));
     }
     try {
-      var raw = global.localStorage && localStorage.getItem(KEY);
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
       if (raw) {
         var own = JSON.parse(raw) || [];
         if (own.length) items = own;
@@ -35,7 +35,7 @@
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(KEY, JSON.stringify(load()));
+      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(load()));
     } catch (e) { /* in-memory only */ }
     if (typeof document === "undefined") return;   // headless (node gate)
     var badge = document.getElementById("story-count");

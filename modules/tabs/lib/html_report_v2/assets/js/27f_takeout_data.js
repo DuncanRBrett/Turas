@@ -430,7 +430,7 @@
     cache = { version: VERSION, text: {}, veto: {}, apex: null };
     if (TR.userState && TR.userState.takeout) merge(cache, TR.userState.takeout, VERSION);
     try {
-      var raw = global.localStorage && localStorage.getItem(KEY);
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
       if (raw) merge(cache, JSON.parse(raw) || {}, VERSION);
     } catch (e) { /* island-only context */ }
     return cache;
@@ -448,7 +448,7 @@
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(KEY, JSON.stringify(store()));
+      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
     } catch (e) { /* storage full/blocked — curation stays in memory */ }
   }
 
