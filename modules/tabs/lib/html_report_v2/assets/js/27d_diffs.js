@@ -317,7 +317,11 @@
 
   views.findings = function (host) {
     var banner = diffBanner || TR.d2.state.banner;
-    if (banner.indexOf("custom:") === 0) banner = TR.d2.firstBanner();
+    // The Differences view profiles one real banner's groups against the rest; a
+    // custom or composite selection has no single source variable, so fall back.
+    if (banner.indexOf("custom:") === 0 || banner.indexOf("composite:") === 0) {
+      banner = TR.d2.firstBanner();
+    }
     var dual = TR.d2.state.sigMode === "dual";
     var all = collectFindings(banner);
     // 95% findings get the full budget; nearly-significant (80%) ones get their

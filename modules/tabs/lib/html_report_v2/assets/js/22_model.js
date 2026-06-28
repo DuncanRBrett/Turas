@@ -164,6 +164,7 @@
     return { source: "computed", columns: columns, rows: rows,
       notRecomputable: !canRecompute,
       maskCount: TR.stats.maskCount(mask), custom: !!spec.custom,
+      composite: !!spec.composite,
       customSource: spec.source ? spec.source.code : null };
   }
 
@@ -358,6 +359,108 @@
     });
   }
 
+  /** Arrow for a z-score vs the rest: ▲/▼ at 95%, hollow ▵/▿ at 80% (dual). */
+  function compositeArrow(z, dual) {
+    if (z === null) return "";
+    if (z > TR.stats.Z95) return "▲";
+    if (z < -TR.stats.Z95) return "▼";
+    if (dual && z > TR.stats.Z80) return "▵";
+    if (dual && z < -TR.stats.Z80) return "▿";
+    return "";
+  }
+
+  /**
+   * Significance for a COMPOSITE (profile) banner: each spotlight column is
+   * tested against THE REST of the sample (everyone NOT in that column).
+   *
+   * Pairwise column-vs-column letters are deliberately NOT produced. A
+   * composite's columns can overlap (a respondent can be in two of them), which
+   * breaks the disjoint-samples assumption behind the two-proportion z-test —
+   * running it would print plausible-but-wrong letters. Column-vs-rest is
+   * disjoint by construction (column and not-column never share a respondent),
+   * so it is always valid, and it is the natural read for a profile banner:
+   * "does this group stand out from everyone else?". Bidirectional — ▲ above the
+   * rest, ▼ below; dual mode adds the 80% level as hollow ▵ / ▿.
+   *
+   * The "rest" recompute mirrors the Differences view (27d_diffs restPct) so the
+   * test and its denominators reconcile with that view — notably a box-scored
+   * NET takes its numerator from box membership but its denominator from the
+   * full answered base, so a no-box respondent (e.g. Neutral on a shown scale)
+   * still counts in the base. Runs on the computed model while rows are still
+   * 1:1 with q.rows (before hide / sort) and writes per cell, so it survives both.
+   */
+  function applyCompositeSignificance(viewModel, q, bannerId, filters, dual) {
+    var spec = TR.stats.columnsFor(bannerId);
+    if (!spec.composite) return;
+    var cols = spec.columns;
+    var mask = TR.stats.mask(filters);
+    var threshold = viewModel.lowBaseThreshold;
+    var n = TR.MICRO.n;
+    // Each column's disjoint complement ("the rest"), built once and reused for
+    // every row; index 0 (Total) has no complement and is never tested.
+    var rests = cols.map(function (c, i) {
+      if (i === 0 || !c.member) return null;
+      var rest = new Uint8Array(n);
+      for (var r = 0; r < n; r++) rest[r] = c.member[r] ? 0 : 1;
+      return { member: rest };
+    });
+    var restCols = cols.map(function (c, i) { return i === 0 ? { member: null } : rests[i]; });
+    // One tabulation pass for the columns and one for their complements covers
+    // every category row + base; means and NETs recompute per row below.
+    var colTab = TR.stats.tabulate(q, cols, mask);
+    var restTab = TR.stats.tabulate(q, restCols, mask);
+    var colMeans = TR.stats.indexMeans(q, cols, mask);
+    var restMeans = colMeans ? TR.stats.indexMeans(q, restCols, mask) : null;
+    var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
+
+    // Two-proportion z of a column vs its rest, gated by the low-base threshold
+    // and the test's own preconditions (propZ returns null when either fails).
+    var propZrest = function (pCol, effCol, pRest, effRest) {
+      if (pCol === null || pRest === null || !effCol || effCol < threshold) return null;
+      return TR.stats.propZ(pCol * effCol, effCol, pRest * effRest, effRest);
+    };
+
+    viewModel.rows.forEach(function (row, ri) {
+      var isMean = row.kind === "mean";
+      var skip = row.diff || (isMean && isStdDevRow(row.label));
+      row.cells.forEach(function (cell, ci) {
+        cell.sig = "";                       // clears any (empty) pairwise letters
+        if (ci === 0 || skip) return;
+        var z = null;
+        if (isMean) {
+          if (!colMeans || !restMeans) return;
+          var cm = colMeans[ci], rm = restMeans[ci];
+          if (!cm || cm.mean === null || !cm.k || cm.k < threshold) return;
+          if (!rm || rm.mean === null || !rm.k) return;
+          z = TR.stats.meanZ(cm.mean, cm.sd, cm.k, rm.mean, rm.sd, rm.k);
+        } else if (row.kind === "net") {
+          var members = q.net_members && q.net_members[String(ri)];
+          if (members && members.length) {
+            var cc = TR.stats.netCounts(q, members, [cols[ci]], mask)[0];
+            var rc = TR.stats.netCounts(q, members, [rests[ci]], mask)[0];
+            z = propZrest(cc.wbase ? cc.n / cc.wbase : null, cc.effBase,
+              rc.wbase ? rc.n / rc.wbase : null, rc.effBase);
+          } else if (boxes) {
+            // box-scored NET: numerator from box membership, denominator from the
+            // FULL answered base (colTab / restTab) — matches restPct.
+            var cb = TR.stats.boxCounts(q.code, ri, [cols[ci]], mask)[0];
+            var rb = TR.stats.boxCounts(q.code, ri, [rests[ci]], mask)[0];
+            var cFull = colTab[ci], rFull = restTab[ci];
+            z = propZrest(cFull.wbase ? cb.n / cFull.wbase : null, cFull.effBase,
+              rFull.wbase ? rb.n / rFull.wbase : null, rFull.effBase);
+          } else {
+            return;
+          }
+        } else {                             // category row
+          var ct = colTab[ci], rt = restTab[ci];
+          z = propZrest(ct.wbase ? (ct.counts[ri] || 0) / ct.wbase : null, ct.effBase,
+            rt.wbase ? (rt.counts[ri] || 0) / rt.wbase : null, rt.effBase);
+        }
+        cell.sig = compositeArrow(z, dual);
+      });
+    });
+  }
+
   /** Drop hidden columns from a model (Total is never hidden). */
   function applyHiddenColumns(viewModel, hiddenLabels) {
     if (!hiddenLabels || !hiddenLabels.length) return viewModel;
@@ -417,14 +520,15 @@
     var q = TR.d2.questionByCode(code);
     if (!q) return null;
     var custom = bannerId && bannerId.indexOf("custom:") === 0;
+    var composite = bannerId && bannerId.indexOf("composite:") === 0;
     var filtered = filters && filters.length > 0;
-    var needCompute = custom || filtered;
+    var needCompute = custom || composite || filtered;
     var viewModel;
     if (needCompute && TR.d2.hasMicrodata()) {
       viewModel = computedModel(q, bannerId, filters, opts.dual);
     } else {
       viewModel = publishedModel(q,
-        custom ? TR.d2.firstBanner() : bannerId, opts.dual);
+        custom || composite ? TR.d2.firstBanner() : bannerId, opts.dual);
     }
     // Finite population correction applies to the DEFAULT (published) view of a
     // population report — never under a filter / custom banner, where a
@@ -434,7 +538,7 @@
     // a weighted base's design effect isn't in the published layer; weighted
     // reports still get the narrower intervals).
     var weighted = !!(TR.AGG.project && TR.AGG.project.weighted);
-    viewModel.fpcDefault = !custom && !filtered && TR.conf.reportHasPopulation();
+    viewModel.fpcDefault = !custom && !composite && !filtered && TR.conf.reportHasPopulation();
     viewModel.code = q.code;
     viewModel.title = q.title;
     viewModel.type = q.type;
@@ -450,6 +554,13 @@
     // it survives both). Unweighted population reports only.
     if (viewModel.fpcDefault && !weighted) {
       applyFpcSignificance(viewModel, q, opts.dual);
+    }
+    // Composite (profile) banners replace pairwise letters with vs-the-rest
+    // arrows — only meaningful on the microdata recompute (its columns carry the
+    // membership the test needs); a no-microdata fallback rendered the first
+    // real banner instead, so guard on the computed source.
+    if (composite && viewModel.source === "computed") {
+      applyCompositeSignificance(viewModel, q, bannerId, filters, opts.dual);
     }
     if (opts.intervals) attachIntervals(viewModel, q);
     var hidden = opts.hiddenCols !== undefined

@@ -22,7 +22,9 @@
       cache = JSON.parse(JSON.stringify(TR.userState.banners));
     }
     try {
-      var raw = global.localStorage && localStorage.getItem(KEY);
+      // Scoped per report so a saved banner never leaks between survey reports
+      // sharing a browser origin (see d2.storeKey).
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
       if (raw) {
         var own = JSON.parse(raw);
         if (Array.isArray(own)) cache = own;
@@ -33,7 +35,7 @@
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(KEY, JSON.stringify(store()));
+      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
     } catch (e) { /* storage full/blocked — saved banners stay in-memory */ }
   }
 

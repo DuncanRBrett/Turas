@@ -72,6 +72,20 @@ label.fpick-q { display: block; cursor: pointer; }
 .fval { display: block; padding: 6px 9px; border-radius: 7px; cursor: pointer; font-size: 12.5px; }
 .fval:hover { background: var(--soft); }
 .fval input { accent-color: var(--brand); margin-right: 7px; }
+/* composite (profile) banner builder */
+.fval.pick { width: 100%; text-align: left; border: none; background: none; color: var(--ink); }
+.cb .cb-help { font-size: 12px; color: var(--muted); margin: 0 0 10px; max-width: 640px; line-height: 1.5; }
+.cb-cols { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cb-col { display: inline-flex; align-items: center; gap: 7px; background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; }
+.cb-col.total { background: var(--brand); color: #fff; border-color: var(--brand); }
+.cb-col em { font-style: normal; color: var(--muted); font-weight: 600; font-size: 10.5px; }
+.cb-col button { border: none; background: none; cursor: pointer; color: var(--muted); font-weight: 700; font-size: 11px; }
+.cb-col button:hover { color: var(--red); }
+.cb-add { border: 1px dashed var(--line); background: #fff; border-radius: 8px; padding: 6px 13px; font-size: 12.5px; font-weight: 600; color: var(--brand); cursor: pointer; margin-bottom: 12px; }
+.cb-add:hover { border-color: var(--brand); }
+.cb-save { display: flex; gap: 8px; align-items: center; }
+.cb-save input { padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; font: 13px var(--font); min-width: 240px; }
+.cb-save button[disabled] { opacity: .45; cursor: not-allowed; }
 
 /* ---------- generic ---------- */
 .tabhost { max-width: 1480px; margin: 0 auto; padding: 18px 28px 80px; }
@@ -126,6 +140,7 @@ button.primary:hover { filter: brightness(1.18); }
 .btab.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btab.custom { background: var(--accent); border-color: var(--accent); }
 .btab.saved { border-color: var(--accent); }
+.btab.saved.composite { border-color: var(--brand); border-style: solid; }
 .btab.saved.on { background: var(--brand); border-color: var(--brand); }
 .btab.add { border-style: dashed; }
 .btab-x { margin-left: 7px; opacity: .7; font-size: 10.5px; font-weight: 700; }
@@ -154,6 +169,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .ct .rm td { font-style: italic; color: #475569; font-weight: 600; background: #faf8f4; }
 .ct .rm td.lab { border-left: 3px solid var(--accent); padding-left: 11px; }
 .ct .sg { color: var(--green); font-weight: 800; font-size: 9px; margin-left: 3px; font-family: ui-monospace, monospace; }
+.ct .sg.dn { color: var(--red, #c0392b); }   /* composite ▼ / ▿ — significantly below the rest */
 .ct .fq { font-size: 10px; color: var(--muted); }
 .ct .dbar { height: 4px; background: var(--soft); border-radius: 2px; margin-top: 4px; overflow: hidden; }
 .ct .dbf { height: 100%; background: var(--brand); opacity: .55; border-radius: 2px; }

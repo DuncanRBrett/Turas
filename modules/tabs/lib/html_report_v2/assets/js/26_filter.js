@@ -208,4 +208,156 @@
 
   filterBar.openCustomBanner = function () { openPicker(true); };
 
+  /* ---------------- composite (profile) banner builder ---------------- */
+
+  // In-progress columns + name while the builder is open. A composite is a
+  // hand-picked set of spotlight groups (each from any question) shown as columns
+  // across EVERY table and tested vs the rest — see 28c_composite.js.
+  var compositeDraft = [], compositeName = "";
+
+  /** Spotlight-group options for a question: detail categories, decomposable NET
+   *  groupings (expanded to member rows) and hidden-scale box groupings — the
+   *  same value set the audience filter offers, each ready to become one column.
+   *  Each option already carries {rows, box?} so columnsFor rebuilds membership. */
+  function groupOptionsFor(q) {
+    var opts = [];
+    TR.d2.catRows(q).forEach(function (cat) {
+      opts.push({ label: cat.label, rows: [cat.index] });
+    });
+    q.rows.forEach(function (r, ri) {
+      if (r.kind === "net" && q.net_members && q.net_members[String(ri)]) {
+        opts.push({ label: r.label, rows: q.net_members[String(ri)].slice(), net: true });
+      }
+    });
+    TR.d2.boxRows(q).forEach(function (br) {
+      opts.push({ label: br.label, rows: [br.index], box: br.index, net: true });
+    });
+    return opts;
+  }
+
+  filterBar.openCompositeBuilder = function () {
+    compositeDraft = [];
+    compositeName = "";
+    renderCompositeBuilder();
+  };
+
+  function renderCompositeBuilder() {
+    var holder = document.getElementById("fpicker");
+    if (!holder) return;
+    holder.hidden = false;
+    var cols = compositeDraft.map(function (c, i) {
+      return '<li class="cb-col"><span>' + fmt.escapeHtml(c.label) +
+        ' <em>' + fmt.escapeHtml(c.code) + "</em></span>" +
+        '<button data-cbdel="' + i + '" aria-label="Remove column">✕</button></li>';
+    }).join("");
+    holder.innerHTML = '<div class="fpick cb"><div class="fpick-head">' +
+      "Build a composite banner" +
+      '<button data-close aria-label="Close">✕</button></div>' +
+      '<p class="cb-help">Add the groups you want as columns — each can come from a ' +
+      "different question (e.g. Marketing, Admin, Cape Town, Tenure 5y+). Total is " +
+      "always the first column, and every group is tested against the rest of the " +
+      "sample, so columns may overlap.</p>" +
+      '<ol class="cb-cols"><li class="cb-col total">Total</li>' + cols + "</ol>" +
+      '<button class="cb-add" data-cbadd>+ Add a group</button>' +
+      '<div class="cb-save"><input type="text" id="cb-name" maxlength="60" ' +
+      'placeholder="Name this banner…" value="' + fmt.escapeHtml(compositeName) + '">' +
+      '<button class="primary" data-cbsave' + (compositeDraft.length ? "" : " disabled") +
+      ">Save &amp; apply</button></div></div>";
+    holder.querySelector("[data-close]").addEventListener("click", function () {
+      holder.hidden = true;
+    });
+    var nameInput = holder.querySelector("#cb-name");
+    if (nameInput) nameInput.addEventListener("input", function () {
+      compositeName = nameInput.value;
+    });
+    holder.querySelectorAll("[data-cbdel]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        compositeDraft.splice(parseInt(btn.getAttribute("data-cbdel"), 10), 1);
+        renderCompositeBuilder();
+      });
+    });
+    holder.querySelector("[data-cbadd]").addEventListener("click", function () {
+      pickCompositeQuestion(holder);
+    });
+    var saveBtn = holder.querySelector("[data-cbsave]");
+    if (saveBtn) saveBtn.addEventListener("click", function () {
+      var name = (compositeName || "").trim();
+      if (!compositeDraft.length) { TR.shell.toast("Add at least one group"); return; }
+      if (!name) { TR.shell.toast("Name the composite banner first"); return; }
+      var id = TR.compositeBanners.add({ name: name,
+        columns: compositeDraft.map(function (c) {
+          var col = { code: c.code, label: c.label, rows: c.rows };
+          if (c.box != null) col.box = c.box;
+          return col;
+        }) });
+      if (!id) { TR.shell.toast("Could not save — add at least one group"); return; }
+      TR.d2.state.banner = id;
+      holder.hidden = true;
+      TR.shell.route();
+      TR.shell.toast("Composite banner applied — saved across reloads and in saved copies");
+    });
+  }
+
+  /** Step 2a: pick which question the next column comes from (reuses the
+   *  searchable question list); "Back" returns to the builder. */
+  function pickCompositeQuestion(holder) {
+    holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
+      "Add a group — pick a question" +
+      '<button data-cbback aria-label="Back">‹ Back</button></div>' +
+      '<input type="search" id="fpick-search" placeholder="Search questions…">' +
+      '<div class="fpick-list">' + TR.AGG.questions.map(function (q) {
+        return '<button class="fpick-q" data-code="' + q.code + '" data-search="' +
+          fmt.escapeHtml((q.code + " " + q.title).toLowerCase()) + '">' +
+          '<span class="qc">' + q.code + "</span> " + fmt.escapeHtml(q.title) +
+          "</button>";
+      }).join("") + "</div></div>";
+    holder.querySelector("[data-cbback]").addEventListener("click", function () {
+      renderCompositeBuilder();
+    });
+    holder.querySelector("#fpick-search").addEventListener("input", function (e) {
+      var term = e.target.value.trim().toLowerCase();
+      holder.querySelectorAll(".fpick-q").forEach(function (b) {
+        b.classList.toggle("hidden",
+          !!term && b.getAttribute("data-search").indexOf(term) === -1);
+      });
+    });
+    holder.querySelectorAll(".fpick-q").forEach(function (b) {
+      b.addEventListener("click", function () {
+        pickCompositeValue(b.getAttribute("data-code"), holder);
+      });
+    });
+    holder.querySelector("#fpick-search").focus();
+  }
+
+  /** Step 2b: pick ONE group from the chosen question to become a column. */
+  function pickCompositeValue(code, holder) {
+    var q = TR.d2.questionByCode(code);
+    var options = groupOptionsFor(q);
+    if (!options.length) {
+      TR.shell.toast("This question has no groups to use as a column");
+      pickCompositeQuestion(holder);
+      return;
+    }
+    holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
+      fmt.escapeHtml(q.code + " — pick one group") +
+      '<button data-cbback aria-label="Back">‹ Back</button></div>' +
+      '<div class="fpick-vals">' + options.map(function (opt, i) {
+        return '<button class="fval pick" data-opt="' + i + '">' +
+          fmt.escapeHtml(opt.label) +
+          (opt.net ? ' <span class="kindtag">group</span>' : "") + "</button>";
+      }).join("") + "</div></div>";
+    holder.querySelector("[data-cbback]").addEventListener("click", function () {
+      pickCompositeQuestion(holder);
+    });
+    holder.querySelectorAll("[data-opt]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var opt = options[parseInt(btn.getAttribute("data-opt"), 10)];
+        var col = { code: code, label: opt.label, rows: opt.rows };
+        if (opt.box != null) col.box = opt.box;
+        compositeDraft.push(col);
+        renderCompositeBuilder();
+      });
+    });
+  }
+
 })(typeof window !== "undefined" ? window : globalThis);

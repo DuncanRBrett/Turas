@@ -1,6 +1,45 @@
 # Composite banner — handover for a new session
 
-**Status:** NOT STARTED. This is item #4 of the tabs‑v2 enhancement batch
+**Status: BUILT (2026‑06‑28), uncommitted on `feature/tabs-executive-takeout`.**
+Shipped as a **profile banner** per Duncan's clarified use case: a hand‑picked set
+of spotlight groups (Total · Marketing · Admin · Cape Town · Tenure 5y+…), each
+from any question, shown as columns across **every** table. The silent‑error trap
+below was dissolved by the design, not just guarded: significance is **each column
+vs THE REST** (disjoint by construction), never pairwise — so overlapping columns
+can't produce a wrong letter because no pairwise letter is ever produced.
+
+## As built
+- **vs‑the‑rest significance, bidirectional.** Each column tested against its
+  complement (everyone not in it): `▲` above the rest / `▼` below at 95%, hollow
+  `▵`/`▿` at the 80% level in dual mode. Mirrors the Differences view's `restPct`
+  (weighted‑safe; box‑scored NETs keep the full answered base as denominator).
+  Pairwise letters are impossible because composite columns carry an empty letter.
+- **Engine:** `columnsFor` composite branch (21_stats.js) → heterogeneous member
+  columns; `applyCompositeSignificance` (22_model.js) writes the arrows per cell;
+  `forQuestion` routes composite through the microdata recompute and excludes it
+  from the FPC re‑letter pass. Render branches on `model.composite` (23_render.js).
+- **Persistence:** `TR.compositeBanners` store (28c_composite.js) — localStorage +
+  saved‑copy island (`composites`), same shape as saved custom banners. The
+  localStorage key is scoped per report via `d2.storeKey` (= base + project name +
+  wave) so a composite never leaks between survey reports sharing a browser origin;
+  the same wrap was applied to the saved‑custom‑banner store (28b). The other
+  per‑report stores (insights, notes, story, report fields, takeout curation) share
+  the same fixed‑global‑key root cause and can take the identical `d2.storeKey` wrap.
+- **UI:** builder in 26_filter.js (`openCompositeBuilder` — pick question → pick one
+  group → repeat → name → save); saved `▦` tabs + "+ Composite…" button + remove in
+  25_cards.js; one‑line methodology note in the context strip; `bannerDescription`.
+- **Fallbacks:** Differences / dashboard‑heatmap resolve composite → firstBanner;
+  snap‑pins resolve via `pinBanner()`; pinned current‑question exhibits keep the
+  composite faithfully (spec travels in the island).
+- **Verified:** `tests/composite_tests.mjs` (7/7 — heterogeneous overlap, ▲/▼/null,
+  mean Welch path, dual ▵, the no‑pairwise‑letter trap, Total never tested) + full
+  38‑module vm load + takeout 27/27 + bundler 25/25 + html_report 87/87.
+
+Everything below is the original pre‑build design note, kept for rationale.
+
+---
+
+**Original status:** NOT STARTED. This was item #4 of the tabs‑v2 enhancement batch
 (`project_tabs_v2_enhancement_batch` in memory). The other six items are done and
 committed (`7ee36f34` feat, `092c3e44` template fix) on branch
 `feature/tabs-executive-takeout`. This is the one we deliberately left for a fresh,

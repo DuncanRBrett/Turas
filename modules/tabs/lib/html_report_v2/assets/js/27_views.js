@@ -130,7 +130,7 @@
   views.dashboard = function (host) {
     var qs = indexQuestions();
     var hb = heatBanner || TR.d2.state.banner;
-    if (hb.indexOf("custom:") === 0) hb = TR.d2.firstBanner();
+    if (hb.indexOf("custom:") === 0 || hb.indexOf("composite:") === 0) hb = TR.d2.firstBanner();
     var byCat = {}, models = {}, heatModels = {};
     qs.forEach(function (q) {
       models[q.code] = modelFor(q.code);

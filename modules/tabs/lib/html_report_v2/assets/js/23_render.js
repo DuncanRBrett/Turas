@@ -215,8 +215,19 @@
           body = '<span class="v">' + fmtPct(cell.pct) + "</span>";
         }
         if (cell.sig) {
-          body += '<span class="sg" title="Significantly higher than column(s) ' +
-            fmt.escapeHtml(cell.sig) + '">▲' + fmt.escapeHtml(cell.sig) + "</span>";
+          if (model.composite) {
+            // composite (profile) banner: cell.sig is a vs-the-rest arrow
+            // (▲ above / ▼ below the rest), not column letters — render it as-is
+            // with a matching tooltip and a down-class for the red ▼ / ▿.
+            var down = /[▼▿]/.test(cell.sig);
+            body += '<span class="sg' + (down ? " dn" : "") +
+              '" title="Significantly ' + (down ? "lower" : "higher") +
+              ' than the rest of the sample (everyone not in this column)">' +
+              fmt.escapeHtml(cell.sig) + "</span>";
+          } else {
+            body += '<span class="sg" title="Significantly higher than column(s) ' +
+              fmt.escapeHtml(cell.sig) + '">▲' + fmt.escapeHtml(cell.sig) + "</span>";
+          }
         }
         if (i === 0 && opts.showDeltas && row.delta) body += deltaChip(row.delta);
         if (opts.intervals && cell.ci) {
@@ -489,7 +500,8 @@
           fill: catColours ? catColours[ri] : palette[k % palette.length], rx: 3 }));
         body.push(S.text(LABEL + w + 6, barY + barH * 0.78,
           (meanScale ? fmtMean(v) : fmtPct(v)) +
-          (cols.length === 1 && cell && cell.sig ? " ▲" + cell.sig : ""),
+          (cols.length === 1 && cell && cell.sig
+            ? " " + (/^[▲▼▵▿]/.test(cell.sig) ? "" : "▲") + cell.sig : ""),
           { "font-size": cols.length > 1 ? 10 : 11.5, "font-weight": 600,
             fill: "#1c2333" }));
         barY += barH + 2;

@@ -375,6 +375,17 @@
         '<span class="btab-x" data-banner-remove="' + id +
         '" role="button" aria-label="Remove saved banner">✕</span></button>');
     });
+    // Saved composite (profile) banners — same persistence as saved custom
+    // banners; the ▦ glyph marks a hand-built set of spotlight groups (each from
+    // any question, tested vs the rest) rather than one question's options.
+    TR.compositeBanners.all().forEach(function (c) {
+      out.push('<button class="btab saved composite' + (s.banner === c.id ? " on" : "") +
+        '" data-banner="' + c.id +
+        '" title="Composite banner — spotlight groups vs the rest">▦ ' +
+        fmt.escapeHtml(TR.charts.clip(c.name || "Composite", 26)) +
+        '<span class="btab-x" data-banner-remove="' + c.id +
+        '" role="button" aria-label="Remove composite banner">✕</span></button>');
+    });
     // The live (unsaved) custom banner — kept as a tab across navigation so it is
     // not lost when you switch to another banner. Lazy-capture an active custom
     // banner (e.g. restored from the URL hash) into customBanner. ★ save promotes
@@ -397,6 +408,9 @@
     if (TR.d2.hasMicrodata()) {
       out.push('<button class="btab add" data-act="custom-banner" ' +
         'title="Cross this question by any other question">+ Custom…</button>');
+      out.push('<button class="btab add" data-act="composite-banner" ' +
+        'title="Build a profile banner — spotlight groups (e.g. Marketing, Cape Town, ' +
+        'Tenure 5y+) shown across every table and tested vs the rest">+ Composite…</button>');
     }
     return '<div class="btabs" role="group" aria-label="Banner">' + out.join("") + "</div>";
   }
@@ -440,6 +454,11 @@
     var contextBits = [];
     if (s.filters.length) contextBits.push("Filtered: " + TR.d2.filterDescription());
     if (s.banner.indexOf("custom:") === 0) contextBits.push(TR.d2.bannerDescription());
+    if (s.banner.indexOf("composite:") === 0) {
+      contextBits.push(TR.d2.bannerDescription());
+      contextBits.push("each column tested vs the rest of the sample (▲ above / ▼ below); " +
+        "columns may overlap, so they are not compared with one another");
+    }
     var contextStrip = contextBits.length
       ? '<div class="ctxstrip">⚠ ' + fmt.escapeHtml(contextBits.join("  ·  ")) +
         " — shown on every pin and export</div>"
@@ -663,7 +682,8 @@
       if (brem) {
         e.stopPropagation();
         var rid = brem.getAttribute("data-banner-remove");
-        TR.savedBanners.remove(rid);
+        if (rid.indexOf("composite:") === 0) TR.compositeBanners.remove(rid);
+        else TR.savedBanners.remove(rid);
         if (TR.d2.state.banner === rid) TR.d2.state.banner = TR.d2.firstBanner();
         cards2.renderActive();
         return;
@@ -840,6 +860,7 @@
         cards2.renderActive();
       }
       if (action === "custom-banner") TR.filterBar.openCustomBanner();
+      if (action === "composite-banner") TR.filterBar.openCompositeBuilder();
     });
     host.addEventListener("input", function (e) {
       if (e.target.id === "qsearch") {

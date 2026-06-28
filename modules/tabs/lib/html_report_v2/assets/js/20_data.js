@@ -72,6 +72,12 @@
   /** Human-readable description of the current banner selection. */
   d2.bannerDescription = function (banner) {
     banner = banner || d2.state.banner;
+    if (banner && banner.indexOf("composite:") === 0) {
+      var comp = TR.compositeBanners && TR.compositeBanners.get(banner);
+      var nc = comp && comp.columns ? comp.columns.length : 0;
+      return "Composite banner — " + (comp ? comp.name : banner) +
+        " (" + nc + " group" + (nc === 1 ? "" : "s") + " vs the rest)";
+    }
     if (banner && banner.indexOf("custom:") === 0) {
       var bits = banner.split(":");
       var q = d2.questionByCode(bits[1]);
@@ -202,6 +208,20 @@
 
   d2.hasMicrodata = function () {
     return !!(TR.MICRO && TR.MICRO.answers);
+  };
+
+  /**
+   * Per-report localStorage namespace. localStorage is shared across every page
+   * on a browser origin, so two report files opened from the same origin would
+   * otherwise read and write the SAME keys — a composite or saved banner built in
+   * one survey's report would leak into another. Scoping each store key to this
+   * project (name + wave) keeps every report's banners / annotations discrete.
+   * The saved-copy island stays the durable source of truth; this only isolates
+   * the live localStorage cache, so nothing travels between unrelated surveys.
+   */
+  d2.storeKey = function (base) {
+    var p = (TR.AGG && TR.AGG.project) || {};
+    return base + ":" + TR.fmt.slug((p.name || "report") + " " + (p.wave || ""));
   };
 
   d2.filtersActive = function () {

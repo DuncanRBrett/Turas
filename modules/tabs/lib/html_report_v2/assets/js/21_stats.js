@@ -117,6 +117,29 @@
   stats.columnsFor = function (banner) {
     var n = TR.MICRO.n;
     var columns = [{ label: "Total", letter: "", member: null }];
+    if (banner && banner.indexOf("composite:") === 0) {
+      // Profile banner: one spotlight column per stored spec entry, each from a
+      // (possibly different) question and each its own membership. The columns
+      // may OVERLAP, so they carry NO letter — composites are never pairwise
+      // tested; significance is computed vs THE REST (model.applyComposite-
+      // Significance). Unknown token (e.g. a shared hash whose spec never
+      // travelled) shows Total only rather than crashing.
+      var spec = TR.compositeBanners && TR.compositeBanners.get(banner);
+      if (!spec || !spec.columns || !spec.columns.length) {
+        return { columns: columns, composite: true, missing: !spec };
+      }
+      spec.columns.forEach(function (def) {
+        var member;
+        if (def.box != null && TR.MICRO.boxes && TR.MICRO.boxes[def.code]) {
+          member = boxMemberArray(TR.MICRO.boxes[def.code], n, def.box);
+        } else {
+          member = memberArray(TR.MICRO.answers[def.code] || [], n, def.rows || []);
+        }
+        columns.push({ label: def.label, letter: "", member: member,
+          composite: true });
+      });
+      return { columns: columns, composite: true, spec: spec };
+    }
     if (banner && banner.indexOf("custom:") === 0) {
       var bits = banner.split(":");
       var code = bits[1];

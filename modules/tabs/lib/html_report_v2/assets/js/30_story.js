@@ -63,13 +63,14 @@
     return TR.AGG.banner_groups.length ? TR.AGG.banner_groups[0].id : "";
   }
 
-  // The banner to record on a pinned story item. A custom banner is a live
-  // "cross anything by anything" spec that a pinned exhibit can't recompute, so
-  // it resolves to the first banner — or "" (Total) on a Total-only survey.
-  // (addExhibit read banner_groups[0].id unguarded here and crashed on CCS.)
+  // The banner to record on a pinned story item. A custom or composite banner is
+  // a live spec that a pinned exhibit can't recompute, so it resolves to the
+  // first banner — or "" (Total) on a Total-only survey. (addExhibit read
+  // banner_groups[0].id unguarded here and crashed on CCS.)
   function pinBanner() {
-    return TR.d2.state.banner.indexOf("custom:") === 0
-      ? firstBanner() : TR.d2.state.banner;
+    var b = TR.d2.state.banner;
+    return (b.indexOf("custom:") === 0 || b.indexOf("composite:") === 0)
+      ? firstBanner() : b;
   }
   story2._pinBanner = pinBanner;   // exposed for the node gate
 
