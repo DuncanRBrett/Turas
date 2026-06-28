@@ -47,11 +47,19 @@
     var max = e.isMean ? (e.scaleMax || 5) : 100;
     var baseline = (e.rest === null || e.rest === undefined) ? e.overall : e.rest;
     var w = Math.min(100, Math.max(0, (e.value || 0) / max * 100)).toFixed(1);
-    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(e.label) + "</div>" +
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(e.label) +
+      ui.survivesChip(e.survives) + "</div>" +
       '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' + cls +
       '" style="width:' + w + '%"></span></span><span class="tko-rv">' +
       ui.fmtVal(e.isMean, e.value, e.decimals) +
       '<span class="tko-rest"> / ' + ui.fmtVal(e.isMean, baseline, e.decimals) + "</span></span></div></div>";
+  };
+
+  /** A "survives correction" chip on an evidence row whose single-cell difference
+   *  clears multiple-comparison correction (text + colour, never colour alone). */
+  ui.survivesChip = function (on) {
+    return on ? ' <span class="tko-badge tko-survives" title="This single cell survives ' +
+      'Benjamini-Hochberg multiple-comparison correction across the whole grid">survives correction</span>' : "";
   };
 
   /** A small ▲/▼ move chip for a member that shifted significantly, else "". */

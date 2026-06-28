@@ -205,6 +205,96 @@
     };
   }
 
+  /** Scale span (max − min) for the variance floor. Likert-type scales (max <= 10)
+   *  run 1..max so the span is max−1; wider metrics (0..100) run from 0. */
+  function scaleSpan(q) {
+    var max = touchpointMax(q);
+    return max <= 10 ? max - 1 : max;
+  }
+
+  /** Weighted mean of a vector (weights default to 1). */
+  function wMean(x, w) {
+    var sw = 0, sx = 0;
+    for (var i = 0; i < x.length; i++) { var wi = w ? w[i] : 1; sw += wi; sx += wi * x[i]; }
+    return sw ? sx / sw : 0;
+  }
+
+  /**
+   * The shared CELL FAMILY for the multiple-comparison trust-gate AND the
+   * odd-one-out pattern: ONE weighted variance-floored Welch test of each breakout
+   * group vs the rest, on every rated question, from per-respondent scores. No new
+   * R, no FPC (that belongs in the reliability layer). Both downstream patterns read
+   * this single object so there is exactly one Welch computation and one BH pass.
+   *
+   * Returns { cells:[{banner,group,q,qtitle,nIn,gap,welchDiff,welchP,flooredG}],
+   *   groups:[{banner,group,base,below,above,qn,meanGap,dir}], K, groupCount,
+   *   questionCount } or null when microdata is absent.
+   */
+  function gatherCellFamily(views) {
+    var micro = TR.MICRO;
+    if (!micro || !micro.scores || !micro.banner_vars) return null;
+    var weights = micro.weights || null;
+    var proj = (TR.AGG && TR.AGG.project) || {};
+    var conf = TR.conf || {};
+    var census = typeof conf.reportHasPopulation === "function" && conf.reportHasPopulation();
+    // Per-arm floor: in a census a subgroup is most of its own population, so the
+    // analyst's reporting floor (default 5) applies; a true sample keeps n>=30.
+    var floor = census ? (proj.min_report_base || MIN_CENSUS_BASE) : (proj.low_base_threshold || 30);
+    var qs = views.indexQuestions().filter(function (q) {
+      return micro.scores[q.code] && micro.scores[q.code].length;
+    });
+    if (!qs.length) return null;
+    var nResp = micro.n || micro.scores[qs[0].code].length;
+    var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    var cells = [], groupAgg = {}, order = [];
+    groups.forEach(function (g) {
+      var bv = micro.banner_vars[g.id];
+      if (!bv) return;
+      var codeSet = {};
+      for (var r = 0; r < nResp; r++) { var cd = bv[r]; if (cd !== null && cd !== undefined && cd >= 0) codeSet[cd] = true; }
+      var codes = Object.keys(codeSet).map(Number).sort(function (a, b) { return a - b; });
+      var model;
+      try { model = views._modelFor(qs[0].code, g.id); } catch (e) { return; }
+      var cols = (model.columns || []).slice(1);                 // non-Total columns
+      if (codes.length !== cols.length) return;                  // label/order mismatch -> skip banner, never mislabel
+      codes.forEach(function (code, ci) {
+        var label = cols[ci].label;
+        qs.forEach(function (q) {
+          var sc = micro.scores[q.code], vfloor = Math.pow(scaleSpan(q) * 0.1, 2);
+          var gx = [], gw = [], rx = [], rw = [], all = [], allw = [];
+          for (var r = 0; r < nResp; r++) {
+            var v = sc[r]; if (v === null || v === undefined) continue;
+            var cd = bv[r]; if (cd === null || cd === undefined || cd < 0) continue;
+            var w = weights ? weights[r] : 1;
+            all.push(v); allw.push(w);
+            if (cd === code) { gx.push(v); gw.push(w); } else { rx.push(v); rw.push(w); }
+          }
+          if (gx.length < floor || rx.length < floor) return;    // both arms must clear the floor
+          var wt = takeout._welchTest(gx, gw, rx, rw, vfloor);
+          var gap = wMean(gx, gw) - wMean(all, allw);            // vs the overall (for the strain/flip read)
+          var gkey = g.name + "::" + label;
+          var ga = groupAgg[gkey] || (groupAgg[gkey] = { banner: g.name, group: label,
+            base: 0, below: 0, above: 0, qn: 0, gapSum: 0 });
+          if (!ga.qn) order.push(gkey);
+          if (gx.length > ga.base) ga.base = gx.length;
+          ga.qn++; ga.gapSum += gap;
+          if (wt.diff < 0) ga.below++; else if (wt.diff > 0) ga.above++;
+          cells.push({ banner: g.name, group: label, q: q.code, qtitle: q.title, nIn: gx.length,
+            gap: gap, welchDiff: wt.diff, welchP: wt.p, flooredG: wt.flooredG, gkey: gkey });
+        });
+      });
+    });
+    if (!cells.length) return null;
+    var groupsOut = order.map(function (k) {
+      var ga = groupAgg[k];
+      ga.meanGap = ga.qn ? ga.gapSum / ga.qn : 0;
+      ga.dir = ga.meanGap < 0 ? "below" : "above";
+      return ga;
+    });
+    return { cells: cells, groups: groupsOut, K: cells.length,
+      groupCount: groupsOut.length, questionCount: qs.length };
+  }
+
   /** Weighted Pearson between two per-respondent vectors, pairwise-complete.
    *  Returns { r, base } where base is the count of complete pairs. */
   function weightedPearson(x, y, w) {
@@ -286,9 +376,11 @@
     try { lv = gatherLevels(views); } catch (e) { lv = { levels: [], apex: [] }; }
     var comove = null;
     try { comove = gatherComovement(views); } catch (e) { comove = null; }
+    var fdr = null;
+    try { fdr = gatherCellFamily(views); } catch (e) { fdr = null; }
     var reliability = gatherReliability(lv.levels.concat(lv.apex));
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
-    return { columns: columns, levels: lv.levels, apex: lv.apex, comove: comove,
+    return { columns: columns, levels: lv.levels, apex: lv.apex, comove: comove, fdr: fdr,
       reliability: reliability, lowBaseThreshold: lowBase };
   };
 

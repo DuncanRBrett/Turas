@@ -647,6 +647,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-move.up { color: var(--tko-protect); } .tko-move.down { color: var(--red); }
 .tko-note { font-size: 11.5px; color: var(--muted); margin-top: 9px; }
 .tko-cap { font-size: 11px; color: var(--faint); margin-top: 8px; font-style: italic; }
+.tko-badge { font-size: 9.5px; font-weight: 700; letter-spacing: .02em; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+.tko-survives { color: var(--tko-protect); background: #e7f4ee; }
 /* Co-movement bundles */
 .tko-bundle { margin: 10px 0 4px; padding: 10px 12px; background: var(--soft); border-radius: 9px; }
 .tko-bundle + .tko-bundle { margin-top: 8px; }

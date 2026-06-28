@@ -42,7 +42,31 @@
     COMOVE_MIN_PARTIAL: 0.20, // an edge needs partial r >= this (after removing the global factor)
     COMOVE_MIN_BASE: 30,      // ...on at least this many complete pairwise responses
     COMOVE_ALPHA: 0.05,       // Benjamini-Hochberg FDR level across all question pairs
-    COMOVE_MAX_BUNDLES: 3     // bundles shown on the card (largest / most cohesive first)
+    COMOVE_MAX_BUNDLES: 3,    // bundles shown on the card (largest / most cohesive first)
+    // Multiple-comparison trust-gate. Scanning every breakout group x rated
+    // question is hundreds of cells; ~5% look striking by luck, and tiny
+    // homogeneous census cells produce absurd t-stats. Two guards: per-cell BH on
+    // a variance-floored Welch test (badges single-cell claims, seeds odd-one-out),
+    // and a per-group directional sign-test (gates the group/split patterns — a
+    // consistent group like Cape Town has NO single significant cell, so gating it
+    // on per-cell significance would wrongly delete it).
+    VARIANCE_FLOOR_FRACTION: 0.1, // arm sd floored at 10% of the scale SPAN; (span*0.1)^2 (=0.16 on 1..5)
+    FDR_ALPHA: 0.05,          // Benjamini-Hochberg level (both the cell and the group families)
+    FDR_METHOD: "BH",         // PRDS-justified (inter-item r all-positive); NOT Benjamini-Yekutieli
+    BADGE_MIN_BASE: 12,       // a cell earns the "survives correction" chip only on a group arm >= this
+    SIGN_ALPHA: 0.05,         // BH level for the per-group sign-test family (gates group/split)
+    SPLIT_MIN_CONSISTENT: 2,  // the winning split must contain >= this many sign-test-consistent groups
+    // "The odd one out": a group below (above) almost everywhere yet the reverse
+    // on one question — a sign-flip against its OWN direction, large and real.
+    ODD_MIN_GAP: 0.20,        // |gap to overall| floor, scale points
+    ODD_MIN_RESID: 0.30,      // |gap - the group's mean gap| floor — the break from its own pattern
+    ODD_MIN_TEST_BASE: 8,     // soft per-cell base floor so a flip can't rest on a thin census cell
+    // "Hidden disagreement" (bimodality): a calm-looking average hiding two camps.
+    BIMODAL_B: 0.5556,        // moment-form Sarle bimodality coefficient must exceed 5/9 (uniform reference)
+    BIMODAL_CALM_FRAC: 0.25,  // |mean - mid| <= this fraction of the half-range (the average looks calm)
+    BIMODAL_MIN_CAMP: 0.20,   // each end-camp (top-two / bottom-two cats) carries >= this share
+    BIMODAL_MIN_DIP: 0.05,    // the middle sits >= this far below the lower end-peak (a real trough)
+    BIMODAL_MIN_BASE: 30      // shape-claim base floor (distinct from the census reporting floor)
   };
 
   /** Cohen's h for two proportions (effect size for a percentage gap). */
@@ -71,57 +95,11 @@
     return max > 0 ? Math.min(1, Math.max(0, level.value / max)) : 0;
   }
 
-  /* ---------------- statistical primitives (pure) ---------------- */
-
-  /** Standard normal CDF Φ(x) — Zelen & Severo (A&S 26.2.17), |error| < 7.5e-8.
-   *  Used to turn a Fisher-z statistic into a p-value for the FDR step. */
-  function normalCdf(x) {
-    var t = 1 / (1 + 0.2316419 * Math.abs(x));
-    var d = 0.3989422804014327 * Math.exp(-x * x / 2);
-    var p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
-      t * (-1.821255978 + t * 1.330274429))));
-    return x > 0 ? 1 - p : p;
-  }
-  takeout._normalCdf = normalCdf;
-
-  /** Partial correlation of a,b controlling for one variable g, from the three
-   *  zero-order correlations. Returns 0 when a controlled variance vanishes. */
-  function partialCorr(rab, rag, rbg) {
-    var d = Math.sqrt((1 - rag * rag) * (1 - rbg * rbg));
-    return d > 1e-12 ? Math.max(-1, Math.min(1, (rab - rag * rbg) / d)) : 0;
-  }
-  takeout._partialCorr = partialCorr;
-
-  /** Two-sided p-value for a (partial) correlation r on base n, controlling k
-   *  covariates, via Fisher's z (se = 1/sqrt(n-k-3)). n too small -> p=1. */
-  function corrPValue(r, n, k) {
-    var df = n - (k || 0) - 3;
-    if (df <= 0) return 1;
-    var rc = Math.max(-0.999999, Math.min(0.999999, r));
-    var z = Math.abs(0.5 * Math.log((1 + rc) / (1 - rc))) * Math.sqrt(df);  // atanh(rc)*sqrt(df)
-    return 2 * normalCdf(-z);
-  }
-  takeout._corrPValue = corrPValue;
-
-  /** Benjamini-Hochberg FDR. Given p-values, returns the indices that survive at
-   *  level alpha: the largest rank k with p(k) <= (k/m)*alpha rejects all p ranked
-   *  <= k. Valid under positive dependence (PRDS) — which inter-question
-   *  correlations on an attitude survey satisfy (all-positive), so BH (not the
-   *  far more conservative Benjamini-Yekutieli) is the right correction here. */
-  function bhFDR(pvals, alpha) {
-    var m = pvals.length;
-    if (!m) return [];
-    var order = pvals.map(function (p, i) { return { p: p, i: i }; })
-      .sort(function (a, b) { return a.p - b.p; });
-    var kMax = -1;
-    for (var k = 0; k < m; k++) {
-      if (order[k].p <= ((k + 1) / m) * alpha) kMax = k;
-    }
-    var out = [];
-    for (var j = 0; j <= kMax; j++) out.push(order[j].i);
-    return out;
-  }
-  takeout._bhFDR = bhFDR;
+  /* ---------------- statistical primitives ---------------- */
+  // The pure number-crunching lives in 27da_takeout_stats.js (loaded first);
+  // alias the few this engine uses so the pattern logic below reads cleanly.
+  var partialCorr = takeout._partialCorr, corrPValue = takeout._corrPValue,
+    bhFDR = takeout._bhFDR, signTest = takeout._signTest, bimodalStat = takeout._bimodalStat;
 
   /**
    * CO-MOVEMENT pattern: groups of questions that rise and fall together across
@@ -371,17 +349,87 @@
   takeout._movementPattern = movementPattern;
 
   /**
-   * Build the patterns object from gathered inputs. Pure: same inputs always
-   * give the same patterns. Assembles GROUP + WEAK/STRONG AREA + MOVEMENT,
-   * omitting any pattern that cannot be computed (graceful degradation).
+   * FDR multiple-comparison TRUST-GATE (not a card). Two guards over the shared
+   * cell family (gatherCellFamily): per-cell Benjamini-Hochberg badges
+   * single-striking-cell claims and seeds the odd-one-out; a per-group directional
+   * sign-test (also BH-corrected) decides which groups are genuinely CONSISTENT.
+   * The group/split patterns gate on the per-GROUP set (consistency), NEVER on the
+   * per-CELL set — a consistent group like Cape Town can have zero individually-
+   * significant cells, so gating it on per-cell significance would wrongly delete
+   * it. No FPC anywhere (that lives in the reliability layer).
+   */
+  function fdrGate(fdr) {
+    if (!fdr || !fdr.cells || !fdr.cells.length) return null;
+    var cells = fdr.cells;
+    var bhAll = bhFDR(cells.map(function (c) { return c.welchP; }), CONST.FDR_ALPHA);
+    var survivorSet = {}; bhAll.forEach(function (k) { survivorSet[k] = true; });
+    var badge = [];
+    bhAll.forEach(function (k) {                       // strict: badge only credible bases, never a floored cell
+      var c = cells[k];
+      if (c.nIn >= CONST.BADGE_MIN_BASE && !c.flooredG) badge.push(c);
+    });
+    var groups = fdr.groups || [];
+    var signSurv = {};
+    bhFDR(groups.map(function (g) { return signTest(g.below, g.above).p; }), CONST.SIGN_ALPHA)
+      .forEach(function (k) { signSurv[k] = true; });
+    var groupsOut = groups.map(function (g, i) {
+      var st = signTest(g.below, g.above);
+      return { banner: g.banner, group: g.group, base: g.base, below: g.below, above: g.above,
+        qn: g.qn, meanGap: g.meanGap, signP: st.p, dir: st.dir, consistent: !!signSurv[i] };
+    });
+    return { kind: "fdr", K: fdr.K, groupCount: fdr.groupCount, questionCount: fdr.questionCount,
+      alpha: CONST.FDR_ALPHA, method: CONST.FDR_METHOD,
+      badge: { count: badge.length, cells: badge.map(function (c) {
+        return { banner: c.banner, group: c.group, q: c.q, qtitle: c.qtitle, nG: c.nIn, diff: c.welchDiff, p: c.welchP };
+      }) },
+      survivorSet: survivorSet,                        // index set into fdr.cells (for odd-one-out)
+      groups: groupsOut,
+      cellSurvivorCount: bhAll.length,
+      dirSurvivorCount: groupsOut.filter(function (g) { return g.consistent; }).length };
+  }
+  takeout._fdrGate = fdrGate;
+
+  /** Does the per-cell badge set contain this (group column, question title)? */
+  function badgeHas(gate, group, qtitle) {
+    return !!(gate && gate.badge.cells.some(function (c) {
+      return c.group === group && c.qtitle === qtitle;
+    }));
+  }
+
+  /**
+   * Build the patterns object from gathered inputs. Pure: same inputs always give
+   * the same patterns. Assembles GROUP + SPLIT + CO-MOVEMENT + WEAK/STRONG AREA +
+   * MOVEMENT, omitting any that cannot be computed (graceful degradation). When the
+   * FDR family is present, the group and split patterns are additionally GATED on
+   * directional consistency, and their evidence rows are badged where a single cell
+   * survives multiplicity correction.
    */
   function buildPatterns(inputs) {
     inputs = inputs || {};
     var patterns = [];
+    var gate = fdrGate(inputs.fdr);
+
     var group = groupPattern(inputs.columns);
-    if (group) patterns.push(group);
+    if (group) {
+      if (gate) {
+        var gc = gate.groups.filter(function (x) { return x.group === group.subject; })[0];
+        group.consistent = !!(gc && gc.consistent && gc.dir === "below");
+        group.signP = gc ? gc.signP : null;
+        (group.evidence || []).forEach(function (e) { e.survives = badgeHas(gate, group.subject, e.label); });
+      }
+      if (!gate || group.consistent) patterns.push(group);   // gate is an additive veto, never a deletion of fallback behaviour
+    }
+
     var split = splitPattern(inputs.columns);
-    if (split) patterns.push(split);
+    if (split) {
+      if (gate) {
+        split.consistent = gate.groups.filter(function (x) {
+          return x.banner === split.subject && x.consistent;
+        }).length >= CONST.SPLIT_MIN_CONSISTENT;
+      }
+      if (!gate || split.consistent) patterns.push(split);
+    }
+
     var comove = comovementPattern(inputs.comove);
     if (comove) patterns.push(comove);
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
@@ -391,6 +439,7 @@
       answer: { metrics: inputs.apex || [] },
       reliability: inputs.reliability || null,
       patterns: patterns,
+      fdr: gate,
       themeCount: groupByTheme(inputs.levels || []).filter(function (t) {
         return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
       }).length,

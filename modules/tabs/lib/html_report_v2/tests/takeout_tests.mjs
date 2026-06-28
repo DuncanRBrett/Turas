@@ -198,6 +198,55 @@ run("statistical primitives: normal CDF, partial correlation, Fisher-z p, BH-FDR
   assert(takeout._bhFDR([0.9, 0.8, 0.7], 0.05).length === 0, "nothing survives when all p are large");
 });
 
+run("FDR primitives: Student-t tail, Welch test, sign test", () => {
+  // Student-t two-sided tail — published table values
+  close(takeout._studentT(3, 50), 0.00420, 5e-4, "t(3,50)");
+  close(takeout._studentT(3, 5), 0.0301, 5e-4, "t(3,5)");
+  close(takeout._studentT(0, 10), 1.0, 1e-9, "t(0,df)=1");
+  assert(takeout._studentT(NaN, 10) === 1 && takeout._studentT(5, -1) === 1,
+    "degenerate t (NaN / df<=0) -> p=1, never 0 (the zero-variance-cell trap)");
+  // Welch with both arms constant -> variance floor engages, finite p, flooredG flagged
+  const w = takeout._welchTest([4, 4, 4, 4], null, [3, 3, 3, 3], null, 0.16);
+  close(w.t, 3.536, 1e-3, "welch t"); close(w.df, 6, 1e-6, "welch df"); assert(w.flooredG, "floored");
+  // the t-tail is load-bearing: a tiny homogeneous arm reads MORE conservatively than the normal approx
+  const tiny = takeout._welchTest([5, 5, 5, 5, 5], null, [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 2, 3, 4, 3], null, 0.16);
+  assert(tiny.p > 2 * takeout._normalCdf(-Math.abs(tiny.t)),
+    "Student-t demotes a small-base cell vs the normal approximation");
+  // exact sign test
+  close(takeout._signTest(18, 2).p, 4.02e-4, 1e-5, "sign(18,2)");
+  close(takeout._signTest(13, 7).p, 0.263, 2e-3, "sign(13,7)");
+  close(takeout._signTest(10, 10).p, 1.0, 1e-9, "sign(10,10)");
+  close(takeout._signTest(19, 1).p, 4.0e-5, 1e-5, "sign(19,1)");
+  assert(takeout._signTest(18, 2).dir === "below", "sign test reports direction");
+});
+
+run("FDR gate: badges credible single cells, gates groups on CONSISTENCY not cells", () => {
+  // a strong credible cell, a tiny floored cell (BH survivor but badge-excluded), + noise
+  const cells = [
+    { banner: "B", group: "G1", q: "Q1", qtitle: "Q1", nIn: 60, gap: 0.5, welchDiff: 0.8, welchP: 1e-5, flooredG: false },
+    { banner: "B", group: "G2", q: "Q2", qtitle: "Q2", nIn: 5, gap: 1.0, welchDiff: 1.5, welchP: 1e-6, flooredG: true }
+  ];
+  for (let i = 0; i < 20; i++) cells.push({ banner: "B", group: "Gx", q: "Qn" + i, qtitle: "Qn" + i,
+    nIn: 40, gap: 0.01, welchDiff: 0.02, welchP: 0.4 + i * 0.02, flooredG: false });
+  const fdr = { cells: cells, K: cells.length, groupCount: 4, questionCount: 20, groups: [
+    { banner: "B", group: "G1", base: 60, below: 1, above: 19, qn: 20, meanGap: 0.4 },   // consistent (above)
+    { banner: "B", group: "G3", base: 40, below: 18, above: 2, qn: 20, meanGap: -0.3 },  // consistent (below)
+    { banner: "B", group: "G4", base: 40, below: 11, above: 9, qn: 20, meanGap: 0.01 }   // not consistent
+  ] };
+  const g = takeout._fdrGate(fdr);
+  assert(g.cellSurvivorCount === 2, "both tiny-p cells survive BH, got " + g.cellSurvivorCount);
+  assert(g.badge.count === 1 && g.badge.cells[0].group === "G1",
+    "only the credible un-floored cell earns the badge (the n=5 floored one is excluded)");
+  const byG = {}; g.groups.forEach((x) => (byG[x.group] = x));
+  assert(byG.G1.consistent && byG.G3.consistent && !byG.G4.consistent,
+    "consistency from the per-group sign test, not from any single cell");
+  // confident null: all noise -> no badge, no consistent group
+  const nullFdr = { cells: cells.slice(2), K: 20, groupCount: 1, questionCount: 20,
+    groups: [{ banner: "B", group: "Gx", base: 40, below: 11, above: 9, qn: 20, meanGap: 0 }] };
+  const gn = takeout._fdrGate(nullFdr);
+  assert(gn.badge.count === 0 && gn.dirSurvivorCount === 0, "structureless family -> confident null");
+});
+
 run("CO-MOVEMENT: finds bundles above the acquiescence floor, not the global blob", () => {
   // 4 questions: A-B and C-D genuinely co-move (raw 0.8); every cross pair is
   // exactly the global-factor product (0.6*0.6=0.36) so its partial is 0.

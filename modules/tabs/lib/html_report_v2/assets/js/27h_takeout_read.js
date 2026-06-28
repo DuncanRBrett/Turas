@@ -109,11 +109,22 @@
       bodyHtml(p, meta.cls) + footHtml(p) + "</article>";
   }
 
-  /** Provenance line — the glass-box audit trail. */
+  /** Provenance line — the glass-box audit trail. When the FDR family is present
+   *  it states the multiplicity correction: how many cells were scanned and how
+   *  many single-cell differences survive it (the rest being consistency, not
+   *  individual cells), or the confident null when nothing stands alone. */
   function provHtml(t) {
-    return '<div class="tko-prov" role="note">Built from grouped questions and breakouts the ' +
-      "report already computes · no AI · " + t.segmentCount + " breakout groups and " +
-      t.themeCount + " tagged areas considered · curated by the researcher.</div>";
+    var base = "Built from grouped questions and breakouts the report already computes · no AI · " +
+      t.segmentCount + " breakout groups and " + t.themeCount + " tagged areas considered";
+    if (t.fdr) {
+      var f = t.fdr, scan = "scanned " + f.groupCount + " groups × " + f.questionCount +
+        " questions = " + f.K + " cells · corrected for multiplicity (" + f.method + ")";
+      base = "no AI · " + scan + " · " + (f.badge.count
+        ? f.badge.count + " stand-alone difference" + (f.badge.count === 1 ? "" : "s") +
+          " survive — the rest is consistency, not single cells"
+        : "nothing survives correction — and that's the headline");
+    }
+    return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + " · curated by the researcher.</div>";
   }
 
   read.html = function (t) {
