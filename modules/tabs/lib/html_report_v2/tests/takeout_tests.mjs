@@ -71,6 +71,24 @@ run("GROUP pattern finds the column behind on the most questions", () => {
   assert(g.evidence.length === 3, "evidence rows present");
 });
 
+run("GROUP pattern is valence-safe: raw category findings are ignored", () => {
+  // A column "ahead" on a raw category (e.g. more Neutral) but behind on the
+  // index must read as under strain — categories carry no good/bad direction,
+  // and a column must never be both "under strain" and "most positive".
+  const f = (col, isMean, dir, gap) => ({ column: col, code: "Q1", title: "Q1", isMean: isMean,
+    value: isMean ? 3.2 : 56, rest: isMean ? 3.9 : 21, overall: isMean ? 3.8 : 25,
+    gap: gap, direction: dir, scaleMin: 0, scaleMax: 5 });
+  const standouts = [
+    f("CT", false, "ahead", 35),    // 56% Neutral vs 21% — "ahead" but meaningless
+    f("CT", true, "behind", -0.7), f("CT", true, "behind", -0.5),
+    f("HO", true, "ahead", 0.6), f("HO", true, "ahead", 0.5)
+  ];
+  const g = takeout._groupPattern(standouts);
+  assert(g && g.subject === "CT", "index decides: CT under strain despite a categorical 'ahead'");
+  assert(g.hits === 2, "only the two index findings counted, got " + g.hits);
+  assert(g.secondary === "HO", "HO (positive index net) is thriving, not also under strain");
+});
+
 run("GROUP pattern needs enough hits (else null)", () => {
   const one = [{ column: "X", code: "Q1", title: "Q1", isMean: true, value: 3, rest: 4,
     overall: 3.9, gap: -1, direction: "behind", scaleMin: 0, scaleMax: 5 }];

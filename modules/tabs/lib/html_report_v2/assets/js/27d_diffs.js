@@ -40,12 +40,28 @@
       for (var r = 0; r < n; r++) rest[r] = groupMember[r] ? 0 : 1;
       var col = [{ member: rest }];
       if (q.rows[ri].kind === "net") {
+        // A NET that decomposes into shown categories recomputes from those
+        // members over the full answered base (netCounts) — correct.
+        var members = q.net_members && q.net_members[String(ri)];
+        if (members && members.length) {
+          var nc = TR.stats.netCounts(q, members, col, mask)[0];
+          return nc && nc.wbase ? nc.n / nc.wbase * 100 : null;
+        }
+        // A box-scored NET (no shown members) takes its NUMERATOR from box
+        // membership but its DENOMINATOR from the full answered base (tabulate),
+        // NOT the box-only base. Otherwise respondents with no box — e.g. Neutral
+        // on a shown satisfaction scale — are dropped from the denominator and the
+        // rest inflates (verified on SACS: the rest read 90% instead of the true
+        // 61%, flipping a group from ahead to behind). Hidden-scale box-only
+        // questions are unaffected (there every answered respondent has a box, so
+        // the two bases are identical).
         var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
-        var c = boxes
-          ? TR.stats.boxCounts(q.code, ri, col, mask)[0]
-          : TR.stats.netCounts(q,
-              (q.net_members && q.net_members[String(ri)]) || [], col, mask)[0];
-        return c.wbase ? c.n / c.wbase * 100 : null;
+        if (boxes) {
+          var hits = TR.stats.boxCounts(q.code, ri, col, mask)[0];
+          var full = TR.stats.tabulate(q, col, mask)[0];
+          return full && full.wbase ? hits.n / full.wbase * 100 : null;
+        }
+        return null;
       }
       var tab = TR.stats.tabulate(q, col, mask)[0];
       return tab.wbase ? (tab.counts[ri] || 0) / tab.wbase * 100 : null;
@@ -142,6 +158,12 @@
       // so the loop index is the question row index used to recompute the rest.
       model.rows.forEach(function (row, ri) {
         if (row.kind === "mean") return;       // means handled below (recomputed)
+        // For rating scales the top-box NETs (+ the index) are the meaningful
+        // standouts; individual scale points (Neutral, Very Satisfied…) read as
+        // wrong sitting next to a top-box that already contains them, so suppress
+        // raw category rows for scale / NPS questions. Other types (multi /
+        // single choice) keep their categories — there the categories ARE the story.
+        if (row.kind === "category" && (q.type === "scale" || q.type === "nps")) return;
         row.cells.forEach(function (cell, i) {
           if (i === 0) return;
           var sig = cell.sig || "";

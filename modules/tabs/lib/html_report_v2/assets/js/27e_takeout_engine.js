@@ -65,36 +65,37 @@
   function groupPattern(standouts) {
     var byCol = {};
     (standouts || []).forEach(function (f) {
-      if (f.value === null || f.value === undefined) return;
+      // Only index/mean/NPS standouts have a consistent good/bad direction
+      // (higher = better). Raw category %s (Neutral, Very Satisfied, …) and
+      // top-box NETs each carry their own valence, so counting their "gap"
+      // direction is meaningless — the index is the one valenced summary.
+      if (!f.isMean || f.value === null || f.value === undefined) return;
       var key = f.column;
-      var c = byCol[key] || (byCol[key] = { column: f.column, group: f.bannerGroup || "", behind: [], ahead: [] });
-      var dir = f.isMean ? (f.direction === "behind" ? "behind" : "ahead") : (f.gap >= 0 ? "ahead" : "behind");
-      (dir === "behind" ? c.behind : c.ahead).push(f);
+      var c = byCol[key] || (byCol[key] = { column: f.column, group: f.bannerGroup || "",
+        behind: [], ahead: [], net: 0 });
+      var eff = effectSize(f);
+      if (f.direction === "behind") { c.behind.push(f); c.net -= eff; }
+      else { c.ahead.push(f); c.net += eff; }
     });
     var cols = Object.keys(byCol).map(function (k) { return byCol[k]; });
-    var pick = function (side) {
-      var best = null;
-      cols.forEach(function (c) {
-        var hits = c[side].length;
-        if (hits < CONST.MIN_GROUP_HITS) return;
-        var eff = c[side].reduce(function (s, f) { return s + effectSize(f); }, 0);
-        if (!best || hits > best.hits || (hits === best.hits && eff > best.eff)) {
-          best = { col: c, hits: hits, eff: eff };
-        }
-      });
-      return best;
-    };
-    var strain = pick("behind"), thriving = pick("ahead");
-    if (!strain) return null;
-    var c = strain.col;
-    var evidence = c.behind.slice().sort(function (a, b) { return effectSize(b) - effectSize(a); })
+    if (!cols.length) return null;
+    // Net signed effect per column: one value each, so the same column can never
+    // be both "under strain" (most negative) and "thriving" (most positive).
+    var strain = null, thrive = null;
+    cols.forEach(function (c) {
+      if (!strain || c.net < strain.net) strain = c;
+      if (!thrive || c.net > thrive.net) thrive = c;
+    });
+    if (!strain || strain.net >= 0 || strain.behind.length < CONST.MIN_GROUP_HITS) return null;
+    var evidence = strain.behind.slice().sort(function (a, b) { return effectSize(b) - effectSize(a); })
       .slice(0, CONST.EVIDENCE_MAX).map(function (f) {
         return { label: f.title, value: f.value, rest: f.rest, overall: f.overall,
-          scaleMax: f.scaleMax, isMean: !!f.isMean, decimals: f.decimals };
+          scaleMax: f.scaleMax, isMean: true, decimals: f.decimals };
       });
-    return { id: "group", kind: "group", subject: c.column, group: c.group,
-      hits: strain.hits, total: c.behind.length + c.ahead.length, evidence: evidence,
-      secondary: thriving ? thriving.col.column : null };
+    return { id: "group", kind: "group", subject: strain.column, group: strain.group,
+      hits: strain.behind.length, total: strain.behind.length + strain.ahead.length,
+      evidence: evidence,
+      secondary: (thrive && thrive !== strain && thrive.net > 0) ? thrive.column : null };
   }
 
   /** Group levels into themes (theme, else section, else "(untagged)"). */
