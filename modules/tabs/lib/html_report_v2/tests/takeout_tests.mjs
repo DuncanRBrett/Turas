@@ -87,6 +87,28 @@ run("GROUP pattern down-weights tiny groups by reliability", () => {
   assert(p && p.subject === "Solid", "the reliable group leads despite the tiny group's larger raw gap");
 });
 
+run("SPLIT pattern names the breakout that differentiates most", () => {
+  const c = (column, group, v, base) => ({ column: column, group: group, base: base,
+    gaps: [{ value: v, total: 4.0, scaleMax: 5 }, { value: v, total: 4.0, scaleMax: 5 }] });
+  const columns = [
+    c("New staff", "Tenure", 4.8, 40), c("Mid", "Tenure", 4.0, 40), c("Long", "Tenure", 3.1, 40),
+    c("North", "Campus", 4.05, 40), c("South", "Campus", 3.95, 40), c("East", "Campus", 4.0, 40)
+  ];
+  const p = takeout._splitPattern(columns);
+  assert(p && p.subject === "Tenure", "Tenure differentiates most, got " + (p && p.subject));
+  assert(p.high.label === "New staff" && p.low.label === "Long", "names the highest and lowest group");
+});
+
+run("SPLIT pattern: null when no single breakout dominates", () => {
+  const c = (column, group, v) => ({ column: column, group: group, base: 40,
+    gaps: [{ value: v, total: 4.0, scaleMax: 5 }] });
+  const columns = [
+    c("A1", "Campus", 4.4), c("A2", "Campus", 3.6),
+    c("B1", "Tenure", 4.4), c("B2", "Tenure", 3.6)
+  ];
+  assert(takeout._splitPattern(columns) === null, "two equally-differentiating splits -> none named");
+});
+
 run("AREA patterns rank weakest and strongest theme", () => {
   const lv = (code, theme, value) => ({ code, title: code, section: "Engagement", theme,
     value, scaleMin: 0, scaleMax: 5, delta: null });

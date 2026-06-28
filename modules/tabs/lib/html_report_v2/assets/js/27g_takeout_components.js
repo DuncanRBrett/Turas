@@ -15,6 +15,7 @@
      always paired with the tag text, so it is never the sole signal. */
   var PATTERN_META = {
     group: { tag: "The group under strain", cls: "strain" },
+    split: { tag: "Which split matters most", cls: "split" },
     weak: { tag: "Weakest area", cls: "weak" },
     strong: { tag: "Strongest area", cls: "strong" },
     moved: { tag: "What moved", cls: "moved" }
@@ -106,6 +107,11 @@
     if (p.id === "group") {
       return p.subject + " scores below the overall on " + p.hits + " of " + p.total +
         " rated questions — the group most under strain.";
+    }
+    if (p.id === "split") {
+      return "Differences run most by " + p.subject + " — " + p.high.label +
+        " sits highest, " + p.low.label + " lowest. Read this study through " +
+        p.subject.toLowerCase() + ".";
     }
     if (p.id === "weak") {
       return p.subject + " is the weakest area — its questions cluster low" +

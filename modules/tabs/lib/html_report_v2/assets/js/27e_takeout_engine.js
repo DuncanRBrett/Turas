@@ -26,6 +26,8 @@
     STRAIN_RELIABLE_BASE: 30, // base at which a group's gap is fully trusted; smaller groups'
                               //   gaps are discounted so a sharp gap on n=5 doesn't outrank a solid n=40
     MIN_AREA_MEMBERS: 2,      // a theme needs >=N questions to count as an "area"
+    MIN_SPLIT_DIFF: 0.02,     // a breakout must differentiate groups by >=2% of scale to "matter"
+    SPLIT_LEAD_RATIO: 1.25,   // ...and lead the next breakout by this much to be THE split (else none dominates)
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
     MIN_MOVE_FRACTION: 0.03   // a wave change must be >=N of the scale to count as a "move"
@@ -103,6 +105,48 @@
       hits: strain.behind.length, total: strain.count, evidence: evidence,
       secondary: (thrive && thrive !== strain && thrive.weighted > 0) ? thrive.column : null };
   }
+
+  /**
+   * SPLIT pattern: which breakout (campus / department / tenure / …) differentiates
+   * groups the most — the lens worth looking through. For each breakout we measure
+   * how spread its groups' average gaps-to-overall are (base-weighted), and name
+   * the breakout only if it both differentiates meaningfully AND clearly leads the
+   * others (else no single split dominates -> omitted). Reuses the column data.
+   */
+  function splitPattern(columns) {
+    var byGroup = {};
+    (columns || []).forEach(function (c) {
+      if (!c.gaps || !c.gaps.length) return;
+      var net = 0, sumV = 0, max = 0;
+      c.gaps.forEach(function (gp) {
+        net += (gp.value - gp.total) / (gp.scaleMax || 1);
+        sumV += gp.value; max = gp.scaleMax || max;
+      });
+      (byGroup[c.group] || (byGroup[c.group] = [])).push({ column: c.column, base: c.base || 0,
+        avgGap: net / c.gaps.length, avgValue: sumV / c.gaps.length, scaleMax: max });
+    });
+    var scored = Object.keys(byGroup).map(function (gn) {
+      var cols = byGroup[gn];
+      if (cols.length < 2) return null;
+      var sw = 0, mean = 0;
+      cols.forEach(function (x) { sw += x.base; mean += x.base * x.avgGap; });
+      mean = sw ? mean / sw : 0;
+      var ss = 0;
+      cols.forEach(function (x) { ss += x.base * Math.pow(x.avgGap - mean, 2); });
+      return { group: gn, diff: sw ? Math.sqrt(ss / sw) : 0, cols: cols };
+    }).filter(Boolean);
+    if (!scored.length) return null;
+    scored.sort(function (a, b) { return b.diff - a.diff; });
+    var top = scored[0], second = scored[1];
+    if (top.diff < CONST.MIN_SPLIT_DIFF) return null;                            // nothing differentiates much
+    if (second && top.diff < second.diff * CONST.SPLIT_LEAD_RATIO) return null;  // no single split dominates
+    var sorted = top.cols.slice().sort(function (a, b) { return a.avgValue - b.avgValue; });
+    var low = sorted[0], high = sorted[sorted.length - 1];
+    return { id: "split", kind: "split", subject: top.group,
+      high: { label: high.column, value: high.avgValue, scaleMax: high.scaleMax },
+      low: { label: low.column, value: low.avgValue, scaleMax: low.scaleMax } };
+  }
+  takeout._splitPattern = splitPattern;
 
   /** Group levels into themes (theme, else section, else "(untagged)"). */
   function groupByTheme(levels) {
@@ -193,6 +237,8 @@
     var patterns = [];
     var group = groupPattern(inputs.columns);
     if (group) patterns.push(group);
+    var split = splitPattern(inputs.columns);
+    if (split) patterns.push(split);
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
     var moved = movementPattern(inputs.apex || []);
     if (moved) patterns.push(moved);

@@ -36,6 +36,10 @@
   function evidence(p, cls) {
     if (p.kind === "group") return (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
     if (p.kind === "area") return (p.evidence || []).map(function (m) { return ui.areaRow(m, cls); }).join("");
+    if (p.kind === "split") {
+      return ui.areaRow({ label: p.high.label, value: p.high.value, scaleMax: p.high.scaleMax }, "strong") +
+        ui.areaRow({ label: p.low.label, value: p.low.value, scaleMax: p.low.scaleMax }, "strain");
+    }
     if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
     return (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "") +
       ui.movementSpark(p.waves);

@@ -57,6 +57,12 @@
       var an = p.moving < 0 ? '<div class="tko-note">Several items slipping since last wave.</div>' : "";
       return arows + an;
     }
+    if (p.kind === "split") {
+      return ui.areaRow({ label: p.high.label, value: p.high.value, scaleMax: p.high.scaleMax }, "strong") +
+        ui.areaRow({ label: p.low.label, value: p.low.value, scaleMax: p.low.scaleMax }, "strain") +
+        '<div class="tko-note">The widest, most consistent gaps run by ' + fmt.escapeHtml(p.subject) +
+        " — look there first.</div>";
+    }
     // movement
     if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
     var rows = (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "");
@@ -66,8 +72,9 @@
 
   /** Deep-link target per pattern kind. */
   function footHtml(p) {
-    var map = { group: ["findings", "see the breakouts →"], weak: ["dashboard", "see the questions →"],
-      strong: ["dashboard", "see the questions →"], moved: ["moved", "see tracking →"] };
+    var map = { group: ["findings", "see the breakouts →"], split: ["findings", "see the breakdown →"],
+      weak: ["dashboard", "see the questions →"], strong: ["dashboard", "see the questions →"],
+      moved: ["moved", "see tracking →"] };
     var go = map[p.id] || ["dashboard", "see detail →"];
     return '<div class="tko-pfoot"><button class="linklike" data-goto="' + go[0] + '">' +
       go[1] + "</button></div>";

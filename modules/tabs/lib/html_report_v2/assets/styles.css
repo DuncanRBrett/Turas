@@ -647,9 +647,9 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-howsure-panel { margin-top: -6px; }
 .tko-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tko-pcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 15px 18px; }
-.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); }
+.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); } .tko-edge-split { border-left-color: var(--tko-decide); }
 .tko-ptag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); }
+.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); } .tko-on-split { color: var(--tko-decide); }
 .tko-ph { font-size: 16px; font-weight: 700; color: var(--ink); margin: 3px 0 0; display: inline-block; }
 .tko-pscore { font-size: 13px; font-weight: 600; color: var(--muted); }
 .tko-take { font-family: var(--tko-serif); font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 11px; }
