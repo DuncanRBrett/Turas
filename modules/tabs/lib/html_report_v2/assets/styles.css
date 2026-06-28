@@ -634,8 +634,37 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-view-present { scroll-snap-type: y proximity; }
 
 @media print {
-  .tko-head, .tko-veto, .tko-edithint, .tko-reset { display: none !important; }
+  .tko-head, .tko-veto, .tko-edithint, .tko-reset, .tko-howsure { display: none !important; }
   .tko-slide { min-height: auto; page-break-inside: avoid; box-shadow: none; }
-  .tko-card, .tko-apex { box-shadow: none; }
+  .tko-card, .tko-apex, .tko-pcard { box-shadow: none; }
   .tko-ed:hover, .tko-ed:focus { background: none; outline: none; }
 }
+
+/* ---------- Patterns view (group / weakest area / strongest area / moved) ---------- */
+.tko-howsure { border: none; background: none; color: var(--brand); font: 600 11.5px var(--font); cursor: pointer; padding: 0; margin-left: auto; }
+.tko-howsure:hover { text-decoration: underline; }
+.tko-reliability { justify-content: flex-start; }
+.tko-howsure-panel { margin-top: -6px; }
+.tko-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tko-pcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 15px 18px; }
+.tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); }
+.tko-ptag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.tko-on-strain { color: var(--red); } .tko-on-weak { color: var(--tko-act); } .tko-on-strong { color: var(--tko-protect); } .tko-on-moved { color: var(--tko-watch); }
+.tko-ph { font-size: 16px; font-weight: 700; color: var(--ink); margin: 3px 0 0; display: inline-block; }
+.tko-pscore { font-size: 13px; font-weight: 600; color: var(--muted); }
+.tko-take { font-family: var(--tko-serif); font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 11px; }
+.tko-row { display: grid; grid-template-columns: 120px 1fr 56px; align-items: center; gap: 9px; margin: 5px 0; }
+.tko-rl { font-size: 11.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tko-track { height: 9px; background: #eef0f7; border-radius: 5px; overflow: hidden; }
+.tko-fill { display: block; height: 100%; border-radius: 5px; background: var(--brand); }
+.tko-fill.tko-strain { background: var(--red); } .tko-fill.tko-weak { background: var(--tko-act); } .tko-fill.tko-strong { background: var(--tko-protect); } .tko-fill.tko-moved { background: var(--tko-watch); }
+.tko-rv { font-size: 11.5px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.tko-rest { color: var(--faint); font-weight: 400; }
+.tko-move { font-size: 10px; font-weight: 700; margin-left: 3px; }
+.tko-move.up { color: var(--tko-protect); } .tko-move.down { color: var(--red); }
+.tko-note { font-size: 11.5px; color: var(--muted); margin-top: 9px; }
+.tko-mspark { margin: 8px 0 2px; }
+.tko-mspark svg { width: 100%; height: auto; display: block; }
+.tko-pfoot { margin-top: 11px; }
+.tko-pfoot .linklike { font-size: 12px; font-weight: 600; }
+.tko-slide-sub { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }

@@ -1,10 +1,10 @@
 /**
- * Executive Takeout — Present view. The same takeout object as a Wrapped-style
- * sequence: a cover, one full-screen card per promoted finding (in posture
- * reading order), and an honest fine-print card. One big idea per screen, the
- * hero number as the art. Headlines and "so whats" stay inline-editable.
+ * Executive Takeout — Present view (Patterns). The same patterns object as a
+ * full-screen sequence: a cover with the headline indices, one screen per
+ * pattern (group / weakest area / strongest area / what moved), and an honest
+ * fine-print card. Takeaways stay inline-editable.
  *
- * Pure HTML builder; the controller (27k) wires editing and deep-links.
+ * Pure HTML builder; the controller (27k) wires editing and links.
  */
 (function (global) {
   "use strict";
@@ -13,83 +13,60 @@
   var fmt = TR.fmt, ui = takeout.ui;
   var present = takeout.presentView = {};
 
-  function postureMeta(id) {
-    var hit = (takeout.POSTURES || []).filter(function (p) { return p.id === id; })[0];
-    return hit || { id: id, label: id, verb: "" };
-  }
-
-  /** "02 / 07 · Act now" slide kicker. */
   function kicker(idx, total, text) {
     var n = function (v) { return (v < 10 ? "0" : "") + v; };
     return '<div class="tko-slide-kicker">' + n(idx) + " / " + n(total) + " · " +
       fmt.escapeHtml(text) + "</div>";
   }
 
-  /** Cover — the two composite indices in one breath. */
   function coverCard(t, total) {
     var project = (TR.AGG && TR.AGG.project && TR.AGG.project.name) || "This study";
-    var nums = (t.answer.metrics || []).slice(0, 3).map(function (c) {
-      return '<div class="tko-cover-kpi"><div class="tko-hero">' + Number(c.value).toFixed(1) +
-        '</div><div class="tko-cover-lab">' + fmt.escapeHtml(c.label || c.title) + " · " +
-        '<span class="tko-band-' + (c.band || "na") + '">' + fmt.escapeHtml(c.band || "—") +
-        "</span> " + ui.topBox(c) + "</div></div>";
+    var answer = takeout.state.getApex(ui.answerSeed(t.patterns));
+    var kpis = (t.answer.metrics || []).slice(0, 3).map(function (m) {
+      return '<div class="tko-cover-kpi"><div class="tko-hero">' + ui.fmtVal(true, m.value) +
+        '</div><div class="tko-cover-lab">' + fmt.escapeHtml(m.label || m.title) + " " +
+        ui.topBox(m) + "</div></div>";
     }).join("");
-    var rel = t.reliability || {};
-    return '<section class="tko-slide tko-slide-cover">' + kicker(1, total, "this study, in one breath") +
-      '<div class="tko-cover-nums">' + (nums || '<div class="tko-hero">—</div>') + "</div>" +
-      '<div class="tko-cover-foot">' + fmt.escapeHtml(project) +
-      (rel.n ? " · " + (rel.census ? "census" : "sample") + " of " + fmt.base(rel.n) : "") +
-      "</div></section>";
+    return '<section class="tko-slide tko-slide-cover">' + kicker(1, total, "the big picture") +
+      ui.editable("__apex__", "answer", answer, "tko-claim tko-claim-lg", "The one-line answer — editable") +
+      '<div class="tko-cover-nums">' + kpis + "</div>" +
+      '<div class="tko-cover-foot">' + fmt.escapeHtml(project) + "</div></section>";
   }
 
-  /** A two-bar (standout) or a single scale gauge (level) per card. */
-  function visual(f) {
-    return f.kind === "level" ? ui.gaugeBar(f) : ui.twoBar(f);
+  function evidence(p, cls) {
+    if (p.kind === "group") return (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
+    if (p.kind === "area") return (p.evidence || []).map(function (m) { return ui.areaRow(m, cls); }).join("");
+    return ui.movementSpark(p.waves);
   }
 
-  /** One finding as a full-screen slide. */
-  function findingCard(f, idx, total, lowThreshold) {
-    var meta = postureMeta(f.posture);
-    var claim = takeout.state.getText(f.id, "claim", ui.seedClaim(f));
-    var soWhat = takeout.state.getText(f.id, "soWhat", ui.seedSoWhat(f));
-    return '<section class="tko-slide tko-slide-finding tko-edge-' + f.posture + '">' +
-      kicker(idx, total, meta.label) +
-      '<div class="tko-slide-pill tko-on-' + f.posture + '">' + ui.glyph(f.posture) +
-      "<span>" + fmt.escapeHtml(meta.label) + "</span></div>" +
-      '<div class="tko-slide-hero">' + ui.fmtVal(f, f.value) +
-      '<span class="tko-slide-tb">' + ui.topBox(f) + "</span></div>" +
-      ui.editable(f.id, "claim", claim, "tko-claim tko-claim-lg", "Finding headline — editable") +
-      ui.questionLine(f) +
-      '<div class="tko-slide-visual">' + visual(f) + "</div>" +
-      ui.editable(f.id, "soWhat", soWhat, "tko-sowhat tko-sowhat-lg", "Implication — editable") +
-      '<div class="tko-slide-foot">' + ui.bannerChip(f) + ui.baseChip(f, lowThreshold) +
-      ui.softTag(f) + ui.deltaChip(f) +
-      '<button class="linklike" data-goq="' + fmt.escapeHtml(f.code) + '">see the table →</button>' +
-      "</div></section>";
+  function patternSlide(p, idx, total) {
+    var meta = ui.patternMeta(p.id);
+    var take = takeout.state.getText(p.id, "takeaway", ui.patternSeed(p));
+    var sub = p.kind === "area"
+      ? fmt.escapeHtml(p.subject) + ' <span class="tko-pscore">· ' + Number(p.avg).toFixed(1) + "</span>"
+      : fmt.escapeHtml(p.subject);
+    return '<section class="tko-slide tko-slide-finding tko-edge-' + meta.cls + '">' +
+      kicker(idx, total, meta.tag) +
+      '<div class="tko-slide-sub">' + sub + (p.kind === "group" ? " " + ui.bannerChip(p.group) : "") + "</div>" +
+      ui.editable(p.id, "takeaway", take, "tko-claim tko-claim-lg", "Takeaway — editable") +
+      '<div class="tko-slide-visual">' + evidence(p, meta.cls) + "</div>" +
+      (p.kind === "movement" && p.driver ? '<div class="tko-note">Led by ' + fmt.escapeHtml(p.driver) + ".</div>" : "") +
+      "</section>";
   }
 
-  /** The closing honesty card. */
-  function finePrintCard(t, total) {
+  function finePrint(t, total) {
     return '<section class="tko-slide tko-slide-fine">' + kicker(total, total, "how sure we are") +
       ui.reliabilityRibbon(t.reliability) +
-      '<div class="tko-prov" role="note">Auto-selected by the Takeout engine from ' +
-      t.candidateCount + " candidate findings · " + t.promotedCount +
-      " promoted · curated by the researcher.</div></section>";
+      '<div class="tko-prov" role="note">Built from grouped questions and breakouts the report ' +
+      "already computes · no AI · curated by the researcher.</div></section>";
   }
 
-  /** Build the full Present sequence for a takeout object. */
-  present.html = function (t, opts) {
-    opts = opts || {};
-    var items = [];
-    t.postures.forEach(function (p) {
-      p.items.forEach(function (f) { items.push(f); });
-    });
-    var total = items.length + 2;   // cover + findings + fine print
+  present.html = function (t) {
+    var ps = t.patterns || [];
+    var total = ps.length + 2;
     var slides = [coverCard(t, total)];
-    items.forEach(function (f, i) {
-      slides.push(findingCard(f, i + 2, total, opts.lowThreshold));
-    });
-    slides.push(finePrintCard(t, total));
+    ps.forEach(function (p, i) { slides.push(patternSlide(p, i + 2, total)); });
+    slides.push(finePrint(t, total));
     return '<div class="tko-deck">' + slides.join("") + "</div>";
   };
 

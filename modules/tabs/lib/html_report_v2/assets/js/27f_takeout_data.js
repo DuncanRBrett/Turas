@@ -114,12 +114,18 @@
       var row = views._meanRow(model);
       var value = row ? row.cells[0].mean : null;
       if (value === null || value === undefined) return;
-      var item = { code: q.code, title: q.title, category: q.category || "",
+      var item = { code: q.code, title: q.title,
+        section: q.category || "",                 // Level 1 (existing Category column)
+        theme: q.theme || q.category || "",        // Level 2 (new Theme column; falls back to section)
         value: value, band: touchpointBand(value, q), delta: row.delta || null,
         base: model.columns[0].base, scaleMin: 0, scaleMax: touchpointMax(q),
         topBox: topBoxOf(q, model) };
+      // A composite is always a headline. A keyword match (satisfaction / overall
+      // / NPS) is a headline ONLY when the question is untagged — if the analyst
+      // grouped it into a section/theme, they meant it as a driver, not a headline.
+      var tagged = !!(q.category || q.theme);
       var isApex = override ? (override.indexOf(q.code) !== -1)
-        : (isComposite(q) || HEADLINE_RE.test(q.title || ""));
+        : (isComposite(q) || (!tagged && HEADLINE_RE.test(q.title || "")));
       if (!isApex) { levels.push(item); return; }
       item.label = shortLabel(q);
       item.waves = safeWaves(row);

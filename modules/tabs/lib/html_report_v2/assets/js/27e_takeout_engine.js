@@ -1,48 +1,33 @@
 /**
- * Executive Takeout — deterministic engine (pure; no DOM, no LLM).
+ * Executive Takeout — Patterns engine (pure; no DOM, no LLM).
  *
- * Selects and ranks the handful of findings that matter from candidates the
- * report already computes, routes them into decision postures, and caps the
- * result at "just enough". Every number is pre-computed upstream; this module
- * only scores, routes, dedupes and caps. Fully unit-tested in
+ * Answers "what's the big picture?" by stepping back from individual questions:
+ *   - GROUP   — the breakout column that is consistently off across the survey
+ *               (e.g. one campus behind on most questions). Needs no tagging.
+ *   - AREA    — the weakest and strongest THEMES (clusters of tagged questions).
+ *   - MOVEMENT — the headline metric or theme that moved most since last wave.
+ *
+ * Every number is pre-computed upstream; this module only groups, ranks and
+ * selects. Generic: it operates on the POSITION of a question (its theme /
+ * section) and on banner columns, never on what they are named, so the same
+ * code runs on an engagement, brand or CX survey. Degrades gracefully when
+ * nothing is tagged (the GROUP pattern still works). Unit-tested in
  * tests/takeout_tests.mjs and the in-browser #selftest.
- *
- * Inputs (assembled by 27f_takeout_data.js):
- *   { standouts:[finding], levels:[finding], apex:[metric],
- *     reliability:{...}, vetoes:{id:true} }
- * Output: the takeout object documented in docs/EXECUTIVE_TAKEOUT_PLAN.md.
  */
 (function (global) {
   "use strict";
   var TR = global.TR = global.TR || {};
   var takeout = TR.takeout = TR.takeout || {};
 
-  /* All tunable thresholds in one place — no magic numbers in the logic. */
+  /* Tunable thresholds — no magic numbers in the logic below. */
   var CONST = takeout.CONST = {
-    CAP_PROTECT: 2,            // per-posture ceilings — the "just enough" cap
-    CAP_ACT: 2,
-    CAP_WATCH: 2,
-    CAP_DECIDE: 1,
-    COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full interestingness
-    WEIGHT_SOLID: 1.0,        // 95%-significant finding
-    WEIGHT_SOFT: 0.5,         // 80%-only ("nearly significant") finding
-    BATTERY_BONUS_PER_ITEM: 0.15,  // x(1 + bonus*(k-1)) for cross-item consistency
-    BATTERY_FORK_MIN: 3       // same column, same direction, >=k items -> a DECIDE fork
+    MIN_GROUP_HITS: 2,        // a column must be off on >=N questions to be "the group"
+    MIN_AREA_MEMBERS: 2,      // a theme needs >=N questions to count as an "area"
+    EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
+    COHEN_H_REFERENCE: 0.8    // Cohen's "large" effect -> full weight
   };
 
-  /** Posture metadata — the four decision lanes, in reading order. */
-  var POSTURES = takeout.POSTURES = [
-    { id: "protect", label: "Protect", verb: "what you're winning on", cap: CONST.CAP_PROTECT },
-    { id: "act", label: "Act now", verb: "where you're exposed", cap: CONST.CAP_ACT },
-    { id: "watch", label: "Watch", verb: "what's moving since last wave", cap: CONST.CAP_WATCH },
-    { id: "decide", label: "Decide", verb: "a genuine fork — the data points two ways", cap: CONST.CAP_DECIDE }
-  ];
-
-  /**
-   * Cohen's h for two proportions — the effect-size measure for a percentage
-   * gap. Down-weights gaps near 0% or 100% and up-weights gaps around 50%.
-   * p1, p2 are proportions in [0, 1].
-   */
+  /** Cohen's h for two proportions (effect size for a percentage gap). */
   function cohenH(p1, p2) {
     var clamp = function (p) { return Math.min(1, Math.max(0, p)); };
     var phi = function (p) { return 2 * Math.asin(Math.sqrt(clamp(p))); };
@@ -50,226 +35,165 @@
   }
   takeout.cohenH = cohenH;
 
-  /**
-   * Effect size of one finding on a 0..1 scale, comparable across metrics.
-   * Proportions use |Cohen's h| / reference; means/index/NPS use the gap as a
-   * fraction of the response-scale range. Returns 0 when not computable.
-   */
+  /** A standout's effect size on a 0..1 scale, comparable across metrics. */
   function effectSize(f) {
-    if (f.metric === "mean") {
+    if (f.isMean) {
       var range = (f.scaleMax - f.scaleMin) || 0;
       return range > 0 ? Math.min(1, Math.abs(f.gap) / range) : 0;
     }
     var baseline = (f.rest === null || f.rest === undefined) ? f.overall : f.rest;
     if (f.value === null || baseline === null || baseline === undefined) return 0;
-    var h = Math.abs(cohenH(f.value / 100, baseline / 100));
-    return Math.min(1, h / CONST.COHEN_H_REFERENCE);
+    return Math.min(1, Math.abs(cohenH(f.value / 100, baseline / 100)) / CONST.COHEN_H_REFERENCE);
   }
   takeout.effectSize = effectSize;
 
-  /** Significance-tier weight: solid 95% counts full, soft 80% counts half. */
-  function tierWeight(soft) {
-    return soft ? CONST.WEIGHT_SOFT : CONST.WEIGHT_SOLID;
+  /** A touchpoint's level on its own 0..1 scale (value as a share of the max). */
+  function areaScore(level) {
+    var max = level.scaleMax || 0;
+    return max > 0 ? Math.min(1, Math.max(0, level.value / max)) : 0;
   }
 
   /**
-   * Base interestingness score (0..100) before the battery bonus:
-   * effect size x significance tier. Significance is a GATE applied upstream;
-   * ranking is by effect, never by p-value.
+   * GROUP pattern: which banner column is most consistently off across the
+   * survey. Tally each column's significant standouts (behind / ahead); the
+   * column behind on the most questions is "the group under strain". Returns
+   * null when no column is off on enough questions. Pure; no tagging needed.
    */
-  function scoreFinding(f) {
-    return effectSize(f) * tierWeight(f.soft) * 100;
-  }
-  takeout.scoreFinding = scoreFinding;
-
-  /** Stable battery key. Without a category we cannot tell related items from
-   *  unrelated ones, so each finding is its own battery (k=1) — never the whole
-   *  survey collapsed into one. "::" cannot occur in the parts. */
-  function batteryKeyFor(f) {
-    if (!f.category) return "solo::" + f.code + "::" + f.label + "::" + f.column;
-    return f.column + "::" + f.category + "::" + f.direction;
-  }
-  takeout._batteryKeyFor = batteryKeyFor;
-
-  /**
-   * Battery-consistency count for a subgroup standout: how many findings share
-   * its column, category and direction (the same segment running the same way
-   * across a battery of related items).
-   */
-  function batteryCounts(standouts) {
-    var tally = {};
-    standouts.forEach(function (f) {
-      var key = batteryKeyFor(f);
-      tally[key] = (tally[key] || 0) + 1;
+  function groupPattern(standouts) {
+    var byCol = {};
+    (standouts || []).forEach(function (f) {
+      if (f.value === null || f.value === undefined) return;
+      var key = f.column;
+      var c = byCol[key] || (byCol[key] = { column: f.column, group: f.bannerGroup || "", behind: [], ahead: [] });
+      var dir = f.isMean ? (f.direction === "behind" ? "behind" : "ahead") : (f.gap >= 0 ? "ahead" : "behind");
+      (dir === "behind" ? c.behind : c.ahead).push(f);
     });
-    return tally;
-  }
-  takeout._batteryCounts = batteryCounts;
-
-  /** Score multiplier for a finding given its battery-consistency count k. */
-  function batteryMultiplier(k) {
-    return 1 + CONST.BATTERY_BONUS_PER_ITEM * Math.max(0, k - 1);
-  }
-  takeout.batteryMultiplier = batteryMultiplier;
-
-  /** Route a subgroup standout to one posture: a systemic same-direction
-   *  pattern across a battery is a fork; otherwise ahead -> Protect, behind ->
-   *  Act. (Significance + base are gated upstream.) */
-  function routePosture(c, batteryK) {
-    if (batteryK >= CONST.BATTERY_FORK_MIN) return "decide";
-    return c.gap >= 0 ? "protect" : "act";
-  }
-  takeout.routePosture = routePosture;
-
-  /** Median touchpoint value — the line between relatively strong and weak, so
-   *  Protect/Act surface the genuine top/bottom touchpoints rather than only
-   *  those past an absolute band (most items sit mid-band on a tight scale). */
-  function medianValue(levels) {
-    var v = levels.map(function (l) { return l.value; })
-      .filter(function (x) { return x !== null && x !== undefined; })
-      .sort(function (a, b) { return a - b; });
-    if (!v.length) return 0;
-    var m = Math.floor(v.length / 2);
-    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
-  }
-  takeout.medianValue = medianValue;
-
-  /** Route a touchpoint level: strong-but-declining is a fork; a significant
-   *  mover is a Watch story; otherwise Protect/Act by rank vs the median. */
-  function routeLevel(f, median) {
-    var declining = !!(f.delta && f.delta.sig && f.delta.diff < 0);
-    if (f.band === "strong" && declining) return "decide";
-    if (f.delta && f.delta.sig) return "watch";
-    return f.value >= median ? "protect" : "act";
-  }
-  takeout.routeLevel = routeLevel;
-
-  /** Within-lane rank score for a level, normalised to the same 0..100 footing
-   *  as a standout's effect size (so a touchpoint level and a subgroup gap
-   *  compete fairly). Distance from the median as a fraction of the scale for
-   *  Protect/Act; movement (with a touch of extremeness) for Watch/Decide. */
-  function scoreLevel(f, median) {
-    var range = (f.scaleMax - f.scaleMin) || 1;
-    var extremeness = Math.abs(f.value - median) / range;
-    if (f.posture === "watch" || f.posture === "decide") {
-      var move = f.delta ? Math.abs(f.delta.diff) / range : 0;
-      return (move + extremeness * 0.25) * 100;
-    }
-    return extremeness * 100;
-  }
-
-  /** Prefer the index (mean) standout over a top-box (%) standout for the same
-   *  question + column, so the takeout speaks one metric — the index — wherever
-   *  a question has one. Categorical standouts with no index are kept. */
-  function preferIndexStandouts(standouts) {
-    var hasMean = {};
-    standouts.forEach(function (f) {
-      if (f.metric === "mean") hasMean[f.code + "::" + f.column] = true;
-    });
-    return standouts.filter(function (f) {
-      return f.metric === "mean" || !hasMean[f.code + "::" + f.column];
-    });
-  }
-
-  /** Stable id so a researcher's text edits survive report regeneration. */
-  function findingId(f) {
-    return f.code + "|" + f.column + "|" + f.metric;
-  }
-  takeout.findingId = findingId;
-
-  /** Normalize a _collectFindings standout into the engine's Finding shape. */
-  function normalizeStandout(f) {
-    var metric = f.isMean ? "mean" : "pct";
-    var out = {
-      code: f.code, title: f.title, category: f.category || "", column: f.column,
-      kind: "standout", metric: metric, value: f.value, rest: f.rest,
-      overall: f.overall, gap: f.gap, soft: !!f.soft,
-      direction: f.isMean ? f.direction : (f.gap >= 0 ? "ahead" : "behind"),
-      decimals: f.decimals, scaleMin: f.scaleMin, scaleMax: f.scaleMax,
-      base: (f.base === undefined ? null : f.base), beaten: f.beaten || [],
-      label: f.label, band: null, delta: null, batteryK: 1, score: 0, posture: null,
-      bannerGroup: f.bannerGroup || "", topBox: null
+    var cols = Object.keys(byCol).map(function (k) { return byCol[k]; });
+    var pick = function (side) {
+      var best = null;
+      cols.forEach(function (c) {
+        var hits = c[side].length;
+        if (hits < CONST.MIN_GROUP_HITS) return;
+        var eff = c[side].reduce(function (s, f) { return s + effectSize(f); }, 0);
+        if (!best || hits > best.hits || (hits === best.hits && eff > best.eff)) {
+          best = { col: c, hits: hits, eff: eff };
+        }
+      });
+      return best;
     };
-    out.id = findingId(out);
+    var strain = pick("behind"), thriving = pick("ahead");
+    if (!strain) return null;
+    var c = strain.col;
+    var evidence = c.behind.slice().sort(function (a, b) { return effectSize(b) - effectSize(a); })
+      .slice(0, CONST.EVIDENCE_MAX).map(function (f) {
+        return { label: f.title, value: f.value, rest: f.rest, overall: f.overall,
+          scaleMax: f.scaleMax, isMean: !!f.isMean, decimals: f.decimals };
+      });
+    return { id: "group", kind: "group", subject: c.column, group: c.group,
+      hits: strain.hits, total: c.behind.length + c.ahead.length, evidence: evidence,
+      secondary: thriving ? thriving.col.column : null };
+  }
+
+  /** Group levels into themes (theme, else section, else "(untagged)"). */
+  function groupByTheme(levels) {
+    var map = {}, order = [];
+    (levels || []).forEach(function (l) {
+      var key = l.theme || l.section || "(untagged)";
+      if (!map[key]) { map[key] = { name: key, section: l.section || "", members: [] }; order.push(map[key]); }
+      map[key].members.push(l);
+    });
+    return order.map(function (t) {
+      var sum = 0, raw = 0, moving = 0;
+      t.members.forEach(function (m) {
+        sum += areaScore(m);
+        raw += (m.value || 0);
+        if (m.delta && m.delta.sig) moving += (m.delta.diff < 0 ? -1 : 1);
+      });
+      t.score = t.members.length ? sum / t.members.length : 0;        // normalised 0..1, for ranking
+      t.avg = t.members.length ? raw / t.members.length : 0;          // raw scale average, for display
+      t.scaleMax = (t.members[0] && t.members[0].scaleMax) || 0;
+      t.moving = moving;   // net signed count of significant movers
+      return t;
+    });
+  }
+
+  /** Evidence rows for an area, weakest- or strongest-member first. */
+  function areaEvidence(theme, weakest) {
+    return theme.members.slice().sort(function (a, b) {
+      return weakest ? areaScore(a) - areaScore(b) : areaScore(b) - areaScore(a);
+    }).slice(0, CONST.EVIDENCE_MAX).map(function (m) {
+      return { label: m.title, value: m.value, scaleMax: m.scaleMax,
+        delta: m.delta || null, topBox: m.topBox || null };
+    });
+  }
+
+  /** WEAKEST and STRONGEST area patterns from multi-question themes. */
+  function areaPatterns(levels) {
+    var themes = groupByTheme(levels).filter(function (t) {
+      return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
+    });
+    if (themes.length < 1) return [];
+    var ranked = themes.slice().sort(function (a, b) { return a.score - b.score; });
+    var weak = ranked[0], strong = ranked[ranked.length - 1];
+    var make = function (t, isWeak) {
+      return { id: isWeak ? "weak" : "strong", kind: "area", subject: t.name,
+        section: t.section, score: t.score, avg: t.avg, scaleMax: t.scaleMax,
+        members: t.members.length, moving: t.moving, evidence: areaEvidence(t, isWeak) };
+    };
+    var out = [make(weak, true)];
+    if (strong !== weak) out.push(make(strong, false));   // need >=2 distinct themes for both
     return out;
   }
 
-  /** Normalize a touchpoint level (Total figure + wave delta) into a Finding. */
-  function normalizeLevel(l) {
-    var out = {
-      code: l.code, title: l.title, category: l.category || "", column: "Total",
-      kind: "level", metric: "mean", value: l.value, rest: null, overall: l.value,
-      gap: null, soft: false,
-      direction: (l.delta && l.delta.diff < 0) ? "behind" : "ahead",
-      decimals: 1, scaleMin: l.scaleMin, scaleMax: l.scaleMax,
-      base: (l.base === undefined ? null : l.base), beaten: [], label: l.title,
-      band: l.band, delta: l.delta || null, batteryK: 1, score: 0, posture: null,
-      bannerGroup: "", topBox: l.topBox || null, waves: l.waves || null
-    };
-    out.id = findingId(out);
-    return out;
-  }
-
-  /** Group routed candidates by posture, rank by score, drop vetoed and exact
-   *  duplicates, then cap. A veto frees its slot for the next-ranked candidate. */
-  function selectByPosture(candidates, vetoes) {
-    vetoes = vetoes || {};
-    var groups = {};
-    POSTURES.forEach(function (p) { groups[p.id] = []; });
-    candidates.forEach(function (f) { groups[f.posture].push(f); });
-    POSTURES.forEach(function (p) {
-      groups[p.id].sort(function (a, b) { return b.score - a.score; });
-      var seen = {}, kept = [];
-      for (var i = 0; i < groups[p.id].length && kept.length < p.cap; i++) {
-        var f = groups[p.id][i];
-        if (seen[f.id] || vetoes[f.id]) continue;
-        seen[f.id] = true;
-        kept.push(f);
+  /** MOVEMENT pattern: the headline metric (or theme) with the biggest
+   *  significant wave change. Returns null when there is no wave history. */
+  function movementPattern(apex, levels) {
+    var movers = [];
+    (apex || []).forEach(function (m) {
+      if (m.delta && m.delta.sig) {
+        movers.push({ subject: m.label || m.title, diff: m.delta.diff, waves: m.waves || null,
+          year: m.delta.year, scaleMax: m.scaleMax });
       }
-      groups[p.id] = kept;
     });
-    return groups;
+    if (!movers.length) return null;   // headline movers lead; themes are the driver note
+    movers.sort(function (a, b) { return Math.abs(b.diff) - Math.abs(a.diff); });
+    var top = movers[0];
+    var themes = groupByTheme(levels);
+    var driver = null;
+    themes.forEach(function (t) {
+      if (t.moving < 0 && (!driver || t.moving < driver.moving)) driver = t;
+    });
+    return { id: "moved", kind: "movement", subject: top.subject, diff: top.diff,
+      year: top.year, waves: top.waves, driver: driver ? driver.name : null };
   }
-  takeout._selectByPosture = selectByPosture;
 
   /**
-   * Build the takeout object from gathered candidates. Pure: same inputs always
-   * yield the same takeout. Standouts score by effect x tier x battery and route
-   * by direction; levels route by rank relative to the median (with movers ->
-   * Watch, strong-decliners -> Decide); then rank, dedupe and cap.
+   * Build the patterns object from gathered inputs. Pure: same inputs always
+   * give the same patterns. Assembles GROUP + WEAK/STRONG AREA + MOVEMENT,
+   * omitting any pattern that cannot be computed (graceful degradation).
    */
-  function buildTakeout(inputs) {
+  function buildPatterns(inputs) {
     inputs = inputs || {};
-    var standouts = preferIndexStandouts((inputs.standouts || []).map(normalizeStandout));
-    var levels = (inputs.levels || []).map(normalizeLevel);
-    var tally = batteryCounts(standouts);
-    standouts.forEach(function (f) {
-      f.batteryK = tally[batteryKeyFor(f)] || 1;
-      f.score = scoreFinding(f) * batteryMultiplier(f.batteryK);
-      f.posture = routePosture(f, f.batteryK);
-    });
-    var median = medianValue(levels);
-    levels.forEach(function (f) {
-      f.posture = routeLevel(f, median);
-      f.score = scoreLevel(f, median);
-    });
-    var routed = standouts.concat(levels).filter(function (f) { return f.posture; });
-    var byPosture = selectByPosture(routed, inputs.vetoes || {});
-    var postures = POSTURES.map(function (p) {
-      return { id: p.id, label: p.label, verb: p.verb, items: byPosture[p.id] || [] };
-    });
-    var promoted = postures.reduce(function (s, p) { return s + p.items.length; }, 0);
+    var patterns = [];
+    var group = groupPattern(inputs.standouts);
+    if (group) patterns.push(group);
+    areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
+    var moved = movementPattern(inputs.apex || [], inputs.levels || []);
+    if (moved) patterns.push(moved);
     return {
       answer: { metrics: inputs.apex || [] },
       reliability: inputs.reliability || null,
-      postures: postures,
-      candidateCount: standouts.length + levels.length,
-      promotedCount: promoted
+      patterns: patterns,
+      themeCount: groupByTheme(inputs.levels || []).filter(function (t) {
+        return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
+      }).length,
+      standoutCount: (inputs.standouts || []).length
     };
   }
-  takeout.buildTakeout = buildTakeout;
+  takeout.buildPatterns = buildPatterns;
 
-  takeout._normalizeStandout = normalizeStandout;
-  takeout._preferIndexStandouts = preferIndexStandouts;
+  takeout._groupPattern = groupPattern;
+  takeout._areaPatterns = areaPatterns;
+  takeout._groupByTheme = groupByTheme;
 
 })(typeof window !== "undefined" ? window : globalThis);

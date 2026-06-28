@@ -12,11 +12,9 @@
 
   var APEX_ID = "__apex__";
 
-  /** Gather candidates, apply the researcher's vetoes, build the takeout. */
-  takeout.compute = function (banner) {
-    var inputs = takeout.gather(banner);
-    inputs.vetoes = takeout.state.vetoes();
-    return takeout.buildTakeout(inputs);
+  /** Gather the report's findings/levels/headlines and build the patterns. */
+  takeout.compute = function () {
+    return takeout.buildPatterns(takeout.gather());
   };
 
   function currentView() {
@@ -46,12 +44,10 @@
   takeout.render = function (host) {
     var view = currentView();
     var t = takeout.compute();
-    var lowThreshold = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
-    var body = view === "present"
-      ? takeout.presentView.html(t, { lowThreshold: lowThreshold })
-      : takeout.readView.html(t, { lowThreshold: lowThreshold });
+    var body = view === "present" ? takeout.presentView.html(t) : takeout.readView.html(t);
     host.innerHTML = '<div class="page tko-page">' + headHtml(view) +
       '<div class="tko-body tko-view-' + view + '">' + body + "</div>" +
+      '<div class="tko-howsure-panel" hidden></div>' +
       '<div class="tko-live" aria-live="polite"></div></div>';
     wire(host);
   };
@@ -105,23 +101,38 @@
         saveEdit(e.target, host);
       }
     });
-    // deep-link a card to its full crosstab; veto promotes the next candidate
     host.addEventListener("click", function (e) {
-      var goq = e.target.closest("[data-goq]");
-      if (goq) { TR.shell.goQuestion(goq.getAttribute("data-goq")); return; }
-      var veto = e.target.closest("[data-veto]");
-      if (veto) {
-        takeout.state.setVeto(veto.getAttribute("data-veto"), true);
-        announce(host, "Finding hidden — next candidate promoted");
-        takeout.render(host);
-        return;
-      }
+      // deep-link a pattern to the tab that shows its detail
+      var go = e.target.closest("[data-goto]");
+      if (go && TR.shell && TR.shell.goTab) { TR.shell.goTab(go.getAttribute("data-goto")); return; }
+      // toggle the "how sure are these numbers?" explainer panel
+      if (e.target.closest("[data-howsure]")) { toggleHowSure(host); return; }
       if (e.target.closest("[data-tko-reset]")) {
         takeout.state.reset();
         announce(host, "Edits discarded — back to the engine's selection");
         takeout.render(host);
       }
     });
+  }
+
+  /** Show/hide the shared confidence explainer (reused from TR.conf) inline. */
+  function toggleHowSure(host) {
+    var panel = host.querySelector(".tko-howsure-panel");
+    if (!panel) return;
+    if (panel.hidden) {
+      panel.innerHTML = (TR.conf && TR.conf.calloutHtml) ? TR.conf.calloutHtml() : "";
+      panel.hidden = false;
+      var cl = panel.querySelector(".callout");
+      if (cl) cl.classList.remove("collapsed");   // open it straight away
+      var head = panel.querySelector("[data-callout]");
+      if (head) head.addEventListener("click", function () {
+        head.closest(".callout").classList.toggle("collapsed");
+      });
+      panel.scrollIntoView({ block: "nearest" });
+    } else {
+      panel.hidden = true;
+      panel.innerHTML = "";
+    }
   }
 
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Verification gate for the Executive Takeout engine. Runs:
- *   1. known-answer tests for the pure engine (Cohen's h, scoring, routing,
- *      battery bonus, build/cap/dedupe) — hand-verifiable expected values.
- *   2. a source structure check (no takeout JS file over 300 active lines).
+ * Verification gate for the Executive Takeout Patterns engine. Runs:
+ *   1. known-answer tests for the pure engine (Cohen's h, effect size, the group
+ *      / area / movement patterns, build + graceful fallback) and the curation
+ *      state — hand-verifiable expected values.
+ *   2. an end-to-end render over stubbed live surfaces (gather -> build -> both
+ *      views) exercising tagging, index+top-box, multi-banner and participation.
+ *   3. a source structure check (no takeout JS file over 300 active lines).
  * Exit 0 = everything passed. No dependencies beyond node.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/takeout_tests.mjs
@@ -17,13 +20,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
 const MAX_ACTIVE_LINES = 300;
 
-/* ---- load the namespace + every takeout module into a sandbox ----
-   (loading them all also fails fast on any syntax error or missing export) */
 const sandbox = { console };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 const takeoutFiles = readdirSync(JS_DIR).filter((f) => /takeout.*\.js$/.test(f)).sort();
-// 01_format defines TR.fmt, which the component layer captures at load time.
 for (const file of ["00_namespace.js", "01_format.js"].concat(takeoutFiles)) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
 }
@@ -37,228 +37,175 @@ function run(name, fn) {
   catch (e) { failed++; console.log("  ✗ " + name + "\n    " + e.message); }
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
-function close(actual, expected, tol, msg) {
-  if (Math.abs(actual - expected) > tol) {
-    throw new Error(msg + ": expected ~" + expected + ", got " + actual);
-  }
-}
+function close(a, e, tol, msg) { if (Math.abs(a - e) > tol) throw new Error(msg + ": expected ~" + e + ", got " + a); }
 
-console.log("Executive Takeout engine — known-answer suite:");
+console.log("Executive Takeout — Patterns engine known-answer suite:");
 
 run("Cohen's h known answers", () => {
   close(takeout.cohenH(0.5, 0.5), 0, 1e-9, "h(.5,.5)=0");
   close(takeout.cohenH(0.86, 0.74), 0.3033, 1e-3, "h(.86,.74)");
-  close(takeout.cohenH(0.6, 0.4), 0.4027, 1e-3, "h(.6,.4)");
-  assert(takeout.cohenH(0.9, 0.5) > 0, "positive when p1>p2");
-  assert(takeout.cohenH(0.5, 0.9) < 0, "negative when p1<p2");
+  assert(takeout.cohenH(0.9, 0.5) > 0 && takeout.cohenH(0.5, 0.9) < 0, "sign follows direction");
 });
 
 run("effect size is comparable across metrics", () => {
-  const prop = { metric: "pct", value: 86, rest: 74, overall: 80 };
-  close(takeout.effectSize(prop), 0.3033 / 0.8, 1e-3, "proportion effect = |h|/ref");
-  const mean = { metric: "mean", gap: 0.6, scaleMin: 0, scaleMax: 10 };
-  close(takeout.effectSize(mean), 0.06, 1e-9, "mean effect = |gap|/range");
-  const huge = { metric: "pct", value: 95, rest: 5, overall: 50 };
-  assert(takeout.effectSize(huge) === 1, "effect clamps to 1");
+  close(takeout.effectSize({ isMean: false, value: 86, rest: 74, overall: 80 }), 0.3033 / 0.8, 1e-3, "proportion");
+  close(takeout.effectSize({ isMean: true, gap: 0.6, scaleMin: 0, scaleMax: 10 }), 0.06, 1e-9, "mean");
 });
 
-run("score: effect x significance tier", () => {
-  const solid = { metric: "pct", value: 86, rest: 74, overall: 80, soft: false };
-  close(takeout.scoreFinding(solid), 37.91, 0.1, "solid 95% score");
-  const soft = { metric: "pct", value: 86, rest: 74, overall: 80, soft: true };
-  close(takeout.scoreFinding(soft), 18.95, 0.1, "soft 80% scores half");
-});
-
-run("battery multiplier rewards consistency", () => {
-  close(takeout.batteryMultiplier(1), 1.0, 1e-9, "lone finding, no bonus");
-  close(takeout.batteryMultiplier(3), 1 + C.BATTERY_BONUS_PER_ITEM * 2, 1e-9, "k=3 bonus");
-});
-
-run("routing: levels to one posture each, relative to the median", () => {
-  const median = 3.5;
-  const lvl = (band, value, delta) => ({ band, value, delta, scaleMin: 0, scaleMax: 5 });
-  assert(takeout.routeLevel(lvl("strong", 4.5, { sig: true, diff: -0.6 }), median) === "decide",
-    "strong + declining -> decide");
-  assert(takeout.routeLevel(lvl("moderate", 3.2, { sig: true, diff: 0.4 }), median) === "watch",
-    "any significant mover -> watch");
-  assert(takeout.routeLevel(lvl("strong", 4.2, null), median) === "protect",
-    "above median, not moving -> protect");
-  assert(takeout.routeLevel(lvl("weak", 2.8, null), median) === "act",
-    "below median, not moving -> act");
-  assert(takeout.medianValue([{ value: 1 }, { value: 3 }, { value: 5 }]) === 3, "median of 1,3,5");
-});
-
-run("index standout is preferred over a top-box standout (same Q + column)", () => {
-  const both = takeout._preferIndexStandouts([
-    { code: "Q1", column: "Seg", metric: "pct" },
-    { code: "Q1", column: "Seg", metric: "mean" },
-    { code: "Q2", column: "Seg", metric: "pct" }
-  ]);
-  assert(both.length === 2, "the duplicate top-box is dropped");
-  assert(both.some((f) => f.code === "Q1" && f.metric === "mean"), "index kept for Q1");
-  assert(both.some((f) => f.code === "Q2" && f.metric === "pct"), "lone top-box kept for Q2");
-});
-
-run("battery grouping is suppressed when category is blank", () => {
-  const f = (label) => ({ code: "Q" + label, category: "", label, column: "Seg", direction: "behind" });
-  const counts = takeout._batteryCounts([f("a"), f("b"), f("c")]);
-  assert(Object.keys(counts).length === 3, "no category -> each finding its own battery");
-  Object.values(counts).forEach((k) => assert(k === 1, "k=1 with no category"));
-});
-
-run("routing: standouts by direction and battery", () => {
-  const so = (gap) => ({ kind: "standout", gap });
-  assert(takeout.routePosture(so(12), 1) === "protect", "ahead -> protect");
-  assert(takeout.routePosture(so(-12), 1) === "act", "behind -> act");
-  assert(takeout.routePosture(so(-12), C.BATTERY_FORK_MIN) === "decide",
-    "systemic segment pattern -> decide");
-});
-
-run("buildTakeout caps, routes and dedupes", () => {
+run("GROUP pattern finds the column behind on the most questions", () => {
+  const mk = (col, code, gap, dir) => ({ column: col, bannerGroup: "Campus", code: code,
+    title: code, isMean: true, value: 3.4, rest: 4.0, overall: 3.9, gap: gap, direction: dir,
+    scaleMin: 0, scaleMax: 5 });
   const standouts = [
-    { code: "Q1", title: "Mission", category: "Belief", column: "All", label: "matters",
-      isMean: false, value: 86, rest: 74, overall: 80, gap: 12, soft: false, beaten: ["x"] },
-    { code: "Q2", title: "Workload", category: "Day", column: "All", label: "ok",
-      isMean: false, value: 47, rest: 63, overall: 55, gap: -16, soft: false, beaten: ["y"] },
-    { code: "Q3", title: "I1", category: "Joiners", column: "Under 2yr", label: "a",
-      isMean: false, value: 40, rest: 62, overall: 55, gap: -22, soft: false, beaten: [] },
-    { code: "Q4", title: "I2", category: "Joiners", column: "Under 2yr", label: "b",
-      isMean: false, value: 41, rest: 60, overall: 54, gap: -19, soft: false, beaten: [] },
-    { code: "Q5", title: "I3", category: "Joiners", column: "Under 2yr", label: "c",
-      isMean: false, value: 38, rest: 61, overall: 53, gap: -23, soft: false, beaten: [] }
+    mk("Cape Town", "Q1", -0.6, "behind"), mk("Cape Town", "Q2", -0.5, "behind"),
+    mk("Cape Town", "Q3", -0.4, "behind"),
+    { column: "Durban", bannerGroup: "Campus", code: "Q1", title: "Q1", isMean: true,
+      value: 4.5, rest: 3.9, overall: 3.9, gap: 0.6, direction: "ahead", scaleMin: 0, scaleMax: 5 },
+    { column: "Durban", bannerGroup: "Campus", code: "Q2", title: "Q2", isMean: true,
+      value: 4.4, rest: 3.9, overall: 3.9, gap: 0.5, direction: "ahead", scaleMin: 0, scaleMax: 5 }
   ];
+  const g = takeout._groupPattern(standouts);
+  assert(g && g.subject === "Cape Town", "Cape Town is the group under strain");
+  assert(g.hits === 3, "behind on 3 questions, got " + g.hits);
+  assert(g.secondary === "Durban", "Durban is the thriving group");
+  assert(g.evidence.length === 3, "evidence rows present");
+});
+
+run("GROUP pattern needs enough hits (else null)", () => {
+  const one = [{ column: "X", code: "Q1", title: "Q1", isMean: true, value: 3, rest: 4,
+    overall: 3.9, gap: -1, direction: "behind", scaleMin: 0, scaleMax: 5 }];
+  assert(takeout._groupPattern(one) === null, "a single behind-finding is not a pattern");
+});
+
+run("AREA patterns rank weakest and strongest theme", () => {
+  const lv = (code, theme, value) => ({ code, title: code, section: "Engagement", theme,
+    value, scaleMin: 0, scaleMax: 5, delta: null });
   const levels = [
-    { code: "Q6", title: "Pride", category: "Belief", value: 8.6, band: "strong",
-      delta: null, base: 220, scaleMin: 0, scaleMax: 10 },
-    { code: "Q7", title: "Systems", category: "Day", value: 4.7, band: "weak",
-      delta: null, base: 215, scaleMin: 0, scaleMax: 10 },
-    { code: "Q8", title: "Engagement", category: "Index", value: 7.4, band: "strong",
-      delta: { sig: true, diff: -0.6, year: 2024 }, base: 220, scaleMin: 0, scaleMax: 10 }
+    lv("Q08", "Recognition & voice", 3.4), lv("Q11", "Recognition & voice", 3.7),
+    lv("Q12", "Belonging & purpose", 4.4), lv("Q13", "Belonging & purpose", 4.5)
   ];
-  const t = takeout.buildTakeout({ standouts, levels, composites: [], reliability: { n: 220 } });
-  const by = {};
-  t.postures.forEach((p) => { by[p.id] = p.items; });
-  assert(t.candidateCount === 8, "8 gated candidates counted, got " + t.candidateCount);
-  assert(by.protect.length <= C.CAP_PROTECT, "protect within cap");
-  assert(by.act.length <= C.CAP_ACT, "act within cap");
-  assert(by.decide.length >= 1, "a decide fork surfaced (battery + strong-declining)");
-  assert(t.promotedCount <= 7, "page capped at <=7, got " + t.promotedCount);
-  // the Under-2yr battery (k=3, all behind) must route to decide, not act
-  const joinerInDecide = by.decide.some((f) => f.column === "Under 2yr");
-  assert(joinerInDecide, "systemic joiner pattern routed to decide");
-  // every promoted finding carries a stable id
-  t.postures.forEach((p) => p.items.forEach((f) =>
-    assert(f.id && f.id.indexOf("|") > 0, "finding has a stable id")));
+  const ps = takeout._areaPatterns(levels);
+  const weak = ps.filter((p) => p.id === "weak")[0];
+  const strong = ps.filter((p) => p.id === "strong")[0];
+  assert(weak && weak.subject === "Recognition & voice", "weakest area is Recognition & voice");
+  close(weak.avg, 3.55, 1e-9, "weak area average");
+  assert(strong && strong.subject === "Belonging & purpose", "strongest area is Belonging & purpose");
+  close(strong.avg, 4.45, 1e-9, "strong area average");
 });
 
-run("buildTakeout is graceful on empty input", () => {
-  const t = takeout.buildTakeout({});
-  assert(t.postures.length === 4, "four posture lanes always present");
-  assert(t.promotedCount === 0 && t.candidateCount === 0, "nothing promoted, nothing crashes");
+run("AREA patterns: single-question themes don't count; untagged falls back", () => {
+  const levels = [
+    { code: "Q1", title: "Q1", section: "", theme: "", value: 3, scaleMax: 5 },
+    { code: "Q2", title: "Q2", section: "", theme: "", value: 4, scaleMax: 5 }
+  ];
+  assert(takeout._areaPatterns(levels).length === 0, "untagged levels yield no area pattern");
+  const lone = [{ code: "Q1", title: "Q1", section: "S", theme: "Solo", value: 3, scaleMax: 5 }];
+  assert(takeout._areaPatterns(lone).length === 0, "a one-question theme is not an area");
 });
 
-run("a veto frees its slot for the next-ranked candidate", () => {
-  // distinct categories so they don't form a battery (which would route to Decide);
-  // each is a lone positive standout -> Protect, ranked by effect size
-  const mk = (code, gap, cat) => ({ code, title: code, category: cat, column: "Seg", label: "x",
-    isMean: false, value: 60 + gap, rest: 60, overall: 60, gap, soft: false, beaten: ["a"] });
-  const standouts = [mk("Q1", 25, "A"), mk("Q2", 18, "B"), mk("Q3", 10, "C")];
-  const base = takeout.buildTakeout({ standouts });
-  const ids = base.postures.find((p) => p.id === "protect").items.map((f) => f.id);
-  assert(ids.length === 2 && ids.indexOf("Q1|Seg|pct") !== -1, "top two by effect shown");
-  // veto the leader -> the third-ranked is promoted into the freed slot
-  const vetoed = takeout.buildTakeout({ standouts, vetoes: { "Q1|Seg|pct": true } });
-  const ids2 = vetoed.postures.find((p) => p.id === "protect").items.map((f) => f.id);
-  assert(ids2.indexOf("Q1|Seg|pct") === -1, "vetoed finding gone");
-  assert(ids2.indexOf("Q3|Seg|pct") !== -1, "next candidate promoted into the slot");
+run("buildPatterns assembles group + areas + movement, and degrades gracefully", () => {
+  const empty = takeout.buildPatterns({});
+  assert(empty.patterns.length === 0, "nothing in, nothing out — no crash");
+  const t = takeout.buildPatterns({
+    standouts: [
+      { column: "Cape Town", bannerGroup: "Campus", code: "Q08", title: "Recognition", isMean: true,
+        value: 3.0, rest: 3.8, overall: 3.6, gap: -0.8, direction: "behind", scaleMin: 0, scaleMax: 5 },
+      { column: "Cape Town", bannerGroup: "Campus", code: "Q11", title: "Opinions", isMean: true,
+        value: 3.1, rest: 3.9, overall: 3.7, gap: -0.8, direction: "behind", scaleMin: 0, scaleMax: 5 }
+    ],
+    levels: [
+      { code: "Q08", title: "Recognition", section: "Engagement", theme: "Recognition & voice", value: 3.4, scaleMax: 5, delta: { sig: true, diff: -0.2 } },
+      { code: "Q11", title: "Opinions", section: "Engagement", theme: "Recognition & voice", value: 3.7, scaleMax: 5, delta: null },
+      { code: "Q12", title: "Mission", section: "Engagement", theme: "Belonging", value: 4.4, scaleMax: 5, delta: null },
+      { code: "Q13", title: "Co-workers", section: "Engagement", theme: "Belonging", value: 4.2, scaleMax: 5, delta: null }
+    ],
+    apex: [{ label: "Engagement", value: 4.08, delta: { sig: true, diff: -0.6, year: 2024 }, waves: [{ year: 2023, value: 4.3 }, { year: 2025, value: 4.08, current: true }] }],
+    reliability: { n: 167 }
+  });
+  const ids = t.patterns.map((p) => p.id);
+  assert(ids.indexOf("group") !== -1, "group pattern present");
+  assert(ids.indexOf("weak") !== -1 && ids.indexOf("strong") !== -1, "weak + strong areas present");
+  assert(ids.indexOf("moved") !== -1, "movement pattern present");
+});
+
+run("curation state round-trips and resets", () => {
+  takeout.state.setText("weak", "takeaway", "Client wording");
+  assert(takeout.state.getText("weak", "takeaway", "seed") === "Client wording", "edit wins");
+  assert(takeout.state.getText("strong", "takeaway", "seed") === "seed", "seed fallback");
+  takeout.state.setApex("My one-line answer");
+  assert(takeout.state.getApex("seed") === "My one-line answer", "apex saved");
+  takeout.state.reset();
+  assert(takeout.state.getText("weak", "takeaway", "seed") === "seed", "reset clears");
 });
 
 run("every takeout module loaded and exposes its API", () => {
-  ["buildTakeout", "gather", "compute", "render"].forEach((fn) =>
+  ["buildPatterns", "gather", "compute", "render"].forEach((fn) =>
     assert(typeof takeout[fn] === "function", fn + " is a function"));
-  assert(takeout.state && typeof takeout.state.setText === "function", "state API present");
-  assert(takeout.ui && typeof takeout.ui.twoBar === "function", "ui atoms present");
+  assert(takeout.ui && typeof takeout.ui.areaRow === "function", "ui atoms present");
   assert(takeout.readView && typeof takeout.readView.html === "function", "read view present");
   assert(takeout.presentView && typeof takeout.presentView.html === "function", "present view present");
 });
 
-run("curation state round-trips and resets", () => {
-  takeout.state.setText("Q1|All|pct", "claim", "Client wording");
-  assert(takeout.state.getText("Q1|All|pct", "claim", "seed") === "Client wording", "edit wins over seed");
-  assert(takeout.state.getText("Q9|x|pct", "claim", "seed") === "seed", "seed is the fallback");
-  takeout.state.setApex("My one-line answer");
-  assert(takeout.state.getApex("seed") === "My one-line answer", "apex saved");
-  takeout.state.setVeto("Q1|All|pct", true);
-  assert(takeout.state.isVetoed("Q1|All|pct") === true, "veto recorded");
-  assert(takeout.state.hasCuration() === true, "curation detected");
-  takeout.state.reset();
-  assert(takeout.state.getText("Q1|All|pct", "claim", "seed") === "seed", "reset clears text");
-  assert(takeout.state.isVetoed("Q1|All|pct") === false, "reset clears vetoes");
-});
-
-run("end-to-end: generic apex, index+top-box, multi-banner, trend spark, participation", () => {
+run("end-to-end: tagging, index+top-box, multi-banner, participation, both views", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   TR.conf = { maxMoePct: () => 0.0, reportHasPopulation: () => true,
-    labels: () => ({ sampling_method_normalised: "census", is_probability: false }) };
+    labels: () => ({ sampling_method_normalised: "census", is_probability: false }),
+    calloutHtml: () => '<div class="callout collapsed"><button data-callout></button></div>" ' };
   TR.render = { wavePoints: (row) => row.waves || null, sparkline: () => '<svg class="spark"></svg>' };
   TR.AGG = { project: { name: "Climate 2025", low_base_threshold: 30, population_size: 220 },
-    banner_groups: [{ id: "Q02", name: "Campus" }, { id: "Q03", name: "Department" }, { id: "Q04", name: "Tenure" }] };
+    banner_groups: [{ id: "Q02", name: "Campus" }, { id: "Q03", name: "Department" }] };
   TR.d2 = { state: { banner: "Q02" }, firstBanner: () => "Q02" };
-  // a scale question carries favourable NET, unfavourable NET, NET POSITIVE (diff), then the mean
   const netRows = [{ kind: "net", label: "Agree" }, { kind: "net", label: "Disagree" },
     { kind: "net", label: "NET POSITIVE" }, { kind: "mean", label: "Index" }];
   const qmodel = (mean, top, delta, waves) => ({ columns: [{ base: 167 }], rows: [
     { kind: "net", cells: [{ pct: top }] }, { kind: "net", cells: [{ pct: 6 }] },
     { kind: "net", cells: [{ pct: top - 6 }] },
     { kind: "mean", cells: [{ mean: mean }], delta: delta || null, waves: waves || null }] });
-  const meanOnly = (mean, delta) => ({ columns: [{ base: 167 }],
-    rows: [{ kind: "mean", cells: [{ mean: mean }], delta: delta || null }] });
-  const Q = {
-    Q28: { mean: 3.9, top: 69, delta: { sig: true, diff: 0.1, year: 2024 },
-      waves: [{ year: 2023, value: 4.08 }, { year: 2024, value: 3.83 }, { year: 2025, value: 3.9, current: true }] },
-    Q08: { mean: 3.44, top: 41, delta: null },
-    Q12: { mean: 4.51, top: 88, delta: null }
+  const meanOnly = (mean, delta, waves) => ({ columns: [{ base: 167 }],
+    rows: [{ kind: "mean", cells: [{ mean: mean }], delta: delta || null, waves: waves || null }] });
+  const M = {
+    Q28: qmodel(3.9, 69, { sig: true, diff: 0.1, year: 2024 }, [{ year: 2023, value: 4.08 }, { year: 2025, value: 3.9, current: true }]),
+    Q_Engage: meanOnly(4.08, { sig: true, diff: -0.08, year: 2024 }, [{ year: 2023, value: 4.31 }, { year: 2025, value: 4.08, current: true }]),
+    Q08: qmodel(3.44, 41, null), Q11: qmodel(3.72, 58, null),
+    Q12: qmodel(4.40, 86, null), Q13: qmodel(4.20, 82, null)
   };
-  const seg = (col, val, rest, gap, dir, base) => ({ code: "Q28",
-    title: "Overall satisfaction with SACAP", category: "", column: col, label: "Index",
-    isMean: true, soft: false, value: val, rest: rest, overall: 3.9, gap: gap,
-    direction: dir, decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: base });
+  const seg = (col, val, gap) => ({ code: "Q28", title: "Overall satisfaction", category: "",
+    column: col, label: "Index", isMean: true, soft: false, value: val, rest: 3.95, overall: 3.9,
+    gap: gap, direction: gap < 0 ? "behind" : "ahead", decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: 38 });
   TR.views = {
     _collectFindings: (g) => {
-      if (g === "Q02") return [seg("Cape Town", 3.38, 3.98, -0.6, "behind", 38),
-        seg("Durban", 4.5, 3.82, 0.68, "ahead", 33)];
-      if (g === "Q03") return [seg("Marketing", 3.43, 3.95, -0.52, "behind", 31)];
-      if (g === "Q04") return [seg("New staff (<1yr)", 4.3, 3.8, 0.5, "ahead", 30)];
+      if (g === "Q02") return [seg("Cape Town", 3.38, -0.6), seg("Cape Town", 3.40, -0.5), seg("Durban", 4.5, 0.6)];
+      if (g === "Q03") return [seg("Marketing", 3.43, -0.5)];
       return [];
     },
     indexQuestions: () => ([
-      { code: "Q28", title: "Overall satisfaction with SACAP as a place to work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q28", title: "Overall satisfaction with SACAP", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
       { code: "Q_Engage", title: "Engagement", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: [{ kind: "mean", label: "Engagement" }] },
-      { code: "Q08", title: "Recognition for good work", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
-      { code: "Q12", title: "Mission makes work feel important", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } }
+      { code: "Q08", title: "Recognition", category: "Engagement", theme: "Recognition & voice", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q11", title: "Opinions count", category: "Engagement", theme: "Recognition & voice", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q12", title: "Mission matters", category: "Engagement", theme: "Belonging & purpose", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q13", title: "Co-workers commit", category: "Engagement", theme: "Belonging & purpose", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } }
     ]),
-    _modelFor: (code) => code === "Q_Engage"
-      ? meanOnly(4.08, { sig: true, diff: -0.08, year: 2024 })
-      : qmodel(Q[code].mean, Q[code].top, Q[code].delta, Q[code].waves),
+    _modelFor: (code) => M[code],
     _meanRow: (m) => m.rows.find((r) => r.kind === "mean")
   };
   TR.model = { forQuestion: (code) => TR.views._modelFor(code) };
 
   const t = takeout.compute();
-  assert(t.candidateCount >= 5, "standouts gathered across all banner groups, got " + t.candidateCount);
-  const read = takeout.readView.html(t, { lowThreshold: 30 });
-  const present = takeout.presentView.html(t, { lowThreshold: 30 });
-  assert(read.indexOf("Satisfaction") !== -1, "satisfaction leads the apex (generic detection)");
-  assert(read.indexOf("69% agree") !== -1, "apex shows index + top-box together");
-  assert(read.indexOf("tko-kpi-spark") !== -1, "apex shows the wave sparkline when history exists");
-  assert(read.indexOf("Campus") !== -1, "standouts tagged with their banner cut");
-  assert(read.indexOf("% response of") !== -1, "participation/response rate shown");
-  assert(read.indexOf("tko-gauge") !== -1, "driver level cards use a gauge bar");
-  assert(read.indexOf("tko-qline") !== -1, "every card names its question");
-  assert(present.indexOf("tko-slide-hero") !== -1, "present renders");
+  assert(t.patterns.some((p) => p.id === "group"), "group pattern built");
+  assert(t.patterns.some((p) => p.id === "weak"), "weakest-area pattern built");
+  const read = takeout.readView.html(t);
+  const present = takeout.presentView.html(t);
+  assert(read.indexOf("Recognition &amp; voice") !== -1, "weakest area named");
+  assert(read.indexOf("Belonging &amp; purpose") !== -1, "strongest area named");
+  assert(read.indexOf("Cape Town") !== -1, "group under strain named");
+  assert(read.indexOf("Satisfaction") !== -1, "satisfaction leads the apex");
+  assert(read.indexOf("69% agree") !== -1, "apex shows index + top-box");
+  assert(read.indexOf("% response of") !== -1, "participation shown");
+  assert(read.indexOf('data-edit="') !== -1, "editable hooks present");
+  assert(present.indexOf("tko-slide") !== -1, "present renders");
 });
 
-/* ---- source structure check ---- */
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");
 function activeLines(src) {
   let inBlock = false, count = 0;

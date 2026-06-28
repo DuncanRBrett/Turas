@@ -1,6 +1,11 @@
 # Executive Takeout → Patterns view: framework + SACS worked example
 
-Status: DESIGN (agreed direction) · 2026-06-28 · branch `feature/tabs-executive-takeout`
+Status: BUILT · 2026-06-28 · branch `feature/tabs-executive-takeout`
+Engine reworked to patterns (group / weakest area / strongest area / moved);
+`Theme` column added on the R side; both views re-shaped. node 16/16, v2 bundler
+25/25, html_report 87/87. Validated on three synthetic survey types (employee
+engagement, brand funnel, CX/CSAT) — same engine, sensible big-picture each.
+Awaiting Duncan's launch_turas regen on a tagged SACS config.
 
 ## Why we're changing it
 

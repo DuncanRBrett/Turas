@@ -492,6 +492,17 @@ process_single_question <- function(question_code, prepared_data,
     NA_character_
   }
 
+  # Extract theme (optional Level-2 grouping for the Executive Takeout patterns
+  # view; sits under Category/Section — e.g. Category "Engagement", Theme
+  # "Recognition & voice"). Carried to the v2 data layer as q.theme.
+  q_theme <- if (!is.null(question_row$Theme) &&
+                 !is.na(question_row$Theme) &&
+                 nzchar(trimws(question_row$Theme))) {
+    trimws(question_row$Theme)
+  } else {
+    NA_character_
+  }
+
   # Extract human-readable filter label (optional, overrides raw filter expression in display)
   q_filter_label <- if (!is.null(question_row$FilterLabel) &&
                         !is.na(question_row$FilterLabel) &&
@@ -511,6 +522,7 @@ process_single_question <- function(question_code, prepared_data,
     table = question_table,
     category = q_category,
     category_order = q_category_order,
+    theme = q_theme,
     partial_sections = partial_sections  # TRS v1.0: Track section-level failures
   ))
 }

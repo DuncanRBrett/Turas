@@ -537,6 +537,12 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   cat_val <- if (is.null(cat_val) || length(cat_val) == 0 || is.na(cat_val[1])) ""
              else as.character(cat_val[1])
 
+  # Theme = optional Level-2 grouping (under Category/Section) for the Executive
+  # Takeout patterns view. "" when untagged; the JS falls back to the section.
+  theme_val <- q_result$theme
+  theme_val <- if (is.null(theme_val) || length(theme_val) == 0 || is.na(theme_val[1])) ""
+               else as.character(theme_val[1])
+
   q_type_v2 <- map_question_type(q_result$question_type)
 
   # Scale maximum for the dashboard gauge/heatmap ("% of each scale's
@@ -593,6 +599,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     code        = as.character(q_result$question_code %||% ""),
     title       = as.character(q_result$question_text %||% ""),
     category    = cat_val,
+    theme       = theme_val,
     type        = q_type_v2,
     bases       = bases,
     rows        = rows,
