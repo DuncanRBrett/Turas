@@ -56,7 +56,7 @@ it finds, how it is computed, and the rule that stops it firing on noise.
 - **Guard:** only counts reliable groups; the top breakout must lead the others by
   a clear margin, else "no single split dominates".
 
-### 5. Questions that move together  ·  TO BUILD
+### 5. Questions that move together  ·  BUILT
 - **Finds:** groups of questions that rise and fall as a set across people — a sign
   they share one underlying cause you can act on once, not three separate ones.
 - **How:** correlate the per-respondent scores across questions; group the ones
@@ -64,7 +64,7 @@ it finds, how it is computed, and the rule that stops it firing on noise.
 - **Guard:** only strong, stable correlations on adequate bases; small or weak
   links are not reported.
 
-### 6. The odd one out  ·  TO BUILD
+### 6. The odd one out  ·  BUILT
 - **Finds:** a group that is low on almost everything but unexpectedly high on one
   thing (or the reverse) — the exception worth explaining.
 - **How:** for a group, compare each question to that group's OWN average; flag the
@@ -72,7 +72,7 @@ it finds, how it is computed, and the rule that stops it firing on noise.
 - **Guard:** the exception must be large relative to the group's usual spread, on a
   reliable base.
 
-### 7. Hidden disagreement  ·  TO BUILD
+### 7. Hidden disagreement  ·  BUILT
 - **Finds:** questions where the average looks calm but people are really two camps
   (lots of highs and lows, few in the middle) — the average hides it.
 - **How:** measure how split each question's answers are (bimodality of the
@@ -100,10 +100,13 @@ These apply to every pattern above.
   the right way for the study type.
 - **Consistency.** A real pattern repeats — across the questions in a theme, or
   across related groups. A lone striking cell is treated as noise.
-- **Correct for how much we looked at.** *(the key piece still to add)* The more
-  cells we check, the more will look surprising by luck. Before calling anything a
-  pattern, the bar is raised by the number of checks, so a finding has to be strong
-  enough that it would not show up by chance across all of them.
+- **Correct for how much we looked at.**  ·  BUILT (FDR trust-gate). The more cells
+  we check, the more will look surprising by luck. Single-cell claims must survive
+  Benjamini-Hochberg correction across the whole grid (a variance-floored Welch test,
+  so a homogeneous census cell can't fake significance); consistency claims (a group
+  under strain, the split that matters) are judged by a per-group directional
+  sign-test instead, because a genuinely consistent group can have no single
+  significant cell. See [PATTERN_RECOGNITION_DESIGN.md](PATTERN_RECOGNITION_DESIGN.md) §A.
 - **A confident null.** When nothing clears the bar, the page says so plainly
   ("no clear pattern stands out — and that's the headline"), rather than inventing
   something.
@@ -132,13 +135,13 @@ only what survives the tests."
 
 ## Build order
 
-1. Add the "raise the bar by how much we looked at" rule across the existing
-   patterns (the biggest trust win).
-2. Which split matters most.
-3. Questions that move together.
-4. The odd one out.
-5. Hidden disagreement.
-6. Direction reversal (later).
+1. ~~Add the "raise the bar by how much we looked at" rule (the FDR trust-gate).~~ **DONE**
+2. ~~Which split matters most.~~ **DONE**
+3. ~~Questions that move together.~~ **DONE**
+4. ~~The odd one out.~~ **DONE**
+5. ~~Hidden disagreement.~~ **DONE**
+6. Direction reversal / Simpson's (later — needs wave-by-subgroup data).
 
-Each ships with known-answer tests and is verified against a real report engine
-run (the `run_real_engine` harness) before it is called done.
+Each shipped with known-answer tests and was verified against a real report engine
+run (the `run_real_engine` harness on the live SACS crosstab report) before being
+called done. Full statistical spec: [PATTERN_RECOGNITION_DESIGN.md](PATTERN_RECOGNITION_DESIGN.md).
