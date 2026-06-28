@@ -87,7 +87,7 @@
   /** Provenance line — the glass-box audit trail. */
   function provHtml(t) {
     return '<div class="tko-prov" role="note">Built from grouped questions and breakouts the ' +
-      "report already computes · no AI · " + t.standoutCount + " differences and " +
+      "report already computes · no AI · " + t.segmentCount + " breakout groups and " +
       t.themeCount + " tagged areas considered · curated by the researcher.</div>";
   }
 

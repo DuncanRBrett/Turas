@@ -104,8 +104,8 @@
   /** Templated takeaway for a pattern (the one editable line per card). */
   ui.patternSeed = function (p) {
     if (p.id === "group") {
-      return p.subject + " is behind the rest on " + p.hits + " of " + p.total +
-        " questions — the group most under strain.";
+      return p.subject + " scores below the overall on " + p.hits + " of " + p.total +
+        " rated questions — the group most under strain.";
     }
     if (p.id === "weak") {
       return p.subject + " is the weakest area — its questions cluster low" +

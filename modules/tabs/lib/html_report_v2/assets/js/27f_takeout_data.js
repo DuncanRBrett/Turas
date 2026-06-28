@@ -138,26 +138,38 @@
     return { levels: levels, apex: apex };
   }
 
-  /** Subgroup standouts across EVERY banner group (campus + department + tenure
-   *  + whatever a study defines), each tagged with the cut it came from, so the
-   *  sharpest difference surfaces wherever it lives. */
-  function gatherStandouts(views) {
-    if (typeof views._collectFindings !== "function") return [];
+  /**
+   * For the "group under strain" pattern: every breakout column's INDEX on every
+   * rated question, compared to the overall. The index is bidirectional (a low
+   * group reads as low — unlike significance letters, which only ever mark a
+   * group being higher), so this finds the consistently-lowest segment cleanly
+   * and reads intuitively in the evidence. Low-base columns are dropped. Returns
+   * [{column, group, gaps:[{title, value, total, scaleMax}]}].
+   */
+  function gatherColumnStrain(views) {
+    var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
-    if (!groups.length) {
-      try { return views._collectFindings(TR.d2 ? TR.d2.firstBanner() : ""); }
-      catch (e) { return []; }
-    }
-    var all = [];
+    var cols = {};
+    var qs = views.indexQuestions();
     groups.forEach(function (g) {
-      try {
-        views._collectFindings(g.id).forEach(function (f) {
-          f.bannerGroup = g.name;
-          all.push(f);
+      qs.forEach(function (q) {
+        var model;
+        try { model = views._modelFor(q.code, g.id); } catch (e) { return; }
+        var row = views._meanRow(model);
+        if (!row || row.cells[0].mean === null || row.cells[0].mean === undefined) return;
+        var total = row.cells[0].mean, max = touchpointMax(q);
+        model.columns.forEach(function (col, i) {
+          if (i === 0) return;                              // skip the Total column
+          var v = row.cells[i] && row.cells[i].mean;
+          if (v === null || v === undefined) return;
+          if (!col.base || col.base < lowBase) return;      // ignore small, noisy cuts
+          var key = g.name + "::" + col.label;
+          (cols[key] || (cols[key] = { column: col.label, group: g.name, gaps: [] }))
+            .gaps.push({ title: q.title, value: v, total: total, scaleMax: max });
         });
-      } catch (e) { /* skip a banner group that fails to compute */ }
+      });
     });
-    return all;
+    return Object.keys(cols).map(function (k) { return cols[k]; });
   }
 
   /** Sample size, precision, and response rate for the reliability stamp. */
@@ -187,13 +199,13 @@
    */
   takeout.gather = function () {
     var views = TR.views || {};
-    var standouts = [];
-    try { standouts = gatherStandouts(views); } catch (e) { standouts = []; }
+    var columns = [];
+    try { columns = gatherColumnStrain(views); } catch (e) { columns = []; }
     var lv = { levels: [], apex: [] };
     try { lv = gatherLevels(views); } catch (e) { lv = { levels: [], apex: [] }; }
     var reliability = gatherReliability(lv.levels.concat(lv.apex));
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
-    return { standouts: standouts, levels: lv.levels, apex: lv.apex,
+    return { columns: columns, levels: lv.levels, apex: lv.apex,
       reliability: reliability, lowBaseThreshold: lowBase };
   };
 

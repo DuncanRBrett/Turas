@@ -21,7 +21,8 @@
 
   /* Tunable thresholds — no magic numbers in the logic below. */
   var CONST = takeout.CONST = {
-    MIN_GROUP_HITS: 2,        // a column must be off on >=N questions to be "the group"
+    MIN_GROUP_HITS: 2,        // a column must be below the overall on >=N questions
+    MIN_STRAIN_GAP: 0.02,     // ...and average >=2% of the scale below it, to be "the group"
     MIN_AREA_MEMBERS: 2,      // a theme needs >=N questions to count as an "area"
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
@@ -57,45 +58,46 @@
   }
 
   /**
-   * GROUP pattern: which banner column is most consistently off across the
-   * survey. Tally each column's significant standouts (behind / ahead); the
-   * column behind on the most questions is "the group under strain". Returns
-   * null when no column is off on enough questions. Pure; no tagging needed.
+   * GROUP pattern: which breakout column sits consistently below the overall
+   * across the survey, on the INDEX (a bidirectional, valenced measure — a low
+   * group reads as low, unlike significance letters which only mark a group being
+   * higher). For each column we net the per-question gap to the overall, as a
+   * fraction of each scale; the most-negative net is "under strain", the most-
+   * positive is "thriving". Returns null unless one column is below on at least
+   * MIN_GROUP_HITS questions AND averages MIN_STRAIN_GAP below the overall.
+   * Input: [{column, group, gaps:[{title, value, total, scaleMax}]}].
    */
-  function groupPattern(standouts) {
-    var byCol = {};
-    (standouts || []).forEach(function (f) {
-      // Only index/mean/NPS standouts have a consistent good/bad direction
-      // (higher = better). Raw category %s (Neutral, Very Satisfied, …) and
-      // top-box NETs each carry their own valence, so counting their "gap"
-      // direction is meaningless — the index is the one valenced summary.
-      if (!f.isMean || f.value === null || f.value === undefined) return;
-      var key = f.column;
-      var c = byCol[key] || (byCol[key] = { column: f.column, group: f.bannerGroup || "",
-        behind: [], ahead: [], net: 0 });
-      var eff = effectSize(f);
-      if (f.direction === "behind") { c.behind.push(f); c.net -= eff; }
-      else { c.ahead.push(f); c.net += eff; }
+  function groupPattern(columns) {
+    if (!columns || !columns.length) return null;
+    var scored = columns.map(function (c) {
+      var net = 0, behind = [];
+      c.gaps.forEach(function (gp) {
+        var frac = (gp.value - gp.total) / (gp.scaleMax || 1);
+        net += frac;
+        if (frac < 0) behind.push(gp);
+      });
+      // Rank by the AVERAGE gap to the overall, not the sum — "worst off" means
+      // furthest below per question (depth), so a large group that is mildly
+      // below on many questions doesn't outrank a group that is sharply below.
+      return { column: c.column, group: c.group, avg: c.gaps.length ? net / c.gaps.length : 0,
+        behind: behind, count: c.gaps.length };
     });
-    var cols = Object.keys(byCol).map(function (k) { return byCol[k]; });
-    if (!cols.length) return null;
-    // Net signed effect per column: one value each, so the same column can never
-    // be both "under strain" (most negative) and "thriving" (most positive).
     var strain = null, thrive = null;
-    cols.forEach(function (c) {
-      if (!strain || c.net < strain.net) strain = c;
-      if (!thrive || c.net > thrive.net) thrive = c;
+    scored.forEach(function (s) {
+      if (!strain || s.avg < strain.avg) strain = s;
+      if (!thrive || s.avg > thrive.avg) thrive = s;
     });
-    if (!strain || strain.net >= 0 || strain.behind.length < CONST.MIN_GROUP_HITS) return null;
-    var evidence = strain.behind.slice().sort(function (a, b) { return effectSize(b) - effectSize(a); })
-      .slice(0, CONST.EVIDENCE_MAX).map(function (f) {
-        return { label: f.title, value: f.value, rest: f.rest, overall: f.overall,
-          scaleMax: f.scaleMax, isMean: true, decimals: f.decimals };
+    if (!strain || strain.behind.length < CONST.MIN_GROUP_HITS || strain.avg > -CONST.MIN_STRAIN_GAP) {
+      return null;
+    }
+    var evidence = strain.behind.slice()
+      .sort(function (a, b) { return (a.value - a.total) - (b.value - b.total); })  // most-below first
+      .slice(0, CONST.EVIDENCE_MAX).map(function (gp) {
+        return { label: gp.title, value: gp.value, rest: gp.total, scaleMax: gp.scaleMax, isMean: true };
       });
     return { id: "group", kind: "group", subject: strain.column, group: strain.group,
-      hits: strain.behind.length, total: strain.behind.length + strain.ahead.length,
-      evidence: evidence,
-      secondary: (thrive && thrive !== strain && thrive.net > 0) ? thrive.column : null };
+      hits: strain.behind.length, total: strain.count, evidence: evidence,
+      secondary: (thrive && thrive !== strain && thrive.avg > 0) ? thrive.column : null };
   }
 
   /** Group levels into themes (theme, else section, else "(untagged)"). */
@@ -185,7 +187,7 @@
   function buildPatterns(inputs) {
     inputs = inputs || {};
     var patterns = [];
-    var group = groupPattern(inputs.standouts);
+    var group = groupPattern(inputs.columns);
     if (group) patterns.push(group);
     areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
     var moved = movementPattern(inputs.apex || []);
@@ -197,7 +199,7 @@
       themeCount: groupByTheme(inputs.levels || []).filter(function (t) {
         return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
       }).length,
-      standoutCount: (inputs.standouts || []).length
+      segmentCount: (inputs.columns || []).length
     };
   }
   takeout.buildPatterns = buildPatterns;

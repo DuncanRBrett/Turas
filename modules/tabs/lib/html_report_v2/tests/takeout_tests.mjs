@@ -52,47 +52,29 @@ run("effect size is comparable across metrics", () => {
   close(takeout.effectSize({ isMean: true, gap: 0.6, scaleMin: 0, scaleMax: 10 }), 0.06, 1e-9, "mean");
 });
 
-run("GROUP pattern finds the column behind on the most questions", () => {
-  const mk = (col, code, gap, dir) => ({ column: col, bannerGroup: "Campus", code: code,
-    title: code, isMean: true, value: 3.4, rest: 4.0, overall: 3.9, gap: gap, direction: dir,
-    scaleMin: 0, scaleMax: 5 });
-  const standouts = [
-    mk("Cape Town", "Q1", -0.6, "behind"), mk("Cape Town", "Q2", -0.5, "behind"),
-    mk("Cape Town", "Q3", -0.4, "behind"),
-    { column: "Durban", bannerGroup: "Campus", code: "Q1", title: "Q1", isMean: true,
-      value: 4.5, rest: 3.9, overall: 3.9, gap: 0.6, direction: "ahead", scaleMin: 0, scaleMax: 5 },
-    { column: "Durban", bannerGroup: "Campus", code: "Q2", title: "Q2", isMean: true,
-      value: 4.4, rest: 3.9, overall: 3.9, gap: 0.5, direction: "ahead", scaleMin: 0, scaleMax: 5 }
+run("GROUP pattern: the column most below the overall is under strain", () => {
+  const g = (value, total) => ({ title: "Q", value: value, total: total, scaleMax: 5 });
+  const col = (column, group, gaps) => ({ column: column, group: group, gaps: gaps });
+  const columns = [
+    col("Cape Town", "Campus", [g(3.2, 3.9), g(3.4, 4.1), g(3.0, 3.8)]),  // consistently below overall
+    col("Durban", "Campus", [g(4.5, 3.9), g(4.4, 4.1), g(4.3, 3.8)]),     // consistently above
+    col("Joburg", "Campus", [g(3.9, 3.9), g(4.1, 4.1), g(3.8, 3.8)])      // roughly average
   ];
-  const g = takeout._groupPattern(standouts);
-  assert(g && g.subject === "Cape Town", "Cape Town is the group under strain");
-  assert(g.hits === 3, "behind on 3 questions, got " + g.hits);
-  assert(g.secondary === "Durban", "Durban is the thriving group");
-  assert(g.evidence.length === 3, "evidence rows present");
+  const p = takeout._groupPattern(columns);
+  assert(p && p.subject === "Cape Town", "Cape Town is the group under strain");
+  assert(p.secondary === "Durban", "Durban is the thriving group");
+  assert(p.hits === 3, "below the overall on all 3, got " + p.hits);
+  assert(p.evidence.length === 3 && p.evidence[0].isMean === true, "evidence is index comparisons");
+  // the most-below question leads the evidence
+  assert(p.evidence[0].value < p.evidence[0].rest, "evidence reads as genuinely behind");
 });
 
-run("GROUP pattern is valence-safe: raw category findings are ignored", () => {
-  // A column "ahead" on a raw category (e.g. more Neutral) but behind on the
-  // index must read as under strain — categories carry no good/bad direction,
-  // and a column must never be both "under strain" and "most positive".
-  const f = (col, isMean, dir, gap) => ({ column: col, code: "Q1", title: "Q1", isMean: isMean,
-    value: isMean ? 3.2 : 56, rest: isMean ? 3.9 : 21, overall: isMean ? 3.8 : 25,
-    gap: gap, direction: dir, scaleMin: 0, scaleMax: 5 });
-  const standouts = [
-    f("CT", false, "ahead", 35),    // 56% Neutral vs 21% — "ahead" but meaningless
-    f("CT", true, "behind", -0.7), f("CT", true, "behind", -0.5),
-    f("HO", true, "ahead", 0.6), f("HO", true, "ahead", 0.5)
-  ];
-  const g = takeout._groupPattern(standouts);
-  assert(g && g.subject === "CT", "index decides: CT under strain despite a categorical 'ahead'");
-  assert(g.hits === 2, "only the two index findings counted, got " + g.hits);
-  assert(g.secondary === "HO", "HO (positive index net) is thriving, not also under strain");
-});
-
-run("GROUP pattern needs enough hits (else null)", () => {
-  const one = [{ column: "X", code: "Q1", title: "Q1", isMean: true, value: 3, rest: 4,
-    overall: 3.9, gap: -1, direction: "behind", scaleMin: 0, scaleMax: 5 }];
-  assert(takeout._groupPattern(one) === null, "a single behind-finding is not a pattern");
+run("GROUP pattern: null when no column is materially below the overall", () => {
+  const flat = [{ column: "A", group: "G", gaps: [{ title: "Q", value: 3.95, total: 4.0, scaleMax: 5 }] }];
+  assert(takeout._groupPattern(flat) === null, "one near-average gap is not a pattern");
+  const slightly = [{ column: "B", group: "G",
+    gaps: [{ title: "Q1", value: 3.98, total: 4.0, scaleMax: 5 }, { title: "Q2", value: 3.97, total: 4.0, scaleMax: 5 }] }];
+  assert(takeout._groupPattern(slightly) === null, "below by <2% of scale is not 'under strain'");
 });
 
 run("AREA patterns rank weakest and strongest theme", () => {
@@ -125,11 +107,13 @@ run("buildPatterns assembles group + areas + movement, and degrades gracefully",
   const empty = takeout.buildPatterns({});
   assert(empty.patterns.length === 0, "nothing in, nothing out — no crash");
   const t = takeout.buildPatterns({
-    standouts: [
-      { column: "Cape Town", bannerGroup: "Campus", code: "Q08", title: "Recognition", isMean: true,
-        value: 3.0, rest: 3.8, overall: 3.6, gap: -0.8, direction: "behind", scaleMin: 0, scaleMax: 5 },
-      { column: "Cape Town", bannerGroup: "Campus", code: "Q11", title: "Opinions", isMean: true,
-        value: 3.1, rest: 3.9, overall: 3.7, gap: -0.8, direction: "behind", scaleMin: 0, scaleMax: 5 }
+    columns: [
+      { column: "Cape Town", group: "Campus", gaps: [
+        { title: "Recognition", value: 3.0, total: 3.8, scaleMax: 5 },
+        { title: "Opinions", value: 3.1, total: 3.9, scaleMax: 5 }] },
+      { column: "Durban", group: "Campus", gaps: [
+        { title: "Recognition", value: 4.4, total: 3.8, scaleMax: 5 },
+        { title: "Opinions", value: 4.3, total: 3.9, scaleMax: 5 }] }
     ],
     levels: [
       { code: "Q08", title: "Recognition", section: "Engagement", theme: "Recognition & voice", value: 3.4, scaleMax: 5, delta: { sig: true, diff: -0.2 } },
@@ -190,38 +174,36 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, both views
   TR.AGG = { project: { name: "Climate 2025", low_base_threshold: 30, population_size: 220 },
     banner_groups: [{ id: "Q02", name: "Campus" }, { id: "Q03", name: "Department" }] };
   TR.d2 = { state: { banner: "Q02" }, firstBanner: () => "Q02" };
-  const netRows = [{ kind: "net", label: "Agree" }, { kind: "net", label: "Disagree" },
-    { kind: "net", label: "NET POSITIVE" }, { kind: "mean", label: "Index" }];
-  const qmodel = (mean, top, delta, waves) => ({ columns: [{ base: 167 }], rows: [
-    { kind: "net", cells: [{ pct: top }] }, { kind: "net", cells: [{ pct: 6 }] },
-    { kind: "net", cells: [{ pct: top - 6 }] },
-    { kind: "mean", cells: [{ mean: mean }], delta: delta || null, waves: waves || null }] });
-  const meanOnly = (mean, delta, waves) => ({ columns: [{ base: 167 }],
-    rows: [{ kind: "mean", cells: [{ mean: mean }], delta: delta || null, waves: waves || null }] });
-  const M = {
-    Q28: qmodel(3.9, 69, { sig: true, diff: 0.1, year: 2024 }, [{ year: 2023, value: 4.08 }, { year: 2025, value: 3.9, current: true }]),
-    Q_Engage: meanOnly(4.08, { sig: true, diff: -0.08, year: 2024 }, [{ year: 2023, value: 4.31 }, { year: 2025, value: 4.08, current: true }]),
-    Q08: qmodel(3.44, 41, null), Q11: qmodel(3.72, 58, null),
-    Q12: qmodel(4.40, 86, null), Q13: qmodel(4.20, 82, null)
+  // every rated question returns a 3-column model (Total · Cape Town · Durban);
+  // Cape Town sits 0.6 below the Total on every question -> the strain group.
+  const TOTAL = { Q28: 3.9, Q_Engage: 4.08, Q08: 3.44, Q11: 3.72, Q12: 4.40, Q13: 4.20 };
+  const TOP = { Q28: 69, Q08: 41, Q11: 58, Q12: 86, Q13: 82 };
+  const mk = (code) => {
+    const t = TOTAL[code], ct = t - 0.6, du = t + 0.4;
+    const cols = [{ base: 167 }, { label: "Cape Town", base: 38 }, { label: "Durban", base: 33 }];
+    const delta = code === "Q28" ? { sig: true, diff: 0.1, year: 2024 }
+      : (code === "Q_Engage" ? { sig: true, diff: -0.08, year: 2024 } : null);
+    const waves = (code === "Q28" || code === "Q_Engage")
+      ? [{ year: 2023, value: t + 0.2 }, { year: 2025, value: t, current: true }] : null;
+    const meanRow = { kind: "mean", cells: [{ mean: t }, { mean: ct }, { mean: du }], delta: delta, waves: waves };
+    if (code === "Q_Engage") return { columns: cols, rows: [meanRow] };
+    const top = TOP[code];
+    return { columns: cols, rows: [
+      { kind: "net", label: "Agree", cells: [{ pct: top }, { pct: top - 20 }, { pct: top + 10 }] },
+      { kind: "net", label: "Disagree", cells: [{ pct: 6 }, { pct: 16 }, { pct: 3 }] },
+      { kind: "net", label: "NET POSITIVE", cells: [{ pct: top - 6 }, { pct: 0 }, { pct: 0 }] },
+      meanRow] };
   };
-  const seg = (col, val, gap) => ({ code: "Q28", title: "Overall satisfaction", category: "",
-    column: col, label: "Index", isMean: true, soft: false, value: val, rest: 3.95, overall: 3.9,
-    gap: gap, direction: gap < 0 ? "behind" : "ahead", decimals: 1, scaleMin: 0, scaleMax: 5, beaten: [], base: 38 });
   TR.views = {
-    _collectFindings: (g) => {
-      if (g === "Q02") return [seg("Cape Town", 3.38, -0.6), seg("Cape Town", 3.40, -0.5), seg("Durban", 4.5, 0.6)];
-      if (g === "Q03") return [seg("Marketing", 3.43, -0.5)];
-      return [];
-    },
     indexQuestions: () => ([
-      { code: "Q28", title: "Overall satisfaction with SACAP", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
+      { code: "Q28", title: "Overall satisfaction with SACAP", category: "", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: mk("Q28").rows, net_diffs: { "2": true } },
       { code: "Q_Engage", title: "Engagement", category: "", type: "single", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: [{ kind: "mean", label: "Engagement" }] },
-      { code: "Q08", title: "Recognition", category: "Engagement", theme: "Recognition & voice", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
-      { code: "Q11", title: "Opinions count", category: "Engagement", theme: "Recognition & voice", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
-      { code: "Q12", title: "Mission matters", category: "Engagement", theme: "Belonging & purpose", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } },
-      { code: "Q13", title: "Co-workers commit", category: "Engagement", theme: "Belonging & purpose", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: netRows, net_diffs: { "2": true } }
+      { code: "Q08", title: "Recognition", category: "Engagement", theme: "Recognition & voice", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: mk("Q08").rows, net_diffs: { "2": true } },
+      { code: "Q11", title: "Opinions count", category: "Engagement", theme: "Recognition & voice", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: mk("Q11").rows, net_diffs: { "2": true } },
+      { code: "Q12", title: "Mission matters", category: "Engagement", theme: "Belonging & purpose", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: mk("Q12").rows, net_diffs: { "2": true } },
+      { code: "Q13", title: "Co-workers commit", category: "Engagement", theme: "Belonging & purpose", type: "scale", scale_max: 5, gauge_green: 4, gauge_amber: 3, rows: mk("Q13").rows, net_diffs: { "2": true } }
     ]),
-    _modelFor: (code) => M[code],
+    _modelFor: (code) => mk(code),
     _meanRow: (m) => m.rows.find((r) => r.kind === "mean")
   };
   TR.model = { forQuestion: (code) => TR.views._modelFor(code) };
