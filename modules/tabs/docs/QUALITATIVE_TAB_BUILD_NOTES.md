@@ -139,6 +139,23 @@ A small/anonymous study (SACS staff) would set `qual_confidentiality_mode` up to
 
 ---
 
+## D2. Noteworthy tiers (triage, not confidentiality — Duncan 2026-06-29)
+
+The noteworthy flag is a **tier**, not a boolean: `2 = must-read`, `1 = noteworthy`,
+`0 = other`. The reader captures the raw marker and derives the tier
+(`qual_noteworthy_tier`); the boolean `noteworthy` stays as `tier >= 1` for back-compat.
+Marker-agnostic + case-insensitive, so today's binary markers ("Yes"/"x") read as tier 1
+and a coder's "Must read" reads as tier 2 — the must-read tier is dormant until a workbook
+uses a stronger marker. The must-read marker set is `QUAL_MUSTREAD_MARKERS` (a config hook
+for studies with custom markers).
+
+The tier rides per record in `DATA_QUAL`. The JS quote drawer + browser get a tier filter
+(**All / Noteworthy+ / Must-read**) whose initial state is `qual_noteworthy_default ∈
+{all, noteworthy, must_read}` (report-level), and the noteworthy spotlight reel leads with
+must-read. This is the "show noteworthy-only, or switch noteworthy vs all" control.
+
+---
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**
@@ -158,8 +175,16 @@ filename) — prevalence board, theme×banner crosstab (`model.forQuestion`), qu
 + `shell.route()` (`24_shell.js`), island parsed in `shell.boot`.
 
 **Config:** Settings keys `qual_workbook` (path), `show_qualitative`,
-`qual_confidentiality_mode`, `qual_demographic_cuts` — added to `build_config_object()`
-and attached to `proj` in `build_dl_project()`.
+`qual_confidentiality_mode`, `qual_demographic_cuts`, `qual_noteworthy_default`
+({all, noteworthy, must_read}) — added to `build_config_object()` and attached to `proj`
+in `build_dl_project()`.
+
+**As-built so far (commits on `feature/tabs-qualitative-tab`):** `qual_workbook_reader.R`
++ `qual_workbook_io.R` (reader subsystem, task 1), `qual_assemble.R` (respondent master +
+banner curation = the join seam, task 2), `qual_island_builder.R` (DATA_QUAL + the verbatim
+confidentiality dial + noteworthy tiers, task 2). ~131 test assertions green; all verified
+against the four real workbooks. Remaining: theme→AGG/MICRO serialisation (task 3),
+config + island wiring (task 4), the JS tab (task 5).
 
 **Island wiring:** `{{DATA_QUAL}}` placeholder in `template.html`; token replace in
 `build_report_v2.R` (`null` when no open-ends or HIDDEN strips text), mirroring the
