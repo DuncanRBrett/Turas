@@ -257,6 +257,9 @@ qual_num_or_na <- function(v) {
 qual_record_from_row <- function(r, roles) {
   cell <- function(c) if (!is.na(c) && length(r) >= c) r[[c]] else ""
   id <- cell(roles$id); text <- cell(roles$verbatim)
+  # A repeated header row (some sheets stack sub-tables) is not a respondent — skip it
+  # without counting, so its header labels never leak in as data.
+  if (grepl(QUAL_ID_PATTERN, id, ignore.case = TRUE)) return(list(record = NULL, dropped = 0L))
   if (!nzchar(id) && !nzchar(text)) return(list(record = NULL, dropped = 0L))
   dropped <- 0L
   theme_vals <- list()

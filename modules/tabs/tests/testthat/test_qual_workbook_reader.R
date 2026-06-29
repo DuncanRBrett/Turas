@@ -236,3 +236,22 @@ test_that("Contents and headerless sheets are skipped with a typed reason", {
   expect_true(headerless$skip)
   expect_equal(headerless$reason, "no_header")
 })
+
+# ==============================================================================
+# REPEATED HEADER — some sheets (CCPB "Fountains") stack sub-tables; a repeated
+# header row inside the data must not be read as a respondent.
+# ==============================================================================
+
+test_that("a repeated header row inside the data is skipped, not read as a respondent", {
+  stacked <- make_sheet(
+    c("Response ID", "Region", "Comment", "Noteworthy"),
+    c("1", "North", "first block", ""),
+    c("Response ID", "Region", "Comment", "Noteworthy"),    # repeated header (stacked sub-table)
+    c("2", "South", "second block", "x")
+  )
+  q <- qual_classify_sheet(stacked, "Fountains")
+  expect_equal(q$meta$n_records, 2L)                         # only the two real respondents
+  expect_equal(vapply(q$records, function(r) r$id, character(1)), c("1", "2"))
+  expect_false(any(vapply(q$records,                          # no leaked header label as a value
+                          function(r) identical(r$demos[["Region"]], "Region"), logical(1))))
+})
