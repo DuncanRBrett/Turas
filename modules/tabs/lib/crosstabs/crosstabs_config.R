@@ -255,14 +255,17 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Optional wave label shown in the v2 report header (e.g. "Annual 2025").
     wave = get_config_value(config, "wave", ""),
 
-    # Qualitative tab (V12). qual_workbook (a coded-comment .xlsx path) -> a
-    # self-contained comment report is emitted alongside the main outputs. The
-    # three confidentiality dials: text level (hidden default / redacted / full),
+    # Qualitative tab (V12). qual_workbook (a coded-comment .xlsx path) -> the
+    # comments are JOINED into the main report by ResponseID (Phase 2); if that join
+    # cannot resolve, a self-contained *_qual_report.html is emitted as a fallback.
+    # The three confidentiality dials: text level (hidden default / redacted / full),
     # demographic association (allow / block), and the noteworthy-tier default view.
+    # qual_join_id_column overrides the auto-detected host response-id column.
     qual_workbook = get_config_value(config, "qual_workbook", ""),
     qual_confidentiality_mode = get_config_value(config, "qual_confidentiality_mode", "hidden"),
     qual_demographic_cuts = get_config_value(config, "qual_demographic_cuts", "allow"),
     qual_noteworthy_default = get_config_value(config, "qual_noteworthy_default", "all"),
+    qual_join_id_column = get_config_value(config, "qual_join_id_column", ""),
 
     # Tab-visibility flags (V12, generic). Crosstabs is always on; each other tab
     # is includable per report. The flags ride into the data layer; tabList()

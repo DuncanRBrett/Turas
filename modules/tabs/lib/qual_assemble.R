@@ -129,3 +129,98 @@ qual_build_respondent_master <- function(questions) {
   list(n = ids$n, ids = ids$ids, id_to_idx = ids$id_to_idx,
        respondents = respondents, banner_dims = banner_dims)
 }
+
+# ==============================================================================
+# PHASE-2 JOIN: resolve the comment workbook against the HOST survey by ResponseID
+# ==============================================================================
+#
+# The integrated report puts the comments INTO the one main v2 report (Turas report
+# = the full deliverable). The comment respondents join to the host survey by their
+# ResponseID, so a comment and a closed answer from the same person share the
+# anonymous MICRO row index (length nrow(survey_data)) and therefore the main banner
+# and the live-filter masks — that is what lets the closed<->open jump filter the
+# comments to "the people in this cell" (stats.mask of the active cut).
+#
+# Only the index changes: the workbook's embedded demographics are kept for the
+# in-tab facet filter (so a Student workbook keeps Campus/Course/NPS facets), and a
+# SACS workbook with no embedded demos simply yields no facets — the closed->open
+# jump supplies the cut instead. Commenters with no matching host respondent are
+# dropped (their id resolves to NA, which the island builder already skips).
+
+# Anchor for the host survey's response-id column, matching the workbook reader's
+# QUAL_ID_PATTERN so "ID" / "Response ID" / "ResponseID" all resolve.
+QUAL_HOST_ID_PATTERN <- "^(response\\s*)?id$"
+
+#' Locate the response-id column in the host survey (config override or the anchor).
+#' @param survey_data The host survey data frame.
+#' @param id_col Optional configured column name (`qual_join_id_column`); when given
+#'   it wins (exact, else case-insensitive). Returns NA when nothing resolves.
+#' @return The column name, or NA_character_ when no id column can be found.
+qual_find_host_id_column <- function(survey_data, id_col = NULL) {
+  nms <- names(survey_data)
+  if (!is.null(id_col) && length(id_col) == 1L && !is.na(id_col) &&
+      nzchar(trimws(id_col)) && !identical(trimws(id_col), "NA")) {
+    id_col <- trimws(id_col)
+    if (id_col %in% nms) return(id_col)
+    ci <- nms[tolower(nms) == tolower(id_col)]
+    return(if (length(ci)) ci[[1]] else NA_character_)
+  }
+  anchor <- grepl(QUAL_HOST_ID_PATTERN, nms, ignore.case = TRUE)
+  if (any(anchor)) return(nms[which(anchor)[1]])
+  NA_character_
+}
+
+#' Map each host respondent's ResponseID to its 0-based survey row index.
+#' First occurrence wins on the (unexpected) duplicate; blank ids are dropped so a
+#' blank workbook id never collides with a blank host id.
+#' @return A named integer vector: trimmed ResponseID -> 0-based row index.
+qual_host_id_to_idx <- function(survey_data, id_col) {
+  ids <- trimws(as.character(survey_data[[id_col]]))
+  keep <- nzchar(ids) & !is.na(ids) & ids != "NA"
+  idx <- (seq_along(ids) - 1L)[keep]
+  ids <- ids[keep]
+  dup <- duplicated(ids)
+  stats::setNames(idx[!dup], ids[!dup])
+}
+
+#' Resolve a comment workbook's respondents against the host survey (the Phase-2 join).
+#'
+#' Builds the same self-contained master (embedded demographics -> banner facets) but
+#' re-keys the anonymous index to the host survey's MICRO rows, so the DATA_QUAL island
+#' shares the main banner + filter masks. Downstream (`qual_build_data_qual`) is
+#' unchanged: it maps each record by `id_to_idx` (NA -> the commenter is not in the
+#' host survey, and is skipped) and reads the workbook demographics from the records.
+#'
+#' @param questions Classified questions from `qual_read_workbook()`.
+#' @param survey_data The host survey data frame (the main report's respondents).
+#' @param id_col Optional host id column name (`qual_join_id_column`); auto-detected
+#'   via the response-id anchor when not supplied.
+#' @return list(status, master, matched, total, id_column). `status` is "PASS" with a
+#'   `master` keyed to the host rows, or "NO_ID_COLUMN" when no id column resolves
+#'   (the caller then falls back to the standalone comment report).
+#' @examples
+#' \dontrun{
+#'   res <- qual_read_workbook("comments.xlsx")
+#'   joined <- qual_resolve_against_survey(res$questions, survey_data)
+#'   if (joined$status == "PASS") island <- qual_build_data_qual(res$questions, joined$master, cfg)
+#' }
+qual_resolve_against_survey <- function(questions, survey_data, id_col = NULL) {
+  id_column <- qual_find_host_id_column(survey_data, id_col)
+  if (is.na(id_column)) {
+    return(list(status = "NO_ID_COLUMN", master = NULL, matched = 0L,
+                total = 0L, id_column = NA_character_))
+  }
+  base_master <- qual_build_respondent_master(questions)   # embedded demos + facets
+  host_id_to_idx <- qual_host_id_to_idx(survey_data, id_column)
+
+  # How many distinct workbook respondents found a host row (diagnostics only).
+  wb_ids <- base_master$ids
+  matched <- sum(!is.na(unname(host_id_to_idx[wb_ids])))
+
+  master <- base_master
+  master$id_to_idx <- host_id_to_idx           # workbook id -> host MICRO row index
+  master$n <- nrow(survey_data)                 # the host respondent (idx) space
+  master$ids <- names(host_id_to_idx)
+  list(status = "PASS", master = master, matched = matched,
+       total = length(wb_ids), id_column = id_column)
+}

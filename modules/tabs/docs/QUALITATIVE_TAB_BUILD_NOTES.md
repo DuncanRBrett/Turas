@@ -209,6 +209,40 @@ mentions are salience, not incidence).
 > template, add the two headers in Excel (cols M/N) or do a careful generator-resync + fresh
 > regenerate — never an openxlsx round-trip of the existing file.
 
+### D3.1 — Phase-2 AS-BUILT (the join; one deliberate divergence from the plan above)
+
+**The join (DONE, tested — `test_qual_join.R`, 28 assertions).** When `qual_workbook` is set,
+the comments are joined into the ONE main v2 report by ResponseID and ride in as the `qual_json`
+of the *main* `write_html_report_v2` call (see `run_crosstabs.R` html_report_v2 block). The seam:
+
+- `qual_resolve_against_survey(questions, survey_data, id_col)` (`qual_assemble.R`) keeps the
+  workbook's embedded demographics (so a Student workbook keeps its Campus/Course/NPS facets)
+  but **re-keys the anonymous index to the host survey's MICRO rows** (`id_to_idx` = workbook
+  ResponseID → host 0-based row, `n` = `nrow(survey_data)`). The host id column auto-detects via
+  the `^(response )?id$` anchor; `qual_join_id_column` (new config key) overrides it. Commenters
+  with no host row resolve to NA and are dropped (the island builder already skipped NA — this is
+  why that guard was there).
+- `build_integrated_qual_island(qual_workbook, config_obj, survey_data)` (`qual_report.R`) reads
+  + classifies + joins + builds the island, returning `status ∈ {PASS, NO_ID_COLUMN, NO_MATCHES}`.
+  On non-PASS the wiring falls back to the standalone `*_qual_report.html` (so nothing regresses);
+  a join failure never touches the Excel/HTML/v2 outputs.
+- Because the island shares the main MICRO index, `stats.mask(filters)` (a `Uint8Array` over the
+  host respondents) is directly usable as the closed→open jump filter: keep DATA_QUAL records
+  whose `idx` has `mask[idx] === 1`. That's the next task.
+
+**DIVERGENCE (deliberate): the synthetic theme questions are NOT merged into the main `dl`/`micro`.**
+The plan above said "merge theme Qs + DATA_QUAL into the main dl/micro." But the Crosstabs tab
+renders **every** `TR.AGG.questions` with no filter (`25_cards.js` sidebarHtml / `20_data.js`
+d2.categories), and the qual tab's prevalence board computes **from the DATA_QUAL records directly**
+(`27q_qualitative.js` `qual.prevalence`), not from a dl AGG question. So merging the synthetic
+theme questions would dump raw theme×banner questions into the **client-facing** Crosstabs list —
+which fights the very reframe this phase is about ("soften the theme×cut significance, let the
+verbatims lead"). The integrated path therefore ships the verbatim/record island only; this also
+lifts the standalone path's "needs themes" restriction (a verbatim-only workbook can now integrate).
+The theme×banner **significance** crosstab (render via `model.forQuestion`) remains a separate,
+not-yet-built TODO; if it's ever wanted in the integrated report, run the qual quant layer against
+the *host* banner and append under a dedicated tab/section flag — do NOT let it leak into Crosstabs.
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**

@@ -682,6 +682,14 @@ config_result$config_obj$html_report_v2 <- .html_report_v2_on   # reflect actual
 if (.html_report_v2_on) {
   v2_out <- config_result$output_path
 
+  # Qualitative comments (V12). When a coded-comment workbook is configured, the
+  # Phase-2 default is to JOIN the comments into the ONE main report by ResponseID
+  # (Turas report = the full deliverable). `.qual_integrated` records whether that
+  # join succeeded so the separate *_qual_report.html below is only a fallback.
+  .qual_wb <- trimws(as.character(config_result$config_obj$qual_workbook %||% ""))
+  .qual_wb_set <- nzchar(.qual_wb) && .qual_wb != "NA"
+  .qual_integrated <- FALSE
+
   # 1) JSON data layer (sidecar; also embedded in the report, and the input
   #    a future wave-tracking config will read).
   data_layer_result <- tryCatch({
@@ -753,10 +761,41 @@ if (.html_report_v2_on) {
       }
 
       dl$project$tracking$enabled <- tracking_on   # show the Tracking tab iff built
+
+      # Qualitative comments, joined into THIS report by ResponseID (Phase 2). The
+      # island shares the main MICRO index, so the closed<->open jump can filter the
+      # comments to the people in the active cut. Wrapped so a qual failure never
+      # affects the report; a non-PASS join (no id column / no matches) leaves the
+      # standalone *_qual_report.html fallback to run below.
+      qual_json_main <- NULL
+      if (.qual_wb_set) {
+        qj <- tryCatch(
+          build_integrated_qual_island(.qual_wb, config_result$config_obj,
+                                        data_result$survey_data),
+          turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+          error = function(e) {
+            cat("\n[WARNING] Qualitative join failed:", conditionMessage(e), "\n")
+            cat("  The main report still builds; trying the standalone comment report.\n\n")
+            NULL
+          })
+        if (!is.null(qj) && identical(qj$status, "PASS")) {
+          qual_json_main <- qj$json
+          .qual_integrated <- TRUE
+          cat(sprintf("  Qualitative: joined %d of %d commenters to the survey by '%s'.\n",
+                      qj$matched, qj$total, qj$id_column))
+        } else if (!is.null(qj) && identical(qj$status, "NO_MATCHES")) {
+          cat(sprintf(paste0("\n[WARNING] Qualitative join found id column '%s' but matched ",
+                             "0 of %d commenters — check the ResponseID alignment (or set ",
+                             "qual_join_id_column). Falling back to a standalone comment report.\n\n"),
+                      qj$id_column, qj$total))
+        }
+      }
+
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
                            sub("\\.xlsx$", "_report.html", v2_out),
                            prev_json = prev_json,
-                           micro_json = serialize_microdata(micro))
+                           micro_json = serialize_microdata(micro),
+                           qual_json = qual_json_main)
     }, error = function(e) {
       cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
       cat("  The Excel and HTML outputs were not affected.\n\n")
@@ -769,12 +808,12 @@ if (.html_report_v2_on) {
     }
   }
 
-  # Qualitative comment report (V12, additive). When a coded-comment workbook is
-  # configured, emit a separate self-contained *_qual_report.html from it. Wrapped
-  # so a qual failure never affects the Excel/HTML/v2 outputs. (The config loader
-  # surfaces an empty cell as "NA", so treat "" and "NA" as unset.)
-  .qual_wb <- trimws(as.character(config_result$config_obj$qual_workbook %||% ""))
-  if (nzchar(.qual_wb) && .qual_wb != "NA") {
+  # Qualitative comment report (V12) — STANDALONE FALLBACK. The Phase-2 default joins
+  # the comments into the main report above; this separate self-contained
+  # *_qual_report.html is only emitted when that join did not integrate (no host id
+  # column, no matches, or the main report did not build). Wrapped so a qual failure
+  # never affects the Excel/HTML/v2 outputs.
+  if (.qual_wb_set && !isTRUE(.qual_integrated)) {
     tryCatch({
       qual_out <- sub("\\.xlsx$", "_qual_report.html", v2_out)
       qr <- build_qual_report_v2(.qual_wb, qual_out, config_result$config_obj)

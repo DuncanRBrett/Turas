@@ -58,6 +58,46 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
     module = module)
 }
 
+#' Build the DATA_QUAL island joined to the host survey (Phase-2 integrated path).
+#'
+#' Reads + classifies the comment workbook, joins its respondents to the host survey
+#' by ResponseID so the island shares the main report's anonymous MICRO row index (and
+#' therefore the main banner + the live-filter masks the closed<->open jump relies on),
+#' then builds the DATA_QUAL island honouring the confidentiality dials. Unlike the
+#' standalone report this does NOT need themed questions — it ships the verbatim/record
+#' island only; the prevalence board computes from the records in the JS.
+#'
+#' @param qual_workbook Path to the coded-comment .xlsx (relative paths resolve against
+#'   the config folder, like structure_file).
+#' @param config_obj The tabs config object (the qual_* dials + qual_join_id_column).
+#' @param survey_data The host survey data frame (the main report's respondents).
+#' @param module Module label for refusal display.
+#' @return list(status, json, island, matched, total, id_column). `status` is "PASS"
+#'   (json populated), "NO_ID_COLUMN" (no response-id column resolved) or "NO_MATCHES"
+#'   (id column found but no workbook respondent joined — likely a wrong id column).
+#'   The caller falls back to the standalone *_qual_report.html on a non-PASS status.
+#' @export
+build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data, module = "TABS") {
+  qual_path <- qual_resolve_workbook_path(qual_workbook, config_obj)
+  read_result <- qual_read_workbook(qual_path, module)          # TRS-refuses on a bad file
+  joined <- qual_resolve_against_survey(read_result$questions, survey_data,
+                                        id_col = config_obj$qual_join_id_column)
+  if (!identical(joined$status, "PASS")) {
+    return(list(status = "NO_ID_COLUMN", json = NULL, island = NULL,
+                matched = 0L, total = 0L, id_column = NA_character_))
+  }
+  if (isTRUE(joined$matched == 0L)) {
+    return(list(status = "NO_MATCHES", json = NULL, island = NULL,
+                matched = 0L, total = joined$total, id_column = joined$id_column))
+  }
+  island <- qual_build_data_qual(read_result$questions, joined$master, list(
+    text_mode = config_obj$qual_confidentiality_mode,
+    demographic_cuts = config_obj$qual_demographic_cuts,
+    noteworthy_default = config_obj$qual_noteworthy_default))
+  list(status = "PASS", json = serialize_data_qual(island), island = island,
+       matched = joined$matched, total = joined$total, id_column = joined$id_column)
+}
+
 #' Build a self-contained v2 comment report from a coded-comment workbook.
 #'
 #' @param qual_workbook Path to the coded-comment .xlsx.
