@@ -784,7 +784,16 @@ if (.html_report_v2_on) {
           cat(sprintf("  Qualitative: joined %d of %d commenters to the survey by '%s'.\n",
                       qj$matched, qj$total, qj$id_column))
           # Closed<->open jump links (CommentSheet/CommentLink on the open-end rows).
-          linkres <- tryCatch(qual_build_links(data_result$selection_df, qj$island),
+          # valid_targets = the codes that actually render a card (Crosstabs questions
+          # + Dashboard composites, i.e. the data-layer questions), plus any declared
+          # composite codes, so a mistyped CommentLink target is flagged, not silent.
+          .valid_targets <- vapply(dl$questions, function(q) as.character(q$code %||% ""), character(1))
+          .cdf <- data_result$composite_defs
+          if (!is.null(.cdf) && is.data.frame(.cdf)) {
+            .cc <- intersect(c("CompositeCode", "composite_code", "Code"), names(.cdf))
+            if (length(.cc)) .valid_targets <- unique(c(.valid_targets, as.character(.cdf[[.cc[1]]])))
+          }
+          linkres <- tryCatch(qual_build_links(data_result$selection_df, qj$island, .valid_targets),
                               error = function(e) NULL)
           if (!is.null(linkres) && length(linkres$links)) {
             dl$project$qualLinks <- linkres$links
@@ -795,6 +804,15 @@ if (.html_report_v2_on) {
             cat(sprintf(paste0("  [WARNING] CommentSheet value(s) not found in the comment ",
                                "workbook: %s — the jump for these open-ends is inactive.\n"),
                         paste(linkres$unresolved, collapse = ", ")))
+          }
+          if (!is.null(linkres) && length(linkres$unlinked_targets)) {
+            .msgs <- vapply(linkres$unlinked_targets, function(u)
+              sprintf("'%s' (open-end %s)", u$target, u$openEnd), character(1))
+            cat(sprintf(paste0("  [WARNING] CommentLink target(s) match no question or composite: ",
+                               "%s — the comments are still in the Qualitative tab, but no jump ",
+                               "affordance will appear on a card. Check the code spelling against ",
+                               "Survey_Structure (e.g. a composite's CompositeCode).\n"),
+                        paste(.msgs, collapse = ", ")))
           }
         } else if (!is.null(qj) && identical(qj$status, "NO_MATCHES")) {
           cat(sprintf(paste0("\n[WARNING] Qualitative join found id column '%s' but matched ",

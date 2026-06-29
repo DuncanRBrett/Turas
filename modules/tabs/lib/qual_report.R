@@ -113,12 +113,19 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
 #'
 #' @param selection_df The full Selection sheet (all rows, as character).
 #' @param island The DATA_QUAL island; its `$questions` carry the resolved sheet codes.
-#' @return list(links, generic, unresolved). `links` is the target-keyed map (possibly
-#'   empty); `generic` are qcodes coded but not linked; `unresolved` are CommentSheet
-#'   values with no matching island question.
+#' @param valid_targets Optional character vector of the codes that actually render a
+#'   card (closed-question codes + composite codes). When supplied, a `CommentLink`
+#'   whose target is not among them is collected in `unlinked_targets` so the caller can
+#'   warn — this catches a mistyped target (e.g. `Q_Values` when the composite is
+#'   `Q_Value`), which would otherwise just silently never show the jump affordance.
+#' @return list(links, generic, unresolved, unlinked_targets). `links` is the target-keyed
+#'   map; `generic` are qcodes coded but not linked; `unresolved` are CommentSheet values
+#'   with no matching island question; `unlinked_targets` are CommentLink targets that
+#'   match no rendered card (each `list(target, openEnd, sheet)`).
 #' @export
-qual_build_links <- function(selection_df, island) {
-  empty <- list(links = list(), generic = character(0), unresolved = character(0))
+qual_build_links <- function(selection_df, island, valid_targets = NULL) {
+  empty <- list(links = list(), generic = character(0), unresolved = character(0),
+                unlinked_targets = list())
   if (is.null(island) || is.null(island$questions) || !length(island$questions)) return(empty)
   if (is.null(selection_df) || !nrow(selection_df) || !("CommentSheet" %in% names(selection_df))) {
     return(empty)
@@ -126,8 +133,9 @@ qual_build_links <- function(selection_df, island) {
   q_by_code <- list()
   for (q in island$questions) q_by_code[[q$code]] <- q
   blank <- function(v) { v <- trimws(as.character(v)); is.na(v) || !nzchar(v) || v == "NA" }
+  check_targets <- !is.null(valid_targets) && length(valid_targets)
 
-  links <- list(); generic <- character(0); unresolved <- character(0)
+  links <- list(); generic <- character(0); unresolved <- character(0); unlinked <- list()
   has_link_col <- "CommentLink" %in% names(selection_df)
   for (i in seq_len(nrow(selection_df))) {
     sheet <- selection_df$CommentSheet[i]
@@ -138,13 +146,18 @@ qual_build_links <- function(selection_df, island) {
     target <- if (has_link_col) selection_df$CommentLink[i] else NA
     open_end <- trimws(as.character(selection_df$QuestionCode[i]))
     if (!blank(target)) {
-      links[[trimws(as.character(target))]] <-
-        list(qcode = qcode, sheet = sheet, openEnd = open_end, title = q_by_code[[qcode]]$title)
+      target <- trimws(as.character(target))
+      links[[target]] <- list(qcode = qcode, sheet = sheet, openEnd = open_end,
+                              title = q_by_code[[qcode]]$title)
+      if (check_targets && !(target %in% valid_targets)) {
+        unlinked[[length(unlinked) + 1L]] <- list(target = target, openEnd = open_end, sheet = sheet)
+      }
     } else {
       generic <- c(generic, qcode)
     }
   }
-  list(links = links, generic = unique(generic), unresolved = unique(unresolved))
+  list(links = links, generic = unique(generic), unresolved = unique(unresolved),
+       unlinked_targets = unlinked)
 }
 
 #' Build a self-contained v2 comment report from a coded-comment workbook.

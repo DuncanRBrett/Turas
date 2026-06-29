@@ -201,6 +201,21 @@ test_that("a Selection sheet without the CommentSheet column yields no links", {
   expect_length(res$links, 0)
 })
 
+test_that("a CommentLink target that matches no rendered card is flagged (catches typos)", {
+  isl <- make_island()
+  sel <- selection_with("Overall", "Q_Values")              # typo: real composite is Q_Value
+  # Without valid_targets the link is still built (back-compat), nothing flagged.
+  expect_length(qual_build_links(sel, isl)$unlinked_targets, 0)
+  # With the rendered-code universe, the mistyped target is reported.
+  res <- qual_build_links(sel, isl, valid_targets = c("Q_Value", "Q25", "Q28"))
+  expect_length(res$unlinked_targets, 1)
+  expect_equal(res$unlinked_targets[[1]]$target, "Q_Values")
+  expect_equal(res$unlinked_targets[[1]]$openEnd, "Q17")
+  # A correct target passes clean.
+  ok <- qual_build_links(selection_with("Overall", "Q_Value"), isl, valid_targets = c("Q_Value"))
+  expect_length(ok$unlinked_targets, 0)
+})
+
 test_that("the island question carries its source sheet name", {
   isl <- make_island()
   expect_equal(isl$questions[[1]]$sheet, "Overall")
