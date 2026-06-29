@@ -723,14 +723,14 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-wrap { display: flex; gap: 18px; align-items: flex-start; }
 .ql-rail { flex: 0 0 230px; display: flex; flex-direction: column; gap: 2px;
   max-height: 78vh; overflow-y: auto; }
-.ql-railitem { display: flex; align-items: center; gap: 8px; text-align: left;
+.ql-railitem { display: flex; align-items: flex-start; gap: 8px; text-align: left;
   padding: 8px 10px; border: 0; background: transparent; border-radius: 8px;
   cursor: pointer; font: inherit; color: var(--ink); }
 .ql-railitem:hover { background: var(--bg); }
 .ql-railitem[aria-current="true"] { background: var(--brand); color: #fff; }
-.ql-glyph { opacity: .7; }
-.ql-railtitle { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.ql-railn { font-size: 11px; opacity: .65; }
+.ql-glyph { opacity: .7; margin-top: 1px; }
+.ql-railtitle { flex: 1; font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
+.ql-railn { font-size: 11px; opacity: .65; margin-top: 1px; }
 .ql-main { flex: 1; min-width: 0; }
 .ql-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .ql-title { margin: 0; font-size: 19px; color: var(--brand); overflow-wrap: anywhere; }
@@ -746,16 +746,33 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-board { margin-bottom: 18px; }
 .ql-boardhd, .ql-drawerhd { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink); }
 .ql-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
-.ql-prow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  border: 0; background: transparent; cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 6px; }
+.ql-prow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  border: 0; background: transparent; cursor: pointer; font: inherit; padding: 5px 6px; border-radius: 6px; }
 .ql-prow:hover { background: var(--bg); }
 .ql-prow.on { background: var(--bg); outline: 2px solid var(--brand); }
-.ql-plabel { flex: 0 0 180px; font-size: 13px; overflow-wrap: anywhere; }
-.ql-pbar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; min-width: 4px;
-  background: var(--line); }
+.ql-plabel { flex: 0 0 190px; font-size: 13px; overflow-wrap: anywhere; }
+.ql-ptrack { flex: 1; height: 15px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.ql-pfill { display: flex; height: 100%; border-radius: 4px; min-width: 2px; }
 .ql-seg.pos { background: var(--green); } .ql-seg.neu { background: var(--muted); } .ql-seg.neg { background: var(--red); }
-.ql-ppct { flex: 0 0 42px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; }
-.ql-pnet { flex: 0 0 40px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ql-ppct { flex: 0 0 40px; text-align: right; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; }
+.ql-pnet { flex: 0 0 58px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.ql-pnet.pos { color: var(--green); } .ql-pnet.neg { color: var(--red); }
+/* facet filter bar */
+.ql-facets { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px;
+  padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.ql-facetlbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ql-facet { font-size: 12px; color: var(--ink); display: inline-flex; align-items: center; gap: 4px; }
+.ql-facet select { font: inherit; font-size: 12px; padding: 2px 6px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--card); color: var(--ink); max-width: 220px; }
+.ql-facetclear { border: 0; background: transparent; color: var(--brand); cursor: pointer; font: inherit;
+  font-size: 12px; font-weight: 600; }
+/* sentiment legend words */
+.qc-pos { color: var(--green); } .qc-neu { color: var(--muted); } .qc-neg { color: var(--red); }
+/* quote demographic tags */
+.ql-qbody { flex: 1; }
+.ql-tags { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
+.ql-tag { font-size: 11px; color: var(--muted); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 8px; }
 .ql-drawer { border-top: 1px solid var(--line); padding-top: 14px; }
 .ql-quote { position: relative; border-left: 3px solid var(--muted); background: var(--card);
   box-shadow: var(--shadow); border-radius: 6px; padding: 9px 12px; margin-bottom: 8px;

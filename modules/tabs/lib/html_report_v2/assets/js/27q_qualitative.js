@@ -2,14 +2,12 @@
  * v2 Qualitative tab — pre-coded comment themes as quant + a verbatim quote drawer.
  *
  * Reads the DATA_QUAL island (TR.QUAL): per-question records keyed by the anonymous
- * index, carrying the verbatim (or null when the build hid it), a noteworthy tier,
- * sentiment, and per-mention theme valences. Themed questions show a prevalence board
- * (%-of-commenters + a pos/neu/neg split) and a quote drawer; raw questions show the
- * verbatim browser. The noteworthy-tier filter (All / Noteworthy+ / Must-read) and the
- * verbatim-text confidentiality (hidden -> "[hidden]") are honoured here.
- *
- * First cut: rail + prevalence + quotes + tier filter. The theme x banner crosstab
- * (via model.forQuestion) and the faceted browser are follow-ons.
+ * index, carrying the verbatim (or null when hidden), a noteworthy tier, sentiment,
+ * per-mention theme valences, and (when the demographic-cuts dial allows) the tagged
+ * demographics. Themed questions show a prevalence board (% of commenters who mentioned
+ * each theme, bar coloured by sentiment) and a quote drawer; raw questions show the
+ * verbatim browser. Demographic facets (e.g. Campus = Cape Town AND NPS = Promoter), the
+ * noteworthy-tier filter and the verbatim-text confidentiality are all honoured here.
  */
 (function (global) {
   "use strict";
@@ -28,12 +26,23 @@
     return (records || []).filter(function (r) { return (r.tier || 0) >= min; });
   };
 
-  /** Per-theme prevalence (%-of-commenters) + the pos/neu/neg valence split. */
-  qual.prevalence = function (question) {
-    var base = (question.records || []).length;
-    var rows = (question.themes || []).map(function (th) {
+  /** Keep records matching every selected demographic facet (AND across dimensions). */
+  qual.facetFilter = function (records, facets) {
+    var dims = facets ? Object.keys(facets).filter(function (d) { return facets[d] != null && facets[d] !== ""; }) : [];
+    if (!dims.length) return records || [];
+    return (records || []).filter(function (r) {
+      var d = r.demos || {};
+      for (var i = 0; i < dims.length; i++) if (d[dims[i]] !== facets[dims[i]]) return false;
+      return true;
+    });
+  };
+
+  /** Per-theme prevalence (% of the given commenters) + the pos/neu/neg valence split. */
+  qual.prevalence = function (records, themes) {
+    var base = (records || []).length;
+    var rows = (themes || []).map(function (th) {
       var pos = 0, neu = 0, neg = 0, n = 0;
-      question.records.forEach(function (r) {
+      records.forEach(function (r) {
         var v = r.themeVals && r.themeVals[String(th.id)];
         if (v == null) return;
         n++;
@@ -42,16 +51,15 @@
       return { id: th.id, label: th.label, n: n,
                pct: base ? Math.round(n / base * 100) : 0,
                pos: pos, neu: neu, neg: neg,
-               net: n ? Math.round((pos - neg) / n * 100) : 0,
-               divisive: n ? Math.round(neu / n * 100) : 0 };
+               net: n ? Math.round((pos - neg) / n * 100) : 0 };
     });
     rows.sort(function (a, b) { return b.n - a.n; });
     return rows;
   };
 
-  /** Records that mentioned a given theme id (after the tier filter). */
-  qual.recordsForTheme = function (question, themeId, tier) {
-    return qual.tierFilter(question.records, tier).filter(function (r) {
+  /** Records (from a pool) that mentioned a given theme id. */
+  qual.recordsForTheme = function (records, themeId) {
+    return (records || []).filter(function (r) {
       return r.themeVals && r.themeVals[String(themeId)] != null;
     });
   };
@@ -73,15 +81,16 @@
     if (!qual._state) {
       qual._state = { q: island.questions[0].code,
                       tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null };
+                      theme: null, facets: {} };
     }
     var st = qual._state;
     var q = findQ(island, st.q) || island.questions[0];
     st.q = q.code;
+
+    var audience = qual.facetFilter(q.records, st.facets);          // demographic cut
     host.innerHTML =
-      '<div class="ql-wrap">' +
-        railHtml(island, st) +
-        '<div class="ql-main">' + mainHtml(island, q, st) + '</div>' +
+      '<div class="ql-wrap">' + railHtml(island, st) +
+        '<div class="ql-main">' + mainHtml(island, q, st, audience) + '</div>' +
       '</div>';
     wire(host, island);
   };
@@ -98,21 +107,38 @@
     return '<nav class="ql-rail" aria-label="Open-end questions">' + items + '</nav>';
   }
 
-  function mainHtml(island, q, st) {
-    return headerHtml(island, q) + tierBarHtml(st) +
-      (q.type === "themed" ? prevalenceHtml(q, st) : "") +
-      drawerHtml(island, q, st) +
-      footerHtml(island, q);
+  function mainHtml(island, q, st, audience) {
+    return headerHtml(island, q, audience) + facetHtml(island, st) + tierBarHtml(st) +
+      (q.type === "themed" ? prevalenceHtml(q, st, audience) : "") +
+      drawerHtml(island, q, st, audience) + footerHtml(island, q);
   }
 
-  function headerHtml(island, q) {
-    var n = q.base ? q.base.answered : 0;
+  function headerHtml(island, q, audience) {
+    var asked = q.base ? q.base.answered : 0;
+    var shown = audience.length;
+    var n = (shown === asked) ? (asked + " answered") : (shown + " of " + asked + " answered");
     var badge = q.type === "themed" ? "THEMED" : "VERBATIM-ONLY";
     var shield = island.textMode === "full" ? "" :
-      '<span class="ql-shield" title="Confidentiality: ' + esc(island.textMode) + '">🛡 ' + esc(island.textMode) + '</span>';
+      '<span class="ql-shield" title="Verbatim confidentiality">🛡 ' + esc(island.textMode) + '</span>';
     return '<header class="ql-head"><h2 class="ql-title">' + esc(q.title) + '</h2>' +
       '<div class="ql-meta"><span class="ql-badge">' + badge + '</span>' +
-      '<span class="ql-base">' + n + ' answered</span>' + shield + '</div></header>';
+      '<span class="ql-base">' + n + '</span>' + shield + '</div></header>';
+  }
+
+  function facetHtml(island, st) {
+    var dims = island.demographics || [];
+    if (!dims.length) return "";
+    var sels = dims.map(function (d) {
+      var opts = '<option value="">All</option>' + d.values.map(function (v) {
+        var on = st.facets[d.label] === v ? " selected" : "";
+        return '<option' + on + '>' + esc(v) + '</option>';
+      }).join("");
+      return '<label class="ql-facet">' + esc(d.label) +
+        ' <select data-dim="' + esc(d.label) + '">' + opts + '</select></label>';
+    }).join("");
+    var active = Object.keys(st.facets).some(function (k) { return st.facets[k]; });
+    var clear = active ? ' <button class="ql-facetclear">clear filters</button>' : "";
+    return '<div class="ql-facets"><span class="ql-facetlbl">Filter comments:</span>' + sels + clear + '</div>';
   }
 
   function tierBarHtml(st) {
@@ -123,57 +149,64 @@
     }).join("") + '</div>';
   }
 
-  function prevalenceHtml(q, st) {
-    var rows = qual.prevalence(q);
-    if (!rows.length) return '<p class="ql-empty">No themes coded for this question.</p>';
-    var max = rows[0].pct || 1;
+  function prevalenceHtml(q, st, audience) {
+    var rows = qual.prevalence(audience, q.themes);
+    if (!rows.length || !audience.length) return '<p class="ql-empty">No coded themes for this selection.</p>';
     var body = rows.map(function (r) {
       var sel = r.id === st.theme ? ' on' : '';
-      var w = Math.max(2, Math.round(r.pct / max * 100));
-      // Diverging valence stack within the bar: pos | neu | neg.
+      // Bar is a fixed 0–100 track; the fill width IS the % of commenters, split by
+      // sentiment of those mentions (green positive / grey mixed / red negative).
       var seg = function (cls, count) {
         return count ? '<span class="ql-seg ' + cls + '" style="flex:' + count + '"></span>' : '';
       };
-      return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '">' +
+      var fill = '<span class="ql-pfill" style="width:' + r.pct + '%">' +
+        seg("pos", r.pos) + seg("neu", r.neu) + seg("neg", r.neg) + '</span>';
+      var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
+      return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
+          'title="' + r.n + ' of ' + audience.length + ' commenters mentioned this">' +
         '<span class="ql-plabel">' + esc(r.label) + '</span>' +
-        '<span class="ql-pbar" style="width:' + w + '%">' +
-          seg("pos", r.pos) + seg("neu", r.neu) + seg("neg", r.neg) + '</span>' +
+        '<span class="ql-ptrack">' + fill + '</span>' +
         '<span class="ql-ppct">' + r.pct + '%</span>' +
-        '<span class="ql-pnet" title="net sentiment">' + (r.net > 0 ? "+" : "") + r.net + '</span>' +
+        '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + '</span>' +
         '</button>';
     }).join("");
-    return '<div class="ql-board"><div class="ql-boardhd">Theme prevalence ' +
-      '<span class="ql-hint">(% of commenters · bar split pos/neu/neg · net)</span></div>' +
-      body + '</div>';
+    return '<div class="ql-board"><div class="ql-boardhd">Themes mentioned' +
+      '<span class="ql-hint"> — % of the ' + audience.length +
+      ' commenters who raised each theme; bar coloured by sentiment ' +
+      '(<b class="qc-pos">positive</b> · <b class="qc-neu">mixed</b> · ' +
+      '<b class="qc-neg">negative</b>); net = net sentiment, −100…+100. Click a theme to read its comments.</span>' +
+      '</div>' + body + '</div>';
   }
 
-  function drawerHtml(island, q, st) {
-    var records;
+  function drawerHtml(island, q, st, audience) {
+    var pool = (q.type === "themed" && st.theme != null)
+      ? qual.recordsForTheme(audience, st.theme) : audience;
+    var records = qual.tierFilter(pool, st.tier);
     var caption;
     if (q.type === "themed" && st.theme != null) {
-      records = qual.recordsForTheme(q, st.theme, st.tier);
       var th = (q.themes || []).filter(function (t) { return t.id === st.theme; })[0];
       caption = 'Comments mentioning “' + esc(th ? th.label : "") + '”';
     } else {
-      records = qual.tierFilter(q.records, st.tier);
-      caption = q.type === "themed" ? "All comments (pick a theme to filter)" : "Comments";
+      caption = q.type === "themed" ? "All comments (pick a theme above to filter)" : "Comments";
     }
     var cards = records.length
-      ? records.map(function (r) { return quoteCard(r, island); }).join("")
-      : '<p class="ql-empty">No comments at this tier.</p>';
+      ? records.map(function (r) { return quoteCard(r); }).join("")
+      : '<p class="ql-empty">No comments for this selection.</p>';
     return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
       ' <span class="ql-hint">(' + records.length + ')</span></div>' + cards + '</div>';
   }
 
-  function quoteCard(r, island) {
+  function quoteCard(r) {
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
-      ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-      : esc(r.text);
+      ? '<span class="ql-hidden">[quote hidden in this copy]</span>' : esc(r.text);
     var star = r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
+    var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
+      .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + '</span>'; }).join("");
     return '<div class="ql-quote ' + sent + '">' + star +
-      '<span class="ql-qtext">' + text + '</span>' +
+      '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
+      (tags ? '<div class="ql-tags">' + tags + '</div>' : '') + '</div>' +
       '<span class="ql-qid">#' + esc(r.idx) + '</span></div>';
   }
 
@@ -182,7 +215,7 @@
     var bits = [(q.base ? q.base.answered : 0) + " comments",
                 island.demographicCuts === "block" ? "demographic cuts blocked" : null,
                 dropped ? (dropped + " stray code(s) quarantined") : null,
-                "verbatims by ID — never model-authored"];
+                "verbatims shown by ID — never model-authored"];
     return '<footer class="ql-foot">' + bits.filter(Boolean).join(" · ") + '</footer>';
   }
 
@@ -203,5 +236,13 @@
         qual.render(host);
       });
     });
+    host.querySelectorAll(".ql-facet select").forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        st.facets[sel.getAttribute("data-dim")] = sel.value;
+        qual.render(host);
+      });
+    });
+    var clr = host.querySelector(".ql-facetclear");
+    if (clr) clr.addEventListener("click", function () { st.facets = {}; qual.render(host); });
   }
 })(typeof window !== "undefined" ? window : globalThis);

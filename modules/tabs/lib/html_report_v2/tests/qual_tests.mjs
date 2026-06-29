@@ -20,20 +20,21 @@ function assert(cond, msg) {
 
 // Themed question: Price mentioned by 2 of 4 commenters (1 pos, 1 neg); Service by 1
 // (neutral); one commenter coded no theme. Tiers: must-read(2), noteworthy(1), other(0).
+// Demographics: Campus + NPS, for the facet filter.
 const q = {
   code: "Q1", title: "Why?", type: "themed",
   themes: [{ id: 0, label: "Price" }, { id: 1, label: "Service" }],
   records: [
-    { idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 } },
-    { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3 } },
-    { idx: 2, tier: 2, sentiment: 2, themeVals: { "1": 2 } },
-    { idx: 3, tier: 0, themeVals: {} }
+    { idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 }, demos: { Campus: "Cape Town", NPS: "Promoter" } },
+    { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3 }, demos: { Campus: "Durban", NPS: "Detractor" } },
+    { idx: 2, tier: 2, sentiment: 2, themeVals: { "1": 2 }, demos: { Campus: "Cape Town", NPS: "Detractor" } },
+    { idx: 3, tier: 0, themeVals: {}, demos: { Campus: "Durban", NPS: "Promoter" } }
   ]
 };
 
 console.log("Qualitative tab — pure helpers:");
 
-const prev = qual.prevalence(q);
+const prev = qual.prevalence(q.records, q.themes);
 assert(prev[0].label === "Price" && prev[0].n === 2 && prev[0].pct === 50,
   "prevalence: Price = 2 mentions = 50% of 4 commenters");
 assert(prev[0].pos === 1 && prev[0].neg === 1 && prev[0].net === 0,
@@ -45,9 +46,17 @@ assert(qual.tierFilter(q.records, "all").length === 4, "tierFilter all -> 4");
 assert(qual.tierFilter(q.records, "noteworthy").length === 2, "tierFilter noteworthy+ -> 2 (tier>=1)");
 assert(qual.tierFilter(q.records, "must_read").length === 1, "tierFilter must-read -> 1 (tier>=2)");
 
-assert(qual.recordsForTheme(q, 0, "all").length === 2, "recordsForTheme Price (all) -> 2");
-assert(qual.recordsForTheme(q, 0, "noteworthy").length === 1,
-  "recordsForTheme Price (noteworthy+) -> 1 (drops the tier-0 mention)");
+assert(qual.recordsForTheme(q.records, 0).length === 2, "recordsForTheme Price -> 2");
+
+// Demographic facets: single dim, AND across dims, and empty = no filter.
+assert(qual.facetFilter(q.records, {}).length === 4, "facetFilter {} -> all 4");
+assert(qual.facetFilter(q.records, { Campus: "Cape Town" }).length === 2,
+  "facetFilter Campus=Cape Town -> 2");
+assert(qual.facetFilter(q.records, { Campus: "Cape Town", NPS: "Promoter" }).length === 1,
+  "facetFilter Campus=Cape Town AND NPS=Promoter -> 1 (record 0)");
+// Prevalence recomputes over the facet-cut audience (Cape Town: 1 Price, 1 Service).
+const cpt = qual.prevalence(qual.facetFilter(q.records, { Campus: "Cape Town" }), q.themes);
+assert(cpt[0].pct === 50 && cpt[1].pct === 50, "prevalence recomputes over the facet cut (Cape Town)");
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
