@@ -27,6 +27,24 @@ serialize_data_qual <- function(island) {
   jsonlite::toJSON(island, na = "null", null = "null", auto_unbox = TRUE, digits = NA)
 }
 
+#' Resolve a qual_workbook path the way structure_file resolves: a relative path is
+#' joined to the config's project root, an absolute path passes through. Falls back to
+#' the raw path when no config root is known (e.g. a direct/standalone call).
+#' @param qual_workbook The configured path (relative or absolute).
+#' @param config_obj The tabs config object (carries config_file_path after loading).
+#' @return The resolved path.
+qual_resolve_workbook_path <- function(qual_workbook, config_obj) {
+  config_path <- config_obj$config_file_path
+  if (is.null(config_path) || !nzchar(config_path) ||
+      !exists("resolve_path", mode = "function") ||
+      !exists("get_project_root", mode = "function")) {
+    return(qual_workbook)
+  }
+  root <- tryCatch(get_project_root(config_path), error = function(e) NULL)
+  if (is.null(root) || !nzchar(root)) return(qual_workbook)
+  tryCatch(resolve_path(root, qual_workbook), error = function(e) qual_workbook)
+}
+
 #' Refuse: the comment workbook has no themed (coded) questions.
 qual_refuse_no_themes <- function(qual_workbook, module) {
   turas_refuse(
@@ -53,14 +71,15 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
 #' }
 #' @export
 build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module = "TABS") {
-  read_result <- qual_read_workbook(qual_workbook, module)        # TRS-refuses on bad file
+  qual_path <- qual_resolve_workbook_path(qual_workbook, config_obj)   # project-relative like structure_file
+  read_result <- qual_read_workbook(qual_path, module)           # TRS-refuses on bad file
   master <- qual_build_respondent_master(read_result$questions)
 
   quant <- qual_build_quant_layer(read_result$questions, master, list(
     demographic_cuts = config_obj$qual_demographic_cuts,
     significance_min_base = config_obj$significance_min_base,
     project_name = config_obj$project_name))
-  if (is.null(quant$agg)) qual_refuse_no_themes(qual_workbook, module)
+  if (is.null(quant$agg)) qual_refuse_no_themes(qual_path, module)
 
   island <- qual_build_data_qual(read_result$questions, master, list(
     text_mode = config_obj$qual_confidentiality_mode,

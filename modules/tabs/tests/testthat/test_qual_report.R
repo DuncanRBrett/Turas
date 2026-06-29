@@ -59,8 +59,7 @@ local({
 
 # ---- Synthetic coded-comment workbook (one themed sheet with a Group cut) ------
 
-write_comment_workbook <- function() {
-  path <- tempfile(fileext = ".xlsx")
+write_comment_workbook <- function(path = tempfile(fileext = ".xlsx")) {
   rows <- list(c("Why did you rate us that way?", NA, NA, NA, NA),       # preamble
                c("ID", "Group", "Comment", "Noteworthy", "Price"))        # header
   for (i in 1:12) {                                                       # 12 respondents
@@ -122,6 +121,19 @@ test_that("FULL mode ships verbatim text; HIDDEN mode ships none", {
 # ==============================================================================
 # REFUSAL: a verbatim-only workbook is refused (Phase-1 needs themes)
 # ==============================================================================
+
+test_that("a project-relative qual_workbook resolves against the config folder", {
+  proj <- file.path(tempdir(), paste0("qproj_", as.integer(Sys.time()) %% 100000))
+  dir.create(proj, showWarnings = FALSE)
+  on.exit(unlink(proj, recursive = TRUE), add = TRUE)
+  write_comment_workbook(file.path(proj, "comments.xlsx"))        # workbook in the project folder
+  cfg <- build_config_object(list(project_name = "RelPath", qual_confidentiality_mode = "hidden"))
+  cfg$config_file_path <- file.path(proj, "MyConfig.xlsx")        # dirname() = the project folder
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(out), add = TRUE)
+  res <- build_qual_report_v2("comments.xlsx", out, cfg)          # RELATIVE path
+  expect_equal(res$status, "PASS")                                # resolved against config folder
+})
 
 test_that("a workbook with no themed questions is refused with a typed code", {
   path <- tempfile(fileext = ".xlsx")
