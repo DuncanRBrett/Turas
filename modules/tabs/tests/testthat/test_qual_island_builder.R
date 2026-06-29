@@ -127,6 +127,25 @@ test_that("qual_scrub_text catches email, url and phone; leaves clean text alone
 # ISLAND-LEVEL FLAGS — dial defaults validated safely
 # ==============================================================================
 
+test_that("demographics ride the island + records when allowed; omitted when blocked", {
+  m2 <- list(id_to_idx = stats::setNames(c(0L, 1L), c("1", "2")), n = 2L,
+             banner_dims = list(list(label = "Group", values = c("A", "B"))))
+  recs <- records
+  recs[[1]]$demos <- list(Group = "A")
+  recs[[2]]$demos <- list(Group = "B")
+  q <- themed_question(recs)
+
+  allowed <- qual_build_data_qual(list(q), m2, list(text_mode = "full", demographic_cuts = "allow"))
+  expect_equal(length(allowed$demographics), 1L)
+  expect_equal(allowed$demographics[[1]]$label, "Group")
+  expect_equal(allowed$demographics[[1]]$values, c("A", "B"))
+  expect_equal(first_record(allowed$questions[[1]], 0L)$demos$Group, "A")
+
+  blocked <- qual_build_data_qual(list(q), m2, list(text_mode = "full", demographic_cuts = "block"))
+  expect_null(blocked$demographics)                        # no demo leak when blocked
+  expect_null(first_record(blocked$questions[[1]], 0L)$demos)
+})
+
 test_that("invalid text mode falls back to hidden; dials and defaults carried", {
   island <- qual_build_data_qual(list(themed_question(records)), master,
                                  list(text_mode = "bogus", demographic_cuts = "block",

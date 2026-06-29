@@ -79,8 +79,10 @@ qual_cfg <- function(config, key, default) {
 #' @param idx The respondent's anonymous 0-based index.
 #' @param theme_id_map Named list mapping theme label -> 0-based theme id.
 #' @param text_mode One of QUAL_TEXT_MODES.
+#' @param demo_labels Banner-dimension labels to carry as record demographics (empty
+#'   when the demographic-cuts dial is "block", so no demographics enter the island).
 #' @return list(record, redactions).
-qual_build_record_island <- function(rec, idx, theme_id_map, text_mode) {
+qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_labels) {
   applied <- qual_apply_text_mode(rec$text, text_mode)
   theme_vals <- list()
   for (label in names(rec$themeVals)) {
@@ -93,6 +95,14 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode) {
     noteworthy = isTRUE(rec$noteworthy), tier = rec$noteworthy_tier,
     sentiment = rec$sentiment, rating = rec$rating, themeVals = theme_vals
   )
+  if (length(demo_labels)) {
+    demos <- list()
+    for (label in demo_labels) {
+      value <- rec$demos[[label]]
+      demos[[label]] <- if (is.null(value) || is.na(value)) NA_character_ else as.character(value)
+    }
+    record$demos <- demos
+  }
   list(record = record, redactions = applied$redactions)
 }
 
@@ -100,8 +110,9 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode) {
 #' @param question A classified question from the reader.
 #' @param id_to_idx Named map from respondent id to 0-based index (the master).
 #' @param text_mode One of QUAL_TEXT_MODES.
+#' @param demo_labels Banner-dimension labels to carry as record demographics.
 #' @return The per-question island list (code, title, type, base, themes, records, meta).
-qual_build_question_island <- function(question, id_to_idx, text_mode) {
+qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labels = character(0)) {
   themes <- question$roles$themes
   theme_list <- lapply(seq_along(themes),
                        function(i) list(id = i - 1L, label = themes[[i]]$label))
@@ -114,7 +125,7 @@ qual_build_question_island <- function(question, id_to_idx, text_mode) {
     # matters for the Phase-2 join, where a qual id may be absent from the host index.
     slot <- unname(id_to_idx[rec$id])
     if (length(slot) != 1L || is.na(slot)) next
-    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode)
+    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels)
     records[[length(records) + 1L]] <- built$record
     redactions <- redactions + built$redactions
   }
@@ -142,8 +153,16 @@ qual_build_data_qual <- function(questions, master, config = list()) {
   cuts <- if (identical(qual_cfg(config, "demographic_cuts", "allow"), "block")) "block" else "allow"
   default_tier <- qual_cfg(config, "noteworthy_default", "all")
   if (!default_tier %in% QUAL_NOTEWORTHY_DEFAULTS) default_tier <- "all"
+  # Demographics are carried for the tab's facet filter — but never when the
+  # demographic-cuts dial is "block" (then the tab is Total-only, no demos leak).
+  banner_dims <- if (identical(cuts, "block") || is.null(master$banner_dims)) list() else master$banner_dims
+  demo_labels <- vapply(banner_dims, function(d) d$label, character(1))
   islands <- lapply(questions,
-                    function(q) qual_build_question_island(q, master$id_to_idx, text_mode))
-  list(textMode = text_mode, demographicCuts = cuts, noteworthyDefault = default_tier,
-       n = master$n, questions = islands)
+                    function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels))
+  out <- list(textMode = text_mode, demographicCuts = cuts, noteworthyDefault = default_tier,
+              n = master$n, questions = islands)
+  if (length(demo_labels)) {
+    out$demographics <- lapply(banner_dims, function(d) list(label = d$label, values = d$values))
+  }
+  out
 }
