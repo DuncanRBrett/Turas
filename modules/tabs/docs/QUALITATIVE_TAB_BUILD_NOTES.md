@@ -156,6 +156,59 @@ must-read. This is the "show noteworthy-only, or switch noteworthy vs all" contr
 
 ---
 
+## D3. Phase 2 — integrated join + closed↔open jump (Duncan 2026-06-29)
+
+Decision: the qual content moves from a separate `*_qual_report.html` into the **one** main
+v2 report (Turas report = the full deliverable, replacing the deck). That means the **join**:
+the comment workbook's respondents join to the main survey by `ResponseID`, so a comment and
+a closed answer from the same person share the anonymous MICRO index and the main banner. This
+is the `qual_assemble.R` seam — only the index/banner source swaps (union-by-workbook →
+match-against-survey); the DATA_QUAL schema, theme serialisation and the tab are unchanged.
+
+**Config contract (Selection sheet — two optional columns on the OPEN-END's row):**
+- `CommentSheet` — the comment-workbook sheet that codes this open-end (sheets are topic-named,
+  so the pipeline can't infer it). Open-ends are already Selection rows (`Include = N`).
+- `CommentLink` — the closed question or **composite** this diagnostic open-end explains;
+  blank = generic/standalone. The resolver looks the target up across closed questions AND
+  composites (composites live in Survey_Structure and render on the Dashboard — they do NOT
+  need moving to Selection; the resolver is composite-aware).
+
+**Worked example (SACS-2025_Crosstab_Config_rebuilt.xlsx; join key confirmed = ResponseID):**
+
+| Open-end (Include=N) | CommentSheet | CommentLink |
+|---|---|---|
+| Q17 | Engagement | Q_Engage (composite) |
+| Q24 | Values | Q_Values (composite) |
+| Q26 | Misalignment | Q25 |
+| Q27 | Culture | *(generic)* |
+| Q29 | Satisfaction | Q28 |
+| Q30 | Engagement Other | *(generic)* |
+
+**The jump.** On the linked closed/composite's card (Dashboard for composites, Crosstabs for
+Q25/Q28) a "💬 N comments" affordance appears. Clicking it switches to the qual view, selects
+the linked open-end, and applies the current cut as a filter (`stats.mask` of the active
+column/cell → keep comment records whose idx is in the mask) — i.e. "the comments from the
+people in this cell," the diagnostic *why* behind the score. A breadcrumb + back restores the
+closed question and column (URL-hash state, so browser-back works too). Generic opens (no
+`CommentLink`) just live in the Qualitative tab standalone.
+
+**Plus:** save/shortlist comments (reuse the Story/Save-copy pin path → survives Save copy);
+export comments to Excel (client-side via the bundled xlsx writer; honours the confidentiality
+mode + current filter/saved set).
+
+**Methodology note:** since it's now client-facing, reframe prevalence as *salience* ("raised
+this"), soften the theme×cut significance, and let the verbatims lead — the jump reframes the
+whole thing around the closed finding, which is the methodologically right shape (open-end
+mentions are salience, not incidence).
+
+> TEMPLATE GOTCHA: `Crosstab_Config_Template.xlsx` has an embedded drawing and does NOT survive
+> an openxlsx load→save round-trip (it breaks the drawing ref and corrupts the file — reverted).
+> History (092c3e44) added Category/CategoryOrder by editing the binary directly in Excel.
+> The generator (`generate_config_templates.R`) is the cleaner source but had drifted (lacked
+> Category/CategoryOrder); `CommentSheet`/`CommentLink` are now added to it. To refresh the live
+> template, add the two headers in Excel (cols M/N) or do a careful generator-resync + fresh
+> regenerate — never an openxlsx round-trip of the existing file.
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**

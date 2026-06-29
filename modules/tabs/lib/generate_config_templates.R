@@ -641,7 +641,11 @@ generate_crosstab_config_template <- function(output_path,
     list(name = "FilterLabel", width = 30, required = FALSE,
          description = "Human-readable label shown in reports instead of the filter expression. Leave blank to show the raw filter."),
     list(name = "QuestionText", width = 40, required = FALSE,
-         description = "Reference only - question wording for your convenience. Not used in processing.")
+         description = "Reference only - question wording for your convenience. Not used in processing."),
+    list(name = "CommentSheet", width = 22, required = FALSE,
+         description = "Open-ends only: the sheet in the comment workbook (qual_workbook) that holds this question's coded comments. Leave blank for closed questions."),
+    list(name = "CommentLink", width = 16, required = FALSE,
+         description = "Diagnostic open-ends only: the closed question or composite this open-end explains (e.g. Q_Engage), which enables jump-to-comments. Leave blank for a generic/standalone open-end.")
   )
 
   # Example selection rows
@@ -650,17 +654,26 @@ generate_crosstab_config_template <- function(output_path,
          BannerBoxCategory = "N", BannerLabel = "Total",
          DisplayOrder = 1, CreateIndex = "N", BaseFilter = "",
          FilterLabel = "",
-         QuestionText = "Total sample (always include as first banner)"),
+         QuestionText = "Total sample (always include as first banner)",
+         CommentSheet = "", CommentLink = ""),
     list(QuestionCode = "Q_Gender", Include = "N", UseBanner = "Y",
          BannerBoxCategory = "N", BannerLabel = "Gender",
          DisplayOrder = 2, CreateIndex = "N", BaseFilter = "",
          FilterLabel = "",
-         QuestionText = "Example: demographic banner question"),
+         QuestionText = "Example: demographic banner question",
+         CommentSheet = "", CommentLink = ""),
     list(QuestionCode = "Q_Satisfaction", Include = "Y", UseBanner = "N",
          BannerBoxCategory = "", BannerLabel = "",
          DisplayOrder = "", CreateIndex = "Y", BaseFilter = "",
          FilterLabel = "",
-         QuestionText = "Example: stub question with index score")
+         QuestionText = "Example: stub question with index score",
+         CommentSheet = "", CommentLink = ""),
+    list(QuestionCode = "Q_OpenEnd", Include = "N", UseBanner = "N",
+         BannerBoxCategory = "", BannerLabel = "",
+         DisplayOrder = "", CreateIndex = "N", BaseFilter = "",
+         FilterLabel = "",
+         QuestionText = "Example: diagnostic open-end, coded in the comment workbook",
+         CommentSheet = "Satisfaction", CommentLink = "Q_Satisfaction")
   )
 
   write_table_sheet(wb, "Selection", selection_cols,
