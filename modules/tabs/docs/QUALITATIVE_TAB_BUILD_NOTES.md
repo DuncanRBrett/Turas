@@ -182,9 +182,23 @@ in `build_dl_project()`.
 **As-built so far (commits on `feature/tabs-qualitative-tab`):** `qual_workbook_reader.R`
 + `qual_workbook_io.R` (reader subsystem, task 1), `qual_assemble.R` (respondent master +
 banner curation = the join seam, task 2), `qual_island_builder.R` (DATA_QUAL + the verbatim
-confidentiality dial + noteworthy tiers, task 2). ~131 test assertions green; all verified
-against the four real workbooks. Remaining: theme→AGG/MICRO serialisation (task 3),
+confidentiality dial + noteworthy tiers, task 2), `qual_quant_layer.R` (theme→AGG/MICRO via
+the existing engine, task 3). ~147 test assertions green; all verified against the four real
+workbooks + a significance known-answer. **The whole R data layer is done.** Remaining:
 config + island wiring (task 4), the JS tab (task 5).
+
+**Task 3 quant-layer notes (`qual_quant_layer.R`):** each themed question becomes a synthetic
+`Multi_Mention` question (one option per theme; a respondent's mentioned theme labels left-
+packed into `code_1..code_k` slot columns), the embedded demographics become a real banner via
+`create_banner_structure`, and it all runs through `process_all_questions` → `build_data_layer`
+→ `build_microdata`. Significance is byte-identical to a closed question — nothing theme-aware
+touches the stats. A `QUAL_NO_THEME_SENTINEL` seats zero-theme commenters into the base so theme
+prevalence reads "% of commenters". `demographic_cuts="block"` → Total-only banner. The standalone
+test bootstraps the chain by cd-ing into `lib/` and extracting `run_crosstabs.R`'s sig functions
+by source-line (it has an unguarded main), mirroring `test_e2e_integration.R`. Per-mention
+sentiment stays in `DATA_QUAL.records.themeVals` (not MICRO) for Phase 1; the JS joins it to
+the banner by anon index — add `micro$sentiments[[qcode]]` later only if live-filtered sentiment
+recompute is needed.
 
 **Island wiring:** `{{DATA_QUAL}}` placeholder in `template.html`; token replace in
 `build_report_v2.R` (`null` when no open-ends or HIDDEN strips text), mirroring the
