@@ -640,12 +640,14 @@ generate_crosstab_config_template <- function(output_path,
          description = "R expression to filter respondents (e.g. Q1 == \"Male\" or !is.na(Q20)). Leave blank for no filter."),
     list(name = "FilterLabel", width = 30, required = FALSE,
          description = "Human-readable label shown in reports instead of the filter expression. Leave blank to show the raw filter."),
-    list(name = "QuestionText", width = 40, required = FALSE,
-         description = "Reference only - question wording for your convenience. Not used in processing."),
+    # Comment-link columns sit to the LEFT of QuestionText (a reference-only column),
+    # matching the live template layout.
     list(name = "CommentSheet", width = 22, required = FALSE,
          description = "Open-ends only: the sheet in the comment workbook (qual_workbook) that holds this question's coded comments. Leave blank for closed questions."),
     list(name = "CommentLink", width = 16, required = FALSE,
-         description = "Diagnostic open-ends only: the closed question or composite this open-end explains (e.g. Q_Engage), which enables jump-to-comments. Leave blank for a generic/standalone open-end.")
+         description = "Diagnostic open-ends only: the closed question or composite this open-end explains (e.g. Q_Engage), which enables jump-to-comments. Leave blank for a generic/standalone open-end."),
+    list(name = "QuestionText", width = 40, required = FALSE,
+         description = "Reference only - question wording for your convenience. Not used in processing.")
   )
 
   # Example selection rows
