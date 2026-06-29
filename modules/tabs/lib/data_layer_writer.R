@@ -141,6 +141,16 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) {
     proj$population_size <- pop_size
   }
+  # Tab-visibility flags (V12). Crosstabs is always shown; tabList() filters the
+  # rest against these. Defaults TRUE so existing reports are unchanged; a tab
+  # still self-hides when its island is absent (e.g. Qualitative without DATA_QUAL).
+  proj$tabs <- list(
+    dashboard   = isTRUE(config_obj$show_dashboard %||% TRUE),
+    patterns    = isTRUE(config_obj$show_patterns %||% TRUE),
+    differences = isTRUE(config_obj$show_differences %||% TRUE),
+    tracking    = isTRUE(config_obj$show_tracking %||% TRUE),
+    qualitative = isTRUE(config_obj$show_qualitative %||% TRUE)
+  )
   # Weighted designs carry a design effect the published data layer doesn't
   # expose per column, so the report's FPC re-letters significance only when
   # unweighted. Carried for the renderer to gate that (intervals are FPC'd

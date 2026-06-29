@@ -192,6 +192,14 @@ source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "microdata_writer.R"))
 source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
+# Qualitative comment report (V12): reader -> assembly -> quant layer -> DATA_QUAL
+# island -> a self-contained comment report. Additive; loaded after its deps.
+source(file.path(script_dir, "qual_workbook_reader.R"))
+source(file.path(script_dir, "qual_workbook_io.R"))
+source(file.path(script_dir, "qual_assemble.R"))
+source(file.path(script_dir, "qual_island_builder.R"))
+source(file.path(script_dir, "qual_quant_layer.R"))
+source(file.path(script_dir, "qual_report.R"))
 
 # ==============================================================================
 # SIGNIFICANCE TESTING FUNCTIONS
@@ -759,6 +767,30 @@ if (.html_report_v2_on) {
         exists("turas_prepare_deliverable", mode = "function")) {
       turas_prepare_deliverable(report_v2_result$output_file)
     }
+  }
+
+  # Qualitative comment report (V12, additive). When a coded-comment workbook is
+  # configured, emit a separate self-contained *_qual_report.html from it. Wrapped
+  # so a qual failure never affects the Excel/HTML/v2 outputs. (The config loader
+  # surfaces an empty cell as "NA", so treat "" and "NA" as unset.)
+  .qual_wb <- trimws(as.character(config_result$config_obj$qual_workbook %||% ""))
+  if (nzchar(.qual_wb) && .qual_wb != "NA") {
+    tryCatch({
+      qual_out <- sub("\\.xlsx$", "_qual_report.html", v2_out)
+      qr <- build_qual_report_v2(.qual_wb, qual_out, config_result$config_obj)
+      if (!is.null(qr) && identical(qr$status, "PASS") &&
+          exists("turas_prepare_deliverable", mode = "function")) {
+        turas_prepare_deliverable(qr$output_file)
+      }
+    },
+    turas_refusal = function(e) {
+      cat(conditionMessage(e))
+      cat("\n  The main Excel/HTML/v2 outputs were not affected.\n\n")
+    },
+    error = function(e) {
+      cat("\n[WARNING] Qualitative comment report failed:", conditionMessage(e), "\n")
+      cat("  The main Excel/HTML/v2 outputs were not affected.\n\n")
+    })
   }
 }
 

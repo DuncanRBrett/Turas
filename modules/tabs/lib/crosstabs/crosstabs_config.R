@@ -255,6 +255,24 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Optional wave label shown in the v2 report header (e.g. "Annual 2025").
     wave = get_config_value(config, "wave", ""),
 
+    # Qualitative tab (V12). qual_workbook (a coded-comment .xlsx path) -> a
+    # self-contained comment report is emitted alongside the main outputs. The
+    # three confidentiality dials: text level (hidden default / redacted / full),
+    # demographic association (allow / block), and the noteworthy-tier default view.
+    qual_workbook = get_config_value(config, "qual_workbook", ""),
+    qual_confidentiality_mode = get_config_value(config, "qual_confidentiality_mode", "hidden"),
+    qual_demographic_cuts = get_config_value(config, "qual_demographic_cuts", "allow"),
+    qual_noteworthy_default = get_config_value(config, "qual_noteworthy_default", "all"),
+
+    # Tab-visibility flags (V12, generic). Crosstabs is always on; each other tab
+    # is includable per report. The flags ride into the data layer; tabList()
+    # filters against them (a tab also self-hides when its island is absent).
+    show_dashboard = safe_logical(get_config_value(config, "show_dashboard", TRUE)),
+    show_patterns = safe_logical(get_config_value(config, "show_patterns", TRUE)),
+    show_differences = safe_logical(get_config_value(config, "show_differences", TRUE)),
+    show_tracking = safe_logical(get_config_value(config, "show_tracking", TRUE)),
+    show_qualitative = safe_logical(get_config_value(config, "show_qualitative", TRUE)),
+
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),
