@@ -115,5 +115,21 @@ assert(rows[1][0] === 5 && rows[1][1] === "Cape Town" && rows[1][5] === "Price" 
 assert(rows[1][3] === "Must-read" && rows[1][4] === "Positive", "exportRows labels tier + sentiment");
 assert(rows[2][6] === "[hidden]", "exportRows: hidden verbatim exports as [hidden] (confidentiality honoured)");
 
+// ---- sentiment filter + counts ----------------------------------------------
+// Fixture q: record 0 pos(1), record 1 neg(3), record 2 mixed(2), record 3 no sentiment.
+console.log("\nQualitative sentiment filter:");
+const scAll = qual.sentimentCounts(q.records);
+assert(scAll.pos === 1 && scAll.neu === 1 && scAll.neg === 1, "sentimentCounts: 1 pos / 1 mixed / 1 neg (4th has none)");
+assert(qual.sentimentFilter(q.records, null).length === 4, "sentimentFilter null -> all");
+assert(qual.sentimentFilter(q.records, 1).length === 1 && qual.sentimentFilter(q.records, 1)[0].idx === 0,
+  "sentimentFilter positive -> the 1 positive record");
+assert(qual.sentimentFilter(q.records, 3).length === 1, "sentimentFilter negative -> 1");
+// visibleRecords composes sentiment after theme/tier/saved.
+assert(qual.visibleRecords(q, { tier: "all", sentiment: 2 }, q.records).length === 1, "visibleRecords sentiment=mixed -> 1");
+assert(qual.visibleRecords(q, { tier: "all", sentiment: null }, q.records).length === 4, "visibleRecords sentiment=null -> all");
+// poolBeforeSentiment ignores the sentiment pick (so the filter buttons can tally).
+assert(qual.poolBeforeSentiment(q, { tier: "must_read", sentiment: 1 }, q.records).length === 1,
+  "poolBeforeSentiment applies tier but NOT sentiment (must-read -> 1)");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

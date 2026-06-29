@@ -64,6 +64,21 @@
     });
   };
 
+  /** Keep records of one overall sentiment (1 pos / 2 mixed / 3 neg); null = all. */
+  qual.sentimentFilter = function (records, sentiment) {
+    if (sentiment == null) return records || [];
+    return (records || []).filter(function (r) { return r.sentiment === sentiment; });
+  };
+
+  /** Pos / mixed / neg counts over a record pool (the sentiment chips + filter tallies). */
+  qual.sentimentCounts = function (records) {
+    var c = { pos: 0, neu: 0, neg: 0 };
+    (records || []).forEach(function (r) {
+      if (r.sentiment === 1) c.pos++; else if (r.sentiment === 2) c.neu++; else if (r.sentiment === 3) c.neg++;
+    });
+    return c;
+  };
+
   /**
    * Records whose respondent index passes the cut mask. The cut is the live global
    * filter (d2.state.filters): the closed->open jump shows "the comments from the
@@ -148,13 +163,21 @@
     return (records || []).filter(function (r) { return qual.isSaved(qcode, r.idx); });
   };
 
-  /** The records the drawer is currently showing: theme -> tier -> shortlist, on
-   *  top of the already cut+facet-filtered audience. Shared by the drawer + export. */
-  qual.visibleRecords = function (q, st, audience) {
+  /** The pool a sentiment pick filters: theme -> tier -> shortlist (everything but
+   *  the sentiment filter itself), so the sentiment buttons can show "if I click this,
+   *  N comments". */
+  qual.poolBeforeSentiment = function (q, st, audience) {
     var pool = (q.type === "themed" && st.theme != null) ? qual.recordsForTheme(audience, st.theme) : audience;
     var records = qual.tierFilter(pool, st.tier);
     if (st.savedOnly) records = qual.savedFilter(records, q.code);
     return records;
+  };
+
+  /** The records the drawer is currently showing: theme -> tier -> sentiment ->
+   *  shortlist, on top of the already cut+facet-filtered audience. Shared by the
+   *  drawer + export so the table and the export never drift. */
+  qual.visibleRecords = function (q, st, audience) {
+    return qual.sentimentFilter(qual.poolBeforeSentiment(q, st, audience), st.sentiment);
   };
 
   // ---- export the visible comments to Excel (client-side) --------------------
@@ -254,7 +277,7 @@
     }
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, facets: {}, railGroups: {}, railHidden: false, savedOnly: false };
+                      theme: null, sentiment: null, facets: {}, railGroups: {}, railHidden: false, savedOnly: false };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -317,7 +340,7 @@
   }
 
   function mainHtml(island, q, st, audience) {
-    return headerHtml(island, q, audience) + facetHtml(island, st) + tierBarHtml(st) +
+    return headerHtml(island, q, audience) + facetHtml(island, st) + controlsHtml(q, st, audience) +
       (q.type === "themed" ? prevalenceHtml(q, st, audience) : "") +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
   }
@@ -350,43 +373,80 @@
     return '<div class="ql-facets"><span class="ql-facetlbl">Filter comments:</span>' + sels + clear + '</div>';
   }
 
-  function tierBarHtml(st) {
-    var opts = [["all", "All"], ["noteworthy", "Noteworthy+"], ["must_read", "Must-read"]];
-    return '<div class="ql-tierbar" role="tablist">' + opts.map(function (o) {
-      var on = st.tier === o[0] ? ' class="ql-tier on"' : ' class="ql-tier"';
-      return '<button' + on + ' data-tier="' + o[0] + '">' + o[1] + '</button>';
-    }).join("") + '</div>';
+  // One controls row: the noteworthy tier, the sentiment filter (with live counts),
+  // and — next to them — the shortlist toggle (per question) + Excel export.
+  function controlsHtml(q, st, audience) {
+    var tierOpts = [["all", "All"], ["noteworthy", "Noteworthy+"], ["must_read", "Must-read"]];
+    var tier = '<div class="ql-seg" role="tablist" aria-label="Noteworthy filter">' +
+      tierOpts.map(function (o) {
+        return '<button class="ql-segbtn' + (st.tier === o[0] ? " on" : "") +
+          '" data-tier="' + o[0] + '">' + o[1] + "</button>";
+      }).join("") + "</div>";
+
+    var sc = qual.sentimentCounts(qual.poolBeforeSentiment(q, st, audience));
+    var total = sc.pos + sc.neu + sc.neg;
+    var sentOpts = [["", "All", total, ""], ["1", "Positive", sc.pos, "pos"],
+                    ["2", "Mixed", sc.neu, "neu"], ["3", "Negative", sc.neg, "neg"]];
+    var cur = st.sentiment == null ? "" : String(st.sentiment);
+    var sent = '<div class="ql-seg sentseg" role="tablist" aria-label="Sentiment filter">' +
+      sentOpts.map(function (o) {
+        return '<button class="ql-segbtn ' + o[3] + (cur === o[0] ? " on" : "") +
+          '" data-sent="' + o[0] + '">' + o[1] +
+          ' <span class="ql-segn">' + o[2] + "</span></button>";
+      }).join("") + "</div>";
+
+    var savedN = qual.savedCount(q.code);
+    var actions = '<div class="ql-actions">' +
+      '<button class="ql-savedonly' + (st.savedOnly ? " on" : "") + '" data-savedonly aria-pressed="' +
+        st.savedOnly + '" title="Show only the comments you have shortlisted for this question">' +
+        "★ Shortlist" + (savedN ? " (" + savedN + ")" : "") + "</button>" +
+      '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
+        "⬇ Export</button></div>";
+    return '<div class="ql-controls">' + tier + sent + actions + "</div>";
   }
 
   function prevalenceHtml(q, st, audience) {
     var rows = qual.prevalence(audience, q.themes);
     if (!rows.length || !audience.length) return '<p class="ql-empty">No coded themes for this selection.</p>';
+    // Bars scale to the most-raised theme so the comparison is easy to read; the %
+    // and the n=… are always shown verbatim, so nothing is overstated.
+    var top = rows.reduce(function (m, r) { return Math.max(m, r.pct); }, 0) || 100;
     var body = rows.map(function (r) {
-      var sel = r.id === st.theme ? ' on' : '';
-      // Bar is a fixed 0–100 track; the fill width IS the % of commenters, split by
-      // sentiment of those mentions (green positive / grey mixed / red negative).
+      var sel = r.id === st.theme ? " on" : "";
+      // Stacked sentiment bar: total width = salience (relative to the top theme),
+      // segments sized by the pos/mixed/neg counts within it.
       var seg = function (cls, count) {
-        return count ? '<span class="ql-seg ' + cls + '" style="flex:' + count + '"></span>' : '';
+        return count ? '<span class="ql-bseg ' + cls + '" style="flex:' + count + '"></span>' : "";
       };
-      var fill = '<span class="ql-pfill" style="width:' + r.pct + '%">' +
-        seg("pos", r.pos) + seg("neu", r.neu) + seg("neg", r.neg) + '</span>';
+      var fill = '<span class="ql-pfill" style="width:' + (top ? (r.pct / top * 100) : 0) + '%">' +
+        seg("pos", r.pos) + seg("neu", r.neu) + seg("neg", r.neg) + "</span>";
+      // Explicit per-sentiment counts (the number of comments behind each colour).
+      var chip = function (cls, count, label) {
+        return '<span class="ql-cc ' + cls + (count ? "" : " zero") + '" title="' + count + " " + label +
+          '">' + count + "</span>";
+      };
+      var counts = '<span class="ql-pcounts" aria-label="comments by sentiment">' +
+        chip("pos", r.pos, "positive") + chip("neu", r.neu, "mixed") + chip("neg", r.neg, "negative") + "</span>";
       var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
       return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
-          'title="' + r.n + ' of ' + audience.length + ' people raised this unprompted">' +
-        '<span class="ql-plabel">' + esc(r.label) + '</span>' +
-        '<span class="ql-ptrack">' + fill + '</span>' +
-        '<span class="ql-ppct">' + r.pct + '%</span>' +
-        '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + '</span>' +
-        '</button>';
+          'title="' + esc(r.label) + " — " + r.n + " of " + audience.length +
+          " raised it unprompted (" + r.pos + " positive, " + r.neu + " mixed, " + r.neg + ' negative)">' +
+        '<span class="ql-plabel">' + esc(r.label) + "</span>" +
+        '<span class="ql-ptrack">' + fill + "</span>" + counts +
+        '<span class="ql-ppct">' + r.pct + '%<span class="ql-pn">n=' + r.n + "</span></span>" +
+        '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + "</span>" +
+        "</button>";
     }).join("");
     return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
       '<span class="ql-hint"> — the % of the ' + audience.length +
-      ' who raised each theme <b>unprompted</b> (salience — what stood out to people, not a ' +
-      'prompted incidence rate); bar coloured by sentiment ' +
+      ' shown who raised each theme <b>unprompted</b> (salience, not a prompted incidence rate). ' +
+      'Bar + chips split each theme by sentiment ' +
       '(<b class="qc-pos">positive</b> · <b class="qc-neu">mixed</b> · ' +
-      '<b class="qc-neg">negative</b>); net = net sentiment, −100…+100. Click a theme to read its comments.</span>' +
-      '</div>' + body + '</div>';
+      '<b class="qc-neg">negative</b>); net = net sentiment −100…+100. Click a theme to read its comments.</span>' +
+      '</div><div class="ql-boardgrid">' + body + "</div></div>";
   }
+
+  var SENT_WORD = { 1: "Positive", 2: "Mixed", 3: "Negative" };
 
   function drawerHtml(island, q, st, audience) {
     var records = qual.visibleRecords(q, st, audience);
@@ -399,20 +459,14 @@
     } else {
       caption = q.type === "themed" ? "All comments (pick a theme above to filter)" : "Comments";
     }
-    var savedN = qual.savedCount(q.code);
-    var tools = '<div class="ql-qtools">' +
-      '<button class="ql-savedonly' + (st.savedOnly ? " on" : "") + '" data-savedonly aria-pressed="' +
-        st.savedOnly + '" title="Show only the comments you have shortlisted">★ Shortlist' +
-        (savedN ? " (" + savedN + ")" : "") + "</button>" +
-      '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
-        "⬇ Export Excel</button></div>";
+    if (st.sentiment != null) caption = (SENT_WORD[st.sentiment] || "") + " · " + caption;
     var cards = records.length
       ? records.map(function (r) { return quoteCard(r, q.code); }).join("")
       : '<p class="ql-empty">' + (st.savedOnly
           ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
           : "No comments for this selection.") + "</p>";
     return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
-      ' <span class="ql-hint">(' + records.length + ")</span>" + tools + "</div>" + cards + "</div>";
+      ' <span class="ql-hint">(' + records.length + ")</span></div>" + cards + "</div>";
   }
 
   function quoteCard(r, qcode) {
@@ -467,8 +521,15 @@
     });
     var toggle = host.querySelector(".ql-railtoggle");
     if (toggle) toggle.addEventListener("click", function () { st.railHidden = !st.railHidden; qual.render(host); });
-    host.querySelectorAll(".ql-tier").forEach(function (b) {
+    host.querySelectorAll("[data-tier]").forEach(function (b) {
       b.addEventListener("click", function () { st.tier = b.getAttribute("data-tier"); qual.render(host); });
+    });
+    host.querySelectorAll("[data-sent]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = b.getAttribute("data-sent");
+        st.sentiment = v === "" ? null : parseInt(v, 10);
+        qual.render(host);
+      });
     });
     host.querySelectorAll(".ql-prow").forEach(function (b) {
       b.addEventListener("click", function () {
