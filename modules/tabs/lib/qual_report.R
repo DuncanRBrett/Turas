@@ -98,6 +98,55 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
        matched = joined$matched, total = joined$total, id_column = joined$id_column)
 }
 
+#' Resolve the closed<->open jump links from the Selection sheet (V12).
+#'
+#' Each open-end row (Include=N) may carry two columns: `CommentSheet` (the comment-
+#' workbook sheet that codes this open-end) and `CommentLink` (the closed question or
+#' composite it explains). This builds a map keyed by the LINK TARGET so the JS can
+#' place a "comments" affordance on that card and jump to the open-end's comments:
+#'   { <targetCode>: { qcode, sheet, openEnd, title } }
+#' The resolver is composite-agnostic on the R side: it just emits the target code; the
+#' JS shows the affordance wherever a card with that code renders (Crosstabs for closed
+#' questions, the Dashboard for composites). Rows with a CommentSheet but no CommentLink
+#' are generic (reachable in the qual tab rail only). A CommentSheet that does not match
+#' any island question is reported as unresolved so the caller can warn.
+#'
+#' @param selection_df The full Selection sheet (all rows, as character).
+#' @param island The DATA_QUAL island; its `$questions` carry the resolved sheet codes.
+#' @return list(links, generic, unresolved). `links` is the target-keyed map (possibly
+#'   empty); `generic` are qcodes coded but not linked; `unresolved` are CommentSheet
+#'   values with no matching island question.
+#' @export
+qual_build_links <- function(selection_df, island) {
+  empty <- list(links = list(), generic = character(0), unresolved = character(0))
+  if (is.null(island) || is.null(island$questions) || !length(island$questions)) return(empty)
+  if (is.null(selection_df) || !nrow(selection_df) || !("CommentSheet" %in% names(selection_df))) {
+    return(empty)
+  }
+  q_by_code <- list()
+  for (q in island$questions) q_by_code[[q$code]] <- q
+  blank <- function(v) { v <- trimws(as.character(v)); is.na(v) || !nzchar(v) || v == "NA" }
+
+  links <- list(); generic <- character(0); unresolved <- character(0)
+  has_link_col <- "CommentLink" %in% names(selection_df)
+  for (i in seq_len(nrow(selection_df))) {
+    sheet <- selection_df$CommentSheet[i]
+    if (blank(sheet)) next
+    sheet <- trimws(as.character(sheet))
+    qcode <- qual_sheet_code(sheet)
+    if (is.null(q_by_code[[qcode]])) { unresolved <- c(unresolved, sheet); next }
+    target <- if (has_link_col) selection_df$CommentLink[i] else NA
+    open_end <- trimws(as.character(selection_df$QuestionCode[i]))
+    if (!blank(target)) {
+      links[[trimws(as.character(target))]] <-
+        list(qcode = qcode, sheet = sheet, openEnd = open_end, title = q_by_code[[qcode]]$title)
+    } else {
+      generic <- c(generic, qcode)
+    }
+  }
+  list(links = links, generic = unique(generic), unresolved = unique(unresolved))
+}
+
 #' Build a self-contained v2 comment report from a coded-comment workbook.
 #'
 #' @param qual_workbook Path to the coded-comment .xlsx.

@@ -130,6 +130,7 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
     redactions <- redactions + built$redactions
   }
   list(code = question$code, title = question$title, type = question$type,
+       sheet = question$sheet,
        base = list(answered = length(records), asked = NA_integer_),
        themes = theme_list, records = records,
        meta = list(dropped_codes = question$meta$dropped_codes,

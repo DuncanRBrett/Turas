@@ -153,3 +153,55 @@ test_that("the confidentiality dial still governs the integrated island text", {
     wb, list(qual_confidentiality_mode = "full"), host_survey())
   expect_match(full$json, "Comment from respondent 101", fixed = TRUE)
 })
+
+# ==============================================================================
+# JUMP LINKS: CommentSheet/CommentLink -> a target-keyed map for the JS affordance
+# ==============================================================================
+
+# The fixture workbook's single sheet is "Overall" -> qual_sheet_code = QUAL_OVERALL.
+make_island <- function() {
+  wb <- write_join_workbook(); on.exit(unlink(wb), add = TRUE)
+  build_integrated_qual_island(wb, list(qual_confidentiality_mode = "full"),
+                               host_survey())$island
+}
+
+selection_with <- function(sheet, link) {
+  data.frame(QuestionCode = "Q17", Include = "N",
+             CommentSheet = sheet, CommentLink = link, stringsAsFactors = FALSE)
+}
+
+test_that("qual_build_links keys a resolved link by its target code", {
+  isl <- make_island()
+  res <- qual_build_links(selection_with("Overall", "Q_Engage"), isl)
+  expect_true("Q_Engage" %in% names(res$links))
+  expect_equal(res$links[["Q_Engage"]]$qcode, "QUAL_OVERALL")
+  expect_equal(res$links[["Q_Engage"]]$openEnd, "Q17")
+  expect_equal(res$links[["Q_Engage"]]$sheet, "Overall")
+  expect_length(res$unresolved, 0)
+})
+
+test_that("a CommentSheet with no CommentLink is generic, not a jump target", {
+  isl <- make_island()
+  res <- qual_build_links(selection_with("Overall", NA), isl)
+  expect_length(res$links, 0)
+  expect_true("QUAL_OVERALL" %in% res$generic)
+})
+
+test_that("a CommentSheet that matches no island question is reported unresolved", {
+  isl <- make_island()
+  res <- qual_build_links(selection_with("Nonexistent Sheet", "Q5"), isl)
+  expect_length(res$links, 0)
+  expect_true("Nonexistent Sheet" %in% res$unresolved)
+})
+
+test_that("a Selection sheet without the CommentSheet column yields no links", {
+  isl <- make_island()
+  sel <- data.frame(QuestionCode = "Q1", Include = "Y", stringsAsFactors = FALSE)
+  res <- qual_build_links(sel, isl)
+  expect_length(res$links, 0)
+})
+
+test_that("the island question carries its source sheet name", {
+  isl <- make_island()
+  expect_equal(isl$questions[[1]]$sheet, "Overall")
+})

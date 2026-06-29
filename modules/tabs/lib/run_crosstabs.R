@@ -783,6 +783,19 @@ if (.html_report_v2_on) {
           .qual_integrated <- TRUE
           cat(sprintf("  Qualitative: joined %d of %d commenters to the survey by '%s'.\n",
                       qj$matched, qj$total, qj$id_column))
+          # Closed<->open jump links (CommentSheet/CommentLink on the open-end rows).
+          linkres <- tryCatch(qual_build_links(data_result$selection_df, qj$island),
+                              error = function(e) NULL)
+          if (!is.null(linkres) && length(linkres$links)) {
+            dl$project$qualLinks <- linkres$links
+            cat(sprintf("  Qualitative: %d closed->open jump link(s) wired.\n",
+                        length(linkres$links)))
+          }
+          if (!is.null(linkres) && length(linkres$unresolved)) {
+            cat(sprintf(paste0("  [WARNING] CommentSheet value(s) not found in the comment ",
+                               "workbook: %s — the jump for these open-ends is inactive.\n"),
+                        paste(linkres$unresolved, collapse = ", ")))
+          }
         } else if (!is.null(qj) && identical(qj$status, "NO_MATCHES")) {
           cat(sprintf(paste0("\n[WARNING] Qualitative join found id column '%s' but matched ",
                              "0 of %d commenters — check the ResponseID alignment (or set ",
