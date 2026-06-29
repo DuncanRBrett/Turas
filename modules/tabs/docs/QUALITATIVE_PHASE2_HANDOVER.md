@@ -1,5 +1,34 @@
 # Qualitative Tab — Phase 2 Handover (integrated join + closed↔open jump)
 
+> **✅ PHASE 2 BUILT (2026-06-29) — all five items done + tested, on
+> `feature/tabs-qualitative-tab` (5 new commits `16914b42`→`3621dad0`, NOT pushed).**
+> As-built detail lives in `QUALITATIVE_TAB_BUILD_NOTES.md` §D3.1–D3.4. Summary:
+> 1. **Join** — `qual_resolve_against_survey` re-keys DATA_QUAL to the host MICRO index by
+>    ResponseID (auto-detected / `qual_join_id_column`); `build_integrated_qual_island` rides
+>    it into the **main** report as `qual_json`; standalone `*_qual_report.html` is now a
+>    fallback. (`test_qual_join.R`, 39 assertions.)
+> 2. **Links** — `CommentSheet`/`CommentLink` → `project.qualLinks` (composite-agnostic in R).
+> 3. **Jump** — "💬 N comments" on the linked Crosstabs/Dashboard card → the qual tab, focused +
+>    filtered to the active cut (`stats.mask`); breadcrumb + browser-back via hash.
+> 4. **Shortlist + Excel export** — ★ per comment (survives Save copy) + ⬇ export the visible set
+>    (confidentiality honoured). (`qual_tests.mjs`, 33 assertions.)
+> 5. **Salience reframe** — board reads "What people raised" (unprompted salience, not incidence).
+>
+> **ONE DELIBERATE DIVERGENCE** from the plan below: the synthetic theme questions are NOT merged
+> into the main `dl`/`micro` (Crosstabs renders every AGG question unfiltered + prevalence computes
+> from records, so merging would pollute the client-facing Crosstabs list and fight the reframe).
+> Rationale in §D3.1. The theme×banner **sig crosstab** stays a deferred TODO.
+>
+> **DUNCAN — to light it up on the real SACS/Student config (then regen via `launch_turas`):**
+> the live config's **Selection sheet** needs `CommentSheet`/`CommentLink` filled on the open-end
+> (Include=N) rows per the locked mapping below, the survey **data must carry a ResponseID column**
+> matching the comment workbook, and `qual_workbook` set (SACS already has it). SACS has no embedded
+> comment-demographics, so its qual facet dropdowns will be empty — the cut comes from the jump.
+>
+> The original Phase-2 build brief follows (kept for context).
+
+---
+
 **Date:** 2026-06-29 · **Branch:** `feature/tabs-qualitative-tab` (20 commits since main
 `0093d7b0`, **NOT pushed/merged**) · **Start here for the Phase-2 build.**
 
