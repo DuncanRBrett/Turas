@@ -53,6 +53,8 @@ test_output/
 *.html
 !modules/hub_app/app/index.html
 !**/tests/**/fixtures/**/*.html
+# Vendored v2 report shell (a source asset, not a generated report)
+!modules/tabs/lib/html_report_v2/assets/template.html
 
 # Temporary files
 *.tmp
