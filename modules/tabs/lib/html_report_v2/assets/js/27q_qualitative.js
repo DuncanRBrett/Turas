@@ -163,6 +163,71 @@
     return (records || []).filter(function (r) { return qual.isSaved(qcode, r.idx); });
   };
 
+  // ---- highlight a passage inside a comment (survives "Save copy") -----------
+  // Stores character ranges [start,end] into the comment's exact text, keyed qcode#idx,
+  // seeded from the saved-copy island + per-report localStorage (like the shortlist).
+  // renderHighlighted() wraps the ranges in <mark>; the selection wiring lives in wire().
+
+  var HL_KEY = "turas_v2_qualhl";
+  var hlCache = null;
+  function hlStore() {
+    if (hlCache) return hlCache;
+    hlCache = {};
+    if (TR.userState && TR.userState.qualHighlights) {
+      Object.keys(TR.userState.qualHighlights).forEach(function (k) { hlCache[k] = TR.userState.qualHighlights[k]; });
+    }
+    try {
+      var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(HL_KEY));
+      if (raw) { var own = JSON.parse(raw) || {}; Object.keys(own).forEach(function (k) { hlCache[k] = own[k]; }); }
+    } catch (e) { /* island-only */ }
+    return hlCache;
+  }
+  function hlPersist() {
+    try {
+      if (typeof localStorage !== "undefined" && TR.d2) localStorage.setItem(TR.d2.storeKey(HL_KEY), JSON.stringify(hlStore()));
+    } catch (e) { /* storage blocked — highlights stay in memory */ }
+  }
+  function hlMerge(ranges) {
+    var sorted = ranges.slice().sort(function (a, b) { return a[0] - b[0]; });
+    var out = [];
+    sorted.forEach(function (r) {
+      var last = out[out.length - 1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+      else out.push([r[0], r[1]]);
+    });
+    return out;
+  }
+  qual.getHighlights = function (qcode, idx) { return hlStore()[qcode + "#" + idx] || []; };
+  qual.addHighlight = function (qcode, idx, start, end) {
+    if (!(end > start)) return;
+    var s = hlStore(), k = qcode + "#" + idx;
+    s[k] = hlMerge((s[k] || []).concat([[start, end]]));
+    hlPersist();
+  };
+  qual.removeHighlight = function (qcode, idx, start) {
+    var s = hlStore(), k = qcode + "#" + idx;
+    var arr = (s[k] || []).filter(function (r) { return r[0] !== start; });
+    if (arr.length) s[k] = arr; else delete s[k];
+    hlPersist();
+  };
+  qual.highlightsAll = function () { return hlStore(); };   // report.saveCopy embeds this
+
+  /** Wrap the stored ranges in <mark> (escaping each piece) — pure, node-testable. */
+  qual.renderHighlighted = function (text, ranges) {
+    if (text == null) return "";
+    if (!ranges || !ranges.length) return esc(text);
+    var sorted = ranges.slice().sort(function (a, b) { return a[0] - b[0]; });
+    var out = "", pos = 0;
+    sorted.forEach(function (rg) {
+      var a = Math.max(pos, rg[0]), b = Math.max(a, Math.min(rg[1], text.length));
+      if (a > pos) out += esc(text.slice(pos, a));
+      if (b > a) out += '<mark class="ql-hl" data-s="' + rg[0] + '">' + esc(text.slice(a, b)) + "</mark>";
+      pos = Math.max(pos, b);
+    });
+    if (pos < text.length) out += esc(text.slice(pos));
+    return out;
+  };
+
   /** The pool a sentiment pick filters: theme -> tier -> shortlist (everything but
    *  the sentiment filter itself), so the sentiment buttons can show "if I click this,
    *  N comments". */
@@ -470,7 +535,8 @@
   function quoteCard(r, qcode) {
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
-      ? '<span class="ql-hidden">[quote hidden in this copy]</span>' : esc(r.text);
+      ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
+      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));   // select-to-highlight
     var star = r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
     var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
@@ -480,7 +546,7 @@
       esc(qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved + '" title="' +
       (saved ? "Remove from your shortlist" : "Add to your shortlist") + '">' +
       (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>";
-    return '<div class="ql-quote ' + sent + '">' + star +
+    return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(qcode) + "#" + esc(r.idx) + '">' + star +
       '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
       (tags ? '<div class="ql-tags">' + tags + '</div>' : '') + '</div>' +
       '<div class="ql-qfoot">' + save + '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
@@ -489,6 +555,7 @@
   function footerHtml(island, q) {
     var dropped = q.meta && q.meta.dropped_codes ? q.meta.dropped_codes : 0;
     var bits = [(q.base ? q.base.answered : 0) + " comments",
+                island.textMode !== "hidden" ? "✎ select text in a comment to highlight a passage" : null,
                 q.type === "themed" ? "themes are salience (raised unprompted), not prompted incidence" : null,
                 island.demographicCuts === "block" ? "demographic cuts blocked" : null,
                 dropped ? (dropped + " stray code(s) quarantined") : null,
@@ -558,6 +625,77 @@
     if (ex) ex.addEventListener("click", function () {
       var v = qual._view;
       if (v) qual.exportXlsx(v.island, v.q, qual.visibleRecords(v.q, st, v.audience));
+    });
+    wireHighlights(host);
+  }
+
+  // ---- highlight selection wiring (select text -> a "Highlight" chip) ---------
+
+  var _hlPop = null;
+  function hlRemovePop() { if (_hlPop) { _hlPop.remove(); _hlPop = null; } }
+
+  function closestQtext(node) {
+    var el = node && (node.nodeType === 1 ? node : node.parentElement);
+    return el && el.closest ? el.closest(".ql-qtext") : null;
+  }
+
+  /** Character offset of (node, nodeOffset) within el's visible text (== the record
+   *  text, since esc() decodes back on display), so ranges map to r.text offsets. */
+  function hlOffset(el, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(el);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return -1; }
+    return r.toString().length;
+  }
+
+  function hlShowPop(rect, onApply) {
+    hlRemovePop();
+    if (typeof document === "undefined") return;
+    var b = document.createElement("button");
+    b.className = "ql-hlpop";
+    b.textContent = "✎ Highlight";
+    b.style.left = Math.round(rect.left + rect.width / 2) + "px";
+    b.style.top = Math.round(rect.top) + "px";
+    b.addEventListener("mousedown", function (e) { e.preventDefault(); });   // keep the selection alive
+    b.addEventListener("click", function (e) { e.stopPropagation(); onApply(); });
+    document.body.appendChild(b);
+    _hlPop = b;
+  }
+
+  function wireHighlights(host) {
+    var drawer = host.querySelector(".ql-drawer");
+    if (!drawer || typeof window === "undefined") return;
+    // Select a passage -> offer to highlight it (within a single comment's text).
+    drawer.addEventListener("mouseup", function () {
+      hlRemovePop();
+      var sel = window.getSelection && window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+      var range = sel.getRangeAt(0);
+      var qt = closestQtext(range.startContainer);
+      if (!qt || qt !== closestQtext(range.endContainer)) return;     // must stay within one comment
+      var card = qt.closest("[data-hl-key]");
+      if (!card) return;
+      var start = hlOffset(qt, range.startContainer, range.startOffset);
+      var end = hlOffset(qt, range.endContainer, range.endOffset);
+      if (start < 0 || end <= start) return;
+      var key = card.getAttribute("data-hl-key"), at = key.lastIndexOf("#");
+      hlShowPop(range.getBoundingClientRect(), function () {
+        qual.addHighlight(key.slice(0, at), parseInt(key.slice(at + 1), 10), start, end);
+        hlRemovePop();
+        qual.render(host);
+      });
+    });
+    // Click an existing highlight to remove it (ignored mid-selection).
+    drawer.addEventListener("click", function (e) {
+      var m = e.target.closest && e.target.closest("mark.ql-hl");
+      if (!m) return;
+      var sel = window.getSelection && window.getSelection();
+      if (sel && !sel.isCollapsed) return;
+      var card = m.closest("[data-hl-key]");
+      if (!card) return;
+      var key = card.getAttribute("data-hl-key"), at = key.lastIndexOf("#");
+      qual.removeHighlight(key.slice(0, at), parseInt(key.slice(at + 1), 10), parseInt(m.getAttribute("data-s"), 10));
+      qual.render(host);
     });
   }
 })(typeof window !== "undefined" ? window : globalThis);

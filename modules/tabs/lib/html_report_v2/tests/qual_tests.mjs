@@ -131,5 +131,20 @@ assert(qual.visibleRecords(q, { tier: "all", sentiment: null }, q.records).lengt
 assert(qual.poolBeforeSentiment(q, { tier: "must_read", sentiment: 1 }, q.records).length === 1,
   "poolBeforeSentiment applies tier but NOT sentiment (must-read -> 1)");
 
+// ---- highlight a passage -----------------------------------------------------
+console.log("\nQualitative highlight:");
+assert(qual.renderHighlighted("hello world", [[0, 5]]).indexOf('<mark class="ql-hl" data-s="0">hello</mark>') === 0,
+  "renderHighlighted wraps the range in a mark");
+assert(qual.renderHighlighted("abc", []) === "abc", "renderHighlighted with no ranges = plain text");
+assert(qual.renderHighlighted(null, [[0, 1]]) === "", "renderHighlighted of hidden/null text = empty");
+qual.addHighlight("HLQ", 0, 0, 5);
+assert(JSON.stringify(qual.getHighlights("HLQ", 0)) === "[[0,5]]", "addHighlight stores the range");
+qual.addHighlight("HLQ", 0, 3, 9);
+assert(JSON.stringify(qual.getHighlights("HLQ", 0)) === "[[0,9]]", "overlapping ranges merge");
+qual.addHighlight("HLQ", 0, 20, 25);
+assert(qual.getHighlights("HLQ", 0).length === 2, "a disjoint range is kept separate");
+qual.removeHighlight("HLQ", 0, 0);
+assert(JSON.stringify(qual.getHighlights("HLQ", 0)) === "[[20,25]]", "removeHighlight drops the range by start offset");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
