@@ -782,27 +782,26 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-board { margin-bottom: 18px; }
 .ql-boardhd, .ql-drawerhd { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink); }
 .ql-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
-.ql-boardgrid { display: flex; flex-direction: column; gap: 2px; }
-.ql-prow { display: grid; grid-template-columns: 180px 1fr auto 54px 62px; align-items: center; gap: 12px;
+.ql-boardgrid { display: flex; flex-direction: column; }
+.ql-prow { display: grid; grid-template-columns: 190px 1fr 64px 48px 50px; align-items: center; gap: 18px;
   width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer; font: inherit;
-  padding: 6px 8px; border-radius: 6px; }
+  padding: 8px 8px; border-radius: 6px; }
+.ql-prow + .ql-prow { border-top: 1px solid var(--line); }
 .ql-prow:hover { background: var(--bg); }
-.ql-prow.on { background: var(--bg); outline: 2px solid var(--brand); }
+.ql-prow.on { background: var(--bg); box-shadow: inset 2px 0 0 var(--brand); }
 .ql-plabel { font-size: 13px; overflow-wrap: anywhere; }
-.ql-ptrack { height: 16px; border-radius: 8px; background: var(--line); overflow: hidden; }
-.ql-pfill { display: flex; height: 100%; border-radius: 8px; min-width: 3px; }
+/* slim salience bar; the segments show the sentiment split, no fussy separators */
+.ql-ptrack { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.ql-pfill { display: flex; height: 100%; border-radius: 6px; min-width: 3px; }
 .ql-bseg.pos { background: var(--green); } .ql-bseg.neu { background: var(--muted); } .ql-bseg.neg { background: var(--red); }
-.ql-bseg + .ql-bseg { box-shadow: inset 1px 0 0 rgba(255,255,255,.55); }
-/* explicit per-sentiment counts */
-.ql-pcounts { display: inline-flex; gap: 4px; }
-.ql-cc { min-width: 22px; text-align: center; font-size: 11px; font-weight: 700; color: #fff;
-  font-variant-numeric: tabular-nums; border-radius: 5px; padding: 1px 5px; }
-.ql-cc.pos { background: var(--green); } .ql-cc.neu { background: var(--muted); } .ql-cc.neg { background: var(--red); }
-.ql-cc.zero { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
-.ql-ppct { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1;
-  text-align: right; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; }
-.ql-pn { font-size: 10px; font-weight: 500; color: var(--muted); }
-.ql-pnet { text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+/* per-sentiment counts as quiet figures (the bar already carries the colour split) */
+.ql-pcounts { display: inline-flex; gap: 8px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.ql-cc { font-size: 12px; font-weight: 600; min-width: 13px; text-align: right; }
+.ql-cc.pos { color: var(--green); } .ql-cc.neu { color: var(--muted); } .ql-cc.neg { color: var(--red); }
+.ql-cc.zero { color: var(--line); }
+.ql-ppct { text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; }
+.ql-pn { display: block; font-size: 10px; font-weight: 500; color: var(--muted); }
+.ql-pnet { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .ql-pnet.pos { color: var(--green); } .ql-pnet.neg { color: var(--red); }
 /* facet filter bar */
 .ql-facets { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px;

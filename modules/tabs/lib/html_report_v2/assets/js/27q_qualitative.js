@@ -438,11 +438,9 @@
         "</button>";
     }).join("");
     return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
-      '<span class="ql-hint"> — the % of the ' + audience.length +
-      ' shown who raised each theme <b>unprompted</b> (salience, not a prompted incidence rate). ' +
-      'Bar + chips split each theme by sentiment ' +
-      '(<b class="qc-pos">positive</b> · <b class="qc-neu">mixed</b> · ' +
-      '<b class="qc-neg">negative</b>); net = net sentiment −100…+100. Click a theme to read its comments.</span>' +
+      '<span class="ql-hint"> — % of the ' + audience.length + ' who raised each theme <b>unprompted</b> ' +
+      '(salience, not incidence). Counts: <b class="qc-pos">positive</b> · <b class="qc-neu">mixed</b> · ' +
+      '<b class="qc-neg">negative</b>. Click a theme to read its comments.</span>' +
       '</div><div class="ql-boardgrid">' + body + "</div></div>";
   }
 
