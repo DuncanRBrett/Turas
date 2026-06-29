@@ -64,6 +64,44 @@
     });
   };
 
+  /**
+   * Records whose respondent index passes the cut mask. The cut is the live global
+   * filter (d2.state.filters): the closed->open jump shows "the comments from the
+   * people in the active cut". A no-op when there is no cut or no microdata island.
+   */
+  qual.maskFilter = function (records, filters) {
+    if (!filters || !filters.length || !TR.stats || !TR.MICRO) return records || [];
+    var mask = TR.stats.mask(filters);
+    return (records || []).filter(function (r) { return mask[r.idx] === 1; });
+  };
+
+  /** The closed<->open jump link for a closed/composite code, or null. */
+  qual.linkFor = function (code) {
+    var links = (TR.AGG && TR.AGG.project && TR.AGG.project.qualLinks) || null;
+    return (links && links[code]) ? links[code] : null;
+  };
+
+  /** Comment count for a qual question code (within the cut when filters given). */
+  qual.commentCount = function (qcode, filters) {
+    var island = TR.QUAL;
+    if (!island) return 0;
+    var q = findQ(island, qcode);
+    if (!q || !q.records) return 0;
+    if (!filters || !filters.length) return q.records.length;
+    return qual.maskFilter(q.records, filters).length;
+  };
+
+  /** The "💬 N comments" affordance for a linked closed/composite card ("" if none). */
+  qual.affordanceHtml = function (code) {
+    var link = qual.linkFor(code);
+    if (!link) return "";
+    var n = qual.commentCount(link.qcode);
+    if (!n) return "";
+    return '<button class="ql-jumpbtn" data-qual-jump="' + esc(code) +
+      '" title="Read the ' + esc(link.title) + ' open-end comments behind this finding">' +
+      "💬 " + n + " comment" + (n === 1 ? "" : "s") + "</button>";
+  };
+
   function findQ(island, code) {
     var qs = island.questions || [];
     for (var i = 0; i < qs.length; i++) if (qs[i].code === code) return qs[i];
@@ -72,30 +110,101 @@
 
   // ---- render ----------------------------------------------------------------
 
+  // ---- jump (a closed/composite card -> these comments, in the active cut) ----
+
+  /** The jump context when we arrived from a closed/composite card (else null). */
+  qual.jumpContext = function () {
+    var d2 = TR.d2, from = d2.state.qualFrom;
+    if (!from) return null;
+    var src = d2.questionByCode ? d2.questionByCode(from) : null;
+    return {
+      from: from,
+      fromTitle: src ? (src.code + " " + src.title) : from,
+      filters: (d2.state.filters || []).slice(),                  // the active cut
+      desc: (d2.filterDescription && d2.filterDescription()) || ""
+    };
+  };
+
+  /** Clear the jump breadcrumb context (the cut/global filter is left untouched). */
+  qual.clearJump = function () {
+    if (!TR.d2) return;
+    TR.d2.state.qualFrom = null;
+    TR.d2.state.qualFromTab = null;
+  };
+
+  /** Jump from a linked closed/composite card to its open-end comments. */
+  qual.jumpTo = function (code) {
+    var link = qual.linkFor(code);
+    if (!link) return;
+    var d2 = TR.d2, s = d2.state;
+    s.qualQ = link.qcode;                       // focus the linked open-end
+    if (qual._state) qual._state.theme = null;
+    s.qualFrom = code;                          // breadcrumb + back target
+    s.qualFromTab = (s.tab === "dashboard") ? "dashboard" : "crosstabs";
+    s.tab = "qualitative";
+    // a NEW history entry, so browser-back returns to the closed view's hash
+    if (typeof history !== "undefined" && history.pushState) {
+      try { history.pushState(null, "", d2.encodeHash()); } catch (e) {}
+    }
+    TR.shell.route();
+  };
+
+  /** Breadcrumb back: return to the closed view we jumped from. */
+  qual.back = function () {
+    var s = TR.d2.state, fromTab = s.qualFromTab || "crosstabs";
+    qual.clearJump();
+    if (typeof history !== "undefined" && history.length > 1 && history.back) {
+      history.back();                           // pops to the closed view's hash
+    } else {
+      s.tab = fromTab; TR.shell.route();        // headless / no-history fallback
+    }
+  };
+
+  // ---- render ----------------------------------------------------------------
+
   qual.render = function (host) {
-    var island = TR.QUAL;
+    var island = TR.QUAL, d2 = TR.d2;
     if (!island || !island.questions || !island.questions.length) {
       host.innerHTML = '<div class="page"><p class="ql-empty">No qualitative data in this report.</p></div>';
       return;
     }
     if (!qual._state) {
-      qual._state = { q: island.questions[0].code,
-                      tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
+      qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
                       theme: null, facets: {}, railGroups: {}, railHidden: false };
     }
     var st = qual._state;
-    var q = findQ(island, st.q) || island.questions[0];
-    st.q = q.code;
+    // The focused open-end lives in d2.state so it round-trips through the URL hash
+    // (deep links + the closed->open jump). Fall back to the first question.
+    if (!d2.state.qualQ || !findQ(island, d2.state.qualQ)) d2.state.qualQ = island.questions[0].code;
+    var q = findQ(island, d2.state.qualQ) || island.questions[0];
+    d2.state.qualQ = q.code;
 
-    var audience = qual.facetFilter(q.records, st.facets);          // demographic cut
+    // Jump context: when we arrived from a closed/composite card the active global
+    // filter is the cut ("the comments from the people in this cell"). The filter bar
+    // is hidden on this tab, so the breadcrumb is where the cut is shown + cleared.
+    var jump = qual.jumpContext();
+    var cutFilters = jump ? jump.filters : null;
+
+    var audience = qual.maskFilter(qual.facetFilter(q.records, st.facets), cutFilters);
     host.innerHTML =
       '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st) +
         '<div class="ql-main">' +
           '<button class="ql-railtoggle" title="Show/hide the question list">⟨⟩ Questions</button>' +
+          breadcrumbHtml(jump) +
           mainHtml(island, q, st, audience) +
         '</div></div>';
     wire(host, island);
   };
+
+  function breadcrumbHtml(jump) {
+    if (!jump) return "";
+    var cut = jump.desc
+      ? '<span class="ql-cut">cut: ' + esc(jump.desc) + "</span>"
+      : '<span class="ql-cut all">all respondents</span>';
+    return '<div class="ql-crumb"><button class="ql-back" data-qual-back>‹ Back to ' +
+      esc(jump.fromTitle) + "</button>" +
+      '<span class="ql-crumblbl">comments behind this finding</span>' + cut + "</div>";
+  }
 
   function railHtml(island, st) {
     var groups = [
@@ -104,7 +213,7 @@
     ].filter(function (g) { return g.qs.length; });
     var html = groups.map(function (g) {
       var items = g.qs.map(function (q) {
-        var sel = q.code === st.q ? ' aria-current="true"' : "";
+        var sel = q.code === TR.d2.state.qualQ ? ' aria-current="true"' : "";
         var glyph = q.type === "themed" ? "▦" : "❝";
         return '<button class="ql-railitem" data-q="' + esc(q.code) + '"' + sel + '>' +
           '<span class="ql-glyph">' + glyph + '</span>' +
@@ -238,8 +347,15 @@
   function wire(host, island) {
     var st = qual._state;
     host.querySelectorAll(".ql-railitem").forEach(function (b) {
-      b.addEventListener("click", function () { st.q = b.getAttribute("data-q"); st.theme = null; qual.render(host); });
+      b.addEventListener("click", function () {
+        TR.d2.state.qualQ = b.getAttribute("data-q");
+        st.theme = null;
+        qual.clearJump();                 // leaving the jumped open-end drops the cut breadcrumb
+        qual.render(host);
+      });
     });
+    var back = host.querySelector("[data-qual-back]");
+    if (back) back.addEventListener("click", function () { qual.back(); });
     host.querySelectorAll(".cathdr[data-railtoggle]").forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-railtoggle");

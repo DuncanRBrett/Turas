@@ -243,6 +243,27 @@ The theme×banner **significance** crosstab (render via `model.forQuestion`) rem
 not-yet-built TODO; if it's ever wanted in the integrated report, run the qual quant layer against
 the *host* banner and append under a dedicated tab/section flag — do NOT let it leak into Crosstabs.
 
+### D3.2 — Phase-2 AS-BUILT (the closed↔open jump; DONE, tested)
+
+A "💬 N comments" affordance renders on every card whose code is a `project.qualLinks` target —
+on the Crosstabs question card (`25_cards.js` qhead) and on the Dashboard index/composite gauge
+(`27_views.js`). `TR.qual.affordanceHtml(code)` returns it (or "") so neither card file needs to
+know the link rules. Clicking it (`TR.qual.jumpTo`, delegated in `24_shell.js`) switches to the
+Qualitative tab, focuses the linked open-end, and applies **the active global filter as the cut** —
+`TR.qual.maskFilter` keeps DATA_QUAL records whose `idx` passes `stats.mask(d2.state.filters)`,
+i.e. "the comments from the people in the current cut". A breadcrumb (`‹ Back to <Q> …  cut: …`)
+shows the source + cut and restores the closed view; browser-back works because the jump
+`history.pushState`es a new entry and the focus/source round-trip through the hash (`qq` / `qfrom`;
+the cut is the existing `filter=`). The focused open-end moved from `qual._state.q` into
+`d2.state.qualQ` so it is hash-addressable. A tab-bar click or a rail pick clears the breadcrumb
+(`qual.clearJump`) — only an actual jump shows a cut.
+
+**Cut granularity (deliberate v1):** the cut is the report-wide live filter, not a single banner
+column. So the analyst filters to the segment of interest (the filter bar), reads the closed
+numbers, then clicks 💬 to read that segment's verbatims. A per-banner-column 💬 ("just the
+Detractors column") is a worthwhile follow-up but needs the table renderer to translate a column
+into a filter spec — noted, not built. Tests: `qual_tests.mjs` jump-helper block (8 new, 20 total).
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**

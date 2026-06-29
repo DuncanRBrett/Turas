@@ -58,5 +58,34 @@ assert(qual.facetFilter(q.records, { Campus: "Cape Town", NPS: "Promoter" }).len
 const cpt = qual.prevalence(qual.facetFilter(q.records, { Campus: "Cape Town" }), q.themes);
 assert(cpt[0].pct === 50 && cpt[1].pct === 50, "prevalence recomputes over the facet cut (Cape Town)");
 
+// ---- Phase-2 jump helpers (linkFor / commentCount / maskFilter / affordanceHtml) ----
+// Stubs: Q28 (a closed question) links to the QUAL_SAT open-end; the cut mask keeps
+// respondents 0 and 2 (a "filtered" call), or all when no filter.
+const TR = globalThis.TR;
+TR.AGG = { project: { qualLinks: { Q28: { qcode: "QUAL_SAT", sheet: "Satisfaction", title: "Satisfaction" } } } };
+TR.QUAL = { questions: [{ code: "QUAL_SAT", records: [{ idx: 0 }, { idx: 1 }, { idx: 2 }, { idx: 3 }] }] };
+TR.MICRO = { n: 4 };
+TR.stats = { mask: function (filters) {
+  const m = new Uint8Array(4);
+  if (filters && filters.length) { m[0] = 1; m[2] = 1; } else { m.fill(1); }
+  return m;
+} };
+
+console.log("\nQualitative jump helpers:");
+assert(qual.linkFor("Q28") && qual.linkFor("Q28").qcode === "QUAL_SAT", "linkFor resolves a linked closed question");
+assert(qual.linkFor("Q99") === null, "linkFor returns null for an unlinked code");
+assert(qual.commentCount("QUAL_SAT") === 4, "commentCount (no cut) = all records");
+assert(qual.commentCount("QUAL_SAT", [{ q: "Q1", rows: [1] }]) === 2, "commentCount within the cut mask = 2");
+assert(qual.commentCount("NOPE") === 0, "commentCount for a missing question = 0");
+
+const recs = TR.QUAL.questions[0].records;
+assert(qual.maskFilter(recs, [{ q: "Q1", rows: [1] }]).length === 2, "maskFilter keeps masked respondents (idx 0,2)");
+assert(qual.maskFilter(recs, []).length === 4, "maskFilter with no cut keeps all");
+
+const aff = qual.affordanceHtml("Q28");
+assert(aff.indexOf("💬 4 comments") >= 0 && aff.indexOf('data-qual-jump="Q28"') >= 0,
+  "affordanceHtml renders a 💬 button carrying the jump target");
+assert(qual.affordanceHtml("Q99") === "", "affordanceHtml is empty for an unlinked card");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

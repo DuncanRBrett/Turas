@@ -464,11 +464,13 @@
         " — shown on every pin and export</div>"
       : "";
 
+    // "💬 comments" jump when this question/composite is linked to an open-end.
+    var commentsBtn = (TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(model.code) : "";
     var html = '<article class="card qc-card">' +
       '<div class="qhead"><div class="qmeta"><span class="qcode">' + model.code +
       "</span>" + sourceBadge + prevBadge +
       '<span class="qnav"><button data-act="prevq" aria-label="Previous question">‹</button>' +
-      '<button data-act="nextq" aria-label="Next question">›</button></span></div>' +
+      '<button data-act="nextq" aria-label="Next question">›</button></span>' + commentsBtn + "</div>" +
       "<h2>" + fmt.escapeHtml(model.title) + "</h2>" + contextStrip + bannerTabsHtml() + "</div>";
 
     var chartModel = null;

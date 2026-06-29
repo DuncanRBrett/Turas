@@ -140,6 +140,9 @@
   };
 
   shell.goTab = function (tab) {
+    // A tab-bar click is plain navigation, never a jump — drop any stale qual
+    // breadcrumb so opening Qualitative directly is a clean browse.
+    if (TR.qual && TR.qual.clearJump) TR.qual.clearJump();
     TR.d2.state.tab = tab;
     shell.route();
   };
@@ -164,6 +167,15 @@
     });
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-savecopy]")) TR.report.saveCopy();
+    });
+    // Closed<->open jump: a "💬 comments" affordance on a linked closed/composite
+    // card opens its open-end comments in the Qualitative tab, filtered to the cut.
+    document.addEventListener("click", function (e) {
+      var jb = e.target.closest("[data-qual-jump]");
+      if (jb && TR.qual && TR.qual.jumpTo) {
+        e.preventDefault();
+        TR.qual.jumpTo(jb.getAttribute("data-qual-jump"));
+      }
     });
     // Pin any on-screen card to the story "as it looks on the page". One
     // delegated listener serves every surface (patterns / dashboard /

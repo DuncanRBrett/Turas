@@ -35,7 +35,10 @@
     hiddenRows: {},         // {qcode: [row labels]} — hidden from the table
     hiddenChartRows: {},    // {qcode: [row labels]} — excluded from the chart
     sorts: {},              // {qcode: {col, dir}}
-    activeQ: null
+    activeQ: null,
+    qualQ: null,            // focused open-end in the Qualitative tab (hash round-trips it)
+    qualFrom: null,         // the closed/composite code we jumped FROM (breadcrumb + back)
+    qualFromTab: null       // the tab to return to on "back" (crosstabs | dashboard)
   };
 
   /** Row scope derived from the two visibility toggles. */
@@ -250,17 +253,24 @@
         return f.q + ":" + (f.box ? "b" : "") + f.rows.join(",");
       }).join("|"));
     }
+    // Qualitative focus + jump source (so the closed->open jump round-trips and
+    // browser-back returns to the closed view). The cut itself is the filter= above.
+    if (s.tab === "qualitative" && s.qualQ) parts.push("qq=" + s.qualQ);
+    if (s.qualFrom) parts.push("qfrom=" + s.qualFrom);
     return "#" + parts.join("&");
   };
 
   d2.decodeHash = function (hash) {
     var s = d2.state;
+    s.qualFrom = null;          // jump breadcrumb is hash-driven (absent => cleared)
     String(hash || "").replace(/^#/, "").split("&").forEach(function (kv) {
       var eq = kv.indexOf("=");
       if (eq < 0) return;
       var k = kv.slice(0, eq), v = decodeURIComponent(kv.slice(eq + 1));
       if (k === "tab") s.tab = v;
       if (k === "q") s.activeQ = v;
+      if (k === "qq") s.qualQ = v;
+      if (k === "qfrom") s.qualFrom = v;
       if (k === "banner") s.banner = v;
       if (k === "count") s.showCounts = v === "1";
       if (k === "iv") s.showIntervals = v === "1";

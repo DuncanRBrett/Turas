@@ -174,6 +174,7 @@
             barPct.toFixed(0) + '%"></span></span>' : "") +
           (spark ? '<span class="gspark">' + spark + "</span>" : "") +
           '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(q.title, 64)) + "</span></button>" +
+          ((TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(q.code) : "") +
           '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
           fmt.escapeHtml(q.code + " — " + q.title) + '" data-snap-context="' +
           fmt.escapeHtml((q.category || "") + " · index") +
