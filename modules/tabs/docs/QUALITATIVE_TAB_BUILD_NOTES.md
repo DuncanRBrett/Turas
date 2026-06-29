@@ -249,9 +249,12 @@ A "💬 N comments" affordance renders on every card whose code is a `project.qu
 on the Crosstabs question card (`25_cards.js` qhead) and on the Dashboard index/composite gauge
 (`27_views.js`). `TR.qual.affordanceHtml(code)` returns it (or "") so neither card file needs to
 know the link rules. Clicking it (`TR.qual.jumpTo`, delegated in `24_shell.js`) switches to the
-Qualitative tab, focuses the linked open-end, and applies **the active global filter as the cut** —
-`TR.qual.maskFilter` keeps DATA_QUAL records whose `idx` passes `stats.mask(d2.state.filters)`,
-i.e. "the comments from the people in the current cut". A breadcrumb (`‹ Back to <Q> …  cut: …`)
+Qualitative tab and focuses the linked open-end. The cut is **the live global filter**, which the
+qual tab always honours (`TR.qual.maskFilter` keeps DATA_QUAL records whose `idx` passes
+`stats.mask(d2.state.filters)`) — the filter bar stays visible on this tab and re-renders the
+comments, so the analyst can also adjust the cut after jumping. The jump itself doesn't change the
+filter; it just pre-sets the breadcrumb against whatever cut was active. "the comments from the
+people in the current cut". A breadcrumb (`‹ Back to <Q> …  cut: …`)
 shows the source + cut and restores the closed view; browser-back works because the jump
 `history.pushState`es a new entry and the focus/source round-trip through the hash (`qq` / `qfrom`;
 the cut is the existing `filter=`). The focused open-end moved from `qual._state.q` into

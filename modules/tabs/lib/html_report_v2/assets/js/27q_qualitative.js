@@ -263,11 +263,12 @@
     var q = findQ(island, d2.state.qualQ) || island.questions[0];
     d2.state.qualQ = q.code;
 
-    // Jump context: when we arrived from a closed/composite card the active global
-    // filter is the cut ("the comments from the people in this cell"). The filter bar
-    // is hidden on this tab, so the breadcrumb is where the cut is shown + cleared.
+    // The cut is the live global filter (the filter bar is visible on this tab and
+    // re-renders it), so the prevalence + drawer always reflect the active filter —
+    // "the comments from the people in this cut". A jump additionally pre-sets that
+    // filter and shows a breadcrumb back to the closed finding it came from.
+    var cutFilters = (d2.state.filters && d2.state.filters.length) ? d2.state.filters : null;
     var jump = qual.jumpContext();
-    var cutFilters = jump ? jump.filters : null;
 
     var audience = qual.maskFilter(qual.facetFilter(q.records, st.facets), cutFilters);
     qual._view = { island: island, q: q, audience: audience };   // for the export handler
