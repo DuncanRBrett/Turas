@@ -90,6 +90,13 @@
     return "Banner: " + (group ? group.name : banner);
   };
 
+  /** Qualitative tab: shown when DATA_QUAL is present and not switched off. */
+  d2.qualitative = function () {
+    var tabs = (TR.AGG.project && TR.AGG.project.tabs) || {};
+    var available = !!(TR.QUAL && TR.QUAL.questions && TR.QUAL.questions.length);
+    return { enabled: tabs.qualitative !== false && available };
+  };
+
   /** Tracking config: project.tracking with safe defaults. */
   d2.tracking = function () {
     var cfg = (TR.AGG.project && TR.AGG.project.tracking) || {};

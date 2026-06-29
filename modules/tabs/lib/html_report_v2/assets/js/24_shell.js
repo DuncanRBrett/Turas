@@ -9,15 +9,22 @@
 
   var shell = TR.shell = {};
 
-  /** Tab list; Tracking only appears when a prior wave is configured. */
+  /**
+   * Tab list. Crosstabs/Story/Report are always present; the rest are gated by
+   * the per-report visibility flags in project.tabs (default-on, so existing
+   * reports are unchanged). Tracking also needs prior-wave data; Qualitative also
+   * needs a non-null DATA_QUAL island.
+   */
   function tabList() {
-    var tabs = [
-      ["takeout", "Patterns"],
-      ["dashboard", "Dashboard"],
-      ["crosstabs", "Crosstabs"],
-      ["findings", "Differences"]
-    ];
-    if (TR.d2.tracking().enabled) tabs.push(["moved", "Tracking"]);
+    var flags = (TR.AGG.project && TR.AGG.project.tabs) || {};
+    var on = function (flag) { return flags[flag] !== false; };
+    var tabs = [];
+    if (on("patterns")) tabs.push(["takeout", "Patterns"]);
+    if (on("dashboard")) tabs.push(["dashboard", "Dashboard"]);
+    tabs.push(["crosstabs", "Crosstabs"]);
+    if (on("differences")) tabs.push(["findings", "Differences"]);
+    if (TR.d2.tracking().enabled && on("tracking")) tabs.push(["moved", "Tracking"]);
+    if (TR.d2.qualitative && TR.d2.qualitative().enabled) tabs.push(["qualitative", "Qualitative"]);
     tabs.push(["story", "Story"], ["report", "Report"]);
     return tabs;
   }
@@ -27,6 +34,7 @@
         prev = parseIsland("data-prev"), verify = parseIsland("data-verify");
     if (!agg) { fatal([{ code: "IO_DATA_PARSE", message: "aggregate data island failed to parse" }]); return; }
     TR.AGG = agg; TR.MICRO = micro; TR.PREV = prev; TR.VERIFY = verify;
+    TR.QUAL = parseIsland("data-qual");          // qualitative verbatims (null when absent)
     TR.userState = parseIsland("user-state");   // saved-copy annotations
     var check = TR.d2.validate(agg, micro, prev);
     if (!check.ok) { fatal(check.errors); return; }
@@ -120,6 +128,7 @@
     else if (d2.state.tab === "dashboard") TR.views.dashboard(host);
     else if (d2.state.tab === "moved") TR.views.whatMoved(host);
     else if (d2.state.tab === "findings") TR.views.findings(host);
+    else if (d2.state.tab === "qualitative") TR.qual.render(host);
     else if (d2.state.tab === "story") TR.story2.renderTab(host);
     else TR.report.renderTab(host);
     // The audience filter recomputes from this wave's microdata; prior waves
