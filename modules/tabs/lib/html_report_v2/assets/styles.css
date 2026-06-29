@@ -801,8 +801,20 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-quote.pos { border-left-color: var(--green); } .ql-quote.neg { border-left-color: var(--red); }
 .ql-qtext { flex: 1; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .ql-hidden { color: var(--muted); font-style: italic; }
-.ql-qid { flex: 0 0 auto; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ql-qfoot { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.ql-qid { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ql-star { color: var(--accent); } .ql-star.must { font-size: 16px; }
+/* Shortlist + export: the per-comment save toggle and the drawer toolbar. */
+.ql-save { border: 1px solid var(--line); background: var(--card); color: var(--muted); font: inherit;
+  font-size: 11px; border-radius: 999px; padding: 1px 9px; cursor: pointer; white-space: nowrap; }
+.ql-save:hover { border-color: var(--accent); color: var(--accent); }
+.ql-save.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ql-drawerhd { display: flex; align-items: center; gap: 8px; }
+.ql-qtools { margin-left: auto; display: inline-flex; gap: 8px; }
+.ql-savedonly, .ql-export { border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  font: inherit; font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 11px; cursor: pointer; }
+.ql-savedonly:hover, .ql-export:hover { border-color: var(--brand); }
+.ql-savedonly.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .ql-foot { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line);
   font-size: 11px; color: var(--muted); }
 .ql-empty { color: var(--muted); padding: 16px 0; }

@@ -264,6 +264,21 @@ numbers, then clicks 💬 to read that segment's verbatims. A per-banner-column 
 Detractors column") is a worthwhile follow-up but needs the table renderer to translate a column
 into a filter spec — noted, not built. Tests: `qual_tests.mjs` jump-helper block (8 new, 20 total).
 
+### D3.3 — Phase-2 AS-BUILT (shortlist + Excel export; DONE, tested)
+
+Each comment card has a **＋ Shortlist / ✓ Shortlisted** toggle; the drawer header carries a
+**★ Shortlist (N)** "saved only" filter and a **⬇ Export Excel** button. The shortlist persists
+exactly like insights/notes: an in-memory store seeded from `TR.userState.qualSaved` + per-report
+localStorage, and `report.saveCopy` now embeds `qualSaved: TR.qual.savedAll()` into the user-state
+island, so a starred set survives "Save copy" and travels with the file. Keys are `qcode#idx`.
+
+Export (`TR.qual.exportXlsx` → the bundled `TR.xlsx.download`, no dependency) writes exactly the
+records the drawer is showing — the cut + facet + theme + tier + saved-only set, via the shared
+`qual.visibleRecords` so the table and the export never drift. Columns: ID, each demographic dim,
+Noteworthy, Sentiment, Themes, Verbatim. **The confidentiality dial is honoured: a hidden verbatim
+exports as `[hidden]`, never the raw text.** Tests: `qual_tests.mjs` shortlist/export block (13 new,
+33 total).
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**

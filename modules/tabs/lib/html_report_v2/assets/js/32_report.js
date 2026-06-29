@@ -222,6 +222,7 @@
       story: TR.story2.items(),
       banners: TR.savedBanners.all(),
       composites: TR.compositeBanners.all(),
+      qualSaved: (TR.qual && TR.qual.savedAll) ? TR.qual.savedAll() : {},
       report: store()
     };
     var json = JSON.stringify(state).replace(/<\//g, "<\\/");

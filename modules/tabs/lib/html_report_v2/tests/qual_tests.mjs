@@ -87,5 +87,33 @@ assert(aff.indexOf("💬 4 comments") >= 0 && aff.indexOf('data-qual-jump="Q28"'
   "affordanceHtml renders a 💬 button carrying the jump target");
 assert(qual.affordanceHtml("Q99") === "", "affordanceHtml is empty for an unlinked card");
 
+// ---- shortlist (save) + export ----------------------------------------------
+console.log("\nQualitative shortlist + export:");
+assert(qual.isSaved("Q1", 0) === false, "isSaved false before saving");
+assert(qual.toggleSave("Q1", 0) === true && qual.isSaved("Q1", 0) === true, "toggleSave on -> saved");
+qual.toggleSave("Q1", 2);
+assert(qual.savedCount("Q1") === 2, "savedCount per question counts both");
+assert(qual.toggleSave("Q1", 0) === false && qual.isSaved("Q1", 0) === false, "toggleSave off -> unsaved");
+assert(qual.savedFilter(q.records, "Q1").length === 1, "savedFilter keeps only shortlisted (idx 2)");
+
+// visibleRecords composes theme -> tier -> shortlist on the passed audience.
+const all4 = q.records;
+assert(qual.visibleRecords(q, { tier: "all", savedOnly: false }, all4).length === 4, "visibleRecords: all");
+assert(qual.visibleRecords(q, { tier: "must_read", savedOnly: false }, all4).length === 1, "visibleRecords: tier must-read -> 1");
+assert(qual.visibleRecords(q, { tier: "all", theme: 0, savedOnly: false }, all4).length === 2, "visibleRecords: theme Price -> 2");
+assert(qual.visibleRecords(q, { tier: "all", savedOnly: true }, all4).length === 1, "visibleRecords: savedOnly -> the 1 shortlisted");
+
+// exportRows: header + a row per record; hidden text exports as [hidden].
+const island = { demographics: [{ label: "Campus" }, { label: "NPS" }] };
+const rows = qual.exportRows(island, q, [
+  { idx: 5, demos: { Campus: "Cape Town", NPS: "Promoter" }, tier: 2, sentiment: 1, themeVals: { "0": 1 }, text: "great value" },
+  { idx: 6, demos: { Campus: "Durban" }, tier: 0, sentiment: 3, themeVals: {}, text: null }
+]);
+assert(rows[0].join("|") === "ID|Campus|NPS|Noteworthy|Sentiment|Themes|Verbatim", "exportRows header = ID + demos + meta");
+assert(rows[1][0] === 5 && rows[1][1] === "Cape Town" && rows[1][5] === "Price" && rows[1][6] === "great value",
+  "exportRows maps idx/demos/theme/verbatim");
+assert(rows[1][3] === "Must-read" && rows[1][4] === "Positive", "exportRows labels tier + sentiment");
+assert(rows[2][6] === "[hidden]", "exportRows: hidden verbatim exports as [hidden] (confidentiality honoured)");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

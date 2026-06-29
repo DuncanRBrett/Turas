@@ -102,6 +102,90 @@
       "💬 " + n + " comment" + (n === 1 ? "" : "s") + "</button>";
   };
 
+  // ---- shortlist: star a comment; survives "Save copy" -----------------------
+  // Mirrors the insights/notes store: seed from the saved-copy island
+  // (TR.userState.qualSaved), let the reader's own localStorage edits win, and
+  // expose savedAll() so report.saveCopy embeds the set back into the island.
+
+  var SAVED_KEY = "turas_v2_qualsaved";
+  var savedCache = null;
+  function savedStore() {
+    if (savedCache) return savedCache;
+    savedCache = {};
+    if (TR.userState && TR.userState.qualSaved) {
+      Object.keys(TR.userState.qualSaved).forEach(function (k) { savedCache[k] = TR.userState.qualSaved[k]; });
+    }
+    try {
+      var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(SAVED_KEY));
+      if (raw) { var own = JSON.parse(raw) || {}; Object.keys(own).forEach(function (k) { savedCache[k] = own[k]; }); }
+    } catch (e) { /* island-only */ }
+    return savedCache;
+  }
+  function savedPersist() {
+    try {
+      if (typeof localStorage !== "undefined" && TR.d2) {
+        localStorage.setItem(TR.d2.storeKey(SAVED_KEY), JSON.stringify(savedStore()));
+      }
+    } catch (e) { /* storage blocked — the shortlist stays in memory */ }
+  }
+  function savedKey(qcode, idx) { return qcode + "#" + idx; }
+
+  qual.isSaved = function (qcode, idx) { return !!savedStore()[savedKey(qcode, idx)]; };
+  qual.toggleSave = function (qcode, idx) {
+    var s = savedStore(), k = savedKey(qcode, idx);
+    if (s[k]) delete s[k]; else s[k] = 1;
+    savedPersist();
+    return !!s[k];
+  };
+  qual.savedAll = function () { return savedStore(); };   // report.saveCopy embeds this
+  qual.savedCount = function (qcode) {
+    var s = savedStore();
+    if (!qcode) return Object.keys(s).length;
+    var pre = qcode + "#";
+    return Object.keys(s).filter(function (k) { return k.indexOf(pre) === 0; }).length;
+  };
+  qual.savedFilter = function (records, qcode) {
+    return (records || []).filter(function (r) { return qual.isSaved(qcode, r.idx); });
+  };
+
+  /** The records the drawer is currently showing: theme -> tier -> shortlist, on
+   *  top of the already cut+facet-filtered audience. Shared by the drawer + export. */
+  qual.visibleRecords = function (q, st, audience) {
+    var pool = (q.type === "themed" && st.theme != null) ? qual.recordsForTheme(audience, st.theme) : audience;
+    var records = qual.tierFilter(pool, st.tier);
+    if (st.savedOnly) records = qual.savedFilter(records, q.code);
+    return records;
+  };
+
+  // ---- export the visible comments to Excel (client-side) --------------------
+
+  var SENT_LABEL = { 1: "Positive", 2: "Mixed", 3: "Negative" };
+  var TIER_LABEL = { 2: "Must-read", 1: "Noteworthy" };
+
+  /** Export matrix: ID + demographics + Noteworthy + Sentiment + Themes + Verbatim.
+   *  Pure + node-testable. Hidden verbatims export as "[hidden]" (the confidentiality
+   *  dial is honoured — no raw text leaks when text was withheld). */
+  qual.exportRows = function (island, q, records) {
+    var dims = ((island && island.demographics) || []).map(function (d) { return d.label; });
+    var byId = {};
+    (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
+    var header = ["ID"].concat(dims).concat(["Noteworthy", "Sentiment", "Themes", "Verbatim"]);
+    var out = [header];
+    (records || []).forEach(function (r) {
+      var demos = dims.map(function (lbl) { return (r.demos && r.demos[lbl] != null) ? r.demos[lbl] : ""; });
+      var themes = Object.keys(r.themeVals || {}).map(function (id) { return byId[id] || ("#" + id); }).join("; ");
+      var text = (r.text == null) ? "[hidden]" : r.text;
+      out.push([r.idx].concat(demos).concat([TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes, text]));
+    });
+    return out;
+  };
+
+  qual.exportXlsx = function (island, q, records) {
+    if (!TR.xlsx || !TR.xlsx.download) return;
+    var base = (TR.fmt && TR.fmt.slug) ? TR.fmt.slug(q.title || q.code || "comments") : "comments";
+    TR.xlsx.download(base + "_comments", "Comments", qual.exportRows(island, q, records));
+  };
+
   function findQ(island, code) {
     var qs = island.questions || [];
     for (var i = 0; i < qs.length; i++) if (qs[i].code === code) return qs[i];
@@ -170,7 +254,7 @@
     }
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, facets: {}, railGroups: {}, railHidden: false };
+                      theme: null, facets: {}, railGroups: {}, railHidden: false, savedOnly: false };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -186,6 +270,7 @@
     var cutFilters = jump ? jump.filters : null;
 
     var audience = qual.maskFilter(qual.facetFilter(q.records, st.facets), cutFilters);
+    qual._view = { island: island, q: q, audience: audience };   // for the export handler
     host.innerHTML =
       '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st) +
         '<div class="ql-main">' +
@@ -302,24 +387,33 @@
   }
 
   function drawerHtml(island, q, st, audience) {
-    var pool = (q.type === "themed" && st.theme != null)
-      ? qual.recordsForTheme(audience, st.theme) : audience;
-    var records = qual.tierFilter(pool, st.tier);
+    var records = qual.visibleRecords(q, st, audience);
     var caption;
-    if (q.type === "themed" && st.theme != null) {
+    if (st.savedOnly) {
+      caption = "Shortlisted comments";
+    } else if (q.type === "themed" && st.theme != null) {
       var th = (q.themes || []).filter(function (t) { return t.id === st.theme; })[0];
       caption = 'Comments mentioning “' + esc(th ? th.label : "") + '”';
     } else {
       caption = q.type === "themed" ? "All comments (pick a theme above to filter)" : "Comments";
     }
+    var savedN = qual.savedCount(q.code);
+    var tools = '<div class="ql-qtools">' +
+      '<button class="ql-savedonly' + (st.savedOnly ? " on" : "") + '" data-savedonly aria-pressed="' +
+        st.savedOnly + '" title="Show only the comments you have shortlisted">★ Shortlist' +
+        (savedN ? " (" + savedN + ")" : "") + "</button>" +
+      '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
+        "⬇ Export Excel</button></div>";
     var cards = records.length
-      ? records.map(function (r) { return quoteCard(r); }).join("")
-      : '<p class="ql-empty">No comments for this selection.</p>';
+      ? records.map(function (r) { return quoteCard(r, q.code); }).join("")
+      : '<p class="ql-empty">' + (st.savedOnly
+          ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
+          : "No comments for this selection.") + "</p>";
     return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
-      ' <span class="ql-hint">(' + records.length + ')</span></div>' + cards + '</div>';
+      ' <span class="ql-hint">(' + records.length + ")</span>" + tools + "</div>" + cards + "</div>";
   }
 
-  function quoteCard(r) {
+  function quoteCard(r, qcode) {
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>' : esc(r.text);
@@ -327,10 +421,15 @@
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
     var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + '</span>'; }).join("");
+    var saved = qual.isSaved(qcode, r.idx);
+    var save = '<button class="ql-save' + (saved ? " on" : "") + '" data-qual-save="' +
+      esc(qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved + '" title="' +
+      (saved ? "Remove from your shortlist" : "Add to your shortlist") + '">' +
+      (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>";
     return '<div class="ql-quote ' + sent + '">' + star +
       '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
       (tags ? '<div class="ql-tags">' + tags + '</div>' : '') + '</div>' +
-      '<span class="ql-qid">#' + esc(r.idx) + '</span></div>';
+      '<div class="ql-qfoot">' + save + '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
 
   function footerHtml(island, q) {
@@ -383,5 +482,20 @@
     });
     var clr = host.querySelector(".ql-facetclear");
     if (clr) clr.addEventListener("click", function () { st.facets = {}; qual.render(host); });
+    // shortlist: star a comment / show only the shortlist / export the visible set
+    host.querySelectorAll("[data-qual-save]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = b.getAttribute("data-qual-save"), at = v.lastIndexOf("#");
+        qual.toggleSave(v.slice(0, at), parseInt(v.slice(at + 1), 10));
+        qual.render(host);
+      });
+    });
+    var so = host.querySelector("[data-savedonly]");
+    if (so) so.addEventListener("click", function () { st.savedOnly = !st.savedOnly; qual.render(host); });
+    var ex = host.querySelector("[data-qual-export]");
+    if (ex) ex.addEventListener("click", function () {
+      var v = qual._view;
+      if (v) qual.exportXlsx(v.island, v.q, qual.visibleRecords(v.q, st, v.audience));
+    });
   }
 })(typeof window !== "undefined" ? window : globalThis);
