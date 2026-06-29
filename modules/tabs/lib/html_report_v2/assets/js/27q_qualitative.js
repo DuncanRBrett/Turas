@@ -81,7 +81,7 @@
     if (!qual._state) {
       qual._state = { q: island.questions[0].code,
                       tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, facets: {} };
+                      theme: null, facets: {}, railGroups: {}, railHidden: false };
     }
     var st = qual._state;
     var q = findQ(island, st.q) || island.questions[0];
@@ -89,22 +89,36 @@
 
     var audience = qual.facetFilter(q.records, st.facets);          // demographic cut
     host.innerHTML =
-      '<div class="ql-wrap">' + railHtml(island, st) +
-        '<div class="ql-main">' + mainHtml(island, q, st, audience) + '</div>' +
-      '</div>';
+      '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st) +
+        '<div class="ql-main">' +
+          '<button class="ql-railtoggle" title="Show/hide the question list">⟨⟩ Questions</button>' +
+          mainHtml(island, q, st, audience) +
+        '</div></div>';
     wire(host, island);
   };
 
   function railHtml(island, st) {
-    var items = island.questions.map(function (q) {
-      var glyph = q.type === "themed" ? "▦" : "❝";
-      var sel = q.code === st.q ? ' aria-current="true"' : "";
-      return '<button class="ql-railitem" data-q="' + esc(q.code) + '"' + sel + '>' +
-        '<span class="ql-glyph">' + glyph + '</span>' +
-        '<span class="ql-railtitle">' + esc(q.title) + '</span>' +
-        '<span class="ql-railn">' + (q.base ? q.base.answered : 0) + '</span></button>';
+    var groups = [
+      { key: "themed", title: "Themed", qs: island.questions.filter(function (q) { return q.type === "themed"; }) },
+      { key: "raw", title: "Verbatim-only", qs: island.questions.filter(function (q) { return q.type !== "themed"; }) }
+    ].filter(function (g) { return g.qs.length; });
+    var html = groups.map(function (g) {
+      var items = g.qs.map(function (q) {
+        var sel = q.code === st.q ? ' aria-current="true"' : "";
+        var glyph = q.type === "themed" ? "▦" : "❝";
+        return '<button class="ql-railitem" data-q="' + esc(q.code) + '"' + sel + '>' +
+          '<span class="ql-glyph">' + glyph + '</span>' +
+          '<span class="ql-railtitle">' + esc(q.title) + '</span>' +
+          '<span class="ql-railn">' + (q.base ? q.base.answered : 0) + '</span></button>';
+      }).join("");
+      // Reuse the Crosstabs sidebar's collapsible-group classes for an identical feel.
+      return '<div class="catgrp' + (st.railGroups[g.key] ? " collapsed" : "") + '">' +
+        '<button class="cathdr" data-railtoggle="' + g.key + '">' +
+        '<span class="catchev">▼</span>' + esc(g.title) +
+        ' <span class="catn">(' + g.qs.length + ')</span></button>' +
+        '<div class="catitems">' + items + '</div></div>';
     }).join("");
-    return '<nav class="ql-rail" aria-label="Open-end questions">' + items + '</nav>';
+    return '<nav class="ql-rail" aria-label="Open-end questions">' + html + '</nav>';
   }
 
   function mainHtml(island, q, st, audience) {
@@ -226,6 +240,15 @@
     host.querySelectorAll(".ql-railitem").forEach(function (b) {
       b.addEventListener("click", function () { st.q = b.getAttribute("data-q"); st.theme = null; qual.render(host); });
     });
+    host.querySelectorAll(".cathdr[data-railtoggle]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var k = b.getAttribute("data-railtoggle");
+        st.railGroups[k] = !st.railGroups[k];      // collapse/expand this group
+        qual.render(host);
+      });
+    });
+    var toggle = host.querySelector(".ql-railtoggle");
+    if (toggle) toggle.addEventListener("click", function () { st.railHidden = !st.railHidden; qual.render(host); });
     host.querySelectorAll(".ql-tier").forEach(function (b) {
       b.addEventListener("click", function () { st.tier = b.getAttribute("data-tier"); qual.render(host); });
     });

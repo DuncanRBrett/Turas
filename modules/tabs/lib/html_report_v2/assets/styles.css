@@ -731,6 +731,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-glyph { opacity: .7; margin-top: 1px; }
 .ql-railtitle { flex: 1; font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
 .ql-railn { font-size: 11px; opacity: .65; margin-top: 1px; }
+.ql-railtoggle { border: 1px solid var(--line); background: var(--card); border-radius: 8px;
+  padding: 3px 10px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; margin-bottom: 10px; }
+.ql-railtoggle:hover { color: var(--brand); border-color: var(--brand); }
+.ql-wrap.norail .ql-rail { display: none; }
 .ql-main { flex: 1; min-width: 0; }
 .ql-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .ql-title { margin: 0; font-size: 19px; color: var(--brand); overflow-wrap: anywhere; }
