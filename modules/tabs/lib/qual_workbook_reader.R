@@ -33,6 +33,11 @@ QUAL_SENTIMENT_CODES <- c("1", "2", "3")
 # Tokens that mean "missing" in a demographic cell (beyond blank).
 QUAL_MISSING_TOKENS  <- c("", "-")
 
+# Noteworthy markers (case-insensitive) that promote a comment to the top "must-read"
+# tier; any other non-blank marker is the ordinary "noteworthy" tier. Configurable
+# later via Settings; today's workbooks use only binary markers, so tier 2 is dormant.
+QUAL_MUSTREAD_MARKERS <- c("must read", "must-read", "must", "must-read!", "critical", "priority")
+
 # A column is the overall-sentiment column only if at least this fraction of its
 # rows are populated (sentiment is dense; themes are sparse).
 QUAL_SENTIMENT_DENSITY_MIN <- 0.5
@@ -252,6 +257,21 @@ qual_num_or_na <- function(v) {
   if (is.na(x)) NA_real_ else x
 }
 
+#' Map a noteworthy marker to a tier ordinal: 0 = other, 1 = noteworthy, 2 = must-read.
+#'
+#' Any non-blank marker is at least "noteworthy"; a marker in the must-read set is
+#' promoted to tier 2. Marker-agnostic and case-insensitive, so "Yes"/"x" both read
+#' as tier 1 while a coder's "Must read" reads as tier 2.
+#' @param marker The raw noteworthy cell value.
+#' @param mustread Character vector of must-read markers (lower-case).
+#' @return An integer tier (0, 1 or 2).
+qual_noteworthy_tier <- function(marker, mustread = QUAL_MUSTREAD_MARKERS) {
+  m <- tolower(trimws(marker))
+  if (!nzchar(m)) return(0L)
+  if (m %in% mustread) return(2L)
+  1L
+}
+
 #' Build one record from a data row; quarantines out-of-range theme/sentiment codes.
 #' @return `list(record, dropped)`; `record` is NULL for a fully-blank trailing row.
 qual_record_from_row <- function(r, roles) {
@@ -276,7 +296,10 @@ qual_record_from_row <- function(r, roles) {
     v <- cell(d$col)
     demos[[d$label]] <- if (v %in% QUAL_MISSING_TOKENS) NA_character_ else v
   }
-  record <- list(id = id, text = text, noteworthy = nzchar(cell(roles$noteworthy)),
+  note_marker <- cell(roles$noteworthy)
+  tier <- qual_noteworthy_tier(note_marker)
+  record <- list(id = id, text = text,
+                 noteworthy = tier >= 1L, noteworthy_tier = tier, noteworthy_marker = note_marker,
                  sentiment = sentiment, rating = qual_num_or_na(cell(roles$rating)),
                  themeVals = theme_vals, demos = demos)
   list(record = record, dropped = dropped)

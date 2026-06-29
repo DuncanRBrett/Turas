@@ -76,6 +76,14 @@ test_that("qual_code_purity and qual_density ignore blanks correctly", {
   expect_equal(qual_density(c("1", "", "2", "")), 0.5)
 })
 
+test_that("qual_noteworthy_tier maps markers to tiers (0 other / 1 noteworthy / 2 must-read)", {
+  expect_equal(qual_noteworthy_tier(""), 0L)
+  expect_equal(qual_noteworthy_tier("x"), 1L)        # binary markers -> noteworthy
+  expect_equal(qual_noteworthy_tier("Yes"), 1L)
+  expect_equal(qual_noteworthy_tier("Must read"), 2L)
+  expect_equal(qual_noteworthy_tier("  CRITICAL "), 2L)   # case/space-insensitive
+})
+
 # ==============================================================================
 # FIXTURE A — SACS-like: themed, no demographics, floating header, stray code
 # ==============================================================================
@@ -124,9 +132,11 @@ test_that("SACS-like: stray code quarantined, not coerced; records honest", {
   expect_length(r9$themeVals, 0L)                       # "11" dropped, not stored
   r7 <- find_record(q, "6")
   expect_true(r7$noteworthy)                            # "Yes" marker
+  expect_equal(r7$noteworthy_tier, 1L)                  # binary marker -> tier 1
   expect_equal(r7$themeVals[["Values"]], 2L)
   r8 <- find_record(q, "8")
   expect_false(r8$noteworthy)                           # blank marker
+  expect_equal(r8$noteworthy_tier, 0L)
   expect_equal(r8$themeVals[["Leadership & Management"]], 3L)
 })
 
