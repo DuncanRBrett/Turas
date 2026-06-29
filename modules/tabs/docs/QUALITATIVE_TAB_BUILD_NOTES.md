@@ -183,9 +183,19 @@ in `build_dl_project()`.
 + `qual_workbook_io.R` (reader subsystem, task 1), `qual_assemble.R` (respondent master +
 banner curation = the join seam, task 2), `qual_island_builder.R` (DATA_QUAL + the verbatim
 confidentiality dial + noteworthy tiers, task 2), `qual_quant_layer.R` (theme→AGG/MICRO via
-the existing engine, task 3). ~147 test assertions green; all verified against the four real
-workbooks + a significance known-answer. **The whole R data layer is done.** Remaining:
-config + island wiring (task 4), the JS tab (task 5).
+the existing engine, task 3), `qual_report.R` + the pipeline wiring (DATA_QUAL island in
+`build_report_v2.R`/`template.html`, the `qual_*`/`show_*` config keys → `project$tabs`, and
+the additive `run_crosstabs.R` hook that emits a `*_qual_report.html`, task 4). ~158 test
+assertions green; all verified against the four real workbooks + a significance known-answer +
+an end-to-end report build (HIDDEN ships zero raw text, FULL ships it). **The whole R backend +
+wiring is done — the comment report builds.** Remaining: the JS Qualitative tab (task 5), which
+is what makes the dedicated tab appear (until then the report builds with the themes as ordinary
+Crosstabs questions + the DATA_QUAL island present).
+
+NOTE: the vendored `assets/template.html` was caught by the blanket `*.html` gitignore and never
+tracked; a `.gitignore` exception now tracks it (precedent: `!modules/hub_app/app/index.html`),
+and the tracked prototype source (`prototypes/report-redesign/fable/v2/src/template.html`) carries
+the same `{{DATA_QUAL}}` placeholder.
 
 **Task 3 quant-layer notes (`qual_quant_layer.R`):** each themed question becomes a synthetic
 `Multi_Mention` question (one option per theme; a respondent's mentioned theme labels left-
