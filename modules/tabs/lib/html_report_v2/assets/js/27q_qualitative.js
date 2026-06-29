@@ -371,16 +371,17 @@
         seg("pos", r.pos) + seg("neu", r.neu) + seg("neg", r.neg) + '</span>';
       var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
       return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
-          'title="' + r.n + ' of ' + audience.length + ' commenters mentioned this">' +
+          'title="' + r.n + ' of ' + audience.length + ' people raised this unprompted">' +
         '<span class="ql-plabel">' + esc(r.label) + '</span>' +
         '<span class="ql-ptrack">' + fill + '</span>' +
         '<span class="ql-ppct">' + r.pct + '%</span>' +
         '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + '</span>' +
         '</button>';
     }).join("");
-    return '<div class="ql-board"><div class="ql-boardhd">Themes mentioned' +
-      '<span class="ql-hint"> — % of the ' + audience.length +
-      ' commenters who raised each theme; bar coloured by sentiment ' +
+    return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
+      '<span class="ql-hint"> — the % of the ' + audience.length +
+      ' who raised each theme <b>unprompted</b> (salience — what stood out to people, not a ' +
+      'prompted incidence rate); bar coloured by sentiment ' +
       '(<b class="qc-pos">positive</b> · <b class="qc-neu">mixed</b> · ' +
       '<b class="qc-neg">negative</b>); net = net sentiment, −100…+100. Click a theme to read its comments.</span>' +
       '</div>' + body + '</div>';
@@ -435,6 +436,7 @@
   function footerHtml(island, q) {
     var dropped = q.meta && q.meta.dropped_codes ? q.meta.dropped_codes : 0;
     var bits = [(q.base ? q.base.answered : 0) + " comments",
+                q.type === "themed" ? "themes are salience (raised unprompted), not prompted incidence" : null,
                 island.demographicCuts === "block" ? "demographic cuts blocked" : null,
                 dropped ? (dropped + " stray code(s) quarantined") : null,
                 "verbatims shown by ID — never model-authored"];
