@@ -35,7 +35,7 @@
     expSort: "original",    // original | value | change
     expWaves: null,         // {year: bool} or null = all
     metricKey: null,        // Explorer mode B / Visualise context metric
-    visSegs: null,          // [segNorm|"total"] selected for Visualise
+    visSel: null,           // {metrics:[key], segs:[segNorm|"total"]} for Visualise
     visMode: "absolute", visCI: false, visLabels: "last", visWaves: null,
     yMin: null, yMax: null
   };

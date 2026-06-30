@@ -25,6 +25,13 @@
       ? cells[cells.length - 1] : null;
   }
 
+  /** Visualise selection produced by clicking a scorecard / sig card: the
+   *  clicked metric and its cut. KPI cards carry no segment (Total only), so
+   *  segNorm falls back to "total". Exposed for the regression test. */
+  summary.cardVisSel = function (metricKey, segNorm) {
+    return { metrics: [metricKey], segs: [segNorm || "total"] };
+  };
+
   /* ---------------- KPI cards ---------------- */
 
   function kpiCards() {
@@ -88,7 +95,7 @@
         var cells = trk.points(m, seg.norm || null);
         var last = lastCell(cells);
         if (!last || !pick(last)) return;
-        out.push({ metric: m, segment: seg.label,
+        out.push({ metric: m, segment: seg.label, segNorm: seg.norm,
           change: last.change_prev, prev: cells[cells.length - 2],
           cur: last });
       });
@@ -107,7 +114,8 @@
     var arrow = c.change >= 0 ? (soft ? "△" : "▲") : (soft ? "▽" : "▼");
     return '<button class="sigcard ' + (c.change >= 0 ? "up" : "down") +
       (soft ? " soft" : "") +
-      '" data-vis="' + c.metric.key + '" data-seglabel="' +
+      '" data-vis="' + c.metric.key + '" data-visseg="' +
+      fmt.escapeHtml(c.segNorm || "total") + '" data-seglabel="' +
       fmt.escapeHtml(c.segment) + '">' +
       '<span class="sig-dir">' + arrow + " " +
       trk.changeText(c.change, c.metric.isMean) + " · " +
@@ -280,8 +288,13 @@
     applySegFilter();
     host.querySelectorAll("[data-vis]").forEach(function (el) {
       el.addEventListener("click", function () {
-        trk.state.metricKey = el.getAttribute("data-vis");
-        trk.state.visSegs = null;
+        var mk = el.getAttribute("data-vis");
+        // Drive the Visualise selection model (visSel) directly, so the card
+        // you click decides BOTH the metric and the cut. Previously this wrote
+        // a dead `visSegs` key and left visSel untouched, so a stale prior
+        // selection (different question / cut) survived the click.
+        trk.state.metricKey = mk;
+        trk.state.visSel = summary.cardVisSel(mk, el.getAttribute("data-visseg"));
         trk.state.sub = "visualise";
         trk.rerender();
       });

@@ -488,6 +488,8 @@
   }
   vis._ciBounds = ciBounds;   // exposed for pinned exhibits + tests
   vis._visTitle = visTitle;   // exposed for the node gate
+  vis._selection = selection;     // exposed for the navigation regression test
+  vis._seriesSpecs = seriesSpecs; // exposed for the navigation regression test
 
   /** Series for the chart/table: spec points transformed for the mode. */
   function buildSeries(specs, sel, mode, yearSet) {
