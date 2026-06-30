@@ -481,11 +481,16 @@
       return Math.max(m, r.neg + r.neu / 2, r.pos + r.neu / 2);
     }, 0) || 1;
     var unit = 50 / maxExt;                           // % of track width per comment, per side
-    var num = function (n, side) {
-      return n >= 3 ? '<span class="ql-bn ' + side + '">' + n + "</span>" : "";   // direct-labelled ends
+    // Label every segment (neg / mixed / pos) with its count, but only when the segment
+    // is wide enough to hold the digits — so a sliver never shows a clipped number. The
+    // count is aligned within its segment by CSS (neg left, mixed centre, pos right).
+    var label = function (n) {
+      if (!n) return "";
+      var needPct = (String(n).length * 6 + 8) / 3.2;
+      return (n * unit >= needPct) ? '<span class="ql-bn">' + n + "</span>" : "";
     };
-    var seg = function (cls, count, inner) {
-      return count ? '<span class="ql-bseg ' + cls + '" style="flex:' + count + '">' + (inner || "") + "</span>" : "";
+    var seg = function (cls, count) {
+      return count ? '<span class="ql-bseg ' + cls + '" style="flex:' + count + '">' + label(count) + "</span>" : "";
     };
     var body = rows.map(function (r) {
       var sel = r.id === st.theme ? " on" : "";
@@ -493,8 +498,7 @@
       var totalPct = (r.neg + r.neu + r.pos) * unit;
       var bar = '<span class="ql-dtrack"><span class="ql-dzero"></span>' +
         '<span class="ql-dbar" style="left:' + (50 - leftExt) + "%;width:" + totalPct + '%">' +
-          seg("neg", r.neg, num(r.neg, "l")) + seg("neu", r.neu, "") +
-          seg("pos", r.pos, num(r.pos, "r")) + "</span></span>";
+          seg("neg", r.neg) + seg("neu", r.neu) + seg("pos", r.pos) + "</span></span>";
       var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
       return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
           'title="' + esc(r.label) + " — " + r.n + " of " + audience.length +
