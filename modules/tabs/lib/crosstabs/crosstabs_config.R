@@ -267,6 +267,15 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     qual_noteworthy_default = get_config_value(config, "qual_noteworthy_default", "all"),
     qual_join_id_column = get_config_value(config, "qual_join_id_column", ""),
 
+    # Disclosure control (V13). The minimum audience base below which the report
+    # withholds identifying detail — the demographic tags on comments now, small
+    # crosstab cells next — so a composite filter (e.g. 1st-year promoters in Cape
+    # Town) cannot be narrowed onto a handful of identifiable people. Default 1 = off
+    # (existing reports unchanged). For a small / sensitive sample such as a 200-person
+    # staff climate survey, set it to 10; set it to the full sample size to forbid
+    # sub-group identification entirely (only the full-sample view shows detail).
+    min_reporting_base = safe_numeric(get_config_value(config, "min_reporting_base", 1)),
+
     # Tab-visibility flags (V12, generic). Crosstabs is always on; each other tab
     # is includable per report. The flags ride into the data layer; tabList()
     # filters against them (a tab also self-hides when its island is absent).

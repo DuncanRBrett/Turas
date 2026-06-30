@@ -347,6 +347,20 @@ test_that("project carries population_size only when usably configured", {
   expect_null(p2$population_size)
 })
 
+test_that("project carries the disclosure threshold only when engaged (>1)", {
+  # off by default -> field omitted, so an existing report is byte-identical
+  p0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$project
+  expect_null(p0$min_reporting_base)
+  # engaged -> carried for the renderer's disclosure control
+  p1 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(min_reporting_base = 10))$project
+  expect_equal(p1$min_reporting_base, 10)
+  # k = 1 is "off" and must not be carried
+  p2 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(min_reporting_base = 1))$project
+  expect_null(p2$min_reporting_base)
+})
+
 # ==============================================================================
 # 2. project block
 # ==============================================================================

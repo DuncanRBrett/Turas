@@ -6,8 +6,10 @@
  * per-mention theme valences, and (when the demographic-cuts dial allows) the tagged
  * demographics. Themed questions show a prevalence board (% of commenters who mentioned
  * each theme, bar coloured by sentiment) and a quote drawer; raw questions show the
- * verbatim browser. Demographic facets (e.g. Campus = Cape Town AND NPS = Promoter), the
- * noteworthy-tier filter and the verbatim-text confidentiality are all honoured here.
+ * verbatim browser. Audience filtering is the global filter bar's job — composite cuts
+ * (e.g. Campus = Cape Town AND Q017 = Promoter AND Year = 1st) flow in via the cut mask,
+ * so there is no per-tab demographic facet row. The noteworthy-tier filter, the sentiment
+ * filter (only when coded) and the verbatim-text confidentiality are honoured here.
  */
 (function (global) {
   "use strict";
@@ -24,17 +26,6 @@
   qual.tierFilter = function (records, tier) {
     var min = TIER_ORDER[tier] || 0;
     return (records || []).filter(function (r) { return (r.tier || 0) >= min; });
-  };
-
-  /** Keep records matching every selected demographic facet (AND across dimensions). */
-  qual.facetFilter = function (records, facets) {
-    var dims = facets ? Object.keys(facets).filter(function (d) { return facets[d] != null && facets[d] !== ""; }) : [];
-    if (!dims.length) return records || [];
-    return (records || []).filter(function (r) {
-      var d = r.demos || {};
-      for (var i = 0; i < dims.length; i++) if (d[dims[i]] !== facets[dims[i]]) return false;
-      return true;
-    });
   };
 
   /** Per-theme prevalence (% of the given commenters) + the pos/neu/neg valence split. */
@@ -77,6 +68,17 @@
       if (r.sentiment === 1) c.pos++; else if (r.sentiment === 2) c.neu++; else if (r.sentiment === 3) c.neg++;
     });
     return c;
+  };
+
+  /** Whether a question carries overall comment-level sentiment coding at all. Only
+   *  sentiment-coded questions get the Positive/Mixed/Negative filter — a raw verbatim
+   *  question, or a themed one with per-theme valence but no overall comment sentiment,
+   *  has none, and would otherwise show a misleading "0 positive / 0 mixed / 0 negative"
+   *  (reads as "we measured and found zero" when nothing was coded). */
+  qual.hasSentiment = function (q) {
+    return !!(q && q.records && q.records.some(function (r) {
+      return r.sentiment === 1 || r.sentiment === 2 || r.sentiment === 3;
+    }));
   };
 
   /**
@@ -242,7 +244,10 @@
    *  shortlist, on top of the already cut+facet-filtered audience. Shared by the
    *  drawer + export so the table and the export never drift. */
   qual.visibleRecords = function (q, st, audience) {
-    return qual.sentimentFilter(qual.poolBeforeSentiment(q, st, audience), st.sentiment);
+    var pool = qual.poolBeforeSentiment(q, st, audience);
+    // Ignore a sentiment pick carried over from a coded question (the control is hidden
+    // here, so a stale selection must not silently empty an un-coded question's list).
+    return qual.hasSentiment(q) ? qual.sentimentFilter(pool, st.sentiment) : pool;
   };
 
   // ---- export the visible comments to Excel (client-side) --------------------
@@ -252,15 +257,21 @@
 
   /** Export matrix: ID + demographics + Noteworthy + Sentiment + Themes + Verbatim.
    *  Pure + node-testable. Hidden verbatims export as "[hidden]" (the confidentiality
-   *  dial is honoured — no raw text leaks when text was withheld). */
-  qual.exportRows = function (island, q, records) {
+   *  dial is honoured — no raw text leaks when text was withheld). When safeDemos is
+   *  false (the audience is below the disclosure threshold) the demographic columns export
+   *  as "[hidden]" too, so a small cut can't be exported with identifying tags attached. */
+  qual.exportRows = function (island, q, records, safeDemos) {
+    if (safeDemos === undefined) safeDemos = true;
     var dims = ((island && island.demographics) || []).map(function (d) { return d.label; });
     var byId = {};
     (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
     var header = ["ID"].concat(dims).concat(["Noteworthy", "Sentiment", "Themes", "Verbatim"]);
     var out = [header];
     (records || []).forEach(function (r) {
-      var demos = dims.map(function (lbl) { return (r.demos && r.demos[lbl] != null) ? r.demos[lbl] : ""; });
+      var demos = dims.map(function (lbl) {
+        if (!safeDemos) return "[hidden]";
+        return (r.demos && r.demos[lbl] != null) ? r.demos[lbl] : "";
+      });
       var themes = Object.keys(r.themeVals || {}).map(function (id) { return byId[id] || ("#" + id); }).join("; ");
       var text = (r.text == null) ? "[hidden]" : r.text;
       out.push([r.idx].concat(demos).concat([TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes, text]));
@@ -270,8 +281,9 @@
 
   qual.exportXlsx = function (island, q, records) {
     if (!TR.xlsx || !TR.xlsx.download) return;
+    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
     var base = (TR.fmt && TR.fmt.slug) ? TR.fmt.slug(q.title || q.code || "comments") : "comments";
-    TR.xlsx.download(base + "_comments", "Comments", qual.exportRows(island, q, records));
+    TR.xlsx.download(base + "_comments", "Comments", qual.exportRows(island, q, records, safeDemos));
   };
 
   function findQ(island, code) {
@@ -342,7 +354,7 @@
     }
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, sentiment: null, facets: {}, railGroups: {}, railHidden: false, savedOnly: false };
+                      theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -351,14 +363,16 @@
     var q = findQ(island, d2.state.qualQ) || island.questions[0];
     d2.state.qualQ = q.code;
 
-    // The cut is the live global filter (the filter bar is visible on this tab and
-    // re-renders it), so the prevalence + drawer always reflect the active filter —
-    // "the comments from the people in this cut". A jump additionally pre-sets that
-    // filter and shows a breadcrumb back to the closed finding it came from.
+    // The cut is the live global filter — the ONE audience control. The filter bar is
+    // visible on this tab and re-renders the comments, so the prevalence + drawer always
+    // reflect the active filter ("the comments from the people in this cut"). Composite
+    // filters (Campus = Cape Town AND Q017 = Promoter AND Year = 1st) all flow here, which
+    // is why the qual tab no longer carries its own demographic facet row. A jump
+    // additionally pre-sets the filter and shows a breadcrumb back to the closed finding.
     var cutFilters = (d2.state.filters && d2.state.filters.length) ? d2.state.filters : null;
     var jump = qual.jumpContext();
 
-    var audience = qual.maskFilter(qual.facetFilter(q.records, st.facets), cutFilters);
+    var audience = qual.maskFilter(q.records, cutFilters);
     qual._view = { island: island, q: q, audience: audience };   // for the export handler
     host.innerHTML =
       '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st) +
@@ -407,7 +421,9 @@
   function mainHtml(island, q, st, audience) {
     // The chart (overview) sits ABOVE the controls; tier/sentiment/shortlist sit directly
     // above the comment list they filter, so it's clear they narrow the list, not the chart.
-    return headerHtml(island, q, audience) + facetHtml(island, st) +
+    // Demographic filtering is the global audience bar's job (composite filters), so there
+    // is no per-tab facet row here.
+    return headerHtml(island, q, audience) +
       (q.type === "themed" ? prevalenceHtml(q, st, audience) : "") +
       controlsHtml(q, st, audience) +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
@@ -425,22 +441,6 @@
       '<span class="ql-base">' + n + '</span>' + shield + '</div></header>';
   }
 
-  function facetHtml(island, st) {
-    var dims = island.demographics || [];
-    if (!dims.length) return "";
-    var sels = dims.map(function (d) {
-      var opts = '<option value="">All</option>' + d.values.map(function (v) {
-        var on = st.facets[d.label] === v ? " selected" : "";
-        return '<option' + on + '>' + esc(v) + '</option>';
-      }).join("");
-      return '<label class="ql-facet">' + esc(d.label) +
-        ' <select data-dim="' + esc(d.label) + '">' + opts + '</select></label>';
-    }).join("");
-    var active = Object.keys(st.facets).some(function (k) { return st.facets[k]; });
-    var clear = active ? ' <button class="ql-facetclear">clear filters</button>' : "";
-    return '<div class="ql-facets"><span class="ql-facetlbl">Filter comments:</span>' + sels + clear + '</div>';
-  }
-
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
   // and — next to them — the shortlist toggle (per question) + Excel export.
   function controlsHtml(q, st, audience) {
@@ -451,17 +451,22 @@
           '" data-tier="' + o[0] + '">' + o[1] + "</button>";
       }).join("") + "</div>";
 
-    var sc = qual.sentimentCounts(qual.poolBeforeSentiment(q, st, audience));
-    var total = sc.pos + sc.neu + sc.neg;
-    var sentOpts = [["", "All", total, ""], ["1", "Positive", sc.pos, "pos"],
-                    ["2", "Mixed", sc.neu, "neu"], ["3", "Negative", sc.neg, "neg"]];
-    var cur = st.sentiment == null ? "" : String(st.sentiment);
-    var sent = '<div class="ql-seg sentseg" role="tablist" aria-label="Sentiment filter">' +
-      sentOpts.map(function (o) {
-        return '<button class="ql-segbtn ' + o[3] + (cur === o[0] ? " on" : "") +
-          '" data-sent="' + o[0] + '">' + o[1] +
-          ' <span class="ql-segn">' + o[2] + "</span></button>";
-      }).join("") + "</div>";
+    // The sentiment filter only appears when the question was actually sentiment-coded;
+    // otherwise it would read "0 positive / 0 mixed / 0 negative" as if measured (it wasn't).
+    var sent = "";
+    if (qual.hasSentiment(q)) {
+      var sc = qual.sentimentCounts(qual.poolBeforeSentiment(q, st, audience));
+      var total = sc.pos + sc.neu + sc.neg;
+      var sentOpts = [["", "All", total, ""], ["1", "Positive", sc.pos, "pos"],
+                      ["2", "Mixed", sc.neu, "neu"], ["3", "Negative", sc.neg, "neg"]];
+      var cur = st.sentiment == null ? "" : String(st.sentiment);
+      sent = '<div class="ql-seg sentseg" role="tablist" aria-label="Sentiment filter">' +
+        sentOpts.map(function (o) {
+          return '<button class="ql-segbtn ' + o[3] + (cur === o[0] ? " on" : "") +
+            '" data-sent="' + o[0] + '">' + o[1] +
+            ' <span class="ql-segn">' + o[2] + "</span></button>";
+        }).join("") + "</div>";
+    }
 
     var savedN = qual.savedCount(q.code);
     var actions = '<div class="ql-actions">' +
@@ -521,6 +526,14 @@
 
   function drawerHtml(island, q, st, audience) {
     var records = qual.visibleRecords(q, st, audience);
+    // Disclosure control: when a composite filter narrows the audience below the
+    // confidentiality threshold, the per-comment demographic tags are withheld (a quote
+    // plus a demographic profile identifies a person on a small sample). The threshold is
+    // on the respondent audience, so setting it to the full sample size hides tags on any
+    // sub-cut — only the full-sample view shows them.
+    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
+    var notice = safeDemos ? "" :
+      '<div class="ql-disclosure" role="note">🛡 ' + esc(TR.disclosure.note()) + "</div>";
     var caption;
     if (st.savedOnly) {
       caption = "Shortlisted comments";
@@ -530,24 +543,24 @@
     } else {
       caption = q.type === "themed" ? "All comments (pick a theme above to filter)" : "Comments";
     }
-    if (st.sentiment != null) caption = (SENT_WORD[st.sentiment] || "") + " · " + caption;
+    if (st.sentiment != null && qual.hasSentiment(q)) caption = (SENT_WORD[st.sentiment] || "") + " · " + caption;
     var cards = records.length
-      ? records.map(function (r) { return quoteCard(r, q.code); }).join("")
+      ? records.map(function (r) { return quoteCard(r, q.code, safeDemos); }).join("")
       : '<p class="ql-empty">' + (st.savedOnly
           ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
           : "No comments for this selection.") + "</p>";
-    return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
+    return '<div class="ql-drawer">' + notice + '<div class="ql-drawerhd">' + caption +
       ' <span class="ql-hint">(' + records.length + ")</span></div>" + cards + "</div>";
   }
 
-  function quoteCard(r, qcode) {
+  function quoteCard(r, qcode, safeDemos) {
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
       : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));   // select-to-highlight
     var star = r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
-    var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
+    var tags = (safeDemos && r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + '</span>'; }).join("");
     var saved = qual.isSaved(qcode, r.idx);
     var save = '<button class="ql-save' + (saved ? " on" : "") + '" data-qual-save="' +
@@ -611,14 +624,6 @@
         qual.render(host);
       });
     });
-    host.querySelectorAll(".ql-facet select").forEach(function (sel) {
-      sel.addEventListener("change", function () {
-        st.facets[sel.getAttribute("data-dim")] = sel.value;
-        qual.render(host);
-      });
-    });
-    var clr = host.querySelector(".ql-facetclear");
-    if (clr) clr.addEventListener("click", function () { st.facets = {}; qual.render(host); });
     // shortlist: star a comment / show only the shortlist / export the visible set
     host.querySelectorAll("[data-qual-save]").forEach(function (b) {
       b.addEventListener("click", function () {

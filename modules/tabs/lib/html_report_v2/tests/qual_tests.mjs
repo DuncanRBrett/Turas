@@ -48,15 +48,12 @@ assert(qual.tierFilter(q.records, "must_read").length === 1, "tierFilter must-re
 
 assert(qual.recordsForTheme(q.records, 0).length === 2, "recordsForTheme Price -> 2");
 
-// Demographic facets: single dim, AND across dims, and empty = no filter.
-assert(qual.facetFilter(q.records, {}).length === 4, "facetFilter {} -> all 4");
-assert(qual.facetFilter(q.records, { Campus: "Cape Town" }).length === 2,
-  "facetFilter Campus=Cape Town -> 2");
-assert(qual.facetFilter(q.records, { Campus: "Cape Town", NPS: "Promoter" }).length === 1,
-  "facetFilter Campus=Cape Town AND NPS=Promoter -> 1 (record 0)");
-// Prevalence recomputes over the facet-cut audience (Cape Town: 1 Price, 1 Service).
-const cpt = qual.prevalence(qual.facetFilter(q.records, { Campus: "Cape Town" }), q.themes);
-assert(cpt[0].pct === 50 && cpt[1].pct === 50, "prevalence recomputes over the facet cut (Cape Town)");
+// Prevalence recomputes over whatever audience it is given (here: the 2 Cape Town
+// records, 1 Price + 1 Service) — the audience now comes from the global cut mask,
+// not a per-tab facet row, so prevalence is just handed the filtered pool.
+const capeTown = q.records.filter((r) => r.demos && r.demos.Campus === "Cape Town");
+const cpt = qual.prevalence(capeTown, q.themes);
+assert(cpt[0].pct === 50 && cpt[1].pct === 50, "prevalence recomputes over the given audience (Cape Town)");
 
 // ---- Phase-2 jump helpers (linkFor / commentCount / maskFilter / affordanceHtml) ----
 // Stubs: Q28 (a closed question) links to the QUAL_SAT open-end; the cut mask keeps
@@ -114,6 +111,15 @@ assert(rows[1][0] === 5 && rows[1][1] === "Cape Town" && rows[1][5] === "Price" 
   "exportRows maps idx/demos/theme/verbatim");
 assert(rows[1][3] === "Must-read" && rows[1][4] === "Positive", "exportRows labels tier + sentiment");
 assert(rows[2][6] === "[hidden]", "exportRows: hidden verbatim exports as [hidden] (confidentiality honoured)");
+// Disclosure control: a too-small audience (safeDemos=false) exports the demographic
+// columns as [hidden] too, so a small cut can't be exported with identifying tags.
+const exposed = qual.exportRows(island, q, [
+  { idx: 5, demos: { Campus: "Cape Town", NPS: "Promoter" }, tier: 2, sentiment: 1, themeVals: {}, text: "great value" }
+], false);
+assert(exposed[1][1] === "[hidden]" && exposed[1][2] === "[hidden]",
+  "exportRows safeDemos=false -> demographic columns hidden");
+assert(exposed[1][6] === "great value", "exportRows safeDemos=false still exports the verbatim (text dial is separate)");
+assert(rows[1][1] === "Cape Town", "exportRows default (safeDemos omitted) -> demographics shown");
 
 // ---- sentiment filter + counts ----------------------------------------------
 // Fixture q: record 0 pos(1), record 1 neg(3), record 2 mixed(2), record 3 no sentiment.
@@ -130,6 +136,19 @@ assert(qual.visibleRecords(q, { tier: "all", sentiment: null }, q.records).lengt
 // poolBeforeSentiment ignores the sentiment pick (so the filter buttons can tally).
 assert(qual.poolBeforeSentiment(q, { tier: "must_read", sentiment: 1 }, q.records).length === 1,
   "poolBeforeSentiment applies tier but NOT sentiment (must-read -> 1)");
+
+// hasSentiment gates the whole sentiment control: only a question with real overall
+// sentiment coding gets the filter (a raw/un-coded question would show "0 positive").
+const rawQ = { code: "QR", title: "Raw", type: "raw", themes: [], records: [
+  { idx: 0, tier: 1, sentiment: null, themeVals: {}, demos: {} },
+  { idx: 1, tier: 0, sentiment: null, themeVals: {}, demos: {} },
+  { idx: 2, tier: 0, sentiment: 0,    themeVals: {}, demos: {} } ] };
+assert(qual.hasSentiment(q) === true, "hasSentiment true when records carry 1/2/3");
+assert(qual.hasSentiment(rawQ) === false, "hasSentiment false when no record is sentiment-coded");
+assert(qual.hasSentiment({ records: [] }) === false, "hasSentiment false for an empty question");
+// A sentiment pick carried over from a coded question must NOT empty an un-coded one.
+assert(qual.visibleRecords(rawQ, { tier: "all", sentiment: 1 }, rawQ.records).length === 3,
+  "visibleRecords ignores a stale sentiment pick on an un-coded question (no silent empty)");
 
 // ---- highlight a passage -----------------------------------------------------
 console.log("\nQualitative highlight:");

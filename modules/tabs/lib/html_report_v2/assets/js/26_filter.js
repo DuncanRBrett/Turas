@@ -25,6 +25,11 @@
         '<button data-fremove="' + i + '" aria-label="Remove filter">✕</button></span>';
     }).join("");
     var n = s.filters.length ? TR.stats.maskCount(TR.stats.mask(s.filters)) : TR.MICRO.n;
+    // Disclosure control: warn (report-wide) when a composite filter narrows the audience
+    // below the confidentiality threshold — the views then withhold identifying detail.
+    var discWarn = (TR.disclosure && TR.disclosure.audienceTooSmall())
+      ? '<div class="fb-warn" role="alert">🛡 ' + fmt.escapeHtml(TR.disclosure.note()) + "</div>"
+      : "";
     holder.innerHTML = '<div class="fb-in"><span class="fb-label">Audience</span>' +
       chips +
       '<button class="fb-add" data-fact="add">+ Add filter</button>' +
@@ -37,7 +42,7 @@
             : "") + "</span>"
         : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
           ") · add a filter and every table, delta and dashboard recomputes live</span>") +
-      "</div><div id='fpicker' hidden></div>";
+      "</div>" + discWarn + "<div id='fpicker' hidden></div>";
     holder.querySelectorAll("[data-fremove]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         TR.d2.state.filters.splice(parseInt(btn.getAttribute("data-fremove"), 10), 1);

@@ -141,6 +141,14 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) {
     proj$population_size <- pop_size
   }
+  # Disclosure-control threshold (V13). Carried only when actually engaged (>1), so a
+  # report without it is byte-identical to today. The renderer hides identifying detail
+  # (comment demographic tags now, small cells next) whenever the live filtered audience
+  # falls below it — set it to the full sample size to forbid any sub-group drill-down.
+  mrb <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
+  if (length(mrb) == 1L && !is.na(mrb) && mrb > 1) {
+    proj$min_reporting_base <- mrb
+  }
   # Tab-visibility flags (V12). Crosstabs is always shown; tabList() filters the
   # rest against these. Defaults TRUE so existing reports are unchanged; a tab
   # still self-hides when its island is absent (e.g. Qualitative without DATA_QUAL).

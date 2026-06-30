@@ -51,6 +51,9 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .fb-add:hover, .fb-clear:hover { border-color: var(--brand); }
 .fb-clear { color: var(--muted); }
 .fb-n { font-size: 11.5px; color: var(--muted); margin-left: 4px; }
+/* disclosure-control warning (audience below the confidentiality threshold) */
+.fb-warn { max-width: 1480px; margin: 6px auto 0; padding: 7px 28px; font-size: 12px; font-weight: 600;
+  color: #8a5300; background: #fff6e5; border-top: 1px solid #f0d9a8; }
 .fpick { max-width: 1480px; margin: 0 auto; padding: 12px 28px 16px; border-top: 1px solid var(--line); }
 .fpick-head { display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; margin-bottom: 8px; }
 .fpick-head button { border: none; background: none; cursor: pointer; color: var(--muted); }
@@ -811,15 +814,6 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-pn { display: block; font-size: 10px; font-weight: 500; color: var(--muted); }
 .ql-pnet { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .ql-pnet.pos { color: var(--green); } .ql-pnet.neg { color: var(--red); }
-/* facet filter bar */
-.ql-facets { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px;
-  padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-.ql-facetlbl { font-size: 12px; font-weight: 600; color: var(--muted); }
-.ql-facet { font-size: 12px; color: var(--ink); display: inline-flex; align-items: center; gap: 4px; }
-.ql-facet select { font: inherit; font-size: 12px; padding: 2px 6px; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--card); color: var(--ink); max-width: 220px; }
-.ql-facetclear { border: 0; background: transparent; color: var(--brand); cursor: pointer; font: inherit;
-  font-size: 12px; font-weight: 600; }
 /* sentiment legend words */
 .qc-pos { color: var(--green); } .qc-neu { color: var(--muted); } .qc-neg { color: var(--red); }
 /* quote demographic tags */
@@ -858,3 +852,6 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-foot { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line);
   font-size: 11px; color: var(--muted); }
 .ql-empty { color: var(--muted); padding: 16px 0; }
+/* disclosure-control notice above the comment list (demographic tags withheld) */
+.ql-disclosure { font-size: 12px; font-weight: 600; color: #8a5300; background: #fff6e5;
+  border: 1px solid #f0d9a8; border-radius: 8px; padding: 8px 12px; margin: 4px 0 12px; }
