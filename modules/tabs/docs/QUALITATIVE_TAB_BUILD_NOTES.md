@@ -296,6 +296,43 @@ mentions are salience, not incidence — Duncan's own quant-analysis standard).
 (R: `test_qual_join.R` 39; JS: `qual_tests.mjs` 33; existing qual + bundler suites green). Verify via
 `launch_turas` on a real SACS/Student project (it's generated HTML — never `preview_start`).
 
+### D3.5 — Phase-2 ROUND 2 (Duncan's review of the live SACS/SACAP report; all DONE)
+
+After the first build, Duncan ran it and iterated. As-built now:
+
+- **Sentiment filter** — an All / Positive / Mixed / Negative segmented control (each with a live
+  count) filters the comment list. Helpers `sentimentFilter` / `sentimentCounts` /
+  `poolBeforeSentiment`. It filters the LIST, not the chart (filtering the chart by sentiment would
+  collapse the diverging bars to one side).
+- **Filter layout (perception fix)** — the tier + sentiment + ★ Shortlist + ⬇ Export controls sit
+  directly ABOVE the comment list (below the chart) under a "Filter the comments below:" label +
+  divider, so it's obvious they narrow the list, not the overview chart. (Tier/sentiment changing
+  the list but not the chart had looked broken.)
+- **Highlight a passage** — select text in a comment → a "✎ Highlight" chip → mark it; click a mark
+  to remove. Stored as char ranges per `qcode#idx` (localStorage + `qualHighlights` saved-copy
+  slice), survives Save copy. `qual.renderHighlighted` is the pure wrapper; selection wiring +
+  offset math in `wire()`. Confidentiality-safe (hidden text has nothing to mark).
+- **CommentLink target validation** — `qual_build_links(selection_df, island, valid_targets)` now
+  flags a `CommentLink` that matches no rendered card; `run_crosstabs` warns at gen time. Surfaced
+  by the live SACS config: Q24's `CommentLink` was `Q_Values` but the composite is `Q_Value`
+  (Duncan fixed it). NB the resolver verified Satisfaction (Q29→Q28) is wired correctly — Q28 is a
+  closed Likert, so its 💬 lives on the **Q28 Crosstabs card** (not the Dashboard like the composites).
+
+- **THE THEME CHART — final design: a 100% diverging sentiment bar.** This went through several
+  iterations (filled chips → quiet count column → absolute-length diverging → inline/below labels)
+  and the ROOT-CAUSE lesson is worth keeping: **never size these bars by volume.** With absolute
+  lengths, one dominant theme (SACS Atmosphere, 82/135) compresses every other bar into slivers, so
+  per-segment count labels collide or vanish — no labelling trick fixes that. Per Duncan's own chart
+  guide ("100% stacked is the standard for rating distributions; label each segment"), the bar now
+  shows each theme's sentiment **mix (proportion)**: every bar is the SAME width (`W = 48%` of the
+  track) and pivots so the neutral midpoint sits on a shared zero line. The lean reads as valence
+  (negative left / positive right / mixed centre); counts sit inside each segment (only a genuine
+  1-comment sliver drops to the tooltip). **Bar length is no longer volume — volume is the salience
+  % + n= + the ranking.** `f = (neg + mixed/2)/tot`, `barLeft = 50 − f·W`. If a future tweak is
+  asked, do NOT revert to absolute lengths — that reintroduces the compression.
+
+Tests after round 2: `qual_tests.mjs` 47, `test_qual_join.R` 44, bundler 25 — all green.
+
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**

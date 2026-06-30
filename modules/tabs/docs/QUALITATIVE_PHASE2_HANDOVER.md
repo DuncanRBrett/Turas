@@ -1,8 +1,28 @@
 # Qualitative Tab — Phase 2 Handover (integrated join + closed↔open jump)
 
-> **✅ PHASE 2 BUILT (2026-06-29) — all five items done + tested, on
-> `feature/tabs-qualitative-tab` (5 new commits `16914b42`→`3621dad0`, NOT pushed).**
-> As-built detail lives in `QUALITATIVE_TAB_BUILD_NOTES.md` §D3.1–D3.4. Summary:
+> **✅ PHASE 2 BUILT + REVIEWED (2026-06-29/30) — done + tested, on
+> `feature/tabs-qualitative-tab` (15 session commits `16914b42`→`ed65e120`, 37 ahead of `main`,
+> NOT pushed/merged).** Round-1 = the five items below; round-2 = Duncan's review of the live
+> SACS/SACAP report (sentiment filter, highlighter, the theme chart redesign, a CommentLink
+> warning). As-built detail: `QUALITATIVE_TAB_BUILD_NOTES.md` §D3.1–**§D3.5**.
+>
+> **ROUND-2 (newest, §D3.5):** sentiment filter (list, not chart) · controls moved above the
+> comment list under "Filter the comments below:" (the perception fix) · **select-to-highlight** a
+> passage (persists, survives Save copy) · `CommentLink` target validation (warns on a typo — caught
+> SACS `Q_Values` vs the real composite `Q_Value`, Duncan fixed it) · **the theme chart is now a
+> 100% diverging sentiment bar** (every theme equal width, pivots on a shared zero; bar = sentiment
+> MIX not volume; volume = the salience % + n + rank). ROOT-CAUSE LESSON: never size these bars by
+> volume — one dominant theme compresses the rest into slivers. Tests: `qual_tests.mjs` 47,
+> `test_qual_join.R` 44, bundler 25 — green.
+>
+> **WHAT THE NEXT SESSION DOES:** Phase 2 is feature-complete. Remaining = (a) Duncan regenerates via
+> `launch_turas` + eyeballs the new chart on the real SACS/SACAP report; (b) confirm the Satisfaction
+> 💬 shows on the **Q28 Crosstabs card** (it's a closed Likert, wired correctly — not on the Dashboard
+> like the Q_Engage/Q_Value composites); (c) the **push/merge decision** for the branch; (d) optional
+> follow-ups — per-banner-COLUMN jump granularity, the theme×banner sig crosstab render, exporting the
+> highlighted excerpt as its own column, and the option to let the noteworthy tier reshape the chart.
+>
+> **Round-1 summary (the five items):** As-built detail in §D3.1–§D3.4.
 > 1. **Join** — `qual_resolve_against_survey` re-keys DATA_QUAL to the host MICRO index by
 >    ResponseID (auto-detected / `qual_join_id_column`); `build_integrated_qual_island` rides
 >    it into the **main** report as `qual_json`; standalone `*_qual_report.html` is now a
