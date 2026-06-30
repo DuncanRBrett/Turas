@@ -55,6 +55,68 @@
     });
   };
 
+  /**
+   * Theme x banner crosstab, computed from comment records + the banner's column
+   * membership (TR.stats.columnsFor().columns, each with a per-respondent `member`
+   * Uint8Array; member == null is the Total column). The base of each column is its
+   * COMMENTERS — records of this question whose idx falls in the column — so every
+   * cell is a % of its column, never the grand total. Each cell carries salience
+   * (% who raised the theme), the pos/mixed/neg split both ways (of the base, which
+   * sums to salience; and of the mentioners, which sums to 100), the net sentiment,
+   * and a vs-the-rest significance flag on the active mode's metric (salience, or —
+   * in skew mode — positivity among mentioners). Columns below the disclosure
+   * threshold are flagged suppressed. Pure given records + columns (+ TR.stats.propZ).
+   */
+  qual.themeCrosstab = function (records, themes, columns, opts) {
+    opts = opts || {};
+    var mode = opts.mode === "skew" ? "skew" : "salience";
+    var minBase = opts.minBase > 1 ? opts.minBase : 1;
+    records = records || []; themes = themes || []; columns = columns || [];
+    var inCol = function (col, idx) { return col.member == null || col.member[idx] === 1; };
+    var cols = columns.map(function (col) {
+      var base = 0;
+      for (var r = 0; r < records.length; r++) if (inCol(col, records[r].idx)) base++;
+      return { label: col.label, base: base, total: col.member == null,
+               suppressed: col.member != null && base > 0 && base < minBase };
+    });
+    var pc = function (x, b) { return b ? Math.round(x / b * 100) : 0; };
+    var rows = themes.map(function (th) {
+      var key = String(th.id);
+      var cells = columns.map(function (col, ci) {
+        var pos = 0, mix = 0, neg = 0;
+        for (var r = 0; r < records.length; r++) {
+          var rec = records[r];
+          if (!inCol(col, rec.idx)) continue;
+          var v = rec.themeVals && rec.themeVals[key];
+          if (v === 1) pos++; else if (v === 2) mix++; else if (v === 3) neg++;
+        }
+        var men = pos + mix + neg, base = cols[ci].base;
+        return { men: men, pos: pos, mix: mix, neg: neg, base: base,
+          salience: pc(men, base), net: men ? Math.round((pos - neg) / men * 100) : 0,
+          ofBase: { pos: pc(pos, base), mix: pc(mix, base), neg: pc(neg, base) },
+          ofMen: { pos: pc(pos, men), mix: pc(mix, men), neg: pc(neg, men) }, sig: "" };
+      });
+      return { id: th.id, label: th.label, cells: cells, totalMen: cells[0] ? cells[0].men : 0 };
+    });
+    rows.sort(function (a, b) { return b.totalMen - a.totalMen; });
+    var Zc = 1.96;
+    rows.forEach(function (row) {
+      var tot = row.cells[0];
+      row.cells.forEach(function (cell, ci) {
+        if (ci === 0 || cols[ci].suppressed || !TR.stats || !TR.stats.propZ) return;
+        var x = mode === "skew" ? cell.pos : cell.men;
+        var nn = mode === "skew" ? cell.men : cell.base;
+        var X = mode === "skew" ? tot.pos : tot.men;
+        var N = mode === "skew" ? tot.men : tot.base;
+        if (nn <= 0 || N - nn <= 0) return;
+        var z = TR.stats.propZ(x, nn, X - x, N - nn);
+        if (z === null) return;
+        cell.sig = z > Zc ? "up" : (z < -Zc ? "down" : "");
+      });
+    });
+    return { columns: cols, rows: rows, mode: mode };
+  };
+
   /** Keep records of one overall sentiment (1 pos / 2 mixed / 3 neg); null = all. */
   qual.sentimentFilter = function (records, sentiment) {
     if (sentiment == null) return records || [];
@@ -354,7 +416,8 @@
     }
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false };
+                      theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false,
+                      themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -422,9 +485,16 @@
     // The chart (overview) sits ABOVE the controls; tier/sentiment/shortlist sit directly
     // above the comment list they filter, so it's clear they narrow the list, not the chart.
     // Demographic filtering is the global audience bar's job (composite filters), so there
-    // is no per-tab facet row here.
-    return headerHtml(island, q, audience) +
-      (q.type === "themed" ? prevalenceHtml(q, st, audience) : "") +
+    // is no per-tab facet row here. Themed questions get an Overview / Crosstab switch — the
+    // crosstab supplements the prevalence board, it does not replace it (Overview is default).
+    var chart = "";
+    if (q.type === "themed") {
+      chart = viewToggleHtml(st) +
+        (st.themeView === "crosstab" && hasBanner()
+          ? crosstabHtml(island, q, st, audience)
+          : prevalenceHtml(q, st, audience));
+    }
+    return headerHtml(island, q, audience) + chart +
       controlsHtml(q, st, audience) +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
   }
@@ -520,6 +590,113 @@
       '<b class="qc-neu">mixed</b> centre; net = net sentiment %. ' +
       "Click a theme to read its comments.</span>" +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
+  }
+
+  // ---- theme x banner crosstab (supplements the prevalence board) ------------
+  // An "Overview / Crosstab" switch sits above the chart: Overview is the diverging
+  // prevalence board (default, unchanged); Crosstab is the theme x banner table —
+  // salience + net sentiment per column, expandable to the pos/mixed/neg split,
+  // with an analyst insight that pins to the Story alongside the table.
+
+  function hasBanner() {
+    return !!(TR.AGG && TR.AGG.banner_groups && TR.AGG.banner_groups.length &&
+      TR.stats && TR.stats.columnsFor);
+  }
+  function xtabBannerId(st) {
+    var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    if (st.xbanner && groups.some(function (g) { return g.id === st.xbanner; })) return st.xbanner;
+    var cur = TR.d2 && TR.d2.state && TR.d2.state.banner;
+    if (cur && groups.some(function (g) { return g.id === cur; })) return cur;
+    return groups.length ? groups[0].id : null;
+  }
+  function viewToggleHtml(st) {
+    if (!hasBanner()) return "";
+    var v = st.themeView === "crosstab" ? "crosstab" : "overview";
+    var btn = function (k, l) {
+      return '<button class="ql-segbtn' + (v === k ? " on" : "") + '" data-themeview="' + k + '">' + l + "</button>";
+    };
+    return '<div class="ql-seg ql-viewtog" role="tablist" aria-label="Theme view">' +
+      btn("overview", "Overview") + btn("crosstab", "Crosstab by banner") + "</div>";
+  }
+  function xSig(sig) {
+    return sig === "up" ? ' <span class="ql-xsig up" title="significantly higher vs the rest">▲</span>'
+         : sig === "down" ? ' <span class="ql-xsig down" title="significantly lower vs the rest">▼</span>' : "";
+  }
+  function xCell(cell, mode, suppressed, counts) {
+    if (suppressed) return '<td class="ql-xc supp"><span title="hidden — column below the confidentiality threshold">·</span></td>';
+    var netCls = cell.net > 0 ? "pos" : cell.net < 0 ? "neg" : "mix";
+    var net = '<span class="ql-xnet ' + netCls + '">net ' + (cell.net > 0 ? "+" : "") + cell.net + "%</span>";
+    if (mode === "skew") {
+      var raised = counts ? (cell.men + " raised") : (cell.salience + "% raised");
+      return '<td class="ql-xc"><span class="ql-xhead ' + netCls + '">' + (cell.net > 0 ? "+" : "") +
+        cell.net + "%" + xSig(cell.sig) + '</span><span class="ql-xsub">' + raised + "</span></td>";
+    }
+    var head = counts ? cell.men : (cell.salience + "%");
+    return '<td class="ql-xc"><span class="ql-xhead">' + head + xSig(cell.sig) + "</span>" + net + "</td>";
+  }
+  function crosstabHtml(island, q, st, audience) {
+    var bannerId = xtabBannerId(st);
+    if (!bannerId) return "";
+    if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
+      return '<div class="ql-xtab card"><p class="ql-disclosure">🛡 ' + esc(TR.disclosure.note()) + "</p></div>";
+    }
+    var spec = TR.stats.columnsFor(bannerId);
+    var minBase = (TR.disclosure && TR.disclosure.minBase) ? TR.disclosure.minBase() : 1;
+    var mode = st.xmode === "skew" ? "skew" : "salience";
+    var counts = !!st.xcounts;
+    var xt = qual.themeCrosstab(audience, q.themes, spec.columns, { mode: mode, minBase: minBase });
+    var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    var bannerName = (groups.filter(function (g) { return g.id === bannerId; })[0] || {}).name || "banner";
+    var clip = function (s) { return (TR.charts && TR.charts.clip) ? TR.charts.clip(s, 16) : s; };
+    var bsel = '<select class="ql-xbanner" data-xbanner aria-label="Cross by banner">' + groups.map(function (g) {
+      return '<option value="' + esc(g.id) + '"' + (g.id === bannerId ? " selected" : "") + ">" + esc(g.name) + "</option>";
+    }).join("") + "</select>";
+    var modeSeg = '<div class="ql-seg" role="tablist" aria-label="Crosstab metric">' +
+      '<button class="ql-segbtn' + (mode === "salience" ? " on" : "") + '" data-xmode="salience">Salience</button>' +
+      '<button class="ql-segbtn' + (mode === "skew" ? " on" : "") + '" data-xmode="skew">Sentiment skew</button></div>';
+    var head = '<tr><th class="ql-xhl">Theme<span class="ql-xhb">ranked by salience</span></th>' +
+      xt.columns.map(function (c) {
+        return "<th>" + esc(clip(c.label)) + '<span class="ql-xhb">' +
+          (c.suppressed ? "n&lt;" + minBase : "n=" + c.base) + "</span></th>";
+      }).join("") + "</tr>";
+    var subRow = function (row, lbl, cls, pick) {
+      return '<tr class="ql-xsub2"><td class="ql-xhl"><span class="' + cls + '">' + lbl + "</span></td>" +
+        row.cells.map(function (cell, ci) {
+          if (xt.columns[ci].suppressed) return '<td class="ql-xc supp"><span>·</span></td>';
+          var v = counts ? cell[pick] : ((mode === "skew" ? cell.ofMen[pick] : cell.ofBase[pick]) + "%");
+          return '<td class="ql-xc"><span class="ql-xsubv">' + v + "</span></td>";
+        }).join("") + "</tr>";
+    };
+    var body = xt.rows.map(function (row) {
+      var expanded = st.xexpand === row.id;
+      var main = '<tr class="ql-xrow' + (st.theme === row.id ? " on" : "") + '" data-xtheme="' + row.id + '">' +
+        '<td class="ql-xhl"><span class="ql-xchev">' + (expanded ? "▾" : "▸") + "</span> " + esc(row.label) + "</td>" +
+        row.cells.map(function (cell, ci) { return xCell(cell, mode, xt.columns[ci].suppressed, counts); }).join("") + "</tr>";
+      if (!expanded) return main;
+      return main + subRow(row, "positive", "qc-pos", "pos") + subRow(row, "mixed", "qc-neu", "mix") +
+        subRow(row, "negative", "qc-neg", "neg");
+    }).join("");
+    var insKey = q.code + ":xtab";
+    var insTxt = (TR.insights && TR.insights.get) ? TR.insights.get(insKey, bannerId) : "";
+    var pinCtx = "Themes by " + bannerName + " · " + (mode === "skew" ? "sentiment skew" : "salience");
+    var modeLabel = mode === "skew"
+      ? "net sentiment of those who raised each theme (of mentioners)"
+      : "% of each column who raised each theme";
+    var countsBox = '<label class="ql-xcounts"><input type="checkbox" data-xcounts' +
+      (counts ? " checked" : "") + "> Counts</label>";
+    return '<section class="ql-xtab card" data-snap-card>' +
+      '<div class="ql-xtop snap-pin"><span class="ql-xlbl">Cross themes by</span>' + bsel + modeSeg + countsBox +
+        '<span class="ql-xspacer"></span><button class="ql-xpin" data-snap-pin ' +
+        'data-snap-source="qualitative" data-snap-title="' + esc(q.title + " — themes by " + bannerName) +
+        '" data-snap-context="' + esc(pinCtx) + '">📌 Pin to story</button></div>' +
+      '<div class="ql-xcap">Themes × ' + esc(bannerName) + " — " + esc(modeLabel) +
+        ". Each cell is a % of its column (commenters)" + (counts ? ", shown as counts" : "") +
+        "; click a theme for its split + comments.</div>" +
+      '<div class="ql-xscroll"><table class="ql-xtable">' + head + body + "</table></div>" +
+      '<div class="insight"><div class="insight-head">Analyst insight</div>' +
+      '<textarea class="ql-xinsight" data-xinsight="' + esc(insKey) +
+      '" placeholder="What does this cut tell you? (pins to the Story with the table)">' + esc(insTxt) +
+      "</textarea></div></section>";
   }
 
   var SENT_WORD = { 1: "Positive", 2: "Mixed", 3: "Negative" };
@@ -622,6 +799,32 @@
         var id = parseInt(b.getAttribute("data-theme"), 10);
         st.theme = (st.theme === id) ? null : id;   // toggle
         qual.render(host);
+      });
+    });
+    // theme x banner crosstab: view switch, banner + metric, row expand, insight
+    host.querySelectorAll("[data-themeview]").forEach(function (b) {
+      b.addEventListener("click", function () { st.themeView = b.getAttribute("data-themeview"); qual.render(host); });
+    });
+    host.querySelectorAll("[data-xbanner]").forEach(function (sel) {
+      sel.addEventListener("change", function () { st.xbanner = sel.value; qual.render(host); });
+    });
+    host.querySelectorAll("[data-xmode]").forEach(function (b) {
+      b.addEventListener("click", function () { st.xmode = b.getAttribute("data-xmode"); qual.render(host); });
+    });
+    host.querySelectorAll("[data-xcounts]").forEach(function (cb) {
+      cb.addEventListener("change", function () { st.xcounts = cb.checked; qual.render(host); });
+    });
+    host.querySelectorAll(".ql-xrow").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = parseInt(b.getAttribute("data-xtheme"), 10);
+        st.theme = id;                                   // select the theme (drawer follows)
+        st.xexpand = (st.xexpand === id) ? null : id;    // toggle its pos/mixed/neg split
+        qual.render(host);
+      });
+    });
+    host.querySelectorAll("[data-xinsight]").forEach(function (ta) {
+      ta.addEventListener("input", function () {
+        if (TR.insights && TR.insights.set) TR.insights.set(ta.getAttribute("data-xinsight"), ta.value, xtabBannerId(st));
       });
     });
     // shortlist: star a comment / show only the shortlist / export the visible set

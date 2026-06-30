@@ -9,6 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const jsDir = path.join(here, "..", "assets", "js");
 
 globalThis.TR = { fmt: { escapeHtml: (s) => String(s == null ? "" : s) } };
+new Function(fs.readFileSync(path.join(jsDir, "21_stats.js"), "utf8"))();   // TR.stats.propZ for crosstab sig
 new Function(fs.readFileSync(path.join(jsDir, "27q_qualitative.js"), "utf8"))();
 const qual = globalThis.TR.qual;
 
@@ -54,6 +55,34 @@ assert(qual.recordsForTheme(q.records, 0).length === 2, "recordsForTheme Price -
 const capeTown = q.records.filter((r) => r.demos && r.demos.Campus === "Cape Town");
 const cpt = qual.prevalence(capeTown, q.themes);
 assert(cpt[0].pct === 50 && cpt[1].pct === 50, "prevalence recomputes over the given audience (Cape Town)");
+
+// ---- theme x banner crosstab (column base = commenters; salience + valence + sig) ----
+console.log("\nQualitative theme x banner crosstab:");
+const xrecs = [
+  { idx: 0, themeVals: { "0": 1 } },   // theme A, positive — in ColX
+  { idx: 1, themeVals: { "0": 3 } },   // theme A, negative — in ColX
+  { idx: 2, themeVals: { "0": 1 } },   // theme A, positive — outside ColX
+  { idx: 3, themeVals: {} }            // commented, no theme — outside ColX
+];
+const xthemes = [{ id: 0, label: "A" }];
+const xcols = [{ label: "Total", member: null }, { label: "ColX", member: [1, 1, 0, 0] }];
+const xt = qual.themeCrosstab(xrecs, xthemes, xcols, { mode: "salience" });
+assert(xt.columns[0].base === 4 && xt.columns[1].base === 2,
+  "column base = commenters in the column (Total 4, ColX 2)");
+const tot = xt.rows[0].cells[0], colx = xt.rows[0].cells[1];
+assert(tot.salience === 75 && tot.net === 33,
+  "Total: 3 of 4 raised A, net (2 pos - 1 neg)/3 = +33");
+assert(tot.ofBase.pos === 50 && tot.ofBase.neg === 25,
+  "of-base split sums toward salience (50 pos + 25 neg of 75)");
+assert(tot.ofMen.pos === 67 && tot.ofMen.neg === 33, "of-mentioners split sums to 100");
+assert(colx.salience === 100 && colx.net === 0, "ColX: both commenters raised A, 1 pos 1 neg = net 0");
+assert(tot.men === 3 && tot.pos === 2 && tot.neg === 1 && tot.mix === 0,
+  "cell carries raw counts (men/pos/mix/neg) for the Counts tickbox to display");
+assert(xt.rows[0].cells.every((c) => c.sig === ""),
+  "tiny bases fail the sig preconditions -> no false significance");
+const sup = qual.themeCrosstab(xrecs, xthemes, xcols, { minBase: 3 });
+assert(sup.columns[1].suppressed === true && sup.columns[0].suppressed === false,
+  "a column below the disclosure threshold is flagged suppressed (Total never is)");
 
 // ---- Phase-2 jump helpers (linkFor / commentCount / maskFilter / affordanceHtml) ----
 // Stubs: Q28 (a closed question) links to the QUAL_SAT open-end; the cut mask keeps
