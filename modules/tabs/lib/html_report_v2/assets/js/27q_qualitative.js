@@ -478,36 +478,29 @@
   function prevalenceHtml(q, st, audience) {
     var rows = qual.prevalence(audience, q.themes);   // ranked by salience (volume) desc
     if (!rows.length || !audience.length) return '<p class="ql-empty">No coded themes for this selection.</p>';
-    // Diverging sentiment bars on a SHARED zero line so valence is comparable across
-    // themes: negatives run left of centre, positives right, mixed straddles the centre.
-    // Each side of the track represents maxExt comment-units; bar length is absolute, so
-    // it also reflects volume, while salience stays the % + the ranking.
-    var maxExt = rows.reduce(function (m, r) {
-      return Math.max(m, r.neg + r.neu / 2, r.pos + r.neu / 2);
-    }, 0) || 1;
-    var unit = 50 / maxExt;                           // % of track width per comment, per side
-    var seg = function (cls, count) {
-      return count ? '<span class="ql-bseg ' + cls + '" style="flex:' + count + '"></span>' : "";
-    };
-    // Counts in a column beside the bar (read left->right in bar order: neg · mixed ·
-    // pos), so EVERY count shows — including the tiny segments the bar can't label.
-    var cc = function (cls, count) {
-      return '<span class="ql-cc ' + cls + (count ? "" : " zero") + '">' + count + "</span>";
+    // 100% (proportion) diverging sentiment bars: every theme's bar is the SAME width
+    // (W% of the track), pivoted so the neutral midpoint sits on a shared zero line. The
+    // lean still reads as valence, but because the bar is proportion (not volume) no
+    // dominant theme can compress the others — every segment is generous, so the counts
+    // fit inside. Salience is the % + the ranking, not the bar length.
+    var W = 48;                                       // bar width as % of track (<=50 so extremes never overflow)
+    var seg = function (cls, count, tot) {
+      if (!count) return "";
+      var label = (count / tot * W) >= 4 ? '<span class="ql-bn">' + count + "</span>" : "";  // shows when wide enough
+      return '<span class="ql-bseg ' + cls + '" style="flex:' + count + '">' + label + "</span>";
     };
     var body = rows.map(function (r) {
       var sel = r.id === st.theme ? " on" : "";
-      var leftExt = (r.neg + r.neu / 2) * unit;
-      var totalPct = (r.neg + r.neu + r.pos) * unit;
+      var tot = r.pos + r.neu + r.neg || 1;           // sentiment-coded mentions of this theme
+      var f = (r.neg + r.neu / 2) / tot;              // fraction of the bar that sits left of zero
       var bar = '<span class="ql-dtrack"><span class="ql-dzero"></span>' +
-        '<span class="ql-dbar" style="left:' + (50 - leftExt) + "%;width:" + totalPct + '%">' +
-          seg("neg", r.neg) + seg("neu", r.neu) + seg("pos", r.pos) + "</span></span>";
-      var counts = '<span class="ql-pcounts" aria-label="negative, mixed, positive counts">' +
-        cc("neg", r.neg) + cc("neu", r.neu) + cc("pos", r.pos) + "</span>";
+        '<span class="ql-dbar" style="left:' + (50 - f * W) + "%;width:" + W + '%">' +
+          seg("neg", r.neg, tot) + seg("neu", r.neu, tot) + seg("pos", r.pos, tot) + "</span></span>";
       var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
       return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
           'title="' + esc(r.label) + " — " + r.n + " of " + audience.length +
           " raised it unprompted (" + r.pos + " positive, " + r.neu + " mixed, " + r.neg + ' negative)">' +
-        '<span class="ql-plabel">' + esc(r.label) + "</span>" + bar + counts +
+        '<span class="ql-plabel">' + esc(r.label) + "</span>" + bar +
         '<span class="ql-ppct">' + r.pct + '%<span class="ql-pn">n=' + r.n + "</span></span>" +
         '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + "%</span>" +
         "</button>";
@@ -516,9 +509,10 @@
       '<span class="ql-dends"><span>← more negative</span><span>more positive →</span></span></div>';
     return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
       '<span class="ql-hint"> — ranked by salience (% of the ' + audience.length +
-      ' who raised each theme <b>unprompted</b>). Each bar pivots on a shared zero: ' +
-      '<b class="qc-neg">negative</b> runs left, <b class="qc-pos">positive</b> right, ' +
-      '<b class="qc-neu">mixed</b> straddles the centre; net = net sentiment %. ' +
+      ' who raised each theme <b>unprompted</b>, right). Each bar is the sentiment <i>mix</i> ' +
+      'of that theme’s comments, so every theme is equal width and the lean shows the balance: ' +
+      '<b class="qc-neg">negative</b> left, <b class="qc-pos">positive</b> right, ' +
+      '<b class="qc-neu">mixed</b> centre; net = net sentiment %. ' +
       "Click a theme to read its comments.</span>" +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
   }

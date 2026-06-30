@@ -785,10 +785,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-boardhd, .ql-drawerhd { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink); }
 .ql-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
 .ql-boardgrid { display: flex; flex-direction: column; }
-/* Diverging sentiment chart: label | diverging bar | counts | salience % | net %. */
-.ql-prow, .ql-daxis { display: grid; grid-template-columns: 178px 1fr 62px 48px 54px; align-items: center; gap: 14px; }
+/* Diverging sentiment chart: label | diverging bar | salience % | net %. */
+.ql-prow, .ql-daxis { display: grid; grid-template-columns: 180px 1fr 48px 56px; align-items: center; gap: 16px; }
 .ql-prow { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer; font: inherit;
-  padding: 8px 8px; border-radius: 6px; }
+  padding: 7px 8px; border-radius: 6px; }
 .ql-prow + .ql-prow { border-top: 1px solid var(--line); }
 .ql-prow:hover { background: var(--bg); }
 .ql-prow.on { background: var(--bg); box-shadow: inset 2px 0 0 var(--brand); }
@@ -796,17 +796,17 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* axis labels above the bars */
 .ql-daxis { padding: 0 8px 4px; }
 .ql-dends { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
-/* the diverging bar: a centred zero line, bar positioned + segments flexed by count */
+/* the 100% diverging bar: a centred zero line; every bar is the same width (set
+   inline) and pivots on the zero; the count sits inside each segment, aligned
+   neg-left / mixed-centre / pos-right. */
 .ql-dtrack { position: relative; height: 16px; }
-.ql-dzero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #cbd2dc; }
+.ql-dzero { position: absolute; left: 50%; top: -2px; height: 18px; width: 1px; background: #cbd2dc; }
 .ql-dbar { position: absolute; top: 1px; display: flex; height: 14px; border-radius: 3px; overflow: hidden; }
-.ql-bseg { height: 100%; overflow: hidden; min-width: 0; }
-.ql-bseg.neg { background: var(--red); } .ql-bseg.neu { background: var(--muted); } .ql-bseg.pos { background: var(--green); }
-/* counts beside the bar (neg · mixed · pos) — every count shows, including slivers */
-.ql-pcounts { display: inline-flex; gap: 6px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
-.ql-cc { font-size: 12px; font-weight: 600; min-width: 14px; text-align: right; }
-.ql-cc.neg { color: var(--red); } .ql-cc.neu { color: var(--muted); } .ql-cc.pos { color: var(--green); }
-.ql-cc.zero { color: var(--line); }
+.ql-bseg { display: flex; align-items: center; height: 100%; overflow: hidden; min-width: 0; }
+.ql-bseg.neg { background: var(--red); justify-content: flex-start; }
+.ql-bseg.neu { background: var(--muted); justify-content: center; }
+.ql-bseg.pos { background: var(--green); justify-content: flex-end; }
+.ql-bn { color: #fff; font-size: 10px; font-weight: 600; line-height: 14px; padding: 0 4px; white-space: nowrap; }
 .ql-ppct { text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; }
 .ql-pn { display: block; font-size: 10px; font-weight: 500; color: var(--muted); }
 .ql-pnet { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
