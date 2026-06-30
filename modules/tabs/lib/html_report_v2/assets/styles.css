@@ -759,7 +759,9 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-badge { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-weight: 600; }
 .ql-shield { color: var(--accent); font-weight: 600; }
 /* controls row: noteworthy tier · sentiment filter (with counts) · shortlist + export */
-.ql-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 14px; }
+.ql-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 4px 0 12px;
+  padding-top: 12px; border-top: 1px solid var(--line); }
+.ql-ctrllbl { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ql-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .ql-segbtn { border: 0; border-right: 1px solid var(--line); background: var(--card); padding: 5px 11px;
   cursor: pointer; font: inherit; font-size: 12px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
@@ -783,8 +785,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-boardhd, .ql-drawerhd { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink); }
 .ql-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
 .ql-boardgrid { display: flex; flex-direction: column; }
-/* Diverging sentiment chart: label | diverging bar | salience % | net %. */
-.ql-prow, .ql-daxis { display: grid; grid-template-columns: 180px 1fr 54px 62px; align-items: center; gap: 16px; }
+/* Diverging sentiment chart: label | diverging bar | counts | salience % | net %. */
+.ql-prow, .ql-daxis { display: grid; grid-template-columns: 178px 1fr 62px 48px 54px; align-items: center; gap: 14px; }
 .ql-prow { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer; font: inherit;
   padding: 8px 8px; border-radius: 6px; }
 .ql-prow + .ql-prow { border-top: 1px solid var(--line); }
@@ -798,11 +800,13 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-dtrack { position: relative; height: 16px; }
 .ql-dzero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #cbd2dc; }
 .ql-dbar { position: absolute; top: 1px; display: flex; height: 14px; border-radius: 3px; overflow: hidden; }
-.ql-bseg { display: flex; align-items: center; height: 100%; overflow: hidden; min-width: 0; }
-.ql-bseg.neg { background: var(--red); justify-content: flex-start; }
-.ql-bseg.neu { background: var(--muted); justify-content: center; }
-.ql-bseg.pos { background: var(--green); justify-content: flex-end; }
-.ql-bn { color: #fff; font-size: 10px; font-weight: 600; line-height: 14px; padding: 0 4px; white-space: nowrap; }
+.ql-bseg { height: 100%; overflow: hidden; min-width: 0; }
+.ql-bseg.neg { background: var(--red); } .ql-bseg.neu { background: var(--muted); } .ql-bseg.pos { background: var(--green); }
+/* counts beside the bar (neg · mixed · pos) — every count shows, including slivers */
+.ql-pcounts { display: inline-flex; gap: 6px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.ql-cc { font-size: 12px; font-weight: 600; min-width: 14px; text-align: right; }
+.ql-cc.neg { color: var(--red); } .ql-cc.neu { color: var(--muted); } .ql-cc.pos { color: var(--green); }
+.ql-cc.zero { color: var(--line); }
 .ql-ppct { text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; }
 .ql-pn { display: block; font-size: 10px; font-weight: 500; color: var(--muted); }
 .ql-pnet { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }

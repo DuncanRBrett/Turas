@@ -405,8 +405,11 @@
   }
 
   function mainHtml(island, q, st, audience) {
-    return headerHtml(island, q, audience) + facetHtml(island, st) + controlsHtml(q, st, audience) +
+    // The chart (overview) sits ABOVE the controls; tier/sentiment/shortlist sit directly
+    // above the comment list they filter, so it's clear they narrow the list, not the chart.
+    return headerHtml(island, q, audience) + facetHtml(island, st) +
       (q.type === "themed" ? prevalenceHtml(q, st, audience) : "") +
+      controlsHtml(q, st, audience) +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
   }
 
@@ -467,7 +470,9 @@
         "★ Shortlist" + (savedN ? " (" + savedN + ")" : "") + "</button>" +
       '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
         "⬇ Export</button></div>";
-    return '<div class="ql-controls">' + tier + sent + actions + "</div>";
+    // Labelled "Filter the comments below" — these narrow the LIST, not the chart above.
+    return '<div class="ql-controls"><span class="ql-ctrllbl">Filter the comments below:</span>' +
+      tier + sent + actions + "</div>";
   }
 
   function prevalenceHtml(q, st, audience) {
@@ -481,16 +486,13 @@
       return Math.max(m, r.neg + r.neu / 2, r.pos + r.neu / 2);
     }, 0) || 1;
     var unit = 50 / maxExt;                           // % of track width per comment, per side
-    // Label every segment (neg / mixed / pos) with its count, but only when the segment
-    // is wide enough to hold the digits — so a sliver never shows a clipped number. The
-    // count is aligned within its segment by CSS (neg left, mixed centre, pos right).
-    var label = function (n) {
-      if (!n) return "";
-      var needPct = (String(n).length * 6 + 8) / 3.2;
-      return (n * unit >= needPct) ? '<span class="ql-bn">' + n + "</span>" : "";
-    };
     var seg = function (cls, count) {
-      return count ? '<span class="ql-bseg ' + cls + '" style="flex:' + count + '">' + label(count) + "</span>" : "";
+      return count ? '<span class="ql-bseg ' + cls + '" style="flex:' + count + '"></span>' : "";
+    };
+    // Counts in a column beside the bar (read left->right in bar order: neg · mixed ·
+    // pos), so EVERY count shows — including the tiny segments the bar can't label.
+    var cc = function (cls, count) {
+      return '<span class="ql-cc ' + cls + (count ? "" : " zero") + '">' + count + "</span>";
     };
     var body = rows.map(function (r) {
       var sel = r.id === st.theme ? " on" : "";
@@ -499,18 +501,19 @@
       var bar = '<span class="ql-dtrack"><span class="ql-dzero"></span>' +
         '<span class="ql-dbar" style="left:' + (50 - leftExt) + "%;width:" + totalPct + '%">' +
           seg("neg", r.neg) + seg("neu", r.neu) + seg("pos", r.pos) + "</span></span>";
+      var counts = '<span class="ql-pcounts" aria-label="negative, mixed, positive counts">' +
+        cc("neg", r.neg) + cc("neu", r.neu) + cc("pos", r.pos) + "</span>";
       var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
       return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
           'title="' + esc(r.label) + " — " + r.n + " of " + audience.length +
           " raised it unprompted (" + r.pos + " positive, " + r.neu + " mixed, " + r.neg + ' negative)">' +
-        '<span class="ql-plabel">' + esc(r.label) + "</span>" + bar +
+        '<span class="ql-plabel">' + esc(r.label) + "</span>" + bar + counts +
         '<span class="ql-ppct">' + r.pct + '%<span class="ql-pn">n=' + r.n + "</span></span>" +
         '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + "%</span>" +
         "</button>";
     }).join("");
     var axis = '<div class="ql-daxis"><span></span>' +
-      '<span class="ql-dends"><span>← more negative</span><span>more positive →</span></span>' +
-      "<span></span><span></span></div>";
+      '<span class="ql-dends"><span>← more negative</span><span>more positive →</span></span></div>';
     return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
       '<span class="ql-hint"> — ranked by salience (% of the ' + audience.length +
       ' who raised each theme <b>unprompted</b>). Each bar pivots on a shared zero: ' +
