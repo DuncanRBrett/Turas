@@ -542,13 +542,28 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     }
   }
 
+  # Weighted designs: the published cell counts are WEIGHTED but the base row shows the
+  # UNWEIGHTED n, so the renderer must recompute proportions on the weighted base and size
+  # significance/intervals on the Kish effective base. Carry both alongside the unweighted n
+  # (which still drives display + the low-base flag). Omitted for unweighted -> byte-identical.
+  weighted_report <- isTRUE(config_obj$apply_weighting)
   bases <- lapply(keys, function(k) {
-    bn <- NA_real_
+    bn <- NA_real_; bw <- NA_real_; be <- NA_real_
     if (!is.null(q_result$bases) && k %in% names(q_result$bases)) {
-      u <- q_result$bases[[k]]$unweighted
+      bk <- q_result$bases[[k]]
+      u <- bk$unweighted
       if (!is.null(u) && length(u) >= 1) bn <- suppressWarnings(as.numeric(u[1]))
+      if (weighted_report) {
+        w <- bk$weighted
+        if (!is.null(w) && length(w) >= 1) bw <- suppressWarnings(as.numeric(w[1]))
+        e <- bk$effective
+        if (!is.null(e) && length(e) >= 1) be <- suppressWarnings(as.numeric(e[1]))
+      }
     }
-    list(n = bn, low = is.na(bn) || bn < low_base)
+    entry <- list(n = bn, low = is.na(bn) || bn < low_base)
+    if (weighted_report && !is.na(bw) && bw > 0) entry$nWeighted <- bw
+    if (weighted_report && !is.na(be) && be > 0) entry$nEff <- be
+    entry
   })
 
   cat_val <- q_result$category

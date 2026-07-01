@@ -197,5 +197,51 @@ run("storeKey scopes localStorage per report so composites stay discrete", () =>
   assert(a.indexOf(base) === 0, "the base key stays a prefix (" + a + ")");
 });
 
+run("weighted published sig uses the weighted base + effective base, not the unweighted base (E1)", () => {
+  const stats = TR.stats, sigCell = TR.model._sigCell;
+  // A: weighted count 30 on Σw=60 (p=0.50), effN=55.  B: weighted count 42 on Σw=140
+  // (p=0.30), effN=130. Unweighted n=100 each. sigCell forms the proportion on the weighted
+  // base and carries the variance on the effective base (x = p*effN over effN).
+  const A = sigCell(30, { n: 100, nWeighted: 60, nEff: 55 });
+  const B = sigCell(42, { n: 100, nWeighted: 140, nEff: 130 });
+  assert(Math.abs(A.x - 27.5) < 1e-9 && A.base === 55, "A -> x = p*effN = 27.5 over effN = 55");
+  assert(Math.abs(B.x - 39) < 1e-9 && B.base === 130, "B -> x = 39 over effN = 130");
+  const zFixed = stats.propZ(A.x, A.base, B.x, B.base);
+  const zBuggy = stats.propZ(30, 100, 42, 100);            // weighted counts over the UNWEIGHTED base
+  assert(zFixed > 1.96, "weighted: A (0.50) is 95%-significantly higher than B (0.30), z=" + zFixed.toFixed(2));
+  assert(zBuggy < 0, "the old unweighted-base path inverts the sign to B>A, z=" + zBuggy.toFixed(2));
+  // Unweighted columns (no nWeighted/nEff) pass the exact counts through unchanged.
+  const U = sigCell(45, { n: 90 });
+  assert(U.x === 45 && U.base === 90, "unweighted design: exact counts unchanged (byte-identical)");
+});
+
+run("disclosure blanks sub-threshold crosstab columns at the model level (task #4)", () => {
+  const priorDisc = TR.disclosure;
+  TR.disclosure = { active: () => true, minBase: () => 10 };
+  const vm = {
+    columns: [{ base: 167, letter: "" }, { base: 1, letter: "A" }, { base: 5, letter: "B" }, { base: 40, letter: "C" }],
+    rows: [{ cells: [{ pct: 60, sig: "" }, { pct: 100, sig: "" }, { pct: 20, sig: "" }, { pct: 55, sig: "AB" }] }]
+  };
+  TR.model._applyDisclosureSuppression(vm);
+  assert(vm.columns[1].suppressed && vm.columns[2].suppressed, "columns with base 1 and 5 (< k=10) are suppressed");
+  assert(!vm.columns[0].suppressed && !vm.columns[3].suppressed, "base 167 and 40 columns are shown");
+  assert(vm.rows[0].cells[1].pct === null && vm.rows[0].cells[2].pct === null, "sub-k cells blanked to null (render as –)");
+  assert(vm.rows[0].cells[0].pct === 60 && vm.rows[0].cells[3].pct === 55, "safe cells untouched");
+  assert(vm.rows[0].cells[3].sig === "", "letters pointing at suppressed A,B stripped from the shown cell");
+
+  // n=1 audience: every column is sub-k, so the whole table blanks (Duncan's live case).
+  const tiny = { columns: [{ base: 1, letter: "" }, { base: 1, letter: "A" }],
+    rows: [{ cells: [{ pct: 100, sig: "" }, { pct: 100, sig: "" }] }] };
+  TR.model._applyDisclosureSuppression(tiny);
+  assert(tiny.rows[0].cells[0].pct === null && tiny.rows[0].cells[1].pct === null, "n=1 cut: Total + column both blanked");
+
+  // Control off (k=1) is a no-op -> unprotected reports byte-identical.
+  TR.disclosure = { active: () => false, minBase: () => 1 };
+  const off = { columns: [{ base: 3 }], rows: [{ cells: [{ pct: 33 }] }] };
+  TR.model._applyDisclosureSuppression(off);
+  assert(off.rows[0].cells[0].pct === 33, "control off -> nothing blanked");
+  TR.disclosure = priorDisc;
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

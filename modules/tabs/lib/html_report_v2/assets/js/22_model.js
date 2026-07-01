@@ -29,6 +29,23 @@
       .replace(/[^a-z0-9 ]/g, "").trim();
   };
 
+  /**
+   * Build a proportion significance cell {x, base} from a published count + column base.
+   * Weighted designs: the published count is WEIGHTED but the base row is UNWEIGHTED, so
+   * form the proportion on the weighted base and carry the variance on the Kish EFFECTIVE
+   * base — passed as x = p*effN over base = effN, which is exactly the weighted z-test the
+   * R engine runs (p from weighted counts, SE ~ p(1-p)/effN). Unweighted designs pass the
+   * exact counts through unchanged, so those reports are byte-identical.
+   */
+  function sigCell(count, base) {
+    var x = count || 0;
+    if (base && base.nWeighted > 0 && base.nEff > 0) {
+      var p = x / base.nWeighted;
+      return { x: p * base.nEff, base: base.nEff };
+    }
+    return { x: x, base: base ? base.n : 0 };
+  }
+
   /** Published view: columns restricted to Total + the chosen banner group.
    *  With dual=true, 80%-level lowercase letters are computed from the
    *  published counts and appended to the published 95% letters. */
@@ -61,9 +78,12 @@
     var letters = columns.map(function (c) { return c.letter; });
     var rows = q.rows.map(function (r, qri) {
       var low80 = null;
-      if (dual && r.kind === "category") {
+      // 80% letters recompute from the published counts for proportion rows — categories AND
+      // NET/box rows (a NET POSITIVE diff carries a null count, so its cell is 0/0 and earns
+      // no letter, matching R). Means are not recomputed here (no per-column SD in the model).
+      if (dual && (r.kind === "category" || r.kind === "net")) {
         var cells = cols.map(function (ci) {
-          return { x: r.n[ci] || 0, base: q.bases[ci] ? q.bases[ci].n : 0 };
+          return sigCell(r.n[ci], q.bases[ci]);
         });
         low80 = TR.stats.sigLetters(cells, letters, threshold, false, true)
           .map(function (s) {
@@ -254,6 +274,8 @@
   /* exposed for the golden parity tests */
   model._computedModel = computedModel;
   model._publishedModel = publishedModel;
+  model._sigCell = sigCell;
+  model._applyDisclosureSuppression = applyDisclosureSuppression;
 
   /**
    * Attach 95% interval bounds to every cell (cell.ci = {lo, hi}).
@@ -296,9 +318,15 @@
         var col = viewModel.columns[ci];
         var base = col ? col.base : null;
         if (!base) return;
-        var ciBase = (col.ciBase != null) ? col.ciBase : base;
-        var p = cell.n !== null && cell.n !== undefined
-          ? cell.n / base : cell.pct / 100;
+        var b = q.bases[ci];
+        var weighted = !!(b && b.nWeighted > 0 && b.nEff > 0);
+        // Weighted: the shown % is weighted, so the proportion is weightedCount/weightedBase
+        // and the interval width uses the Kish effective base (variance ~ 1/effN). Unweighted:
+        // exact counts, FPC-corrected width when a universe is known (ciBase).
+        var ciBase = weighted ? b.nEff : ((col.ciBase != null) ? col.ciBase : base);
+        var p = weighted
+          ? (cell.n != null ? cell.n / b.nWeighted : cell.pct / 100)
+          : (cell.n !== null && cell.n !== undefined ? cell.n / base : cell.pct / 100);
         var w = TR.conf.wilson(Math.min(Math.max(p, 0), 1), ciBase);
         if (w) cell.ci = { lo: w.lower * 100, hi: w.upper * 100 };
       });
@@ -511,6 +539,42 @@
   }
 
   /**
+   * Disclosure control: blank any column whose reporting base is below the confidentiality
+   * threshold k (a base of 1..k-1), so a filter narrowed down to a handful of people can't
+   * show their exact answers in the crosstab / dashboard / differences / exports. An empty
+   * column (base 0) is already "–"; k = 1 (off) is a no-op, so unprotected reports are
+   * byte-identical. When the whole filtered audience is < k every column blanks, which is the
+   * n=1-cut case. Letters pointing AT a blanked column are stripped from the columns that
+   * remain, so a shown cell never claims "higher than B" once B is hidden. (Complementary
+   * subtraction suppression across a banner group is the next increment.)
+   */
+  function applyDisclosureSuppression(viewModel) {
+    if (!(TR.disclosure && TR.disclosure.active && TR.disclosure.active())) return;
+    var minBase = TR.disclosure.minBase();
+    var gone = [];
+    viewModel.columns.forEach(function (col, ci) {
+      var base = col.base;
+      if (base == null || base === 0 || base >= minBase) return;
+      col.suppressed = true;
+      if (col.letter) gone.push(col.letter);
+      viewModel.rows.forEach(function (row) {
+        var cell = row.cells[ci];
+        if (!cell) return;
+        cell.pct = null; cell.mean = null; cell.n = null; cell.sig = ""; cell.ci = null;
+        cell.suppressed = true;
+      });
+    });
+    if (gone.length) {
+      var re = new RegExp("[" + gone.join("") + "]", "gi");   // strip both 95% + 80% forms
+      viewModel.rows.forEach(function (row) {
+        row.cells.forEach(function (cell) {
+          if (cell && cell.sig && !cell.suppressed) cell.sig = cell.sig.replace(re, "");
+        });
+      });
+    }
+  }
+
+  /**
    * The model the UI renders.
    * @param {object} [opts] - {hiddenCols, hiddenRows, rowScope, sort, dual,
    *   intervals} — intervals=true attaches 95% bounds to every cell.
@@ -549,6 +613,9 @@
     // wave delta would compare filtered-now against unfiltered-prior. Flag the
     // model so attachDeltas suppresses the (misleading) trend under a filter.
     viewModel.filtered = !!(filters && filters.length > 0) && TR.d2.hasMicrodata();
+    // Blank sub-threshold columns BEFORE deltas/significance/intervals, so none of them
+    // compute (or leak) anything for a cut too small to report.
+    applyDisclosureSuppression(viewModel);
     TR.waves.attachDeltas(q, viewModel);
     // Re-letter significance on the FPC base before hiding/sorting (per-cell, so
     // it survives both). Unweighted population reports only.

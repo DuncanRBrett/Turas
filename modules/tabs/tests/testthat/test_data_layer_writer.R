@@ -793,3 +793,31 @@ test_that("dl$ai is attached when ai is supplied and omitted otherwise", {
   dl_without <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
   expect_false("ai" %in% names(dl_without))                 # AI-free reports unchanged
 })
+
+# ==============================================================================
+# Weighted base serialisation (D1/E1) — the renderer needs the weighted + effective
+# base to recompute proportions/significance correctly, not the unweighted base.
+# ==============================================================================
+
+test_that("weighted reports serialise the weighted + effective base; unweighted omit them", {
+  q <- make_dl_q_single()
+  q$bases <- list(
+    "TOTAL::Total"   = list(unweighted = 100, weighted = 120, effective = 90),
+    "Gender::Male"   = list(unweighted = 50,  weighted = 70,  effective = 44),
+    "Gender::Female" = list(unweighted = 50,  weighted = 50,  effective = 48))
+  bi <- make_dl_banner_info()
+
+  # Weighted: nWeighted + nEff ride alongside the unweighted n (which still drives display).
+  wq <- build_dl_question(q, bi, make_dl_config(apply_weighting = TRUE), low_base = 30)
+  expect_equal(wq$bases[[1]]$n, 100)
+  expect_equal(wq$bases[[1]]$nWeighted, 120)
+  expect_equal(wq$bases[[1]]$nEff, 90)
+  expect_equal(wq$bases[[2]]$nWeighted, 70)
+  expect_equal(wq$bases[[2]]$nEff, 44)
+
+  # Unweighted (default): byte-identical — no nWeighted/nEff keys at all.
+  uq <- build_dl_question(q, bi, make_dl_config(apply_weighting = FALSE), low_base = 30)
+  expect_equal(uq$bases[[1]]$n, 100)
+  expect_null(uq$bases[[1]]$nWeighted)
+  expect_null(uq$bases[[1]]$nEff)
+})
