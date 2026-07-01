@@ -565,9 +565,21 @@ write_question_table <- function(wb, sheet, result, banner_info, styles,
 #' @return Integer, next row number
 #' @export
 write_base_rows <- function(wb, sheet, banner_info, question_bases, styles,
-                            current_row, config) {
+                            current_row, config, suppressed_idx = integer(0)) {
   internal_keys <- banner_info$internal_keys
   total_cols <- 2 + length(banner_info$columns)
+
+  # Disclosure control: overwrite a withheld column's base with a marker (e.g.
+  # "n<10") so the exact sub-threshold count is not disclosed. No-op (and no new
+  # dependency) when nothing is suppressed, keeping unprotected output identical.
+  mark_suppressed <- function(row) {
+    if (!length(suppressed_idx)) return(invisible(NULL))
+    marker <- disclosure_marker(config$min_reporting_base)
+    for (ci in suppressed_idx) {
+      openxlsx::writeData(wb, sheet, marker, startRow = row,
+                          startCol = ci + 2, colNames = FALSE)
+    }
+  }
 
   # Constants (ensure these are defined)
   UNWEIGHTED_BASE_LABEL <- "Base (unweighted)"
@@ -587,6 +599,7 @@ write_base_rows <- function(wb, sheet, banner_info, question_bases, styles,
 
       openxlsx::addStyle(wb, sheet, styles$base, rows = current_row,
                         cols = seq_len(total_cols), gridExpand = TRUE)
+      mark_suppressed(current_row)
       current_row <- current_row + 1
     }
 
@@ -600,6 +613,7 @@ write_base_rows <- function(wb, sheet, banner_info, question_bases, styles,
 
     openxlsx::addStyle(wb, sheet, styles$base, rows = current_row,
                       cols = seq_len(total_cols), gridExpand = TRUE)
+    mark_suppressed(current_row)
     current_row <- current_row + 1
 
     if (config$show_effective_n) {
@@ -613,6 +627,7 @@ write_base_rows <- function(wb, sheet, banner_info, question_bases, styles,
 
       openxlsx::addStyle(wb, sheet, styles$base, rows = current_row,
                         cols = seq_len(total_cols), gridExpand = TRUE)
+      mark_suppressed(current_row)
       current_row <- current_row + 1
     }
   } else {
@@ -626,6 +641,7 @@ write_base_rows <- function(wb, sheet, banner_info, question_bases, styles,
 
     openxlsx::addStyle(wb, sheet, styles$base, rows = current_row,
                       cols = seq_len(total_cols), gridExpand = TRUE)
+    mark_suppressed(current_row)
     current_row <- current_row + 1
   }
 
@@ -1715,6 +1731,23 @@ create_guide_sheet <- function(wb, config_obj, banner_info, styles) {
   add_entry("Small base (*)", "An asterisk (*) next to a base size indicates a small base. Results should be interpreted with caution.")
   add_entry("Very small base (**)", "A double asterisk (**) indicates a very small base. Results are indicative only and should not be used for decision-making.")
   add_row("", "")
+
+  # === CONFIDENTIALITY / DISCLOSURE CONTROL ===
+  # Only shown when a confidentiality threshold (k > 1) is active, so guides for
+  # unprotected reports stay unchanged.
+  k_disc <- suppressWarnings(as.numeric(cfg_val("min_reporting_base", 1)))
+  if (length(k_disc) == 1 && !is.na(k_disc) && k_disc > 1) {
+    k_int <- as.integer(round(k_disc))
+    add_section("CONFIDENTIALITY (DISCLOSURE CONTROL)")
+    add_entry("Reporting threshold",
+              sprintf("A confidentiality threshold of %d has been applied. Any banner column based on fewer than %d respondents is withheld to protect the identity of individuals.",
+                      k_int, k_int))
+    add_entry(disclosure_marker(k_disc),
+              "Marks a withheld column: its base is below the reporting threshold, so its cells are left blank and the exact count is not shown.")
+    add_entry("Scope",
+              "This protects the crosstab cells and bases in this workbook. Columns at or above the threshold are reported in full.")
+    add_row("", "")
+  }
 
   # === BANNER COLUMNS ===
   if (!is.null(banner_info) && !is.null(banner_info$column_letters)) {

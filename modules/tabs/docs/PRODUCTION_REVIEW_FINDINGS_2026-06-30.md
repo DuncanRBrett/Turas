@@ -50,11 +50,14 @@ render gate also has unguarded paths, and fails open in one configuration.
   hides demographic *tags* but still renders every verbatim *text* (text is withheld only when the
   independent `text_mode='hidden'`). With the cut named in the filter bar, tag suppression is largely
   cosmetic. Fix: when `audienceTooSmall()`, withhold the quote list (or force text hidden), not just tags.
-- **B4 (high, completeness).** `excel_writer.R` `write_crosstab_workbook()` — the MAIN crosstab
-  workbook, the file analysts actually distribute, has **no** disclosure awareness at all; every below-k
-  sub-cut ships in full. Distinct from the §4 "complementary cell suppression follow-up" (that concerns
-  HTML tables). Fix: gate the workbook (blank sub-k cells + cover-sheet note), withhold it when `k>1`,
-  or at minimum warn loudly on the console that the threshold does not cover it.
+- **B4 (high, completeness). RESOLVED 2026-07-01.** The MAIN crosstab workbook — the file analysts
+  actually distribute — had **no** disclosure awareness; every below-k sub-cut shipped in full. *Pointer
+  correction:* the live writer is `workbook_builder.R` `write_single_question()` (→ `write_base_rows` +
+  `write_question_table_fast`), not the legacy/test-only `excel_writer.R` `write_crosstab_workbook()`. Fix:
+  `disclosure_suppressed_columns()` flags columns with unweighted base in `[1, k-1]`; withheld columns are
+  blanked with a `n<k` base marker + a Guide cover note; `k<=1` is byte-identical. Tested in
+  `test_workbook_builder.R`. The complementary (subtraction) suppression noted in §4 remains a follow-up on
+  BOTH the HTML and workbook paths (equal), not this item.
 - **B5 (high, completeness; = low A confirmed live).** `21d_disclosure.js:32` — `audienceBase()`
   returns `Infinity` when `TR.MICRO` is absent, so `audienceTooSmall()` is always false and tags render.
   `build_microdata()` degrades to NULL on any error (`run_crosstabs.R:728`), so `k=10` can silently do

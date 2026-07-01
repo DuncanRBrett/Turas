@@ -427,7 +427,8 @@ add_significance_row <- function(test_data, banner_info, row_type, internal_colu
 #' @return Integer, next row
 #' @export
 write_question_table_fast <- function(wb, sheet, data_table, banner_info,
-                                       internal_keys, styles, current_row) {
+                                       internal_keys, styles, current_row,
+                                       suppressed_idx = integer(0)) {
   if (is.null(data_table) || nrow(data_table) == 0) return(current_row)
 
   n_rows <- nrow(data_table)
@@ -444,6 +445,9 @@ write_question_table_fast <- function(wb, sheet, data_table, banner_info,
   total_col_idx <- which(internal_keys == total_key)
 
   for (i in seq_along(internal_keys)) {
+    # Disclosure control: a withheld column stays all-NA (blank) with no
+    # significance letters collected. No-op when suppressed_idx is empty.
+    if (i %in% suppressed_idx) next
     internal_key <- internal_keys[i]
     if (internal_key %in% names(data_table)) {
       col_data <- data_table[[internal_key]]

@@ -49,15 +49,30 @@ portrait 8; R island 54, report 20, join 44, quant-layer 16, data-layer 194, bun
 
 ## Outstanding (priority order)
 
-### 1. `#5` — main Excel workbook disclosure coverage  *(finishes the disclosure blocker)*
-`excel_writer.R` `write_crosstab_workbook()` has **no** disclosure awareness — the standalone `.xlsx` the
-pipeline writes ships every sub-k cut in full. Distinct code path from the HTML (the model-level fix does
-NOT reach it). Structure: col 1 = row label, col 2 = row type, **cols 3+ = banner columns**; each column's
-base = `question_bases[[key]]$unweighted` (see `write_base_rows`). Fix: when `config$min_reporting_base>1`,
-blank the cells + base of any column with unweighted base < k (write a marker, e.g. `n<k`) and add a
-cover-sheet note. **Complementary (subtraction) suppression across a banner group is a noted follow-up per
-the brief** — the first pass just blanks the small columns. Add a test in `test_data_layer_writer.R` /
-`test_excel_output.R`. **Until this ships, do not hand out the standalone workbook for a sensitive survey.**
+### ~~1. `#5` — main Excel workbook disclosure coverage~~ — **DONE (2026-07-01 session), tested**
+This **finishes the disclosure blocker**. Correction to the original pointer: the live workbook is NOT
+written by `excel_writer.R` `write_crosstab_workbook()` (that function is **legacy / test-only**). The live
+path is `workbook_builder.R` `create_crosstabs_workbook()` → `write_crosstabs_sheet()` →
+`write_single_question()` → `write_base_rows()` (excel_writer.R, bases) + `write_question_table_fast()`
+(run_crosstabs.R, cells). Implemented:
+- `disclosure_suppressed_columns()` (workbook_builder.R) returns the 1-based column indices whose
+  **unweighted** base is in `[1, k-1]` (`k = config$min_reporting_base`); base 0 never flagged; `k<=1`
+  returns `integer(0)` → **byte-identical when off**. Computed once per question in `write_single_question`.
+- `write_base_rows(..., suppressed_idx)` overwrites each withheld column's base cells with a marker
+  (`disclosure_marker(k)` → e.g. `n<10`) — more conservative than the HTML (which keeps the exact base),
+  deliberate for a distributed file.
+- `write_question_table_fast(..., suppressed_idx)` blanks a withheld column (leaves its NA-initialised
+  matrix column, collects **no** significance letters for it).
+- `create_guide_sheet()` gains a **CONFIDENTIALITY (DISCLOSURE CONTROL)** section, gated on `k>1`.
+- Tests: `test_workbook_builder.R` — pure `disclosure_suppressed_columns`/`disclosure_marker` unit tests +
+  an end-to-end `create_crosstabs_workbook` read-back proving Female (n=3) blanks with a `n<10` marker while
+  Male (n=50)/Total stay intact, and `k=1` is unmarked/full. (Also defined the missing `SIG2_ROW_TYPE`
+  constant in that file's setup — two `create_crosstabs_workbook` tests were silently isolation-broken.)
+- **Follow-ups (documented, not done, NOT leaks of the withheld column's own values):** (a) letters that
+  point AT a withheld column are not stripped from other columns — letters restart per banner group, so a
+  global strip would be unsafe across banners; (b) complementary (subtraction) suppression across a banner
+  group — same deferral as the HTML side (`applyDisclosureSuppression` calls it "the next increment").
+  The workbook is now at **parity** with the HTML's protection level.
 
 ### 2. `#8` — weighted wave-on-wave significance uses the unweighted base  *(fully scoped)*
 `22w_waves.js`: `sdOfScores` computes the Kish `effN` (line ~201) but the sig tests `meanLevel`/`propLevel`
@@ -102,8 +117,9 @@ tracker path awaits a real weighted-project run; don't rush sig math.
 
 ## Merge gate
 
-- **Disclosure (the hard blocker):** comment side + quant HTML suppression **done**; `#5` (Excel workbook)
-  is the last piece before it's fully closed.
+- **Disclosure (the hard blocker): CLOSED.** comment side + quant HTML suppression + `#5` (standalone Excel
+  workbook) all **done**. Residual complementary-subtraction suppression is a documented follow-up on both
+  the HTML and workbook paths (equal on both), separately tracked — not a merge blocker.
 - **Weighted/census stats:** `#6` done (crosstab); `#8` (wave sig) + `#7` (FPC/parity) remain — block for
   weighted/census deliverables.
 - The cluster-3/4/5 mediums are fix-forward, not individually merge-blocking.

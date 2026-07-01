@@ -97,6 +97,8 @@ if (!exists("TOTAL_COLUMN", envir = globalenv()))
   assign("TOTAL_COLUMN", "Total", envir = globalenv())
 if (!exists("SIG_ROW_TYPE", envir = globalenv()))
   assign("SIG_ROW_TYPE", "Sig.", envir = globalenv())
+if (!exists("SIG2_ROW_TYPE", envir = globalenv()))
+  assign("SIG2_ROW_TYPE", "Sig.2", envir = globalenv())
 
 # Extract write_question_table_fast from run_crosstabs.R
 # (it lives there, not in excel_writer.R)
@@ -492,4 +494,175 @@ test_that("handles empty all_results gracefully", {
   # Crosstabs sheet should still exist even with no questions
   sheet_names <- openxlsx::getSheetNames(tmp)
   expect_true("Crosstabs" %in% sheet_names)
+})
+
+
+# ==============================================================================
+# 5. Disclosure control — the standalone workbook (#5)
+# ==============================================================================
+#
+# The distributed .xlsx is a distinct code path from the HTML report and does
+# NOT inherit the JS render-time gate. When min_reporting_base (k) > 1 it must
+# withhold any banner column based on 1..k-1 respondents (blank cells + a "n<k"
+# base marker); when k <= 1 it must be byte-identical to the unprotected output.
+
+context("disclosure_suppressed_columns / disclosure_marker")
+
+test_that("disclosure_marker formats the threshold", {
+  expect_equal(disclosure_marker(10), "n<10")
+  expect_equal(disclosure_marker(5), "n<5")
+  expect_equal(disclosure_marker(3.0), "n<3")
+})
+
+test_that("flags only columns with base in [1, k-1]", {
+  banner_info <- make_wb_test_banner_info()
+  bases <- list(
+    "TOTAL::Total"  = list(unweighted = 100),
+    "Gender::Male"  = list(unweighted = 50),
+    "Gender::Female" = list(unweighted = 3)
+  )
+  # k = 10 -> Female (base 3) is the 3rd column
+  expect_equal(
+    disclosure_suppressed_columns(bases, banner_info, list(min_reporting_base = 10)),
+    3L
+  )
+  # base exactly k is NOT suppressed (strict <)
+  bases$`Gender::Female`$unweighted <- 10
+  expect_equal(
+    length(disclosure_suppressed_columns(bases, banner_info, list(min_reporting_base = 10))),
+    0
+  )
+  # base = k - 1 IS suppressed
+  bases$`Gender::Female`$unweighted <- 9
+  expect_equal(
+    disclosure_suppressed_columns(bases, banner_info, list(min_reporting_base = 10)),
+    3L
+  )
+})
+
+test_that("base of 0 is never flagged (already empty, nothing to hide)", {
+  banner_info <- make_wb_test_banner_info()
+  bases <- list(
+    "TOTAL::Total"  = list(unweighted = 100),
+    "Gender::Male"  = list(unweighted = 50),
+    "Gender::Female" = list(unweighted = 0)
+  )
+  expect_equal(
+    length(disclosure_suppressed_columns(bases, banner_info, list(min_reporting_base = 10))),
+    0
+  )
+})
+
+test_that("k <= 1 or missing disables the control (byte-identical off)", {
+  banner_info <- make_wb_test_banner_info()
+  bases <- list(
+    "TOTAL::Total"  = list(unweighted = 100),
+    "Gender::Male"  = list(unweighted = 50),
+    "Gender::Female" = list(unweighted = 3)
+  )
+  expect_equal(length(disclosure_suppressed_columns(bases, banner_info, list(min_reporting_base = 1))), 0)
+  expect_equal(length(disclosure_suppressed_columns(bases, banner_info, list())), 0)
+  expect_equal(length(disclosure_suppressed_columns(bases, banner_info, list(min_reporting_base = NA))), 0)
+  expect_equal(length(disclosure_suppressed_columns(NULL, banner_info, list(min_reporting_base = 10))), 0)
+})
+
+
+# A question whose Female column is a sub-k cut (base 3); Female carries
+# distinctive frequency values (2, 1) we can look for in the written sheet.
+make_disc_results <- function(female_base = 3) {
+  list(
+    Q1 = list(
+      question_code = "Q1",
+      question_text = "How satisfied?",
+      question_type = "Single_Response",
+      table = data.frame(
+        RowLabel = c("Satisfied", "Satisfied", "Neutral", "Neutral"),
+        RowType = c("Frequency", "Column %", "Frequency", "Column %"),
+        "TOTAL::Total"  = c(60, 60.0, 40, 40.0),
+        "Gender::Male"  = c(35, 70.0, 15, 30.0),
+        "Gender::Female" = c(2, 66.7, 1, 33.3),
+        check.names = FALSE, stringsAsFactors = FALSE
+      ),
+      bases = list(
+        "TOTAL::Total"  = list(unweighted = 100, weighted = 100, effective = 100),
+        "Gender::Male"  = list(unweighted = 50, weighted = 50, effective = 50),
+        "Gender::Female" = list(unweighted = female_base, weighted = female_base,
+                                effective = female_base)
+      ),
+      base_filter = NULL
+    )
+  )
+}
+
+# Build a workbook and read the Crosstabs sheet back as a character matrix.
+build_and_read_crosstabs <- function(config) {
+  tmp <- tempfile(fileext = ".xlsx")
+  create_crosstabs_workbook(
+    all_results = make_disc_results(female_base = 3),
+    composite_results = list(), composite_defs = NULL,
+    survey_structure = make_wb_test_survey_structure(),
+    survey_data = make_wb_test_survey_data(n = 100),
+    banner_info = make_wb_test_banner_info(),
+    config_obj = config, error_log = create_error_log(),
+    trs_state = NULL, run_status = "PASS",
+    skipped_questions = list(), partial_questions = list(),
+    processed_questions = c("Q1"),
+    crosstab_questions = data.frame(
+      Variable_Name = "Q1", Variable_Label = "How satisfied?",
+      Variable_Type = "Single_Response", stringsAsFactors = FALSE
+    ),
+    effective_n = 100, master_weights = rep(1, 100),
+    output_path = tmp, script_version = "10.2.0"
+  )
+  mat <- openxlsx::read.xlsx(tmp, sheet = "Crosstabs", colNames = FALSE,
+                             skipEmptyRows = FALSE)
+  guide <- openxlsx::read.xlsx(tmp, sheet = "Guide", colNames = FALSE,
+                               skipEmptyRows = FALSE)
+  unlink(tmp)
+  list(
+    total  = as.character(mat[[3]]),   # col 3 = Total
+    male   = as.character(mat[[4]]),   # col 4 = Male (safe, base 50)
+    female = as.character(mat[[5]]),   # col 5 = Female (sub-k, base 3)
+    guide  = as.character(unlist(guide))
+  )
+}
+
+context("standalone workbook withholds sub-k columns")
+
+test_that("k = 10 blanks the Female sub-k column and marks its base", {
+  config <- make_wb_test_config()
+  config$min_reporting_base <- 10
+  r <- build_and_read_crosstabs(config)
+
+  # Marker present in the withheld column, absent from safe column + Total
+  expect_true("n<10" %in% r$female)
+  expect_false("n<10" %in% r$male)
+  expect_false("n<10" %in% r$total)
+
+  # Female's own values are gone (frequencies 2 and 1, col% 66.7)
+  expect_false("2" %in% r$female)
+  expect_false("1" %in% r$female)
+  expect_false("66.7" %in% r$female)
+
+  # Safe column is untouched (control: Male freq 35 still reported)
+  expect_true("35" %in% r$male)
+  # Total is untouched
+  expect_true("60" %in% r$total)
+
+  # Guide gained the confidentiality note referencing the threshold
+  expect_true(any(grepl("CONFIDENTIALITY", r$guide)))
+  expect_true(any(grepl("n<10", r$guide)))
+})
+
+test_that("k = 1 (off) reports the Female column in full — no marker, no note", {
+  config <- make_wb_test_config()
+  config$min_reporting_base <- 1
+  r <- build_and_read_crosstabs(config)
+
+  # No marker anywhere; Female's data is reported
+  expect_false(any(grepl("^n<", r$female)))
+  expect_true("2" %in% r$female)   # Female freq reported when off
+
+  # No confidentiality note in the Guide
+  expect_false(any(grepl("CONFIDENTIALITY", r$guide)))
 })

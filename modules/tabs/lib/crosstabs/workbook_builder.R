@@ -336,6 +336,60 @@ create_run_status_sheet <- function(wb, trs_state, run_status,
 
 
 # ==============================================================================
+# DISCLOSURE CONTROL (workbook)
+# ==============================================================================
+
+#' Confidentiality marker for a withheld column
+#'
+#' The label written into a suppressed column's base cells, e.g. "n<10".
+#'
+#' @param k Numeric, the confidentiality threshold (min_reporting_base)
+#' @return Character scalar marker
+#' @keywords internal
+disclosure_marker <- function(k) {
+  k_int <- suppressWarnings(as.integer(round(as.numeric(k))))
+  if (length(k_int) == 0 || is.na(k_int)) "n<k" else sprintf("n<%d", k_int)
+}
+
+#' Banner columns to withhold for disclosure control
+#'
+#' Returns the 1-based indices (into \code{banner_info$internal_keys} /
+#' \code{$columns}) of banner columns whose UNWEIGHTED reporting base falls in
+#' \code{[1, k-1]}, where \code{k = config$min_reporting_base}. Such a column
+#' describes a handful of identifiable people, so the distributed \code{.xlsx}
+#' must withhold its cells and base — the standalone workbook is a distinct code
+#' path from the HTML report and does not inherit the JS render-time gate.
+#'
+#' A base of 0 is already empty (nothing to hide) and is never flagged;
+#' \code{k <= 1} disables the control and returns \code{integer(0)}, so
+#' unprotected workbooks stay byte-identical. Suppression is decided per question
+#' (each question carries its own per-column bases).
+#'
+#' NOTE (follow-up, per the production-review brief): this first pass blanks the
+#' small columns only. It does NOT yet strip significance letters that point AT a
+#' withheld column (letters restart per banner group, so a global strip would be
+#' unsafe across banners), nor apply complementary subtraction suppression across
+#' a banner group. Neither is a leak of the withheld column's own values.
+#'
+#' @param question_bases List keyed by internal_key, each with \code{$unweighted}
+#' @param banner_info List with \code{internal_keys}
+#' @param config List with \code{min_reporting_base}
+#' @return Integer vector of 1-based column indices to withhold (possibly empty)
+#' @keywords internal
+disclosure_suppressed_columns <- function(question_bases, banner_info, config) {
+  k <- suppressWarnings(as.numeric(config$min_reporting_base))
+  if (length(k) == 0 || is.na(k) || k <= 1) return(integer(0))
+  if (is.null(question_bases)) return(integer(0))
+  keys <- banner_info$internal_keys
+  idx <- integer(0)
+  for (i in seq_along(keys)) {
+    b <- suppressWarnings(as.numeric(question_bases[[keys[i]]]$unweighted))
+    if (length(b) == 1 && !is.na(b) && b >= 1 && b < k) idx <- c(idx, i)
+  }
+  idx
+}
+
+# ==============================================================================
 # CROSSTABS SHEET
 # ==============================================================================
 
@@ -404,15 +458,22 @@ write_single_question <- function(wb, sheet, question_results, q_code,
       current_row <- current_row + 1
     }
 
+    # Disclosure control: withhold banner columns whose reporting base is below
+    # the confidentiality threshold (base 1..k-1). Empty unless k > 1, so
+    # unprotected workbooks are byte-identical.
+    suppressed_idx <- disclosure_suppressed_columns(
+      question_results$bases, banner_info, config_obj
+    )
+
     # Write base rows
     current_row <- write_base_rows(wb, sheet, banner_info,
                                    question_results$bases, styles,
-                                   current_row, config_obj)
+                                   current_row, config_obj, suppressed_idx)
 
     # Write question table
     current_row <- write_question_table_fast(wb, sheet, question_results$table,
                                               banner_info, banner_info$internal_keys,
-                                              styles, current_row)
+                                              styles, current_row, suppressed_idx)
 
     # Add spacing
     current_row <- current_row + 1
