@@ -95,6 +95,16 @@
     var subBits = [];
     if (p.client) subBits.push(fmt.escapeHtml(p.client));
     subBits.push("<strong>interactive report</strong>");
+    // At-a-glance weighting indicator (weighted reports only), so the reader is
+    // never left guessing whether the figures are weighted. Names the weight
+    // variable in a tooltip when known.
+    if (p.weighted) {
+      subBits.push('<strong class="hdr-wt"' +
+        (p.weight_variable
+          ? ' title="Figures weighted by ‘' + fmt.escapeHtml(p.weight_variable) + '’"'
+          : ' title="Figures are weighted"') +
+        ">weighted data</strong>");
+    }
     subBits.push("single file &middot; works offline");
     return '<header class="hdr"><div class="hdr-in">' +
       '<div class="hdr-brand">' + brandmark +

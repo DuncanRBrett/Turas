@@ -58,6 +58,10 @@
         label: TR.AGG.columns[ci].label,
         letter: ci === 0 ? "" : TR.AGG.columns[ci].letter,
         base: base,
+        // Weighted designs also carry the weighted base + Kish effective base so
+        // the renderer can show them (null on unweighted -> no extra rows).
+        baseW: q.bases[ci] ? (q.bases[ci].nWeighted != null ? q.bases[ci].nWeighted : null) : null,
+        baseEff: q.bases[ci] ? (q.bases[ci].nEff != null ? q.bases[ci].nEff : null) : null,
         low: q.bases[ci] ? !!q.bases[ci].low : false
       };
       // Finite population correction: when a universe N is known for the column,
@@ -140,6 +144,10 @@
     var columns = spec.columns.map(function (col, i) {
       return { label: col.label, letter: col.letter,
         base: canRecompute ? tabs[i].base : null,
+        // Weighted base (Σw) + Kish effective base for the base-row display;
+        // the renderer only shows them on a weighted report.
+        baseW: canRecompute ? tabs[i].wbase : null,
+        baseEff: canRecompute ? tabs[i].effBase : null,
         low: canRecompute && tabs[i].base < threshold };
     });
 

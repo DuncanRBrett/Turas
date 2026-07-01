@@ -160,7 +160,15 @@
     });
     out.push("</tr></thead><tbody>");
     var ivLabels = opts.intervals ? TR.conf.labels() : null;
-    out.push('<tr class="rb"><td class="lab">Base (n=)</td>');
+    // Weighted designs: the primary row is the unweighted sample size (it anchors
+    // the low-base flag); the weighted + Kish effective bases follow beneath, so
+    // the reader can see the report IS weighted and read the design effect. The
+    // rows mirror the Excel workbook. Unweighted reports keep the single "Base
+    // (n=)" row unchanged.
+    var wproj = (TR.AGG && TR.AGG.project) || {};
+    var wtd = !!wproj.weighted;
+    out.push('<tr class="rb"><td class="lab">' +
+      (wtd ? "Base (unweighted)" : "Base (n=)") + "</td>");
     model.columns.forEach(function (col) {
       // Worst-case margin is sized on the finite-population-corrected effective
       // base when a universe is known (Infinity -> ±0.0pp for a full census).
@@ -190,6 +198,28 @@
           : "") + "</td>");
     });
     out.push("</tr>");
+
+    // Weighted base + Kish effective base rows (weighted reports only; the
+    // per-column values come from the data layer / recompute, rounded like the
+    // workbook). Effective base is gated by the report's show_effective_n.
+    if (wtd) {
+      out.push('<tr class="rb"><td class="lab">Base (weighted)</td>');
+      model.columns.forEach(function (col) {
+        out.push("<td>" +
+          (col.baseW != null ? fmt.base(col.baseW) : "–") + "</td>");
+      });
+      out.push("</tr>");
+      if (wproj.show_effective_n !== false) {
+        out.push('<tr class="rb"><td class="lab" title="Kish effective sample ' +
+          'size — significance and confidence intervals are sized on this, not ' +
+          'the raw count">Effective base</td>');
+        model.columns.forEach(function (col) {
+          out.push("<td>" +
+            (col.baseEff != null ? fmt.base(col.baseEff) : "–") + "</td>");
+        });
+        out.push("</tr>");
+      }
+    }
 
     model.rows.forEach(function (row, ri) {
       var cls = row.kind === "net" ? "rn" : row.kind === "mean" ? "rm" : "rc";

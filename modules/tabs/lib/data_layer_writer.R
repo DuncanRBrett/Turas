@@ -163,7 +163,22 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # expose per column, so the report's FPC re-letters significance only when
   # unweighted. Carried for the renderer to gate that (intervals are FPC'd
   # regardless). Omitted when FALSE -> unweighted reports unchanged.
-  if (isTRUE(config_obj$apply_weighting)) proj$weighted <- TRUE
+  if (isTRUE(config_obj$apply_weighting)) {
+    proj$weighted <- TRUE
+    # Surface the weighting to the reader (badge + base rows), mirroring the
+    # Excel workbook. The per-column weighted/effective bases already ride in
+    # each question's `bases` (nWeighted/nEff); these just drive the display.
+    wl <- config_obj$weight_label
+    if (!is.null(wl) && length(wl) >= 1 && !is.na(wl[1]) && nzchar(trimws(wl[1])))
+      proj$weight_label <- as.character(wl[1])
+    wv <- config_obj$weight_variable
+    if (!is.null(wv) && length(wv) >= 1 && !is.na(wv[1]) && nzchar(trimws(wv[1])))
+      proj$weight_variable <- as.character(wv[1])
+    # Base-row visibility, matching the workbook's show_unweighted_n /
+    # show_effective_n (the weighted base row always shows on a weighted report).
+    proj$show_unweighted_n <- isTRUE(config_obj$show_unweighted_n)
+    proj$show_effective_n  <- isTRUE(config_obj$show_effective_n)
+  }
   # Inline researcher / client logos as data URIs when configured; omit (the
   # renderer shows the brand dot) otherwise. researcher_logo_path falls back to
   # the legacy single logo_path, mirroring the classic report.

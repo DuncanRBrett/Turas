@@ -361,6 +361,37 @@ test_that("project carries the disclosure threshold only when engaged (>1)", {
   expect_null(p2$min_reporting_base)
 })
 
+test_that("project surfaces weighting metadata only when weighted", {
+  # unweighted default -> no weighting fields at all (byte-identical)
+  p0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$project
+  expect_null(p0$weighted)
+  expect_null(p0$weight_label)
+  expect_null(p0$weight_variable)
+  expect_null(p0$show_unweighted_n)
+  expect_null(p0$show_effective_n)
+
+  # weighted -> flag + label + variable + base-row visibility for the renderer
+  p1 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(apply_weighting = TRUE,
+                                        weight_label = "Weighted",
+                                        weight_variable = "weight",
+                                        show_unweighted_n = TRUE,
+                                        show_effective_n = TRUE))$project
+  expect_true(p1$weighted)
+  expect_equal(p1$weight_label, "Weighted")
+  expect_equal(p1$weight_variable, "weight")
+  expect_true(p1$show_unweighted_n)
+  expect_true(p1$show_effective_n)
+
+  # weighted but no optional label/variable -> those omitted, flag still carried
+  p2 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(apply_weighting = TRUE))$project
+  expect_true(p2$weighted)
+  expect_null(p2$weight_label)
+  expect_null(p2$weight_variable)
+  expect_false(p2$show_effective_n)
+})
+
 # ==============================================================================
 # 2. project block
 # ==============================================================================
