@@ -287,5 +287,30 @@ assert(qual.hubsForMark("Q1", 0).length === 1 && qual.hubsForMark("Q1", 0)[0].id
 const h3 = qual.hubCreate("Third");
 assert(h3 !== h1 && parseInt(h3, 10) > parseInt(h2, 10), "hub ids are monotonic — a deleted id is never reissued");
 
+// hub insight + distinct-respondent gate + Story exhibit (step 3)
+assert(qual.hubSetInsight(h2, "Masters want faster support") === true, "hubSetInsight true on a real hub");
+assert(qual.hubGet(h2).insight === "Masters want faster support", "hubSetInsight stores the finding");
+assert(qual.hubSetInsight("nope", "x") === false, "hubSetInsight false on an unknown id");
+assert(qual.hubDistinctRespondents([{ record: { idx: 0 } }, { record: { idx: 0 } }, { record: { idx: 3 } }]) === 2,
+  "hubDistinctRespondents counts distinct respondents (idx), not comments");
+
+const exItems = [
+  { qcode: "Q1", record: { idx: 0, sentiment: 1, text: "great value", demos: { Campus: "Cape Town" } }, question: { title: "Why recommend?" } },
+  { qcode: "Q2", record: { idx: 1, sentiment: 3, text: "slow", demos: { Campus: "Durban" } }, question: { title: "Anything else?" } }
+];
+const ex = qual.hubExhibit({ name: "Masters", insight: "Faster support wanted" }, exItems, { coverage: "2 of 5 marks", safeDemos: true });
+assert(ex.title === "Masters" && ex.context === "Faster support wanted", "hubExhibit: title = hub name, context = insight");
+assert(ex.html.indexOf("Masters") >= 0 && ex.html.indexOf("Faster support wanted") >= 0 &&
+  ex.html.indexOf("great value") >= 0 && ex.html.indexOf("Cape Town") >= 0,
+  "hubExhibit html carries the name, insight, quotes + demo code (safeDemos)");
+assert(ex.lines[0] === "Masters" && ex.lines.indexOf("Faster support wanted") >= 0 &&
+  ex.lines.some((l) => l.indexOf("great value") >= 0), "hubExhibit lines carry the finding + quotes for the deck");
+const exSafe = qual.hubExhibit({ name: "X", insight: "" }, exItems, { safeDemos: false });
+assert(exSafe.html.indexOf("Cape Town") < 0, "hubExhibit safeDemos=false drops the demographic code");
+const many = [];
+for (let i = 0; i < 11; i++) many.push({ qcode: "Q1", record: { idx: i, text: "c" + i, demos: {} }, question: { title: "Q" } });
+assert(qual.hubExhibit({ name: "Big", insight: "" }, many, { cap: 8 }).html.indexOf("+ 3 more comments in this hub") >= 0,
+  "hubExhibit caps quotes at `cap` and notes the remainder");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

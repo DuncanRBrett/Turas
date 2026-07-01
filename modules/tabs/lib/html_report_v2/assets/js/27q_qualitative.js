@@ -522,6 +522,7 @@
       if (!h.marks || typeof h.marks !== "object") h.marks = {};
       h.id = id;
       h.name = (typeof h.name === "string" && h.name) ? h.name : "Untitled hub";
+      if (typeof h.insight !== "string") h.insight = "";
     });
     return { seq: seq, order: order, byId: byId };
   }
@@ -557,7 +558,7 @@
     var s = hubsStore();
     s.seq += 1;
     var id = String(s.seq);
-    s.byId[id] = { id: id, name: (name || "").trim() || "Untitled hub", marks: {} };
+    s.byId[id] = { id: id, name: (name || "").trim() || "Untitled hub", insight: "", marks: {} };
     s.order.push(id);
     hubsPersist();
     return id;
@@ -597,6 +598,68 @@
     var s = hubsStore(), k = markKey(qcode, idx), out = [];
     s.order.forEach(function (id) { if (s.byId[id].marks[k]) out.push({ id: id, name: s.byId[id].name }); });
     return out;
+  };
+  qual.hubSetInsight = function (id, text) {
+    var h = hubsStore().byId[id];
+    if (!h) return false;
+    h.insight = String(text == null ? "" : text);
+    hubsPersist();
+    return true;
+  };
+  /** Distinct respondents behind a set of collected items (idx == the respondent). The
+   *  privacy unit for the hub k-gate: a named hub that isolates fewer than k distinct
+   *  respondents must not be exported to the report. */
+  qual.hubDistinctRespondents = function (items) {
+    var seen = {};
+    (items || []).forEach(function (it) { if (it && it.record) seen[it.record.idx] = 1; });
+    return Object.keys(seen).length;
+  };
+
+  /**
+   * Build a Story exhibit for a hub — its name, its one-line insight (the finding), a
+   * coverage line, and up to `cap` illustrative quotes (with a compact demographic code
+   * when safeDemos) + a "+N more" note. Returns a pinSnapshot payload
+   * { source, title, context, html, lines }. Pure + node-testable — the html is what the
+   * Story renders, the lines are what the deck export rasterises.
+   */
+  qual.hubExhibit = function (hub, items, opts) {
+    opts = opts || {};
+    var cap = opts.cap > 0 ? opts.cap : 8;
+    var name = (hub && hub.name) || "Hub";
+    var insight = ((hub && hub.insight) || "").trim();
+    var coverage = (opts.coverage || "").trim();
+    var safeDemos = opts.safeDemos !== false;
+    var shown = (items || []).slice(0, cap);
+    var moreN = (items || []).length - shown.length;
+    var demoCode = function (r) {
+      if (!safeDemos || !r.demos) return "";
+      return Object.keys(r.demos).filter(function (k) { return r.demos[k] != null; })
+        .map(function (k) { return r.demos[k]; }).join(" · ");
+    };
+    var qhtml = shown.map(function (it) {
+      var r = it.record, sent = SENT[r.sentiment] || "neu";
+      var txt = r.text == null ? "[quote hidden]" : r.text;
+      var code = demoCode(r), cite = esc(it.question.title) + (code ? " · " + esc(code) : "");
+      return '<blockquote class="ql-exq ' + sent + '">' + esc(txt) + "<cite>" + cite + "</cite></blockquote>";
+    }).join("");
+    var html = '<div class="ql-exhibit" data-exhibit="hub"><div class="ql-exhead">' +
+      '<span class="ql-exkicker">Comment hub</span><h3 class="ql-extitle">' + esc(name) + "</h3>" +
+      (insight ? '<p class="ql-exins">' + esc(insight) + "</p>" : "") +
+      (coverage ? '<p class="ql-excov">' + esc(coverage) + "</p>" : "") + "</div>" +
+      qhtml +
+      (moreN > 0 ? '<p class="ql-exmore">+ ' + moreN + " more comment" + (moreN === 1 ? "" : "s") + " in this hub</p>" : "") +
+      "</div>";
+    var lines = [name];
+    if (insight) lines.push(insight);
+    if (coverage) lines.push(coverage);
+    shown.forEach(function (it) {
+      var r = it.record;
+      if (r.text == null) return;
+      var code = demoCode(r);
+      lines.push("“" + r.text + "” — " + it.question.title + (code ? " (" + code + ")" : ""));
+    });
+    if (moreN > 0) lines.push("+ " + moreN + " more");
+    return { source: "qualitative", title: name, context: insight || coverage, html: html, lines: lines };
   };
 
   function findQ(island, code) {
@@ -1176,7 +1239,7 @@
       : pool.items;
     var groupBy = st.groupBy === "theme" ? "theme" : "question";
     var shown = cutFilters ? filterItems(base, cutFilters) : base;
-    qual._colview = { island: island, items: shown };      // for the export handler
+    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
     var groups = qual.groupCollection(island, shown, groupBy);
 
     var toggle = '<div class="ql-seg" role="tablist" aria-label="Group the collection by">' +
@@ -1196,6 +1259,32 @@
       'in this data run — re-mark to refresh them">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
 
+    // Plain-text coverage for the Story exhibit + the promote context on _colview.
+    var coverPlain = "Illustrating " + shown.length + " of " + scopeTotal + noun +
+      (activeHub ? (" in " + activeHub.name) : "") + (cutDesc ? " · " + cutDesc : "");
+    qual._colview = { island: island, items: shown, hub: activeHub, coverPlain: coverPlain, safeDemos: safeDemos };
+
+    // A selected hub gets an insight field (the one-line finding) + "Add to story". The
+    // promote is gated: a hub that isolates fewer than k distinct respondents must not be
+    // exported to the report (the §4 hub k-gate at save/export; block-mode for now).
+    var insightBlock = "";
+    if (activeHub) {
+      var hubSmall = TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
+        qual.hubDistinctRespondents(shown) < TR.disclosure.minBase();
+      var promote = shown.length === 0
+        ? '<span class="ql-hubsmall">add comments to build this hub’s story</span>'
+        : hubSmall
+          ? '<span class="ql-hubsmall" title="This hub isolates fewer than the confidentiality threshold of ' +
+            TR.disclosure.minBase() + ' respondents">🛡 below the confidentiality threshold — can’t add to the report</span>'
+          : '<button class="ql-hubpromote" data-hub-promote ' +
+            'title="Add this hub — its finding + quotes — to the Story tab">📌 Add to story</button>';
+      insightBlock = '<div class="insight ql-hubinsight"><div class="insight-head">Hub insight — the one-line finding' +
+        '<span class="ql-xspacer"></span>' + promote + "</div>" +
+        '<textarea class="ql-hubinstext" data-hub-insight ' +
+        'placeholder="What’s the story of this hub? (one line — travels to the report when you add it to the Story)">' +
+        esc(activeHub.insight || "") + "</textarea></div>";
+    }
+
     var ctx = { hubs: qual.hubList(), pickFor: st.hubPickFor };
     var emptyMsg = activeHub
       ? ("“" + esc(activeHub.name) + "” is empty here — switch to All marks and use ＋ Hub on a comment to add it.")
@@ -1208,7 +1297,7 @@
         }).join("")
       : '<p class="ql-empty">' + emptyMsg + "</p>";
 
-    return head + hubBar +
+    return head + hubBar + insightBlock +
       '<div class="ql-controls"><span class="ql-ctrllbl">Group your marks:</span>' + toggle + actions + "</div>" +
       '<div class="ql-colcover">' + cover + "</div>" +
       '<div class="ql-drawer ql-coldrawer">' + cards + "</div>";
@@ -1381,6 +1470,21 @@
     var pickGo = byId("data-hubpicknewgo");
     if (pickGo) pickGo.addEventListener("click", function () { commitPickNewHub(host, st, pickGo.getAttribute("data-hubpicknewgo")); });
     on("data-hubpickdone", function () { st.hubPickFor = null; qual.render(host); });
+    // hub insight (persist on input, NO re-render so the cursor stays put) + promote to story
+    var ins = host.querySelector("[data-hub-insight]");
+    if (ins) ins.addEventListener("input", function () { if (st.hub != null) qual.hubSetInsight(st.hub, ins.value); });
+    var promote = host.querySelector("[data-hub-promote]");
+    if (promote) promote.addEventListener("click", function () {
+      var v = qual._colview;
+      if (!v || !v.hub || !TR.story2 || !TR.story2.pinSnapshot) return;
+      // privacy gate: never export a hub that isolates fewer than k distinct respondents.
+      if (TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
+          qual.hubDistinctRespondents(v.items) < TR.disclosure.minBase()) {
+        if (TR.shell && TR.shell.toast) TR.shell.toast("Hub is below the confidentiality threshold — not added to the story");
+        return;
+      }
+      TR.story2.pinSnapshot(qual.hubExhibit(v.hub, v.items, { coverage: v.coverPlain, safeDemos: v.safeDemos }));
+    });
     // Enter submits / Escape cancels the inline inputs; focus the header edit input.
     var enterKey = function (sel, go, esc) {
       var el = host.querySelector(sel);
