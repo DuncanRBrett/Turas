@@ -262,14 +262,29 @@
    *  to rasterise arbitrary HTML, so it renders the same content as a card). */
   shell.snapshotLines = function (cardEl) {
     var out = [];
+    function add(t) {
+      t = (t || "").replace(/\s+/g, " ").trim();
+      if (t && out.indexOf(t) === -1) out.push(t);
+    }
+    // headings / captions / prose — skip anything inside a table, whose cells are
+    // harvested row-by-row below so the tabular layout survives.
     cardEl.querySelectorAll(
       "h1,h2,h3,h4,strong,p,li,.tko-take,.tko-note,.tko-cap,.df-sentence,.df-beats,.gv,.gt"
     ).forEach(function (el) {
-      if (el.closest(".snap-pin")) return;
-      var t = (el.textContent || "").replace(/\s+/g, " ").trim();
-      if (t && out.indexOf(t) === -1) out.push(t);
+      if (el.closest(".snap-pin") || el.closest("table")) return;
+      add(el.textContent);
     });
-    return out.slice(0, 14);
+    // Table rows: join each row's cells so a pinned crosstab carries its NUMBERS,
+    // not just its title (I1 — the deck/PNG export had the caption but no figures).
+    cardEl.querySelectorAll("table tr").forEach(function (tr) {
+      if (tr.closest(".snap-pin")) return;
+      var cells = [];
+      tr.querySelectorAll("th,td").forEach(function (c) {
+        cells.push((c.textContent || "").replace(/\s+/g, " ").trim());
+      });
+      add(cells.filter(function (x) { return x !== ""; }).join(" · "));
+    });
+    return out.slice(0, 20);
   };
 
   shell.toast = function (message) {
