@@ -5,6 +5,36 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Tabs: Qualitative tab** — a dedicated view for pre-coded open-end / verbatim
+  comments in the v2 interactive report. Coded themes are treated as ordinary quant
+  (a multi-mention variable, each mention carrying a 1/2/3 sentiment valence), so
+  theme prevalence, theme×banner crosstabs, significance and the global composite
+  filter all flow through the existing engine — zero new stats. Reading path: a
+  per-question prevalence board (salience, i.e. raised unprompted, with a diverging
+  sentiment split that is never sized by volume) plus a verbatim drawer with a
+  noteworthy-tier filter, a sentiment filter (only where coded), select-to-highlight,
+  a ★ shortlist and an Excel export. A 💬 affordance jumps from a closed / composite
+  finding to the open-end comments behind it, in the active cut. Verbatim
+  confidentiality has three modes (hidden / redacted / full) and a demographic-cuts
+  dial; a disclosure control (`min_reporting_base`) suppresses small-cell detail at
+  render and export. Fully additive: with no qualitative workbook configured, every
+  report is byte-identical. See `modules/tabs/docs/QUALITATIVE_TAB_BUILD_NOTES.md`.
+- **Tabs: Comment Hubs** — named collections over the pool of shortlisted +
+  highlighted comments. "★ Your collection" gathers every mark across all questions
+  into one place (group by question or theme, honouring the audience filter — so a
+  filter to e.g. Master's gives "Master's reactions across questions"). Named reader
+  hubs let you file comments into "Master's students", "account issues", etc.; filing
+  a comment in a hub is itself a way to save it (shortlist and hub in one), from the
+  question list or the collection, via a scalable add-to-hub dropdown. Each hub
+  carries a one-line analyst insight and promotes into the Story as a clean exhibit
+  (name + finding + coverage + quotes) that exports to PowerPoint. A named hub is
+  independent of the audience filter; a hub whose distinct-respondent count is below
+  the disclosure threshold keeps its comments but drops the demographic tags.
+  Non-destructive by construction — hubs are views over the pool, never containers,
+  so no mark is ever mutated. Reader hubs persist per report in the browser
+  (localStorage); baking authored hubs into a delivered saved copy (with the
+  privacy-clear at save) is the remaining step. See
+  `modules/tabs/docs/COMMENT_HUBS_PLAN.md`.
 - **Tabs: Finite population correction (FPC)** — for census / full-invite
   studies (e.g. staff or student surveys) where the universe is small and only
   part of it responds. A new `population_size` setting (study total) and an
