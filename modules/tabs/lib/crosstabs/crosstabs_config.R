@@ -161,6 +161,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     weight_variable = get_config_value(config, "weight_variable", NULL),
     show_unweighted_n = safe_logical(get_config_value(config, "show_unweighted_n", TRUE)),
     show_effective_n = safe_logical(get_config_value(config, "show_effective_n", TRUE)),
+    show_weighted_base = safe_logical(get_config_value(config, "show_weighted_base", TRUE)),
     weight_label = get_config_value(config, "weight_label", "Weighted"),
 
     # Display settings
@@ -697,7 +698,8 @@ load_crosstabs_config <- function(config_file) {
   # Check for unrecognised settings — typos are silently ignored otherwise
   .KNOWN_SETTINGS <- c(
     # Weighting
-    "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n", "weight_label",
+    "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
+    "show_weighted_base", "weight_label",
     "default_weight", "weight_column_exists",
     "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
     # Display — frequencies and percentages

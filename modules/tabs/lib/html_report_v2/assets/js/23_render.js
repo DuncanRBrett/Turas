@@ -201,14 +201,21 @@
 
     // Weighted base + Kish effective base rows (weighted reports only; the
     // per-column values come from the data layer / recompute, rounded like the
-    // workbook). Effective base is gated by the report's show_effective_n.
+    // workbook). The unweighted row above always shows (it anchors the low-base
+    // flag and is the disclosure requirement); the weighted base — least useful
+    // interpretively, and identical to unweighted on the Total — can be dropped
+    // for simpler client tables via show_weighted_base. Effective base is gated
+    // by show_effective_n. Both default on (undefined -> shown) so a report
+    // generated before these flags existed is unchanged.
     if (wtd) {
-      out.push('<tr class="rb"><td class="lab">Base (weighted)</td>');
-      model.columns.forEach(function (col) {
-        out.push("<td>" +
-          (col.baseW != null ? fmt.base(col.baseW) : "–") + "</td>");
-      });
-      out.push("</tr>");
+      if (wproj.show_weighted_base !== false) {
+        out.push('<tr class="rb"><td class="lab">Base (weighted)</td>');
+        model.columns.forEach(function (col) {
+          out.push("<td>" +
+            (col.baseW != null ? fmt.base(col.baseW) : "–") + "</td>");
+        });
+        out.push("</tr>");
+      }
       if (wproj.show_effective_n !== false) {
         out.push('<tr class="rb"><td class="lab" title="Kish effective sample ' +
           'size — significance and confidence intervals are sized on this, not ' +

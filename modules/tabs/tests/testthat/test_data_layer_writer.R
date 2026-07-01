@@ -382,6 +382,8 @@ test_that("project surfaces weighting metadata only when weighted", {
   expect_equal(p1$weight_variable, "weight")
   expect_true(p1$show_unweighted_n)
   expect_true(p1$show_effective_n)
+  # weighted base row defaults on when the key is absent
+  expect_true(p1$show_weighted_base)
 
   # weighted but no optional label/variable -> those omitted, flag still carried
   p2 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
@@ -390,6 +392,12 @@ test_that("project surfaces weighting metadata only when weighted", {
   expect_null(p2$weight_label)
   expect_null(p2$weight_variable)
   expect_false(p2$show_effective_n)
+
+  # the weighted base row can be dropped for simpler client tables
+  p3 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(apply_weighting = TRUE,
+                                        show_weighted_base = FALSE))$project
+  expect_false(p3$show_weighted_base)
 })
 
 # ==============================================================================

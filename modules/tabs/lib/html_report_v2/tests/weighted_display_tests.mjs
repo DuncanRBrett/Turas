@@ -113,6 +113,18 @@ run("effective base row hidden when show_effective_n is false", () => {
   assert(!html.includes("Effective base"), "effective base row suppressed by config");
 });
 
+/* ---------------- 3b. show_weighted_base drops the weighted base row ---------------- */
+run("weighted base row hidden when show_weighted_base is false (simpler deck)", () => {
+  loadFixture();
+  TR.AGG.project.show_weighted_base = false;
+  const m = TR.model.forQuestion("Q1", "Gender", [], { dual: false });
+  const html = TR.render.tableHtml(m, {});
+  assert(!html.includes("Base (weighted)"), "weighted base row dropped by config");
+  // the two that carry interpretive meaning still show
+  assert(html.includes("Base (unweighted)"), "unweighted count still shows (always on)");
+  assert(html.includes("Effective base"), "effective base still shows");
+});
+
 /* ---------------- 4. unweighted report: base block unchanged ---------------- */
 run("unweighted report keeps the single 'Base (n=)' row, no extra rows", () => {
   loadFixture();

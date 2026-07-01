@@ -174,10 +174,14 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     wv <- config_obj$weight_variable
     if (!is.null(wv) && length(wv) >= 1 && !is.na(wv[1]) && nzchar(trimws(wv[1])))
       proj$weight_variable <- as.character(wv[1])
-    # Base-row visibility, matching the workbook's show_unweighted_n /
-    # show_effective_n (the weighted base row always shows on a weighted report).
-    proj$show_unweighted_n <- isTRUE(config_obj$show_unweighted_n)
-    proj$show_effective_n  <- isTRUE(config_obj$show_effective_n)
+    # Base-row visibility. The unweighted count always shows in the HTML (it
+    # anchors the low-base flag and is the disclosure requirement); the effective
+    # base and the weighted base are each toggleable, both defaulting on. Absence
+    # of the key -> TRUE, so the weighted base shows unless explicitly dropped.
+    proj$show_unweighted_n  <- isTRUE(config_obj$show_unweighted_n)
+    proj$show_effective_n   <- isTRUE(config_obj$show_effective_n)
+    proj$show_weighted_base <- is.null(config_obj$show_weighted_base) ||
+      isTRUE(config_obj$show_weighted_base)
   }
   # Inline researcher / client logos as data URIs when configured; omit (the
   # renderer shows the brand dot) otherwise. researcher_logo_path falls back to
