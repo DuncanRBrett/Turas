@@ -1184,7 +1184,7 @@
     var byId = {}; (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
     var chips = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null && byId[id]; })
       .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
-    var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
+    var tags = ctx.dropTags ? "" : (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
     var flags = (it.saved ? '<span class="ql-cflag" title="shortlisted">★</span>' : "") +
                 (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "");
@@ -1226,20 +1226,34 @@
       return head + hubBar + '<div class="ql-drawer"><p class="ql-empty">Nothing collected yet. As you read, ' +
         "★ shortlist a comment or ✎ highlight a passage — they gather here, across every question.</p></div>";
     }
-    // Disclosure: a sub-threshold cut hides the whole list, the same rule as the drawer.
-    if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
-      qual._colview = { island: island, items: [] };
-      return head + '<div class="ql-drawer"><div class="ql-disclosure" role="note">🛡 ' +
-        esc(TR.disclosure.note()) + "</div></div>";
+    // A named hub is a hand-picked set — INDEPENDENT of the audience filter (show all its
+    // members). "All marks" is the exploratory view: it honours the live cut, and a below-k
+    // cut hides it (a small cut-derived view could identify). A selected hub is NOT a cut,
+    // so that gate does not apply to it — a hub is shown whatever the filter.
+    var cutDesc = (cutFilters && TR.d2 && TR.d2.filterDescription) ? TR.d2.filterDescription() : "";
+    var shown;
+    if (activeHub) {
+      shown = pool.items.filter(function (it) { return activeHub.marks[it.qcode + "#" + it.idx]; });
+    } else {
+      if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
+        qual._colview = { island: island, items: [] };
+        return head + hubBar + '<div class="ql-drawer"><div class="ql-disclosure" role="note">🛡 ' +
+          esc(TR.disclosure.note()) + "</div></div>";
+      }
+      shown = cutFilters ? filterItems(pool.items, cutFilters) : pool.items;
     }
 
-    // Hub scope first (pool ∩ hub), then the audience cut.
-    var base = activeHub
-      ? pool.items.filter(function (it) { return activeHub.marks[it.qcode + "#" + it.idx]; })
-      : pool.items;
+    // §4 for a hub: the COMMENTS are never the secret (they live in their questions); what
+    // the threshold protects is DEMOGRAPHIC tags on a small named set. So a hub with fewer
+    // than k distinct respondents keeps its comments but drops the per-comment tags — on
+    // screen AND in the exported exhibit — rather than being blocked from the report.
+    var hubBelowK = !!(activeHub && TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
+      qual.hubDistinctRespondents(shown) < TR.disclosure.minBase());
+    var safeDemos = activeHub
+      ? !hubBelowK
+      : !(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
+
     var groupBy = st.groupBy === "theme" ? "theme" : "question";
-    var shown = cutFilters ? filterItems(base, cutFilters) : base;
-    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
     var groups = qual.groupCollection(island, shown, groupBy);
 
     var toggle = '<div class="ql-seg" role="tablist" aria-label="Group the collection by">' +
@@ -1248,36 +1262,35 @@
     var actions = '<div class="ql-actions"><button class="ql-export" data-col-export ' +
       'title="Download everything shown here as an Excel file">⬇ Export</button></div>';
 
-    var cutDesc = (cutFilters && TR.d2 && TR.d2.filterDescription) ? TR.d2.filterDescription() : "";
-    var scopeLbl = activeHub ? (" in " + esc(activeHub.name)) : "";
-    var noun = scopeTotal === 1 ? " mark" : " marks";
-    var cover = shown.length === scopeTotal
-      ? ("Showing all " + scopeTotal + noun + scopeLbl)
-      : ("Showing " + shown.length + " of " + scopeTotal + noun + scopeLbl + (cutDesc ? " in this cut" : ""));
-    if (cutDesc) cover += ' · <span class="ql-cut">' + esc(cutDesc) + "</span>";
+    var noun = shown.length === 1 ? " mark" : " marks";
+    var cover, coverPlain;
+    if (activeHub) {
+      cover = "Showing all " + shown.length + noun + " in " + esc(activeHub.name);
+      if (cutDesc) cover += ' · <span class="ql-cut">a hub shows all its comments — the filter doesn’t narrow it</span>';
+      coverPlain = "Illustrating " + shown.length + noun + " in " + activeHub.name;
+    } else {
+      cover = shown.length === scopeTotal
+        ? ("Showing all " + scopeTotal + noun)
+        : ("Showing " + shown.length + " of " + scopeTotal + noun + (cutDesc ? " in this cut" : ""));
+      if (cutDesc) cover += ' · <span class="ql-cut">' + esc(cutDesc) + "</span>";
+      coverPlain = "Illustrating " + shown.length + " of " + scopeTotal + noun + (cutDesc ? " · " + cutDesc : "");
+    }
     if (pool.orphans) cover += ' · <span class="ql-orphan" title="These marks point at comments not present ' +
       'in this data run — re-mark to refresh them">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
-
-    // Plain-text coverage for the Story exhibit + the promote context on _colview.
-    var coverPlain = "Illustrating " + shown.length + " of " + scopeTotal + noun +
-      (activeHub ? (" in " + activeHub.name) : "") + (cutDesc ? " · " + cutDesc : "");
     qual._colview = { island: island, items: shown, hub: activeHub, coverPlain: coverPlain, safeDemos: safeDemos };
 
-    // A selected hub gets an insight field (the one-line finding) + "Add to story". The
-    // promote is gated: a hub that isolates fewer than k distinct respondents must not be
-    // exported to the report (the §4 hub k-gate at save/export; block-mode for now).
+    // A selected hub gets an insight field (the one-line finding) + "Add to story". Never
+    // blocked: a below-k hub just drops its demographic tags (safeDemos above), with a calm
+    // note — the comments themselves are already in the report.
     var insightBlock = "";
     if (activeHub) {
-      var hubSmall = TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
-        qual.hubDistinctRespondents(shown) < TR.disclosure.minBase();
       var promote = shown.length === 0
         ? '<span class="ql-hubsmall">add comments to build this hub’s story</span>'
-        : hubSmall
-          ? '<span class="ql-hubsmall" title="This hub isolates fewer than the confidentiality threshold of ' +
-            TR.disclosure.minBase() + ' respondents">🛡 below the confidentiality threshold — can’t add to the report</span>'
-          : '<button class="ql-hubpromote" data-hub-promote ' +
-            'title="Add this hub — its finding + quotes — to the Story tab">📌 Add to story</button>';
+        : '<button class="ql-hubpromote" data-hub-promote ' +
+          'title="Add this hub — its finding + quotes — to the Story tab">📌 Add to story</button>' +
+          (hubBelowK ? '<span class="ql-hubsmall" title="Fewer than the confidentiality threshold of ' +
+            TR.disclosure.minBase() + ' distinct respondents — demographic tags are hidden in the report">🛡 tags hidden</span>' : "");
       insightBlock = '<div class="insight ql-hubinsight"><div class="insight-head">Hub insight — the one-line finding' +
         '<span class="ql-xspacer"></span>' + promote + "</div>" +
         '<textarea class="ql-hubinstext" data-hub-insight ' +
@@ -1285,9 +1298,9 @@
         esc(activeHub.insight || "") + "</textarea></div>";
     }
 
-    var ctx = { hubs: qual.hubList(), pickFor: st.hubPickFor };
+    var ctx = { hubs: qual.hubList(), pickFor: st.hubPickFor, dropTags: hubBelowK };
     var emptyMsg = activeHub
-      ? ("“" + esc(activeHub.name) + "” is empty here — switch to All marks and use ＋ Hub on a comment to add it.")
+      ? ("“" + esc(activeHub.name) + "” is empty — switch to All marks and use ＋ Hub on a comment to add it.")
       : "No marks fall in this cut — broaden the filter to see them.";
     var cards = groups.length
       ? groups.map(function (g) {
@@ -1477,12 +1490,8 @@
     if (promote) promote.addEventListener("click", function () {
       var v = qual._colview;
       if (!v || !v.hub || !TR.story2 || !TR.story2.pinSnapshot) return;
-      // privacy gate: never export a hub that isolates fewer than k distinct respondents.
-      if (TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
-          qual.hubDistinctRespondents(v.items) < TR.disclosure.minBase()) {
-        if (TR.shell && TR.shell.toast) TR.shell.toast("Hub is below the confidentiality threshold — not added to the story");
-        return;
-      }
+      // Never blocked — a below-k hub already ships with its demographic tags dropped
+      // (v.safeDemos, set in collectionMain); the comments are safe to include.
       TR.story2.pinSnapshot(qual.hubExhibit(v.hub, v.items, { coverage: v.coverPlain, safeDemos: v.safeDemos }));
     });
     // Enter submits / Escape cancels the inline inputs; focus the header edit input.
