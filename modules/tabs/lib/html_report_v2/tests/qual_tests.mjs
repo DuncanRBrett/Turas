@@ -262,5 +262,30 @@ const csafe = qual.collectionExportRows(colIsland, pool.items, false);
 assert(csafe[1][2] === "[hidden]" && csafe[1][8] === "[hidden]",
   "collectionExportRows safeDemos=false hides demographics + verbatim (no sub-k leak)");
 
+// ---- named reader hubs (named lenses over the pool) -------------------------
+// The store is the module singleton (empty at process start: no userState/localStorage).
+console.log("\nQualitative reader hubs:");
+assert(qual.hubList().length === 0, "hubs: none to start");
+const h1 = qual.hubCreate("  Masters students  ");
+assert(qual.hubGet(h1).name === "Masters students", "hubCreate trims the name");
+const h2 = qual.hubCreate("");
+assert(qual.hubGet(h2).name === "Untitled hub", "hubCreate blank name -> 'Untitled hub'");
+assert(qual.hubList().length === 2 && qual.hubList()[0].id === h1, "hubList is in creation order");
+assert(qual.hubToggleMark(h1, "Q1", 0) === true && qual.hubHasMark(h1, "Q1", 0) === true, "hubToggleMark adds a mark");
+assert(qual.hubList()[0].count === 1, "hubList count reflects membership");
+assert(qual.hubToggleMark(h1, "Q1", 0) === false && qual.hubHasMark(h1, "Q1", 0) === false,
+  "hubToggleMark removes it (the mark itself is untouched — hub is only a reference)");
+qual.hubToggleMark(h1, "Q1", 0); qual.hubToggleMark(h2, "Q1", 0);   // same comment in two hubs
+assert(qual.hubsForMark("Q1", 0).length === 2, "hubsForMark lists every hub the mark is in (overlap)");
+assert(qual.hubRename(h1, "  Master's  ") === true && qual.hubGet(h1).name === "Master's", "hubRename trims");
+assert(qual.hubRename(h1, "   ") === true && qual.hubGet(h1).name === "Master's", "hubRename all-blank keeps the old name");
+assert(qual.hubRename("nope", "x") === false, "hubRename false on an unknown id");
+qual.hubDelete(h1);
+assert(qual.hubGet(h1) === null && qual.hubList().length === 1, "hubDelete removes the hub definition");
+assert(qual.hubsForMark("Q1", 0).length === 1 && qual.hubsForMark("Q1", 0)[0].id === h2,
+  "after delete, the same mark's membership of OTHER hubs survives (mark never touched)");
+const h3 = qual.hubCreate("Third");
+assert(h3 !== h1 && parseInt(h3, 10) > parseInt(h2, 10), "hub ids are monotonic — a deleted id is never reissued");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

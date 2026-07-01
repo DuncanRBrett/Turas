@@ -499,6 +499,106 @@
       qual.collectionExportRows(island, items, safeDemos), { keepText: true });
   };
 
+  // ---- named reader hubs: named lenses over the pool -------------------------
+  // A hub is a NAMED SET of marks (qcode#idx) — a VIEW over the pool, never a
+  // container: adding a comment to a hub, or renaming/deleting a hub, never touches a
+  // mark, and the same mark can sit in several hubs. Reader hubs live in per-report
+  // localStorage (mirroring the shortlist). qual.hubsAll() is exposed for the step-2
+  // authored-hub island bake but is deliberately NOT yet wired into report.saveCopy
+  // (that + the privacy-clear-at-save gate is step 2). Ids are monotonic: a deleted
+  // hub's id is never reissued, so a stale reference can't resurrect into another hub.
+
+  var HUBS_KEY = "turas_v2_qualhubs";
+  var hubsCache = null;
+  function normalizeHubs(raw) {
+    var s = (raw && typeof raw === "object") ? raw : {};
+    var byId = (s.byId && typeof s.byId === "object") ? s.byId : {};
+    var order = Array.isArray(s.order) ? s.order.filter(function (id) { return byId[id]; }) : [];
+    Object.keys(byId).forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });   // defensive
+    var maxId = order.reduce(function (m, id) { var n = parseInt(id, 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
+    var seq = (typeof s.seq === "number" && s.seq > maxId) ? s.seq : maxId;
+    order.forEach(function (id) {
+      var h = byId[id];
+      if (!h.marks || typeof h.marks !== "object") h.marks = {};
+      h.id = id;
+      h.name = (typeof h.name === "string" && h.name) ? h.name : "Untitled hub";
+    });
+    return { seq: seq, order: order, byId: byId };
+  }
+  function hubsStore() {
+    if (hubsCache) return hubsCache;
+    var seed = (TR.userState && TR.userState.qualHubs) || null;   // step-2 authored bake seeds here
+    try {
+      var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(HUBS_KEY));
+      if (raw) seed = JSON.parse(raw);                            // the reader's own set wins entirely
+    } catch (e) { /* island / empty */ }
+    hubsCache = normalizeHubs(seed);
+    return hubsCache;
+  }
+  function hubsPersist() {
+    try {
+      if (typeof localStorage !== "undefined" && TR.d2) {
+        localStorage.setItem(TR.d2.storeKey(HUBS_KEY), JSON.stringify(hubsStore()));
+      }
+    } catch (e) { /* storage blocked — hubs stay in memory */ }
+  }
+  function markKey(qcode, idx) { return qcode + "#" + idx; }
+
+  qual.hubsAll = function () { return hubsStore(); };            // report.saveCopy will embed this (step 2)
+  qual.hubList = function () {
+    var s = hubsStore();
+    return s.order.map(function (id) {
+      var h = s.byId[id];
+      return { id: id, name: h.name, count: Object.keys(h.marks).length };
+    });
+  };
+  qual.hubGet = function (id) { return hubsStore().byId[id] || null; };
+  qual.hubCreate = function (name) {
+    var s = hubsStore();
+    s.seq += 1;
+    var id = String(s.seq);
+    s.byId[id] = { id: id, name: (name || "").trim() || "Untitled hub", marks: {} };
+    s.order.push(id);
+    hubsPersist();
+    return id;
+  };
+  qual.hubRename = function (id, name) {
+    var h = hubsStore().byId[id];
+    if (!h) return false;
+    h.name = (name || "").trim() || h.name;   // an all-blank rename keeps the old name
+    hubsPersist();
+    return true;
+  };
+  qual.hubDelete = function (id) {
+    var s = hubsStore();
+    if (!s.byId[id]) return false;
+    delete s.byId[id];
+    s.order = s.order.filter(function (x) { return x !== id; });
+    hubsPersist();
+    return true;
+  };
+  qual.hubHasMark = function (id, qcode, idx) {
+    var h = hubsStore().byId[id];
+    return !!(h && h.marks[markKey(qcode, idx)]);
+  };
+  qual.hubToggleMark = function (id, qcode, idx) {
+    var h = hubsStore().byId[id];
+    if (!h) return false;
+    var k = markKey(qcode, idx);
+    if (h.marks[k]) delete h.marks[k]; else h.marks[k] = 1;
+    hubsPersist();
+    return !!h.marks[k];
+  };
+  qual.hubMarks = function (id) {
+    var h = hubsStore().byId[id];
+    return h ? h.marks : {};
+  };
+  qual.hubsForMark = function (qcode, idx) {
+    var s = hubsStore(), k = markKey(qcode, idx), out = [];
+    s.order.forEach(function (id) { if (s.byId[id].marks[k]) out.push({ id: id, name: s.byId[id].name }); });
+    return out;
+  };
+
   function findQ(island, code) {
     var qs = island.questions || [];
     for (var i = 0; i < qs.length; i++) if (qs[i].code === code) return qs[i];
@@ -569,7 +669,7 @@
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
                       theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false,
                       themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false,
-                      view: "question", groupBy: "question" };
+                      view: "question", groupBy: "question", hub: null, hubEditing: null, hubPickFor: null };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -953,8 +1053,67 @@
     return items.filter(function (it) { return mask[it.record.idx] === 1; });
   }
 
-  function collectionCard(it) {
-    var q = it.question, r = it.record, qcode = it.qcode;
+  // The hub selector bar: "All marks" + a chip per hub (name + pool-resolved count),
+  // a "＋ New hub" affordance, and — for the selected hub — inline rename / delete.
+  // Only one inline text input is ever open (st.hubEditing is a single value).
+  function hubBarHtml(st, total, resolvedCounts) {
+    var chip = function (id, label, count, on) {
+      return '<button class="ql-hubsel' + (on ? " on" : "") + '" data-hubsel="' + esc(id == null ? "" : id) +
+        '">' + esc(label) + ' <span class="ql-hubseln">' + count + "</span></button>";
+    };
+    var chips = chip(null, "All marks", total, st.hub == null);
+    qual.hubList().forEach(function (h) {
+      var c = resolvedCounts[h.id] != null ? resolvedCounts[h.id] : h.count;
+      chips += chip(h.id, h.name, c, st.hub === h.id);
+    });
+    var newBit = (st.hubEditing === "new")
+      ? '<span class="ql-hubnewrow"><input class="ql-hubinput" data-hubnewinput type="text" ' +
+        'placeholder="hub name" maxlength="60"><button class="ql-hubbtn" data-hubnewgo>Add</button>' +
+        '<button class="ql-hublink" data-hubnewcancel>Cancel</button></span>'
+      : '<button class="ql-hublink" data-hubnew>＋ New hub</button>';
+    var manage = "";
+    if (st.hub != null && qual.hubGet(st.hub)) {
+      manage = (st.hubEditing === st.hub)
+        ? '<span class="ql-hubnewrow"><input class="ql-hubinput" data-hubrenameinput type="text" value="' +
+          esc(qual.hubGet(st.hub).name) + '" maxlength="60"><button class="ql-hubbtn" data-hubrenamego>Save</button>' +
+          '<button class="ql-hublink" data-hubrenamecancel>Cancel</button></span>'
+        : '<button class="ql-hublink" data-hubrename title="Rename this hub">✎ Rename</button>' +
+          '<button class="ql-hublink danger" data-hubdel ' +
+          'title="Delete this hub — its comments stay in the pool">🗑 Delete</button>';
+    }
+    return '<div class="ql-hubbar"><span class="ql-ctrllbl">Hubs:</span>' + chips + newBit + manage + "</div>";
+  }
+
+  // The per-card hub area: closed = the hubs this comment is already in + a "＋ Hub"
+  // button; open (st.hubPickFor === key) = a toggle per hub + an inline new-hub field.
+  function cardHubHtml(it, key, ctx) {
+    if (ctx.pickFor === key) {
+      var opts = (ctx.hubs && ctx.hubs.length)
+        ? ctx.hubs.map(function (h) {
+            var inIt = qual.hubHasMark(h.id, it.qcode, it.idx);
+            return '<button class="ql-hubopt' + (inIt ? " on" : "") + '" data-hubtoggle="' + esc(h.id) +
+              '" data-hubkey="' + esc(key) + '">' + (inIt ? "✓ " : "") + esc(h.name) + "</button>";
+          }).join("")
+        : '<span class="ql-hubnote">No hubs yet — name one below.</span>';
+      return '<div class="ql-cardhubs picking"><span class="ql-hublbl">Add to a hub:</span>' +
+        '<span class="ql-hubopts">' + opts + "</span>" +
+        '<span class="ql-hubnewrow"><input class="ql-hubinput" data-hubpicknew="' + esc(key) +
+          '" type="text" placeholder="＋ new hub" maxlength="60">' +
+          '<button class="ql-hubbtn" data-hubpicknewgo="' + esc(key) + '">Create + add</button>' +
+          '<button class="ql-hublink" data-hubpickdone>Done</button></span></div>';
+    }
+    var inHubs = qual.hubsForMark(it.qcode, it.idx);
+    var members = inHubs.length
+      ? '<span class="ql-hublbl">in</span>' +
+        inHubs.map(function (h) { return '<span class="ql-hubchip">' + esc(h.name) + "</span>"; }).join("")
+      : "";
+    return '<div class="ql-cardhubs">' + members +
+      '<button class="ql-hubadd" data-hubpick="' + esc(key) + '" title="Add this comment to a hub">＋ Hub</button></div>';
+  }
+
+  function collectionCard(it, ctx) {
+    ctx = ctx || {};
+    var q = it.question, r = it.record, qcode = it.qcode, key = qcode + "#" + r.idx;
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
@@ -966,26 +1125,42 @@
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
     var flags = (it.saved ? '<span class="ql-cflag" title="shortlisted">★</span>' : "") +
                 (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "");
-    return '<div class="ql-quote ' + sent + ' ql-ccard" data-hl-key="' + esc(qcode) + "#" + esc(r.idx) + '">' +
+    return '<div class="ql-quote ' + sent + ' ql-ccard" data-hl-key="' + esc(key) + '">' +
       '<div class="ql-qbody">' +
         '<div class="ql-csrc"><button class="ql-cjump" data-col-jump="' + esc(qcode) +
           '" title="Go to this question">' + esc(q.title) + " ›</button>" + flags + "</div>" +
         '<span class="ql-qtext">' + text + "</span>" +
         (chips ? '<div class="ql-cthemes">' + chips + "</div>" : "") +
         (tags ? '<div class="ql-tags">' + tags + "</div>" : "") +
+        cardHubHtml(it, key, ctx) +
       "</div>" +
       '<div class="ql-qfoot"><span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
 
   function collectionMain(island, st, cutFilters, pool) {
     var total = pool.items.length;
+
+    // Resolve the selected hub (drop a stale selection), and count each hub's
+    // pool-resolved membership — its marks that are actually in the pool right now.
+    if (st.hub != null && !qual.hubGet(st.hub)) st.hub = null;
+    var poolKeys = {};
+    pool.items.forEach(function (it) { poolKeys[it.qcode + "#" + it.idx] = 1; });
+    var resolved = {};
+    qual.hubList().forEach(function (h) {
+      var marks = qual.hubMarks(h.id), n = 0;
+      Object.keys(marks).forEach(function (k) { if (poolKeys[k]) n++; });
+      resolved[h.id] = n;
+    });
+    var activeHub = st.hub != null ? qual.hubGet(st.hub) : null;
+    var scopeTotal = activeHub ? resolved[activeHub.id] : total;
     var head = '<header class="ql-head"><h2 class="ql-title">★ Your collection</h2>' +
-      '<div class="ql-meta"><span class="ql-badge">ALL MARKS</span>' +
-      '<span class="ql-base">' + total + (total === 1 ? " mark" : " marks") + "</span></div></header>";
+      '<div class="ql-meta"><span class="ql-badge">' + (activeHub ? esc(activeHub.name) : "ALL MARKS") +
+      '</span><span class="ql-base">' + scopeTotal + (scopeTotal === 1 ? " mark" : " marks") + "</span></div></header>";
+    var hubBar = hubBarHtml(st, total, resolved);
 
     if (!total) {
       qual._colview = { island: island, items: [] };
-      return head + '<div class="ql-drawer"><p class="ql-empty">Nothing collected yet. As you read, ' +
+      return head + hubBar + '<div class="ql-drawer"><p class="ql-empty">Nothing collected yet. As you read, ' +
         "★ shortlist a comment or ✎ highlight a passage — they gather here, across every question.</p></div>";
     }
     // Disclosure: a sub-threshold cut hides the whole list, the same rule as the drawer.
@@ -995,8 +1170,12 @@
         esc(TR.disclosure.note()) + "</div></div>";
     }
 
+    // Hub scope first (pool ∩ hub), then the audience cut.
+    var base = activeHub
+      ? pool.items.filter(function (it) { return activeHub.marks[it.qcode + "#" + it.idx]; })
+      : pool.items;
     var groupBy = st.groupBy === "theme" ? "theme" : "question";
-    var shown = cutFilters ? filterItems(pool.items, cutFilters) : pool.items;
+    var shown = cutFilters ? filterItems(base, cutFilters) : base;
     qual._colview = { island: island, items: shown };      // for the export handler
     var groups = qual.groupCollection(island, shown, groupBy);
 
@@ -1007,23 +1186,29 @@
       'title="Download everything shown here as an Excel file">⬇ Export</button></div>';
 
     var cutDesc = (cutFilters && TR.d2 && TR.d2.filterDescription) ? TR.d2.filterDescription() : "";
-    var cover = shown.length === total
-      ? ("Showing all " + total + (total === 1 ? " mark" : " marks"))
-      : ("Showing " + shown.length + " of " + total + " marks" + (cutDesc ? " in this cut" : ""));
+    var scopeLbl = activeHub ? (" in " + esc(activeHub.name)) : "";
+    var noun = scopeTotal === 1 ? " mark" : " marks";
+    var cover = shown.length === scopeTotal
+      ? ("Showing all " + scopeTotal + noun + scopeLbl)
+      : ("Showing " + shown.length + " of " + scopeTotal + noun + scopeLbl + (cutDesc ? " in this cut" : ""));
     if (cutDesc) cover += ' · <span class="ql-cut">' + esc(cutDesc) + "</span>";
     if (pool.orphans) cover += ' · <span class="ql-orphan" title="These marks point at comments not present ' +
       'in this data run — re-mark to refresh them">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
 
+    var ctx = { hubs: qual.hubList(), pickFor: st.hubPickFor };
+    var emptyMsg = activeHub
+      ? ("“" + esc(activeHub.name) + "” is empty here — switch to All marks and use ＋ Hub on a comment to add it.")
+      : "No marks fall in this cut — broaden the filter to see them.";
     var cards = groups.length
       ? groups.map(function (g) {
           return '<div class="ql-colhd">' + esc(g.label) +
             ' <span class="ql-hint">(' + g.items.length + ")</span></div>" +
-            g.items.map(collectionCard).join("");
+            g.items.map(function (it) { return collectionCard(it, ctx); }).join("");
         }).join("")
-      : '<p class="ql-empty">No marks fall in this cut — broaden the filter to see them.</p>';
+      : '<p class="ql-empty">' + emptyMsg + "</p>";
 
-    return head +
+    return head + hubBar +
       '<div class="ql-controls"><span class="ql-ctrllbl">Group your marks:</span>' + toggle + actions + "</div>" +
       '<div class="ql-colcover">' + cover + "</div>" +
       '<div class="ql-drawer ql-coldrawer">' + cards + "</div>";
@@ -1044,7 +1229,9 @@
     });
     // collection view: open it, switch its grouping, jump from a card to its question
     var colOpen = host.querySelector("[data-col-open]");
-    if (colOpen) colOpen.addEventListener("click", function () { st.view = "collection"; qual.render(host); });
+    if (colOpen) colOpen.addEventListener("click", function () {
+      st.view = "collection"; st.hubEditing = null; st.hubPickFor = null; qual.render(host);
+    });
     host.querySelectorAll("[data-colgroup]").forEach(function (b) {
       b.addEventListener("click", function () { st.groupBy = b.getAttribute("data-colgroup"); qual.render(host); });
     });
@@ -1056,6 +1243,7 @@
         qual.render(host);
       });
     });
+    wireHubs(host, st);
     var back = host.querySelector("[data-qual-back]");
     if (back) back.addEventListener("click", function () { qual.back(); });
     host.querySelectorAll(".cathdr[data-railtoggle]").forEach(function (b) {
@@ -1131,6 +1319,91 @@
       if (v) qual.exportCollectionXlsx(v.island, v.items);
     });
     wireHighlights(host);
+  }
+
+  // ---- hub interactions (selector bar + per-card add-to-hub picker) ----------
+
+  function inputVal(host, sel) { var el = host.querySelector(sel); return el ? String(el.value || "") : ""; }
+  function commitNewHub(host, st) {
+    var name = inputVal(host, "[data-hubnewinput]").trim();
+    if (name) st.hub = qual.hubCreate(name);   // create and select it
+    st.hubEditing = null;
+    qual.render(host);
+  }
+  function commitRename(host, st) {
+    var name = inputVal(host, "[data-hubrenameinput]").trim();
+    if (name && st.hub != null) qual.hubRename(st.hub, name);
+    st.hubEditing = null;
+    qual.render(host);
+  }
+  function commitPickNewHub(host, st, key) {
+    var name = inputVal(host, '[data-hubpicknew="' + key + '"]').trim();
+    var m = qual.splitMark(key);
+    if (name && m) { var id = qual.hubCreate(name); qual.hubToggleMark(id, m.qcode, m.idx); }
+    qual.render(host);                          // picker stays open for more adds
+  }
+
+  function wireHubs(host, st) {
+    host.querySelectorAll("[data-hubsel]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = b.getAttribute("data-hubsel");
+        st.hub = v === "" ? null : v;
+        st.hubEditing = null; st.hubPickFor = null;
+        qual.render(host);
+      });
+    });
+    var byId = function (a) { return host.querySelector("[" + a + "]"); };
+    var on = function (a, fn) { var el = byId(a); if (el) el.addEventListener("click", fn); };
+    on("data-hubnew", function () { st.hubEditing = "new"; st.hubPickFor = null; qual.render(host); });
+    on("data-hubnewgo", function () { commitNewHub(host, st); });
+    on("data-hubnewcancel", function () { st.hubEditing = null; qual.render(host); });
+    on("data-hubrename", function () { st.hubEditing = st.hub; st.hubPickFor = null; qual.render(host); });
+    on("data-hubrenamego", function () { commitRename(host, st); });
+    on("data-hubrenamecancel", function () { st.hubEditing = null; qual.render(host); });
+    on("data-hubdel", function () {
+      var h = qual.hubGet(st.hub);
+      if (!h) return;
+      if (typeof confirm !== "undefined" && !confirm('Delete the hub "' + h.name + '"? Its comments stay in your collection.')) return;
+      qual.hubDelete(st.hub); st.hub = null; st.hubEditing = null;
+      qual.render(host);
+    });
+    // per-card add-to-hub picker
+    host.querySelectorAll("[data-hubpick]").forEach(function (b) {
+      b.addEventListener("click", function () { st.hubPickFor = b.getAttribute("data-hubpick"); st.hubEditing = null; qual.render(host); });
+    });
+    host.querySelectorAll("[data-hubtoggle]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var m = qual.splitMark(b.getAttribute("data-hubkey"));
+        if (m) qual.hubToggleMark(b.getAttribute("data-hubtoggle"), m.qcode, m.idx);
+        qual.render(host);                       // picker stays open (st.hubPickFor unchanged)
+      });
+    });
+    var pickGo = byId("data-hubpicknewgo");
+    if (pickGo) pickGo.addEventListener("click", function () { commitPickNewHub(host, st, pickGo.getAttribute("data-hubpicknewgo")); });
+    on("data-hubpickdone", function () { st.hubPickFor = null; qual.render(host); });
+    // Enter submits / Escape cancels the inline inputs; focus the header edit input.
+    var enterKey = function (sel, go, esc) {
+      var el = host.querySelector(sel);
+      if (!el) return;
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); go(); }
+        else if (e.key === "Escape") { e.preventDefault(); esc(); }
+      });
+    };
+    enterKey("[data-hubnewinput]", function () { commitNewHub(host, st); }, function () { st.hubEditing = null; qual.render(host); });
+    enterKey("[data-hubrenameinput]", function () { commitRename(host, st); }, function () { st.hubEditing = null; qual.render(host); });
+    var pickInput = host.querySelector("[data-hubpicknew]");
+    if (pickInput) {
+      var pk = pickInput.getAttribute("data-hubpicknew");
+      pickInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); commitPickNewHub(host, st, pk); }
+        else if (e.key === "Escape") { e.preventDefault(); st.hubPickFor = null; qual.render(host); }
+      });
+    }
+    if (st.hubEditing) {
+      var f = host.querySelector("[data-hubnewinput], [data-hubrenameinput]");
+      if (f && f.focus) { try { f.focus(); } catch (e) {} }
+    }
   }
 
   // ---- highlight selection wiring (select text -> a "Highlight" chip) ---------

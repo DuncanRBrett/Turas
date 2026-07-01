@@ -887,6 +887,39 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-cthemes { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
 .ql-cchip { font-size: 11px; color: var(--brand); background: var(--bg); border: 1px solid var(--brand);
   border-radius: 999px; padding: 1px 8px; }
+/* Comment Hubs — named reader hubs (selector bar + per-card add-to-hub picker) */
+.ql-hubbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 10px; }
+.ql-hubsel { border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit;
+  font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 11px; cursor: pointer; }
+.ql-hubsel:hover { border-color: var(--brand); }
+.ql-hubsel.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ql-hubseln { opacity: .7; font-weight: 400; margin-left: 2px; }
+.ql-hubsel.on .ql-hubseln { opacity: .85; }
+.ql-hublink { border: 0; background: none; color: var(--brand); font: inherit; font-size: 12px; font-weight: 600;
+  padding: 3px 4px; cursor: pointer; }
+.ql-hublink:hover { text-decoration: underline; }
+.ql-hublink.danger { color: var(--red); }
+.ql-hubnewrow { display: inline-flex; align-items: center; gap: 4px; }
+.ql-hubinput { border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 12px; padding: 3px 8px;
+  min-width: 130px; }
+.ql-hubinput:focus { outline: none; border-color: var(--brand); }
+.ql-hubbtn { border: 1px solid var(--brand); background: var(--brand); color: #fff; font: inherit; font-size: 12px;
+  font-weight: 600; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.ql-hubbtn:hover { background: var(--ink); border-color: var(--ink); }
+.ql-cardhubs { margin-top: 7px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ql-cardhubs.picking { padding: 7px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.ql-hublbl { font-size: 11px; color: var(--muted); }
+.ql-hubchip { font-size: 11px; color: var(--accent); background: var(--card); border: 1px solid var(--accent);
+  border-radius: 999px; padding: 1px 8px; }
+.ql-hubadd { border: 1px dashed var(--line); background: var(--card); color: var(--muted); font: inherit;
+  font-size: 11px; border-radius: 999px; padding: 1px 9px; cursor: pointer; white-space: nowrap; }
+.ql-hubadd:hover { border-color: var(--accent); color: var(--accent); border-style: solid; }
+.ql-hubopts { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.ql-hubopt { border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 11px;
+  border-radius: 999px; padding: 1px 9px; cursor: pointer; }
+.ql-hubopt:hover { border-color: var(--accent); }
+.ql-hubopt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ql-hubnote { font-size: 11px; color: var(--muted); font-style: italic; }
 /* theme x banner crosstab (supplements the prevalence board) */
 .ql-viewtog { margin-bottom: 12px; }
 .ql-xtab { padding: 14px 16px; margin-bottom: 4px; }
