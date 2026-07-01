@@ -320,8 +320,9 @@
   /** Export matrix: ID + demographics + Noteworthy + Sentiment + Themes + Verbatim.
    *  Pure + node-testable. Hidden verbatims export as "[hidden]" (the confidentiality
    *  dial is honoured — no raw text leaks when text was withheld). When safeDemos is
-   *  false (the audience is below the disclosure threshold) the demographic columns export
-   *  as "[hidden]" too, so a small cut can't be exported with identifying tags attached. */
+   *  false (the audience is below the disclosure threshold) the demographic columns AND the
+   *  verbatim text export as "[hidden]" too, so a small cut can't be exported with any
+   *  identifying detail attached. */
   qual.exportRows = function (island, q, records, safeDemos) {
     if (safeDemos === undefined) safeDemos = true;
     var dims = ((island && island.demographics) || []).map(function (d) { return d.label; });
@@ -335,7 +336,7 @@
         return (r.demos && r.demos[lbl] != null) ? r.demos[lbl] : "";
       });
       var themes = Object.keys(r.themeVals || {}).map(function (id) { return byId[id] || ("#" + id); }).join("; ");
-      var text = (r.text == null) ? "[hidden]" : r.text;
+      var text = (!safeDemos || r.text == null) ? "[hidden]" : r.text;
       out.push([r.idx].concat(demos).concat([TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes, text]));
     });
     return out;
@@ -551,6 +552,12 @@
   }
 
   function prevalenceHtml(q, st, audience) {
+    // Disclosure control: the board shows per-theme counts over the live audience, so on a
+    // sub-threshold cut it would reveal small-cell detail ("1 of 3 raised it, 1 negative")
+    // for a named cut. Withhold the whole board below k, mirroring the crosstab gate.
+    if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
+      return '<div class="ql-board"><p class="ql-disclosure">🛡 ' + esc(TR.disclosure.note()) + "</p></div>";
+    }
     var rows = qual.prevalence(audience, q.themes);   // ranked by salience (volume) desc
     if (!rows.length || !audience.length) return '<p class="ql-empty">No coded themes for this selection.</p>';
     // 100% (proportion) diverging sentiment bars: every theme's bar is the SAME width
@@ -702,15 +709,16 @@
   var SENT_WORD = { 1: "Positive", 2: "Mixed", 3: "Negative" };
 
   function drawerHtml(island, q, st, audience) {
+    // Disclosure control: when a composite filter (or a closed<->open jump) narrows the
+    // audience below the confidentiality threshold, withhold the WHOLE comment list — the
+    // verbatim text, the demographic tags and even the comment count could identify a person
+    // on a small named cut. The threshold is on the respondent audience, so k = the full
+    // sample hides comments on any sub-cut; only the full-sample view shows them.
+    if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
+      return '<div class="ql-drawer"><div class="ql-disclosure" role="note">🛡 ' +
+        esc(TR.disclosure.note()) + "</div></div>";
+    }
     var records = qual.visibleRecords(q, st, audience);
-    // Disclosure control: when a composite filter narrows the audience below the
-    // confidentiality threshold, the per-comment demographic tags are withheld (a quote
-    // plus a demographic profile identifies a person on a small sample). The threshold is
-    // on the respondent audience, so setting it to the full sample size hides tags on any
-    // sub-cut — only the full-sample view shows them.
-    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
-    var notice = safeDemos ? "" :
-      '<div class="ql-disclosure" role="note">🛡 ' + esc(TR.disclosure.note()) + "</div>";
     var caption;
     if (st.savedOnly) {
       caption = "Shortlisted comments";
@@ -722,22 +730,24 @@
     }
     if (st.sentiment != null && qual.hasSentiment(q)) caption = (SENT_WORD[st.sentiment] || "") + " · " + caption;
     var cards = records.length
-      ? records.map(function (r) { return quoteCard(r, q.code, safeDemos); }).join("")
+      ? records.map(function (r) { return quoteCard(r, q.code); }).join("")
       : '<p class="ql-empty">' + (st.savedOnly
           ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
           : "No comments for this selection.") + "</p>";
-    return '<div class="ql-drawer">' + notice + '<div class="ql-drawerhd">' + caption +
+    return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
       ' <span class="ql-hint">(' + records.length + ")</span></div>" + cards + "</div>";
   }
 
-  function quoteCard(r, qcode, safeDemos) {
+  // Reached only when the audience is at/above the disclosure threshold (drawerHtml gates
+  // the whole list below k), so demographic tags are safe to show here.
+  function quoteCard(r, qcode) {
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
       : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));   // select-to-highlight
     var star = r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
-    var tags = (safeDemos && r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
+    var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + '</span>'; }).join("");
     var saved = qual.isSaved(qcode, r.idx);
     var save = '<button class="ql-save' + (saved ? " on" : "") + '" data-qual-save="' +
@@ -755,7 +765,8 @@
     var bits = [(q.base ? q.base.answered : 0) + " comments",
                 island.textMode !== "hidden" ? "✎ select text in a comment to highlight a passage" : null,
                 q.type === "themed" ? "themes are salience (raised unprompted), not prompted incidence" : null,
-                island.demographicCuts === "block" ? "demographic cuts blocked" : null,
+                island.demographicCuts === "block" ? "demographic cuts blocked" :
+                island.demographicCuts === "safe" ? "demographic tags shown only where the group is large enough" : null,
                 dropped ? (dropped + " stray code(s) quarantined") : null,
                 "verbatims shown by ID — never model-authored"];
     return '<footer class="ql-foot">' + bits.filter(Boolean).join(" · ") + '</footer>';

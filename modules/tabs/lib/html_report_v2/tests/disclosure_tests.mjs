@@ -53,5 +53,18 @@ assert(disc.cellOk(1) === false && disc.cellOk(9) === false, "cellOk: 1..k-1 is 
 TR.AGG.project.min_reporting_base = 1;
 assert(disc.cellOk(2) === true, "cellOk: control off -> any count shows");
 
+// Fail CLOSED: disclosure engaged but microdata absent (build degraded to published-only)
+// must NOT reveal identifying detail just because the base can't be computed.
+const savedMicro = TR.MICRO;
+TR.AGG.project.min_reporting_base = 10;
+TR.MICRO = null;
+assert(disc.audienceBase() === null, "no microdata -> audience base is unknown (null), not Infinity");
+assert(disc.audienceTooSmall() === true, "disclosure on + no microdata -> fail closed (too small)");
+assert(disc.note().indexOf("can't be verified") !== -1, "note explains the base is unverifiable");
+// ...but with the control off, missing microdata gates nothing (existing reports unaffected).
+TR.AGG.project.min_reporting_base = 1;
+assert(disc.audienceTooSmall() === false, "control off + no microdata -> nothing gated");
+TR.MICRO = savedMicro;
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 if (failed) process.exit(1);

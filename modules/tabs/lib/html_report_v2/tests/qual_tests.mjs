@@ -141,13 +141,14 @@ assert(rows[1][0] === 5 && rows[1][1] === "Cape Town" && rows[1][5] === "Price" 
 assert(rows[1][3] === "Must-read" && rows[1][4] === "Positive", "exportRows labels tier + sentiment");
 assert(rows[2][6] === "[hidden]", "exportRows: hidden verbatim exports as [hidden] (confidentiality honoured)");
 // Disclosure control: a too-small audience (safeDemos=false) exports the demographic
-// columns as [hidden] too, so a small cut can't be exported with identifying tags.
+// columns AND the verbatim as [hidden], so a small cut can't be exported with any
+// identifying detail — the text is just as identifying as the tags on a named sub-k cut.
 const exposed = qual.exportRows(island, q, [
   { idx: 5, demos: { Campus: "Cape Town", NPS: "Promoter" }, tier: 2, sentiment: 1, themeVals: {}, text: "great value" }
 ], false);
 assert(exposed[1][1] === "[hidden]" && exposed[1][2] === "[hidden]",
   "exportRows safeDemos=false -> demographic columns hidden");
-assert(exposed[1][6] === "great value", "exportRows safeDemos=false still exports the verbatim (text dial is separate)");
+assert(exposed[1][6] === "[hidden]", "exportRows safeDemos=false also withholds the verbatim (no text leak on a sub-k export)");
 assert(rows[1][1] === "Cape Town", "exportRows default (safeDemos omitted) -> demographics shown");
 
 // ---- sentiment filter + counts ----------------------------------------------

@@ -146,6 +146,71 @@ test_that("demographics ride the island + records when allowed; omitted when blo
   expect_null(first_record(blocked$questions[[1]], 0L)$demos)
 })
 
+# ==============================================================================
+# DISCLOSURE INDEPENDENCE — the threshold does NOT silently re-tag comments
+# ==============================================================================
+
+test_that("min_reporting_base does not override the tagging dial (independent by design)", {
+  m2 <- list(id_to_idx = stats::setNames(c(0L, 1L), c("1", "2")), n = 2L,
+             banner_dims = list(list(label = "Group", values = c("A", "B"))))
+  recs <- records
+  recs[[1]]$demos <- list(Group = "A")
+  recs[[2]]$demos <- list(Group = "B")
+  q <- themed_question(recs)
+
+  # allow + a threshold: tags + full text STILL ride the island. k gates the on-screen /
+  # quant drill-down, not the island payload; the orchestrator warns (it does not re-tag).
+  allowed <- qual_build_data_qual(list(q), m2,
+    list(text_mode = "full", demographic_cuts = "allow", min_reporting_base = 10))
+  expect_equal(allowed$demographicCuts, "allow")
+  expect_equal(first_record(allowed$questions[[1]], 0L)$demos$Group, "A")
+  expect_equal(first_record(allowed$questions[[1]], 0L)$text, "Email me at bob@example.com")
+
+  # block is the source-side de-identification: no demos enter the island, at ANY k.
+  blocked <- qual_build_data_qual(list(q), m2,
+    list(text_mode = "full", demographic_cuts = "block", min_reporting_base = 10))
+  expect_null(blocked$demographics)
+  expect_null(first_record(blocked$questions[[1]], 0L)$demos)
+})
+
+test_that("qual_kanon_tags keeps broad tags, drops fine crossings below k", {
+  # 3 Admin (one <1yr, two 5yr), 1 Finance 5yr. Admin=3, Finance=1, <1yr=1, 5yr=3,
+  # Admin&<1yr=1, Admin&5yr=2, Finance&5yr=1.
+  rows <- list(list(Dept = "Admin", Tenure = "<1yr"), list(Dept = "Admin", Tenure = "5yr"),
+               list(Dept = "Admin", Tenure = "5yr"), list(Dept = "Finance", Tenure = "5yr"))
+  res <- qual_kanon_tags(rows, c("Dept", "Tenure"), 2)
+  expect_equal(res[[1]]$Dept, "Admin"); expect_true(is.na(res[[1]]$Tenure))  # <1yr crossing=1 dropped
+  expect_equal(res[[2]]$Dept, "Admin"); expect_equal(res[[2]]$Tenure, "5yr")  # crossing=2 -> both kept
+  expect_true(is.na(res[[4]]$Dept)); expect_equal(res[[4]]$Tenure, "5yr")      # Finance=1 dropped
+  # k = 1 (off) returns the rows unchanged.
+  same <- qual_kanon_tags(rows, c("Dept", "Tenure"), 1)
+  expect_equal(same[[1]]$Tenure, "<1yr")
+})
+
+test_that("demographic_cuts='safe' k-anonymises comment tags against min_reporting_base", {
+  m <- list(id_to_idx = stats::setNames(0:3, as.character(1:4)), n = 4L,
+            banner_dims = list(list(label = "Dept", values = c("Admin", "Finance")),
+                               list(label = "Tenure", values = c("<1yr", "5yr"))))
+  mkr <- function(id, dept, ten) {
+    r <- mk_rec(id, paste0("c", id), themeVals = list(Service = 1L))
+    r$demos <- list(Dept = dept, Tenure = ten); r
+  }
+  q <- themed_question(list(mkr("1", "Admin", "<1yr"), mkr("2", "Admin", "5yr"),
+                            mkr("3", "Admin", "5yr"), mkr("4", "Finance", "5yr")))
+  island <- qual_build_data_qual(list(q), m,
+    list(text_mode = "full", demographic_cuts = "safe", min_reporting_base = 2))
+  expect_equal(island$demographicCuts, "safe")
+  r1 <- first_record(island$questions[[1]], 0L)          # Admin,<1yr -> Admin kept, <1yr suppressed
+  expect_equal(r1$demos$Dept, "Admin")
+  expect_true(is.na(r1$demos$Tenure))
+  r2 <- first_record(island$questions[[1]], 1L)          # Admin,5yr  -> both kept
+  expect_equal(r2$demos$Dept, "Admin")
+  expect_equal(r2$demos$Tenure, "5yr")
+  r4 <- first_record(island$questions[[1]], 3L)          # Finance,5yr -> Finance suppressed
+  expect_true(is.na(r4$demos$Dept))
+  expect_equal(r4$demos$Tenure, "5yr")
+})
+
 test_that("invalid text mode falls back to hidden; dials and defaults carried", {
   island <- qual_build_data_qual(list(themed_question(records)), master,
                                  list(text_mode = "bogus", demographic_cuts = "block",

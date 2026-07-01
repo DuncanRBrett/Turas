@@ -734,6 +734,16 @@ if (.html_report_v2_on) {
           NULL
         })
 
+      # Disclosure needs the microdata base to gate sub-k cuts. If the operator asked
+      # for a threshold but micro didn't build, the renderer fails CLOSED (all detail
+      # hidden) — warn loudly so the operator knows the filtered views are gone by design.
+      .mrb <- suppressWarnings(as.numeric(config_result$config_obj$min_reporting_base))
+      if (is.null(micro) && length(.mrb) == 1L && !is.na(.mrb) && .mrb > 1) {
+        cat("\n[WARNING] Disclosure threshold (min_reporting_base =", .mrb,
+            ") is set but the microdata island is unavailable.\n")
+        cat("  The report hides ALL identifying detail (fail-closed). Restore the microdata to re-enable filtered views.\n\n")
+      }
+
       # Tabs-integrated tracker (OFF by default): emit this wave's contribution,
       # then — when enabled and a waves_source resolves — assemble the tracking
       # island from the prior waves' contributions plus this one.
@@ -768,6 +778,10 @@ if (.html_report_v2_on) {
       # affects the report; a non-PASS join (no id column / no matches) leaves the
       # standalone *_qual_report.html fallback to run below.
       qual_json_main <- NULL
+      # Disclosure config sanity (warn, don't override): a threshold gates the on-screen
+      # and quant views, but comment tags / raw verbatims only leave the page SOURCE when
+      # demographic_cuts='block' / confidentiality_mode!='full'. Nudge to the source-safe combo.
+      if (.qual_wb_set) qual_warn_source_disclosure(config_result$config_obj)
       if (.qual_wb_set) {
         qj <- tryCatch(
           build_integrated_qual_island(.qual_wb, config_result$config_obj,

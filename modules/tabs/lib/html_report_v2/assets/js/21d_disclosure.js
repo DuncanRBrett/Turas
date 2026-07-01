@@ -28,16 +28,23 @@
   /** Whether disclosure control is engaged for this report at all. */
   disc.active = function () { return disc.minBase() > 1; };
 
-  /** Respondents matching the live global filter (= the whole sample when unfiltered). */
+  /** Respondents matching the live global filter (= the whole sample when unfiltered).
+   *  Returns null when the base cannot be computed (no microdata island) — the caller
+   *  MUST treat that as "unknown", never as "large" (see audienceTooSmall: fail closed). */
   disc.audienceBase = function () {
-    if (!TR.MICRO) return Infinity;
+    if (!TR.MICRO) return null;
     var f = TR.d2 && TR.d2.state && TR.d2.state.filters;
     return (f && f.length && TR.stats) ? TR.stats.maskCount(TR.stats.mask(f)) : TR.MICRO.n;
   };
 
-  /** True when the live audience is too small to show identifying detail (tags, quotes). */
+  /** True when the live audience is too small to show identifying detail (tags, quotes).
+   *  Fails CLOSED: if disclosure is engaged but the base can't be verified (microdata
+   *  absent — e.g. the build degraded to published-only), withhold detail rather than
+   *  assume the audience is safe. */
   disc.audienceTooSmall = function () {
-    return disc.active() && disc.audienceBase() < disc.minBase();
+    if (!disc.active()) return false;
+    var base = disc.audienceBase();
+    return base === null || base < disc.minBase();
   };
 
   /** Whether a single count (a crosstab cell, a sub-base) is safe to show in full. A
@@ -48,8 +55,13 @@
 
   /** Standard one-liner for the UI when the audience is below the threshold. */
   disc.note = function () {
-    return "Audience too small (n=" + disc.audienceBase() + ", below the confidentiality " +
-      "threshold of " + disc.minBase() + ") — demographic detail is hidden to protect " +
-      "individual identities. Broaden the filter to see it.";
+    var base = disc.audienceBase();
+    if (base === null) {
+      return "Confidentiality threshold (k=" + disc.minBase() + ") is on but the audience size " +
+        "can't be verified in this view — demographic detail is hidden to protect individual identities.";
+    }
+    return "Audience too small (n=" + base + ", below the confidentiality threshold of " +
+      disc.minBase() + ") — demographic detail is hidden to protect individual identities. " +
+      "Broaden the filter to see it.";
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -151,3 +151,37 @@ test_that("a workbook with no themed questions is refused with a typed code", {
   expect_s3_class(err, "turas_refusal")
   expect_equal(err$code, "DATA_QUAL_NO_THEMES")
 })
+
+# ==============================================================================
+# DISCLOSURE CONFIG SANITY WARNING (source-side footgun)
+# ==============================================================================
+
+test_that("qual_warn_source_disclosure warns on a leaky protected config, quiet otherwise", {
+  # Threshold set but tags + full text left in the source -> loud warning.
+  out <- capture.output(qual_warn_source_disclosure(list(
+    min_reporting_base = 10, qual_demographic_cuts = "allow", qual_confidentiality_mode = "full")))
+  expect_true(any(grepl("DISCLOSURE WARNING", out)))
+  expect_true(any(grepl("demographic tags", out)))
+  expect_true(any(grepl("raw verbatims", out)))
+
+  # Source-safe protected config (block + non-full text) -> silent.
+  out2 <- capture.output(qual_warn_source_disclosure(list(
+    min_reporting_base = 10, qual_demographic_cuts = "block", qual_confidentiality_mode = "redacted")))
+  expect_equal(length(out2), 0L)
+
+  # Disclosure off (k = 1) -> silent regardless of the other dials.
+  out3 <- capture.output(qual_warn_source_disclosure(list(
+    min_reporting_base = 1, qual_demographic_cuts = "allow", qual_confidentiality_mode = "full")))
+  expect_equal(length(out3), 0L)
+
+  # "safe" (k-anonymised tags) + a non-full text mode is source-safe -> silent.
+  out4 <- capture.output(qual_warn_source_disclosure(list(
+    min_reporting_base = 10, qual_demographic_cuts = "safe", qual_confidentiality_mode = "redacted")))
+  expect_equal(length(out4), 0L)
+
+  # "safe" + full text warns about the TEXT only, not the tags.
+  out5 <- capture.output(qual_warn_source_disclosure(list(
+    min_reporting_base = 10, qual_demographic_cuts = "safe", qual_confidentiality_mode = "full")))
+  expect_true(any(grepl("raw verbatims", out5)))
+  expect_false(any(grepl("demographic tags", out5)))
+})

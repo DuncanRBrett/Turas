@@ -93,9 +93,44 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
   island <- qual_build_data_qual(read_result$questions, joined$master, list(
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
-    noteworthy_default = config_obj$qual_noteworthy_default))
+    noteworthy_default = config_obj$qual_noteworthy_default,
+    min_reporting_base = config_obj$min_reporting_base))   # k for "safe" tag anonymisation
   list(status = "PASS", json = serialize_data_qual(island), island = island,
        matched = joined$matched, total = joined$total, id_column = joined$id_column)
+}
+
+#' Warn (console, Shiny-visible) when a disclosure threshold is set but the qual config
+#' still lets identifying comment detail into the page SOURCE.
+#'
+#' min_reporting_base (k) gates the on-screen and quant drill-down, but demographic tags
+#' and raw verbatims only leave the serialized island when qual_demographic_cuts = "block"
+#' and qual_confidentiality_mode != "full". So a report with k > 1 but demos/full text still
+#' in the island is protected on screen yet reconstructable via View-Source on a sub-k cut.
+#' This nudges the operator to the source-safe combination WITHOUT overriding their explicit
+#' dial choice (the dials are independent by design — see qual_build_data_qual).
+#'
+#' @param config_obj The tabs config object.
+#' @return invisible(NULL); emits a console warning as a side effect.
+#' @export
+qual_warn_source_disclosure <- function(config_obj) {
+  k <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
+  if (!(length(k) == 1L && !is.na(k) && k > 1)) return(invisible(NULL))
+  # "block" ships no tags; "safe" ships only k-anonymised tags — both are source-safe.
+  # Only "allow" leaves full per-comment demographics in the page source.
+  tags_in_source <- !(identical(config_obj$qual_demographic_cuts, "block") ||
+                      identical(config_obj$qual_demographic_cuts, "safe"))
+  text_in_source <- identical(config_obj$qual_confidentiality_mode, "full")
+  if (!tags_in_source && !text_in_source) return(invisible(NULL))
+  cat("\n┌─── TURAS DISCLOSURE WARNING ────────────────────────────────┐\n")
+  cat("│ min_reporting_base =", k, "gates the on-screen and quant views, but\n")
+  cat("│ the comment island still carries identifying detail in the PAGE SOURCE:\n")
+  if (tags_in_source) cat("│  • demographic tags  (qual_demographic_cuts = 'allow')\n")
+  if (text_in_source) cat("│  • raw verbatims     (qual_confidentiality_mode = 'full')\n")
+  cat("│ A sub-k cut is then reconstructable via View-Source / Save-As.\n")
+  cat("│ For a source-safe report set qual_demographic_cuts = 'safe' (k-anon tags)\n")
+  cat("│ or 'block' (no tags), and a non-'full' text mode. Leave as-is for INTERNAL use.\n")
+  cat("└─────────────────────────────────────────────────────────────┘\n\n")
+  invisible(NULL)
 }
 
 #' Resolve the closed<->open jump links from the Selection sheet (V12).
@@ -186,7 +221,8 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
   island <- qual_build_data_qual(read_result$questions, master, list(
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
-    noteworthy_default = config_obj$qual_noteworthy_default))
+    noteworthy_default = config_obj$qual_noteworthy_default,
+    min_reporting_base = config_obj$min_reporting_base))   # k for "safe" tag anonymisation
 
   # The quant run used a minimal unweighted/dual-sig config; re-brand the project
   # from the user's config (logos, colours, the show_* tab flags) and mark it as
