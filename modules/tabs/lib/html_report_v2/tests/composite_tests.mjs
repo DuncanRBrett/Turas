@@ -243,5 +243,17 @@ run("disclosure blanks sub-threshold crosstab columns at the model level (task #
   TR.disclosure = priorDisc;
 });
 
+run("composite ids are monotonic — a freed id is never reissued (H)", () => {
+  const spec = (label, r) => ({ name: label, columns: [{ code: "Q002", label: label, rows: [r] }] });
+  const a = TR.compositeBanners.add(spec("A", 0));
+  const b = TR.compositeBanners.add(spec("B", 1));      // b is the current max
+  TR.compositeBanners.remove(b);                          // free the highest id
+  const c = TR.compositeBanners.add(spec("C", 0));        // must NOT reuse b's id
+  const num = (id) => parseInt(id.split(":")[1], 10);
+  assert(c !== b, "new banner does not reuse the freed id (" + c + " vs " + b + ")");
+  assert(c !== a, "new banner id distinct from the surviving one");
+  assert(num(c) > num(b), "id climbs past the removed max (" + c + " > " + b + ")");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

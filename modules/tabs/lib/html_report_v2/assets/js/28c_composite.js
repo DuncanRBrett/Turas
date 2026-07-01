@@ -24,7 +24,9 @@
 
   var comp = TR.compositeBanners = {};
   var KEY = "turas_v2_composites";
+  var SEQ_KEY = "turas_v2_composites_seq";   // monotonic id high-water mark
   var cache = null;
+  var seqHW = 0;                              // in-memory high-water (storage-free sessions)
 
   function store() {
     if (cache) return cache;
@@ -64,15 +66,30 @@
 
   comp.has = function (bannerId) { return !!comp.get(bannerId); };
 
-  /** Next stable token: max existing numeric suffix + 1 (no RNG, so the node
-   *  harness and any deterministic test see predictable ids). */
+  /** Next MONOTONIC token (no RNG, so the node harness sees predictable ids).
+   *  It never reissues a freed id — removing the highest composite and adding a
+   *  new one used to reuse that id, and the new (differently-defined) profile
+   *  banner then inherited the removed one's saved analyst insight/note. The
+   *  high-water mark is the max of any live id, the persisted counter and the
+   *  in-memory counter, so ids only ever climb — within a session and across
+   *  them (persisted where storage is available). */
   function nextToken() {
-    var max = 0;
+    var maxExisting = 0;
     store().forEach(function (b) {
       var t = parseInt(String(b.id || "").split(":")[1], 10);
-      if (!isNaN(t) && t > max) max = t;
+      if (!isNaN(t) && t > maxExisting) maxExisting = t;
     });
-    return String(max + 1);
+    var persisted = 0;
+    try {
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(SEQ_KEY));
+      persisted = raw ? (parseInt(raw, 10) || 0) : 0;
+    } catch (e) { /* in-memory only */ }
+    var next = Math.max(maxExisting, persisted, seqHW) + 1;
+    seqHW = next;
+    try {
+      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(SEQ_KEY), String(next));
+    } catch (e) { /* storage blocked — seqHW keeps the session monotonic */ }
+    return String(next);
   }
 
   /**
