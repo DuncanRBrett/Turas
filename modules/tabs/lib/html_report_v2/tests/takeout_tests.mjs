@@ -298,6 +298,30 @@ run("curation state round-trips and resets", () => {
   assert(takeout.state.getText("weak", "takeaway", "seed") === "seed", "reset clears");
 });
 
+run("save-copy round-trips Patterns curation (K1)", () => {
+  takeout.state.reset();
+  takeout.state.setText("theme-x", "takeaway", "Analyst rewrite");
+  takeout.state.setVeto("pattern-y", true);
+  takeout.state.setApex("The headline");
+  const snap = takeout.state.snapshot();
+  assert(snap && snap.text["theme-x::takeaway"] === "Analyst rewrite" &&
+         snap.veto["pattern-y"] === true && snap.apex === "The headline",
+    "snapshot captures the analyst's text + veto + apex");
+  // Reopen the saved copy: a fresh module instance hydrates from userState.takeout, exactly
+  // as boot does after parseIsland("user-state"). Before K1 this key was never written, so
+  // the reopened tab reverted to raw engine seeds.
+  const priorUserState = sandbox.TR.userState;
+  sandbox.TR.userState = { takeout: snap };
+  vm.runInContext(readFileSync(path.join(JS_DIR, "27f_takeout_data.js"), "utf8"), sandbox,
+    { filename: "27f_takeout_data.js" });
+  const reopened = sandbox.TR.takeout.state;
+  assert(reopened.getText("theme-x", "takeaway", "seed") === "Analyst rewrite", "reopened: takeaway edit survived");
+  assert(reopened.isVetoed("pattern-y") === true, "reopened: veto survived");
+  assert(reopened.getApex("seed") === "The headline", "reopened: apex survived");
+  sandbox.TR.userState = priorUserState;
+  reopened.reset();
+});
+
 run("every takeout module loaded and exposes its API", () => {
   ["buildPatterns", "gather", "compute", "render"].forEach((fn) =>
     assert(typeof takeout[fn] === "function", fn + " is a function"));

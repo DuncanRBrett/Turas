@@ -413,6 +413,9 @@
       var s = store();
       return !!s.apex || Object.keys(s.text).length > 0 || Object.keys(s.veto).length > 0;
     },
+    // The full curation store ({version,text,veto,apex}) so Save-copy can bake the analyst's
+    // Patterns edits/vetoes/apex into the portable .html (they hydrate back via userState.takeout).
+    snapshot: function () { return store(); },
     reset: function () { cache = { version: VERSION, text: {}, veto: {}, apex: null }; persist(); }
   };
 

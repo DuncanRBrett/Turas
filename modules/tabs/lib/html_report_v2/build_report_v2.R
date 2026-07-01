@@ -92,10 +92,30 @@ build_report_v2_html <- function(data_json, config_obj,
     gsub(">", "&gt;", txt, fixed = TRUE)
   }
 
-  replace_token <- function(text, token, content) {
-    parts <- strsplit(text, token, fixed = TRUE)[[1]]
-    if (length(parts) == 1) stop(sprintf("[CFG_REPORT_V2_TOKEN] template missing %s", token))
-    paste(parts, collapse = content)
+  # Single-pass template fill. Every {{TOKEN}} is resolved in ONE pass over the TEMPLATE, so
+  # content inlined for one token is never re-scanned for another. escape_island() neutralises
+  # "</" but NOT "{{...}}", so under a sequential replace a survey verbatim or option label
+  # containing the literal "{{JS}}" (or any later token) would splice the JS bundle / another
+  # island into a data island and corrupt the report. Scanning only the template fixes that.
+  render_template <- function(template, tokens) {
+    for (tok in names(tokens)) {
+      if (!grepl(tok, template, fixed = TRUE)) {
+        stop(sprintf("[CFG_REPORT_V2_TOKEN] template missing %s", tok))
+      }
+    }
+    m <- gregexpr("\\{\\{[A-Za-z_]+\\}\\}", template)[[1]]
+    if (identical(as.integer(m), -1L)) return(template)
+    lens <- attr(m, "match.length")
+    pieces <- vector("list", 2L * length(m) + 1L); p <- 0L; last <- 1L
+    for (i in seq_along(m)) {
+      start <- m[i]
+      pieces[[p <- p + 1L]] <- substr(template, last, start - 1L)
+      tok <- substr(template, start, start + lens[i] - 1L)
+      pieces[[p <- p + 1L]] <- if (tok %in% names(tokens)) tokens[[tok]] else tok  # unknown left as-is
+      last <- start + lens[i]
+    }
+    pieces[[p <- p + 1L]] <- substr(template, last, nchar(template))
+    paste(pieces[seq_len(p)], collapse = "")
   }
 
   blank <- function(x) is.null(x) || length(x) == 0 ||
@@ -104,31 +124,27 @@ build_report_v2_html <- function(data_json, config_obj,
            else if (!blank(config_obj$project_name)) config_obj$project_name
            else "Turas Report"
 
-  html <- read_text(template_path)
-  html <- replace_token(html, "{{TITLE}}", escape_html(as.character(title)))
-  html <- replace_token(html, "{{GENERATED}}", generated)
-  html <- replace_token(html, "{{CSS}}", read_text(css_path))
-  html <- replace_token(html, "{{DATA_AGG}}", escape_island(data_json))
-  # Microdata island: inline when supplied (anonymised per-respondent indices +
-  # weights) so the live filter bar and "+ Custom…" banner light up and the
-  # stats engine recomputes weighted figures; else null (published-only report).
+  # Islands inline when supplied (anonymised indices/weights, scrubbed comments), else null so
+  # the corresponding tab stays hidden (published-only / no Tracking / no Qualitative).
   micro_inlined <- if (!is.null(micro_json) && nzchar(micro_json) && micro_json != "null") {
     escape_island(micro_json)
   } else "null"
-  html <- replace_token(html, "{{DATA_MICRO}}", micro_inlined)
-  # Prior-wave / tracking island: inline when supplied (same </ escaping as the
-  # agg island), else null so the Tracking tab stays hidden. Carries the wave
-  # history — for trackers, anonymised per-wave microdata the engine recomputes.
   prev_inlined <- if (!is.null(prev_json) && nzchar(prev_json)) escape_island(prev_json) else "null"
-  html <- replace_token(html, "{{DATA_PREV}}", prev_inlined)
-  html <- replace_token(html, "{{DATA_VERIFY}}", "null")
-  # Qualitative verbatim island: inline when supplied (scrubbed comments keyed by the
-  # anonymous index), else null so the Qualitative tab stays hidden (Tracking pattern).
   qual_inlined <- if (!is.null(qual_json) && nzchar(qual_json) && qual_json != "null") {
     escape_island(qual_json)
   } else "null"
-  html <- replace_token(html, "{{DATA_QUAL}}", qual_inlined)
-  html <- replace_token(html, "{{JS}}", bundle_report_v2_js(assets_dir))
+
+  html <- render_template(read_text(template_path), list(
+    "{{TITLE}}"       = escape_html(as.character(title)),
+    "{{GENERATED}}"   = generated,
+    "{{CSS}}"         = read_text(css_path),
+    "{{DATA_AGG}}"    = escape_island(data_json),
+    "{{DATA_MICRO}}"  = micro_inlined,
+    "{{DATA_PREV}}"   = prev_inlined,
+    "{{DATA_VERIFY}}" = "null",
+    "{{DATA_QUAL}}"   = qual_inlined,
+    "{{JS}}"          = bundle_report_v2_js(assets_dir)
+  ))
 
   if (grepl('(src|href)="https?://', html)) {
     stop("[CFG_REPORT_V2_EXTERNAL] bundled report references an external URL.")

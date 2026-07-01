@@ -152,6 +152,21 @@ test_that("escapes </ inside the embedded JSON so it cannot break the script", {
   expect_true(grepl("<\\/script", html, fixed = TRUE))
 })
 
+test_that("a verbatim containing a template token cannot corrupt the report (single-pass fill)", {
+  q <- make_dl_q_single()
+  q$question_text <- "Respondent wrote {{JS}} in the box"
+  dl <- build_data_layer(list(Q1 = q), make_dl_banner_info(), make_dl_config())
+  json <- serialize_data_layer(dl)
+  html <- build_report_v2_html(json, make_dl_config(), assets_dir)
+  # The verbatim token survives literally in the island (it is NOT treated as a token). Under
+  # the old sequential replace, filling {{JS}} last overwrote this occurrence with the entire
+  # JS bundle, breaking JSON.parse and blanking the report.
+  expect_true(grepl("{{JS}}", html, fixed = TRUE))
+  # The data island JSON is still intact (schema marker present, not spliced apart).
+  expect_true(grepl('"schema_version":2', html, fixed = TRUE))
+  expect_false(grepl('(src|href)="https?://', html))     # still self-contained
+})
+
 # ==============================================================================
 # 3. write end-to-end
 # ==============================================================================

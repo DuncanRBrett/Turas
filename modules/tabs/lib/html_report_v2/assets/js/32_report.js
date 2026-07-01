@@ -224,6 +224,7 @@
       composites: TR.compositeBanners.all(),
       qualSaved: (TR.qual && TR.qual.savedAll) ? TR.qual.savedAll() : {},
       qualHighlights: (TR.qual && TR.qual.highlightsAll) ? TR.qual.highlightsAll() : {},
+      takeout: (TR.takeout && TR.takeout.state && TR.takeout.state.snapshot) ? TR.takeout.state.snapshot() : null,
       report: store()
     };
     var json = JSON.stringify(state).replace(/<\//g, "<\\/");
