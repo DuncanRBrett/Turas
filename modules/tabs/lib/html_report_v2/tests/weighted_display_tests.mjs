@@ -29,7 +29,8 @@ sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "20_data.js",
-  "21_stats.js", "21c_confidence.js", "22w_waves.js", "22_model.js", "23_render.js"]) {
+  "21_stats.js", "21c_confidence.js", "22w_waves.js", "22_model.js", "23_render.js",
+  "26_filter.js"]) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
 }
 const TR = sandbox.TR;
@@ -193,6 +194,21 @@ run("intervals bracket the shown % on a banner past the first (own-base fix)", (
   const b1 = yes.cells[1];
   assert(b1.ci.hi < 90, "B1 upper bound sane (was ~100 under the bug): " + b1.ci.hi.toFixed(1));
   assert(b1.ci.lo > 50, "B1 lower bound sane: " + b1.ci.lo.toFixed(1));
+});
+
+/* ---------------- 6. weighting callout for the reader ---------------- */
+run("weighting callout appears only when weighted and explains the three bases", () => {
+  TR.AGG = { project: { weighted: true, weight_variable: "weight" } };
+  const note = TR.filterBar.weightingNote();
+  assert(note.indexOf("Weighted data") !== -1, "callout headline present");
+  assert(note.indexOf("weight") !== -1, "names the weight variable");
+  assert(note.indexOf("Base (unweighted)") !== -1 &&
+         note.indexOf("Base (weighted)") !== -1 &&
+         note.indexOf("Effective base") !== -1, "explains all three bases");
+
+  // unweighted -> no callout at all
+  TR.AGG = { project: { weighted: false } };
+  eq(TR.filterBar.weightingNote(), "", "no callout on an unweighted report");
 });
 
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");

@@ -10,6 +10,35 @@
 
   var filterBar = TR.filterBar = {};
 
+  /**
+   * Report-wide weighting callout: a collapsible note explaining, in plain
+   * language, that the figures are weighted and how to read the three base
+   * rows. Empty string on an unweighted report. Pure (reads TR.AGG.project only)
+   * so it can be unit-tested without a DOM.
+   */
+  filterBar.weightingNote = function () {
+    var p = (TR.AGG && TR.AGG.project) || {};
+    if (!p.weighted) return "";
+    var by = p.weight_variable
+      ? " using ‘" + fmt.escapeHtml(p.weight_variable) + "’" : "";
+    return '<details class="fb-wnote"><summary>⚖ Weighted data — figures ' +
+      "represent the population, not the raw sample. How the three bases work ▸" +
+      "</summary><div><p>These results are <strong>weighted</strong>" + by +
+      " so the sample matches the known profile of the population. Every " +
+      "percentage, mean and significance test is calculated on the weights, so " +
+      "the figures describe the population rather than the unadjusted sample.</p>" +
+      "<p>Each table shows three base sizes:</p><ul>" +
+      "<li><strong>Base (unweighted)</strong> — the actual number of people who " +
+      "answered. Judge how robust a result is on this: a small unweighted base " +
+      "is fragile however large the weighted figure looks.</li>" +
+      "<li><strong>Base (weighted)</strong> — the weighted total the percentages " +
+      "are calculated on.</li>" +
+      "<li><strong>Effective base</strong> — the sample's effective size once " +
+      "weighting is accounted for (always ≤ the unweighted count). Significance " +
+      "tests and confidence intervals are sized on this, because weighting " +
+      "reduces precision.</li></ul></div></details>";
+  };
+
   filterBar.render = function () {
     var holder = document.getElementById("filterbar");
     if (!holder) return;
@@ -42,7 +71,7 @@
             : "") + "</span>"
         : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
           ") · add a filter and every table, delta and dashboard recomputes live</span>") +
-      "</div>" + discWarn + "<div id='fpicker' hidden></div>";
+      "</div>" + discWarn + filterBar.weightingNote() + "<div id='fpicker' hidden></div>";
     holder.querySelectorAll("[data-fremove]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         TR.d2.state.filters.splice(parseInt(btn.getAttribute("data-fremove"), 10), 1);

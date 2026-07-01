@@ -159,7 +159,17 @@
           "tables (Campus crosses exact; other banners mean |error| " +
           (ok.mean_abs_err_pp !== undefined ? ok.mean_abs_err_pp.toFixed(1) : "≈2") +
           "pp on healthy bases). A production build embeds real anonymised data."
-        : "") + "</p>" + TR.ai.methodologyHtml();
+        : "") + "</p>" +
+      (p.weighted
+        ? "<p><strong>Weighting.</strong> Figures are weighted" +
+          (p.weight_variable ? " using ‘" + fmt.escapeHtml(p.weight_variable) + "’" : "") +
+          " so the sample matches the known profile of the population; percentages, means and " +
+          "significance are all calculated on the weights. Each table shows the <em>unweighted " +
+          "base</em> (the number of people who answered — judge robustness on this), the " +
+          "<em>weighted base</em> (the denominator the percentages use) and the <em>effective " +
+          "base</em> (the sample's effective size after weighting, on which significance tests " +
+          "and confidence intervals are sized, since weighting reduces precision).</p>"
+        : "") + TR.ai.methodologyHtml();
   }
 
   function wire(host) {
