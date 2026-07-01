@@ -104,5 +104,27 @@ sel = vis._selection();
 assert(sel.metrics[0] === "Q15::1" && sel.segs[0] === "total",
   "no visSel → selection falls back to metricKey · Total");
 
+// 6. G2: twice-yearly trackers — the current wave's trend x-key must come from
+//    wave_order (2025.5), not the re-parsed 4-digit year, so it never collides
+//    with the H1 same-year wave (the published history keys that point as 2025).
+globalThis.TR.render = { CHART_TYPES: [] };
+globalThis.TR.svg = { el: () => "" };
+load("23za_trend.js");
+const render = globalThis.TR.render;
+
+globalThis.TR.AGG = { project: { wave: "2025 H2", wave_order: 2025.5 } };
+assert(render.currentYear() === 2025.5,
+  "G2: twice-yearly current wave keys off wave_order (2025.5), not the parsed year");
+assert(render.currentYear() !== 2025,
+  "G2: the current H2 x-key cannot collide with the 2025 (H1) history point");
+
+globalThis.TR.AGG = { project: { wave: "Annual 2025" } };
+assert(render.currentYear() === 2025,
+  "G2: annual tracker unchanged — parses 2025 from the wave label (byte-identical)");
+
+globalThis.TR.AGG = { project: { wave: "H1 2026", wave_order: "2026" } };
+assert(render.currentYear() === 2026,
+  "G2: a string wave_order (config cells arrive as strings) is parsed");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

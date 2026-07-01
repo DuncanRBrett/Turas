@@ -13,9 +13,17 @@
 
   render.CHART_TYPES.push(["line", "Trend · waves"]);
 
-  /** Current-wave year parsed from project.wave ("Annual 2025" -> 2025). */
+  /** Current wave's order key for the trend axis. Prefers config wave_order
+   *  (e.g. 2025.5, so a twice-yearly H2 point never collides with the H1
+   *  same-year wave — the published history keys both off wave_order); falls
+   *  back to the 4-digit year parsed from project.wave for annual trackers. */
   render.currentYear = function () {
-    var m = /(\d{4})/.exec((TR.AGG.project && TR.AGG.project.wave) || "");
+    var p = (TR.AGG && TR.AGG.project) || {};
+    if (p.wave_order !== null && p.wave_order !== undefined && p.wave_order !== "") {
+      var n = parseFloat(p.wave_order);
+      if (!isNaN(n)) return n;
+    }
+    var m = /(\d{4})/.exec(p.wave || "");
     return m ? parseInt(m[1], 10) : null;
   };
 

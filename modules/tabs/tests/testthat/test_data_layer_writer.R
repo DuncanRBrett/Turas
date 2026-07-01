@@ -400,6 +400,20 @@ test_that("project surfaces weighting metadata only when weighted", {
   expect_false(p3$show_weighted_base)
 })
 
+test_that("project carries wave_order only for sub-annual trackers (G2)", {
+  # not set -> omitted, so annual trackers key off the parsed year (unchanged)
+  p0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$project
+  expect_null(p0$wave_order)
+  # twice-yearly -> the fractional order key rides into the report
+  p1 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(wave_order = 2025.5))$project
+  expect_equal(p1$wave_order, 2025.5)
+  # blank / non-numeric -> omitted
+  p2 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(wave_order = ""))$project
+  expect_null(p2$wave_order)
+})
+
 # ==============================================================================
 # 2. project block
 # ==============================================================================

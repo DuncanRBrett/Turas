@@ -149,6 +149,15 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(mrb) == 1L && !is.na(mrb) && mrb > 1) {
     proj$min_reporting_base <- mrb
   }
+  # Current wave's order key for the trend axis (twice-yearly / sub-annual
+  # trackers). Carried only when config wave_order is set — annual trackers key
+  # off the parsed 4-digit year and stay byte-identical. Without it the renderer's
+  # current-wave x-key re-parses the year, so a 2025 H2 point collides with the
+  # 2025 H1 wave (which the published history already keys as 2025).
+  wo <- suppressWarnings(as.numeric(config_obj$wave_order))
+  if (length(wo) == 1L && !is.na(wo)) {
+    proj$wave_order <- wo
+  }
   # Tab-visibility flags (V12). Crosstabs is always shown; tabList() filters the
   # rest against these. Defaults TRUE so existing reports are unchanged; a tab
   # still self-hides when its island is absent (e.g. Qualitative without DATA_QUAL).
