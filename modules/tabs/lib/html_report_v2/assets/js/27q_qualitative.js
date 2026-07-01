@@ -346,7 +346,10 @@
     if (!TR.xlsx || !TR.xlsx.download) return;
     var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
     var base = (TR.fmt && TR.fmt.slug) ? TR.fmt.slug(q.title || q.code || "comments") : "comments";
-    TR.xlsx.download(base + "_comments", "Comments", qual.exportRows(island, q, records, safeDemos));
+    // keepText: verbatims, IDs and demographic values are prose / identifiers —
+    // never coerce them to numbers (a "50%" comment or an 007 code would mangle).
+    TR.xlsx.download(base + "_comments", "Comments",
+      qual.exportRows(island, q, records, safeDemos), { keepText: true });
   };
 
   function findQ(island, code) {

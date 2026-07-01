@@ -33,34 +33,44 @@
       '" sheetId="1" r:id="rId1"/></sheets></workbook>';
   }
 
-  /** Cell XML: numbers stay numeric, everything else is an inline string. */
-  function cell(value) {
+  /** Cell XML: numbers stay numeric, everything else is an inline string.
+   *  keepText forces a string cell even for numeric-looking text — for columns
+   *  that are prose / identifiers (verbatims, IDs, phone or account numbers)
+   *  where coercion would mangle the value. A numeric-matrix export leaves it
+   *  off, so a display "45%" still lands as the number 45. */
+  function cell(value, keepText) {
     if (typeof value === "number" && isFinite(value)) {
       return "<c><v>" + value + "</v></c>";
     }
     var text = String(value == null ? "" : value);
     var numeric = text.replace(/[%\s ,]/g, "");
-    if (numeric !== "" && !isNaN(Number(numeric)) && /^[\d.\-+]+$/.test(numeric)) {
+    // Coerce only a clean number, and only when the caller allows it. Never a
+    // leading-zero identifier (007, phone / account / postal codes): that is not
+    // a number, and storing it as one drops the zero (007 -> 7).
+    if (!keepText && numeric !== "" && !isNaN(Number(numeric)) &&
+        /^[\d.\-+]+$/.test(numeric) && !/^[+-]?0\d/.test(numeric)) {
       return "<c><v>" + Number(numeric) + "</v></c>";
     }
     return '<c t="inlineStr"><is><t xml:space="preserve">' + esc(text) + "</t></is></c>";
   }
+  xlsx._cell = cell;   // exposed for the export coercion tests
 
-  function sheet(rows) {
+  function sheet(rows, keepText) {
     return XML + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       "<sheetData>" + rows.map(function (row) {
-        return "<row>" + row.map(cell).join("") + "</row>";
+        return "<row>" + row.map(function (v) { return cell(v, keepText); }).join("") + "</row>";
       }).join("") + "</sheetData></worksheet>";
   }
 
-  /** Workbook bytes for a single sheet (also embedded in native charts). */
-  xlsx.bytes = function (sheetName, rows) {
+  /** Workbook bytes for a single sheet (also embedded in native charts).
+   *  opts.keepText -> string cells are never coerced to numbers (text exports). */
+  xlsx.bytes = function (sheetName, rows, opts) {
     return TR.zip.build([
       { name: "[Content_Types].xml", data: CT },
       { name: "_rels/.rels", data: ROOT_RELS },
       { name: "xl/workbook.xml", data: workbook(sheetName) },
       { name: "xl/_rels/workbook.xml.rels", data: WB_RELS },
-      { name: "xl/worksheets/sheet1.xml", data: sheet(rows) }
+      { name: "xl/worksheets/sheet1.xml", data: sheet(rows, opts && opts.keepText) }
     ]);
   };
 
@@ -69,9 +79,10 @@
    * @param {string} filename - without extension.
    * @param {string} sheetName - tab name.
    * @param {Array<Array>} rows - first row is typically the header.
+   * @param {object} [opts] - {keepText} to suppress numeric coercion (text exports).
    */
-  xlsx.download = function (filename, sheetName, rows) {
-    var bytes = xlsx.bytes(sheetName, rows);
+  xlsx.download = function (filename, sheetName, rows, opts) {
+    var bytes = xlsx.bytes(sheetName, rows, opts);
     var blob = new Blob([bytes], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     var link = document.createElement("a");
