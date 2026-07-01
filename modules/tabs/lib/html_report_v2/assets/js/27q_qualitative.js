@@ -367,6 +367,138 @@
       qual.exportRows(island, q, records, safeDemos), { keepText: true });
   };
 
+  // ---- collection: the pool (all marks) aggregated across questions ----------
+  // The "collection" is a VIEW over the durable pool — every shortlisted (★) and
+  // every highlighted (✎) comment, gathered across all questions into one place. It
+  // reads the existing shortlist + highlight stores and NEVER mutates them, so the
+  // marks can't be lost by anything the collection does. Both stores are keyed
+  // qcode#idx; a key that no longer resolves to a record (a mark left over from an
+  // earlier data run) is counted as an orphan and skipped, so a stale mark degrades
+  // to an honest footnote instead of a broken card. Pure + node-testable.
+
+  var NO_THEME = "No theme";
+
+  /** Index every question's records by idx, for O(1) resolution of a qcode#idx key. */
+  function recordIndex(island) {
+    var map = {};
+    ((island && island.questions) || []).forEach(function (q) {
+      var byIdx = {};
+      (q.records || []).forEach(function (r) { byIdx[r.idx] = r; });
+      map[q.code] = { q: q, byIdx: byIdx };
+    });
+    return map;
+  }
+
+  /** Split a "qcode#idx" mark key into {qcode, idx}, or null if malformed. The idx is
+   *  the trailing integer after the LAST '#' (a qcode itself never contains '#'). */
+  qual.splitMark = function (key) {
+    var s = key == null ? "" : String(key), at = s.lastIndexOf("#");
+    if (at < 0) return null;
+    var qcode = s.slice(0, at), idx = parseInt(s.slice(at + 1), 10);
+    if (!qcode || isNaN(idx)) return null;
+    return { qcode: qcode, idx: idx };
+  };
+
+  /**
+   * Aggregate the pool into collected items across all questions.
+   *   savedMap : { "qcode#idx": 1 }              (the shortlist store)
+   *   hlMap    : { "qcode#idx": [[start,end]..] } (the highlight store)
+   * Returns { items: [...], orphans: N }. Each item is
+   *   { qcode, idx, record, question, saved, highlighted }
+   * de-duplicated by qcode#idx (a comment that is BOTH shortlisted and highlighted is
+   * one item carrying both flags). Orphans (keys with no matching record) are counted
+   * once over the union of the two stores, never rendered. Pure — no DOM, no storage.
+   */
+  qual.collectPool = function (island, savedMap, hlMap) {
+    var res = recordIndex(island);
+    savedMap = savedMap || {}; hlMap = hlMap || {};
+    var keys = {};
+    Object.keys(savedMap).forEach(function (k) { if (savedMap[k]) keys[k] = 1; });
+    Object.keys(hlMap).forEach(function (k) { if (hlMap[k] && hlMap[k].length) keys[k] = 1; });
+    var items = [], orphans = 0;
+    Object.keys(keys).forEach(function (key) {
+      var m = qual.splitMark(key);
+      var slot = m && res[m.qcode];
+      var rec = slot && slot.byIdx[m.idx];
+      if (!rec) { orphans++; return; }
+      items.push({ qcode: m.qcode, idx: m.idx, record: rec, question: slot.q,
+                   saved: !!savedMap[key], highlighted: !!(hlMap[key] && hlMap[key].length) });
+    });
+    return { items: items, orphans: orphans };
+  };
+
+  /**
+   * Group collected items for display.
+   *   mode "question" (default) — by source question, in island order.
+   *   mode "theme" — by theme LABEL across questions (affinity grouping): a comment
+   *     appears under every theme it carries; comments with no coded theme fall in a
+   *     "No theme" group. Theme groups rank by distinct-comment count desc, "No theme"
+   *     last. Returns an ordered array of { key, label, items }. Pure + node-testable.
+   */
+  qual.groupCollection = function (island, items, mode) {
+    items = items || [];
+    if (mode === "theme") {
+      var groups = {}, order = [];
+      var push = function (label, it) {
+        if (!groups[label]) { groups[label] = { key: label, label: label, items: [] }; order.push(label); }
+        groups[label].items.push(it);
+      };
+      items.forEach(function (it) {
+        var byId = {};
+        ((it.question && it.question.themes) || []).forEach(function (t) { byId[String(t.id)] = t.label; });
+        var vals = it.record.themeVals || {};
+        var labels = Object.keys(vals).filter(function (id) { return vals[id] != null && byId[id]; })
+          .map(function (id) { return byId[id]; });
+        if (labels.length) labels.forEach(function (lbl) { push(lbl, it); });
+        else push(NO_THEME, it);
+      });
+      return order.map(function (l) { return groups[l]; }).sort(function (a, b) {
+        if (a.label === NO_THEME) return 1;
+        if (b.label === NO_THEME) return -1;
+        return b.items.length - a.items.length;
+      });
+    }
+    var byQ = {};
+    items.forEach(function (it) { (byQ[it.qcode] || (byQ[it.qcode] = [])).push(it); });
+    return ((island && island.questions) || []).filter(function (q) { return byQ[q.code]; })
+      .map(function (q) { return { key: q.code, label: q.title, items: byQ[q.code] }; });
+  };
+
+  /** Export matrix for the collection: ID + Question + demographics + Noteworthy +
+   *  Sentiment + Themes + Shortlisted + Highlighted + Verbatim. Mirrors exportRows'
+   *  confidentiality rule — when safeDemos is false the demographic columns AND the
+   *  verbatim export as "[hidden]", and a hidden verbatim always exports as "[hidden]".
+   *  Pure + node-testable. */
+  qual.collectionExportRows = function (island, items, safeDemos) {
+    if (safeDemos === undefined) safeDemos = true;
+    var dims = ((island && island.demographics) || []).map(function (d) { return d.label; });
+    var header = ["ID", "Question"].concat(dims)
+      .concat(["Noteworthy", "Sentiment", "Themes", "Shortlisted", "Highlighted", "Verbatim"]);
+    var out = [header];
+    (items || []).forEach(function (it) {
+      var r = it.record, q = it.question, byId = {};
+      (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
+      var demos = dims.map(function (lbl) {
+        if (!safeDemos) return "[hidden]";
+        return (r.demos && r.demos[lbl] != null) ? r.demos[lbl] : "";
+      });
+      var themes = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null; })
+        .map(function (id) { return byId[id] || ("#" + id); }).join("; ");
+      var text = (!safeDemos || r.text == null) ? "[hidden]" : r.text;
+      out.push([r.idx, q.title].concat(demos).concat(
+        [TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes,
+         it.saved ? "Yes" : "", it.highlighted ? "Yes" : "", text]));
+    });
+    return out;
+  };
+
+  qual.exportCollectionXlsx = function (island, items) {
+    if (!TR.xlsx || !TR.xlsx.download) return;
+    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
+    TR.xlsx.download("collection_comments", "Collection",
+      qual.collectionExportRows(island, items, safeDemos), { keepText: true });
+  };
+
   function findQ(island, code) {
     var qs = island.questions || [];
     for (var i = 0; i < qs.length; i++) if (qs[i].code === code) return qs[i];
@@ -436,7 +568,8 @@
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
                       theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false,
-                      themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false };
+                      themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false,
+                      view: "question", groupBy: "question" };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -452,16 +585,25 @@
     // is why the qual tab no longer carries its own demographic facet row. A jump
     // additionally pre-sets the filter and shows a breadcrumb back to the closed finding.
     var cutFilters = (d2.state.filters && d2.state.filters.length) ? d2.state.filters : null;
-    var jump = qual.jumpContext();
 
-    var audience = qual.maskFilter(q.records, cutFilters);
-    qual._view = { island: island, q: q, audience: audience };   // for the export handler
+    // The pool (every shortlisted + highlighted comment) drives both the rail's "Your
+    // collection" count and the collection view itself — compute it once per render.
+    var collected = qual.collectPool(island, qual.savedAll(), qual.highlightsAll());
+
+    var body;
+    if (st.view === "collection") {
+      body = collectionMain(island, st, cutFilters, collected);
+    } else {
+      var jump = qual.jumpContext();
+      var audience = qual.maskFilter(q.records, cutFilters);
+      qual._view = { island: island, q: q, audience: audience };   // for the export handler
+      body = breadcrumbHtml(jump) + mainHtml(island, q, st, audience);
+    }
     host.innerHTML =
-      '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st) +
+      '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st, collected.items.length) +
         '<div class="ql-main">' +
           '<button class="ql-railtoggle" title="Show/hide the question list">⟨⟩ Questions</button>' +
-          breadcrumbHtml(jump) +
-          mainHtml(island, q, st, audience) +
+          body +
         '</div></div>';
     wire(host, island);
   };
@@ -476,14 +618,14 @@
       '<span class="ql-crumblbl">comments behind this finding</span>' + cut + "</div>";
   }
 
-  function railHtml(island, st) {
+  function railHtml(island, st, markCount) {
     var groups = [
       { key: "themed", title: "Themed", qs: island.questions.filter(function (q) { return q.type === "themed"; }) },
       { key: "raw", title: "Verbatim-only", qs: island.questions.filter(function (q) { return q.type !== "themed"; }) }
     ].filter(function (g) { return g.qs.length; });
     var html = groups.map(function (g) {
       var items = g.qs.map(function (q) {
-        var sel = q.code === TR.d2.state.qualQ ? ' aria-current="true"' : "";
+        var sel = (st.view !== "collection" && q.code === TR.d2.state.qualQ) ? ' aria-current="true"' : "";
         var glyph = q.type === "themed" ? "▦" : "❝";
         return '<button class="ql-railitem" data-q="' + esc(q.code) + '"' + sel + '>' +
           '<span class="ql-glyph">' + glyph + '</span>' +
@@ -497,7 +639,15 @@
         ' <span class="catn">(' + g.qs.length + ')</span></button>' +
         '<div class="catitems">' + items + '</div></div>';
     }).join("");
-    return '<nav class="ql-rail" aria-label="Open-end questions">' + html + '</nav>';
+    // A pinned "Your collection" entry sits above the question groups — the reader's
+    // whole pool of marks (shortlisted + highlighted) in one place, across every question.
+    var colCur = st.view === "collection" ? ' aria-current="true"' : "";
+    var colBtn = '<button class="ql-railcol" data-col-open' + colCur +
+      ' title="Every comment you have shortlisted or highlighted, across all questions">' +
+      '<span class="ql-glyph">★</span>' +
+      '<span class="ql-railtitle">Your collection</span>' +
+      '<span class="ql-railn">' + (markCount || 0) + '</span></button>';
+    return '<nav class="ql-rail" aria-label="Open-end questions">' + colBtn + html + '</nav>';
   }
 
   function mainHtml(island, q, st, audience) {
@@ -790,6 +940,95 @@
     return '<footer class="ql-foot">' + bits.filter(Boolean).join(" · ") + '</footer>';
   }
 
+  // ---- collection view: the whole pool of marks, across questions ------------
+  // Reached from the pinned "Your collection" rail entry. Aggregates every shortlisted
+  // + highlighted comment (qual.collectPool), applies the SAME global cut as the rest of
+  // the tab, groups by question or theme, and gates on the disclosure threshold exactly
+  // like the drawer. It reads the pool and never mutates a mark. One .ql-drawer wraps all
+  // the cards so the select-to-highlight wiring works here too.
+
+  function filterItems(items, filters) {
+    if (!filters || !filters.length || !TR.stats || !TR.MICRO) return items;
+    var mask = TR.stats.mask(filters);
+    return items.filter(function (it) { return mask[it.record.idx] === 1; });
+  }
+
+  function collectionCard(it) {
+    var q = it.question, r = it.record, qcode = it.qcode;
+    var sent = SENT[r.sentiment] || "neu";
+    var text = (r.text == null)
+      ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
+      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));
+    var byId = {}; (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
+    var chips = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null && byId[id]; })
+      .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
+    var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
+      .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
+    var flags = (it.saved ? '<span class="ql-cflag" title="shortlisted">★</span>' : "") +
+                (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "");
+    return '<div class="ql-quote ' + sent + ' ql-ccard" data-hl-key="' + esc(qcode) + "#" + esc(r.idx) + '">' +
+      '<div class="ql-qbody">' +
+        '<div class="ql-csrc"><button class="ql-cjump" data-col-jump="' + esc(qcode) +
+          '" title="Go to this question">' + esc(q.title) + " ›</button>" + flags + "</div>" +
+        '<span class="ql-qtext">' + text + "</span>" +
+        (chips ? '<div class="ql-cthemes">' + chips + "</div>" : "") +
+        (tags ? '<div class="ql-tags">' + tags + "</div>" : "") +
+      "</div>" +
+      '<div class="ql-qfoot"><span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
+  }
+
+  function collectionMain(island, st, cutFilters, pool) {
+    var total = pool.items.length;
+    var head = '<header class="ql-head"><h2 class="ql-title">★ Your collection</h2>' +
+      '<div class="ql-meta"><span class="ql-badge">ALL MARKS</span>' +
+      '<span class="ql-base">' + total + (total === 1 ? " mark" : " marks") + "</span></div></header>";
+
+    if (!total) {
+      qual._colview = { island: island, items: [] };
+      return head + '<div class="ql-drawer"><p class="ql-empty">Nothing collected yet. As you read, ' +
+        "★ shortlist a comment or ✎ highlight a passage — they gather here, across every question.</p></div>";
+    }
+    // Disclosure: a sub-threshold cut hides the whole list, the same rule as the drawer.
+    if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
+      qual._colview = { island: island, items: [] };
+      return head + '<div class="ql-drawer"><div class="ql-disclosure" role="note">🛡 ' +
+        esc(TR.disclosure.note()) + "</div></div>";
+    }
+
+    var groupBy = st.groupBy === "theme" ? "theme" : "question";
+    var shown = cutFilters ? filterItems(pool.items, cutFilters) : pool.items;
+    qual._colview = { island: island, items: shown };      // for the export handler
+    var groups = qual.groupCollection(island, shown, groupBy);
+
+    var toggle = '<div class="ql-seg" role="tablist" aria-label="Group the collection by">' +
+      '<button class="ql-segbtn' + (groupBy === "question" ? " on" : "") + '" data-colgroup="question">By question</button>' +
+      '<button class="ql-segbtn' + (groupBy === "theme" ? " on" : "") + '" data-colgroup="theme">By theme</button></div>';
+    var actions = '<div class="ql-actions"><button class="ql-export" data-col-export ' +
+      'title="Download everything shown here as an Excel file">⬇ Export</button></div>';
+
+    var cutDesc = (cutFilters && TR.d2 && TR.d2.filterDescription) ? TR.d2.filterDescription() : "";
+    var cover = shown.length === total
+      ? ("Showing all " + total + (total === 1 ? " mark" : " marks"))
+      : ("Showing " + shown.length + " of " + total + " marks" + (cutDesc ? " in this cut" : ""));
+    if (cutDesc) cover += ' · <span class="ql-cut">' + esc(cutDesc) + "</span>";
+    if (pool.orphans) cover += ' · <span class="ql-orphan" title="These marks point at comments not present ' +
+      'in this data run — re-mark to refresh them">' + pool.orphans +
+      " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
+
+    var cards = groups.length
+      ? groups.map(function (g) {
+          return '<div class="ql-colhd">' + esc(g.label) +
+            ' <span class="ql-hint">(' + g.items.length + ")</span></div>" +
+            g.items.map(collectionCard).join("");
+        }).join("")
+      : '<p class="ql-empty">No marks fall in this cut — broaden the filter to see them.</p>';
+
+    return head +
+      '<div class="ql-controls"><span class="ql-ctrllbl">Group your marks:</span>' + toggle + actions + "</div>" +
+      '<div class="ql-colcover">' + cover + "</div>" +
+      '<div class="ql-drawer ql-coldrawer">' + cards + "</div>";
+  }
+
   // ---- interaction -----------------------------------------------------------
 
   function wire(host, island) {
@@ -798,7 +1037,22 @@
       b.addEventListener("click", function () {
         TR.d2.state.qualQ = b.getAttribute("data-q");
         st.theme = null;
+        st.view = "question";             // a question click leaves the collection
         qual.clearJump();                 // leaving the jumped open-end drops the cut breadcrumb
+        qual.render(host);
+      });
+    });
+    // collection view: open it, switch its grouping, jump from a card to its question
+    var colOpen = host.querySelector("[data-col-open]");
+    if (colOpen) colOpen.addEventListener("click", function () { st.view = "collection"; qual.render(host); });
+    host.querySelectorAll("[data-colgroup]").forEach(function (b) {
+      b.addEventListener("click", function () { st.groupBy = b.getAttribute("data-colgroup"); qual.render(host); });
+    });
+    host.querySelectorAll("[data-col-jump]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        TR.d2.state.qualQ = b.getAttribute("data-col-jump");
+        st.theme = null; st.view = "question";
+        qual.clearJump();
         qual.render(host);
       });
     });
@@ -870,6 +1124,11 @@
     if (ex) ex.addEventListener("click", function () {
       var v = qual._view;
       if (v) qual.exportXlsx(v.island, v.q, qual.visibleRecords(v.q, st, v.audience));
+    });
+    var colEx = host.querySelector("[data-col-export]");
+    if (colEx) colEx.addEventListener("click", function () {
+      var v = qual._colview;
+      if (v) qual.exportCollectionXlsx(v.island, v.items);
     });
     wireHighlights(host);
   }

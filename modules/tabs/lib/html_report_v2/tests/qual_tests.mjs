@@ -207,5 +207,60 @@ assert(qual.getHighlights("HLQ", 0).length === 2, "a disjoint range is kept sepa
 qual.removeHighlight("HLQ", 0, 0);
 assert(JSON.stringify(qual.getHighlights("HLQ", 0)) === "[[20,25]]", "removeHighlight drops the range by start offset");
 
+// ---- collection: the pool (all marks) aggregated across questions -----------
+// A stand-alone island with two questions; the pool is passed in explicitly (not the
+// module's mutable store), so every count below is hand-computable.
+console.log("\nQualitative collection (the pool, all marks):");
+const colIsland = {
+  demographics: [{ label: "Campus" }],
+  questions: [
+    { code: "Q1", title: "Why recommend?", type: "themed",
+      themes: [{ id: 0, label: "Price" }, { id: 1, label: "Service" }],
+      records: [
+        { idx: 0, tier: 2, sentiment: 1, themeVals: { "0": 1 }, demos: { Campus: "Cape Town" }, text: "great value" },
+        { idx: 2, tier: 0, sentiment: 3, themeVals: { "1": 3 }, demos: { Campus: "Durban" }, text: "slow support" }
+      ] },
+    { code: "Q2", title: "Anything else?", type: "raw", themes: [],
+      records: [ { idx: 1, tier: 1, sentiment: null, themeVals: {}, demos: { Campus: "Cape Town" }, text: "more parking" } ] }
+  ]
+};
+// shortlist Q1#0 + Q2#1; highlight Q1#0 (so it's both) + Q1#2; and one stale mark (Q9#7).
+const colSaved = { "Q1#0": 1, "Q2#1": 1 };
+const colHl = { "Q1#0": [[0, 5]], "Q1#2": [[0, 4]], "Q9#7": [[0, 2]] };
+const pool = qual.collectPool(colIsland, colSaved, colHl);
+assert(pool.items.length === 3, "collectPool: 3 distinct marks resolve (Q1#0, Q2#1, Q1#2)");
+assert(pool.orphans === 1, "collectPool: the stale Q9#7 mark is 1 orphan, skipped not rendered");
+const colByKey = {}; pool.items.forEach((it) => { colByKey[it.qcode + "#" + it.idx] = it; });
+assert(colByKey["Q1#0"].saved === true && colByKey["Q1#0"].highlighted === true,
+  "collectPool: a comment BOTH shortlisted and highlighted is ONE item carrying both flags");
+assert(colByKey["Q1#2"].saved === false && colByKey["Q1#2"].highlighted === true,
+  "collectPool: a highlight-only mark carries the highlighted flag only");
+assert(colByKey["Q2#1"].question.title === "Anything else?", "collectPool: each item carries its source question");
+assert(qual.splitMark("Q1#0").qcode === "Q1" && qual.splitMark("Q1#0").idx === 0, "splitMark parses qcode + idx");
+assert(qual.splitMark("bad") === null, "splitMark is null on a malformed key");
+
+const gq = qual.groupCollection(colIsland, pool.items, "question");
+assert(gq.length === 2 && gq[0].key === "Q1" && gq[1].key === "Q2", "groupCollection question: groups in island order");
+assert(gq[0].items.length === 2 && gq[0].label === "Why recommend?", "groupCollection question: Q1 holds its 2 marks, labelled by title");
+
+const gt = qual.groupCollection(colIsland, pool.items, "theme");
+const gtBy = {}; gt.forEach((g) => { gtBy[g.label] = g; });
+assert(gtBy["Price"] && gtBy["Price"].items.length === 1, "groupCollection theme: Price holds the Q1#0 comment");
+assert(gtBy["Service"] && gtBy["Service"].items.length === 1, "groupCollection theme: Service holds the Q1#2 comment");
+assert(gtBy["No theme"] && gtBy["No theme"].items.length === 1, "groupCollection theme: the raw Q2 comment falls under No theme");
+assert(gt[gt.length - 1].label === "No theme", "groupCollection theme: No theme sorts last");
+
+const crows = qual.collectionExportRows(colIsland, pool.items);
+assert(crows[0].join("|") === "ID|Question|Campus|Noteworthy|Sentiment|Themes|Shortlisted|Highlighted|Verbatim",
+  "collectionExportRows header = ID + Question + demos + meta + flags + verbatim");
+const cRowByText = {}; crows.slice(1).forEach((r) => { cRowByText[r[8]] = r; });
+assert(cRowByText["great value"][1] === "Why recommend?" && cRowByText["great value"][2] === "Cape Town",
+  "collectionExportRows carries the source question + demographics");
+assert(cRowByText["great value"][6] === "Yes" && cRowByText["great value"][7] === "Yes",
+  "collectionExportRows flags the shortlisted + highlighted columns");
+const csafe = qual.collectionExportRows(colIsland, pool.items, false);
+assert(csafe[1][2] === "[hidden]" && csafe[1][8] === "[hidden]",
+  "collectionExportRows safeDemos=false hides demographics + verbatim (no sub-k leak)");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

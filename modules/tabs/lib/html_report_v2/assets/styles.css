@@ -865,6 +865,28 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* disclosure-control notice above the comment list (demographic tags withheld) */
 .ql-disclosure { font-size: 12px; font-weight: 600; color: #8a5300; background: #fff6e5;
   border: 1px solid #f0d9a8; border-radius: 8px; padding: 8px 12px; margin: 4px 0 12px; }
+/* Comment Hubs — the collection view (every shortlisted + highlighted mark, in one place) */
+.ql-railcol { display: flex; align-items: flex-start; gap: 8px; text-align: left; width: 100%;
+  border: 1px solid var(--accent); background: var(--card); border-radius: 8px; padding: 7px 10px;
+  cursor: pointer; font: inherit; margin-bottom: 8px; }
+.ql-railcol:hover { background: var(--bg); }
+.ql-railcol[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ql-railcol[aria-current="true"] .ql-railn, .ql-railcol[aria-current="true"] .ql-glyph { opacity: .9; }
+.ql-colcover { font-size: 12px; color: var(--muted); margin: -6px 0 12px; display: flex; flex-wrap: wrap;
+  align-items: center; gap: 4px 8px; }
+.ql-orphan { color: #8a5300; background: #fff6e5; border: 1px solid #f0d9a8; border-radius: 999px;
+  padding: 0 8px; font-weight: 600; }
+.ql-colhd { font-size: 13px; font-weight: 700; color: var(--brand); margin: 18px 0 8px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.ql-coldrawer > .ql-colhd:first-child { margin-top: 0; }
+.ql-csrc { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.ql-cjump { border: 0; background: none; color: var(--brand); font: inherit; font-size: 12px; font-weight: 600;
+  padding: 0; cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.ql-cjump:hover { text-decoration: underline; }
+.ql-cflag { font-size: 11px; color: var(--accent); }
+.ql-cthemes { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
+.ql-cchip { font-size: 11px; color: var(--brand); background: var(--bg); border: 1px solid var(--brand);
+  border-radius: 999px; padding: 1px 8px; }
 /* theme x banner crosstab (supplements the prevalence board) */
 .ql-viewtog { margin-bottom: 12px; }
 .ql-xtab { padding: 14px 16px; margin-bottom: 4px; }
