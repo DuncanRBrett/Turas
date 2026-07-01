@@ -103,7 +103,8 @@
     var s = waves.currentScores(q);
     if (!s || !s.length) return null;
     var w = waves.currentWeights(q);
-    return { value: meanOfScores(s, w), base: s.length, sd: sdOfScores(s, w) };
+    return { value: meanOfScores(s, w), base: s.length, sd: sdOfScores(s, w),
+      effBase: effNfromWeights(w, s.length) };
   };
 
   /**
@@ -241,6 +242,45 @@
     return waveQ.base || null;
   }
 
+  /* ---------- effective base for weighted wave-on-wave significance ----------
+   * A weighted estimate carries the variance of its KISH effective base
+   * n_eff = (Σw)²/Σw², not its raw respondent count. Sizing the wave z-test on
+   * the raw base (as it did) over-states precision and over-flags movements on a
+   * weighted tracker. These size it on n_eff, mirroring the crosstab weighted
+   * z-test (22_model.js sigCell) and the R engine (weighting.R). Total path only:
+   * segments and computed-totals waves have no per-respondent weights, so they
+   * fall back to the plain base — and an unweighted study has n_eff === n, so
+   * every path below is byte-identical there. */
+  function effNfromWeights(w, n) {
+    if (!w || !w.length) return n;
+    var wsum = 0, sumW2 = 0;
+    for (var i = 0; i < w.length; i++) { wsum += w[i]; sumW2 += w[i] * w[i]; }
+    return sumW2 > 0 ? Math.round((wsum * wsum) / sumW2) : n;   // rounded, as R does
+  }
+
+  /** Effective base of a HISTORY wave point (Total only): the Kish n_eff when
+   *  the wave carries per-respondent weights, else undefined so the point falls
+   *  back to its plain base. */
+  function effBaseOf(waveQ, seg) {
+    if (seg || !waveQ || !waveQ.weights || !waveQ.weights.length) return undefined;
+    return effNfromWeights(waveQ.weights, baseOf(waveQ, null));
+  }
+
+  /** The base significance is sized on: the effective base when a point carries
+   *  one, else its plain base (so unweighted / segment points are unchanged). */
+  function effBaseOfPoint(p) {
+    return (p.effBase != null && p.effBase > 0) ? p.effBase : p.base;
+  }
+
+  /** (count, base) a proportion test runs on. Weighted (n_eff < base): the shown
+   *  % carried on the effective base (x = %·n_eff over n_eff), the weighted
+   *  z-test. Unweighted (n_eff === base): the exact integer count, byte-identical. */
+  function sigPair(p) {
+    var eff = effBaseOfPoint(p);
+    if (eff === p.base && p.x !== null && p.x !== undefined) return { x: p.x, base: p.base };
+    return { x: p.value / 100 * eff, base: eff };
+  }
+
   /* ---------- spread of mean-kind metrics (from published distributions) --- */
 
   /** Per-category respondent scores behind a mean-kind row: {ri: score}.
@@ -327,8 +367,9 @@
         b.sd === null || b.sd === undefined) return 0;
     if (!a.base || !b.base) return 0;
     var threshold = TR.AGG.project.low_base_threshold || 30;
-    if (a.base < threshold || b.base < threshold) return 0;
-    var z = TR.stats.meanZ(a.value, a.sd, a.base, b.value, b.sd, b.base);
+    var ea = effBaseOfPoint(a), eb = effBaseOfPoint(b);
+    if (ea < threshold || eb < threshold) return 0;      // gate on the effective base
+    var z = TR.stats.meanZ(a.value, a.sd, ea, b.value, b.sd, eb);
     if (z === null) return 0;
     var az = Math.abs(z);
     return az > TR.stats.Z95 ? 2 : az > TR.stats.Z80 ? 1 : 0;
@@ -355,8 +396,10 @@
   function propLevel(a, b) {
     if (a.x === null || b.x === null || !a.base || !b.base) return 0;
     var threshold = TR.AGG.project.low_base_threshold || 30;
-    if (a.base < threshold || b.base < threshold) return 0;
-    var z = TR.stats.propZ(a.x, a.base, b.x, b.base);
+    var ea = effBaseOfPoint(a), eb = effBaseOfPoint(b);
+    if (ea < threshold || eb < threshold) return 0;      // gate on the effective base
+    var pa = sigPair(a), pb = sigPair(b);                // % on n_eff (weighted) / exact count
+    var z = TR.stats.propZ(pa.x, pa.base, pb.x, pb.base);
     if (z === null) return 0;
     var az = Math.abs(z);
     return az > TR.stats.Z95 ? 2 : az > TR.stats.Z80 ? 1 : 0;
@@ -376,6 +419,7 @@
       if (value === null || value === undefined) return;
       series.push({ wave: h.wave, year: h.year, value: value,
         base: baseOf(h.q, seg || null),
+        effBase: effBaseOf(h.q, seg || null),
         x: isMean || row.diff ? null : countOf(h.q, row, value, seg || null),
         sd: isMean && !row.diff
           ? waves.sdAtWave(q, row, h.q, seg || null) : undefined });
@@ -458,7 +502,9 @@
       var curX = !canSig ? null
         : (row.cells[0].n !== null && row.cells[0].n !== undefined
           ? row.cells[0].n : Math.round(cur / 100 * curBase));
-      var curPoint = { value: cur, base: curBase, x: curX,
+      var col0 = viewModel.columns[0];
+      var curEff = (col0.baseEff != null && col0.baseEff > 0) ? col0.baseEff : curBase;
+      var curPoint = { value: cur, base: curBase, x: curX, effBase: curEff,
         sd: isMean && !row.diff ? sdFromModel(q, row, viewModel) : undefined };
       var sigVs = function (point) {
         if (canSig) return sigBetween(curPoint, point);

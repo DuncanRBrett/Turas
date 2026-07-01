@@ -178,13 +178,14 @@
       // distribution). The 1-dp display is unchanged.
       if (metric.isMean && !metric.diff) {
         var cp = TR.waves.currentPoint(metric.q);
-        if (cp) return { value: cp.value, base: cp.base, x: null };
+        if (cp) return { value: cp.value, base: cp.base, x: null, effBase: cp.effBase };
       }
       var cell = metric.row.cells[0];
       var v = metric.isMean ? cell.mean : cell.pct;
       if (v === null || v === undefined) return null;
-      return { value: v,
-        base: trk.publishedModel(metric.code, null).columns[0].base,
+      var m0 = trk.publishedModel(metric.code, null).columns[0];
+      return { value: v, base: m0.base,
+        effBase: (m0.baseEff != null && m0.baseEff > 0) ? m0.baseEff : m0.base,
         x: cell.n !== null && cell.n !== undefined ? cell.n : null };
     }
     var seg = trk.segmentByNorm(segNorm);
@@ -264,7 +265,7 @@
     var points = series.slice();
     if (cur) {
       points.push({ wave: TR.AGG.project.wave, year: TR.render.currentYear(),
-        value: cur.value, base: cur.base,
+        value: cur.value, base: cur.base, effBase: cur.effBase,
         x: canSig ? (cur.x !== null ? cur.x
           : Math.round(cur.value / 100 * (cur.base || 0))) : null,
         sd: metric.isMean && !metric.diff

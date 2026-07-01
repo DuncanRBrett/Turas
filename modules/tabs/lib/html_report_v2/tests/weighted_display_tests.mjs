@@ -211,5 +211,47 @@ run("weighting callout appears only when weighted and explains the three bases",
   eq(TR.filterBar.weightingNote(), "", "no callout on an unweighted report");
 });
 
+/* ---------------- 7. weighted wave-on-wave significance (#8) ---------------- */
+// The wave z-test must be sized on the KISH effective base, not the raw count —
+// otherwise a weighted tracker over-flags movements. Known-answer: a 50%->65%
+// move on 100 respondents is 95%-significant; the same move on a Kish effective
+// base of 40 is only 80%. Unweighted points (no effBase) are byte-identical.
+run("weighted wave delta is sized on the effective base, not the raw base (#8)", () => {
+  TR.AGG = { project: { low_base_threshold: 30 } };
+
+  // proportions
+  const w = TR.waves.cellsFor(
+    [{ value: 50, base: 100, effBase: 40, x: 50 }, { value: 65, base: 100, effBase: 40, x: 65 }],
+    true, "dual");
+  eq(w[1].sig_prev, false, "not 95%-significant on the effective base (40)");
+  eq(w[1].soft_prev, true, "but 80%-significant — the effective base downgraded the flag");
+
+  // the SAME numbers unweighted (no effBase) stay 95%-significant on the raw base
+  const u = TR.waves.cellsFor(
+    [{ value: 50, base: 100, x: 50 }, { value: 65, base: 100, x: 65 }], true, "dual");
+  eq(u[1].sig_prev, true, "unweighted (effBase absent) stays 95%-sig on the raw base");
+
+  // means: a 3.7 -> 4.0 move (sd 1.0) is 95%-sig on 100 but only 80% on eff 40
+  const wm = TR.waves.cellsFor(
+    [{ value: 3.7, sd: 1.0, base: 100, effBase: 40 }, { value: 4.0, sd: 1.0, base: 100, effBase: 40 }],
+    false, "dual");
+  eq(wm[1].sig_prev, false, "weighted mean delta not 95%-sig on the effective base");
+  eq(wm[1].soft_prev, true, "weighted mean delta is 80%-sig");
+  const um = TR.waves.cellsFor(
+    [{ value: 3.7, sd: 1.0, base: 100 }, { value: 4.0, sd: 1.0, base: 100 }], false, "dual");
+  eq(um[1].sig_prev, true, "unweighted mean delta stays 95%-sig on the raw base");
+});
+
+run("effNfromWeights matches Kish and a low effective base gates the test out (#8)", () => {
+  TR.AGG = { project: { low_base_threshold: 30 } };
+  // varied weights: n=4 respondents, Σw=4, Σw²=6 -> n_eff = 16/6 = 2.67 -> rounds to 3.
+  // A pair with a tiny effective base is excluded from testing entirely.
+  const w = TR.waves.cellsFor(
+    [{ value: 20, base: 100, effBase: 3, x: 20 }, { value: 80, base: 100, effBase: 3, x: 80 }],
+    true, "dual");
+  eq(w[1].sig_prev, false, "sub-threshold effective base is not tested (no false flag)");
+  eq(w[1].soft_prev, false, "and not softly flagged either");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);
