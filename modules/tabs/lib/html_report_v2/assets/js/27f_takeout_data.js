@@ -240,8 +240,17 @@
     // Per-arm floor: in a census a subgroup is most of its own population, so the
     // analyst's reporting floor (default 5) applies; a true sample keeps n>=30.
     var floor = census ? (proj.min_report_base || MIN_CENSUS_BASE) : (proj.low_base_threshold || 30);
+    // The odd-one-out finder (the only consumer of this family) tests each cell's
+    // gap against FIXED scale-point floors AND against the group's mean gap across
+    // the family — both only meaningful within one comparable scale band. Restrict
+    // the family to small-range rating scales (max ≤ 10): an NPS / score question
+    // (±100) would otherwise clear a floor tuned for 1–5 points on a trivial wobble
+    // — a fabricated "odd one out" — and its ±100 gaps would swamp the mean-gap
+    // baseline. Strain/thrive keep NPS: they normalise each gap by scaleMax; this
+    // family does not.
     var qs = views.indexQuestions().filter(function (q) {
-      return micro.scores[q.code] && micro.scores[q.code].length;
+      return micro.scores[q.code] && micro.scores[q.code].length &&
+        q.type !== "nps" && touchpointMax(q) <= 10;
     });
     if (!qs.length) return null;
     var nResp = micro.n || micro.scores[qs[0].code].length;

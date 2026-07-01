@@ -385,6 +385,34 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, read view"
   assert(read.indexOf('data-edit="') !== -1, "editable hooks present");
 });
 
+run("ODD-ONE-OUT family excludes NPS/score scales (F1: no cross-scale fabrication)", () => {
+  // A 1–5 rating and an NPS (0–100) question over two banner groups. The family
+  // that feeds the odd-one-out finder applies fixed scale-point floors, so a ±100
+  // NPS gap would sail past a 1–5 floor and fabricate a spurious "odd one out".
+  const N = 40, bv = [], rate = [], nps = [];
+  for (let i = 0; i < N; i++) {
+    const g0 = i < 20;
+    bv.push(g0 ? 0 : 1);
+    rate.push(g0 ? (i % 2 ? 5 : 4) : (i % 2 ? 4 : 3));    // 1–5 scale
+    nps.push(g0 ? (i % 2 ? 80 : 60) : (i % 2 ? 20 : 40));  // 0–100 NPS index (big gaps)
+  }
+  TR.conf = { reportHasPopulation: () => false };
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Banner" }] };
+  TR.MICRO = { n: N, weights: null, banner_vars: { B: bv }, scores: { Q_RATE: rate, Q_NPS: nps } };
+  TR.views = {
+    indexQuestions: () => ([
+      { code: "Q_RATE", title: "Rating", category: "", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] },
+      { code: "Q_NPS", title: "NPS", category: "", type: "nps", scale_max: 100, rows: [{ kind: "mean" }] }
+    ]),
+    _modelFor: () => ({ columns: [{ base: N }, { label: "G0", base: 20 }, { label: "G1", base: 20 }] })
+  };
+  const g = takeout.gather();
+  assert(g.fdr, "the rating question forms the family");
+  assert(g.fdr.questionCount === 1, "NPS excluded -> one comparable-scale question, got " + g.fdr.questionCount);
+  assert(g.fdr.cells.every((c) => c.q !== "Q_NPS"), "no NPS cell can enter the odd-one-out family");
+  assert(g.fdr.cells.some((c) => c.q === "Q_RATE"), "the rating question's cells are present");
+});
+
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");
 function activeLines(src) {
   let inBlock = false, count = 0;
