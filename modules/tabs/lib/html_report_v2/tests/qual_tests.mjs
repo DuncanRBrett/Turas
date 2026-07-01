@@ -84,6 +84,18 @@ const sup = qual.themeCrosstab(xrecs, xthemes, xcols, { minBase: 3 });
 assert(sup.columns[1].suppressed === true && sup.columns[0].suppressed === false,
   "a column below the disclosure threshold is flagged suppressed (Total never is)");
 
+// C-round: a 3-way even split (1 pos / 1 mix / 1 neg) must reconcile —
+// independently rounding each to 33 would sum to 99, not the 100 salience.
+const drecs = [
+  { idx: 0, themeVals: { "0": 1 } }, { idx: 1, themeVals: { "0": 2 } }, { idx: 2, themeVals: { "0": 3 } }
+];
+const dc = qual.themeCrosstab(drecs, [{ id: 0, label: "A" }], [{ label: "Total", member: null }], {}).rows[0].cells[0];
+assert(dc.salience === 100, "all 3 raised the theme -> salience 100");
+assert(dc.ofBase.pos + dc.ofBase.mix + dc.ofBase.neg === dc.salience,
+  "of-base split reconciles with salience, no ±1 drift: " + JSON.stringify(dc.ofBase));
+assert(dc.ofMen.pos + dc.ofMen.mix + dc.ofMen.neg === 100,
+  "of-mentioners split sums to exactly 100: " + JSON.stringify(dc.ofMen));
+
 // ---- Phase-2 jump helpers (linkFor / commentCount / maskFilter / affordanceHtml) ----
 // Stubs: Q28 (a closed question) links to the QUAL_SAT open-end; the cut mask keeps
 // respondents 0 and 2 (a "filtered" call), or all when no filter.

@@ -80,6 +80,20 @@
                suppressed: col.member != null && base > 0 && base < minBase };
     });
     var pc = function (x, b) { return b ? Math.round(x / b * 100) : 0; };
+    // Split three counts into integer percentages that SUM to the rounded total
+    // (largest-remainder), so pos+mix+neg reconciles with the salience / 100
+    // instead of drifting a point from independently rounding each part.
+    var splitPct = function (parts, denom) {
+      if (!denom) return [0, 0, 0];
+      var raw = parts.map(function (p) { return p / denom * 100; });
+      var flo = raw.map(Math.floor);
+      var target = Math.round(parts.reduce(function (a, b) { return a + b; }, 0) / denom * 100);
+      var rem = target - flo.reduce(function (a, b) { return a + b; }, 0);
+      raw.map(function (v, i) { return { i: i, f: v - flo[i] }; })
+        .sort(function (a, b) { return b.f - a.f; })
+        .slice(0, Math.max(0, rem)).forEach(function (o) { flo[o.i]++; });
+      return flo;
+    };
     var rows = themes.map(function (th) {
       var key = String(th.id);
       var cells = columns.map(function (col, ci) {
@@ -91,10 +105,11 @@
           if (v === 1) pos++; else if (v === 2) mix++; else if (v === 3) neg++;
         }
         var men = pos + mix + neg, base = cols[ci].base;
+        var ob = splitPct([pos, mix, neg], base), om = splitPct([pos, mix, neg], men);
         return { men: men, pos: pos, mix: mix, neg: neg, base: base,
           salience: pc(men, base), net: men ? Math.round((pos - neg) / men * 100) : 0,
-          ofBase: { pos: pc(pos, base), mix: pc(mix, base), neg: pc(neg, base) },
-          ofMen: { pos: pc(pos, men), mix: pc(mix, men), neg: pc(neg, men) }, sig: "" };
+          ofBase: { pos: ob[0], mix: ob[1], neg: ob[2] },
+          ofMen: { pos: om[0], mix: om[1], neg: om[2] }, sig: "" };
       });
       return { id: th.id, label: th.label, cells: cells, totalMen: cells[0] ? cells[0].men : 0 };
     });

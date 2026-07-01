@@ -42,7 +42,9 @@
       labels.forEach(function (l) { l.pos = Math.max(minPos, l.pos - overflow); });
       for (var j = labels.length - 2; j >= 0; j--) {
         if (labels[j + 1].pos - labels[j].pos < minGap) {
-          labels[j].pos = labels[j + 1].pos - minGap;
+          // clamp to minPos: the backward sweep could otherwise push a callout
+          // off the top of the track on a crowded small-slice chart.
+          labels[j].pos = Math.max(minPos, labels[j + 1].pos - minGap);
         }
       }
     }

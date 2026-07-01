@@ -322,13 +322,25 @@
     if (!qs.length) return null;
     var nResp = micro.n || micro.scores[qs[0].code].length;
     var out = qs.map(function (q) {
-      var K = touchpointMax(q), sc = micro.scores[q.code], counts = new Array(K).fill(0);
+      var K = touchpointMax(q), sc = micro.scores[q.code];
+      // Detect a 0-based scale (NPS 0–10 / raw recommend). "round(v) - 1" assumed
+      // 1..K, so v=0 mapped to idx -1 and the detractor camp was dropped — a real
+      // two-camp 0–10 split then read as unimodal. Keep 1..K exactly as before;
+      // for a 0-based scale bin from 0 (K+1 bins) so the bottom camp is counted.
+      var lo = Infinity;
+      for (var i = 0; i < nResp; i++) {
+        var s = sc[i]; if (s === null || s === undefined) continue;
+        var sv = Math.round(s); if (sv < lo) lo = sv;
+      }
+      var zeroBased = isFinite(lo) && lo <= 0;
+      var bins = zeroBased ? K + 1 : K, shift = zeroBased ? 0 : 1;
+      var counts = new Array(bins).fill(0);
       for (var r = 0; r < nResp; r++) {
         var v = sc[r]; if (v === null || v === undefined) continue;
-        var idx = Math.round(v) - 1;                      // scores run 1..K
-        if (idx >= 0 && idx < K) counts[idx] += weights ? weights[r] : 1;
+        var idx = Math.round(v) - shift;
+        if (idx >= 0 && idx < bins) counts[idx] += weights ? weights[r] : 1;
       }
-      return { code: q.code, title: q.title, counts: counts, scaleMax: K };
+      return { code: q.code, title: q.title, counts: counts, scaleMax: bins };
     });
     return { questions: out };
   }

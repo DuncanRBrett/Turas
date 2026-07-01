@@ -413,6 +413,25 @@ run("ODD-ONE-OUT family excludes NPS/score scales (F1: no cross-scale fabricatio
   assert(g.fdr.cells.some((c) => c.q === "Q_RATE"), "the rating question's cells are present");
 });
 
+run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
+  // A 0–10 recommend scale split into hard camps at 0 (detractors) and 10
+  // (promoters). "round(v) - 1" dropped v=0, so the detractor camp vanished and
+  // the split read as unimodal. The bottom camp must now be counted.
+  const N = 40, nps = [];
+  for (let i = 0; i < N; i++) nps.push(i < 20 ? 0 : 10);
+  TR.conf = { reportHasPopulation: () => false };
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [] };
+  TR.MICRO = { n: N, weights: null, scores: { Q_NPS: nps } };
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q_NPS", title: "Recommend", category: "", type: "nps", scale_max: 10 }])
+  };
+  const g = takeout.gather();
+  const q = g.bimodal && g.bimodal.questions && g.bimodal.questions.find((x) => x.code === "Q_NPS");
+  assert(q, "Q_NPS scanned for bimodality");
+  assert(q.counts[0] > 0, "the 0-camp (detractors) is counted, not dropped");
+  assert(q.scaleMax === 11, "0-based scale binned over 0..10 (11 bins), got " + q.scaleMax);
+});
+
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");
 function activeLines(src) {
   let inBlock = false, count = 0;

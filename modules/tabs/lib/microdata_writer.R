@@ -171,7 +171,10 @@ micro_answers_single <- function(col, maps) {
 #' @return A length-n list of integer vectors / NA
 #' @keywords internal
 micro_answers_multi <- function(survey_data, code, maps, n) {
-  cols <- grep(paste0("^", code, "_\\d+$"), names(survey_data), value = TRUE)
+  # \Q…\E quotes the code literally, so a metacharacter in a question code
+  # (e.g. a ".") can't act as a wildcard and over-match unrelated columns.
+  cols <- grep(paste0("^\\Q", code, "\\E_\\d+$"), names(survey_data),
+               perl = TRUE, value = TRUE)
   if (length(cols) == 0 && code %in% names(survey_data)) cols <- code
   out <- vector("list", n)
   for (r in seq_len(n)) {
@@ -202,7 +205,8 @@ micro_answers_multi <- function(survey_data, code, maps, n) {
 micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
   maps <- micro_value_index_map(dl_q, survey_structure)
   has_cols <- dl_q$code %in% names(survey_data) ||
-    length(grep(paste0("^", dl_q$code, "_\\d+$"), names(survey_data))) > 0
+    length(grep(paste0("^\\Q", dl_q$code, "\\E_\\d+$"), names(survey_data),
+                perl = TRUE)) > 0
   if (is.null(maps) || !has_cols) {
     return(I(rep(NA_integer_, n)))   # serialises to [null,…] — still length n
   }
