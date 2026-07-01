@@ -239,6 +239,17 @@ assert(colByKey["Q2#1"].question.title === "Anything else?", "collectPool: each 
 assert(qual.splitMark("Q1#0").qcode === "Q1" && qual.splitMark("Q1#0").idx === 0, "splitMark parses qcode + idx");
 assert(qual.splitMark("bad") === null, "splitMark is null on a malformed key");
 
+// A comment filed ONLY in a hub (not shortlisted/highlighted) is still pooled — so
+// "add to a hub" is itself a way to save a comment (shortlist + hub in one).
+const poolH = qual.collectPool(colIsland, {}, {}, { "Q2#1": 1 });
+assert(poolH.items.length === 1 && poolH.items[0].qcode === "Q2" && poolH.items[0].idx === 1,
+  "collectPool: a hub-only mark is pooled (add-to-hub = save)");
+assert(poolH.items[0].hubbed === true && poolH.items[0].saved === false && poolH.items[0].highlighted === false,
+  "collectPool: a hub-only item carries hubbed=true, saved/highlighted=false");
+const poolU = qual.collectPool(colIsland, { "Q1#0": 1 }, {}, { "Q1#0": 1 });
+assert(poolU.items.length === 1 && poolU.items[0].saved === true && poolU.items[0].hubbed === true,
+  "collectPool: a shortlisted + hubbed mark is ONE item carrying both flags");
+
 const gq = qual.groupCollection(colIsland, pool.items, "question");
 assert(gq.length === 2 && gq[0].key === "Q1" && gq[1].key === "Q2", "groupCollection question: groups in island order");
 assert(gq[0].items.length === 2 && gq[0].label === "Why recommend?", "groupCollection question: Q1 holds its 2 marks, labelled by title");
