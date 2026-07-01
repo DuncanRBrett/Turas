@@ -326,14 +326,18 @@
         var col = viewModel.columns[ci];
         var base = col ? col.base : null;
         if (!base) return;
-        var b = q.bases[ci];
-        var weighted = !!(b && b.nWeighted > 0 && b.nEff > 0);
+        // Use THIS column's own weighted + effective base, already aligned to the
+        // column in the model. NOT q.bases[ci]: that is indexed by the full column
+        // list, whereas ci is the position within the current banner view — so on
+        // any banner past the first, every column would borrow a different column's
+        // base and the interval detaches from the shown % (e.g. 73% -> 12–18pp).
+        var weighted = !!(col.baseW > 0 && col.baseEff > 0);
         // Weighted: the shown % is weighted, so the proportion is weightedCount/weightedBase
         // and the interval width uses the Kish effective base (variance ~ 1/effN). Unweighted:
         // exact counts, FPC-corrected width when a universe is known (ciBase).
-        var ciBase = weighted ? b.nEff : ((col.ciBase != null) ? col.ciBase : base);
+        var ciBase = weighted ? col.baseEff : ((col.ciBase != null) ? col.ciBase : base);
         var p = weighted
-          ? (cell.n != null ? cell.n / b.nWeighted : cell.pct / 100)
+          ? (cell.n != null ? cell.n / col.baseW : cell.pct / 100)
           : (cell.n !== null && cell.n !== undefined ? cell.n / base : cell.pct / 100);
         var w = TR.conf.wilson(Math.min(Math.max(p, 0), 1), ciBase);
         if (w) cell.ci = { lo: w.lower * 100, hi: w.upper * 100 };

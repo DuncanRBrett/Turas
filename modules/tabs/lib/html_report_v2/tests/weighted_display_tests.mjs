@@ -137,5 +137,63 @@ run("unweighted report keeps the single 'Base (n=)' row, no extra rows", () => {
   assert(!html.includes("Base (unweighted)"), "no relabel when off");
 });
 
+/* ---------------- 5. intervals use each column's OWN base on a 2nd banner ------ */
+// Regression for the interval misalignment: attachIntervals indexed q.bases by the
+// view position, but on any banner past the first the view is a column SUBSET, so
+// each column borrowed a different column's weighted/effective base and the interval
+// detached from the shown % (SACAP: 73% -> 12–18pp). It must use the column's own base.
+function loadTwoBannerFixture() {
+  TR.PREV = null; TR.userState = null; TR.MICRO = null;
+  TR.AGG = {
+    project: { name: "Two-banner", low_base_threshold: 30, weighted: true,
+      weight_variable: "weight" },
+    banner_groups: [{ id: "A", name: "Banner A" }, { id: "B", name: "Banner B" }],
+    columns: [
+      { label: "Total", letter: "",  group: null },
+      { label: "A1",    letter: "B", group: "A" },
+      { label: "A2",    letter: "C", group: "A" },
+      { label: "B1",    letter: "B", group: "B" },
+      { label: "B2",    letter: "C", group: "B" }
+    ],
+    questions: [
+      { code: "Q1", title: "Recommend", type: "single", category: "Test",
+        // B1's weighted base (800) is nothing like A1's (500): under the old bug B1
+        // would borrow A1's base and read 560/500 -> clamp to ~100%, far from 70%.
+        bases: [
+          { n: 1000, low: false, nWeighted: 1000, nEff: 900 },
+          { n: 500,  low: false, nWeighted: 500,  nEff: 450 },
+          { n: 500,  low: false, nWeighted: 500,  nEff: 450 },
+          { n: 100,  low: false, nWeighted: 800,  nEff: 90 },
+          { n: 100,  low: false, nWeighted: 200,  nEff: 95 }
+        ],
+        rows: [
+          { kind: "category", label: "Yes",
+            pct: [65, 60, 70, 70, 60], n: [650, 300, 350, 560, 120], sig: ["", "", "", "", ""] }
+        ] }
+    ]
+  };
+  if (TR.d2) TR.d2._qIndex = null;
+}
+
+run("intervals bracket the shown % on a banner past the first (own-base fix)", () => {
+  loadTwoBannerFixture();
+  // Banner B: view is [Total, B1, B2] -> original indices [0, 3, 4]
+  const m = TR.model.forQuestion("Q1", "B", [], { dual: false, intervals: true });
+  const yes = m.rows.find((r) => r.label === "Yes");
+  eq(m.columns.map((c) => c.label).join("|"), "Total|B1|B2", "view = Total + banner B");
+  m.columns.forEach((col, i) => {
+    const cell = yes.cells[i];
+    assert(cell.ci, "interval attached to " + col.label);
+    // the interval must bracket the shown %; the bug produced 70% -> ~99–100
+    assert(cell.ci.lo <= cell.pct + 0.5 && cell.ci.hi >= cell.pct - 0.5,
+      col.label + " interval [" + cell.ci.lo.toFixed(1) + "," + cell.ci.hi.toFixed(1) +
+      "] must bracket " + cell.pct + "%");
+  });
+  // B1 specifically: 70% on effective base 90 -> a sane ±~9pp, NOT pinned at 100
+  const b1 = yes.cells[1];
+  assert(b1.ci.hi < 90, "B1 upper bound sane (was ~100 under the bug): " + b1.ci.hi.toFixed(1));
+  assert(b1.ci.lo > 50, "B1 lower bound sane: " + b1.ci.lo.toFixed(1));
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);
