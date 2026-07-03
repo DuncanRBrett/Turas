@@ -765,13 +765,17 @@ generate_crosstab_config_template <- function(output_path,
     list(name = "Comment", width = 60, required = TRUE,
          description = "Comment text. Supports markdown for HTML reports (bold, bullets, links)."),
     list(name = "Banner", width = 20, required = FALSE,
-         description = "Optional: specific banner column this comment applies to. Leave blank for all banners.")
+         description = "Optional: specific banner column this comment applies to. Leave blank for all banners."),
+    # Reader-experience column (optional; READER_EXPERIENCE_PLAN.md §E)
+    list(name = "Headline", width = 45, required = FALSE,
+         description = "Optional one-line analyst insight headline for this question - shown above the question text on v2 report cards. May stand alone (Comment blank).")
   )
 
   comments_examples <- list(
-    list(QuestionCode = "_BACKGROUND", Comment = "This survey was conducted among 500 adults nationally in Q1 2025.", Banner = ""),
-    list(QuestionCode = "_EXECUTIVE_SUMMARY", Comment = "Key finding: Overall satisfaction increased by 5 points year-on-year.", Banner = ""),
-    list(QuestionCode = "Q_Satisfaction", Comment = "Note: Question wording changed from previous wave.", Banner = "")
+    list(QuestionCode = "_BACKGROUND", Comment = "This survey was conducted among 500 adults nationally in Q1 2025.", Banner = "", Headline = ""),
+    list(QuestionCode = "_EXECUTIVE_SUMMARY", Comment = "Key finding: Overall satisfaction increased by 5 points year-on-year.", Banner = "", Headline = ""),
+    list(QuestionCode = "Q_Satisfaction", Comment = "Note: Question wording changed from previous wave.", Banner = "",
+         Headline = "Satisfaction is up 5 points, driven by service quality")
   )
 
   write_table_sheet(wb, "Comments", comments_cols,
@@ -944,6 +948,15 @@ generate_survey_structure_template <- function(output_path) {
          description = "For Numeric questions: minimum expected value. Used for validation and binning."),
     list(name = "Max_Value", width = 12, required = FALSE,
          description = "For Numeric questions: maximum expected value. Used for validation and binning."),
+    # Reader-experience columns (all optional; READER_EXPERIENCE_PLAN.md §E)
+    list(name = "ShortLabel", width = 25, required = FALSE,
+         description = "Optional short label used where space is tight (dashboard cards, chart/PPTX titles). Leave blank to auto-trim QuestionText."),
+    list(name = "Scale_Min", width = 12, required = FALSE,
+         description = "Optional explicit scale minimum for rated questions (e.g. 0 or 1). Only used when Scale_Max is also set and Scale_Min < Scale_Max."),
+    list(name = "Scale_Max", width = 12, required = FALSE,
+         description = "Optional explicit scale maximum for rated questions (e.g. 5 or 10). With Scale_Min, replaces scale inference for bands, index maths and chart axes."),
+    list(name = "LinkedOpenQuestion", width = 20, required = FALSE,
+         description = "Optional QuestionCode of the open-end that explains this closed question - connects its comments to the stat in the v2 report."),
     list(name = "Notes", width = 30, required = FALSE,
          description = "Internal notes about this question (not shown in output).")
   )
@@ -958,7 +971,10 @@ generate_survey_structure_template <- function(output_path) {
          Category = "Media Usage", Notes = "5 response options = 5 columns (Q_Media_1 to Q_Media_5)"),
     list(QuestionCode = "Q_Satisfaction", QuestionText = "How satisfied are you overall? (1-5)",
          Variable_Type = "Rating", Columns = 1,
-         Category = "Satisfaction", Notes = "1 = Very Dissatisfied, 5 = Very Satisfied"),
+         Category = "Satisfaction",
+         ShortLabel = "Overall satisfaction", Scale_Min = 1, Scale_Max = 5,
+         LinkedOpenQuestion = "Q_Comments",
+         Notes = "1 = Very Dissatisfied, 5 = Very Satisfied"),
     list(QuestionCode = "Q_Agreement", QuestionText = "I would recommend this brand to others",
          Variable_Type = "Likert", Columns = 1,
          Category = "Brand", Notes = "Strongly Disagree to Strongly Agree (5-point)"),

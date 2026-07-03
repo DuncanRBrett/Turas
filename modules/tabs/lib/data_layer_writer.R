@@ -484,6 +484,44 @@ build_dl_categories <- function(all_results) {
 }
 
 
+#' Trimmed string from an optional sheet cell, "NA"-safe ("" when unusable)
+#'
+#' The config/structure loaders can surface an empty Excel cell as NA or as the
+#' literal string "NA"; both (and whitespace-only) read as blank. Only the
+#' first element of a vector cell is considered.
+#'
+#' @param x A cell value (any type, possibly NULL / NA / "NA")
+#' @return A trimmed non-blank character string, or "" when blank/unusable
+#' @keywords internal
+.dl_chr_cell <- function(x) {
+  if (is.null(x) || length(x) < 1 || is.na(x[1])) return("")
+  s <- trimws(as.character(x[1]))
+  if (!nzchar(s) || identical(s, "NA")) "" else s
+}
+
+
+#' Find a question's row on the structure workbook's Questions sheet
+#'
+#' Looks the code up in survey_structure$questions (exact, case-sensitive —
+#' the same matching prepare_question_data uses). Source of the optional
+#' reader-experience columns (ShortLabel, Scale_Min/Scale_Max,
+#' LinkedOpenQuestion).
+#'
+#' @param code Question code (character)
+#' @param survey_structure Loaded structure (needs $questions), or NULL
+#' @return A one-row data frame, or NULL when absent/unmatched
+#' @keywords internal
+.dl_structure_question_row <- function(code, survey_structure) {
+  qs <- survey_structure$questions
+  if (is.null(qs) || !is.data.frame(qs) || !"QuestionCode" %in% names(qs) ||
+      is.null(code) || !nzchar(code)) {
+    return(NULL)
+  }
+  hit <- qs[!is.na(qs$QuestionCode) & qs$QuestionCode == code, , drop = FALSE]
+  if (nrow(hit) == 0) NULL else hit[1, , drop = FALSE]
+}
+
+
 #' Build one questions[] entry from a tabs question result
 #'
 #' Pivots the long-format result table into wide pct/n/sig arrays (one cell per
@@ -718,6 +756,44 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   )
   if (!is.null(index_scores)) out$index_scores <- index_scores
   if (!is.null(net_diffs)) out$net_diffs <- net_diffs
+
+  # Reader-experience source fields (READER_EXPERIENCE_PLAN.md §E). All are
+  # OPTIONAL columns on the structure workbook's Questions sheet; each key is
+  # emitted only when its cell is usable, so a config without the columns
+  # produces byte-identical output.
+  srow <- .dl_structure_question_row(out$code, survey_structure)
+  if (!is.null(srow)) {
+    # E/A2: analyst-authored short label for tight surfaces (cards, chart and
+    # PPTX titles) — replaces mid-word auto-truncation of the question text.
+    sl <- .dl_chr_cell(srow$ShortLabel)
+    if (nzchar(sl)) out$short_label <- sl
+
+    # E: explicit scale bounds — remove scale inference; feed bands, index
+    # maths and chart axes. Only honoured when BOTH parse as numbers and
+    # min < max; a half-filled or inverted pair is ignored (inference stands).
+    smin <- suppressWarnings(as.numeric(.dl_chr_cell(srow$Scale_Min)))
+    smax <- suppressWarnings(as.numeric(.dl_chr_cell(srow$Scale_Max)))
+    if (length(smin) == 1L && length(smax) == 1L &&
+        !is.na(smin) && !is.na(smax) && smin < smax) {
+      out$scale_min <- smin
+      out$scale_max <- smax   # explicit declaration overrides the inferred max
+    }
+
+    # E/C2: declared closed->open question link (the open-end that explains
+    # this closed question). Emitted here; build_data_layer() validates the
+    # target against the run and drops it — with a console NOTE — when broken.
+    lo <- .dl_chr_cell(srow$LinkedOpenQuestion)
+    if (nzchar(lo)) out$linked_open <- lo
+  }
+
+  # E/B3: per-question analyst headline (Comments sheet's optional Headline
+  # column, carried as the "headlines" attribute by load_comments_sheet).
+  headlines <- attr(config_obj$comments, "headlines", exact = TRUE)
+  if (!is.null(headlines) && nzchar(out$code)) {
+    hl <- .dl_chr_cell(headlines[[out$code]])
+    if (nzchar(hl)) out$headline <- hl
+  }
+
   out
 }
 
@@ -872,6 +948,7 @@ build_data_layer <- function(all_results, banner_info, config_obj,
                            survey_structure)
     if (!is.null(q)) questions[[length(questions) + 1]] <- q
   }
+  questions <- .validate_linked_open(questions, all_results, survey_structure)
 
   columns <- .validate_column_populations(
     build_dl_columns(banner_info, config_obj), questions
@@ -894,6 +971,42 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   # passed in). Omitted entirely when AI insights are off or nothing surfaced.
   if (!is.null(ai)) dl$ai <- ai
   dl
+}
+
+
+#' Validate declared closed->open question links against the run
+#'
+#' A LinkedOpenQuestion must name a question that exists in this run — either a
+#' processed question (all_results) or one defined on the structure workbook's
+#' Questions sheet (open-ends are typically defined there but not crosstabbed).
+#' A broken code is reported with a console NOTE — never silently, Turas runs
+#' under Shiny — and the \code{linked_open} key is dropped for that question.
+#' Questions without the field pass through untouched (byte-identical).
+#'
+#' @param questions Question list from build_dl_question()
+#' @param all_results The tabs results list (processed question codes)
+#' @param survey_structure Loaded structure (needs $questions), or NULL
+#' @return The question list, with broken links removed
+#' @keywords internal
+.validate_linked_open <- function(questions, all_results, survey_structure) {
+  if (!length(questions)) return(questions)
+  known <- names(all_results) %||% character(0)
+  qs <- survey_structure$questions
+  if (!is.null(qs) && is.data.frame(qs) && "QuestionCode" %in% names(qs)) {
+    known <- union(known, as.character(qs$QuestionCode[!is.na(qs$QuestionCode)]))
+  }
+  for (i in seq_along(questions)) {
+    lo <- questions[[i]]$linked_open
+    if (is.null(lo)) next
+    if (!(lo %in% known)) {
+      cat(sprintf(paste0(
+        "  [NOTE] Question %s: LinkedOpenQuestion \"%s\" does not match any question ",
+        "in this run — link omitted. Check the code against the Questions sheet.\n"),
+        questions[[i]]$code, lo))
+      questions[[i]]$linked_open <- NULL
+    }
+  }
+  questions
 }
 
 

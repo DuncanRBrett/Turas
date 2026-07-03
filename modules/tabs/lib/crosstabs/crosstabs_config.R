@@ -373,11 +373,17 @@ get_output_path <- function(project_root, output_subfolder, output_filename) {
 #' Load Optional Comments Sheet from Config Excel
 #'
 #' Reads a "Comments" sheet from the config workbook if it exists.
-#' Expected columns: QuestionCode, Comment.
+#' Expected columns: QuestionCode, Comment. An optional \code{Headline} column
+#' carries a one-line analyst insight headline per question (reader experience
+#' plan, section E); a row may carry a Headline with a blank Comment. The first
+#' non-blank headline per question wins; headlines are attached as the
+#' \code{"headlines"} attribute (named list keyed by QuestionCode).
 #' Returns a named list (keyed by question code) or NULL if sheet is absent.
 #'
 #' @param config_file Character, path to config Excel file
-#' @return Named list of comments keyed by QuestionCode, or NULL
+#' @return Named list of comments keyed by QuestionCode (with optional
+#'   \code{background_text} / \code{executive_summary} / \code{headlines}
+#'   attributes), or NULL
 #' @keywords internal
 load_comments_sheet <- function(config_file) {
   tryCatch({
@@ -398,9 +404,12 @@ load_comments_sheet <- function(config_file) {
       return(NULL)
     }
 
-    # Filter valid rows
-    df <- df[!is.na(df$QuestionCode) & nzchar(trimws(df$QuestionCode)) &
-             !is.na(df$Comment) & nzchar(trimws(df$Comment)), , drop = FALSE]
+    # A usable Comment cell (same test the historical row filter applied)
+    has_comment <- function(x) !is.na(x) && nzchar(trimws(x))
+
+    # Filter valid rows — QuestionCode is always required; Comment may be blank
+    # on a row that only carries a Headline (V13.x)
+    df <- df[!is.na(df$QuestionCode) & nzchar(trimws(df$QuestionCode)), , drop = FALSE]
     if (nrow(df) == 0) return(NULL)
 
     # Support optional Banner column for multi-banner comments
@@ -413,6 +422,7 @@ load_comments_sheet <- function(config_file) {
     executive_summary <- NULL
 
     for (i in seq_len(nrow(df))) {
+      if (!has_comment(df$Comment[i])) next
       q_code <- trimws(toupper(df$QuestionCode[i]))
       if (q_code == "_BACKGROUND") {
         background_text <- trimws(df$Comment[i])
@@ -424,9 +434,25 @@ load_comments_sheet <- function(config_file) {
     # Filter out special rows from question comments
     df <- df[!trimws(toupper(df$QuestionCode)) %in% special_codes, , drop = FALSE]
 
+    # Optional per-question analyst headline (reader experience plan §E) — the
+    # first non-blank Headline per question wins. The loader can surface an
+    # empty cell as the literal string "NA"; treat that as blank.
+    headlines <- list()
+    if ("Headline" %in% names(df)) {
+      for (i in seq_len(nrow(df))) {
+        h <- df$Headline[i]
+        if (is.na(h)) next
+        h <- trimws(h)
+        if (!nzchar(h) || identical(h, "NA")) next
+        q_code <- trimws(df$QuestionCode[i])
+        if (is.null(headlines[[q_code]])) headlines[[q_code]] <- h
+      }
+    }
+
     # Build structure: comments[[q_code]] = list of list(banner, text)
     comments <- list()
     for (i in seq_len(nrow(df))) {
+      if (!has_comment(df$Comment[i])) next
       q_code <- trimws(df$QuestionCode[i])
       banner <- if (has_banner && !is.na(df$Banner[i]) && nzchar(trimws(df$Banner[i]))) {
         trimws(df$Banner[i])
@@ -441,16 +467,28 @@ load_comments_sheet <- function(config_file) {
       }
     }
 
+    # Nothing usable at all -> NULL, exactly as a sheet with no valid rows
+    # behaved before the Headline column existed
+    if (length(comments) == 0 && length(headlines) == 0 &&
+        is.null(background_text) && is.null(executive_summary)) {
+      return(NULL)
+    }
+
     n_total <- if (length(comments) > 0) sum(vapply(comments, length, integer(1))) else 0L
     cat(sprintf("  [INFO] Loaded %d comments for %d questions from Comments sheet\n",
                 n_total, length(comments)))
 
     if (!is.null(background_text)) cat(sprintf("  [INFO] Background text loaded from Comments sheet\n"))
     if (!is.null(executive_summary)) cat(sprintf("  [INFO] Executive summary loaded from Comments sheet\n"))
+    if (length(headlines) > 0) {
+      cat(sprintf("  [INFO] Loaded %d question headline(s) from Comments sheet\n",
+                  length(headlines)))
+    }
 
-    # Attach dashboard text as attributes
+    # Attach dashboard text (and headlines) as attributes
     attr(comments, "background_text") <- background_text
     attr(comments, "executive_summary") <- executive_summary
+    if (length(headlines) > 0) attr(comments, "headlines") <- headlines
 
     comments
   }, error = function(e) {
