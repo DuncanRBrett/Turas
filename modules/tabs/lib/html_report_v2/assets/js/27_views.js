@@ -127,6 +127,17 @@
 
   /* ---------------- Dashboard ---------------- */
 
+  /** "▲▼ chips show change vs <prev wave>. " — named from the tracking
+   *  island (never a hard-coded year), and only when at least one gauge
+   *  actually carries a delta chip (non-tracking / filtered reports: ""). */
+  function deltaIntro(hasDelta) {
+    var wl = TR.cards2.waveLabels();
+    return hasDelta && wl.prev
+      ? "▲▼ chips show change vs " + fmt.escapeHtml(wl.prev) + ". "
+      : "";
+  }
+  views._deltaIntro = deltaIntro;   // exposed for the node gate
+
   views.dashboard = function (host) {
     var qs = indexQuestions();
     var hb = heatBanner || TR.d2.state.banner;
@@ -138,12 +149,16 @@
         ? models[q.code] : modelFor(q.code, hb);
       (byCat[q.category] = byCat[q.category] || []).push(q);
     });
+    var hasDelta = qs.some(function (q) {
+      var r = meanRow(models[q.code]);
+      return !!(r && r.delta);
+    });
     var html = ['<div class="page"><div class="dash-intro card">' +
       "<h2>Experience dashboard</h2><p>Index scores for every rated touchpoint " +
       "— <span class='gl g'>strong ≥75%</span> <span class='gl a'>moderate 50–74%</span> " +
       "<span class='gl r'>weak &lt;50%</span> of each scale's maximum. " +
       (TR.d2.filtersActive() ? "<strong>Filtered audience — recomputed live.</strong> " : "") +
-      "▲▼ chips show change vs 2024. Click any card or cell to open the full table.</p>" +
+      deltaIntro(hasDelta) + "Click any card or cell to open the full table.</p>" +
       moeChipHtml(qs, heatModels) + "</div>"];
 
     Object.keys(byCat).forEach(function (cat) {

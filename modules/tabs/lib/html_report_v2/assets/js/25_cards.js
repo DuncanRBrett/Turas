@@ -416,6 +416,42 @@
   }
   cards2._bannerTabsHtml = bannerTabsHtml;   // exposed for the node gate
 
+  /** Wave names from the report's own tracking island — never hard-coded
+   *  years. current = the live wave's label, prev = the latest prior wave's;
+   *  both "" (tracking false) on a report with no wave history. */
+  cards2.waveLabels = function () {
+    var t = TR.d2.tracking();
+    if (!t.enabled) return { tracking: false, current: "", prev: "" };
+    var cur = "";
+    ((TR.PREV && TR.PREV.waves) || []).forEach(function (w) {
+      if (w.current) cur = String(w.wave || w.label || w.year || "");
+    });
+    if (!cur) cur = String((TR.AGG.project && TR.AGG.project.wave) || "");
+    var last = t.waves[t.waves.length - 1];   // island order: oldest first
+    return { tracking: true, current: cur,
+      prev: last ? String(last.wave || last.label || last.year || "") : "" };
+  };
+
+  /** PUBLISHED badge — names the wave only when the report tracks one. */
+  function publishedBadgeHtml() {
+    var wl = cards2.waveLabels();
+    return '<span class="badge-published" title="Published ' +
+      (wl.current ? fmt.escapeHtml(wl.current) + " " : "") +
+      'value, verbatim">PUBLISHED</span>';
+  }
+  cards2._publishedBadgeHtml = publishedBadgeHtml;
+
+  /** No-wave-history badge — "" on non-tracking reports (nothing to be new
+   *  relative to), else named after the current wave. */
+  function noHistoryBadgeHtml() {
+    var wl = cards2.waveLabels();
+    if (!wl.tracking) return "";
+    return '<span class="badge-prev off">' +
+      (wl.current ? "new in " + fmt.escapeHtml(wl.current) : "new this wave") +
+      "</span>";
+  }
+  cards2._noHistoryBadgeHtml = noHistoryBadgeHtml;
+
   cards2.renderActive = function () {
     var s = TR.d2.state;
     var holder = document.getElementById("qcard");
@@ -441,14 +477,14 @@
             fmt.escapeHtml("Recomputed live from microdata. " +
               (TR.d2.filterDescription() || "")) + '">COMPUTED · n=' +
             fmt.base(model.columns[0].base) + "</span>"
-          : '<span class="badge-published" title="Published 2025 value, verbatim">PUBLISHED</span>';
+          : publishedBadgeHtml();
     var prevBadge = model.prevWave
       ? '<span class="badge-prev" title="' + model.history.length +
         " prior wave" + (model.history.length > 1 ? "s" : "") + " · latest " +
         fmt.escapeHtml(model.prevWave.wave) + " (n=" +
         fmt.base(model.prevWave.base) + ')">tracked since ' +
         model.history[0].year + "</span>"
-      : '<span class="badge-prev off">new in 2025</span>';
+      : noHistoryBadgeHtml();
 
     // context strip: filters + custom banner can never get lost (item 14/15)
     var contextBits = [];

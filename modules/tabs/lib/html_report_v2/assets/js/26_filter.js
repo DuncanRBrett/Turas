@@ -176,6 +176,74 @@
     TR.shell.toast("Custom banner applied — kept as a tab · ★ save to keep it for good");
   }
 
+  /** Category rows observed inside the selected boxes (boxes[r] → answers[r]),
+   *  ascending. null when any box member carries no shown single-category
+   *  answer (hidden / unshown option, multi-mention) — the box is then not
+   *  decomposable into answer space. */
+  function boxCatRows(q, boxIdxs) {
+    var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
+    var answers = TR.MICRO.answers && TR.MICRO.answers[q.code];
+    if (!boxes || !answers) return null;
+    var wanted = {};
+    boxIdxs.forEach(function (b) { wanted[b] = true; });
+    var isCat = {};
+    q.rows.forEach(function (r, ri) {
+      if (r.kind === "category") isCat[ri] = true;
+    });
+    var out = {};
+    for (var r = 0; r < boxes.length; r++) {
+      var b = boxes[r];
+      if (b === null || b === undefined || !wanted[b]) continue;
+      var a = answers[r];
+      if (a === null || a === undefined || Array.isArray(a) || !isCat[a]) return null;
+      out[a] = true;
+    }
+    return Object.keys(out).map(Number);
+  }
+
+  /**
+   * Build ONE audience-filter entry from picker selections ("c<idx>" category,
+   * "n<idx>" decomposable NET, "b<idx>" box grouping). stats.mask evaluates an
+   * entry EITHER in box space (f.box) or in answer space — never both — so a
+   * box grouping ticked alongside plain values is expanded to the category
+   * rows observed in its microdata box membership and the whole selection ORs
+   * in answer space (a category index can never match box membership, so the
+   * old single box flag silently dropped the plain values).
+   * @returns {{filter: Object}|{error: string}}
+   */
+  filterBar.selectionToFilter = function (q, values) {
+    var cats = {}, boxes = {};
+    values.forEach(function (v) {
+      if (v.charAt(0) === "c") {
+        cats[parseInt(v.slice(1), 10)] = true;
+      } else if (v.charAt(0) === "b") {
+        boxes[parseInt(v.slice(1), 10)] = true;
+      } else {
+        (q.net_members[v.slice(1)] || []).forEach(function (ri) {
+          cats[ri] = true;
+        });
+      }
+    });
+    var catList = Object.keys(cats).map(Number);
+    var boxList = Object.keys(boxes).map(Number);
+    if (!catList.length && !boxList.length) {
+      return { error: "Pick at least one value" };
+    }
+    if (boxList.length && catList.length) {
+      var expanded = boxCatRows(q, boxList);
+      if (!expanded) {
+        return { error: "These groupings can't be combined with single " +
+          "values — apply the grouping as its own filter" };
+      }
+      expanded.forEach(function (ri) { cats[ri] = true; });
+      return { filter: { q: q.code, rows: Object.keys(cats).map(Number) } };
+    }
+    if (boxList.length) {
+      return { filter: { q: q.code, rows: boxList, box: true } };
+    }
+    return { filter: { q: q.code, rows: catList } };
+  };
+
   /**
    * Value picker. Offers category rows, decomposable NET rows (applied by
    * expanding to their member categories) AND box groupings for hidden-scale
@@ -213,26 +281,12 @@
     });
     var applyBtn = holder.querySelector("[data-apply]");
     if (applyBtn) applyBtn.addEventListener("click", function () {
-      var rows = {}, box = false;
+      var values = [];
       Array.prototype.forEach.call(holder.querySelectorAll("input:checked"),
-        function (el) {
-          var v = el.value;
-          if (v.charAt(0) === "c") {
-            rows[parseInt(v.slice(1), 10)] = true;
-          } else if (v.charAt(0) === "b") {
-            box = true;
-            rows[parseInt(v.slice(1), 10)] = true;
-          } else {
-            (q.net_members[v.slice(1)] || []).forEach(function (ri) {
-              rows[ri] = true;
-            });
-          }
-        });
-      var rowList = Object.keys(rows).map(Number);
-      if (!rowList.length) { TR.shell.toast("Pick at least one value"); return; }
-      var filter = { q: code, rows: rowList };
-      if (box) filter.box = true;
-      TR.d2.state.filters.push(filter);
+        function (el) { values.push(el.value); });
+      var built = filterBar.selectionToFilter(q, values);
+      if (built.error) { TR.shell.toast(built.error); return; }
+      TR.d2.state.filters.push(built.filter);
       holder.hidden = true;
       filterBar.render();
       TR.shell.route();

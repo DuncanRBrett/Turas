@@ -14,6 +14,21 @@
     if (a !== e) throw new Error(label + ": expected " + e + ", got " + a);
   }
 
+  /** TRUE only when the SACAP prototype dataset is bundled. The `fixture`
+   *  cases below assert that dataset's published numbers (question codes,
+   *  titles, wave counts) — on any other project they would crash or fail
+   *  and falsely report a healthy stats engine as broken, so run() skips
+   *  them unless this exact data is present. */
+  selftest2.fixturePresent = function () {
+    var q8 = TR.d2 && TR.d2.questionByCode && TR.d2.questionByCode("Q008");
+    return !!(q8 && q8.title &&
+      TR.model.norm(q8.title).indexOf("registration process at sacap") !== -1 &&
+      TR.d2.questionByCode("Q002") && TR.d2.questionByCode("Q005") &&
+      TR.d2.questionByCode("Q010") &&
+      TR.MICRO && TR.MICRO.n &&
+      TR.PREV && TR.PREV.waves && TR.PREV.waves.length);
+  };
+
   selftest2.cases = function () {
     return [
       { name: "z-test known answer (production formula)", fn: function () {
@@ -24,7 +39,7 @@
         // np<5 precondition: 3/100 vs 0/100 suppressed
         eq(TR.stats.propHigher(3, 100, 0, 100), false, "np precondition");
       } },
-      { name: "filter mask + recompute (golden vs published)", fn: function () {
+      { name: "filter mask + recompute (golden vs published)", fixture: true, fn: function () {
         var campus = TR.AGG.banner_groups[0].id;
         var q = TR.AGG.questions[3];
         var pub = TR.model._publishedModel(q, campus);
@@ -35,7 +50,7 @@
         var ri = q.rows.findIndex(function (r) { return r.kind === "category"; });
         eq(comp.rows[ri].cells[1].n, pub.rows[ri].cells[1].n, q.code + " first cell count");
       } },
-      { name: "filtered base shrinks and stays consistent", fn: function () {
+      { name: "filtered base shrinks and stays consistent", fixture: true, fn: function () {
         var q0 = TR.AGG.questions[0];
         var firstCat = TR.d2.catRows(q0)[0];
         var filters = [{ q: q0.code, rows: [firstCat.index] }];
@@ -46,13 +61,13 @@
           TR.AGG.banner_groups[0].id, filters);
         eq(comp.columns[0].base <= n, true, "filtered base bounded by mask");
       } },
-      { name: "custom banner columns from any question", fn: function () {
+      { name: "custom banner columns from any question", fixture: true, fn: function () {
         var q = TR.AGG.questions[2]; // intensity (2 categories)
         var spec = TR.stats.columnsFor("custom:" + q.code);
         eq(spec.columns.length, TR.d2.catRows(q).length + 1, "Total + categories");
         eq(spec.custom, true, "flagged custom");
       } },
-      { name: "hash state round-trip", fn: function () {
+      { name: "hash state round-trip", fixture: true, fn: function () {
         var s = TR.d2.state;
         var keep = JSON.stringify({ t: s.tab, q: s.activeQ, b: s.banner, f: s.filters });
         s.tab = "crosstabs"; s.activeQ = "Q008"; s.banner = "Q005";
@@ -65,7 +80,7 @@
         var prev = JSON.parse(keep);
         s.tab = prev.t; s.activeQ = prev.q; s.banner = prev.b; s.filters = prev.f;
       } },
-      { name: "wave matching present", fn: function () {
+      { name: "wave matching present", fixture: true, fn: function () {
         var matched = 0;
         TR.AGG.questions.forEach(function (q) {
           var m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
@@ -73,7 +88,7 @@
         });
         eq(matched >= 60, true, "at least 60 questions tracked, got " + matched);
       } },
-      { name: "multi-wave known answers (registration: NET, Index, sig)", fn: function () {
+      { name: "multi-wave known answers (registration: NET, Index, sig)", fixture: true, fn: function () {
         // workbook ground truth: 2022 'Good or excellent' = 83, Index = 82
         var q = TR.AGG.questions.filter(function (qq) {
           return TR.model.norm(qq.title) ===
@@ -100,7 +115,7 @@
         eq(avg.delta.sig, false, "no significant change vs previous wave");
         eq(avg.deltaBase.sig, true, "significant change vs baseline wave");
       } },
-      { name: "per-segment tracking known answers (campus, published)", fn: function () {
+      { name: "per-segment tracking known answers (campus, published)", fixture: true, fn: function () {
         // NPS by segment: history from wave workbooks, current = published cell
         var nps = TR.trk.metricList("key").filter(function (m) {
           return TR.model.norm(m.label) === "nps score";
@@ -142,7 +157,7 @@
         eq(svg.indexOf('r="2.6"') !== -1, true, "current point accented");
         eq(svg.indexOf("2020: 10%") !== -1, true, "tooltip carries per-year values");
       } },
-      { name: "pptx deck builds from a story model", fn: function () {
+      { name: "pptx deck builds from a story model", fixture: true, fn: function () {
         var model = TR.model.forQuestion(TR.AGG.questions[0].code,
           TR.AGG.banner_groups[0].id, []);
         var slides = [TR.exporter.titleSlide(1),
@@ -190,9 +205,13 @@
           "Not_Specified -> SI (cautious default)");
         eq(TR.conf.labels("garbage").interval_abbrev, "SI",
           "unrecognised -> cautious default");
-        // this report: SACAP is configured Not_Specified -> SI/PE everywhere
-        eq(TR.conf.labels().interval_name, "Stability Interval",
-          "project default vocabulary");
+        // the SACAP fixture is configured Not_Specified -> SI/PE everywhere;
+        // other projects legitimately configure Random -> CI, so assert the
+        // no-argument default only when the fixture is the bundled data
+        if (selftest2.fixturePresent()) {
+          eq(TR.conf.labels().interval_name, "Stability Interval",
+            "project default vocabulary");
+        }
       } },
       { name: "max margin-of-error known answers (dashboard chip)", fn: function () {
         // hand-verifiable: 1.96 * sqrt(.25/n) * 100
@@ -201,7 +220,7 @@
         eq(Math.abs(TR.conf.maxMoePct(75) - 11.316) < 0.01, true,
           "n=75 -> +/-11.3pp, got " + TR.conf.maxMoePct(75));
       } },
-      { name: "crosstab intervals: golden spot-check, additive only", fn: function () {
+      { name: "crosstab intervals: golden spot-check, additive only", fixture: true, fn: function () {
         var withCi = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id,
           [], { intervals: true });
         var net = withCi.rows.filter(function (r) {
@@ -257,7 +276,11 @@
   };
 
   selftest2.run = function () {
+    var haveFixture = selftest2.fixturePresent();
     var results = selftest2.cases().map(function (testCase) {
+      if (testCase.fixture && !haveFixture) {
+        return { name: testCase.name, ok: true, skipped: true };
+      }
       try {
         testCase.fn();
         return { name: testCase.name, ok: true };
@@ -266,12 +289,17 @@
       }
     });
     var failed = results.filter(function (r) { return !r.ok; }).length;
+    var skipped = results.filter(function (r) { return r.skipped; }).length;
+    var ran = results.length - skipped;
     if (typeof document !== "undefined") {
       var panel = document.createElement("div");
       panel.className = "card selftest" + (failed ? " selftest-fail" : "");
-      panel.innerHTML = "<h2>Self-test: " + (results.length - failed) + "/" +
-        results.length + " passed</h2><ul>" + results.map(function (r) {
-          return "<li>" + (r.ok ? "✓" : "✗") + " " + TR.fmt.escapeHtml(r.name) +
+      panel.innerHTML = "<h2>Self-test: " + (ran - failed) + "/" + ran +
+        " passed" + (skipped ? " · " + skipped + " skipped" : "") +
+        "</h2><ul>" + results.map(function (r) {
+          return "<li>" + (r.skipped ? "○" : r.ok ? "✓" : "✗") + " " +
+            TR.fmt.escapeHtml(r.name) +
+            (r.skipped ? " — skipped (fixture not present)" : "") +
             (r.error ? " — <code>" + TR.fmt.escapeHtml(r.error) + "</code>" : "") + "</li>";
         }).join("") + "</ul>";
       var host = document.getElementById("tabhost");

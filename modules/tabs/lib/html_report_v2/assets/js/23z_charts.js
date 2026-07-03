@@ -264,11 +264,19 @@
         return (cx + rad * Math.cos(a)).toFixed(2) + " " +
                (cy + rad * Math.sin(a)).toFixed(2);
       };
-      body.push(S.el("path", { d: "M " + p(angle, R) +
-        " A " + R + " " + R + " 0 " + large + " 1 " + p(a2, R) +
-        " L " + p(a2, r0) +
-        " A " + r0 + " " + r0 + " 0 " + large + " 0 " + p(angle, r0) + " Z",
-        fill: palette[i % palette.length], stroke: "#fff", "stroke-width": 1.5 }));
+      if (sweep > Math.PI * 2 - 1e-4) {
+        // 100% slice: an SVG arc whose endpoints coincide renders as nothing,
+        // so the donut would vanish — draw the full ring as a stroked circle
+        body.push(S.el("circle", { cx: cx, cy: cy, r: (R + r0) / 2,
+          fill: "none", stroke: palette[i % palette.length],
+          "stroke-width": R - r0 }));
+      } else {
+        body.push(S.el("path", { d: "M " + p(angle, R) +
+          " A " + R + " " + R + " 0 " + large + " 1 " + p(a2, R) +
+          " L " + p(a2, r0) +
+          " A " + r0 + " " + r0 + " 0 " + large + " 0 " + p(angle, r0) + " Z",
+          fill: palette[i % palette.length], stroke: "#fff", "stroke-width": 1.5 }));
+      }
       var mid = angle + sweep / 2;
       if (sweep > 0.3) {
         var lr = (R + r0) / 2;
