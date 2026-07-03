@@ -238,6 +238,15 @@
     return d2.state.filters.length > 0;
   };
 
+  /** Space-tight label for a question: the analyst-authored ShortLabel when the
+   *  pipeline supplies one, else the full title. DEFENSIVE — reports built
+   *  before the ShortLabel column simply carry no short_label field. */
+  d2.shortLabel = function (q) {
+    if (!q) return "";
+    return (typeof q.short_label === "string" && q.short_label.trim())
+      ? q.short_label : (q.title || "");
+  };
+
   /* ---------- hash state ---------- */
 
   d2.encodeHash = function () {

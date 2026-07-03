@@ -41,7 +41,7 @@
     return trk().metricList("key").map(function (m) {
       return '<option value="' + m.key + '"' +
         (selected === m.key ? " selected" : "") + ">" + m.code + " · " +
-        fmt.escapeHtml(TR.charts.clip(m.title, 40)) + " — " +
+        fmt.escapeHtml(TR.charts.clip(m.short || m.title, 40)) + " — " +
         fmt.escapeHtml(TR.charts.clip(m.label, 24)) + "</option>";
     }).join("");
   }
@@ -346,7 +346,7 @@
             '<td class="lab"><button class="linklike" data-vis="' + e.metric.key +
             '" title="' + fmt.escapeHtml(e.metric.title + " — " + e.metric.label) +
             '">' + e.metric.code + " · " +
-            fmt.escapeHtml(TR.charts.clip(e.metric.title, 42)) + "</button>" +
+            fmt.escapeHtml(TR.charts.clip(e.metric.short || e.metric.title, 42)) + "</button>" +
             '<div class="idxd">' + fmt.escapeHtml(TR.charts.clip(e.metric.label, 36)) +
             "</div></td>"));
         });

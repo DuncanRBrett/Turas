@@ -644,6 +644,8 @@
     viewModel.fpcDefault = !custom && !composite && !filtered && TR.conf.reportHasPopulation();
     viewModel.code = q.code;
     viewModel.title = q.title;
+    // analyst ShortLabel for space-tight surfaces (null on older data layers)
+    viewModel.short_label = TR.d2.shortLabel(q) !== q.title ? TR.d2.shortLabel(q) : null;
     viewModel.type = q.type;
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();

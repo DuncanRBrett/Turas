@@ -71,7 +71,9 @@
             : "") + "</span>"
         : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
           ") · add a filter and every table, delta and dashboard recomputes live</span>") +
-      "</div>" + discWarn + filterBar.weightingNote() + "<div id='fpicker' hidden></div>";
+      // The weighted-bases explainer (weightingNote) renders inside the shared
+      // "How to read this" panel (A4) — no longer stacked under the filter bar.
+      "</div>" + discWarn + "<div id='fpicker' hidden></div>";
     holder.querySelectorAll("[data-fremove]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         TR.d2.state.filters.splice(parseInt(btn.getAttribute("data-fremove"), 10), 1);

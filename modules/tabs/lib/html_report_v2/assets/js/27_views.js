@@ -96,6 +96,13 @@
       }
     });
     if (!overall) return "";
+    // After the first viewed session the long sentence collapses to the shared
+    // "How to read this" ⓘ (persisted per report — see reader.peCollapsed).
+    if (TR.reader && TR.reader.peCollapsed()) {
+      return '<p class="moechip moechip-collapsed"><button class="linklike" ' +
+        'data-legend-open>ⓘ ' + labels.moe_name +
+        ", significance &amp; bands — how to read this report</button></p>";
+    }
     var bits = "At n=" + fmt.base(overall) +
       ", overall percentages are stable to about ±" +
       TR.conf.maxMoePct(overall).toFixed(1) + "pp";
@@ -109,6 +116,7 @@
       'these numbers?” on the Crosstabs tab">' +
       labels.moe_name + " (" + labels.moe_abbrev + "): " + bits + ".</p>";
   }
+  views._moeChipHtml = moeChipHtml;   // exposed for the node gate
 
   function meanRow(model) {
     for (var i = 0; i < model.rows.length; i++) {
@@ -138,6 +146,45 @@
   }
   views._deltaIntro = deltaIntro;   // exposed for the node gate
 
+  /**
+   * A1 fixed card anatomy — one gauge card, fixed slots: score top-left ·
+   * question code top-right (structural flex head, nothing absolute over the
+   * score) · band bar · title clamped to 2 lines · ONE meta row at the foot
+   * holding the Δ chip + 💬 comments pill + 📌 pin. Exposed for the node gate.
+   */
+  function gaugeCardHtml(q, model) {
+    var row = meanRow(model);
+    var value = row ? row.cells[0].mean : null;
+    var max = scoreMax(q), gc = gaugeColour(value, max, q);
+    var hasVal = value !== null && value !== undefined && max > 0;
+    var barPct = hasVal ? Math.max(0, Math.min(value / max, 1)) * 100 : 0;
+    var pts = row ? TR.render.wavePoints(row) : null;
+    var spark = (pts && pts.length > 1)
+      ? TR.render.sparkline(pts, true, { w: 212, h: 28 }) : "";
+    var short = TR.d2.shortLabel(q);
+    return '<div class="gauge-wrap" data-snap-card style="--gc:' + gc + '">' +
+      '<button class="gauge" data-goq="' + q.code + '" title="' +
+      fmt.escapeHtml(q.title) +
+      (row ? intervalTip(row.cells[0], model.columns[0].base) : "") + '">' +
+      '<span class="ghead"><span class="gv">' + fmt.score(value) +
+      (hasVal ? '<span class="gsc">/' + max + "</span>" : "") + "</span>" +
+      '<span class="gq">' + q.code + "</span></span>" +
+      (hasVal ? '<span class="gbar"><span class="gbf" style="width:' +
+        barPct.toFixed(0) + '%"></span></span>' : "") +
+      (spark ? '<span class="gspark">' + spark + "</span>" : "") +
+      '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(short, 120)) +
+      "</span></button>" +
+      '<span class="gmeta">' +
+      (row ? TR.render.deltaChip(row.delta) : "") +
+      ((TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(q.code) : "") +
+      '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
+      fmt.escapeHtml(q.code + " — " + short) + '" data-snap-context="' +
+      fmt.escapeHtml((q.category || "") + " · index") +
+      '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>' +
+      "</span></div>";
+  }
+  views._gaugeCardHtml = gaugeCardHtml;
+
   views.dashboard = function (host) {
     var qs = indexQuestions();
     var hb = heatBanner || TR.d2.state.banner;
@@ -164,36 +211,7 @@
     Object.keys(byCat).forEach(function (cat) {
       html.push('<div class="dash-cat"><h3>' + fmt.escapeHtml(cat) + "</h3><div class='gauges'>");
       byCat[cat].forEach(function (q) {
-        var row = meanRow(models[q.code]);
-        var value = row ? row.cells[0].mean : null;
-        var delta = row && row.delta ? row.delta : null;
-        var max = scoreMax(q), gc = gaugeColour(value, max, q);
-        // gauge bar = value vs scale max; sparkline = the wave trajectory (only
-        // when wave history is attached — non-tracking reports just show the bar)
-        var hasVal = value !== null && value !== undefined && max > 0;
-        var barPct = hasVal ? Math.max(0, Math.min(value / max, 1)) * 100 : 0;
-        var pts = row ? TR.render.wavePoints(row) : null;
-        var spark = (pts && pts.length > 1) ? TR.render.sparkline(pts, true, { w: 212, h: 28 }) : "";
-        html.push('<div class="gauge-wrap" data-snap-card>' +
-          '<button class="gauge" data-goq="' + q.code + '" title="' +
-          fmt.escapeHtml(q.title) +
-          (row ? intervalTip(row.cells[0], models[q.code].columns[0].base) : "") +
-          '" style="--gc:' + gc + '">' +
-          '<span class="gq">' + q.code + "</span>" +
-          '<span class="gv">' + (value === null ? "–" : value.toFixed(1)) +
-          (hasVal ? '<span class="gsc">/' + max + "</span>" : "") +
-          (delta ? '<span class="gd ' + (delta.diff >= 0 ? "up" : "down") + '">' +
-            (delta.diff >= 0 ? "▲" : "▼") + Math.abs(delta.diff).toFixed(1) + "</span>" : "") +
-          "</span>" +
-          (hasVal ? '<span class="gbar"><span class="gbf" style="width:' +
-            barPct.toFixed(0) + '%"></span></span>' : "") +
-          (spark ? '<span class="gspark">' + spark + "</span>" : "") +
-          '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(q.title, 64)) + "</span></button>" +
-          ((TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(q.code) : "") +
-          '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
-          fmt.escapeHtml(q.code + " — " + q.title) + '" data-snap-context="' +
-          fmt.escapeHtml((q.category || "") + " · index") +
-          '" title="Pin this card to the story" aria-label="Pin card to story">📌</button></div>');
+        html.push(gaugeCardHtml(q, models[q.code]));
       });
       html.push("</div></div>");
     });
@@ -267,7 +285,8 @@
       var row = meanRow(model);
       if (!row) return;
       html.push('<tr><td class="lab"><button class="linklike" data-goq="' + q.code +
-        '">' + fmt.escapeHtml(TR.charts.clip(q.title, 52)) + "</button></td>");
+        '" title="' + fmt.escapeHtml(q.title) + '">' +
+        fmt.escapeHtml(TR.charts.clip(TR.d2.shortLabel(q), 52)) + "</button></td>");
       var max = scoreMax(q);
       row.cells.forEach(function (cell, i) {
         var v = cell.mean;
@@ -278,7 +297,7 @@
             Math.round(40 + norm / 100 * 50).toString(16)) +
           '" title="' + fmt.escapeHtml(model.columns[i].label) +
           intervalTip(cell, model.columns[i].base) + '">' +
-          (v === null ? "–" : (max <= 10 ? v.toFixed(1) : Math.round(v))) +
+          (v === null ? "–" : (max <= 10 ? fmt.score(v) : Math.round(v))) +
           (low ? " ⚠" : "") + "</td>");
       });
       html.push("</tr>");

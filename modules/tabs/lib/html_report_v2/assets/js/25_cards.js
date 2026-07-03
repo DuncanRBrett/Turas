@@ -587,19 +587,17 @@
 
   function explainersHtml() {
     var p = TR.AGG.project;
+    // Table-specific mechanics only — significance letters, arrows, Δ chips
+    // and bands live in the ONE shared "How to read this" panel (A4).
     return '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
-      '<span class="callout-ico">i</span> Reading this table — legend' +
+      '<span class="callout-ico">i</span> Reading this table' +
       '<span class="callout-chev">▼</span></button><div class="callout-body"><ul>' +
       "<li><strong>Heatmap</strong> — cell shading scales with the value within each row.</li>" +
-      "<li><strong>▲ letters</strong> — significantly higher than that lettered column. With the 80% option on: UPPERCASE = 95% confidence, lowercase = 80%.</li>" +
-      "<li><strong>⚠ low base</strong> — fewer than " + p.low_base_threshold +
-      " respondents; excluded from significance testing.</li>" +
-      "<li><strong>▲/▼ chips on Total</strong> — change vs the most recent " +
-      "prior wave carrying this question; outlined chips are significant " +
-      "changes. The wave strip under tracked questions plots the full " +
-      "published history.</li>" +
       "<li><strong>PUBLISHED / COMPUTED</strong> — published figures are the report of record; filtered or custom-banner figures recompute live and are badged.</li>" +
-      "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕.</li>" +
+      "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots the full published history.</li>" +
+      '<li>Significance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score ' +
+      'bands are explained in <button class="linklike" data-legend-open>ⓘ How to ' +
+      "read this report</button>.</li>" +
       "</ul></div></div>" +
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +

@@ -41,12 +41,14 @@
 
   exhibit.titleFor = function (item, models) {
     if (item.title) return item.title;
+    // default pin titles prefer the analyst ShortLabel when the model carries one
+    var label = function (m) { return m.short_label || m.title; };
     if (item.segments && models.length === 1) {
       // round-5 pins without an explicit title
-      return models[0].code + " · " + TR.charts.clip(models[0].title, 56) +
+      return models[0].code + " · " + TR.charts.clip(label(models[0]), 56) +
         " — " + TR.charts.clip(item.metricLabel || "", 26) + " · by segment";
     }
-    if (models.length === 1) return models[0].code + " — " + models[0].title;
+    if (models.length === 1) return models[0].code + " — " + label(models[0]);
     return "Composite — " + models.length + " tracked metrics";
   };
 

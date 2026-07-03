@@ -60,6 +60,13 @@
       safe + ' at 95% confidence">' + safe + "</sup>";
   };
 
+  /** Index/mean score display — ONE rule everywhere a score card shows a
+   *  mean (dashboard gauges, heatmap, tracking): 1 decimal, en dash for null. */
+  fmt.score = function (value) {
+    if (value == null || (typeof value === "number" && isNaN(value))) return "–";
+    return Number(value).toFixed(1);
+  };
+
   /** Base sizes with thin-space thousands separator: 12345 -> "12 345". */
   fmt.base = function (n) {
     if (n == null || (typeof n === "number" && isNaN(n))) return "–";

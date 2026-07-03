@@ -98,7 +98,7 @@
         : model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
       note || ""].filter(Boolean).join(" · ");
     var matrix = opts.includeTable !== false ? TR.render.matrix(model) : null;
-    return exporter.cardSvgRaw(model.code + " — " + model.title, meta, opts.chartSvg, matrix);
+    return exporter.cardSvgRaw(model.code + " — " + (model.short_label || model.title), meta, opts.chartSvg, matrix);
   };
 
   function wrapText(text, maxChars) {
@@ -855,7 +855,7 @@
     var content =
       rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: 0.07 }, brand) +
       textBox(next(), { x: MARGIN, y: 0.3, w: contentW, h: 0.65 },
-        [para(model.code + " — " + model.title, { size: 19, bold: true, colour: brand })]) +
+        [para(model.code + " — " + (model.short_label || model.title), { size: 19, bold: true, colour: brand })]) +
       textBox(next(), { x: MARGIN, y: 0.95, w: contentW, h: 0.3 },
         [para([TR.AGG.project.name, TR.AGG.project.wave,
           model.source === "computed" ? "filtered audience (live recompute)" : "published values",

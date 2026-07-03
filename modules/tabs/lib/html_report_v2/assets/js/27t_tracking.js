@@ -44,7 +44,8 @@
 
   trk.fmtVal = function (v, isMean) {
     if (v === null || v === undefined) return "–";
-    return isMean ? (Math.round(v * 10) / 10).toString() : Math.round(v) + "%";
+    // fmt.score = the ONE mean/index display rule (matches the dashboard)
+    return isMean ? fmt.score(v) : Math.round(v) + "%";
   };
 
   trk.years = function () {
@@ -92,6 +93,7 @@
 
   function metricEntry(q, model, row, ri) {
     return { key: q.code + "::" + ri, code: q.code, title: q.title,
+      short: TR.d2.shortLabel(q),   // space-tight surfaces (falls back to title)
       category: q.category, label: row.label, kind: row.kind,
       isMean: row.kind === "mean", diff: !!row.diff, ri: ri,
       q: TR.d2.questionByCode(q.code), row: row };

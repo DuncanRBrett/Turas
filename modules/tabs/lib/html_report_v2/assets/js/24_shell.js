@@ -111,6 +111,9 @@
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + subBits.join(" &middot; ") + "</div></div></div>" +
       '<div class="hdr-meta">' + clientLogo +
+      '<button class="hdr-legend" data-legend-open aria-haspopup="dialog" ' +
+      'title="How to read this report — significance letters, arrows, bands, precision">' +
+      "ⓘ How to read</button>" +
       '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
       'insights, story and report sections embedded — ready to send">💾 Save copy</button>' +
       "</div></div>" +
@@ -121,6 +124,9 @@
           "</button>";
       }).join("") + "</nav></header>" +
       '<div id="filterbar" class="filterbar"></div>' +
+      // A3: who the numbers describe — persistent on EVERY tab; polite so a
+      // cut change is announced without stealing focus
+      '<div id="audstrip" class="audstrip" aria-live="polite"></div>' +
       '<div id="tabhost" class="tabhost"></div>' +
       '<div id="toast" role="status" aria-live="polite"></div>' +
       '<div id="present-overlay" hidden></div>';
@@ -146,6 +152,7 @@
     // Takeout summarises the published view, so it hides the bar too.
     var fb = document.getElementById("filterbar");
     if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout";
+    if (TR.reader) TR.reader.renderStrip();
     d2.pushHash();
   };
 
@@ -177,6 +184,11 @@
     });
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-savecopy]")) TR.report.saveCopy();
+    });
+    // One "How to read this" panel for the whole report — every ⓘ trigger
+    // (header, collapsed PE box, crosstabs footer) opens the same dialog.
+    document.addEventListener("click", function (e) {
+      if (e.target.closest("[data-legend-open]") && TR.reader) TR.reader.openLegend();
     });
     // Closed<->open jump: a "💬 comments" affordance on a linked closed/composite
     // card opens its open-end comments in the Qualitative tab, filtered to the cut.
