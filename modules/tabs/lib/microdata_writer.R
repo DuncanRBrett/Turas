@@ -48,6 +48,21 @@ micro_display_map <- function(qcode, survey_structure) {
   opt <- survey_structure$options
   if (is.null(opt) || !("QuestionCode" %in% names(opt))) return(NULL)
   qopt <- opt[!is.na(opt$QuestionCode) & opt$QuestionCode == qcode, , drop = FALSE]
+  if (nrow(qopt) == 0) {
+    # Multi-mention options are keyed by slot code ({code}_1..{code}_N) rather
+    # than the root code (the same convention prepare_question_data and the
+    # banner slot fallback read), so fall back to the slot rows — otherwise raw
+    # OptionText values never resolve when DisplayText differs and every live
+    # filter / custom-banner recompute shows the option at 0%. Anchored to
+    # digits so a prefix-sharing code (Q1 vs Q1_STAFF) can't leak options;
+    # deduplicated by OptionText like the banner fallback (banner.R).
+    slot_pattern <- paste0("^\\Q", qcode, "\\E_[0-9]+$")
+    qopt <- opt[!is.na(opt$QuestionCode) &
+                  grepl(slot_pattern, opt$QuestionCode, perl = TRUE), , drop = FALSE]
+    if (nrow(qopt) > 0) {
+      qopt <- qopt[!duplicated(trimws(as.character(qopt$OptionText))), , drop = FALSE]
+    }
+  }
   if (nrow(qopt) == 0) return(NULL)
   disp <- ifelse(!is.na(qopt$DisplayText) & nzchar(as.character(qopt$DisplayText)),
                  as.character(qopt$DisplayText), as.character(qopt$OptionText))
@@ -247,14 +262,40 @@ micro_weights <- function(survey_data, config_obj) {
 }
 
 
+#' Raw OptionText -> BoxCategory map for a box-category banner group
+#'
+#' Built from the group's own options (which carry BoxCategory). Options with
+#' no BoxCategory map to nothing (the respondent falls in no column — exactly
+#' how create_boxcategory_indices treats them).
+#'
+#' @param options The banner group's options data frame
+#' @return Named character vector OptionText -> BoxCategory (possibly empty)
+#' @keywords internal
+micro_boxcat_value_map <- function(options) {
+  empty <- setNames(character(0), character(0))
+  if (is.null(options) || !is.data.frame(options) ||
+      !all(c("OptionText", "BoxCategory") %in% names(options))) {
+    return(empty)
+  }
+  bc <- trimws(as.character(options$BoxCategory))
+  keep <- !is.na(bc) & nzchar(bc)
+  if (!any(keep)) return(empty)
+  setNames(bc[keep], trimws(as.character(options$OptionText[keep])))
+}
+
+
 #' Per-banner-group respondent column membership (length n each)
 #'
 #' For every banner group, each respondent maps to the zero-based AGG column
 #' index of the column whose option they match (MICRO_NO_COLUMN when none).
 #' Keyed by banner_code — the group id the engine's stats.columnsFor() reads.
-#' Built-in single-response banners are covered; groups whose banner question has
-#' no options yield an all-(-1) vector (safe: the engine still boots, that banner
-#' simply shows only the Total column under a live filter).
+#' Built-in single-response banners are covered. Box-category banners
+#' (BannerBoxCategory = 'Y') map raw value -> BoxCategory -> column, because
+#' their column labels are BoxCategory names, not option DisplayTexts — the
+#' DisplayText path could never match and every column recomputed to base 0
+#' under a live filter. Groups whose banner question has no options yield an
+#' all-(-1) vector (safe: the engine still boots, that banner simply shows only
+#' the Total column under a live filter).
 #'
 #' @param banner_info Banner structure
 #' @param survey_data Respondent data
@@ -291,16 +332,25 @@ micro_banner_vars <- function(banner_info, survey_data, survey_structure, n) {
 
     vec <- rep(MICRO_NO_COLUMN, n)
     qcode <- tryCatch(as.character(grp$question$QuestionCode[1]), error = function(e) NA_character_)
-    disp_map <- if (!is.na(qcode) && qcode %in% names(survey_data)) {
-      micro_display_map(qcode, survey_structure)
-    } else {
-      NULL
-    }
-    if (!is.null(disp_map)) {
+    if (!is.na(qcode) && qcode %in% names(survey_data)) {
       keysr <- trimws(as.character(survey_data[[qcode]]))
-      labels <- unname(disp_map[keysr])                  # respondent -> display label
-      agg <- lbl_to_agg[labels]                          # display label -> AGG col index
-      vec <- ifelse(is.na(agg), MICRO_NO_COLUMN, as.integer(agg))
+      if (isTRUE(grp$is_boxcategory)) {
+        # Box-category banner: the column labels in lbl_to_agg are BoxCategory
+        # names, so map respondent raw value -> BoxCategory -> AGG column.
+        box_map <- micro_boxcat_value_map(grp$options)
+        if (length(box_map) > 0) {
+          boxes <- unname(box_map[keysr])                # respondent -> box name
+          agg <- lbl_to_agg[boxes]                       # box name -> AGG col index
+          vec <- ifelse(is.na(agg), MICRO_NO_COLUMN, as.integer(agg))
+        }
+      } else {
+        disp_map <- micro_display_map(qcode, survey_structure)
+        if (!is.null(disp_map)) {
+          labels <- unname(disp_map[keysr])              # respondent -> display label
+          agg <- lbl_to_agg[labels]                      # display label -> AGG col index
+          vec <- ifelse(is.na(agg), MICRO_NO_COLUMN, as.integer(agg))
+        }
+      }
     }
     out[[banner_code]] <- I(as.integer(vec))
   }
@@ -320,6 +370,29 @@ micro_variable_type <- function(qcode, survey_structure) {
   row <- q[!is.na(q$QuestionCode) & q$QuestionCode == qcode, , drop = FALSE]
   if (nrow(row) == 0 || !("Variable_Type" %in% names(row))) return(NA_character_)
   as.character(row$Variable_Type[1])
+}
+
+
+#' Min_Value / Max_Value range for a Numeric question (from the structure)
+#'
+#' @param qcode Question code
+#' @param survey_structure Loaded structure (needs $questions)
+#' @return list(min, max) — each numeric or NA when unset
+#' @keywords internal
+micro_numeric_range <- function(qcode, survey_structure) {
+  none <- list(min = NA_real_, max = NA_real_)
+  q <- survey_structure$questions
+  if (is.null(q) || !("QuestionCode" %in% names(q))) return(none)
+  row <- q[!is.na(q$QuestionCode) & q$QuestionCode == qcode, , drop = FALSE]
+  if (nrow(row) == 0) return(none)
+  rng <- none
+  if ("Min_Value" %in% names(row)) {
+    rng$min <- suppressWarnings(as.numeric(row$Min_Value[1]))
+  }
+  if ("Max_Value" %in% names(row)) {
+    rng$max <- suppressWarnings(as.numeric(row$Max_Value[1]))
+  }
+  rng
 }
 
 
@@ -380,6 +453,12 @@ micro_scores_for_question <- function(dl_q, survey_data, survey_structure, n) {
   raw <- trimws(as.character(survey_data[[dl_q$code]]))
   if (vt == "Numeric") {
     sc <- suppressWarnings(as.numeric(raw))
+    # Mirror the published mean's Min_Value/Max_Value range filter
+    # (calculate_numeric_statistics) so a live recomputed mean excludes the
+    # same sentinel codes (e.g. 999 = "don't know") the published mean does.
+    rng <- micro_numeric_range(dl_q$code, survey_structure)
+    if (!is.na(rng$min)) sc[!is.na(sc) & sc < rng$min] <- NA_real_
+    if (!is.na(rng$max)) sc[!is.na(sc) & sc > rng$max] <- NA_real_
   } else {
     vmap <- micro_score_value_map(dl_q$code, survey_structure, vt)
     if (length(vmap) == 0) return(NULL)

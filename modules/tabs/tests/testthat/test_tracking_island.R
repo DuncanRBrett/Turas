@@ -224,3 +224,81 @@ test_that("read_wave_contributions returns empty for a missing source", {
   expect_equal(length(read_wave_contributions("")), 0)
   expect_equal(length(read_wave_contributions("/no/such/dir")), 0)
 })
+
+# ==============================================================================
+# 6. audit fixes: duplicate titles + stale-wave dedupe
+# ==============================================================================
+
+context("tracking_island: duplicate normalised titles")
+
+test_that("no-mapping metrics occurrence-suffix duplicate titles (mirrors 22w ensureIndexes)", {
+  dl <- list(questions = list(
+    list(code = "Q1", title = "Overall rating", type = "scale"),
+    list(code = "Q2", title = "Overall  Rating!", type = "scale"),   # same normalised title
+    list(code = "Q3", title = "Overall rating", type = "scale")))
+  out <- capture.output(m <- tracking_metrics(dl))
+  keys <- vapply(m, function(x) x$key, character(1))
+  expect_equal(keys, c("overall rating", "overall rating#1", "overall rating#2"))
+  expect_true(any(grepl("duplicate normalised question title", out)))
+})
+
+test_that("unique titles stay unsuffixed with no warning", {
+  out <- capture.output(m <- tracking_metrics(ti_data_layer()))
+  keys <- vapply(m, function(x) x$key, character(1))
+  expect_equal(keys, c("overall rating", "recommend nps", "no scores here"))
+  expect_false(any(grepl("duplicate", out)))
+})
+
+test_that("duplicate-title questions keep their OWN scores in the contribution", {
+  dl <- list(questions = list(
+    list(code = "Q1", title = "Overall rating", type = "scale"),
+    list(code = "Q2", title = "Overall rating", type = "scale")))
+  micro <- list(n = 2, scores = list(Q1 = I(c(6, 8)), Q2 = I(c(1, 3))),
+                weights = I(c(1, 1)))
+  out <- capture.output(
+    contrib <- wave_contribution(dl, micro, list(wave = "W", wave_order = 2024)))
+  keys <- vapply(contrib$questions, function(q) q$match_key, character(1))
+  expect_equal(keys, c("overall rating", "overall rating#1"))
+  expect_equal(as.numeric(contrib$questions[[1]]$scores), c(6, 8))   # Q1's own
+  expect_equal(as.numeric(contrib$questions[[2]]$scores), c(1, 3))   # Q2's own
+})
+
+context("tracking_island: stale-wave dedupe")
+
+test_that("build_tracking_island drops a stale prior carrying the current wave's label", {
+  mk <- function(name, ord, vals) {
+    micro <- list(n = 2, scores = list(Q1 = I(vals)), weights = I(c(1, 1)))
+    dl <- list(questions = list(list(code = "Q1", title = "Overall rating", type = "scale")))
+    wave_contribution(dl, micro, list(wave = name, wave_order = ord))
+  }
+  current <- mk("Wave 2026", 2026, c(6, 8))
+  stale   <- mk("Wave 2026", 2026, c(1, 2))    # earlier run of the SAME wave
+  real    <- mk("Wave 2025", 2025, c(5, 7))
+  out <- capture.output(island <- build_tracking_island(current, list(real, stale)))
+  labels <- vapply(island$waves, function(w) w$wave, character(1))
+  expect_equal(labels, c("Wave 2025", "Wave 2026"))                  # stale dropped
+  expect_true(isTRUE(island$waves[[2]]$current))
+  expect_equal(as.numeric(island$waves[[2]]$questions[[1]]$scores), c(6, 8))
+  expect_true(any(grepl("stale prior contribution", out)))
+})
+
+test_that("read_wave_contributions keeps only the NEWEST sidecar per wave label", {
+  d <- tempfile("waves_"); dir.create(d)
+  on.exit(unlink(d, recursive = TRUE), add = TRUE)
+  wj <- function(label, val) sprintf(
+    '{"wave":"%s","year":2025,"segments":[],"questions":[{"code":"Q1","match_key":"m","title":"M","base":1,"score_type":"mean","scores":[%d]}]}',
+    label, val)
+  old_f <- file.path(d, "proj_old_wave.json")
+  new_f <- file.path(d, "proj_new_wave.json")
+  other <- file.path(d, "proj_2024_wave.json")
+  writeLines(wj("Wave 2025", 1), old_f)
+  writeLines(wj("Wave 2025", 2), new_f)
+  writeLines(sub('"year":2025', '"year":2024', wj("Wave 2024", 9)), other)
+  Sys.setFileTime(old_f, Sys.time() - 3600)          # the stale one is older
+  out <- capture.output(res <- read_wave_contributions(d))
+  labels <- vapply(res, function(c) as.character(c$wave), character(1))
+  expect_setequal(labels, c("Wave 2025", "Wave 2024"))
+  kept <- Find(function(c) identical(as.character(c$wave), "Wave 2025"), res)
+  expect_equal(kept$questions[[1]]$scores[[1]], 2)   # newest file won
+  expect_true(any(grepl("stale duplicate", out)))
+})

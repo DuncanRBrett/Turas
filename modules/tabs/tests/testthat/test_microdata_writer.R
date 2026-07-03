@@ -355,3 +355,128 @@ test_that("box_category_scores averages the option score (OptionText or OptionVa
   expect_equal(unname(s2[["Agree"]]), 4.5)
   expect_equal(unname(s2[["Disagree"]]), 1.5)
 })
+
+# ==============================================================================
+# 7. audit fixes: box-category banners, slot-keyed options, numeric range
+# ==============================================================================
+
+context("microdata_writer: box-category banner groups")
+
+test_that("box-category banner groups map respondents via BoxCategory membership", {
+  # Banner on Q2 grouped into "Low (1-2)" / "High (3)" — column labels are
+  # BoxCategory names, so the DisplayText path can never match. Known answer:
+  # Q2 data 3,1,2,3,2 -> High(2), Low(1), Low(1), High(2), Low(1).
+  bi <- list(
+    columns = c("Total", "Low (1-2)", "High (3)"),
+    internal_keys = c("TOTAL::Total", "Q2::BOXCAT::Low (1-2)", "Q2::BOXCAT::High (3)"),
+    letters = c("-", "A", "B"),
+    column_to_banner = c("TOTAL::Total" = "TOTAL",
+                         "Q2::BOXCAT::Low (1-2)" = "Q2",
+                         "Q2::BOXCAT::High (3)" = "Q2"),
+    key_to_display = c("TOTAL::Total" = "Total",
+                       "Q2::BOXCAT::Low (1-2)" = "Low (1-2)",
+                       "Q2::BOXCAT::High (3)" = "High (3)"),
+    banner_info = list(Q2 = list(
+      internal_keys = c("Q2::BOXCAT::Low (1-2)", "Q2::BOXCAT::High (3)"),
+      columns = c("Low (1-2)", "High (3)"),
+      is_boxcategory = TRUE,
+      options = data.frame(
+        QuestionCode = "Q2", OptionText = c("1", "2", "3"),
+        DisplayText = c("1", "2", "3"),
+        BoxCategory = c("Low (1-2)", "Low (1-2)", "High (3)"),
+        stringsAsFactors = FALSE),
+      question = data.frame(QuestionCode = "Q2", QuestionText = "Rate",
+                            stringsAsFactors = FALSE))))
+  bv <- micro_banner_vars(bi, mw_data(), mw_structure(), 5)
+  expect_equal(as.integer(bv$Q2), c(2L, 1L, 1L, 2L, 1L))
+})
+
+test_that("a boxcat option with no BoxCategory maps to no column (-1)", {
+  bi <- list(
+    columns = c("Total", "Low"),
+    internal_keys = c("TOTAL::Total", "Q2::BOXCAT::Low"),
+    letters = c("-", "A"),
+    column_to_banner = c("TOTAL::Total" = "TOTAL", "Q2::BOXCAT::Low" = "Q2"),
+    key_to_display = c("TOTAL::Total" = "Total", "Q2::BOXCAT::Low" = "Low"),
+    banner_info = list(Q2 = list(
+      internal_keys = "Q2::BOXCAT::Low", columns = "Low", is_boxcategory = TRUE,
+      options = data.frame(
+        QuestionCode = "Q2", OptionText = c("1", "2", "3"),
+        DisplayText = c("1", "2", "3"),
+        BoxCategory = c("Low", "Low", NA),           # "3" carries no box
+        stringsAsFactors = FALSE),
+      question = data.frame(QuestionCode = "Q2", stringsAsFactors = FALSE))))
+  bv <- micro_banner_vars(bi, mw_data(), mw_structure(), 5)
+  # Q2 data 3,1,2,3,2 -> -1, Low(1), Low(1), -1, Low(1)
+  expect_equal(as.integer(bv$Q2), c(-1L, 1L, 1L, -1L, 1L))
+})
+
+context("microdata_writer: multi-mention slot-keyed options")
+
+test_that("slot-keyed options resolve raw OptionText when DisplayText differs", {
+  struct <- list(
+    questions = data.frame(
+      QuestionCode = "Q05", QuestionText = "Brands",
+      Variable_Type = "Multi_Mention", Columns = 2, stringsAsFactors = FALSE),
+    options = data.frame(
+      QuestionCode = c("Q05_1", "Q05_2"),
+      OptionText   = c("Brand A (incl. sub-brands)", "Brand B"),
+      DisplayText  = c("Brand A", "Brand B"),
+      stringsAsFactors = FALSE))
+  dl_q <- list(code = "Q05", type = "multi", rows = list(
+    list(kind = "category", label = "Brand A"),        # row 0
+    list(kind = "category", label = "Brand B")))       # row 1
+  sd <- data.frame(
+    Q05_1 = c("Brand A (incl. sub-brands)", "Brand B"),
+    Q05_2 = c("Brand B", NA),
+    stringsAsFactors = FALSE)
+  ans <- micro_answers_for_question(dl_q, sd, struct, 2)
+  expect_setequal(as.integer(ans[[1]]), c(0L, 1L))     # A + B both resolve
+  expect_equal(as.integer(ans[[2]]), 1L)
+})
+
+test_that("the slot fallback cannot leak a prefix-sharing question's options", {
+  struct <- list(
+    questions = data.frame(
+      QuestionCode = "Q1", QuestionText = "Pick",
+      Variable_Type = "Multi_Mention", Columns = 1, stringsAsFactors = FALSE),
+    options = data.frame(
+      QuestionCode = c("Q1_STAFF_1"),                 # NOT a Q1 slot
+      OptionText   = c("Leak"),
+      DisplayText  = c("Leak"),
+      stringsAsFactors = FALSE))
+  expect_null(micro_display_map("Q1", struct))         # anchored: no match
+})
+
+context("microdata_writer: Numeric score range filter")
+
+test_that("Numeric scores honour the published Min_Value/Max_Value range filter", {
+  struct <- list(
+    questions = data.frame(
+      QuestionCode = "HRS", QuestionText = "Hours lost",
+      Variable_Type = "Numeric", Columns = 1,
+      Min_Value = 0, Max_Value = 24, stringsAsFactors = FALSE),
+    options = data.frame(QuestionCode = character(0), OptionText = character(0),
+                         DisplayText = character(0), stringsAsFactors = FALSE))
+  dl_q <- list(code = "HRS", type = "numeric",
+               rows = list(list(kind = "mean", label = "Mean")))
+  sd <- data.frame(HRS = c("5", "999", "10", "-1", NA), stringsAsFactors = FALSE)
+  sc <- micro_scores_for_question(dl_q, sd, struct, 5)
+  # 999 (sentinel) and -1 (out of range) are excluded exactly like the
+  # published mean (calculate_numeric_statistics); mean of the rest = 7.5
+  expect_equal(sc, c(5, NA, 10, NA, NA))
+  expect_equal(mean(sc, na.rm = TRUE), 7.5)
+})
+
+test_that("Numeric scores stay unfiltered when no Min/Max is configured", {
+  struct <- list(
+    questions = data.frame(
+      QuestionCode = "HRS", QuestionText = "Hours lost",
+      Variable_Type = "Numeric", Columns = 1, stringsAsFactors = FALSE),
+    options = data.frame(QuestionCode = character(0), OptionText = character(0),
+                         DisplayText = character(0), stringsAsFactors = FALSE))
+  dl_q <- list(code = "HRS", type = "numeric",
+               rows = list(list(kind = "mean", label = "Mean")))
+  sd <- data.frame(HRS = c("5", "999"), stringsAsFactors = FALSE)
+  expect_equal(micro_scores_for_question(dl_q, sd, struct, 2), c(5, 999))
+})

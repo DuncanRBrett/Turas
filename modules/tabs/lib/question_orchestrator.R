@@ -92,9 +92,13 @@ prepare_question_data <- function(question_code, base_filter,
   # Load question options
   # FIXED: Multi-mention uses column names as QuestionCode in Options
   if (question_info$Variable_Type == "Multi_Mention") {
-    pattern <- paste0("^", question_code, "_")
+    # Anchored to the {code}_<digits> slot convention (\Q..\E quotes any regex
+    # metacharacter in the code). An unanchored "^<code>_" prefix leaked a
+    # prefix-sharing question's options (e.g. QUAL_CULTURE swallowed
+    # QUAL_CULTURE_STAFF_1..m), injecting phantom/duplicate rows.
+    pattern <- paste0("^\\Q", question_code, "\\E_[0-9]+$")
     question_options <- survey_structure$options[
-      grepl(pattern, survey_structure$options$QuestionCode),
+      grepl(pattern, survey_structure$options$QuestionCode, perl = TRUE),
     ]
   } else {
     question_options <- survey_structure$options[
@@ -151,15 +155,37 @@ prepare_question_data <- function(question_code, base_filter,
   # STEP 4: CALCULATE BASE SIZES
   # ============================================================================
 
+  # Allocation questions store data across {code}_1..{code}_N with NO bare
+  # {code} column, and a zero allocation is a real answer — so the base is
+  # any-column-answered (non-NA). calculate_weighted_base has no Allocation
+  # branch (its single-response path would report base 0), so compute here.
+  is_allocation <- identical(as.character(question_info$Variable_Type), "Allocation")
+  allocation_cols <- character(0)
+  if (is_allocation) {
+    n_alloc_cols <- suppressWarnings(as.integer(question_info$Columns))
+    if (!is.na(n_alloc_cols) && n_alloc_cols >= 1L) {
+      allocation_cols <- intersect(
+        paste0(question_code, "_", seq_len(n_alloc_cols)),
+        names(filtered_data)
+      )
+    }
+  }
+
   banner_bases <- list()
   for (key in banner_info$internal_keys) {
     row_idx <- banner_row_indices[[key]]
     if (length(row_idx) > 0) {
       subset_data <- filtered_data[row_idx, , drop = FALSE]
       subset_weights <- question_weights[row_idx]
-      base_result <- calculate_weighted_base(
-        subset_data, question_info, subset_weights
-      )
+      if (is_allocation) {
+        base_result <- calculate_allocation_base(
+          subset_data, allocation_cols, subset_weights
+        )
+      } else {
+        base_result <- calculate_weighted_base(
+          subset_data, question_info, subset_weights
+        )
+      }
     } else {
       base_result <- list(unweighted = 0, weighted = 0, effective = 0)
     }
@@ -179,6 +205,32 @@ prepare_question_data <- function(question_code, base_filter,
     banner_bases = banner_bases,
     base_filter = base_filter
   ))
+}
+
+#' Base sizes for an Allocation question (any-column-answered)
+#'
+#' A respondent is in base when ANY allocation slot holds a non-NA numeric
+#' value — zero is a real allocation and MUST count (unlike the multi-mention
+#' base, which treats numeric 0 as no-response). Mirrors the allocation
+#' processor's zero-is-data rule (allocation_processor.R).
+#'
+#' @param data_subset Data frame, one banner segment's rows
+#' @param allocation_cols Character vector of existing {code}_i column names
+#' @param weights Numeric vector aligned to data_subset rows
+#' @return List with $unweighted, $weighted, $effective
+#' @keywords internal
+calculate_allocation_base <- function(data_subset, allocation_cols, weights) {
+  if (length(allocation_cols) == 0 || nrow(data_subset) == 0) {
+    return(list(unweighted = 0, weighted = 0, effective = 0))
+  }
+  answered <- Reduce(`|`, lapply(allocation_cols, function(cc) {
+    !is.na(suppressWarnings(as.numeric(data_subset[[cc]])))
+  }))
+  list(
+    unweighted = sum(answered, na.rm = TRUE),
+    weighted   = sum(weights[answered], na.rm = TRUE),
+    effective  = calculate_effective_n(weights[answered])
+  )
 }
 
 # ==============================================================================
@@ -333,6 +385,39 @@ process_single_question <- function(question_code, prepared_data,
         how_to_fix = c(
           "Check that the question data is in the expected numeric format",
           "Verify the question configuration in Survey_Structure",
+          "Review the error message for specific issues"
+        )
+      )
+    })
+
+    question_table <- if (!is.null(individual_results)) {
+      individual_results
+    } else {
+      data.frame(stringsAsFactors = FALSE)
+    }
+
+  } else if (question_info$Variable_Type == "Allocation") {
+    # ---------------------------------------------------------------------
+    # ALLOCATION QUESTIONS (constant-sum) — mean per option, by banner
+    # Previously unrouted: Allocation fell into the standard processor, which
+    # refused on the missing bare {code} column (or mis-tabulated it as
+    # single-choice). TRS v1.0: Processing failures must refuse, not warn.
+    # ---------------------------------------------------------------------
+    individual_results <- tryCatch({
+      process_allocation_question(
+        filtered_data, question_info, question_options,
+        banner_info, banner_row_indices, question_weights,
+        banner_bases, config, is_weighted
+      )
+    }, error = function(e) {
+      tabs_refuse(
+        code = "DATA_ALLOCATION_QUESTION_FAILED",
+        title = paste0("Failed to Process Allocation Question: ", question_code),
+        problem = paste0("Allocation question processing failed: ", conditionMessage(e)),
+        why_it_matters = "This question will be missing from output, producing incomplete results.",
+        how_to_fix = c(
+          "Check that the allocation columns ({code}_1..{code}_N) exist and are numeric",
+          "Verify Columns in Survey_Structure matches the number of allocation options",
           "Review the error message for specific issues"
         )
       )

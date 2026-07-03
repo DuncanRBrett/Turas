@@ -610,5 +610,70 @@ test_that("errors on non-numeric Columns value", {
 })
 
 # ==============================================================================
+# ORCHESTRATOR ROUTING (audit fix: Allocation was never routed in the live path)
+# ==============================================================================
+
+context("allocation routing via question_orchestrator")
+
+source(file.path(.tabs_lib_dir, "weighting.R"))
+source(file.path(.tabs_lib_dir, "banner.R"))
+source(file.path(.tabs_lib_dir, "banner_indices.R"))
+source(file.path(.tabs_lib_dir, "question_orchestrator.R"))
+
+alloc_orch_data <- function() data.frame(
+  BUDGET_1 = c(50, 25, 0, 25),
+  BUDGET_2 = c(30, 50, 40, 40),
+  BUDGET_3 = c(20, 25, 60, 35),
+  stringsAsFactors = FALSE)
+
+alloc_orch_structure <- function() list(
+  questions = data.frame(
+    QuestionCode = "BUDGET", QuestionText = "Budget split",
+    Variable_Type = "Allocation", Columns = 3, stringsAsFactors = FALSE),
+  options = data.frame(
+    QuestionCode = c("BUDGET", "BUDGET", "BUDGET"),
+    OptionText   = c("Rent", "Food", "Fun"),
+    DisplayText  = c("Rent", "Food", "Fun"),
+    ShowInOutput = "Y", stringsAsFactors = FALSE))
+
+alloc_orch_config <- function() list(
+  decimal_places_numeric = 1, enable_significance_testing = FALSE, verbose = FALSE)
+
+test_that("prepare_question_data computes an any-column-answered Allocation base", {
+  banner_info <- create_total_only_banner()
+  prepared <- prepare_question_data("BUDGET", NA, alloc_orch_data(),
+                                    alloc_orch_structure(), banner_info, rep(1, 4))
+  base <- prepared$banner_bases[["TOTAL::Total"]]
+  expect_equal(base$unweighted, 4)     # a 0 in one slot is still an answer
+  expect_equal(base$weighted, 4)
+  expect_equal(base$effective, 4)
+})
+
+test_that("process_single_question routes Allocation to the allocation processor", {
+  banner_info <- create_total_only_banner()
+  prepared <- prepare_question_data("BUDGET", NA, alloc_orch_data(),
+                                    alloc_orch_structure(), banner_info, rep(1, 4))
+  question_row <- data.frame(QuestionCode = "BUDGET", BaseFilter = NA,
+                             stringsAsFactors = FALSE)
+  result <- process_single_question("BUDGET", prepared, banner_info,
+                                    alloc_orch_config(), FALSE, question_row)
+  expect_equal(result$question_type, "Allocation")
+  tab <- result$table
+  # Mean-allocation-per-option (the allocation shape), NOT a single-choice tab
+  expect_equal(tab$RowLabel, c("Rent", "Food", "Fun"))
+  expect_true(all(tab$RowType == "Average"))
+  # Known answers: col means of BUDGET_1..3 = 25 / 40 / 35
+  vals <- suppressWarnings(as.numeric(tab[["TOTAL::Total"]]))
+  expect_equal(vals, c(25, 40, 35))
+})
+
+test_that("calculate_allocation_base counts all-zero allocators and skips all-NA rows", {
+  data <- data.frame(B_1 = c(0, NA), B_2 = c(0, NA), stringsAsFactors = FALSE)
+  base <- calculate_allocation_base(data, c("B_1", "B_2"), c(1, 1))
+  expect_equal(base$unweighted, 1)     # zeros are data; the all-NA row is not
+  expect_equal(base$weighted, 1)
+})
+
+# ==============================================================================
 # END OF TEST FILE
 # ==============================================================================

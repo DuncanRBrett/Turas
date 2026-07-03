@@ -356,24 +356,28 @@ load_survey_data <- function(data_file_path, project_root = NULL,
 }
 
 
-#' Load Survey Data with Smart Caching (V10.0)
+#' Load Survey Data with Smart Caching (V10.0; RDS cache since V11)
 #'
-#' For large Excel files (>50MB), automatically creates a CSV cache
-#' for dramatically faster subsequent loads. Excel loads at ~10MB/sec
-#' while CSV via data.table loads at ~500MB/sec (50x faster).
+#' For large Excel files (>50MB), automatically creates an RDS cache
+#' for dramatically faster subsequent loads (Excel parses at ~10MB/sec).
 #'
 #' USAGE: Drop-in replacement for load_survey_data() when working with
 #' large Excel files that are read multiple times.
 #'
 #' CACHING BEHAVIOR:
-#' - Cache file stored alongside source as {filename}_cache.csv
+#' - Cache file stored alongside source as {filename}_cache.rds
 #' - Cache auto-regenerates when source file is modified
 #' - Cache only created if file size exceeds threshold
 #' - Falls back to standard load_survey_data() if caching not beneficial
 #'
+#' WHY RDS (not CSV): a CSV round-trip re-infers column types on reload, so a
+#' text option code like "01" came back as integer 1 and silently counted zero
+#' against OptionText "01" on every cached run. readRDS returns exactly the
+#' object saveRDS wrote — cached and uncached runs are identical.
+#'
 #' @param data_file_path Character, path to data file
 #' @param project_root Character, optional project root
-#' @param auto_cache Logical, enable CSV caching for large files (default: TRUE)
+#' @param auto_cache Logical, enable RDS caching for large files (default: TRUE)
 #' @param cache_threshold_mb Numeric, file size threshold in MB for caching (default: 50)
 #' @param convert_labelled Logical, convert SPSS labels (default: FALSE)
 #' @return Data frame with survey responses
@@ -403,28 +407,43 @@ load_survey_data_smart <- function(data_file_path, project_root = NULL,
   if (auto_cache && file_ext %in% c("xlsx", "xls")) {
     file_size_mb <- file.info(data_file_path)$size / 1024^2
 
-    if (file_size_mb > cache_threshold_mb && is_package_available("data.table")) {
-      csv_cache_path <- sub("\\.(xlsx|xls)$", "_cache.csv", data_file_path)
+    if (file_size_mb > cache_threshold_mb) {
+      rds_cache_path <- sub("\\.(xlsx|xls)$", "_cache.rds", data_file_path)
+
+      # Pre-V11 CSV caches re-inferred column types on reload (text codes like
+      # "01" became integer 1 and counted zero) — never read one; tell the
+      # operator it is superseded.
+      legacy_csv_cache <- sub("\\.(xlsx|xls)$", "_cache.csv", data_file_path)
+      if (file.exists(legacy_csv_cache)) {
+        cat(sprintf(
+          "  [NOTE] Ignoring legacy CSV cache '%s' (type-unsafe; superseded by the RDS cache). It can be deleted.\n",
+          basename(legacy_csv_cache)))
+      }
 
       # Check if cache exists and is newer than source
-      cache_valid <- file.exists(csv_cache_path) &&
-                     file.mtime(csv_cache_path) >= file.mtime(data_file_path)
+      cache_valid <- file.exists(rds_cache_path) &&
+                     file.mtime(rds_cache_path) >= file.mtime(data_file_path)
 
-      if (!cache_valid) {
-        cat(sprintf("Large Excel file (%.1f MB) detected. Creating CSV cache...\n", file_size_mb))
-        data <- readxl::read_excel(data_file_path)
-        tryCatch({
-          data.table::fwrite(data, csv_cache_path)
-          cat("  CSV cache created:", basename(csv_cache_path), "\n")
-        }, error = function(e) {
-          cat("  [WARNING] Could not create CSV cache:", e$message, "\n")
-          cat("  Continuing without cache.\n")
+      if (cache_valid) {
+        cat("Loading from RDS cache (faster)...\n")
+        cached <- tryCatch(readRDS(rds_cache_path), error = function(e) {
+          cat("  [WARNING] Could not read RDS cache:", conditionMessage(e), "\n")
+          cat("  Re-reading the Excel source.\n")
+          NULL
         })
-        return(as.data.frame(data))
-      } else {
-        cat("Loading from CSV cache (faster)...\n")
-        return(data.table::fread(csv_cache_path, data.table = FALSE))
+        if (!is.null(cached)) return(cached)
       }
+
+      cat(sprintf("Large Excel file (%.1f MB) detected. Creating RDS cache...\n", file_size_mb))
+      data <- as.data.frame(readxl::read_excel(data_file_path))
+      tryCatch({
+        saveRDS(data, rds_cache_path)
+        cat("  RDS cache created:", basename(rds_cache_path), "\n")
+      }, error = function(e) {
+        cat("  [WARNING] Could not create RDS cache:", conditionMessage(e), "\n")
+        cat("  Continuing without cache.\n")
+      })
+      return(data)
     }
   }
 

@@ -277,10 +277,26 @@ process_standard_banner <- function(banner_code, question_info, options, start_c
   
   # Create column labels from DisplayText
   banner_columns <- options$DisplayText
-  
-  # Create internal keys for data lookup
+
+  # Create internal keys for data lookup. Keys must be unique per OPTION: two
+  # options sharing a DisplayText would otherwise collide on one key, and the
+  # second option's row set silently overwrites the first's in
+  # create_single_choice_indices (subset_indices[[internal_key]] <- ...) — both
+  # columns then show the second option's respondents. Duplicates get a
+  # positional "#<n>" suffix on the KEY only; the displayed column label is
+  # unchanged.
   banner_internal_keys <- paste0(banner_code, "::", banner_columns)
-  
+  dup_keys <- duplicated(banner_internal_keys)
+  if (any(dup_keys)) {
+    dup_labels <- unique(as.character(banner_columns[dup_keys]))
+    cat(sprintf(
+      "  [WARNING] Banner '%s': duplicated DisplayText %s across options — columns are kept separate (internal keys disambiguated by option position). Consider distinct DisplayText labels.\n",
+      banner_code,
+      paste(sprintf("'%s'", dup_labels), collapse = ", ")
+    ))
+    banner_internal_keys <- make.unique(banner_internal_keys, sep = "#")
+  }
+
   # Generate Excel column letters (A, B, C, etc.)
   num_cols <- length(banner_columns)
   banner_letters <- generate_excel_letters(num_cols)

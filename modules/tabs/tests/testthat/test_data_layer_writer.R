@@ -874,3 +874,72 @@ test_that("weighted reports serialise the weighted + effective base; unweighted 
   expect_null(uq$bases[[1]]$nWeighted)
   expect_null(uq$bases[[1]]$nEff)
 })
+
+# ==============================================================================
+# ROWS KEYED BY (RowLabel, RowSource) — a box NET sharing an option's label
+# must keep BOTH rows (audit fix: unique labels dropped the NET row)
+# ==============================================================================
+
+context("data_layer_writer: label collisions (option vs box NET)")
+
+# 5-point-style scale where the BoxCategory NET is named "Satisfied" — the same
+# label as one of its member options. Classic Excel shows both rows.
+make_dl_q_label_collision <- function() {
+  list(
+    question_code = "Q9", question_text = "How satisfied are you?",
+    question_type = "Likert", category = "Satisfaction",
+    table = data.frame(
+      RowLabel  = c("Very satisfied", "Very satisfied",
+                    "Satisfied", "Satisfied",
+                    "Dissatisfied", "Dissatisfied",
+                    "Satisfied", "Satisfied"),          # the NET, same label
+      RowType   = c("Frequency", "Column %",
+                    "Frequency", "Column %",
+                    "Frequency", "Column %",
+                    "Frequency", "Column %"),
+      RowSource = c("individual", "individual",
+                    "individual", "individual",
+                    "individual", "individual",
+                    "boxcategory", "boxcategory"),
+      "TOTAL::Total"   = c("25", "25.0", "30", "30.0", "45", "45.0", "55", "55.0"),
+      "Gender::Male"   = c("15", "30.0", "15", "30.0", "20", "40.0", "30", "60.0"),
+      "Gender::Female" = c("10", "20.0", "15", "30.0", "25", "50.0", "25", "50.0"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 100, weighted = 100, effective = 100),
+      "Gender::Male"   = list(unweighted = 50,  weighted = 50,  effective = 50),
+      "Gender::Female" = list(unweighted = 50,  weighted = 50,  effective = 50))
+  )
+}
+
+test_that("an option row and a box NET sharing a label BOTH survive", {
+  q <- build_dl_question(make_dl_q_label_collision(), make_dl_banner_info(),
+                         make_dl_config(), low_base = 30)
+  sat_rows <- Filter(function(r) identical(r$label, "Satisfied"), q$rows)
+  expect_length(sat_rows, 2)
+  kinds <- vapply(sat_rows, function(r) r$kind, character(1))
+  expect_setequal(kinds, c("category", "net"))
+  # Each row carries ITS OWN values: option 30% / NET 55% on Total
+  opt <- Find(function(r) identical(r$kind, "category"), sat_rows)
+  net <- Find(function(r) identical(r$kind, "net"), sat_rows)
+  expect_equal(opt$pct[[1]], 30)
+  expect_equal(net$pct[[1]], 55)
+  expect_equal(opt$n[[1]], 30)     # frequencies stay per-row too
+  expect_equal(net$n[[1]], 55)
+  # Row order preserved: the NET (appended after the options) comes last
+  labels <- vapply(q$rows, function(r) r$label, character(1))
+  expect_equal(labels, c("Very satisfied", "Satisfied", "Dissatisfied", "Satisfied"))
+  expect_equal(vapply(q$rows, function(r) r$kind, character(1)),
+               c("category", "category", "category", "net"))
+})
+
+test_that("a table without RowSource still keys by label alone (unchanged)", {
+  q_def <- make_dl_q_label_collision()
+  q_def$table$RowSource <- NULL
+  q <- build_dl_question(q_def, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  # Without RowSource the two "Satisfied" parents can't be told apart — the
+  # legacy single-row behaviour is preserved (first values win)
+  sat_rows <- Filter(function(r) identical(r$label, "Satisfied"), q$rows)
+  expect_length(sat_rows, 1)
+  expect_equal(sat_rows[[1]]$pct[[1]], 30)
+})

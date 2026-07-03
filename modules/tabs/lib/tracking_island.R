@@ -147,10 +147,25 @@ tracking_metrics <- function(data_layer, mapping = NULL) {
   }
   # No mapping: list every question; wave_contribution keeps only those that
   # actually carry microdata scores (which only mean-kind questions do).
+  # Duplicate normalised titles get an occurrence suffix (t, t#1, t#2, ...)
+  # mirroring the renderer's ensureIndexes (22w_waves.js) and extract_waves.py —
+  # an unsuffixed duplicate key made two questions collide in the wave index
+  # and one silently showed the other's trend.
   out <- list()
+  seen <- list()
   for (q in data_layer$questions) {
+    key <- tracking_norm(q$title)
+    seen_key <- paste0("k:", key)   # prefixed: a blank title can't defeat the lookup
+    k <- seen[[seen_key]] %||% 0L
+    seen[[seen_key]] <- k + 1L
+    if (k > 0L) {
+      cat(sprintf(
+        "  [WARNING] Tracking: duplicate normalised question title '%s' (question %s) — keyed as '%s#%d' to keep trends separate.\n",
+        key, as.character(q$code), key, k))
+      key <- paste0(key, "#", k)
+    }
     out[[length(out) + 1]] <- list(code = as.character(q$code),
-      key = tracking_norm(q$title), title = as.character(q$title),
+      key = key, title = as.character(q$title),
       score_type = if (identical(q$type, "nps")) "nps" else "mean")
   }
   out
@@ -220,6 +235,24 @@ build_tracking_island <- function(current_contribution, prior_contributions = li
     w
   })
   priors <- priors[!vapply(priors, is.null, logical(1))]
+
+  # A prior contribution with the CURRENT wave's label is a stale sidecar from
+  # an earlier run of this same wave (e.g. a renamed/versioned re-run whose old
+  # *_wave.json no longer matches exclude_path). Keeping it would make the
+  # current wave compare against itself, masking the real wave-on-wave movement.
+  cur_label <- as.character(current_contribution$wave %||% "")
+  if (nzchar(cur_label)) {
+    is_self <- vapply(priors, function(w) {
+      identical(as.character(w$wave %||% ""), cur_label)
+    }, logical(1))
+    if (any(is_self)) {
+      cat(sprintf(
+        "  [NOTE] Tracking: skipped %d stale prior contribution(s) labelled '%s' (same wave as the current run).\n",
+        sum(is_self), cur_label))
+      priors <- priors[!is_self]
+    }
+  }
+
   waves <- c(priors, list(current_contribution))
 
   keys <- vapply(waves, function(w) {
@@ -268,7 +301,10 @@ write_wave_contribution <- function(contribution, output_path) {
 #' Read prior waves' tracking contributions from a source folder
 #'
 #' Reads every *_wave.json under `waves_source` (skipping the current run's own
-#' file when given). Malformed files are skipped with a warning.
+#' file when given). Malformed files are skipped with a warning. When two
+#' sidecars carry the SAME wave label (a re-run of a wave under a different
+#' output filename left its stale sidecar behind), only the newest file is
+#' kept — otherwise the duplicate would enter the island as extra "history".
 #'
 #' @param waves_source Folder containing prior *_wave.json contributions
 #' @param exclude_path Optional path to skip (this run's own contribution)
@@ -284,13 +320,27 @@ read_wave_contributions <- function(waves_source, exclude_path = NULL) {
     files <- files[normalizePath(files, mustWork = FALSE) !=
                    normalizePath(exclude_path, mustWork = FALSE)]
   }
-  out <- lapply(files, function(f) {
+  # Newest first, so the first contribution seen per wave label wins the dedupe.
+  if (length(files) > 1) {
+    files <- files[order(file.mtime(files), decreasing = TRUE)]
+  }
+  out <- list()
+  seen_labels <- character(0)
+  for (f in files) {
     c <- tryCatch(jsonlite::read_json(f, simplifyVector = FALSE), error = function(e) NULL)
     if (is.null(c) || is.null(c$questions)) {
       cat(sprintf("  [WARNING] Skipped unreadable wave contribution: %s\n", basename(f)))
-      return(NULL)
+      next
     }
-    c
-  })
-  out[!vapply(out, is.null, logical(1))]
+    lbl <- as.character(c$wave %||% "")
+    if (nzchar(lbl) && lbl %in% seen_labels) {
+      cat(sprintf(
+        "  [NOTE] Tracking: skipped stale duplicate of wave '%s' (%s) — a newer sidecar for that wave was kept.\n",
+        lbl, basename(f)))
+      next
+    }
+    if (nzchar(lbl)) seen_labels <- c(seen_labels, lbl)
+    out[[length(out) + 1]] <- c
+  }
+  out
 }

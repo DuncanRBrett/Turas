@@ -597,3 +597,73 @@ test_that("exact root-code options take priority over slot fallback", {
   expect_equal(length(brand_cols), 2)
   expect_equal(brand_cols, c("Robertsons", "Cape Herb & Spice"))
 })
+
+# ==============================================================================
+# DUPLICATE DisplayText OPTIONS (audit fix: colliding internal keys)
+# ==============================================================================
+
+context("duplicate DisplayText banner options")
+
+make_dup_display_structure <- function() {
+  list(
+    questions = data.frame(
+      QuestionCode = "Region",
+      QuestionText = "Which region?",
+      Variable_Type = "Single_Response",
+      Columns = "Region",
+      stringsAsFactors = FALSE
+    ),
+    options = data.frame(
+      QuestionCode = c("Region", "Region", "Region"),
+      OptionText   = c("North", "East", "West"),
+      DisplayText  = c("North", "Other", "Other"),   # East + West both shown as "Other"
+      ShowInOutput = c("Y", "Y", "Y"),
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+make_dup_display_selection <- function() {
+  data.frame(
+    QuestionCode = "Region",
+    Include = "N",
+    UseBanner = "Y",
+    BannerBoxCategory = "N",
+    DisplayOrder = 1,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("duplicated DisplayText yields unique internal keys and a console warning", {
+  out <- capture.output(
+    banner <- create_banner_structure(make_dup_display_selection(),
+                                      make_dup_display_structure())
+  )
+  expect_true(any(grepl("duplicated DisplayText", out)))
+  expect_equal(anyDuplicated(banner$internal_keys), 0L)
+  # Display labels are unchanged — both columns still read "Other"
+  expect_equal(banner$columns, c("Total", "North", "Other", "Other"))
+  expect_equal(banner$internal_keys,
+               c("TOTAL::Total", "Region::North", "Region::Other", "Region::Other#1"))
+})
+
+test_that("each duplicated-label option keeps its OWN respondents", {
+  out <- capture.output(
+    banner <- create_banner_structure(make_dup_display_selection(),
+                                      make_dup_display_structure())
+  )
+  data <- data.frame(Region = c("North", "East", "West", "East"),
+                     stringsAsFactors = FALSE)
+  idx <- create_banner_row_indices(data, banner)$row_indices
+  expect_equal(idx[["Region::Other"]], c(2L, 4L))    # East respondents
+  expect_equal(idx[["Region::Other#1"]], 3L)         # West respondents — not overwritten
+  expect_equal(idx[["Region::North"]], 1L)
+})
+
+test_that("distinct DisplayText banners emit no duplicate-label warning", {
+  out <- capture.output(
+    banner <- create_banner_structure(make_test_selection(),
+                                      make_test_survey_structure())
+  )
+  expect_false(any(grepl("duplicated DisplayText", out)))
+})

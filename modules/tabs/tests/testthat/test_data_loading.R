@@ -299,3 +299,56 @@ test_that("reads table sheet with standard headers", {
   expect_equal(nrow(result), 2)
   expect_true("QuestionCode" %in% names(result))
 })
+
+# ==============================================================================
+# 9. load_survey_data_smart — RDS cache type fidelity (audit fix)
+# ==============================================================================
+
+context("load_survey_data_smart: cache fidelity")
+
+test_that("RDS cache round-trips text option codes byte-identically", {
+  skip_if_not_installed("openxlsx")
+  skip_if_not_installed("readxl")
+  d <- tempfile("smart_cache_"); dir.create(d)
+  on.exit(unlink(d, recursive = TRUE), add = TRUE)
+  xlsx <- file.path(d, "survey.xlsx")
+  df <- data.frame(
+    RespID = 1:3,
+    Q1     = c("01", "02", "12"),     # text codes with leading zeroes
+    W      = c(1.5, 2, 0.5),
+    stringsAsFactors = FALSE
+  )
+  openxlsx::write.xlsx(df, xlsx)
+
+  # First run reads Excel and writes the cache
+  out1 <- capture.output(
+    first <- load_survey_data_smart(xlsx, auto_cache = TRUE, cache_threshold_mb = 0))
+  expect_true(file.exists(file.path(d, "survey_cache.rds")))
+
+  # Second run loads the cache — results must be IDENTICAL to the first run
+  out2 <- capture.output(
+    second <- load_survey_data_smart(xlsx, auto_cache = TRUE, cache_threshold_mb = 0))
+  expect_true(any(grepl("RDS cache", out2)))
+  expect_identical(second, first)
+  # The exact regression: "01" must NOT come back as integer 1
+  expect_identical(second$Q1, c("01", "02", "12"))
+  expect_true(is.character(second$Q1))
+  expect_true(is.numeric(second$W))                  # numerics stay numeric
+})
+
+test_that("a legacy CSV cache is ignored (never read) and noted on the console", {
+  skip_if_not_installed("openxlsx")
+  skip_if_not_installed("readxl")
+  d <- tempfile("smart_cache_"); dir.create(d)
+  on.exit(unlink(d, recursive = TRUE), add = TRUE)
+  xlsx <- file.path(d, "survey.xlsx")
+  df <- data.frame(Q1 = c("01", "02"), stringsAsFactors = FALSE)
+  openxlsx::write.xlsx(df, xlsx)
+  # A stale pre-V11 CSV cache with corrupted (re-inferred) types
+  writeLines(c("Q1", "1", "2"), file.path(d, "survey_cache.csv"))
+
+  out <- capture.output(
+    got <- load_survey_data_smart(xlsx, auto_cache = TRUE, cache_threshold_mb = 0))
+  expect_true(any(grepl("legacy CSV cache", out)))
+  expect_identical(got$Q1, c("01", "02"))            # from Excel, not the CSV
+})

@@ -167,3 +167,44 @@ test_that("a workbook with no themed questions yields a null quant layer", {
   expect_null(ql$agg)
   expect_null(ql$micro)
 })
+
+# ==============================================================================
+# PREFIX-SHARING CODES — QUAL_CULTURE must not swallow QUAL_CULTURE_STAFF's
+# theme options (audit fix: the orchestrator's option match is now anchored)
+# ==============================================================================
+
+test_that("prefix-sharing question codes cannot cross-contaminate theme options", {
+  n <- 20
+  master <- list(
+    n = n, ids = as.character(seq_len(n)),
+    id_to_idx = stats::setNames(seq_len(n) - 1L, as.character(seq_len(n))),
+    respondents = lapply(seq_len(n), function(i)
+      list(idx = i - 1L, id = as.character(i), demos = list())),
+    banner_dims = list())
+  mk_q <- function(code, title, themes, theme_of) list(
+    code = code, title = title, type = "themed",
+    roles = list(themes = lapply(themes, function(t) list(col = NA, label = t))),
+    records = lapply(seq_len(n), function(i)
+      list(id = as.character(i), themeVals = stats::setNames(list(1L), theme_of(i)))))
+  culture <- mk_q("QUAL_CULTURE", "Culture", c("Communication", "Trust"),
+                  function(i) if (i <= 10) "Communication" else "Trust")
+  staff   <- mk_q("QUAL_CULTURE_STAFF", "Culture Staff", c("Communication", "Workload"),
+                  function(i) if (i <= 5) "Communication" else "Workload")
+  ql <- qual_build_quant_layer(list(culture, staff), master,
+                               list(demographic_cuts = "block"))
+  qc <- Find(function(q) q$code == "QUAL_CULTURE", ql$agg$questions)
+  qs <- Find(function(q) q$code == "QUAL_CULTURE_STAFF", ql$agg$questions)
+  cat_labels <- function(q) vapply(
+    Filter(function(r) identical(r$kind, "category"), q$rows),
+    function(r) r$label, character(1))
+  # No leak: each question shows ONLY its own themes, once each —
+  # no phantom "Workload" row on Culture, no duplicated "Communication"
+  expect_setequal(cat_labels(qc), c("Communication", "Trust"))
+  expect_equal(anyDuplicated(cat_labels(qc)), 0L)
+  expect_setequal(cat_labels(qs), c("Communication", "Workload"))
+  # Known answers per question (base 20 commenters each)
+  expect_equal(cell_pct(qc, ql$agg, "Communication", "Total"), 50)   # 10/20
+  expect_equal(cell_pct(qc, ql$agg, "Trust", "Total"), 50)           # 10/20
+  expect_equal(cell_pct(qs, ql$agg, "Communication", "Total"), 25)   # 5/20
+  expect_equal(cell_pct(qs, ql$agg, "Workload", "Total"), 75)        # 15/20
+})

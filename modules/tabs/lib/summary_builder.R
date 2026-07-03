@@ -483,8 +483,16 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
     }
   }
 
-  # Add remaining standard metrics that aren't part of any composite
-  source_question_codes <- names(source_map)
+  # Add remaining standard metrics that aren't part of any EMITTED composite.
+  # Source questions are only re-emitted under composites present in
+  # composite_metrics (the loops above) — a composite hidden from the summary
+  # (ExcludeFromSummary=Y, index_summary_show_composites=FALSE, or missing from
+  # composite_results) never appears there, so its source questions must fall
+  # through to the standard list or they silently vanish from Index_Summary.
+  emitted_composite_codes <- unique(as.character(composite_metrics$QuestionCode))
+  source_question_codes <- names(source_map)[vapply(source_map, function(comps) {
+    any(comps %in% emitted_composite_codes)
+  }, logical(1))]
   remaining_metrics <- standard_metrics[!standard_metrics$QuestionCode %in% source_question_codes, , drop = FALSE]
 
   if (nrow(remaining_metrics) > 0) {
