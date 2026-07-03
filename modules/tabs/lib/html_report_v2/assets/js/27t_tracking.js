@@ -201,7 +201,11 @@
     if (!segCell) return null;
     var value = metric.isMean ? segCell.mean : segCell.pct;
     if (value === null || value === undefined) return null;
-    return { value: value, base: model.columns[ci].base,
+    // Carry the column's Kish effective base (like the Total path above) so a
+    // weighted report's segment significance runs on n_eff, not the raw n.
+    var segCol = model.columns[ci];
+    return { value: value, base: segCol.base,
+      effBase: (segCol.baseEff != null && segCol.baseEff > 0) ? segCol.baseEff : segCol.base,
       x: segCell.n !== null && segCell.n !== undefined ? segCell.n : null };
   };
 

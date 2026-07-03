@@ -160,15 +160,19 @@
     return v !== null ? v : netFromMembers(q, ri, waveQ, seg);
   }
 
-  /** Index mean recomputed from a wave's published distribution. */
+  /** Index mean recomputed from a wave's published distribution. Requires
+   *  EVERY scored category to resolve in the prior wave (same all-or-nothing
+   *  rule as netFromMembers): a partial match would re-normalise over a
+   *  truncated distribution and fabricate a shifted mean. */
   function indexFromDistribution(q, waveQ, seg) {
     if (!q.index_scores) return null;
-    var sum = 0, weight = 0;
+    var sum = 0, weight = 0, missing = false;
     Object.keys(q.index_scores).forEach(function (label) {
       var v = rowValue(waveQ, label, seg);
-      if (v !== null) { sum += q.index_scores[label] * v; weight += v; }
+      if (v === null) { missing = true; return; }
+      sum += q.index_scores[label] * v; weight += v;
     });
-    return weight > 0 ? sum / weight : null;
+    return (!missing && weight > 0) ? sum / weight : null;
   }
 
   /* ---------- microdata recompute (per-respondent scores) ----------
@@ -204,6 +208,9 @@
     return Math.sqrt((v / wsum) * effN / (effN - 1));    // sample SD (effN df)
   }
   waves.sdFromScores = sdOfScores;
+  // exposed for the regression tests (audit_stats_tests.mjs)
+  waves._sigPair = sigPair;
+  waves._indexFromDistribution = indexFromDistribution;
 
   function meanValue(q, row, waveQ, seg) {
     if (!seg && waveQ.scores) return meanOfScores(waveQ.scores, waveQ.weights);  // microdata
@@ -272,12 +279,19 @@
     return (p.effBase != null && p.effBase > 0) ? p.effBase : p.base;
   }
 
-  /** (count, base) a proportion test runs on. Weighted (n_eff < base): the shown
-   *  % carried on the effective base (x = %·n_eff over n_eff), the weighted
-   *  z-test. Unweighted (n_eff === base): the exact integer count, byte-identical. */
+  /** (count, base) a proportion test runs on. Weighted report: the shown %
+   *  carried on the effective base (x = %·n_eff over n_eff) — the weighted
+   *  z-test form. Unweighted report: the exact integer count, byte-identical.
+   *  Weightedness is the PROJECT flag, never inferred from n_eff === base: a
+   *  constant (e.g. expansion) weight has n_eff exactly n while p.x is the
+   *  weighted frequency, and pairing that x with the unweighted base feeds the
+   *  test a proportion off by the weight factor. */
   function sigPair(p) {
     var eff = effBaseOfPoint(p);
-    if (eff === p.base && p.x !== null && p.x !== undefined) return { x: p.x, base: p.base };
+    var weighted = !!(TR.AGG && TR.AGG.project && TR.AGG.project.weighted);
+    if (!weighted && eff === p.base && p.x !== null && p.x !== undefined) {
+      return { x: p.x, base: p.base };
+    }
     return { x: p.value / 100 * eff, base: eff };
   }
 
@@ -372,7 +386,7 @@
     var z = TR.stats.meanZ(a.value, a.sd, ea, b.value, b.sd, eb);
     if (z === null) return 0;
     var az = Math.abs(z);
-    return az > TR.stats.Z95 ? 2 : az > TR.stats.Z80 ? 1 : 0;
+    return az > TR.stats.zPrimary(1) ? 2 : az > TR.stats.zSecondary(1) ? 1 : 0;
   }
   /** Strong (95%) Welch test — unchanged semantics for non-dual callers. */
   function meanSigBetween(a, b) { return meanLevel(a, b) === 2; }
@@ -402,7 +416,7 @@
     var z = TR.stats.propZ(pa.x, pa.base, pb.x, pb.base);
     if (z === null) return 0;
     var az = Math.abs(z);
-    return az > TR.stats.Z95 ? 2 : az > TR.stats.Z80 ? 1 : 0;
+    return az > TR.stats.zPrimary(1) ? 2 : az > TR.stats.zSecondary(1) ? 1 : 0;
   }
   /** Strong (95%) proportion test — unchanged semantics for non-dual callers. */
   function sigBetween(a, b) { return propLevel(a, b) === 2; }
@@ -413,6 +427,10 @@
    */
   waves.series = function (q, row, ri, seg) {
     var isMean = row.kind === "mean";
+    // An SD row's "history" would be each wave's MEAN (valueAt resolves
+    // mean-kind rows through stats.mean/index) — no published SD series
+    // exists, so the row is untracked rather than trended against the mean.
+    if (isMean && TR.model.isStdDevRow(row.label)) return [];
     var series = [];
     waves.history(q).forEach(function (h) {
       var value = waves.valueAt(q, row, ri, h.q, seg || null);
@@ -492,6 +510,7 @@
 
     viewModel.rows.forEach(function (row, ri) {
       var isMean = row.kind === "mean";
+      if (isMean && TR.model.isStdDevRow(row.label)) return;   // untracked (no SD history)
       var series = waves.series(q, row, ri, null);
       if (!series.length) return;
       row.waves = series;

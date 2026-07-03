@@ -84,7 +84,11 @@
       var tab = TR.stats.tabulate(q, col, mask)[0];
       return tab.wbase ? (tab.counts[ri] || 0) / tab.wbase * 100 : null;
     }
-    // No microdata: exact when unweighted (weighted count == unweighted base).
+    // No microdata: exact only when unweighted (published n are respondent
+    // counts). On a weighted report the published n is the WEIGHTED frequency
+    // while the bases are unweighted — the identity breaks, so no rest value
+    // (callers fall back to comparing against the overall figure).
+    if (TR.AGG && TR.AGG.project && TR.AGG.project.weighted) return null;
     var rb = totalBase - groupBase;
     if (!rb || groupCell.n == null || totalCell.n == null) return null;
     return (totalCell.n - groupCell.n) / rb * 100;
@@ -123,23 +127,39 @@
         if (v === null || v === undefined) return;
         if (!any) { lo = hi = v; any = true; } else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
       });
+    } else if (q.index_scores) {
+      // indexMeans fell back to q.index_scores, so the scale range must too —
+      // a collapsed 0..0 range inflates the finding's score ~10x and breaks
+      // the comparison bars (division by zero width).
+      Object.keys(q.index_scores).forEach(function (label) {
+        var v = q.index_scores[label];
+        if (v === null || v === undefined) return;
+        if (!any) { lo = hi = v; any = true; } else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      });
     }
     var scaleMin = Math.min(0, lo), scaleMax = Math.max(0, hi);
     var range = (scaleMax - scaleMin) || 1;
     var decimals = /nps/i.test(row.label) ? 0 : 1;
     var n = TR.MICRO.n;
+    // The disclosure k-gate blanks below-k columns in the crosstab; a recomputed
+    // mean must not resurrect them here (means[i].k is the Kish effective base,
+    // <= the raw count, so this gate is never looser than the crosstab's).
+    var kMin = (TR.disclosure && TR.disclosure.active && TR.disclosure.active())
+      ? TR.disclosure.minBase() : 1;
+    var floor = Math.max(threshold, kMin);
     spec.columns.forEach(function (col, i) {
-      if (i === 0 || means[i].mean === null || !means[i].k || means[i].k < threshold) return;
+      if (i === 0 || means[i].mean === null || !means[i].k || means[i].k < floor) return;
       var rest = new Uint8Array(n);
       for (var r = 0; r < n; r++) rest[r] = col.member[r] ? 0 : 1;
       var rm = TR.stats.indexMeans(q, [{ member: rest }], mask)[0];
-      if (!rm || rm.mean === null || !rm.k || rm.k < threshold) return;
+      if (!rm || rm.mean === null || !rm.k || rm.k < floor) return;
       var z = TR.stats.meanZ(means[i].mean, means[i].sd, means[i].k, rm.mean, rm.sd, rm.k);
       if (z === null) return;
       var az = Math.abs(z);
-      if (az <= TR.stats.Z80) return;             // not different from the rest at all
-      var soft = az <= TR.stats.Z95;              // 80% but not 95% — "nearly significant"
-      if (soft && !dual) return;                  // soft findings only when 95%+80% is on
+      var zHi = TR.stats.zPrimary(1), zLo = TR.stats.zSecondary(1);
+      if (az <= zLo) return;                      // not different from the rest at all
+      var soft = az <= zHi;                       // secondary but not primary — "nearly significant"
+      if (soft && !dual) return;                  // soft findings only when dual-sig is on
       var gap = means[i].mean - rm.mean;
       out.push({ code: q.code, title: q.title, category: q.category,
         label: row.label, column: col.label, isMean: true, kind: "mean", soft: soft,

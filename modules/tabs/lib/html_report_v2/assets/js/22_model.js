@@ -18,10 +18,14 @@
     return TR.AGG.project.low_base_threshold || 30;
   }
 
-  /** A standard-deviation summary row (reports spread, not the mean). */
+  /** A standard-deviation summary row (reports spread, not the mean).
+   *  Exported: the waves engine must NOT track these — a mean-kind row's wave
+   *  history resolves to each wave's MEAN, so pairing it with a current SD
+   *  fabricates a huge sig-flagged "decline". */
   function isStdDevRow(label) {
     return /^(std\.?\s*dev|standard deviation)/i.test(String(label || ""));
   }
+  model.isStdDevRow = isStdDevRow;
 
   /** Normalise a label/title for cross-wave matching (mirrors pipeline). */
   model.norm = function (text) {
@@ -74,7 +78,9 @@
       if (N > 1 && base != null) {
         entry.population = N;
         entry.coverage = TR.conf.coverage(base, N);
-        entry.ciBase = TR.conf.fpcBase(base, base, N);
+        // fpcBase's nEff argument is the Kish effective base on weighted designs
+        // (its own contract) — the sampling fraction still uses the raw count.
+        entry.ciBase = TR.conf.fpcBase(entry.baseEff != null ? entry.baseEff : base, base, N);
         entry.low = entry.ciBase < threshold;
       }
       return entry;
@@ -311,10 +317,12 @@
           });
           var sd = TR.waves.sdFromPairs(pairs);
           var col = viewModel.columns[ci];
-          var base = col ? col.base : null;
+          // Variance scales with the Kish effective base on weighted designs —
+          // the raw n would claim precision the design effect took away.
+          var base = col ? (col.baseEff != null ? col.baseEff : col.base) : null;
           // ciBase carries the finite-population-corrected effective base when a
           // universe is known (Infinity for a full census -> zero-width); else
-          // it is the plain base, so non-population reports are unchanged.
+          // it is the effective/plain base, so non-population reports are unchanged.
           var ciBase = (col && col.ciBase != null) ? col.ciBase : base;
           var bounds = sd === null ? null : TR.conf.meanCI(cell.mean, sd, ciBase);
           if (bounds) cell.ci = bounds;
@@ -334,8 +342,10 @@
         var weighted = !!(col.baseW > 0 && col.baseEff > 0);
         // Weighted: the shown % is weighted, so the proportion is weightedCount/weightedBase
         // and the interval width uses the Kish effective base (variance ~ 1/effN). Unweighted:
-        // exact counts, FPC-corrected width when a universe is known (ciBase).
-        var ciBase = weighted ? col.baseEff : ((col.ciBase != null) ? col.ciBase : base);
+        // exact counts. Either way, ciBase (when a universe is known) already carries the
+        // FPC-corrected effective base, so population reports narrow consistently here,
+        // in the mean branch, and in the base-row MOE.
+        var ciBase = (col.ciBase != null) ? col.ciBase : (weighted ? col.baseEff : base);
         var p = weighted
           ? (cell.n != null ? cell.n / col.baseW : cell.pct / 100)
           : (cell.n !== null && cell.n !== undefined ? cell.n / base : cell.pct / 100);
@@ -363,7 +373,10 @@
     var letters = viewModel.columns.map(function (c) { return c.letter; });
     var sizeAt = function (ci) {
       var c = viewModel.columns[ci];
-      return (c && c.ciBase != null) ? c.ciBase : (c ? c.base : null);
+      var b = (c && c.ciBase != null) ? c.ciBase : (c ? c.base : null);
+      // A full census (ciBase Infinity) has no sampling error to test; excluding
+      // it also keeps Infinity out of propZ/meanZ, which would NaN every pairing.
+      return b === Infinity ? null : b;
     };
     viewModel.rows.forEach(function (row) {
       if (row.diff) return;                       // differences carry no test
@@ -379,7 +392,8 @@
               pairs.push({ p: cc.pct, s: scores[ri] });
             }
           });
-          return { mean: cell.mean, sd: TR.waves.sdFromPairs(pairs), k: sizeAt(ci) };
+          var absent = cell.suppressed || cell.mean === null || cell.mean === undefined;
+          return { mean: cell.mean, sd: TR.waves.sdFromPairs(pairs), k: absent ? null : sizeAt(ci) };
         });
         var msig = TR.stats.sigLetters(cells, letters, threshold, true, dual);
         row.cells.forEach(function (cell, ci) {
@@ -389,8 +403,16 @@
       }
       var pcells = row.cells.map(function (cell, ci) {
         var base = sizeAt(ci);
-        var p = (cell.pct === null || cell.pct === undefined) ? null : cell.pct / 100;
-        return { x: p === null ? 0 : p * base, base: base };
+        // A missing or disclosure-suppressed cell is excluded from the test —
+        // treating it as 0% would letter visible columns against a phantom zero.
+        if (cell.suppressed || cell.pct === null || cell.pct === undefined || !base) {
+          return { x: null, base: null };
+        }
+        var col = viewModel.columns[ci];
+        // Prefer the exact published count over the rounded displayed % —
+        // reconstruction from cell.pct flips letters on borderline pairs.
+        var p = (cell.n != null && col && col.base) ? (cell.n / col.base) : (cell.pct / 100);
+        return { x: p * base, base: base };
       });
       var psig = TR.stats.sigLetters(pcells, letters, threshold, false, dual);
       row.cells.forEach(function (cell, ci) {
@@ -399,13 +421,15 @@
     });
   }
 
-  /** Arrow for a z-score vs the rest: ▲/▼ at 95%, hollow ▵/▿ at 80% (dual). */
+  /** Arrow for a z-score vs the rest, at the project's configured primary /
+   *  secondary levels (single planned test per column — no Bonferroni). */
   function compositeArrow(z, dual) {
     if (z === null) return "";
-    if (z > TR.stats.Z95) return "▲";
-    if (z < -TR.stats.Z95) return "▼";
-    if (dual && z > TR.stats.Z80) return "▵";
-    if (dual && z < -TR.stats.Z80) return "▿";
+    var zHi = TR.stats.zPrimary(1), zLo = TR.stats.zSecondary(1);
+    if (z > zHi) return "▲";
+    if (z < -zHi) return "▼";
+    if (dual && z > zLo) return "▵";
+    if (dual && z < -zLo) return "▿";
     return "";
   }
 
@@ -466,6 +490,9 @@
       row.cells.forEach(function (cell, ci) {
         cell.sig = "";                       // clears any (empty) pairwise letters
         if (ci === 0 || skip) return;
+        // Disclosure suppression (which ran first) blanked this cell — an arrow
+        // on a blank would resurrect exactly what was withheld.
+        if (cell.suppressed || (viewModel.columns[ci] && viewModel.columns[ci].suppressed)) return;
         var z = null;
         if (isMean) {
           if (!colMeans || !restMeans) return;

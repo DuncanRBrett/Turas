@@ -13,11 +13,66 @@
 
   var stats = TR.stats = {};
 
-  var Z_CRITICAL = 1.96;        // alpha = 0.05, two-sided
-  var Z_80 = 1.2816;            // alpha = 0.20, two-sided (dual-sig option)
   var ANSWERED_UNSHOWN = -2;    // answered, category not displayed
-  stats.Z95 = Z_CRITICAL;
-  stats.Z80 = Z_80;
+
+  /** Inverse standard-normal CDF (Acklam's rational approximation, |ε|<1.2e-9). */
+  function qnorm(p) {
+    if (!(p > 0 && p < 1)) return NaN;
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+      1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+      6.680131188771972e+01, -1.328068155288572e+01];
+    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+      -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+      3.754408661907416e+00];
+    var pl = 0.02425, q, r;
+    if (p < pl) {
+      q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+    if (p <= 1 - pl) {
+      q = p - 0.5; r = q * q;
+      return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+        (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+    }
+    q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+
+  /** Two-sided critical z for a significance level (zCrit(0.05) ≈ 1.96). */
+  stats.zCrit = function (alpha) { return -qnorm(alpha / 2); };
+
+  /** The project's configured primary / secondary (dual-sig) levels, with the
+   *  conventional 0.05 / 0.20 defaults — the same defaults the R engine uses,
+   *  so a report with no explicit config behaves exactly as before. */
+  function projAlpha() {
+    var p = TR.AGG && TR.AGG.project;
+    var a = p && Number(p.alpha);
+    return (a > 0 && a < 1) ? a : 0.05;
+  }
+  function projAlpha2() {
+    var p = TR.AGG && TR.AGG.project;
+    var a = p && Number(p.alpha_secondary);
+    var lo = projAlpha();
+    return (a > lo && a < 1) ? a : 0.20;
+  }
+  /** Bonferroni is the R engine's default; only an explicit false disables it. */
+  stats.bonferroni = function () {
+    var p = TR.AGG && TR.AGG.project;
+    return !(p && p.bonferroni === false);
+  };
+  /** Critical z at the project's primary / secondary level over m comparisons
+   *  (Bonferroni divisor — pass 1, or omit, for a single planned test). With
+   *  the default config these reduce to the familiar 1.96 / 1.2816. */
+  stats.zPrimary = function (m) { return stats.zCrit(projAlpha() / (m > 1 ? m : 1)); };
+  stats.zSecondary = function (m) { return stats.zCrit(projAlpha2() / (m > 1 ? m : 1)); };
+  // Fixed conventional constants — for 95% intervals and scale normalisation,
+  // NOT for significance tests (those honour the configured alpha above).
+  stats.Z95 = 1.96;
+  stats.Z80 = 1.2816;
 
   /**
    * Per-respondent weight. Absent TR.MICRO.weights (e.g. unweighted projects
@@ -145,6 +200,12 @@
       var code = bits[1];
       var mode = bits[2] || "cat";
       var q = TR.d2.questionByCode(code);
+      // A saved custom banner (localStorage / shared #hash) can outlive its
+      // question across a regen — show Total only rather than crashing, the
+      // same missing-spec behaviour the composite branch has above.
+      if (!q) {
+        return { columns: columns, custom: true, missing: true };
+      }
       var answers = TR.MICRO.answers[code];
       var letterAt = 0;
       var defs = [];
@@ -281,13 +342,21 @@
    */
   stats.boxCounts = function (qcode, boxRi, columns, mask) {
     var boxes = TR.MICRO.boxes[qcode];
+    var answers = TR.MICRO.answers && TR.MICRO.answers[qcode];
     return columns.map(function (col) {
       var hit = 0, base = 0, wbase = 0, sumW2 = 0;
       for (var r = 0; r < mask.length; r++) {
         if (!mask[r]) continue;
         if (col.member && !col.member[r]) continue;
         var b = boxes[r];
-        if (b === null || b === undefined) continue;
+        // The denominator is the FULL answered base — the published convention,
+        // and the one restPct / the composite vs-the-rest test already use: an
+        // answer that belongs to no box (e.g. Neutral under partial BoxCategory
+        // coverage) still counts in the base, just never in the numerator. Box
+        // presence stands in for "answered" only when the scale is hidden and
+        // boxes are all the microdata carries.
+        var a = answers ? answers[r] : undefined;
+        if ((b === null || b === undefined) && (a === null || a === undefined)) continue;
         var w = weightAt(r);
         base++; wbase += w; sumW2 += w * w;
         if (b === boxRi) hit += w;
@@ -378,7 +447,7 @@
 
   stats.propHigher = function (x1, n1, x2, n2) {
     var z = stats.propZ(x1, n1, x2, n2);
-    return z !== null && z > Z_CRITICAL;
+    return z !== null && z > stats.zPrimary(1);
   };
 
   /** Welch t statistic of mean1 vs mean2, or null when undefined. */
@@ -392,7 +461,7 @@
   /** Welch t-test; true when mean1 is significantly higher. */
   stats.meanHigher = function (m1, sd1, n1, m2, sd2, n2) {
     var z = stats.meanZ(m1, sd1, n1, m2, sd2, n2);
-    return z !== null && z > Z_CRITICAL;
+    return z !== null && z > stats.zPrimary(1);
   };
 
   /**
@@ -407,6 +476,13 @@
    */
   stats.sigLetters = function (cells, letters, lowBaseThreshold, isMean, dual) {
     var sizeOf = function (cell) { return isMean ? cell.k : cell.base; };
+    // Bonferroni divisor mirrors R (run_crosstabs.R run_significance_tests_for_row):
+    // choose(k, 2) over ALL the group's non-Total columns — low-base columns still
+    // count in the divisor even though their own tests are skipped.
+    var k = cells.length - 1;
+    var m = stats.bonferroni() ? k * (k - 1) / 2 : 1;
+    var zHi = stats.zPrimary(m);
+    var zLo = stats.zSecondary(m);
     return cells.map(function (cell, i) {
       if (i === 0) return "";
       var out = "";
@@ -419,8 +495,8 @@
           ? stats.meanZ(cell.mean, cell.sd, cell.k, other.mean, other.sd, other.k)
           : stats.propZ(cell.x, cell.base, other.x, other.base);
         if (z === null) continue;
-        if (z > Z_CRITICAL) out += letters[j] || "";
-        else if (dual && z > Z_80) out += (letters[j] || "").toLowerCase();
+        if (z > zHi) out += letters[j] || "";
+        else if (dual && z > zLo) out += (letters[j] || "").toLowerCase();
       }
       return out;
     });
