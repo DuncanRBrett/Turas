@@ -119,7 +119,21 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   name <- if (!blank(config_obj$project_title)) config_obj$project_title
           else if (!blank(config_obj$project_name)) config_obj$project_name
           else "Turas Report"
-  alpha <- as.numeric(config_obj$alpha %||% 0.05)
+  # [[ ]] access: $alpha would PARTIAL-MATCH alpha_secondary/alpha_default when
+  # a config lacks alpha, silently testing at the wrong level.
+  alpha <- suppressWarnings(as.numeric(config_obj[["alpha"]] %||% 0.05))
+  if (length(alpha) != 1L || is.na(alpha) || alpha <= 0 || alpha >= 1) alpha <- 0.05
+  # The secondary (dual-sig) level and the Bonferroni flag travel with the report
+  # so the in-browser recompute engine tests at the SAME levels as the published
+  # letters (the config loader can hand us "NA" strings — treat those as absent).
+  alpha2 <- suppressWarnings(as.numeric(config_obj[["alpha_secondary"]]))
+  if (length(alpha2) != 1L || is.na(alpha2) || alpha2 <= alpha || alpha2 >= 1) alpha2 <- 0.20
+  bon_raw <- config_obj$bonferroni_correction
+  bonferroni <- if (is.logical(bon_raw)) {
+    isTRUE(bon_raw)
+  } else {
+    !(toupper(trimws(as.character(bon_raw %||% "TRUE"))) %in% c("FALSE", "F", "N", "NO", "0"))
+  }
   sm <- as.character(config_obj$sampling_method %||% "Not_Specified")
   proj <- list(
     name               = as.character(name),
@@ -129,6 +143,8 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     accent_colour      = as.character(config_obj$accent_colour %||% "#CC9900"),
     low_base_threshold = as.numeric(config_obj$significance_min_base %||% 30),
     alpha              = alpha,
+    alpha_secondary    = alpha2,
+    bonferroni         = bonferroni,
     sampling_method    = sm,
     sig_note           = build_sig_note(alpha, sm),
     tracking           = list(enabled = isTRUE(tracking_enabled), default_scope = "all")
@@ -502,19 +518,34 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
                   "Unweighted Base", "Weighted Base", "Effective Base")
   mean_types <- c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare")
 
-  # Numeric values for (label, RowType) across every column, NA where absent
-  vals_for <- function(lbl, rtype) {
+  # Rows are keyed by (RowLabel, RowSource) — NOT label alone — so a
+  # BoxCategory NET sharing its label with a displayed option (e.g. box
+  # "Satisfied" grouping options that include "Satisfied") keeps BOTH rows.
+  # Unique labels collapsed the pair and silently dropped the NET row from the
+  # v2 report. Tables without RowSource have one "" source per label, so their
+  # iteration order and output are unchanged.
+  row_src <- if ("RowSource" %in% names(table)) {
+    s <- trimws(as.character(table$RowSource))
+    ifelse(is.na(s), "", s)
+  } else {
+    rep("", nrow(table))
+  }
+
+  # Numeric values for (label, source, RowType) across every column, NA where absent
+  vals_for <- function(lbl, src, rtype) {
     sel <- table[!is.na(table$RowLabel) & !is.na(table$RowType) &
-                 table$RowLabel == lbl & table$RowType == rtype, , drop = FALSE]
+                 table$RowLabel == lbl & row_src == src &
+                 table$RowType == rtype, , drop = FALSE]
     vapply(keys, function(k) {
       if (nrow(sel) > 0 && k %in% names(table)) {
         suppressWarnings(as.numeric(sel[1, k]))
       } else NA_real_
     }, numeric(1), USE.NAMES = FALSE)
   }
-  sig_for <- function(lbl) {
+  sig_for <- function(lbl, src) {
     sel <- table[!is.na(table$RowLabel) & !is.na(table$RowType) &
-                 table$RowLabel == lbl & table$RowType == "Sig.", , drop = FALSE]
+                 table$RowLabel == lbl & row_src == src &
+                 table$RowType == "Sig.", , drop = FALSE]
     vapply(keys, function(k) {
       if (nrow(sel) > 0 && k %in% names(table)) {
         v <- as.character(sel[1, k])
@@ -525,16 +556,33 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   null_vec  <- function() as.list(rep(NA_real_, length(keys)))  # serialises to [null,...]
   empty_sig <- function() as.list(rep("", length(keys)))
 
-  ord_labels <- unique(table$RowLabel[!is.na(table$RowLabel) & nzchar(table$RowLabel)])
+  # RowSource -> row class, mirroring classify_row_labels' primary branch; NA
+  # when the source is blank/unknown (fall back to the per-label classifier,
+  # whose first-source-wins answer is only ambiguous for label collisions).
+  src_class <- function(src) {
+    if (!nzchar(src)) return(NA_character_)
+    if (src %in% c("individual", "ranking")) return("category")
+    if (src %in% c("boxcategory", "net_positive")) return("net")
+    if (src %in% c("summary", "chi_square", "composite", "ranking_mean")) return("mean")
+    NA_character_
+  }
+
+  keep_rows <- !is.na(table$RowLabel) & nzchar(table$RowLabel)
+  pair_ids  <- paste(table$RowLabel, row_src, sep = "\r")
+  ord_idx   <- which(keep_rows & !duplicated(pair_ids))
 
   rows <- list()
   metric_type <- NA_character_   # the headline summary-stat kind, if any
-  for (lbl in ord_labels) {
-    lbl_types <- unique(table$RowType[!is.na(table$RowLabel) & table$RowLabel == lbl])
+  for (ri in ord_idx) {
+    lbl <- table$RowLabel[ri]
+    src <- row_src[ri]
+    lbl_types <- unique(table$RowType[!is.na(table$RowLabel) &
+                                      table$RowLabel == lbl & row_src == src])
     # Base rows are carried by bases[] — skip them here
     if (length(lbl_types) > 0 && all(lbl_types %in% base_types)) next
 
-    cl <- cls[[lbl]]
+    cl <- src_class(src)
+    if (is.na(cl)) cl <- cls[[lbl]]
     if (is.null(cl) || is.na(cl)) cl <- "category"
 
     if (cl == "mean") {
@@ -545,13 +593,13 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       }
       rows[[length(rows) + 1]] <- list(
         kind = "mean", label = lbl,
-        pct = as.list(vals_for(lbl, mrt[1])), n = null_vec(), sig = empty_sig())
+        pct = as.list(vals_for(lbl, src, mrt[1])), n = null_vec(), sig = empty_sig())
     } else {
-      pr <- vals_for(lbl, primary_stat)
+      pr <- vals_for(lbl, src, primary_stat)
       if (all(is.na(pr))) {
         for (fb in c("Column %", "Row %", "Frequency")) {
           if (fb == primary_stat) next
-          alt <- vals_for(lbl, fb)
+          alt <- vals_for(lbl, src, fb)
           if (!all(is.na(alt))) { pr <- alt; break }
         }
       }
@@ -565,8 +613,8 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       rows[[length(rows) + 1]] <- list(
         kind = kind, label = lbl,
         pct = as.list(pr),
-        n   = if (is_net_diff) null_vec() else as.list(vals_for(lbl, "Frequency")),
-        sig = if (stats$has_sig) as.list(sig_for(lbl)) else empty_sig())
+        n   = if (is_net_diff) null_vec() else as.list(vals_for(lbl, src, "Frequency")),
+        sig = if (stats$has_sig) as.list(sig_for(lbl, src)) else empty_sig())
     }
   }
 
@@ -825,10 +873,14 @@ build_data_layer <- function(all_results, banner_info, config_obj,
     if (!is.null(q)) questions[[length(questions) + 1]] <- q
   }
 
+  columns <- .validate_column_populations(
+    build_dl_columns(banner_info, config_obj), questions
+  )
+
   dl <- list(
     schema_version = 2L,
     project        = project,
-    columns        = build_dl_columns(banner_info, config_obj),
+    columns        = columns,
     banner_groups  = build_dl_banner_groups(banner_info),
     categories     = build_dl_categories(all_results),
     questions      = questions
@@ -842,6 +894,49 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   # passed in). Omitted entirely when AI insights are off or nothing surfaced.
   if (!is.null(ai)) dl$ai <- ai
   dl
+}
+
+
+#' Drop any column population smaller than the column's achieved base
+#'
+#' A configured universe N below the responding n is impossible (you cannot
+#' interview more people than exist) and, carried through, renders zero-width
+#' intervals, a clamped "100% of N" coverage note beside a visibly larger
+#' base, and broken significance letters. The population is dropped for that
+#' column (standard intervals apply) and the problem is reported loudly on
+#' the console — Turas runs under Shiny, so silence would hide it.
+#'
+#' @param columns Column list from build_dl_columns()
+#' @param questions Question list from build_dl_question() (bases per column)
+#' @return The column list, with impossible populations removed
+#' @keywords internal
+.validate_column_populations <- function(columns, questions) {
+  if (!length(columns) || !length(questions)) return(columns)
+  for (i in seq_along(columns)) {
+    pop <- columns[[i]]$population
+    if (is.null(pop)) next
+    achieved <- 0
+    for (q in questions) {
+      bn <- tryCatch(q$bases[[i]]$n, error = function(e) NULL)
+      if (!is.null(bn) && length(bn) == 1L && is.finite(bn) && bn > achieved) {
+        achieved <- bn
+      }
+    }
+    if (achieved > pop) {
+      cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+      cat("│ Code: CFG_POPULATION_BELOW_BASE\n")
+      cat(sprintf("│ Column: %s\n", columns[[i]]$label))
+      cat(sprintf(
+        "│ Configured population N = %s is SMALLER than the achieved\n│ base n = %s — impossible, so the finite population\n",
+        format(pop, big.mark = ","), format(achieved, big.mark = ",")
+      ))
+      cat("│ correction is DISABLED for this column (standard intervals).\n")
+      cat("│ Fix population_size / the Population sheet and re-run.\n")
+      cat("└───────────────────────────────────────────────────────┘\n\n")
+      columns[[i]]$population <- NULL
+    }
+  }
+  columns
 }
 
 

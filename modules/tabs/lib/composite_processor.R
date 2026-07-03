@@ -652,13 +652,31 @@ test_composite_significance <- function(data, composite_code, source_questions,
   # banner_info$sig_letters does not exist; use banner_info$letters.
   key_to_letter <- setNames(banner_info$letters, internal_keys)
 
-  # Test each pair (skip if fewer than 2 keys)
+  # Pairwise tests are only valid WITHIN a banner group: column letters restart
+  # per group (A, B, C… in each), so a cross-group letter is ambiguous, and the
+  # Total column overlaps every other column (never a disjoint comparison).
+  # The Bonferroni divisor is per group, mirroring the regular category rows.
+  key_banner <- vapply(
+    strsplit(internal_keys, "::", fixed = TRUE),
+    function(parts) parts[1],
+    character(1)
+  )
+  names(key_banner) <- internal_keys
+  group_sizes <- table(key_banner[key_banner != "TOTAL"])
+
+  # Test each within-group pair (skip if fewer than 2 keys)
   n_keys <- length(internal_keys)
   for (i in seq_len(max(0L, n_keys - 1L))) {
     key_a <- internal_keys[i]
 
     for (j in (i + 1L):n_keys) {
       key_b <- internal_keys[j]
+
+      # Same banner group only; Total is never a test column
+      group_a <- key_banner[[key_a]]
+      if (group_a == "TOTAL" || !identical(group_a, key_banner[[key_b]])) {
+        next
+      }
 
       # Get subsets - handle NULL subsets like main calculation does
       idx_a <- banner_info$subsets[[key_a]]
@@ -730,9 +748,11 @@ test_composite_significance <- function(data, composite_code, source_questions,
       bonf_corr <- !is.null(config$bonferroni_correction) && config$bonferroni_correction
       min_base <- if (!is.null(config$significance_min_base)) config$significance_min_base else 30
 
-      # Apply Bonferroni correction if enabled
+      # Apply Bonferroni correction if enabled — divided by this banner GROUP's
+      # comparison count, the same divisor the regular category rows use, so a
+      # composite row and the rows above it letter at the same adjusted alpha
       test_alpha <- if (bonf_corr) {
-        alpha / choose(length(internal_keys), 2)
+        alpha / choose(as.integer(group_sizes[[group_a]]), 2)
       } else {
         alpha
       }

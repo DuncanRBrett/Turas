@@ -132,9 +132,46 @@ process_standard_question <- function(data, question_info, question_options,
     }
   }
   
+  # Unmatched-value diagnostic: every answered value must match a configured
+  # option. safe_equal's exact (trimmed) matching silently zero-counts anything
+  # else — e.g. "I re-registered" in the data vs "I reregistered" in the
+  # structure left 61% of a question's answers out of every row while the base
+  # still counted them. Those respondents disappear from the percentages with
+  # no visible failure, so this must be loud (console-visible under Shiny).
+  check_cols <- if (is_multi_mention) existing_cols else question_col
+  answered <- unlist(
+    lapply(check_cols, function(cc) trimws(as.character(data[[cc]]))),
+    use.names = FALSE
+  )
+  answered <- answered[!is.na(answered) & nzchar(answered)]
+  known_options <- trimws(as.character(question_options$OptionText))
+  unmatched <- answered[!(answered %in% known_options)]
+  if (length(unmatched) > 0) {
+    unmatched_freq <- sort(table(unmatched), decreasing = TRUE)
+    shown_values <- utils::head(unmatched_freq, 10)
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: DATA_UNMATCHED_OPTION_VALUES\n")
+    cat("│ Question:", question_col, "\n")
+    cat(sprintf(
+      "│ %d answer(s) (%.1f%% of answered) match NO configured option:\n",
+      length(unmatched), 100 * length(unmatched) / length(answered)
+    ))
+    for (v in names(shown_values)) {
+      cat(sprintf("│   %d x \"%s\"\n", shown_values[[v]], v))
+    }
+    if (length(unmatched_freq) > length(shown_values)) {
+      cat("│   ... and", length(unmatched_freq) - length(shown_values),
+          "more distinct value(s)\n")
+    }
+    cat("│ These respondents stay in the base but count in NO row, so\n")
+    cat("│ every percentage for this question is understated. Fix the\n")
+    cat("│ OptionText spelling in Survey_Structure (or the data) and re-run.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  }
+
   # Process each option
   results_list <- list()
-  
+
   for (option_idx in seq_len(nrow(display_options))) {
     current_option <- display_options[option_idx, ]
     option_text <- current_option$OptionText

@@ -168,11 +168,14 @@ create_percentage_row <- function(row_counts, banner_bases, internal_keys,
       base_info$unweighted
     }
     
-    # Calculate and format percentage
-    percentage <- calculate_weighted_percentage(row_counts[key], weighted_base)
+    # Calculate at the configured precision — calculate_weighted_percentage's
+    # 0-dp default would pre-round to a whole number before format_output_value
+    # rounds again, so configured decimals could never appear
+    percentage <- calculate_weighted_percentage(row_counts[key], weighted_base,
+                                                decimal_places = decimal_places)
     row[[key]] <- format_output_value(
-      percentage, 
-      "percent", 
+      percentage,
+      "percent",
       decimal_places_percent = decimal_places
     )
   }
@@ -243,7 +246,9 @@ create_row_percentage_row <- function(row_counts, banner_info, internal_keys,
           format_output_value(0, "percent", decimal_places_percent = decimal_places)
         }
       } else {
-        percentage <- calculate_weighted_percentage(row_counts[key], banner_total)
+        # Configured precision here too — see the column-percent note above
+        percentage <- calculate_weighted_percentage(row_counts[key], banner_total,
+                                                    decimal_places = decimal_places)
         row[[key]] <- format_output_value(
           percentage,
           "percent",

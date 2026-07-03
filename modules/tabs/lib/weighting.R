@@ -1326,20 +1326,12 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
   if (is.null(test_data) || length(test_data) < 2) return(NULL)
   if (is.null(banner_info) || is.null(internal_keys)) return(NULL)
 
-  # Calculate number of comparisons for Bonferroni
-  num_comparisons <- choose(length(test_data), 2)
-  if (num_comparisons == 0) return(NULL)
-
-  alpha_adj <- alpha
-  if (bonferroni_correction && num_comparisons > 0) {
-    alpha_adj <- alpha / num_comparisons
-  }
-
-  # Dual-alpha: secondary threshold, same Bonferroni divisor (V10.10).
+  # Dual-alpha toggle (V10.10). The Bonferroni thresholds are computed PER
+  # BANNER GROUP inside the loop below: tests only ever run within a group, and
+  # the regular category rows divide by the group's own choose(k, 2) — a global
+  # divisor would letter the NET row at a stricter alpha than the category rows
+  # directly above it in the same table.
   dual <- !is.null(alpha2)
-  alpha2_adj <- if (dual) {
-    if (bonferroni_correction && num_comparisons > 0) alpha2 / num_comparisons else alpha2
-  } else NULL
 
   # Initialize results for both nets (primary; secondary only when dual)
   net1_sig  <- setNames(rep("", length(internal_keys)), internal_keys)
@@ -1359,6 +1351,17 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
   for (banner_code in names(banner_info$banner_info)) {
     banner_cols   <- banner_info$banner_info[[banner_code]]$internal_keys
     banner_letters <- banner_info$banner_info[[banner_code]]$letters
+
+    # Per-group Bonferroni divisor (mirrors run_significance_tests_for_row)
+    cols_with_data <- sum(vapply(banner_cols,
+                                 function(k) !is.null(test_data[[k]]),
+                                 logical(1)))
+    num_comparisons <- choose(cols_with_data, 2)
+    if (num_comparisons == 0) next
+    alpha_adj <- if (bonferroni_correction) alpha / num_comparisons else alpha
+    alpha2_adj <- if (dual) {
+      if (bonferroni_correction) alpha2 / num_comparisons else alpha2
+    } else NULL
 
     # Test each column against others in same banner
     for (i in seq_along(banner_cols)) {
