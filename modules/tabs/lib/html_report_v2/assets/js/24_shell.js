@@ -70,6 +70,7 @@
     if (!d2.questionByCode(d2.state.activeQ)) {
       d2.state.activeQ = agg.questions[0].code;
     }
+    d2.state.tab = shell.landingTab(location.hash, d2.state.tab);
     document.title = agg.project.name + " — Turas Report v2";
     applyTheme();
     document.getElementById("app").innerHTML = frameHtml();
@@ -77,6 +78,17 @@
     shell.route();
     wireTopLevel();
     if (wantSelftest && TR.selftest2) TR.selftest2.run();
+  };
+
+  /**
+   * D1 landing: a deep link naming a tab (#tab=…) ALWAYS wins; otherwise a
+   * saved/shared copy with cover content opens on the exec-summary cover;
+   * otherwise today's default landing stands (analyst-fresh unchanged).
+   */
+  shell.landingTab = function (hash, current) {
+    if (/(^#|[&#])tab=/.test(hash || "")) return current;
+    return (TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable())
+      ? "cover" : current;
   };
 
   function parseIsland(id) {
@@ -132,6 +144,13 @@
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + subBits.join(" &middot; ") + "</div></div></div>" +
       '<div class="hdr-meta">' + clientLogo +
+      // D1: the cover is the saved-copy landing page, not a READ tab — this
+      // small header link is the only way back to it, and only exists when a
+      // cover exists (saved copy + story content)
+      (TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable()
+        ? '<button class="hdr-legend hdr-cover" data-cover-open ' +
+          'title="Back to the report cover — executive summary and leading findings">' +
+          "Cover</button>" : "") +
       '<button class="hdr-legend" data-legend-open aria-haspopup="dialog" ' +
       'title="How to read this report — significance letters, arrows, bands, precision">' +
       "ⓘ How to read</button>" +
@@ -151,11 +170,18 @@
   /** Route current state.tab into the tab host. */
   shell.route = function () {
     var d2 = TR.d2, host = document.getElementById("tabhost");
+    // a cover deep link on a report without cover content (analyst-fresh, or
+    // the story was cleared) lands on the dashboard, never a blank page
+    if (d2.state.tab === "cover" &&
+        !(TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable())) {
+      d2.state.tab = "dashboard";
+    }
     document.querySelectorAll(".tabbtn").forEach(function (btn) {
       btn.setAttribute("aria-selected",
         String(btn.getAttribute("data-tab") === d2.state.tab));
     });
-    if (d2.state.tab === "takeout") TR.takeout.render(host);
+    if (d2.state.tab === "cover") TR.reader.renderCover(host);
+    else if (d2.state.tab === "takeout") TR.takeout.render(host);
     else if (d2.state.tab === "crosstabs") TR.cards2.renderTab(host);
     else if (d2.state.tab === "dashboard") TR.views.dashboard(host);
     else if (d2.state.tab === "moved") TR.views.whatMoved(host);
@@ -165,9 +191,11 @@
     else TR.report.renderTab(host);
     // The audience filter recomputes from this wave's microdata; prior waves
     // are pre-aggregated, so a filter can't apply on Tracking. The Executive
-    // Takeout summarises the published view, so it hides the bar too.
+    // Takeout summarises the published view, so it hides the bar too. The
+    // cover is a landing page, not an analysis surface — no filter bar.
     var fb = document.getElementById("filterbar");
-    if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout";
+    if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout" ||
+      d2.state.tab === "cover";
     if (TR.reader) TR.reader.renderStrip();
     d2.pushHash();
   };
@@ -210,6 +238,9 @@
     });
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-savecopy]")) TR.report.saveCopy();
+    });
+    document.addEventListener("click", function (e) {
+      if (e.target.closest("[data-cover-open]")) shell.goTab("cover");
     });
     // One "How to read this" panel for the whole report — every ⓘ trigger
     // (header, collapsed PE box, crosstabs footer) opens the same dialog.

@@ -88,6 +88,14 @@
 
   report.data = function () { return store(); };
 
+  /** Effective text of a narrative section — the analyst's typed text when
+   *  the key exists (even ""), else the config default. The cover (24a)
+   *  reads the same value the Report tab shows. */
+  report.sectionText = function (sec) {
+    var s = store();
+    return sec in s.sections ? s.sections[sec] : sectionDefault(sec);
+  };
+
   /* Defaults imported from the config (project.report_meta) — shown until the
    * analyst types their own. A field set in localStorage (even to "") wins, so
    * the analyst can always override; an untouched field falls back here. */

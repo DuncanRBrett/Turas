@@ -94,8 +94,15 @@
   story2.pinCurrent = function (flags) {
     var s = TR.d2.state;
     var chartState = TR.cards2.chartState();
+    // D2: the default pin title is the insight line (headline > analyst-insight
+    // first sentence — reader.insightTitle, the bundle-B chain). "" keeps each
+    // surface's existing default (story head = title, PPTX = short_label/title);
+    // older pins carry no title field and render unchanged.
+    var ins = (TR.reader && TR.reader.insightTitle)
+      ? TR.reader.insightTitle(TR.d2.questionByCode(s.activeQ), s.banner) : null;
     load().push({
       kind: "question",
+      title: ins ? ins.text : "",
       q: s.activeQ,
       banner: s.banner,
       filters: JSON.parse(JSON.stringify(s.filters)),
@@ -329,6 +336,55 @@
     }) };
   }
 
+  /**
+   * Display title for any pin — the stored title first (D2 question pins,
+   * snapshots, titled tracking exhibits), else the reader insight chain
+   * (headline > analyst-insight first sentence), else the item kind's
+   * existing default. Read-only: old pins are never migrated.
+   */
+  story2.pinTitle = function (item) {
+    if (item.title) return item.title;
+    if (item.kind === "question") {
+      var q = TR.d2.questionByCode(item.q);
+      var ins = (TR.reader && TR.reader.insightTitle)
+        ? TR.reader.insightTitle(q, item.banner) : null;
+      if (ins) return ins.text;
+      return q ? (TR.d2.shortLabel ? TR.d2.shortLabel(q) : q.title) : item.q;
+    }
+    if (item.kind === "exhibit") {
+      return TR.exhibit.titleFor(item, TR.exhibit.models(item));
+    }
+    if (item.kind === "heatmap") return "Index heatmap";
+    if (item.kind === "composite") return "Composite — " + item.category;
+    return item.kind === "divider" ? (item.title || "Section") : "Pinned card";
+  };
+
+  /** Evidence-only body of an item (no head/controls/commentary) — the cover
+   *  (24a) renders findings through the SAME renderers as the story tab, so
+   *  each pin's disclosure gates travel with it. "" when nothing resolves. */
+  story2.itemBodyHtml = function (item) {
+    if (item.kind === "divider") return "";
+    if (item.kind === "exhibit") return TR.exhibit.panelsHtml(item);
+    if (item.kind === "snapshot") {
+      return '<div class="snap-body">' + (item.html || "") + "</div>";
+    }
+    if (item.kind === "heatmap" || item.kind === "composite") {
+      var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
+      return matrix ? '<div class="si-table">' + matrixTable(matrix) + "</div>" : "";
+    }
+    var model = modelFor(item);
+    if (!model) return "";
+    var flags = item.flags || { chart: false, table: true };
+    if (flags.chart) {
+      return '<div class="chart si-chart">' +
+        TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
+        "</div>";
+    }
+    return '<div class="si-table">' + TR.render.tableHtml(model,
+      { heatmap: true, showDeltas: TR.d2.tracking().enabled,
+        intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>";
+  };
+
   function contextLine(item, model) {
     var bits = [];
     if (item.kind === "question") {
@@ -447,9 +503,10 @@
     var model = modelFor(item);
     if (!model) return "";
     var flags = item.flags || { chart: false, table: true, insight: true };
+    // D2: a stored insight title leads; a title-less (older) pin is unchanged
     return '<div class="card story-item" data-i="' + i + '">' +
       '<div class="si-head"><span class="qcode">' + (i + 1) + ". " + model.code +
-      "</span> <strong>" + fmt.escapeHtml(TR.charts.clip(model.title, 90)) + "</strong>" +
+      "</span> <strong>" + fmt.escapeHtml(TR.charts.clip(item.title || model.title, 90)) + "</strong>" +
       '<span class="si-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</span>" +
       buttons + "</div>" +
       (flags.chart ? '<div class="chart si-chart">' +
@@ -462,6 +519,8 @@
         fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner) || "") +
         "</textarea>" : "") + "</div>";
   }
+
+  story2._itemHtml = itemHtml;   // exposed for the node gate
 
   function matrixTable(matrix) {
     return '<table class="ct"><thead><tr>' + matrix.head.map(function (h, i) {
@@ -503,7 +562,8 @@
           chartSvg: flags.chart
             ? TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0])
             : null,
-          includeTable: flags.table !== false
+          includeTable: flags.table !== false,
+          title: item.title || null   // D2: PNG title = pin title
         });
       } else if (e.target.closest("[data-open]")) {
         var openItem = load()[i];
@@ -575,7 +635,8 @@
           { chart: flags.chart, table: flags.table, insight: flags.insight,
             chartType: item.chartType || "bar",
             chartCols: item.chartCols || [0],
-            intervals: !!item.intervals }));
+            intervals: !!item.intervals,
+            title: item.title || null }));   // D2: slide title = pin title
       }
     });
     return slides;
@@ -625,7 +686,8 @@
       ? TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) : null;
     return TR.exporter.cardSvg(model,
       item.note || TR.insights.get(item.q, item.banner) || "",
-      { chartSvg: chart, includeTable: flags.table !== false });
+      { chartSvg: chart, includeTable: flags.table !== false,
+        title: item.title || null });   // D2: card title = pin title
   }
 
   function topAction(action) {
@@ -721,7 +783,7 @@
     } else {
       var model = modelFor(item);
       var flags = item.flags || { table: true, insight: true };
-      body = "<h1>" + fmt.escapeHtml(model.code + " — " + model.title) + "</h1>" +
+      body = "<h1>" + fmt.escapeHtml(model.code + " — " + (item.title || model.title)) + "</h1>" +
         '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</p>" +
         ((flags.insight !== false && (item.note || TR.insights.get(item.q, item.banner))) ?
           '<div class="pr-note">' +

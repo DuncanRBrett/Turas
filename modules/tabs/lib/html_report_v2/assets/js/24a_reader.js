@@ -89,12 +89,15 @@
     return '<span class="aud-label">Audience</span>' + bits.join('<span class="aud-sep">·</span>');
   };
 
-  /** Render the strip into its shell slot (aria-live sits on the container). */
+  /** Render the strip into its shell slot (aria-live sits on the container).
+   *  The cover is a landing page, not an analysis surface — no strip there
+   *  (:empty hides the container). */
   reader.renderStrip = function () {
     if (typeof document === "undefined") return;
     var holder = document.getElementById("audstrip");
     if (!holder) return;
-    holder.innerHTML = reader.audienceStripHtml(TR.d2.state.tab);
+    holder.innerHTML = TR.d2.state.tab === "cover"
+      ? "" : reader.audienceStripHtml(TR.d2.state.tab);
   };
 
   /* ------------- plain-language significance (B2) ------------- */
@@ -267,6 +270,100 @@
       if (first) return { text: first, source: "insight" };
     }
     return null;
+  };
+
+  /* ---------------- exec-summary cover (D1) ---------------- */
+
+  /** The cover's leading findings: the first 3–5 story items carrying
+   *  evidence (dividers are structure, not findings). */
+  reader.coverFindings = function () {
+    var items = (TR.story2 && TR.story2.items) ? TR.story2.items() : [];
+    return items.filter(function (it) { return it.kind !== "divider"; }).slice(0, 5);
+  };
+
+  /**
+   * The cover opens only on a saved/shared copy (user-state island present)
+   * that carries story content: story pins (incl. promoted hub insights)
+   * and/or an authored Report-tab executive summary / background section.
+   * Analyst-fresh reports keep today's landing exactly.
+   */
+  reader.coverAvailable = function () {
+    if (!TR.userState) return false;
+    if (reader.coverFindings().length) return true;
+    var rpt = TR.report;
+    if (!rpt || !rpt.sectionText) return false;
+    return !!(String(rpt.sectionText("exec") || "").trim() ||
+      String(rpt.sectionText("background") || "").trim());
+  };
+
+  /** Where "Explore the dashboard →" lands: the first READ tab (dashboard
+   *  unless flag-gated off) — never a hard-coded id. */
+  reader.exploreTarget = function () {
+    return TR.shell.tabGroups()[0].tabs[0][0];
+  };
+
+  function coverParas(text) {
+    return String(text).trim().split(/\n+/).map(function (p) {
+      return "<p>" + fmt.escapeHtml(p) + "</p>";
+    }).join("");
+  }
+
+  /**
+   * The cover page: report title/client/wave, the analyst headline sections
+   * (Report-tab executive summary / background when authored), then the
+   * leading findings — each story pin as its insight sentence (pin title)
+   * over a compact evidence thumbnail. Thumbnails re-use each pin's own
+   * renderer (story2.itemBodyHtml), so disclosure gates travel with the pin
+   * — never re-derived here.
+   */
+  reader.coverHtml = function () {
+    var p = (TR.AGG && TR.AGG.project) || {};
+    var sub = [p.client, p.wave].filter(Boolean).map(function (x) {
+      return fmt.escapeHtml(String(x));
+    }).join(" · ");
+    var explore = '<button class="primary cover-explore" data-cover-explore>' +
+      "Explore the dashboard →</button>";
+    var html = ['<div class="page cover">'];
+    html.push('<div class="card cover-head">' +
+      '<div class="cover-kicker">Report cover</div>' +
+      "<h1>" + fmt.escapeHtml(p.name || "") + "</h1>" +
+      (sub ? '<div class="cover-sub">' + sub + "</div>" : "") + explore + "</div>");
+    var rpt = TR.report;
+    [["exec", "Executive summary"], ["background", "Background & method"]]
+      .forEach(function (sec) {
+        var text = (rpt && rpt.sectionText)
+          ? String(rpt.sectionText(sec[0]) || "").trim() : "";
+        if (!text) return;
+        html.push('<div class="card cover-sec"><h3>' + sec[1] + "</h3>" +
+          coverParas(text) + "</div>");
+      });
+    var findings = reader.coverFindings();
+    if (findings.length) {
+      html.push('<h2 class="cover-h2">Leading findings</h2>');
+      findings.forEach(function (item, i) {
+        html.push('<div class="card cover-finding">' +
+          '<h3 class="cf-title"><span class="cf-n">' + (i + 1) + "</span> " +
+          fmt.escapeHtml(TR.story2.pinTitle(item)) + "</h3>" +
+          '<div class="cover-thumb">' + TR.story2.itemBodyHtml(item) +
+          "</div></div>");
+      });
+      html.push('<div class="card cover-foot">' + explore + "</div>");
+    }
+    html.push("</div>");
+    return html.join("");
+  };
+
+  /** Render the cover route into the tab host. */
+  reader.renderCover = function (host) {
+    var wrap = document.createElement("div");
+    wrap.innerHTML = reader.coverHtml();
+    host.replaceChildren(wrap);
+    // fresh wrapper per render — the listener dies with the node
+    wrap.addEventListener("click", function (e) {
+      if (e.target.closest("[data-cover-explore]")) {
+        TR.shell.goTab(reader.exploreTarget());
+      }
+    });
   };
 
   /* ---------------- "How to read this" panel (A4) ---------------- */
