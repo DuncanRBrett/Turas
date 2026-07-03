@@ -97,6 +97,178 @@
     holder.innerHTML = reader.audienceStripHtml(TR.d2.state.tab);
   };
 
+  /* ------------- plain-language significance (B2) ------------- */
+
+  var EXPLAIN_KEY = "v2explain_sig";
+  var explainCached = null;
+
+  /**
+   * Whether plain-language significance is on. The reader's own persisted
+   * choice is authoritative once set (ownership: read the existing store
+   * first); otherwise saved copies (TR.userState island present) default ON —
+   * they go to client readers — and analyst-fresh reports default OFF.
+   */
+  reader.explainOn = function () {
+    if (explainCached !== null) return explainCached;
+    var stored = null;
+    try {
+      if (typeof localStorage !== "undefined") {
+        stored = localStorage.getItem(TR.d2.storeKey(EXPLAIN_KEY));
+      }
+    } catch (e) { /* storage unavailable — fall to the default */ }
+    explainCached = stored === null ? !!TR.userState : stored === "1";
+    return explainCached;
+  };
+
+  reader.setExplain = function (on) {
+    explainCached = !!on;
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(TR.d2.storeKey(EXPLAIN_KEY), on ? "1" : "0");
+      }
+    } catch (e) { /* storage unavailable — in-memory only */ }
+  };
+
+  // Level wording derives from the project's configured alphas (21_stats.js —
+  // the one source the tests use), NEVER a hard-coded "95%"/"80%" string.
+  function levelText(alpha) { return Math.round((1 - alpha) * 100) + "%"; }
+  function primaryLevel() {
+    return levelText(TR.stats && TR.stats.alphaPrimary ? TR.stats.alphaPrimary() : 0.05);
+  }
+  function secondaryLevel() {
+    return levelText(TR.stats && TR.stats.alphaSecondary ? TR.stats.alphaSecondary() : 0.20);
+  }
+  reader._levels = function () {
+    return { primary: primaryLevel(), secondary: secondaryLevel() };
+  };
+
+  /** The cell's displayed value as text (mean 1dp, % rounded) — null when absent. */
+  function valText(kind, cell) {
+    if (!cell) return null;
+    var v = kind === "mean" ? cell.mean : cell.pct;
+    if (v === null || v === undefined) return null;
+    return kind === "mean" ? Number(v).toFixed(1) : Math.round(v) + "%";
+  }
+
+  function joinList(items) {
+    if (items.length <= 1) return items.join("");
+    return items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+  }
+
+  /**
+   * Plain sentence for a sig-lettered crosstab cell: letters resolve to column
+   * labels (and that column's value in the same row) via the model's letter
+   * map. Uppercase letters speak at the report's primary level, lowercase at
+   * the weaker secondary level. "" when nothing resolvable.
+   */
+  reader.letterSentence = function (model, row, ci) {
+    var cell = row.cells[ci], col = model.columns[ci];
+    if (!cell || !cell.sig || !col) return "";
+    var own = valText(row.kind, cell);
+    if (own === null) return "";
+    var byLetter = {};
+    model.columns.forEach(function (c, i) {
+      if (c.letter) byLetter[String(c.letter).toUpperCase()] = i;
+    });
+    var refs = function (chars) {
+      var out = [];
+      chars.forEach(function (ch) {
+        var ti = byLetter[ch.toUpperCase()];
+        if (ti === undefined) return;
+        var tv = valText(row.kind, row.cells[ti]);
+        out.push(model.columns[ti].label + (tv === null ? "" : " (" + tv + ")"));
+      });
+      return out;
+    };
+    var hi = [], lo = [];
+    String(cell.sig).split("").forEach(function (ch) {
+      if (!/[a-z]/i.test(ch)) return;
+      (ch === ch.toUpperCase() ? hi : lo).push(ch);
+    });
+    var hiRefs = refs(hi), loRefs = refs(lo);
+    var head = col.label + " (" + own + ")";
+    if (hiRefs.length && loRefs.length) {
+      return head + " is meaningfully higher than " + joinList(hiRefs) +
+        " at the report's " + primaryLevel() + " level. It is also higher than " +
+        joinList(loRefs) + " at the weaker " + secondaryLevel() + " level (directional).";
+    }
+    if (hiRefs.length) {
+      return head + " is meaningfully higher than " + joinList(hiRefs) +
+        " at the report's " + primaryLevel() + " level.";
+    }
+    if (loRefs.length) {
+      return head + " is higher than " + joinList(loRefs) + " at the weaker " +
+        secondaryLevel() + " level (directional) — not at the report's " +
+        primaryLevel() + " level.";
+    }
+    return "";
+  };
+
+  /** Plain sentence for a composite (vs-the-rest) arrow cell: ▲▼ at the
+   *  primary level, hollow ▵▿ at the weaker secondary level. */
+  reader.arrowSentence = function (model, row, ci) {
+    var cell = row.cells[ci], col = model.columns[ci];
+    if (!cell || !cell.sig || !col) return "";
+    var sig = String(cell.sig);
+    if (!/[▲▼▵▿]/.test(sig)) return "";
+    var own = valText(row.kind, cell);
+    if (own === null) return "";
+    var dir = /[▼▿]/.test(sig) ? "lower" : "higher";
+    var head = col.label + " (" + own + ")";
+    return /[▲▼]/.test(sig)
+      ? head + " is meaningfully " + dir + " than the rest of the sample at the report's " +
+        primaryLevel() + " level."
+      : head + " is " + dir + " than the rest of the sample at the weaker " +
+        secondaryLevel() + " level (directional).";
+  };
+
+  /** Plain sentence for a Δ (wave-change) chip, from the delta the model
+   *  already carries (current value = prev + diff, wave named from the data). */
+  reader.deltaSentence = function (delta) {
+    if (!delta || delta.diff === null || delta.diff === undefined) return "";
+    var f = function (v) {
+      return delta.isMean ? Number(v).toFixed(1) : Math.round(v) + "%";
+    };
+    var cur = f(delta.prev + delta.diff), prev = f(delta.prev);
+    var wave = String(delta.wave || delta.year || "the prior wave");
+    var dir = delta.diff >= 0 ? "higher" : "lower";
+    return delta.sig
+      ? "This wave (" + cur + ") is meaningfully " + dir + " than " + wave +
+        " (" + prev + ") at the report's " + primaryLevel() + " level."
+      : "This wave (" + cur + ") is " + dir + " than " + wave + " (" + prev +
+        "), but the change is within the survey's noise — not significant at the report's " +
+        primaryLevel() + " level.";
+  };
+
+  /* ------------- insight titles on cards (B3) ------------- */
+
+  /** First sentence of an analyst note (first line, cut at .!? + space/end). */
+  function firstSentence(text) {
+    var t = String(text || "").trim().split(/\n/)[0].trim();
+    var m = t.match(/^.*?[.!?](?=\s|$)/);
+    return (m ? m[0] : t).trim();
+  }
+
+  /**
+   * The one-line insight title for a question's card / header. The analyst
+   * headline (Comments-sheet Headline column, q.headline) always wins; absent
+   * that, the first sentence of a stored analyst insight (28_insights.js —
+   * clearly marked by the caller via source:"insight"); otherwise null — this
+   * bundle never auto-generates a sentence.
+   */
+  reader.insightTitle = function (q, banner) {
+    if (!q) return null;
+    if (typeof q.headline === "string" && q.headline.trim()) {
+      return { text: q.headline.trim(), source: "headline" };
+    }
+    var note = (TR.insights && TR.insights.get) ? TR.insights.get(q.code, banner || null) : "";
+    if (note) {
+      var first = firstSentence(note);
+      if (first) return { text: first, source: "insight" };
+    }
+    return null;
+  };
+
   /* ---------------- "How to read this" panel (A4) ---------------- */
 
   /** The consolidated legend: sig letters (incl. lowercase 80%), ▲▵ arrows,
@@ -140,6 +312,13 @@
       sections.push("<h3>Weighted data</h3>" +
         (wnote || "<ul><li>Figures are weighted; significance uses the effective base.</li></ul>"));
     }
+    // B2 toggle: the same preference as the compact "Explain" control on the
+    // crosstabs sig-mode bar (one persisted store behind both).
+    sections.push("<h3>Explain significance</h3>" +
+      '<label class="xpl-toggle"><input type="checkbox" data-explain-toggle' +
+      (reader.explainOn() ? " checked" : "") + "> Explain significance in plain " +
+      "language — hover or focus any significance letter, arrow or Δ chip for a " +
+      "sentence saying what it means.</label>");
     return sections.join("");
   };
 
@@ -160,6 +339,14 @@
     host.appendChild(overlay);
     var panel = overlay.firstChild;
     var restoreFocus = document.activeElement;
+    // B2 toggle lives in the dialog; flipping it re-renders the live tab so
+    // every sig marker gains/drops its plain-language tooltip immediately.
+    overlay.addEventListener("change", function (e) {
+      if (e.target && e.target.hasAttribute && e.target.hasAttribute("data-explain-toggle")) {
+        reader.setExplain(e.target.checked);
+        if (TR.shell && TR.shell.route) TR.shell.route();
+      }
+    });
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay || e.target.closest("[data-legend-close]")) {
         reader.closeLegend();

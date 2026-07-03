@@ -59,6 +59,10 @@
     var lo = projAlpha();
     return (a > lo && a < 1) ? a : 0.20;
   }
+  // The configured levels themselves — the reader layer words its plain-language
+  // sentences from these ("the report's 95% level"), never a hard-coded 95/80.
+  stats.alphaPrimary = projAlpha;
+  stats.alphaSecondary = projAlpha2;
   /** Bonferroni is the R engine's default; only an explicit false disables it. */
   stats.bonferroni = function () {
     var p = TR.AGG && TR.AGG.project;

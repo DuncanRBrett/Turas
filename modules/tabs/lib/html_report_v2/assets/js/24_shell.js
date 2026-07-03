@@ -10,24 +10,45 @@
   var shell = TR.shell = {};
 
   /**
-   * Tab list. Crosstabs/Story/Report are always present; the rest are gated by
-   * the per-report visibility flags in project.tabs (default-on, so existing
-   * reports are unchanged). Tracking also needs prior-wave data; Qualitative also
-   * needs a non-null DATA_QUAL island.
+   * B1 Read vs Analyse navigation: the tab bar renders two visual groups —
+   * reading surfaces first, the analyst workbenches after a divider. Story/
+   * Crosstabs/Report are always present; the rest are gated by the per-report
+   * visibility flags in project.tabs (default-on, so existing reports are
+   * unchanged). Tracking also needs prior-wave data; Qualitative also needs a
+   * non-null DATA_QUAL island. Tab ids are unchanged, so saved-copy deep links
+   * (#tab=…) keep resolving.
    */
-  function tabList() {
+  function tabGroups() {
     var flags = (TR.AGG.project && TR.AGG.project.tabs) || {};
     var on = function (flag) { return flags[flag] !== false; };
-    var tabs = [];
-    if (on("patterns")) tabs.push(["takeout", "Patterns"]);
-    if (on("dashboard")) tabs.push(["dashboard", "Dashboard"]);
-    tabs.push(["crosstabs", "Crosstabs"]);
-    if (on("differences")) tabs.push(["findings", "Differences"]);
-    if (TR.d2.tracking().enabled && on("tracking")) tabs.push(["moved", "Tracking"]);
-    if (TR.d2.qualitative && TR.d2.qualitative().enabled) tabs.push(["qualitative", "Qualitative"]);
-    tabs.push(["story", "Story"], ["report", "Report"]);
-    return tabs;
+    var read = [];
+    if (on("dashboard")) read.push(["dashboard", "Dashboard"]);
+    if (on("patterns")) read.push(["takeout", "Patterns"]);
+    if (TR.d2.tracking().enabled && on("tracking")) read.push(["moved", "Tracking"]);
+    if (TR.d2.qualitative && TR.d2.qualitative().enabled) read.push(["qualitative", "Qualitative"]);
+    read.push(["story", "Story"]);
+    var analyse = [["crosstabs", "Crosstabs"]];
+    if (on("differences")) analyse.push(["findings", "Differences"]);
+    analyse.push(["report", "Report"]);
+    return [{ label: "Read", tabs: read }, { label: "Analyse", tabs: analyse }];
   }
+  shell.tabGroups = tabGroups;   // exposed for the node gate
+
+  /** The grouped tab bar. Group labels and the divider are aria-hidden so the
+   *  tablist exposes only tabs to assistive tech; visual grouping is CSS. */
+  function tabsNavHtml() {
+    return '<nav class="tabs" role="tablist">' + tabGroups().map(function (g, gi) {
+      return (gi ? '<span class="tabsep" aria-hidden="true"></span>' : "") +
+        '<span class="tabgrp-label" aria-hidden="true">' + g.label + "</span>" +
+        g.tabs.map(function (t) {
+          return '<button role="tab" class="tabbtn" data-tab="' + t[0] +
+            '" aria-selected="false">' + t[1] +
+            (t[0] === "story" ? ' <span class="count" id="story-count">0</span>' : "") +
+            "</button>";
+        }).join("");
+    }).join("") + "</nav>";
+  }
+  shell._tabsNavHtml = tabsNavHtml;   // exposed for the node gate
 
   shell.boot = function () {
     var agg = parseIsland("data-agg"), micro = parseIsland("data-micro"),
@@ -117,12 +138,7 @@
       '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
       'insights, story and report sections embedded — ready to send">💾 Save copy</button>' +
       "</div></div>" +
-      '<nav class="tabs" role="tablist">' + tabList().map(function (t) {
-        return '<button role="tab" class="tabbtn" data-tab="' + t[0] +
-          '" aria-selected="false">' + t[1] +
-          (t[0] === "story" ? ' <span class="count" id="story-count">0</span>' : "") +
-          "</button>";
-      }).join("") + "</nav></header>" +
+      tabsNavHtml() + "</header>" +
       '<div id="filterbar" class="filterbar"></div>' +
       // A3: who the numbers describe — persistent on EVERY tab; polite so a
       // cut change is announced without stealing focus
@@ -181,6 +197,16 @@
     document.querySelector(".tabs").addEventListener("click", function (e) {
       var btn = e.target.closest(".tabbtn");
       if (btn) shell.goTab(btn.getAttribute("data-tab"));
+    });
+    // tablist arrow-key navigation (Left/Right move focus across BOTH groups)
+    document.querySelector(".tabs").addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      var btns = Array.prototype.slice.call(document.querySelectorAll(".tabbtn"));
+      var at = btns.indexOf(document.activeElement);
+      if (at === -1) return;
+      e.preventDefault();
+      var next = (at + (e.key === "ArrowRight" ? 1 : -1) + btns.length) % btns.length;
+      btns[next].focus();
     });
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-savecopy]")) TR.report.saveCopy();

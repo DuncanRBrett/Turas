@@ -179,6 +179,12 @@
       '<option value="95"' + (s.sigMode === "95" ? " selected" : "") + ">95%</option>" +
       '<option value="dual"' + (s.sigMode === "dual" ? " selected" : "") + ">95% + 80%</option>" +
       "</select></label>" +
+      // B2: compact twin of the "Explain significance" toggle in the ⓘ dialog
+      '<label class="tg" title="Plain-language significance — hover or focus any ' +
+      'letter, arrow or Δ chip for a sentence saying what it means">' +
+      '<input type="checkbox" data-explain-sig' +
+      (TR.reader && TR.reader.explainOn && TR.reader.explainOn() ? " checked" : "") +
+      "> Explain</label>" +
       (TR.d2.tracking().enabled
         ? toggle("showDeltas", "Δ chips",
             "Change chips on the Total column vs the most recent prior " +
@@ -452,6 +458,24 @@
   }
   cards2._noHistoryBadgeHtml = noHistoryBadgeHtml;
 
+  /**
+   * B3: the question header. An analyst headline (q.headline) or, failing
+   * that, the first sentence of a stored analyst insight (clearly marked)
+   * leads as the h2; the question text drops to a secondary line. No insight
+   * -> the plain question h2, unchanged. Exposed for the node gate.
+   */
+  function titleHtml(model) {
+    var q = TR.d2.questionByCode(model.code);
+    var ins = (TR.reader && TR.reader.insightTitle)
+      ? TR.reader.insightTitle(q, TR.d2.state.banner) : null;
+    if (!ins) return "<h2>" + fmt.escapeHtml(model.title) + "</h2>";
+    return '<h2 class="qh-insight">' + fmt.escapeHtml(ins.text) +
+      (ins.source === "insight" ? ' <span class="qh-src">analyst insight</span>' : "") +
+      "</h2>" +
+      '<div class="qh-question">' + fmt.escapeHtml(model.title) + "</div>";
+  }
+  cards2._titleHtml = titleHtml;
+
   cards2.renderActive = function () {
     var s = TR.d2.state;
     var holder = document.getElementById("qcard");
@@ -507,7 +531,7 @@
       "</span>" + sourceBadge + prevBadge +
       '<span class="qnav"><button data-act="prevq" aria-label="Previous question">‹</button>' +
       '<button data-act="nextq" aria-label="Next question">›</button></span>' + commentsBtn + "</div>" +
-      "<h2>" + fmt.escapeHtml(model.title) + "</h2>" + contextStrip + bannerTabsHtml() + "</div>";
+      titleHtml(model) + contextStrip + bannerTabsHtml() + "</div>";
 
     var chartModel = null;
     if (s.showChart) {
@@ -942,6 +966,11 @@
       }
       if (e.target.hasAttribute && e.target.hasAttribute("data-sigmode")) {
         TR.d2.state.sigMode = e.target.value;
+        cards2.renderActive();
+        return;
+      }
+      if (e.target.hasAttribute && e.target.hasAttribute("data-explain-sig")) {
+        TR.reader.setExplain(e.target.checked);
         cards2.renderActive();
       }
     });

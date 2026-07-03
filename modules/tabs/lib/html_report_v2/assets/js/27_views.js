@@ -162,6 +162,15 @@
     var spark = (pts && pts.length > 1)
       ? TR.render.sparkline(pts, true, { w: 212, h: 28 }) : "";
     var short = TR.d2.shortLabel(q);
+    // B3: analyst insight line (headline / marked insight first sentence) sits
+    // in the TITLE AREA above the question line — one CSS-clamped line, so the
+    // A1 slots stay overlap-proof. Absent -> nothing (never auto-generated).
+    var ins = (TR.reader && TR.reader.insightTitle) ? TR.reader.insightTitle(q) : null;
+    var insHtml = ins
+      ? '<span class="gi">' + fmt.escapeHtml(TR.charts.clip(ins.text, 120)) +
+        (ins.source === "insight" ? ' <span class="gi-src">analyst insight</span>' : "") +
+        "</span>"
+      : "";
     return '<div class="gauge-wrap" data-snap-card style="--gc:' + gc + '">' +
       '<button class="gauge" data-goq="' + q.code + '" title="' +
       fmt.escapeHtml(q.title) +
@@ -172,6 +181,7 @@
       (hasVal ? '<span class="gbar"><span class="gbf" style="width:' +
         barPct.toFixed(0) + '%"></span></span>' : "") +
       (spark ? '<span class="gspark">' + spark + "</span>" : "") +
+      insHtml +
       '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(short, 120)) +
       "</span></button>" +
       '<span class="gmeta">' +

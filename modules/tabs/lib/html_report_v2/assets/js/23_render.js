@@ -122,17 +122,32 @@
     return "background:rgba(" + r + "," + g + "," + b + "," + alpha.toFixed(3) + ");";
   }
 
+  /** B2: reader toggle for plain-language significance (off in bare sandboxes). */
+  function explainOn() {
+    return !!(TR.reader && TR.reader.explainOn && TR.reader.explainOn());
+  }
+  /** Focusable-tooltip attributes for a plain-language sentence ("" when none).
+   *  aria-label carries the sentence for keyboard/AT focus; the visual tooltip
+   *  is the CSS .xpl::after (pointer-events none, so clicks pass through). */
+  function explainAttrs(sentence) {
+    if (!sentence) return "";
+    var esc = fmt.escapeHtml(sentence);
+    return ' xpl" tabindex="0" data-explain="' + esc + '" aria-label="' + esc;
+  }
+
   function deltaChip(delta) {
     if (!delta || delta.diff === null) return "";
     var up = delta.diff >= 0;
     var size = delta.isMean ? Math.abs(delta.diff).toFixed(1)
       : Math.abs(delta.diff).toFixed(0);
     if (!delta.isMean && Math.abs(delta.diff) < 1) return "";
+    var sentence = explainOn() ? TR.reader.deltaSentence(delta) : "";
     return '<span class="delta ' + (up ? "up" : "down") +
-      (delta.sig ? " sig" : "") + '" title="' +
-      (delta.year || "prior wave") + ": " +
-      (delta.isMean ? delta.prev.toFixed(1) : Math.round(delta.prev) + "%") +
-      (delta.sig ? " · significant change" : "") + '">' +
+      (delta.sig ? " sig" : "") +
+      (sentence ? explainAttrs(sentence) : '" title="' +
+        (delta.year || "prior wave") + ": " +
+        (delta.isMean ? delta.prev.toFixed(1) : Math.round(delta.prev) + "%") +
+        (delta.sig ? " · significant change" : "")) + '">' +
       (up ? "▲" : "▼") + size + "</span>";
   }
   render.deltaChip = deltaChip;
@@ -252,18 +267,27 @@
           body = '<span class="v">' + fmtPct(cell.pct) + "</span>";
         }
         if (cell.sig) {
+          // B2: with "Explain significance" on, the marker becomes a focusable
+          // plain-language tooltip built from the model's own letter map / delta.
+          var sentence = explainOn()
+            ? (model.composite ? TR.reader.arrowSentence(model, row, i)
+              : TR.reader.letterSentence(model, row, i)) : "";
           if (model.composite) {
             // composite (profile) banner: cell.sig is a vs-the-rest arrow
             // (▲ above / ▼ below the rest), not column letters — render it as-is
             // with a matching tooltip and a down-class for the red ▼ / ▿.
             var down = /[▼▿]/.test(cell.sig);
             body += '<span class="sg' + (down ? " dn" : "") +
-              '" title="Significantly ' + (down ? "lower" : "higher") +
-              ' than the rest of the sample (everyone not in this column)">' +
+              (sentence ? explainAttrs(sentence) : '" title="Significantly ' +
+                (down ? "lower" : "higher") +
+                ' than the rest of the sample (everyone not in this column)') + '">' +
               fmt.escapeHtml(cell.sig) + "</span>";
           } else {
-            body += '<span class="sg" title="Significantly higher than column(s) ' +
-              fmt.escapeHtml(cell.sig) + '">▲' + fmt.escapeHtml(cell.sig) + "</span>";
+            body += '<span class="sg' +
+              (sentence ? explainAttrs(sentence)
+                : '" title="Significantly higher than column(s) ' +
+                  fmt.escapeHtml(cell.sig)) + '">▲' +
+              fmt.escapeHtml(cell.sig) + "</span>";
           }
         }
         if (i === 0 && opts.showDeltas && row.delta) body += deltaChip(row.delta);
