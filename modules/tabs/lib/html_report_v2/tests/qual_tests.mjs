@@ -8,7 +8,11 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsDir = path.join(here, "..", "assets", "js");
 
-globalThis.TR = { fmt: { escapeHtml: (s) => String(s == null ? "" : s) } };
+globalThis.TR = { fmt: {
+  escapeHtml: (s) => String(s == null ? "" : s),
+  score: (v) => Number(v).toFixed(1),          // one-decimal score rule (01_format.js)
+  base: (n) => String(n)
+} };
 new Function(fs.readFileSync(path.join(jsDir, "21_stats.js"), "utf8"))();   // TR.stats.propZ for crosstab sig
 new Function(fs.readFileSync(path.join(jsDir, "27q_qualitative.js"), "utf8"))();
 const qual = globalThis.TR.qual;
@@ -401,6 +405,178 @@ assert(gatedHtml.indexOf("Withheld to protect confidentiality.") >= 0,
   "below k the controls row carries the standard disclosure note");
 
 TR.disclosure = null;   // leave no gate behind for anything after
+
+// ---- Reader bundle C1 — curated-first split ----------------------------------
+// Module store state at this point: Q1#2 is shortlisted (from the shortlist
+// section above); no Q1 highlights. A fresh highlight also curates.
+console.log("\nReader C1 — curated-first:");
+const c1a = qual.curatedSplit(q.records, "Q1");
+assert(c1a.curated.length === 1 && c1a.curated[0].idx === 2, "curatedSplit: the shortlisted comment is curated");
+assert(c1a.rest.length === 3 && c1a.rest[0].idx === 0 && c1a.rest[2].idx === 3,
+  "curatedSplit: the rest keep their original order");
+qual.addHighlight("Q1", 1, 0, 3);
+const c1b = qual.curatedSplit(q.records, "Q1");
+assert(c1b.curated.length === 2 && c1b.curated[0].idx === 1 && c1b.curated[1].idx === 2,
+  "curatedSplit: a highlighted comment is curated too, order preserved");
+
+// ---- Reader C2 — declared closed<->open links + the closed-stat chip ---------
+console.log("\nReader C2 — declared links + closed-stat chip:");
+TR.AGG = { project: {}, questions: [
+  { code: "Q28", title: "Overall satisfaction rating", short_label: "Overall rating", linked_open: "QO",
+    rows: [{ kind: "mean", label: "Mean", pct: [78.34, 70.1] }], bases: [{ n: 106 }, { n: 50 }] },
+  { code: "Q29", title: "Broken link", linked_open: "NOPE" }
+] };
+TR.QUAL = { questions: [{ code: "QO", title: "Why that rating?", records: [{ idx: 0 }] }] };
+assert(qual.linkFor("Q28") && qual.linkFor("Q28").qcode === "QO",
+  "linkFor resolves a DECLARED linked_open (no ResponseID-join needed)");
+assert(qual.linkFor("Q29") === null, "linkFor ignores a declared link whose target is not in the island");
+const c2f = qual.closedFor("QO");
+assert(c2f && c2f.code === "Q28" && c2f.title === "Overall rating",
+  "closedFor reverses the link (short label preferred for the chip)");
+const c2chip = qual.closedStatChip("QO");
+assert(c2chip.indexOf("Rated 78.3 · n=106") >= 0, "closedStatChip carries the Total mean + base (Rated 78.3 · n=106)");
+assert(c2chip.indexOf('data-qual-return="Q28"') >= 0, "closedStatChip links back to the closed question");
+assert(qual.closedStatChip("UNLINKED") === "", "closedStatChip is EMPTY for an unlinked qual question");
+TR.AGG = { project: { qualLinks: { QC: { qcode: "QO2", title: "Open 2" } } }, questions: [] };
+assert(qual.closedFor("QO2") && qual.closedFor("QO2").code === "QC",
+  "closedFor also reverses a ResponseID-join (qualLinks) link");
+assert(qual.headlineFor({ code: "X", headline: "  Speed is the story  " }) === "Speed is the story",
+  "headlineFor trims the island's own field");
+TR.AGG = { project: {}, questions: [{ code: "QO", headline: "Agg headline" }] };
+assert(qual.headlineFor({ code: "QO" }) === "Agg headline", "headlineFor falls back to the AGG entry (defensive)");
+assert(qual.headlineFor({ code: "ZZ" }) === "", "headlineFor is empty when no headline anywhere");
+
+// championed quotes: shortlist first, then highest tier; hidden text never champions
+const champRecs = [
+  { idx: 0, tier: 0, sentiment: 1, themeVals: { "0": 1 }, text: "ok" },
+  { idx: 1, tier: 2, sentiment: 3, themeVals: { "0": 3 }, text: "bad" },
+  { idx: 2, tier: 1, sentiment: 1, themeVals: { "0": 1 }, text: "nice" },
+  { idx: 3, tier: 2, sentiment: 1, themeVals: { "0": 1 }, text: null }
+];
+qual.toggleSave("CHQ", 0);
+const champs = qual.championQuotes(champRecs, 0, "CHQ", 2);
+assert(champs.length === 2 && champs[0].idx === 0, "championQuotes: the shortlisted comment champions first");
+assert(champs[1].idx === 1, "championQuotes: then the highest tier (a hidden-text must-read never champions)");
+
+// ---- Reader C3 — everything else + coverage ----------------------------------
+console.log("\nReader C3 — everything else + coverage:");
+assert(qual.unthemed(q.records).length === 1 && qual.unthemed(q.records)[0].idx === 3,
+  "unthemed finds the record with no coded theme");
+assert(qual.recordsForTheme(q.records, qual.OTHER_THEME).length === 1 &&
+  qual.recordsForTheme(q.records, qual.OTHER_THEME)[0].idx === 3,
+  "the OTHER_THEME sentinel selects the unthemed records through the same pipeline");
+const cov = qual.coverage(q.records);
+assert(cov.themed === 3 && cov.total === 4 && cov.pct === 75, "coverage: 3 of 4 comments themed = 75%");
+assert(qual.coverage([]).pct === 0, "coverage of an empty pool is 0, never NaN");
+
+// ---- Reader C4 — focus reading mode (pure core) -------------------------------
+console.log("\nReader C4 — focus mode:");
+assert(qual.focusNav(0, "j", 3).pos === 1 && qual.focusNav(1, "ArrowDown", 3).pos === 2,
+  "focusNav: j / ArrowDown move forward");
+assert(qual.focusNav(2, "j", 3).pos === 2, "focusNav clamps at the last quote");
+assert(qual.focusNav(2, "k", 3).pos === 1 && qual.focusNav(0, "ArrowUp", 3).pos === 0,
+  "focusNav: k / ArrowUp move back, clamped at the first");
+assert(qual.focusNav(1, "Escape", 3).close === true, "focusNav: Escape closes");
+assert(qual.focusNav(1, "x", 3).pos === 1 && qual.focusNav(1, "x", 3).close === false,
+  "focusNav ignores unrelated keys");
+const fents = qual.focusEntries([
+  { idx: 0, sentiment: 1, text: "great", demos: { Campus: "Cape Town" } },
+  { idx: 1, sentiment: 3, text: null, demos: { Campus: "Durban" } }
+], { code: "FQ", title: "Why?" });
+const fhtml = qual.focusHtml(fents, 0, { title: "Why?" });
+assert(fhtml.indexOf("1 of 2") >= 0, "focusHtml shows the reading position (1 of 2)");
+assert(fhtml.indexOf('class="ql-fq pos cur"') >= 0, "focusHtml marks the current quote");
+assert(qual.focusHtml(fents, 1, {}).indexOf('class="ql-fq neg cur"') >= 0,
+  "focusHtml at pos 1 marks the second quote as current");
+assert(fhtml.indexOf("[quote hidden in this copy]") >= 0, "focusHtml honours hidden verbatims");
+assert(fhtml.indexOf("Cape Town") >= 0, "focusHtml shows the demographic chips by default");
+assert(qual.focusHtml(fents, 0, { dropTags: true }).indexOf("Cape Town") < 0,
+  "focusHtml dropTags hides the chips (a below-k hub's rule travels into focus)");
+assert(fhtml.indexOf("data-focus-close") >= 0 && fhtml.indexOf("Esc to close") >= 0,
+  "focusHtml carries the close control + the key hints");
+
+// ---- Reader bundle C — themed question render ---------------------------------
+// The whole reader layer through qual.render on the inert host: headline,
+// coverage bar, closed-stat chip, everything-else card, champions, curated-first.
+console.log("\nReader bundle C — themed render:");
+TR.AGG = { project: {}, questions: [
+  { code: "Q28", title: "Overall satisfaction rating", linked_open: "QT",
+    rows: [{ kind: "mean", pct: [78.34] }], bases: [{ n: 106 }] }
+] };
+TR.QUAL = {
+  textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
+  demographics: [{ label: "Campus" }],
+  questions: [{ code: "QT", title: "Why that score?", type: "themed",
+    headline: "Support speed is the sticking point",
+    base: { answered: 4 },
+    themes: [{ id: 0, label: "Price" }, { id: 1, label: "Support" }],
+    records: [
+      { idx: 0, tier: 2, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "great value" },
+      { idx: 1, tier: 0, sentiment: 3, themeVals: { "1": 3 }, demos: {}, text: "slow support" },
+      { idx: 2, tier: 1, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "cheap and cheerful" },
+      { idx: 3, tier: 0, sentiment: 2, themeVals: {}, demos: {}, text: "meh" }
+    ] }]
+};
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.disclosure = null;
+qual.toggleSave("QT", 1);                       // curate one comment (the shortlist)
+qual._state = null;
+qual.render(host);
+let ch = host.innerHTML;
+assert(ch.indexOf("Support speed is the sticking point") >= 0,
+  "the analyst headline renders at the top of the question view");
+assert(ch.indexOf("75% of comments themed") >= 0, "the coverage bar reports 3 of 4 = 75% themed");
+assert(ch.indexOf("Rated 78.3 · n=106") >= 0 && ch.indexOf('data-qual-return="Q28"') >= 0,
+  "the closed-stat chip renders in the header and links back to Q28");
+assert(ch.indexOf("Everything else") >= 0 && ch.indexOf('data-theme="__else__"') >= 0,
+  "unthemed comments get a first-class Everything else card");
+assert(ch.indexOf("“great value”") >= 0 && ch.indexOf("ql-champq") >= 0,
+  "theme cards carry championed quotes inline (highest tier for Price)");
+assert(ch.indexOf("“slow support”") >= 0,
+  "the shortlisted comment champions its theme (Support)");
+assert(ch.indexOf("★ Analyst’s selection") >= 0, "curated comments lead under the Analyst's selection rubric");
+assert(ch.indexOf("Show all 4 comments") >= 0, "the rest sit behind a show-all control");
+assert(ch.indexOf('data-hl-key="QT#1"') >= 0 && ch.indexOf('data-hl-key="QT#0"') < 0,
+  "collapsed: only the curated comment renders as a quote card");
+assert(ch.indexOf('<span class="ql-sent neg">Negative</span>') >= 0,
+  "sentiment carries a TEXT marker on the quote card, never colour-only");
+assert(ch.indexOf("data-qual-focus") >= 0 && ch.indexOf("data-theme-focus") >= 0,
+  "focus reading entry points render on the drawer + theme cards");
+qual._state.showRest = true;
+qual.render(host);
+ch = host.innerHTML;
+assert(ch.indexOf('data-hl-key="QT#0"') >= 0 && ch.indexOf("All comments") >= 0,
+  "show-all expands the rest under an All comments rubric");
+assert(ch.indexOf('data-hl-key="QT#1"') < ch.indexOf('data-hl-key="QT#0"'),
+  "curated-first ordering: the analyst's selection renders before the rest");
+assert(ch.indexOf("Back to the analyst’s selection") >= 0, "expanded state offers the way back");
+
+// unlinked question -> no stat chip at all
+TR.AGG = { project: {}, questions: [] };
+qual._state = null;
+qual.render(host);
+assert(host.innerHTML.indexOf("ql-statchip") < 0, "no closed-stat chip when the question is unlinked");
+
+// below k the whole reader layer stays gated exactly as before: no board, no
+// champions, no curated rubric, no focus entry — and the coverage bar reads
+// the UNFILTERED records so nothing cut-derived leaks.
+TR.MICRO = { n: 4 };
+TR.d2.state.filters = [{ q: "Q1", rows: [1] }];
+TR.disclosure = { active: () => true, minBase: () => 10,
+  audienceTooSmall: () => true, note: () => "Withheld to protect confidentiality." };
+qual._state = null;
+qual.render(host);
+ch = host.innerHTML;
+assert(ch.indexOf("ql-champq") < 0, "below k no championed quotes render (the board is withheld)");
+assert(ch.indexOf("Analyst’s selection") < 0 && ch.indexOf("data-qual-focus") < 0,
+  "below k the drawer stays withheld — no curated rubric, no focus entry point");
+assert(ch.indexOf("Withheld to protect confidentiality.") >= 0,
+  "below k the standard disclosure note still renders");
+assert(ch.indexOf("75% of comments themed") >= 0,
+  "the gated coverage bar reads the unfiltered records (75%), never the cut");
+assert(ch.indexOf("2 of 4 answered") < 0, "below k the cut count stays withheld in the header");
+TR.disclosure = null;
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

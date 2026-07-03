@@ -10,6 +10,13 @@
  * (e.g. Campus = Cape Town AND Q017 = Promoter AND Year = 1st) flow in via the cut mask,
  * so there is no per-tab demographic facet row. The noteworthy-tier filter, the sentiment
  * filter (only when coded) and the verbatim-text confidentiality are honoured here.
+ *
+ * Reader bundle C (READER_EXPERIENCE_PLAN.md): quote-first typography with the analyst's
+ * curated selection leading (C1); theme cards carrying championed quotes + a closed-stat
+ * chip when a closed question links here — declared q.linked_open or the ResponseID join,
+ * both directions (C2); unthemed comments as a first-class "Everything else" card + a
+ * theme-coverage bar (C3); and a keyboard-driven focus reading mode (C4). All of it is
+ * presentation over the SAME gated record pools — no new data paths past the k-gates.
  */
 (function (global) {
   "use strict";
@@ -48,11 +55,33 @@
     return rows;
   };
 
-  /** Records (from a pool) that mentioned a given theme id. */
+  /** Sentinel theme id: the UNthemed comments as a first-class selection (C3). */
+  qual.OTHER_THEME = "__else__";
+
+  /** Records (from a pool) that mentioned a given theme id. The sentinel
+   *  qual.OTHER_THEME selects the unthemed records instead — "Everything else"
+   *  rides the same theme -> drawer pipeline as a real theme. */
   qual.recordsForTheme = function (records, themeId) {
+    if (themeId === qual.OTHER_THEME) return qual.unthemed(records);
     return (records || []).filter(function (r) {
       return r.themeVals && r.themeVals[String(themeId)] != null;
     });
+  };
+
+  /** Records carrying no coded theme at all (every themeVals entry null/absent). */
+  qual.unthemed = function (records) {
+    return (records || []).filter(function (r) {
+      var tv = r.themeVals || {};
+      return !Object.keys(tv).some(function (k) { return tv[k] != null; });
+    });
+  };
+
+  /** Share of comments carrying at least one theme — the header coverage bar
+   *  ("83% of comments themed"), from the existing assignments only. */
+  qual.coverage = function (records) {
+    var total = (records || []).length;
+    var themed = total - qual.unthemed(records).length;
+    return { themed: themed, total: total, pct: total ? Math.round(themed / total * 100) : 0 };
   };
 
   /**
@@ -169,10 +198,77 @@
     return (records || []).filter(function (r) { return mask[r.idx] === 1; });
   };
 
-  /** The closed<->open jump link for a closed/composite code, or null. */
+  /** The closed<->open jump link for a closed/composite code, or null. The
+   *  ResponseID-join links (project.qualLinks) win; a declared LinkedOpenQuestion
+   *  (q.linked_open, optional source-format field) is honoured when its target
+   *  open-end actually exists in this report's island. */
   qual.linkFor = function (code) {
     var links = (TR.AGG && TR.AGG.project && TR.AGG.project.qualLinks) || null;
-    return (links && links[code]) ? links[code] : null;
+    if (links && links[code]) return links[code];
+    var closed = aggQuestion(code);
+    var lo = closed && closed.linked_open;
+    if (lo && TR.QUAL) {
+      var open = findQ(TR.QUAL, lo);
+      if (open) return { qcode: lo, title: open.title || lo };
+    }
+    return null;
+  };
+
+  /** The closed question in TR.AGG.questions with this code, or null. */
+  function aggQuestion(code) {
+    var qs = (TR.AGG && TR.AGG.questions) || [];
+    for (var i = 0; i < qs.length; i++) if (qs[i].code === code) return qs[i];
+    return null;
+  }
+
+  /** The closed/composite question a qual question explains (reverse of linkFor):
+   *  a declared linked_open pointing here, else a ResponseID-join link. Returns
+   *  { code, title, q } (q = the AGG entry when present) or null. */
+  qual.closedFor = function (qcode) {
+    var qs = (TR.AGG && TR.AGG.questions) || [];
+    var hit = null, i;
+    for (i = 0; i < qs.length; i++) if (qs[i].linked_open === qcode) { hit = qs[i]; break; }
+    if (!hit) {
+      var links = (TR.AGG && TR.AGG.project && TR.AGG.project.qualLinks) || {};
+      var keys = Object.keys(links);
+      for (i = 0; i < keys.length; i++) {
+        if (links[keys[i]] && links[keys[i]].qcode === qcode) {
+          hit = aggQuestion(keys[i]) || { code: keys[i], title: keys[i] };
+          break;
+        }
+      }
+    }
+    if (!hit) return null;
+    return { code: hit.code, title: hit.short_label || hit.title || hit.code, q: hit.rows ? hit : null };
+  };
+
+  /** The closed-stat chip for a qual question header ("📊 Rated 78.3 · n=106 ·
+   *  view Q28 ›") — the bidirectional half of the 💬 jump. "" when unlinked;
+   *  the stat is omitted (link only) when the closed question has no mean row. */
+  qual.closedStatChip = function (qcode) {
+    var c = qual.closedFor(qcode);
+    if (!c) return "";
+    var stat = "";
+    if (c.q) {
+      var mr = (c.q.rows || []).filter(function (r) { return r.kind === "mean"; })[0];
+      var v = mr && mr.pct ? mr.pct[0] : null;
+      var b = c.q.bases && c.q.bases[0] ? c.q.bases[0].n : null;
+      if (v != null) {
+        stat = "Rated " + ((TR.fmt && TR.fmt.score) ? TR.fmt.score(v) : v) +
+          (b != null ? " · n=" + ((TR.fmt && TR.fmt.base) ? TR.fmt.base(b) : b) : "");
+      }
+    }
+    return '<button class="ql-statchip" data-qual-return="' + esc(c.code) +
+      '" title="Open ' + esc(c.title) + ' — the closed question these comments sit behind">📊 ' +
+      (stat ? esc(stat) + " · " : "") + "view " + esc(c.code) + " ›</button>";
+  };
+
+  /** The analyst's one-line headline for a question (optional source-format
+   *  field) — the island's own field first, else the AGG entry's. "" if none. */
+  qual.headlineFor = function (q) {
+    if (q && typeof q.headline === "string" && q.headline.trim()) return q.headline.trim();
+    var agg = q && aggQuestion(q.code);
+    return (agg && typeof agg.headline === "string" && agg.headline.trim()) ? agg.headline.trim() : "";
   };
 
   /** Comment count for a qual question code (within the cut when filters given). */
@@ -358,6 +454,46 @@
     // Ignore a sentiment pick carried over from a coded question (the control is hidden
     // here, so a stale selection must not silently empty an un-coded question's list).
     return qual.hasSentiment(q) ? qual.sentimentFilter(pool, st.sentiment) : pool;
+  };
+
+  /** Split records into the analyst's curated set (shortlisted or carrying a
+   *  highlight) and the rest, order preserved — curated-first rendering (C1).
+   *  Presentation-only: both halves come from the SAME gated record pool. */
+  qual.curatedSplit = function (records, qcode) {
+    var curated = [], rest = [];
+    (records || []).forEach(function (r) {
+      var marked = qual.isSaved(qcode, r.idx) || qual.getHighlights(qcode, r.idx).length > 0;
+      (marked ? curated : rest).push(r);
+    });
+    return { curated: curated, rest: rest };
+  };
+
+  /** Up to `cap` championed quotes for a theme (C2): shortlisted first, then
+   *  highest noteworthy tier. Hidden-text records never champion. */
+  qual.championQuotes = function (records, themeId, qcode, cap) {
+    cap = cap > 0 ? cap : 2;
+    var pool = qual.recordsForTheme(records, themeId)
+      .filter(function (r) { return r.text != null; });
+    pool.sort(function (a, b) {
+      var sa = qual.isSaved(qcode, a.idx) ? 1 : 0, sb = qual.isSaved(qcode, b.idx) ? 1 : 0;
+      if (sa !== sb) return sb - sa;
+      return (b.tier || 0) - (a.tier || 0);
+    });
+    return pool.slice(0, cap);
+  };
+
+  /** j/k + arrow-key navigation for the focus reading mode (C4). Pure: given
+   *  the current position, a key and the list length, the next position and
+   *  whether the key closes the view. Positions clamp at both ends. */
+  qual.focusNav = function (pos, key, len) {
+    if (key === "Escape") return { pos: pos, close: true };
+    var next = pos;
+    if (key === "j" || key === "J" || key === "ArrowDown" || key === "ArrowRight") {
+      next = Math.min(len - 1, pos + 1);
+    } else if (key === "k" || key === "K" || key === "ArrowUp" || key === "ArrowLeft") {
+      next = Math.max(0, pos - 1);
+    }
+    return { pos: next, close: false };
   };
 
   // ---- export the visible comments to Excel (client-side) --------------------
@@ -718,6 +854,107 @@
     return null;
   }
 
+  // ---- focus reading mode (C4) -----------------------------------------------
+  // A full-width single-column reading view over an ALREADY-GATED record list —
+  // the same records the drawer / collection is showing, zero new data logic.
+  // focusHtml/focusNav are pure (node-testable); openFocus is the DOM shell.
+
+  /** Normalise drawer records into focus entries { record, qcode, qtitle }. */
+  qual.focusEntries = function (records, q) {
+    return (records || []).map(function (r) {
+      return { record: r, qcode: q.code, qtitle: q.title };
+    });
+  };
+
+  /** The focus view's inner HTML: header (title · position · key hints · close)
+   *  + one large quote block per entry, the current one marked .cur. Honours the
+   *  hidden-text + highlight rules exactly as the drawer does; opts.dropTags
+   *  drops the demographic chips (a below-k hub's rule travels with it). */
+  qual.focusHtml = function (entries, pos, opts) {
+    opts = opts || {};
+    var head = '<div class="ql-fhead"><h2 class="ql-ftitle">' + esc(opts.title || "Focus reading") + "</h2>" +
+      '<span class="ql-fpos" data-focus-pos>' + (pos + 1) + " of " + entries.length + "</span>" +
+      '<span class="ql-fkeys">j / k or arrow keys to move · Esc to close</span>' +
+      '<button class="ql-fclose" data-focus-close aria-label="Close focus reading">✕</button></div>';
+    var blocks = entries.map(function (e, i) {
+      var r = e.record, sent = SENT[r.sentiment] || "neu";
+      var text = r.text == null
+        ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
+        : qual.renderHighlighted(r.text, qual.getHighlights(e.qcode, r.idx));
+      var word = SENT_WORD[r.sentiment]
+        ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
+      var tags = opts.dropTags ? "" : (r.demos ? Object.keys(r.demos) : [])
+        .filter(function (k) { return r.demos[k] != null; })
+        .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
+      return '<blockquote class="ql-fq ' + sent + (i === pos ? " cur" : "") + '" data-fi="' + i + '" tabindex="0">' +
+        '<div class="ql-fqtext">' + text + "</div>" +
+        '<div class="ql-fmeta">' + word + tags +
+        '<span class="ql-fsrc">' + esc(e.qtitle || "") + '</span><span class="ql-qid">#' + esc(r.idx) + "</span></div></blockquote>";
+    }).join("");
+    return head + '<div class="ql-fbody">' + blocks + "</div>";
+  };
+
+  var FOCUS_ID = "qual-focus";
+
+  qual.closeFocus = function () {
+    if (typeof document === "undefined") return;
+    var open = document.getElementById(FOCUS_ID);
+    if (open) open.remove();
+  };
+
+  /** Open the focus reading view. opts: title, dropTags, trigger (the element
+   *  focus returns to on close). Keyboard: j/k + arrows move, Esc closes. */
+  qual.openFocus = function (entries, opts) {
+    if (typeof document === "undefined" || !entries || !entries.length) return;
+    opts = opts || {};
+    qual.closeFocus();
+    var pos = 0;
+    var overlay = document.createElement("div");
+    overlay.id = FOCUS_ID;
+    overlay.className = "ql-focusov";
+    overlay.innerHTML = '<div class="ql-focus" role="dialog" aria-modal="true" ' +
+      'aria-label="Focus reading mode">' + qual.focusHtml(entries, pos, opts) + "</div>";
+    // lives INSIDE #app so saveCopy (which empties #app in its clone) can never
+    // bake an open focus view into a saved copy — mirrors the legend overlay
+    var host = document.getElementById("app") || document.body;
+    host.appendChild(overlay);
+    var panel = overlay.firstChild;
+    var restoreFocus = opts.trigger || document.activeElement;
+    var posEl = overlay.querySelector("[data-focus-pos]");
+    function setPos(p) {
+      pos = p;
+      overlay.querySelectorAll(".ql-fq").forEach(function (bq, i) {
+        bq.classList.toggle("cur", i === pos);
+      });
+      if (posEl) posEl.textContent = (pos + 1) + " of " + entries.length;
+      var cur = overlay.querySelector('.ql-fq[data-fi="' + pos + '"]');
+      if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "center" });
+    }
+    function close() {
+      overlay.remove();
+      if (restoreFocus && restoreFocus.focus) { try { restoreFocus.focus(); } catch (e) {} }
+    }
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay || e.target.closest("[data-focus-close]")) { close(); return; }
+      var bq = e.target.closest(".ql-fq");
+      if (bq) setPos(parseInt(bq.getAttribute("data-fi"), 10));
+    });
+    // j/k + Esc, plus the same Tab trap as the legend panel — listeners die
+    // with the overlay node, so nothing stacks across opens
+    overlay.addEventListener("keydown", function (e) {
+      var nav = qual.focusNav(pos, e.key, entries.length);
+      if (nav.close) { e.preventDefault(); close(); return; }
+      if (nav.pos !== pos) { e.preventDefault(); setPos(nav.pos); return; }
+      if (e.key !== "Tab") return;
+      var focusables = panel.querySelectorAll("button, [tabindex]:not([tabindex='-1'])");
+      if (!focusables.length) return;
+      var first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    overlay.querySelector("[data-focus-close]").focus();
+  };
+
   // ---- render ----------------------------------------------------------------
 
   // ---- jump (a closed/composite card -> these comments, in the active cut) ----
@@ -748,7 +985,7 @@
     if (!link) return;
     var d2 = TR.d2, s = d2.state;
     s.qualQ = link.qcode;                       // focus the linked open-end
-    if (qual._state) qual._state.theme = null;
+    if (qual._state) { qual._state.theme = null; qual._state.showRest = false; }
     s.qualFrom = code;                          // breadcrumb + back target
     s.qualFromTab = (s.tab === "dashboard") ? "dashboard" : "crosstabs";
     s.tab = "qualitative";
@@ -782,7 +1019,7 @@
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
                       theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false,
                       themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false,
-                      view: "question", groupBy: "question", hub: null, hubEditing: null };
+                      view: "question", groupBy: "question", hub: null, hubEditing: null, showRest: false };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -891,9 +1128,22 @@
     var badge = q.type === "themed" ? "THEMED" : "VERBATIM-ONLY";
     var shield = island.textMode === "full" ? "" :
       '<span class="ql-shield" title="Verbatim confidentiality">🛡 ' + esc(island.textMode) + '</span>';
-    return '<header class="ql-head"><h2 class="ql-title">' + esc(q.title) + '</h2>' +
+    // the analyst's one-line insight for this question (optional headline field)
+    var headline = qual.headlineFor(q);
+    var headlineHtml = headline ? '<p class="ql-headline">' + esc(headline) + "</p>" : "";
+    // C3 coverage bar — how complete the theme frame is. Below k it reads the
+    // UNFILTERED records (never cut-derived), matching the gated header count.
+    var cov = "";
+    if (q.type === "themed" && (q.themes || []).length) {
+      var c = qual.coverage(gated ? q.records : audience);
+      cov = '<span class="ql-cov" title="' + c.themed + " of " + c.total +
+        ' comments carry at least one theme">' +
+        '<span class="ql-covtrack"><span class="ql-covfill" style="width:' + c.pct + '%"></span></span>' +
+        c.pct + "% of comments themed</span>";
+    }
+    return '<header class="ql-head"><h2 class="ql-title">' + esc(q.title) + '</h2>' + headlineHtml +
       '<div class="ql-meta"><span class="ql-badge">' + badge + '</span>' +
-      '<span class="ql-base">' + n + '</span>' + shield + '</div></header>';
+      '<span class="ql-base">' + n + '</span>' + cov + qual.closedStatChip(q.code) + shield + '</div></header>';
   }
 
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
@@ -965,7 +1215,7 @@
       var label = (count / tot * W) >= 4 ? '<span class="ql-bn">' + count + "</span>" : "";  // shows when wide enough
       return '<span class="ql-bseg ' + cls + '" style="flex:' + count + '">' + label + "</span>";
     };
-    var body = rows.map(function (r) {
+    var card = function (r, other) {
       var sel = r.id === st.theme ? " on" : "";
       var tot = r.pos + r.neu + r.neg || 1;           // sentiment-coded mentions of this theme
       var f = (r.neg + r.neu / 2) / tot;              // fraction of the bar that sits left of zero
@@ -973,14 +1223,41 @@
         '<span class="ql-dbar" style="left:' + (50 - f * W) + "%;width:" + W + '%">' +
           seg("neg", r.neg, tot) + seg("neu", r.neu, tot) + seg("pos", r.pos, tot) + "</span></span>";
       var netCls = r.net > 0 ? "pos" : r.net < 0 ? "neg" : "neu";
-      return '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" ' +
-          'title="' + esc(r.label) + " — " + r.n + " of " + audience.length +
-          " raised it unprompted (" + r.pos + " positive, " + r.neu + " mixed, " + r.neg + ' negative)">' +
-        '<span class="ql-plabel">' + esc(r.label) + "</span>" + bar +
-        '<span class="ql-ppct">' + r.pct + '%<span class="ql-pn">n=' + r.n + "</span></span>" +
-        '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + "%</span>" +
-        "</button>";
-    }).join("");
+      var title = other
+        ? (r.n + " of " + audience.length + " commented without raising a coded theme (" +
+           r.pos + " positive, " + r.neu + " mixed, " + r.neg + " negative)")
+        : (r.label + " — " + r.n + " of " + audience.length + " raised it unprompted (" +
+           r.pos + " positive, " + r.neu + " mixed, " + r.neg + " negative)");
+      // 1–2 championed quotes inline (C2): the analyst's shortlist first, else
+      // the highest noteworthy tier — reached only ABOVE the disclosure gate.
+      var champ = qual.championQuotes(audience, r.id, q.code, 2).map(function (c) {
+        return '<div class="ql-champq ' + (SENT[c.sentiment] || "neu") + '">“' + esc(c.text) +
+          '”<span class="ql-champid">#' + esc(c.idx) +
+          (qual.isSaved(q.code, c.idx) ? " · shortlisted" : "") + "</span></div>";
+      }).join("");
+      return '<div class="ql-tcard"><div class="ql-trow">' +
+        '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" title="' + esc(title) + '">' +
+          '<span class="ql-plabel' + (other ? " other" : "") + '">' + esc(r.label) + "</span>" + bar +
+          '<span class="ql-ppct">' + r.pct + '%<span class="ql-pn">n=' + r.n + "</span></span>" +
+          '<span class="ql-pnet ' + netCls + '">net ' + (r.net > 0 ? "+" : "") + r.net + "%</span>" +
+        "</button>" +
+        '<button class="ql-tfocus" data-theme-focus="' + r.id +
+          '" title="Read these comments in focus mode" aria-label="Read ' + esc(r.label) +
+          ' in focus mode">⤢</button></div>' +
+        (champ ? '<div class="ql-champ">' + champ + "</div>" : "") + "</div>";
+    };
+    var body = rows.map(function (r) { return card(r, false); }).join("");
+    // C3: the unthemed comments as a first-class card — same treatment, ranked
+    // last regardless of volume so the frame's themes always lead.
+    var unthemed = qual.unthemed(audience);
+    if (unthemed.length) {
+      var uc = qual.sentimentCounts(unthemed);
+      var un = uc.pos + uc.neu + uc.neg;
+      body += card({ id: qual.OTHER_THEME, label: "Everything else", n: unthemed.length,
+        pct: Math.round(unthemed.length / audience.length * 100),
+        pos: uc.pos, neu: uc.neu, neg: uc.neg,
+        net: un ? Math.round((uc.pos - uc.neg) / un * 100) : 0 }, true);
+    }
     var axis = '<div class="ql-daxis"><span></span>' +
       '<span class="ql-dends"><span>← more negative</span><span>more positive →</span></span></div>';
     return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
@@ -1116,6 +1393,8 @@
     var caption;
     if (st.savedOnly) {
       caption = "Shortlisted comments";
+    } else if (q.type === "themed" && st.theme === qual.OTHER_THEME) {
+      caption = "Comments with no coded theme (everything else)";
     } else if (q.type === "themed" && st.theme != null) {
       var th = (q.themes || []).filter(function (t) { return t.id === st.theme; })[0];
       caption = 'Comments mentioning “' + esc(th ? th.label : "") + '”';
@@ -1123,13 +1402,40 @@
       caption = q.type === "themed" ? "All comments (pick a theme above to filter)" : "Comments";
     }
     if (st.sentiment != null && qual.hasSentiment(q)) caption = (SENT_WORD[st.sentiment] || "") + " · " + caption;
-    var cards = records.length
-      ? records.map(function (r) { return quoteCard(r, q.code); }).join("")
-      : '<p class="ql-empty">' + (st.savedOnly
-          ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
-          : "No comments for this selection.") + "</p>";
+    var focusBtn = records.length
+      ? '<button class="ql-focusbtn" data-qual-focus ' +
+        'title="Read these comments one at a time — j/k or arrows to move, Esc to close">⤢ Focus</button>'
+      : "";
     return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
-      ' <span class="ql-hint">(' + records.length + ")</span></div>" + cards + "</div>";
+      ' <span class="ql-hint">(' + records.length + ")</span>" + focusBtn + "</div>" +
+      drawerCardsHtml(records, q, st) + "</div>";
+  }
+
+  // Curated-first (C1): the analyst's selection (shortlisted / highlighted)
+  // leads under its own rubric; "show all N" expands the rest. Presentation
+  // only — both halves are the SAME already-gated visible-record list, and the
+  // shortlist-only view (already curated by definition) keeps its flat list.
+  function drawerCardsHtml(records, q, st) {
+    if (!records.length) {
+      return '<p class="ql-empty">' + (st.savedOnly
+        ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
+        : "No comments for this selection.") + "</p>";
+    }
+    var cardOf = function (r) { return quoteCard(r, q.code); };
+    var split = st.savedOnly ? { curated: [], rest: records } : qual.curatedSplit(records, q.code);
+    if (!split.curated.length) return records.map(cardOf).join("");
+    var html = '<div class="ql-curhd">★ Analyst’s selection <span class="ql-hint">(' +
+      split.curated.length + ")</span></div>" + split.curated.map(cardOf).join("");
+    if (!split.rest.length) return html;
+    if (st.showRest) {
+      html += '<div class="ql-curhd rest">All comments</div>' + split.rest.map(cardOf).join("") +
+        '<button class="ql-showall" data-qual-showall aria-expanded="true">' +
+        "Back to the analyst’s selection</button>";
+    } else {
+      html += '<button class="ql-showall" data-qual-showall aria-expanded="false">Show all ' +
+        records.length + " comments</button>";
+    }
+    return html;
   }
 
   // Reached only when the audience is at/above the disclosure threshold (drawerHtml gates
@@ -1148,11 +1454,14 @@
       esc(qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved + '" title="' +
       (saved ? "Remove from your shortlist" : "Add to your shortlist") + '">' +
       (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>";
+    // sentiment word beside the edge accent — the coding is never colour-only
+    var sentWord = SENT_WORD[r.sentiment]
+      ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
     return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(qcode) + "#" + esc(r.idx) + '">' + star +
       '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
       (tags ? '<div class="ql-tags">' + tags + '</div>' : '') +
       hubControlHtml(qcode + "#" + r.idx) + '</div>' +
-      '<div class="ql-qfoot">' + save + '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
+      '<div class="ql-qfoot">' + save + sentWord + '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
 
   function footerHtml(island, q) {
@@ -1263,7 +1572,9 @@
         (tags ? '<div class="ql-tags">' + tags + "</div>" : "") +
         hubControlHtml(key) +
       "</div>" +
-      '<div class="ql-qfoot"><span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
+      '<div class="ql-qfoot">' + (SENT_WORD[r.sentiment]
+        ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "") +
+      '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
 
   function collectionMain(island, st, cutFilters, pool) {
@@ -1325,7 +1636,10 @@
     var toggle = '<div class="ql-seg" role="tablist" aria-label="Group the collection by">' +
       '<button class="ql-segbtn' + (groupBy === "question" ? " on" : "") + '" data-colgroup="question">By question</button>' +
       '<button class="ql-segbtn' + (groupBy === "theme" ? " on" : "") + '" data-colgroup="theme">By theme</button></div>';
-    var actions = '<div class="ql-actions"><button class="ql-export" data-col-export ' +
+    var actions = '<div class="ql-actions">' +
+      (shown.length ? '<button class="ql-focusbtn" data-col-focus ' +
+        'title="Read these comments one at a time — j/k or arrows to move, Esc to close">⤢ Focus</button>' : "") +
+      '<button class="ql-export" data-col-export ' +
       'title="Download everything shown here as an Excel file">⬇ Export</button></div>';
 
     var noun = shown.length === 1 ? " mark" : " marks";
@@ -1344,7 +1658,8 @@
     if (pool.orphans) cover += ' · <span class="ql-orphan" title="These marks point at comments not present ' +
       'in this data run — re-mark to refresh them">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
-    qual._colview = { island: island, items: shown, hub: activeHub, coverPlain: coverPlain, safeDemos: safeDemos };
+    qual._colview = { island: island, items: shown, hub: activeHub, coverPlain: coverPlain,
+                      safeDemos: safeDemos, dropTags: hubBelowK };
 
     // A selected hub gets an insight field (the one-line finding) + "Add to story". Never
     // blocked: a below-k hub just drops its demographic tags (safeDemos above), with a calm
@@ -1384,12 +1699,25 @@
 
   // ---- interaction -----------------------------------------------------------
 
+  /** A data-theme attribute back to a theme id (numeric, or the OTHER sentinel). */
+  function themeAttr(raw) {
+    return raw === qual.OTHER_THEME ? raw : parseInt(raw, 10);
+  }
+
+  /** Display label for a theme id (the focus view's title). */
+  function focusThemeLabel(q, id) {
+    if (id === qual.OTHER_THEME) return "Everything else";
+    var th = (q.themes || []).filter(function (t) { return t.id === id; })[0];
+    return th ? th.label : "Theme";
+  }
+
   function wire(host, island) {
     var st = qual._state;
     host.querySelectorAll(".ql-railitem").forEach(function (b) {
       b.addEventListener("click", function () {
         TR.d2.state.qualQ = b.getAttribute("data-q");
         st.theme = null;
+        st.showRest = false;              // a new question re-collapses to the curated selection
         st.view = "question";             // a question click leaves the collection
         qual.clearJump();                 // leaving the jumped open-end drops the cut breadcrumb
         qual.render(host);
@@ -1406,7 +1734,7 @@
     host.querySelectorAll("[data-col-jump]").forEach(function (b) {
       b.addEventListener("click", function () {
         TR.d2.state.qualQ = b.getAttribute("data-col-jump");
-        st.theme = null; st.view = "question";
+        st.theme = null; st.showRest = false; st.view = "question";
         qual.clearJump();
         qual.render(host);
       });
@@ -1435,9 +1763,45 @@
     });
     host.querySelectorAll(".ql-prow").forEach(function (b) {
       b.addEventListener("click", function () {
-        var id = parseInt(b.getAttribute("data-theme"), 10);
+        var id = themeAttr(b.getAttribute("data-theme"));
         st.theme = (st.theme === id) ? null : id;   // toggle
         qual.render(host);
+      });
+    });
+    // C4 focus reading mode: from a theme card, the drawer, or the collection.
+    // Every entry reuses the ALREADY-GATED records its surface is showing.
+    host.querySelectorAll("[data-theme-focus]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = qual._view;
+        if (!v) return;
+        var id = themeAttr(b.getAttribute("data-theme-focus"));
+        var stTheme = { tier: st.tier, sentiment: st.sentiment, savedOnly: st.savedOnly, theme: id };
+        qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, stTheme, v.audience), v.q),
+          { title: focusThemeLabel(v.q, id) + " — " + v.q.title, trigger: b });
+      });
+    });
+    var fb = host.querySelector("[data-qual-focus]");
+    if (fb) fb.addEventListener("click", function () {
+      var v = qual._view;
+      if (v) qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, st, v.audience), v.q),
+        { title: v.q.title, trigger: fb });
+    });
+    var cf = host.querySelector("[data-col-focus]");
+    if (cf) cf.addEventListener("click", function () {
+      var v = qual._colview;
+      if (!v || !v.items.length) return;
+      qual.openFocus(v.items.map(function (it) {
+        return { record: it.record, qcode: it.qcode, qtitle: it.question.title };
+      }), { title: v.hub ? v.hub.name : "Your collection", dropTags: v.dropTags, trigger: cf });
+    });
+    // curated-first: expand / re-collapse the non-selected comments
+    var sa = host.querySelector("[data-qual-showall]");
+    if (sa) sa.addEventListener("click", function () { st.showRest = !st.showRest; qual.render(host); });
+    // the closed-stat chip: back to the linked closed question's crosstab card
+    host.querySelectorAll("[data-qual-return]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        qual.clearJump();
+        if (TR.shell && TR.shell.goQuestion) TR.shell.goQuestion(b.getAttribute("data-qual-return"));
       });
     });
     // theme x banner crosstab: view switch, banner + metric, row expand, insight
