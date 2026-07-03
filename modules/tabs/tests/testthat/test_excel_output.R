@@ -499,6 +499,43 @@ test_that("guide sheet content varies with config", {
   expect_true("Guide" %in% openxlsx::sheets(wb2))
 })
 
+test_that("guide sheet lists the banner column letters from banner_info$letters", {
+  # Regression: the legend was gated on banner_info$column_letters, a field
+  # banner.R never creates (it builds banner_info$letters), so the letter ->
+  # column mapping was silently omitted from every workbook.
+  wb <- openxlsx::createWorkbook()
+  styles <- create_excel_styles()
+  config <- make_test_config()
+  config$enable_significance_testing <- TRUE
+  banner_info <- make_test_banner_info()
+  # Real banner.R shape: the untested Total column carries "-"
+  banner_info$letters <- c("-", "A", "B")
+
+  create_guide_sheet(wb, config, banner_info, styles)
+
+  guide <- openxlsx::readWorkbook(wb, sheet = "Guide")
+  topics <- trimws(guide$Topic)
+  expect_true("BANNER COLUMN LETTERS" %in% topics)
+  expect_equal(guide$Description[which(topics == "A")], "Male")
+  expect_equal(guide$Description[which(topics == "B")], "Female")
+  # The Total's placeholder "-" is never listed as a letter
+  expect_false("-" %in% topics)
+})
+
+test_that("guide sheet omits the letters legend for a Total-only banner", {
+  wb <- openxlsx::createWorkbook()
+  styles <- create_excel_styles()
+  config <- make_test_config()
+  banner_info <- make_test_banner_info()
+  banner_info$letters <- "-"
+  banner_info$column_labels <- "Total"
+
+  create_guide_sheet(wb, config, banner_info, styles)
+
+  guide <- openxlsx::readWorkbook(wb, sheet = "Guide")
+  expect_false("BANNER COLUMN LETTERS" %in% trimws(guide$Topic))
+})
+
 
 # ==============================================================================
 # 9. End-to-end: write to file and verify

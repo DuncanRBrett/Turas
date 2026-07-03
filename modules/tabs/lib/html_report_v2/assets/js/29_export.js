@@ -9,7 +9,10 @@
  */
 (function (global) {
   "use strict";
-  var TR = global.TR, fmt = TR.fmt, S = TR.svg, esc = TR.fmt.escapeXml;
+  // esc strips XML-1.0-illegal characters as well as escaping entities (see
+  // TR.xlsx.escape) — a stray control char in a verbatim otherwise corrupts
+  // the slide part.
+  var TR = global.TR, fmt = TR.fmt, S = TR.svg, esc = TR.xlsx.escape;
 
   var exporter = TR.exporter = {};
   var EMU = 914400, SLIDE_W = 13.333, SLIDE_H = 7.5, MARGIN = 0.55;
@@ -446,6 +449,20 @@
       '<c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>';
   }
 
+  /** Embedded-workbook column letter for 0-based series index k: series 0
+   *  lives in column B (A holds the category labels). Base-26 A..Z,AA..
+   *  (mirrors banner.R's generate_excel_letters) so a 26th series makes a
+   *  valid Sheet1!$AA$… reference, not Sheet1!$[$…. */
+  function seriesLetter(k) {
+    var n = k + 2, s = "";
+    while (n > 0) {
+      s = String.fromCharCode(65 + (n - 1) % 26) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+  exporter._seriesLetter = seriesLetter;   // exposed for the export tests
+
   function chartSeries(model, rows, cols, type) {
     var palette = TR.render.palette();
     // Single-series bar/column and pie colour by CATEGORY (the semantic palette
@@ -462,7 +479,7 @@
     return cols.map(function (ci, k) {
       var col = model.columns[ci];
       var colour = palette[k % palette.length].replace("#", "").toUpperCase();
-      var letter = String.fromCharCode(66 + k);
+      var letter = seriesLetter(k);
       var valPts = rows.map(function (r, i) {
         var v = r.cells[ci] ? r.cells[ci].pct : null;
         return '<c:pt idx="' + i + '"><c:v>' +
@@ -514,7 +531,7 @@
       "</c:strCache></c:strRef></c:cat>";
     return rows.map(function (r, k) {
       var colour = rampColour(k);
-      var letter = String.fromCharCode(66 + k);
+      var letter = seriesLetter(k);
       var valPts = cols.map(function (ci, i) {
         var v = r.cells[ci] ? r.cells[ci].pct : null;
         return '<c:pt idx="' + i + '"><c:v>' +
@@ -539,6 +556,15 @@
    * packager, honouring chart type, row kind (detail/NETs) and columns.
    */
   exporter.buildChart = function (model, type, cols) {
+    // A question pinned on the trend-over-waves chart ("line") exports the
+    // wave-history line chart, matching the screen — a bar of current-wave
+    // values would silently drop the tracking story. Only a model with no
+    // wave history at all falls through to the bar chart.
+    if (type === "line") {
+      var trend = exporter.buildTrendChart(model);
+      if (trend) return trend;
+      type = "bar";
+    }
     // A mean ("Index") plot renders as a clustered bar/column with each charted
     // column as its own labelled bar — mirrors the on-screen chart (coerce a
     // percentage type to bar, then transpose columns -> labelled bars).
@@ -646,8 +672,21 @@
    * union of years incl. the current wave. {xml, workbook} or null.
    */
   exporter.buildTrendChart = function (model) {
-    var rows = TR.render.trendRows(model).slice(0, 6);
+    var all = TR.render.trendRows(model);
+    if (!all.length) return null;
+    // Mean-scale (0-10) rows and percentage/index rows never share an axis —
+    // the dominant group wins, the rest are dropped with a note. Mirrors
+    // render.trendChart exactly so the export matches the pinned view.
+    var small = all.filter(function (r) {
+      return r.kind === "mean" && Math.max.apply(null, r.waves.map(function (w) {
+        return w.value;
+      })) <= 10;
+    });
+    var pct = all.filter(function (r) { return small.indexOf(r) === -1; });
+    var meanScale = small.length > pct.length;
+    var rows = (meanScale ? small : pct).slice(0, 6);
     if (!rows.length) return null;
+    var dropped = all.length - rows.length;
     var palette = TR.render.palette();
     var years = [];
     rows.forEach(function (r) {
@@ -655,7 +694,7 @@
         if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
       });
     });
-    years.sort();
+    TR.render.waveKeySort(years);
     var pointsOf = function (r) {
       var byYear = {};
       TR.render.wavePoints(r).forEach(function (p) { byYear[p.year] = p.value; });
@@ -675,7 +714,7 @@
       "</c:strCache></c:strRef></c:cat>";
     var series = rows.map(function (r, k) {
       var colour = palette[k % palette.length].replace("#", "").toUpperCase();
-      var letter = String.fromCharCode(66 + k);
+      var letter = seriesLetter(k);
       var valPts = pointsOf(r).map(function (v, i) {
         return '<c:pt idx="' + i + '"><c:v>' + (v === null ? "" : v) + "</c:v></c:pt>";
       }).join("");
@@ -694,10 +733,10 @@
         "</c:numCache></c:numRef></c:val></c:ser>";
     }).join("");
     var pctOnly = rows.every(function (r) { return r.kind !== "mean"; });
-    var allMean = rows.every(function (r) { return r.kind === "mean"; });
     // Fixed value axis matching the pin: 0 (or the negative floor for NPS) to a
     // nice max, with means anchored to at least 10 — so auto-scaling never
-    // exaggerates a small wave-on-wave move.
+    // exaggerates a small wave-on-wave move. meanScale comes from the scale
+    // split above, exactly as on screen.
     var lo = 0, hi = 0;
     rows.forEach(function (r) {
       TR.render.wavePoints(r).forEach(function (p) {
@@ -706,7 +745,6 @@
         if (p.value > hi) hi = p.value;
       });
     });
-    var meanScale = allMean && hi <= 10;
     var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
     var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
     if (axisMax <= axisMin) axisMax = axisMin + 1;
@@ -734,7 +772,9 @@
         }));
       }));
     // sheet name must match the Sheet1!… formula refs (see buildChart)
-    return { xml: xml, workbook: TR.xlsx.bytes("Sheet1", workbookRows) };
+    return { xml: xml, workbook: TR.xlsx.bytes("Sheet1", workbookRows),
+      note: dropped > 0
+        ? dropped + " series hidden (mixed scales or >6)" : "" };
   };
 
   /**
@@ -837,8 +877,16 @@
         var chart = exporter.buildChart(model, flags.chartType || "bar", dcols);
         if (chart) {
           charts.push(chart);
+          // the trend chart's mixed-scale note ("N series hidden …") renders
+          // as a strip under the chart, mirroring the on-screen footnote
+          var chartNoteH = chart.note ? 0.22 : 0;
           content += chartFrame(next(),
-            { x: MARGIN, y: top, w: contentW, h: chartH }, "rId2");
+            { x: MARGIN, y: top, w: contentW, h: chartH - chartNoteH }, "rId2");
+          if (chart.note) {
+            content += textBox(next(),
+              { x: MARGIN, y: top + chartH - chartNoteH, w: contentW, h: chartNoteH },
+              [para(chart.note, { size: 8.5, colour: GREY })]);
+          }
           top += chartH + 0.2;
         }
       }

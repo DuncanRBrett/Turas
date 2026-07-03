@@ -27,6 +27,20 @@
     return m ? parseInt(m[1], 10) : null;
   };
 
+  /** Chronological in-place sort for wave order keys. Numeric when every key
+   *  parses ([9, 10, 11] — Array.prototype.sort's default string compare gives
+   *  [10, 11, 9]); lexicographic only when a key is non-numeric. Shared with
+   *  the native PPTX trend chart so both axes agree. */
+  render.waveKeySort = function (years) {
+    return years.sort(function (a, b) {
+      var na = Number(a), nb = Number(b);
+      if (isNaN(na) || isNaN(nb)) {
+        return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+      }
+      return na - nb;
+    });
+  };
+
   /** Full point list for a model row: history + the current Total value.
    *  Rows whose .waves already embed the current point (Visualise pseudo
    *  rows) keep it — nothing is appended when the cells carry no value. */
@@ -198,7 +212,7 @@
         if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
       });
     });
-    years.sort();
+    render.waveKeySort(years);
     var lo = 0, hi = 0;
     series.forEach(function (s) {
       s.points.forEach(function (p) {

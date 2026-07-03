@@ -5,9 +5,21 @@
  */
 (function (global) {
   "use strict";
-  var TR = global.TR, esc = TR.fmt.escapeXml;
+  var TR = global.TR;
 
   var xlsx = TR.xlsx = {};
+
+  /** escapeXml + strip characters XML 1.0 forbids even when entity-escaped:
+   *  C0 controls other than \t \n \r, U+FFFE/U+FFFF and unpaired surrogates
+   *  (valid pairs — emoji — survive). A stray \x0B in a verbatim otherwise
+   *  yields an invalid worksheet/slide part that Excel and PowerPoint refuse.
+   *  Shared with the PPTX text runs in 29_export.js. */
+  xlsx.escape = function (value) {
+    return TR.fmt.escapeXml(value).replace(
+      /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u0000-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/g,
+      function (m) { return m.length === 2 ? m : ""; });
+  };
+  var esc = xlsx.escape;
 
   var XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   var CT = XML +

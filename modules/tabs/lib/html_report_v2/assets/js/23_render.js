@@ -306,12 +306,31 @@
       var label = col.label + (col.letter ? " (" + col.letter + ")" : "");
       head = head.concat(perCol(label, label + " lo", label + " hi"));
     });
-    var baseCells = ["Base (n=)"];
+    // Weighted reports mirror the on-screen base block (tableHtml): the
+    // unweighted row is relabelled and the weighted + Kish effective bases
+    // follow, gated by the same show_weighted_base / show_effective_n flags —
+    // an export labelled plain "Base (n=)" next to weighted percentages reads
+    // as unweighted counts.
+    var wproj = (TR.AGG && TR.AGG.project) || {};
+    var wtd = !!wproj.weighted;
+    var baseCells = [wtd ? "Base (unweighted)" : "Base (n=)"];
     model.columns.forEach(function (col) {
       baseCells = baseCells.concat(
         perCol(fmt.base(col.base) + (col.low ? " ⚠" : ""), "", ""));
     });
     var body = [{ kind: "base", cells: baseCells }];
+    if (wtd) {
+      var baseRow = function (label, key) {
+        var cells = [label];
+        model.columns.forEach(function (col) {
+          cells = cells.concat(
+            perCol(col[key] != null ? fmt.base(col[key]) : "–", "", ""));
+        });
+        body.push({ kind: "base", cells: cells });
+      };
+      if (wproj.show_weighted_base !== false) baseRow("Base (weighted)", "baseW");
+      if (wproj.show_effective_n !== false) baseRow("Effective base", "baseEff");
+    }
     var round1 = function (v) { return Math.round(v * 10) / 10; };
     // The wave-change chip for a row (▼0.1), as structured data the export
     // tables can colour; Excel/TSV ignore it. Tiny non-mean moves are dropped,

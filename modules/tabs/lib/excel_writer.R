@@ -1750,11 +1750,15 @@ create_guide_sheet <- function(wb, config_obj, banner_info, styles) {
   }
 
   # === BANNER COLUMNS ===
-  if (!is.null(banner_info) && !is.null(banner_info$column_letters)) {
+  # banner.R stores the letters as banner_info$letters ("-" for the untested
+  # Total column); only lettered columns are listed.
+  if (!is.null(banner_info) && !is.null(banner_info$letters) &&
+      any(!is.na(banner_info$letters) & banner_info$letters != "-")) {
     add_section("BANNER COLUMN LETTERS")
     add_entry("Reference", "The following letters are assigned to banner columns for significance testing:")
-    for (i in seq_along(banner_info$column_letters)) {
-      ltr <- banner_info$column_letters[i]
+    for (i in seq_along(banner_info$letters)) {
+      ltr <- banner_info$letters[i]
+      if (is.na(ltr) || ltr == "-") next
       col_label <- if (!is.null(banner_info$column_labels) && i <= length(banner_info$column_labels)) {
         banner_info$column_labels[i]
       } else {

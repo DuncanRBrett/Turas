@@ -61,5 +61,34 @@ run("keepText forces a string cell even for clean numbers (text exports)", () =>
   assert(isNum(cell(45, true), 45), "native number unaffected by keepText");
 });
 
+/* ---- XML-1.0-illegal characters are stripped (corrupt-workbook gate) ---- */
+const esc = sandbox.TR.xlsx.escape;
+
+run("escape strips C0 controls XML 1.0 forbids (\\x0B verbatim gate)", () => {
+  assert(esc("a\x0Bb\x1Ac\x00d") === "abcd",
+    "\\x0B \\x1A \\x00 stripped: " + JSON.stringify(esc("a\x0Bb\x1Ac\x00d")));
+  assert(esc("l1\nl2\tl3\rl4") === "l1\nl2\tl3\rl4", "\\t \\n \\r survive (legal in XML 1.0)");
+  assert(esc(" plain text! ") === " plain text! ", "ordinary text untouched");
+});
+
+run("escape strips U+FFFE/U+FFFF and unpaired surrogates, keeps emoji pairs", () => {
+  assert(esc("a\uFFFEb\uFFFFc") === "abc", "FFFE/FFFF stripped");
+  assert(esc("a\uD800b") === "ab", "lone high surrogate stripped");
+  assert(esc("a\uDC00b") === "ab", "lone low surrogate stripped");
+  assert(esc("ok 😀 done") === "ok 😀 done", "valid surrogate pair (emoji) survives");
+});
+
+run("escape still entity-escapes after stripping", () => {
+  assert(esc("a<b\x0B&c") === "a&lt;b&amp;c",
+    "entities + strip compose: " + JSON.stringify(esc("a<b\x0B&c")));
+});
+
+run("a cell built from a control-char verbatim contains no illegal bytes", () => {
+  const xml = cell("Great\x0B course\x1A!", true);
+  assert(isText(xml), "verbatim stays a text cell");
+  assert(xml.indexOf("Great course!") !== -1, "text preserved minus the control chars");
+  assert(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(xml), "no illegal control bytes in the cell XML");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);
