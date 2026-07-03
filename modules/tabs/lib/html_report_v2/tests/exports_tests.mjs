@@ -229,5 +229,115 @@ run("weighted base rows land in TSV and carry '–' for a column missing baseW",
   assert(tsv.indexOf("Effective base\t371\t180") !== -1, "TSV effective row");
 });
 
+/* ---------------- 6. WP3–WP5 deck spine: cover, order, quotes, appendix -------- */
+// Real exporter + real story assembler (30_story) and exhibit engine (30x)
+// over minimal state stubs — the asserts run against genuine slide XML.
+
+vm.runInContext(readFileSync(path.join(JS_DIR, "30_story.js"), "utf8"), sandbox,
+  { filename: "30_story.js" });
+vm.runInContext(readFileSync(path.join(JS_DIR, "30x_exhibit.js"), "utf8"), sandbox,
+  { filename: "30x_exhibit.js" });
+
+function storyDeckSetup() {
+  TR.AGG = { project: { name: "Deck fixture", client: "CCS", wave: "Wave 12",
+    brand_colour: "#123ABC" }, questions: [], banner_groups: [] };
+  TR.d2 = { storeKey: (b) => b, bannerDescription: () => "All respondents",
+    tracking: () => ({ enabled: false, waves: [] }),
+    questionByCode: () => null, state: { filters: [] } };
+  TR.insights = { get: () => "" };
+  TR.shell = { toast: () => {} };
+  TR.views = { _indexQuestions: () => [],
+    _heatMatrix: () => ({ head: ["Metric"], rows: [] }) };
+  TR.report = { sectionText: (s) =>
+    s === "exec" ? "Overall service holds up.\nSecond paragraph." : "" };
+  TR.conf = { methodNote: () => "Wilson 95%" };
+}
+
+const quotePin = { kind: "snapshot", source: "qualitative",
+  title: "Masters want faster support", context: "3 of 9 comments", html: "",
+  lines: ["x"], moreN: 1, note: "",
+  quotes: [{ text: "slow support", q: "Anything else?", tags: ["Durban"],
+    sentiment: "neg" }] };
+const oldPin = { kind: "snapshot", source: "patterns", title: "Old pinned card",
+  context: "", html: "", lines: ["line one"], note: "" };
+const heatPin = { kind: "heatmap", banner: "", filters: [], note: "" };
+const xmlOf = (s) => (typeof s === "string" ? s : s.xml);
+
+run("deck spine: cover leads, quote slide, divider 01, old-pin table, Detail 02", () => {
+  storyDeckSetup();
+  const slides = TR.story2._slidesFor([
+    quotePin, { kind: "divider", title: "Part 2", note: "" }, heatPin, oldPin]);
+  eq(slides.length, 6, "cover + quote + divider + old pin + Detail divider + heatmap");
+  const cover = xmlOf(slides[0]);
+  assert(cover.indexOf("Deck fixture") !== -1, "cover carries the project name");
+  assert(cover.indexOf("Overall service holds up.") !== -1,
+    "cover carries the authored exec summary");
+  assert(cover.indexOf("Masters want faster support") !== -1,
+    "cover lists pin titles as insight lines");
+  assert(cover.indexOf("Old pinned card") !== -1, "every evidence pin named");
+  assert(cover.indexOf("Turas · The Research LampPost") !== -1, "wordmark on the cover");
+  assert(cover.indexOf("Part 2") === -1, "dividers are structure, not findings");
+  const quote = xmlOf(slides[1]);
+  assert(quote.indexOf(">“<") !== -1, "quote glyph on the qual pin's slide");
+  assert(quote.indexOf("<a:tbl>") === -1, "new quotes payload is never a table");
+  assert(quote.indexOf("Anything else? · Durban · Negative") !== -1,
+    "attribution chip line under the quote");
+  assert(quote.indexOf("+1 more in the report") !== -1, "pin overflow in the footer");
+  assert(xmlOf(slides[2]).indexOf("Part 2") !== -1 &&
+    xmlOf(slides[2]).indexOf(">01<") !== -1, "story divider numbered 01");
+  assert(xmlOf(slides[3]).indexOf("<a:tbl>") !== -1,
+    "OLD pin (no quotes payload) keeps the table fallback");
+  assert(xmlOf(slides[3]).indexOf("line one") !== -1, "old pin lines rendered");
+  assert(xmlOf(slides[4]).indexOf("Detail") !== -1 &&
+    xmlOf(slides[4]).indexOf(">02<") !== -1,
+    "matrix pins group behind a numbered Detail divider");
+  assert(xmlOf(slides[5]).indexOf("Index heatmap") !== -1,
+    "heatmap slide after the Detail divider");
+  assert(slides.every((s) => xmlOf(s).indexOf(TR.pptx.PAGE_TOKEN) === -1),
+    "page tokens resolved across the deck");
+});
+
+run("appendix flag: marked pins move behind an Appendix divider, APPENDIX kicker", () => {
+  storyDeckSetup();
+  const slides = TR.story2._slidesFor([
+    Object.assign({}, oldPin), Object.assign({}, heatPin, { appendix: true })]);
+  eq(slides.length, 4, "cover + pin + Appendix divider + appendix slide");
+  assert(xmlOf(slides[2]).indexOf("Appendix") !== -1, "Appendix divider");
+  assert(xmlOf(slides[3]).indexOf("APPENDIX") !== -1, "appendix slide kicker");
+  // with explicit appendix marks, unmarked matrix pins keep their story place
+  const keep = TR.story2._slidesFor([
+    Object.assign({}, heatPin), Object.assign({}, oldPin, { appendix: true })]);
+  assert(xmlOf(keep[1]).indexOf("Index heatmap") !== -1,
+    "analyst-marked decks are never re-sorted");
+});
+
+run("an all-tables deck keeps its order — no Detail divider inserted", () => {
+  storyDeckSetup();
+  const slides = TR.story2._slidesFor([
+    Object.assign({}, heatPin), Object.assign({}, heatPin)]);
+  eq(slides.length, 3, "cover + two heatmaps, nothing inserted");
+});
+
+run("WP5: exhibit trend slide carries the wave-delta chip and the CI note", () => {
+  storyDeckSetup();
+  TR.AGG.project.wave_order = 11;
+  TR.d2.questionByCode = (c) => ({ code: c, title: "KPI" });
+  TR.trk = { points: () => [{ year: 9, value: 50 },
+    { year: 10, value: 55, change_prev: 5, sig_prev: true, current: true }] };
+  const model = { code: "Q1", title: "KPI question",
+    columns: [{ label: "Total", base: 200 }],
+    rows: [{ kind: "net", label: "Top2 (NET)", waves: [], cells: [{ pct: 55 }] }] };
+  TR.model = { forQuestion: () => model };
+  const item = { kind: "exhibit", qs: ["Q1"], banner: "", filters: [], ci: true,
+    series: [{ code: "Q1", ri: 0, seg: "total", label: "Total" }],
+    flags: { dist: false, trend: true, table: false, insight: true }, note: "" };
+  const slide = TR.exhibit.slide(item);
+  assert(slide.xml.indexOf("▲ +5pp •") !== -1, "delta chip from the headline series");
+  assert(slide.xml.indexOf("Wilson 95% confidence bands shown") !== -1,
+    "CI note in the footer when interval bands are pinned on");
+  const noCi = TR.exhibit.slide(Object.assign({}, item, { ci: false }));
+  assert(noCi.xml.indexOf("confidence bands shown") === -1, "no CI note when bands off");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);

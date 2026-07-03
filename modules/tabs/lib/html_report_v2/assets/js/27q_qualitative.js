@@ -805,8 +805,12 @@
    * Build a Story exhibit for a hub — its name, its one-line insight (the finding), a
    * coverage line, and up to `cap` illustrative quotes (with a compact demographic code
    * when safeDemos) + a "+N more" note. Returns a pinSnapshot payload
-   * { source, title, context, html, lines }. Pure + node-testable — the html is what the
-   * Story renders, the lines are what the deck export rasterises.
+   * { source, title, context, html, lines, quotes, moreN }. Pure + node-testable — the
+   * html is what the Story renders, the lines are what the image deck rasterises, and
+   * quotes is the structured payload the editable deck's quote slide renders (WP4).
+   * Every disclosure rule the exhibit applies travels into the payload: hidden text
+   * (record.text == null) is never included; below-k hubs (safeDemos=false) carry no
+   * demographic tags.
    */
   qual.hubExhibit = function (hub, items, opts) {
     opts = opts || {};
@@ -817,11 +821,12 @@
     var safeDemos = opts.safeDemos !== false;
     var shown = (items || []).slice(0, cap);
     var moreN = (items || []).length - shown.length;
-    var demoCode = function (r) {
-      if (!safeDemos || !r.demos) return "";
+    var demoTags = function (r) {
+      if (!safeDemos || !r.demos) return [];
       return Object.keys(r.demos).filter(function (k) { return r.demos[k] != null; })
-        .map(function (k) { return r.demos[k]; }).join(" · ");
+        .map(function (k) { return r.demos[k]; });
     };
+    var demoCode = function (r) { return demoTags(r).join(" · "); };
     var qhtml = shown.map(function (it) {
       var r = it.record, sent = SENT[r.sentiment] || "neu";
       var txt = r.text == null ? "[quote hidden]" : r.text;
@@ -838,14 +843,20 @@
     var lines = [name];
     if (insight) lines.push(insight);
     if (coverage) lines.push(coverage);
+    // structured quotes for the editable deck's quote slide (WP4) — built
+    // beside lines so the two carry EXACTLY the same disclosure gates
+    var quotes = [];
     shown.forEach(function (it) {
       var r = it.record;
-      if (r.text == null) return;
+      if (r.text == null) return;   // hidden text stays hidden — never pinned
       var code = demoCode(r);
       lines.push("“" + r.text + "” — " + it.question.title + (code ? " (" + code + ")" : ""));
+      quotes.push({ text: r.text, q: it.question.title,
+        tags: demoTags(r), sentiment: SENT[r.sentiment] || "neu" });
     });
     if (moreN > 0) lines.push("+ " + moreN + " more");
-    return { source: "qualitative", title: name, context: insight || coverage, html: html, lines: lines };
+    return { source: "qualitative", title: name, context: insight || coverage,
+      html: html, lines: lines, quotes: quotes, moreN: moreN > 0 ? moreN : 0 };
   };
 
   function findQ(island, code) {

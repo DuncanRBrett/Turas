@@ -31,7 +31,9 @@
     SIZE: { cover: 32, divider: 30, title: 20, subtitle: 11, body: 11,
             kicker: 10, footer: 8.5,
             // secondary steps: divider/cover lead lines + table density tiers
-            lead: 13, table: 11, tableSmall: 9.5, tableTiny: 9 },
+            lead: 13, table: 11, tableSmall: 9.5, tableTiny: 9,
+            // archetype steps: divider ordinal (WP3) + quote slide (WP4)
+            ordinal: 60, quote: 14, quoteGlyph: 36, chip: 9.5 },
     MARGIN: 0.6,
     HEADER: { rule: { x: 0, y: 0, w: 13.333, h: 0.06 },          // brand rule
               kicker: { x: 0.6, y: 0.30, w: 12.13, h: 0.24 },    // grey caps

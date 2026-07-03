@@ -471,6 +471,35 @@
     return bits.join(" · ");
   };
 
+  /** WP5 wave-delta chip for a trend slide: the headline series' move vs the
+   *  prior wave, formatted by the same deltaText the exhibit table uses.
+   *  null when the exhibit has no trend panel or no delta to report. */
+  function slideChip(item, models) {
+    if (!(item.flags || {}).trend) return null;
+    var d = null;
+    if (isSeriesItem(item)) {
+      var rows = seriesPseudoRows(item, models);
+      var last = rows.length ? rows[0].waves[rows[0].waves.length - 1] : null;
+      if (last && last.change_prev !== null && last.change_prev !== undefined) {
+        d = { diff: last.change_prev, sig: last.sig_prev, isMean: !!rows[0].isMean };
+      }
+    } else if (models.length === 1) {
+      var row = exhibit.headlineRow(models[0]);
+      if (row && row.delta && row.delta.diff !== null &&
+          row.delta.diff !== undefined) d = row.delta;
+    }
+    if (!d) return null;
+    return { text: deltaText(d), up: d.diff >= 0 };
+  }
+
+  /** WP5 CI footer note for a pinned Visualise view drawn with interval
+   *  bands — names the method that actually drew them (footer-mid). */
+  function slideCiNotes(item, models) {
+    if (!item.ci) return null;
+    return { notes: [TR.conf.methodNote(seriesIntervalKind(item, models)) +
+      " confidence bands shown"] };
+  }
+
   /** PPTX slide: one native chart object per visible chart panel. */
   exhibit.slide = function (item) {
     var models = exhibit.models(item);
@@ -510,7 +539,9 @@
       meta: exhibit.contextLine(item, models) + scaleNote,
       charts: charts,
       matrix: flags.table ? exhibit.matrix(item, models) : null,
-      note: (flags.insight !== false && item.note) ? item.note : ""
+      note: (flags.insight !== false && item.note) ? item.note : "",
+      chip: slideChip(item, models),                // WP5 wave-delta chip
+      footer: slideCiNotes(item, models) || {}      // WP5 CI note when bands on
     });
   };
 

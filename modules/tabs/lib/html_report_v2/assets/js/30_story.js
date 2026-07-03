@@ -216,9 +216,18 @@
    *  card has no chart/table to rasterise, so the slide shows the same content
    *  rendered as a card). */
   story2.pinSnapshot = function (snap) {
-    load().push({ kind: "snapshot", source: snap.source || "card",
+    var item = { kind: "snapshot", source: snap.source || "card",
       title: snap.title || "Pinned card", context: snap.context || "",
-      html: snap.html || "", lines: (snap.lines || []).slice(), note: "" });
+      html: snap.html || "", lines: (snap.lines || []).slice(), note: "" };
+    // WP4: a structured quotes payload (qual hub exhibits) exports as a
+    // quote-typography slide. Additive — the payload arrives ALREADY
+    // disclosure-gated (hidden text absent, below-k tags dropped); old pins
+    // without it keep the table fallback unchanged.
+    if (snap.quotes && snap.quotes.length) {
+      item.quotes = JSON.parse(JSON.stringify(snap.quotes));
+      item.moreN = snap.moreN || 0;
+    }
+    load().push(item);
     touch();
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
@@ -591,11 +600,48 @@
     }
   }
 
+  /** WP3 cover: the same content as the HTML cover — project head, the
+   *  authored exec summary (report.sectionText) and the leading findings as
+   *  pin-title insight lines (story2.pinTitle, the reader chain). Falls back
+   *  to the plain title slide when the exporter has no cover (node stubs). */
+  function coverSlideFor(list) {
+    if (!TR.exporter.coverSlide) return TR.exporter.titleSlide(list.length);
+    var findings = list.filter(function (it) { return it.kind !== "divider"; })
+      .slice(0, 5).map(function (it) { return story2.pinTitle(it); });
+    var exec = (TR.report && TR.report.sectionText)
+      ? String(TR.report.sectionText("exec") || "").trim() : "";
+    return TR.exporter.coverSlide({ exec: exec, findings: findings });
+  }
+
+  // Data-table pin kinds — the deck's "Detail" tail when no appendix flags
+  // are in play (WP5).
+  function isDetailItem(item) {
+    return item.kind === "heatmap" || item.kind === "composite";
+  }
+
   function slidesFor(list) {
-    var slides = [TR.exporter.titleSlide(list.length)];
-    list.forEach(function (item) {
+    // WP5 deck tail: pins flagged appendix:true go behind an "Appendix"
+    // divider. When the analyst marked nothing, matrix/table pins (heatmap /
+    // composite) group behind a "Detail" divider — but only on a MIXED deck;
+    // an all-tables deck has nothing to separate and keeps its order.
+    var main = list, tail = [], tailTitle = "";
+    if (list.some(function (it) { return !!it.appendix; })) {
+      tailTitle = "Appendix";
+      main = list.filter(function (it) { return !it.appendix; });
+      tail = list.filter(function (it) { return !!it.appendix; });
+    } else if (list.some(isDetailItem) && list.some(function (it) {
+      return it.kind !== "divider" && !isDetailItem(it);
+    })) {
+      tailTitle = "Detail";
+      main = list.filter(function (it) { return !isDetailItem(it); });
+      tail = list.filter(isDetailItem);
+    }
+    var slides = [coverSlideFor(list)];
+    var divN = 0;   // WP3: dividers numbered in deck order
+    var emit = function (item, apx) {
       if (item.kind === "divider") {
-        slides.push(TR.exporter.dividerSlide(item.title, item.note || ""));
+        slides.push(TR.exporter.dividerSlide(item.title, item.note || "",
+          { num: ++divN }));
         return;
       }
       if (item.kind === "exhibit") {
@@ -606,7 +652,7 @@
       if (item.kind === "heatmap") {
         slides.push(TR.exporter.matrixSlide("Index heatmap",
           contextLine(item) + (item.note ? " · " + item.note : ""),
-          heatmapMatrix(item), { kicker: "Dashboard" }));
+          heatmapMatrix(item), { kicker: apx ? "Appendix" : "Dashboard" }));
         return;
       }
       if (item.kind === "composite") {
@@ -617,15 +663,27 @@
         slides.push(cm
           ? TR.exporter.matrixSlide("Composite — " + item.category,
               contextLine(item) + (item.note ? " · " + item.note : ""), cm,
-              { kicker: "Composite" })
+              { kicker: apx ? "Appendix" : "Composite" })
           : TR.exporter.dividerSlide("Composite — " + item.category,
               "This pin no longer resolves in this report."));
         return;
       }
       if (item.kind === "snapshot") {
+        // WP4: a structured quotes payload renders in quote typography; old
+        // pins (no payload) keep the one-column table fallback unchanged
+        if (item.quotes && item.quotes.length && TR.exporter.quoteSlide) {
+          slides.push(TR.exporter.quoteSlide({
+            title: item.title || "Pinned card",
+            kicker: apx ? "Appendix" : (item.source || "Verbatims"),
+            meta: item.context || "",
+            quotes: item.quotes, moreN: item.moreN || 0,
+            note: item.note || "" }));
+          return;
+        }
         slides.push(TR.exporter.matrixSlide(item.title || "Pinned card",
           (item.context || "") + (item.note ? " · " + item.note : ""),
-          snapshotMatrix(item), { kicker: item.source || "Pinned card" }));
+          snapshotMatrix(item),
+          { kicker: apx ? "Appendix" : (item.source || "Pinned card") }));
         return;
       }
       var model = modelFor(item);
@@ -639,7 +697,13 @@
             intervals: !!item.intervals,
             title: item.title || null }));   // D2: slide title = pin title
       }
-    });
+    };
+    main.forEach(function (item) { emit(item, false); });
+    if (tail.length) {
+      slides.push(TR.exporter.dividerSlide(tailTitle,
+        "Supporting data tables", { num: ++divN }));
+      tail.forEach(function (item) { emit(item, tailTitle === "Appendix"); });
+    }
     // WP1: resolve footer page-number tokens now the deck length is known
     // (the node gates stub TR.exporter without paginate — tokens never appear
     // there because the stubs emit no chrome)

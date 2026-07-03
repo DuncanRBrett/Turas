@@ -196,9 +196,14 @@
   function para(text, o) {
     if (!text && !o.delta) return "<a:p/>";
     var run = function (t, colour, bold) {
+      // optional alpha (percent) — the divider ordinal is 20%-alpha white
+      var fill = o.alpha
+        ? '<a:srgbClr val="' + colour + '"><a:alpha val="' +
+          Math.round(o.alpha * 1000) + '"/></a:srgbClr>'
+        : '<a:srgbClr val="' + colour + '"/>';
       return '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
         (bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
-        '<a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill>' +
+        '<a:solidFill>' + fill + '</a:solidFill>' +
         // explicit latin face: text boxes match the charts (and the theme)
         '<a:latin typeface="' + STYLE.FONT + '"/>' +
         "</a:rPr><a:t>" + esc(t) + "</a:t></a:r>";
@@ -987,8 +992,10 @@
    * chart, rels rId2..rId(1+n)) + optional table + insight band, on the
    * shared header/body/footer grid.
    * @param {object} spec - {title, meta, charts, matrix, note, kicker,
-   *   footer} — kicker defaults to TRACKING; footer fields (qcode, qtext,
-   *   base…) are optional and omitted segments drop gracefully.
+   *   footer, chip} — kicker defaults to TRACKING; footer fields (qcode,
+   *   qtext, base…) are optional and omitted segments drop gracefully;
+   *   chip = {text, up} draws the wave-delta chip (WP5) top-right of BODY
+   *   on the callout chrome (CALLOUT_BG + GOOD/BAD edge).
    */
   exporter.exhibitSlide = function (spec) {
     var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
@@ -1015,6 +1022,19 @@
       content += tableFrame(next(), { x: MARGIN, y: top, w: STYLE.BODY.w,
         h: Math.min(blockH, (matrix.body.length + 1) * 0.28) }, matrix, brand,
         matrix.head.length > 8 ? SIZE.tableSmall : SIZE.table);
+    }
+    // WP5 wave-delta chip: ▲ +4pp • top-right of BODY, on the callout chrome
+    // (drawn after the charts so it sits above the chart frame)
+    if (spec.chip && spec.chip.text) {
+      var chipC = spec.chip.up === false ? STYLE.BAD : STYLE.GOOD;
+      var chipBox = { x: MARGIN + STYLE.BODY.w - 1.9, y: STYLE.BODY.y + 0.06,
+        w: 1.9, h: 0.36 };
+      content += rectShape(next(), chipBox, STYLE.CALLOUT_BG) +
+        fillRect(next(), { x: chipBox.x, y: chipBox.y, w: 0.05, h: chipBox.h }, chipC) +
+        textBox(next(), { x: chipBox.x + 0.12, y: chipBox.y + 0.04,
+          w: chipBox.w - 0.2, h: 0.28 },
+          [para(spec.chip.text, { size: SIZE.kicker, bold: true, colour: chipC,
+            align: "ctr" })]);
     }
     if (hasNote) content += callout(next, noteLines, noteH);
     content += footer(next, spec.footer || {});
@@ -1154,18 +1174,78 @@
     return { xml: wrapSlide(content), charts: charts };
   };
 
-  /** Section divider slide (story dividers). */
-  exporter.dividerSlide = function (title, subtitle) {
+  /** Section divider slide (story dividers). opts.num draws the big section
+   *  ordinal ("02") at 20%-alpha white top-right (WP3); omitted = unnumbered
+   *  (back-compat + placeholder slides). */
+  exporter.dividerSlide = function (title, subtitle, opts) {
     var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
     var id = 1;
     var next = function () { return ++id; };
+    var ordinal = (opts && opts.num)
+      ? textBox(next(), { x: SLIDE_W - 3.3, y: 0.3, w: 2.7, h: 1.15 },
+          [para((opts.num < 10 ? "0" : "") + opts.num,
+            { size: SIZE.ordinal, bold: true, colour: WHITE, alpha: 20, align: "r" })])
+      : "";
     return wrapSlide(
       rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, brand) +
+      ordinal +
       rectShape(next(), { x: MARGIN, y: 3.55, w: 1.4, h: 0.05 }, STYLE.GOLD) +
       textBox(next(), { x: MARGIN, y: 2.7, w: SLIDE_W - MARGIN * 2, h: 0.9 },
         [para(title, { size: SIZE.divider, bold: true, colour: WHITE })]) +
       textBox(next(), { x: MARGIN, y: 3.75, w: SLIDE_W - MARGIN * 2, h: 0.5 },
         [para(subtitle || "", { size: SIZE.lead, colour: STYLE.ON_BRAND_MUTED })]));
+  };
+
+  /** Sentiment names for the quote-slide chip line — the marker colour is
+   *  never colour-only (spec archetype 5): the chip says the word. */
+  var SENT_WORD = { pos: "Positive", neg: "Negative", neu: "Mixed" };
+
+  /**
+   * Verbatim/quote slide (WP4): up to 4 quotes in quote typography — gold
+   * opening-quote glyph, italic ink quote on a 9.5" measure, grey attribution
+   * chip line (question · demo tags · sentiment word) and a sentiment edge
+   * rect — never a one-column table. spec = {title, meta, kicker, quotes:
+   * [{text, q, tags, sentiment}], moreN, note}. Quotes arrive ALREADY
+   * disclosure-gated (hidden text was never put in the payload; below-k tags
+   * were dropped at pin time) — this renders, it never re-derives.
+   */
+  exporter.quoteSlide = function (spec) {
+    var id = 1;
+    var next = function () { return ++id; };
+    var hasNote = !!(spec.note && spec.note.trim());
+    var noteLines = hasNote ? wrapText(spec.note, 150).slice(0, 3) : [];
+    var noteH = hasNote ? 0.45 + noteLines.length * 0.24 : 0;
+    var content = header(next, { kicker: spec.kicker || "Verbatims",
+      title: spec.title, subtitle: spec.meta || "" });
+    var all = spec.quotes || [];
+    var quotes = all.slice(0, 4);
+    var moreN = (spec.moreN || 0) + (all.length - quotes.length);
+    var top = STYLE.BODY.y;
+    var bottom = STYLE.BODY.y + STYLE.BODY.h - (hasNote ? noteH + 0.12 : 0);
+    var blockH = quotes.length ? (bottom - top) / quotes.length : 0;
+    quotes.forEach(function (qt, i) {
+      var y = top + i * blockH;
+      var sentC = qt.sentiment === "pos" ? STYLE.GOOD
+        : qt.sentiment === "neg" ? STYLE.BAD : GREY;
+      // sentiment edge — colour is reinforced by the chip's sentiment word
+      content += fillRect(next(), { x: MARGIN, y: y + 0.06, w: 0.05,
+        h: Math.max(blockH - 0.18, 0.2) }, sentC);
+      content += textBox(next(), { x: MARGIN + 0.18, y: y - 0.04, w: 0.75, h: 0.7 },
+        [para("“", { size: SIZE.quoteGlyph, bold: true, colour: STYLE.GOLD })]);
+      content += textBox(next(), { x: MARGIN + 1.0, y: y + 0.06, w: 9.5,
+        h: Math.max(blockH - 0.42, 0.3) },
+        [para(TR.charts.clip(String(qt.text || ""), 300),
+          { size: SIZE.quote, italic: true, colour: INK })]);
+      var chip = [qt.q].concat(qt.tags || [])
+        .concat([SENT_WORD[qt.sentiment] || null]).filter(Boolean).join(" · ");
+      content += textBox(next(), { x: MARGIN + 1.0, y: y + blockH - 0.34,
+        w: 9.5, h: 0.26 },
+        [para(TR.charts.clip(chip, 120), { size: SIZE.chip, colour: GREY })]);
+    });
+    if (hasNote) content += callout(next, noteLines, noteH);
+    content += footer(next,
+      { qtext: moreN > 0 ? "+" + moreN + " more in the report" : null });
+    return { xml: wrapSlide(content), charts: [] };
   };
 
   /** Generic title + native table slide (heatmaps, composites, snapshots) on
@@ -1183,6 +1263,68 @@
         h: Math.min(STYLE.BODY.h, (matrix.body.length + 1) * 0.32) }, matrix, brand,
         matrix.head.length > 8 ? SIZE.tableSmall : SIZE.table) +
       footer(next, opts.footer || {}));
+  };
+
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"];
+
+  /**
+   * Exec-summary cover (WP3): white page, brand rule down the left edge,
+   * REPORT kicker, project name, client · wave · date, the authored exec
+   * summary (first two paragraphs) and the leading findings as numbered
+   * insight lines with gold chips — the same content as the HTML cover
+   * (reader.coverFindings / report.sectionText), passed in by the deck
+   * assembler so this stays data-source-agnostic. Degrades to a clean title
+   * cover when spec carries no exec text / findings.
+   * spec = {exec, findings: [title, …]}. Replaces titleSlide in the editable
+   * deck; the image deck keeps titleSlide untouched.
+   */
+  exporter.coverSlide = function (spec) {
+    spec = spec || {};
+    var p = TR.AGG.project;
+    var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
+    var id = 1;
+    var next = function () { return ++id; };
+    var content = fillRect(next(), { x: 0, y: 0, w: 0.18, h: SLIDE_H }, brand);
+    content += textBox(next(), { x: MARGIN + 0.15, y: 0.62, w: 11.9, h: 0.3 },
+      [para("REPORT", { size: SIZE.kicker, bold: true, colour: GREY })]);
+    content += textBox(next(), { x: MARGIN + 0.15, y: 0.95, w: 11.9, h: 1.15 },
+      [para(p.name || "", { size: SIZE.cover, bold: true, colour: INK })]);
+    var d = new Date();
+    var sub = [p.client, p.wave,
+      d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear()]
+      .filter(Boolean).join(" · ");
+    content += textBox(next(), { x: MARGIN + 0.15, y: 2.12, w: 11.9, h: 0.34 },
+      [para(sub, { size: SIZE.lead, colour: GREY })]);
+    var y = 2.75;
+    var exec = String(spec.exec || "").trim();
+    if (exec) {
+      var execParas = exec.split(/\n+/).slice(0, 2).map(function (t) {
+        return para(TR.charts.clip(t, 320), { size: SIZE.body, colour: INK });
+      });
+      content += textBox(next(), { x: MARGIN + 0.15, y: y, w: 11.9, h: 1.5 },
+        execParas);
+      y += 1.62;
+    }
+    // leading findings only when story pins exist — same rule as the HTML
+    // cover (coverAvailable); a pin-less deck keeps a clean title cover
+    var findings = (spec.findings || []).filter(Boolean).slice(0, 5);
+    findings.forEach(function (text, i) {
+      var rowH = Math.min(0.52, (SLIDE_H - 0.55 - y) / (findings.length - i));
+      content += rectShape(next(), { x: MARGIN + 0.15, y: y + 0.03, w: 0.3, h: 0.3 },
+        STYLE.GOLD);
+      content += textBox(next(), { x: MARGIN + 0.15, y: y + 0.045, w: 0.3, h: 0.26 },
+        [para(String(i + 1), { size: SIZE.kicker, bold: true, colour: WHITE,
+          align: "ctr" })]);
+      content += textBox(next(), { x: MARGIN + 0.6, y: y, w: 11.2, h: rowH },
+        [para(TR.charts.clip(text, 130), { size: SIZE.lead, bold: true, colour: INK })]);
+      y += rowH;
+    });
+    // text wordmark, cover only (Duncan's locked decision — no logo asset)
+    content += textBox(next(), { x: SLIDE_W - MARGIN - 4.2, y: 7.02, w: 4.2, h: 0.32 },
+      [para("Turas · The Research LampPost",
+        { size: SIZE.footer, colour: GREY, align: "r" })]);
+    return wrapSlide(content);
   };
 
   exporter.titleSlide = function (itemCount) {

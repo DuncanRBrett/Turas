@@ -360,5 +360,112 @@ run("trend chart: emphasis line in brand, context grey, labels on emphasis only"
   eq(count(chart.xml, "<c:dLbls>"), 1, "labels on the emphasis series only");
 });
 
+/* ---------------- WP3: exec-summary cover + numbered dividers ---------------- */
+
+run("coverSlide: brand edge, REPORT kicker, head, exec text + numbered findings", () => {
+  proj({ client: "CCS", wave: "Wave 3" });
+  const xml = TR.exporter.coverSlide({
+    exec: "Overall service holds up.\nSecond paragraph here.",
+    findings: ["Registration is the pain point", "Value beats price"] });
+  const inch = (v) => Math.round(v * 914400);
+  at(xml, '<a:ext cx="' + inch(0.18) + '" cy="' + inch(7.5) + '"/>',
+    "full-height brand rule down the left edge");
+  at(xml, 'val="123ABC"', "edge in the project brand colour");
+  at(xml, ">REPORT<", "cover kicker");
+  at(xml, ">Style fixture<", "project name");
+  at(xml, "CCS · Wave 3 · ", "client · wave · date line");
+  at(xml, "Overall service holds up.", "authored exec summary, para 1");
+  at(xml, "Second paragraph here.", "exec summary para 2");
+  at(xml, "Registration is the pain point", "finding 1 as an insight line");
+  at(xml, "Value beats price", "finding 2 as an insight line");
+  at(xml, ">1<", "gold chip number 1");
+  at(xml, ">2<", "gold chip number 2");
+  at(xml, "Turas · The Research LampPost", "text wordmark (cover only)");
+  notAt(xml, TR.pptx.PAGE_TOKEN, "no page tokens on the cover");
+});
+
+run("coverSlide degrades to a clean title cover without exec text / findings", () => {
+  proj({ client: "CCS", wave: "Wave 3" });
+  const xml = TR.exporter.coverSlide({});
+  at(xml, ">Style fixture<", "project name still leads");
+  eq(count(xml, 'prst="roundRect"'), 0, "no finding chips when there are no findings");
+  notAt(xml, "exhibits · built natively", "no machine-y title-slide copy");
+});
+
+run("dividerSlide: 20%-alpha two-digit ordinal when numbered; unnumbered stays clean", () => {
+  proj();
+  const numbered = TR.exporter.dividerSlide("Drivers of choice", "", { num: 2 });
+  at(numbered, ">02<", "two-digit section ordinal");
+  at(numbered, '<a:srgbClr val="FFFFFF"><a:alpha val="20000"/></a:srgbClr>',
+    "ordinal at 20%-alpha white");
+  at(numbered, "Drivers of choice", "title kept");
+  const plain = TR.exporter.dividerSlide("Section", "sub");
+  notAt(plain, "<a:alpha", "no ordinal without a number (back-compat)");
+});
+
+/* ---------------- WP4: verbatim quote slide ---------------- */
+
+const QUOTES = [
+  { text: "Great value for money", q: "Why recommend?", tags: ["Female", "25–34"], sentiment: "pos" },
+  { text: "Support is too slow", q: "Anything else?", tags: ["Male"], sentiment: "neg" },
+  { text: "It is fine I suppose", q: "Anything else?", tags: [], sentiment: "neu" }
+];
+
+run("quoteSlide: quote typography — glyph, italic quote, attribution, NO table", () => {
+  proj();
+  const slide = TR.exporter.quoteSlide({ title: "Masters",
+    meta: "Faster support wanted", quotes: QUOTES, moreN: 0, note: "" });
+  at(slide.xml, ">“<", "gold opening-quote glyph");
+  at(slide.xml, 'i="1"', "quote runs italic");
+  at(slide.xml, "Great value for money", "quote text");
+  at(slide.xml, "Why recommend? · Female · 25–34 · Positive",
+    "attribution chip: question · demo tags · sentiment word");
+  at(slide.xml, "Anything else? · Male · Negative", "negative attribution");
+  at(slide.xml, "Anything else? · Mixed", "tag-less quote still names its sentiment");
+  notAt(slide.xml, "<a:tbl>", "never a one-column table");
+  at(slide.xml, 'val="' + STYLE.GOOD + '"', "positive sentiment edge");
+  at(slide.xml, 'val="' + STYLE.BAD + '"', "negative sentiment edge");
+  at(slide.xml, "VERBATIMS", "default kicker");
+  at(slide.xml, "Faster support wanted", "insight in the subtitle");
+});
+
+run("quoteSlide caps at 4 quotes and counts the rest in the footer", () => {
+  proj();
+  const many = Array.from({ length: 6 }, (_, i) => (
+    { text: "Quote number " + i, q: "Q", tags: [], sentiment: "neu" }));
+  const slide = TR.exporter.quoteSlide({ title: "Big", quotes: many, moreN: 2 });
+  at(slide.xml, "Quote number 3", "fourth quote shown");
+  notAt(slide.xml, "Quote number 4", "fifth quote dropped");
+  at(slide.xml, "+4 more in the report",
+    "footer counts slide overflow (2) + pin overflow (2)");
+});
+
+run("quoteSlide renders the analyst note as the gold callout band", () => {
+  proj();
+  const slide = TR.exporter.quoteSlide({ title: "T", quotes: QUOTES.slice(0, 1),
+    note: "The verbatims explain the drop." });
+  at(slide.xml, "ANALYST INSIGHT", "callout band present");
+  at(slide.xml, "The verbatims explain the drop.", "note text in the band");
+});
+
+/* ---------------- WP5: wave-delta chip + CI note on exhibit slides ------------ */
+
+run("exhibitSlide: delta chip on the callout chrome + CI note in the footer", () => {
+  proj();
+  const slide = TR.exporter.exhibitSlide({ title: "KPI", meta: "", charts: [],
+    matrix: null, note: "", chip: { text: "▲ +4pp •", up: true },
+    footer: { notes: ["Wilson 95% confidence bands shown"] } });
+  at(slide.xml, "▲ +4pp •", "delta chip text");
+  at(slide.xml, 'val="' + STYLE.CALLOUT_BG + '"', "chip on the callout background");
+  at(slide.xml, 'val="' + STYLE.GOOD + '"', "up chip edged GOOD");
+  at(slide.xml, "Wilson 95% confidence bands shown", "CI note in the footer-mid");
+  const down = TR.exporter.exhibitSlide({ title: "KPI", meta: "", charts: [],
+    matrix: null, note: "", chip: { text: "▼ −2pp", up: false } });
+  at(down.xml, 'val="' + STYLE.BAD + '"', "down chip edged BAD");
+  const none = TR.exporter.exhibitSlide({ title: "KPI", meta: "", charts: [],
+    matrix: null, note: "" });
+  notAt(none.xml, 'val="' + STYLE.CALLOUT_BG + '"', "no chip chrome without a chip");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);

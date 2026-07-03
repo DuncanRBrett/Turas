@@ -327,6 +327,23 @@ for (let i = 0; i < 11; i++) many.push({ qcode: "Q1", record: { idx: i, text: "c
 assert(qual.hubExhibit({ name: "Big", insight: "" }, many, { cap: 8 }).html.indexOf("+ 3 more comments in this hub") >= 0,
   "hubExhibit caps quotes at `cap` and notes the remainder");
 
+// WP4: structured quotes payload for the editable deck's quote slide — carries the
+// SAME disclosure gates as html/lines (hidden text absent, below-k tags dropped).
+assert(Array.isArray(ex.quotes) && ex.quotes.length === 2, "hubExhibit: structured quotes payload present");
+assert(ex.quotes[0].text === "great value" && ex.quotes[0].q === "Why recommend?" &&
+  ex.quotes[0].tags.join() === "Cape Town" && ex.quotes[0].sentiment === "pos",
+  "each quote carries text, question, demo tags and sentiment");
+assert(ex.quotes[1].sentiment === "neg", "sentiment code mapped (3 -> neg)");
+assert(exSafe.quotes.length === 2 && exSafe.quotes.every((q) => q.tags.length === 0),
+  "below-k exhibit payload (safeDemos=false) carries NO demographic tags");
+const hiddenItems = exItems.concat([{ qcode: "Q3",
+  record: { idx: 9, sentiment: 1, text: null, demos: {} }, question: { title: "Hidden" } }]);
+const exHidden = qual.hubExhibit({ name: "H", insight: "" }, hiddenItems, {});
+assert(exHidden.quotes.length === 2 && !exHidden.quotes.some((q) => q.q === "Hidden"),
+  "hidden text (record.text == null) never enters the quotes payload");
+assert(qual.hubExhibit({ name: "Big", insight: "" }, many, { cap: 8 }).moreN === 3,
+  "moreN carries the beyond-cap remainder for the quote slide footer");
+
 // ---- disclosure leaks (audit 2026-07-02) -------------------------------------
 // 1. the 💬 affordance counts within the ACTIVE cut (and shows no number below k);
 // 2. exportXlsx refuses below k (the drawer withholds the list — so must the export);
