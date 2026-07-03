@@ -16,24 +16,36 @@
   function store() {
     if (cache) return cache;
     cache = {};
-    if (TR.userState && TR.userState.annotations) {
-      Object.keys(TR.userState.annotations).forEach(function (k) {
-        cache[k] = TR.userState.annotations[k];
-      });
-    }
+    var own = null;
     try {
       var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
-      if (raw) {
-        var own = JSON.parse(raw) || {};
-        Object.keys(own).forEach(function (k) { cache[k] = own[k]; });
-      }
+      if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && own._owns) {
+      Object.keys(own).forEach(function (k) { if (k !== "_owns") cache[k] = own[k]; });
+      return cache;
+    }
+    if (TR.userState && TR.userState.annotations) {
+      Object.keys(TR.userState.annotations).forEach(function (k) {
+        if (k !== "_owns") cache[k] = TR.userState.annotations[k];
+      });
+    }
+    if (own) Object.keys(own).forEach(function (k) { if (k !== "_owns") cache[k] = own[k]; });
     return cache;
   }
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
+      if (global.localStorage) {
+        var out = { _owns: true };   // every persist here is a reader change
+        Object.keys(store()).forEach(function (k) { out[k] = store()[k]; });
+        localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(out));
+      }
     } catch (e) { /* in-memory only */ }
   }
 

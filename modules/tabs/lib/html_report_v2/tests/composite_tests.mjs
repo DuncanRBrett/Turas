@@ -255,5 +255,33 @@ run("composite ids are monotonic — a freed id is never reissued (H)", () => {
   assert(num(c) > num(b), "id climbs past the removed max (" + c + " > " + b + ")");
 });
 
+run("a stale composite story pin exports a placeholder slide, never crashes the deck", () => {
+  // audit 2026-07-02 30_story.js:536 — compositeMatrix() null (category renamed /
+  // mean rows gone after a carry-forward) crashed matrixSlide->fitMatrix and killed
+  // the WHOLE pptx export. Now: placeholder slide, live pins unaffected.
+  vm.runInContext(readFileSync(path.join(JS_DIR, "30_story.js"), "utf8"), sandbox,
+    { filename: "30_story.js" });
+  TR.charts = { clip: (s) => s };
+  TR.shell = { toast: () => {} };
+  TR.exporter = {
+    titleSlide: () => ({ kind: "title" }),
+    // dereferences the matrix exactly like fitMatrix does (matrix.body.length)
+    matrixSlide: (title, ctx, m) => ({ kind: "matrix", title: title, rows: m.body.length }),
+    dividerSlide: (title, note) => ({ kind: "divider", title: title, note: note })
+  };
+  const items = TR.story2.items();
+  items.length = 0;
+  items.push({ kind: "composite", category: "Ghost", banner: compId, filters: [] });   // stale
+  items.push({ kind: "composite", category: "Test", banner: compId, filters: [] });    // live (Q007 mean)
+  const slides = TR.story2._slidesFor(items);
+  eq(slides.length, 3, "title + placeholder + live composite");
+  eq(slides[1].kind, "divider", "the stale pin becomes a visible placeholder slide");
+  eq(slides[1].title, "Composite — Ghost", "the placeholder keeps the pin's title");
+  assert(slides[1].note.indexOf("no longer resolves") >= 0,
+    "the placeholder says the pin no longer resolves");
+  eq(slides[2].kind, "matrix", "the live composite still exports its matrix slide");
+  eq(slides[2].rows, 1, "live matrix carries its one index metric (Q007)");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

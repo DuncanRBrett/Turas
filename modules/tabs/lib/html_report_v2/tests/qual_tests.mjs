@@ -323,5 +323,84 @@ for (let i = 0; i < 11; i++) many.push({ qcode: "Q1", record: { idx: i, text: "c
 assert(qual.hubExhibit({ name: "Big", insight: "" }, many, { cap: 8 }).html.indexOf("+ 3 more comments in this hub") >= 0,
   "hubExhibit caps quotes at `cap` and notes the remainder");
 
+// ---- disclosure leaks (audit 2026-07-02) -------------------------------------
+// 1. the 💬 affordance counts within the ACTIVE cut (and shows no number below k);
+// 2. exportXlsx refuses below k (the drawer withholds the list — so must the export);
+// 3. the controls row hides live counts + the export button below k (render-level).
+console.log("\nQualitative disclosure leaks:");
+
+// affordanceHtml: the stubbed cut mask (set up above) keeps idx 0 and 2 -> 2 of 4.
+TR.d2 = { state: { filters: [{ q: "Q1", rows: [1] }] } };
+TR.disclosure = null;
+assert(qual.affordanceHtml("Q28").indexOf("💬 2 comments") >= 0,
+  "affordanceHtml counts within the ACTIVE cut (2 of 4, matching what the jump reveals)");
+TR.d2.state.filters = [];
+assert(qual.affordanceHtml("Q28").indexOf("💬 4 comments") >= 0,
+  "affordanceHtml with no cut -> the unfiltered 4");
+TR.d2.state.filters = [{ q: "Q1", rows: [1] }];
+TR.disclosure = { audienceTooSmall: () => true };
+const gatedAff = qual.affordanceHtml("Q28");
+assert(gatedAff.indexOf("💬 comments") >= 0 && !/💬 \d/.test(gatedAff),
+  "below k the affordance shows NO number (the count itself would leak)");
+
+// exportXlsx: below k the drawer withholds the whole list — the export must too.
+let dl = null;
+TR.xlsx = { download: (name, sheet, rows, opts) => { dl = { name, sheet, rows, opts }; } };
+TR.disclosure = { audienceTooSmall: () => true };
+qual.exportXlsx(island, q, q.records);
+assert(dl === null, "exportXlsx below k refuses — no file, not even row-level metadata");
+TR.disclosure = { audienceTooSmall: () => false };
+qual.exportXlsx(island, q, q.records.slice(0, 1));
+assert(dl !== null && dl.rows.length === 2 && dl.rows[1][1] === "Cape Town",
+  "exportXlsx at/above k exports normally (header + 1 row, demographics shown)");
+
+// controls row + header, via qual.render on an inert host (no DOM needed: wire()
+// finds no elements). Question: 4 answered, cut mask keeps idx 0 + 2 (2 shown),
+// sentiment-coded 2 pos / 0 mixed / 1 neg over the cut? — counts are over the FULL
+// pool passed (audience = the 2 masked records: idx 0 pos, idx 2 pos -> 2 pos).
+TR.QUAL = {
+  textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
+  demographics: [{ label: "Campus" }],
+  questions: [{ code: "QS", title: "Open feedback", type: "raw", themes: [],
+    base: { answered: 4 },
+    records: [
+      { idx: 0, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "a" },
+      { idx: 1, tier: 0, sentiment: 3, themeVals: {}, demos: {}, text: "b" },
+      { idx: 2, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "c" },
+      { idx: 3, tier: 0, sentiment: 3, themeVals: {}, demos: {}, text: "d" }
+    ] }]
+};
+TR.d2 = { state: { filters: [{ q: "Q1", rows: [1] }], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "cut" };
+const host = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+
+TR.disclosure = null;                                  // ungated render first
+qual._state = null;
+qual.render(host);
+const openHtml = host.innerHTML;
+assert(openHtml.indexOf("2 of 4 answered") >= 0, "ungated header shows the cut count (2 of 4 answered)");
+assert(openHtml.indexOf("data-qual-export") >= 0, "ungated controls render the ⬇ Export button");
+assert(openHtml.indexOf('All <span class="ql-segn">2</span>') >= 0 &&
+  openHtml.indexOf('Positive <span class="ql-segn">2</span>') >= 0 &&
+  openHtml.indexOf('Negative <span class="ql-segn">0</span>') >= 0,
+  "ungated sentiment chips carry live counts (All 2 · Positive 2 · Negative 0 over the cut)");
+
+TR.disclosure = { active: () => true, minBase: () => 10,
+  audienceTooSmall: () => true, note: () => "Withheld to protect confidentiality." };
+qual._state = null;
+qual.render(host);
+const gatedHtml = host.innerHTML;
+assert(gatedHtml.indexOf("data-qual-export") < 0, "below k the ⬇ Export button is NOT rendered at all");
+assert(gatedHtml.indexOf("ql-segn") < 0, "below k the sentiment chips carry NO counts");
+assert(gatedHtml.indexOf("2 of 4 answered") < 0 && gatedHtml.indexOf("4 answered") >= 0,
+  "below k the header shows only the unfiltered total (4 answered), never the cut count");
+assert(gatedHtml.indexOf('data-tier="all" disabled') >= 0 &&
+  gatedHtml.indexOf('data-sent="" disabled') >= 0,
+  "below k the tier + sentiment controls render disabled");
+assert(gatedHtml.indexOf("Withheld to protect confidentiality.") >= 0,
+  "below k the controls row carries the standard disclosure note");
+
+TR.disclosure = null;   // leave no gate behind for anything after
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

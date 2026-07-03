@@ -189,11 +189,16 @@
   qual.affordanceHtml = function (code) {
     var link = qual.linkFor(code);
     if (!link) return "";
-    var n = qual.commentCount(link.qcode);
+    // Count within the ACTIVE cut, so the number matches what the jump reveals —
+    // and below the disclosure threshold even that count would leak, so no number.
+    var filters = (TR.d2 && TR.d2.state && TR.d2.state.filters && TR.d2.state.filters.length)
+      ? TR.d2.state.filters : null;
+    var n = qual.commentCount(link.qcode, filters);
     if (!n) return "";
+    var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
     return '<button class="ql-jumpbtn" data-qual-jump="' + esc(code) +
       '" title="Read the ' + esc(link.title) + ' open-end comments behind this finding">' +
-      "💬 " + n + " comment" + (n === 1 ? "" : "s") + "</button>";
+      (gated ? "💬 comments" : "💬 " + n + " comment" + (n === 1 ? "" : "s")) + "</button>";
   };
 
   // ---- shortlist: star a comment; survives "Save copy" -----------------------
@@ -206,19 +211,32 @@
   function savedStore() {
     if (savedCache) return savedCache;
     savedCache = {};
-    if (TR.userState && TR.userState.qualSaved) {
-      Object.keys(TR.userState.qualSaved).forEach(function (k) { savedCache[k] = TR.userState.qualSaved[k]; });
-    }
+    var own = null;
     try {
       var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(SAVED_KEY));
-      if (raw) { var own = JSON.parse(raw) || {}; Object.keys(own).forEach(function (k) { savedCache[k] = own[k]; }); }
+      if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && own._owns) {
+      Object.keys(own).forEach(function (k) { if (k !== "_owns") savedCache[k] = own[k]; });
+      return savedCache;
+    }
+    if (TR.userState && TR.userState.qualSaved) {
+      Object.keys(TR.userState.qualSaved).forEach(function (k) { if (k !== "_owns") savedCache[k] = TR.userState.qualSaved[k]; });
+    }
+    if (own) Object.keys(own).forEach(function (k) { if (k !== "_owns") savedCache[k] = own[k]; });
     return savedCache;
   }
   function savedPersist() {
     try {
       if (typeof localStorage !== "undefined" && TR.d2) {
-        localStorage.setItem(TR.d2.storeKey(SAVED_KEY), JSON.stringify(savedStore()));
+        var out = { _owns: true };   // every persist here is a reader change
+        Object.keys(savedStore()).forEach(function (k) { out[k] = savedStore()[k]; });
+        localStorage.setItem(TR.d2.storeKey(SAVED_KEY), JSON.stringify(out));
       }
     } catch (e) { /* storage blocked — the shortlist stays in memory */ }
   }
@@ -252,18 +270,33 @@
   function hlStore() {
     if (hlCache) return hlCache;
     hlCache = {};
-    if (TR.userState && TR.userState.qualHighlights) {
-      Object.keys(TR.userState.qualHighlights).forEach(function (k) { hlCache[k] = TR.userState.qualHighlights[k]; });
-    }
+    var own = null;
     try {
       var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(HL_KEY));
-      if (raw) { var own = JSON.parse(raw) || {}; Object.keys(own).forEach(function (k) { hlCache[k] = own[k]; }); }
+      if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && own._owns) {
+      Object.keys(own).forEach(function (k) { if (k !== "_owns") hlCache[k] = own[k]; });
+      return hlCache;
+    }
+    if (TR.userState && TR.userState.qualHighlights) {
+      Object.keys(TR.userState.qualHighlights).forEach(function (k) { if (k !== "_owns") hlCache[k] = TR.userState.qualHighlights[k]; });
+    }
+    if (own) Object.keys(own).forEach(function (k) { if (k !== "_owns") hlCache[k] = own[k]; });
     return hlCache;
   }
   function hlPersist() {
     try {
-      if (typeof localStorage !== "undefined" && TR.d2) localStorage.setItem(TR.d2.storeKey(HL_KEY), JSON.stringify(hlStore()));
+      if (typeof localStorage !== "undefined" && TR.d2) {
+        var out = { _owns: true };   // every persist here is a reader change
+        Object.keys(hlStore()).forEach(function (k) { out[k] = hlStore()[k]; });
+        localStorage.setItem(TR.d2.storeKey(HL_KEY), JSON.stringify(out));
+      }
     } catch (e) { /* storage blocked — highlights stay in memory */ }
   }
   function hlMerge(ranges) {
@@ -359,6 +392,10 @@
 
   qual.exportXlsx = function (island, q, records) {
     if (!TR.xlsx || !TR.xlsx.download) return;
+    // Below the disclosure threshold the drawer withholds the whole list (even the
+    // count) — the export must keep that promise: a row per comment (ID, tier,
+    // sentiment, themes) would reveal exactly what the gate suppresses on screen.
+    if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) return;
     var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
     var base = (TR.fmt && TR.fmt.slug) ? TR.fmt.slug(q.title || q.code || "comments") : "comments";
     // keepText: verbatims, IDs and demographic values are prose / identifiers —
@@ -496,9 +533,11 @@
     return out;
   };
 
-  qual.exportCollectionXlsx = function (island, items) {
+  qual.exportCollectionXlsx = function (island, items, safeDemos) {
     if (!TR.xlsx || !TR.xlsx.download) return;
-    var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
+    // The caller passes the view's gate (hub-specific when a hub is active — set in
+    // collectionMain) so the export can never be more revealing than the screen.
+    if (safeDemos === undefined) safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
     TR.xlsx.download("collection_comments", "Collection",
       qual.collectionExportRows(island, items, safeDemos), { keepText: true });
   };
@@ -845,7 +884,10 @@
   function headerHtml(island, q, audience) {
     var asked = q.base ? q.base.answered : 0;
     var shown = audience.length;
-    var n = (shown === asked) ? (asked + " answered") : (shown + " of " + asked + " answered");
+    // Below the disclosure threshold the cut's commenter count is withheld too —
+    // show only the (unfiltered) answered total, matching the gated drawer.
+    var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
+    var n = (gated || shown === asked) ? (asked + " answered") : (shown + " of " + asked + " answered");
     var badge = q.type === "themed" ? "THEMED" : "VERBATIM-ONLY";
     var shield = island.textMode === "full" ? "" :
       '<span class="ql-shield" title="Verbatim confidentiality">🛡 ' + esc(island.textMode) + '</span>';
@@ -857,40 +899,50 @@
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
   // and — next to them — the shortlist toggle (per question) + Excel export.
   function controlsHtml(q, st, audience) {
+    // Disclosure control: below k the board/crosstab/drawer are all withheld, so this
+    // row must not leak the cut either — no live sentiment counts, no export button
+    // (it would emit a row per comment); the filters stay visible but disabled, with
+    // the standard disclosure note.
+    var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
+    var dis = gated ? " disabled" : "";
     var tierOpts = [["all", "All"], ["noteworthy", "Noteworthy+"], ["must_read", "Must-read"]];
     var tier = '<div class="ql-seg" role="tablist" aria-label="Noteworthy filter">' +
       tierOpts.map(function (o) {
         return '<button class="ql-segbtn' + (st.tier === o[0] ? " on" : "") +
-          '" data-tier="' + o[0] + '">' + o[1] + "</button>";
+          '" data-tier="' + o[0] + '"' + dis + '>' + o[1] + "</button>";
       }).join("") + "</div>";
 
     // The sentiment filter only appears when the question was actually sentiment-coded;
     // otherwise it would read "0 positive / 0 mixed / 0 negative" as if measured (it wasn't).
     var sent = "";
     if (qual.hasSentiment(q)) {
-      var sc = qual.sentimentCounts(qual.poolBeforeSentiment(q, st, audience));
-      var total = sc.pos + sc.neu + sc.neg;
-      var sentOpts = [["", "All", total, ""], ["1", "Positive", sc.pos, "pos"],
-                      ["2", "Mixed", sc.neu, "neu"], ["3", "Negative", sc.neg, "neg"]];
+      var sc = gated ? null : qual.sentimentCounts(qual.poolBeforeSentiment(q, st, audience));
+      var sentOpts = [["", "All", sc ? sc.pos + sc.neu + sc.neg : null, ""],
+                      ["1", "Positive", sc ? sc.pos : null, "pos"],
+                      ["2", "Mixed", sc ? sc.neu : null, "neu"],
+                      ["3", "Negative", sc ? sc.neg : null, "neg"]];
       var cur = st.sentiment == null ? "" : String(st.sentiment);
       sent = '<div class="ql-seg sentseg" role="tablist" aria-label="Sentiment filter">' +
         sentOpts.map(function (o) {
           return '<button class="ql-segbtn ' + o[3] + (cur === o[0] ? " on" : "") +
-            '" data-sent="' + o[0] + '">' + o[1] +
-            ' <span class="ql-segn">' + o[2] + "</span></button>";
+            '" data-sent="' + o[0] + '"' + dis + '>' + o[1] +
+            (o[2] == null ? "" : ' <span class="ql-segn">' + o[2] + "</span>") + "</button>";
         }).join("") + "</div>";
     }
 
     var savedN = qual.savedCount(q.code);
     var actions = '<div class="ql-actions">' +
-      '<button class="ql-savedonly' + (st.savedOnly ? " on" : "") + '" data-savedonly aria-pressed="' +
-        st.savedOnly + '" title="Show only the comments you have shortlisted for this question">' +
+      '<button class="ql-savedonly' + (st.savedOnly ? " on" : "") + '" data-savedonly' + dis +
+        ' aria-pressed="' + st.savedOnly +
+        '" title="Show only the comments you have shortlisted for this question">' +
         "★ Shortlist" + (savedN ? " (" + savedN + ")" : "") + "</button>" +
-      '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
-        "⬇ Export</button></div>";
+      (gated ? "" :
+        '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
+        "⬇ Export</button>") + "</div>";
     // Labelled "Filter the comments below" — these narrow the LIST, not the chart above.
     return '<div class="ql-controls"><span class="ql-ctrllbl">Filter the comments below:</span>' +
-      tier + sent + actions + "</div>";
+      tier + sent + actions +
+      (gated ? '<span class="ql-disclosure">🛡 ' + esc(TR.disclosure.note()) + "</span>" : "") + "</div>";
   }
 
   function prevalenceHtml(q, st, audience) {
@@ -1432,7 +1484,7 @@
     var colEx = host.querySelector("[data-col-export]");
     if (colEx) colEx.addEventListener("click", function () {
       var v = qual._colview;
-      if (v) qual.exportCollectionXlsx(v.island, v.items);
+      if (v) qual.exportCollectionXlsx(v.island, v.items, v.safeDemos);
     });
     wireHighlights(host);
   }

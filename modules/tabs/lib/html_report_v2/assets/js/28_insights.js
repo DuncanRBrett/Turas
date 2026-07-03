@@ -14,26 +14,38 @@
   function store() {
     if (cache) return cache;
     cache = {};
+    var own = null;
+    try {
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
+      if (raw) own = JSON.parse(raw) || null;
+    } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && own._owns) {
+      Object.keys(own).forEach(function (k) { if (k !== "_owns") cache[k] = own[k]; });
+      return cache;
+    }
     // saved-copy state (embedded island) seeds the store; the reader's own
     // localStorage edits then take precedence over the author's
     if (TR.userState && TR.userState.insights) {
       Object.keys(TR.userState.insights).forEach(function (k) {
-        cache[k] = TR.userState.insights[k];
+        if (k !== "_owns") cache[k] = TR.userState.insights[k];
       });
     }
-    try {
-      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
-      if (raw) {
-        var own = JSON.parse(raw) || {};
-        Object.keys(own).forEach(function (k) { cache[k] = own[k]; });
-      }
-    } catch (e) { /* island-only */ }
+    if (own) Object.keys(own).forEach(function (k) { if (k !== "_owns") cache[k] = own[k]; });
     return cache;
   }
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
+      if (global.localStorage) {
+        var out = { _owns: true };   // every persist here is a reader change
+        Object.keys(store()).forEach(function (k) { out[k] = store()[k]; });
+        localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(out));
+      }
     } catch (e) { /* storage full/blocked — insights stay in-memory */ }
   }
 

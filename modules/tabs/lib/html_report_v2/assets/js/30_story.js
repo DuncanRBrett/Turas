@@ -15,32 +15,49 @@
   var story2 = TR.story2 = {};
   var KEY = "turas_v2_story";
   var items = null;
+  var owned = false;   // the reader has changed the story in this browser
   var presentAt = 0;
 
   function load() {
     if (items) return items;
     items = [];
+    var own = null;
+    try {
+      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
+      if (raw) own = JSON.parse(raw) || null;
+    } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && !Array.isArray(own) && own._owns) {
+      owned = true;
+      items = Array.isArray(own.items) ? own.items : [];
+      return items;
+    }
     if (TR.userState && Array.isArray(TR.userState.story)) {
       items = JSON.parse(JSON.stringify(TR.userState.story));
     }
-    try {
-      var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
-      if (raw) {
-        var own = JSON.parse(raw) || [];
-        if (own.length) items = own;
-      }
-    } catch (e) { /* island-only */ }
+    if (Array.isArray(own) && own.length) items = own;   // legacy un-owning state
     return items;
   }
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(load()));
+      if (global.localStorage) {
+        localStorage.setItem(TR.d2.storeKey(KEY),
+          JSON.stringify(owned ? { _owns: true, items: load() } : load()));
+      }
     } catch (e) { /* in-memory only */ }
     if (typeof document === "undefined") return;   // headless (node gate)
     var badge = document.getElementById("story-count");
     if (badge) badge.textContent = String(load().length);
   }
+
+  // A reader change (add/edit/delete/clear) takes ownership, then persists;
+  // renderTab's passive persist stays un-owning (it never changes the story).
+  function touch() { owned = true; persist(); }
 
   story2.items = function () { return load(); };
 
@@ -50,7 +67,7 @@
     (incoming || []).forEach(function (item) {
       if (!have[JSON.stringify(item)]) load().push(item);
     });
-    persist();
+    touch();
   };
 
   /* ---------------- pin creators ---------------- */
@@ -100,7 +117,7 @@
       counts: !!s.showCounts,         // the "Counts" toggle travels with the pin
       note: ""
     });
-    persist();
+    touch();
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
 
@@ -115,7 +132,7 @@
       chartKind: chartState.kind, chartCols: chartState.cols,
       hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
       note: "" });
-    persist();
+    touch();
     TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
   };
 
@@ -131,7 +148,7 @@
       flags: { dist: !!flags.dist, trend: !!flags.trend,
         table: !!flags.table, insight: flags.insight !== false },
       distType: "column", note: spec.note || "" });
-    persist();
+    touch();
     TR.shell.toast("Pinned exactly as selected (" + load().length +
       ") — see the Story tab");
   };
@@ -173,7 +190,7 @@
           trend: holder.querySelector("#ex-trend").checked,
           table: holder.querySelector("#ex-table").checked, insight: true },
         distType: "column", note: "" });
-      persist();
+      touch();
       holder.hidden = true;
       story2.renderTab(document.getElementById("tabhost"));
     });
@@ -182,7 +199,7 @@
   story2.pinHeatmap = function (banner) {
     load().push({ kind: "heatmap", banner: banner,
       filters: JSON.parse(JSON.stringify(TR.d2.state.filters)), note: "" });
-    persist();
+    touch();
     TR.shell.toast("Heatmap pinned to story (" + load().length + ")");
   };
 
@@ -195,7 +212,7 @@
     load().push({ kind: "snapshot", source: snap.source || "card",
       title: snap.title || "Pinned card", context: snap.context || "",
       html: snap.html || "", lines: (snap.lines || []).slice(), note: "" });
-    persist();
+    touch();
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
 
@@ -203,7 +220,7 @@
     var title = prompt("Section title for the divider:");
     if (!title) return;
     load().push({ kind: "divider", title: title, note: "" });
-    persist();
+    touch();
     story2.renderTab(document.getElementById("tabhost"));
   };
 
@@ -230,7 +247,7 @@
         load().push({ kind: "composite", category: b.getAttribute("data-cat"),
           banner: pinBanner(),
           filters: JSON.parse(JSON.stringify(TR.d2.state.filters)), note: "" });
-        persist();
+        touch();
         holder.hidden = true;
         story2.renderTab(document.getElementById("tabhost"));
       });
@@ -471,12 +488,12 @@
         var list = load(), j = i + dir;
         if (j >= 0 && j < list.length) {
           var tmp = list[i]; list[i] = list[j]; list[j] = tmp;
-          persist();
+          touch();
           story2.renderTab(document.getElementById("tabhost"));
         }
       } else if (e.target.closest("[data-remove]")) {
         load().splice(i, 1);
-        persist();
+        touch();
         story2.renderTab(document.getElementById("tabhost"));
       } else if (e.target.closest("[data-png]")) {
         var item = load()[i];
@@ -499,7 +516,7 @@
       if (e.target.classList.contains("si-note")) {
         var card = e.target.closest(".story-item");
         load()[parseInt(card.getAttribute("data-i"), 10)].note = e.target.value;
-        persist();
+        touch();
       }
     });
     var importer = host.querySelector("#story-import");
@@ -533,9 +550,15 @@
         return;
       }
       if (item.kind === "composite") {
-        slides.push(TR.exporter.matrixSlide("Composite — " + item.category,
-          contextLine(item) + (item.note ? " · " + item.note : ""),
-          compositeMatrix(item)));
+        // a stale pin (category no longer resolves -> null matrix) must not
+        // crash the whole deck — a visible placeholder slide, like the
+        // stale-question-pin guard in present mode
+        var cm = compositeMatrix(item);
+        slides.push(cm
+          ? TR.exporter.matrixSlide("Composite — " + item.category,
+              contextLine(item) + (item.note ? " · " + item.note : ""), cm)
+          : TR.exporter.dividerSlide("Composite — " + item.category,
+              "This pin no longer resolves in this report."));
         return;
       }
       if (item.kind === "snapshot") {
@@ -557,6 +580,7 @@
     });
     return slides;
   }
+  story2._slidesFor = slidesFor;   // exposed for the node gate
 
   /** One story item -> a card SVG for the pixel-perfect image deck. Mirrors the
    *  on-screen render of each item kind; null when the item has nothing to show
@@ -607,7 +631,7 @@
   function topAction(action) {
     if (action === "clear") {
       items = [];
-      persist();
+      touch();
       story2.renderTab(document.getElementById("tabhost"));
     }
     if (action === "divider") story2.addDivider();
@@ -678,11 +702,16 @@
         '<div class="pr-table snap-body">' + (item.html || "") + "</div>";
     } else if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
-      body = "<h1>" + (item.kind === "heatmap" ? "Index heatmap"
-          : "Composite — " + fmt.escapeHtml(item.category)) + "</h1>" +
-        '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item)) + "</p>" +
-        (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
-        '<div class="pr-table">' + matrixTable(matrix) + "</div>";
+      // a stale composite pin (null matrix) must not crash present mode —
+      // same guard as the stale question pin below
+      body = matrix
+        ? "<h1>" + (item.kind === "heatmap" ? "Index heatmap"
+            : "Composite — " + fmt.escapeHtml(item.category)) + "</h1>" +
+          '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item)) + "</p>" +
+          (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
+          '<div class="pr-table">' + matrixTable(matrix) + "</div>"
+        : '<div class="pr-divider"><h1>Unavailable exhibit</h1>' +
+          '<p class="pr-ctx">This pin no longer resolves in this report.</p></div>';
     } else if (!modelFor(item)) {
       // a stale pin (question no longer in this report) must not crash
       // present mode — itemHtml and the PPTX path already skip it

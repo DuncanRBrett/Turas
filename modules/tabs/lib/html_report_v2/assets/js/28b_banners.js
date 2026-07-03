@@ -17,25 +17,42 @@
   function store() {
     if (cache) return cache;
     cache = [];
-    // saved-copy island seeds the list; the reader's own localStorage wins.
-    if (TR.userState && Array.isArray(TR.userState.banners)) {
-      cache = JSON.parse(JSON.stringify(TR.userState.banners));
-    }
+    var own = null;
     try {
       // Scoped per report so a saved banner never leaks between survey reports
       // sharing a browser origin (see d2.storeKey).
       var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
-      if (raw) {
-        var own = JSON.parse(raw);
-        if (Array.isArray(own)) cache = own;
-      }
+      if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && !Array.isArray(own) && own._owns) {
+      cache = Array.isArray(own.items) ? own.items : [];
+      return cache;
+    }
+    if (TR.userState && Array.isArray(TR.userState.banners)) {
+      cache = JSON.parse(JSON.stringify(TR.userState.banners));
+    }
+    if (Array.isArray(own)) {
+      // un-owning local banners merge ADDITIVELY by id — a stale pre-existing
+      // store for this project key must not hide the island's saved banners
+      var have = {};
+      cache.forEach(function (b) { have[saved.id(b)] = true; });
+      own.forEach(function (b) { if (!have[saved.id(b)]) cache.push(b); });
+    }
     return cache;
   }
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
+      if (global.localStorage) {
+        // every persist here is a reader change
+        localStorage.setItem(TR.d2.storeKey(KEY),
+          JSON.stringify({ _owns: true, items: store() }));
+      }
     } catch (e) { /* storage full/blocked — saved banners stay in-memory */ }
   }
 

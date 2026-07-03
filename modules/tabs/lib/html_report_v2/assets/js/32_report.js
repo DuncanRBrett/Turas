@@ -34,28 +34,53 @@
   function store() {
     if (cache) return cache;
     cache = { sections: {}, about: {}, slides: [] };
-    if (TR.userState && TR.userState.report) {
-      cache = JSON.parse(JSON.stringify(TR.userState.report));
-    }
+    var own = null;
     try {
       var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
-      if (raw) {
-        var own = JSON.parse(raw);
-        if (own && (Object.keys(own.sections || {}).length ||
-            Object.keys(own.about || {}).length || (own.slides || []).length)) {
-          cache = own;
-        }
-      }
+      if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // Ownership marker: once the reader changes anything here, the persisted
+    // localStorage state carries _owns:true and is authoritative — the island
+    // seed is ignored on load, so deletions stay deleted. State without the
+    // marker (legacy / first visit) seeds from the island and merges without
+    // claiming ownership; only a reader change through the persist path does.
+    if (own && own._owns) {
+      cache = { sections: own.sections || {}, about: own.about || {},
+        slides: own.slides || [] };
+      return cache;
+    }
+    if (TR.userState && TR.userState.report) {
+      cache = JSON.parse(JSON.stringify(TR.userState.report));
+      delete cache._owns;
+    }
     cache.sections = cache.sections || {};
     cache.about = cache.about || {};
     cache.slides = cache.slides || [];
+    if (own && typeof own === "object") {
+      // un-owning local state fills gaps ADDITIVELY — a stale pre-existing store
+      // for this project key must not hide the island's authored sections/slides
+      Object.keys(own.sections || {}).forEach(function (k) {
+        if (!(k in cache.sections)) cache.sections[k] = own.sections[k];
+      });
+      Object.keys(own.about || {}).forEach(function (k) {
+        if (!(k in cache.about)) cache.about[k] = own.about[k];
+      });
+      var have = {};
+      cache.slides.forEach(function (s) { have[JSON.stringify(s)] = true; });
+      (own.slides || []).forEach(function (s) {
+        if (!have[JSON.stringify(s)]) cache.slides.push(s);
+      });
+    }
     return cache;
   }
 
   function persist() {
     try {
-      if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
+      if (global.localStorage) {
+        var s = store();   // every persist here is a reader change
+        localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(
+          { _owns: true, sections: s.sections, about: s.about, slides: s.slides }));
+      }
     } catch (e) {
       TR.shell.toast("Browser storage is full — use Save copy to keep your work");
     }
