@@ -1187,7 +1187,9 @@
             { size: SIZE.ordinal, bold: true, colour: WHITE, alpha: 20, align: "r" })])
       : "";
     return wrapSlide(
-      rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, brand) +
+      // full-bleed background is a SHARP rect: roundRect here leaves white
+      // notched corners on the rendered slide (WP6 visual QA finding)
+      fillRect(next(), { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, brand) +
       ordinal +
       rectShape(next(), { x: MARGIN, y: 3.55, w: 1.4, h: 0.05 }, STYLE.GOLD) +
       textBox(next(), { x: MARGIN, y: 2.7, w: SLIDE_W - MARGIN * 2, h: 0.9 },
@@ -1333,7 +1335,8 @@
     var id = 1;
     var next = function () { return ++id; };
     return wrapSlide(
-      rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, brand) +
+      // sharp full-bleed background (see dividerSlide)
+      fillRect(next(), { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, brand) +
       textBox(next(), { x: 1, y: 2.5, w: SLIDE_W - 2, h: 1.1 },
         [para(p.name, { size: SIZE.cover, bold: true, colour: WHITE })]) +
       textBox(next(), { x: 1, y: 3.7, w: SLIDE_W - 2, h: 0.9 },
