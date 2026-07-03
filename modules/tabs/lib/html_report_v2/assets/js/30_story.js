@@ -606,7 +606,7 @@
       if (item.kind === "heatmap") {
         slides.push(TR.exporter.matrixSlide("Index heatmap",
           contextLine(item) + (item.note ? " · " + item.note : ""),
-          heatmapMatrix(item)));
+          heatmapMatrix(item), { kicker: "Dashboard" }));
         return;
       }
       if (item.kind === "composite") {
@@ -616,7 +616,8 @@
         var cm = compositeMatrix(item);
         slides.push(cm
           ? TR.exporter.matrixSlide("Composite — " + item.category,
-              contextLine(item) + (item.note ? " · " + item.note : ""), cm)
+              contextLine(item) + (item.note ? " · " + item.note : ""), cm,
+              { kicker: "Composite" })
           : TR.exporter.dividerSlide("Composite — " + item.category,
               "This pin no longer resolves in this report."));
         return;
@@ -624,7 +625,7 @@
       if (item.kind === "snapshot") {
         slides.push(TR.exporter.matrixSlide(item.title || "Pinned card",
           (item.context || "") + (item.note ? " · " + item.note : ""),
-          snapshotMatrix(item)));
+          snapshotMatrix(item), { kicker: item.source || "Pinned card" }));
         return;
       }
       var model = modelFor(item);
@@ -639,7 +640,10 @@
             title: item.title || null }));   // D2: slide title = pin title
       }
     });
-    return slides;
+    // WP1: resolve footer page-number tokens now the deck length is known
+    // (the node gates stub TR.exporter without paginate — tokens never appear
+    // there because the stubs emit no chrome)
+    return TR.exporter.paginate ? TR.exporter.paginate(slides) : slides;
   }
   story2._slidesFor = slidesFor;   // exposed for the node gate
 

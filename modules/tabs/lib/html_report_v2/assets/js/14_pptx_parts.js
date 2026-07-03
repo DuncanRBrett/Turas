@@ -13,6 +13,43 @@
 
   var pptx = TR.pptx = TR.pptx || {};
 
+  /**
+   * Boardroom style constants (PPTX_BOARDROOM_SPEC.md §2.1) — one face, one
+   * type scale, one grid. Every slide archetype in 29_export.js consumes
+   * these; no ad-hoc font sizes or colours live in the slide builders.
+   * Geometry in inches on the 13.333 × 7.5 canvas.
+   */
+  pptx.STYLE = {
+    FONT: "Arial",                       // one face everywhere (charts already Arial)
+    INK: "1C2333", GREY: "6B7280", FAINT: "E7E9F2", PAPER: "FFFFFF",
+    GOOD: "1B6E53", BAD: "B3372F", GOLD: "CC9900",
+    CONTEXT: ["AEB4C2", "C6CBD6", "8F97A8", "D8DCE5"],  // muted series greys
+    // shared archetype surfaces (additive to the spec's core palette)
+    ZEBRA: "F3F4F8", ROW_ALT: "FAFBFE", BORDER: "D8DCEA",
+    CALLOUT_BG: "FBF6E8", ON_BRAND_MUTED: "D9DCEC", CHART_INK: "3B4252",
+    // brand/accent stay dynamic: TR.charts.brandOf()/accentOf() (project config)
+    SIZE: { cover: 32, divider: 30, title: 20, subtitle: 11, body: 11,
+            kicker: 10, footer: 8.5,
+            // secondary steps: divider/cover lead lines + table density tiers
+            lead: 13, table: 11, tableSmall: 9.5, tableTiny: 9 },
+    MARGIN: 0.6,
+    HEADER: { rule: { x: 0, y: 0, w: 13.333, h: 0.06 },          // brand rule
+              kicker: { x: 0.6, y: 0.30, w: 12.13, h: 0.24 },    // grey caps
+              title: { x: 0.6, y: 0.56, w: 12.13, h: 0.86 },     // insight, ink
+              subtitle: { x: 0.6, y: 1.44, w: 12.13, h: 0.28 } },// Q code + text
+    BODY: { x: 0.6, y: 1.86, w: 12.13, h: 4.62 },                // to y=6.48
+    FOOTER: { rule: { x: 0.6, y: 6.72, w: 12.13, h: 0.012 },     // FAINT hairline
+              left: { x: 0.6, y: 6.80, w: 6.4, h: 0.44 },        // question text
+              mid: { x: 7.1, y: 6.80, w: 3.6, h: 0.44 },         // base + sig note
+              right: { x: 10.8, y: 6.80, w: 1.93, h: 0.44 } }    // wordmark + page
+  };
+
+  // Page-number tokens: the footer chrome emits these; the deck assembler
+  // (story2 slidesFor -> exporter.paginate) resolves them once the slide
+  // count is known.
+  pptx.PAGE_TOKEN = "@@PG@@";
+  pptx.PAGE_TOTAL_TOKEN = "@@PGT@@";
+
   var XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   var NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
   var NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -127,8 +164,10 @@
       '<a:hlink><a:srgbClr val="0563C1"/></a:hlink>' +
       '<a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme>' +
       '<a:fontScheme name="Turas">' +
-      '<a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
-      '<a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>' +
+      // STYLE.FONT for both faces — the mixed Calibri-text/Arial-chart look is
+      // exactly what the boardroom spec retires
+      '<a:majorFont><a:latin typeface="' + pptx.STYLE.FONT + '"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
+      '<a:minorFont><a:latin typeface="' + pptx.STYLE.FONT + '"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>' +
       "</a:fontScheme>" +
       '<a:fmtScheme name="Office">' +
       "<a:fillStyleLst>" + fill + fill + fill + "</a:fillStyleLst>" +

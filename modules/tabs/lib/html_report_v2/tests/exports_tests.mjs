@@ -28,7 +28,8 @@ sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "13_zip.js",
-  "23_render.js", "23z_charts.js", "23za_trend.js", "23y_xlsx.js", "29_export.js"]) {
+  "14_pptx_parts.js", "23_render.js", "23z_charts.js", "23za_trend.js",
+  "23y_xlsx.js", "29_export.js"]) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
 }
 const TR = sandbox.TR;

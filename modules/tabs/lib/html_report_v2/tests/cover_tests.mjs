@@ -351,13 +351,17 @@ const EXPORT_MODEL = {
 };
 
 run("D2: PPTX slide title = pin title when set, short_label/title default when not", () => {
+  // WP1 (boardroom spec): the question code no longer prefixes the slide title
+  // — it moves to the subtitle ("Q2 · <question text>") and the footer.
   const exporter = exporterSandbox().TR.exporter;
   const withTitle = exporter.slideForModel(EXPORT_MODEL, "",
     { table: false, title: "Registration is the pain point" });
-  at(withTitle.xml, "Q2 — Registration is the pain point", "insight title on the slide");
+  at(withTitle.xml, "Registration is the pain point", "insight title on the slide");
+  at(withTitle.xml, "Q2 · Flat single-select", "code + question text in the subtitle");
+  assert(withTitle.xml.indexOf("Q2 — ") === -1, "code no longer prefixes the title");
   assert(withTitle.xml.indexOf("Flat short") === -1, "default title replaced");
   const without = exporter.slideForModel(EXPORT_MODEL, "", { table: false });
-  at(without.xml, "Q2 — Flat short", "title-less pins keep the existing default");
+  at(without.xml, "Flat short", "title-less pins keep the existing default");
 });
 
 run("D2: image-deck/PNG card title = pin title when set, default when not", () => {
