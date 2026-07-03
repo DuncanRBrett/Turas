@@ -740,7 +740,12 @@ table.ws td.sparkcell { padding: 1px 8px; }
   cursor: pointer; white-space: nowrap; line-height: 1.6; }
 .ql-jumpbtn:hover { background: var(--brand); color: #fff; }
 .qmeta .ql-jumpbtn { margin-left: auto; }
-.gauge-wrap .ql-jumpbtn { position: absolute; left: 8px; top: 8px; padding: 1px 8px; font-size: 11px; }
+/* On a dashboard gauge the pill lives in its own reserved footer slot — the
+   .has-qual padding keeps the score/title clear of it at any title length or
+   viewport width; max-width keeps it clear of the bottom-right 📌 snap-pin. */
+.gauge-wrap .ql-jumpbtn { position: absolute; left: 10px; bottom: 8px; padding: 1px 8px;
+  font-size: 11px; max-width: calc(100% - 52px); overflow: hidden; text-overflow: ellipsis; }
+.gauge-wrap.has-qual > .gauge { padding-bottom: 36px; }
 .ql-crumb { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;
   padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
 .ql-back { border: 0; background: transparent; color: var(--brand); font: inherit; font-weight: 700;

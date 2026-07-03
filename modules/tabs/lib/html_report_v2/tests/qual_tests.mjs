@@ -3,6 +3,7 @@
 // tier-filter and theme-record helpers against hand-computable answers.
 import fs from "node:fs";
 import path from "node:path";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -401,6 +402,74 @@ assert(gatedHtml.indexOf("Withheld to protect confidentiality.") >= 0,
   "below k the controls row carries the standard disclosure note");
 
 TR.disclosure = null;   // leave no gate behind for anything after
+
+// ---- dashboard: the 💬 pill renders in its own footer slot, never over the score ----
+// Regression for the overlap bug: the pill was absolutely positioned at the card's
+// top-left, on top of the "8.0/10" headline. The card must now (a) flag the wrap
+// with .has-qual so CSS reserves a footer slot, and (b) emit the pill as a SIBLING
+// of the gauge button, outside the score/title markup.
+console.log("\nDashboard comment-pill slot:");
+{
+  const sandbox = { console };
+  sandbox.globalThis = sandbox;
+  sandbox.window = sandbox;
+  const mkModel = () => ({
+    rows: [{ kind: "mean", cells: [{ mean: 8.03 }], delta: null }],
+    columns: [{ label: "Total", base: 1155 }]
+  });
+  sandbox.TR = {
+    fmt: { escapeHtml: (s) => String(s == null ? "" : s), base: (n) => String(n) },
+    charts: { clip: (s) => String(s) },
+    render: { wavePoints: () => null, sparkline: () => "" },
+    model: { forQuestion: () => mkModel() },
+    d2: { state: { banner: "b1", filters: [] }, firstBanner: () => "b1", filtersActive: () => false },
+    cards2: { waveLabels: () => ({ prev: null }) },
+    conf: { labels: () => ({ interval_abbrev: "SI", precision_term: "margin of error",
+      moe_name: "Margin of error", moe_abbrev: "MoE" }), maxMoePct: () => 2.9, fmtRange: () => "" },
+    AGG: {
+      project: {},
+      banner_groups: [{ id: "b1", name: "Banner" }],
+      questions: [
+        { code: "Q1", title: "A deliberately long question title that wraps across several lines of the card",
+          type: "scale", scale_max: 10, category: "Experience", rows: [{ kind: "mean" }] },
+        { code: "Q2", title: "Unlinked question", type: "scale", scale_max: 10,
+          category: "Experience", rows: [{ kind: "mean" }] }
+      ]
+    },
+    // Only Q1 carries linked comments — Q2 proves the slot is conditional.
+    qual: { affordanceHtml: (code) => code === "Q1"
+      ? '<button class="ql-jumpbtn" data-qual-jump="Q1">💬 1155 comments</button>' : "" }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(jsDir, "27_views.js"), "utf8"), sandbox,
+    { filename: "27_views.js" });
+  const host = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  sandbox.TR.views.dashboard(host);
+  const dash = host.innerHTML;
+
+  const q1 = dash.slice(dash.indexOf('data-goq="Q1"') - 200, dash.indexOf('data-goq="Q2"'));
+  assert(q1.indexOf('class="gauge-wrap has-qual"') >= 0,
+    "linked card: wrap carries .has-qual so CSS reserves the pill's footer slot");
+  const gaugeClose = q1.indexOf("</button>");   // the gauge button closes after the title
+  const pillAt = q1.indexOf("ql-jumpbtn");
+  assert(pillAt >= 0 && gaugeClose >= 0 && pillAt > gaugeClose,
+    "linked card: pill is a sibling AFTER the gauge button, not inside the score/title markup");
+  assert(q1.indexOf("💬 1155 comments") >= 0, "linked card: pill text + jump wiring intact");
+
+  const q2 = dash.slice(dash.indexOf('data-goq="Q2"') - 200);
+  assert(q2.indexOf("has-qual") < 0 && q2.indexOf("ql-jumpbtn") < 0,
+    "unlinked card: no .has-qual flag and no pill");
+
+  // CSS contract: the pill is pinned to the card FOOTER (bottom, never top) and
+  // .has-qual reserves the slot's height with bottom padding on the gauge.
+  const css = fs.readFileSync(path.join(here, "..", "assets", "styles.css"), "utf8");
+  const pillRule = (css.match(/\.gauge-wrap \.ql-jumpbtn\s*\{[^}]*\}/) || [""])[0];
+  assert(/bottom:/.test(pillRule) && !/[^-]top:/.test(pillRule),
+    "CSS: .gauge-wrap .ql-jumpbtn anchors to the bottom of the card, never the top");
+  const slotRule = (css.match(/\.gauge-wrap\.has-qual[^{]*\{[^}]*\}/) || [""])[0];
+  assert(/padding-bottom:/.test(slotRule),
+    "CSS: .has-qual reserves the footer slot with padding-bottom on the gauge");
+}
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
