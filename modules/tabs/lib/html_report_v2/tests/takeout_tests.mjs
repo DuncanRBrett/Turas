@@ -432,6 +432,136 @@ run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
   assert(q.scaleMax === 11, "0-based scale binned over 0..10 (11 bins), got " + q.scaleMax);
 });
 
+run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (audit #1)", () => {
+  // A 12-respondent and a 30-respondent column. With min_reporting_base = 25 only
+  // the n=30 column may report; with no configured k the census fallback of 5 admits both.
+  TR.conf = { reportHasPopulation: () => true };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: { population_size: 60, min_reporting_base: 25 },
+    banner_groups: [{ id: "B", name: "Banner" }] };
+  TR.MICRO = null;
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+    _meanRow: (m) => m.rows[0]
+  };
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 42 }, { label: "A", base: 12 }, { label: "B", base: 30 }],
+    rows: [{ kind: "mean", cells: [{ mean: 3.8 }, { mean: 3.0 }, { mean: 4.1 }] }] }) };
+  let cols = takeout.gather().columns;
+  assert(cols.length === 1 && cols[0].column === "B", "k=25 gates the n=12 column out, keeps n=30");
+  delete TR.AGG.project.min_reporting_base;
+  cols = takeout.gather().columns;
+  assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
+});
+
+run("Patterns tab ignores the live audience filter — published full-sample view (audit #2)", () => {
+  const seen = [];
+  TR.conf = { reportHasPopulation: () => false };
+  TR.d2 = { state: { banner: "B", filters: [{ q: "Q9", rows: [1] }] }, storeKey: (k) => k };
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Banner" }] };
+  TR.MICRO = null;
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+    _meanRow: (m) => m.rows[0],
+    _modelFor: () => { throw new Error("takeout must not read the filtered live view"); }
+  };
+  TR.model = { forQuestion: (code, banner, filters) => {
+    seen.push(filters);
+    return { columns: [{ label: "Total", base: 40 }, { label: "A", base: 20 }, { label: "B2", base: 20 }],
+      rows: [{ kind: "mean", cells: [{ mean: 3.8 }, { mean: 3.3 }, { mean: 4.3 }] }] };
+  } };
+  const g = takeout.gather();
+  assert(seen.length >= 2, "levels + strain both requested models, got " + seen.length);
+  assert(seen.every((f) => Array.isArray(f) && f.length === 0),
+    "every model request passes EMPTY filters despite the live audience filter");
+  assert(g.levels.length === 1 && g.levels[0].value === 3.8, "full-sample mean gathered");
+});
+
+run("reliability MoE sizes on the Kish effective base on weighted studies (audit #4)", () => {
+  // n=800 unweighted, n_eff=500. Worst-case MoE = 1.96*sqrt(0.25/n)*100:
+  // on n_eff=500 -> 4.3827pp; the raw n=800 would wrongly claim 3.4648pp.
+  TR.conf = { reportHasPopulation: () => false, labels: () => ({}),
+    maxMoePct: (n) => 1.96 * Math.sqrt(0.25 / n) * 100 };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: {}, banner_groups: [] };
+  TR.MICRO = null;
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+    _meanRow: (m) => m.rows[0]
+  };
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 800, baseEff: 500 }],
+    rows: [{ kind: "mean", cells: [{ mean: 3.8 }] }] }) };
+  const rel = takeout.gather().reliability;
+  assert(rel.n === 800, "displayed n stays the respondent count, got " + rel.n);
+  close(rel.moePct, 4.3827, 1e-3, "MoE computed on n_eff=500");
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 800 }],
+    rows: [{ kind: "mean", cells: [{ mean: 3.8 }] }] }) };
+  close(takeout.gather().reliability.moePct, 3.4648, 1e-3, "unweighted falls back to base n=800");
+});
+
+run("rigor footer states a hit inline, never points at nonexistent cards (audit #3)", () => {
+  TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
+  const cells = [];
+  for (let i = 0; i < 19; i++) cells.push({ banner: "Campus", group: "Odd", q: "Q" + i, qtitle: "Q" + i,
+    nIn: 40, gap: -0.39, value: 3.2, total: 3.59, scaleMax: 5, welchDiff: -0.4, welchP: 0.5, flooredG: false });
+  cells.push({ banner: "Campus", group: "Odd", q: "Qx", qtitle: "Pay", nIn: 40, gap: 0.63, value: 4.24,
+    total: 3.57, scaleMax: 5, welchDiff: 0.6, welchP: 1e-17, flooredG: false });
+  const fdr = { cells, K: cells.length, groupCount: 1, questionCount: 20,
+    groups: [{ banner: "Campus", group: "Odd", base: 40, below: 19, above: 1, qn: 20, meanGap: -0.339 }] };
+  const bimodal = { questions: [{ code: "QB", title: "Return to office", counts: [40, 8, 4, 8, 40], scaleMax: 5 }] };
+  const t = takeout.buildPatterns({ fdr, bimodal });
+  assert(t.patterns.every((p) => p.kind !== "odd" && p.kind !== "bimodal"),
+    "odd/bimodal still footer checks, not cards (Phase-1 card set banked)");
+  const html = takeout.readView.html(t);
+  assert(html.indexOf("flagged on the cards above") === -1, "never references nonexistent cards");
+  assert(html.indexOf("found:") !== -1, "the footer states what was found");
+  assert(html.indexOf("Pay") !== -1 && html.indexOf("4.2 vs 3.6") !== -1,
+    "odd finding named inline with its real cells");
+  assert(html.indexOf("Return to office") !== -1, "bimodal finding named inline");
+  // confident null unchanged: nothing found -> the honest null line, no 'found:'
+  const t0 = takeout.buildPatterns({ fdr: { cells: cells.slice(0, 19), K: 19, groupCount: 1, questionCount: 19,
+    groups: [{ banner: "Campus", group: "Odd", base: 40, below: 19, above: 0, qn: 19, meanGap: -0.39 }] },
+    bimodal: { questions: [{ code: "QB", title: "Calm", counts: [3, 3, 12, 19, 63], scaleMax: 5 }] } });
+  const html0 = takeout.readView.html(t0);
+  assert(html0.indexOf("nothing held up beyond chance") !== -1 && html0.indexOf("found:") === -1,
+    "confident null still reads as nothing held up");
+});
+
+run("curation reset()/deletions survive reload — owning state beats the island seed (audit #5)", () => {
+  const mem = {};
+  sandbox.localStorage = { getItem: (k) => (k in mem ? mem[k] : null),
+    setItem: (k, v) => { mem[k] = String(v); } };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => "test::" + k };
+  const island = { version: 2, text: { "a::takeaway": "island edit" }, veto: { v1: true }, apex: "island apex" };
+  const reload = () => {
+    vm.runInContext(readFileSync(path.join(JS_DIR, "27f_takeout_data.js"), "utf8"), sandbox,
+      { filename: "27f_takeout_data.js" });
+    return sandbox.TR.takeout.state;
+  };
+  sandbox.TR.userState = { takeout: island };
+  let st = reload();
+  assert(st.getText("a", "takeaway", "seed") === "island edit", "island seeds a fresh reader");
+  st.setText("b", "takeaway", "reader edit");   // first edit -> the copy owns the full state
+  st = reload();
+  assert(st.getText("a", "takeaway", "seed") === "island edit", "island edit carried into the owned state");
+  assert(st.getText("b", "takeaway", "seed") === "reader edit", "reader edit survives reload");
+  st.setText("a", "takeaway", "");              // delete the island-baked edit
+  st = reload();
+  assert(st.getText("a", "takeaway", "seed") === "seed", "island-baked edit stays deleted after reload");
+  st.reset();
+  st = reload();
+  assert(st.getText("b", "takeaway", "seed") === "seed" && !st.isVetoed("v1") &&
+    st.getApex("seed") === "seed", "reset is durable — the island cannot resurrect edits");
+  // a legacy localStorage state (no _owns marker) still merges over the island exactly as before
+  mem["test::turas_v2_takeout"] = JSON.stringify({ version: 2, text: { "c::takeaway": "legacy" } });
+  st = reload();
+  assert(st.getText("a", "takeaway", "seed") === "island edit" &&
+    st.getText("c", "takeaway", "seed") === "legacy", "legacy state merges island + localStorage as today");
+  sandbox.TR.userState = undefined;
+});
+
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");
 function activeLines(src) {
   let inBlock = false, count = 0;

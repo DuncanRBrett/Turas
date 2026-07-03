@@ -497,6 +497,23 @@
   }
   takeout._bimodalityPattern = bimodalityPattern;
 
+  /** One-line statements of a rigor-check hit, for the footer (plain text —
+   *  the read view escapes them; every number is a real cell). */
+  function round1(v) { return Math.round(v * 10) / 10; }
+  function oddNote(odd) {
+    var f = odd.flip;
+    return odd.subject + (odd.direction === "low-but-high"
+      ? " runs low overall yet sits above the overall on “"
+      : " runs high overall yet sits below the overall on “") +
+      f.qtitle + "” (" + round1(f.value) + " vs " + round1(f.total) + ")";
+  }
+  function bimodalNote(bm) {
+    var titles = bm.questions.slice(0, 2).map(function (q) { return "“" + q.title + "”"; });
+    var more = bm.flaggedCount - titles.length;
+    return titles.join(", ") + (more > 0 ? " and " + more + " more" : "") +
+      (bm.flaggedCount === 1 ? " splits" : " split") + " into two camps behind a calm average";
+  }
+
   /**
    * Build the patterns object from gathered inputs. Pure: same inputs always give
    * the same patterns. Assembles GROUP + SPLIT + CO-MOVEMENT + WEAK/STRONG AREA +
@@ -535,14 +552,17 @@
 
     // Co-moving RETIRED (the acquiescence halo, not a pattern). Odd-one-out and
     // hidden disagreement DEMOTED to the rigor footer — still computed (the
-    // never-cry-wolf check), but no empty cards: the footer reports they were run.
+    // never-cry-wolf check), no card (the Phase-1 card set is banked). A hit
+    // carries a one-line note so the footer states the finding, truthfully.
     var odd = oddOnePattern(inputs.fdr, gate);
     var bimodal = bimodalityPattern(inputs.bimodal);
     var rigor = {
       odd: odd ? { scanned: odd.familyCells || (gate ? gate.K : 0),
-        survivors: odd.survivors || 0, found: !odd.nullResult } : null,
+        survivors: odd.survivors || 0, found: !odd.nullResult,
+        note: odd.nullResult ? null : oddNote(odd) } : null,
       bimodal: bimodal ? { scanned: bimodal.scanned || 0,
-        flagged: bimodal.flaggedCount || 0, found: !bimodal.nullResult } : null
+        flagged: bimodal.flaggedCount || 0, found: !bimodal.nullResult,
+        note: bimodal.nullResult ? null : bimodalNote(bimodal) } : null
     };
 
     return {

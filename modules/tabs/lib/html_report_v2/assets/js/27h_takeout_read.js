@@ -177,14 +177,23 @@
       base = "no AI · " + scan;
     }
     // Rigor footer: the demoted never-cry-wolf checks (odd-one-out + hidden
-    // disagreement) report as one honest line instead of empty cards.
-    var rg = t.rigor || {}, checks = [];
-    if (rg.odd) checks.push("every group for a true exception");
-    if (rg.bimodal) checks.push("every question for a hidden two-camp split");
+    // disagreement) report as one honest line instead of empty cards. A hit is
+    // stated HERE, inline — these checks deliberately have no card (the Phase-1
+    // card set is banked), so never point at cards that don't exist.
+    var rg = t.rigor || {}, checks = [], found = [];
+    if (rg.odd) {
+      checks.push("every group for a true exception");
+      if (rg.odd.found) found.push(rg.odd.note ||
+        "one group breaks its own pattern on a single question");
+    }
+    if (rg.bimodal) {
+      checks.push("every question for a hidden two-camp split");
+      if (rg.bimodal.found) found.push(rg.bimodal.note ||
+        "at least one question splits into two camps behind a calm average");
+    }
     if (checks.length) {
-      var found = (rg.odd && rg.odd.found) || (rg.bimodal && rg.bimodal.found);
       base += " · also checked " + checks.join(" and ") +
-        (found ? " — flagged on the cards above" : " — nothing held up beyond chance");
+        (found.length ? " — found: " + found.join("; ") : " — nothing held up beyond chance");
     }
     return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + " · curated by the researcher.</div>";
   }

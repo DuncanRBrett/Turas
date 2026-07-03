@@ -110,7 +110,7 @@
     var override = headlineOverride();
     var levels = [], headline = [], composite = [];
     views.indexQuestions().forEach(function (q) {
-      var model = views._modelFor(q.code);
+      var model = publishedModel(views, q.code);
       var row = views._meanRow(model);
       var value = row ? row.cells[0].mean : null;
       if (value === null || value === undefined) return;
@@ -118,7 +118,8 @@
         section: q.category || "",                 // Level 1 (existing Category column)
         theme: q.theme || q.category || "",        // Level 2 (new Theme column; falls back to section)
         value: value, band: touchpointBand(value, q), delta: row.delta || null,
-        base: model.columns[0].base, scaleMin: 0, scaleMax: touchpointMax(q),
+        base: model.columns[0].base, baseEff: model.columns[0].baseEff || null,
+        scaleMin: 0, scaleMax: touchpointMax(q),
         topBox: topBoxOf(q, model) };
       // A composite is always a headline. A keyword match (satisfaction / overall
       // / NPS) is a headline ONLY when the question is untagged — if the analyst
@@ -147,9 +148,27 @@
    * [{column, group, gaps:[{title, value, total, scaleMax}]}].
    */
   // Minimum responses to report a subgroup in a census (anonymity / meaning),
-  // when the n>=30 sample-error floor doesn't apply. Override per study with
-  // project.min_report_base.
+  // when the n>=30 sample-error floor doesn't apply. The analyst's disclosure k
+  // (project.min_reporting_base — the SAME key 21d_disclosure.js reads; the data
+  // layer emits it only when > 1) overrides; 5 is only the no-config fallback.
   var MIN_CENSUS_BASE = 5;
+
+  function censusFloor(proj) {
+    var k = proj.min_reporting_base;
+    return (typeof k === "number" && k > 1) ? k : MIN_CENSUS_BASE;
+  }
+
+  /** The Patterns tab summarises the PUBLISHED full-sample view (the shell hides
+   *  the filter bar on it for exactly that reason), so every model it reads must
+   *  ignore the live audience filter — empty filters, never TR.d2.state.filters.
+   *  The microdata scans (cell family, bimodality) already run unmasked. */
+  function publishedModel(views, code, banner) {
+    if (TR.model && typeof TR.model.forQuestion === "function") {
+      return TR.model.forQuestion(code, banner || (TR.d2 && TR.d2.state.banner),
+        [], { hiddenCols: [], intervals: true });
+    }
+    return views._modelFor(code, banner);
+  }
 
   function gatherColumnStrain(views) {
     var proj = (TR.AGG && TR.AGG.project) || {};
@@ -159,14 +178,14 @@
     // finite-population correction makes it reliable. Use the analyst's reporting
     // floor there; keep the low-base threshold only for true samples.
     var census = typeof conf.reportHasPopulation === "function" && conf.reportHasPopulation();
-    var floor = census ? (proj.min_report_base || MIN_CENSUS_BASE) : (proj.low_base_threshold || 30);
+    var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
     var cols = {};
     var qs = views.indexQuestions();
     groups.forEach(function (g) {
       qs.forEach(function (q) {
         var model;
-        try { model = views._modelFor(q.code, g.id); } catch (e) { return; }
+        try { model = publishedModel(views, q.code, g.id); } catch (e) { return; }
         var row = views._meanRow(model);
         if (!row || row.cells[0].mean === null || row.cells[0].mean === undefined) return;
         var total = row.cells[0].mean, max = touchpointMax(q);
@@ -187,8 +206,10 @@
 
   /** Sample size, precision, and response rate for the reliability stamp. */
   function gatherReliability(items) {
-    var n = 0;
-    items.forEach(function (l) { if (l.base > n) n = l.base; });
+    var n = 0, nEff = null;
+    items.forEach(function (l) {
+      if (l.base > n) { n = l.base; nEff = l.baseEff > 0 ? l.baseEff : null; }
+    });
     var conf = TR.conf || {};
     var census = typeof conf.reportHasPopulation === "function"
       ? conf.reportHasPopulation() : false;
@@ -196,7 +217,9 @@
     var pop = (TR.AGG && TR.AGG.project && TR.AGG.project.population_size) || null;
     return {
       n: n,
-      moePct: typeof conf.maxMoePct === "function" && n ? conf.maxMoePct(n) : null,
+      // Weighted studies size precision on the Kish effective base, exactly as
+      // every significance test does; the displayed n stays the respondent count.
+      moePct: typeof conf.maxMoePct === "function" && n ? conf.maxMoePct(nEff || n) : null,
       census: census,
       population: pop,
       responseRate: (pop && n) ? Math.round(n / pop * 100) : null,
@@ -239,7 +262,7 @@
     var census = typeof conf.reportHasPopulation === "function" && conf.reportHasPopulation();
     // Per-arm floor: in a census a subgroup is most of its own population, so the
     // analyst's reporting floor (default 5) applies; a true sample keeps n>=30.
-    var floor = census ? (proj.min_report_base || MIN_CENSUS_BASE) : (proj.low_base_threshold || 30);
+    var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
     // The odd-one-out finder (the only consumer of this family) tests each cell's
     // gap against FIXED scale-point floors AND against the group's mean gap across
     // the family — both only meaningful within one comparable scale band. Restrict
@@ -263,7 +286,7 @@
       for (var r = 0; r < nResp; r++) { var cd = bv[r]; if (cd !== null && cd !== undefined && cd >= 0) codeSet[cd] = true; }
       var codes = Object.keys(codeSet).map(Number).sort(function (a, b) { return a - b; });
       var model;
-      try { model = views._modelFor(qs[0].code, g.id); } catch (e) { return; }
+      try { model = publishedModel(views, qs[0].code, g.id); } catch (e) { return; }
       var cols = (model.columns || []).slice(1);                 // non-Total columns
       if (codes.length !== cols.length) return;                  // label/order mismatch -> skip banner, never mislabel
       codes.forEach(function (code, ci) {
@@ -380,11 +403,22 @@
   function store() {
     if (cache) return cache;
     cache = { version: VERSION, text: {}, veto: {}, apex: null };
-    if (TR.userState && TR.userState.takeout) merge(cache, TR.userState.takeout, VERSION);
+    var saved = null;
     try {
       var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
-      if (raw) merge(cache, JSON.parse(raw) || {}, VERSION);
-    } catch (e) { /* island-only context */ }
+      if (raw) saved = JSON.parse(raw) || null;
+    } catch (e) { saved = null; /* island-only context */ }
+    // An OWNING localStorage state (_owns — written as the full post-edit state on
+    // every persist) replaces the island seed entirely, so reset() and deletions
+    // survive a reload instead of the tombstone-less merge resurrecting island-
+    // baked edits. A legacy state (no marker) merges over the island as before.
+    if (saved && saved._owns === true && saved.version === VERSION) {
+      merge(cache, saved, VERSION);
+      cache._owns = true;
+      return cache;
+    }
+    if (TR.userState && TR.userState.takeout) merge(cache, TR.userState.takeout, VERSION);
+    merge(cache, saved, VERSION);
     return cache;
   }
 
@@ -400,6 +434,9 @@
 
   function persist() {
     try {
+      // From the first edit on, the reader's copy owns the full state (island
+      // included, since it was merged into the cache) — see store().
+      store()._owns = true;
       if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
     } catch (e) { /* storage full/blocked — curation stays in memory */ }
   }

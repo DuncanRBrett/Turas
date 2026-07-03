@@ -140,5 +140,31 @@ run("buildPatterns: portraits + split pointer; co-moving/odd/bimodal not cards",
     "portrait cap respected");
 });
 
+run("rigor notes: a hit carries a one-line statement for the footer (audit #3)", () => {
+  const cells = [];
+  for (let i = 0; i < 19; i++) cells.push({ banner: "Campus", group: "Odd", q: "Q" + i, qtitle: "Q" + i,
+    nIn: 40, gap: -0.39, value: 3.2, total: 3.59, scaleMax: 5, welchDiff: -0.4, welchP: 0.5, flooredG: false });
+  cells.push({ banner: "Campus", group: "Odd", q: "Qx", qtitle: "Pay", nIn: 40, gap: 0.63, value: 4.24,
+    total: 3.57, scaleMax: 5, welchDiff: 0.6, welchP: 1e-17, flooredG: false });
+  const fdr = { cells, K: cells.length, groupCount: 1, questionCount: 20,
+    groups: [{ banner: "Campus", group: "Odd", base: 40, below: 19, above: 1, qn: 20, meanGap: -0.339 }] };
+  const bimodal = { questions: [{ code: "QB", title: "Return to office", counts: [40, 8, 4, 8, 40], scaleMax: 5 }] };
+  const t = takeout.buildPatterns({ fdr, bimodal });
+  assert(t.rigor.odd.found === true, "odd hit recorded");
+  eq(t.rigor.odd.note, "Odd runs low overall yet sits above the overall on “Pay” (4.2 vs 3.6)",
+    "odd note names the group, the question and the real cells");
+  assert(t.rigor.bimodal.found === true, "bimodal hit recorded");
+  eq(t.rigor.bimodal.note, "“Return to office” splits into two camps behind a calm average",
+    "bimodal note names the question");
+  assert(t.patterns.every((p) => p.kind !== "odd" && p.kind !== "bimodal"), "still no odd/bimodal cards");
+  // a confident null carries no note
+  const t0 = takeout.buildPatterns({
+    fdr: { cells: cells.slice(0, 19), K: 19, groupCount: 1, questionCount: 19,
+      groups: [{ banner: "Campus", group: "Odd", base: 40, below: 19, above: 0, qn: 19, meanGap: -0.39 }] },
+    bimodal: { questions: [{ code: "QB", title: "Calm", counts: [3, 3, 12, 19, 63], scaleMax: 5 }] } });
+  assert(t0.rigor.odd.found === false && t0.rigor.odd.note === null, "null odd -> no note");
+  assert(t0.rigor.bimodal.found === false && t0.rigor.bimodal.note === null, "null bimodal -> no note");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
