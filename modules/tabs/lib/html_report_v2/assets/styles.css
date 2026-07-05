@@ -834,10 +834,21 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .ql-badge { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-weight: 600; }
 .ql-shield { color: var(--accent); font-weight: 600; }
+/* fix #4: skip-to-comments button, right-aligned in the header meta row */
+.ql-jumpcomments { margin-left: auto; border: 1px solid var(--line); background: var(--card); color: var(--brand);
+  font: inherit; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 12px; cursor: pointer;
+  white-space: nowrap; }
+.ql-jumpcomments:hover { border-color: var(--brand); background: var(--bg); }
 /* controls row: noteworthy tier · sentiment filter (with counts) · shortlist + export */
 .ql-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 4px 0 12px;
   padding-top: 12px; border-top: 1px solid var(--line); }
 .ql-ctrllbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+/* fix #4: a clear section break marking where the comments (+ their filters) begin */
+.ql-secdivider { display: flex; align-items: center; gap: 12px; margin: 28px 0 8px; scroll-margin-top: 88px; }
+.ql-secdivider::after { content: ""; flex: 1; height: 2px; background: var(--line); border-radius: 2px; }
+.ql-seclabel { font-weight: 700; font-size: 14px; color: var(--ink); white-space: nowrap; }
+/* on themed questions the divider above already separates it — drop the double rule */
+.ql-controls.undivided { border-top: 0; padding-top: 0; margin-top: 0; }
 .ql-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .ql-segbtn { border: 0; border-right: 1px solid var(--line); background: var(--card); padding: 5px 11px;
   cursor: pointer; font: inherit; font-size: 12px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
@@ -860,6 +871,17 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-board { margin-bottom: 18px; }
 .ql-boardhd, .ql-drawerhd { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink); }
 .ql-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
+/* board header: a title row (title + inline-comments toggle) above the hint block */
+.ql-boardhdrow { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px;
+  flex-wrap: wrap; margin-bottom: 3px; }
+.ql-boardttl { font-weight: 700; font-size: 13px; color: var(--ink); }
+.ql-boardtools { display: inline-flex; align-items: center; gap: 10px; font-weight: 400; }
+/* fix #3: the show/hide example-comments checkbox */
+.ql-inlinetoggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500;
+  color: var(--ink); cursor: pointer; user-select: none; white-space: nowrap; }
+.ql-inlinetoggle input { cursor: pointer; margin: 0; }
+/* fix #1: the one-line selection-rule note, shown only when examples are on */
+.ql-champrule { display: block; margin-top: 4px; font-style: italic; }
 .ql-boardgrid { display: flex; flex-direction: column; }
 /* Diverging sentiment chart: label | diverging bar | salience % | net %. */
 .ql-prow, .ql-daxis { display: grid; grid-template-columns: 180px 1fr 48px 56px; align-items: center; gap: 16px; }
@@ -1082,7 +1104,11 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-champq { font-size: 12.5px; font-style: italic; color: var(--ink); border-left: 2px solid var(--line);
   padding: 1px 10px; margin: 3px 0; overflow-wrap: anywhere; }
 .ql-champq.pos { border-left-color: var(--green); } .ql-champq.neg { border-left-color: var(--red); }
-.ql-champid { font-style: normal; font-size: 10.5px; color: var(--muted); margin-left: 8px; white-space: nowrap; }
+/* fix #2: clamp a long example comment to 3 lines so it can't blow out the card */
+.ql-champtext { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+  overflow: hidden; }
+.ql-champid { font-style: normal; font-size: 10.5px; color: var(--muted); display: block; margin-top: 2px;
+  white-space: nowrap; }
 /* C4 focus reading mode */
 .ql-focusbtn { border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit;
   font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 11px; cursor: pointer; }
