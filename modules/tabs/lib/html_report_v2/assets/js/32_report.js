@@ -168,6 +168,9 @@
         return '<div class="rpt-field"><label>' + f[1] + "</label>" +
           '<div class="rpt-about-static">' + fmt.escapeHtml(aboutVal) + "</div></div>";
       }).join("") + autoAboutHtml() + "</div>");
+    // Statistical diagnostics — the interactive twin of the Excel stats pack
+    // (empty string when the island carries none, e.g. an older report).
+    html.push(report.diagnosticsHtml());
     html.push("</div>");
     // fresh wrapper per render — never stack duplicate listeners
     var wrap = document.createElement("div");
@@ -204,6 +207,51 @@
           "and confidence intervals are sized, since weighting reduces precision).</p>"
         : "") + TR.ai.methodologyHtml();
   }
+
+  // The statistical diagnostics panel — the interactive twin of the Excel stats
+  // pack (project.diagnostics, attached by the R build; a curated subset). A pure
+  // function of the island object so it is unit-testable; "" when absent, so old
+  // reports (and any build that couldn't attach it) simply omit the panel.
+  report.diagnosticsHtml = function () {
+    var d = TR.AGG && TR.AGG.project && TR.AGG.project.diagnostics;
+    if (!d || typeof d !== "object") return "";
+    var esc = fmt.escapeHtml;
+    var secs = (d.sections || []).map(function (s) {
+      var rows = ((s && s.rows) || []).map(function (r) {
+        return "<tr><th>" + esc(r && r[0]) + "</th><td>" + esc(r && r[1]) + "</td></tr>";
+      }).join("");
+      if (!rows) return "";
+      return '<div class="rpt-diag-sec"><h4>' + esc(s.title) + "</h4>" +
+        '<table class="rpt-diag-tbl"><tbody>' + rows + "</tbody></table></div>";
+    }).join("");
+    var w = d.warnings || {};
+    var evs = (w.events && typeof w.events.map === "function") ? w.events : [];
+    var warn;
+    if (!evs.length) {
+      warn = '<div class="rpt-diag-sec rpt-diag-warn"><h4>Warnings &amp; events</h4>' +
+        '<p class="rpt-diag-clean">✓ ' + esc(w.summary || "No events — ran cleanly") + "</p></div>";
+    } else {
+      warn = '<div class="rpt-diag-sec rpt-diag-warn"><h4>Warnings &amp; events</h4>' +
+        '<table class="rpt-diag-tbl rpt-diag-events"><thead><tr><th>Level</th><th>Code</th>' +
+        "<th>Detail</th></tr></thead><tbody>" +
+        evs.map(function (e) {
+          e = e || {};
+          var lvl = String(e.level || "INFO").toUpperCase();
+          var cls = lvl === "REFUSE" ? "refuse" : lvl === "PARTIAL" ? "partial" : "info";
+          var detail = [e.title, e.message].filter(function (x) { return x && x !== "—"; }).join(" — ");
+          return '<tr><td><span class="rpt-diag-lvl ' + cls + '">' + esc(lvl) + "</span></td>" +
+            "<td>" + esc(e.code) + "</td><td>" + esc(detail) + "</td></tr>";
+        }).join("") + "</tbody></table></div>";
+    }
+    var st = String(d.status || "PASS").toUpperCase();
+    var stCls = st === "PASS" ? "pass" : st === "PARTIAL" ? "partial" : "refuse";
+    return '<details class="card rpt-diag"><summary class="rpt-diag-sum">Statistical diagnostics' +
+      '<span class="rpt-diag-status ' + stCls + '">' + esc(d.status || "PASS") + "</span></summary>" +
+      '<p class="hint">The run’s diagnostic record — data received and used, the statistical ' +
+      "assumptions applied, TRS events and reproducibility. The interactive twin of the Excel stats " +
+      "pack; it travels inside saved copies.</p>" +
+      '<div class="rpt-diag-grid">' + secs + warn + "</div></details>";
+  };
 
   function wire(host) {
     host.addEventListener("input", function (e) {
