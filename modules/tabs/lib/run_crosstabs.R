@@ -189,6 +189,7 @@ tabs_source("html_report", "99_html_report_main.R")
 # transformer's row helpers, so it must load after the html_report module).
 source(file.path(script_dir, "score_utils.R"))
 source(file.path(script_dir, "data_layer_writer.R"))
+source(file.path(script_dir, "stats_diagnostics.R"))
 source(file.path(script_dir, "microdata_writer.R"))
 source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
@@ -743,6 +744,25 @@ if (.html_report_v2_on) {
                              data_result$survey_structure,
                              ai = build_dl_ai(config_result$config_obj))
 
+      # Statistical diagnostics (V13): the interactive twin of the Excel stats
+      # pack. Always attached (independent of Generate_Stats_Pack) so every v2
+      # report is self-documenting and the diagnostics ride inside saved copies.
+      # Curated subset — raw config echo stays in the Excel deliverable. Never
+      # allowed to break the report: a failure just drops the panel.
+      dl$project$diagnostics <- tryCatch(
+        diagnostics_for_island(build_tabs_diagnostics(
+          config_result   = config_result,
+          data_result     = data_result,
+          analysis_result = analysis_result,
+          workbook_result = workbook_result,
+          start_time      = start_time,
+          script_version  = SCRIPT_VERSION)),
+        error = function(e) {
+          cat("\n[WARNING] Report diagnostics panel could not be built:",
+              conditionMessage(e), "\n  The v2 report still builds without it.\n\n")
+          NULL
+        })
+
       # Anonymised microdata island (per-respondent indices + weights) so the
       # live filter bar + "+ Custom…" banner light up and recompute weighted
       # figures; NULL on failure degrades the report to published-only.
@@ -954,101 +974,15 @@ generate_tabs_stats_pack <- function(config_result, data_result,
     output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
   }
 
-  config_obj <- config_result$config_obj
-
-  # Data receipt
-  data_receipt <- list(
-    file_name = basename(config_obj$data_file %||% "unknown"),
-    n_rows    = nrow(data_result$survey_data),
-    n_cols    = ncol(data_result$survey_data)
-  )
-
-  # Data used
-  n_questions <- length(analysis_result$all_results)
-  n_skipped <- length(analysis_result$skipped_questions)
-  n_partial <- length(analysis_result$partial_questions)
-
-  data_used <- list(
-    n_respondents      = nrow(data_result$survey_data),
-    n_excluded         = 0L,
-    questions_total    = n_questions + n_skipped,
-    questions_analysed = n_questions,
-    questions_skipped  = n_skipped,
-    questions_partial  = n_partial
-  )
-
-  # Weight diagnostics
-  is_weighted <- isTRUE(config_obj$apply_weighting)
-  weight_var <- if (is_weighted) config_obj$weight_variable else NULL
-  eff_n_val <- data_result$effective_n %||% NA
-
-  # Significance testing parameters
-  sig_enabled <- isTRUE(config_obj$enable_significance_testing)
-  alpha_val <- config_obj$alpha %||% 0.05
-  min_base_val <- config_obj$min_base %||% 30
-
-  # TRS summary
-  run_result <- workbook_result$run_result
-  n_events <- length(run_result$events %||% list())
-  n_refusals <- sum(vapply(run_result$events %||% list(),
-                           function(e) identical(e$level, "REFUSE"), logical(1)))
-  n_partials <- sum(vapply(run_result$events %||% list(),
-                           function(e) identical(e$level, "PARTIAL"), logical(1)))
-  trs_summary <- if (n_events == 0) {
-    "No events — ran cleanly"
-  } else {
-    parts <- character(0)
-    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
-    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
-    remainder <- n_events - n_refusals - n_partials
-    if (remainder > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
-    paste(parts, collapse = ", ")
-  }
-
-  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-
-  assumptions <- list(
-    "Analysis Type"              = "Cross-tabulation",
-    "Questions Processed"        = as.character(n_questions),
-    "Questions Skipped"          = as.character(n_skipped),
-    "Weighting"                  = if (is_weighted) sprintf("Yes — %s", weight_var) else "No",
-    "Effective N"                = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "—",
-    "Significance Testing"       = if (sig_enabled) "Enabled" else "Disabled",
-    "Alpha (p-value threshold)"  = if (sig_enabled) sprintf("%.3f", alpha_val) else "—",
-    "Minimum Base Size"          = as.character(min_base_val),
-    "Bonferroni Correction"      = if (sig_enabled && isTRUE(config_obj$bonferroni_correction)) "Applied" else "Not applied",
-    "Interactive Report"         = if (isTRUE(config_obj$html_report_v2)) "Generated" else "Not requested",
-    "Classic HTML Report"        = if (isTRUE(config_obj$html_report)) "Generated" else "Not requested",
-    "AI Insights"                = if (isTRUE(config_obj$ai_insights)) "Enabled" else "Disabled",
-    "TRS Status"                 = run_result$status %||% "PASS",
-    "TRS Events"                 = trs_summary
-  )
-
-  config_echo <- list(
-    data_file      = config_obj$data_file,
-    structure_file = config_obj$structure_file,
-    output_file    = config_result$output_path,
-    apply_weighting = config_obj$apply_weighting,
-    weight_variable = config_obj$weight_variable,
-    enable_significance_testing = config_obj$enable_significance_testing
-  )
-
-  payload <- list(
-    module           = "TABS",
-    project_name     = workbook_result$project_name   %||% NULL,
-    analyst_name     = config_obj$analyst_name         %||% NULL,
-    research_house   = config_obj$research_house       %||% NULL,
-    run_timestamp    = start_time,
-    turas_version    = script_version,
-    r_version        = R.version$version.string,
-    status           = run_result$status %||% "PASS",
-    duration_seconds = if (duration_secs > 0 && duration_secs < 86400) duration_secs else NA,
-    data_receipt     = data_receipt,
-    data_used        = data_used,
-    assumptions      = assumptions,
-    run_result       = run_result,
-    packages         = c("openxlsx", "readxl"),
-    config_echo      = config_echo
+  # Assemble the diagnostic payload (shared with the in-report diagnostics panel,
+  # so the Excel pack and the report can never drift).
+  payload <- build_tabs_diagnostics(
+    config_result   = config_result,
+    data_result     = data_result,
+    analysis_result = analysis_result,
+    workbook_result = workbook_result,
+    start_time      = start_time,
+    script_version  = script_version
   )
 
   result <- turas_write_stats_pack(payload, output_path)

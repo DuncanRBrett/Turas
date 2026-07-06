@@ -592,6 +592,33 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .as-foot button:hover { color: var(--red); }
 .footer-callout { margin-top: 14px; }
 
+/* Report tab — statistical diagnostics (the interactive twin of the Excel stats pack) */
+.rpt-diag { margin-top: 12px; }
+.rpt-diag > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 700; color: var(--brand); }
+.rpt-diag > summary::-webkit-details-marker { display: none; }
+.rpt-diag > summary::before { content: "▸"; color: var(--muted); font-size: 11px; font-weight: 400; }
+.rpt-diag[open] > summary::before { content: "▾"; }
+.rpt-diag-status { font-size: 11px; font-weight: 700; letter-spacing: .02em; border-radius: 999px;
+  padding: 2px 10px; border: 1px solid transparent; }
+.rpt-diag-status.pass { background: rgba(27, 110, 83, .12); color: var(--green); border-color: rgba(27, 110, 83, .3); }
+.rpt-diag-status.partial { background: rgba(204, 153, 0, .14); color: #9a5410; border-color: rgba(204, 153, 0, .35); }
+.rpt-diag-status.refuse { background: rgba(179, 55, 47, .12); color: var(--red); border-color: rgba(179, 55, 47, .3); }
+.rpt-diag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 26px; margin-top: 12px; }
+.rpt-diag-sec h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.rpt-diag-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rpt-diag-tbl th, .rpt-diag-tbl td { text-align: left; padding: 3px 10px 3px 0; vertical-align: top; }
+.rpt-diag-tbl tbody th { font-weight: 500; color: var(--muted); white-space: nowrap; width: 46%; }
+.rpt-diag-tbl td { color: var(--ink); }
+.rpt-diag-warn { grid-column: 1 / -1; }
+.rpt-diag-events thead th { font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+.rpt-diag-events tbody td { border-bottom: 1px solid var(--line); }
+.rpt-diag-lvl { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.rpt-diag-lvl.info { background: rgba(50, 51, 103, .1); color: var(--brand); }
+.rpt-diag-lvl.partial { background: rgba(204, 153, 0, .16); color: #9a5410; }
+.rpt-diag-lvl.refuse { background: rgba(179, 55, 47, .12); color: var(--red); }
+.rpt-diag-clean { color: var(--green); font-size: 12.5px; margin: 2px 0 0; }
+
 /* chart dropdowns + story flag toggles */
 .charttools select { padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; font: 12px var(--font); background: #fff; }
 .si-flags { display: inline-flex; gap: 8px; margin-left: 10px; }
