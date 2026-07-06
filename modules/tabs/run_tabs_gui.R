@@ -316,6 +316,12 @@ run_tabs_gui <- function() {
                          value = FALSE),
             checkboxInput("prepare_deliverable",
                          "Prepare client deliverable (minify for delivery)",
+                         value = FALSE),
+            checkboxInput("generate_reader_report",
+                         "Also create the Reader report (narrative summary that links into the tables)",
+                         value = FALSE),
+            checkboxInput("reader_ai_prose",
+                         HTML("&nbsp;&nbsp;&#8627; draft the Reader narrative with AI (aggregates only, no verbatims; flagged in the report)"),
                          value = FALSE)
           )
         )
@@ -402,6 +408,14 @@ run_tabs_gui <- function() {
         # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",
                isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+
+        # Reader report (narrative summary, separate file) — the GUI choice
+        # overrides the config's generate_reader_report setting.
+        assign("TURAS_GENERATE_READER_REPORT",
+               isTRUE(input$generate_reader_report), envir = .GlobalEnv)
+        # Draft the Reader narrative with AI (opt-in; aggregates only, flagged).
+        assign("TURAS_READER_AI_PROSE",
+               isTRUE(input$reader_ai_prose), envir = .GlobalEnv)
         if (isTRUE(input$prepare_deliverable)) {
           .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
             input$client_name

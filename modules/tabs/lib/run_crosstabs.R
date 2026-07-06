@@ -192,6 +192,9 @@ source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "microdata_writer.R"))
 source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
+source(file.path(script_dir, "reader_report", "derive_reader_model.R"))
+source(file.path(script_dir, "reader_report", "reader_ai_prose.R"))
+source(file.path(script_dir, "reader_report", "build_reader_report.R"))
 # Qualitative comment report (V12): reader -> assembly -> quant layer -> DATA_QUAL
 # island -> a self-contained comment report. Additive; loaded after its deps.
 source(file.path(script_dir, "qual_workbook_reader.R"))
@@ -683,6 +686,20 @@ if (isTRUE(config_result$config_obj$html_report)) {
   isTRUE(get0("TURAS_HTML_REPORT_V2", ifnotfound = FALSE))
 config_result$config_obj$html_report_v2 <- .html_report_v2_on   # reflect actual decision in the run summary
 
+# Reader report (narrative summary, separate file). Enabled by the config Settings
+# sheet (generate_reader_report) OR the GUI (TURAS_GENERATE_READER_REPORT, which
+# overrides). It rides on the v2 build below — it reuses that data layer — so it
+# can only run when the v2 report runs. Reflect the actual decision in the summary.
+.reader_report_on <- (isTRUE(config_result$config_obj$generate_reader_report) ||
+  isTRUE(get0("TURAS_GENERATE_READER_REPORT", ifnotfound = FALSE))) && .html_report_v2_on
+config_result$config_obj$generate_reader_report <- .reader_report_on
+
+# Reader AI prose (opt-in narrative drafting) — config Settings OR the GUI global
+# (which turns it on). Aggregates only leave the machine; the report is flagged.
+if (isTRUE(get0("TURAS_READER_AI_PROSE", ifnotfound = FALSE))) {
+  config_result$config_obj$reader_ai_prose <- TRUE
+}
+
 if (.html_report_v2_on) {
   v2_out <- config_result$output_path
 
@@ -854,6 +871,38 @@ if (.html_report_v2_on) {
     if (!is.null(report_v2_result) && report_v2_result$status == "PASS" &&
         exists("turas_prepare_deliverable", mode = "function")) {
       turas_prepare_deliverable(report_v2_result$output_file)
+    }
+
+    # Reader report (narrative summary) — a SEPARATE file beside the crosstab that
+    # deep-links back into it. Opt-in; deterministic unless reader_ai_prose is on.
+    # Reuses the dl / prev_json / qual_json_main already built above (no recompute),
+    # so it only runs when the crosstab itself built. Wrapped so any Reader failure
+    # never affects the Excel / crosstab outputs.
+    if (isTRUE(.reader_report_on) && !is.null(report_v2_result) &&
+        identical(report_v2_result$status, "PASS")) {
+      tryCatch({
+        reader_out <- sub("\\.xlsx$", "_Reader.html", v2_out)
+        rr <- generate_reader_report(
+          dl            = dl,
+          prev_json     = prev_json,
+          qual_json     = qual_json_main,
+          crosstab_file = basename(report_v2_result$output_file),
+          config_obj    = config_result$config_obj,
+          output_path   = reader_out
+        )
+        if (!is.null(rr) && identical(rr$status, "PASS") &&
+            exists("turas_prepare_deliverable", mode = "function")) {
+          turas_prepare_deliverable(rr$output_file)
+        }
+      },
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        cat("\n  The Excel / crosstab outputs were not affected.\n\n")
+      },
+      error = function(e) {
+        cat("\n[WARNING] Reader report build failed:", conditionMessage(e), "\n")
+        cat("  The Excel / crosstab outputs were not affected.\n\n")
+      })
     }
   }
 

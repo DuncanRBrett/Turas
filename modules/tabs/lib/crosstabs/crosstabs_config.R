@@ -347,7 +347,17 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
 
     # AI model selection — friendly label ("Sonnet 4.6"/"Opus 4.8") or an exact
     # model ID. Resolved in the AI layer; blank uses the sidecar/default model.
-    ai_model = get_config_value(config, "ai_model", NULL)
+    ai_model = get_config_value(config, "ai_model", NULL),
+
+    # V15 Reader report — a separate narrative-summary file written beside the
+    # crosstab that deep-links back into it. Opt-in; the GUI checkbox sets
+    # TURAS_GENERATE_READER_REPORT, which overrides this. The report is
+    # DETERMINISTIC by default (built on-device from the data layer, no AI,
+    # nothing leaves the machine). reader_ai_prose sends AGGREGATES ONLY to the
+    # model to draft the prose — never microdata or verbatims — and stays off
+    # unless the operator explicitly turns it on.
+    generate_reader_report = safe_logical(get_config_value(config, "generate_reader_report", FALSE)),
+    reader_ai_prose = safe_logical(get_config_value(config, "reader_ai_prose", FALSE))
   )
 }
 
