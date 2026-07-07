@@ -268,6 +268,71 @@ test_that("detects orphan options", {
 })
 
 
+context("structure validators — check_ranking_questions")
+
+test_that("passes when Ranking_Format is Position or Item", {
+  questions <- data.frame(
+    QuestionCode = c("Q1", "Q_RANK1", "Q_RANK2"),
+    QuestionText = c("Satisfaction", "Rank rewards", "Rank features"),
+    Variable_Type = c("Single_Response", "Ranking", "Ranking"),
+    Ranking_Format = c(NA, "Position", "Item"),
+    stringsAsFactors = FALSE
+  )
+  log <- new_error_log()
+  result <- check_ranking_questions(questions, log)
+  errors <- result[result$Severity == "Error", ]
+  expect_equal(nrow(errors), 0)
+})
+
+test_that("detects blank Ranking_Format on a Ranking question", {
+  questions <- data.frame(
+    QuestionCode = "Q_RANK1",
+    QuestionText = "Rank rewards",
+    Variable_Type = "Ranking",
+    Ranking_Format = NA,
+    stringsAsFactors = FALSE
+  )
+  log <- new_error_log()
+  result <- check_ranking_questions(questions, log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("'Position' or 'Item'", errors$Description, fixed = TRUE)))
+  # Regression guard: the old message wrongly named Best_to_Worst/Worst_to_Best,
+  # which is Ranking_Direction's vocabulary, not Ranking_Format's.
+  expect_false(any(grepl("Best_to_Worst", errors$Description, fixed = TRUE)))
+})
+
+test_that("rejects an invalid Ranking_Format value", {
+  questions <- data.frame(
+    QuestionCode = "Q_RANK1",
+    QuestionText = "Rank rewards",
+    Variable_Type = "Ranking",
+    Ranking_Format = "Best_to_Worst",
+    stringsAsFactors = FALSE
+  )
+  log <- new_error_log()
+  result <- check_ranking_questions(questions, log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("Invalid Ranking_Format", errors$Issue_Type, fixed = TRUE)))
+  expect_true(any(grepl("unrecognised Ranking_Format value", errors$Description, fixed = TRUE)))
+})
+
+test_that("errors when Ranking_Format column is entirely missing", {
+  questions <- data.frame(
+    QuestionCode = "Q_RANK1",
+    QuestionText = "Rank rewards",
+    Variable_Type = "Ranking",
+    stringsAsFactors = FALSE
+  )
+  log <- new_error_log()
+  result <- check_ranking_questions(questions, log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("Ranking_Format column missing", errors$Description, fixed = TRUE)))
+})
+
+
 # ==============================================================================
 # 2. Config Validators
 # ==============================================================================

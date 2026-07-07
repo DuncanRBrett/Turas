@@ -157,8 +157,25 @@ check_ranking_questions <- function(questions_df, error_log) {
           "Validation",
           "Missing Ranking_Format Values",
           sprintf(
-            "Ranking questions missing format specification: %s. Specify 'Best_to_Worst' or 'Worst_to_Best'.",
+            "Ranking questions missing format specification: %s. Specify 'Position' or 'Item'.",
             paste(missing_format, collapse = ", ")
+          ),
+          "",
+          "Error"
+        )
+      }
+      present <- ranking_questions[!ranking_questions$QuestionCode %in% missing_format, ]
+      invalid_format <- present$QuestionCode[
+        !trimws(present$Ranking_Format) %in% c("Position", "Item")
+      ]
+      if (length(invalid_format) > 0) {
+        error_log <- log_issue(
+          error_log,
+          "Validation",
+          "Invalid Ranking_Format Values",
+          sprintf(
+            "Ranking questions have an unrecognised Ranking_Format value: %s. Must be exactly 'Position' or 'Item'.",
+            paste(invalid_format, collapse = ", ")
           ),
           "",
           "Error"
