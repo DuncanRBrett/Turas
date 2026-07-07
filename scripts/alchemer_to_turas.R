@@ -815,7 +815,13 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     h <- names(data.table::fread(data_export_path, nrows = 0L, header = TRUE))
     return(list(row_index = 1L, values = h))
   }
-  block <- openxlsx::read.xlsx(data_export_path, sheet = 1L,
+  if (!ext %in% c("xlsx", "xlsm")) {
+    stop(sprintf(
+      "Cannot read data export '%s': unsupported format. Supported: .xlsx, .xlsm, .csv.",
+      basename(data_export_path)), call. = FALSE)
+  }
+  block <- openxlsx::read.xlsx(.att_openxlsx_readable_path(data_export_path),
+                               sheet = 1L,
                                rows = seq_len(max_scan), colNames = FALSE,
                                skipEmptyRows = FALSE, skipEmptyCols = FALSE)
   best <- list(row_index = 1L, n_colon = -1L, values = character(0))
@@ -827,6 +833,67 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     }
   }
   list(row_index = best$row_index, values = best$values)
+}
+
+# ---- data-export validation & safe reading ----------------------------------
+
+# Data-export formats the header-alignment reads can consume.
+.ATT_EXPORT_EXTS <- c("csv", "xlsx", "xlsm")
+
+#' Validate the optional data-export path before any expensive work
+#'
+#' Returns NULL when no export was supplied (Data_Headers then falls back to a
+#' structure-only row). Returns the path-expanded path when it points to a
+#' readable, supported file. Stops with an actionable message when a path was
+#' supplied but cannot be used — so a wrong path or format fails fast and
+#' clearly, up front, instead of surfacing a cryptic openxlsx error partway
+#' through the run (after the API fetch and several written files).
+#'
+#' @keywords internal
+.att_validate_data_export <- function(data_export_path) {
+  if (is.null(data_export_path) ||
+      !nzchar(trimws(as.character(data_export_path)))) {
+    return(NULL)
+  }
+  path <- path.expand(trimws(as.character(data_export_path)))
+  if (!file.exists(path)) {
+    stop(sprintf(paste0(
+      "Data export not found: '%s'.\n",
+      "  Check the path, or clear the Data Export field to generate ",
+      "structure-only configs (Data_Headers without a data file)."),
+      path), call. = FALSE)
+  }
+  ext <- tolower(tools::file_ext(path))
+  if (!ext %in% .ATT_EXPORT_EXTS) {
+    fmt <- if (nzchar(ext)) paste0("a .", ext, " file") else "a file with no extension"
+    stop(sprintf(paste0(
+      "Data export '%s' is %s, which cannot be read.\n",
+      "  Supported formats: .xlsx, .xlsm, .csv. Re-save or re-export the data ",
+      "as .xlsx or .csv, or clear the Data Export field to generate ",
+      "structure-only configs."),
+      basename(path), fmt), call. = FALSE)
+  }
+  path
+}
+
+#' Return a path that openxlsx will accept for reading
+#'
+#' openxlsx guards its readers with a case-sensitive filename check, so a valid
+#' workbook with an upper-case extension (e.g. `DATA.XLSX`) is rejected. When
+#' the literal path would fail that check, read from a lower-case-extension temp
+#' copy rather than renaming the analyst's file.
+#'
+#' @keywords internal
+.att_openxlsx_readable_path <- function(path) {
+  if (grepl("\\.(xlsx|xlsm)$", path)) return(path)
+  ext      <- tolower(tools::file_ext(path))
+  norm_ext <- if (ext %in% c("xlsx", "xlsm")) ext else "xlsx"
+  tmp      <- tempfile(fileext = paste0(".", norm_ext))
+  if (!file.copy(path, tmp, overwrite = TRUE)) {
+    stop(sprintf("Could not stage a readable copy of data export '%s'.",
+                 basename(path)), call. = FALSE)
+  }
+  tmp
 }
 
 # Normalise a key for lookup: strip HTML, collapse whitespace, lowercase,
@@ -1236,9 +1303,14 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
   if (ext == "csv") {
     all <- data.table::fread(data_export_path, header = FALSE)
-  } else {
-    all <- openxlsx::read.xlsx(data_export_path, sheet = 1L, colNames = FALSE,
+  } else if (ext %in% c("xlsx", "xlsm")) {
+    all <- openxlsx::read.xlsx(.att_openxlsx_readable_path(data_export_path),
+                               sheet = 1L, colNames = FALSE,
                                skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+  } else {
+    stop(sprintf(
+      "Cannot read data export '%s': unsupported format. Supported: .xlsx, .xlsm, .csv.",
+      basename(data_export_path)), call. = FALSE)
   }
   if (is.null(all) || nrow(all) <= header_row) {
     warning("No data rows found below the detected header — data file skipped.",
@@ -1330,6 +1402,12 @@ alchemer_to_turas <- function(survey_id,
     stop(sprintf("Template(s) not found:\n%s\n  Run from the Turas project root.",
                  paste0("  ", missing_tpls, collapse = "\n")), call. = FALSE)
   }
+
+  # Validate the optional data export up front so a wrong path or unsupported
+  # format fails fast with a clear message, rather than a cryptic openxlsx error
+  # 15-30s into the API fetch. NULL here means "no export" — Data_Headers then
+  # falls back to a structure-only row.
+  data_export_path <- .att_validate_data_export(data_export_path)
 
   cat(sprintf("Fetching survey %s from Alchemer API...\n", survey_id))
   api_dt <- fetch_alchemer_reporting_values(
