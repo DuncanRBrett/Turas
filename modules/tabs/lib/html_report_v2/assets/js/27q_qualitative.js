@@ -24,7 +24,7 @@
   var qual = TR.qual = TR.qual || {};
   var esc = function (s) { return (TR.fmt && TR.fmt.escapeHtml) ? TR.fmt.escapeHtml(s) : String(s == null ? "" : s); };
 
-  var TIER_ORDER = { all: 0, noteworthy: 1, must_read: 2 };
+  var TIER_ORDER = { all: 0, noteworthy: 1, must_read: 2, priority: 3 };
   var SENT = { 1: "pos", 2: "neu", 3: "neg" };
 
   // ---- pure helpers (node-testable) -----------------------------------------
@@ -33,6 +33,19 @@
   qual.tierFilter = function (records, tier) {
     var min = TIER_ORDER[tier] || 0;
     return (records || []).filter(function (r) { return (r.tier || 0) >= min; });
+  };
+
+  /** Stable display/export order: highest noteworthy tier first (Priority ->
+   *  Must-read -> Noteworthy -> the rest); within a tier the existing (data)
+   *  order is kept — so the comments to lead with are never buried by record id. */
+  qual.byTierDesc = function (records) {
+    return (records || [])
+      .map(function (r, i) { return { r: r, i: i }; })
+      .sort(function (a, b) {
+        var d = (b.r.tier || 0) - (a.r.tier || 0);
+        return d !== 0 ? d : a.i - b.i;
+      })
+      .map(function (x) { return x.r; });
   };
 
   /** Per-theme prevalence (% of the given commenters) + the pos/neu/neg valence split. */
@@ -453,7 +466,9 @@
     var pool = qual.poolBeforeSentiment(q, st, audience);
     // Ignore a sentiment pick carried over from a coded question (the control is hidden
     // here, so a stale selection must not silently empty an un-coded question's list).
-    return qual.hasSentiment(q) ? qual.sentimentFilter(pool, st.sentiment) : pool;
+    var records = qual.hasSentiment(q) ? qual.sentimentFilter(pool, st.sentiment) : pool;
+    // Lead with the highest tier (Priority -> Must-read -> Noteworthy), never by record id.
+    return qual.byTierDesc(records);
   };
 
   /** Split records into the analyst's curated set (shortlisted or carrying a
@@ -499,7 +514,7 @@
   // ---- export the visible comments to Excel (client-side) --------------------
 
   var SENT_LABEL = { 1: "Positive", 2: "Mixed", 3: "Negative" };
-  var TIER_LABEL = { 2: "Must-read", 1: "Noteworthy" };
+  var TIER_LABEL = { 3: "Priority", 2: "Must-read", 1: "Noteworthy" };
 
   /** Export matrix: ID + demographics + Noteworthy + Sentiment + Themes + Verbatim.
    *  Pure + node-testable. Hidden verbatims export as "[hidden]" (the confidentiality
@@ -1166,7 +1181,8 @@
     // the standard disclosure note.
     var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
     var dis = gated ? " disabled" : "";
-    var tierOpts = [["all", "All"], ["noteworthy", "Noteworthy+"], ["must_read", "Must-read"]];
+    var tierOpts = [["all", "All"], ["noteworthy", "Noteworthy+"],
+                   ["must_read", "Must-read+"], ["priority", "Priority"]];
     var tier = '<div class="ql-seg" role="tablist" aria-label="Noteworthy filter">' +
       tierOpts.map(function (o) {
         return '<button class="ql-segbtn' + (st.tier === o[0] ? " on" : "") +
@@ -1456,7 +1472,8 @@
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
       : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));   // select-to-highlight
-    var star = r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
+    var star = r.tier >= 3 ? '<span class="ql-star priority" title="priority">★</span>'
+             : r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
     var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + '</span>'; }).join("");

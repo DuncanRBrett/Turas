@@ -76,12 +76,20 @@ test_that("qual_code_purity and qual_density ignore blanks correctly", {
   expect_equal(qual_density(c("1", "", "2", "")), 0.5)
 })
 
-test_that("qual_noteworthy_tier maps markers to tiers (0 other / 1 noteworthy / 2 must-read)", {
+test_that("qual_noteworthy_tier maps markers to tiers (0 other / 1 note / 2 must-read / 3 priority)", {
   expect_equal(qual_noteworthy_tier(""), 0L)
-  expect_equal(qual_noteworthy_tier("x"), 1L)        # binary markers -> noteworthy
+  expect_equal(qual_noteworthy_tier("x"), 1L)        # any non-blank -> noteworthy
   expect_equal(qual_noteworthy_tier("Yes"), 1L)
+  expect_equal(qual_noteworthy_tier("y"), 1L)        # legacy binary mark still counts
+  expect_equal(qual_noteworthy_tier("n"), 1L)        # explicit noteworthy code
+  expect_equal(qual_noteworthy_tier("N"), 1L)
   expect_equal(qual_noteworthy_tier("Must read"), 2L)
   expect_equal(qual_noteworthy_tier("  CRITICAL "), 2L)   # case/space-insensitive
+  expect_equal(qual_noteworthy_tier("m"), 2L)        # must-read code
+  expect_equal(qual_noteworthy_tier("M"), 2L)
+  expect_equal(qual_noteworthy_tier("p"), 3L)        # priority code (lead-with)
+  expect_equal(qual_noteworthy_tier("P"), 3L)
+  expect_equal(qual_noteworthy_tier(" Priority "), 3L)   # word alias, case/space-insensitive
 })
 
 # ==============================================================================

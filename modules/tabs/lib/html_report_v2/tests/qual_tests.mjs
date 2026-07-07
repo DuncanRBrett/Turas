@@ -49,7 +49,16 @@ assert(prev[1].label === "Service" && prev[1].pct === 25,
 
 assert(qual.tierFilter(q.records, "all").length === 4, "tierFilter all -> 4");
 assert(qual.tierFilter(q.records, "noteworthy").length === 2, "tierFilter noteworthy+ -> 2 (tier>=1)");
-assert(qual.tierFilter(q.records, "must_read").length === 1, "tierFilter must-read -> 1 (tier>=2)");
+assert(qual.tierFilter(q.records, "must_read").length === 1, "tierFilter must-read+ -> 1 (tier>=2)");
+assert(qual.tierFilter(q.records, "priority").length === 0, "tierFilter priority -> 0 (no tier>=3 here)");
+
+// byTierDesc: highest tier leads (Priority 3 > Must-read 2 > Noteworthy 1 > rest 0),
+// stable within a tier — so comments lead P,M,N and never by record id.
+var tierMix = [{ idx: 0, tier: 1 }, { idx: 1, tier: 0 }, { idx: 2, tier: 3 },
+               { idx: 3, tier: 2 }, { idx: 4, tier: 0 }, { idx: 5, tier: 1 }];
+assert(qual.byTierDesc(tierMix).map(function (r) { return r.idx; }).join(",") === "2,3,0,5,1,4",
+  "byTierDesc: P(2)->M(3)->N(0,5 stable)->rest(1,4 stable)");
+assert(qual.tierFilter(tierMix, "priority").length === 1, "tierFilter priority -> 1 (the tier-3)");
 
 assert(qual.recordsForTheme(q.records, 0).length === 2, "recordsForTheme Price -> 2");
 
@@ -144,6 +153,8 @@ assert(qual.visibleRecords(q, { tier: "all", savedOnly: false }, all4).length ==
 assert(qual.visibleRecords(q, { tier: "must_read", savedOnly: false }, all4).length === 1, "visibleRecords: tier must-read -> 1");
 assert(qual.visibleRecords(q, { tier: "all", theme: 0, savedOnly: false }, all4).length === 2, "visibleRecords: theme Price -> 2");
 assert(qual.visibleRecords(q, { tier: "all", savedOnly: true }, all4).length === 1, "visibleRecords: savedOnly -> the 1 shortlisted");
+assert(qual.visibleRecords(q, { tier: "all", savedOnly: false }, all4).map(function (r) { return r.idx; }).join(",") === "2,0,1,3",
+  "visibleRecords: leads by tier (must-read idx2, noteworthy idx0, then rest idx1,3) not by record id");
 
 // exportRows: header + a row per record; hidden text exports as [hidden].
 const island = { demographics: [{ label: "Campus" }, { label: "NPS" }] };
@@ -594,6 +605,25 @@ assert(ch.indexOf("75% of comments themed") >= 0,
   "the gated coverage bar reads the unfiltered records (75%), never the cut");
 assert(ch.indexOf("2 of 4 answered") < 0, "below k the cut count stays withheld in the header");
 TR.disclosure = null;
+
+// ---- Priority (tier 3) reaches the DOM: the star badge + the filter button ----
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
+  questions: [{ code: "QP", title: "Open", type: "raw", themes: [], base: { answered: 3 },
+    records: [
+      { idx: 0, tier: 3, sentiment: 1, themeVals: {}, demos: {}, text: "lead with me" },
+      { idx: 1, tier: 2, sentiment: 1, themeVals: {}, demos: {}, text: "must read me" },
+      { idx: 2, tier: 1, sentiment: 1, themeVals: {}, demos: {}, text: "noteworthy me" }
+    ] }] };
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.disclosure = null;
+qual._state = null;
+const hostP = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+qual.render(hostP);
+const pHtml = hostP.innerHTML;
+assert(pHtml.indexOf('data-tier="priority"') >= 0, "render: the Priority tier-filter button reaches the DOM");
+assert(pHtml.indexOf('class="ql-star priority" title="priority"') >= 0, "render: a tier-3 comment shows the Priority star");
+assert(pHtml.indexOf('class="ql-star must" title="must-read"') >= 0, "render: a tier-2 comment shows the Must-read star");
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

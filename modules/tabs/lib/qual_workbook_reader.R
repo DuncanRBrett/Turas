@@ -33,10 +33,12 @@ QUAL_SENTIMENT_CODES <- c("1", "2", "3")
 # Tokens that mean "missing" in a demographic cell (beyond blank).
 QUAL_MISSING_TOKENS  <- c("", "-")
 
-# Noteworthy markers (case-insensitive) that promote a comment to the top "must-read"
-# tier; any other non-blank marker is the ordinary "noteworthy" tier. Configurable
-# later via Settings; today's workbooks use only binary markers, so tier 2 is dormant.
-QUAL_MUSTREAD_MARKERS <- c("must read", "must-read", "must", "must-read!", "critical", "priority")
+# Noteworthy-column codes (case-insensitive), graded into three tiers. Any non-blank
+# value is at least "noteworthy" (tier 1) — so legacy marks like "y" still count — and
+# an explicit single-letter code promotes it: "m" -> must-read (tier 2), "p" -> priority
+# (tier 3, the "lead with in a presentation" comments). Word aliases kept for back-compat.
+QUAL_PRIORITY_MARKERS <- c("p", "priority")
+QUAL_MUSTREAD_MARKERS <- c("m", "must read", "must-read", "must", "must-read!", "critical")
 
 # A column is the overall-sentiment column only if at least this fraction of its
 # rows are populated (sentiment is dense; themes are sparse).
@@ -257,17 +259,22 @@ qual_num_or_na <- function(v) {
   if (is.na(x)) NA_real_ else x
 }
 
-#' Map a noteworthy marker to a tier ordinal: 0 = other, 1 = noteworthy, 2 = must-read.
+#' Map a noteworthy marker to a tier ordinal: 0 = other, 1 = noteworthy, 2 = must-read,
+#' 3 = priority.
 #'
 #' Any non-blank marker is at least "noteworthy"; a marker in the must-read set is
-#' promoted to tier 2. Marker-agnostic and case-insensitive, so "Yes"/"x" both read
-#' as tier 1 while a coder's "Must read" reads as tier 2.
+#' promoted to tier 2, and one in the priority set to tier 3. Marker-agnostic and
+#' case-insensitive, so "Yes"/"x"/"n" all read as tier 1, a coder's "m"/"Must read"
+#' as tier 2, and "p"/"Priority" as tier 3.
 #' @param marker The raw noteworthy cell value.
 #' @param mustread Character vector of must-read markers (lower-case).
-#' @return An integer tier (0, 1 or 2).
-qual_noteworthy_tier <- function(marker, mustread = QUAL_MUSTREAD_MARKERS) {
+#' @param priority Character vector of priority markers (lower-case).
+#' @return An integer tier (0, 1, 2 or 3).
+qual_noteworthy_tier <- function(marker, mustread = QUAL_MUSTREAD_MARKERS,
+                                 priority = QUAL_PRIORITY_MARKERS) {
   m <- tolower(trimws(marker))
   if (!nzchar(m)) return(0L)
+  if (m %in% priority) return(3L)
   if (m %in% mustread) return(2L)
   1L
 }

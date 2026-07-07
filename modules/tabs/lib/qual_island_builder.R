@@ -22,7 +22,7 @@
 # Verbatim-text confidentiality modes (dial 2; default hidden = numbers-only ship).
 QUAL_TEXT_MODES <- c("hidden", "redacted", "full")
 # Report-level default for the noteworthy tier filter (dial honoured in the JS).
-QUAL_NOTEWORTHY_DEFAULTS <- c("all", "noteworthy", "must_read")
+QUAL_NOTEWORTHY_DEFAULTS <- c("all", "noteworthy", "must_read", "priority")
 
 # Direct-identifier patterns scrubbed in REDACTED mode. These catch DIRECT identifiers
 # (email / URL / phone); contextual identifiers ("the only male diploma lecturer") are
