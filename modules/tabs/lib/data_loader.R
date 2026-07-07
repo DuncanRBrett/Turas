@@ -27,6 +27,42 @@
 SUPPORTED_DATA_FORMATS <- c("xlsx", "xls", "csv", "sav")
 SUPPORTED_CONFIG_FORMATS <- c("xlsx", "xls")
 
+# Leading UTF-8 byte-order mark (U+FEFF). UTF-8 CSV/Excel exports — notably
+# Alchemer — can prefix the first column header with a BOM. It is invisible but
+# breaks exact and anchored ("^...") column-name matching downstream: e.g. the
+# qualitative-comment ResponseID join and question-code lookups against the
+# Survey_Structure. Built with intToUtf8() so no invisible BOM sits in source.
+UTF8_BOM_CHAR <- intToUtf8(65279L)
+
+
+# ==============================================================================
+# HELPER: Column-name hygiene
+# ==============================================================================
+
+#' Strip a leading UTF-8 byte-order mark (BOM) from a character vector
+#'
+#' UTF-8 exports (notably Alchemer CSV->Excel) can prefix the first column
+#' header with an invisible BOM (U+FEFF). The BOM is not part of the intended
+#' column name but breaks exact and anchored string matching downstream — the
+#' qualitative-comment ResponseID join anchors its id-column pattern with "^",
+#' and question-code lookups compare names exactly, so a BOM-prefixed
+#' "Response ID" silently matches nothing. Removing it at the load boundary
+#' makes every column name match as the operator sees it.
+#'
+#' Pure: reads/writes nothing. Only a *leading* BOM is removed; a BOM elsewhere
+#' in a name (not a real-world case) is left untouched. Vectors with no BOM are
+#' returned unchanged (byte-identical), so non-BOM data is never altered.
+#'
+#' @param x A character vector (typically column names).
+#' @return `x` with any leading BOM removed from each element.
+#' @examples
+#' strip_leading_bom(c(paste0(intToUtf8(65279L), "Response ID"), "Q1"))
+#' # -> c("Response ID", "Q1")
+#' @keywords internal
+strip_leading_bom <- function(x) {
+  sub(paste0("^", UTF8_BOM_CHAR, "+"), "", x)
+}
+
 
 # ==============================================================================
 # HELPER: Auto-detect header row for table sheets
@@ -324,6 +360,12 @@ load_survey_data <- function(data_file_path, project_root = NULL,
       how_to_fix = "Ensure your data file contains tabular data (rows and columns), not other R objects."
     )
   }
+
+  # Strip any leading BOM from column names (a UTF-8 export artifact, e.g.
+  # Alchemer). It is invisible but breaks anchored column-name matching
+  # downstream — the qualitative ResponseID join and question-code lookup.
+  # No-op (names byte-identical) when no BOM is present.
+  names(survey_data) <- strip_leading_bom(names(survey_data))
 
   if (nrow(survey_data) == 0) {
     tabs_refuse(

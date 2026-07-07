@@ -352,3 +352,44 @@ test_that("a legacy CSV cache is ignored (never read) and noted on the console",
   expect_true(any(grepl("legacy CSV cache", out)))
   expect_identical(got$Q1, c("01", "02"))            # from Excel, not the CSV
 })
+
+
+# ==============================================================================
+# data_loader.R — strip_leading_bom (column-name hygiene)
+# ==============================================================================
+#
+# Regression: an Alchemer UTF-8 export prefixes the first column header with an
+# invisible BOM (U+FEFF), so the data's id column reads as "Response ID"
+# not "Response ID". That silently defeated the qualitative ResponseID join
+# (see test_qual_join.R). load_survey_data now strips a leading BOM at the load
+# boundary via strip_leading_bom(); these are the known-answer tests for it.
+
+context("data_loader — strip_leading_bom")
+
+BOM <- intToUtf8(65279L)   # U+FEFF, built explicitly (no invisible BOM in source)
+
+test_that("UTF8_BOM_CHAR is exactly U+FEFF", {
+  expect_identical(utf8ToInt(UTF8_BOM_CHAR), 65279L)
+})
+
+test_that("strips a leading BOM from the real Alchemer id header", {
+  expect_identical(strip_leading_bom(paste0(BOM, "Response ID")), "Response ID")
+})
+
+test_that("only the leading BOM is removed; the rest of the name is untouched", {
+  expect_identical(strip_leading_bom(paste0("A", BOM, "B")), paste0("A", BOM, "B"))
+})
+
+test_that("collapses multiple leading BOMs", {
+  expect_identical(strip_leading_bom(paste0(BOM, BOM, "X")), "X")
+})
+
+test_that("is a no-op on clean names (non-BOM data is never altered)", {
+  clean <- c("ResponseID", "Q1", "Q2", "")
+  expect_identical(strip_leading_bom(clean), clean)
+})
+
+test_that("cleans only the BOM-bearing element of a vector", {
+  got <- strip_leading_bom(c(paste0(BOM, "Response ID"), "Q1", "Q2"))
+  expect_identical(got, c("Response ID", "Q1", "Q2"))
+})

@@ -575,6 +575,14 @@ if (is.list(config_result) && identical(config_result$status, "REFUSED")) {
   return(config_result)
 }
 
+# Attach the config file path so downstream path resolution can find the project
+# root. Needed by the qualitative workbook resolver (qual_resolve_workbook_path),
+# the data layer, and AI-sidecar detection — for EVERY report type. Previously
+# this was set only inside the classic-HTML block, so a V2-only run (the default)
+# left it NULL and a relative qual_workbook path resolved against the run CWD
+# (tabs/lib) instead of the project, silently dropping the Qualitative tab.
+config_result$config_obj$config_file_path <- config_result$config_file
+
 # ==============================================================================
 # STEP 2: LOAD DATA
 # ==============================================================================
@@ -642,9 +650,6 @@ if (!(length(.classic_flag) == 1 && is.na(.classic_flag))) {
 
 if (isTRUE(config_result$config_obj$html_report)) {
   html_output_path <- sub("\\.xlsx$", ".html", config_result$output_path)
-
-  # Attach config file path for AI insights sidecar detection
-  config_result$config_obj$config_file_path <- config_result$config_file
 
   html_result <- tryCatch({
     generate_html_report(

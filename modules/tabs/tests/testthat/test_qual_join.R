@@ -29,8 +29,10 @@ local({
   lib <- file.path(repo, "modules/tabs/lib")
   suppressWarnings(suppressMessages({ library(jsonlite); library(openxlsx) }))
   source(file.path(repo, "modules/shared/lib/trs_refusal.R"), local = FALSE)
-  for (f in c("qual_workbook_reader.R", "qual_workbook_io.R", "qual_assemble.R",
-              "qual_island_builder.R", "qual_report.R")) {
+  for (f in c("validation_utils.R", "path_utils.R",  # get_project_root/resolve_path for the workbook resolver
+              "qual_workbook_reader.R", "qual_workbook_io.R", "qual_assemble.R",
+              "qual_island_builder.R", "qual_report.R",
+              "data_loader.R")) {   # strip_leading_bom — the loader-side half of the BOM regression
     source(file.path(lib, f), local = FALSE)
   }
 })
@@ -87,6 +89,24 @@ test_that("ResponseID maps to the correct 0-based host row, first occurrence win
   expect_equal(unname(m[["101"]]), 3L)
   expect_equal(unname(m[["103"]]), 4L)
   expect_false("" %in% names(m))                   # blanks dropped
+})
+
+test_that("regression: a BOM-prefixed id header defeats detection until the loader strips it", {
+  # CCPB W2026: the Alchemer UTF-8 export prefixed the first column header with an
+  # invisible BOM (U+FEFF), so the data's id column read as "<BOM>Response ID". The
+  # BOM breaks the "^(response\\s*)?id$" anchor, so the qual ResponseID join silently
+  # found no id column and the comments never showed. load_survey_data now strips a
+  # leading BOM at the load boundary (strip_leading_bom); this pins both halves.
+  bom <- intToUtf8(65279L)
+  raw <- host_survey(paste0(bom, "Response ID"))     # as readxl yields it, pre-cleaning
+  expect_true(is.na(qual_find_host_id_column(raw)))  # the bug: BOM defeats the anchor
+
+  cleaned <- raw
+  names(cleaned) <- strip_leading_bom(names(cleaned))   # the loader-side fix
+  expect_equal(qual_find_host_id_column(cleaned), "Response ID")
+  # and the full re-key then resolves the commenters
+  m <- qual_host_id_to_idx(cleaned, "Response ID")
+  expect_equal(unname(m[["101"]]), 3L)
 })
 
 # ==============================================================================
@@ -219,4 +239,39 @@ test_that("a CommentLink target that matches no rendered card is flagged (catche
 test_that("the island question carries its source sheet name", {
   isl <- make_island()
   expect_equal(isl$questions[[1]]$sheet, "Overall")
+})
+
+# ==============================================================================
+# WORKBOOK PATH RESOLUTION — the contract run_crosstabs must satisfy
+# ==============================================================================
+#
+# CCPB W2026: a relative qual_workbook ("02 Data/…") resolves against the
+# project root ONLY when config_obj$config_file_path is set. The V2 pipeline
+# previously set config_file_path only inside the classic-HTML block, so a
+# V2-only run left it NULL and the relative path resolved against the run CWD
+# (tabs/lib) — the workbook was "not found" and the Qualitative tab silently
+# dropped. run_crosstabs now sets config_file_path unconditionally; these pin
+# the resolver behaviour that fix depends on.
+
+test_that("a relative qual_workbook resolves against the project root when config_file_path is set", {
+  tmp <- tempfile("proj_"); dir.create(file.path(tmp, "02 Data"), recursive = TRUE)
+  on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
+  cfg_file <- file.path(tmp, "Config.xlsx")
+  writeLines("x", cfg_file)                                  # placeholder; resolver only reads the path
+  cfg <- list(config_file_path = cfg_file)
+  got <- qual_resolve_workbook_path("02 Data/Comments.xlsx", cfg)
+  # get_project_root normalises the base (symlinks, // ); build the expectation
+  # from the same normalised root so the comparison is symlink-stable.
+  expect_equal(got, file.path(normalizePath(tmp, mustWork = FALSE), "02 Data", "Comments.xlsx"))
+})
+
+test_that("without config_file_path the relative path is returned raw (the pre-fix failure)", {
+  got <- qual_resolve_workbook_path("02 Data/Comments.xlsx", list())   # config_file_path NULL
+  expect_equal(got, "02 Data/Comments.xlsx")                            # unresolved -> CWD-relative -> not found
+})
+
+test_that("an absolute qual_workbook passes through regardless of config_file_path", {
+  abs_path <- normalizePath(tempdir(), mustWork = FALSE)
+  abs_wb <- file.path(abs_path, "Comments.xlsx")
+  expect_equal(qual_resolve_workbook_path(abs_wb, list(config_file_path = "/some/Config.xlsx")), abs_wb)
 })
