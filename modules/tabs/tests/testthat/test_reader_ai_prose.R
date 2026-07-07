@@ -140,6 +140,35 @@ test_that("an invented number is rejected -> deterministic narrative stands", {
   expect_false(grepl("999", m$verdict$body %||% "", fixed = TRUE))
 })
 
+context("reader_ai_prose: years are not treated as invented numbers")
+
+test_that("the year pool fills the span between the years the study names", {
+  facts <- list(project = list(name = "SACS 2025", wave = "2025"),
+                trend = list(sinceYear = 2023))
+  expect_equal(.reader_year_pool(facts), c(2023, 2024, 2025))
+  # untracked study with no year anywhere -> empty pool, not an error
+  expect_length(.reader_year_pool(list(project = list(name = "Acme Study"))), 0)
+})
+
+test_that("a digit range is two numbers, not a negative (2023-2025 != -2025)", {
+  chk <- deterministic_number_check("Every item fell between 2023-2025.", c(2023, 2024, 2025))
+  expect_true(chk$pass)
+  chk2 <- deterministic_number_check("Scores sit in the 3.9-4.5 band.", c(3.9, 4.5))
+  expect_true(chk2$pass)
+  # a genuine negative is still checked as a negative
+  chk3 <- deterministic_number_check("A change of -0.48 since 2023.", c(-0.48, 2023))
+  expect_true(chk3$pass)
+})
+
+test_that("prose naming the wave year survives the number check", {
+  skip_if_not_installed("ellmer")
+  yearly <- modifyList(GOOD, list(subtitle = "The 2025 read: strong base, one soft spot."))
+  assign(".STUB_AI_RESPONSE", yearly, envir = globalenv())
+  m <- reader_apply_ai_prose(mk_model(), mk_cfg(reader_ai_prose = TRUE))
+  expect_equal(m$disclosure$mode, "ai")
+  expect_match(m$prose$subtitle, "2025")
+})
+
 test_that("disabled or no response leaves the deterministic narrative unchanged", {
   det <- mk_model()
   # disabled
@@ -149,4 +178,88 @@ test_that("disabled or no response leaves the deterministic narrative unchanged"
   assign(".STUB_AI_RESPONSE", NULL, envir = globalenv())
   m2 <- reader_apply_ai_prose(det, mk_cfg(reader_ai_prose = TRUE))
   expect_equal(m2$disclosure$mode, "deterministic")
+})
+
+# ==============================================================================
+# WP1 — failure visibility: a degraded AI run must be marked, not hidden (§3.7)
+# ==============================================================================
+
+context("reader_ai_prose: failure visibility (WP1)")
+
+test_that("AI requested but degraded stamps a banner token on the disclosure", {
+  # the provider returns nothing -> the AI path falls back to the on-device prose
+  assign(".STUB_AI_RESPONSE", NULL, envir = globalenv())
+  m <- reader_apply_ai_prose(mk_model(), mk_cfg(reader_ai_prose = TRUE))
+  expect_equal(m$disclosure$mode, "deterministic")           # fell back
+  expect_equal(m$disclosure$requested_mode, "ai")            # but AI was requested
+  expect_true(nzchar(m$disclosure$fallback_reason %||% ""))  # banner reason present
+})
+
+test_that("a deterministic run carries no failure-banner token", {
+  m <- reader_apply_ai_prose(mk_model(), mk_cfg(reader_ai_prose = FALSE))
+  expect_equal(m$disclosure$requested_mode, "deterministic")
+  expect_null(m$disclosure$fallback_reason)
+})
+
+test_that("a successful AI run records requested_mode = ai and no fallback", {
+  skip_if_not_installed("ellmer")
+  assign(".STUB_AI_RESPONSE", GOOD, envir = globalenv())
+  m <- reader_apply_ai_prose(mk_model(), mk_cfg(reader_ai_prose = TRUE))
+  expect_equal(m$disclosure$mode, "ai")
+  expect_equal(m$disclosure$requested_mode, "ai")
+  expect_null(m$disclosure$fallback_reason)
+})
+
+# ==============================================================================
+# WP2 — fact-sheet v2: fact ids + derived numbers + design facts, and a checker
+# that accepts legitimately derived figures but still rejects alien ones (§3.2/§3.6)
+# ==============================================================================
+
+context("reader_ai_prose: fact-sheet v2 (WP2)")
+
+test_that("the facts payload carries stable ids, a derived pool and design facts", {
+  facts <- reader_ai_facts(mk_model())
+  # stable ids on every headline / item fact
+  expect_true(all(vapply(facts$headline, function(h) nzchar(h$id %||% ""), logical(1))))
+  expect_true(all(vapply(facts$items, function(i) nzchar(i$id %||% ""), logical(1))))
+  # derived-numbers pool
+  expect_false(is.null(facts$derived))
+  expect_equal(facts$derived$nItems, 2L)
+  expect_equal(facts$derived$spread, 1.1)          # strongest 4.50 - weakest 3.40
+  # percent-of-scale is a derived figure on each fact (4.5 on a 10-pt scale = 45)
+  expect_true(45 %in% vapply(facts$items, function(i) i$pctOfScale %||% NA_real_, numeric(1)))
+  # design facts ground the limits prose
+  expect_false(is.null(facts$design))
+  expect_equal(facts$design$censusOrSample, "Census")
+  # still aggregates only — no microdata / verbatim keys anywhere
+  flat <- paste(names(unlist(facts)), collapse = " ")
+  expect_false(grepl("record|verbatim|text|respondent|answers|micro", flat, ignore.case = TRUE))
+})
+
+test_that("a derived figure the model cites is accepted by the number check", {
+  facts <- reader_ai_facts(mk_model())
+  pool <- extract_all_numbers(facts); pool <- pool[!is.na(pool)]
+  expect_true(45 %in% pool)   # percent-of-scale entered the allow-pool
+  chk <- deterministic_number_check("The strongest item reaches 45% of the scale ceiling.", pool)
+  expect_true(chk$pass)
+})
+
+test_that("a rounded or formatted variant of a source figure is accepted", {
+  # rounding: prose rounds a derived 76.3 down to 76
+  expect_true(deterministic_number_check("Net agreement sits at 76%.", c(76.3))$pass)
+  # formatted variants: a signed net (+63) and a percentage (76%)
+  expect_true(deterministic_number_check("A net positive of +63 and 76% agreement.", c(63, 76))$pass)
+})
+
+test_that("an alien figure is still rejected", {
+  expect_false(deterministic_number_check("A surprising 512 respondents drove it.", c(63, 76))$pass)
+})
+
+test_that("a response citing a derived figure survives end-to-end", {
+  skip_if_not_installed("ellmer")
+  deriv <- modifyList(GOOD, list(
+    verdict = "The strongest item reaches 45% of the scale ceiling; the smallest group is just 20 people."))
+  assign(".STUB_AI_RESPONSE", deriv, envir = globalenv())
+  m <- reader_apply_ai_prose(mk_model(), mk_cfg(reader_ai_prose = TRUE))
+  expect_equal(m$disclosure$mode, "ai")   # 45 (percent-of-scale) is a legitimate derived figure
 })

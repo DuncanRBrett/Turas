@@ -122,8 +122,13 @@ verify_callout <- function(callout, question_data, ai_config, build_prompt_fn) {
 deterministic_number_check <- function(narrative, question_data) {
   if (is.null(narrative) || !nzchar(narrative)) return(list(pass = TRUE, issues = NULL))
 
-  # Extract all numbers from the narrative (integers and decimals)
-  numbers_in_text <- regmatches(narrative, gregexpr("-?\\d+\\.?\\d*", narrative))[[1]]
+  # Extract all numbers from the narrative (integers and decimals). A leading
+  # "-" only counts as a minus sign when it does not follow a digit or dot —
+  # otherwise a range like "2023-2025" would be read as 2023 and -2025.
+  numbers_in_text <- regmatches(
+    narrative,
+    gregexpr("(?<![\\d.])-?\\d+\\.?\\d*", narrative, perl = TRUE)
+  )[[1]]
   if (length(numbers_in_text) == 0) return(list(pass = TRUE, issues = NULL))
 
   numbers_in_text <- unique(as.numeric(numbers_in_text))

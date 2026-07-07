@@ -348,7 +348,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
                      grp_names, people$lowest$label))
   }
 
-  disclosure <- list(mode = "deterministic", model = NULL,
+  disclosure <- list(mode = "deterministic", requested_mode = "deterministic", model = NULL,
     text = paste0("Built on-device from the survey's own figures. No AI was used; ",
                   "no data left this machine. Every number is computed by Turas and ",
                   "traces to a cell in the crosstab."))

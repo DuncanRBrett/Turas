@@ -63,6 +63,16 @@
     '<button id="rr-plain" class="on" type="button">Plain reading</button>' +
     '<button id="rr-xp" type="button">Practitioner</button></div></div></div></div>');
 
+  /* ---- AI-degraded banner (§3.7): AI prose was requested but the pipeline
+     fell back to the on-device narrative. Show it so a degraded run is never
+     mistaken for an AI draft. ---- */
+  if (M.disclosure && M.disclosure.requested_mode === "ai" && M.disclosure.mode !== "ai") {
+    var reason = M.disclosure.fallback_reason ? " (" + esc(M.disclosure.fallback_reason) + ")" : "";
+    push('<div class="rr-degraded" role="status">' +
+      "<b>AI narrative was requested but unavailable" + reason +
+      "</b> — showing the on-device narrative. Every figure is still computed by Turas from the survey data.</div>");
+  }
+
   /* ---- hero ---- */
   var metaBits = [];
   if (proj.sampling_method) metaBits.push("<span>" + esc(proj.sampling_method) + "</span>");

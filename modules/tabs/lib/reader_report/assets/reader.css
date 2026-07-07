@@ -110,6 +110,10 @@ table.reg td.n{font-family:var(--mono);color:var(--warn);white-space:nowrap}
 .topbar .brand{font-family:var(--sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
 .ai-badge{font-family:var(--sans);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-deep);border:1px solid var(--accent);background:#FBF1D6;border-radius:9px;padding:2px 9px;white-space:nowrap}
 .mode{margin-left:auto}
+
+/* AI-degraded banner (§3.7) — AI prose requested but fell back to on-device */
+.rr-degraded{max-width:1000px;margin:0 auto;padding:11px 22px;font-family:var(--sans);font-size:13px;line-height:1.5;color:#7A3B12;background:#FCEFDD;border-bottom:1px solid #E7C9A5}
+.rr-degraded b{color:#7A3B12}
 .mode-switch{display:flex;border:1px solid var(--brand-deep);border-radius:4px;overflow:hidden}
 .mode-switch button{font-family:var(--sans);font-size:12px;padding:5px 12px;border:0;background:transparent;color:var(--brand-deep);cursor:pointer}
 .mode-switch button.on{background:var(--brand-deep);color:#F2F5F2}
