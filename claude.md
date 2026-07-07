@@ -643,6 +643,7 @@ Each module has:
 ### What Claude Should Do
 
 ✅ **Always:**
+- On any non-trivial task (multi-step, multi-file, or unclear "done"), invoke the `fable-method` skill before starting work
 - Read existing code before making changes
 - Run tests before and after modifications
 - Use TRS refusal pattern (never `stop()`)
