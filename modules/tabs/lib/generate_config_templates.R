@@ -535,6 +535,28 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
+    # ---- READER REPORT (OPTIONAL, ADDITIVE) ----
+    list(
+      section_name = "READER REPORT (OPTIONAL)",
+      fields = list(
+        list(name = "generate_reader_report", default = "FALSE", required = FALSE,
+             description = paste0("Also build the narrative Reader report (a *_Reader.html file) — a ",
+               "plain-language summary that sits beside the crosstab and deep-links into its tables. ",
+               "Requires html_report_v2 = TRUE (it reuses that report's data layer, so no statistic is ",
+               "recomputed). Deterministic and on-device by default: no data leaves this machine."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("FALSE", "TRUE")),
+        list(name = "reader_ai_prose", default = "FALSE", required = FALSE,
+             description = paste0("Draft the Reader narrative with an AI model instead of the built-in ",
+               "template (only used when generate_reader_report = TRUE). Requires an Anthropic API key in ",
+               "the ANTHROPIC_API_KEY environment variable. Only aggregate figures are sent — never ",
+               "microdata or verbatims — and every number the model writes is checked against the data. ",
+               "If the model is unavailable the report falls back to the on-device narrative and says so."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("FALSE", "TRUE"))
+      )
+    ),
+
     # ---- ROW DESCRIPTORS ----
     list(
       section_name = "ROW DESCRIPTORS (HTML Report)",
@@ -615,7 +637,7 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "Analyst_Name", default = "", required = FALSE,
              description = "Analyst name — appears in the stats pack Declaration sheet.",
              valid_values_text = "Free text"),
-        list(name = "Research_House", default = "", required = FALSE,
+        list(name = "research_house", default = "", required = FALSE,
              description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
              valid_values_text = "Free text")
       )

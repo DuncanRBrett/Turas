@@ -53,8 +53,18 @@ source(file.path(tabs_root, "lib", "generate_config_templates.R"))
 
 # Also source the config loader (and its table-sheet helper) so the optional
 # Population sheet can be round-tripped back through load_population_sheet().
+# type_utils.R provides safe_logical/safe_numeric, which build_config_object()
+# calls at runtime (not just define-time), so it must load before any test
+# calls build_config_object() directly.
 # Guarded — a missing dependency must not break the template tests.
-for (dep in c(file.path("lib", "data_loader.R"),
+for (dep in c(file.path("lib", "validation_utils.R"),
+              file.path("lib", "path_utils.R"),
+              file.path("lib", "type_utils.R"),
+              file.path("lib", "logging_utils.R"),
+              file.path("lib", "config_utils.R"),
+              file.path("lib", "excel_utils.R"),
+              file.path("lib", "filter_utils.R"),
+              file.path("lib", "data_loader.R"),
               file.path("lib", "crosstabs", "crosstabs_config.R"))) {
   p <- file.path(tabs_root, dep)
   if (file.exists(p)) try(source(p), silent = TRUE)
@@ -114,6 +124,79 @@ test_that("crosstab config Settings sheet has expected structure", {
 
   # Settings sheet uses key-value layout; first column should contain field names
   expect_true(nrow(settings) > 0)
+})
+
+test_that("crosstab config Settings sheet offers the Reader report flags", {
+  # WP1: freshly generated configs must expose generate_reader_report and
+  # reader_ai_prose (both default FALSE), or the Reader report can never be
+  # switched on from a template-built config.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  settings <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  cells <- unlist(settings, use.names = FALSE)
+
+  expect_true("generate_reader_report" %in% cells)
+  expect_true("reader_ai_prose" %in% cells)
+})
+
+test_that("crosstab config Settings sheet writes research_house in lowercase snake_case", {
+  # Regression guard: this field was previously written as "Research_House",
+  # which get_config_value() (an exact-match lookup) can never find since
+  # build_config_object() reads it as "research_house" — a silent no-op even
+  # when the operator filled the cell in. Every other Settings-sheet field
+  # uses lowercase_snake_case; this one must match that convention too.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  settings <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  cells <- unlist(settings, use.names = FALSE)
+
+  expect_true("research_house" %in% cells)
+  expect_false("Research_House" %in% cells)
+})
+
+test_that(".KNOWN_SETTINGS whitelist recognises settings that were flagged as unrecognised on live CCPB config", {
+  # Regression guard for a batch of settings that were genuinely in use
+  # (loaded by build_config_object with real defaults, or consumed
+  # downstream) but missing from the config loader's known-settings
+  # whitelist, so every project using them saw a false "may be typos"
+  # warning. The whitelist is a function-local vector inside
+  # load_crosstabs_config(), so it is checked here via its deparsed body
+  # rather than as a standalone exported constant.
+  skip_if_not(exists("load_crosstabs_config", mode = "function"))
+  src <- paste(deparse(body(load_crosstabs_config)), collapse = "\n")
+
+  for (setting in c("heatmap_colour", "research_house", "qual_confidentiality_mode",
+                     "qual_demographic_cuts", "qual_noteworthy_default", "min_reporting_base")) {
+    expect_true(
+      grepl(setting, src, fixed = TRUE),
+      info = sprintf("'%s' should appear in load_crosstabs_config()'s known-settings whitelist", setting)
+    )
+  }
+})
+
+test_that("build_config_object loads heatmap_colour and research_house through to the config object", {
+  # Regression guard: both settings were readable downstream
+  # (02_table_builder.R, stats_diagnostics.R) but never assigned in
+  # build_config_object(), so they were silent no-ops even when set.
+  skip_if_not(exists("build_config_object", mode = "function"))
+
+  config_obj <- build_config_object(list(
+    heatmap_colour = "#123456",
+    research_house = "White Label Partner Co"
+  ))
+
+  expect_equal(config_obj$heatmap_colour, "#123456")
+  expect_equal(config_obj$research_house, "White Label Partner Co")
+})
+
+test_that("build_config_object defaults research_house sensibly when unset", {
+  skip_if_not(exists("build_config_object", mode = "function"))
+  config_obj <- build_config_object(list())
+  expect_equal(config_obj$research_house, "The Research Lamppost")
 })
 
 test_that("crosstab config Selection sheet has expected columns", {

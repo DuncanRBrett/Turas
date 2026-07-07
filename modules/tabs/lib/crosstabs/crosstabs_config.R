@@ -267,6 +267,13 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     qual_demographic_cuts = get_config_value(config, "qual_demographic_cuts", "allow"),
     qual_noteworthy_default = get_config_value(config, "qual_noteworthy_default", "all"),
     qual_join_id_column = get_config_value(config, "qual_join_id_column", ""),
+    # Whitelisted alongside their siblings above (qual_*, min_reporting_base
+    # already loaded below): heatmap_colour and research_house are both
+    # genuine, template-documented settings that were readable downstream
+    # (02_table_builder.R, stats_diagnostics.R) but never populated here,
+    # so they were silent no-ops even when set.
+    heatmap_colour = get_config_value(config, "heatmap_colour", ""),
+    research_house = get_config_value(config, "research_house", "The Research Lamppost"),
 
     # Disclosure control (V13). The minimum audience base below which the report
     # withholds identifying detail — the demographic tags on comments now, small
@@ -765,6 +772,9 @@ load_crosstabs_config <- function(config_file) {
     "alpha_secondary", "alpha_default",
     # Checkpointing
     "enable_checkpointing",
+    # Qualitative confidentiality & disclosure control
+    "qual_confidentiality_mode", "qual_demographic_cuts", "qual_noteworthy_default",
+    "qual_join_id_column", "min_reporting_base",
     # Sample composition & index summary
     "create_sample_composition", "create_index_summary",
     "index_summary_show_sections", "index_summary_show_base_sizes",
@@ -775,10 +785,12 @@ load_crosstabs_config <- function(config_file) {
     "html_report", "html_report_v2", "html_report_v2_tracking",
     "waves_source", "question_mapping", "wave_order", "sampling_method",
     "population_size", "wave",
+    # Reader report (narrative summary, rides on html_report_v2)
+    "generate_reader_report", "reader_ai_prose",
     "brand_colour", "accent_colour", "project_title", "project_name",
-    "company_name", "client_name",
+    "company_name", "client_name", "research_house",
     "researcher_logo_path", "client_logo_path", "logo_path",
-    "chart_bar_colour", "chart_palette_preset",
+    "chart_bar_colour", "chart_palette_preset", "heatmap_colour",
     "chart_series_colour_1", "chart_series_colour_2", "chart_series_colour_3",
     "chart_series_colour_4", "chart_series_colour_5", "chart_series_colour_6",
     "chart_series_colour_7", "chart_series_colour_8",
