@@ -165,8 +165,20 @@ This is where review attention concentrates.
    *Pending (needs step 4):* a full `run_tracker()` end-to-end render with
    aggregate waves — the summary/validator/stats-pack still assume a real data
    frame per wave (see §4.5).
-4. **Integration fixes.** Teach the three spots in §4.5 about aggregate bases;
-   full tracker regression suite stays green.
+4. **Integration fixes.** Teach the microdata-assuming spots to tolerate
+   aggregate waves; full tracker regression suite stays green. ✅
+   *Done:* `validate_wave_data`, `validate_data_availability` and
+   `validate_trackable_questions` skip aggregate waves for weight/column checks
+   and count an aggregate metric as available via the store (availability is now
+   "resolves in ≥1 wave", not "present in every wave"); the stats-pack reports NA
+   (not a misleading 0) for an aggregate wave's base; `resolve_wave_types` coerces
+   `WaveID`/`WaveName` to character (a numeric year WaveID would index
+   `wave_data` by position). **Proven end-to-end:** a mixed config (2 aggregate
+   waves + 1 data wave) runs `run_tracker` to a rendered Excel report + stats
+   pack; a committed integration test asserts the values (aggregate figures
+   reproduced exactly, data wave computed) and the honest significance — mean and
+   NPS show no test, and the proportion earns a real z-test across the
+   aggregate→data boundary (50%→66.7%, p=0.022). Full suite **1969/0**.
 5. **Live CCPB wire-up.** 2025 as a real wave beside the history; question mapping
    aligns codes; run 2012→2025 on the total column; Duncan regenerates via
    `launch_turas` and eyeballs. 2026 slots in when fieldwork lands.

@@ -811,6 +811,12 @@ generate_tracker_stats_pack <- function(config, wave_data, trend_results,
 
   # Per-wave sample sizes and weight diagnostics (contractual deliverable)
   wave_diagnostics <- lapply(wave_names, function(wn) {
+    # Aggregate waves have no respondent data frame — their base lives per-metric
+    # in the values store. Report NA here rather than a misleading 0 records.
+    if (is_aggregate_wave(config, wn)) {
+      return(list(wave = wn, n_unweighted = NA, n_weighted = NA, eff_n = NA,
+                  weight_min = NA, weight_max = NA, weight_cv = NA))
+    }
     wd <- wave_data[[wn]]
     if (is.null(wd) || !is.data.frame(wd)) {
       return(list(wave = wn, n_unweighted = 0L, n_weighted = NA, eff_n = NA,

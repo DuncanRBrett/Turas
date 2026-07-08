@@ -296,6 +296,11 @@ validate_data_availability <- function(config, question_map, wave_data) {
 
   # Check all waves loaded
   for (wave_id in wave_ids) {
+    # Aggregate waves carry no respondent weights — their figures are pre-computed.
+    if (is_aggregate_wave(config, wave_id)) {
+      results$info <- c(results$info, paste0("Wave ", wave_id, ": aggregate values (no respondent weights)"))
+      next
+    }
     if (!wave_id %in% names(wave_data)) {
       results$errors <- c(results$errors, paste0("Wave ", wave_id, " data not loaded"))
     } else {
@@ -362,6 +367,9 @@ validate_trackable_questions <- function(config, question_map, wave_data) {
     # Check availability in each wave (for non-composite questions)
     missing_waves <- character(0)
     for (wave_id in wave_ids) {
+      # Aggregate waves resolve via the values store, not a data column; a metric
+      # legitimately absent in some years is a normal ragged panel, not "missing".
+      if (is_aggregate_wave(config, wave_id)) next
       wave_code <- get_wave_question_code(question_map, q_code, wave_id)
       if (is.na(wave_code)) {
         missing_waves <- c(missing_waves, wave_id)
@@ -393,16 +401,26 @@ validate_trackable_questions <- function(config, question_map, wave_data) {
     }
   }
 
-  # Count questions available across all waves
-  all_wave_questions <- get_questions_across_all_waves(question_map, wave_ids)
-  tracked_and_available <- intersect(tracked_questions, all_wave_questions)
+  # A tracked question counts as available if it resolves in at least one wave —
+  # a microdata column (data wave) OR the aggregate store (aggregate wave).
+  agg_store <- config$aggregate_store
+  available_any <- Filter(function(q_code) {
+    any(vapply(wave_ids, function(wid) {
+      if (is_aggregate_wave(config, wid)) {
+        !is.null(get_aggregate_metric(agg_store, q_code, wid))
+      } else {
+        wc <- get_wave_question_code(question_map, q_code, wid)
+        !is.na(wc) && wid %in% names(wave_data) && wc %in% names(wave_data[[wid]])
+      }
+    }, logical(1)))
+  }, tracked_questions)
 
   results$info <- c(results$info,
-                   paste0(length(tracked_and_available), " of ", length(tracked_questions),
-                         " tracked questions available across all waves"))
+                   paste0(length(available_any), " of ", length(tracked_questions),
+                         " tracked questions available in at least one wave"))
 
-  if (length(tracked_and_available) == 0) {
-    results$errors <- c(results$errors, "No tracked questions available across all waves")
+  if (length(available_any) == 0) {
+    results$errors <- c(results$errors, "No tracked questions available in any wave")
   }
 
   return(results)

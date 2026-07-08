@@ -27,6 +27,7 @@ source(file.path(tracker_root, "lib", "constants.R"))
 source(file.path(tracker_root, "lib", "metric_types.R"))
 source(file.path(tracker_root, "lib", "statistical_core.R"))
 source(file.path(tracker_root, "lib", "tracker_config_loader.R"))
+source(file.path(tracker_root, "lib", "trend_changes.R"))
 source(file.path(tracker_root, "lib", "trend_significance.R"))
 source(file.path(tracker_root, "lib", "aggregate_wave_loader.R"))
 source(file.path(tracker_root, "lib", "question_mapper.R"))
@@ -34,6 +35,8 @@ source(file.path(tracker_root, "lib", "question_mapper.R"))
 # fallback path; pre-source them (absolute) so it resolves from the testthat dir.
 source(file.path(turas_root, "modules", "shared", "lib", "weights_utils.R"))
 source(file.path(tracker_root, "lib", "wave_loader.R"))
+source(file.path(tracker_root, "lib", "validation_tracker.R"))
+source(file.path(tracker_root, "lib", "trend_calculator.R"))
 
 # ------------------------------------------------------------------------------
 # HELPERS
@@ -285,6 +288,76 @@ test_that("load_all_waves loads aggregate waves into the store and marks them", 
   expect_false(is.null(hit))
   expect_equal(hit$value, 8.7)
   expect_equal(get_aggregate_metric(res$aggregate_store, "Q2", "W2012")$value, 60)
+})
+
+# ==============================================================================
+# END-TO-END: mixed aggregate (2012/2013) + data (2025) through the pipeline
+# ==============================================================================
+
+test_that("mixed aggregate+data pipeline: correct values and HONEST significance", {
+  tdir <- file.path(tempdir(), paste0("agg_it_", as.integer(Sys.time()) %% 1e6))
+  dir.create(tdir, showWarnings = FALSE)
+  on.exit(unlink(tdir, recursive = TRUE), add = TRUE)
+
+  vpath <- file.path(tdir, "values.csv")
+  write.csv(data.frame(
+    metric_id = c("Q_OVR","Q_OVR","Q_NPS","Q_NPS","Q_YES","Q_YES"),
+    wave = c("2012","2013","2012","2013","2012","2013"),
+    metric_type = c("mean","mean","nps","nps","proportion","proportion"),
+    value = c(8.5, 8.7, 55, 60, 45, 50), base = c(200,210,200,210,200,210),
+    stringsAsFactors = FALSE), vpath, row.names = FALSE)
+  write.csv(data.frame(
+    ovr = rep(c(9,8,10,7,9,8), 10), nps = rep(c(10,9,8,6,10,7), 10),
+    yes = rep(c("Yes","No","Yes","Yes","No","Yes"), 10), stringsAsFactors = FALSE),
+    file.path(tdir, "data_2025.csv"), row.names = FALSE)
+
+  config <- list(
+    waves = data.frame(
+      WaveID = c("2012","2013","2025"), WaveName = c("2012","2013","2025"),
+      DataFile = c(NA, NA, "data_2025.csv"),
+      FieldworkStart = c(NA, NA, "2025-01-01"), FieldworkEnd = c(NA, NA, "2025-01-31"),
+      WaveType = c("aggregate","aggregate","data"), AggregateFile = c(vpath, vpath, NA),
+      stringsAsFactors = FALSE),
+    tracked_questions = data.frame(
+      QuestionCode = c("Q_OVR","Q_NPS","Q_YES"),
+      TrackingSpecs = c("mean","nps_score","category:Yes"), stringsAsFactors = FALSE),
+    banner = data.frame(BreakVariable = "Total", BreakLabel = "Total", stringsAsFactors = FALSE),
+    settings = list(minimum_base = 10, alpha = 0.05), config_path = file.path(tdir, "config.xlsx")
+  )
+  qmap <- data.frame(
+    QuestionCode = c("Q_OVR","Q_NPS","Q_YES"),
+    QuestionText = c("Overall","Recommend","Allow signage"),
+    QuestionType = c("Rating","NPS","Single_Response"),
+    `2025` = c("ovr","nps","yes"), check.names = FALSE, stringsAsFactors = FALSE)
+
+  question_map <- build_question_map_index(qmap, config)
+  wlr <- load_all_waves(config, data_dir = tdir, question_mapping = qmap)
+  config$aggregate_store <- wlr$aggregate_store
+
+  # Validators accept the mixed config (no refusal, no errors)
+  vres <- validate_tracker_setup(config, qmap, question_map, wlr$wave_data)
+  expect_equal(length(vres$errors), 0)
+
+  tr <- calculate_all_trends(config, question_map, wlr$wave_data,
+                             wave_structures = wlr$wave_structures)$trends
+
+  # --- values: aggregate figures reproduced exactly; data wave computed ---
+  expect_equal(tr$Q_OVR$wave_results[["2012"]]$metrics$mean, 8.5)
+  expect_equal(tr$Q_OVR$wave_results[["2013"]]$metrics$mean, 8.7)
+  expect_equal(round(tr$Q_OVR$wave_results[["2025"]]$metrics$mean, 2), 8.5)
+  expect_equal(tr$Q_NPS$wave_results[["2012"]]$nps, 55)
+  expect_equal(round(tr$Q_NPS$wave_results[["2025"]]$nps, 1), 33.3)
+  expect_equal(tr$Q_YES$wave_results[["2012"]]$proportions[["Yes"]], 45)
+  expect_equal(round(tr$Q_YES$wave_results[["2025"]]$proportions[["Yes"]], 1), 66.7)
+
+  # --- honest significance ---
+  # mean: no fabricated arrow (SD unknown on the aggregate side)
+  expect_false(isTRUE(tr$Q_OVR$significance$mean[["2012_vs_2013"]]$significant))
+  expect_false(isTRUE(tr$Q_OVR$significance$mean[["2013_vs_2025"]]$significant))
+  # NPS: explicit no-test (promoter/detractor split unknown)
+  expect_false(isTRUE(tr$Q_NPS$significance[["2012_vs_2013"]]$significant))
+  # proportion: a REAL z-test across the aggregate->data boundary (50% -> 66.7%)
+  expect_true(isTRUE(tr$Q_YES$significance$Yes[["2013_vs_2025"]]$significant))
 })
 
 # ==============================================================================

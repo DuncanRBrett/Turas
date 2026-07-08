@@ -73,6 +73,11 @@ read_config_sheet <- function(file_path, sheet_name, expected_col, ...) {
 #'   AggregateFile.
 #' @keywords internal
 resolve_wave_types <- function(waves) {
+  # WaveID / WaveName must be character: a numeric year WaveID (e.g. 2012) would
+  # make wave_data[[wave_id]] index by POSITION, silently corrupting the run.
+  if ("WaveID" %in% names(waves)) waves$WaveID <- as.character(waves$WaveID)
+  if ("WaveName" %in% names(waves)) waves$WaveName <- as.character(waves$WaveName)
+
   # Default + normalise WaveType
   if (!"WaveType" %in% names(waves)) {
     waves$WaveType <- "data"

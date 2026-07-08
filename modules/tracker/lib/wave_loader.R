@@ -805,6 +805,10 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
 
   # Validate each wave
   for (wave_id in expected_waves) {
+    # Aggregate waves carry no respondent data frame — their figures come from
+    # the values store (validated when loaded). Nothing to check per-column here.
+    if (is_aggregate_wave(config, wave_id)) next
+
     wave_df <- wave_data[[wave_id]]
 
     # Check weight_var exists
