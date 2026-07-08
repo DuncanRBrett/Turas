@@ -269,7 +269,7 @@ load_aggregate_values <- function(file_path) {
 
 #' Look Up One Aggregate Metric Value
 #'
-#' @param store List. Result of load_aggregate_values().
+#' @param store List. Result of load_aggregate_values() (or a merged store with $index).
 #' @param metric_id Character. Metric key.
 #' @param wave Character. Wave identifier.
 #' @return Named list (metric_id, wave, metric_type, value, base, sd) or NULL if absent.
@@ -277,4 +277,74 @@ load_aggregate_values <- function(file_path) {
 get_aggregate_metric <- function(store, metric_id, wave) {
   if (is.null(store) || is.null(store$index)) return(NULL)
   store$index[[paste(trimws(as.character(metric_id)), trimws(as.character(wave)), sep = "||")]]
+}
+
+
+# ==============================================================================
+# AGGREGATE-WAVE RESULT BUILDERS
+# ==============================================================================
+# These turn one stored aggregate figure into the SAME per-wave result object
+# each trend calculator produces from microdata, so significance and outputs run
+# unchanged. Dispersion is left NA on purpose:
+#   - mean: sd = NA  -> t-test returns NA -> "no test" (never a fabricated arrow)
+#   - nps : promoter/detractor split unknown -> variance NA -> "no test"
+#   - proportion: needs only value + base -> real z-test when base is supplied
+# A blank base becomes an effective N of 0 so the minimum-base gate cleanly skips
+# the test (NA would error inside the `>= min_base` comparison).
+# ==============================================================================
+
+# Synthetic single response-code used to key a PURE-aggregate proportion metric
+# (one with no microdata wave to derive a category code from). The displayed
+# metric name still comes from MetricLabel/question; this is an internal key.
+AGG_PROPORTION_CODE <- "value"
+
+#' Effective base for an aggregate entry (blank base -> 0, which skips sig)
+#' @keywords internal
+aggregate_base_n <- function(entry) {
+  if (!is.null(entry$base) && length(entry$base) == 1 && !is.na(entry$base)) entry$base else 0
+}
+
+#' Is this wave declared WaveType = "aggregate"?
+#' @export
+is_aggregate_wave <- function(config, wave_id) {
+  if (is.null(config$waves) || !"WaveType" %in% names(config$waves)) return(FALSE)
+  idx <- match(wave_id, config$waves$WaveID)
+  if (is.na(idx)) return(FALSE)
+  wt <- config$waves$WaveType[idx]
+  !is.na(wt) && tolower(trimws(as.character(wt))) == "aggregate"
+}
+
+#' Build a rating (mean) wave result from a stored aggregate figure.
+#' @keywords internal
+build_aggregate_rating_result <- function(entry) {
+  base_n <- aggregate_base_n(entry)
+  list(
+    available = TRUE,
+    metrics = list(mean = as.numeric(entry$value), sd = NA_real_, eff_n = base_n),
+    n_unweighted = base_n, n_weighted = base_n, eff_n = base_n
+  )
+}
+
+#' Build an NPS wave result from a stored aggregate net score.
+#' @keywords internal
+build_aggregate_nps_result <- function(entry) {
+  base_n <- aggregate_base_n(entry)
+  list(
+    nps = as.numeric(entry$value),
+    promoters_pct = NA_real_, passives_pct = NA_real_, detractors_pct = NA_real_,
+    n_unweighted = base_n, n_weighted = base_n, eff_n = base_n,
+    available = TRUE
+  )
+}
+
+#' Build a single-choice proportion wave result from a stored aggregate %.
+#' @param code Character. Response code this % is keyed under (matches codes_to_track).
+#' @keywords internal
+build_aggregate_proportion_result <- function(entry, code) {
+  base_n <- aggregate_base_n(entry)
+  list(
+    proportions = stats::setNames(as.numeric(entry$value), code),
+    n_unweighted = base_n, n_weighted = base_n, eff_n = base_n,
+    available = TRUE
+  )
 }

@@ -264,6 +264,19 @@ calculate_nps_trend <- function(q_code, question_map, wave_data, config,
   wave_results <- list()
 
   for (wave_id in wave_ids) {
+    # Aggregate wave: inject the stored net score. No promoter/detractor split is
+    # recorded, so significance is honestly "no test" (variance is undeterminable).
+    if (is_aggregate_wave(config, wave_id)) {
+      entry <- get_aggregate_metric(config$aggregate_store, q_code, wave_id)
+      wave_results[[wave_id]] <- if (!is.null(entry) && identical(entry$metric_type, "nps")) {
+        build_aggregate_nps_result(entry)
+      } else {
+        list(nps = NA, promoters_pct = NA, passives_pct = NA, detractors_pct = NA,
+             n_unweighted = NA, n_weighted = NA, available = FALSE)
+      }
+      next
+    }
+
     wave_df <- wave_data[[wave_id]]
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
 
@@ -399,9 +412,11 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
   # Get TrackingSpecs
   tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
-  # Get all unique response codes across all waves
+  # Get all unique response codes across all waves (microdata waves only —
+  # aggregate waves carry a single pre-computed %, not category-level data)
   all_codes <- character(0)
   for (wave_id in wave_ids) {
+    if (is_aggregate_wave(config, wave_id)) next
     wave_df <- wave_data[[wave_id]]
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
     if (!is.null(q_data)) {
@@ -421,6 +436,7 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
     for (code in all_codes) {
       total_count <- 0
       for (wave_id in wave_ids) {
+        if (is_aggregate_wave(config, wave_id)) next
         wave_df <- wave_data[[wave_id]]
         q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
         if (!is.null(q_data)) {
@@ -442,10 +458,33 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
     all_codes
   }
 
+  # Pure-aggregate proportion metric: no microdata to derive a category code from.
+  # Key the single stored % under a synthetic code so it can be tracked/plotted.
+  if (length(codes_to_track) == 0) {
+    has_agg <- any(vapply(wave_ids, function(w) {
+      is_aggregate_wave(config, w) &&
+        !is.null(get_aggregate_metric(config$aggregate_store, q_code, w))
+    }, logical(1)))
+    if (has_agg) codes_to_track <- AGG_PROPORTION_CODE
+  }
+
   # Calculate proportions for each wave
   wave_results <- list()
 
   for (wave_id in wave_ids) {
+    # Aggregate wave: inject the stored % under the tracked code. Real z-test runs
+    # once a base is supplied; a blank base yields eff_n 0 and the gate skips it.
+    if (is_aggregate_wave(config, wave_id)) {
+      entry <- get_aggregate_metric(config$aggregate_store, q_code, wave_id)
+      wave_results[[wave_id]] <- if (!is.null(entry) && identical(entry$metric_type, "proportion") &&
+                                     length(codes_to_track) > 0) {
+        build_aggregate_proportion_result(entry, codes_to_track[1])
+      } else {
+        list(proportions = NA, n_unweighted = NA, n_weighted = NA, available = FALSE)
+      }
+      next
+    }
+
     wave_df <- wave_data[[wave_id]]
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
 
@@ -682,6 +721,18 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
   wave_results <- list()
 
   for (wave_id in wave_ids) {
+    # Aggregate wave: inject the stored mean. No dispersion is recorded, so sd is
+    # left NA and the t-test returns "no test" rather than a fabricated arrow.
+    if (is_aggregate_wave(config, wave_id)) {
+      entry <- get_aggregate_metric(config$aggregate_store, q_code, wave_id)
+      wave_results[[wave_id]] <- if (!is.null(entry) && identical(entry$metric_type, "mean")) {
+        build_aggregate_rating_result(entry)
+      } else {
+        list(available = FALSE, metrics = list())
+      }
+      next
+    }
+
     # Extract question data for this wave
     wave_df <- wave_data[[wave_id]]
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)

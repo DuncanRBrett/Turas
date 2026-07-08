@@ -166,6 +166,13 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
 
   n_waves <- nrow(config$waves)
 
+  # Aggregate waves carry no respondent file — they load from a published-values
+  # table instead. Force sequential loading and accumulate their combined store.
+  has_aggregate <- "WaveType" %in% names(config$waves) &&
+    any(tolower(trimws(as.character(config$waves$WaveType))) == "aggregate", na.rm = TRUE)
+  aggregate_store_index <- list()
+  aggregate_loaded_paths <- character(0)
+
   # Detect optional StructureFile / ConfigFile columns
   has_structure_col <- "StructureFile" %in% names(config$waves)
   has_config_col <- "ConfigFile" %in% names(config$waves)
@@ -186,7 +193,10 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
   # 2. At least 3 waves (overhead not worth it for fewer)
   # 3. Required packages are available
   use_parallel <- FALSE
-  if (parallel && n_waves >= 3) {
+  if (parallel && has_aggregate) {
+    cat("  Note: aggregate waves present — using sequential loading.\n")
+  }
+  if (parallel && n_waves >= 3 && !has_aggregate) {
     if (requireNamespace("future", quietly = TRUE) &&
         requireNamespace("future.apply", quietly = TRUE)) {
       use_parallel <- TRUE
@@ -281,6 +291,23 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
     for (i in 1:n_waves) {
       wave_id <- config$waves$WaveID[i]
       wave_name <- config$waves$WaveName[i]
+
+      # --- Aggregate wave: no data file; load its values table into the store ---
+      if (is_aggregate_wave(config, wave_id)) {
+        agg_file <- config$waves$AggregateFile[i]
+        agg_path <- resolve_data_file_path(agg_file, data_dir)
+        if (!(agg_path %in% aggregate_loaded_paths)) {
+          agg <- load_aggregate_values(agg_path)
+          aggregate_store_index <- c(aggregate_store_index, agg$index)
+          aggregate_loaded_paths <- c(aggregate_loaded_paths, agg_path)
+        }
+        # Marker only — calculators branch on is_aggregate_wave() before touching it.
+        wave_data[[wave_id]] <- data.frame()
+        wave_structures[[wave_id]] <- NULL
+        cat(paste0("  Loading Wave ", wave_id, ": ", wave_name, " (aggregate values)\n"))
+        next
+      }
+
       data_file <- config$waves$DataFile[i]
 
       cat(paste0("  Loading Wave ", wave_id, ": ", wave_name, "\n"))
@@ -341,7 +368,8 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
   # list of data frames can access $wave_data; the wave_structures are new)
   return(list(
     wave_data = wave_data,
-    wave_structures = wave_structures
+    wave_structures = wave_structures,
+    aggregate_store = list(index = aggregate_store_index)
   ))
 }
 

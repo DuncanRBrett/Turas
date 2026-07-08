@@ -148,8 +148,23 @@ This is where review attention concentrates.
    `tests/testthat/test_aggregate_wave_ingest.R` (41 assertions). Full tracker
    suite 1935/0. Real 464-row CCPB file loads to 60 metrics × 14 waves.
 3. **Engine branch + honest sig.** Aggregate waves produce result objects; sig
-   routes per §4.4. **Golden test:** aggregate-only run reproduces the published
-   2012–2024 figures to the decimal, and unknown-SD/NPS metrics show *no test*.
+   routes per §4.4. ✅
+   *Done:* `aggregate_wave_loader.R` gains `is_aggregate_wave()` + three result
+   builders (rating/nps/proportion) that carry the stored value with dispersion
+   left NA. The rating, NPS and single-choice calculators intercept aggregate
+   waves at the top of their per-wave loop (before `extract_question_data`);
+   single-choice guards its code-derivation loops and adds a synthetic single
+   code (`AGG_PROPORTION_CODE`) for pure-aggregate metrics. Plumbing:
+   `load_all_waves()` branches aggregate waves (no data file; builds the store;
+   marker `wave_data` entry) and returns `aggregate_store`; `run_tracker()`
+   attaches it to `config$aggregate_store`. Composite/multi-mention are left
+   unsupported-but-safe (blank QuestionMap cells → unavailable). **Verified:**
+   builder output fed through the REAL `trend_significance.R` functions —
+   means/NPS return "no test", proportions with a base run a real z-test, blank
+   base skips cleanly (eff_n 0, never NA). Full tracker suite **1957/0**.
+   *Pending (needs step 4):* a full `run_tracker()` end-to-end render with
+   aggregate waves — the summary/validator/stats-pack still assume a real data
+   frame per wave (see §4.5).
 4. **Integration fixes.** Teach the three spots in §4.5 about aggregate bases;
    full tracker regression suite stays green.
 5. **Live CCPB wire-up.** 2025 as a real wave beside the history; question mapping

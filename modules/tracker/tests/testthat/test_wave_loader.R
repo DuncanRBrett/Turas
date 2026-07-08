@@ -48,6 +48,10 @@ if (file.exists(config_loader_path)) source(config_loader_path)
 wave_loader_path <- file.path(tracker_root, "lib", "wave_loader.R")
 if (file.exists(wave_loader_path)) source(wave_loader_path)
 
+# load_all_waves() branches on is_aggregate_wave() from aggregate_wave_loader.R
+agg_loader_path <- file.path(tracker_root, "lib", "aggregate_wave_loader.R")
+if (file.exists(agg_loader_path)) source(agg_loader_path)
+
 
 # ==============================================================================
 # HELPER: Create test config and data

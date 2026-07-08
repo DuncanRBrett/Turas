@@ -322,6 +322,8 @@ run_tracker <- function(tracking_config_path,
   wave_load_result <- load_all_waves(config, data_dir, question_mapping)
   wave_data <- wave_load_result$wave_data
   wave_structures <- wave_load_result$wave_structures
+  # Make the aggregate-wave values store available to the trend calculators
+  config$aggregate_store <- wave_load_result$aggregate_store
 
   # Display wave summary
   wave_summary <- get_wave_summary(wave_data)

@@ -38,6 +38,7 @@ shared_lib <- file.path(turas_root, "modules", "shared", "lib")
 source(file.path(shared_lib, "weights_utils.R"))
 
 source(file.path(tracker_root, "lib", "wave_loader.R"))
+source(file.path(tracker_root, "lib", "aggregate_wave_loader.R"))
 source(file.path(tracker_root, "lib", "tracking_crosstab_engine.R"))
 
 # ==============================================================================

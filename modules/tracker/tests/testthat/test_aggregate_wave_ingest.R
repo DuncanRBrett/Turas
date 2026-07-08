@@ -23,8 +23,17 @@ turas_root   <- normalizePath(file.path(tracker_root, "..", ".."), mustWork = FA
 trs_path <- file.path(turas_root, "modules", "shared", "lib", "trs_refusal.R")
 if (file.exists(trs_path)) source(trs_path)
 source(file.path(tracker_root, "lib", "00_guard.R"))
+source(file.path(tracker_root, "lib", "constants.R"))
+source(file.path(tracker_root, "lib", "metric_types.R"))
+source(file.path(tracker_root, "lib", "statistical_core.R"))
 source(file.path(tracker_root, "lib", "tracker_config_loader.R"))
+source(file.path(tracker_root, "lib", "trend_significance.R"))
 source(file.path(tracker_root, "lib", "aggregate_wave_loader.R"))
+source(file.path(tracker_root, "lib", "question_mapper.R"))
+# wave_loader.R pulls in shared weight utilities via a working-dir-relative
+# fallback path; pre-source them (absolute) so it resolves from the testthat dir.
+source(file.path(turas_root, "modules", "shared", "lib", "weights_utils.R"))
+source(file.path(tracker_root, "lib", "wave_loader.R"))
 
 # ------------------------------------------------------------------------------
 # HELPERS
@@ -240,6 +249,111 @@ test_that("load_aggregate_values refuses a negative base", {
 # ==============================================================================
 # get_aggregate_metric()
 # ==============================================================================
+
+# ==============================================================================
+# load_all_waves() — aggregate wave plumbing
+# ==============================================================================
+
+test_that("load_all_waves loads aggregate waves into the store and marks them", {
+  vals <- data.frame(
+    metric_id   = c("Q1", "Q1", "Q2"),
+    wave        = c("W2012", "W2013", "W2012"),   # wave value must equal WaveID
+    metric_type = c("mean", "mean", "nps"),
+    value       = c(8.7, 8.9, 60),
+    stringsAsFactors = FALSE
+  )
+  af <- tempfile(fileext = ".csv")
+  write.csv(vals, af, row.names = FALSE)
+  on.exit(unlink(af), add = TRUE)
+
+  config <- list(
+    waves = data.frame(
+      WaveID = c("W2012", "W2013"), WaveName = c("2012", "2013"),
+      WaveType = c("aggregate", "aggregate"), AggregateFile = c(af, af),
+      stringsAsFactors = FALSE
+    ),
+    tracked_questions = data.frame(QuestionCode = c("Q1", "Q2"), stringsAsFactors = FALSE),
+    banner = data.frame(BreakVariable = character(0), BreakLabel = character(0), stringsAsFactors = FALSE),
+    settings = list()
+  )
+
+  res <- load_all_waves(config, data_dir = NULL, question_mapping = NULL)
+
+  expect_true(all(c("W2012", "W2013") %in% names(res$wave_data)))   # marker entries present
+  expect_false(is.null(res$aggregate_store$index))
+  hit <- get_aggregate_metric(res$aggregate_store, "Q1", "W2012")
+  expect_false(is.null(hit))
+  expect_equal(hit$value, 8.7)
+  expect_equal(get_aggregate_metric(res$aggregate_store, "Q2", "W2012")$value, 60)
+})
+
+# ==============================================================================
+# is_aggregate_wave() + result builders
+# ==============================================================================
+
+test_that("is_aggregate_wave detects aggregate waves and is safe when WaveType absent", {
+  cfg <- list(waves = data.frame(WaveID = c("W1", "W2"),
+                                 WaveType = c("aggregate", "data"), stringsAsFactors = FALSE))
+  expect_true(is_aggregate_wave(cfg, "W1"))
+  expect_false(is_aggregate_wave(cfg, "W2"))
+  expect_false(is_aggregate_wave(cfg, "W9"))                                  # unknown wave
+  expect_false(is_aggregate_wave(list(waves = data.frame(WaveID = "W1")), "W1"))  # no WaveType col
+})
+
+test_that("builders carry the value and leave dispersion NA; blank base -> eff_n 0", {
+  r <- build_aggregate_rating_result(list(value = 8.7, base = 100, metric_type = "mean"))
+  expect_equal(r$metrics$mean, 8.7)
+  expect_true(is.na(r$metrics$sd))
+  expect_equal(r$eff_n, 100)
+
+  n <- build_aggregate_nps_result(list(value = 70, base = 100, metric_type = "nps"))
+  expect_equal(n$nps, 70)
+  expect_true(is.na(n$promoters_pct))
+
+  p <- build_aggregate_proportion_result(list(value = 55, base = NA, metric_type = "proportion"), "value")
+  expect_equal(unname(p$proportions["value"]), 55)
+  expect_equal(p$eff_n, 0)   # blank base becomes 0 so the min-base gate skips cleanly
+})
+
+# ==============================================================================
+# HONEST SIGNIFICANCE — the core claim: aggregate figures feed the SAME sig
+# tests; means/NPS without dispersion return "no test", proportions with a base
+# get a real z-test. (Builder output -> real trend_significance.R functions.)
+# ==============================================================================
+
+test_that("aggregate mean: t-test returns no significant result (sd unknown), no crash", {
+  cfg <- list(settings = list(minimum_base = 5, alpha = 0.05))
+  wr <- list(W1 = build_aggregate_rating_result(list(value = 8.7, base = 200, metric_type = "mean")),
+             W2 = build_aggregate_rating_result(list(value = 9.3, base = 210, metric_type = "mean")))
+  sig <- perform_significance_tests_means(wr, c("W1", "W2"), cfg)
+  expect_false(isTRUE(sig[["W1_vs_W2"]]$significant))   # never a fabricated arrow
+})
+
+test_that("aggregate NPS: no test (promoter/detractor split unknown), no crash", {
+  cfg <- list(settings = list(minimum_base = 5, alpha = 0.05))
+  wr <- list(W1 = build_aggregate_nps_result(list(value = 60, base = 200, metric_type = "nps")),
+             W2 = build_aggregate_nps_result(list(value = 75, base = 200, metric_type = "nps")))
+  sig <- perform_significance_tests_nps(wr, c("W1", "W2"), cfg)
+  expect_false(isTRUE(sig[["W1_vs_W2"]]$significant))
+})
+
+test_that("aggregate proportion WITH base gets a real z-test (40% vs 60% at n=200 is significant)", {
+  cfg <- list(settings = list(minimum_base = 5, alpha = 0.05))
+  wr <- list(W1 = build_aggregate_proportion_result(list(value = 40, base = 200, metric_type = "proportion"), "value"),
+             W2 = build_aggregate_proportion_result(list(value = 60, base = 200, metric_type = "proportion"), "value"))
+  sig <- perform_significance_tests_proportions(wr, c("W1", "W2"), cfg, "value")
+  expect_true(isTRUE(sig[["W1_vs_W2"]]$significant))
+  expect_false(is.null(sig[["W1_vs_W2"]]$p_value))
+})
+
+test_that("aggregate proportion with BLANK base -> no test (eff_n 0 skips the gate)", {
+  cfg <- list(settings = list(minimum_base = 30, alpha = 0.05))
+  wr <- list(W1 = build_aggregate_proportion_result(list(value = 40, base = NA, metric_type = "proportion"), "value"),
+             W2 = build_aggregate_proportion_result(list(value = 60, base = NA, metric_type = "proportion"), "value"))
+  sig <- perform_significance_tests_proportions(wr, c("W1", "W2"), cfg, "value")
+  expect_false(isTRUE(sig[["W1_vs_W2"]]$significant))
+  expect_match(sig[["W1_vs_W2"]]$reason, "insufficient")
+})
 
 test_that("get_aggregate_metric returns the row for a known key and NULL otherwise", {
   f <- write_values_csv(valid_values_df())
