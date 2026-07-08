@@ -59,6 +59,71 @@ read_config_sheet <- function(file_path, sheet_name, expected_col, ...) {
 }
 
 
+#' Resolve Wave Types (data vs aggregate)
+#'
+#' Normalises the optional \code{WaveType} and \code{AggregateFile} columns on the
+#' Waves data frame so the rest of the pipeline can branch on wave type.
+#' Fully backward-compatible: if \code{WaveType} is absent, every wave defaults to
+#' \code{"data"} and behaviour is identical to before this feature.
+#'
+#' @param waves Data frame from the Waves sheet.
+#' @return The waves data frame with normalised \code{WaveType} ("data"|"aggregate")
+#'   and an \code{AggregateFile} column (NA where not supplied).
+#'   Throws a turas_refusal on an invalid WaveType or an aggregate wave with no
+#'   AggregateFile.
+#' @keywords internal
+resolve_wave_types <- function(waves) {
+  # Default + normalise WaveType
+  if (!"WaveType" %in% names(waves)) {
+    waves$WaveType <- "data"
+  }
+  wt <- tolower(trimws(as.character(waves$WaveType)))
+  wt[is.na(wt) | wt == ""] <- "data"
+
+  invalid <- setdiff(unique(wt), c("data", "aggregate"))
+  if (length(invalid) > 0) {
+    # TRS Refusal: CFG_INVALID_WAVE_TYPE
+    tracker_refuse(
+      code = "CFG_INVALID_WAVE_TYPE",
+      title = "Invalid WaveType Value",
+      problem = paste0("The Waves sheet has WaveType value(s) that are not recognised: ",
+                       paste(invalid, collapse = ", ")),
+      why_it_matters = "WaveType selects how a wave is loaded — 'data' (a respondent-level file) or 'aggregate' (a published values table). An unknown value cannot be routed.",
+      how_to_fix = "Set WaveType to 'data' or 'aggregate'. A blank value defaults to 'data'.",
+      observed = unique(as.character(waves$WaveType))
+    )
+  }
+  waves$WaveType <- wt
+
+  # Default AggregateFile column
+  if (!"AggregateFile" %in% names(waves)) {
+    waves$AggregateFile <- NA_character_
+  }
+
+  # Aggregate waves must name an AggregateFile
+  agg <- which(waves$WaveType == "aggregate")
+  if (length(agg) > 0) {
+    af <- trimws(as.character(waves$AggregateFile[agg]))
+    missing_af <- agg[is.na(af) | af == "" | toupper(af) == "NA"]
+    if (length(missing_af) > 0) {
+      ids <- if ("WaveID" %in% names(waves)) waves$WaveID[missing_af] else paste0("row ", missing_af)
+      # TRS Refusal: CFG_MISSING_AGGREGATE_FILE
+      tracker_refuse(
+        code = "CFG_MISSING_AGGREGATE_FILE",
+        title = "Aggregate Wave Missing AggregateFile",
+        problem = paste0("Wave(s) marked WaveType='aggregate' have no AggregateFile: ",
+                         paste(ids, collapse = ", ")),
+        why_it_matters = "An aggregate wave has no respondent data file; it must point at a values table instead.",
+        how_to_fix = "Add the AggregateFile path (the values table) for each aggregate wave, or set WaveType='data'.",
+        observed = ids
+      )
+    }
+  }
+
+  waves
+}
+
+
 #' Load Tracking Configuration
 #'
 #' Loads the main tracking configuration file (tracking_config.xlsx) and
@@ -160,8 +225,18 @@ load_tracking_config <- function(config_path) {
     }
   }
 
-  # Validate required columns in Waves
-  required_wave_cols <- c("WaveID", "WaveName", "DataFile", "FieldworkStart", "FieldworkEnd")
+  # Resolve wave types (adds WaveType / AggregateFile with backward-compatible
+  # defaults; refuses on an invalid WaveType or an aggregate wave with no file).
+  waves <- resolve_wave_types(waves)
+
+  # Validate required columns in Waves.
+  # DataFile + fieldwork dates are required only when at least one wave is a
+  # respondent-level 'data' wave. A pure-aggregate config needs WaveID + WaveName
+  # only — its figures come from the AggregateFile, not a data file.
+  required_wave_cols <- c("WaveID", "WaveName")
+  if (any(waves$WaveType == "data")) {
+    required_wave_cols <- c(required_wave_cols, "DataFile", "FieldworkStart", "FieldworkEnd")
+  }
   missing_cols <- setdiff(required_wave_cols, names(waves))
   if (length(missing_cols) > 0) {
     # TRS Refusal: CFG_MISSING_WAVE_COLUMNS
@@ -172,7 +247,7 @@ load_tracking_config <- function(config_path) {
       why_it_matters = "All columns are required to properly define each wave of data.",
       how_to_fix = c(
         "Add the missing columns to the Waves sheet",
-        "Required: WaveID, WaveName, DataFile, FieldworkStart, FieldworkEnd"
+        "Required: WaveID, WaveName (+ DataFile, FieldworkStart, FieldworkEnd for data waves)"
       ),
       expected = required_wave_cols,
       observed = names(waves),
@@ -612,9 +687,14 @@ validate_tracking_config <- function(config, question_mapping) {
     )
   }
 
-  # Validate data files exist (if absolute paths provided)
+  # Validate data files exist (if absolute paths provided).
+  # Aggregate waves have no data file — skip them (their values table is
+  # resolved and checked when the aggregate wave is loaded).
+  wave_types <- if ("WaveType" %in% names(config$waves)) config$waves$WaveType else rep("data", nrow(config$waves))
   for (i in seq_len(nrow(config$waves))) {
+    if (!is.na(wave_types[i]) && wave_types[i] == "aggregate") next
     data_file <- config$waves$DataFile[i]
+    if (is.null(data_file) || is.na(data_file)) next
     # Only validate if absolute path provided (relative paths resolved later)
     if (file.exists(dirname(data_file)) && !file.exists(data_file)) {
       cat("[WARNING]", paste0("Data file not found for Wave ", config$waves$WaveID[i], ": ", data_file), "\n")
