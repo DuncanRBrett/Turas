@@ -7,9 +7,9 @@
 
 ---
 
-## 0. Decisions — Duncan rules on these before the session starts
+## 0. Decisions — locked, do not re-litigate
 
-Fable's recommendation stated for each; Duncan may veto, and the vetoing message wins.
+Locked by the Fable review to Fable's recommendation below (Duncan may veto; the vetoing message wins). **Session A is NOT blocked on a ruling — proceed on these defaults if Duncan has not said otherwise.**
 
 1. **Post-hoc trimming semantics (C1).** Recommendation: for **rim** weights, deprecate the post-hoc `apply_trimming` path entirely — refuse `apply_trimming = Y` on a rim spec with `CFG_TRIM_USE_CAP` pointing the user to `cap_weights` (which trims *inside* calibration and preserves margins — the correct mechanism already exists). For **design/cell** weights, keep post-hoc trimming but always call `rescale_after_trimming` (restore sum) and disclose in diagnostics that trimming moved weighted proportions. Alternative if Duncan wants post-hoc trim kept for rim: trim → rescale → re-run calibrate with trimmed weights as base weights (trim-and-re-rake loop), which is more code and more failure modes.
 2. **Design-weight scale (H1).** Are design weights meant to gross to population (mean = pop/sample) or normalise to mean 1 / sum n? Recommendation: normalise to sum = n by default in the config pipeline (consistent with rim, sane tabs weighted-Ns), with an explicit `Grossing = YES` config option that keeps population scale and stamps it in diagnostics. Note: Kish n_eff is scale-invariant, so sig testing is unaffected either way — this is about weighted-N display and cross-method consistency.
@@ -40,7 +40,7 @@ Fable's recommendation stated for each; Duncan may veto, and the vetoing message
 
 **W6 — ID + column integrity (H3).** In the guard/preflight: refuse duplicate respondent IDs; refuse (or warn loudly, Duncan's call — recommend refuse) when id_column was auto-defaulted to column 1 AND is non-unique; refuse `weight_name` colliding with an existing data column or the id_column (`run_weighting.R:344,514`). Tests for each refusal.
 
-**W7 — Config/label hygiene (M3, M4, M5, M2, M1, M6).** (a) Preflight category-mismatch Warning→Error for design/cell (rim already refuses); `trimws()` both sides of all label matching, keep case-sensitive. (b) `config_loader.R:373`: after coercion, refuse if any target cell became NA that wasn't blank, naming the cell. (c) Cell keys: use a collision-safe separator (e.g. ``) or refuse category values containing the separator. (d) `validation.R:314-316`: derive DEFF/efficiency from unrounded n_eff (match `diagnostics.R`). (e) Rim core direct-API: validate targets sum ≈ 1 in `calculate_rim_weights` itself; clean refusal on duplicate target categories. (f) Cell direct-API: refuse negative/NA target_percent. Tests for each.
+**W7 — Config/label hygiene (M3, M4, M5, M2, M1, M6).** (a) Preflight category-mismatch Warning→Error for design/cell (rim already refuses); `trimws()` both sides of all label matching, keep case-sensitive. (b) `config_loader.R:373`: after coercion, refuse if any target cell became NA that wasn't blank, naming the cell. (c) Cell keys: use a collision-safe separator (e.g. the ASCII unit separator `"\x1F"`, which cannot appear in survey categories) or refuse category values containing the separator. (d) `validation.R:314-316`: derive DEFF/efficiency from unrounded n_eff (match `diagnostics.R`). (e) Rim core direct-API: validate targets sum ≈ 1 in `calculate_rim_weights` itself; clean refusal on duplicate target categories. (f) Cell direct-API: refuse negative/NA target_percent. Tests for each.
 
 **W8 — Numeric test batch (§5 gaps — cheap, high value; do even if time runs short on earlier packages).** Add hand-checkable assertions: Kish on `c(1,1,3)` → n_eff = 25/11, deff = 33/25; unequal-strata design analytic values (71.4/166.7 fixture); multi-variable rim: recompute ALL achieved margins vs targets; rim-on-design g-weights = final/base numerically; NA-bearing rim data → excluded rows NA, others keep positional alignment (assert by ID); strengthen the cap test to a bound ≠ default.
 

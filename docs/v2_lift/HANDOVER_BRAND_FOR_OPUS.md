@@ -34,7 +34,7 @@ Locked by the Fable review (Duncan may veto — review §9 lists the veto points
 
 ## 2. Session A — engine correctness (`feature/brand-correctness`)
 
-**A0.** Merge the docs-only commit 6c1f0e41 from `origin/review/brand-report-v2-upgrade-2026-06` (adds `modules/brand/docs/BRAND_REPORT_V2_UPGRADE_REVIEW.md`, nothing else — verify with `git show --stat`), then the branch is closable.
+**A0.** Merge the docs-only commit 6c1f0e41 from `origin/review/brand-report-v2-upgrade-2026-06` (adds `modules/brand/docs/BRAND_REPORT_V2_UPGRADE_REVIEW.md`, nothing else — verify with `git show --stat` BEFORE merging; if it is not docs-only, stop and leave it for Duncan). **Explicit exemption from the no-merge rule:** this one docs-only merge may be performed by the session (local merge only, no push); all code merges remain Duncan's. Then the branch is closable.
 
 **A1. Fix C1 (Dirichlet expected all-NA).** Rewrite `.dn_extract_expected` (`08c_dirichlet_norms.R:242-269`) per locked decision 2. Also fix the single-brand latent crash (function object passes the `length(v) >= n` guard when n=1). Tests: non-NA expected values + sane ranges on the existing known-answer fixture; DJ_Flag produces at least one non-"on_line" value on a fixture designed to deviate; single-brand path refuses or computes, never crashes. This closes the §5 green-bias (tests currently assert existence only — `test_dirichlet_norms.R:205-211`).
 
