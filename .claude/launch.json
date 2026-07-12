@@ -127,6 +127,30 @@
         "/Users/duncan/Dev/Turas/prototypes/report-redesign/fable"
       ],
       "port": 8775
+    },
+    {
+      "name": "assa-report",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8781",
+        "--directory",
+        "/private/tmp/claude-501/-Users-duncan-Dev-Turas/e860aa3d-b020-4fab-926d-b95084eb7e3b/scratchpad"
+      ],
+      "port": 8781
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8780",
+        "--directory",
+        "/Users/duncan/Dev/TRL Website"
+      ],
+      "port": 8780
     }
   ]
 }
