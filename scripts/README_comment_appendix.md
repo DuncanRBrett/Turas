@@ -8,6 +8,11 @@ losing any coding you have done.
 It generalises the hand-built appendices used on **SACS** and **CCPB** into one reusable
 tool. (Before this, each survey's appendix was built by hand.)
 
+> **Setting up a new project?** For the full end-to-end workflow — build → code → wire into
+> the crosstab config → see it in the report — see
+> [`modules/tabs/docs/QUAL_COMMENT_APPENDIX_GUIDE.md`](../modules/tabs/docs/QUAL_COMMENT_APPENDIX_GUIDE.md).
+> This README is the script reference only.
+
 ## What it produces
 
 One worksheet per comment column (sheet name = the column name), in the Turas layout:
