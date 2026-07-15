@@ -30,8 +30,8 @@ local({
   suppressWarnings(suppressMessages({ library(jsonlite); library(openxlsx) }))
   source(file.path(repo, "modules/shared/lib/trs_refusal.R"), local = FALSE)
   for (f in c("validation_utils.R", "path_utils.R",  # get_project_root/resolve_path for the workbook resolver
-              "qual_workbook_reader.R", "qual_workbook_io.R", "qual_assemble.R",
-              "qual_island_builder.R", "qual_report.R",
+              "qual_workbook_reader.R", "qual_unions.R", "qual_workbook_io.R", "qual_assemble.R",
+              "qual_island_builder.R", "qual_report.R", "score_utils.R",  # unions + band derivation
               "data_loader.R")) {   # strip_leading_bom — the loader-side half of the BOM regression
     source(file.path(lib, f), local = FALSE)
   }
