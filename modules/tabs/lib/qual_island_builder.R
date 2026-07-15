@@ -95,6 +95,10 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
     noteworthy = isTRUE(rec$noteworthy), tier = rec$noteworthy_tier,
     sentiment = rec$sentiment, rating = rec$rating, themeVals = theme_vals
   )
+  # The split band (NPS Detractor/Passive/Promoter etc.) is a first-class report-level
+  # axis, carried alongside sentiment — NOT a demographic tag, so it is never subject to
+  # the demographic k-anonymisation (the band mirrors a closed question already reported).
+  if (!is.null(rec$band) && !is.na(rec$band)) record$band <- as.character(rec$band)
   if (length(demo_labels)) {
     demos <- list()
     for (label in demo_labels) {
@@ -189,13 +193,17 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
     records[[length(records) + 1L]] <- built$record
     redactions <- redactions + built$redactions
   }
-  list(code = question$code, title = question$title, type = question$type,
+  out <- list(code = question$code, title = question$title, type = question$type,
        sheet = question$sheet,
        base = list(answered = length(records), asked = NA_integer_),
        themes = theme_list, records = records,
        meta = list(dropped_codes = question$meta$dropped_codes,
                    n_records = length(records),
                    pii_scrubbed = redactions > 0L, redactions = redactions))
+  # A split-bearing question (band-unioned open-end) carries its split axis so the JS
+  # can offer an All / <band> segmented view over the records.
+  if (!is.null(question$split)) out$split <- question$split
+  out
 }
 
 #' Build the full DATA_QUAL island from questions + the respondent master + config.

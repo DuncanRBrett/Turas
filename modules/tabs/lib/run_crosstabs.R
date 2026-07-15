@@ -199,6 +199,7 @@ source(file.path(script_dir, "reader_report", "build_reader_report.R"))
 # Qualitative comment report (V12): reader -> assembly -> quant layer -> DATA_QUAL
 # island -> a self-contained comment report. Additive; loaded after its deps.
 source(file.path(script_dir, "qual_workbook_reader.R"))
+source(file.path(script_dir, "qual_unions.R"))
 source(file.path(script_dir, "qual_workbook_io.R"))
 source(file.path(script_dir, "qual_assemble.R"))
 source(file.path(script_dir, "qual_island_builder.R"))
@@ -829,9 +830,13 @@ if (.html_report_v2_on) {
       # demographic_cuts='block' / confidentiality_mode!='full'. Nudge to the source-safe combo.
       if (.qual_wb_set) qual_warn_source_disclosure(config_result$config_obj)
       if (.qual_wb_set) {
+        # Band-split open-ends (e.g. an NPS "why?" routed into Detractor/Passive/Promoter
+        # sheets) are reassembled into one question — parse the union specs from Selection.
+        .qual_unions <- tryCatch(qual_selection_unions(data_result$selection_df),
+                                 error = function(e) list())
         qj <- tryCatch(
           build_integrated_qual_island(.qual_wb, config_result$config_obj,
-                                        data_result$survey_data),
+                                        data_result$survey_data, unions = .qual_unions),
           turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
           error = function(e) {
             cat("\n[WARNING] Qualitative join failed:", conditionMessage(e), "\n")

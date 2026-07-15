@@ -77,9 +77,13 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
 #'   (id column found but no workbook respondent joined — likely a wrong id column).
 #'   The caller falls back to the standalone *_qual_report.html on a non-PASS status.
 #' @export
-build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data, module = "TABS") {
+build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data, module = "TABS",
+                                         unions = list()) {
   qual_path <- qual_resolve_workbook_path(qual_workbook, config_obj)
   read_result <- qual_read_workbook(qual_path, module)          # TRS-refuses on a bad file
+  # Reassemble any band-split open-ends (e.g. NPS Detractor/Passive/Promoter sheets) into
+  # one question with a per-record band, BEFORE the join keys them to the host survey.
+  read_result$questions <- qual_apply_sheet_unions(read_result$questions, unions)
   joined <- qual_resolve_against_survey(read_result$questions, survey_data,
                                         id_col = config_obj$qual_join_id_column)
   if (!identical(joined$status, "PASS")) {
@@ -90,6 +94,10 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
     return(list(status = "NO_MATCHES", json = NULL, island = NULL,
                 matched = 0L, total = joined$total, id_column = joined$id_column))
   }
+  # Reconcile each band-split record to the recommend score (the score wins; sheet-of-
+  # origin is the fallback), now that the join gives each comment its host survey row.
+  read_result$questions <- qual_derive_bands(read_result$questions, unions,
+                                             survey_data, joined$master$id_to_idx)
   island <- qual_build_data_qual(read_result$questions, joined$master, list(
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
@@ -176,16 +184,27 @@ qual_build_links <- function(selection_df, island, valid_targets = NULL) {
     sheet <- selection_df$CommentSheet[i]
     if (blank(sheet)) next
     sheet <- trimws(as.character(sheet))
-    qcode <- qual_sheet_code(sheet)
-    if (is.null(q_by_code[[qcode]])) { unresolved <- c(unresolved, sheet); next }
-    target <- if (has_link_col) selection_df$CommentLink[i] else NA
     open_end <- trimws(as.character(selection_df$QuestionCode[i]))
+    # A CommentSheet may name several band sheets (union) or one sheet. A union resolves
+    # to the synthetic union code (shared with qual_apply_sheet_unions); a single sheet
+    # to its own sheet code — so the jump lands on the ONE reassembled question either way.
+    spec <- qual_parse_comment_sheet(sheet)
+    if (!length(spec$members)) next
+    if (isTRUE(spec$union)) {
+      qcode <- qual_union_code(open_end, spec$members)
+      sheet_label <- qcode
+    } else {
+      qcode <- qual_sheet_code(spec$members[[1]]$sheet)
+      sheet_label <- spec$members[[1]]$sheet
+    }
+    if (is.null(q_by_code[[qcode]])) { unresolved <- c(unresolved, sheet_label); next }
+    target <- if (has_link_col) selection_df$CommentLink[i] else NA
     if (!blank(target)) {
       target <- trimws(as.character(target))
-      links[[target]] <- list(qcode = qcode, sheet = sheet, openEnd = open_end,
+      links[[target]] <- list(qcode = qcode, sheet = sheet_label, openEnd = open_end,
                               title = q_by_code[[qcode]]$title)
       if (check_targets && !(target %in% valid_targets)) {
-        unlinked[[length(unlinked) + 1L]] <- list(target = target, openEnd = open_end, sheet = sheet)
+        unlinked[[length(unlinked) + 1L]] <- list(target = target, openEnd = open_end, sheet = sheet_label)
       }
     } else {
       generic <- c(generic, qcode)
