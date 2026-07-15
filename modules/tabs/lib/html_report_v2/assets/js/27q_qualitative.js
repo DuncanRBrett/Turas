@@ -1063,7 +1063,8 @@
     }
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, sentiment: null, band: null, railGroups: {}, railHidden: false, savedOnly: false,
+                      theme: null, sentiment: null, band: null, tagsOff: false, tagHide: {},
+                      railGroups: {}, railHidden: false, savedOnly: false,
                       themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false,
                       view: "question", groupBy: "question", hub: null, hubEditing: null, showRest: false };
     }
@@ -1160,7 +1161,7 @@
           : prevalenceHtml(q, st, audience));
     }
     return headerHtml(island, q, audience) + chart +
-      controlsHtml(q, st, audience) +
+      controlsHtml(q, st, audience, island) +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
   }
 
@@ -1194,7 +1195,7 @@
 
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
   // and — next to them — the shortlist toggle (per question) + Excel export.
-  function controlsHtml(q, st, audience) {
+  function controlsHtml(q, st, audience, island) {
     // Disclosure control: below k the board/crosstab/drawer are all withheld, so this
     // row must not leak the cut either — no live sentiment counts, no export button
     // (it would emit a row per comment); the filters stay visible but disabled, with
@@ -1244,6 +1245,25 @@
         }).join("") + "</div>";
     }
 
+    // Tag display control (Feature 2): the reader can hide all tags to declutter, or toggle
+    // an individual dimension. Purely SUBTRACTIVE — it only hides fields the analyst already
+    // cleared into the island (the demographic_cuts / k-anon gate runs in R), so it can never
+    // reveal a suppressed value or lower k. Shown only when the island carries tag dimensions.
+    var tagctl = "";
+    var tagDims = ((island && island.demographics) || []).map(function (d) { return d.label; });
+    if (!gated && tagDims.length) {
+      var off = !!st.tagsOff;
+      var fields = off ? "" : tagDims.map(function (lbl) {
+        var shown = !(st.tagHide && st.tagHide[lbl]);
+        return '<button class="ql-tagfield' + (shown ? " on" : "") + '" data-tagfield="' +
+          esc(lbl) + '" aria-pressed="' + shown + '">' + esc(lbl) + "</button>";
+      }).join("");
+      tagctl = '<div class="ql-tagctl"><button class="ql-tagall' + (off ? "" : " on") +
+        '" data-tagall aria-pressed="' + (!off) +
+        '" title="Show or hide the demographic tags on each comment">🏷 Tags</button>' +
+        fields + "</div>";
+    }
+
     var savedN = qual.savedCount(q.code);
     var actions = '<div class="ql-actions">' +
       '<button class="ql-savedonly' + (st.savedOnly ? " on" : "") + '" data-savedonly' + dis +
@@ -1255,7 +1275,7 @@
         "⬇ Export</button>") + "</div>";
     // Labelled "Filter the comments below" — these narrow the LIST, not the chart above.
     return '<div class="ql-controls"><span class="ql-ctrllbl">Filter the comments below:</span>' +
-      band + tier + sent + actions +
+      band + tier + sent + tagctl + actions +
       (gated ? '<span class="ql-disclosure">🛡 ' + esc(TR.disclosure.note()) + "</span>" : "") + "</div>";
   }
 
@@ -1513,8 +1533,13 @@
     var star = r.tier >= 3 ? '<span class="ql-star priority" title="priority">★</span>'
              : r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
-    var tags = (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
-      .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + '</span>'; }).join("");
+    // Tags honour the reader's tag toggle (hide-all / per-field), and read "Label: value"
+    // so several dimensions stay legible ("Centre: Worcester DC · Channel: Presell"). The
+    // toggle is subtractive only — a field absent from r.demos (gated/k-anon in R) can't appear.
+    var qst = qual._state || {};
+    var tags = (!qst.tagsOff && r.demos ? Object.keys(r.demos) : [])
+      .filter(function (k) { return r.demos[k] != null && !(qst.tagHide && qst.tagHide[k]); })
+      .map(function (k) { return '<span class="ql-tag">' + esc(k) + ": " + esc(r.demos[k]) + "</span>"; }).join("");
     var saved = qual.isSaved(qcode, r.idx);
     var save = '<button class="ql-save' + (saved ? " on" : "") + '" data-qual-save="' +
       esc(qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved + '" title="' +
@@ -1825,6 +1850,16 @@
       b.addEventListener("click", function () {
         var v = b.getAttribute("data-band");
         st.band = v === "" ? null : v;   // "" = All
+        qual.render(host);
+      });
+    });
+    var tagall = host.querySelector("[data-tagall]");
+    if (tagall) tagall.addEventListener("click", function () { st.tagsOff = !st.tagsOff; qual.render(host); });
+    host.querySelectorAll("[data-tagfield]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var lbl = b.getAttribute("data-tagfield");
+        if (!st.tagHide) st.tagHide = {};
+        st.tagHide[lbl] = !st.tagHide[lbl];
         qual.render(host);
       });
     });

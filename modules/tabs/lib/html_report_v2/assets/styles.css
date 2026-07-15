@@ -884,6 +884,13 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-segbtn.neg.on { background: var(--red); color: #fff; }
 .sentseg .ql-segbtn.pos.on::before, .sentseg .ql-segbtn.neu.on::before, .sentseg .ql-segbtn.neg.on::before { background: #fff; }
 .ql-actions { margin-left: auto; display: inline-flex; gap: 8px; }
+/* Reader tag-display control (Feature 2): hide-all + one pill per demographic dimension. */
+.ql-tagctl { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ql-tagall, .ql-tagfield { border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  border-radius: 999px; padding: 4px 10px; font-size: 11px; line-height: 1.2; cursor: pointer; }
+.ql-tagall:hover, .ql-tagfield:hover { background: var(--bg); }
+.ql-tagall.on { color: var(--ink); border-color: var(--brand); }
+.ql-tagfield.on { color: #fff; background: var(--brand); border-color: var(--brand); }
 .ql-board { margin-bottom: 18px; }
 .ql-boardhd, .ql-drawerhd { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink); }
 .ql-hint { font-weight: 400; color: var(--muted); font-size: 11px; }

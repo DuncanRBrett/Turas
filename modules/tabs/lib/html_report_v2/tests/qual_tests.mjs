@@ -676,5 +676,36 @@ assert(hostB.innerHTML.indexOf('data-band="Detractor"') >= 0, "render: the Detra
 assert(hostB.innerHTML.indexOf('data-band=""') >= 0, "render: the All band button reaches the DOM");
 assert(hostB.innerHTML.indexOf('aria-label="NPS band filter"') >= 0, "render: the band segment is labelled by its split dim");
 
+// ---- Reader tag toggle (Feature 2) --------------------------------------------
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
+  demographics: [{ label: "Centre", values: ["Worcester DC"] }, { label: "Channel", values: ["Presell"] }],
+  questions: [{ code: "QT", title: "Open", type: "raw", themes: [], base: { answered: 1 },
+    records: [{ idx: 0, tier: 0, sentiment: 1, themeVals: {}, text: "good service",
+      demos: { Centre: "Worcester DC", Channel: "Presell" } }] }] };
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.disclosure = null; qual._state = null;
+const hostT = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+qual.render(hostT);
+assert(hostT.innerHTML.indexOf("Centre: Worcester DC") >= 0, "tags: a chip reads 'Label: value'");
+assert(hostT.innerHTML.indexOf("data-tagall") >= 0, "tags: the master tag toggle reaches the DOM");
+assert(hostT.innerHTML.indexOf('data-tagfield="Channel"') >= 0, "tags: a per-field toggle reaches the DOM");
+
+qual._state.tagsOff = true;
+hostT.innerHTML = ""; qual.render(hostT);
+assert(hostT.innerHTML.indexOf("Centre: Worcester DC") < 0, "tags: hide-all removes every chip");
+
+qual._state.tagsOff = false; qual._state.tagHide = { Channel: true };
+hostT.innerHTML = ""; qual.render(hostT);
+assert(hostT.innerHTML.indexOf("Centre: Worcester DC") >= 0, "tags: per-field hide keeps the other fields");
+assert(hostT.innerHTML.indexOf("Channel: Presell") < 0, "tags: per-field hide removes only that field");
+
+// Subtractive invariant: a field the analyst suppressed (absent from r.demos) never renders,
+// even though the reader has not hidden it — the toggle can only take away, never reveal.
+qual._state = null;
+TR.QUAL.questions[0].records[0].demos = { Centre: "Worcester DC" };   // Channel gated away in R
+hostT.innerHTML = ""; qual.render(hostT);
+assert(hostT.innerHTML.indexOf("Channel:") < 0, "tags: a field absent from the record (gated in R) never appears");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
