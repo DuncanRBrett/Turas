@@ -108,6 +108,22 @@
   }
   function sigChanges() { return changeCards(function (l) { return l.sig_prev; }); }
   function softChanges() { return changeCards(function (l) { return l.soft_prev; }); }
+  // True when at least one metric × segment carried the inputs for a wave-on-wave test.
+  // Lets the empty state say "nothing significant" (tests ran) vs "couldn't be tested"
+  // (historical waves loaded without the base / distribution a test needs).
+  function anyTestablePrev() {
+    var trk = TR.trk, any = false;
+    var segs = [{ norm: "" }].concat(TR.waves.segments().map(function (s) {
+      return { norm: s.norm };
+    }));
+    trk.metricList("key").filter(function (m) { return !m.diff; }).forEach(function (m) {
+      segs.forEach(function (seg) {
+        var last = lastCell(trk.points(m, seg.norm || null));
+        if (last && last.tested_prev) any = true;
+      });
+    });
+    return any;
+  }
 
   function sigCardHtml(c, soft) {
     var trk = TR.trk;
@@ -257,7 +273,10 @@
           fmt.escapeHtml(label) + "</option>";
       }).join("") + "</select></div>" +
       (changes.length ? "" :
-        "<p class='trknote'>No significant wave-on-wave changes.</p>") +
+        "<p class='trknote'>" + (anyTestablePrev()
+          ? "No significant wave-on-wave changes."
+          : "Significance could not be tested because the historical wave bases were " +
+            "not loaded — the wave-on-wave changes are directional only.") + "</p>") +
       '<div class="sigcards">' + shown.map(function (c) { return sigCardHtml(c); }).join("") +
       "</div>" +
       (changes.length > 24 && !showAllSig
