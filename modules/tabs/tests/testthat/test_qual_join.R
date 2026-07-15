@@ -156,6 +156,34 @@ test_that("build_integrated_qual_island keys records to host rows and drops unma
   expect_equal(length(q$records), 4L)              # commenter 555 dropped (not in host)
 })
 
+test_that("qual_tag_dimensions attaches a host column as a comment tag (the F2 seam)", {
+  wb <- write_join_workbook(); on.exit(unlink(wb), add = TRUE)
+  # Tag from the host survey's own 'x' column (values a..e at rows 0..4); Region label.
+  cfg <- list(qual_confidentiality_mode = "full", qual_demographic_cuts = "allow",
+              qual_tag_dimensions = "x:Region", qual_join_id_column = "")
+  out <- build_integrated_qual_island(wb, cfg, host_survey())
+  expect_equal(out$status, "PASS")
+  isl <- out$island
+  # The dimension is registered, so the JS renders the 🏷 Tags control + chips.
+  labs <- vapply(isl$demographics, function(d) d$label, character(1))
+  expect_true("Region" %in% labs)
+  # Each comment carries its host row's value: idx0->a, idx2->c, idx3->d, idx4->e.
+  q <- isl$questions[[1]]
+  region_at <- function(idx) {
+    for (r in q$records) if (identical(r$idx, idx)) return(r$demos$Region)
+    NULL
+  }
+  expect_equal(region_at(3L), "d")   # commenter 101 -> host row 3 -> x = "d"
+  expect_equal(region_at(0L), "a")   # commenter 104 -> host row 0 -> x = "a"
+})
+
+test_that("no qual_tag_dimensions => no demographics dimension (the F2 no-op default)", {
+  wb <- write_join_workbook(); on.exit(unlink(wb), add = TRUE)
+  out <- build_integrated_qual_island(
+    wb, list(qual_confidentiality_mode = "full", qual_demographic_cuts = "allow"), host_survey())
+  expect_null(out$island$demographics)   # nothing configured -> no tag control appears
+})
+
 test_that("an id column that matches nobody reports NO_MATCHES (not a silent empty island)", {
   wb <- write_join_workbook(ids = c("A1", "A2")); on.exit(unlink(wb), add = TRUE)
   cfg <- list(qual_confidentiality_mode = "hidden", qual_join_id_column = "")
