@@ -449,11 +449,25 @@
     return out;
   };
 
-  /** The pool a sentiment pick filters: theme -> tier -> shortlist (everything but
-   *  the sentiment filter itself), so the sentiment buttons can show "if I click this,
-   *  N comments". */
+  /** Filter to one split band (NPS Detractor/Passive/Promoter etc.). Only bites on a
+   *  split-bearing question; a null/"" band (All) passes everything. The band is the
+   *  report-level split axis carried on the record, not a demographic tag. */
+  qual.bandFilter = function (q, records, band) {
+    if (!q || !q.split || band == null || band === "") return records || [];
+    return (records || []).filter(function (r) { return r.band === band; });
+  };
+
+  /** How many of `records` fall in `band` ("" = every band) — for the segment counts. */
+  qual.bandCount = function (q, records, band) {
+    return qual.bandFilter(q, records, band).length;
+  };
+
+  /** The pool a sentiment pick filters: band -> theme -> tier -> shortlist (everything
+   *  but the sentiment filter itself), so the sentiment buttons can show "if I click
+   *  this, N comments". The band narrows first so every downstream count is per-band. */
   qual.poolBeforeSentiment = function (q, st, audience) {
-    var pool = (q.type === "themed" && st.theme != null) ? qual.recordsForTheme(audience, st.theme) : audience;
+    var base = qual.bandFilter(q, audience, st.band);
+    var pool = (q.type === "themed" && st.theme != null) ? qual.recordsForTheme(base, st.theme) : base;
     var records = qual.tierFilter(pool, st.tier);
     if (st.savedOnly) records = qual.savedFilter(records, q.code);
     return records;
@@ -527,16 +541,22 @@
     var dims = ((island && island.demographics) || []).map(function (d) { return d.label; });
     var byId = {};
     (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
-    var header = ["ID"].concat(dims).concat(["Noteworthy", "Sentiment", "Themes", "Verbatim"]);
+    // The split band is a report-level axis (like Noteworthy/Sentiment), so it exports even
+    // when demographics are withheld — it never identifies on its own (it mirrors the
+    // recommend question already reported).
+    var bandCol = (q.split && (q.split.bands || []).length) ? [q.split.dim || "Band"] : [];
+    var header = ["ID"].concat(bandCol).concat(dims).concat(["Noteworthy", "Sentiment", "Themes", "Verbatim"]);
     var out = [header];
     (records || []).forEach(function (r) {
       var demos = dims.map(function (lbl) {
         if (!safeDemos) return "[hidden]";
         return (r.demos && r.demos[lbl] != null) ? r.demos[lbl] : "";
       });
+      var bandVal = bandCol.length ? [r.band || ""] : [];
       var themes = Object.keys(r.themeVals || {}).map(function (id) { return byId[id] || ("#" + id); }).join("; ");
       var text = (!safeDemos || r.text == null) ? "[hidden]" : r.text;
-      out.push([r.idx].concat(demos).concat([TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes, text]));
+      out.push([r.idx].concat(bandVal).concat(demos)
+        .concat([TIER_LABEL[r.tier] || "", SENT_LABEL[r.sentiment] || "", themes, text]));
     });
     return out;
   };
@@ -1043,7 +1063,7 @@
     }
     if (!qual._state) {
       qual._state = { tier: TIER_ORDER[island.noteworthyDefault] != null ? island.noteworthyDefault : "all",
-                      theme: null, sentiment: null, railGroups: {}, railHidden: false, savedOnly: false,
+                      theme: null, sentiment: null, band: null, railGroups: {}, railHidden: false, savedOnly: false,
                       themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false,
                       view: "question", groupBy: "question", hub: null, hubEditing: null, showRest: false };
     }
@@ -1189,6 +1209,23 @@
           '" data-tier="' + o[0] + '"' + dis + '>' + o[1] + "</button>";
       }).join("") + "</div>";
 
+    // The band segment appears only on a split-bearing question (an NPS "why?" reassembled
+    // from Detractor/Passive/Promoter sheets): All + one button per band, each with its count.
+    // It narrows the LIST like the tier/sentiment segments, and the board recomputes per band.
+    var band = "";
+    if (q.split && (q.split.bands || []).length) {
+      var bandOpts = [["", "All"]].concat((q.split.bands || []).map(function (b) { return [b, b]; }));
+      var curB = st.band == null ? "" : st.band;
+      band = '<div class="ql-seg bandseg" role="tablist" aria-label="' +
+        esc(q.split.dim || "Split") + ' filter">' +
+        bandOpts.map(function (o) {
+          var cnt = gated ? null : qual.bandCount(q, audience, o[0]);
+          return '<button class="ql-segbtn' + (curB === o[0] ? " on" : "") +
+            '" data-band="' + esc(o[0]) + '"' + dis + '>' + esc(o[1]) +
+            (cnt == null ? "" : ' <span class="ql-segn">' + cnt + "</span>") + "</button>";
+        }).join("") + "</div>";
+    }
+
     // The sentiment filter only appears when the question was actually sentiment-coded;
     // otherwise it would read "0 positive / 0 mixed / 0 negative" as if measured (it wasn't).
     var sent = "";
@@ -1218,7 +1255,7 @@
         "⬇ Export</button>") + "</div>";
     // Labelled "Filter the comments below" — these narrow the LIST, not the chart above.
     return '<div class="ql-controls"><span class="ql-ctrllbl">Filter the comments below:</span>' +
-      tier + sent + actions +
+      band + tier + sent + actions +
       (gated ? '<span class="ql-disclosure">🛡 ' + esc(TR.disclosure.note()) + "</span>" : "") + "</div>";
   }
 
@@ -1429,6 +1466,7 @@
       caption = q.type === "themed" ? "All comments (pick a theme above to filter)" : "Comments";
     }
     if (st.sentiment != null && qual.hasSentiment(q)) caption = (SENT_WORD[st.sentiment] || "") + " · " + caption;
+    if (q.split && st.band != null && st.band !== "") caption = esc(st.band) + " · " + caption;
     var focusBtn = records.length
       ? '<button class="ql-focusbtn" data-qual-focus ' +
         'title="Read these comments one at a time — j/k or arrows to move, Esc to close">⤢ Focus</button>'
@@ -1745,6 +1783,7 @@
       b.addEventListener("click", function () {
         TR.d2.state.qualQ = b.getAttribute("data-q");
         st.theme = null;
+        st.band = null;                   // a new question resets the split-band segment to All
         st.showRest = false;              // a new question re-collapses to the curated selection
         st.view = "question";             // a question click leaves the collection
         qual.clearJump();                 // leaving the jumped open-end drops the cut breadcrumb
@@ -1762,7 +1801,7 @@
     host.querySelectorAll("[data-col-jump]").forEach(function (b) {
       b.addEventListener("click", function () {
         TR.d2.state.qualQ = b.getAttribute("data-col-jump");
-        st.theme = null; st.showRest = false; st.view = "question";
+        st.theme = null; st.band = null; st.showRest = false; st.view = "question";
         qual.clearJump();
         qual.render(host);
       });
@@ -1781,6 +1820,13 @@
     if (toggle) toggle.addEventListener("click", function () { st.railHidden = !st.railHidden; qual.render(host); });
     host.querySelectorAll("[data-tier]").forEach(function (b) {
       b.addEventListener("click", function () { st.tier = b.getAttribute("data-tier"); qual.render(host); });
+    });
+    host.querySelectorAll("[data-band]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = b.getAttribute("data-band");
+        st.band = v === "" ? null : v;   // "" = All
+        qual.render(host);
+      });
     });
     host.querySelectorAll("[data-sent]").forEach(function (b) {
       b.addEventListener("click", function () {

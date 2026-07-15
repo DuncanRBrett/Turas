@@ -625,5 +625,56 @@ assert(pHtml.indexOf('data-tier="priority"') >= 0, "render: the Priority tier-fi
 assert(pHtml.indexOf('class="ql-star priority" title="priority"') >= 0, "render: a tier-3 comment shows the Priority star");
 assert(pHtml.indexOf('class="ql-star must" title="must-read"') >= 0, "render: a tier-2 comment shows the Must-read star");
 
+// ---- Split band (NPS Detractor/Passive/Promoter) view-by ----------------------
+const qsplit = {
+  code: "Q79", title: "Why recommend", type: "raw", themes: [],
+  split: { dim: "NPS band", bands: ["Detractor", "Passive", "Promoter"] },
+  base: { answered: 4 },
+  records: [
+    { idx: 0, tier: 0, sentiment: 3, themeVals: {}, demos: {}, band: "Detractor", text: "bad" },
+    { idx: 1, tier: 0, sentiment: 2, themeVals: {}, demos: {}, band: "Passive", text: "ok" },
+    { idx: 2, tier: 0, sentiment: 1, themeVals: {}, demos: {}, band: "Promoter", text: "great" },
+    { idx: 3, tier: 0, sentiment: 1, themeVals: {}, demos: {}, band: "Promoter", text: "love it" }
+  ]
+};
+assert(qual.bandFilter(qsplit, qsplit.records, "Promoter").length === 2, "bandFilter Promoter -> 2");
+assert(qual.bandFilter(qsplit, qsplit.records, "Detractor").length === 1, "bandFilter Detractor -> 1");
+assert(qual.bandFilter(qsplit, qsplit.records, "").length === 4, "bandFilter '' (All) -> every band");
+assert(qual.bandFilter(qsplit, qsplit.records, null).length === 4, "bandFilter null (All) -> every band");
+assert(qual.bandCount(qsplit, qsplit.records, "Passive") === 1, "bandCount Passive -> 1");
+
+// A non-split question ignores a stale band selection (returns everything).
+const qnos = { code: "R", type: "raw", themes: [],
+  records: [{ idx: 0, tier: 0, themeVals: {} }, { idx: 1, tier: 0, themeVals: {} }] };
+assert(qual.bandFilter(qnos, qnos.records, "Promoter").length === 2,
+  "bandFilter on a non-split question passes everything through");
+
+// The band narrows the drawer pool and the visible records.
+assert(qual.poolBeforeSentiment(qsplit,
+  { band: "Promoter", tier: "all", savedOnly: false, theme: null }, qsplit.records).length === 2,
+  "poolBeforeSentiment respects the band");
+assert(qual.visibleRecords(qsplit,
+  { band: "Detractor", tier: "all", savedOnly: false, theme: null, sentiment: null }, qsplit.records).length === 1,
+  "visibleRecords respects the band");
+
+// Export carries a Band column (the split dim), even alongside demographics.
+const bex = qual.exportRows({ demographics: [] }, qsplit, qsplit.records, true);
+assert(bex[0][1] === "NPS band", "exportRows: the split dim is the 2nd header column");
+assert(bex[1][1] === "Detractor" && bex[3][1] === "Promoter", "exportRows: each row carries its band");
+const bexNoSplit = qual.exportRows({ demographics: [] }, qnos, qnos.records, true);
+assert(bexNoSplit[0].indexOf("NPS band") < 0, "exportRows: no band column on a non-split question");
+
+// Render: the band segment reaches the DOM (All + one button per band).
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
+  demographics: [], questions: [qsplit] };
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.disclosure = null; qual._state = null;
+const hostB = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+qual.render(hostB);
+assert(hostB.innerHTML.indexOf('data-band="Detractor"') >= 0, "render: the Detractor band button reaches the DOM");
+assert(hostB.innerHTML.indexOf('data-band=""') >= 0, "render: the All band button reaches the DOM");
+assert(hostB.innerHTML.indexOf('aria-label="NPS band filter"') >= 0, "render: the band segment is labelled by its split dim");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
