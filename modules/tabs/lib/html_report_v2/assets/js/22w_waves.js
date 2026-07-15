@@ -468,6 +468,19 @@
       if (a.sd !== undefined && a.sd !== null) return meanLevel(a, b);
       return 0;
     };
+    // Could the test between two waves actually RUN — i.e. did both waves carry the
+    // inputs it needs (bases >= the reporting threshold, a count for proportions, a
+    // spread for means)? propLevel/meanLevel return 0 both when a test runs and finds
+    // nothing AND when it can't run at all, so this separates "flat" from "untestable"
+    // (e.g. historical waves loaded as bare aggregates with no base / distribution).
+    var testable = function (a, b) {
+      var threshold = TR.AGG.project.low_base_threshold || 30;
+      if (!a.base || !b.base) return false;
+      if (effBaseOfPoint(a) < threshold || effBaseOfPoint(b) < threshold) return false;
+      return canSig
+        ? (a.x !== null && a.x !== undefined && b.x !== null && b.x !== undefined)
+        : (a.sd !== null && a.sd !== undefined && b.sd !== null && b.sd !== undefined);
+    };
     return points.map(function (p, i) {
       var prev = i > 0 ? points[i - 1] : null;
       var first = i > 0 ? points[0] : null;
@@ -477,6 +490,7 @@
         x: p.x, sd: p.sd, current: !!p.current,
         change_prev: prev ? p.value - prev.value : null,
         sig_prev: on && lp === 2, soft_prev: dual && lp === 1,
+        tested_prev: !!prev && testable(p, prev),   // inputs present for a wave-on-wave test
         change_base: first ? p.value - first.value : null,
         sig_base: on && lb === 2, soft_base: dual && lb === 1 };
     });

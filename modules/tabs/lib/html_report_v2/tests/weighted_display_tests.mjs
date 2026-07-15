@@ -253,5 +253,32 @@ run("effNfromWeights matches Kish and a low effective base gates the test out (#
   eq(w[1].soft_prev, false, "and not softly flagged either");
 });
 
+run("tested_prev separates 'flat' from 'untestable' (historical bases not loaded)", () => {
+  TR.AGG = { project: { low_base_threshold: 30 } };
+
+  // The CCPB case: the current wave carries a spread + base, but the prior wave is a
+  // bare aggregate (mean only, no spread) — so the wave-on-wave test cannot run.
+  const noPrevSd = TR.waves.cellsFor(
+    [{ value: 8.5, base: 380 }, { value: 8.8, sd: 1.2, base: 396 }], false, "95");
+  eq(noPrevSd[1].sig_prev, false, "cannot be 95%-sig without the prior wave's spread");
+  eq(noPrevSd[1].tested_prev, false, "flagged NOT testable — prior wave has no spread");
+
+  // both waves carry a spread + base -> the test runs (here it lands flat, not untestable)
+  const flat = TR.waves.cellsFor(
+    [{ value: 8.7, sd: 1.2, base: 380 }, { value: 8.8, sd: 1.2, base: 396 }], false, "95");
+  eq(flat[1].sig_prev, false, "small move on a wide spread is not significant");
+  eq(flat[1].tested_prev, true, "but it WAS testable — both waves carry the inputs");
+
+  // proportions: a prior wave with no base is untestable
+  const noPrevBase = TR.waves.cellsFor(
+    [{ value: 50, x: 50 }, { value: 65, base: 100, x: 65 }], true, "95");
+  eq(noPrevBase[1].tested_prev, false, "prior wave with no base is untestable");
+
+  // a sub-threshold prior base is untestable too (no false "flat" claim)
+  const lowBase = TR.waves.cellsFor(
+    [{ value: 8.5, sd: 1.2, base: 10 }, { value: 8.8, sd: 1.2, base: 396 }], false, "95");
+  eq(lowBase[1].tested_prev, false, "prior base below the reporting threshold is untestable");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);
