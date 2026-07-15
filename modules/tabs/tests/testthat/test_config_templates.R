@@ -170,7 +170,8 @@ test_that(".KNOWN_SETTINGS whitelist recognises settings that were flagged as un
   src <- paste(deparse(body(load_crosstabs_config)), collapse = "\n")
 
   for (setting in c("heatmap_colour", "research_house", "qual_confidentiality_mode",
-                     "qual_demographic_cuts", "qual_noteworthy_default", "min_reporting_base")) {
+                     "qual_demographic_cuts", "qual_noteworthy_default", "min_reporting_base",
+                     "qual_tag_dimensions")) {
     expect_true(
       grepl(setting, src, fixed = TRUE),
       info = sprintf("'%s' should appear in load_crosstabs_config()'s known-settings whitelist", setting)
@@ -191,6 +192,17 @@ test_that("build_config_object loads heatmap_colour and research_house through t
 
   expect_equal(config_obj$heatmap_colour, "#123456")
   expect_equal(config_obj$research_house, "White Label Partner Co")
+})
+
+test_that("build_config_object loads qual_tag_dimensions through to the config object", {
+  # Regression guard (Feature 2 host tags): config_obj is an explicit whitelist, not the
+  # raw settings — a qual_tag_dimensions row was read fine downstream but never assigned
+  # here, so the comment tag control silently never appeared even when the setting was set.
+  skip_if_not(exists("build_config_object", mode = "function"))
+  config_obj <- build_config_object(list(qual_tag_dimensions = "S03:Centre, S11:Channel"))
+  expect_equal(config_obj$qual_tag_dimensions, "S03:Centre, S11:Channel")
+  # and it defaults to "" (a clean no-op) when unset
+  expect_equal(build_config_object(list())$qual_tag_dimensions, "")
 })
 
 test_that("build_config_object defaults research_house sensibly when unset", {
