@@ -331,7 +331,7 @@ run("every takeout module loaded and exposes its API", () => {
 
 run("end-to-end: tagging, index+top-box, multi-banner, participation, read view", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
-  TR.conf = { maxMoePct: () => 0.0, reportHasPopulation: () => true,
+  TR.conf = { maxMoePct: () => 0.0, fpcActiveReport: () => true,
     labels: () => ({ sampling_method_normalised: "census", is_probability: false }),
     calloutHtml: () => '<div class="callout collapsed"><button data-callout></button></div>" ' };
   TR.render = { wavePoints: (row) => row.waves || null, sparkline: () => '<svg class="spark"></svg>' };
@@ -396,7 +396,7 @@ run("ODD-ONE-OUT family excludes NPS/score scales (F1: no cross-scale fabricatio
     rate.push(g0 ? (i % 2 ? 5 : 4) : (i % 2 ? 4 : 3));    // 1–5 scale
     nps.push(g0 ? (i % 2 ? 80 : 60) : (i % 2 ? 20 : 40));  // 0–100 NPS index (big gaps)
   }
-  TR.conf = { reportHasPopulation: () => false };
+  TR.conf = { fpcActiveReport: () => false };
   TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Banner" }] };
   TR.MICRO = { n: N, weights: null, banner_vars: { B: bv }, scores: { Q_RATE: rate, Q_NPS: nps } };
   TR.views = {
@@ -419,7 +419,7 @@ run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
   // the split read as unimodal. The bottom camp must now be counted.
   const N = 40, nps = [];
   for (let i = 0; i < N; i++) nps.push(i < 20 ? 0 : 10);
-  TR.conf = { reportHasPopulation: () => false };
+  TR.conf = { fpcActiveReport: () => false };
   TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [] };
   TR.MICRO = { n: N, weights: null, scores: { Q_NPS: nps } };
   TR.views = {
@@ -435,7 +435,7 @@ run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
 run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (audit #1)", () => {
   // A 12-respondent and a 30-respondent column. With min_reporting_base = 25 only
   // the n=30 column may report; with no configured k the census fallback of 5 admits both.
-  TR.conf = { reportHasPopulation: () => true };
+  TR.conf = { fpcActiveReport: () => true };
   TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
   TR.AGG = { project: { population_size: 60, min_reporting_base: 25 },
     banner_groups: [{ id: "B", name: "Banner" }] };
@@ -456,7 +456,7 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
 
 run("Patterns tab ignores the live audience filter — published full-sample view (audit #2)", () => {
   const seen = [];
-  TR.conf = { reportHasPopulation: () => false };
+  TR.conf = { fpcActiveReport: () => false };
   TR.d2 = { state: { banner: "B", filters: [{ q: "Q9", rows: [1] }] }, storeKey: (k) => k };
   TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Banner" }] };
   TR.MICRO = null;
@@ -480,7 +480,7 @@ run("Patterns tab ignores the live audience filter — published full-sample vie
 run("reliability MoE sizes on the Kish effective base on weighted studies (audit #4)", () => {
   // n=800 unweighted, n_eff=500. Worst-case MoE = 1.96*sqrt(0.25/n)*100:
   // on n_eff=500 -> 4.3827pp; the raw n=800 would wrongly claim 3.4648pp.
-  TR.conf = { reportHasPopulation: () => false, labels: () => ({}),
+  TR.conf = { fpcActiveReport: () => false, labels: () => ({}),
     maxMoePct: (n) => 1.96 * Math.sqrt(0.25 / n) * 100 };
   TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
   TR.AGG = { project: {}, banner_groups: [] };

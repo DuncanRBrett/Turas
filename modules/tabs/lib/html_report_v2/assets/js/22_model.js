@@ -641,7 +641,7 @@
     // a weighted base's design effect isn't in the published layer; weighted
     // reports still get the narrower intervals).
     var weighted = !!(TR.AGG.project && TR.AGG.project.weighted);
-    viewModel.fpcDefault = !custom && !composite && !filtered && TR.conf.reportHasPopulation();
+    viewModel.fpcDefault = !custom && !composite && !filtered && TR.conf.fpcActiveReport();
     viewModel.code = q.code;
     viewModel.title = q.title;
     // analyst ShortLabel for space-tight surfaces (null on older data layers)

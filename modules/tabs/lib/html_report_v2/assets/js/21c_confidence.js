@@ -167,18 +167,41 @@
 
   /* ---------------- finite population correction (FPC) ---------------- */
 
+  // Below this sampling fraction the finite-population correction is negligible
+  // (about 2.5% narrowing at 5% coverage) and, more importantly, the study is a
+  // sample — not a census. Below the floor the FPC is NOT applied and no census
+  // framing is shown, so a thin sample with a configured population_size reads as
+  // the ordinary sample it is. Standard textbook FPC cut-off.
+  var FPC_MIN_COVERAGE = 0.05;
+
   /**
    * Effective-base multiplier for a base of nActual respondents drawn from a
-   * known finite population N: (N-1)/(N-nActual). Verbatim port of
-   * apply_fpc()/calculate_fpc_factor() in 03_study_level.R.
-   *  - >= 1 (narrows the interval / strengthens the test);
+   * known finite population N: (N-1)/(N-nActual). Port of apply_fpc()/
+   * calculate_fpc_factor() in 03_study_level.R, with the material-coverage floor.
+   *  - > 1 (narrows the interval / strengthens the test) only above the floor;
    *  - Infinity at full census (nActual >= N) -> zero-width interval;
-   *  - 1 when no usable population is known -> unconfigured reports unchanged.
+   *  - 1 when no usable population is known, OR coverage <= the floor -> the
+   *    report is treated as an ordinary (infinite-population) sample.
    */
   conf.fpcMul = function (nActual, N) {
     if (!(N > 1) || !(nActual > 0)) return 1;
+    if (nActual / N <= FPC_MIN_COVERAGE) return 1;   // thin sample -> no correction
     if (nActual >= N) return Infinity;
     return (N - 1) / (N - nActual);
+  };
+
+  /** True when the FPC materially corrects a base of nActual drawn from N
+   *  (i.e. a known universe AND coverage above the material floor). */
+  conf.fpcApplies = function (nActual, N) { return conf.fpcMul(nActual, N) > 1; };
+
+  /** Does the FPC materially apply to THIS report (report-level framing: the
+   *  census callout sentence, the PUBLISHED·FPC badge, the takeout base floor)?
+   *  A study-total universe gates on its own coverage; a per-column-only universe
+   *  keeps it (that framing is gated per column). */
+  conf.fpcActiveReport = function () {
+    if (!conf.reportHasPopulation()) return false;
+    var rr = conf.responseRate();
+    return rr ? conf.fpcApplies(rr.n, rr.N) : true;
   };
 
   /** FPC-adjusted effective base: feed straight into wilson/meanCI/z-tests.
@@ -254,7 +277,10 @@
         }
         var ciBase = (totalN > 1) ? conf.fpcBase(base, base, totalN) : base;
         var w = conf.wilsonPct(pct, ciBase);
-        if (w) best = { pct: pct, n: base, lo: w.lo, hi: w.hi, fpc: totalN > 1 };
+        // fpc flag reflects whether the correction MATERIALLY applied (drives the
+        // "for the group as a whole" vs "if we ran the survey again" tail); below
+        // the coverage floor ciBase === base, so the tail is the sample one.
+        if (w) best = { pct: pct, n: base, lo: w.lo, hi: w.hi, fpc: conf.fpcApplies(base, totalN) };
       });
     });
     return best;
@@ -291,10 +317,13 @@
    * narrow interval never reads as certainty. "" when no population is set.
    */
   function fpcNote() {
-    if (!conf.reportHasPopulation()) return "";
+    // Only when the FPC materially applies (known universe AND coverage above the
+    // floor). A thin sample with a configured population_size returns "" here, so
+    // the design sentence reads as the plain sample it is — no census framing.
+    if (!conf.fpcActiveReport()) return "";
     var rr = conf.responseRate();
     var lead = rr
-      ? " This was a near-census: about " + Math.round(rr.rate * 100) +
+      ? " About " + Math.round(rr.rate * 100) +
         "% of the " + TR.fmt.base(rr.N) + "-strong universe responded, so "
       : " Known group sizes were supplied, so ";
     return lead + "ranges include a <strong>finite population correction</strong> " +

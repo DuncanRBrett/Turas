@@ -177,7 +177,7 @@
     // is the wrong frame — a small subgroup is most of its own population, so the
     // finite-population correction makes it reliable. Use the analyst's reporting
     // floor there; keep the low-base threshold only for true samples.
-    var census = typeof conf.reportHasPopulation === "function" && conf.reportHasPopulation();
+    var census = typeof conf.fpcActiveReport === "function" && conf.fpcActiveReport();
     var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
     var cols = {};
@@ -211,8 +211,8 @@
       if (l.base > n) { n = l.base; nEff = l.baseEff > 0 ? l.baseEff : null; }
     });
     var conf = TR.conf || {};
-    var census = typeof conf.reportHasPopulation === "function"
-      ? conf.reportHasPopulation() : false;
+    var census = typeof conf.fpcActiveReport === "function"
+      ? conf.fpcActiveReport() : false;
     var labels = typeof conf.labels === "function" ? conf.labels() : {};
     var pop = (TR.AGG && TR.AGG.project && TR.AGG.project.population_size) || null;
     return {
@@ -259,7 +259,7 @@
     var weights = micro.weights || null;
     var proj = (TR.AGG && TR.AGG.project) || {};
     var conf = TR.conf || {};
-    var census = typeof conf.reportHasPopulation === "function" && conf.reportHasPopulation();
+    var census = typeof conf.fpcActiveReport === "function" && conf.fpcActiveReport();
     // Per-arm floor: in a census a subgroup is most of its own population, so the
     // analyst's reporting floor (default 5) applies; a true sample keeps n>=30.
     var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
