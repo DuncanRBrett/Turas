@@ -65,12 +65,12 @@
       (s.filters.length
         ? '<button class="fb-clear" data-fact="clear">Clear</button>' +
           '<span class="fb-n">n=' + fmt.base(n) + " of " + fmt.base(TR.MICRO.n) +
-          ' · live recompute · <em>synthetic microdata</em>' +
+          ' · live recompute' +
           (TR.d2.tracking().enabled
             ? ' · wave trends hidden while filtered (prior waves are full-sample totals)'
             : "") + "</span>"
         : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
-          ") · add a filter and every table, delta and dashboard recomputes live</span>") +
+          ") · add a filter and every table and dashboard recomputes live</span>") +
       // The weighted-bases explainer (weightingNote) renders inside the shared
       // "How to read this" panel (A4) — no longer stacked under the filter bar.
       "</div>" + discWarn + "<div id='fpicker' hidden></div>";
