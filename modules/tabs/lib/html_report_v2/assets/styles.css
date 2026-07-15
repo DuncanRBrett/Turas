@@ -296,6 +296,8 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .gauge .gspark svg { width: 100%; height: auto; display: block; }
 .gmeta { display: flex; align-items: center; gap: 6px; padding: 0 10px 9px 14px; margin-top: auto; min-height: 24px; }
 .gmeta .delta { margin-left: 0; font-size: 11px; }
+.gmeta .gn { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gmeta .gn.low { color: #a8842c; font-weight: 700; }   /* amber: base below the reporting threshold */
 .gmeta .ql-jumpbtn { position: static; padding: 1px 8px; font-size: 11px; }
 .gmeta .snap-pin { position: static; margin-left: auto; }
 /* Pin-to-story control on any pinnable card (patterns / dashboard / differences). */

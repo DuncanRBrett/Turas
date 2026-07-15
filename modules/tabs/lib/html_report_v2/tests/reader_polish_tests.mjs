@@ -142,6 +142,31 @@ run("A1: no absolutely-positioned pill/pin can overlap the score (CSS contract)"
   assert(CSS.indexOf(".gmeta {") !== -1, "meta row style present");
 });
 
+run("A1: gauge meta row carries the base (n=), amber below the reporting threshold", () => {
+  const sb = viewsSandbox();
+  const full = gaugeFixture();
+  full.model.columns[0].base = 200;
+  let html = sb.TR.views._gaugeCardHtml(full.q, full.model);
+  const metaRow = html.slice(at(html, '<span class="gmeta">', "meta row"));
+  assert(metaRow.indexOf("n=200") !== -1, "the base value shows in the meta row");
+  const nAt = at(metaRow, 'class="gn', "base chip");
+  const chipAt = at(metaRow, 'class="delta', "delta chip");
+  assert(nAt < chipAt, "the base leads the meta row, before the delta");
+  assert(metaRow.indexOf('class="gn low"') === -1, "a full base is not flagged amber");
+
+  const thin = gaugeFixture();
+  thin.model.columns[0].base = 12;   // below the default 30 threshold
+  html = sb.TR.views._gaugeCardHtml(thin.q, thin.model);
+  assert(html.indexOf('class="gn low"') !== -1, "a sub-threshold base flags amber (.low)");
+  assert(html.indexOf("n=12") !== -1, "and still shows the value");
+});
+
+// CSS: the base token is muted grey, amber when low
+run("A1: base token style — muted grey by default, amber .low", () => {
+  assert(/\.gmeta \.gn\s*\{[^}]*var\(--faint\)/.test(CSS), "n is muted grey");
+  assert(/\.gmeta \.gn\.low\s*\{[^}]*#a8842c/.test(CSS), "low base turns amber");
+});
+
 run("A2: shortLabel fallback chain — analyst label wins, title otherwise", () => {
   const sb = viewsSandbox();
   const d2 = sb.TR.d2;

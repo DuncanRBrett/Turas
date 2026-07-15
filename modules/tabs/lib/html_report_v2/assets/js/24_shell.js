@@ -338,7 +338,7 @@
     // headings / captions / prose — skip anything inside a table, whose cells are
     // harvested row-by-row below so the tabular layout survives.
     cardEl.querySelectorAll(
-      "h1,h2,h3,h4,strong,p,li,.tko-take,.tko-note,.tko-cap,.df-sentence,.df-beats,.gv,.gt"
+      "h1,h2,h3,h4,strong,p,li,.tko-take,.tko-note,.tko-cap,.df-sentence,.df-beats,.gv,.gt,.gn"
     ).forEach(function (el) {
       if (el.closest(".snap-pin") || el.closest("table")) return;
       add(el.textContent);

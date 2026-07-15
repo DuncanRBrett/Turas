@@ -171,6 +171,15 @@
         (ins.source === "insight" ? ' <span class="gi-src">analyst insight</span>' : "") +
         "</span>"
       : "";
+    // The base sits in the meta row — muted, and amber when below the reporting
+    // threshold, so thin (often conditional) touchpoints flag themselves.
+    var base = (model.columns && model.columns[0]) ? model.columns[0].base : null;
+    var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
+    var nHtml = (base !== null && base !== undefined)
+      ? '<span class="gn' + (base < lowBase ? " low" : "") + '"' +
+        (base < lowBase ? ' title="Base below the reporting threshold (' + lowBase +
+          ") — read with caution\"" : "") + ">n=" + fmt.base(base) + "</span>"
+      : "";
     return '<div class="gauge-wrap" data-snap-card style="--gc:' + gc + '">' +
       '<button class="gauge" data-goq="' + q.code + '" title="' +
       fmt.escapeHtml(q.title) +
@@ -184,7 +193,7 @@
       insHtml +
       '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(short, 120)) +
       "</span></button>" +
-      '<span class="gmeta">' +
+      '<span class="gmeta">' + nHtml +
       (row ? TR.render.deltaChip(row.delta) : "") +
       ((TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(q.code) : "") +
       '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
