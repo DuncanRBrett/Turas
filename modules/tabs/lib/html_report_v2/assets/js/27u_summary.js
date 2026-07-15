@@ -69,7 +69,7 @@
       '" title="' + fmt.escapeHtml(m.title) + intervalTip +
       ' — click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
-      fmt.escapeHtml(TR.charts.clip(m.short || m.title, 44)) + "</span>" +
+      fmt.escapeHtml(m.short || m.title) + "</span>" +   // full question text — wraps, never ellipsed
       '<span class="kpi-value">' + trk.fmtVal(last.value, true) +
       '<span class="kpi-type">' + card.type + "</span></span>" +
       chip + '<span class="kpi-spark">' + TR.render.sparkline(
