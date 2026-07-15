@@ -126,6 +126,13 @@ calculate_effective_n <- function(weights) {
 # FINITE POPULATION CORRECTION (FPC)
 # ==============================================================================
 
+# Material-coverage floor. Below this sampling fraction (n / N) the finite
+# population correction is negligible and — more to the point — the study is a
+# SAMPLE, not a census, so no correction is applied. Mirrors FPC_MIN_COVERAGE in
+# the v2 report's JS (21c_confidence.js) so the Excel crosstabs, the stats pack
+# and the interactive report always agree on when the FPC engages.
+FPC_MIN_COVERAGE <- 0.05
+
 #' Finite population correction factor
 #'
 #' When a sample of \code{n} respondents is drawn (without replacement) from a
@@ -144,6 +151,8 @@ calculate_effective_n <- function(weights) {
 #' match \code{calculate_effective_n}'s kernel style):
 #' - \code{N} missing / NA / non-finite / <= 1: returns 1 (no correction).
 #' - \code{n} missing / NA / <= 0: returns 1 (no correction).
+#' - Coverage \code{n / N <= FPC_MIN_COVERAGE} (5%): returns 1 — a thin sample is
+#'   not a census, and the correction would be negligible, so none is applied.
 #' - \code{n >= N} (full census, incl. rounding over-coverage): returns 0 — there
 #'   is nothing left to be uncertain about once everyone is measured.
 #'
@@ -163,6 +172,9 @@ calculate_fpc_factor <- function(n, N) {
   }
   if (is.null(n) || length(n) != 1L || is.na(n) || !is.finite(n) || n <= 0) {
     return(1)
+  }
+  if (n / N <= FPC_MIN_COVERAGE) {
+    return(1)   # thin sample: correction negligible -> treat as infinite-population
   }
   if (n >= N) {
     return(0)
@@ -187,6 +199,8 @@ calculate_fpc_factor <- function(n, N) {
 #' EDGE CASES:
 #' - No usable population (NA / non-finite / <= 1): returns \code{n_eff} unchanged
 #'   ⇒ byte-identical to a report with no population configured.
+#' - Coverage \code{n_actual / N <= FPC_MIN_COVERAGE} (5%): returns \code{n_eff}
+#'   unchanged — a thin sample is treated as an infinite-population sample.
 #' - \code{n_actual >= N} (full census): returns \code{Inf} ⇒ a zero-width
 #'   interval downstream (Wilson/mean-CI collapse to the point estimate).
 #'
@@ -208,6 +222,9 @@ apply_fpc <- function(n_eff, n_actual, N) {
   if (is.null(n_actual) || length(n_actual) != 1L || is.na(n_actual) ||
       !is.finite(n_actual) || n_actual <= 0) {
     return(n_eff)
+  }
+  if (n_actual / N <= FPC_MIN_COVERAGE) {
+    return(n_eff)   # thin sample: correction negligible -> effective base unchanged
   }
   if (n_actual >= N) {
     return(Inf)
