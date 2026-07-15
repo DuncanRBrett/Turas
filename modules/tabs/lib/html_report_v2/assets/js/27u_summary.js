@@ -221,11 +221,12 @@
 
     var html = ['<div class="card"><h3>Key metric scorecard · ' +
       fmt.escapeHtml(TR.AGG.project.wave) + "</h3>" +
-      "<p class='trknote'>Card colour bands the latest value against the " +
-      "tracker thresholds (green strong / amber moderate / red weak per " +
-      "metric type). Significance: proportions use the pooled z; means, " +
-      "indexes and NPS use a Welch test on the spread derived from each " +
-      "wave's published category distribution.</p>" +
+      "<p class='trknote'>Card colour shows the latest value against the " +
+      "tracker thresholds — green strong, amber moderate, red weak, by " +
+      "metric type. Change between waves is tested with the right test for " +
+      "the number: a two-proportion z-test for percentages; a Welch t-test " +
+      "for means, indexes and NPS. For those, the spread comes from each " +
+      "wave's published breakdown — the same counts that give the mean.</p>" +
       '<div class="kpis">' + cards.map(kpiCardHtml).join("") + "</div></div>"];
 
     var sm = TR.d2.state.sigMode;
@@ -244,9 +245,9 @@
       '<option value="95"' + (sm === "95" ? " selected" : "") + ">95%</option>" +
       '<option value="dual"' + (sm === "dual" ? " selected" : "") +
       ">95% + 80%</option></select></label>" +
-      '<span class="trknote">Total only · all key metrics (means Welch-' +
-      "tested on published-distribution SDs, %s pooled z) · latest wave vs " +
-      "previous</span></div></div>");
+      '<span class="trknote">Total only · all key metrics (percentages ' +
+      "z-tested; means, indexes and NPS Welch-tested, spread from each wave's " +
+      "published breakdown) · latest wave vs previous</span></div></div>");
 
     html.push('<div class="card"><div class="heathead"><h3>Significant changes · ' +
       "latest wave</h3><select data-sigseg><option value=''>All segments</option>" +

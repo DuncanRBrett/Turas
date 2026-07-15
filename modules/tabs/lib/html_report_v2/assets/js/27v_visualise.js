@@ -132,8 +132,9 @@
       "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
       "<span class='lg cb-r'>weak</span>" +
       "<span class='lg'>▲▼ coloured = significant at 95% vs the comparison " +
-      "wave — pooled z for %, Welch on published-distribution SDs for " +
-      "means/indexes/NPS</span><span class='lg'>⚠ base under " +
+      "wave — two-proportion z-test on percentages, Welch t-test on " +
+      "means/indexes/NPS (spread from each wave's published breakdown)</span>" +
+      "<span class='lg'>⚠ base under " +
       (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
   }
 
@@ -587,9 +588,9 @@
           "Explorer</button>") + "</div>" +
       '<div class="scopebar">' + modeBtn("absolute", "Absolute") +
       modeBtn("prev", "vs Previous") + modeBtn("base", "vs Baseline") +
-      '<label class="tg" title="Proportions: Wilson score interval on the ' +
-      "published base. Means, indexes and NPS: SD derived from the " +
-      'published category distribution of each wave."><input type="checkbox" data-visci' +
+      '<label class="tg" title="Percentages: Wilson score interval on the ' +
+      "published base. Means, indexes and NPS: spread taken from each wave's " +
+      'published breakdown."><input type="checkbox" data-visci' +
       (s.visCI ? " checked" : "") + (mode !== "absolute" ? " disabled" : "") +
       "> 95% " + TR.conf.labels().interval_abbrev + " bands</label>" +
       '<label class="tg">Labels <select data-vislabels>' +
@@ -615,9 +616,9 @@
         '<div class="chart-error">No data for this selection.</div>') + "</div>" +
       (s.visCI && mode === "absolute"
         ? '<p class="trknote">95% ' + TR.conf.labels().interval_term +
-          " bands — proportions: Wilson score interval on the published " +
-          "base; means, indexes and NPS: SD derived from the published " +
-          "category distribution of each wave." +
+          " bands — percentages: Wilson score interval on the published " +
+          "base; means, indexes and NPS: spread taken from each wave's " +
+          "published breakdown." +
           (TR.conf.labels().is_probability ? "" :
             " Quoted as stability intervals: this survey did not use " +
             "formal random sampling.") + "</p>"
