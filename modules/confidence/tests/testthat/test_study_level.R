@@ -307,6 +307,19 @@ test_that("calculate_fpc_factor: invalid n returns 1 (no correction)", {
   expect_equal(calculate_fpc_factor(-5, 100), 1)
 })
 
+test_that("calculate_fpc_factor: a thin sample (coverage <= 5%) gets no correction", {
+  # A sample, not a census — matches the v2 report's FPC coverage gate.
+  expect_equal(calculate_fpc_factor(396, 14563), 1)   # CCPB shape: 2.7%
+  expect_equal(calculate_fpc_factor(50, 1000), 1)     # exactly 5% -> still no correction
+  expect_lt(calculate_fpc_factor(51, 1000), 1)        # just above 5% -> a real correction
+})
+
+test_that("apply_fpc: a thin sample (coverage <= 5%) leaves the effective base unchanged", {
+  expect_equal(apply_fpc(396, 396, 14563), 396)
+  expect_equal(apply_fpc(50, 50, 1000), 50)           # exactly 5%
+  expect_gt(apply_fpc(51, 51, 1000), 51)              # just above 5% -> inflated
+})
+
 test_that("apply_fpc: inflates effective base by (N-1)/(N-n)", {
   # n=20, N=27 -> 20 * 26 / 7 = 74.2857...
   expect_equal(apply_fpc(20, 20, 27), 20 * 26 / 7, tolerance = 1e-9)

@@ -280,5 +280,47 @@ run("tested_prev separates 'flat' from 'untestable' (historical bases not loaded
   eq(lowBase[1].tested_prev, false, "prior base below the reporting threshold is untestable");
 });
 
+// ---- FPC material-coverage gate: a thin sample is not a finite-population study ----
+run("FPC gate: fpcMul is off below 5% coverage, on above, Infinity at census", () => {
+  eq(TR.conf.fpcMul(396, 14563), 1, "2.7% coverage (CCPB) -> no correction");
+  eq(TR.conf.fpcMul(200, 14563), 1, "1.4% coverage -> no correction");
+  assert(TR.conf.fpcMul(100, 200) > 1, "50% coverage -> a real correction");
+  eq(TR.conf.fpcMul(200, 200), Infinity, "full census -> Infinity (zero-width interval)");
+  eq(TR.conf.fpcMul(50, 1), 1, "no usable population -> 1");
+});
+
+run("FPC gate: fpcApplies mirrors the material floor", () => {
+  assert(!TR.conf.fpcApplies(396, 14563), "thin sample -> FPC does not materially apply");
+  assert(TR.conf.fpcApplies(120, 200), "60% coverage -> FPC applies");
+});
+
+run("FPC gate: fpcActiveReport false for a thin sample, true for a near-census", () => {
+  TR.AGG = { project: { population_size: 14563, low_base_threshold: 30 },
+    columns: [{ label: "Total" }], questions: [] };
+  TR.MICRO = { n: 396 };                                  // 2.7% coverage — CCPB shape
+  assert(!TR.conf.fpcActiveReport(), "population set but 2.7% coverage -> not a finite-population study");
+  TR.MICRO = { n: 10000 };                                 // 68.7% coverage
+  assert(TR.conf.fpcActiveReport(), "68.7% coverage -> FPC materially active");
+  TR.AGG = { project: { low_base_threshold: 30 }, columns: [{ label: "Total" }], questions: [] };
+  TR.MICRO = { n: 396 };
+  assert(!TR.conf.fpcActiveReport(), "no configured population -> not active");
+});
+
+run("FPC callout: no census/FPC framing for a thin sample; present for a near-census", () => {
+  const base = { low_base_threshold: 30, sampling_method: "Stratified" };
+  TR.AGG = { project: Object.assign({ population_size: 14563 }, base),
+    columns: [{ label: "Total" }], questions: [], banner_groups: [] };
+  TR.MICRO = { n: 396 };                                  // 2.7% — a sample
+  let html = TR.conf.calloutHtml();
+  assert(html.indexOf("finite population correction") === -1, "thin sample: no FPC sentence");
+  assert(html.indexOf("near-census") === -1, "the 'near-census' claim is gone entirely");
+  assert(html.indexOf("probability sampling, so ranges are formal") !== -1,
+    "thin sample reads as a plain probability sample");
+  TR.MICRO = { n: 10000 };                                 // 68.7% — genuinely finite-population
+  html = TR.conf.calloutHtml();
+  assert(html.indexOf("finite population correction") !== -1, "near-census: FPC sentence present");
+  assert(html.indexOf("near-census") === -1, "and still never uses the 'near-census' wording");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);

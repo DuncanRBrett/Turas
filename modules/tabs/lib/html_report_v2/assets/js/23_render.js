@@ -189,7 +189,10 @@
       // base when a universe is known (Infinity -> ±0.0pp for a full census).
       var moeBase = col.ciBase != null ? col.ciBase : col.base;
       var moe = opts.intervals && col.base ? TR.conf.maxMoePct(moeBase) : null;
-      var lowTitle = col.population != null
+      // The FPC only frames a column when it MATERIALLY applies (known universe +
+      // coverage above the floor); a thin sample reads as a plain low base.
+      var colFpc = col.population != null && TR.conf.fpcApplies(col.base, col.population);
+      var lowTitle = colFpc
         ? "Even after the finite population correction the effective base is below "
           + model.lowBaseThreshold + " — interpret with caution"
         : "Base below " + model.lowBaseThreshold + " — interpret with caution";
@@ -199,7 +202,7 @@
         : fmt.base(col.base)) +
         // Coverage of a known universe: a small base that is most of its group
         // is a near-complete count, not a fragile sample. Shown when configured.
-        (col.population != null && col.coverage != null
+        (colFpc && col.coverage != null
           ? '<div class="civ" title="' + fmt.escapeHtml(fmt.base(col.base) +
             " of " + fmt.base(col.population) + " in this group responded — its " +
             "numbers carry a finite population correction") + '">' +
