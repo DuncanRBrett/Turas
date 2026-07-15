@@ -776,7 +776,7 @@ load_crosstabs_config <- function(config_file) {
     # Checkpointing
     "enable_checkpointing",
     # Qualitative confidentiality & disclosure control
-    "qual_confidentiality_mode", "qual_demographic_cuts", "qual_noteworthy_default",
+    "qual_workbook", "qual_confidentiality_mode", "qual_demographic_cuts", "qual_noteworthy_default",
     "qual_join_id_column", "min_reporting_base", "qual_tag_dimensions",
     # Sample composition & index summary
     "create_sample_composition", "create_index_summary",

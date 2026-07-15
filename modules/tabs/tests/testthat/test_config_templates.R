@@ -141,6 +141,26 @@ test_that("crosstab config Settings sheet offers the Reader report flags", {
   expect_true("reader_ai_prose" %in% cells)
 })
 
+test_that("crosstab config Settings sheet offers the Qualitative (comment) tab settings", {
+  # Regression guard: the qual_* dials were hand-added to live configs (drift) and
+  # missing from the generator, so a fresh template could not switch on the comment tab
+  # or its host-tag / confidentiality options without the operator knowing the key names.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  settings <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  cells <- unlist(settings, use.names = FALSE)
+
+  for (k in c("qual_workbook", "qual_confidentiality_mode", "qual_demographic_cuts",
+              "qual_noteworthy_default", "qual_tag_dimensions", "qual_join_id_column")) {
+    expect_true(k %in% cells, info = paste(k, "should appear in the generated Settings sheet"))
+  }
+  # each qual dial ships a description (the operator shouldn't have to guess the choices)
+  expect_true(any(grepl("k-anonymise", cells, fixed = TRUE)))       # qual_demographic_cuts help
+  expect_true(any(grepl("S03:Centre", cells, fixed = TRUE)))        # qual_tag_dimensions example
+})
+
 test_that("crosstab config Settings sheet writes research_house in lowercase snake_case", {
   # Regression guard: this field was previously written as "Research_House",
   # which get_config_value() (an exact-match lookup) can never find since
@@ -169,9 +189,9 @@ test_that(".KNOWN_SETTINGS whitelist recognises settings that were flagged as un
   skip_if_not(exists("load_crosstabs_config", mode = "function"))
   src <- paste(deparse(body(load_crosstabs_config)), collapse = "\n")
 
-  for (setting in c("heatmap_colour", "research_house", "qual_confidentiality_mode",
+  for (setting in c("heatmap_colour", "research_house", "qual_workbook", "qual_confidentiality_mode",
                      "qual_demographic_cuts", "qual_noteworthy_default", "min_reporting_base",
-                     "qual_tag_dimensions")) {
+                     "qual_tag_dimensions", "qual_join_id_column")) {
     expect_true(
       grepl(setting, src, fixed = TRUE),
       info = sprintf("'%s' should appear in load_crosstabs_config()'s known-settings whitelist", setting)

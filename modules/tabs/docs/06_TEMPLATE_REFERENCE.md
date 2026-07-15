@@ -482,6 +482,27 @@ threshold, significance tests won't be performed for that column.
 **What 30 means:** This is a common statistical rule of thumb. You can
 lower it (to 20) if needed, but be aware results become less reliable.
 
+#### min_reporting_base
+
+**What it does:** Disclosure control — the reporting threshold *k* below
+which the report hides identifying detail so a filtered cut cannot narrow
+onto identifiable people.
+
+**Required:** No
+
+**What to enter:** An integer. `1` = off.
+
+**Default:** `1`
+
+**What it governs:** (1) the audience gate — when a live filter narrows the
+comment audience below *k*, the whole comment list (text, tags, even the
+count) is withheld; (2) the `qual_demographic_cuts = safe` tag
+k-anonymisation — a comment shows only the broadest combination of
+demographic tags that still covers ≥ *k* respondents (and, on a band-split
+question, ≥ *k* within its NPS band). `1` disables both. For a client-facing
+or sensitive study set a real floor (e.g. `30`, matching
+`significance_min_base`). See also the Qualitative (Comment) Tab settings.
+
 #### bonferroni_correction
 
 **What it does:** Controls whether to adjust for multiple comparisons.
@@ -865,6 +886,37 @@ selectivity) are configured in the auto-generated JSON sidecar file
 (`{config_name}_ai_insights.json`). See the AI Insights User Guide for
 details.
 
+### Qualitative (Comment) Tab
+
+Joins a coded-comment workbook to the survey by ResponseID and adds an
+interactive **Qualitative** tab. Full walkthrough (build the appendix →
+code → wire → run, including the NPS "why?" split and host-survey tags):
+**QUAL_COMMENT_APPENDIX_GUIDE.md**.
+
+| Setting | Description | Values | Default |
+|----|----|----|----|
+| `qual_workbook` | Path to the coded-comment workbook (Comment Appendix), relative to the config file — include the subfolder. Blank = no comment tab | e.g. `02 Data/<project> Comment Appendix.xlsx` | (blank) |
+| `qual_confidentiality_mode` | How verbatim text is shown | `hidden` (numbers only), `redacted` (auto-scrub names/emails/numbers), `full` | hidden |
+| `qual_demographic_cuts` | Demographic tags on comments | `allow` (all), `safe` (k-anonymised), `block` (none) | allow |
+| `qual_noteworthy_default` | Which noteworthy tier the comment filter opens on | `all`, `noteworthy`, `must_read`, `priority` | all |
+| `qual_tag_dimensions` | Host-survey columns shown as comment tags, via the join | comma list of `Column` or `Column:Label`, e.g. `S03:Centre, S11:Channel` | (blank) |
+| `qual_join_id_column` | Override the auto-detected respondent-id column | a column name, or blank | (blank) |
+
+**Confidentiality.** Comment tags carry re-identification risk on small
+cells, so `qual_demographic_cuts = safe` k-anonymises tag *combinations*
+against `min_reporting_base` (see Significance Testing Settings) — and does
+so *within each NPS band*, so a tag common overall but unique among (say)
+the detractors is suppressed for them. Use `safe` for any client-facing
+report that carries tags, `block` for a confidential low-sample study.
+`min_reporting_base` also withholds the whole comment list when a filtered
+cut falls below it. The default `qual_confidentiality_mode = hidden` shows
+no verbatim text — set `redacted` or `full` to display comments.
+
+**NPS "why?" split.** An open-end routed into Detractor / Passive /
+Promoter sheets is reassembled into one question via the Selection sheet's
+`CommentSheet` mapping — see `CommentSheet`, `SplitDimension` and
+`NpsScoreQuestion` under the Selection Sheet below.
+
 ------------------------------------------------------------------------
 
 ## Selection Sheet
@@ -1021,6 +1073,47 @@ processing.
 
 This column is ignored by Tabs. It's there so you can see what each
 question is without switching to the Survey_Structure file.
+
+### Column: CommentSheet
+
+**What it does:** Links an open-end question to its coded comments in the
+`qual_workbook` (see the Qualitative tab settings).
+
+**Required:** No (open-ends only)
+
+**What to enter:** The comment-workbook sheet name (e.g. `Q06Comment`). For
+an NPS-style "why?" routed into several band sheets, list them as
+`Sheet:Band; Sheet:Band; …` to reassemble into ONE question — e.g.
+`DetractorComment:Detractor; PassiveComment:Passive; PromoterComment:Promoter`
+(`:` is safe as the separator — Excel forbids it in a sheet name).
+
+### Column: CommentLink
+
+**What it does:** The closed question or composite the open-end explains —
+puts a "💬 comments" jump affordance on that card.
+
+**Required:** No (blank = a standalone/generic open-end)
+
+**What to enter:** The closed question/composite code (e.g. `Q_Engage`, `Q79`).
+
+### Column: SplitDimension
+
+**What it does:** Names the split axis of a band-split open-end (used as the
+segmented-view label and the export column header).
+
+**Required:** No (band-split open-ends only; defaults to `NPS band`)
+
+**What to enter:** e.g. `NPS band`.
+
+### Column: NpsScoreQuestion
+
+**What it does:** The 0–10 recommend question the band is DERIVED from — the
+score wins over which sheet the comment text landed in, and mismatches are
+logged to the console.
+
+**Required:** No (band-split open-ends only; defaults to the `CommentLink` target)
+
+**What to enter:** e.g. `Q79`.
 
 ------------------------------------------------------------------------
 

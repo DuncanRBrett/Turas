@@ -641,6 +641,56 @@ generate_crosstab_config_template <- function(output_path,
              description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
              valid_values_text = "Free text")
       )
+    ),
+
+    # ---- QUALITATIVE (COMMENT) TAB ----
+    # The comment tab joins a coded-comment workbook to the survey by ResponseID.
+    # Full walkthrough (build → code → wire → run, incl. the NPS split + host tags):
+    # docs/QUAL_COMMENT_APPENDIX_GUIDE.md. min_reporting_base (the disclosure k that
+    # these dials use) lives under SIGNIFICANCE TESTING above.
+    list(
+      section_name = "QUALITATIVE (COMMENT) TAB (OPTIONAL)",
+      fields = list(
+        list(name = "qual_workbook", default = "", required = FALSE,
+             description = paste0(
+               "Path to the coded-comment workbook (the Comment Appendix), relative to THIS config ",
+               "file — include the subfolder or it will not be found. Set it to switch on the ",
+               "Qualitative tab; leave blank for no comment tab."),
+             valid_values_text = "e.g. 02 Data/<project> Comment Appendix.xlsx"),
+        list(name = "qual_confidentiality_mode", default = "hidden", required = FALSE,
+             description = paste0(
+               "How verbatim text is shown: 'hidden' = numbers only (the safe default — shows NO text); ",
+               "'redacted' = auto-scrub names / emails / phone numbers; 'full' = as typed. Use 'redacted' ",
+               "or 'full' to display the comments."),
+             valid_values_text = "hidden, redacted, or full",
+             dropdown = c("hidden", "redacted", "full")),
+        list(name = "qual_demographic_cuts", default = "allow", required = FALSE,
+             description = paste0(
+               "Demographic tags on comments: 'allow' = every tag (internal use); 'safe' = k-anonymise ",
+               "tag COMBINATIONS against min_reporting_base (and within each NPS band) so small cells are ",
+               "suppressed; 'block' = no tags at all (Total-only). Use 'safe' for any client-facing report ",
+               "that carries tags, 'block' for a confidential low-sample study."),
+             valid_values_text = "allow, safe, or block",
+             dropdown = c("allow", "safe", "block")),
+        list(name = "qual_noteworthy_default", default = "all", required = FALSE,
+             description = paste0(
+               "Which noteworthy tier the comment filter opens on: 'all', 'noteworthy' (tier 1+), ",
+               "'must_read' (tier 2+), or 'priority' (tier 3 — the lead-with comments)."),
+             valid_values_text = "all, noteworthy, must_read, or priority",
+             dropdown = c("all", "noteworthy", "must_read", "priority")),
+        list(name = "qual_tag_dimensions", default = "", required = FALSE,
+             description = paste0(
+               "Host-survey columns shown as comment tags, reached via the ResponseID join — a comma ",
+               "list of 'Column' or 'Column:Label', e.g. 'S03:Centre, S11:Channel'. Governed by ",
+               "qual_demographic_cuts + min_reporting_base. Blank = only the workbook's own demographic ",
+               "columns are tagged."),
+             valid_values_text = "e.g. S03:Centre, S11:Channel"),
+        list(name = "qual_join_id_column", default = "", required = FALSE,
+             description = paste0(
+               "Override the survey's respondent-id column used to join comments to the data. ",
+               "Blank = auto-detect (matches 'ID' / 'Response ID' / 'ResponseID')."),
+             valid_values_text = "a column name, or blank to auto-detect")
+      )
     )
   )
 
