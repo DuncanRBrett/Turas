@@ -213,7 +213,7 @@ run("A5: one mean/index format — fmt.score shared by dashboard and tracking", 
     "gauge score uses fmt.score");
 });
 
-run("A4: dashboard PE box — full sentence first, ⓘ once seen", () => {
+run("A4: dashboard PE box — full sentence first, removed once seen (header ⓘ covers it)", () => {
   const sb = viewsSandbox();
   const qs = [{ code: "Q8" }];
   const heatModels = { Q8: { columns: [{ label: "Total", base: 400 },
@@ -224,8 +224,7 @@ run("A4: dashboard PE box — full sentence first, ⓘ once seen", () => {
   assert(full.indexOf("Durban") !== -1, "names the smallest cut");
   sb.__peCollapsed = true;
   const collapsed = sb.TR.views._moeChipHtml(qs, heatModels);
-  assert(collapsed.indexOf("data-legend-open") !== -1, "collapsed to the ⓘ trigger");
-  assert(collapsed.indexOf("stable to about") === -1, "long sentence gone once seen");
+  assert(collapsed === "", "dashboard PE box drops away once seen — no duplicate ⓘ (the header covers it)");
 });
 
 /* ---------------- sandbox B: reader (strip + legend + persistence) ---------------- */

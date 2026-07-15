@@ -96,12 +96,11 @@
       }
     });
     if (!overall) return "";
-    // After the first viewed session the long sentence collapses to the shared
-    // "How to read this" ⓘ (persisted per report — see reader.peCollapsed).
+    // After the first viewed session the precision sentence simply drops away on the
+    // dashboard — the header's "ⓘ How to read" button already reopens the same legend,
+    // so a second "how to read this report" link here would just duplicate it.
     if (TR.reader && TR.reader.peCollapsed()) {
-      return '<p class="moechip moechip-collapsed"><button class="linklike" ' +
-        'data-legend-open>ⓘ ' + labels.moe_name +
-        ", significance &amp; bands — how to read this report</button></p>";
+      return "";
     }
     var bits = "At n=" + fmt.base(overall) +
       ", overall percentages are stable to about ±" +
