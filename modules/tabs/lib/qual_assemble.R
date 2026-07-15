@@ -224,3 +224,83 @@ qual_resolve_against_survey <- function(questions, survey_data, id_col = NULL) {
   list(status = "PASS", master = master, matched = matched,
        total = length(wb_ids), id_column = id_column)
 }
+
+# ==============================================================================
+# HOST-SOURCED DEMOGRAPHIC TAGS (Feature 2) — tag comments with banner variables
+# ==============================================================================
+#
+# The comment workbook may carry no demographics (e.g. CCPB), but the ResponseID join
+# makes every host banner variable reachable per comment. These helpers stamp a chosen
+# host column's value onto each comment record and register the dimension on the master
+# banner, so host tags flow through the SAME demographic_cuts / k-anonymisation / island
+# machinery as an embedded workbook demographic — no separate disclosure path.
+
+#' Parse the `qual_tag_dimensions` config into host-column -> tag-label pairs.
+#'
+#' Syntax: a comma/semicolon list of "Column" or "Column:Label"
+#' (e.g. "S03:Centre, S11:Channel"). ':' separates the host column from its display label.
+#' @param cfg The config value (may be blank / "NA").
+#' @return A list of list(col, label); empty when blank.
+qual_parse_tag_dims <- function(cfg) {
+  s <- trimws(as.character(cfg))
+  if (length(s) != 1L || is.na(s) || !nzchar(s) || s == "NA") return(list())
+  parts <- trimws(strsplit(s, "[,;\n]+")[[1]])
+  parts <- parts[nzchar(parts)]
+  lapply(parts, function(p) {
+    if (grepl(":", p, fixed = TRUE)) {
+      kv <- trimws(strsplit(p, ":", fixed = TRUE)[[1]])
+      list(col = kv[[1]], label = if (length(kv) >= 2L && nzchar(kv[[2]])) kv[[2]] else kv[[1]])
+    } else {
+      list(col = p, label = p)
+    }
+  })
+}
+
+#' Attach host-survey demographic tags to each comment record.
+#'
+#' For each configured dimension (a host column + a display label) this stamps the
+#' respondent's value onto the record's `demos` bag and registers the dimension on the
+#' master banner, so it is k-anonymised and gated exactly like an embedded demographic.
+#' A dimension whose column is absent — or whose label duplicates an existing banner
+#' dimension — is skipped with a console warning (Shiny-visible).
+#'
+#' @param questions Classified questions (records carry `id` + a `demos` list).
+#' @param master The join master (`id_to_idx` + `banner_dims`).
+#' @param tag_dims list(col, label) pairs from `qual_parse_tag_dims()`.
+#' @param survey_data The host survey data frame.
+#' @return list(questions, master) with host tags stamped + banner dims registered.
+qual_attach_host_tags <- function(questions, master, tag_dims, survey_data) {
+  if (!length(tag_dims) || is.null(survey_data) || !is.data.frame(survey_data)) {
+    return(list(questions = questions, master = master))
+  }
+  id_to_idx <- master$id_to_idx
+  existing <- if (length(master$banner_dims))
+    vapply(master$banner_dims, function(d) d$label, character(1)) else character(0)
+  added <- list()
+  for (td in tag_dims) {
+    col <- td$col; label <- td$label
+    if (!(col %in% names(survey_data))) {
+      cat(sprintf("  [WARNING] qual_tag_dimensions: host column '%s' not found — skipped.\n", col))
+      next
+    }
+    taken <- c(existing, vapply(added, function(d) d$label, character(1)))
+    if (label %in% taken) {
+      cat(sprintf("  [WARNING] qual_tag_dimensions: label '%s' already a banner dimension — skipped.\n", label))
+      next
+    }
+    colvals <- as.character(survey_data[[col]])
+    for (qi in seq_along(questions)) {
+      recs <- questions[[qi]]$records
+      for (ri in seq_along(recs)) {
+        hidx <- unname(id_to_idx[recs[[ri]]$id])
+        v <- if (length(hidx) == 1L && !is.na(hidx)) colvals[hidx + 1L] else NA_character_
+        v <- if (is.null(v) || is.na(v) || !nzchar(trimws(v)) || trimws(v) == "NA") NA_character_ else trimws(v)
+        questions[[qi]]$records[[ri]]$demos[[label]] <- v
+      }
+    }
+    vals <- trimws(colvals); vals <- vals[!is.na(vals) & nzchar(vals) & vals != "NA"]
+    added[[length(added) + 1L]] <- list(label = label, values = qual_sort_ids(unique(vals)))
+  }
+  master$banner_dims <- c(master$banner_dims, added)
+  list(questions = questions, master = master)
+}

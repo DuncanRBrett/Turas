@@ -166,6 +166,32 @@ qual_kanon_tags <- function(demo_rows, labels, k) {
   res
 }
 
+#' k-anonymise demographic tags WITHIN each split band.
+#'
+#' Once a split-band segmented view exists, a respondent's band (NPS Detractor/Passive/
+#' Promoter) is a VISIBLE quasi-identifier: a tag safe across everyone can still be unique
+#' among (say) the 6 detractors. So a tag combination must clear k *within its band*, not
+#' just overall. Respondents with no band ("") form one group; with a single group this is
+#' identical to `qual_kanon_tags`, so the no-split case is unchanged.
+#'
+#' @param rows List of per-respondent demos (named list label -> value/NA), order = `ids`.
+#' @param ids Respondent ids, parallel to `rows`.
+#' @param bands Each respondent's split band ("" when none), parallel to `ids`.
+#' @param labels Demographic dimension labels to consider.
+#' @param k Reporting threshold.
+#' @return A named list (id -> k-anonymised demos), preserving `ids` order.
+qual_kanon_tags_by_group <- function(rows, ids, bands, labels, k) {
+  n <- length(ids)
+  out <- vector("list", n)
+  if (n == 0L) return(stats::setNames(out, ids))
+  groups <- split(seq_len(n), bands)
+  for (g in groups) {
+    kan <- qual_kanon_tags(rows[g], labels, k)
+    for (j in seq_along(g)) out[[g[[j]]]] <- kan[[j]]
+  }
+  stats::setNames(out, ids)
+}
+
 #' Build the island entry for one question (themed or raw).
 #' @param question A classified question from the reader.
 #' @param id_to_idx Named map from respondent id to 0-based index (the master).
@@ -238,15 +264,22 @@ qual_build_data_qual <- function(questions, master, config = list()) {
   if (identical(cuts, "safe") && length(demo_labels)) {
     k <- suppressWarnings(as.numeric(qual_cfg(config, "min_reporting_base", 1)))
     if (length(k) == 1L && !is.na(k) && k > 1) {
-      seen <- new.env(parent = emptyenv()); ids <- character(0); rows <- list()
+      # Collect each unique respondent's demos + their split band (the real, non-empty band
+      # wins if they appear in both a split and a non-split question) so tags are k-anonymised
+      # within the band — the band being a visible quasi-identifier once the segment exists.
+      band_of <- new.env(parent = emptyenv()); ids <- character(0); rows <- list()
       for (q in questions) for (rec in q$records) {
         id <- as.character(rec$id)
-        if (is.null(seen[[id]])) {
-          assign(id, TRUE, envir = seen)
+        b <- if (is.null(rec$band) || is.na(rec$band)) "" else as.character(rec$band)
+        if (!exists(id, envir = band_of, inherits = FALSE)) {
+          assign(id, b, envir = band_of)
           ids <- c(ids, id); rows[[length(rows) + 1L]] <- rec$demos
+        } else if (nzchar(b) && !nzchar(get(id, envir = band_of, inherits = FALSE))) {
+          assign(id, b, envir = band_of)                 # upgrade "" -> the real band
         }
       }
-      demo_map <- stats::setNames(qual_kanon_tags(rows, demo_labels, k), ids)
+      bands <- vapply(ids, function(id) get(id, envir = band_of, inherits = FALSE), character(1))
+      demo_map <- qual_kanon_tags_by_group(rows, ids, bands, demo_labels, k)
     }
   }
   islands <- lapply(questions,

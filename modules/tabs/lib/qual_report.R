@@ -98,6 +98,12 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
   # origin is the fallback), now that the join gives each comment its host survey row.
   read_result$questions <- qual_derive_bands(read_result$questions, unions,
                                              survey_data, joined$master$id_to_idx)
+  # Attach host-survey demographic tags (e.g. centre, channel) reachable via the join, so
+  # they get the SAME demographic_cuts / k-anonymisation / disclosure gate as workbook demos.
+  tagged <- qual_attach_host_tags(read_result$questions, joined$master,
+                                  qual_parse_tag_dims(config_obj$qual_tag_dimensions), survey_data)
+  read_result$questions <- tagged$questions
+  joined$master <- tagged$master
   island <- qual_build_data_qual(read_result$questions, joined$master, list(
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
