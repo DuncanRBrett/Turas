@@ -53,7 +53,7 @@ local({
               "question_dispatcher.R", "question_orchestrator.R", "composite_processor.R",
               "crosstabs/crosstabs_config.R", "html_report/01_data_transformer.R",
               "data_layer_writer.R", "microdata_writer.R", "html_report_v2/build_report_v2.R",
-              "qual_workbook_reader.R", "qual_workbook_io.R", "qual_assemble.R",
+              "qual_workbook_reader.R", "qual_unions.R", "qual_workbook_io.R", "qual_assemble.R",
               "qual_island_builder.R", "qual_quant_layer.R", "qual_report.R")) source(f, local = FALSE)
 })
 
