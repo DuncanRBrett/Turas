@@ -1,7 +1,21 @@
 # Per-Comment Attributes — NPS split + demographic tagging
 
-**Status:** Planning (pre-build) · **Date:** 2026-07-15 · **Owner:** Duncan Brett
+**Status:** BUILT + tested on branch `feature/tabs-comment-attributes` (verified against the
+live CCPB CSAT W2026 config/data) · Duncan wires his config + regenerates via `launch_turas`.
+· **Date:** 2026-07-15 · **Owner:** Duncan Brett
 **Module:** `tabs` (qualitative comment reporting in `html_report_v2`)
+
+> **What was built (all tested, no pipeline run on client data):**
+> - **Feature 1** — `CommentSheet` accepts a `Sheet:Band; …` mapping; band sheets reassemble
+>   into one question (`qual_unions.R`); band derived from the recommend score + reconciled
+>   (`qual_derive_bands`); All/Detractor/Passive/Promoter segmented view (`27q_qualitative.js`).
+> - **Feature 2** — `qual_tag_dimensions` attaches host-survey tags via the join
+>   (`qual_attach_host_tags`), **band-aware** k-anonymised (`qual_kanon_tags_by_group`); reader
+>   🏷 Tags on/off + per-field toggle; chips read `Label: value`.
+> - Tests: `test_qual_unions.R` (55), `test_qual_host_tags.R` (21), `qual_tests.mjs` (+25 → 203);
+>   config-template + all existing qual suites green. Config template + this guide updated.
+> - **Duncan still decides (§8):** the client-facing `min_reporting_base` floor (built with `30`
+>   as the documented default, matching `significance_min_base`).
 **Supersedes nothing; extends** `QUALITATIVE_TAB_PLAN.md` §3 (line 83 split-sheet
 spec) and §10 (confidentiality dials), and reuses the Phase-2 join from
 `QUALITATIVE_PHASE2_HANDOVER.md`.
@@ -349,14 +363,26 @@ ships without its test. Duncan regenerates the real SACS/CCPB report via
 
 ---
 
-## 9. What I did not verify (assumptions to confirm)
+## 9. CCPB ground truth (verified 2026-07-15 against the live files)
 
-- The exact CCPB Q79 sheet/column names and that it is three-band (stated in the
-  plan doc §3 line 62; not checked against live CCPB config/data — client data is
-  gitignored/OneDrive).
-- That the CCPB config identifies a 0–10 recommend score usable for derivation
-  (needed for §3.3 primary path; sheet-of-origin fallback covers its absence).
-- The house cell-size floor `k` (§8.3) — used 30 as a placeholder.
+- **Q79 is the 0–10 recommend score** (values 5–10; 10→200, 9→98, 8→64, 7→26, 6→7, 5→1).
+  Band-from-score gives ~298 Promoters / ~90 Passives / ~8 Detractors — matching the three
+  comment sheets' sizes (~262 / 76 / 6). So derivation works *and* validates the sheets.
+- **The Q79 "why?" is three sheets** in the Comment Appendix: `DetractorComment`,
+  `PassiveComment`, `PromoterComment` — band = sheet. They carry no demographics (only
+  ResponseID + verbatim), so centre/channel tags can *only* come from the host survey.
+- **The live config confirms the pain:** `Q79`'s `CommentSheet`/`CommentLink` are blank (its
+  comments are unwireable today), while `Q75` shows the single-sheet pattern.
+- **Host firmographics:** `S03` = distribution centre (Worcester DC, Paarl DC, … MLP Calvinia),
+  `S11` = channel (Tellsell / Presell / Indirect). `S10` is the *interviewer* — never tag it.
+- **House base floor:** the config sets `significance_min_base = 30`, so `min_reporting_base = 30`
+  is the natural disclosure k. The live config has `qual_demographic_cuts = allow` and
+  `min_reporting_base = True` (not a real number) — **both must change** (→ `safe`, → `30`)
+  before host tags ship on the 8-detractor base.
 
-Everything else references code read this session; no behaviour is claimed
-"working" — this is a design, to be verified stage by stage in §7.
+### CCPB wiring (what Duncan sets in `CCPB_CSAT_W2026_Crosstab_Config.xlsx`)
+
+- Selection, the `Q79` row: `CommentSheet = "DetractorComment:Detractor; PassiveComment:Passive;
+  PromoterComment:Promoter"`, `CommentLink = "Q79"` (SplitDimension/NpsScoreQuestion optional).
+- Settings: `qual_tag_dimensions = "S03:Centre, S11:Channel"`, `qual_demographic_cuts = "safe"`,
+  `min_reporting_base = "30"`, `qual_confidentiality_mode = "redacted"` (already set).
