@@ -287,7 +287,7 @@
       '<button data-act="heat-pin" class="primary">📌 Pin to story</button></span></div>' +
       "<div class='heatwrap'><table class='heatgrid'><thead><tr><th></th>"];
     first.columns.forEach(function (col) {
-      html.push("<th>" + fmt.escapeHtml(TR.charts.clip(col.label, 16)) + "</th>");
+      html.push("<th>" + fmt.escapeHtml(col.label) + "</th>");   // full banner header — wraps, never ellipsed
     });
     html.push("</tr></thead><tbody>");
     qs.forEach(function (q) {
@@ -296,7 +296,7 @@
       if (!row) return;
       html.push('<tr><td class="lab"><button class="linklike" data-goq="' + q.code +
         '" title="' + fmt.escapeHtml(q.title) + '">' +
-        fmt.escapeHtml(TR.charts.clip(TR.d2.shortLabel(q), 52)) + "</button></td>");
+        fmt.escapeHtml(TR.d2.shortLabel(q)) + "</button></td>");   // full question label — wraps in the 280px lab column
       var max = scoreMax(q);
       row.cells.forEach(function (cell, i) {
         var v = cell.mean;
