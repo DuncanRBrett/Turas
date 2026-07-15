@@ -707,5 +707,56 @@ TR.QUAL.questions[0].records[0].demos = { Centre: "Worcester DC" };   // Channel
 hostT.innerHTML = ""; qual.render(hostT);
 assert(hostT.innerHTML.indexOf("Channel:") < 0, "tags: a field absent from the record (gated in R) never appears");
 
+// ---- shortlisting keeps the list visible (no auto-collapse on first ★) --------
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
+  questions: [{ code: "QC", title: "Open", type: "raw", themes: [], base: { answered: 3 },
+    records: [
+      { idx: 0, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "alpha" },
+      { idx: 1, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "bravo" },
+      { idx: 2, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "charlie" }
+    ] }] };
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.disclosure = null;
+qual.toggleSave("QC", 1);                          // shortlist one comment
+const hostC = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+qual._state = null; qual.render(hostC);            // fresh state: showRest defaults false -> collapses
+assert(hostC.innerHTML.indexOf("Show all 3 comments") >= 0,
+  "baseline: a curated set collapses the rest when showRest is false");
+qual._state.showRest = true;                       // the state the save/highlight handlers now set
+hostC.innerHTML = ""; qual.render(hostC);
+assert(hostC.innerHTML.indexOf("Show all 3 comments") < 0,
+  "shortlisting (showRest) does not collapse the list");
+assert(hostC.innerHTML.indexOf("charlie") >= 0 && hostC.innerHTML.indexOf("bravo") >= 0,
+  "every comment stays visible after shortlisting");
+qual.toggleSave("QC", 1);                           // reset the saved store
+
+// ---- shortlist is available inside focus reading mode -------------------------
+const xfQ = { code: "FQ", title: "Why" };
+const xfRecs = [
+  { idx: 0, tier: 0, sentiment: 1, themeVals: {}, demos: { Centre: "Worcester DC" }, text: "aaa" },
+  { idx: 1, tier: 0, sentiment: 3, themeVals: {}, demos: {}, text: "bbb" }
+];
+const xfEnt = qual.focusEntries(xfRecs, xfQ);
+qual._state = { tagsOff: false, tagHide: {} };
+const xfH1 = qual.focusHtml(xfEnt, 0, { title: "Why" });
+assert(xfH1.indexOf('data-focus-save="FQ#0"') >= 0, "focus: a shortlist button reaches each entry");
+assert(xfH1.indexOf("s to shortlist") >= 0, "focus: the key hint advertises 's to shortlist'");
+assert(xfH1.indexOf("Centre: Worcester DC") >= 0, "focus: tags read 'Label: value'");
+
+qual.toggleSave("FQ", 0);
+const xfH2 = qual.focusHtml(xfEnt, 0, { title: "Why" });
+assert(xfH2.indexOf('data-focus-save="FQ#0" aria-pressed="true"') >= 0,
+  "focus: the shortlist button reflects the saved state");
+qual.toggleSave("FQ", 0);   // reset
+
+const xfHNo = qual.focusHtml(xfEnt, 0, { title: "Why", saveable: false });
+assert(xfHNo.indexOf("data-focus-save") < 0, "focus: saveable:false omits the shortlist button");
+assert(xfHNo.indexOf("s to shortlist") < 0, "focus: saveable:false drops the key hint");
+
+qual._state = { tagsOff: true, tagHide: {} };
+const xfHOff = qual.focusHtml(xfEnt, 0, { title: "Why" });
+assert(xfHOff.indexOf("Centre: Worcester DC") < 0, "focus: the reader tag toggle hides focus tags too");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

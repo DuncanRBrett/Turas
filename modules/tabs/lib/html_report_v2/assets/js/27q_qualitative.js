@@ -918,10 +918,13 @@
    *  drops the demographic chips (a below-k hub's rule travels with it). */
   qual.focusHtml = function (entries, pos, opts) {
     opts = opts || {};
+    var saveable = opts.saveable !== false;   // every current caller passes real qcode+idx
     var head = '<div class="ql-fhead"><h2 class="ql-ftitle">' + esc(opts.title || "Focus reading") + "</h2>" +
       '<span class="ql-fpos" data-focus-pos>' + (pos + 1) + " of " + entries.length + "</span>" +
-      '<span class="ql-fkeys">j / k or arrow keys to move · Esc to close</span>' +
+      '<span class="ql-fkeys">j / k or arrow keys to move · ' +
+      (saveable ? "s to shortlist · " : "") + 'Esc to close</span>' +
       '<button class="ql-fclose" data-focus-close aria-label="Close focus reading">✕</button></div>';
+    var qst = qual._state || {};
     var blocks = entries.map(function (e, i) {
       var r = e.record, sent = SENT[r.sentiment] || "neu";
       var text = r.text == null
@@ -929,12 +932,19 @@
         : qual.renderHighlighted(r.text, qual.getHighlights(e.qcode, r.idx));
       var word = SENT_WORD[r.sentiment]
         ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
-      var tags = opts.dropTags ? "" : (r.demos ? Object.keys(r.demos) : [])
-        .filter(function (k) { return r.demos[k] != null; })
-        .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
+      // Tags honour opts.dropTags (below-k hub rule) AND the reader tag toggle, "Label: value".
+      var tags = (opts.dropTags || qst.tagsOff || !r.demos) ? "" : Object.keys(r.demos)
+        .filter(function (k) { return r.demos[k] != null && !(qst.tagHide && qst.tagHide[k]); })
+        .map(function (k) { return '<span class="ql-tag">' + esc(k) + ": " + esc(r.demos[k]) + "</span>"; }).join("");
+      var saved = saveable && qual.isSaved(e.qcode, r.idx);
+      var save = saveable
+        ? '<button class="ql-fsave' + (saved ? " on" : "") + '" data-focus-save="' +
+          esc(e.qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved +
+          '" title="Shortlist this comment (s)">' + (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>"
+        : "";
       return '<blockquote class="ql-fq ' + sent + (i === pos ? " cur" : "") + '" data-fi="' + i + '" tabindex="0">' +
         '<div class="ql-fqtext">' + text + "</div>" +
-        '<div class="ql-fmeta">' + word + tags +
+        '<div class="ql-fmeta">' + save + word + tags +
         '<span class="ql-fsrc">' + esc(e.qtitle || "") + '</span><span class="ql-qid">#' + esc(r.idx) + "</span></div></blockquote>";
     }).join("");
     return head + '<div class="ql-fbody">' + blocks + "</div>";
@@ -953,6 +963,7 @@
   qual.openFocus = function (entries, opts) {
     if (typeof document === "undefined" || !entries || !entries.length) return;
     opts = opts || {};
+    var saveable = opts.saveable !== false;
     qual.closeFocus();
     var pos = 0;
     var overlay = document.createElement("div");
@@ -979,15 +990,32 @@
     function close() {
       overlay.remove();
       if (restoreFocus && restoreFocus.focus) { try { restoreFocus.focus(); } catch (e) {} }
+      if (opts.onClose) opts.onClose();   // sync the underlying drawer (new shortlists show + no collapse)
+    }
+    // Toggle the shortlist on a focus card and update its button in place (focus manages
+    // its own DOM; the drawer re-syncs on close via opts.onClose).
+    function toggleFocusSave(btn) {
+      var val = btn.getAttribute("data-focus-save"), at = val.lastIndexOf("#");
+      var on = qual.toggleSave(val.slice(0, at), parseInt(val.slice(at + 1), 10));
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on);
+      btn.textContent = on ? "✓ Shortlisted" : "＋ Shortlist";
+      if (opts.onSave) opts.onSave(on);
     }
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay || e.target.closest("[data-focus-close]")) { close(); return; }
+      var sv = e.target.closest("[data-focus-save]");
+      if (sv) { toggleFocusSave(sv); return; }        // don't also move position
       var bq = e.target.closest(".ql-fq");
       if (bq) setPos(parseInt(bq.getAttribute("data-fi"), 10));
     });
     // j/k + Esc, plus the same Tab trap as the legend panel — listeners die
     // with the overlay node, so nothing stacks across opens
     overlay.addEventListener("keydown", function (e) {
+      if (saveable && (e.key === "s" || e.key === "S")) {   // shortlist the comment being read
+        var cur = overlay.querySelector('.ql-fq[data-fi="' + pos + '"] [data-focus-save]');
+        if (cur) { e.preventDefault(); toggleFocusSave(cur); return; }
+      }
       var nav = qual.focusNav(pos, e.key, entries.length);
       if (nav.close) { e.preventDefault(); close(); return; }
       if (nav.pos !== pos) { e.preventDefault(); setPos(nav.pos); return; }
@@ -1886,14 +1914,16 @@
         var id = themeAttr(b.getAttribute("data-theme-focus"));
         var stTheme = { tier: st.tier, sentiment: st.sentiment, savedOnly: st.savedOnly, theme: id };
         qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, stTheme, v.audience), v.q),
-          { title: focusThemeLabel(v.q, id) + " — " + v.q.title, trigger: b });
+          { title: focusThemeLabel(v.q, id) + " — " + v.q.title, trigger: b,
+            onSave: function () { st.showRest = true; }, onClose: function () { qual.render(host); } });
       });
     });
     var fb = host.querySelector("[data-qual-focus]");
     if (fb) fb.addEventListener("click", function () {
       var v = qual._view;
       if (v) qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, st, v.audience), v.q),
-        { title: v.q.title, trigger: fb });
+        { title: v.q.title, trigger: fb,
+          onSave: function () { st.showRest = true; }, onClose: function () { qual.render(host); } });
     });
     var cf = host.querySelector("[data-col-focus]");
     if (cf) cf.addEventListener("click", function () {
@@ -1901,7 +1931,8 @@
       if (!v || !v.items.length) return;
       qual.openFocus(v.items.map(function (it) {
         return { record: it.record, qcode: it.qcode, qtitle: it.question.title };
-      }), { title: v.hub ? v.hub.name : "Your collection", dropTags: v.dropTags, trigger: cf });
+      }), { title: v.hub ? v.hub.name : "Your collection", dropTags: v.dropTags, trigger: cf,
+        onClose: function () { qual.render(host); } });
     });
     // curated-first: expand / re-collapse the non-selected comments
     var sa = host.querySelector("[data-qual-showall]");
@@ -1944,6 +1975,7 @@
       b.addEventListener("click", function () {
         var v = b.getAttribute("data-qual-save"), at = v.lastIndexOf("#");
         qual.toggleSave(v.slice(0, at), parseInt(v.slice(at + 1), 10));
+        st.showRest = true;   // marking a comment must never collapse the list you're reading
         qual.render(host);
       });
     });
@@ -2104,6 +2136,7 @@
       hlShowPop(range.getBoundingClientRect(), function () {
         qual.addHighlight(key.slice(0, at), parseInt(key.slice(at + 1), 10), start, end);
         hlRemovePop();
+        if (qual._state) qual._state.showRest = true;   // highlighting must not collapse the list either
         qual.render(host);
       });
     });
