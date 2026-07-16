@@ -257,42 +257,61 @@ reader_generate_ai_prose <- function(model, config_obj = list()) {
 
   facts <- reader_ai_facts(model)
   prompt <- reader_ai_prompt(facts)
-  res <- tryCatch(call_insight_model(prompt, reader_prose_schema(), ai_config),
-                  error = function(e) NULL)
-  if (is.null(res) || !is.list(res) || !nzchar(res$verdict %||% "")) {
-    cat("  [Reader AI] No usable response. Keeping the on-device narrative.\n")
-    return(fail("no usable response from the model"))
-  }
-
-  prose <- list(
-    title = as.character(res$title %||% model$prose$title),
-    subtitle = as.character(res$subtitle %||% model$prose$subtitle),
-    claims = .reader_as_leaves(res$claims),
-    verdict = as.character(res$verdict),
-    leverage = .reader_as_leaves(res$leverage),
-    limits = .reader_as_leaves(res$limits))
-
-  # Number check: every figure in the AI prose must exist in the facts we sent.
-  # Pass a clean, NA-free numeric vector as the source. The shared check treats
-  # its argument as the source pool (extract_all_numbers is identity on a numeric
-  # vector) and NA in the pool would break its any(... < tol) comparison. The
-  # pool includes the fact-sheet v2 derived-numbers and design facts (they live
-  # inside `facts`), so citing a legitimately derived figure is not a false
-  # reject (§3.6).
-  narrative <- paste(c(prose$title, prose$subtitle, prose$verdict,
-    unlist(lapply(c(prose$claims, prose$leverage, prose$limits), function(x) c(x$lead, x$body)))),
-    collapse = " ")
+  # Number-check source pool, computed once: every figure in the AI prose must
+  # exist in the facts we sent. Pass a clean, NA-free numeric vector as the
+  # source. The shared check treats its argument as the source pool
+  # (extract_all_numbers is identity on a numeric vector) and NA in the pool
+  # would break its any(... < tol) comparison. The pool includes the fact-sheet
+  # v2 derived-numbers and design facts (they live inside `facts`), so citing a
+  # legitimately derived figure is not a false reject (§3.6).
   facts_numbers <- extract_all_numbers(facts)
   facts_numbers <- c(facts_numbers, .reader_year_pool(facts))
   facts_numbers <- facts_numbers[!is.na(facts_numbers)]
-  chk <- deterministic_number_check(narrative, facts_numbers)
-  if (!isTRUE(chk$pass)) {
-    cat(sprintf("  [Reader AI] REJECTED, %s. Keeping the on-device narrative.\n",
-                chk$issues %||% "a cited number is not in the data"))
-    return(fail("a cited figure was not in the data"))
+
+  # The check is strict, and a first draft occasionally cites a figure the model
+  # computed rather than one it was given. One retry, naming the exact figures
+  # that broke the rule, rescues most such drafts; the callout pipeline does
+  # the same with verify_callout + regeneration. Two strikes and the
+  # deterministic narrative stands.
+  for (attempt in 1:2) {
+    res <- tryCatch(call_insight_model(prompt, reader_prose_schema(), ai_config),
+                    error = function(e) NULL)
+    if (is.null(res) || !is.list(res) || !nzchar(res$verdict %||% "")) {
+      cat("  [Reader AI] No usable response. Keeping the on-device narrative.\n")
+      return(fail("no usable response from the model"))
+    }
+
+    prose <- list(
+      title = as.character(res$title %||% model$prose$title),
+      subtitle = as.character(res$subtitle %||% model$prose$subtitle),
+      claims = .reader_as_leaves(res$claims),
+      verdict = as.character(res$verdict),
+      leverage = .reader_as_leaves(res$leverage),
+      limits = .reader_as_leaves(res$limits))
+
+    narrative <- paste(c(prose$title, prose$subtitle, prose$verdict,
+      unlist(lapply(c(prose$claims, prose$leverage, prose$limits), function(x) c(x$lead, x$body)))),
+      collapse = " ")
+    chk <- deterministic_number_check(narrative, facts_numbers)
+    if (isTRUE(chk$pass)) {
+      prose$model <- get_model_display_name(ai_config)
+      return(list(prose = prose, reason = NULL))
+    }
+
+    if (attempt == 1L) {
+      cat(sprintf("  [Reader AI] draft rejected (%s). Retrying once, naming the offending figures.\n",
+                  chk$issues %||% "a cited number is not in the data"))
+      prompt$user <- paste0(prompt$user,
+        "\n\nYOUR PREVIOUS DRAFT WAS REJECTED: it cited figures that are not in the facts above (",
+        chk$issues %||% "figures not present in the facts",
+        "). Rewrite the narrative citing ONLY figures that appear above, exactly as given. ",
+        "Never compute, round or combine a figure yourself.")
+    } else {
+      cat(sprintf("  [Reader AI] REJECTED, %s. Keeping the on-device narrative.\n",
+                  chk$issues %||% "a cited number is not in the data"))
+    }
   }
-  prose$model <- get_model_display_name(ai_config)
-  list(prose = prose, reason = NULL)
+  fail("a cited figure was not in the data")
 }
 
 #' Apply AI prose to the model when reader_ai_prose is on. Returns the model,

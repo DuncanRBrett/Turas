@@ -140,6 +140,26 @@ test_that("an invented number is rejected -> deterministic narrative stands", {
   expect_false(grepl("999", m$verdict$body %||% "", fixed = TRUE))
 })
 
+test_that("a rejected first draft is retried once — a clean second draft lands", {
+  skip_if_not_installed("ellmer")
+  # first call returns the miscited draft, the second a clean one; the retry
+  # prompt must name the offending figure so the model knows what broke.
+  assign(".STUB_CALLS", 0L, envir = globalenv())
+  orig <- get("call_insight_model", envir = globalenv())
+  assign("call_insight_model", function(prompt, schema, ai_config) {
+    n <- get(".STUB_CALLS", envir = globalenv()) + 1L
+    assign(".STUB_CALLS", n, envir = globalenv())
+    if (n == 2L) expect_match(prompt$user, "999", fixed = TRUE)
+    if (n == 1L) BAD else GOOD
+  }, envir = globalenv())
+  on.exit(assign("call_insight_model", orig, envir = globalenv()), add = TRUE)
+
+  m <- reader_apply_ai_prose(mk_model(), mk_cfg(reader_ai_prose = TRUE))
+  expect_equal(get(".STUB_CALLS", envir = globalenv()), 2L)  # exactly one retry
+  expect_equal(m$disclosure$mode, "ai")                      # second draft survived
+  expect_equal(m$prose$title, "A quiet slip")
+})
+
 context("reader_ai_prose: years are not treated as invented numbers")
 
 test_that("the year pool fills the span between the years the study names", {
