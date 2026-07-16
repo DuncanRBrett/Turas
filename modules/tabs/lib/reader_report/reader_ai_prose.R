@@ -217,6 +217,7 @@ reader_ai_prompt <- function(facts) {
     get0("TURAS_PROSE_VOICE", ifnotfound = ""),
     "",
     "HONESTY (hard rules). Use ONLY numbers that appear in the FACTS. Never invent, round beyond the given precision, or extrapolate a figure.",
+    "Never compute a figure of your own — no differences, sums or averages; to compare two given figures, set them side by side.",
     "Every number you write must be traceable to the facts. Small-base sub-groups are leads, not verdicts — say so. Do not name a cause the data can't support.",
     "",
     "STRUCTURE. Return: a title; a one-sentence subtitle; the argument as 3-5 ordered claims (lead phrase + a sentence or two);",

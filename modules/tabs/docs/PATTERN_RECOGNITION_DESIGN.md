@@ -375,7 +375,7 @@ Confident-null marker (the SACS case): `{ id:'odd', kind:'odd', nullResult:true,
 
 `PATTERN_META.odd = { tag:'The odd one out', cls:'odd' }`.
 
-**Takeaway (firing):** `"<Group> runs <below|above> the overall almost everywhere — yet on '<title>' it is unexpectedly <higher|lower> (<value> vs <total>, +<gap> against its usual <meanGap>). The exception worth explaining."` Badge on a surviving flip: `"exception · survives multiplicity correction"`.
+**Takeaway (firing):** `"<Group> runs <below|above> the overall almost everywhere — yet on '<title>' it is unexpectedly <higher|lower> (<value> vs <total>, +<gap> against its usual <meanGap>)."` Badge on a surviving flip: `"exception · survives multiplicity correction"`.
 
 **Confident-null line (SACS):** `"No group breaks its own pattern — every exception is either too small to matter or sits on a census cell too thin to trust."` Caption: `"scanned 19 groups × 20 rated questions = 380 cells · corrected for multiplicity (Benjamini-Hochberg) · an exception must oppose the group's own direction, clear 0.30 scale points, and survive correction · 0 survive."`
 

@@ -103,7 +103,7 @@
       return lead + " — yet rates “" + hi.label + "” highest" +
         (hi.peerTop && hi.peerCount > 1 ? " of any " + p.group.toLowerCase() : "") +
         " (" + Number(hi.value).toFixed(1) + " vs " + Number(hi.rest).toFixed(1) +
-        " overall). The tension worth explaining.";
+        " overall).";
     }
     if (!strained && lo) {
       return lead + " — yet dips on “" + lo.label + "” (" + Number(lo.value).toFixed(1) +
@@ -239,7 +239,7 @@
       return p.column + " runs " + (low ? "below" : "above") + " the overall almost everywhere — yet on " +
         "“" + f.qtitle + "” it is unexpectedly " + (low ? "higher" : "lower") + " (" +
         Number(f.value).toFixed(1) + " vs " + Number(f.total).toFixed(1) + ", against its usual " +
-        (f.meanGap >= 0 ? "+" : "−") + Math.abs(f.meanGap).toFixed(2) + "). The exception worth explaining.";
+        (f.meanGap >= 0 ? "+" : "−") + Math.abs(f.meanGap).toFixed(2) + ").";
     }
     if (p.id === "bimodal") {
       if (p.nullResult) return "No hidden disagreement — every question's average reflects a single camp, not two.";

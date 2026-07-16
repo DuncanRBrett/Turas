@@ -289,7 +289,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
 
   prose <- list(
     title = as.character(proj$name %||% config_obj$project_title %||% "Reader report"),
-    subtitle = sprintf("The story in the numbers%s.",
+    subtitle = sprintf("Every figure below comes from the survey data%s.",
                        if (!is.na(ref_year)) sprintf(", tracked against %s", ref_year) else ""),
     claims = claims,
     limits = list(
