@@ -176,6 +176,7 @@ GUI tick-box for option 2):
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
+| `html_report_v2_microdata` | `Y` | Embed the anonymised per-respondent microdata island. `N` = the **confidentiality ship**: an aggregates-only file for insider populations (see Anonymisation & governance) — the live filter, custom banners, COMPUTED views and the Tracking tab switch off for that build. Only an explicit `N`/`FALSE` disables; blank keeps the island. |
 | `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. Weighted studies are supported (the wave trend is weighted to match the crosstab). |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
 | `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…) — robust to renames — and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
@@ -211,6 +212,20 @@ onward; a back-catalogue can be produced by running each historical wave once.)
   backfill artifacts are git-ignored; treat `_wave.json` / `_microdata.json` as
   client-confidential and store them with the client's project, not in source
   control.
+- **Anonymised ≠ unidentifiable for insiders.** The coded records decode against
+  the labels shipped in the same file, so a recipient who *knows the population*
+  (an employer reading a small staff survey) can re-identify small cells from
+  banner-variable combinations and then read that respondent's full answer
+  vector. The display k-gate (`min_reporting_base`) governs what *renders*, not
+  what ships in the page source. For those ships set
+  `html_report_v2_microdata = N`: the file then carries published aggregates
+  only — the same confidentiality as a printed report. Costs: no live filter,
+  custom banners or COMPUTED views; the Tracking tab is skipped for that build
+  and no `_wave.json` is written (keep the wave file from your full build).
+  Recommended workflow: **two configs** — your own working copy with microdata
+  ON, the client copy with it OFF — and pair the client copy with the qual
+  dials (`qual_confidentiality_mode` hidden, `qual_demographic_cuts = block`)
+  for a fully source-safe ship.
 
 ---
 

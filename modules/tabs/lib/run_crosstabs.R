@@ -772,7 +772,11 @@ if (.html_report_v2_on) {
       # Anonymised microdata island (per-respondent indices + weights) so the
       # live filter bar + "+ Custom…" banner light up and recompute weighted
       # figures; NULL on failure degrades the report to published-only.
-      micro <- tryCatch(
+      # html_report_v2_microdata = FALSE omits the island DELIBERATELY: the
+      # aggregates-only confidentiality ship (no per-respondent records in the
+      # file) for insider populations where coded records could re-identify.
+      .micro_wanted <- !isFALSE(config_result$config_obj$html_report_v2_microdata)
+      micro <- if (!.micro_wanted) NULL else tryCatch(
         build_microdata(dl, data_result$survey_data, data_result$survey_structure,
                         analysis_result$banner_info, config_result$config_obj),
         error = function(e) {
@@ -781,11 +785,26 @@ if (.html_report_v2_on) {
           NULL
         })
 
-      # Disclosure needs the microdata base to gate sub-k cuts. If the operator asked
-      # for a threshold but micro didn't build, the renderer fails CLOSED (all detail
-      # hidden) — warn loudly so the operator knows the filtered views are gone by design.
       .mrb <- suppressWarnings(as.numeric(config_result$config_obj$min_reporting_base))
-      if (is.null(micro) && length(.mrb) == 1L && !is.na(.mrb) && .mrb > 1) {
+      .mrb_set <- length(.mrb) == 1L && !is.na(.mrb) && .mrb > 1
+      if (!.micro_wanted) {
+        # Deliberate omission — record the confidentiality trade in the console
+        # so the operator can see exactly what this ship does and doesn't carry.
+        cat("\n  Microdata island: OMITTED by config (html_report_v2_microdata = FALSE).\n")
+        cat("    Confidentiality ship: the report file carries no per-respondent records.\n")
+        cat("    Published figures only — live filter, custom banners and COMPUTED views are off.\n")
+        if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
+          cat("    Tracking tab: skipped this build (the live wave needs microdata); no *_wave.json written.\n")
+        }
+        if (.mrb_set) {
+          cat("    Disclosure detail panels: hidden (fail-closed without a microdata base).\n")
+        }
+        cat("\n")
+      } else if (is.null(micro) && .mrb_set) {
+        # Disclosure needs the microdata base to gate sub-k cuts. If the operator asked
+        # for a threshold but micro didn't build (UNEXPECTEDLY — the deliberate omission
+        # above speaks for itself), the renderer fails CLOSED (all detail hidden) — warn
+        # loudly so the operator knows the filtered views are gone by design.
         cat("\n[WARNING] Disclosure threshold (min_reporting_base =", .mrb,
             ") is set but the microdata island is unavailable.\n")
         cat("  The report hides ALL identifying detail (fail-closed). Restore the microdata to re-enable filtered views.\n\n")

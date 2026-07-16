@@ -141,6 +141,29 @@ test_that("fills every token and embeds the data island", {
   expect_false(grepl('(src|href)="https?://', html))
 })
 
+test_that("no-micro ship (html_report_v2_microdata = FALSE): null island, NO respondent records", {
+  # The flag ships exactly this: micro NULL -> serialize_microdata(NULL) ==
+  # "null" -> a null DATA_MICRO island. The confidentiality guarantee is
+  # NEGATIVE, so assert the ABSENCE of microdata markers in the built HTML —
+  # not just the presence of "null" somewhere (which is vacuously true).
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  json <- serialize_data_layer(dl)
+
+  html_off <- build_report_v2_html(json, make_dl_config(), assets_dir,
+                                   micro_json = "null")
+  expect_false(grepl("\"banner_vars\"", html_off, fixed = TRUE))
+  expect_false(grepl("\"weights\"", html_off, fixed = TRUE))
+
+  # The same build WITH a micro payload embeds those markers — proving the
+  # negative assertions above are meaningful, not green-by-construction.
+  micro_json <- paste0('{"n":2,"answers":{"Q1":[0,1]},',
+                       '"banner_vars":{"Gender":[0,1]},"weights":[1,1]}')
+  html_on <- build_report_v2_html(json, make_dl_config(), assets_dir,
+                                  micro_json = micro_json)
+  expect_true(grepl("\"banner_vars\"", html_on, fixed = TRUE))
+  expect_true(grepl("\"weights\"", html_on, fixed = TRUE))
+})
+
 test_that("escapes </ inside the embedded JSON so it cannot break the script", {
   q <- make_dl_q_single()
   q$question_text <- "Closing tag </script> attempt"

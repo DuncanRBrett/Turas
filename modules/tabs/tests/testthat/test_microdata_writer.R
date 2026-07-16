@@ -232,6 +232,13 @@ test_that("the payload carries only indices/weights — no raw answers or ids", 
   expect_true(grepl("\"answers\"", json) && grepl("\"weights\"", json))
 })
 
+test_that("serialize_microdata(NULL) is the literal 'null' island (no-micro ship contract)", {
+  # run_crosstabs passes serialize_microdata(micro) straight to the bundler;
+  # the html_report_v2_microdata = FALSE path relies on NULL -> "null" so the
+  # DATA_MICRO island is null and every TR.MICRO consumer degrades cleanly.
+  expect_identical(as.character(serialize_microdata(NULL)), "null")
+})
+
 test_that("serialize_microdata renders answers as length-n arrays (n=1 safe)", {
   one <- list(n = 1, answers = list(Q1 = I(c(2L))), banner_vars = list(), weights = I(c(1)))
   expect_match(serialize_microdata(one), "\"Q1\":\\[2\\]")

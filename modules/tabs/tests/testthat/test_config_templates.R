@@ -225,6 +225,26 @@ test_that("build_config_object loads qual_tag_dimensions through to the config o
   expect_equal(build_config_object(list())$qual_tag_dimensions, "")
 })
 
+test_that("html_report_v2_microdata: default TRUE, explicit FALSE honoured, junk cannot flip it", {
+  # The no-micro confidentiality flag (aggregates-only client ships). Only an
+  # explicit FALSE may omit the island: a blank Settings cell reaches the
+  # loader as the string "NA" (stringification gotcha), and junk must not
+  # silently strip the live filter / custom banners from every report.
+  skip_if_not(exists("build_config_object", mode = "function"))
+
+  expect_true(build_config_object(list())$html_report_v2_microdata)   # unset -> TRUE
+  expect_false(build_config_object(list(html_report_v2_microdata = "FALSE"))$html_report_v2_microdata)
+  expect_false(build_config_object(list(html_report_v2_microdata = "No"))$html_report_v2_microdata)
+  expect_true(build_config_object(list(html_report_v2_microdata = "TRUE"))$html_report_v2_microdata)
+  expect_true(build_config_object(list(html_report_v2_microdata = "NA"))$html_report_v2_microdata)
+})
+
+test_that("html_report_v2_microdata is registered in the known-settings whitelist", {
+  skip_if_not(exists("load_crosstabs_config", mode = "function"))
+  src <- paste(deparse(body(load_crosstabs_config)), collapse = "\n")
+  expect_true(grepl("html_report_v2_microdata", src, fixed = TRUE))
+})
+
 test_that("build_config_object defaults research_house sensibly when unset", {
   skip_if_not(exists("build_config_object", mode = "function"))
   config_obj <- build_config_object(list())

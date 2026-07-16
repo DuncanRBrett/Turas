@@ -226,6 +226,14 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Additive: when TRUE, a *_data.json island is written alongside the
     # existing Excel/HTML outputs. Old paths are untouched when FALSE.
     html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE)),
+    # V13 confidentiality dial (ON by default = today's behaviour). FALSE omits
+    # the anonymised per-respondent DATA_MICRO island from the v2 report — the
+    # aggregates-only ship for insider populations (small staff surveys) where
+    # coded records + banner cuts could re-identify individuals. Only an
+    # explicit FALSE disables: blank/junk cells keep the island (default TRUE
+    # passed to safe_logical too, so a stringified-"NA" cell cannot flip it).
+    html_report_v2_microdata = safe_logical(
+      get_config_value(config, "html_report_v2_microdata", TRUE), default = TRUE),
     # V11 tabs-integrated tracker (OFF by default). When TRUE AND a waves_source
     # resolves, the v2 report gains a Tracking tab built from anonymised per-wave
     # microdata. Independent of the standalone tracker module, which is untouched.
@@ -786,6 +794,7 @@ load_crosstabs_config <- function(config_file) {
     "generate_stats_pack",
     # HTML report
     "html_report", "html_report_v2", "html_report_v2_tracking",
+    "html_report_v2_microdata",
     "waves_source", "question_mapping", "wave_order", "sampling_method",
     "population_size", "wave",
     # Reader report (narrative summary, rides on html_report_v2)
