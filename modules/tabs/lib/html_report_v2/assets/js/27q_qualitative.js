@@ -497,18 +497,46 @@
     return { curated: curated, rest: rest };
   };
 
-  /** Up to `cap` championed quotes for a theme (C2): shortlisted first, then
-   *  highest noteworthy tier. Hidden-text records never champion. */
+  /** Up to `cap` championed quotes for a theme (C2). The rule (fix #1) — so the
+   *  inline pair is never arbitrary:
+   *    1. the analyst's shortlist always leads (explicit editorial picks win);
+   *    2. the remaining slots fill as a BALANCED SPREAD — one positive, one
+   *       negative — so the reader sees the theme's range, not just its loudest
+   *       side. Mixed/uncoded are the fallback, so a one-sided theme simply fills
+   *       from the sentiment that exists (its dominant lean), best tier first.
+   *  Within any bucket the order is noteworthy tier desc, then comment ID asc —
+   *  a stable, deterministic tie-break (never source array order). Hidden-text
+   *  records never champion. */
   qual.championQuotes = function (records, themeId, qcode, cap) {
     cap = cap > 0 ? cap : 2;
     var pool = qual.recordsForTheme(records, themeId)
       .filter(function (r) { return r.text != null; });
-    pool.sort(function (a, b) {
-      var sa = qual.isSaved(qcode, a.idx) ? 1 : 0, sb = qual.isSaved(qcode, b.idx) ? 1 : 0;
-      if (sa !== sb) return sb - sa;
-      return (b.tier || 0) - (a.tier || 0);
-    });
-    return pool.slice(0, cap);
+    if (!pool.length) return [];
+    var byTier = function (a, b) {
+      if ((b.tier || 0) !== (a.tier || 0)) return (b.tier || 0) - (a.tier || 0);
+      return a.idx - b.idx;                          // stable, deterministic tie-break
+    };
+    // 1. the analyst's shortlist leads, outright — even two same-sentiment picks
+    var saved = pool.filter(function (r) { return qual.isSaved(qcode, r.idx); }).sort(byTier);
+    var chosen = saved.slice(0, cap);
+    if (chosen.length >= cap) return chosen;
+    var taken = {}; chosen.forEach(function (r) { taken[r.idx] = 1; });
+    // 2. balanced spread over the rest: prefer the polarity not yet on screen
+    var rest = pool.filter(function (r) { return !taken[r.idx]; });
+    var pos = rest.filter(function (r) { return r.sentiment === 1; }).sort(byTier);
+    var neg = rest.filter(function (r) { return r.sentiment === 3; }).sort(byTier);
+    var neu = rest.filter(function (r) { return r.sentiment !== 1 && r.sentiment !== 3; }).sort(byTier);
+    var hasPos = chosen.some(function (r) { return r.sentiment === 1; });
+    var hasNeg = chosen.some(function (r) { return r.sentiment === 3; });
+    var queues = (hasPos && !hasNeg) ? [neg, pos, neu]    // already positive -> lead with a negative
+               : [pos, neg, neu];                         // default / already-negative -> positive first
+    var i = 0;
+    while (chosen.length < cap && (pos.length || neg.length || neu.length)) {
+      var qq = queues[i % queues.length];
+      if (qq.length) chosen.push(qq.shift());
+      i++;
+    }
+    return chosen;
   };
 
   /** j/k + arrow-key navigation for the focus reading mode (C4). Pure: given
@@ -1094,7 +1122,8 @@
                       theme: null, sentiment: null, band: null, tagsOff: false, tagHide: {},
                       railGroups: {}, railHidden: false, savedOnly: false,
                       themeView: "overview", xmode: "salience", xbanner: null, xexpand: null, xcounts: false,
-                      view: "question", groupBy: "question", hub: null, hubEditing: null, showRest: false };
+                      view: "question", groupBy: "question", hub: null, hubEditing: null, showRest: false,
+                      showChampions: false };
     }
     var st = qual._state;
     // The focused open-end lives in d2.state so it round-trips through the URL hash
@@ -1188,7 +1217,13 @@
           ? crosstabHtml(island, q, st, audience)
           : prevalenceHtml(q, st, audience));
     }
-    return headerHtml(island, q, audience) + chart +
+    // Clear separator + scroll anchor (fix #4): mark where the chart ends and the
+    // comments begin, so the section start is unmissable and the header's jump
+    // button lands here. Themed only — raw questions show comments immediately.
+    var divider = q.type === "themed"
+      ? '<div class="ql-secdivider" id="ql-comments-anchor"><span class="ql-seclabel">💬 The comments</span></div>'
+      : "";
+    return headerHtml(island, q, audience) + chart + divider +
       controlsHtml(q, st, audience, island) +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
   }
@@ -1216,9 +1251,15 @@
         '<span class="ql-covtrack"><span class="ql-covfill" style="width:' + c.pct + '%"></span></span>' +
         c.pct + "% of comments themed</span>";
     }
+    // Skip-to-comments (fix #4): a themed question pushes the comment list below the
+    // chart, so offer a jump straight to it (the section is anchored below the chart).
+    var jump = q.type === "themed"
+      ? '<button class="ql-jumpcomments" data-jump-comments ' +
+        'title="Skip the chart — jump to the comments and their filters">↓ Jump to comments</button>'
+      : "";
     return '<header class="ql-head"><h2 class="ql-title">' + esc(q.title) + '</h2>' + headlineHtml +
       '<div class="ql-meta"><span class="ql-badge">' + badge + '</span>' +
-      '<span class="ql-base">' + n + '</span>' + cov + qual.closedStatChip(q.code) + shield + '</div></header>';
+      '<span class="ql-base">' + n + '</span>' + cov + qual.closedStatChip(q.code) + shield + jump + '</div></header>';
   }
 
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
@@ -1302,7 +1343,10 @@
         '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
         "⬇ Export</button>") + "</div>";
     // Labelled "Filter the comments below" — these narrow the LIST, not the chart above.
-    return '<div class="ql-controls"><span class="ql-ctrllbl">Filter the comments below:</span>' +
+    // On themed questions the section divider above already separates it, so drop the
+    // controls' own top rule to avoid a double line (fix #4).
+    var undivided = q.type === "themed" ? " undivided" : "";
+    return '<div class="ql-controls' + undivided + '"><span class="ql-ctrllbl">Filter the comments below:</span>' +
       band + tier + sent + tagctl + actions +
       (gated ? '<span class="ql-disclosure">🛡 ' + esc(TR.disclosure.note()) + "</span>" : "") + "</div>";
   }
@@ -1340,13 +1384,17 @@
            r.pos + " positive, " + r.neu + " mixed, " + r.neg + " negative)")
         : (r.label + " — " + r.n + " of " + audience.length + " raised it unprompted (" +
            r.pos + " positive, " + r.neu + " mixed, " + r.neg + " negative)");
-      // 1–2 championed quotes inline (C2): the analyst's shortlist first, else
-      // the highest noteworthy tier — reached only ABOVE the disclosure gate.
-      var champ = qual.championQuotes(audience, r.id, q.code, 2).map(function (c) {
-        return '<div class="ql-champq ' + (SENT[c.sentiment] || "neu") + '">“' + esc(c.text) +
-          '”<span class="ql-champid">#' + esc(c.idx) +
+      // 1–2 championed quotes inline (C2), gated behind the inline-comments toggle
+      // (fix #3, default off) so the chart overview stays clean until asked for.
+      // Selection is the balanced-spread rule (fix #1, see qual.championQuotes);
+      // the text is clamped to 3 lines (fix #2, see .ql-champtext) so a long
+      // comment can't blow out the card. Reached only ABOVE the disclosure gate.
+      var champ = st.showChampions ? qual.championQuotes(audience, r.id, q.code, 2).map(function (c) {
+        return '<div class="ql-champq ' + (SENT[c.sentiment] || "neu") + '">' +
+          '<span class="ql-champtext">“' + esc(c.text) + '”</span>' +
+          '<span class="ql-champid">#' + esc(c.idx) +
           (qual.isSaved(q.code, c.idx) ? " · shortlisted" : "") + "</span></div>";
-      }).join("");
+      }).join("") : "";
       return '<div class="ql-tcard"><div class="ql-trow">' +
         '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" title="' + esc(title) + '">' +
           '<span class="ql-plabel' + (other ? " other" : "") + '">' + esc(r.label) + "</span>" + bar +
@@ -1372,13 +1420,25 @@
     }
     var axis = '<div class="ql-daxis"><span></span>' +
       '<span class="ql-dends"><span>← more negative</span><span>more positive →</span></span></div>';
-    return '<div class="ql-board"><div class="ql-boardhd">What people raised' +
-      '<span class="ql-hint"> — ranked by salience (% of the ' + audience.length +
+    // Inline-comments toggle (fix #3): off by default, so the board opens as a
+    // clean overview; ticking it reveals the balanced-spread example comments and
+    // a one-line note (fix #1) making the selection rule visible to the reader.
+    var champChecked = st.showChampions ? " checked" : "";
+    var tools = '<label class="ql-inlinetoggle" title="Show a couple of example comments beneath each theme bar">' +
+      '<input type="checkbox" data-champtoggle' + champChecked + "> Show example comments</label>";
+    var champRule = st.showChampions
+      ? '<span class="ql-hint ql-champrule">Examples show one positive + one negative comment per theme; ' +
+        "your ★ shortlisted picks always lead.</span>"
+      : "";
+    return '<div class="ql-board"><div class="ql-boardhd">' +
+      '<div class="ql-boardhdrow"><span class="ql-boardttl">What people raised</span>' +
+      '<div class="ql-boardtools">' + tools + "</div></div>" +
+      '<span class="ql-hint">Ranked by salience (% of the ' + audience.length +
       ' who raised each theme <b>unprompted</b>, right). Each bar is the sentiment <i>mix</i> ' +
       'of that theme’s comments, so every theme is equal width and the lean shows the balance: ' +
       '<b class="qc-neg">negative</b> left, <b class="qc-pos">positive</b> right, ' +
       '<b class="qc-neu">mixed</b> centre; net = net sentiment %. ' +
-      "Click a theme to read its comments.</span>" +
+      "Click a theme to read its comments.</span>" + champRule +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
   }
 
@@ -1943,6 +2003,15 @@
         qual.clearJump();
         if (TR.shell && TR.shell.goQuestion) TR.shell.goQuestion(b.getAttribute("data-qual-return"));
       });
+    });
+    // inline-comments toggle (fix #3): show/hide the example comments under each bar
+    var champT = host.querySelector("[data-champtoggle]");
+    if (champT) champT.addEventListener("change", function () { st.showChampions = champT.checked; qual.render(host); });
+    // jump-to-comments (fix #4): scroll straight to the comments section anchor
+    var jumpC = host.querySelector("[data-jump-comments]");
+    if (jumpC) jumpC.addEventListener("click", function () {
+      var anchor = host.querySelector("#ql-comments-anchor");
+      if (anchor && anchor.scrollIntoView) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     // theme x banner crosstab: view switch, banner + metric, row expand, insight
     host.querySelectorAll("[data-themeview]").forEach(function (b) {

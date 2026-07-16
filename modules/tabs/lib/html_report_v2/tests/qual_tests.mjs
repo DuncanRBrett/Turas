@@ -474,17 +474,44 @@ TR.AGG = { project: {}, questions: [{ code: "QO", headline: "Agg headline" }] };
 assert(qual.headlineFor({ code: "QO" }) === "Agg headline", "headlineFor falls back to the AGG entry (defensive)");
 assert(qual.headlineFor({ code: "ZZ" }) === "", "headlineFor is empty when no headline anywhere");
 
-// championed quotes: shortlist first, then highest tier; hidden text never champions
+// championed quotes (fix #1): the analyst shortlist leads, then a BALANCED
+// spread — one positive + one negative — so the inline pair shows the theme's
+// range, not just its loudest side. Hidden text never champions.
 const champRecs = [
-  { idx: 0, tier: 0, sentiment: 1, themeVals: { "0": 1 }, text: "ok" },
-  { idx: 1, tier: 2, sentiment: 3, themeVals: { "0": 3 }, text: "bad" },
-  { idx: 2, tier: 1, sentiment: 1, themeVals: { "0": 1 }, text: "nice" },
-  { idx: 3, tier: 2, sentiment: 1, themeVals: { "0": 1 }, text: null }
+  { idx: 0, tier: 0, sentiment: 1, themeVals: { "0": 1 }, text: "ok" },      // pos
+  { idx: 1, tier: 2, sentiment: 3, themeVals: { "0": 3 }, text: "bad" },      // neg, must-read
+  { idx: 2, tier: 1, sentiment: 1, themeVals: { "0": 1 }, text: "nice" },     // pos, noteworthy
+  { idx: 3, tier: 2, sentiment: 1, themeVals: { "0": 1 }, text: null }        // hidden -> never
 ];
+// no shortlist: a balanced pair, one positive + one negative, hidden text excluded
+const balanced = qual.championQuotes(champRecs, 0, "CHQX", 2);
+assert(balanced.length === 2 && balanced.some((r) => r.sentiment === 1) && balanced.some((r) => r.sentiment === 3),
+  "championQuotes default: a balanced spread — one positive, one negative");
+assert(balanced.every((r) => r.text != null), "championQuotes never champions a hidden-text record");
+
+// one-sided theme (only positives) falls back to the dominant sentiment, best tier first
+const posOnly = [
+  { idx: 0, tier: 0, sentiment: 1, themeVals: { "0": 1 }, text: "ok" },
+  { idx: 1, tier: 2, sentiment: 1, themeVals: { "0": 1 }, text: "excellent" },
+  { idx: 2, tier: 1, sentiment: 1, themeVals: { "0": 1 }, text: "nice" }
+];
+const oneSided = qual.championQuotes(posOnly, 0, "CHQP", 2);
+assert(oneSided.length === 2 && oneSided[0].idx === 1 && oneSided[1].idx === 2,
+  "championQuotes one-sided: fills from the dominant sentiment, highest tier first");
+
+// the analyst shortlist always overrides the balance heuristic — even two positives win
 qual.toggleSave("CHQ", 0);
+qual.toggleSave("CHQ", 2);
 const champs = qual.championQuotes(champRecs, 0, "CHQ", 2);
-assert(champs.length === 2 && champs[0].idx === 0, "championQuotes: the shortlisted comment champions first");
-assert(champs[1].idx === 1, "championQuotes: then the highest tier (a hidden-text must-read never champions)");
+assert(champs.length === 2 && champs.every((r) => qual.isSaved("CHQ", r.idx)),
+  "championQuotes: two shortlisted picks win outright, over the balance heuristic");
+
+// a SINGLE shortlisted pick still yields a balanced pair — the fill prefers the
+// opposite polarity so the reader sees both sides
+qual.toggleSave("CHQB", 0);
+const mixed = qual.championQuotes(champRecs, 0, "CHQB", 2);
+assert(mixed.length === 2 && mixed[0].idx === 0 && mixed[1].sentiment === 3,
+  "championQuotes: one shortlisted positive is paired with a negative for balance");
 
 // ---- Reader C3 — everything else + coverage ----------------------------------
 console.log("\nReader C3 — everything else + coverage:");
@@ -559,8 +586,22 @@ assert(ch.indexOf("Rated 78.3 · n=106") >= 0 && ch.indexOf('data-qual-return="Q
   "the closed-stat chip renders in the header and links back to Q28");
 assert(ch.indexOf("Everything else") >= 0 && ch.indexOf('data-theme="__else__"') >= 0,
   "unthemed comments get a first-class Everything else card");
-assert(ch.indexOf("“great value”") >= 0 && ch.indexOf("ql-champq") >= 0,
-  "theme cards carry championed quotes inline (highest tier for Price)");
+// fix #3: inline comments are OFF by default — a clean chart overview, no champions
+assert(ch.indexOf("ql-champq") < 0, "inline example comments are off by default (no champions until toggled)");
+assert(ch.indexOf("data-champtoggle") >= 0, "fix #3: the Show-example-comments toggle renders on the board");
+// fix #4: a jump-to-comments button up top + a clearly separated, anchored comments section
+assert(ch.indexOf("data-jump-comments") >= 0, "fix #4: a jump-to-comments button renders in the header");
+assert(ch.indexOf('id="ql-comments-anchor"') >= 0 && ch.indexOf("ql-secdivider") >= 0,
+  "fix #4: the comments section is marked by a separated, anchored divider");
+
+// turn the inline comments on: the balanced-spread examples now render under each theme
+qual._state.showChampions = true;
+qual.render(host);
+ch = host.innerHTML;
+assert(ch.indexOf("ql-champtext") >= 0 && ch.indexOf("Examples show one positive + one negative") >= 0,
+  "fix #1/#2: with examples on, champions render (clamped .ql-champtext) under the stated selection rule");
+assert(ch.indexOf("“great value”") >= 0,
+  "theme cards carry a championed quote inline once examples are shown (Price)");
 assert(ch.indexOf("“slow support”") >= 0,
   "the shortlisted comment champions its theme (Support)");
 assert(ch.indexOf("★ Analyst’s selection") >= 0, "curated comments lead under the Analyst's selection rubric");
