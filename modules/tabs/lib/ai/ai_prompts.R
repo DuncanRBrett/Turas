@@ -51,10 +51,7 @@ AI_SYSTEM_PROMPT <- paste0(
   "- Describe what the data shows, not what it means strategically. ",
   "\"Eastern Cape scores 23% good/excellent on delivery, compared ",
   "to 66% in Gauteng\" is your job. \"The company needs to ",
-  "investigate its Eastern Cape logistics\" is the researcher's job.\n",
-  "- Do not use: \"delve\", \"dive into\", \"unpack\", \"landscape\", ",
-  "\"nuanced\", \"robust\" (unless statistical), \"leverage\", ",
-  "\"holistic\", \"key takeaway\", \"it is worth noting\"."
+  "investigate its Eastern Cape logistics\" is the researcher's job."
 )
 
 
@@ -169,8 +166,7 @@ AI_EXEC_NARRATIVE_USER_PROMPT_TEMPLATE <- paste0(
 
   "Write 3-5 paragraphs. Lead with the most commercially important ",
   "finding. Prioritise cross-question patterns over question-by-",
-  "question recital. Use \"the data suggests\" not \"the data proves\". ",
-  "End with a forward-looking question the data raises.\n\n",
+  "question recital. Use \"the data suggests\" not \"the data proves\".\n\n",
 
   "STUDY CONTEXT:\n{study_context_json}\n\n",
   "KEY PATTERNS IDENTIFIED:\n{patterns_json}\n\n",
@@ -197,6 +193,14 @@ build_insight_prompt <- function(data, study_context, prompt_type) {
 
   json_opts <- list(auto_unbox = TRUE, digits = 4, pretty = FALSE)
 
+  # Append the shared prose-voice fragment to the SYSTEM prompt of the prose
+  # calls only (not the verification / selectivity QA calls). Defensive get0:
+  # if ai_voice.R was not sourced, degrade to no-voice rather than erroring.
+  .with_voice <- function(system) {
+    v <- get0("TURAS_PROSE_VOICE", ifnotfound = "")
+    if (nzchar(v)) paste0(system, "\n\n", v) else system
+  }
+
   switch(prompt_type,
 
     "ai_callout" = {
@@ -207,7 +211,7 @@ build_insight_prompt <- function(data, study_context, prompt_type) {
       user <- gsub("{study_context_json}", as.character(ctx_json), user, fixed = TRUE)
       user <- gsub("{question_data_json}", as.character(q_json), user, fixed = TRUE)
 
-      list(system = AI_SYSTEM_PROMPT, user = user)
+      list(system = .with_voice(AI_SYSTEM_PROMPT), user = user)
     },
 
     "verification" = {
@@ -238,7 +242,7 @@ build_insight_prompt <- function(data, study_context, prompt_type) {
       user <- gsub("{study_context_json}", as.character(ctx_json), user, fixed = TRUE)
       user <- gsub("{all_questions_json}", as.character(all_json), user, fixed = TRUE)
 
-      list(system = AI_EXEC_PATTERNS_SYSTEM_PROMPT, user = user)
+      list(system = .with_voice(AI_EXEC_PATTERNS_SYSTEM_PROMPT), user = user)
     },
 
     "exec_narrative" = {
@@ -251,7 +255,7 @@ build_insight_prompt <- function(data, study_context, prompt_type) {
       user <- gsub("{patterns_json}", as.character(patterns_json), user, fixed = TRUE)
       user <- gsub("{all_questions_json}", as.character(all_json), user, fixed = TRUE)
 
-      list(system = AI_EXEC_NARRATIVE_SYSTEM_PROMPT, user = user)
+      list(system = .with_voice(AI_EXEC_NARRATIVE_SYSTEM_PROMPT), user = user)
     },
 
     # Unknown prompt type

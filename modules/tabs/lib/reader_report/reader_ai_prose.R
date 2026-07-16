@@ -30,6 +30,9 @@ if (!exists("%||%", mode = "function")) {
       exists("deterministic_number_check", mode = "function")) return(TRUE)
   lib <- get0(".tabs_lib_dir", ifnotfound = file.path("modules", "tabs", "lib"))
   shared_ai <- file.path(dirname(dirname(lib)), "shared", "lib", "ai")
+  # the prose-voice fragment is optional — its absence must not disable the layer
+  voice_p <- file.path(shared_ai, "ai_voice.R")
+  if (file.exists(voice_p)) source(voice_p, local = FALSE)
   ok <- TRUE
   for (f in c("ai_utils.R", "ai_provider.R", "ai_verify.R")) {
     p <- file.path(shared_ai, f)
@@ -211,10 +214,7 @@ reader_ai_prompt <- function(facts) {
     "You are a sharp South African market-research analyst writing the reader-facing narrative for a survey report.",
     "Your job is to find the STORY in the figures — the through-line, the argument a decision-maker can act on — not to restate the numbers.",
     "",
-    "VOICE. Write like a smart, experienced person talking straight to the reader. Short, clear sentences; no padding.",
-    "Dry and plain, never a consultancy slide. Say the point in ordinary words. Banned: em-dash pile-ups; showy triads;",
-    "aphoristic one-liners as filler; 'delve', 'unpack', 'landscape', 'journey', 'leverage', 'robust', 'nuanced', 'holistic';",
-    "'it's worth noting', 'at the end of the day'. South African English spelling (colour, organisation, behaviour). Contractions are fine.",
+    get0("TURAS_PROSE_VOICE", ifnotfound = ""),
     "",
     "HONESTY (hard rules). Use ONLY numbers that appear in the FACTS. Never invent, round beyond the given precision, or extrapolate a figure.",
     "Every number you write must be traceable to the facts. Small-base sub-groups are leads, not verdicts — say so. Do not name a cause the data can't support.",

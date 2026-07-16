@@ -387,6 +387,7 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
         if (!nzchar(turas_root_dir)) turas_root_dir <- getwd()
 
         source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_provider.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_voice.R"), local = FALSE)
         source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_schemas.R"), local = FALSE)
         source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_utils.R"), local = FALSE)
         source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_verify.R"), local = FALSE)
