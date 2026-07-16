@@ -154,5 +154,51 @@ run("no meta -> fields are omitted but the note and methodology still render", (
     "the auto-generated methodology block is kept below the note");
 });
 
+console.log("\nReport tab — read-only authored sections (config-sourced):");
+
+run("background + exec render read-only from the config, one paragraph per line", () => {
+  const TR = boot(undefined, {
+    background: "Why we ran it.",
+    exec_summary: "First finding.\nSecond finding."
+  });
+  const h = TR.report.sectionsHtml();
+  assert(h.indexOf("<textarea") < 0, "no editable textarea remains");
+  assert(h.indexOf("<h3>Background & method</h3>") >= 0, "background card renders");
+  assert(h.indexOf("<p>Why we ran it.</p>") >= 0, "background text as a paragraph");
+  assert(h.indexOf("<p>First finding.</p><p>Second finding.</p>") >= 0,
+    "multi-line exec splits into paragraphs");
+});
+
+run("populated sections are pinnable to the story (declarative snap markup)", () => {
+  const h = boot(undefined, { exec_summary: "Only exec." }).report.sectionsHtml();
+  assert(h.split("data-snap-pin").length - 1 === 1, "exactly one pin (the populated card)");
+  assert(h.indexOf('data-snap-source="report"') >= 0, "pin is tagged source=report");
+  assert(h.indexOf('data-snap-title="Executive summary"') >= 0, "pin carries the section title");
+  assert(h.split(" data-snap-card").length - 1 === 1, "only the populated card is snapshottable");
+});
+
+run("an unset section shows the config hint instead of an editor", () => {
+  const h = boot(undefined, { exec_summary: "Only exec." }).report.sectionsHtml();
+  assert(h.indexOf("_BACKGROUND") >= 0, "the hint names the Comments-sheet row");
+  const none = boot(undefined, undefined).report.sectionsHtml();
+  assert(none.indexOf("_BACKGROUND") >= 0 && none.indexOf("_EXECUTIVE_SUMMARY") >= 0,
+    "both hints when nothing is authored");
+  assert(none.indexOf("data-snap-pin") < 0, "nothing to pin on an unauthored report");
+});
+
+run("the fieldwork fallback still supplies Background & method", () => {
+  const h = boot(undefined, { fieldwork: "May 2026" }).report.sectionsHtml();
+  assert(h.indexOf("<p>Fieldwork: May 2026.</p>") >= 0, "the fieldwork line renders");
+});
+
+run("sectionText is config-only — legacy stored edits are ignored", () => {
+  const TR = boot(undefined, { exec_summary: "CFG TEXT" });
+  TR.userState = { report: { sections: { exec: "OLD LOCAL EDIT" }, about: {}, slides: [] } };
+  assert(TR.report.sectionText("exec") === "CFG TEXT",
+    "the config value wins over stored analyst edits");
+  assert(boot(undefined, undefined).report.sectionText("exec") === "",
+    "empty when the config authors nothing");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

@@ -116,21 +116,23 @@ run("D1: cover opens only when userState AND content — all four combinations",
     true, "saved copy + story pins");
 });
 
-run("D1: an authored exec summary or background alone is cover content", () => {
-  const exec = coverSandbox({ userState: { report: {
-    sections: { exec: "The findings that matter." }, about: {}, slides: [] } } });
-  eq(exec.TR.reader.coverAvailable(), true, "exec summary alone");
-  const bg = coverSandbox({ userState: { report: {
-    sections: { background: "Fieldwork in May." }, about: {}, slides: [] } } });
-  eq(bg.TR.reader.coverAvailable(), true, "background alone");
-  const blank = coverSandbox({ userState: { report: {
-    sections: { exec: "   " }, about: {}, slides: [] } } });
+run("D1: a config-authored exec summary or background alone is cover content", () => {
+  // Sections are authored in the config (report_meta from the Comments sheet)
+  // and read-only in the app — the cover reads the SAME value the Report tab
+  // shows, so config sections alone (on a saved copy) are content…
+  const exec = coverSandbox({ userState: {},
+    project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
+  eq(exec.TR.reader.coverAvailable(), true, "config exec summary alone");
+  const bg = coverSandbox({ userState: {},
+    project: { name: "P", report_meta: { background: "Fieldwork in May." } } });
+  eq(bg.TR.reader.coverAvailable(), true, "config background alone");
+  const blank = coverSandbox({ userState: {},
+    project: { name: "P", report_meta: { exec_summary: "   " } } });
   eq(blank.TR.reader.coverAvailable(), false, "whitespace-only section is not content");
-  // config-authored sections (report_meta from the Comments sheet) count too —
-  // the cover reads the SAME effective value the Report tab shows
-  const cfg = coverSandbox({ userState: {},
-    project: { name: "P", report_meta: { exec_summary: "Config-authored summary." } } });
-  eq(cfg.TR.reader.coverAvailable(), true, "config _EXECUTIVE_SUMMARY counts on a saved copy");
+  // …and legacy locally-typed sections in stored state no longer count
+  const legacy = coverSandbox({ userState: { report: {
+    sections: { exec: "Old locally-typed summary." }, about: {}, slides: [] } } });
+  eq(legacy.TR.reader.coverAvailable(), false, "legacy stored edits are ignored");
 });
 
 /* ---------------- D1: landing decision + routing ---------------- */
@@ -203,8 +205,11 @@ const COVER_OPTS = {
       { kind: "question", q: "Q8", banner: "", filters: [],
         flags: { chart: false, table: true, insight: true }, note: "" }
     ],
-    report: { sections: { exec: "Line one.\nLine two." }, about: {}, slides: [] }
+    // legacy locally-typed section — ignored now that sections are config-authored
+    report: { sections: { exec: "STALE LOCAL EDIT" }, about: {}, slides: [] }
   },
+  project: { name: "CCS 2026", client: "CCS", wave: "Wave 2",
+    report_meta: { exec_summary: "Line one.\nLine two." } },
   questions: [{ code: "Q8", title: "How was registration?",
     headline: "Registration is the pain point" }],
   models: { Q8: { code: "Q8", title: "How was registration?", rows: [], columns: [] } }
@@ -217,6 +222,8 @@ run("D1: cover = title/client/wave + authored sections + explore action", () => 
   assert(name < sub, "title above the client/wave line");
   at(html, "<h3>Executive summary</h3><p>Line one.</p><p>Line two.</p>",
     "authored exec summary as paragraphs");
+  assert(html.indexOf("STALE LOCAL EDIT") === -1,
+    "a legacy locally-typed section never reaches the cover");
   assert(html.indexOf("Background &amp; method") === -1,
     "unauthored section omitted, never an empty card");
   assert(count(html, "data-cover-explore") >= 1, "Explore the dashboard action present");

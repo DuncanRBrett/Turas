@@ -1,10 +1,10 @@
 /**
  * v2 Report tab — the narrative wrapper around the numbers: background &
- * method, executive summary, added slides (text blocks or imported images,
+ * method and executive summary (authored in the config, read-only here,
+ * pinnable to the story), added slides (text blocks or imported images,
  * e.g. from a qual phase), and About (analyst + contact from the config, the
  * standard report-construction note) plus the auto-generated methodology
- * notes. All sections are editable, persist locally, and travel inside saved
- * report copies.
+ * notes. Added slides persist locally and travel inside saved report copies.
  *
  * Also owns "Save copy": clones this document with the user's insights,
  * story and report sections embedded, so the saved .html opens for anyone
@@ -20,11 +20,10 @@
   var KEY = "turas_v2_report";
   var cache = null;
 
+  // [key, card title, the config Comments-sheet row that authors it]
   var SECTIONS = [
-    ["background", "Background & method",
-      "Why the study was run, who was interviewed, fieldwork dates, method notes…"],
-    ["exec", "Executive summary",
-      "The findings that matter, in the analyst's words…"]
+    ["background", "Background & method", "_BACKGROUND"],
+    ["exec", "Executive summary", "_EXECUTIVE_SUMMARY"]
   ];
   var ABOUT_FIELDS = [
     ["analyst", "Analyst / author"],
@@ -91,13 +90,12 @@
 
   report.data = function () { return store(); };
 
-  /** Effective text of a narrative section — the analyst's typed text when
-   *  the key exists (even ""), else the config default. The cover (24a)
-   *  reads the same value the Report tab shows. */
-  report.sectionText = function (sec) {
-    var s = store();
-    return sec in s.sections ? s.sections[sec] : sectionDefault(sec);
-  };
+  /** Effective text of a narrative section — authored by the report author in
+   *  the config (project.report_meta via the Comments sheet) and read-only in
+   *  the app, so this is always the config value. Legacy section edits in
+   *  stored state are deliberately ignored. The cover (24a) reads the same
+   *  value the Report tab shows. */
+  report.sectionText = function (sec) { return sectionDefault(sec); };
 
   /* Defaults imported from the config (project.report_meta) — shown until the
    * analyst types their own. A field set in localStorage (even to "") wins, so
@@ -125,17 +123,12 @@
     var s = store();
     var html = ['<div class="page">'];
     html.push('<div class="card"><h2>Report</h2><p>The narrative around the numbers. ' +
-      "Background &amp; method and the Executive summary are editable, saved in " +
-      "this browser, and embedded in <strong>saved copies</strong> of the report " +
-      "— use <em>Save copy</em> (top right) to produce a single .html with your " +
-      "insights, story and these sections baked in, ready to send.</p></div>");
-    SECTIONS.forEach(function (sec) {
-      var secVal = sec[0] in s.sections ? s.sections[sec[0]] : sectionDefault(sec[0]);
-      html.push('<div class="card"><h3>' + sec[1] + "</h3>" +
-        '<textarea class="rpt-section" data-section="' + sec[0] +
-        '" placeholder="' + fmt.escapeHtml(sec[2]) + '">' +
-        fmt.escapeHtml(secVal) + "</textarea></div>");
-    });
+      "Background &amp; method and the Executive summary are written by the " +
+      "report author in the project configuration and appear on the cover of " +
+      "saved copies — pin either card (📌) to add it to the story. Use " +
+      "<em>Save copy</em> (top right) to produce a single .html with your " +
+      "insights and story baked in, ready to send.</p></div>");
+    html.push(report.sectionsHtml());
 
     // AI-assisted key findings (read-only, labelled) — shown only when present.
     html.push(TR.ai.execSummaryHtml());
@@ -172,6 +165,33 @@
     wrap.innerHTML = html.join("");
     host.replaceChildren(wrap);
     wire(wrap);
+  };
+
+  /** Background & method + Executive summary — authored by the report author
+   * in the config (Comments sheet _BACKGROUND / _EXECUTIVE_SUMMARY rows, with
+   * the fieldwork-dates fallback) and rendered read-only, one paragraph per
+   * line. A populated card is a data-snap-card with the standard snap-pin, so
+   * the section can be pinned to the story — the shell's document-level
+   * handler (24_shell) does the capture; no wiring here. A pure function of
+   * the data island so it is unit-testable. */
+  report.sectionsHtml = function () {
+    return SECTIONS.map(function (sec) {
+      var text = String(sectionDefault(sec[0]) || "").trim();
+      var body = text
+        ? text.split(/\n+/).map(function (p) {
+            return "<p>" + fmt.escapeHtml(p) + "</p>";
+          }).join("")
+        : '<p class="hint">Not set — the report author writes this in the ' +
+          "config file (Comments sheet, " + sec[2] + " row).</p>";
+      return '<div class="card rpt-sec-card"' + (text ? " data-snap-card" : "") +
+        "><h3>" + sec[1] + "</h3>" +
+        (text
+          ? '<button class="snap-pin" data-snap-pin data-snap-source="report" ' +
+            'data-snap-title="' + fmt.escapeHtml(sec[1]) + '" data-snap-context="" ' +
+            'title="Pin this section to the story" ' +
+            'aria-label="Pin section to story">📌</button>'
+          : "") + body + "</div>";
+    }).join("");
   };
 
   /** The About card: analyst + contact (config-fed, shown when set), then the
@@ -285,10 +305,6 @@
 
   function wire(host) {
     host.addEventListener("input", function (e) {
-      if (e.target.classList.contains("rpt-section")) {
-        store().sections[e.target.getAttribute("data-section")] = e.target.value;
-        persist();
-      }
       if (e.target.classList.contains("as-title")) {
         var slide = e.target.closest(".added-slide");
         store().slides[parseInt(slide.getAttribute("data-i"), 10)].title = e.target.value;

@@ -579,7 +579,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .divider-title { letter-spacing: 1px; text-transform: uppercase; font-size: 13px; color: var(--brand); }
 .pr-divider { text-align: center; padding: 120px 0; }
 .pr-divider h1 { font-size: 40px; }
-.rpt-section { width: 100%; min-height: 110px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 13px; font: 13px var(--font); resize: vertical; }
+.rpt-sec-card { position: relative; }   /* anchors the absolute snap-pin */
 .rpt-field { display: flex; gap: 10px; align-items: center; margin: 7px 0; }
 .rpt-field label { width: 200px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .rpt-field input { flex: 1; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; font: 12.5px var(--font); }
