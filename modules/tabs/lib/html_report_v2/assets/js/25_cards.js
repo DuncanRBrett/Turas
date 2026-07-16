@@ -574,9 +574,7 @@
     html += TR.ai.calloutHtml(model.code);
 
     var bannerName = TR.d2.bannerDescription().replace("Banner: ", "");
-    html += '<div class="insight"><div class="insight-head">Analyst insight · ' +
-      fmt.escapeHtml(TR.charts.clip(bannerName, 30)) +
-      ' <span class="hint">banner-specific, falls back to the general note · saved locally · in saved copies</span></div>' +
+    html += '<div class="insight"><div class="insight-head">Insight</div>' +
       '<textarea id="insight-box" placeholder="Insight for ' + model.code +
       " (" + fmt.escapeHtml(TR.charts.clip(bannerName, 24)) + ")…\">" +
       fmt.escapeHtml(TR.insights.get(model.code, s.banner)) + "</textarea></div></article>";
@@ -617,11 +615,19 @@
       '<span class="callout-ico">i</span> Reading this table' +
       '<span class="callout-chev">▼</span></button><div class="callout-body"><ul>' +
       "<li><strong>Heatmap</strong> — cell shading scales with the value within each row.</li>" +
-      "<li><strong>PUBLISHED / COMPUTED</strong> — published figures are the report of record; filtered or custom-banner figures recompute live and are badged.</li>" +
+      "<li><strong>PUBLISHED / COMPUTED</strong> — ‘Published’ figures are the " +
+      "official numbers of record, worked out when the report was built. The moment " +
+      "you apply a filter or build your own banner, Turas recalculates from the " +
+      "underlying responses and marks the result ‘Computed’ — so you always know " +
+      "whether you're seeing the signed-off figures or a live cut of the data.</li>" +
       "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots the full published history.</li>" +
       '<li>Significance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score ' +
       'bands are explained in <button class="linklike" data-legend-open>ⓘ How to ' +
       "read this report</button>.</li>" +
+      "<li><strong>Insight</strong> — jot your own note on the question in the " +
+      "Insight box at the foot of the card. It's kept for the banner you're viewing " +
+      "(each banner has its own; a blank one falls back to the question's general " +
+      "note), saved in this browser, and carried into any saved copy.</li>" +
       "</ul></div></div>" +
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +
@@ -629,8 +635,11 @@
       "<p>Column percentages are compared pairwise within the banner using a " +
       "<strong>two-proportion pooled z-test</strong> — at 95% confidence, plus an " +
       "optional 80% level shown as lowercase letters (the tabs dual-significance " +
-      "convention). Letters are only awarded when expected counts are ≥ 5 in both " +
-      "columns and both bases are at least " + p.low_base_threshold + ". Index " +
+      "convention). Letters are only awarded when the category being compared is " +
+      "common enough for the z-test to be reliable — in each column at least five " +
+      "respondents are expected to fall in the category and at least five outside " +
+      "it (at the two columns' pooled rate) — and both bases are at least " +
+      p.low_base_threshold + ". Index " +
       "means use <strong>Welch's t-test</strong> on banded scores. Year-on-year " +
       "chips test this wave's Total against the prior wave's Total.</p></div></div>" +
       TR.conf.calloutHtml();

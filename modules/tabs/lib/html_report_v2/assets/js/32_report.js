@@ -188,8 +188,8 @@
       ". Published figures are the report of record; filtered and custom-banner " +
       "views recompute live from embedded respondent-level data and are badged " +
       "COMPUTED. Significance: two-proportion pooled z-test at 95% (optional 80% " +
-      "lowercase letters), expected counts ≥ 5, bases under " + p.low_base_threshold +
-      " excluded and flagged ⚠. " +
+      "lowercase letters), expected cell counts ≥ 5 (in and out of the category), " +
+      "bases under " + p.low_base_threshold + " excluded and flagged ⚠. " +
       (TR.MICRO && TR.MICRO.synthetic
         ? "This prototype's respondent data is SYNTHETIC, fitted to the published " +
           "tables (Campus crosses exact; other banners mean |error| " +

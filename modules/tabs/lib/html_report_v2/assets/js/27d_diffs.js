@@ -383,8 +383,8 @@
       "groups they beat; averages show whether they sit above or below the rest " +
       "(" + (dual ? "95%, plus nearly-significant differences at 80%" : "95% level") +
       ", this wave; year-on-year changes live in Tracking). Classification questions " +
-      "— demographics, firmographics — are left out: they describe the groups, not " +
-      "what they think.</p>" +
+      "(such as demographics or firmographics) describe the groups, not what they " +
+      "think and so are left out.</p>" +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' +
       '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +

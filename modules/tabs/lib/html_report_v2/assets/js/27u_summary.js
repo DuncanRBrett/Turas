@@ -239,10 +239,7 @@
       fmt.escapeHtml(TR.AGG.project.wave) + "</h3>" +
       "<p class='trknote'>Card colour shows the latest value against the " +
       "tracker thresholds — green strong, amber moderate, red weak, by " +
-      "metric type. Change between waves is tested with the right test for " +
-      "the number: a two-proportion z-test for percentages; a Welch t-test " +
-      "for means, indexes and NPS. For those, the spread comes from each " +
-      "wave's published breakdown — the same counts that give the mean.</p>" +
+      "metric type.</p>" +
       '<div class="kpis">' + cards.map(kpiCardHtml).join("") + "</div></div>"];
 
     var sm = TR.d2.state.sigMode;
@@ -261,9 +258,8 @@
       '<option value="95"' + (sm === "95" ? " selected" : "") + ">95%</option>" +
       '<option value="dual"' + (sm === "dual" ? " selected" : "") +
       ">95% + 80%</option></select></label>" +
-      '<span class="trknote">Total only · all key metrics (percentages ' +
-      "z-tested; means, indexes and NPS Welch-tested, spread from each wave's " +
-      "published breakdown) · latest wave vs previous</span></div></div>");
+      '<span class="trknote">Total only · all key metrics · latest wave vs ' +
+      "previous</span></div></div>");
 
     html.push('<div class="card"><div class="heathead"><h3>Significant changes · ' +
       "latest wave</h3><select data-sigseg><option value=''>All segments</option>" +
@@ -297,7 +293,24 @@
     }
 
     html.push(matrixHtml());
+    // How-tested detail lives in a small collapsed callout at the foot of the
+    // scorecard — off the headline, but one click away for anyone who wants the
+    // method behind the wave-on-wave chips.
+    html.push('<div class="callout collapsed footer-callout">' +
+      '<button class="callout-head" data-callout>' +
+      '<span class="callout-ico">σ</span> How wave-on-wave changes are tested' +
+      '<span class="callout-chev">▼</span></button><div class="callout-body">' +
+      "<p>Change between waves is tested with the right test for the number: a " +
+      "two-proportion z-test for percentages; a Welch t-test for means, indexes " +
+      "and NPS. For those, the spread comes from each wave's published breakdown " +
+      "— the same counts that give the mean.</p></div></div>");
     host.innerHTML = html.join("");
+
+    host.querySelectorAll("[data-callout]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        el.closest(".callout").classList.toggle("collapsed");
+      });
+    });
 
     var applySegFilter = function () {
       host.querySelectorAll(".sigcard").forEach(function (el) {

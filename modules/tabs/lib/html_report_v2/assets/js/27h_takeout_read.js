@@ -29,8 +29,7 @@
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +
       '<div class="tko-eyebrow">The big picture</div>' +
       ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer — editable", seed) +
-      "</div>" + (kpis ? '<div class="tko-apex-metrics">' + kpis + "</div>" : "") + "</div>" +
-      ui.reliabilityRibbon(t.reliability) + "</div>";
+      "</div>" + (kpis ? '<div class="tko-apex-metrics">' + kpis + "</div>" : "") + "</div></div>";
   }
 
   /** Heading line for a pattern card (subject + context). */
