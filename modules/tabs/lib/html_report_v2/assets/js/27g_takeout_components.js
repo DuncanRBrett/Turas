@@ -297,7 +297,8 @@
       fmt.escapeHtml(text) + "</div>";
   };
 
-  /** Reliability ribbon: how much to trust the page, in one honest line. */
+  /** Reliability ribbon: how much to trust the page, in one honest line.
+   *  Rendered in the read-view footer, above the provenance line (27h). */
   ui.reliabilityRibbon = function (rel) {
     if (!rel || !rel.n) return "";
     var parts = [(rel.census ? "Census" : "Sample"), "n = " + fmt.base(rel.n)];
