@@ -178,6 +178,31 @@
     return summary.length ? summary : detail;
   }
 
+  /** Signed change label in the metric's own units: means/indexes/NPS
+   *  get one decimal ("+0.2"), percentages whole pp ("+3"); the caller
+   *  appends "pp" per series. Mirrors the tracker table's changeText. */
+  function fmtDelta(v, isMean) {
+    if (v === null || v === undefined) return "–";
+    var mag = isMean ? (Math.round(Math.abs(v) * 10) / 10).toFixed(1)
+      : String(Math.round(Math.abs(v)));
+    var sign = v > 1e-4 ? "+" : v < -1e-4 ? "−" : "";
+    return sign + mag;
+  }
+  render._fmtDelta = fmtDelta;   // exposed for the delta node suite
+
+  /** Nice symmetric half-range for a delta axis. niceMax floors at 5 —
+   *  right for absolute percentages, 16× too coarse for ±0.3 mean-point
+   *  changes, which it squashed into a flat line at zero. */
+  function niceDeltaMax(value) {
+    if (!(value > 0)) return 1;
+    var steps = [0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5];
+    for (var i = 0; i < steps.length; i++) {
+      if (value <= steps[i]) return steps[i];
+    }
+    return S.niceMax(value);
+  }
+  render._niceDeltaMax = niceDeltaMax;   // exposed for the delta node suite
+
   /** Least-squares linear fit over {x, y} pairs: {slope, intercept},
    *  or null with fewer than 2 points or no spread in x. */
   function olsFit(pts) {
@@ -222,7 +247,10 @@
    *   note: axis note override, annotations: [{year, label}] (dashed
    *   markers), clickable: data-year attrs on points for tagging,
    *   trendline: dashed least-squares fit line per series (Visualise
-   *   toggle — passed only in Absolute mode)}.
+   *   toggle — passed only in Absolute mode),
+   *   delta: change-mode chart (vs Previous / vs Baseline) — symmetric
+   *   zero-centred axis sized to the changes, signed unit-true labels
+   *   ("+0.2" mean points, "+3pp"), the zero gridline emphasised}.
    */
   render.trendChart = function (model, opts) {
     opts = opts || {};
@@ -238,8 +266,11 @@
     rows = (meanScale ? small : pct).slice(0, 6);
     var dropped = trendRows(model).length - rows.length;
 
+    // row.isMean matters only on delta pseudo rows (27v forces their kind
+    // to "net" so they never join the anchored 0-10 mean axis, but their
+    // labels must still format in the metric's own units).
     var series = rows.map(function (r) {
-      return { label: r.label, isMean: r.kind === "mean", row: r,
+      return { label: r.label, isMean: r.kind === "mean" || !!r.isMean, row: r,
         points: render.wavePoints(r), sigNow: !!(r.delta && r.delta.sig) };
     });
     var years = [];
@@ -256,13 +287,25 @@
         if (p.value > hi) hi = p.value;
       });
     });
-    var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
-    var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+    var delta = !!opts.delta;
+    var axisMax, axisMin;
+    if (delta) {
+      // change chart: symmetric about zero, sized to the changes — the
+      // 5-floor of niceMax squashed ±0.3 mean-point moves into a flat line
+      axisMax = niceDeltaMax(Math.max(Math.abs(lo), Math.abs(hi)));
+      axisMin = -axisMax;
+    } else {
+      axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
+      axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+    }
     if (opts.yMax !== undefined && opts.yMax !== null) axisMax = opts.yMax;
     if (opts.yMin !== undefined && opts.yMin !== null) axisMin = opts.yMin;
     if (axisMax <= axisMin) axisMax = axisMin + 1;
     // % suffix only when every plotted series is a proportion
     var pctAxis = rows.every(function (r) { return r.kind !== "mean"; });
+    // delta ticks carry "pp" only when every series is a proportion; a
+    // mixed-unit selection leaves the axis bare (the footer names units)
+    var deltaUnit = series.every(function (s) { return !s.isMean; }) ? "pp" : "";
 
     var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 30;
     var plotW = W - padL - padR, plotH = H - padT - padB;
@@ -277,11 +320,14 @@
     var body = [];
     [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
       var v = axisMin + (axisMax - axisMin) * f;
+      // delta charts emphasise the zero line (mid-axis), not the floor
+      var isBase = delta ? Math.abs(v) < 1e-9 : f === 0;
       body.push(S.el("line", { x1: padL, y1: yOf(v), x2: padL + plotW,
-        y2: yOf(v), stroke: f === 0 ? "#d8dcea" : "#eef0f7" }));
+        y2: yOf(v), stroke: isBase ? "#d8dcea" : "#eef0f7" }));
       body.push(S.text(padL - 6, yOf(v) + 3,
-        meanScale ? (Math.round(v * 10) / 10)
-          : Math.round(v) + (pctAxis ? "%" : ""),
+        delta ? parseFloat(v.toFixed(2)) + deltaUnit
+          : meanScale ? (Math.round(v * 10) / 10)
+            : Math.round(v) + (pctAxis ? "%" : ""),
         { "text-anchor": "end", "font-size": 9.5, fill: "#9aa1b1" }));
     });
     years.forEach(function (year) {
@@ -387,7 +433,8 @@
         var labelThis = labelAll && pi < s.points.length - 1;
         if (labelThis && labelMode !== "none") {
           pointLabels.push({ x: xOf(p.year), pos: yOf(p.value) - 8,
-            text: fmtVal(p.value, s.isMean), colour: colour,
+            text: delta ? fmtDelta(p.value, s.isMean) + (s.isMean ? "" : "pp")
+              : fmtVal(p.value, s.isMean), colour: colour,
             weight: p.current ? 700 : 400 });
         }
       });
@@ -395,7 +442,9 @@
       // end labels carry the VALUE only — series names live in the
       // bottom legend where there is room for the full question text
       endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
-        text: labelMode === "none" ? "" : fmtVal(last.value, s.isMean) });
+        text: labelMode === "none" ? ""
+          : delta ? fmtDelta(last.value, s.isMean) + (s.isMean ? "" : "pp")
+            : fmtVal(last.value, s.isMean) });
     });
     // repel per-point value labels within each wave column so they never
     // overlap (matches the end-label behaviour, now for every point).

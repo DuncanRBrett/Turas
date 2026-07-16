@@ -548,6 +548,9 @@
       rows: series.map(function (sr) {
         return { kind: mode === "absolute" ? sr.spec.metric.kind : "net",
           diff: sr.spec.metric.diff, label: sr.label, waves: sr.points,
+          // delta rows keep kind "net" (no anchored 0-10 axis) but carry the
+          // metric's mean-ness so the chart labels changes in its own units
+          isMean: mode !== "absolute" && sr.spec.metric.isMean,
           metricKey: sr.spec.metric.key,
           cells: [{ pct: null, mean: null, n: null, sig: "" }] };
       }) };
@@ -558,13 +561,17 @@
         return sr ? ciBounds(sr.spec.metric, sr.spec.segId, point) : null;
       } : null,
       trendline: mode === "absolute" && !!s.visTrendline,
+      delta: mode !== "absolute",
       annotations: notes.map(function (n) {
         return { year: n.year, label: n.text };
       }),
       clickable: true,   // tag a point on any line (single or multi-series)
       note: (mode === "absolute" ? "Published values" :
-        mode === "prev" ? "Change vs previous wave (pp)" :
-        "Change vs baseline wave (pp)") +
+        (mode === "prev" ? "Change vs previous wave ("
+          : "Change vs baseline wave (") +
+        (specs.every(function (sp) { return sp.metric.isMean; }) ? "points"
+          : specs.every(function (sp) { return !sp.metric.isMean; }) ? "pp"
+            : "pp / points") + ")") +
         (singleMetric ? " · " + fmt.escapeHtml(singleMetric.label) : "")
     });
 
