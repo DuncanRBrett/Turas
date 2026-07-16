@@ -151,6 +151,7 @@
       series: JSON.parse(JSON.stringify(spec.series)),
       annotations: JSON.parse(JSON.stringify(spec.annotations || [])),
       ci: !!spec.ci,
+      trendline: !!spec.trendline,   // dashed least-squares fit, as on screen
       banner: firstBanner(), filters: [],
       flags: { dist: !!flags.dist, trend: !!flags.trend,
         table: !!flags.table, insight: flags.insight !== false },

@@ -178,6 +178,40 @@
     return summary.length ? summary : detail;
   }
 
+  /** Least-squares linear fit over {x, y} pairs: {slope, intercept},
+   *  or null with fewer than 2 points or no spread in x. */
+  function olsFit(pts) {
+    var n = pts.length;
+    if (n < 2) return null;
+    var sx = 0, sy = 0, sxx = 0, sxy = 0;
+    pts.forEach(function (p) {
+      sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y;
+    });
+    var den = n * sxx - sx * sx;
+    if (Math.abs(den) < 1e-9) return null;
+    var slope = (n * sxy - sx * sy) / den;
+    return { slope: slope, intercept: (sy - slope * sx) / n };
+  }
+  render._olsFit = olsFit;   // exposed for the trendline node suite
+
+  /** Clip the segment (x0,v0)→(x1,v1) to lo ≤ v ≤ hi exactly, in data
+   *  space — clamping the endpoints instead would bend the fitted slope.
+   *  Returns [{x, v}, {x, v}] or null when fully outside the range. */
+  function clipSeg(x0, v0, x1, v1, lo, hi) {
+    var dv = v1 - v0;
+    if (Math.abs(dv) < 1e-12) {
+      return (v0 < lo || v0 > hi) ? null
+        : [{ x: x0, v: v0 }, { x: x1, v: v1 }];
+    }
+    var tLo = (lo - v0) / dv, tHi = (hi - v0) / dv;
+    var t0 = Math.max(0, Math.min(tLo, tHi));
+    var t1 = Math.min(1, Math.max(tLo, tHi));
+    if (t0 >= t1) return null;
+    return [{ x: x0 + t0 * (x1 - x0), v: v0 + t0 * dv },
+      { x: x0 + t1 * (x1 - x0), v: v0 + t1 * dv }];
+  }
+  render._clipSeg = clipSeg;   // exposed for the trendline node suite
+
   /**
    * Wave trend line chart for a question model (chart type "line").
    * One series per row with history; up to 6 series. Mean-scale rows
@@ -186,7 +220,9 @@
    * @param {object} [opts] - Visualise overrides: {yMin, yMax,
    *   labels: "auto"|"all"|"last"|"none", ci: (row, point) => halfwidth,
    *   note: axis note override, annotations: [{year, label}] (dashed
-   *   markers), clickable: data-year attrs on points for tagging}.
+   *   markers), clickable: data-year attrs on points for tagging,
+   *   trendline: dashed least-squares fit line per series (Visualise
+   *   toggle — passed only in Absolute mode)}.
    */
   render.trendChart = function (model, opts) {
     opts = opts || {};
@@ -268,6 +304,7 @@
     var labelMode = opts.labels || "auto";
     var endLabels = [];
     var pointLabels = [];   // per-point value labels — repelled per wave column
+    var trendsDrawn = 0;    // fitted lines actually on the chart (note suffix)
     series.forEach(function (s, k) {
       var colour = palette[k % palette.length];
       // optional 95% interval band behind the line (Visualise toggle).
@@ -290,6 +327,37 @@
           }).join(" ");
           body.push(S.el("path", { d: upper + lower + " Z", fill: colour,
             "fill-opacity": 0.12, stroke: "none" }));
+        }
+      }
+      // optional dashed least-squares trendline (Visualise toggle). Fitted
+      // on the plotted wave positions — waves sit equally spaced on this
+      // axis even when the calendar gaps — and clipped exactly to the axis
+      // range so a tight user y-window crops the line, never bends it.
+      // Painted above the interval band, below the data line and points.
+      if (opts.trendline && years.length > 1) {
+        var fitPts = s.points.map(function (p) {
+          return { x: years.indexOf(p.year), y: p.value };
+        });
+        var fit = olsFit(fitPts);
+        if (fit) {
+          var xa = Infinity, xb = -Infinity;
+          fitPts.forEach(function (p) {
+            if (p.x < xa) xa = p.x;
+            if (p.x > xb) xb = p.x;
+          });
+          var seg = clipSeg(xa, fit.intercept + fit.slope * xa,
+            xb, fit.intercept + fit.slope * xb, axisMin, axisMax);
+          if (seg) {
+            var posOf = function (xi) {
+              return padL + xi / (years.length - 1) * plotW;
+            };
+            body.push(S.el("line", { "class": "trendfit",
+              x1: posOf(seg[0].x).toFixed(1), y1: yOf(seg[0].v).toFixed(1),
+              x2: posOf(seg[1].x).toFixed(1), y2: yOf(seg[1].v).toFixed(1),
+              stroke: colour, "stroke-width": 1.6,
+              "stroke-dasharray": "6 4", "stroke-opacity": 0.75 }));
+            trendsDrawn++;
+          }
         }
       }
       var d = s.points.map(function (p, i) {
@@ -356,7 +424,8 @@
     });
     var note = (opts.note || "Published wave Totals · " + years[0] + "–" +
       years[years.length - 1]) + (dropped > 0 ? " · " + dropped +
-      " series hidden (mixed scales or >6)" : "");
+      " series hidden (mixed scales or >6)" : "") +
+      (trendsDrawn ? " · dashed = linear trend (least squares)" : "");
     body.push(S.text(padL, H - 4, note, { "font-size": 9.5, fill: "#9aa1b1" }));
     var legend = null, height = H;
     if (series.length > 1) {

@@ -557,6 +557,7 @@
         var sr = series.filter(function (x) { return x.label === row.label; })[0];
         return sr ? ciBounds(sr.spec.metric, sr.spec.segId, point) : null;
       } : null,
+      trendline: mode === "absolute" && !!s.visTrendline,
       annotations: notes.map(function (n) {
         return { year: n.year, label: n.text };
       }),
@@ -593,6 +594,10 @@
       'published breakdown."><input type="checkbox" data-visci' +
       (s.visCI ? " checked" : "") + (mode !== "absolute" ? " disabled" : "") +
       "> 95% " + TR.conf.labels().interval_abbrev + " bands</label>" +
+      '<label class="tg" title="Dashed least-squares linear fit over the ' +
+      'plotted waves — one per series."><input type="checkbox" data-vistrendline' +
+      (s.visTrendline ? " checked" : "") +
+      (mode !== "absolute" ? " disabled" : "") + "> Trendline</label>" +
       '<label class="tg">Labels <select data-vislabels>' +
       ["last", "all", "none"].map(function (l) {
         return '<option value="' + l + '"' +
@@ -729,6 +734,11 @@
     var ci = host.querySelector("[data-visci]");
     if (ci) ci.addEventListener("change", function () {
       trk().state.visCI = ci.checked;
+      rerender();
+    });
+    var tl = host.querySelector("[data-vistrendline]");
+    if (tl) tl.addEventListener("change", function () {
+      trk().state.visTrendline = tl.checked;
       rerender();
     });
     host.querySelector("[data-vislabels]").addEventListener("change", function (e) {
@@ -883,6 +893,7 @@
         TR.story2.pinTrackingView({
           title: visTitle(sel, specs),
           ci: !!(s.visCI && mode === "absolute"),
+          trendline: !!(s.visTrendline && mode === "absolute"),
           qs: specs.map(function (sp) { return sp.metric.code; })
             .filter(function (c, i, a) { return a.indexOf(c) === i; }),
           series: specs.map(function (sp) {

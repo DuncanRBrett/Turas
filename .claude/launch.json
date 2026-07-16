@@ -151,6 +151,18 @@
         "/Users/duncan/Dev/TRL Website"
       ],
       "port": 8780
+    },
+    {
+      "name": "trendline-harness",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8782",
+        "--directory",
+        "/private/tmp/claude-501/-Users-duncan-Dev-Turas/4eab1a15-3eb3-48e4-9063-95dd9635d60e/scratchpad"
+      ],
+      "port": 8782
     }
   ]
 }

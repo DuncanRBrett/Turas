@@ -425,7 +425,8 @@
       out.push('<div class="chart ex-chart">' +
         TR.render.trendChart(exhibit.trendModel(item, models),
           { annotations: item.annotations || [],
-            ci: seriesCi(item) }) + "</div>");
+            ci: seriesCi(item),
+            trendline: !!item.trendline }) + "</div>");
     }
     if (flags.table) {
       out.push('<div class="si-table">' +
