@@ -202,7 +202,10 @@
     var body = cards ||
       '<div class="tko-empty">No clear cross-question pattern stands out on this study — ' +
       "and that, honestly, is the headline.</div>";
-    return apexHtml(t) + '<div class="tko-pgrid">' + body + "</div>" + provHtml(t);
+    // Footer order: the reliability line (with the "how sure" entry point) sits
+    // directly above the provenance line — demoted from the apex, not deleted.
+    return apexHtml(t) + '<div class="tko-pgrid">' + body + "</div>" +
+      ui.reliabilityRibbon(t.reliability) + provHtml(t);
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

@@ -382,6 +382,11 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, read view"
   assert(read.indexOf("Satisfaction") !== -1, "satisfaction leads the apex");
   assert(read.indexOf("69% agree") !== -1, "apex shows index + top-box");
   assert(read.indexOf("% response of") !== -1, "participation shown");
+  // 4b985a8e demoted the reliability ribbon from the apex header to the footer:
+  // it must render after the pattern grid (above the provenance line), never in the apex.
+  assert(read.indexOf("tko-reliability") > read.indexOf("tko-pgrid"),
+    "reliability ribbon sits in the footer, not the apex");
+  assert(read.indexOf("data-howsure") !== -1, "the how-sure explainer entry point renders");
   assert(read.indexOf('data-edit="') !== -1, "editable hooks present");
 });
 
