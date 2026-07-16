@@ -799,5 +799,46 @@ qual._state = { tagsOff: true, tagHide: {} };
 const xfHOff = qual.focusHtml(xfEnt, 0, { title: "Why" });
 assert(xfHOff.indexOf("Centre: Worcester DC") < 0, "focus: the reader tag toggle hides focus tags too");
 
+// ---- aggregates-only ship: the theme×banner crosstab needs microdata ----------
+// html_report_v2_microdata = N ships TR.MICRO = null; columnsFor reads
+// TR.MICRO.banner_vars, so offering the crosstab would throw on the first click
+// and wedge the whole tab (the stored view state makes every re-render repeat
+// the throw). Without microdata the Overview/Crosstab toggle must not render,
+// and a stale crosstab view state must fall back to the overview board.
+const qx = { code: "QX", title: "Culture", type: "themed",
+  themes: [{ id: 0, label: "Price" }], base: { answered: 2 },
+  records: [
+    { idx: 0, tier: 0, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "aa" },
+    { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3 }, demos: {}, text: "bb" }
+  ] };
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
+  demographics: [], questions: [qx] };
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.AGG = { banner_groups: [{ id: "b1", name: "Department" }], columns: [] };
+// The stats engine is fully present (an earlier block stubbed TR.stats without
+// columnsFor) — only the microdata island distinguishes the two ships here.
+TR.stats = { columnsFor: () => ({ columns: [{ label: "Total", letter: "", member: null }] }),
+  mask: () => null, maskCount: () => 0, propZ: () => null };
+TR.disclosure = null;
+TR.MICRO = null;                                     // the aggregates-only ship
+const hostX = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+qual._state = null;
+qual.render(hostX);
+assert(hostX.innerHTML.indexOf("data-themeview") < 0,
+  "no-microdata: the Overview/Crosstab toggle does not render");
+qual._state.themeView = "crosstab";                  // stale state (saved copy / pre-fix click)
+hostX.innerHTML = "";
+let xThrew = false;
+try { qual.render(hostX); } catch (e) { xThrew = true; }
+assert(!xThrew, "no-microdata: a stale crosstab view state renders without throwing");
+assert(hostX.innerHTML.indexOf("ql-boardgrid") >= 0,
+  "no-microdata: the stale crosstab state falls back to the overview board");
+TR.MICRO = { n: 2, answers: {}, banner_vars: { b1: [0, 1] } };
+qual._state = null;
+hostX.innerHTML = ""; qual.render(hostX);
+assert(hostX.innerHTML.indexOf('data-themeview="crosstab"') >= 0,
+  "with microdata: the Crosstab by banner toggle renders");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

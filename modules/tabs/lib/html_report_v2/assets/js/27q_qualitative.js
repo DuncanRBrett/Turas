@@ -1449,8 +1449,13 @@
   // with an analyst insight that pins to the Story alongside the table.
 
   function hasBanner() {
+    // The theme×banner crosstab recomputes from per-respondent banner membership
+    // (columnsFor reads TR.MICRO.banner_vars), so an aggregates-only ship
+    // (html_report_v2_microdata = N ships TR.MICRO = null) cannot offer it —
+    // hide the Overview/Crosstab toggle and fall back to the overview board,
+    // the same trade that turns off live filters and custom banners.
     return !!(TR.AGG && TR.AGG.banner_groups && TR.AGG.banner_groups.length &&
-      TR.stats && TR.stats.columnsFor);
+      TR.stats && TR.stats.columnsFor && TR.MICRO && TR.MICRO.banner_vars);
   }
   function xtabBannerId(st) {
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
