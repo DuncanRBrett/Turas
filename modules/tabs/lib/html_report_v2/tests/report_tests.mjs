@@ -1,7 +1,10 @@
-// Report tab — statistical diagnostics panel (report.diagnosticsHtml).
-// Loads 32_report.js into a vm sandbox with a minimal TR and asserts the panel
-// renders from project.diagnostics (the interactive twin of the Excel stats
-// pack), is omitted when absent, and flags TRS events by level.
+// Report tab — statistical diagnostics panel (report.diagnosticsHtml) and the
+// About card (report.aboutHtml). Loads 32_report.js into a vm sandbox with a
+// minimal TR and asserts the diagnostics panel renders from
+// project.diagnostics (the interactive twin of the Excel stats pack), is
+// omitted when absent, and flags TRS events by level; and that About renders
+// analyst + contact from report_meta plus the standard report-construction
+// note in place of the old configurable disclaimer field.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -17,8 +20,9 @@ function run(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
-// A fresh module load with project.diagnostics set to the given object.
-function boot(diagnostics) {
+// A fresh module load with project.diagnostics / project.report_meta set to
+// the given objects (either may be undefined, as on a report without them).
+function boot(diagnostics, reportMeta) {
   const sandbox = {
     console,
     localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }
@@ -29,7 +33,7 @@ function boot(diagnostics) {
   sandbox.TR = {
     fmt: { escapeHtml: (s) => String(s == null ? "" : s) },
     ai: { execSummaryHtml: () => "", methodologyHtml: () => "" },
-    AGG: { project: { name: "proj", diagnostics: diagnostics } }
+    AGG: { project: { name: "proj", diagnostics: diagnostics, report_meta: reportMeta } }
   };
   vm.runInContext(readFileSync(path.join(JS_DIR, "32_report.js"), "utf8"),
     sandbox, { filename: "32_report.js" });
@@ -102,6 +106,52 @@ run("a malformed section (missing rows) is skipped, not crashed on", () => {
   const h = boot(odd).report.diagnosticsHtml();
   assert(h.indexOf(">Declaration<") >= 0, "the well-formed section still renders");
   assert(h.indexOf(">Empty<") < 0, "the row-less section is dropped rather than throwing");
+});
+
+console.log("\nReport tab — About card & report-construction note:");
+
+run("analyst + contact render from the config-fed island meta", () => {
+  const h = boot(undefined, {
+    analyst: "Duncan Brett", company: "The Research LampPost",
+    email: "duncan@researchlamppost.co.za", phone: "+27 82 000 0000"
+  }).report.aboutHtml();
+  assert(h.indexOf("Analyst / author") >= 0 && h.indexOf("Duncan Brett") >= 0,
+    "the analyst field renders with the configured name");
+  assert(h.indexOf("Contact details") >= 0, "the contact field renders");
+  assert(h.indexOf("The Research LampPost · duncan@researchlamppost.co.za · +27 82 000 0000") >= 0,
+    "contact joins company · email · phone");
+});
+
+run("the standard report-construction note replaces the old disclaimer field", () => {
+  const h = boot(undefined, { analyst: "D", closing: "OLD CLOSING TEXT" }).report.aboutHtml();
+  assert(h.indexOf("Report construction") >= 0, "the note's heading renders");
+  assert(h.indexOf("conventional statistical software, not an AI system") >= 0,
+    "the deterministic-software claim renders");
+  assert(h.indexOf("no AI model takes part in any calculation") >= 0,
+    "the no-AI-in-calculation claim renders");
+  assert(h.indexOf("says so and names the model") >= 0, "the AI-disclosure promise renders");
+  assert(h.indexOf("reviewed and validated by the report author") >= 0,
+    "the author-validation line renders");
+  assert(h.indexOf("Disclaimers / confidentiality") < 0, "the old disclaimer field is gone");
+  assert(h.indexOf("OLD CLOSING TEXT") < 0, "closing_notes no longer renders in About");
+});
+
+run("the producing company interpolates into the note, with a TRL fallback", () => {
+  const h = boot(undefined, { company: "Acme Insights" }).report.aboutHtml();
+  assert(h.indexOf("produced by Acme Insights using Turas Analytics") >= 0,
+    "the configured company_name is used");
+  const f = boot(undefined, undefined).report.aboutHtml();
+  assert(f.indexOf("produced by The Research LampPost using Turas Analytics") >= 0,
+    "falls back to The Research LampPost when report_meta is absent");
+});
+
+run("no meta -> fields are omitted but the note and methodology still render", () => {
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("Analyst / author") < 0, "no empty analyst field is rendered");
+  assert(h.indexOf("Contact details") < 0, "no empty contact field is rendered");
+  assert(h.indexOf("Report construction") >= 0, "the note renders regardless");
+  assert(h.indexOf("Methodology (auto-generated)") >= 0,
+    "the auto-generated methodology block is kept below the note");
 });
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
