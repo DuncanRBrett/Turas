@@ -248,7 +248,7 @@ test_that("html_report_v2_microdata is registered in the known-settings whitelis
 test_that("build_config_object defaults research_house sensibly when unset", {
   skip_if_not(exists("build_config_object", mode = "function"))
   config_obj <- build_config_object(list())
-  expect_equal(config_obj$research_house, "The Research Lamppost")
+  expect_equal(config_obj$research_house, "The Research LampPost")
 })
 
 test_that("crosstab config Selection sheet has expected columns", {

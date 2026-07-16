@@ -137,7 +137,7 @@ build_tab_javascript <- function() {
 #' @param apply_weighting Logical - whether weighting was applied
 #' @return htmltools::div
 build_header <- function(project_title, brand_colour, total_n, n_questions,
-                         company_name = "The Research Lamppost",
+                         company_name = "The Research LampPost",
                          client_name = NULL,
                          researcher_logo_uri = NULL,
                          apply_weighting = FALSE) {

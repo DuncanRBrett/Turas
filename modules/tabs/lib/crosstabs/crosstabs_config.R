@@ -284,7 +284,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # (02_table_builder.R, stats_diagnostics.R) but never populated here,
     # so they were silent no-ops even when set.
     heatmap_colour = get_config_value(config, "heatmap_colour", ""),
-    research_house = get_config_value(config, "research_house", "The Research Lamppost"),
+    research_house = get_config_value(config, "research_house", "The Research LampPost"),
 
     # Disclosure control (V13). The minimum audience base below which the report
     # withholds identifying detail — the demographic tags on comments now, small
@@ -307,7 +307,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),
-    company_name = get_config_value(config, "company_name", "The Research Lamppost"),
+    company_name = get_config_value(config, "company_name", "The Research LampPost"),
     client_name = get_config_value(config, "client_name", NULL),
     researcher_logo_path = get_config_value(config, "researcher_logo_path", NULL),
     client_logo_path = get_config_value(config, "client_logo_path", NULL),
