@@ -25,7 +25,8 @@
     MIN_STRAIN_GAP: 0.02,     // ...and (reliability-weighted) >=2% of the scale below it
     STRAIN_RELIABLE_BASE: 30, // base at which a group's gap is fully trusted; smaller groups'
                               //   gaps are discounted so a sharp gap on n=5 doesn't outrank a solid n=40
-    MIN_AREA_MEMBERS: 2,      // a theme needs >=N questions to count as an "area"
+    MIN_AREA_MEMBERS: 1,      // a single tagged question IS an area (its rating is the
+                              //   area's score); "(untagged)" is excluded regardless
     MIN_SPLIT_DIFF: 0.02,     // a breakout must differentiate groups by >=2% of scale to "matter"
     SPLIT_LEAD_RATIO: 1.25,   // ...and lead the next breakout by this much to be THE split (else none dominates)
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
@@ -290,22 +291,36 @@
         raw += (m.value || 0);
         if (m.delta && m.delta.sig) moving += (m.delta.diff < 0 ? -1 : 1);
       });
-      t.score = t.members.length ? sum / t.members.length : 0;        // normalised 0..1, for ranking
-      t.avg = t.members.length ? raw / t.members.length : 0;          // raw scale average, for display
+      // The area's SCORE is its summary question where one exists: the declared
+      // AreaSummary (the section-overall rating — respondents already weighed
+      // the components in it), else the sole member of a one-question theme.
+      // Only a multi-question theme with no declared overall falls back to the
+      // flat average — equal weights are a fallback, never the model.
+      t.summary = null;
+      t.members.forEach(function (m) { if (!t.summary && m.summary) t.summary = m; });
+      if (!t.summary && t.members.length === 1) t.summary = t.members[0];
+      t.score = t.summary ? areaScore(t.summary)
+        : (t.members.length ? sum / t.members.length : 0);            // normalised 0..1, for ranking
+      t.avg = t.members.length ? raw / t.members.length : 0;          // flat average (fallback display)
       t.scaleMax = (t.members[0] && t.members[0].scaleMax) || 0;
       t.moving = moving;   // net signed count of significant movers
       return t;
     });
   }
 
-  /** Evidence rows for an area, weakest- or strongest-member first. */
+  /** Evidence rows for an area: the summary question pinned first (it IS the
+   *  area's score), then components weakest- or strongest-first. */
   function areaEvidence(theme, weakest) {
-    return theme.members.slice().sort(function (a, b) {
-      return weakest ? areaScore(a) - areaScore(b) : areaScore(b) - areaScore(a);
-    }).slice(0, CONST.EVIDENCE_MAX).map(function (m) {
-      return { label: m.title, value: m.value, scaleMax: m.scaleMax,
-        delta: m.delta || null, topBox: m.topBox || null };
-    });
+    var summary = theme.summary || null;
+    var rest = theme.members.filter(function (m) { return m !== summary; })
+      .sort(function (a, b) {
+        return weakest ? areaScore(a) - areaScore(b) : areaScore(b) - areaScore(a);
+      });
+    return (summary ? [summary] : []).concat(rest).slice(0, CONST.EVIDENCE_MAX)
+      .map(function (m) {
+        return { label: m.title, value: m.value, scaleMax: m.scaleMax,
+          delta: m.delta || null, topBox: m.topBox || null, summary: m === summary };
+      });
   }
 
   /** An area can only be summarised when its questions share a scale family —
@@ -317,23 +332,40 @@
     return members.every(function (m) { return m.scaleMax === sm; });
   }
 
-  /** WEAKEST and STRONGEST area patterns from multi-question themes — only themes
-   *  whose questions share a scale (commensurable), so no cross-scale average. */
+  /** WEAKEST and STRONGEST area patterns. An area = any tagged theme (one
+   *  question is enough); it scores on its summary question (see groupByTheme).
+   *  Only themes whose questions share a scale qualify (no cross-scale average),
+   *  and the strongest/weakest RACE runs within one scale family — an NPS-only
+   *  area (0-100) must never be crowned against 0-10 rating areas. The race
+   *  takes the family with the most areas (ties: more member questions, then
+   *  the smaller scale); other families sit out. */
   function areaPatterns(levels) {
     var themes = groupByTheme(levels).filter(function (t) {
       return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS &&
         commensurable(t.members);
     });
     if (themes.length < 1) return [];
-    var ranked = themes.slice().sort(function (a, b) { return a.score - b.score; });
+    var fams = {};
+    themes.forEach(function (t) { (fams[t.scaleMax] || (fams[t.scaleMax] = [])).push(t); });
+    var famTotal = function (k) {
+      return fams[k].reduce(function (s, t) { return s + t.members.length; }, 0);
+    };
+    var famKey = Object.keys(fams).sort(function (a, b) {
+      return (fams[b].length - fams[a].length) || (famTotal(b) - famTotal(a)) || (a - b);
+    })[0];
+    var race = fams[famKey];
+    var ranked = race.slice().sort(function (a, b) { return a.score - b.score; });
     var weak = ranked[0], strong = ranked[ranked.length - 1];
     var make = function (t, isWeak) {
       return { id: isWeak ? "weak" : "strong", kind: "area", subject: t.name,
         section: t.section, score: t.score, avg: t.avg, scaleMax: t.scaleMax,
-        members: t.members.length, moving: t.moving, evidence: areaEvidence(t, isWeak) };
+        members: t.members.length, moving: t.moving, raceSize: race.length,
+        summary: t.summary ? { label: t.summary.title, value: t.summary.value,
+          scaleMax: t.summary.scaleMax } : null,
+        evidence: areaEvidence(t, isWeak) };
     };
     var out = [make(weak, true)];
-    if (strong !== weak) out.push(make(strong, false));   // need >=2 distinct themes for both
+    if (strong !== weak) out.push(make(strong, false));   // need >=2 distinct areas for both
     return out;
   }
 

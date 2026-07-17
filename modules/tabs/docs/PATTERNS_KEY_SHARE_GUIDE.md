@@ -116,6 +116,31 @@ The WIL/practicum participation questions (Q031–Q048) can be tagged `Yes`
 if participation is the story that wave; they run on their course-filtered
 bases either way. Registration and profile questions stay blank.
 
+## Area cards and the AreaSummary column (added 2026-07-17)
+
+The weakest/strongest area cards used to require two questions per theme
+and flat-average them. Both rules were wrong on a study built the classic
+way — component ratings plus a section-overall question. The customer has
+already weighed the components in the overall; averaging it back in with
+them produces a number nobody rated, and barring one-question areas kept
+a 9.5 Orders rating out of the race while a two-question 8.85 "won".
+
+Now: any tagged theme is an area, one question is enough, and an area
+scores on its **summary question** — mark it with `Y` in a new
+`AreaSummary` column on the Selection sheet. A single-question area needs
+no marker. A multi-question area with no marker still falls back to the
+flat average, and the card states that basis. The strongest/weakest race
+runs within one scale family, so an NPS-only area is never crowned
+against 0–10 ratings.
+
+CCPB W2026 AreaSummary fills: Q08 (Deliveries), Q27 (Salesperson), Q46
+(Coolers), Q64 (Fountains). Signwriting has no overall question — it
+ranks on its average and says so (worth adding an overall next wave).
+Orders/Invoicing/Call centre/Merchandising/MyPenbev are single-question
+areas — nothing to fill. The Overall category (Q78 + Q79) mixes a 0–10
+with an NPS, so it is correctly dropped from the area race; those two are
+the apex tiles via `patterns_headline`.
+
 ## Two Settings-sheet levers (added 2026-07-17)
 
 Both are rows on the config's Settings sheet, both optional, both parsed as

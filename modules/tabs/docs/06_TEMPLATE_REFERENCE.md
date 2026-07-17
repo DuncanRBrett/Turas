@@ -1088,6 +1088,20 @@ order) — and rated questions, where CreateIndex already summarises them
 **See:** `PATTERNS_KEY_SHARE_GUIDE.md` for worked examples from live
 studies.
 
+### Column: AreaSummary
+
+**What it does:** Marks THE question that summarises its Category/Theme
+area for the Patterns tab — the section-overall rating (e.g.
+"satisfaction with the coolers overall"). The area then scores and ranks
+on this question; its sibling questions become the explanation beneath
+it, not equal votes in a flat average.
+
+**Required:** No. One per area. A single-question area needs no marker —
+its own rating is the area's score. A multi-question area with no marker
+falls back to the plain average of its questions, and the card says so.
+
+**What to enter:** `Y` on the summary question's row; blank elsewhere.
+
 ### Column: BaseFilter
 
 **What it does:** Restricts the analysis to a subset of respondents.

@@ -602,6 +602,15 @@ process_single_question <- function(question_code, prepared_data,
     NA_character_
   }
 
+  # Extract AreaSummary (optional, Y/blank): marks THE question that summarises
+  # its area/theme for the Patterns tab — the section-overall rating (e.g.
+  # "satisfaction with the coolers overall"). The area then scores on this
+  # question; its siblings become the explanation, not equal votes in a flat
+  # average. Carried to the v2 data layer as q.area_summary (TRUE only).
+  q_area_summary <- !is.null(question_row$AreaSummary) &&
+    !is.na(question_row$AreaSummary) &&
+    identical(toupper(trimws(question_row$AreaSummary)), "Y")
+
   # Extract human-readable filter label (optional, overrides raw filter expression in display)
   q_filter_label <- if (!is.null(question_row$FilterLabel) &&
                         !is.na(question_row$FilterLabel) &&
@@ -623,6 +632,7 @@ process_single_question <- function(question_code, prepared_data,
     category_order = q_category_order,
     theme = q_theme,
     key_share = q_key_share,
+    area_summary = q_area_summary,
     partial_sections = partial_sections  # TRS v1.0: Track section-level failures
   ))
 }

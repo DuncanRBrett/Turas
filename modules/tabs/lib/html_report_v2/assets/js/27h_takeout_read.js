@@ -79,8 +79,14 @@
     }
     if (p.kind === "area") {
       var arows = (p.evidence || []).map(function (m) { return ui.areaRow(m, cls); }).join("");
+      // Scoring basis, stated: summary-led areas rank on the tagged overall
+      // rating; a multi-question area with no overall declared falls back to a
+      // flat average — say so rather than let it pass as a rated number.
+      var basis = (!p.summary && p.members > 1)
+        ? '<div class="tko-cap">Ranked on the plain average of its ' + p.members +
+          " questions — no overall rating is declared for this area.</div>" : "";
       var an = p.moving < 0 ? '<div class="tko-note">Several items slipping since last wave.</div>' : "";
-      return arows + an;
+      return arows + basis + an;
     }
     if (p.kind === "split") {
       // Navigation pointer only — no synthetic average-index rows (the "4.4 / 3.7

@@ -788,6 +788,9 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   )
   if (!is.null(index_scores)) out$index_scores <- index_scores
   if (!is.null(net_diffs)) out$net_diffs <- net_diffs
+  # AreaSummary: the question that summarises its area/theme (Patterns tab).
+  # Emitted only when TRUE so untagged configs stay byte-identical.
+  if (isTRUE(q_result$area_summary)) out$area_summary <- TRUE
 
   # Reader-experience source fields (READER_EXPERIENCE_PLAN.md §E). All are
   # OPTIONAL columns on the structure workbook's Questions sheet; each key is

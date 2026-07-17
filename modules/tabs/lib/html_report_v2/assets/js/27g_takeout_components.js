@@ -44,7 +44,8 @@
    *  move chip when it shifted. cls colours the bar by pattern kind. */
   ui.areaRow = function (m, cls) {
     var pct = m.scaleMax ? Math.min(100, Math.max(0, m.value / m.scaleMax * 100)) : 0;
-    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(m.label) + "</div>" +
+    var tag = m.summary ? ' <span class="tko-peer">overall</span>' : "";
+    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(m.label) + tag + "</div>" +
       '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' + cls +
       '" style="width:' + pct.toFixed(1) + '%"></span></span>' +
       '<span class="tko-rv">' + Number(m.value).toFixed(1) + ui.moveChip(m.delta) + "</span></div></div>";
@@ -263,10 +264,21 @@
         " the room into two camps the average hides — read the distribution, not the mean.";
     }
     if (p.id === "weak") {
+      // Summary-led area: quote the real overall rating. Flat fallback keeps
+      // the qualitative line (its ranking average is not a number anyone rated).
+      if (p.summary) {
+        return p.subject + " is the weakest area — rated " +
+          Number(p.summary.value).toFixed(1) + " overall" +
+          (p.moving < 0 ? ", and slipping." : ".");
+      }
       return p.subject + " is the weakest area — its questions cluster low" +
         (p.moving < 0 ? ", and are slipping." : ".");
     }
     if (p.id === "strong") {
+      if (p.summary) {
+        return p.subject + " is the strongest area — rated " +
+          Number(p.summary.value).toFixed(1) + " overall.";
+      }
       return p.subject + " is the strongest area — what is holding things together.";
     }
     if (p.id === "moved") {

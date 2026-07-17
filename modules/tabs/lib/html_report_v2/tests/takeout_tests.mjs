@@ -20,11 +20,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
 // Per-file ceiling. Raised from 300 once the engine grew to the full pattern
 // library (group / split / co-movement / odd-one-out / hidden-disagreement /
-// areas / movement + the FDR trust-gate). The pure number-crunching is already
-// factored into 27da_takeout_stats.js; what remains is small, single-purpose
-// pattern functions — the file is long because there are many of them, not
-// because any one is. Keep individual functions well under 100 lines.
-const MAX_ACTIVE_LINES = 360;
+// areas / movement + the FDR trust-gate), then to 380 when areas gained the
+// summary-question scoring + scale-family race (2026-07-17). The pure
+// number-crunching is already factored into 27da_takeout_stats.js; what
+// remains is small, single-purpose pattern functions — the file is long
+// because there are many of them, not because any one is. Keep individual
+// functions well under 100 lines.
+const MAX_ACTIVE_LINES = 380;
 
 const sandbox = { console };
 sandbox.globalThis = sandbox;
@@ -131,14 +133,56 @@ run("AREA patterns rank weakest and strongest theme", () => {
   close(strong.avg, 4.45, 1e-9, "strong area average");
 });
 
-run("AREA patterns: single-question themes don't count; untagged falls back", () => {
+run("AREA patterns: a single tagged question IS an area; untagged still excluded", () => {
   const levels = [
     { code: "Q1", title: "Q1", section: "", theme: "", value: 3, scaleMax: 5 },
     { code: "Q2", title: "Q2", section: "", theme: "", value: 4, scaleMax: 5 }
   ];
   assert(takeout._areaPatterns(levels).length === 0, "untagged levels yield no area pattern");
-  const lone = [{ code: "Q1", title: "Q1", section: "S", theme: "Solo", value: 3, scaleMax: 5 }];
-  assert(takeout._areaPatterns(lone).length === 0, "a one-question theme is not an area");
+  const lone = [{ code: "Q1", title: "Invoicing", section: "S", theme: "Invoicing", value: 9.2, scaleMax: 10 }];
+  const ps = takeout._areaPatterns(lone);
+  assert(ps.length === 1 && ps[0].subject === "Invoicing", "one tagged question is an area");
+  close(ps[0].score, 0.92, 1e-9, "the area's score IS its question's rating");
+  assert(ps[0].summary && ps[0].summary.value === 9.2, "sole member doubles as the summary");
+});
+
+run("the area scores on its overall question, not a flat average (the coolers case)", () => {
+  const lv = (title, theme, value, scaleMax, summary) =>
+    ({ code: title, title, theme, value, scaleMax, summary: !!summary });
+  const levels = [
+    lv("Ease of ordering", "Orders", 9.5, 10),
+    lv("Delivery overall", "Deliveries", 8.8, 10), lv("Delivery team", "Deliveries", 8.9, 10),
+    lv("Cooler order ease", "Coolers", 8.0, 10), lv("Complaint response", "Coolers", 7.5, 10),
+    lv("Technicians", "Coolers", 9.2, 10), lv("Placement time", "Coolers", 7.6, 10),
+    lv("Coolers overall", "Coolers", 9.0, 10, true),      // the declared AreaSummary
+    lv("Sign order ease", "Signwriting", 7.9, 10), lv("Progress updates", "Signwriting", 7.3, 10),
+    lv("Responsiveness", "Signwriting", 6.6, 10), lv("Professionalism", "Signwriting", 8.2, 10),
+    lv("Condition", "Signwriting", 8.6, 10),
+    lv("Eyethu recommend", "Eyethu", 40, 100)             // NPS-only area — sits out of the race
+  ];
+  const cool = takeout._groupByTheme(levels).filter((t) => t.name === "Coolers")[0];
+  close(cool.score, 0.90, 1e-9, "Coolers scores on its overall (9.0), NOT the flat 8.46 mean");
+  assert(cool.summary && cool.summary.title === "Coolers overall", "summary is the declared question");
+  const ps = takeout._areaPatterns(levels);
+  const weak = ps.filter((p) => p.id === "weak")[0], strong = ps.filter((p) => p.id === "strong")[0];
+  assert(strong.subject === "Orders", "a one-question 9.5 area wins, got " + strong.subject);
+  assert(weak.subject === "Signwriting", "weakest by its questions, got " + weak.subject);
+  assert(strong.raceSize === 4 && weak.raceSize === 4,
+    "the NPS-only Eyethu area sits OUT of a 0-10 race (raceSize 4)");
+  assert(takeout.ui.patternSeed(strong).indexOf("rated 9.5 overall") !== -1,
+    "strongest seed quotes the real overall rating");
+  assert(takeout.ui.patternSeed(weak).indexOf("cluster low") !== -1,
+    "flat-fallback area keeps the qualitative line (no invented rating)");
+  // evidence: the summary pins first with its marker; flat areas disclose their basis
+  const coolLevels = levels.filter((l) => l.theme === "Coolers" || l.theme === "Orders");
+  const ps2 = takeout._areaPatterns(coolLevels);   // Coolers (0.90) is weakest vs Orders (0.95)
+  const weakCool = ps2.filter((p) => p.id === "weak")[0];
+  assert(weakCool.subject === "Coolers" && weakCool.evidence[0].summary === true &&
+    weakCool.evidence[0].label === "Coolers overall", "summary row pinned first");
+  TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
+  const html = takeout.readView.html(takeout.buildPatterns({ levels, scope: { rated: 14, shares: 0 } }));
+  assert(html.indexOf("no overall rating is declared for this area") !== -1,
+    "a flat-average area states its basis on the card");
 });
 
 run("buildPatterns assembles portraits + areas + movement, and degrades gracefully", () => {

@@ -281,6 +281,15 @@ test_that("key_share (the Patterns favourable-share declaration) is carried; bla
   expect_identical(uq$key_share, "")
 })
 
+test_that("area_summary (the area's overall-question marker) is TRUE-only, absent otherwise", {
+  q <- make_dl_q_scale()
+  q$area_summary <- TRUE
+  wq <- build_dl_question(q, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_true(isTRUE(wq$area_summary))
+  uq <- build_dl_question(make_dl_q_scale(), make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_null(uq$area_summary)
+})
+
 # ------------------------------------------------------------------------------
 # Finite population correction: per-column population emission
 # ------------------------------------------------------------------------------

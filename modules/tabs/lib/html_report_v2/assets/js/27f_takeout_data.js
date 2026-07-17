@@ -145,6 +145,7 @@
       var item = { code: q.code, title: q.title,
         section: q.category || "",                 // Level 1 (existing Category column)
         theme: q.theme || q.category || "",        // Level 2 (new Theme column; falls back to section)
+        summary: q.area_summary === true,          // AreaSummary: this question IS its area's score
         value: value, band: touchpointBand(value, q), delta: row.delta || null,
         base: model.columns[0].base, baseEff: model.columns[0].baseEff || null,
         scaleMin: 0, scaleMax: touchpointMax(q),
