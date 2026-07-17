@@ -308,6 +308,16 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     show_tracking = safe_logical(get_config_value(config, "show_tracking", TRUE)),
     show_qualitative = safe_logical(get_config_value(config, "show_qualitative", TRUE)),
 
+    # Patterns-tab levers (optional). patterns_headline pins the apex KPI tiles
+    # to these question codes, in order (e.g. "Q78, Q79") — otherwise the tab
+    # auto-detects satisfaction/overall-titled questions, which on a study with
+    # many section ratings picks the wrong ones. patterns_exclude_banners keeps
+    # operational cuts (e.g. "Interviewer") out of the Patterns scan entirely —
+    # a fieldwork-QC banner must never become the client-facing lead portrait.
+    # Comma/semicolon-separated; parsed in the data layer.
+    patterns_headline = get_config_value(config, "patterns_headline", NULL),
+    patterns_exclude_banners = get_config_value(config, "patterns_exclude_banners", NULL),
+
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),

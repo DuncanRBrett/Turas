@@ -726,6 +726,59 @@ run("KeyShare cells join the trust-gate family; odd-one-out never reads them (kn
   assert(odd && odd.nullResult, "odd-one-out ignores isPct cells");
 });
 
+run("patterns_exclude_banners keeps operational cuts (Interviewer) out of the scan", () => {
+  TR.conf = { fpcActiveReport: () => false };
+  TR.d2 = { state: { banner: "S01", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: { low_base_threshold: 30, patterns_exclude_banners: ["Interviewer"] },
+    banner_groups: [{ id: "S01", name: "Centre" }, { id: "S10", name: "Interviewer" }],
+    questions: [] };
+  TR.MICRO = null;
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+    _meanRow: (m) => m.rows[0]
+  };
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 80 }, { label: "A", base: 40 }, { label: "B2", base: 40 }],
+    rows: [{ kind: "mean", cells: [{ mean: 3.8 }, { mean: 3.2 }, { mean: 4.4 }] }] }) };
+  const g = takeout.gather();
+  assert(g.columns.length === 2 && g.columns.every((c) => c.group === "Centre"),
+    "only the Centre banner scans; the Interviewer cut never becomes a portrait");
+  // matching is case/space-insensitive and accepts the banner id too
+  TR.AGG.project.patterns_exclude_banners = ["  interviewer ", "S01"];
+  assert(takeout._scanBannerGroups().length === 0, "label (any case/space) and id both match");
+  // no config -> every banner group, exactly as before
+  delete TR.AGG.project.patterns_exclude_banners;
+  assert(takeout._scanBannerGroups().length === 2, "no exclusion config -> unchanged");
+});
+
+run("patterns_headline pins the apex KPIs; a scalar value never substring-matches codes", () => {
+  TR.conf = { fpcActiveReport: () => false };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.render = { wavePoints: () => null };
+  TR.AGG = { project: { takeout_headline: ["Q79", "Q78"] }, banner_groups: [], questions: [] };
+  TR.MICRO = null;
+  const q = (code, title) => ({ code, title, type: "scale", scale_max: 10,
+    rows: [{ kind: "mean" }], net_diffs: null });
+  TR.views = {
+    // Q7 is a decoy: without array handling, "Q78".indexOf("Q7") would apex it.
+    indexQuestions: () => ([q("Q7", "Ease of ordering"), q("Q78", "Overall performance"),
+      q("Q79", "Recommend CCPB")]),
+    _meanRow: (m) => m.rows[0]
+  };
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 80 }],
+    rows: [{ kind: "mean", cells: [{ mean: 8.8 }] }] }) };
+  let lv = takeout.gather();
+  assert(lv.apex.length === 2, "only the pinned codes are apex, got " + lv.apex.length);
+  assert(lv.apex[0].code === "Q79" && lv.apex[1].code === "Q78", "apex follows the override ORDER");
+  assert(lv.levels.some((l) => l.code === "Q7"), "the decoy stays a driver level");
+  // the writer emits arrays, but a scalar must degrade safely (split, no substring match)
+  TR.AGG.project.takeout_headline = "Q78, Q79";
+  lv = takeout.gather();
+  assert(lv.apex.length === 2 && !lv.apex.some((a) => a.code === "Q7"),
+    "scalar config splits into codes; Q7 never rides in on a substring");
+});
+
 run("empty state is scope-honest: 'nothing found' only when something was scanned", () => {
   const none = takeout.readView.html(takeout.buildPatterns({ scope: { rated: 0, shares: 0 } }));
   assert(none.indexOf("nothing it can score") !== -1, "unscannable study says so");

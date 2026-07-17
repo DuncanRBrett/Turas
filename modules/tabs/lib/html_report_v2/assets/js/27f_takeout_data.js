@@ -56,9 +56,37 @@
   var HEADLINE_RE = /satisf|overall|recommend|\bnps\b|csat|net promoter/i;
 
   function headlineOverride() {
+    // Config: patterns_headline -> project.takeout_headline (question codes, in
+    // order). Normalised to an array here so a scalar that slipped past the
+    // writer's I() can never substring-match codes (override.indexOf on a
+    // string would make "Q7" hit inside "Q78").
     var h = TR.AGG && TR.AGG.project && TR.AGG.project.takeout_headline;
-    return (h && h.length) ? h : null;
+    if (!h) return null;
+    if (!Array.isArray(h)) {
+      h = String(h).split(/[,;]/).map(function (s) { return s.trim(); })
+        .filter(function (s) { return s.length > 0; });
+    }
+    return h.length ? h : null;
   }
+
+  /**
+   * Banner groups the Patterns scan may read. patterns_exclude_banners (config)
+   * names operational cuts — Interviewer, fieldwork admin — that must never
+   * become a client-facing portrait; matched on the banner's label or id,
+   * case/space/NBSP-insensitive. No config -> every banner group, as before.
+   */
+  function scanBannerGroups() {
+    var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    var ex = (TR.AGG && TR.AGG.project && TR.AGG.project.patterns_exclude_banners) || [];
+    if (!Array.isArray(ex)) ex = [ex];
+    if (!ex.length) return groups;
+    var norm = (takeout._shares && takeout._shares._normLabel) ||
+      function (s) { return String(s || "").trim().toLowerCase(); };
+    var set = {};
+    ex.forEach(function (x) { set[norm(x)] = true; });
+    return groups.filter(function (g) { return !set[norm(g.name)] && !set[norm(g.id)]; });
+  }
+  takeout._scanBannerGroups = scanBannerGroups;   // exposed for the node gate
 
   /** A tidy short label for a headline question (long question text -> a noun). */
   function shortLabel(q) {
@@ -179,7 +207,7 @@
     // floor there; keep the low-base threshold only for true samples.
     var census = typeof conf.fpcActiveReport === "function" && conf.fpcActiveReport();
     var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
-    var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    var groups = scanBannerGroups();
     var cols = {};
     var qs = views.indexQuestions();
     groups.forEach(function (g) {
@@ -318,7 +346,7 @@
       if (sc) famQs.push({ q: s.q, sc: sc, isPct: true });
     });
     if (!famQs.length) return null;
-    var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    var groups = scanBannerGroups();
     var cells = [], groupAgg = {}, order = [];
     groups.forEach(function (g) {
       var bv = micro.banner_vars[g.id];

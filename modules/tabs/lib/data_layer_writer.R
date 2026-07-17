@@ -184,6 +184,16 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     tracking    = isTRUE(config_obj$show_tracking %||% TRUE),
     qualitative = isTRUE(config_obj$show_qualitative %||% TRUE)
   )
+  # Patterns-tab levers (optional; omitted -> engine defaults, byte-identical).
+  # patterns_headline -> island field takeout_headline (the JS contract predates
+  # the tab's rename): the apex KPI question codes, in the order given.
+  # patterns_exclude_banners: banner labels/ids the Patterns scan must skip —
+  # operational cuts like Interviewer. I() keeps one-element lists as JSON
+  # arrays under auto_unbox (the JS expects arrays).
+  ph <- .dl_split_csv(config_obj$patterns_headline)
+  if (length(ph) > 0) proj$takeout_headline <- I(ph)
+  pxb <- .dl_split_csv(config_obj$patterns_exclude_banners)
+  if (length(pxb) > 0) proj$patterns_exclude_banners <- I(pxb)
   # Weighted designs carry a design effect the published data layer doesn't
   # expose per column, so the report's FPC re-letters significance only when
   # unweighted. Carried for the renderer to gate that (intervals are FPC'd
@@ -407,6 +417,20 @@ build_dl_columns <- function(banner_info, config_obj = NULL) {
   invisible(NULL)
 }
 
+
+#' Split a comma/semicolon-separated config value into a trimmed character vector
+#'
+#' For optional list-valued Settings keys (patterns_headline,
+#' patterns_exclude_banners). NULL / NA / empty -> character(0), so the caller
+#' can omit the island field entirely.
+#'
+#' @param x Raw config value (single string or NULL)
+#' @return Character vector of non-empty trimmed parts
+.dl_split_csv <- function(x) {
+  if (is.null(x) || length(x) == 0 || is.na(x[1])) return(character(0))
+  parts <- trimws(strsplit(as.character(x[1]), "[,;]")[[1]])
+  parts[nzchar(parts)]
+}
 
 #' Build the banner_groups[] array of the data layer
 #'

@@ -255,6 +255,23 @@ test_that("banner_groups and categories are derived from the data", {
   expect_setequal(unlist(dl$categories), c("Awareness", "Satisfaction"))
 })
 
+test_that("Patterns levers: headline + banner exclusion emitted as arrays, omitted when unset", {
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(patterns_headline = "Q78, Q79",
+                   patterns_exclude_banners = "Interviewer"))
+  expect_equal(as.character(dl$project$takeout_headline), c("Q78", "Q79"))
+  expect_equal(as.character(dl$project$patterns_exclude_banners), "Interviewer")
+  # one-element value must SERIALISE as a JSON array under auto_unbox — the JS
+  # contract expects arrays (a bare string would substring-match question codes)
+  expect_identical(
+    as.character(jsonlite::toJSON(dl$project$patterns_exclude_banners, auto_unbox = TRUE)),
+    '["Interviewer"]')
+  # unset -> keys absent entirely (byte-identical island for existing reports)
+  dl0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_null(dl0$project$takeout_headline)
+  expect_null(dl0$project$patterns_exclude_banners)
+})
+
 test_that("key_share (the Patterns favourable-share declaration) is carried; blank when undeclared", {
   q <- make_dl_q_single()
   q$key_share <- "Always"

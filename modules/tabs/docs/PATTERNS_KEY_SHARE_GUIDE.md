@@ -116,6 +116,28 @@ The WIL/practicum participation questions (Q031–Q048) can be tagged `Yes`
 if participation is the story that wave; they run on their course-filtered
 bases either way. Registration and profile questions stay blank.
 
+## Two Settings-sheet levers (added 2026-07-17)
+
+Both are rows on the config's Settings sheet, both optional, both parsed as
+comma/semicolon-separated lists.
+
+**`patterns_exclude_banners`** — banner labels (or ids) the Patterns scan
+must skip. Operational cuts like Interviewer are fieldwork QC, not client
+story: without this, the tab's lead portrait can be an interviewer effect
+("Lebogang carries a tension…"). The banner stays everywhere else —
+crosstabs, Differences — it just never becomes a portrait.
+CCPB W2026: `Interviewer`.
+
+**`patterns_headline`** — pins the apex KPI tiles to these question codes,
+in order. Without it the tab auto-detects satisfaction/overall-titled
+questions and takes the first three in questionnaire order — on CCPB that
+put delivery, invoicing and merchandising in the tiles (two of them both
+labelled "Satisfaction") and left the actual headlines, Q78 overall
+performance and Q79 recommend, off the page entirely.
+CCPB W2026: `Q78, Q79`.
+
+The third lever already existed: `show_patterns` = N hides the tab.
+
 ## Mechanics, for the record
 
 - The column flows Selection sheet → orchestrator → report island as

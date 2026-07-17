@@ -251,6 +251,17 @@ test_that("build_config_object defaults research_house sensibly when unset", {
   expect_equal(config_obj$research_house, "The Research LampPost")
 })
 
+test_that("Patterns levers pass the config whitelist (the config_obj gotcha)", {
+  empty <- build_config_object(list())
+  expect_null(empty$patterns_headline)
+  expect_null(empty$patterns_exclude_banners)
+  cfg <- build_config_object(list(
+    patterns_headline = "Q78, Q79",
+    patterns_exclude_banners = "Interviewer"))
+  expect_equal(cfg$patterns_headline, "Q78, Q79")
+  expect_equal(cfg$patterns_exclude_banners, "Interviewer")
+})
+
 test_that("crosstab config Selection sheet has expected columns", {
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
