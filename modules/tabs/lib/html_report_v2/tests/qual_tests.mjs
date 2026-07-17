@@ -741,6 +741,27 @@ qual._state = null; hostN.innerHTML = ""; qual.render(hostN);
 assert(hostN.innerHTML.indexOf("Uninformative comments hidden") >= 0,
   "render: the 'Uninformative comments hidden' chip reaches a raw-question header");
 
+// ---- footer verbatim-provenance note is plain and mode-aware --------------------
+function footNote(textMode) {
+  TR.QUAL = { textMode: textMode, noteworthyDefault: "all", demographicCuts: "allow",
+    demographics: [], verbatimScope: "all",
+    questions: [{ code: "QF", title: "Open", type: "raw", themes: [], base: { answered: 1 },
+      records: [{ idx: 0, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "a real comment" }] }] };
+  TR.disclosure = null; qual._state = null;
+  const h = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  qual.render(h);
+  return h.innerHTML;
+}
+assert(footNote("full").indexOf("comments shown as given, not edited post-survey") >= 0,
+  "footer: full mode says comments are shown as given, not edited post-survey");
+assert(footNote("redacted").indexOf("comments shown as given, identifying details removed") >= 0,
+  "footer: redacted mode says identifying details are removed (never claims 'not edited')");
+const hiddenFoot = footNote("hidden");
+assert(hiddenFoot.indexOf("shown as given") < 0 && hiddenFoot.indexOf("not edited") < 0,
+  "footer: hidden mode (no verbatims shown) carries no 'as given' note");
+assert(footNote("full").indexOf("model-authored") < 0,
+  "footer: the old 'model-authored' jargon is gone");
+
 // ---- Split band (NPS Detractor/Passive/Promoter) view-by ----------------------
 const qsplit = {
   code: "Q79", title: "Why recommend", type: "raw", themes: [],

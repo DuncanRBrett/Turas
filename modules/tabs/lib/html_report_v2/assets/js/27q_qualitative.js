@@ -1689,13 +1689,20 @@
 
   function footerHtml(island, q) {
     var dropped = q.meta && q.meta.dropped_codes ? q.meta.dropped_codes : 0;
+    // Provenance of the verbatim text — plain language, and honest per text mode:
+    // "full" ships the comment untouched; "redacted" removes identifying details but
+    // never rewrites; "hidden" shows no text at all, so the note is dropped.
+    var verbatimNote =
+      island.textMode === "hidden"   ? null :
+      island.textMode === "redacted" ? "comments shown as given, identifying details removed" :
+                                       "comments shown as given, not edited post-survey";
     var bits = [(q.base ? q.base.answered : 0) + " comments",
                 island.textMode !== "hidden" ? "✎ select text in a comment to highlight a passage" : null,
                 q.type === "themed" ? "themes are salience (raised unprompted), not prompted incidence" : null,
                 island.demographicCuts === "block" ? "demographic cuts blocked" :
                 island.demographicCuts === "safe" ? "demographic tags shown only where the group is large enough" : null,
                 dropped ? (dropped + " stray code(s) quarantined") : null,
-                "verbatims shown by ID — never model-authored"];
+                verbatimNote];
     return '<footer class="ql-foot">' + bits.filter(Boolean).join(" · ") + '</footer>';
   }
 
