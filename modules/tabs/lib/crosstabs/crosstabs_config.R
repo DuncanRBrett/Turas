@@ -274,6 +274,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     qual_confidentiality_mode = get_config_value(config, "qual_confidentiality_mode", "hidden"),
     qual_demographic_cuts = get_config_value(config, "qual_demographic_cuts", "allow"),
     qual_noteworthy_default = get_config_value(config, "qual_noteworthy_default", "all"),
+    # Verbatim scope: which comments ship readable text. "all" = every comment except
+    # hide-marked ones; "noteworthy" = only tier >= 1 (noteworthy/must-read/priority).
+    # Withheld comments still count in the distribution — only their text is withheld.
+    qual_verbatim_scope = get_config_value(config, "qual_verbatim_scope", "all"),
     qual_join_id_column = get_config_value(config, "qual_join_id_column", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
     # Must be populated here — config_obj is an explicit whitelist, not the raw settings.
@@ -785,7 +789,7 @@ load_crosstabs_config <- function(config_file) {
     "enable_checkpointing",
     # Qualitative confidentiality & disclosure control
     "qual_workbook", "qual_confidentiality_mode", "qual_demographic_cuts", "qual_noteworthy_default",
-    "qual_join_id_column", "min_reporting_base", "qual_tag_dimensions",
+    "qual_verbatim_scope", "qual_join_id_column", "min_reporting_base", "qual_tag_dimensions",
     # Sample composition & index summary
     "create_sample_composition", "create_index_summary",
     "index_summary_show_sections", "index_summary_show_base_sizes",

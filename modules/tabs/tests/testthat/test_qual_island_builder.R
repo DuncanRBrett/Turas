@@ -34,9 +34,9 @@ source(file.path(turas_root, "modules/tabs/lib/qual_island_builder.R"))
 
 mk_theme <- function(label) list(col = NA_integer_, label = label)
 mk_rec <- function(id, text, tier = 1L, sentiment = NA_integer_, rating = NA_real_,
-                   themeVals = list()) {
+                   themeVals = list(), hidden = FALSE) {
   list(id = id, text = text, noteworthy = tier >= 1L, noteworthy_tier = tier,
-       sentiment = sentiment, rating = rating, themeVals = themeVals)
+       hidden = hidden, sentiment = sentiment, rating = rating, themeVals = themeVals)
 }
 themed_question <- function(records) {
   list(code = "QUAL_OVERALL", title = "Why?", type = "themed",
@@ -219,4 +219,78 @@ test_that("invalid text mode falls back to hidden; dials and defaults carried", 
   expect_equal(island$demographicCuts, "block")        # carried for the JS
   expect_equal(island$noteworthyDefault, "all")        # invalid default -> all
   expect_equal(island$n, 2L)
+})
+
+# ==============================================================================
+# VERBATIM SCOPE — which comments ship their text (all-except-hide / noteworthy)
+# ==============================================================================
+
+# A four-record master: one priority (tier 3), one plain noteworthy (tier 1),
+# one un-noteworthy (tier 0), one explicitly hidden — every comment is themed, so
+# the distribution must count all four regardless of which text ships.
+scope_master <- list(id_to_idx = stats::setNames(0:3, c("1", "2", "3", "4")), n = 4L)
+scope_records <- list(
+  mk_rec("1", "priority quote", tier = 3L, sentiment = 1L, themeVals = list(Service = 1L)),
+  mk_rec("2", "noteworthy quote", tier = 1L, sentiment = 1L, themeVals = list(Service = 1L)),
+  mk_rec("3", "ordinary quote", tier = 0L, sentiment = 3L, themeVals = list(Price = 3L)),
+  mk_rec("4", "hidden quote", tier = 0L, sentiment = 2L, themeVals = list(Price = 2L), hidden = TRUE)
+)
+scope_island <- function(scope) {
+  qual_build_data_qual(list(themed_question(scope_records)), scope_master,
+                       list(text_mode = "full", verbatim_scope = scope))$questions[[1]]
+}
+
+test_that("scope 'all' ships every verbatim except hide-marked ones", {
+  q <- scope_island("all")
+  expect_equal(first_record(q, 0L)$text, "priority quote")
+  expect_equal(first_record(q, 1L)$text, "noteworthy quote")
+  expect_equal(first_record(q, 2L)$text, "ordinary quote")     # tier 0 still shows under 'all'
+  expect_true(is.na(first_record(q, 3L)$text))                 # hide -> text withheld
+  expect_true(isTRUE(first_record(q, 3L)$suppressed))          # and flagged for the list
+  # The other three are shown, so carry no suppressed flag.
+  expect_null(first_record(q, 0L)$suppressed)
+  expect_null(first_record(q, 2L)$suppressed)
+})
+
+test_that("scope 'noteworthy' ships only tier >= 1; ordinary + hidden are withheld", {
+  q <- scope_island("noteworthy")
+  expect_equal(first_record(q, 0L)$text, "priority quote")     # tier 3 shows
+  expect_equal(first_record(q, 1L)$text, "noteworthy quote")   # tier 1 shows
+  expect_true(is.na(first_record(q, 2L)$text))                 # tier 0 withheld
+  expect_true(isTRUE(first_record(q, 2L)$suppressed))
+  expect_true(is.na(first_record(q, 3L)$text))                 # hide withheld too
+  expect_true(isTRUE(first_record(q, 3L)$suppressed))
+})
+
+test_that("withheld comments still count: all records, themes, sentiment survive the scope", {
+  for (scope in c("all", "noteworthy")) {
+    q <- scope_island(scope)
+    expect_equal(length(q$records), 4L)                        # every record emitted
+    expect_equal(q$base$answered, 4L)                          # base counts all four
+    # Theme codes + sentiment ride even on a withheld record (idx 3, the hidden one).
+    hidden_rec <- first_record(q, 3L)
+    expect_equal(hidden_rec$sentiment, 2L)
+    expect_equal(hidden_rec$themeVals[["1"]], 2L)              # Price = theme id 1
+  }
+})
+
+test_that("verbatim scope is validated and carried on the island; invalid -> all", {
+  expect_equal(qual_build_data_qual(list(themed_question(records)), master,
+                                    list(verbatim_scope = "noteworthy"))$verbatimScope, "noteworthy")
+  expect_equal(qual_build_data_qual(list(themed_question(records)), master,
+                                    list(verbatim_scope = "bogus"))$verbatimScope, "all")
+  expect_equal(qual_build_data_qual(list(themed_question(records)), master,
+                                    list())$verbatimScope, "all")   # default
+})
+
+test_that("qual_verbatim_shows encodes the gate (hide always wins; scope picks the rest)", {
+  note <- list(noteworthy_tier = 1L, hidden = FALSE)
+  ord  <- list(noteworthy_tier = 0L, hidden = FALSE)
+  hid  <- list(noteworthy_tier = 1L, hidden = TRUE)   # marked hide despite a tier
+  expect_true(qual_verbatim_shows(note, "all"))
+  expect_true(qual_verbatim_shows(ord,  "all"))
+  expect_false(qual_verbatim_shows(hid, "all"))       # hide wins under 'all'
+  expect_true(qual_verbatim_shows(note, "noteworthy"))
+  expect_false(qual_verbatim_shows(ord, "noteworthy"))
+  expect_false(qual_verbatim_shows(hid, "noteworthy"))
 })

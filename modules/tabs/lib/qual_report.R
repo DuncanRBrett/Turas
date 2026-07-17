@@ -108,6 +108,7 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
     noteworthy_default = config_obj$qual_noteworthy_default,
+    verbatim_scope = config_obj$qual_verbatim_scope,
     min_reporting_base = config_obj$min_reporting_base))   # k for "safe" tag anonymisation
   list(status = "PASS", json = serialize_data_qual(island), island = island,
        matched = joined$matched, total = joined$total, id_column = joined$id_column)
@@ -247,6 +248,7 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
     noteworthy_default = config_obj$qual_noteworthy_default,
+    verbatim_scope = config_obj$qual_verbatim_scope,
     min_reporting_base = config_obj$min_reporting_base))   # k for "safe" tag anonymisation
 
   # The quant run used a minimal unweighted/dual-sig config; re-brand the project

@@ -40,6 +40,14 @@ QUAL_MISSING_TOKENS  <- c("", "-")
 QUAL_PRIORITY_MARKERS <- c("p", "priority")
 QUAL_MUSTREAD_MARKERS <- c("m", "must read", "must-read", "must", "must-read!", "critical")
 
+# Verbatim-suppression markers (case-insensitive). "hide"/"hidden" in the noteworthy
+# column withholds THIS comment's verbatim text from the report — it is counted in the
+# theme distribution like any other, but its text never ships (the build-time twin of a
+# reader who does not want a comment surfaced). A hide marker is NOT noteworthy: it
+# forces tier 0, so it can never be mistaken for an editorial "feature this" mark. This
+# is the one reserved exception to "any non-blank marker is at least noteworthy".
+QUAL_HIDE_MARKERS <- c("hide", "hidden")
+
 # A column is the overall-sentiment column only if at least this fraction of its
 # rows are populated (sentiment is dense; themes are sparse).
 QUAL_SENTIMENT_DENSITY_MIN <- 0.5
@@ -265,7 +273,9 @@ qual_num_or_na <- function(v) {
 #' Any non-blank marker is at least "noteworthy"; a marker in the must-read set is
 #' promoted to tier 2, and one in the priority set to tier 3. Marker-agnostic and
 #' case-insensitive, so "Yes"/"x"/"n" all read as tier 1, a coder's "m"/"Must read"
-#' as tier 2, and "p"/"Priority" as tier 3.
+#' as tier 2, and "p"/"Priority" as tier 3. The one exception is a hide marker
+#' ("hide"/"hidden"): it means "withhold this verbatim", not "feature it", so it reads
+#' as tier 0 (see qual_verbatim_hidden and QUAL_HIDE_MARKERS).
 #' @param marker The raw noteworthy cell value.
 #' @param mustread Character vector of must-read markers (lower-case).
 #' @param priority Character vector of priority markers (lower-case).
@@ -274,9 +284,20 @@ qual_noteworthy_tier <- function(marker, mustread = QUAL_MUSTREAD_MARKERS,
                                  priority = QUAL_PRIORITY_MARKERS) {
   m <- tolower(trimws(marker))
   if (!nzchar(m)) return(0L)
+  if (m %in% QUAL_HIDE_MARKERS) return(0L)   # a hide marker is a suppression, never noteworthy
   if (m %in% priority) return(3L)
   if (m %in% mustread) return(2L)
   1L
+}
+
+#' Whether a noteworthy-column marker withholds this comment's verbatim ("hide"/"hidden").
+#' Case-insensitive. A hidden comment is still counted in every distribution; only its
+#' text is withheld (build-time). Kept separate from the tier so the two axes — editorial
+#' emphasis vs suppression — never collide in one value.
+#' @param marker The raw noteworthy cell value.
+#' @return TRUE when the marker is a hide token.
+qual_verbatim_hidden <- function(marker) {
+  tolower(trimws(marker)) %in% QUAL_HIDE_MARKERS
 }
 
 #' Build one record from a data row; quarantines out-of-range theme/sentiment codes.
@@ -305,8 +326,10 @@ qual_record_from_row <- function(r, roles) {
   }
   note_marker <- cell(roles$noteworthy)
   tier <- qual_noteworthy_tier(note_marker)
+  hidden <- qual_verbatim_hidden(note_marker)
   record <- list(id = id, text = text,
                  noteworthy = tier >= 1L, noteworthy_tier = tier, noteworthy_marker = note_marker,
+                 hidden = hidden,
                  sentiment = sentiment, rating = qual_num_or_na(cell(roles$rating)),
                  themeVals = theme_vals, demos = demos)
   list(record = record, dropped = dropped)

@@ -69,6 +69,32 @@ const capeTown = q.records.filter((r) => r.demos && r.demos.Campus === "Cape Tow
 const cpt = qual.prevalence(capeTown, q.themes);
 assert(cpt[0].pct === 50 && cpt[1].pct === 50, "prevalence recomputes over the given audience (Cape Town)");
 
+// ---- verbatim scope: withheld comments count but do not list -------------------
+// The R build nulls a withheld comment's text and flags record.suppressed. The
+// distribution must still count it; the readable list must drop it.
+console.log("\nVerbatim scope (suppressed records count but don't list):");
+const scopeQ = {
+  code: "SC", title: "Why?", type: "themed",
+  themes: [{ id: 0, label: "Price" }, { id: 1, label: "Service" }],
+  records: [
+    { idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 }, text: "shown price" },
+    { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3 }, text: null, suppressed: true },
+    { idx: 2, tier: 0, sentiment: 2, themeVals: { "1": 2 }, text: null, suppressed: true }
+  ]
+};
+assert(qual.shown(scopeQ.records).length === 1, "shown() keeps only non-suppressed records");
+assert(qual.shown(scopeQ.records)[0].idx === 0, "shown() keeps the right record");
+// Distribution counts every record, suppressed or not: Price raised by 2 of 3.
+const scPrev = qual.prevalence(scopeQ.records, scopeQ.themes);
+assert(scPrev[0].label === "Price" && scPrev[0].n === 2 && scPrev[0].pct === 67,
+  "prevalence counts suppressed records too (Price 2 of 3 = 67%)");
+// The readable list drops them.
+const scSt = { band: null, theme: null, tier: "all", sentiment: null, savedOnly: false };
+assert(qual.visibleRecords(scopeQ, scSt, scopeQ.records).length === 1,
+  "visibleRecords drops suppressed records from the list");
+assert(qual.poolBeforeSentiment(scopeQ, scSt, scopeQ.records).length === 1,
+  "poolBeforeSentiment drops suppressed records (so sentiment chip counts match the list)");
+
 // ---- theme x banner crosstab (column base = commenters; salience + valence + sig) ----
 console.log("\nQualitative theme x banner crosstab:");
 const xrecs = [
@@ -665,6 +691,34 @@ const pHtml = hostP.innerHTML;
 assert(pHtml.indexOf('data-tier="priority"') >= 0, "render: the Priority tier-filter button reaches the DOM");
 assert(pHtml.indexOf('class="ql-star priority" title="priority"') >= 0, "render: a tier-3 comment shows the Priority star");
 assert(pHtml.indexOf('class="ql-star must" title="must-read"') >= 0, "render: a tier-2 comment shows the Must-read star");
+
+// ---- board note: a curated (suppressed-bearing) themed question says so ---------
+TR.AGG = { banner_groups: [], columns: [] };   // no banner -> no crosstab toggle, board renders
+TR.MICRO = null;
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
+  questions: [{ code: "QN", title: "Why?", type: "themed",
+    themes: [{ id: 0, label: "Price" }], base: { answered: 3 },
+    records: [
+      { idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "shown" },
+      { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3 }, demos: {}, text: null, suppressed: true },
+      { idx: 2, tier: 0, sentiment: 2, themeVals: { "0": 2 }, demos: {}, text: null, suppressed: true }
+    ] }] };
+TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+  questionByCode: () => null, filterDescription: () => "" };
+TR.disclosure = null; qual._state = null;
+const hostN = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+qual.render(hostN);
+assert(hostN.innerHTML.indexOf("Distribution reflects all 3 comments") >= 0 &&
+  hostN.innerHTML.indexOf("1 are shown as readable quotes") >= 0,
+  "render: the board note states the full distribution base and the shown count");
+// The suppressed comments never render as comment cards.
+assert(hostN.innerHTML.indexOf("[quote hidden") < 0,
+  "render: withheld comments are not listed as placeholder cards");
+// A fully-shown question carries no board note.
+TR.QUAL.questions[0].records = [{ idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "shown" }];
+qual._state = null; hostN.innerHTML = ""; qual.render(hostN);
+assert(hostN.innerHTML.indexOf("Distribution reflects all") < 0,
+  "render: no board note when every comment is shown");
 
 // ---- Split band (NPS Detractor/Passive/Promoter) view-by ----------------------
 const qsplit = {

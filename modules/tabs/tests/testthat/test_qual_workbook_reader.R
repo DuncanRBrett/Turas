@@ -90,6 +90,19 @@ test_that("qual_noteworthy_tier maps markers to tiers (0 other / 1 note / 2 must
   expect_equal(qual_noteworthy_tier("p"), 3L)        # priority code (lead-with)
   expect_equal(qual_noteworthy_tier("P"), 3L)
   expect_equal(qual_noteworthy_tier(" Priority "), 3L)   # word alias, case/space-insensitive
+  # A hide marker is a suppression, never noteworthy — tier 0, not tier 1.
+  expect_equal(qual_noteworthy_tier("hide"), 0L)
+  expect_equal(qual_noteworthy_tier("Hidden"), 0L)
+  expect_equal(qual_noteworthy_tier(" HIDE "), 0L)
+})
+
+test_that("qual_verbatim_hidden detects hide/hidden markers, case- and space-insensitive", {
+  expect_true(qual_verbatim_hidden("hide"))
+  expect_true(qual_verbatim_hidden("Hidden"))
+  expect_true(qual_verbatim_hidden("  HIDE  "))
+  expect_false(qual_verbatim_hidden(""))              # blank is shown, not hidden
+  expect_false(qual_verbatim_hidden("x"))             # a tier-1 mark is not a hide
+  expect_false(qual_verbatim_hidden("p"))             # priority is not a hide
 })
 
 # ==============================================================================

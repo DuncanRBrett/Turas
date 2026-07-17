@@ -457,16 +457,29 @@
     return (records || []).filter(function (r) { return r.band === band; });
   };
 
-  /** How many of `records` fall in `band` ("" = every band) — for the segment counts. */
+  /** How many of `records` fall in `band` ("" = every band) — for the segment counts.
+   *  Counts only shown comments, so the band buttons match the list they navigate. */
   qual.bandCount = function (q, records, band) {
-    return qual.bandFilter(q, records, band).length;
+    return qual.bandFilter(q, qual.shown(records), band).length;
   };
 
-  /** The pool a sentiment pick filters: band -> theme -> tier -> shortlist (everything
-   *  but the sentiment filter itself), so the sentiment buttons can show "if I click
-   *  this, N comments". The band narrows first so every downstream count is per-band. */
+  /** Records whose verbatim ships — i.e. NOT withheld by the build-time verbatim scope
+   *  or a "hide" marker (record.suppressed). Withheld comments are counted in every
+   *  distribution (prevalence, coverage, crosstab all read the full audience) but never
+   *  appear in the readable comment LIST, so this gate is applied only on the list path,
+   *  never on the chart. A report built with qual_verbatim_scope = all and no hide marks
+   *  has no suppressed records, so this is a no-op for the common case. */
+  qual.shown = function (records) {
+    return (records || []).filter(function (r) { return !r.suppressed; });
+  };
+
+  /** The pool a sentiment pick filters: shown -> band -> theme -> tier -> shortlist
+   *  (everything but the sentiment filter itself), so the sentiment buttons can show
+   *  "if I click this, N comments". Withheld verbatims drop out first so the list and
+   *  its counts reflect only readable comments; the band narrows next so every
+   *  downstream count is per-band. */
   qual.poolBeforeSentiment = function (q, st, audience) {
-    var base = qual.bandFilter(q, audience, st.band);
+    var base = qual.bandFilter(q, qual.shown(audience), st.band);
     var pool = (q.type === "themed" && st.theme != null) ? qual.recordsForTheme(base, st.theme) : base;
     var records = qual.tierFilter(pool, st.tier);
     if (st.savedOnly) records = qual.savedFilter(records, q.code);
@@ -1430,6 +1443,15 @@
       ? '<span class="ql-hint ql-champrule">Examples show one positive + one negative comment per theme; ' +
         "your ★ shortlisted picks always lead.</span>"
       : "";
+    // Honesty note: when the report curates the readable set (qual_verbatim_scope /
+    // hide markers), say so on the board's face — the distribution reflects EVERY
+    // comment, but only a subset are shown as readable quotes. Keeps a reader from
+    // mistaking "few quotes" for "few comments".
+    var shownN = qual.shown(audience).length, totalN = audience.length;
+    var scopeNote = shownN < totalN
+      ? '<span class="ql-hint ql-scopenote">Distribution reflects all ' + totalN +
+        " comments; " + shownN + " are shown as readable quotes (the rest are counted, not displayed).</span>"
+      : "";
     return '<div class="ql-board"><div class="ql-boardhd">' +
       '<div class="ql-boardhdrow"><span class="ql-boardttl">What people raised</span>' +
       '<div class="ql-boardtools">' + tools + "</div></div>" +
@@ -1438,7 +1460,7 @@
       'of that theme’s comments, so every theme is equal width and the lean shows the balance: ' +
       '<b class="qc-neg">negative</b> left, <b class="qc-pos">positive</b> right, ' +
       '<b class="qc-neu">mixed</b> centre; net = net sentiment %. ' +
-      "Click a theme to read its comments.</span>" + champRule +
+      "Click a theme to read its comments.</span>" + champRule + scopeNote +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
   }
 

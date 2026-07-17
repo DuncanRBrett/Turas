@@ -918,6 +918,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-inlinetoggle input { cursor: pointer; margin: 0; }
 /* fix #1: the one-line selection-rule note, shown only when examples are on */
 .ql-champrule { display: block; margin-top: 4px; font-style: italic; }
+.ql-scopenote { display: block; margin-top: 4px; font-weight: 500; color: var(--ink); }
 .ql-boardgrid { display: flex; flex-direction: column; }
 /* Diverging sentiment chart: label | diverging bar | salience % | net %. */
 .ql-prow, .ql-daxis { display: grid; grid-template-columns: 180px 1fr 48px 56px; align-items: center; gap: 16px; }

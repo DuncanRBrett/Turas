@@ -21,6 +21,11 @@
 
 # Verbatim-text confidentiality modes (dial 2; default hidden = numbers-only ship).
 QUAL_TEXT_MODES <- c("hidden", "redacted", "full")
+# Verbatim scope (dial 3): which comments ship readable text. "all" ships every comment
+# except hide-marked ones; "noteworthy" ships only tier >= 1 (noteworthy/must-read/
+# priority). Orthogonal to text mode — scope picks WHICH comments, text mode picks HOW
+# their text is treated. Every comment is counted in the distribution regardless.
+QUAL_VERBATIM_SCOPES <- c("all", "noteworthy")
 # Report-level default for the noteworthy tier filter (dial honoured in the JS).
 QUAL_NOTEWORTHY_DEFAULTS <- c("all", "noteworthy", "must_read", "priority")
 
@@ -74,16 +79,42 @@ qual_cfg <- function(config, key, default) {
   if (is.null(value) || (length(value) == 1L && is.na(value))) default else value
 }
 
+#' Whether a record's verbatim text ships, given the report's verbatim scope.
+#'
+#' The scope decides which comments are readable; every comment is counted in the theme
+#' distribution regardless (its text is the only thing withheld). A comment is shown when:
+#'   - scope "all"        — always, UNLESS it carries a hide marker; or
+#'   - scope "noteworthy" — only when it is tier >= 1 (noteworthy / must-read / priority),
+#'                          and a hide marker still withholds it (redundant, since a hide
+#'                          marker is tier 0, but explicit).
+#' An unthemed, un-noteworthy comment under "noteworthy" scope is simply not shown — it
+#' still counts, it just carries no readable text (Duncan's rule: theme all, show some).
+#' @param rec A reader record (noteworthy_tier, hidden).
+#' @param scope "all" or "noteworthy".
+#' @return TRUE when the verbatim text should ship.
+qual_verbatim_shows <- function(rec, scope) {
+  if (isTRUE(rec$hidden)) return(FALSE)
+  if (identical(scope, "noteworthy")) return(isTRUE(rec$noteworthy_tier >= 1L))
+  TRUE
+}
+
 #' Build one record's island entry, remapping theme labels to ids and applying text mode.
-#' @param rec A reader record (id, text, noteworthy_tier, sentiment, rating, themeVals).
+#' @param rec A reader record (id, text, noteworthy_tier, hidden, sentiment, rating, themeVals).
 #' @param idx The respondent's anonymous 0-based index.
 #' @param theme_id_map Named list mapping theme label -> 0-based theme id.
 #' @param text_mode One of QUAL_TEXT_MODES.
 #' @param demo_labels Banner-dimension labels to carry as record demographics (empty
 #'   when the demographic-cuts dial is "block", so no demographics enter the island).
+#' @param scope Verbatim scope ("all" or "noteworthy") — governs whether THIS record's
+#'   text ships. A withheld record is emitted with text = null and suppressed = TRUE, so
+#'   it still counts in the distribution but is never listed as a readable comment.
 #' @return list(record, redactions).
-qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_labels) {
-  applied <- qual_apply_text_mode(rec$text, text_mode)
+qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_labels,
+                                      scope = "all") {
+  shows <- qual_verbatim_shows(rec, scope)
+  # A withheld verbatim never enters the island as text (build-time confidentiality /
+  # curation) — no text mode, no PII scrub needed, nothing readable in the page source.
+  applied <- if (shows) qual_apply_text_mode(rec$text, text_mode) else list(text = NULL, redactions = 0L)
   theme_vals <- list()
   for (label in names(rec$themeVals)) {
     id <- theme_id_map[[label]]
@@ -95,6 +126,10 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
     noteworthy = isTRUE(rec$noteworthy), tier = rec$noteworthy_tier,
     sentiment = rec$sentiment, rating = rec$rating, themeVals = theme_vals
   )
+  # suppressed = withheld from the readable list (scope or hide). Emitted only when true
+  # so the JS drops it from the comment list while still counting it everywhere else;
+  # absent (the common case) reads as false, keeping the island lean.
+  if (!shows) record$suppressed <- TRUE
   # The split band (NPS Detractor/Passive/Promoter etc.) is a first-class report-level
   # axis, carried alongside sentiment — NOT a demographic tag, so it is never subject to
   # the demographic k-anonymisation (the band mirrors a closed question already reported).
@@ -199,9 +234,10 @@ qual_kanon_tags_by_group <- function(rows, ids, bands, labels, k) {
 #' @param demo_labels Banner-dimension labels to carry as record demographics.
 #' @param demo_map Optional named list (respondent id -> k-anonymised demos) used by the
 #'   "safe" tagging mode; when supplied it replaces each record's raw demographics.
+#' @param scope Verbatim scope ("all" or "noteworthy"), passed to each record build.
 #' @return The per-question island list (code, title, type, base, themes, records, meta).
 qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labels = character(0),
-                                       demo_map = NULL) {
+                                       demo_map = NULL, scope = "all") {
   themes <- question$roles$themes
   theme_list <- lapply(seq_along(themes),
                        function(i) list(id = i - 1L, label = themes[[i]]$label))
@@ -215,7 +251,7 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
     slot <- unname(id_to_idx[rec$id])
     if (length(slot) != 1L || is.na(slot)) next
     if (!is.null(demo_map)) rec$demos <- demo_map[[as.character(rec$id)]]   # "safe" mode k-anon tags
-    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels)
+    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels, scope)
     records[[length(records) + 1L]] <- built$record
     redactions <- redactions + built$redactions
   }
@@ -255,6 +291,11 @@ qual_build_data_qual <- function(questions, master, config = list()) {
   # tags that still covers >= k people ("Admin" when there are 70, not "Admin + <1yr" when 3).
   default_tier <- qual_cfg(config, "noteworthy_default", "all")
   if (!default_tier %in% QUAL_NOTEWORTHY_DEFAULTS) default_tier <- "all"
+  # Verbatim scope: which comments ship their readable text. "all" ships everything bar
+  # hide-marked comments; "noteworthy" ships only tier >= 1 (plus hide still withholds).
+  # Withheld comments are still counted in every distribution — only their text is gone.
+  scope <- qual_cfg(config, "verbatim_scope", "all")
+  if (!scope %in% QUAL_VERBATIM_SCOPES) scope <- "all"
   # Demographics ride the island unless blocked (then the tab is Total-only, no demos leak).
   banner_dims <- if (identical(cuts, "block") || is.null(master$banner_dims)) list() else master$banner_dims
   demo_labels <- vapply(banner_dims, function(d) d$label, character(1))
@@ -283,9 +324,9 @@ qual_build_data_qual <- function(questions, master, config = list()) {
     }
   }
   islands <- lapply(questions,
-                    function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels, demo_map))
+                    function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels, demo_map, scope))
   out <- list(textMode = text_mode, demographicCuts = cuts, noteworthyDefault = default_tier,
-              n = master$n, questions = islands)
+              verbatimScope = scope, n = master$n, questions = islands)
   if (length(demo_labels)) {
     out$demographics <- lapply(banner_dims, function(d) list(label = d$label, values = d$values))
   }
