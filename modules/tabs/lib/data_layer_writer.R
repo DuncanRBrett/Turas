@@ -690,6 +690,13 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   theme_val <- if (is.null(theme_val) || length(theme_val) == 0 || is.na(theme_val[1])) ""
                else as.character(theme_val[1])
 
+  # KeyShare = the analyst-declared favourable share for the Patterns scan
+  # (Selection sheet column; see question_orchestrator.R). "" when undeclared —
+  # the JS then leaves the question out of the scan.
+  key_share_val <- q_result$key_share
+  key_share_val <- if (is.null(key_share_val) || length(key_share_val) == 0 || is.na(key_share_val[1])) ""
+                   else as.character(key_share_val[1])
+
   q_type_v2 <- map_question_type(q_result$question_type)
 
   # Scale maximum for the dashboard gauge/heatmap ("% of each scale's
@@ -747,6 +754,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     title       = as.character(q_result$question_text %||% ""),
     category    = cat_val,
     theme       = theme_val,
+    key_share   = key_share_val,
     type        = q_type_v2,
     bases       = bases,
     rows        = rows,

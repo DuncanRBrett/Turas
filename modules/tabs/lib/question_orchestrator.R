@@ -588,6 +588,20 @@ process_single_question <- function(question_code, prepared_data,
     NA_character_
   }
 
+  # Extract KeyShare (optional): the exact option / box / NET label whose share
+  # summarises this question for the Patterns tab, HIGHER-IS-BETTER by the
+  # analyst's declaration (e.g. "Always" on delivery-day, "Not a problem" on
+  # language). Blank = the question stays out of the Patterns scan. Carried to
+  # the v2 data layer as q.key_share; ignored on rated questions (their index
+  # already summarises them).
+  q_key_share <- if (!is.null(question_row$KeyShare) &&
+                     !is.na(question_row$KeyShare) &&
+                     nzchar(trimws(question_row$KeyShare))) {
+    trimws(question_row$KeyShare)
+  } else {
+    NA_character_
+  }
+
   # Extract human-readable filter label (optional, overrides raw filter expression in display)
   q_filter_label <- if (!is.null(question_row$FilterLabel) &&
                         !is.na(question_row$FilterLabel) &&
@@ -608,6 +622,7 @@ process_single_question <- function(question_code, prepared_data,
     category = q_category,
     category_order = q_category_order,
     theme = q_theme,
+    key_share = q_key_share,
     partial_sections = partial_sections  # TRS v1.0: Track section-level failures
   ))
 }

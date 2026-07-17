@@ -234,7 +234,7 @@ load_question_selection <- function(config_file) {
   # are the V12 qualitative jump columns on the open-end rows (CommentSheet = the
   # comment-workbook sheet that codes this open-end; CommentLink = the closed
   # question/composite it explains) — see qual_build_links().
-  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "CommentSheet", "CommentLink")) {
+  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "KeyShare", "CommentSheet", "CommentLink")) {
     if (!col %in% names(selection_df)) {
       selection_df[[col]] <- NA_character_
     } else {

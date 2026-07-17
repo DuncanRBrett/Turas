@@ -73,6 +73,12 @@
    *  bar coloured by direction (strain = below, strong = above). A peer note marks
    *  where the group is the highest / lowest of its banner siblings ("highest of 3
    *  campuses"). Both value and baseline are real cells — no synthetic aggregate. */
+  /** A portrait cell in its own units: "62%" for a KeyShare row, "4.2" for an
+   *  index — the same real-cell values the crosstab shows. */
+  function portraitCell(row, v) {
+    return row.isPct ? Math.round(v) + "%" : Number(v).toFixed(1);
+  }
+
   ui.portraitRow = function (e, dir) {
     var max = e.scaleMax || 5;
     var w = Math.min(100, Math.max(0, (e.value || 0) / max * 100)).toFixed(1);
@@ -85,8 +91,8 @@
     return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(e.label) + peer + "</div>" +
       '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' +
       (dir === "high" ? "strong" : "strain") + '" style="width:' + w + '%"></span></span>' +
-      '<span class="tko-rv">' + Number(e.value).toFixed(1) +
-      '<span class="tko-rest"> / ' + Number(e.rest).toFixed(1) + "</span></span></div></div>";
+      '<span class="tko-rv">' + portraitCell(e, e.value) +
+      '<span class="tko-rest"> / ' + portraitCell(e, e.rest) + "</span></span></div></div>";
   };
 
   /** The editable takeaway seed for a portrait — the tension in one sentence:
@@ -96,18 +102,28 @@
     var strained = p.lean === "strained";
     var hi = p.highs && p.highs[0], lo = p.lows && p.lows[0];
     var majCount = strained ? p.hits : p.gains;
+    // "questions scored" = the scan's actual reach (rated indexes + declared
+    // key shares), so the count never reads as the whole questionnaire.
     var lead = p.subject + (strained ? " is under strain — below the overall on "
-      : " is the strong group — above the overall on ") + majCount + " of " + p.total +
-      " rated questions";
+      : " is the strong group — above the overall on ") + majCount + " of the " + p.total +
+      " questions scored";
     if (strained && hi) {
+      // An index counter-spike reads as a rating; a KeyShare one as a lead on
+      // the share. Both quote the two real cells.
+      if (hi.isPct) {
+        return lead + " — yet " +
+          (hi.peerTop && hi.peerCount > 1 ? "leads every " + p.group.toLowerCase() + " on “"
+            : "leads on “") + hi.label + "” (" + portraitCell(hi, hi.value) + " vs " +
+          portraitCell(hi, hi.rest) + " overall).";
+      }
       return lead + " — yet rates “" + hi.label + "” highest" +
         (hi.peerTop && hi.peerCount > 1 ? " of any " + p.group.toLowerCase() : "") +
-        " (" + Number(hi.value).toFixed(1) + " vs " + Number(hi.rest).toFixed(1) +
+        " (" + portraitCell(hi, hi.value) + " vs " + portraitCell(hi, hi.rest) +
         " overall).";
     }
     if (!strained && lo) {
-      return lead + " — yet dips on “" + lo.label + "” (" + Number(lo.value).toFixed(1) +
-        " vs " + Number(lo.rest).toFixed(1) + " overall). The one to watch.";
+      return lead + " — yet dips on “" + lo.label + "” (" + portraitCell(lo, lo.value) +
+        " vs " + portraitCell(lo, lo.rest) + " overall). The one to watch.";
     }
     return lead + (strained && lo ? ", most on “" + lo.label + "”." : ".");
   };
@@ -213,8 +229,8 @@
   ui.patternSeed = function (p) {
     if (p.kind === "portrait") return ui.portraitTension(p);
     if (p.id === "group") {
-      return p.subject + " scores below the overall on " + p.hits + " of " + p.total +
-        " rated questions — the group most under strain.";
+      return p.subject + " scores below the overall on " + p.hits + " of the " + p.total +
+        " questions scored — the group most under strain.";
     }
     if (p.id === "split") {
       // Navigation pointer — no synthetic average. (sigGaps = directionally-

@@ -567,6 +567,181 @@ run("curation reset()/deletions survive reload — owning state beats the island
   sandbox.TR.userState = undefined;
 });
 
+// ---------------------------------------------------------------------------
+// KeyShare — share questions join the scan (tier one)
+// ---------------------------------------------------------------------------
+
+run("KeyShare row resolution: NETs first, no diff rows, NBSP/case/space-safe, no guessing", () => {
+  const shares = takeout._shares;
+  const q = {
+    code: "Q12", key_share: "always  ",
+    net_diffs: { "3": true },
+    rows: [
+      { kind: "category", label: "Always " },
+      { kind: "category", label: "Sometimes" },
+      { kind: "net", label: "Always" },          // a NET sharing the option's label wins
+      { kind: "net", label: "NET POSITIVE" }
+    ]
+  };
+  assert(shares._resolveRow(q) === 2, "NET row beats the same-named category");
+  assert(shares._resolveRow({ code: "Q", key_share: "NET POSITIVE", net_diffs: { "0": true },
+    rows: [{ kind: "net", label: "NET POSITIVE" }] }) === -1,
+    "a score-difference NET can never be the share");
+  assert(shares._resolveRow({ code: "Q", key_share: "Never", rows: q.rows }) === -1,
+    "no matching row -> -1, the question stays out (no guessing)");
+});
+
+run("KeyShare eligibility: rated and classification questions stay out", () => {
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q_RATED", key_share: "Agree" }]),
+    _isClassification: (q) => q.code === "S01"
+  };
+  TR.AGG = { questions: [
+    { code: "Q_RATED", key_share: "Agree", rows: [{ kind: "category", label: "Agree" }] },
+    { code: "S01", key_share: "Male", rows: [{ kind: "category", label: "Male" }] },
+    { code: "Q12", key_share: "Always", rows: [{ kind: "category", label: "Always" }] },
+    { code: "Q13", rows: [{ kind: "category", label: "Yes" }] }
+  ] };
+  const list = takeout._shares.list(TR.views);
+  assert(list.length === 1 && list[0].q.code === "Q12" && list[0].ri === 0,
+    "only the declared, non-rated, non-classification share scans");
+});
+
+run("KeyShare score vector: 0/100/null with the published denominator", () => {
+  const shares = takeout._shares;
+  // single: answered-unshown (-2) counts in the base, never the numerator
+  const single = { q: { code: "Q", rows: [{ kind: "category", label: "Yes" }] }, ri: 0 };
+  const v1 = shares.scoreVector(single, { answers: { Q: [0, 1, -2, null] } }, 4);
+  assert(JSON.stringify(v1) === "[100,0,0,null]", "single: in/out/unshown/skip -> " + JSON.stringify(v1));
+  // multi: any mention of a wanted member counts once
+  const multi = { q: { code: "M", rows: [{ kind: "net", label: "NET Uses" }],
+    net_members: { "0": [2, 3] } }, ri: 0 };
+  const v2 = shares.scoreVector(multi, { answers: { M: [[0, 2], [1], null] } }, 3);
+  assert(JSON.stringify(v2) === "[100,0,null]", "multi via net_members -> " + JSON.stringify(v2));
+  // box-scored NET (no members, no raw answers): box membership is the source
+  const boxed = { q: { code: "B", rows: [{ kind: "net", label: "Good" }] }, ri: 0 };
+  const v3 = shares.scoreVector(boxed, { boxes: { B: [0, 1, null] } }, 3);
+  assert(JSON.stringify(v3) === "[100,0,null]", "box-scored NET -> " + JSON.stringify(v3));
+  assert(shares.scoreVector(boxed, {}, 3) === null, "no microdata for the question -> null");
+});
+
+run("KeyShare strain gathering: the declared share joins as a real % cell (known answer)", () => {
+  TR.conf = { fpcActiveReport: () => false };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: { low_base_threshold: 30 },
+    banner_groups: [{ id: "B", name: "Depot" }],
+    questions: [{ code: "Q12", title: "Correct delivery day", key_share: "Always",
+      rows: [{ kind: "category", label: "Always" }, { kind: "category", label: "Sometimes" }] }] };
+  TR.MICRO = null;
+  TR.views = { indexQuestions: () => [], _meanRow: (m) => null };
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 80 }, { label: "A", base: 40 }, { label: "B2", base: 40 }],
+    rows: [
+      { kind: "category", cells: [{ pct: 71 }, { pct: 62 }, { pct: 80 }] },
+      { kind: "category", cells: [{ pct: 29 }, { pct: 38 }, { pct: 20 }] }
+    ] }) };
+  const g = takeout.gather();
+  assert(g.columns.length === 2, "two depot columns gathered, got " + g.columns.length);
+  const a = g.columns.filter((c) => c.column === "A")[0];
+  assert(a && a.gaps.length === 1, "one share gap on depot A");
+  const gap = a.gaps[0];
+  assert(gap.isPct === true && gap.scaleMax === 100, "share gap is a % on the 0-100 scale");
+  close(gap.value, 62, 1e-9, "the group's real cell");
+  close(gap.total, 71, 1e-9, "the overall's real cell");
+  assert(g.scope.rated === 0 && g.scope.shares === 1, "scan scope stamped");
+  assert(g.reliability.n === 80, "share-only study still stamps n from the Total base, got " + g.reliability.n);
+});
+
+run("KeyShare portraits render as percentages, and the tension sentence speaks share", () => {
+  TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
+  // Depot A: strained on two rated questions, yet leads every depot on the share.
+  const cols = [
+    { column: "A", group: "Depot", base: 40, gaps: [
+      { title: "Ease of ordering", value: 3.0, total: 3.8, scaleMax: 5 },
+      { title: "Invoicing", value: 3.1, total: 3.9, scaleMax: 5 },
+      { title: "Correct delivery day", value: 84, total: 71, scaleMax: 100, isPct: true }] },
+    { column: "B2", group: "Depot", base: 40, gaps: [
+      { title: "Ease of ordering", value: 4.4, total: 3.8, scaleMax: 5 },
+      { title: "Invoicing", value: 4.5, total: 3.9, scaleMax: 5 },
+      { title: "Correct delivery day", value: 58, total: 71, scaleMax: 100, isPct: true }] }
+  ];
+  const t = takeout.buildPatterns({ columns: cols, scope: { rated: 2, shares: 1 } });
+  const port = t.patterns.filter((p) => p.kind === "portrait" && p.subject === "A")[0];
+  assert(port, "depot A earns a portrait");
+  assert(port.highs.length === 1 && port.highs[0].isPct === true, "the share is its high side");
+  const seed = takeout.ui.portraitTension(port);
+  assert(seed.indexOf("leads every depot on “Correct delivery day” (84% vs 71% overall)") !== -1,
+    "tension sentence quotes the share cells: " + seed);
+  assert(seed.indexOf("questions scored") !== -1, "the count names the scanned set, not the questionnaire");
+  const html = takeout.readView.html(t);
+  assert(html.indexOf('tko-rv">84%<') !== -1 && html.indexOf("/ 71%") !== -1,
+    "portrait row shows the two real % cells");
+  assert(html.indexOf('tko-rv">84.0<') === -1 && html.indexOf("/ 71.0") === -1,
+    "a share value never renders as a decimal index");
+});
+
+run("KeyShare cells join the trust-gate family; odd-one-out never reads them (known answer)", () => {
+  // 80 respondents, two depots of 40. One rated question (A runs 0.5 below B)
+  // and one share (A 80% in-share, B 30%). gap = group - OVERALL: share overall
+  // = 44/80 = 55% -> A +25pp exactly. meanGap must stay rated-only.
+  const N = 80, bv = [], rate = [], ans = [];
+  for (let i = 0; i < N; i++) {
+    const a = i < 40;
+    bv.push(a ? 0 : 1);
+    rate.push(a ? (i % 2 ? 3 : 4) : (i % 2 ? 4 : 5));          // A mean 3.5, B mean 4.5
+    ans.push(a ? (i % 5 < 4 ? 0 : 1) : (i % 10 < 3 ? 0 : 1));  // A 32/40=80%, B 12/40=30%
+  }
+  TR.conf = { fpcActiveReport: () => false };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Depot" }],
+    questions: [{ code: "Q_SHARE", title: "Correct delivery day", key_share: "Always",
+      rows: [{ kind: "category", label: "Always" }, { kind: "category", label: "Never" }] }] };
+  TR.MICRO = { n: N, weights: null, banner_vars: { B: bv },
+    scores: { Q_RATE: rate }, answers: { Q_SHARE: ans } };
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q_RATE", title: "Rating", category: "", type: "scale",
+      scale_max: 5, rows: [{ kind: "mean" }] }]),
+    _meanRow: (m) => null
+  };
+  TR.model = { forQuestion: () => ({
+    columns: [{ base: N }, { label: "A", base: 40 }, { label: "B2", base: 40 }],
+    rows: [] }) };
+  const g = takeout.gather();
+  assert(g.fdr && g.fdr.questionCount === 2, "family scans rated + share, got " +
+    (g.fdr && g.fdr.questionCount));
+  const shareCells = g.fdr.cells.filter((c) => c.q === "Q_SHARE");
+  assert(shareCells.length === 2 && shareCells.every((c) => c.isPct), "share cells marked isPct");
+  const aCell = shareCells.filter((c) => c.group === "A")[0];
+  close(aCell.gap, 25, 1e-6, "share gap = 80% - 55% overall = +25pp");
+  const gate = takeout._fdrGate(g.fdr);
+  const aGroup = gate.groups.filter((x) => x.group === "A")[0];
+  close(aGroup.meanGap, -0.5, 1e-6, "meanGap stays rated-only scale points (3.5 - 4.0)");
+  assert(aGroup.qn === 2, "sign test counts BOTH cells, got " + aGroup.qn);
+  assert(gate.survivorSet[g.fdr.cells.indexOf(aCell)],
+    "a 50pp A-vs-B split survives BH — the share is genuinely gated, not decoration");
+  // The share cell FLIPS A's rated direction (below on rating, far above on the
+  // share) with a huge gap — everything the odd-one-out looks for — yet it must
+  // never fire on a pp cell (scale-point floors, F1 guard).
+  const odd = takeout._oddOnePattern(g.fdr, gate);
+  assert(odd && odd.nullResult, "odd-one-out ignores isPct cells");
+});
+
+run("empty state is scope-honest: 'nothing found' only when something was scanned", () => {
+  const none = takeout.readView.html(takeout.buildPatterns({ scope: { rated: 0, shares: 0 } }));
+  assert(none.indexOf("nothing it can score") !== -1, "unscannable study says so");
+  assert(none.indexOf("KeyShare") !== -1, "and points at the fix");
+  assert(none.indexOf("No clear cross-question pattern") === -1,
+    "an unscannable study never claims a null finding");
+  const noGroups = takeout.readView.html(takeout.buildPatterns({ scope: { rated: 3, shares: 0 } }));
+  assert(noGroups.indexOf("Nothing to compare") !== -1, "questions but no groups says so");
+  const genuine = takeout.readView.html(takeout.buildPatterns({
+    scope: { rated: 1, shares: 0 },
+    columns: [{ column: "A", group: "G", base: 40,
+      gaps: [{ title: "Q", value: 3.99, total: 4.0, scaleMax: 5 }] }] }));
+  assert(genuine.indexOf("No clear cross-question pattern stands out") !== -1,
+    "a scanned-but-flat study keeps the honest null headline");
+});
+
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");
 function activeLines(src) {
   let inBlock = false, count = 0;

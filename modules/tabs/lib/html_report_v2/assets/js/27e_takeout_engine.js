@@ -185,8 +185,10 @@
       c.gaps.forEach(function (gp) {
         var frac = (gp.value - gp.total) / (gp.scaleMax || 1);
         var peer = peers[c.group + "||" + gp.title] || { count: 0 };
+        // isPct marks a KeyShare row (a favourable %, not an index mean) so the
+        // card and the tension sentence format it as "62% / 71%", never "62.0".
         var row = { label: gp.title, value: gp.value, rest: gp.total, scaleMax: gp.scaleMax,
-          frac: frac, isMean: true, peerCount: peer.count,
+          frac: frac, isMean: !gp.isPct, isPct: !!gp.isPct, peerCount: peer.count,
           peerTop: !!(peer.hi && peer.hi.col === c.column),
           peerBottom: !!(peer.lo && peer.lo.col === c.column) };
         if (frac <= -CONST.MIN_STRAIN_GAP) lows.push(row);
@@ -429,6 +431,11 @@
     gate.groups.forEach(function (g) { mg[g.banner + "::" + g.group] = g.meanGap; });
     var cand = [];
     fdr.cells.forEach(function (c, idx) {
+      // KeyShare cells gap in pp on a 0–100 encoding; the fixed floors below
+      // (ODD_MIN_GAP / ODD_MIN_RESID) are scale-point tuned, and the meanGap
+      // baseline is rated-only — so share cells sit out of this finder, exactly
+      // as NPS does (same cross-scale-fabrication guard, F1).
+      if (c.isPct) return;
       var meanGap = mg[c.banner + "::" + c.group];
       if (meanGap === undefined) return;
       var dir = meanGap < 0 ? -1 : 1, gapSign = c.gap < 0 ? -1 : 1;
@@ -572,6 +579,7 @@
       portraitCount: ports.length,
       fdr: gate,
       rigor: rigor,
+      scope: inputs.scope || null,   // what was scannable — the read view's honest empty state
       themeCount: groupByTheme(inputs.levels || []).filter(function (t) {
         return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
       }).length,

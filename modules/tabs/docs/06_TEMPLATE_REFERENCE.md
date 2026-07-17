@@ -1056,6 +1056,38 @@ values - For NPS questions: Calculates NPS score
 **When to use Y:** For any question where an average or score is
 meaningful.
 
+### Column: KeyShare
+
+**What it does:** Brings a closed Single_Response or Multi_Mention
+question into the Patterns tab's cross-question scan by naming its key
+share — the one answer (or BoxCategory / NET grouping) whose share
+summarises the question.
+
+**Required:** No. Blank means the question stays out of the Patterns
+scan, which is the honest default: the data cannot tell which answer is
+the good one, so nothing is scanned until you say.
+
+**What to enter:** The exact label of an option, BoxCategory or NET row
+— matched after trimming, ignoring case and non-breaking spaces. A
+grouping (NET/box) wins over a same-named single option.
+
+**The one rule:** the share you name must be one where a HIGHER share is
+BETTER. If the natural summary of a question is a problem share, name
+the favourable complement instead — on "Is language a problem?" enter
+`Not a problem`, not the problem options.
+
+**Examples:** - `Always` (delivery on the correct day) - `Yes` (offered
+a sales promotion) - `Not a problem` (language difficulty, flipped) -
+`Quarterly or better` (a BoxCategory grouping of visit frequency)
+
+**When to leave blank:** Profile and preference questions with no good
+or bad direction (order method, franchise vs independent, who takes the
+order) — and rated questions, where CreateIndex already summarises them
+(a KeyShare on a rated question is ignored).
+
+**See:** `PATTERNS_KEY_SHARE_GUIDE.md` for worked examples from live
+studies.
+
 ### Column: BaseFilter
 
 **What it does:** Restricts the analysis to a subset of respondents.

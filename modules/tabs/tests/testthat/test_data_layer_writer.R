@@ -255,6 +255,15 @@ test_that("banner_groups and categories are derived from the data", {
   expect_setequal(unlist(dl$categories), c("Awareness", "Satisfaction"))
 })
 
+test_that("key_share (the Patterns favourable-share declaration) is carried; blank when undeclared", {
+  q <- make_dl_q_single()
+  q$key_share <- "Always"
+  wq <- build_dl_question(q, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_identical(wq$key_share, "Always")
+  uq <- build_dl_question(make_dl_q_single(), make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_identical(uq$key_share, "")
+})
+
 # ------------------------------------------------------------------------------
 # Finite population correction: per-column population emission
 # ------------------------------------------------------------------------------

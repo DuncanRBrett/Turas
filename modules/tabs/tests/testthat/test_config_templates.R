@@ -258,7 +258,7 @@ test_that("crosstab config Selection sheet has expected columns", {
   generate_crosstab_config_template(tmp)
   selection <- openxlsx::read.xlsx(tmp, sheet = "Selection", startRow = 3)
 
-  expected_cols <- c("QuestionCode", "Include", "UseBanner")
+  expected_cols <- c("QuestionCode", "Include", "UseBanner", "KeyShare")
   for (col in expected_cols) {
     expect_true(col %in% names(selection),
                 info = sprintf("Missing column '%s' in Selection sheet", col))

@@ -112,7 +112,8 @@ run("uniform extremeness is a story too — top on nearly everything is not buri
   eq(ps[0].subject, "Star", "uniform-extreme group leads the faint tension");
   eq(ps[0].counterSpike, 0, "Star has no tension — it's pure extremeness");
   assert(ps[0].uniform === true, "flagged uniform");
-  assert(takeout.ui.portraitTension(ps[0]).indexOf("5 of 5") !== -1, "narrative calls out the sweep (5 of 5)");
+  assert(takeout.ui.portraitTension(ps[0]).indexOf("5 of the 5 questions scored") !== -1,
+    "narrative calls out the sweep (5 of the 5 questions scored)");
 });
 
 run("commensurable areas only — mixed-scale theme is dropped", () => {

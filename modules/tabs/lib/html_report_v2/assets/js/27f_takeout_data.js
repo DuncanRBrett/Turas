@@ -201,6 +201,31 @@
         });
       });
     });
+    // KeyShare questions join the same scan as favourable shares: the declared
+    // row's % per column vs the overall %, on the 0–100 scale, so a 5pp share
+    // gap and a 0.25-point gap on a 1–5 index carry the same fraction-of-scale
+    // weight the rated gaps already use. isPct drives % display downstream.
+    var shareList = takeout._shares ? takeout._shares.list(views) : [];
+    groups.forEach(function (g) {
+      shareList.forEach(function (s) {
+        var model;
+        try { model = publishedModel(views, s.q.code, g.id); } catch (e) { return; }
+        var row = model.rows[s.ri];
+        if (!row || !row.cells) return;
+        var total = row.cells[0] && row.cells[0].pct;
+        if (total === null || total === undefined) return;
+        model.columns.forEach(function (col, i) {
+          if (i === 0) return;
+          var v = row.cells[i] && row.cells[i].pct;
+          if (v === null || v === undefined) return;
+          if (!col.base || col.base < floor) return;
+          var key = g.name + "::" + col.label;
+          var c = cols[key] || (cols[key] = { column: col.label, group: g.name, base: 0, gaps: [] });
+          if (col.base > c.base) c.base = col.base;
+          c.gaps.push({ title: s.q.title, value: v, total: total, scaleMax: 100, isPct: true });
+        });
+      });
+    });
     return Object.keys(cols).map(function (k) { return cols[k]; });
   }
 
@@ -272,11 +297,27 @@
     // baseline. Strain/thrive keep NPS: they normalise each gap by scaleMax; this
     // family does not.
     var qs = views.indexQuestions().filter(function (q) {
-      return micro.scores[q.code] && micro.scores[q.code].length &&
+      return micro.scores && micro.scores[q.code] && micro.scores[q.code].length &&
         q.type !== "nps" && touchpointMax(q) <= 10;
     });
-    if (!qs.length) return null;
-    var nResp = micro.n || micro.scores[qs[0].code].length;
+    var shareList = takeout._shares ? takeout._shares.list(views) : [];
+    var nResp = micro.n || (qs.length ? micro.scores[qs[0].code].length : 0);
+    if (!nResp) return null;
+    // One family, two sources: rated questions test their per-respondent index
+    // scores; KeyShare questions test a 0/100 in-the-share encoding (a Welch t
+    // on 0/100 IS the unpooled two-proportion z, in pp; touchpointMax(q)=100
+    // puts the shared variance floor at 10pp). Share cells are marked isPct —
+    // the odd-one-out finder skips them (its gap floors are scale-point tuned)
+    // but the per-cell BH pass and the per-group sign test read them in full,
+    // so share-heavy studies get the same never-cry-wolf gate as rated ones.
+    var famQs = qs.map(function (q) {
+      return { q: q, sc: micro.scores[q.code], isPct: false };
+    });
+    shareList.forEach(function (s) {
+      var sc = takeout._shares.scoreVector(s, micro, nResp);
+      if (sc) famQs.push({ q: s.q, sc: sc, isPct: true });
+    });
+    if (!famQs.length) return null;
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
     var cells = [], groupAgg = {}, order = [];
     groups.forEach(function (g) {
@@ -286,13 +327,13 @@
       for (var r = 0; r < nResp; r++) { var cd = bv[r]; if (cd !== null && cd !== undefined && cd >= 0) codeSet[cd] = true; }
       var codes = Object.keys(codeSet).map(Number).sort(function (a, b) { return a - b; });
       var model;
-      try { model = publishedModel(views, qs[0].code, g.id); } catch (e) { return; }
+      try { model = publishedModel(views, famQs[0].q.code, g.id); } catch (e) { return; }
       var cols = (model.columns || []).slice(1);                 // non-Total columns
       if (codes.length !== cols.length) return;                  // label/order mismatch -> skip banner, never mislabel
       codes.forEach(function (code, ci) {
         var label = cols[ci].label;
-        qs.forEach(function (q) {
-          var sc = micro.scores[q.code], vfloor = Math.pow(scaleSpan(q) * 0.1, 2);
+        famQs.forEach(function (f) {
+          var q = f.q, sc = f.sc, vfloor = Math.pow(scaleSpan(q) * 0.1, 2);
           var gx = [], gw = [], rx = [], rw = [], all = [], allw = [];
           for (var r = 0; r < nResp; r++) {
             var v = sc[r]; if (v === null || v === undefined) continue;
@@ -307,13 +348,18 @@
           var gap = gMean - oMean;                                // vs the overall (for the strain/flip read)
           var gkey = g.name + "::" + label;
           var ga = groupAgg[gkey] || (groupAgg[gkey] = { banner: g.name, group: label,
-            base: 0, below: 0, above: 0, qn: 0, gapSum: 0 });
+            base: 0, below: 0, above: 0, qn: 0, qnRated: 0, gapSum: 0 });
           if (!ga.qn) order.push(gkey);
           if (gx.length > ga.base) ga.base = gx.length;
-          ga.qn++; ga.gapSum += gap;
+          // qn / below / above feed the per-group sign test — every cell counts.
+          // gapSum stays RATED-ONLY (scale points): it becomes meanGap, the
+          // odd-one-out baseline, and pp gaps would corrupt its units.
+          ga.qn++;
+          if (!f.isPct) { ga.qnRated++; ga.gapSum += gap; }
           if (wt.diff < 0) ga.below++; else if (wt.diff > 0) ga.above++;
           cells.push({ banner: g.name, group: label, q: q.code, qtitle: q.title, nIn: gx.length,
             gap: gap, value: gMean, total: oMean, scaleMax: touchpointMax(q),
+            isPct: f.isPct,
             welchDiff: wt.diff, welchP: wt.p, flooredG: wt.flooredG, gkey: gkey });
         });
       });
@@ -321,12 +367,14 @@
     if (!cells.length) return null;
     var groupsOut = order.map(function (k) {
       var ga = groupAgg[k];
-      ga.meanGap = ga.qn ? ga.gapSum / ga.qn : 0;
+      // meanGap = the group's usual gap in SCALE POINTS across rated questions
+      // only (the odd-one-out baseline); 0 when the group has no rated cells.
+      ga.meanGap = ga.qnRated ? ga.gapSum / ga.qnRated : 0;
       ga.dir = ga.meanGap < 0 ? "below" : "above";
       return ga;
     });
     return { cells: cells, groups: groupsOut, K: cells.length,
-      groupCount: groupsOut.length, questionCount: qs.length };
+      groupCount: groupsOut.length, questionCount: famQs.length };
   }
 
   /**
@@ -384,10 +432,22 @@
     try { fdr = gatherCellFamily(views); } catch (e) { fdr = null; }
     var bimodal = null;
     try { bimodal = gatherBimodality(views); } catch (e) { bimodal = null; }
-    var reliability = gatherReliability(lv.levels.concat(lv.apex));
+    // Scan scope — what the engine could actually read. The read view words its
+    // empty state from this, so "we scanned and found nothing" is only ever
+    // claimed when something was scanned (rated indexes or KeyShare shares).
+    var ratedCount = 0, shareItems = [];
+    try { ratedCount = views.indexQuestions().length; } catch (e) { ratedCount = 0; }
+    try { shareItems = takeout._shares ? takeout._shares.list(views) : []; } catch (e) { shareItems = []; }
+    var relItems = lv.levels.concat(lv.apex);
+    try {
+      relItems = relItems.concat(takeout._shares.reliabilityItems(views, shareItems,
+        function (code) { return publishedModel(views, code); }));
+    } catch (e) { /* shares module absent — rated items alone stamp reliability */ }
+    var reliability = gatherReliability(relItems);
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
     return { columns: columns, levels: lv.levels, apex: lv.apex, comove: comove, fdr: fdr,
-      bimodal: bimodal, reliability: reliability, lowBaseThreshold: lowBase };
+      bimodal: bimodal, reliability: reliability, lowBaseThreshold: lowBase,
+      scope: { rated: ratedCount, shares: shareItems.length } };
   };
 
   /* ---------------- state (curation, persisted) ---------------- */

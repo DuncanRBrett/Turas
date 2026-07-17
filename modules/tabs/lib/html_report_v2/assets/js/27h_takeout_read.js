@@ -197,11 +197,30 @@
     return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + " · curated by the researcher.</div>";
   }
 
+  /** The honest empty state. "Nothing stands out" is a FINDING — it may only be
+   *  claimed when something was actually scanned. A study with nothing the
+   *  engine can score is told what the scan reads instead; one with questions
+   *  but no comparable groups is told that. */
+  function emptyHtml(t) {
+    var s = t.scope;
+    if (s && (s.rated + s.shares) === 0) {
+      return '<div class="tko-empty">Patterns has nothing it can score on this study. ' +
+        "The scan reads rated questions (an index) and closed questions with a declared " +
+        "key share — the KeyShare column on the config’s Selection sheet, naming the " +
+        "answer where a higher share is better. Tag a few and regenerate.</div>";
+    }
+    if (!t.segmentCount) {
+      return '<div class="tko-empty">Nothing to compare: this study has no breakout ' +
+        "groups above the reporting floor — questions to score, but no groups to test " +
+        "them across.</div>";
+    }
+    return '<div class="tko-empty">No clear cross-question pattern stands out on this study — ' +
+      "and that, honestly, is the headline.</div>";
+  }
+
   read.html = function (t) {
     var cards = (t.patterns || []).map(cardHtml).join("");
-    var body = cards ||
-      '<div class="tko-empty">No clear cross-question pattern stands out on this study — ' +
-      "and that, honestly, is the headline.</div>";
+    var body = cards || emptyHtml(t);
     // Footer order: the reliability line (with the "how sure" entry point) sits
     // directly above the provenance line — demoted from the apex, not deleted.
     return apexHtml(t) + '<div class="tko-pgrid">' + body + "</div>" +
