@@ -44,6 +44,12 @@ Open each sheet and code by hand. Everything here survives every re-run of the b
 - **Noteworthy tier** — put one code in the `Noteworthy` column (case-insensitive):
   `n` = Noteworthy · `m` = Must-read · `p` = Priority ("lead with in a presentation").
   Any other non-blank mark counts as Noteworthy. Blank = ordinary comment.
+- **Hide a comment** — the one reserved word `hide` (or `hidden`) in the same
+  `Noteworthy` column withholds *that comment's* text from the report while still
+  counting it in the theme distribution. It is not noteworthy (it's the opposite),
+  so it never counts as a tier mark. Use it to drop an uninformative or identifying
+  comment without distorting the numbers. See `qual_verbatim_scope` in §3 for
+  showing only the noteworthy comments across the whole report.
 - **Overall Sentiment** — `1` positive / `2` mixed / `3` negative (legend sits above the header).
 - **Themes** — add a column per theme to the **right of the verbatim** (from col E), header =
   the theme name, and code `1`/`2`/`3` per comment. The prevalence board and theme filters
@@ -66,6 +72,7 @@ Two sheets in the project's `*_Crosstab_Config.xlsx`.
 | `qual_confidentiality_mode` | `redacted` | **Default is `hidden`, which shows NO verbatims.** Use `redacted` (auto-scrubs names/emails/numbers) or `full` to display the text. |
 | `qual_demographic_cuts` | `allow` | Disclosure of demographic tags: `allow` / `safe` (k-anonymised) / `block`. **Use `safe` for any client-facing report that carries tags** (see §5). |
 | `qual_noteworthy_default` | `all` | Which tier the filter opens on: `all` / `noteworthy` / `must_read` / `priority`. |
+| `qual_verbatim_scope` | `all` | Which comments ship readable text (build-time curation). `all` = every comment except those marked `hide`. `noteworthy` = only tier 1+ comments are readable; the rest are counted but not shown. **Theme all, show some** — use `noteworthy` to ship a curated handful of quotes from a large body of comments while the numbers reflect them all. |
 | `min_reporting_base` | `1` | Disclosure k (used by both the audience gate and the `safe` tag k-anonymisation). `1` = off. Set a real floor (e.g. `30`, matching `significance_min_base`) for a client-facing report with tags. |
 | `qual_tag_dimensions` | *(blank)* | Comment tags from the **host survey** (see §5): a comma list of `Column` or `Column:Label`, e.g. `S03:Centre, S11:Channel`. Blank = only the comment workbook's own demographic columns are tagged. |
 | `qual_join_id_column` | *(blank)* | Only set if the respondent-id column doesn't auto-detect. |

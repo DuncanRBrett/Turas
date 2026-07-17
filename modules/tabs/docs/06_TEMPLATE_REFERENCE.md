@@ -899,6 +899,7 @@ code → wire → run, including the NPS "why?" split and host-survey tags):
 | `qual_confidentiality_mode` | How verbatim text is shown | `hidden` (numbers only), `redacted` (auto-scrub names/emails/numbers), `full` | hidden |
 | `qual_demographic_cuts` | Demographic tags on comments | `allow` (all), `safe` (k-anonymised), `block` (none) | allow |
 | `qual_noteworthy_default` | Which noteworthy tier the comment filter opens on | `all`, `noteworthy`, `must_read`, `priority` | all |
+| `qual_verbatim_scope` | Which comments ship readable text (build-time curation, not a reader filter) | `all` (every comment except those marked `hide`), `noteworthy` (only tier 1+ — noteworthy / must-read / priority) | all |
 | `qual_tag_dimensions` | Host-survey columns shown as comment tags, via the join | comma list of `Column` or `Column:Label`, e.g. `S03:Centre, S11:Channel` | (blank) |
 | `qual_join_id_column` | Override the auto-detected respondent-id column | a column name, or blank | (blank) |
 
@@ -911,6 +912,31 @@ report that carries tags, `block` for a confidential low-sample study.
 `min_reporting_base` also withholds the whole comment list when a filtered
 cut falls below it. The default `qual_confidentiality_mode = hidden` shows
 no verbatim text — set `redacted` or `full` to display comments.
+
+**Verbatim scope — theme all, show some.** `qual_verbatim_scope` curates
+which comments ship their *readable text*, independently of which are
+*counted*. Every comment (themed or not) is always counted in the theme
+distribution, coverage and base sizes; scope only governs whose verbatim is
+readable. This is a build-time curation — a withheld comment's text is absent
+from the file (not merely hidden in the UI), the same confidentiality
+guarantee as omitting microdata. Two ways to withhold, both keyed on the
+comment workbook's noteworthy column:
+
+- `hide` / `hidden` (case-insensitive) in the noteworthy column withholds
+  *that one comment's* verbatim under any scope. It is never noteworthy
+  (forced tier 0), so it does not collide with the tier marks. Use it to drop
+  an uninformative or identifying comment while still counting it.
+- `qual_verbatim_scope = noteworthy` withholds *every* comment that is not
+  tier 1+ — so only the comments you flagged noteworthy / must-read /
+  priority are readable, and the rest are counted but not shown. Use it to
+  ship a curated handful of quotes from a large body of comments (e.g. 100 of
+  1000) while the numbers still reflect all 1000.
+
+A small header chip on each question names the scope in force ("Noteworthy
+comments only" or "Uninformative comments hidden"), so the reader always
+knows which comments they are seeing. `qual_verbatim_scope` composes with
+`qual_confidentiality_mode` (scope picks *which* comments; the mode picks
+*how* their text is treated — `full` / `redacted` / `hidden`).
 
 **NPS "why?" split.** An open-end routed into Detractor / Passive /
 Promoter sheets is reassembled into one question via the Selection sheet's

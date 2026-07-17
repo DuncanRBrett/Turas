@@ -353,7 +353,9 @@ filename) — prevalence board, theme×banner crosstab (`model.forQuestion`), qu
 
 **Config:** Settings keys `qual_workbook` (path), `show_qualitative`,
 `qual_confidentiality_mode`, `qual_demographic_cuts`, `qual_noteworthy_default`
-({all, noteworthy, must_read}) — added to `build_config_object()` and attached to `proj`
+({all, noteworthy, must_read}), `qual_verbatim_scope` ({all, noteworthy} — which
+comments ship readable text; `hide`/`hidden` in the Noteworthy column withholds one
+comment, counted-not-shown) — added to `build_config_object()` and attached to `proj`
 in `build_dl_project()`.
 
 **As-built so far (commits on `feature/tabs-qualitative-tab`):** `qual_workbook_reader.R`
