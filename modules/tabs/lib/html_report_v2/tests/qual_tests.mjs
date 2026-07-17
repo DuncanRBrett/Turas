@@ -692,33 +692,54 @@ assert(pHtml.indexOf('data-tier="priority"') >= 0, "render: the Priority tier-fi
 assert(pHtml.indexOf('class="ql-star priority" title="priority"') >= 0, "render: a tier-3 comment shows the Priority star");
 assert(pHtml.indexOf('class="ql-star must" title="must-read"') >= 0, "render: a tier-2 comment shows the Must-read star");
 
-// ---- board note: a curated (suppressed-bearing) themed question says so ---------
-TR.AGG = { banner_groups: [], columns: [] };   // no banner -> no crosstab toggle, board renders
+// ---- scope chip: the header notation of which comments are shown ----------------
+// scopeChip is a pure helper — assert its three states directly.
+const chipQmixed = { records: [
+  { idx: 0, tier: 1, suppressed: false }, { idx: 1, tier: 0, suppressed: true }] };
+const chipQclean = { records: [{ idx: 0, tier: 1, suppressed: false }] };
+assert(qual.scopeChip({ verbatimScope: "noteworthy" }, chipQclean).indexOf("Noteworthy comments only") >= 0,
+  "scopeChip: 'noteworthy' scope reads 'Noteworthy comments only' (even with nothing hidden)");
+assert(qual.scopeChip({ verbatimScope: "all" }, chipQmixed).indexOf("Uninformative comments hidden") >= 0,
+  "scopeChip: 'all' scope with a hidden comment reads 'Uninformative comments hidden'");
+assert(qual.scopeChip({ verbatimScope: "all" }, chipQclean) === "",
+  "scopeChip: 'all' scope with nothing hidden shows no chip (the default)");
+assert(qual.scopeChip({}, chipQclean) === "",
+  "scopeChip: absent verbatimScope defaults to 'all' -> no chip when nothing hidden");
+
+// ---- and it reaches the DOM on both themed and raw questions --------------------
+TR.AGG = { banner_groups: [], columns: [] };   // no banner -> no crosstab toggle
 TR.MICRO = null;
 TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
-  questions: [{ code: "QN", title: "Why?", type: "themed",
+  verbatimScope: "noteworthy",
+  questions: [{ code: "QN", title: "Why?", type: "themed", verbatimScope: "noteworthy",
     themes: [{ id: 0, label: "Price" }], base: { answered: 3 },
     records: [
       { idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "shown" },
       { idx: 1, tier: 0, sentiment: 3, themeVals: { "0": 3 }, demos: {}, text: null, suppressed: true },
       { idx: 2, tier: 0, sentiment: 2, themeVals: { "0": 2 }, demos: {}, text: null, suppressed: true }
     ] }] };
+// render() reads island from TR.QUAL; scopeChip reads island.verbatimScope.
 TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
   questionByCode: () => null, filterDescription: () => "" };
 TR.disclosure = null; qual._state = null;
 const hostN = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
 qual.render(hostN);
-assert(hostN.innerHTML.indexOf("Distribution reflects all 3 comments") >= 0 &&
-  hostN.innerHTML.indexOf("1 are shown as readable quotes") >= 0,
-  "render: the board note states the full distribution base and the shown count");
+assert(hostN.innerHTML.indexOf("Noteworthy comments only") >= 0,
+  "render: the 'Noteworthy comments only' chip reaches the themed header");
 // The suppressed comments never render as comment cards.
 assert(hostN.innerHTML.indexOf("[quote hidden") < 0,
   "render: withheld comments are not listed as placeholder cards");
-// A fully-shown question carries no board note.
-TR.QUAL.questions[0].records = [{ idx: 0, tier: 1, sentiment: 1, themeVals: { "0": 1 }, demos: {}, text: "shown" }];
+// Raw (verbatim-only) question gets the chip too, and the 'all + hide' wording.
+TR.QUAL = { textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
+  verbatimScope: "all",
+  questions: [{ code: "QR", title: "Open", type: "raw", themes: [], base: { answered: 2 },
+    records: [
+      { idx: 0, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "shown" },
+      { idx: 1, tier: 0, sentiment: 3, themeVals: {}, demos: {}, text: null, suppressed: true }
+    ] }] };
 qual._state = null; hostN.innerHTML = ""; qual.render(hostN);
-assert(hostN.innerHTML.indexOf("Distribution reflects all") < 0,
-  "render: no board note when every comment is shown");
+assert(hostN.innerHTML.indexOf("Uninformative comments hidden") >= 0,
+  "render: the 'Uninformative comments hidden' chip reaches a raw-question header");
 
 // ---- Split band (NPS Detractor/Passive/Promoter) view-by ----------------------
 const qsplit = {

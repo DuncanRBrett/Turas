@@ -473,6 +473,31 @@
     return (records || []).filter(function (r) { return !r.suppressed; });
   };
 
+  /** A small header notation of the verbatim scope in force, so a reader always knows
+   *  which comments they are looking at (and that the distribution still counts them all):
+   *    - "noteworthy" scope  -> "★ Noteworthy comments only" (shown on every question,
+   *      it is a report-wide policy — even where a question happens to hide nothing);
+   *    - "all" scope with hide markers -> "Uninformative comments hidden" (only where a
+   *      question actually withholds one, since "all" with nothing hidden is the default).
+   *  Nothing renders for the plain default (scope "all", no hides). Reads q.records (the
+   *  full, unfiltered question set) so the notation is stable across the live cut. */
+  qual.scopeChip = function (island, q) {
+    var scope = (island && island.verbatimScope) || "all";
+    var recs = q.records || [];
+    var suppressed = recs.filter(function (r) { return r.suppressed; }).length;
+    if (scope === "noteworthy") {
+      return '<span class="ql-scopechip note" title="This report shows only comments flagged ' +
+        "noteworthy, must-read or priority. All " + recs.length +
+        ' comments are still counted in the theme distribution.">★ Noteworthy comments only</span>';
+    }
+    if (suppressed > 0) {
+      return '<span class="ql-scopechip hide" title="' + suppressed + " uninformative comment" +
+        (suppressed === 1 ? "" : "s") + ' (marked hide) withheld from the list — still counted in the ' +
+        'distribution.">Uninformative comments hidden</span>';
+    }
+    return "";
+  };
+
   /** The pool a sentiment pick filters: shown -> band -> theme -> tier -> shortlist
    *  (everything but the sentiment filter itself), so the sentiment buttons can show
    *  "if I click this, N comments". Withheld verbatims drop out first so the list and
@@ -1272,7 +1297,8 @@
       : "";
     return '<header class="ql-head"><h2 class="ql-title">' + esc(q.title) + '</h2>' + headlineHtml +
       '<div class="ql-meta"><span class="ql-badge">' + badge + '</span>' +
-      '<span class="ql-base">' + n + '</span>' + cov + qual.closedStatChip(q.code) + shield + jump + '</div></header>';
+      '<span class="ql-base">' + n + '</span>' + cov + qual.closedStatChip(q.code) + shield +
+      qual.scopeChip(island, q) + jump + '</div></header>';
   }
 
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
@@ -1443,15 +1469,6 @@
       ? '<span class="ql-hint ql-champrule">Examples show one positive + one negative comment per theme; ' +
         "your ★ shortlisted picks always lead.</span>"
       : "";
-    // Honesty note: when the report curates the readable set (qual_verbatim_scope /
-    // hide markers), say so on the board's face — the distribution reflects EVERY
-    // comment, but only a subset are shown as readable quotes. Keeps a reader from
-    // mistaking "few quotes" for "few comments".
-    var shownN = qual.shown(audience).length, totalN = audience.length;
-    var scopeNote = shownN < totalN
-      ? '<span class="ql-hint ql-scopenote">Distribution reflects all ' + totalN +
-        " comments; " + shownN + " are shown as readable quotes (the rest are counted, not displayed).</span>"
-      : "";
     return '<div class="ql-board"><div class="ql-boardhd">' +
       '<div class="ql-boardhdrow"><span class="ql-boardttl">What people raised</span>' +
       '<div class="ql-boardtools">' + tools + "</div></div>" +
@@ -1460,7 +1477,7 @@
       'of that theme’s comments, so every theme is equal width and the lean shows the balance: ' +
       '<b class="qc-neg">negative</b> left, <b class="qc-pos">positive</b> right, ' +
       '<b class="qc-neu">mixed</b> centre; net = net sentiment %. ' +
-      "Click a theme to read its comments.</span>" + champRule + scopeNote +
+      "Click a theme to read its comments.</span>" + champRule +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
   }
 
