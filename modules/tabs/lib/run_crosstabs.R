@@ -190,6 +190,7 @@ tabs_source("html_report", "99_html_report_main.R")
 source(file.path(script_dir, "score_utils.R"))
 source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "stats_diagnostics.R"))
+source(file.path(script_dir, "patterns_echo.R"))
 source(file.path(script_dir, "microdata_writer.R"))
 source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
@@ -768,6 +769,18 @@ if (.html_report_v2_on) {
               conditionMessage(e), "\n  The v2 report still builds without it.\n\n")
           NULL
         })
+
+      # Patterns config echo (V13): every Patterns lever (patterns_exclude_banners,
+      # patterns_headline, KeyShare, AreaSummary) validated against what the data
+      # layer actually contains — a misspelt banner or option label is reported in
+      # the console and on the Report tab's diagnostics panel instead of silently
+      # doing nothing. Inactive configs pass through untouched; never breaks the
+      # report.
+      dl <- tryCatch(attach_patterns_echo(dl), error = function(e) {
+        cat("\n[WARNING] Patterns config echo failed:", conditionMessage(e), "\n")
+        cat("  The v2 report still builds without it.\n\n")
+        dl
+      })
 
       # Anonymised microdata island (per-respondent indices + weights) so the
       # live filter bar + "+ Custom…" banner light up and recompute weighted
