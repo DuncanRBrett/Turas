@@ -545,6 +545,28 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
+    # ---- PATTERNS TAB (OPTIONAL) ----
+    # The full Patterns surface is these two Settings rows plus two Selection
+    # columns (KeyShare, AreaSummary). Every declaration is validated at
+    # generation time and echoed in the console + the Report tab's diagnostics
+    # panel, so a typo is reported instead of silently doing nothing.
+    list(
+      section_name = "PATTERNS TAB (OPTIONAL)",
+      fields = list(
+        list(name = "patterns_exclude_banners", default = "", required = FALSE,
+             description = paste0("Banners the Patterns tab must skip, comma-separated (label or code, ",
+               "e.g. Interviewer). Operational cuts are fieldwork QC, not client story — without this ",
+               "the tab's lead portrait can be an interviewer effect. The banner still works everywhere ",
+               "else (crosstabs, Differences); it just never becomes a portrait. Blank = scan every banner."),
+             valid_values_text = "Comma-separated banner labels/codes, or leave blank"),
+        list(name = "patterns_headline", default = "", required = FALSE,
+             description = paste0("Pin the Patterns apex KPI tiles to these question codes, in order ",
+               "(e.g. Q78, Q79). Blank = auto-detect from question titles, which on a study with many ",
+               "section ratings can pick the wrong ones and crowd out the true headline."),
+             valid_values_text = "Comma-separated question codes, or leave blank")
+      )
+    ),
+
     # ---- READER REPORT (OPTIONAL, ADDITIVE) ----
     list(
       section_name = "READER REPORT (OPTIONAL)",
