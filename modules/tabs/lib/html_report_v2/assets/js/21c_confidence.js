@@ -322,15 +322,30 @@
     // the design sentence reads as the plain sample it is — no census framing.
     if (!conf.fpcActiveReport()) return "";
     var rr = conf.responseRate();
-    var lead = rr
-      ? " About " + Math.round(rr.rate * 100) +
-        "% of the " + TR.fmt.base(rr.N) + "-strong universe responded, so "
+    var census = conf.labels().sampling_method_normalised === "census";
+    // "Responded" (and the non-response caveat) presume everyone was invited —
+    // true only for a declared census. On a sample the same number is coverage
+    // of the universe, and most of the universe was never asked, so the honest
+    // note is that the correction exists and is modest.
+    if (census) {
+      var lead = rr
+        ? " About " + Math.round(rr.rate * 100) +
+          "% of the " + TR.fmt.base(rr.N) + "-strong universe responded, so "
+        : " Known group sizes were supplied, so ";
+      return lead + "ranges include a <strong>finite population correction</strong> " +
+        "— they narrow as coverage of a group rises, reaching zero for a full " +
+        "census. The remaining uncertainty is mainly <strong>non-response</strong>: " +
+        "the people who did not answer may differ from those who did, and no " +
+        "interval can correct for that.";
+    }
+    var slead = rr
+      ? " The sample covers about " + Math.round(rr.rate * 100) +
+        "% of the " + TR.fmt.base(rr.N) + "-strong universe, so "
       : " Known group sizes were supplied, so ";
-    return lead + "ranges include a <strong>finite population correction</strong> " +
-      "— they narrow as coverage of a group rises, reaching zero for a full " +
-      "census. The remaining uncertainty is mainly <strong>non-response</strong>: " +
-      "the people who did not answer may differ from those who did, and no " +
-      "interval can correct for that.";
+    return slead + "ranges include a <strong>finite population correction</strong> — " +
+      "they narrow as coverage of a group rises, and at low coverage the " +
+      "effect is slight. Sampling uncertainty itself is unchanged: most of " +
+      "the universe was not interviewed.";
   }
 
   /** One honest sentence about the sampling design (labels port). */

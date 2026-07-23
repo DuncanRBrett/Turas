@@ -201,8 +201,12 @@
           fmt.base(col.base) + " ⚠</span>"
         : fmt.base(col.base)) +
         // Coverage of a known universe: a small base that is most of its group
-        // is a near-complete count, not a fragile sample. Shown when configured.
-        (colFpc && col.coverage != null
+        // is a near-complete count, not a fragile sample. That framing is only
+        // true on a DECLARED census — on a sample the base cell stays a plain n
+        // (the tiny FPC still applies to the intervals, silently). "5% of
+        // 14 563" under every base on a stratified sample reads as noise.
+        (colFpc && col.coverage != null &&
+         TR.conf.labels().sampling_method_normalised === "census"
           ? '<div class="civ" title="' + fmt.escapeHtml(fmt.base(col.base) +
             " of " + fmt.base(col.population) + " in this group responded — its " +
             "numbers carry a finite population correction") + '">' +

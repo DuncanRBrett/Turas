@@ -495,7 +495,7 @@
         ? '<span class="badge-published" title="' +
           fmt.escapeHtml("Published value with a finite population correction: " +
             "intervals and significance reflect how much of each group's known " +
-            "universe responded.") + '">PUBLISHED · FPC</span>'
+            "universe was covered.") + '">PUBLISHED · FPC</span>'
         : model.source === "computed"
           ? '<span class="badge-computed" title="' +
             fmt.escapeHtml("Recomputed live from microdata. " +

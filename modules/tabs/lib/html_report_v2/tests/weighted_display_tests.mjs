@@ -306,6 +306,50 @@ run("FPC gate: fpcActiveReport false for a thin sample, true for a near-census",
   assert(!TR.conf.fpcActiveReport(), "no configured population -> not active");
 });
 
+run("FPC callout wording: 'responded' + non-response caveat only on a DECLARED census", () => {
+  // CCPB shape: Stratified, 5.2% coverage — just above the material floor, so
+  // the FPC sentence appears, but it must speak coverage, never "responded"
+  // (most of the universe was never asked).
+  TR.AGG = { project: { population_size: 14563, low_base_threshold: 30,
+    sampling_method: "Stratified" }, columns: [{ label: "Total" }], questions: [], banner_groups: [] };
+  TR.MICRO = { n: 753 };
+  let html = TR.conf.calloutHtml();
+  assert(html.indexOf("finite population correction") !== -1, "5.2% coverage: FPC sentence present");
+  assert(html.indexOf("responded") === -1, "sample: never says 'responded'");
+  assert(html.indexOf("covers about 5%") !== -1, "sample: speaks coverage of the universe");
+  assert(html.indexOf("non-response") === -1, "sample: no non-response caveat (nobody was 'invited')");
+  // A declared census keeps the response framing and the non-response caveat.
+  TR.AGG.project.sampling_method = "Census";
+  TR.MICRO = { n: 10000 };
+  html = TR.conf.calloutHtml();
+  assert(html.indexOf("universe responded") !== -1, "census: response framing kept");
+  assert(html.indexOf("non-response") !== -1, "census: non-response caveat kept");
+});
+
+run("crosstab base cell: '% of N' coverage line only on a DECLARED census", () => {
+  // A stratified sample with per-column universes must show a plain base (753),
+  // not "5% of 14 563" under every base cell; a census keeps the coverage line.
+  const model = {
+    lowBaseThreshold: 30,
+    columns: [
+      { label: "Total", base: 753, population: 14563, coverage: 753 / 14563 },
+      { label: "A", base: 300, population: 5000, coverage: 300 / 5000 }
+    ],
+    rows: [{ kind: "category", label: "Yes",
+      cells: [{ pct: 60, n: 452, sig: "" }, { pct: 61, n: 183, sig: "" }] }]
+  };
+  TR.AGG = { project: { population_size: 14563, sampling_method: "Stratified",
+    low_base_threshold: 30 }, columns: [{ label: "Total" }], questions: [] };
+  TR.MICRO = { n: 753 };
+  // fpcApplies(300, 5000) = 6% coverage -> colFpc true; the gate must be the design
+  let html = TR.render.tableHtml(model, {});
+  assert(html.indexOf("% of ") === -1, "stratified sample: no coverage line under bases");
+  assert(html.indexOf(">753<") !== -1 || html.indexOf("753") !== -1, "plain base shown");
+  TR.AGG.project.sampling_method = "Census";
+  html = TR.render.tableHtml(model, {});
+  assert(html.indexOf("% of ") !== -1, "census: coverage line returns");
+});
+
 run("FPC callout: no census/FPC framing for a thin sample; present for a near-census", () => {
   const base = { low_base_threshold: 30, sampling_method: "Stratified" };
   TR.AGG = { project: Object.assign({ population_size: 14563 }, base),
