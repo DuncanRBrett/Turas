@@ -318,6 +318,12 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     patterns_headline = get_config_value(config, "patterns_headline", NULL),
     patterns_exclude_banners = get_config_value(config, "patterns_exclude_banners", NULL),
 
+    # Free-text fieldwork caveat appended to the "how sure" design sentence in
+    # the v2 report (e.g. substitution rules, replaced clusters, low response).
+    # The generated design wording covers the textbook design; this carries the
+    # honest asterisk where fieldwork reality deviated from it.
+    sampling_note = get_config_value(config, "sampling_note", NULL),
+
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),

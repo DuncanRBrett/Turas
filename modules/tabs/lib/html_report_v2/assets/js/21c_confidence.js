@@ -416,8 +416,18 @@
     bullets.push("<li><strong>“Significant”</strong> means a difference too " +
       "large to be explained by sampling wobble alone — not necessarily " +
       "an important one.</li>");
+    // Analyst's fieldwork caveat (config sampling_note) — the honest asterisk
+    // where fieldwork deviated from the textbook design (substitution rules,
+    // replaced clusters, low response). Free text: escaped, sentence-terminated.
+    var fieldNote = TR.AGG && TR.AGG.project && TR.AGG.project.sampling_note;
+    var noteHtml = "";
+    if (fieldNote) {
+      var s = String(fieldNote).trim();
+      if (s && !/[.!?]$/.test(s)) s += ".";
+      if (s) noteHtml = " " + TR.fmt.escapeHtml(s);
+    }
     bullets.push("<li><strong>About this survey:</strong> " +
-      designSentence(labels) + "</li>");
+      designSentence(labels) + noteHtml + "</li>");
     return '<div class="callout collapsed footer-callout">' +
       '<button class="callout-head" data-callout>' +
       '<span class="callout-ico">±</span> How sure can I be of these numbers?' +

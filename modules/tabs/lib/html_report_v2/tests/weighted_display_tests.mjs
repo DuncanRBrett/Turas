@@ -326,6 +326,22 @@ run("FPC callout wording: 'responded' + non-response caveat only on a DECLARED c
   assert(html.indexOf("non-response") !== -1, "census: non-response caveat kept");
 });
 
+run("sampling_note rides into the how-sure callout, escaped and sentence-terminated", () => {
+  TR.AGG = { project: { population_size: 14563, low_base_threshold: 30,
+    sampling_method: "Stratified",
+    sampling_note: "Where a selected store could not be interviewed, a substitute " +
+      "from the same centre & channel was drawn" },
+    columns: [{ label: "Total" }], questions: [], banner_groups: [] };
+  TR.MICRO = { n: 753 };
+  let html = TR.conf.calloutHtml();
+  assert(html.indexOf("a substitute from the same centre &amp; channel was drawn.") !== -1,
+    "note appended, HTML-escaped, and given its full stop");
+  assert(html.indexOf("About this survey") !== -1, "sits inside the design bullet");
+  delete TR.AGG.project.sampling_note;
+  html = TR.conf.calloutHtml();
+  assert(html.indexOf("substitute") === -1, "no note configured -> callout unchanged");
+});
+
 run("crosstab base cell: '% of N' coverage line only on a DECLARED census", () => {
   // A stratified sample with per-column universes must show a plain base (753),
   // not "5% of 14 563" under every base cell; a census keeps the coverage line.

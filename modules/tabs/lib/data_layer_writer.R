@@ -194,6 +194,12 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(ph) > 0) proj$takeout_headline <- I(ph)
   pxb <- .dl_split_csv(config_obj$patterns_exclude_banners)
   if (length(pxb) > 0) proj$patterns_exclude_banners <- I(pxb)
+  # Fieldwork caveat for the "how sure" panel (substitution etc.) — plain text,
+  # escaped at render; carried only when non-empty so old islands are unchanged.
+  sn <- config_obj$sampling_note
+  if (!is.null(sn) && length(sn) >= 1 && !is.na(sn[1]) && nzchar(trimws(sn[1]))) {
+    proj$sampling_note <- trimws(as.character(sn[1]))
+  }
   # Weighted designs carry a design effect the published data layer doesn't
   # expose per column, so the report's FPC re-letters significance only when
   # unweighted. Carried for the renderer to gate that (intervals are FPC'd

@@ -272,6 +272,17 @@ test_that("Patterns levers: headline + banner exclusion emitted as arrays, omitt
   expect_null(dl0$project$patterns_exclude_banners)
 })
 
+test_that("sampling_note is carried trimmed, omitted when blank/NA", {
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(sampling_note = "  Substitution was allowed. "))
+  expect_identical(dl$project$sampling_note, "Substitution was allowed.")
+  dl0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_null(dl0$project$sampling_note)
+  dlb <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(sampling_note = "   "))
+  expect_null(dlb$project$sampling_note)
+})
+
 test_that("key_share (the Patterns favourable-share declaration) is carried; blank when undeclared", {
   q <- make_dl_q_single()
   q$key_share <- "Always"
