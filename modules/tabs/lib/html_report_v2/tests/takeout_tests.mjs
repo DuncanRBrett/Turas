@@ -21,12 +21,13 @@ const JS_DIR = path.join(HERE, "..", "assets", "js");
 // Per-file ceiling. Raised from 300 once the engine grew to the full pattern
 // library (group / split / co-movement / odd-one-out / hidden-disagreement /
 // areas / movement + the FDR trust-gate), then to 380 when areas gained the
-// summary-question scoring + scale-family race (2026-07-17). The pure
-// number-crunching is already factored into 27da_takeout_stats.js; what
-// remains is small, single-purpose pattern functions — the file is long
-// because there are many of them, not because any one is. Keep individual
-// functions well under 100 lines.
-const MAX_ACTIVE_LINES = 380;
+// summary-question scoring + scale-family race (2026-07-17), then to 390 for
+// the also-scanned/no-story collection (2026-07-23). The pure number-crunching
+// is already factored into 27da_takeout_stats.js; what remains is small,
+// single-purpose pattern functions — the file is long because there are many
+// of them, not because any one is. Keep individual functions well under 100
+// lines.
+const MAX_ACTIVE_LINES = 390;
 
 const sandbox = { console };
 sandbox.globalThis = sandbox;
@@ -503,6 +504,33 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
   delete TR.AGG.project.min_reporting_base;
   cols = takeout.gather().columns;
   assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
+});
+
+run("a scanned group with no eligible portrait is named in the also-scanned note", () => {
+  // Three groups on one banner: two with strong opposite leans (portraits), one
+  // flat (no portrait). The flat one must appear in noStory and the rendered
+  // note; an ELIGIBLE group must never appear there.
+  const gap = (t, v, tot) => ({ title: t, value: v, total: tot, scaleMax: 5 });
+  const columns = [
+    { column: "Strained", group: "Centre", base: 100,
+      gaps: [gap("Q1", 3.0, 4.0), gap("Q2", 3.1, 4.1), gap("Q3", 3.2, 4.2)] },
+    { column: "Thriving", group: "Centre", base: 100,
+      gaps: [gap("Q1", 4.8, 4.0), gap("Q2", 4.9, 4.1), gap("Q3", 4.9, 4.2)] },
+    { column: "Flat", group: "Centre", base: 100,
+      gaps: [gap("Q1", 4.01, 4.0), gap("Q2", 4.09, 4.1), gap("Q3", 4.21, 4.2)] }
+  ];
+  const t = takeout.buildPatterns({ columns, scope: { rated: 3, shares: 0 } });
+  assert(t.noStory.length === 1 && t.noStory[0].subject === "Flat",
+    "only the flat group is no-story, got " + JSON.stringify(t.noStory));
+  TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
+  TR.AGG = { project: {} };
+  TR.d2 = { storeKey: (k) => k };
+  const page = takeout.readView.html(t);
+  assert(page.indexOf("Also scanned: Flat (n = 100)") !== -1, "note names the flat group with its base");
+  assert(page.indexOf("Also scanned:") === page.lastIndexOf("Also scanned:"), "one note, not per group");
+  // a banner with NO portraits at all gets the empty state, never the note
+  const t2 = takeout.buildPatterns({ columns: [columns[2]], scope: { rated: 3, shares: 0 } });
+  assert(t2.noStory.length === 0, "no portrayed banner -> no note (empty state covers it)");
 });
 
 run("census floor needs real coverage — a 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {

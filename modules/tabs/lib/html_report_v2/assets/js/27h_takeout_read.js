@@ -224,8 +224,24 @@
       "and that, honestly, is the headline.</div>";
   }
 
+  /** The groups a portrayed banner scanned that produced NO portrait — stated
+   *  on the page so "where is the 4th centre?" has its answer: middling on
+   *  everything is itself a reading, not an omission. */
+  function noStoryHtml(t) {
+    var list = t.noStory || [];
+    if (!list.length) return "";
+    var names = list.map(function (g) {
+      return g.subject + " (n = " + fmt.base(g.base) + ")";
+    }).join(", ");
+    return '<div class="tko-cap tko-nostory">Also scanned: ' + fmt.escapeHtml(names) +
+      (list.length === 1 ? " — it sits" : " — they sit") +
+      " close to the overall on most questions, with no consistent lean either way. " +
+      "No portrait is honest reporting, not a gap.</div>";
+  }
+
   read.html = function (t) {
     var cards = (t.patterns || []).map(cardHtml).join("");
+    if (cards) cards += noStoryHtml(t);
     var body = cards || emptyHtml(t);
     // Footer order: the reliability line (with the "how sure" entry point) sits
     // directly above the provenance line — demoted from the apex, not deleted.

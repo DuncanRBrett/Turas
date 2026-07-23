@@ -572,6 +572,24 @@
     var ports = portraits(inputs.columns, gate);
     ports.slice(0, CONST.PORTRAIT_MAX).forEach(function (p) { patterns.push(p); });
 
+    // Groups scanned but with NO eligible portrait, on banners that did produce
+    // one — the reader who sees 3 of 4 centres will ask where the 4th went, and
+    // the honest answer ("scanned; no consistent lean") belongs on the page, not
+    // in support email. Eligible-but-capped groups are excluded (they have a
+    // story, just not a top slot); a banner with no portraits at all is covered
+    // by the empty state instead.
+    var portrayedBanners = {}, eligibleKey = {};
+    ports.forEach(function (p) {
+      portrayedBanners[p.group] = true;
+      eligibleKey[p.group + "::" + p.subject] = true;
+    });
+    var noStory = [];
+    (inputs.columns || []).forEach(function (c) {
+      if (!portrayedBanners[c.group]) return;
+      if (eligibleKey[c.group + "::" + c.column]) return;
+      noStory.push({ subject: c.column, group: c.group, base: c.base });
+    });
+
     // Which cut divides the data most — a navigation pointer, NO synthetic average.
     var split = splitPattern(inputs.columns);
     if (split) {
@@ -609,6 +627,7 @@
       reliability: inputs.reliability || null,
       patterns: patterns,
       portraitCount: ports.length,
+      noStory: noStory,
       fdr: gate,
       rigor: rigor,
       scope: inputs.scope || null,   // what was scannable — the read view's honest empty state
