@@ -30,6 +30,9 @@
     if (typeof id === "string" && id.indexOf("portrait:") === 0) {
       return { tag: "In focus", cls: "focus" };
     }
+    if (typeof id === "string" && id.indexOf("steady:") === 0) {
+      return { tag: "The steady one", cls: "steady" };
+    }
     return PATTERN_META[id] || { tag: "", cls: "" };
   };
 
@@ -229,6 +232,13 @@
   /** Templated takeaway for a pattern (the one editable line per card). */
   ui.patternSeed = function (p) {
     if (p.kind === "portrait") return ui.portraitTension(p);
+    if (p.kind === "steady") {
+      // The claim is steadiness, proven by the group's own spread — never a lean.
+      return p.subject + " is the steady one — close to the overall almost everywhere (" +
+        p.below + " question" + (p.below === 1 ? "" : "s") + " a touch below, " +
+        p.above + " a touch above, none consistently). What works elsewhere should " +
+        "work here; it is nobody's problem child.";
+    }
     if (p.id === "group") {
       return p.subject + " scores below the overall on " + p.hits + " of the " + p.total +
         " questions scored — the group most under strain.";

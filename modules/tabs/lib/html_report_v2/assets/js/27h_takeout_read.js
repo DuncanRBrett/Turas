@@ -34,7 +34,7 @@
 
   /** Heading line for a pattern card (subject + context). */
   function headHtml(p) {
-    if (p.kind === "portrait") {
+    if (p.kind === "portrait" || p.kind === "steady") {
       return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
     }
     if (p.kind === "area") {
@@ -70,6 +70,16 @@
       if (lo) blocks += '<div class="tko-side"><div class="tko-sidehd tko-sidehd-low">Where it lags</div>' + lo + "</div>";
       if (hi) blocks += '<div class="tko-side"><div class="tko-sidehd tko-sidehd-high">Where it leads</div>' + hi + "</div>";
       return '<div class="tko-portrait">' + blocks + "</div>";
+    }
+    if (p.kind === "steady") {
+      // Even its extremes are modest — show the sharpest dip and lead as proof
+      // of flatness, plus the sign-test working when the gate ran.
+      var srows = (p.lows || []).map(function (e) { return ui.portraitRow(e, "low"); }).join("") +
+        (p.highs || []).map(function (e) { return ui.portraitRow(e, "high"); }).join("");
+      var swork = "Largest gaps either way shown above — none survive the " +
+        "consistency test" + (p.signP !== null && p.signP !== undefined
+          ? " (sign-test p = " + p.signP.toFixed(2) + ")" : "") + ".";
+      return srows + '<div class="tko-cap">' + swork + "</div>";
     }
     if (p.kind === "group") {
       var rows = (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
@@ -126,7 +136,8 @@
       bimodal: ["crosstabs", "see the distributions →"],
       weak: ["dashboard", "see the questions →"], strong: ["dashboard", "see the questions →"],
       moved: ["moved", "see tracking →"] };
-    var go = (p.kind === "portrait" ? ["findings", "see the breakouts →"] : map[p.id]) ||
+    var go = ((p.kind === "portrait" || p.kind === "steady")
+      ? ["findings", "see the breakouts →"] : map[p.id]) ||
       ["dashboard", "see detail →"];
     return '<div class="tko-pfoot"><button class="linklike" data-goto="' + go[0] + '">' +
       go[1] + "</button></div>";

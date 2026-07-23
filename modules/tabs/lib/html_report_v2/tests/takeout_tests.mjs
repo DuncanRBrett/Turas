@@ -21,13 +21,13 @@ const JS_DIR = path.join(HERE, "..", "assets", "js");
 // Per-file ceiling. Raised from 300 once the engine grew to the full pattern
 // library (group / split / co-movement / odd-one-out / hidden-disagreement /
 // areas / movement + the FDR trust-gate), then to 380 when areas gained the
-// summary-question scoring + scale-family race (2026-07-17), then to 390 for
-// the also-scanned/no-story collection (2026-07-23). The pure number-crunching
-// is already factored into 27da_takeout_stats.js; what remains is small,
-// single-purpose pattern functions — the file is long because there are many
-// of them, not because any one is. Keep individual functions well under 100
-// lines.
-const MAX_ACTIVE_LINES = 390;
+// summary-question scoring + scale-family race (2026-07-17), then to 410 when
+// the no-story collection grew into the steady-group card (2026-07-23). The
+// pure number-crunching is already factored into 27da_takeout_stats.js; what
+// remains is small, single-purpose pattern functions — the file is long
+// because there are many of them, not because any one is. Keep individual
+// functions well under 100 lines.
+const MAX_ACTIVE_LINES = 410;
 
 const sandbox = { console };
 sandbox.globalThis = sandbox;
@@ -506,31 +506,43 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
   assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
 });
 
-run("a scanned group with no eligible portrait is named in the also-scanned note", () => {
-  // Three groups on one banner: two with strong opposite leans (portraits), one
-  // flat (no portrait). The flat one must appear in noStory and the rendered
-  // note; an ELIGIBLE group must never appear there.
+run("a scanned group with no lean becomes the STEADY card; overflow goes to the note", () => {
+  // Four groups on one banner: two with strong opposite leans (portraits), two
+  // flat. The larger flat one becomes a steady CARD (STEADY_MAX = 1) whose claim
+  // is steadiness — the smaller flat one goes to the also-scanned note. An
+  // eligible group appears in neither.
   const gap = (t, v, tot) => ({ title: t, value: v, total: tot, scaleMax: 5 });
   const columns = [
     { column: "Strained", group: "Centre", base: 100,
       gaps: [gap("Q1", 3.0, 4.0), gap("Q2", 3.1, 4.1), gap("Q3", 3.2, 4.2)] },
     { column: "Thriving", group: "Centre", base: 100,
       gaps: [gap("Q1", 4.8, 4.0), gap("Q2", 4.9, 4.1), gap("Q3", 4.9, 4.2)] },
-    { column: "Flat", group: "Centre", base: 100,
-      gaps: [gap("Q1", 4.01, 4.0), gap("Q2", 4.09, 4.1), gap("Q3", 4.21, 4.2)] }
+    { column: "Flat", group: "Centre", base: 120,
+      gaps: [gap("Q1", 4.01, 4.0), gap("Q2", 4.09, 4.1), gap("Q3", 4.21, 4.2)] },
+    { column: "FlatSmall", group: "Centre", base: 60,
+      gaps: [gap("Q1", 3.99, 4.0), gap("Q2", 4.11, 4.1), gap("Q3", 4.19, 4.2)] }
   ];
   const t = takeout.buildPatterns({ columns, scope: { rated: 3, shares: 0 } });
-  assert(t.noStory.length === 1 && t.noStory[0].subject === "Flat",
-    "only the flat group is no-story, got " + JSON.stringify(t.noStory));
+  const steady = t.patterns.filter((p) => p.kind === "steady");
+  assert(steady.length === 1 && steady[0].subject === "Flat",
+    "largest flat group gets the steady card, got " + JSON.stringify(steady.map((p) => p.subject)));
+  assert(steady[0].below + steady[0].above <= steady[0].total, "counts are real");
+  assert(t.noStory.length === 1 && t.noStory[0].subject === "FlatSmall",
+    "the second flat group overflows to the note, got " + JSON.stringify(t.noStory));
+  const seed = takeout.ui.patternSeed(steady[0]);
+  assert(seed.indexOf("steady one") !== -1 && seed.indexOf("strain") === -1,
+    "seed claims steadiness, never a lean: " + seed);
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   TR.AGG = { project: {} };
   TR.d2 = { storeKey: (k) => k };
   const page = takeout.readView.html(t);
-  assert(page.indexOf("Also scanned: Flat (n = 100)") !== -1, "note names the flat group with its base");
-  assert(page.indexOf("Also scanned:") === page.lastIndexOf("Also scanned:"), "one note, not per group");
-  // a banner with NO portraits at all gets the empty state, never the note
+  assert(page.indexOf("The steady one") !== -1, "steady card renders with its tag");
+  assert(page.indexOf("Also scanned: FlatSmall (n = 60)") !== -1, "note names only the overflow");
+  assert(page.indexOf("Also scanned: Flat (") === -1, "the carded group is not in the note");
+  // a banner with NO portraits at all keeps the empty state — no steady card either
   const t2 = takeout.buildPatterns({ columns: [columns[2]], scope: { rated: 3, shares: 0 } });
-  assert(t2.noStory.length === 0, "no portrayed banner -> no note (empty state covers it)");
+  assert(t2.patterns.filter((p) => p.kind === "steady").length === 0 && t2.noStory.length === 0,
+    "no portrayed banner -> no steady card, no note");
 });
 
 run("census floor needs real coverage — a 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {

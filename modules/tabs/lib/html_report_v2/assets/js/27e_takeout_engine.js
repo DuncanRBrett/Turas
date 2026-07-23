@@ -31,6 +31,9 @@
     SPLIT_LEAD_RATIO: 1.25,   // ...and lead the next breakout by this much to be THE split (else none dominates)
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
     PORTRAIT_MAX: 3,          // group portraits shown on the page (ranked by tension)
+    STEADY_MAX: 1,            // "steady group" cards (a scanned group with no lean —
+                              //   not standing out IS its story); the rest go to the
+                              //   "also scanned" footnote
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
     MIN_MOVE_FRACTION: 0.03,  // a wave change must be >=N of the scale to count as a "move"
                               //   (0.03 -> 0.15 on a 5-pt scale, 3pp on a 0-100 metric);
@@ -573,21 +576,46 @@
     ports.slice(0, CONST.PORTRAIT_MAX).forEach(function (p) { patterns.push(p); });
 
     // Groups scanned but with NO eligible portrait, on banners that did produce
-    // one — the reader who sees 3 of 4 centres will ask where the 4th went, and
-    // the honest answer ("scanned; no consistent lean") belongs on the page, not
-    // in support email. Eligible-but-capped groups are excluded (they have a
-    // story, just not a top slot); a banner with no portraits at all is covered
-    // by the empty state instead.
+    // one — the reader who sees 3 of 4 centres will ask where the 4th went. Not
+    // standing out IS that group's story (Duncan's read), so the largest such
+    // groups get a STEADY card: the claim is "runs with the overall", proven by
+    // its own numbers (below/above counts, and its largest dips and leads shown
+    // as evidence — even the extremes are modest). Never a manufactured lean.
+    // Eligible-but-capped groups are excluded (they have a story, just not a
+    // top slot); a banner with no portraits at all keeps the empty state.
+    // Beyond STEADY_MAX, the remainder is named in the "also scanned" note.
     var portrayedBanners = {}, eligibleKey = {};
     ports.forEach(function (p) {
       portrayedBanners[p.group] = true;
       eligibleKey[p.group + "::" + p.subject] = true;
     });
-    var noStory = [];
+    var flat = [];
     (inputs.columns || []).forEach(function (c) {
       if (!portrayedBanners[c.group]) return;
       if (eligibleKey[c.group + "::" + c.column]) return;
-      noStory.push({ subject: c.column, group: c.group, base: c.base });
+      var lows = [], highs = [];
+      c.gaps.forEach(function (gp) {
+        var frac = (gp.value - gp.total) / (gp.scaleMax || 1);
+        var row = { label: gp.title, value: gp.value, rest: gp.total,
+          scaleMax: gp.scaleMax, frac: frac, isMean: !gp.isPct, isPct: !!gp.isPct };
+        if (frac < 0) lows.push(row); else if (frac > 0) highs.push(row);
+      });
+      lows.sort(function (a, b) { return a.frac - b.frac; });
+      highs.sort(function (a, b) { return b.frac - a.frac; });
+      var g = gate ? (gate.groups.filter(function (x) {
+        return x.banner === c.group && x.group === c.column;
+      })[0] || null) : null;
+      flat.push({ id: "steady:" + c.group + "::" + c.column, kind: "steady",
+        subject: c.column, group: c.group, base: c.base,
+        below: lows.length, above: highs.length, total: c.gaps.length,
+        lows: lows.slice(0, 2), highs: highs.slice(0, 2),
+        signP: g ? g.signP : null });
+    });
+    flat.sort(function (a, b) { return (b.base || 0) - (a.base || 0); });
+    var steadyCards = flat.slice(0, CONST.STEADY_MAX);
+    steadyCards.forEach(function (p) { patterns.push(p); });
+    var noStory = flat.slice(CONST.STEADY_MAX).map(function (p) {
+      return { subject: p.subject, group: p.group, base: p.base };
     });
 
     // Which cut divides the data most — a navigation pointer, NO synthetic average.
