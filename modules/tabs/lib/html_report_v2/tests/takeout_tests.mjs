@@ -482,9 +482,11 @@ run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
 });
 
 run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (audit #1)", () => {
-  // A 12-respondent and a 30-respondent column. With min_reporting_base = 25 only
-  // the n=30 column may report; with no configured k the census fallback of 5 admits both.
-  TR.conf = { fpcActiveReport: () => true };
+  // A 12-respondent and a 30-respondent column in a NEAR-CENSUS (42 of 60 = 70%
+  // coverage, so the census floor legitimately applies). With min_reporting_base
+  // = 25 only the n=30 column may report; with no configured k the census
+  // fallback of 5 admits both.
+  TR.conf = { fpcActiveReport: () => true, responseRate: () => ({ n: 42, N: 60 }) };
   TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
   TR.AGG = { project: { population_size: 60, min_reporting_base: 25 },
     banner_groups: [{ id: "B", name: "Banner" }] };
@@ -501,6 +503,32 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
   delete TR.AGG.project.min_reporting_base;
   cols = takeout.gather().columns;
   assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
+});
+
+run("census floor needs real coverage — a 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {
+  // CCPB shape: population_size configured (FPC active for intervals) but only
+  // ~5% of the universe interviewed. A thin filtered cell (n=16 fountain owners
+  // in one centre) must NOT enter the strain scan — it is a sample of hundreds,
+  // not most of its own population. Same fixture as audit #1 except coverage.
+  TR.conf = { fpcActiveReport: () => true, responseRate: () => ({ n: 750, N: 14563 }) };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: { population_size: 14563 }, banner_groups: [{ id: "B", name: "Banner" }] };
+  TR.MICRO = null;
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+    _meanRow: (m) => m.rows[0]
+  };
+  TR.model = { forQuestion: () => ({
+    columns: [{ label: "Total", base: 42 }, { label: "Thin", base: 16 }, { label: "Solid", base: 30 }],
+    rows: [{ kind: "mean", cells: [{ mean: 3.8 }, { mean: 3.0 }, { mean: 4.1 }] }] }) };
+  const cols = takeout.gather().columns;
+  assert(cols.length === 1 && cols[0].column === "Solid",
+    "5% coverage -> floor stays 30; the n=16 cell is out (got " +
+    cols.map((c) => c.column).join(",") + ")");
+  assert(takeout._reportingFloor(TR.AGG.project) === 30, "reportingFloor says 30 at 5% coverage");
+  // ...and at 70% coverage the same project gets the census floor back
+  TR.conf.responseRate = () => ({ n: 42, N: 60 });
+  assert(takeout._reportingFloor(TR.AGG.project) === 5, "near-census -> analyst floor (fallback 5)");
 });
 
 run("Patterns tab ignores the live audience filter — published full-sample view (audit #2)", () => {

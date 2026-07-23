@@ -187,6 +187,26 @@
     return (typeof k === "number" && k > 1) ? k : MIN_CENSUS_BASE;
   }
 
+  // The census floor replaces the n>=30 sample floor only when the study
+  // genuinely approaches its universe. Merely configuring a population_size
+  // activates the FPC for intervals (harmless at any coverage), but "a small
+  // subgroup is most of its own population" is only true near full coverage —
+  // on a 5%-coverage customer study, 16 fountain owners are a sample of
+  // hundreds, and cells that thin must not seed portraits or the cell family.
+  var CENSUS_COVERAGE_MIN = 0.5;
+
+  /** The reporting floor for every Patterns scan (strain columns, cell family,
+   *  bimodality): the analyst's census floor near full coverage, else n>=30. */
+  function reportingFloor(proj) {
+    var conf = TR.conf || {};
+    if (typeof conf.fpcActiveReport === "function" && conf.fpcActiveReport()) {
+      var rr = typeof conf.responseRate === "function" ? conf.responseRate() : null;
+      if (rr && rr.N > 1 && rr.n / rr.N >= CENSUS_COVERAGE_MIN) return censusFloor(proj);
+    }
+    return proj.low_base_threshold || 30;
+  }
+  takeout._reportingFloor = reportingFloor;   // exposed for the node gate
+
   /** The Patterns tab summarises the PUBLISHED full-sample view (the shell hides
    *  the filter bar on it for exactly that reason), so every model it reads must
    *  ignore the live audience filter — empty filters, never TR.d2.state.filters.
@@ -201,13 +221,11 @@
 
   function gatherColumnStrain(views) {
     var proj = (TR.AGG && TR.AGG.project) || {};
-    var conf = TR.conf || {};
     // In a near-census of a small finite population the sample-error floor (30)
     // is the wrong frame — a small subgroup is most of its own population, so the
-    // finite-population correction makes it reliable. Use the analyst's reporting
-    // floor there; keep the low-base threshold only for true samples.
-    var census = typeof conf.fpcActiveReport === "function" && conf.fpcActiveReport();
-    var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
+    // finite-population correction makes it reliable. reportingFloor() grants the
+    // census floor only near full coverage; true samples keep n>=30.
+    var floor = reportingFloor(proj);
     var groups = scanBannerGroups();
     var cols = {};
     var qs = views.indexQuestions();
@@ -312,11 +330,10 @@
     if (!micro || !micro.scores || !micro.banner_vars) return null;
     var weights = micro.weights || null;
     var proj = (TR.AGG && TR.AGG.project) || {};
-    var conf = TR.conf || {};
-    var census = typeof conf.fpcActiveReport === "function" && conf.fpcActiveReport();
-    // Per-arm floor: in a census a subgroup is most of its own population, so the
-    // analyst's reporting floor (default 5) applies; a true sample keeps n>=30.
-    var floor = census ? censusFloor(proj) : (proj.low_base_threshold || 30);
+    // Per-arm floor: shared with the strain scan — the census floor only near
+    // full coverage (a subgroup is then most of its own population); a true
+    // sample keeps n>=30.
+    var floor = reportingFloor(proj);
     // The odd-one-out finder (the only consumer of this family) tests each cell's
     // gap against FIXED scale-point floors AND against the group's mean gap across
     // the family — both only meaningful within one comparable scale band. Restrict
