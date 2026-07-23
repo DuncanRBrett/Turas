@@ -283,9 +283,14 @@
       if (l.base > n) { n = l.base; nEff = l.baseEff > 0 ? l.baseEff : null; }
     });
     var conf = TR.conf || {};
-    var census = typeof conf.fpcActiveReport === "function"
-      ? conf.fpcActiveReport() : false;
     var labels = typeof conf.labels === "function" ? conf.labels() : {};
+    // "Census" is the DECLARED design, never inferred from the FPC being active
+    // — a configured universe turns the FPC on at any coverage, but a stratified
+    // sample of 5% of an outlet universe is not a census and must not be
+    // labelled one. (The Patterns reporting floor makes the same distinction
+    // via reportingFloor().)
+    var design = labels.sampling_method_normalised || "";
+    var census = design === "census";
     var pop = (TR.AGG && TR.AGG.project && TR.AGG.project.population_size) || null;
     return {
       n: n,
@@ -293,9 +298,12 @@
       // every significance test does; the displayed n stays the respondent count.
       moePct: typeof conf.maxMoePct === "function" && n ? conf.maxMoePct(nEff || n) : null,
       census: census,
+      design: design,
       population: pop,
+      // Meaningful as a RESPONSE rate only when everyone was invited (census);
+      // for a sample it is coverage of the universe and the ribbon words it so.
       responseRate: (pop && n) ? Math.round(n / pop * 100) : null,
-      sampleNote: census ? "census" : (labels.sampling_method_normalised || "sample"),
+      sampleNote: census ? "census" : (design || "sample"),
       sigNote: labels.is_probability === false ? "stability interval" : "confidence"
     };
   }

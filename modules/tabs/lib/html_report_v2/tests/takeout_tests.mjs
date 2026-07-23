@@ -506,6 +506,44 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
   assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
 });
 
+run("reliability ribbon speaks the DECLARED design — FPC-active never means census", () => {
+  // CCPB shape: stratified sample of 753 from a 14,563 universe. population_size
+  // switches the FPC on, but the ribbon must say "Stratified sample", and the
+  // universe line reads coverage ("of a universe of"), not "response".
+  TR.conf = {
+    fpcActiveReport: () => true,
+    responseRate: () => ({ n: 753, N: 14563 }),
+    labels: () => ({ sampling_method_normalised: "stratified", is_probability: true }),
+    maxMoePct: () => 3.6
+  };
+  TR.AGG = { project: { population_size: 14563, sampling_method: "Stratified" } };
+  const rel = takeout._gatherReliability
+    ? takeout._gatherReliability([{ base: 753 }])
+    : (() => { // reach it through gather()'s output shape instead
+        TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+        TR.AGG.banner_groups = [];
+        TR.MICRO = null;
+        TR.views = { indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5,
+          rows: [{ kind: "mean" }] }]), _meanRow: (m) => m.rows[0] };
+        TR.model = { forQuestion: () => ({ columns: [{ label: "Total", base: 753 }],
+          rows: [{ kind: "mean", cells: [{ mean: 3.8 }] }] }) };
+        return takeout.gather().reliability;
+      })();
+  assert(rel.census === false, "FPC active but declared design is stratified -> not census");
+  assert(rel.design === "stratified", "declared design carried, got " + rel.design);
+  const ribbon = takeout.ui.reliabilityRibbon(rel);
+  assert(ribbon.indexOf("Stratified sample") !== -1, "ribbon leads with the declared design: " + ribbon);
+  assert(ribbon.indexOf("Census") === -1, "never the census label");
+  assert(ribbon.indexOf("of a universe of") !== -1 && ribbon.indexOf("% response") === -1,
+    "universe line is coverage, not response: " + ribbon);
+  // a DECLARED census keeps its label and the response wording
+  TR.conf.labels = () => ({ sampling_method_normalised: "census", is_probability: true });
+  const rel2 = takeout.gather().reliability;
+  const ribbon2 = takeout.ui.reliabilityRibbon(rel2);
+  assert(rel2.census === true && ribbon2.indexOf("Census") !== -1 &&
+    ribbon2.indexOf("% response of") !== -1, "declared census unchanged: " + ribbon2);
+});
+
 run("peer chips need a field of 3+ — 'highest of 2' is empty praise", () => {
   // On filtered questions (cooler-request follow-ups) only 2 centres clear the
   // reporting floor; one of two is always highest, so no chip and no

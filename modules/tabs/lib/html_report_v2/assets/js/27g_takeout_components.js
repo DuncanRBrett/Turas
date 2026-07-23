@@ -344,8 +344,16 @@
    *  Rendered in the read-view footer, above the provenance line (27h). */
   ui.reliabilityRibbon = function (rel) {
     if (!rel || !rel.n) return "";
-    var parts = [(rel.census ? "Census" : "Sample"), "n = " + fmt.base(rel.n)];
-    if (rel.responseRate) parts.push(rel.responseRate + "% response of " + fmt.base(rel.population));
+    // The lead word is the DECLARED design ("Stratified sample"), never inferred
+    // from the FPC; and the universe line only reads "response" on a census —
+    // on a sample 753 of 14 563 is coverage, not a response rate.
+    var design = rel.census ? "Census"
+      : rel.design ? cap(rel.design.replace(/_/g, " ")) + " sample" : "Sample";
+    var parts = [design, "n = " + fmt.base(rel.n)];
+    if (rel.responseRate) {
+      parts.push(rel.responseRate + "% " + (rel.census ? "response of " : "of a universe of ") +
+        fmt.base(rel.population));
+    }
     if (rel.moePct !== null && rel.moePct !== undefined) {
       parts.push("±" + Number(rel.moePct).toFixed(1) + "pp worst-case");
     }
