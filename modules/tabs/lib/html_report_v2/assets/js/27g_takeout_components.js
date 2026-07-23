@@ -86,10 +86,13 @@
   ui.portraitRow = function (e, dir) {
     var max = e.scaleMax || 5;
     var w = Math.min(100, Math.max(0, (e.value || 0) / max * 100)).toFixed(1);
+    // "highest of N" needs N >= 3 to mean anything — in a two-group field one
+    // of them is always highest, so the chip would be empty praise (it appears
+    // on filtered questions where only 2 groups clear the reporting floor).
     var peer = "";
-    if (dir === "high" && e.peerTop && e.peerCount > 1) {
+    if (dir === "high" && e.peerTop && e.peerCount > 2) {
       peer = ' <span class="tko-peer">highest of ' + e.peerCount + "</span>";
-    } else if (dir === "low" && e.peerBottom && e.peerCount > 1) {
+    } else if (dir === "low" && e.peerBottom && e.peerCount > 2) {
       peer = ' <span class="tko-peer">lowest of ' + e.peerCount + "</span>";
     }
     return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(e.label) + peer + "</div>" +
@@ -114,14 +117,16 @@
     if (strained && hi) {
       // An index counter-spike reads as a rating; a KeyShare one as a lead on
       // the share. Both quote the two real cells.
+      // Peer phrasing needs a field of >= 3 (in a two-group field someone is
+      // always first — same floor as the "highest of N" chip).
       if (hi.isPct) {
         return lead + " — yet " +
-          (hi.peerTop && hi.peerCount > 1 ? "leads every " + p.group.toLowerCase() + " on “"
+          (hi.peerTop && hi.peerCount > 2 ? "leads every " + p.group.toLowerCase() + " on “"
             : "leads on “") + hi.label + "” (" + portraitCell(hi, hi.value) + " vs " +
           portraitCell(hi, hi.rest) + " overall).";
       }
       return lead + " — yet rates “" + hi.label + "” highest" +
-        (hi.peerTop && hi.peerCount > 1 ? " of any " + p.group.toLowerCase() : "") +
+        (hi.peerTop && hi.peerCount > 2 ? " of any " + p.group.toLowerCase() : "") +
         " (" + portraitCell(hi, hi.value) + " vs " + portraitCell(hi, hi.rest) +
         " overall).";
     }

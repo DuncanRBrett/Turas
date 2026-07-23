@@ -506,6 +506,22 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
   assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
 });
 
+run("peer chips need a field of 3+ — 'highest of 2' is empty praise", () => {
+  // On filtered questions (cooler-request follow-ups) only 2 centres clear the
+  // reporting floor; one of two is always highest, so no chip and no
+  // "of any centre" seed phrasing. At 3+ the chip returns.
+  const row2 = { label: "Q", value: 8.7, rest: 7.9, scaleMax: 10, peerCount: 2, peerTop: true };
+  assert(takeout.ui.portraitRow(row2, "high").indexOf("tko-peer") === -1, "no chip at peerCount=2");
+  const row3 = Object.assign({}, row2, { peerCount: 3 });
+  assert(takeout.ui.portraitRow(row3, "high").indexOf("highest of 3") !== -1, "chip returns at 3");
+  const low2 = { label: "Q", value: 3.1, rest: 4.0, scaleMax: 10, peerCount: 2, peerBottom: true };
+  assert(takeout.ui.portraitRow(low2, "low").indexOf("tko-peer") === -1, "no 'lowest of 2' either");
+  const seed = takeout.ui.portraitTension({ kind: "portrait", subject: "G", group: "Centre",
+    lean: "strained", hits: 5, gains: 1, total: 10,
+    lows: [], highs: [{ label: "Ease", value: 8.7, rest: 7.9, peerCount: 2, peerTop: true }] });
+  assert(seed.indexOf("of any centre") === -1, "seed drops the peer boast at 2: " + seed);
+});
+
 run("a scanned group with no lean becomes the STEADY card; overflow goes to the note", () => {
   // Four groups on one banner: two with strong opposite leans (portraits), two
   // flat. The larger flat one becomes a steady CARD (STEADY_MAX = 1) whose claim
@@ -767,6 +783,7 @@ run("KeyShare strain gathering: the declared share joins as a real % cell (known
 run("KeyShare portraits render as percentages, and the tension sentence speaks share", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   // Depot A: strained on two rated questions, yet leads every depot on the share.
+  // Three depots — the "leads every depot" peer boast needs a field of 3+.
   const cols = [
     { column: "A", group: "Depot", base: 40, gaps: [
       { title: "Ease of ordering", value: 3.0, total: 3.8, scaleMax: 5 },
@@ -775,7 +792,11 @@ run("KeyShare portraits render as percentages, and the tension sentence speaks s
     { column: "B2", group: "Depot", base: 40, gaps: [
       { title: "Ease of ordering", value: 4.4, total: 3.8, scaleMax: 5 },
       { title: "Invoicing", value: 4.5, total: 3.9, scaleMax: 5 },
-      { title: "Correct delivery day", value: 58, total: 71, scaleMax: 100, isPct: true }] }
+      { title: "Correct delivery day", value: 58, total: 71, scaleMax: 100, isPct: true }] },
+    { column: "C", group: "Depot", base: 40, gaps: [
+      { title: "Ease of ordering", value: 4.0, total: 3.8, scaleMax: 5 },
+      { title: "Invoicing", value: 4.1, total: 3.9, scaleMax: 5 },
+      { title: "Correct delivery day", value: 70, total: 71, scaleMax: 100, isPct: true }] }
   ];
   const t = takeout.buildPatterns({ columns: cols, scope: { rated: 2, shares: 1 } });
   const port = t.patterns.filter((p) => p.kind === "portrait" && p.subject === "A")[0];
