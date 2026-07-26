@@ -292,6 +292,38 @@ test_that("key_share (the Patterns favourable-share declaration) is carried; bla
   expect_identical(uq$key_share, "")
 })
 
+test_that("filter_label / base_filter (the question's own audience) reach the data layer", {
+  # A routed question publishes a base smaller than the sample; the label is
+  # the only thing that says why, so it has to travel with the question.
+  q <- make_dl_q_single()
+  q$filter_label <- "Filter = Allows signwriting in your shop"
+  q$base_filter <- "Q37 ==\"Yes\""
+  wq <- build_dl_question(q, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_identical(wq$filter_label, "Filter = Allows signwriting in your shop")
+  expect_identical(wq$base_filter, "Q37 ==\"Yes\"")
+
+  # Routing done in the questionnaire: a label with no filter expression.
+  ql <- make_dl_q_single()
+  ql$filter_label <- "Filter = Allows signwriting in your shop"
+  ql$base_filter <- NA
+  wl <- build_dl_question(ql, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_identical(wl$filter_label, "Filter = Allows signwriting in your shop")
+  expect_null(wl$base_filter)
+
+  # Asked of everyone (and blank/whitespace cells): neither key is emitted, so
+  # a config without the columns produces byte-identical output.
+  uq <- build_dl_question(make_dl_q_single(), make_dl_banner_info(),
+                          make_dl_config(), low_base = 30)
+  expect_null(uq$filter_label)
+  expect_null(uq$base_filter)
+  qb <- make_dl_q_single()
+  qb$filter_label <- "   "
+  qb$base_filter <- ""
+  wb <- build_dl_question(qb, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_null(wb$filter_label)
+  expect_null(wb$base_filter)
+})
+
 test_that("area_summary (the area's overall-question marker) is TRUE-only, absent otherwise", {
   q <- make_dl_q_scale()
   q$area_summary <- TRUE

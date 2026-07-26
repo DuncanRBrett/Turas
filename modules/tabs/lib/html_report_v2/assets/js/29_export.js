@@ -99,6 +99,9 @@
     var meta = [TR.AGG.project.name, TR.AGG.project.wave,
       model.notRecomputable ? "n/a under filter — not recomputable"
         : model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
+      // the question's own audience travels with every export of it, so a
+      // routed question's smaller base is never read as a shortfall
+      model.audience ? "Base: " + model.audience : "",
       note || ""].filter(Boolean).join(" · ");
     var matrix = opts.includeTable !== false ? TR.render.matrix(model) : null;
     // D2: a pin's stored insight title leads the card when the caller has one
@@ -1114,6 +1117,9 @@
     var content = header(next, {
       kicker: [model.category,
         model.source === "computed" ? "filtered audience (live recompute)" : "published values",
+        // model.audience = who the QUESTION was asked of (routing);
+        // model.filterNote = the cut the READER pinned. Both, never merged.
+        model.audience ? "Base: " + model.audience : "",
         model.filterNote || ""].filter(Boolean).join(" · "),
       title: flags.title || model.short_label || model.title,
       subtitle: model.code + " · " + model.title });

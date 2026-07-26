@@ -476,6 +476,20 @@
   }
   cards2._titleHtml = titleHtml;
 
+  /**
+   * The question's own audience line. A routed question (asked only of a
+   * subset, whether by BaseFilter or by questionnaire routing the analyst
+   * labelled) reports a base smaller than the sample — without this the
+   * reader sees the shortfall and not the reason. "" when everyone was asked
+   * and on reports built before the data layer carried it.
+   */
+  function audienceHtml(model) {
+    var note = model && model.audience;
+    if (!note) return "";
+    return '<div class="qaudience"><b>Base:</b> ' + fmt.escapeHtml(note) + "</div>";
+  }
+  cards2._audienceHtml = audienceHtml;
+
   cards2.renderActive = function () {
     var s = TR.d2.state;
     var holder = document.getElementById("qcard");
@@ -531,7 +545,7 @@
       "</span>" + sourceBadge + prevBadge +
       '<span class="qnav"><button data-act="prevq" aria-label="Previous question">‹</button>' +
       '<button data-act="nextq" aria-label="Next question">›</button></span>' + commentsBtn + "</div>" +
-      titleHtml(model) + contextStrip + bannerTabsHtml() + "</div>";
+      titleHtml(model) + audienceHtml(model) + contextStrip + bannerTabsHtml() + "</div>";
 
     var chartModel = null;
     if (s.showChart) {

@@ -247,6 +247,19 @@
       ? q.short_label : (q.title || "");
   };
 
+  /** The question's OWN audience — who was asked it (Selection sheet
+   *  FilterLabel, else the raw BaseFilter expression). "" when the question
+   *  went to everyone. This is not the reader's live filter: it is baked into
+   *  the published figures, so a routed question's smaller base is explained
+   *  rather than left looking like a shortfall. DEFENSIVE — reports built
+   *  before this shipped carry neither field. */
+  d2.audienceNote = function (q) {
+    if (!q) return "";
+    var lab = typeof q.filter_label === "string" ? q.filter_label.trim() : "";
+    if (lab) return lab;
+    return typeof q.base_filter === "string" ? q.base_filter.trim() : "";
+  };
+
   /* ---------- hash state ---------- */
 
   d2.encodeHash = function () {

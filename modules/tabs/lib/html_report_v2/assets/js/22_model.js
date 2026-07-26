@@ -646,6 +646,10 @@
     viewModel.title = q.title;
     // analyst ShortLabel for space-tight surfaces (null on older data layers)
     viewModel.short_label = TR.d2.shortLabel(q) !== q.title ? TR.d2.shortLabel(q) : null;
+    // Who was asked this question (Selection FilterLabel / BaseFilter) — null
+    // when everyone was. Travels on the model so the card AND every export of
+    // it state the audience beside the base.
+    viewModel.audience = TR.d2.audienceNote(q) || null;
     viewModel.type = q.type;
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();

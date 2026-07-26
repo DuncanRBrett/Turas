@@ -727,6 +727,23 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   key_share_val <- if (is.null(key_share_val) || length(key_share_val) == 0 || is.na(key_share_val[1])) ""
                    else as.character(key_share_val[1])
 
+  # BaseFilter / FilterLabel = the question's own audience (Selection sheet).
+  # A routed question ("asked only of shops that allow signwriting") reports a
+  # smaller base than the survey total, and the base on its own never says WHY
+  # — so the analyst's label travels with the question and the card states the
+  # audience next to the n. FilterLabel wins when both are set; the raw filter
+  # expression is the fallback (same rule as the classic report and Excel).
+  # A label with no BaseFilter is legitimate: the routing happened in the
+  # questionnaire, so the data arrives already restricted.
+  filter_label_val <- q_result$filter_label
+  filter_label_val <- if (is.null(filter_label_val) || length(filter_label_val) == 0 ||
+                          is.na(filter_label_val[1])) ""
+                      else trimws(as.character(filter_label_val[1]))
+  base_filter_val <- q_result$base_filter
+  base_filter_val <- if (is.null(base_filter_val) || length(base_filter_val) == 0 ||
+                         is.na(base_filter_val[1])) ""
+                     else trimws(as.character(base_filter_val[1]))
+
   q_type_v2 <- map_question_type(q_result$question_type)
 
   # Scale maximum for the dashboard gauge/heatmap ("% of each scale's
@@ -797,6 +814,11 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # AreaSummary: the question that summarises its area/theme (Patterns tab).
   # Emitted only when TRUE so untagged configs stay byte-identical.
   if (isTRUE(q_result$area_summary)) out$area_summary <- TRUE
+
+  # Audience note: emitted only when the analyst set one, so a config with
+  # neither column produces byte-identical output.
+  if (nzchar(filter_label_val)) out$filter_label <- filter_label_val
+  if (nzchar(base_filter_val)) out$base_filter <- base_filter_val
 
   # Reader-experience source fields (READER_EXPERIENCE_PLAN.md §E). All are
   # OPTIONAL columns on the structure workbook's Questions sheet; each key is
