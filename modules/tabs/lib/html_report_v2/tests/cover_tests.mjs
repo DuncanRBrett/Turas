@@ -284,7 +284,7 @@ function pinSandbox() {
   });
 }
 
-run("D2: default-title chain — headline > insight first sentence > surface default", () => {
+run("D2: default-title chain — headline > surface default; the insight never titles", () => {
   const sb = pinSandbox();
   const TR = sb.TR;
   TR.insights.set("Q7", "Course choice splits the campuses. More detail here.");
@@ -293,8 +293,10 @@ run("D2: default-title chain — headline > insight first sentence > surface def
   TR.d2.state.activeQ = "Q6"; TR.story2.pinCurrent();
   const items = TR.story2.items();
   eq(items[0].title, "Registration is the pain point", "q.headline wins");
-  eq(items[1].title, "Course choice splits the campuses.",
-    "else the analyst insight's first sentence (reader.insightTitle chain)");
+  eq(items[1].title, "",
+    "a stored insight does NOT title the pin — the pin body prints it in full");
+  eq(TR.story2.pinTitle(items[1]), "Which course?",
+    "the display chain falls to the question, not the insight");
   eq(items[2].title, "", "else empty — each surface keeps its existing default");
   eq(TR.story2.pinTitle(items[2]), "Plain short",
     "the display chain then falls to short_label/title");

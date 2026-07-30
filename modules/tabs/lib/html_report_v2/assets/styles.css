@@ -254,7 +254,10 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .insight { margin-top: 14px; }
 .insight-head { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
 .insight-head .hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
-.insight textarea, .si-note { width: 100%; min-height: 56px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font: 12.5px var(--font); resize: vertical; background: #fffdf6; }
+/* height is set inline by shell.autoGrowNotes — the box grows to its text.
+   max-height caps it on a very long note; the scrollbar that then appears is
+   the "there is more below" signal. */
+.insight textarea, .si-note { width: 100%; min-height: 56px; max-height: 60vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font: 12.5px var(--font); resize: vertical; background: #fffdf6; }
 .insight textarea:focus, .si-note:focus { border-color: var(--accent); }
 
 /* AI insights (read-only, always labelled — distinct from the analyst note) */

@@ -1197,6 +1197,7 @@
           '<button class="ql-railtoggle" title="Show/hide the question list">⟨⟩ Questions</button>' +
           body +
         '</div></div>';
+    if (TR.shell && TR.shell.autoGrowNotes) TR.shell.autoGrowNotes(host);   // themes×banner insight box, full height
     wire(host, island);
   };
 

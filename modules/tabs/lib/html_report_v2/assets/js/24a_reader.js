@@ -253,17 +253,31 @@
   }
 
   /**
-   * The one-line insight title for a question's card / header. The analyst
-   * headline (Comments-sheet Headline column, q.headline) always wins; absent
-   * that, the first sentence of a stored analyst insight (28_insights.js —
-   * clearly marked by the caller via source:"insight"); otherwise null — this
-   * bundle never auto-generates a sentence.
+   * The analyst's own headline for a question (Comments-sheet Headline
+   * column, q.headline), or null. This is the only title a surface may use
+   * when it ALSO prints the insight in full below — the crosstab card and the
+   * story pin both do, and promoting the insight there said it twice.
    */
-  reader.insightTitle = function (q, banner) {
+  reader.headlineTitle = function (q) {
     if (!q) return null;
     if (typeof q.headline === "string" && q.headline.trim()) {
       return { text: q.headline.trim(), source: "headline" };
     }
+    return null;
+  };
+
+  /**
+   * The one-line insight title for a question's card / header. The analyst
+   * headline always wins; absent that, the first sentence of a stored analyst
+   * insight (28_insights.js — clearly marked by the caller via
+   * source:"insight"); otherwise null — this bundle never auto-generates a
+   * sentence. For surfaces that show the line ALONE (dashboard gauge tiles):
+   * anything that also shows the insight box wants headlineTitle.
+   */
+  reader.insightTitle = function (q, banner) {
+    var headline = reader.headlineTitle(q);
+    if (headline) return headline;
+    if (!q) return null;
     var note = (TR.insights && TR.insights.get) ? TR.insights.get(q.code, banner || null) : "";
     if (note) {
       var first = firstSentence(note);

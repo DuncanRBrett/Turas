@@ -717,6 +717,7 @@
     }
     html.push("</div>");
     host.innerHTML = html.join("");
+    if (TR.shell && TR.shell.autoGrowNotes) TR.shell.autoGrowNotes(host);   // this view re-renders outside shell.route
 
     /* ---- wiring ---- */
     var rerender = function () { trk().rerender(); };

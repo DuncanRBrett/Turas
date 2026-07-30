@@ -197,6 +197,7 @@
     if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout" ||
       d2.state.tab === "cover";
     if (TR.reader) TR.reader.renderStrip();
+    shell.autoGrowNotes(host);   // every tab render lands here
     d2.pushHash();
   };
 
@@ -274,6 +275,12 @@
         lines: shell.snapshotLines(card)
       });
     });
+    // Note boxes follow the typing — one delegated listener for every surface.
+    document.addEventListener("input", function (e) {
+      if (e.target && e.target.matches && e.target.matches(NOTE_SEL)) {
+        growNote(e.target);
+      }
+    });
     global.addEventListener("hashchange", function () {
       TR.d2.decodeHash(location.hash);
       TR.filterBar.render();
@@ -303,6 +310,40 @@
       });
       onPin(flags);
     });
+  };
+
+  /* ---------------- self-sizing note boxes ---------------- */
+
+  /**
+   * Every analyst note box (crosstab Insight, story-pin commentary, the
+   * Qualitative and Visualise insight boxes) is a textarea that used to open
+   * at a fixed three-ish lines, so a longer note was silently cut off with
+   * nothing to say so. These grow to fit their content instead; the CSS
+   * max-height caps the growth and the scrollbar that then appears is the
+   * "there is more" signal. One selector, shared with styles.css.
+   */
+  var NOTE_SEL = ".insight textarea, textarea.si-note";
+
+  function growNote(ta) {
+    if (!ta || !ta.style) return;
+    ta.style.height = "auto";
+    // A textarea in a hidden tab measures 0 — leave it alone rather than
+    // collapse it; the next render on a visible tab sizes it properly.
+    if (!(ta.scrollHeight > 0)) return;
+    // Everything here is border-box but scrollHeight is content+padding only,
+    // so the border has to be added back or every box keeps a 2px scrollbar.
+    var cs = global.getComputedStyle ? global.getComputedStyle(ta) : null;
+    var border = cs
+      ? (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0)
+      : 2;
+    ta.style.height = (ta.scrollHeight + border) + "px";
+  }
+
+  /** Size every note box under `root` (default: the whole document). */
+  shell.autoGrowNotes = function (root) {
+    var scope = root || document;
+    if (!scope.querySelectorAll) return;
+    scope.querySelectorAll(NOTE_SEL).forEach(growNote);
   };
 
   /**

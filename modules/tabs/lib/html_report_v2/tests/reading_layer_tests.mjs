@@ -332,7 +332,7 @@ run("B3: fallback chain — headline wins, insight first sentence next, else nul
   eq(reader.insightTitle(null), null, "null-safe");
 });
 
-run("B3: crosstab header — insight leads, question drops to the secondary line", () => {
+run("B3: crosstab header — headline leads, question drops to the secondary line", () => {
   const sb = readerSandbox({ insights: { Q7: "Course choice splits the campuses. More detail here." } });
   const TR = sb.TR;
   load(sb, "25_cards.js");
@@ -346,9 +346,8 @@ run("B3: crosstab header — insight leads, question drops to the secondary line
     '<h2 class="qh-insight">Registration is the pain point</h2>' +
     '<div class="qh-question">How was registration?</div>', "headline over title");
   eq(TR.cards2._titleHtml({ code: "Q7", title: "Which course?" }),
-    '<h2 class="qh-insight">Course choice splits the campuses.' +
-    ' <span class="qh-src">analyst insight</span></h2>' +
-    '<div class="qh-question">Which course?</div>', "marked insight fallback");
+    "<h2>Which course?</h2>",
+    "a stored insight does NOT lead the header — it reads in full in the box below");
   eq(TR.cards2._titleHtml({ code: "Q6", title: "Plain question" }),
     "<h2>Plain question</h2>", "no insight -> plain header unchanged");
 });

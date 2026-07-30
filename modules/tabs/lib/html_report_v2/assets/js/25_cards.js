@@ -459,19 +459,20 @@
   cards2._noHistoryBadgeHtml = noHistoryBadgeHtml;
 
   /**
-   * B3: the question header. An analyst headline (q.headline) or, failing
-   * that, the first sentence of a stored analyst insight (clearly marked)
-   * leads as the h2; the question text drops to a secondary line. No insight
-   * -> the plain question h2, unchanged. Exposed for the node gate.
+   * B3: the question header. An analyst headline (q.headline) leads as the h2
+   * and the question text drops to a secondary line. A stored analyst insight
+   * does NOT lead here: this card already prints the insight in full in its
+   * own box below the table, so promoting its first sentence to the h2 said
+   * the same thing twice. (Cards elsewhere — dashboard gauges, story pins —
+   * have no insight box, so they keep the marked fallback.) No headline ->
+   * the plain question h2, unchanged. Exposed for the node gate.
    */
   function titleHtml(model) {
     var q = TR.d2.questionByCode(model.code);
-    var ins = (TR.reader && TR.reader.insightTitle)
-      ? TR.reader.insightTitle(q, TR.d2.state.banner) : null;
+    var ins = (TR.reader && TR.reader.headlineTitle)
+      ? TR.reader.headlineTitle(q) : null;
     if (!ins) return "<h2>" + fmt.escapeHtml(model.title) + "</h2>";
-    return '<h2 class="qh-insight">' + fmt.escapeHtml(ins.text) +
-      (ins.source === "insight" ? ' <span class="qh-src">analyst insight</span>' : "") +
-      "</h2>" +
+    return '<h2 class="qh-insight">' + fmt.escapeHtml(ins.text) + "</h2>" +
       '<div class="qh-question">' + fmt.escapeHtml(model.title) + "</div>";
   }
   cards2._titleHtml = titleHtml;
@@ -593,6 +594,7 @@
       " (" + fmt.escapeHtml(TR.charts.clip(bannerName, 24)) + ")…\">" +
       fmt.escapeHtml(TR.insights.get(model.code, s.banner)) + "</textarea></div></article>";
     holder.innerHTML = html;
+    if (TR.shell && TR.shell.autoGrowNotes) TR.shell.autoGrowNotes(holder);   // the Insight box opens at its full height
     document.querySelectorAll(".qlink").forEach(function (a) {
       var active = a.getAttribute("data-code") === s.activeQ;
       a.classList.toggle("on", active);

@@ -6,6 +6,10 @@
  * crosstab pinned to the Story exported with its title and none of its numbers
  * (I1). This checks the numbers now survive, row by row.
  *
+ * Also gates shell.autoGrowNotes — the analyst note boxes (crosstab Insight,
+ * story-pin commentary, qual/visualise insights) open at their full height
+ * instead of clipping a long note at three lines with nothing to say so.
+ *
  * Run: node modules/tabs/lib/html_report_v2/tests/shell_snapshot_tests.mjs
  */
 import { readFileSync } from "node:fs";
@@ -61,6 +65,47 @@ run("empty cells are dropped, no orphan separators", () => {
   const card = fakeCard(["Title"], [["Row", "", "10%"]]);
   const lines = TR.shell.snapshotLines(card);
   assert(lines.indexOf("Row · 10%") !== -1, "blank middle cell dropped: " + JSON.stringify(lines));
+});
+
+/* ---------------- self-sizing note boxes ---------------- */
+
+const SHELL_SRC = readFileSync(path.join(JS_DIR, "24_shell.js"), "utf8");
+
+// A textarea stub: scrollHeight is content+padding (border-box), as in a browser.
+const fakeNote = (scrollHeight) => ({ scrollHeight: scrollHeight, style: {} });
+function fakeRoot(notes) {
+  const seen = [];
+  return {
+    seen,
+    querySelectorAll(sel) { seen.push(sel); return notes; }
+  };
+}
+
+run("autoGrowNotes sizes each note box to its content (+ the border-box border)", () => {
+  const notes = [fakeNote(140), fakeNote(56)];
+  TR.shell.autoGrowNotes(fakeRoot(notes));
+  assert(notes[0].style.height === "142px", "tall note grew: " + notes[0].style.height);
+  assert(notes[1].style.height === "58px", "short note sized too: " + notes[1].style.height);
+});
+
+run("one selector, matching the CSS rule — both the insight box and the pin note", () => {
+  const root = fakeRoot([]);
+  TR.shell.autoGrowNotes(root);
+  assert(root.seen[0] === ".insight textarea, textarea.si-note",
+    "selector was: " + root.seen[0]);
+});
+
+run("a note in a hidden tab measures 0 and is left alone, never collapsed", () => {
+  const note = fakeNote(0);
+  TR.shell.autoGrowNotes(fakeRoot([note]));
+  assert(note.style.height === "auto", "left at auto, not 0px: " + note.style.height);
+});
+
+run("typing keeps the box in step — one delegated input listener", () => {
+  assert(SHELL_SRC.indexOf('document.addEventListener("input"') !== -1,
+    "delegated input listener wired in the shell");
+  assert(SHELL_SRC.indexOf("e.target.matches(NOTE_SEL)") !== -1,
+    "it grows exactly the note boxes");
 });
 
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");

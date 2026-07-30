@@ -94,12 +94,13 @@
   story2.pinCurrent = function (flags) {
     var s = TR.d2.state;
     var chartState = TR.cards2.chartState();
-    // D2: the default pin title is the insight line (headline > analyst-insight
-    // first sentence — reader.insightTitle, the bundle-B chain). "" keeps each
-    // surface's existing default (story head = title, PPTX = short_label/title);
-    // older pins carry no title field and render unchanged.
-    var ins = (TR.reader && TR.reader.insightTitle)
-      ? TR.reader.insightTitle(TR.d2.questionByCode(s.activeQ), s.banner) : null;
+    // D2: the default pin title is the analyst headline (reader.headlineTitle).
+    // NOT the insight's first sentence — the pin body prints the insight in
+    // full below the table, so titling the pin with it said it twice. "" keeps
+    // each surface's existing default (story head = title, PPTX =
+    // short_label/title); older pins carry no title field and render unchanged.
+    var ins = (TR.reader && TR.reader.headlineTitle)
+      ? TR.reader.headlineTitle(TR.d2.questionByCode(s.activeQ)) : null;
     load().push({
       kind: "question",
       title: ins ? ins.text : "",
@@ -348,16 +349,17 @@
 
   /**
    * Display title for any pin — the stored title first (D2 question pins,
-   * snapshots, titled tracking exhibits), else the reader insight chain
-   * (headline > analyst-insight first sentence), else the item kind's
-   * existing default. Read-only: old pins are never migrated.
+   * snapshots, titled tracking exhibits), else the analyst headline, else the
+   * item kind's existing default. The insight is never borrowed as a title
+   * here: the pin already shows it in full. Read-only: old pins are never
+   * migrated, so a saved copy keeps whatever title it was pinned with.
    */
   story2.pinTitle = function (item) {
     if (item.title) return item.title;
     if (item.kind === "question") {
       var q = TR.d2.questionByCode(item.q);
-      var ins = (TR.reader && TR.reader.insightTitle)
-        ? TR.reader.insightTitle(q, item.banner) : null;
+      var ins = (TR.reader && TR.reader.headlineTitle)
+        ? TR.reader.headlineTitle(q) : null;
       if (ins) return ins.text;
       return q ? (TR.d2.shortLabel ? TR.d2.shortLabel(q) : q.title) : item.q;
     }
@@ -453,6 +455,7 @@
     wrap.innerHTML = html.join("");
     host.replaceChildren(wrap);
     wire(wrap);
+    if (TR.shell && TR.shell.autoGrowNotes) TR.shell.autoGrowNotes(wrap);   // pin commentary opens at its full height
     persist();
   };
 
