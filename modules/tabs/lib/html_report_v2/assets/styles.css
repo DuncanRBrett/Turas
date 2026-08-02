@@ -464,6 +464,17 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .si-btns { margin-left: auto; display: flex; gap: 4px; }
 .si-table { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .si-note { margin-top: 8px; }
+/* priority comments pinned beside the numbers (crosstab pin -> Story / present) */
+.si-quotes { margin-top: 12px; }
+.si-qhd { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.si-q { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--muted); background: var(--card);
+  font-size: 13px; line-height: 1.45; font-style: italic; }
+.si-q.pos { border-left-color: var(--green); } .si-q.neg { border-left-color: var(--red); }
+.si-q cite { display: block; margin-top: 4px; font-size: 11px; font-style: normal; color: var(--muted); }
+/* present mode runs on a dark stage — the quote block follows it */
+.present .si-qhd { color: #8fa0c4; }
+.present .si-q { background: #182142; color: #fff; }
+.present .si-q cite { color: #8fa0c4; }
 #present-overlay { position: fixed; inset: 0; background: #10162a; z-index: 300; overflow: auto; }
 .present { max-width: 1240px; margin: 0 auto; padding: 26px 40px; color: #fff; }
 .pr-head { display: flex; justify-content: space-between; color: #8fa0c4; font-size: 12px; margin-bottom: 22px; }

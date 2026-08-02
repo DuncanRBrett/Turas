@@ -936,5 +936,65 @@ hostX.innerHTML = ""; qual.render(hostX);
 assert(hostX.innerHTML.indexOf('data-themeview="crosstab"') >= 0,
   "with microdata: the Crosstab by banner toggle renders");
 
+// ---- priority comments behind a closed question (the crosstab pin) ----------
+// Tier 3 ("p" in the coding workbook) is AUTHORED, so it must read the same
+// whatever the reader has starred and whatever cut is on screen.
+
+console.log("\nPriority comments for the crosstab pin:");
+
+TR.AGG = { project: { qualLinks: { Q28: { qcode: "QP", title: "Satisfaction" } } },
+  questions: [] };
+TR.QUAL = { textMode: "full", demographicCuts: "allow", questions: [{
+  code: "QP", title: "Why that rating?", base: { answered: 5 },
+  records: [
+    { idx: 0, tier: 3, sentiment: 1, text: "Invoices are easy to read",
+      demos: { Centre: "Worcester", Channel: "Presell" } },
+    { idx: 1, tier: 2, sentiment: 3, text: "Must-read, not priority" },
+    { idx: 2, tier: 0, sentiment: 2, text: "Ordinary comment" },
+    { idx: 3, tier: 3, sentiment: 3, text: "They keep changing the product codes",
+      demos: { Centre: "Paarl" } },
+    { idx: 4, tier: 3, sentiment: 1, text: null }          // hidden in this copy
+  ] }] };
+
+let pq = qual.priorityQuotes("Q28");
+assert(pq.length === 2, "priorityQuotes: only tier 3 with text (must-read, ordinary and hidden all excluded)");
+assert(pq[0].text === "Invoices are easy to read" && pq[0].q === "Why that rating?",
+  "priorityQuotes: carries the verbatim and the open-end title");
+assert(pq[0].sentiment === "pos" && pq[1].sentiment === "neg",
+  "priorityQuotes: sentiment mapped to the pos/neu/neg payload words");
+assert(pq[0].tags.join(" · ") === "Worcester · Presell",
+  "priorityQuotes: demographic tags as values, in field order");
+assert(qual.priorityQuotes("Q99").length === 0,
+  "priorityQuotes: an unlinked question has none");
+
+// Filter-independence: priority is marked against the QUESTION, not the cut, so
+// the live filter must not narrow it (the rule a named hub already follows).
+TR.MICRO = { n: 5 };
+TR.stats.mask = () => [1, 0, 0, 0, 0];
+TR.d2 = Object.assign({}, TR.d2, { state: { filters: [{ dim: "x", values: ["y"] }] } });
+assert(qual.priorityQuotes("Q28").length === 2,
+  "priorityQuotes: the live audience filter does NOT narrow the set");
+
+// Disclosure: below-k open-end drops the tags, keeps the comments; block drops
+// the tags whatever the base.
+TR.AGG.project.min_reporting_base = 10;                     // base 5 < k
+new Function(fs.readFileSync(path.join(jsDir, "21d_disclosure.js"), "utf8"))();
+pq = qual.priorityQuotes("Q28");
+assert(pq.length === 2 && pq[0].tags.length === 0,
+  "priorityQuotes: an open-end below k keeps its comments and drops the tags");
+TR.AGG.project.min_reporting_base = 1;
+TR.QUAL.demographicCuts = "block";
+assert(qual.priorityQuotes("Q28")[0].tags.length === 0,
+  "priorityQuotes: the block dial drops the tags at any base");
+TR.QUAL.demographicCuts = "allow";
+
+const block = qual.priorityBlockHtml(qual.priorityQuotes("Q28"));
+assert(block.indexOf("In their words") >= 0 && block.indexOf("si-q neg") >= 0,
+  "priorityBlockHtml: heading plus a sentiment-classed quote per comment");
+assert(block.indexOf("<cite>Why that rating? · Paarl</cite>") >= 0,
+  "priorityBlockHtml: attribution reads question then tags");
+assert(qual.priorityBlockHtml([]) === "",
+  "priorityBlockHtml: nothing to show renders nothing");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

@@ -297,6 +297,44 @@ run("deck spine: cover leads, quote slide, divider 01, old-pin table, Detail 02"
     "page tokens resolved across the deck");
 });
 
+// A crosstab pin carrying the analyst's priority comments: the numbers keep
+// their slide and the evidence follows on its own, in quote typography — three
+// verbatims squeezed under a crosstab is the layout this avoids.
+run("priority comments: a question pin emits a companion quote slide", () => {
+  storyDeckSetup();
+  const model = { code: "Q28", title: "Invoicing satisfaction",
+    columns: [{ label: "Total", base: 764 }],
+    rows: [{ kind: "net", label: "Very satisfied (NET)", cells: [{ pct: 81 }] }] };
+  TR.model = { forQuestion: () => model };
+  TR.qual = { priorityQuotes: () => [{ text: "They keep changing the product codes",
+    q: "Any niggles?", tags: ["Paarl"], sentiment: "neg" }] };
+  const pin = { kind: "question", q: "Q28", banner: "", filters: [], note: "",
+    flags: { chart: false, table: true, insight: true, comments: true } };
+  const slides = TR.story2._slidesFor([pin]);
+  eq(slides.length, 3, "cover + the question slide + the quote slide");
+  assert(xmlOf(slides[1]).indexOf("<a:tbl>") !== -1, "the numbers keep their own slide");
+  const quote = xmlOf(slides[2]);
+  assert(quote.indexOf("They keep changing the product codes") !== -1,
+    "the verbatim lands on the companion slide");
+  assert(quote.indexOf("<a:tbl>") === -1, "quotes are never a one-column table");
+  assert(quote.indexOf("Any niggles? · Paarl · Negative") !== -1,
+    "attribution chip carries question, tag and the sentiment word");
+  assert(quote.indexOf("IN THEIR WORDS") !== -1, "companion slide kicker (headers uppercase it)");
+
+  // same pin without the flag: no companion slide, deck byte-identical to before
+  const off = TR.story2._slidesFor([Object.assign({}, pin,
+    { flags: { chart: false, table: true, insight: true } })]);
+  eq(off.length, 2, "no comments flag -> cover + question slide only");
+
+  // the image deck must not silently drop the evidence the editable deck shows
+  TR.charts = Object.assign({}, TR.charts, { brandOf: () => "#123ABC" });
+  const cards = TR.story2._imageCards([pin]);
+  eq(cards.length, 2, "image deck: the question card plus a quote card");
+  assert(cards[1].indexOf("They keep changing the product codes") !== -1,
+    "image deck: the verbatim is rendered on the companion card");
+  delete TR.qual;
+});
+
 run("appendix flag: marked pins move behind an Appendix divider, APPENDIX kicker", () => {
   storyDeckSetup();
   const slides = TR.story2._slidesFor([

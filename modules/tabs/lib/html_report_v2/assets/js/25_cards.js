@@ -676,14 +676,25 @@
       });
     }, 0);
     var tracked = !!cards2.activeModel().prevWave;
-    TR.shell.pinMenu(menu, [
+    var elements = [
       { key: "chart", label: "Chart (" + fmt.escapeHtml(s.chartType) + ")",
         checked: s.showChart },
       { key: "table", label: "Table", checked: true },
       { key: "insight", label: "Insight", checked: true }
-    ], function (flags) {
+    ];
+    // The analyst's priority comments on the linked open-end, offered only when
+    // there are some — an always-on checkbox would be dead on most questions.
+    // The count is filter-independent by design (qual.priorityQuotes): priority
+    // is marked against the question, not against the cut on screen.
+    var priority = (TR.qual && TR.qual.priorityQuotes)
+      ? TR.qual.priorityQuotes(s.activeQ) : [];
+    if (priority.length) {
+      elements.push({ key: "comments", checked: true,
+        label: "Priority comments (" + priority.length + ")" });
+    }
+    TR.shell.pinMenu(menu, elements, function (flags) {
       menu.hidden = true;
-      if (!flags.chart && !flags.table && !flags.insight) {
+      if (!flags.chart && !flags.table && !flags.insight && !flags.comments) {
         TR.shell.toast("Pick at least one element to pin");
         return;
       }

@@ -317,6 +317,33 @@ run("D2: story item + present title = the pin title; note stays editable as toda
   at(STORY_SRC, "model.code + \" — \" + (item.title || model.title)", "present title = pin title");
 });
 
+// Priority comments ride the same question pin as the numbers: the block sits
+// between the table and the editable commentary, and an old pin (no comments
+// flag) renders exactly as before.
+run("priority comments render inside the pinned question card", () => {
+  const sb = pinSandbox();
+  const TR = sb.TR;
+  TR.qual = { priorityQuotes: () => [{ text: "Invoices are easy to read",
+    q: "Any niggles?", tags: ["Paarl"], sentiment: "pos" }],
+    priorityBlockHtml: (qs) => '<div class="si-quotes">' +
+      qs.map((x) => "<blockquote>" + x.text + "</blockquote>").join("") + "</div>" };
+  TR.d2.state.activeQ = "Q8";
+  TR.story2.pinCurrent({ chart: false, table: true, insight: true, comments: true });
+  const item = TR.story2.items()[0];
+  eq(item.flags.comments, true, "the flag is stored on the pin");
+  const html = TR.story2._itemHtml(item, 0);
+  at(html, "Invoices are easy to read", "the verbatim renders in the story card");
+  assert(html.indexOf('class="si-quotes"') < html.indexOf('class="si-note"'),
+    "quotes sit above the analyst's commentary box");
+  eq(TR.story2._quotesFor(item).length, 1, "quotesFor resolves the pin's comments");
+
+  // the same pin without the flag asks the qual module for nothing
+  const off = Object.assign({}, item, { flags: { table: true, insight: true } });
+  eq(TR.story2._quotesFor(off).length, 0, "no flag -> no comments, no call-through");
+  assert(TR.story2._itemHtml(off, 0).indexOf("si-quotes") === -1,
+    "an older pin renders unchanged");
+});
+
 run("D2: existing pins in saved copies render unchanged — no migration", () => {
   const sb = coverSandbox(COVER_OPTS);
   const TR = sb.TR;

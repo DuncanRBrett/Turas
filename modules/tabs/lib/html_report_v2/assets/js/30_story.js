@@ -397,6 +397,25 @@
         intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>";
   };
 
+  /** The priority comments a question pin carries, or [] — recomputed from the
+   *  island on every render rather than frozen into the pin, because tier 3 is
+   *  authored in the coding workbook and is the same for every reader. Guarded:
+   *  a report without a qual island has no TR.qual at all. */
+  function quotesFor(item) {
+    if (!item || item.kind !== "question") return [];
+    var flags = item.flags || {};
+    if (!flags.comments) return [];
+    return (TR.qual && TR.qual.priorityQuotes) ? TR.qual.priorityQuotes(item.q) : [];
+  }
+  story2._quotesFor = quotesFor;   // exposed for the node gate
+
+  /** The quote block for the on-screen surfaces ("" when the pin carries none). */
+  function quoteBlockHtml(item) {
+    var quotes = quotesFor(item);
+    return (quotes.length && TR.qual && TR.qual.priorityBlockHtml)
+      ? TR.qual.priorityBlockHtml(quotes) : "";
+  }
+
   function contextLine(item, model) {
     var bits = [];
     if (item.kind === "question") {
@@ -528,6 +547,7 @@
       (flags.table ? '<div class="si-table">' + TR.render.tableHtml(model,
         { heatmap: true, showDeltas: TR.d2.tracking().enabled,
           intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>" : "") +
+      quoteBlockHtml(item) +
       (flags.insight ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
         fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner) || "") +
         "</textarea>" : "") + "</div>";
@@ -700,6 +720,17 @@
             chartCols: item.chartCols || [0],
             intervals: !!item.intervals,
             title: item.title || null }));   // D2: slide title = pin title
+        // The evidence gets its own slide rather than a strip under the table:
+        // three verbatims crammed below a crosstab are unreadable, and the deck
+        // already has quote typography for exactly this (exporter.quoteSlide).
+        var quotes = quotesFor(item);
+        if (quotes.length && TR.exporter.quoteSlide) {
+          slides.push(TR.exporter.quoteSlide({
+            title: item.title || model.title,
+            kicker: apx ? "Appendix" : "In their words",
+            meta: contextLine(item, model),
+            quotes: quotes, moreN: 0, note: "" }));
+        }
       }
     };
     main.forEach(function (item) { emit(item, false); });
@@ -762,6 +793,25 @@
         title: item.title || null });   // D2: card title = pin title
   }
 
+  /** The image deck's card list: one card per item, plus a companion quote card
+   *  wherever a pin carries priority comments — so the image deck shows the same
+   *  evidence as the editable deck rather than silently dropping it. */
+  function imageCards(list) {
+    var cards = [];
+    list.forEach(function (item) {
+      cards.push(itemCardSvg(item));
+      var quotes = quotesFor(item);
+      if (quotes.length && TR.exporter.quoteCardSvg) {
+        var model = modelFor(item);
+        cards.push(TR.exporter.quoteCardSvg("In their words — " +
+          (item.title || (model ? model.title : item.q)),
+          contextLine(item, model), quotes));
+      }
+    });
+    return cards;
+  }
+  story2._imageCards = imageCards;   // exposed for the node gate
+
   function topAction(action) {
     if (action === "clear") {
       items = [];
@@ -777,7 +827,7 @@
         fmt.slug(TR.AGG.project.name) + "_story.pptx");
     }
     if (action === "pptx-img") {
-      TR.exporter.downloadImageDeck(load().map(itemCardSvg),
+      TR.exporter.downloadImageDeck(imageCards(load()),
         fmt.slug(TR.AGG.project.name) + "_story_images.pptx");
     }
     if (action === "present") startPresent();
@@ -865,7 +915,8 @@
           "</div>" : "") +
         (flags.table !== false ? '<div class="pr-table">' + TR.render.tableHtml(model,
           { heatmap: true, showDeltas: TR.d2.tracking().enabled,
-            intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>" : "");
+            intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>" : "") +
+        quoteBlockHtml(item);
     }
     overlay.hidden = false;
     overlay.innerHTML = '<div class="present">' + head + body +

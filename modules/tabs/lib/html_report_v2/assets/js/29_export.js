@@ -109,6 +109,47 @@
       (opts.title || model.short_label || model.title), meta, opts.chartSvg, matrix);
   };
 
+  /** Companion quote card for the image deck — the verbatims a pinned question
+   *  carries, laid out as quote blocks rather than a one-column table (the same
+   *  choice quoteSlide makes for the editable deck). Quotes arrive ALREADY
+   *  disclosure-gated; this renders, it never re-derives. */
+  exporter.quoteCardSvg = function (title, metaText, quotes) {
+    var W = 1100, PAD = 24;
+    var brand = TR.charts.brandOf();
+    var parts = [], y = PAD + 14;
+    wrapText(title, 80).forEach(function (line) {
+      parts.push(S.text(PAD, y, line, { "font-size": 17, "font-weight": 700, fill: "#1c2333" }));
+      y += 22;
+    });
+    parts.push(S.text(PAD, y, TR.charts.clip(metaText || "", 130),
+      { "font-size": 11, fill: "#6b7280" }));
+    y += 24;
+    (quotes || []).forEach(function (qt) {
+      var edge = qt.sentiment === "pos" ? "#1a7f5a"
+        : qt.sentiment === "neg" ? "#b3261e" : "#6b7280";
+      var lines = wrapText(String(qt.text == null ? "" : qt.text), 95);
+      var blockTop = y;
+      lines.forEach(function (line) {
+        parts.push(S.text(PAD + 16, y + 12, line,
+          { "font-size": 14, "font-style": "italic", fill: "#1c2333" }));
+        y += 20;
+      });
+      var chip = [qt.q].concat(qt.tags || []).filter(Boolean).join(" · ");
+      if (chip) {
+        parts.push(S.text(PAD + 16, y + 12, TR.charts.clip(chip, 120),
+          { "font-size": 11, fill: "#6b7280" }));
+        y += 18;
+      }
+      parts.push(S.el("rect", { x: PAD, y: blockTop, width: 4,
+        height: Math.max(y - blockTop, 12), fill: edge }));
+      y += 14;
+    });
+    y += PAD;
+    var frame = S.el("rect", { x: 0, y: 0, width: W, height: y, fill: "#ffffff" }) +
+      S.el("rect", { x: 0, y: 0, width: W, height: 5, fill: brand });
+    return S.root(W, y, "quotes", frame + parts.join(""));
+  };
+
   function wrapText(text, maxChars) {
     var words = String(text).split(" "), lines = [], cur = "";
     words.forEach(function (w) {

@@ -310,6 +310,71 @@
       (gated ? "💬 comments" : "💬 " + n + " comment" + (n === 1 ? "" : "s")) + "</button>";
   };
 
+  // ---- priority comments behind a closed question (the crosstab pin) ---------
+  // The AUTHORED half of the comment story: tier 3 ("p" in the coding workbook)
+  // ships in the island, so it reads the same for every reader and needs no
+  // freezing at pin time. The reader's own marks (shortlist / highlights / hubs)
+  // stay in the Qualitative tab and reach the story through a hub — two origins,
+  // two routes, deliberately not merged here.
+
+  /**
+   * The priority comments behind a closed/composite question code, as a quote
+   * payload ([{ text, q, tags, sentiment, idx }]).
+   *
+   * Deliberately FILTER-INDEPENDENT: priority is marked against the whole
+   * question in the coding workbook, not against a cut, so narrowing the
+   * audience must not silently empty the evidence beside the numbers. This is
+   * the rule a named hub already follows — a curated set is not a cut.
+   *
+   * Disclosure travels with the payload, exactly as hubExhibit does: hidden
+   * text (record.text == null) is never returned, and the demographic tags drop
+   * when the dial blocks them or when the open-end's own commenter base sits
+   * below k. The base read is the open-end's, not the live filter's, because
+   * the pin's audience is everyone who answered it.
+   *
+   * [] when the question has no linked open-end or nothing is marked priority.
+   */
+  qual.priorityQuotes = function (code) {
+    var island = TR.QUAL;
+    if (!island) return [];
+    var link = qual.linkFor(code);
+    if (!link) return [];
+    var q = findQ(island, link.qcode);
+    if (!q || !q.records) return [];
+    var base = (q.base && q.base.answered) || q.records.length;
+    var tagsOk = island.demographicCuts !== "block" &&
+      !(TR.disclosure && TR.disclosure.cellOk && !TR.disclosure.cellOk(base));
+    var title = q.title || link.title || link.qcode;
+    return q.records.filter(function (r) {
+      return (r.tier || 0) >= 3 && r.text != null;
+    }).map(function (r) {
+      return {
+        text: r.text,
+        q: title,
+        tags: (tagsOk && r.demos)
+          ? Object.keys(r.demos).filter(function (k) { return r.demos[k] != null; })
+              .map(function (k) { return r.demos[k]; })
+          : [],
+        sentiment: SENT[r.sentiment] || "neu",
+        idx: r.idx
+      };
+    });
+  };
+
+  /** The quote block a pinned question carries in the Story, present mode and
+   *  the report — the same already-gated payload the deck's quote slide gets.
+   *  Pure + node-testable; "" when there is nothing to show. */
+  qual.priorityBlockHtml = function (quotes) {
+    if (!quotes || !quotes.length) return "";
+    return '<div class="si-quotes"><div class="si-qhd">In their words</div>' +
+      quotes.map(function (qt) {
+        var chip = [qt.q].concat(qt.tags || []).filter(Boolean).join(" · ");
+        return '<blockquote class="si-q ' + (qt.sentiment || "neu") + '">' +
+          esc(qt.text) + (chip ? "<cite>" + esc(chip) + "</cite>" : "") +
+          "</blockquote>";
+      }).join("") + "</div>";
+  };
+
   // ---- shortlist: star a comment; survives "Save copy" -----------------------
   // Mirrors the insights/notes store: seed from the saved-copy island
   // (TR.userState.qualSaved), let the reader's own localStorage edits win, and
