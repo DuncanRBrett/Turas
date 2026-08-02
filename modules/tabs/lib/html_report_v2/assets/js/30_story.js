@@ -129,13 +129,16 @@
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
 
-  /** The flagship two-panel pin: this-wave distribution + trend-over-waves. */
-  story2.pinExhibit = function () {
+  /** The flagship two-panel pin: this-wave distribution + trend-over-waves.
+   *  `withComments` comes from the pin menu's own priority-comments tickbox —
+   *  the exhibit-then-evidence pair a findings deck is usually built as. */
+  story2.pinExhibit = function (withComments) {
     var s = TR.d2.state;
     var chartState = TR.cards2.chartState();
     load().push({ kind: "exhibit", qs: [s.activeQ], banner: s.banner,
       filters: JSON.parse(JSON.stringify(s.filters)),
-      flags: { dist: true, trend: true, table: false, insight: true },
+      flags: { dist: true, trend: true, table: false, insight: true,
+        comments: !!withComments },
       distType: chartState.type === "line" ? "column" : chartState.type,
       chartKind: chartState.kind, chartCols: chartState.cols,
       hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
@@ -402,10 +405,15 @@
    *  authored in the coding workbook and is the same for every reader. Guarded:
    *  a report without a qual island has no TR.qual at all. */
   function quotesFor(item) {
-    if (!item || item.kind !== "question") return [];
+    if (!item) return [];
     var flags = item.flags || {};
     if (!flags.comments) return [];
-    return (TR.qual && TR.qual.priorityQuotes) ? TR.qual.priorityQuotes(item.q) : [];
+    // A trend exhibit is pinned on one question (qs[0]); a composite exhibit
+    // spans several, and there is no one open-end behind it, so it carries none.
+    var code = item.kind === "question" ? item.q
+      : (item.kind === "exhibit" && item.qs && item.qs.length === 1) ? item.qs[0] : null;
+    if (!code) return [];
+    return (TR.qual && TR.qual.priorityQuotes) ? TR.qual.priorityQuotes(code) : [];
   }
   story2._quotesFor = quotesFor;   // exposed for the node gate
 
@@ -502,6 +510,7 @@
         fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</span>" +
         buttons + "</div>" +
         TR.exhibit.panelsHtml(item) +
+        quoteBlockHtml(item) +
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
             fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
@@ -662,6 +671,16 @@
     }
     var slides = [coverSlideFor(list)];
     var divN = 0;   // WP3: dividers numbered in deck order
+    // The evidence gets its own slide rather than a strip under the exhibit:
+    // three verbatims squeezed below a crosstab are unreadable, and the deck
+    // already has quote typography for exactly this (exporter.quoteSlide).
+    var pushQuoteSlide = function (item, apx, title, meta) {
+      var quotes = quotesFor(item);
+      if (!quotes.length || !TR.exporter.quoteSlide) return;
+      slides.push(TR.exporter.quoteSlide({ title: title,
+        kicker: apx ? "Appendix" : "In their words",
+        meta: meta || "", quotes: quotes, moreN: 0, note: "" }));
+    };
     var emit = function (item, apx) {
       if (item.kind === "divider") {
         slides.push(TR.exporter.dividerSlide(item.title, item.note || "",
@@ -671,6 +690,11 @@
       if (item.kind === "exhibit") {
         var exSlide = TR.exhibit.slide(item);
         if (exSlide) slides.push(exSlide);
+        if (quotesFor(item).length) {
+          var exModels = TR.exhibit.models(item);
+          pushQuoteSlide(item, apx, TR.exhibit.titleFor(item, exModels),
+            TR.exhibit.contextLine(item, exModels));
+        }
         return;
       }
       if (item.kind === "heatmap") {
@@ -720,17 +744,8 @@
             chartCols: item.chartCols || [0],
             intervals: !!item.intervals,
             title: item.title || null }));   // D2: slide title = pin title
-        // The evidence gets its own slide rather than a strip under the table:
-        // three verbatims crammed below a crosstab are unreadable, and the deck
-        // already has quote typography for exactly this (exporter.quoteSlide).
-        var quotes = quotesFor(item);
-        if (quotes.length && TR.exporter.quoteSlide) {
-          slides.push(TR.exporter.quoteSlide({
-            title: item.title || model.title,
-            kicker: apx ? "Appendix" : "In their words",
-            meta: contextLine(item, model),
-            quotes: quotes, moreN: 0, note: "" }));
-        }
+        pushQuoteSlide(item, apx, item.title || model.title,
+          contextLine(item, model));
       }
     };
     main.forEach(function (item) { emit(item, false); });
@@ -802,10 +817,11 @@
       cards.push(itemCardSvg(item));
       var quotes = quotesFor(item);
       if (quotes.length && TR.exporter.quoteCardSvg) {
-        var model = modelFor(item);
+        // an exhibit has no single question model — its own title chain answers
+        var model = item.kind === "question" ? modelFor(item) : null;
         cards.push(TR.exporter.quoteCardSvg("In their words — " +
-          (item.title || (model ? model.title : item.q)),
-          contextLine(item, model), quotes));
+          (item.title || (model ? model.title : story2.pinTitle(item))),
+          model ? contextLine(item, model) : filterNote(item) || "", quotes));
       }
     });
     return cards;
@@ -878,7 +894,8 @@
         '<p class="pr-ctx">' +
         fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</p>" +
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
-        '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>";
+        '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>" +
+        quoteBlockHtml(item);
     } else if (item.kind === "snapshot") {
       body = "<h1>" + fmt.escapeHtml(item.title || "Pinned card") + "</h1>" +
         (item.context ? '<p class="pr-ctx">' + fmt.escapeHtml(item.context) + "</p>" : "") +

@@ -710,7 +710,10 @@
     if (exhibitBtn) {
       exhibitBtn.addEventListener("click", function () {
         menu.hidden = true;
-        TR.story2.pinExhibit();
+        // the exhibit button sits under the same tickboxes — the comments one
+        // is the only element it shares with them, so it reads it directly
+        var cb = menu.querySelector('[data-pf="comments"]');
+        TR.story2.pinExhibit(!!(cb && cb.checked));
       });
     }
   }

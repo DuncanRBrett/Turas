@@ -335,6 +335,37 @@ run("priority comments: a question pin emits a companion quote slide", () => {
   delete TR.qual;
 });
 
+// The pair a findings deck is usually built as: the trend exhibit, then the
+// verbatims behind it. The exhibit is pinned on one question, so it resolves
+// the same priority set the crosstab pin does.
+run("priority comments: a trend exhibit gets the same companion slide", () => {
+  storyDeckSetup();
+  TR.AGG.project.wave_order = 11;
+  TR.d2.questionByCode = (c) => ({ code: c, title: "Invoicing" });
+  TR.trk = { points: () => [{ year: 9, value: 79 },
+    { year: 10, value: 81, change_prev: 2, current: true }] };
+  TR.model = { forQuestion: () => ({ code: "Q28", title: "Invoicing",
+    columns: [{ label: "Total", base: 764 }],
+    rows: [{ kind: "net", label: "Very satisfied (NET)", waves: [], cells: [{ pct: 81 }] }] }) };
+  const seen = [];
+  TR.qual = { priorityQuotes: (code) => { seen.push(code);
+    return [{ text: "Sometimes they provide us with paper invoices",
+      q: "Any niggles?", tags: [], sentiment: "neg" }]; } };
+  const item = { kind: "exhibit", qs: ["Q28"], banner: "", filters: [], note: "",
+    flags: { dist: true, trend: true, table: false, insight: true, comments: true } };
+  const slides = TR.story2._slidesFor([item]);
+  eq(slides.length, 3, "cover + the two-panel exhibit + the quote slide");
+  eq(seen[0], "Q28", "the exhibit resolves comments through its single question");
+  assert(xmlOf(slides[2]).indexOf("Sometimes they provide us with paper invoices") !== -1,
+    "the verbatim lands on the companion slide");
+
+  // a COMPOSITE exhibit spans several questions — no one open-end behind it
+  const multi = Object.assign({}, item, { qs: ["Q28", "Q29"] });
+  eq(TR.story2._quotesFor(multi).length, 0,
+    "a multi-question exhibit carries no comments");
+  delete TR.qual;
+});
+
 run("appendix flag: marked pins move behind an Appendix divider, APPENDIX kicker", () => {
   storyDeckSetup();
   const slides = TR.story2._slidesFor([
