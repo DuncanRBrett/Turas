@@ -472,20 +472,23 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .si-qband { margin: 10px 0 2px; font-size: 12px; font-weight: 700; color: var(--ink); }
 .si-q.pos { border-left-color: var(--green); } .si-q.neg { border-left-color: var(--red); }
 .si-q cite { display: block; margin-top: 4px; font-size: 11px; font-style: normal; color: var(--muted); }
-/* present mode runs on a dark stage — the quote block follows it */
-.present .si-qhd { color: #8fa0c4; }
-.present .si-qband { color: #fff; }
-.present .si-q { background: #182142; color: #fff; }
-.present .si-q cite { color: #8fa0c4; }
-#present-overlay { position: fixed; inset: 0; background: #10162a; z-index: 300; overflow: auto; }
-.present { max-width: 1240px; margin: 0 auto; padding: 26px 40px; color: #fff; }
-.pr-head { display: flex; justify-content: space-between; color: #8fa0c4; font-size: 12px; margin-bottom: 22px; }
-.pr-head button { background: none; border: 1px solid #3c4a6e; color: #8fa0c4; border-radius: 7px; padding: 4px 12px; cursor: pointer; }
-.present h1 { font-size: 26px; margin-bottom: 6px; }
-.pr-ctx { color: #8fa0c4; font-size: 12.5px; margin-bottom: 14px; }
-.pr-note { background: rgba(204, 153, 0, .12); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 15px; margin-bottom: 16px; color: #f3e7c4; }
-.pr-table { background: #fff; border-radius: 10px; padding: 14px; color: var(--ink); }
-.pr-foot { text-align: center; color: #5d6c8f; font-size: 11.5px; margin-top: 18px; }
+/* Present mode runs on the report's own paper, not a dark stage: it reads
+   better projected, the charts and tables were drawn for a light ground
+   anyway, and the deck then looks like the rest of the report. Every colour
+   below is a token — no present-only palette to keep in step. */
+#present-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 300; overflow: auto; }
+.present { max-width: 1240px; margin: 0 auto; padding: 26px 40px; color: var(--ink); }
+.pr-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+.pr-head button { background: var(--card); border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 4px 12px; cursor: pointer; }
+.present h1 { font-size: 26px; margin-bottom: 6px; color: var(--brand); }
+.pr-ctx { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+.pr-note { background: rgba(204, 153, 0, .10); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 15px; margin-bottom: 16px; color: var(--ink); }
+.pr-table { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; color: var(--ink); box-shadow: var(--shadow); }
+.pr-foot { text-align: center; color: var(--faint); font-size: 11.5px; margin-top: 18px; }
+/* on the story tab the quotes sit inside the pin's card; in present mode there
+   is no card, so the block gets the same panel treatment as .pr-table */
+.present .si-quotes { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px 16px; box-shadow: var(--shadow); }
+.present .si-q { background: var(--soft); }
 
 /* ---------- misc ---------- */
 #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 400; pointer-events: none; }
