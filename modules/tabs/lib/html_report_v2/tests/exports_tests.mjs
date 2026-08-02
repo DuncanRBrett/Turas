@@ -366,6 +366,48 @@ run("priority comments: a trend exhibit gets the same companion slide", () => {
   delete TR.qual;
 });
 
+// A band-split open-end (NPS) tells its story one band at a time — and six
+// priority marks across three bands would otherwise breach the slide's cap of 4.
+run("priority comments: a band-split question gets one quote slide per band", () => {
+  storyDeckSetup();
+  TR.model = { forQuestion: () => ({ code: "Q79", title: "Recommend CCPB",
+    columns: [{ label: "Total", base: 764 }],
+    rows: [{ kind: "net", label: "Promoter (NET)", cells: [{ pct: 61 }] }] }) };
+  const q = (band, text) => ({ text: text, q: "Why that score?", band: band,
+    tags: [], sentiment: band === "Detractor" ? "neg" : "pos" });
+  TR.qual = {
+    priorityQuotes: () => [q("Detractor", "Codes keep changing"),
+      q("Detractor", "Paper invoices"), q("Promoter", "Never let us down")],
+    groupQuotesByBand: (qs) => {
+      const out = [], by = {};
+      qs.forEach((x) => { const b = x.band || "";
+        if (!by[b]) { by[b] = { band: b, quotes: [] }; out.push(by[b]); }
+        by[b].quotes.push(x); });
+      return out;
+    } };
+  const pin = { kind: "question", q: "Q79", banner: "", filters: [], note: "",
+    flags: { chart: false, table: true, insight: true, comments: true } };
+  const slides = TR.story2._slidesFor([pin]);
+  eq(slides.length, 4, "cover + the numbers + one slide per band (2 bands)");
+  const det = xmlOf(slides[2]), pro = xmlOf(slides[3]);
+  assert(det.indexOf("Recommend CCPB — Detractor") !== -1, "band names its own slide");
+  assert(det.indexOf("Codes keep changing") !== -1 && det.indexOf("Paper invoices") !== -1,
+    "both detractor quotes on the detractor slide");
+  assert(det.indexOf("Never let us down") === -1, "the promoter quote is not on it");
+  assert(pro.indexOf("Recommend CCPB — Promoter") !== -1 &&
+    pro.indexOf("Never let us down") !== -1, "the promoter band gets its own slide");
+  assert(det.indexOf("more in the report") === -1,
+    "splitting by band keeps each slide clear of the 4-quote cap");
+
+  // the image deck splits the same way
+  TR.charts = Object.assign({}, TR.charts, { brandOf: () => "#123ABC" });
+  const cards = TR.story2._imageCards([pin]);
+  eq(cards.length, 3, "image deck: the question card plus one card per band");
+  assert(cards[1].indexOf("Detractor") !== -1 && cards[2].indexOf("Promoter") !== -1,
+    "image deck cards are titled by band, in band order");
+  delete TR.qual;
+});
+
 run("appendix flag: marked pins move behind an Appendix divider, APPENDIX kicker", () => {
   storyDeckSetup();
   const slides = TR.story2._slidesFor([

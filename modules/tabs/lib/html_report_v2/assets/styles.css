@@ -469,10 +469,12 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .si-qhd { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 .si-q { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--muted); background: var(--card);
   font-size: 13px; line-height: 1.45; font-style: italic; }
+.si-qband { margin: 10px 0 2px; font-size: 12px; font-weight: 700; color: var(--ink); }
 .si-q.pos { border-left-color: var(--green); } .si-q.neg { border-left-color: var(--red); }
 .si-q cite { display: block; margin-top: 4px; font-size: 11px; font-style: normal; color: var(--muted); }
 /* present mode runs on a dark stage — the quote block follows it */
 .present .si-qhd { color: #8fa0c4; }
+.present .si-qband { color: #fff; }
 .present .si-q { background: #182142; color: #fff; }
 .present .si-q cite { color: #8fa0c4; }
 #present-overlay { position: fixed; inset: 0; background: #10162a; z-index: 300; overflow: auto; }

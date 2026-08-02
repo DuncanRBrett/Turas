@@ -1033,5 +1033,20 @@ assert(npsBlock.indexOf("<cite>Why that score? · Detractor</cite>") >= 0,
 assert(npsBlock.indexOf("Why that score? · Promoter · Paarl") >= 0,
   "priorityBlockHtml: band then demographic tags");
 
+// One group per band, in arrival order — the deck turns each into its own slide.
+const grouped = qual.groupQuotesByBand(qual.priorityQuotes("Q79"));
+assert(grouped.map((g) => g.band).join(",") === "Detractor,Passive,Promoter",
+  "groupQuotesByBand: one group per band, in the order the quotes arrive");
+assert(grouped.every((g) => g.quotes.length === 1),
+  "groupQuotesByBand: every quote lands in its own band's group");
+const flat = qual.groupQuotesByBand([{ text: "a" }, { text: "b" }]);
+assert(flat.length === 1 && flat[0].band === "" && flat[0].quotes.length === 2,
+  "groupQuotesByBand: an unbanded payload is one group (the non-NPS case)");
+assert(qual.groupQuotesByBand([]).length === 0, "groupQuotesByBand: empty in, empty out");
+assert(npsBlock.indexOf('<div class="si-qband">Detractor</div>') >= 0,
+  "priorityBlockHtml: a band-split pin gets a sub-head per band on screen");
+assert(qual.priorityBlockHtml(qual.priorityQuotes("Q28")).indexOf("si-qband") < 0,
+  "priorityBlockHtml: a single-band question keeps its flat list");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

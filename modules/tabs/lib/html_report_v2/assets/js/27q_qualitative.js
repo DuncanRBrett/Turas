@@ -382,18 +382,42 @@
       .map(function (w) { return w.qt; });
   };
 
+  /**
+   * Split a quote payload into one group per band, in the order the quotes
+   * arrive (priorityQuotes has already put them in the question's band order).
+   * A payload with no bands — or all one band — comes back as a single group,
+   * so the caller can always iterate and the unbanded case is unchanged.
+   * Returns [{ band, quotes }]; [] for an empty payload. Pure + node-testable.
+   */
+  qual.groupQuotesByBand = function (quotes) {
+    var groups = [], byBand = {};
+    (quotes || []).forEach(function (qt) {
+      var band = qt.band || "";
+      if (!byBand[band]) { byBand[band] = { band: band, quotes: [] }; groups.push(byBand[band]); }
+      byBand[band].quotes.push(qt);
+    });
+    return groups;
+  };
+
   /** The quote block a pinned question carries in the Story, present mode and
    *  the report — the same already-gated payload the deck's quote slide gets.
    *  Pure + node-testable; "" when there is nothing to show. */
   qual.priorityBlockHtml = function (quotes) {
     if (!quotes || !quotes.length) return "";
+    var groups = qual.groupQuotesByBand(quotes);
+    var banded = groups.length > 1;   // one band only -> no sub-heads, as before
+    var quoteHtml = function (qt) {
+      // band leads the attribution — it is the axis the reader is reading by
+      var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
+      return '<blockquote class="si-q ' + (qt.sentiment || "neu") + '">' +
+        esc(qt.text) + (chip ? "<cite>" + esc(chip) + "</cite>" : "") +
+        "</blockquote>";
+    };
     return '<div class="si-quotes"><div class="si-qhd">In their words</div>' +
-      quotes.map(function (qt) {
-        // band leads the attribution — it is the axis the reader is reading by
-        var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
-        return '<blockquote class="si-q ' + (qt.sentiment || "neu") + '">' +
-          esc(qt.text) + (chip ? "<cite>" + esc(chip) + "</cite>" : "") +
-          "</blockquote>";
+      groups.map(function (g) {
+        // the screen mirrors the deck's one-slide-per-band split
+        return (banded && g.band ? '<div class="si-qband">' + esc(g.band) + "</div>" : "") +
+          g.quotes.map(quoteHtml).join("");
       }).join("") + "</div>";
   };
 

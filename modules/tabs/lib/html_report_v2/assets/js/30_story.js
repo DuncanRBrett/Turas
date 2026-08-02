@@ -674,12 +674,20 @@
     // The evidence gets its own slide rather than a strip under the exhibit:
     // three verbatims squeezed below a crosstab are unreadable, and the deck
     // already has quote typography for exactly this (exporter.quoteSlide).
+    // A band-split open-end (NPS Detractor/Passive/Promoter) gets ONE SLIDE PER
+    // BAND: that is how the story is told, and it keeps each band clear of the
+    // slide's 4-quote cap, which two priority marks per band sheet would breach.
     var pushQuoteSlide = function (item, apx, title, meta) {
       var quotes = quotesFor(item);
       if (!quotes.length || !TR.exporter.quoteSlide) return;
-      slides.push(TR.exporter.quoteSlide({ title: title,
-        kicker: apx ? "Appendix" : "In their words",
-        meta: meta || "", quotes: quotes, moreN: 0, note: "" }));
+      var groups = (TR.qual && TR.qual.groupQuotesByBand)
+        ? TR.qual.groupQuotesByBand(quotes) : [{ band: "", quotes: quotes }];
+      groups.forEach(function (g) {
+        slides.push(TR.exporter.quoteSlide({
+          title: g.band ? title + " — " + g.band : title,
+          kicker: apx ? "Appendix" : "In their words",
+          meta: meta || "", quotes: g.quotes, moreN: 0, note: "" }));
+      });
     };
     var emit = function (item, apx) {
       if (item.kind === "divider") {
@@ -819,9 +827,15 @@
       if (quotes.length && TR.exporter.quoteCardSvg) {
         // an exhibit has no single question model — its own title chain answers
         var model = item.kind === "question" ? modelFor(item) : null;
-        cards.push(TR.exporter.quoteCardSvg("In their words — " +
-          (item.title || (model ? model.title : story2.pinTitle(item))),
-          model ? contextLine(item, model) : filterNote(item) || "", quotes));
+        var head = item.title || (model ? model.title : story2.pinTitle(item));
+        var meta = model ? contextLine(item, model) : (filterNote(item) || "");
+        // one card per band, mirroring the editable deck's one slide per band
+        var groups = (TR.qual && TR.qual.groupQuotesByBand)
+          ? TR.qual.groupQuotesByBand(quotes) : [{ band: "", quotes: quotes }];
+        groups.forEach(function (g) {
+          cards.push(TR.exporter.quoteCardSvg("In their words — " + head +
+            (g.band ? " · " + g.band : ""), meta, g.quotes));
+        });
       }
     });
     return cards;
