@@ -429,6 +429,14 @@ run("quoteSlide: quote typography — glyph, italic quote, attribution, NO table
   at(slide.xml, "Faster support wanted", "insight in the subtitle");
 });
 
+run("quoteSlide: a band-split quote says which band it came from", () => {
+  const slide = TR.exporter.quoteSlide({ title: "Recommend",
+    quotes: [{ text: "Codes keep changing", q: "Why that score?",
+      band: "Detractor", tags: ["Paarl"], sentiment: "neg" }] });
+  assert(slide.xml.indexOf("Why that score? · Detractor · Paarl · Negative") !== -1,
+    "band leads the tags in the attribution chip");
+});
+
 run("quoteSlide caps at 4 quotes and counts the rest in the footer", () => {
   proj();
   const many = Array.from({ length: 6 }, (_, i) => (

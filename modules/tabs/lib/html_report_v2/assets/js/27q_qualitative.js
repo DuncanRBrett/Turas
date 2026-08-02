@@ -332,6 +332,13 @@
    * below k. The base read is the open-end's, not the live filter's, because
    * the pin's audience is everyone who answered it.
    *
+   * A band-split open-end (the NPS Detractor/Passive/Promoter union) returns all
+   * its bands, ordered by the question's own band order, each quote carrying its
+   * band. The band is NOT a demographic tag — it mirrors a closed question that
+   * is already reported, so it is never k-anonymised away and never dropped.
+   * Without it a detractor's gripe and a promoter's praise sit side by side on a
+   * slide looking alike.
+   *
    * [] when the question has no linked open-end or nothing is marked priority.
    */
   qual.priorityQuotes = function (code) {
@@ -345,12 +352,14 @@
     var tagsOk = island.demographicCuts !== "block" &&
       !(TR.disclosure && TR.disclosure.cellOk && !TR.disclosure.cellOk(base));
     var title = q.title || link.title || link.qcode;
-    return q.records.filter(function (r) {
+    var bands = (q.split && q.split.bands) ? q.split.bands : [];
+    var out = q.records.filter(function (r) {
       return (r.tier || 0) >= 3 && r.text != null;
     }).map(function (r) {
       return {
         text: r.text,
         q: title,
+        band: r.band || "",
         tags: (tagsOk && r.demos)
           ? Object.keys(r.demos).filter(function (k) { return r.demos[k] != null; })
               .map(function (k) { return r.demos[k]; })
@@ -359,6 +368,18 @@
         idx: r.idx
       };
     });
+    if (!bands.length) return out;
+    // Reading order = the question's declared band order (Detractor -> Passive ->
+    // Promoter), stable within a band; an unbanded record sorts last.
+    var rank = function (b) {
+      var at = bands.indexOf(b);
+      return at < 0 ? bands.length : at;
+    };
+    return out.map(function (qt, i) { return { qt: qt, i: i }; })
+      .sort(function (a, b) {
+        return (rank(a.qt.band) - rank(b.qt.band)) || (a.i - b.i);
+      })
+      .map(function (w) { return w.qt; });
   };
 
   /** The quote block a pinned question carries in the Story, present mode and
@@ -368,7 +389,8 @@
     if (!quotes || !quotes.length) return "";
     return '<div class="si-quotes"><div class="si-qhd">In their words</div>' +
       quotes.map(function (qt) {
-        var chip = [qt.q].concat(qt.tags || []).filter(Boolean).join(" · ");
+        // band leads the attribution — it is the axis the reader is reading by
+        var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
         return '<blockquote class="si-q ' + (qt.sentiment || "neu") + '">' +
           esc(qt.text) + (chip ? "<cite>" + esc(chip) + "</cite>" : "") +
           "</blockquote>";

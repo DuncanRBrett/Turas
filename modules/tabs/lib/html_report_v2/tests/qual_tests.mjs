@@ -996,5 +996,42 @@ assert(block.indexOf("<cite>Why that rating? · Paarl</cite>") >= 0,
 assert(qual.priorityBlockHtml([]) === "",
   "priorityBlockHtml: nothing to show renders nothing");
 
+// A band-split open-end (the NPS Detractor/Passive/Promoter union): all bands come
+// back, in the question's own band order, each quote saying which band it is from.
+TR.AGG = { project: { qualLinks: { Q79: { qcode: "QNPS", title: "Recommend" } } },
+  questions: [] };
+TR.QUAL = { textMode: "full", demographicCuts: "allow", questions: [{
+  code: "QNPS", title: "Why that score?", base: { answered: 90 },
+  split: { dim: "NPS band", bands: ["Detractor", "Passive", "Promoter"] },
+  records: [
+    { idx: 0, tier: 3, sentiment: 1, band: "Promoter", text: "Never let us down",
+      demos: { Centre: "Paarl" } },
+    { idx: 1, tier: 3, sentiment: 3, band: "Detractor", text: "Codes keep changing" },
+    { idx: 2, tier: 1, sentiment: 2, band: "Passive", text: "Not priority" },
+    { idx: 3, tier: 3, sentiment: 2, band: "Passive", text: "Paper invoices" }
+  ] }] };
+
+const nps = qual.priorityQuotes("Q79");
+assert(nps.map((x) => x.band).join(",") === "Detractor,Passive,Promoter",
+  "priorityQuotes: a band-split open-end reads in the question's band order");
+assert(nps.length === 3, "priorityQuotes: every band's priority comment comes back");
+assert(nps[0].text === "Codes keep changing",
+  "priorityQuotes: the detractor leads, not the data order");
+
+// The band is NOT a demographic tag — it mirrors a reported closed question, so
+// the k-gate and the block dial must never strip it.
+TR.AGG.project.min_reporting_base = 500;                    // base 90 < k
+new Function(fs.readFileSync(path.join(jsDir, "21d_disclosure.js"), "utf8"))();
+const gatedNps = qual.priorityQuotes("Q79");
+assert(gatedNps[2].band === "Promoter" && gatedNps[2].tags.length === 0,
+  "priorityQuotes: below k the band survives and the demographic tags go");
+TR.AGG.project.min_reporting_base = 1;
+
+const npsBlock = qual.priorityBlockHtml(qual.priorityQuotes("Q79"));
+assert(npsBlock.indexOf("<cite>Why that score? · Detractor</cite>") >= 0,
+  "priorityBlockHtml: the band leads the attribution, ahead of any tags");
+assert(npsBlock.indexOf("Why that score? · Promoter · Paarl") >= 0,
+  "priorityBlockHtml: band then demographic tags");
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

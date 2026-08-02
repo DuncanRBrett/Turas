@@ -134,7 +134,7 @@
           { "font-size": 14, "font-style": "italic", fill: "#1c2333" }));
         y += 20;
       });
-      var chip = [qt.q].concat(qt.tags || []).filter(Boolean).join(" · ");
+      var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
       if (chip) {
         parts.push(S.text(PAD + 16, y + 12, TR.charts.clip(chip, 120),
           { "font-size": 11, fill: "#6b7280" }));
@@ -1285,7 +1285,9 @@
         h: Math.max(blockH - 0.42, 0.3) },
         [para(TR.charts.clip(String(qt.text || ""), 300),
           { size: SIZE.quote, italic: true, colour: INK })]);
-      var chip = [qt.q].concat(qt.tags || [])
+      // qt.band (NPS Detractor/Passive/Promoter and the like) leads the tags when
+      // the payload carries one; payloads without it are unchanged.
+      var chip = [qt.q, qt.band].concat(qt.tags || [])
         .concat([SENT_WORD[qt.sentiment] || null]).filter(Boolean).join(" · ");
       content += textBox(next(), { x: MARGIN + 1.0, y: y + blockH - 0.34,
         w: 9.5, h: 0.26 },
