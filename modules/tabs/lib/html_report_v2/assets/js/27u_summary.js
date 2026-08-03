@@ -25,6 +25,50 @@
       ? cells[cells.length - 1] : null;
   }
 
+  /**
+   * Prior waves that this wave pairs with nothing from — {priors, waveLabels}
+   * when history loaded but no question matched it, else null.
+   *
+   * The cross-wave key changes shape with the R-side config: the canonical
+   * question code when a Question_Mapping is loaded, the normalised title when
+   * one is not. History built under one and a wave built under the other can
+   * never meet, and every metric then has no previous value — which the pulse
+   * would otherwise render as "0 significant increases · 0 decreases · 0
+   * stable". That reads as "nothing moved this wave" when the truth is
+   * "nothing was compared", so the render says the latter instead.
+   * Exposed for the regression test.
+   */
+  summary.unmatchedHistory = function () {
+    var priors = ((TR.PREV && TR.PREV.waves) || []).filter(function (w) {
+      return !w.current;
+    });
+    if (!priors.length) return null;               // no history: not this state
+    var paired = TR.AGG.questions.some(function (q) {
+      var model = TR.trk.publishedModel(q.code, null);
+      return !!(model && model.prevWave);
+    });
+    if (paired) return null;
+    return { priors: priors.length,
+      waveLabels: priors.map(function (w) { return String(w.wave); }) };
+  };
+
+  function unmatchedHtml(info) {
+    var span = info.waveLabels.length > 1
+      ? info.waveLabels[0] + "–" + info.waveLabels[info.waveLabels.length - 1]
+      : info.waveLabels[0];
+    return '<div class="card"><h3>Tracking could not be compared</h3>' +
+      "<p class='trknote'>" + info.priors + " prior wave" +
+      (info.priors === 1 ? "" : "s") + " loaded (" + fmt.escapeHtml(span) +
+      "), but no metric in this wave matched any of them, so there is no " +
+      "wave-on-wave comparison to show. This is a configuration problem, not " +
+      "a finding — it does not mean the numbers held steady.</p>" +
+      "<p class='trknote'>The usual cause is that this wave was built without " +
+      "a question mapping, so its metrics are keyed by question title while " +
+      "the history is keyed by question code. Setting " +
+      "<code>question_mapping</code> in the crosstab config to the tracker's " +
+      "Question_Mapping workbook keys both sides the same way.</p></div>";
+  }
+
   /** Visualise selection produced by clicking a scorecard / sig card: the
    *  clicked metric and its cut. KPI cards carry no segment (Total only), so
    *  segNorm falls back to "total". Exposed for the regression test. */
@@ -209,6 +253,14 @@
 
   summary.render = function (host) {
     var trk = TR.trk;
+    // Nothing paired: say so plainly rather than rendering zeros that read as
+    // findings. The explainers below are the scorecard's method notes, which
+    // describe a comparison that did not happen — they stay off too.
+    var unmatched = summary.unmatchedHistory();
+    if (unmatched) {
+      host.innerHTML = unmatchedHtml(unmatched);
+      return;
+    }
     var cards = kpiCards();
     var changes = sigChanges();
     var tested = trk.metricList("key").filter(function (m) {
