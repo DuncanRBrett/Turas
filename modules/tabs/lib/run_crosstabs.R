@@ -868,7 +868,8 @@ if (.html_report_v2_on) {
                                  error = function(e) list())
         qj <- tryCatch(
           build_integrated_qual_island(.qual_wb, config_result$config_obj,
-                                        data_result$survey_data, unions = .qual_unions),
+                                        data_result$survey_data, unions = .qual_unions,
+                                        survey_structure = data_result$survey_structure),
           turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
           error = function(e) {
             cat("\n[WARNING] Qualitative join failed:", conditionMessage(e), "\n")

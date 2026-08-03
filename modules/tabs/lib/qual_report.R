@@ -72,13 +72,16 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
 #' @param config_obj The tabs config object (the qual_* dials + qual_join_id_column).
 #' @param survey_data The host survey data frame (the main report's respondents).
 #' @param module Module label for refusal display.
+#' @param unions Band-split union specs from the Selection sheet.
+#' @param survey_structure The loaded survey structure, so host tag values resolve to
+#'   their option display labels instead of the raw (often coded) data values.
 #' @return list(status, json, island, matched, total, id_column). `status` is "PASS"
 #'   (json populated), "NO_ID_COLUMN" (no response-id column resolved) or "NO_MATCHES"
 #'   (id column found but no workbook respondent joined — likely a wrong id column).
 #'   The caller falls back to the standalone *_qual_report.html on a non-PASS status.
 #' @export
 build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data, module = "TABS",
-                                         unions = list()) {
+                                         unions = list(), survey_structure = NULL) {
   qual_path <- qual_resolve_workbook_path(qual_workbook, config_obj)
   read_result <- qual_read_workbook(qual_path, module)          # TRS-refuses on a bad file
   # Reassemble any band-split open-ends (e.g. NPS Detractor/Passive/Promoter sheets) into
@@ -101,7 +104,8 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
   # Attach host-survey demographic tags (e.g. centre, channel) reachable via the join, so
   # they get the SAME demographic_cuts / k-anonymisation / disclosure gate as workbook demos.
   tagged <- qual_attach_host_tags(read_result$questions, joined$master,
-                                  qual_parse_tag_dims(config_obj$qual_tag_dimensions), survey_data)
+                                  qual_parse_tag_dims(config_obj$qual_tag_dimensions), survey_data,
+                                  survey_structure)
   read_result$questions <- tagged$questions
   joined$master <- tagged$master
   island <- qual_build_data_qual(read_result$questions, joined$master, list(

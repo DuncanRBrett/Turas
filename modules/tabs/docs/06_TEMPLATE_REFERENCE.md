@@ -900,7 +900,7 @@ code → wire → run, including the NPS "why?" split and host-survey tags):
 | `qual_demographic_cuts` | Demographic tags on comments | `allow` (all), `safe` (k-anonymised), `block` (none) | allow |
 | `qual_noteworthy_default` | Which noteworthy tier the comment filter opens on | `all`, `noteworthy`, `must_read`, `priority` | all |
 | `qual_verbatim_scope` | Which comments ship readable text (build-time curation, not a reader filter) | `all` (every comment except those marked `hide`), `noteworthy` (only tier 1+ — noteworthy / must-read / priority) | all |
-| `qual_tag_dimensions` | Host-survey columns shown as comment tags, via the join | comma list of `Column` or `Column:Label`, e.g. `S03:Centre, S11:Channel` | (blank) |
+| `qual_tag_dimensions` | Host-survey columns shown as comment tags, via the join; values show as their Survey_Structure DisplayText | comma list of `Column` or `Column:Label`, e.g. `S01:Centre, S09:Channel` | (blank) |
 | `qual_join_id_column` | Override the auto-detected respondent-id column | a column name, or blank | (blank) |
 
 **Confidentiality.** Comment tags carry re-identification risk on small

@@ -30,6 +30,7 @@ detect_turas_root <- function() {
 .root <- detect_turas_root()
 source(file.path(.root, "modules/tabs/lib/qual_assemble.R"))        # parse_tag_dims, attach, sort
 source(file.path(.root, "modules/tabs/lib/qual_island_builder.R"))  # kanon_by_group, build_data_qual
+source(file.path(.root, "modules/tabs/lib/microdata_writer.R"))     # micro_display_map (tag labels)
 
 # ---- qual_parse_tag_dims -----------------------------------------------------
 
@@ -83,6 +84,87 @@ test_that("an unmatched respondent gets NA, and a missing/dup dimension is skipp
   ok <- suppressWarnings(qual_attach_host_tags(qs, list(id_to_idx = stats::setNames(0L, "54"), banner_dims = list()),
                              list(list(col = "S03", label = "Centre")), survey))
   expect_true(is.na(ok$questions[[1]]$records[[2]]$demos$Centre))
+})
+
+# ---- host tag values resolve to their structure display labels ---------------
+
+# A coded host column (the CCPB channel case: data holds "11"/"12", the structure
+# carries the words) must tag readably, or the chip reads "Channel: 11".
+mk_struct <- function(...) {
+  list(options = do.call(rbind, list(...)))
+}
+mk_opt <- function(code, option_text, display_text) {
+  data.frame(QuestionCode = code, OptionText = option_text, DisplayText = display_text,
+             stringsAsFactors = FALSE)
+}
+
+test_that("a coded host column tags with its DisplayText, not the raw code", {
+  qs <- list(mk_q(mk_r("54"), mk_r("11")))
+  master <- list(id_to_idx = stats::setNames(c(0L, 1L), c("54", "11")), banner_dims = list())
+  survey <- data.frame(S09 = c("11", "12"), stringsAsFactors = FALSE)
+  struct <- mk_struct(mk_opt("S09", "11", "11 - Spaza"),
+                      mk_opt("S09", "12", "12 - Supermarket"))
+
+  res <- qual_attach_host_tags(qs, master, list(list(col = "S09", label = "Channel")),
+                               survey, struct)
+  expect_equal(res$questions[[1]]$records[[1]]$demos$Channel, "11 - Spaza")
+  expect_equal(res$questions[[1]]$records[[2]]$demos$Channel, "12 - Supermarket")
+  # the banner dimension carries the labels too, so the cut picker matches the chips
+  dim <- Filter(function(d) identical(d$label, "Channel"), res$master$banner_dims)[[1]]
+  expect_equal(sort(dim$values), c("11 - Spaza", "12 - Supermarket"))
+})
+
+test_that("structure OptionText matches the data value trimmed, as the processors do", {
+  # CCPB's structure carries trailing spaces ("Presell ") the data does not.
+  qs <- list(mk_q(mk_r("54")))
+  master <- list(id_to_idx = stats::setNames(0L, "54"), banner_dims = list())
+  survey <- data.frame(S11 = "Presell", stringsAsFactors = FALSE)
+  struct <- mk_struct(mk_opt("S11", "Presell ", "Presell"))
+
+  res <- qual_attach_host_tags(qs, master, list(list(col = "S11", label = "Sales Method")),
+                               survey, struct)
+  expect_equal(res$questions[[1]]$records[[1]]$demos[["Sales Method"]], "Presell")
+})
+
+test_that("a value with no option is tagged raw and reported, never dropped", {
+  # CCPB's S09 holds '06A', which the structure does not declare.
+  qs <- list(mk_q(mk_r("54"), mk_r("11")))
+  master <- list(id_to_idx = stats::setNames(c(0L, 1L), c("54", "11")), banner_dims = list())
+  survey <- data.frame(S09 = c("06A", "11"), stringsAsFactors = FALSE)
+  struct <- mk_struct(mk_opt("S09", "11", "11 - Spaza"))
+
+  expect_output(
+    res <- qual_attach_host_tags(qs, master, list(list(col = "S09", label = "Channel")),
+                                 survey, struct),
+    "06A")
+  expect_equal(res$questions[[1]]$records[[1]]$demos$Channel, "06A")   # kept, not dropped
+  expect_equal(res$questions[[1]]$records[[2]]$demos$Channel, "11 - Spaza")
+})
+
+test_that("no structure, or a column absent from it, leaves the raw values alone", {
+  qs <- list(mk_q(mk_r("54")))
+  master <- list(id_to_idx = stats::setNames(0L, "54"), banner_dims = list())
+  survey <- data.frame(S03 = "Worcester DC", stringsAsFactors = FALSE)
+  dims <- list(list(col = "S03", label = "Plant"))
+
+  bare <- qual_attach_host_tags(qs, master, dims, survey)                      # no structure
+  expect_equal(bare$questions[[1]]$records[[1]]$demos$Plant, "Worcester DC")
+
+  other <- qual_attach_host_tags(qs, master, dims, survey,
+                                 mk_struct(mk_opt("S09", "11", "11 - Spaza")))  # S03 not in it
+  expect_equal(other$questions[[1]]$records[[1]]$demos$Plant, "Worcester DC")
+})
+
+test_that("an NA host value stays NA and is not reported as unmapped", {
+  qs <- list(mk_q(mk_r("54")))
+  master <- list(id_to_idx = stats::setNames(0L, "54"), banner_dims = list())
+  survey <- data.frame(S09 = NA_character_, stringsAsFactors = FALSE)
+  struct <- mk_struct(mk_opt("S09", "11", "11 - Spaza"))
+
+  expect_silent(res <- qual_attach_host_tags(qs, master,
+                                             list(list(col = "S09", label = "Channel")),
+                                             survey, struct))
+  expect_true(is.na(res$questions[[1]]$records[[1]]$demos$Channel))
 })
 
 # ---- qual_kanon_tags_by_group (the disclosure crux) --------------------------

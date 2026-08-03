@@ -256,6 +256,40 @@ qual_parse_tag_dims <- function(cfg) {
   })
 }
 
+#' Resolve a host tag column's raw data values to their structure display labels.
+#'
+#' A host column often stores codes rather than words (e.g. a channel column holding
+#' "11", "12"), which makes a raw-value chip unreadable. This maps each value through
+#' the question's Survey_Structure options with the SAME trimmed-OptionText match the
+#' crosstab processors use, so a tag chip reads the way the crosstab row does.
+#'
+#' Values with no option in the structure are left raw (never dropped) and reported
+#' once per dimension on the console, because that mismatch is nearly always structure
+#' or data drift the operator wants to know about.
+#'
+#' @param col The host column / question code.
+#' @param colvals The column's raw values, already `as.character()`.
+#' @param label The tag's display label (for the warning only).
+#' @param survey_structure The loaded structure (needs `$options`); NULL leaves values raw.
+#' @return A character vector the same length as `colvals`.
+qual_host_tag_labels <- function(col, colvals, label, survey_structure) {
+  if (is.null(survey_structure)) return(colvals)
+  dmap <- micro_display_map(col, survey_structure)
+  if (is.null(dmap) || !length(dmap)) return(colvals)
+  keys <- trimws(colvals)
+  hit <- !is.na(keys) & keys %in% names(dmap)
+  out <- colvals
+  out[hit] <- unname(dmap[keys[hit]])
+  unmapped <- unique(keys[!hit & !is.na(keys) & nzchar(keys) & keys != "NA"])
+  if (length(unmapped)) {
+    cat(sprintf(paste0("  [WARNING] qual_tag_dimensions: '%s' (%s) has %d data value(s) with no",
+                       " option in Survey_Structure — tagged raw: %s\n"),
+                label, col, length(unmapped),
+                paste(utils::head(unmapped, 5L), collapse = ", ")))
+  }
+  out
+}
+
 #' Attach host-survey demographic tags to each comment record.
 #'
 #' For each configured dimension (a host column + a display label) this stamps the
@@ -264,12 +298,17 @@ qual_parse_tag_dims <- function(cfg) {
 #' A dimension whose column is absent — or whose label duplicates an existing banner
 #' dimension — is skipped with a console warning (Shiny-visible).
 #'
+#' Values are resolved to their Survey_Structure display labels when the structure is
+#' supplied, so a coded host column tags readably (see `qual_host_tag_labels()`).
+#'
 #' @param questions Classified questions (records carry `id` + a `demos` list).
 #' @param master The join master (`id_to_idx` + `banner_dims`).
 #' @param tag_dims list(col, label) pairs from `qual_parse_tag_dims()`.
 #' @param survey_data The host survey data frame.
+#' @param survey_structure The loaded survey structure; NULL tags the raw data values.
 #' @return list(questions, master) with host tags stamped + banner dims registered.
-qual_attach_host_tags <- function(questions, master, tag_dims, survey_data) {
+qual_attach_host_tags <- function(questions, master, tag_dims, survey_data,
+                                  survey_structure = NULL) {
   if (!length(tag_dims) || is.null(survey_data) || !is.data.frame(survey_data)) {
     return(list(questions = questions, master = master))
   }
@@ -288,7 +327,8 @@ qual_attach_host_tags <- function(questions, master, tag_dims, survey_data) {
       cat(sprintf("  [WARNING] qual_tag_dimensions: label '%s' already a banner dimension — skipped.\n", label))
       next
     }
-    colvals <- as.character(survey_data[[col]])
+    colvals <- qual_host_tag_labels(col, as.character(survey_data[[col]]),
+                                    label, survey_structure)
     for (qi in seq_along(questions)) {
       recs <- questions[[qi]]$records
       for (ri in seq_along(recs)) {

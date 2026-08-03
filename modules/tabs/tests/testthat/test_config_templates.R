@@ -158,7 +158,7 @@ test_that("crosstab config Settings sheet offers the Qualitative (comment) tab s
   }
   # each qual dial ships a description (the operator shouldn't have to guess the choices)
   expect_true(any(grepl("k-anonymise", cells, fixed = TRUE)))       # qual_demographic_cuts help
-  expect_true(any(grepl("S03:Centre", cells, fixed = TRUE)))        # qual_tag_dimensions example
+  expect_true(any(grepl("S01:Centre", cells, fixed = TRUE)))        # qual_tag_dimensions example
 })
 
 test_that("crosstab config Settings sheet writes research_house in lowercase snake_case", {
