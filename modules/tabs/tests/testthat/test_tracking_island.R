@@ -302,3 +302,75 @@ test_that("read_wave_contributions keeps only the NEWEST sidecar per wave label"
   expect_equal(kept$questions[[1]]$scores[[1]], 2)   # newest file won
   expect_true(any(grepl("stale duplicate", out)))
 })
+
+# ==============================================================================
+# 6. pairing report — an unmatched tracker must be LOUD, not silently zero
+# ==============================================================================
+
+context("tracking_island: pairing report")
+
+# A wave keyed by title (no Question_Mapping) against history keyed by canonical
+# code (built with one) — the CCPB W2026 failure. Every trend comes out empty and
+# the tab would render "0 significant increases / 0 decreases / 0 stable".
+ti_contrib <- function(wave, year, keys) list(
+  wave = wave, year = year, segments = list(),
+  questions = lapply(keys, function(k) list(
+    code = toupper(k), match_key = k, title = k, base = 3,
+    score_type = "mean", scores = list(6, 7, 8))))
+
+test_that("tracking_wave_keys reads match_key and falls back to title_norm", {
+  w <- list(questions = list(list(match_key = "q02"), list(title_norm = "ease of ordering"),
+                             list(match_key = ""), list()))
+  expect_equal(tracking_wave_keys(w), c("q02", "ease of ordering"))
+  expect_equal(tracking_wave_keys(list(questions = list())), character(0))
+})
+
+test_that("a total key mismatch warns loudly and names both key shapes", {
+  current <- ti_contrib("W2026", 2026, c("please rate ccpb overall", "the ease of placing orders"))
+  priors <- list(ti_contrib("2024", 2024, c("q78", "q02")),
+                 ti_contrib("2025", 2025, c("q78", "q02")))
+  out <- capture.output(res <- tracking_report_pairing(current, priors))
+  expect_equal(res$matched, 0)
+  expect_equal(res$current, 2)
+  expect_equal(res$priors, 2)
+  expect_true(any(grepl("no metric matched history", out)))
+  expect_true(any(grepl("please rate ccpb overall", out)))   # this wave's shape
+  expect_true(any(grepl("q78", out)))                        # history's shape
+  expect_true(any(grepl("question_mapping", out)))           # the actionable fix
+})
+
+test_that("build_tracking_island raises the mismatch warning on assembly", {
+  out <- capture.output(island <- build_tracking_island(
+    ti_contrib("W2026", 2026, c("please rate ccpb overall")),
+    list(ti_contrib("2025", 2025, c("q78")))))
+  expect_equal(length(island$waves), 2)          # island still builds
+  expect_true(any(grepl("no metric matched history", out)))
+})
+
+test_that("a partial mismatch notes the count instead of crying wolf", {
+  out <- capture.output(res <- tracking_report_pairing(
+    ti_contrib("W2026", 2026, c("q78", "q02", "q99")),
+    list(ti_contrib("2025", 2025, c("q78", "q02")))))
+  expect_equal(res$matched, 2)
+  expect_equal(res$unmatched, 1)
+  expect_true(any(grepl("2 of 3 metrics matched", out)))
+  expect_false(any(grepl("no metric matched history", out)))
+})
+
+test_that("a full match says so quietly and never warns", {
+  out <- capture.output(res <- tracking_report_pairing(
+    ti_contrib("W2026", 2026, c("q78", "q02")),
+    list(ti_contrib("2025", 2025, c("q78", "q02")))))
+  expect_equal(res$matched, 2)
+  expect_equal(res$unmatched, 0)
+  expect_true(any(grepl("all 2 metrics matched", out)))
+  expect_false(any(grepl("WARNING", out)))
+})
+
+test_that("a first wave (no history) is not a mismatch", {
+  out <- capture.output(res <- tracking_report_pairing(
+    ti_contrib("W2026", 2026, c("q78")), list()))
+  expect_equal(res$matched, 0)
+  expect_equal(res$priors, 0)
+  expect_equal(length(out), 0)                   # nothing to say, says nothing
+})

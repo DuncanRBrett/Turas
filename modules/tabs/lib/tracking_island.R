@@ -225,6 +225,75 @@ wave_contribution <- function(data_layer, micro, config_obj, mapping = NULL) {
 #'
 #' @param current_contribution This wave's contribution (from wave_contribution)
 #' @param prior_contributions List of prior waves' contributions
+#' The cross-wave keys a contribution offers (match_key, title_norm fallback)
+#'
+#' @param w A wave contribution
+#' @return Character vector of non-empty keys
+#' @keywords internal
+tracking_wave_keys <- function(w) {
+  qs <- w$questions %||% list()
+  if (!length(qs)) return(character(0))
+  keys <- vapply(qs, function(q) {
+    as.character(q$match_key %||% q$title_norm %||% "")[1]
+  }, character(1))
+  keys[!is.na(keys) & nzchar(keys)]
+}
+
+
+#' Report how many of this wave's metrics pair with the prior waves
+#'
+#' The cross-wave key changes SHAPE with the config: `tracking_metrics()` keys by
+#' the canonical question code when a Question_Mapping is loaded, and by the
+#' normalised title when one is not. A wave built under one regime can never pair
+#' with history built under the other — and the Tracking tab renders that total
+#' miss as a scorecard with no cards and "0 significant increases / 0 decreases /
+#' 0 stable", which reads as "nothing moved this wave" when the truth is "nothing
+#' was compared". So say it here, at build time, where the operator can see it.
+#'
+#' Only the metrics THIS wave contributes are checked (the mean/NPS kind that
+#' carry scores) — those are what the scorecard and the wave-on-wave counts are
+#' built from.
+#'
+#' @param current_contribution This wave's contribution
+#' @param priors The prior wave contributions (already de-duplicated)
+#' @return list(current, priors, matched, unmatched), invisibly
+#' @keywords internal
+tracking_report_pairing <- function(current_contribution, priors) {
+  cur_keys <- tracking_wave_keys(current_contribution)
+  out <- list(current = length(cur_keys), priors = length(priors),
+              matched = 0L, unmatched = length(cur_keys))
+  if (!length(priors) || !length(cur_keys)) return(invisible(out))
+
+  prior_keys <- unique(unlist(lapply(priors, tracking_wave_keys), use.names = FALSE))
+  out$matched <- sum(cur_keys %in% prior_keys)
+  out$unmatched <- length(cur_keys) - out$matched
+
+  if (out$matched == 0L) {
+    shape <- function(keys) if (length(keys)) sprintf("\"%s\"", keys[1]) else "(none)"
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Tabs tracking — no metric matched history\n")
+    cat(sprintf("│ %d prior wave(s) loaded, but none of this wave's %d tracked\n",
+                out$priors, out$current))
+    cat("│ metrics share a cross-wave key with them, so every trend\n")
+    cat("│ is empty and the Tracking tab has nothing to compare.\n")
+    cat(sprintf("│ This wave keys by: %s\n", shape(cur_keys)))
+    cat(sprintf("│ History keys by  : %s\n", shape(prior_keys)))
+    cat("│ How to fix: set 'question_mapping' in the config to the\n")
+    cat("│ tracker's Question_Mapping workbook, so this wave keys by\n")
+    cat("│ the canonical question code the way the history does.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  } else if (out$unmatched > 0L) {
+    cat(sprintf(
+      "  [NOTE] Tracking: %d of %d metrics matched history; %d found no prior wave.\n",
+      out$matched, out$current, out$unmatched))
+  } else {
+    cat(sprintf("  Tracking: all %d metrics matched %d prior wave(s).\n",
+                out$matched, out$priors))
+  }
+  invisible(out)
+}
+
+
 #' @return A tracking-island list, or NULL when there is no current contribution
 #' @export
 build_tracking_island <- function(current_contribution, prior_contributions = list()) {
@@ -252,6 +321,10 @@ build_tracking_island <- function(current_contribution, prior_contributions = li
       priors <- priors[!is_self]
     }
   }
+
+  # Loud when this wave pairs with nothing — an unmatched tracker renders as
+  # zeros, which read as findings rather than as a missing comparison.
+  tracking_report_pairing(current_contribution, priors)
 
   waves <- c(priors, list(current_contribution))
 

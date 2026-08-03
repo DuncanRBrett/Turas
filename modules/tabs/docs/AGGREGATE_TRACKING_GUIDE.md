@@ -257,6 +257,7 @@ available.
 |---|---|
 | Tracking tab doesn't appear | The island has ≤1 wave. Almost always `waves_source` isn't resolving — confirm it's the **absolute** path to the folder that actually contains the `*_wave.json` files. |
 | Tab appears but a question has no history | The current wave keyed by title instead of code — `question_mapping` isn't pointing at your QuestionMap, or its `Wave<YEAR>` codes don't match the live data. |
+| Tab appears and says "Tracking could not be compared" | *No* metric matched history — the whole wave keyed the other way. Same cause as the row above, and the run also prints a boxed `no metric matched history` warning naming both key shapes. Fix `question_mapping` and re-run. |
 | One proportion/NET has no history | Label mismatch — the `category:<label>` in the QuestionMap doesn't match the crosstab row / BoxCategory label. Compare them (case/punctuation are normalised; the words must match). |
 | No significance anywhere | Expected if no bases/sd are supplied. See section 7–8. |
 | A Multi_Mention "any" NET won't track | Not supported via BoxCategory (the CCPB Q03 case). Needs a separate mechanism. |
