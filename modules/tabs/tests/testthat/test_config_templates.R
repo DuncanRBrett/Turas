@@ -183,18 +183,17 @@ test_that(".KNOWN_SETTINGS whitelist recognises settings that were flagged as un
   # (loaded by build_config_object with real defaults, or consumed
   # downstream) but missing from the config loader's known-settings
   # whitelist, so every project using them saw a false "may be typos"
-  # warning. The whitelist is a function-local vector inside
-  # load_crosstabs_config(), so it is checked here via its deparsed body
-  # rather than as a standalone exported constant.
-  skip_if_not(exists("load_crosstabs_config", mode = "function"))
-  src <- paste(deparse(body(load_crosstabs_config)), collapse = "\n")
+  # warning. The whitelist now lives in the TABS_KNOWN_SETTINGS constant (it is
+  # shared with warn_merged_setting_rows), so it is checked directly rather than
+  # by grepping the deparsed body of load_crosstabs_config().
+  skip_if_not(exists("TABS_KNOWN_SETTINGS"))
 
   for (setting in c("heatmap_colour", "research_house", "qual_workbook", "qual_confidentiality_mode",
                      "qual_demographic_cuts", "qual_noteworthy_default", "min_reporting_base",
                      "qual_tag_dimensions", "qual_join_id_column")) {
     expect_true(
-      grepl(setting, src, fixed = TRUE),
-      info = sprintf("'%s' should appear in load_crosstabs_config()'s known-settings whitelist", setting)
+      setting %in% TABS_KNOWN_SETTINGS,
+      info = sprintf("'%s' should be in the known-settings whitelist", setting)
     )
   }
 })
@@ -240,9 +239,8 @@ test_that("html_report_v2_microdata: default TRUE, explicit FALSE honoured, junk
 })
 
 test_that("html_report_v2_microdata is registered in the known-settings whitelist", {
-  skip_if_not(exists("load_crosstabs_config", mode = "function"))
-  src <- paste(deparse(body(load_crosstabs_config)), collapse = "\n")
-  expect_true(grepl("html_report_v2_microdata", src, fixed = TRUE))
+  skip_if_not(exists("TABS_KNOWN_SETTINGS"))
+  expect_true("html_report_v2_microdata" %in% TABS_KNOWN_SETTINGS)
 })
 
 test_that("build_config_object defaults research_house sensibly when unset", {
@@ -369,4 +367,136 @@ test_that("crosstab config template overwrites existing file", {
 
   expect_true(file.exists(tmp))
   expect_true(second_size > 0)
+})
+
+# ==============================================================================
+# MERGED SETTING ROWS — a setting with no Value cell must not vanish quietly
+# ==============================================================================
+
+context("crosstabs_config: merged setting rows")
+
+# The Settings sheet formats SECTION HEADERS as a row merged across A:E. A real
+# setting row that picks up that formatting has no Value cell, readxl reads NA,
+# load_config_sheet drops the setting, and the run uses the default in silence —
+# how CCPB W2026 lost question_mapping and shipped an unpaired Tracking tab.
+msr_fixture <- function(merge_rows = integer(0), merge_cols = 1:5) {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Settings")
+  df <- data.frame(
+    Setting = c("apply_weighting", "WEIGHTING", "question_mapping", "priority_metric"),
+    Value   = c("FALSE", NA, "map.xlsx", "Mean"),
+    stringsAsFactors = FALSE)
+  openxlsx::writeData(wb, "Settings", df)          # header row 1, data rows 2-5
+  for (r in merge_rows) openxlsx::mergeCells(wb, "Settings", cols = merge_cols, rows = r)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  path
+}
+
+test_that("excel_col_number converts single and multi-letter references", {
+  expect_equal(excel_col_number("A"), 1L)
+  expect_equal(excel_col_number("B"), 2L)
+  expect_equal(excel_col_number("Z"), 26L)
+  expect_equal(excel_col_number("AB"), 28L)
+})
+
+test_that("a merged setting row is named, with its row and merge range", {
+  f <- msr_fixture(merge_rows = 4)                 # row 4 = question_mapping
+  on.exit(unlink(f), add = TRUE)
+  out <- capture.output(hits <- warn_merged_setting_rows(f))
+  expect_equal(hits, "question_mapping")
+  expect_true(any(grepl("question_mapping", out)))
+  expect_true(any(grepl("row 4", out)))
+  expect_true(any(grepl("A4:E4", out)))
+  expect_true(any(grepl("unmerge", out, ignore.case = TRUE)))
+})
+
+test_that("a merged SECTION HEADER is not mistaken for a broken setting", {
+  f <- msr_fixture(merge_rows = 3)                 # row 3 = "WEIGHTING", a header
+  on.exit(unlink(f), add = TRUE)
+  out <- capture.output(hits <- warn_merged_setting_rows(f))
+  expect_equal(length(hits), 0)
+  expect_equal(length(out), 0)
+})
+
+test_that("an unmerged sheet says nothing at all", {
+  f <- msr_fixture()
+  on.exit(unlink(f), add = TRUE)
+  out <- capture.output(hits <- warn_merged_setting_rows(f))
+  expect_equal(length(hits), 0)
+  expect_equal(length(out), 0)
+})
+
+test_that("a merge that leaves the Value cell readable is not reported", {
+  f <- msr_fixture(merge_rows = 4, merge_cols = 2:5)   # B4:E4 — B is the anchor
+  on.exit(unlink(f), add = TRUE)
+  expect_equal(length(capture.output(hits <- warn_merged_setting_rows(f))), 0)
+  expect_equal(length(hits), 0)
+})
+
+test_that("several broken rows are listed together, in sheet order", {
+  f <- msr_fixture(merge_rows = c(5, 4))           # priority_metric + question_mapping
+  on.exit(unlink(f), add = TRUE)
+  out <- capture.output(hits <- warn_merged_setting_rows(f))
+  expect_equal(hits, c("question_mapping", "priority_metric"))   # row 4 before row 5
+})
+
+test_that("an unreadable file or missing sheet is silent, never an error", {
+  expect_silent(h1 <- warn_merged_setting_rows(tempfile(fileext = ".xlsx")))
+  expect_equal(length(h1), 0)
+  f <- msr_fixture(merge_rows = 4)
+  on.exit(unlink(f), add = TRUE)
+  expect_silent(h2 <- warn_merged_setting_rows(f, sheet_name = "NoSuchSheet"))
+  expect_equal(length(h2), 0)
+})
+
+test_that("TABS_KNOWN_SETTINGS is the shared list, not a private copy", {
+  expect_true(is.character(TABS_KNOWN_SETTINGS))
+  expect_true(all(c("question_mapping", "priority_metric", "qual_verbatim_scope")
+                  %in% TABS_KNOWN_SETTINGS))
+  expect_false(any(duplicated(TABS_KNOWN_SETTINGS)))
+})
+
+# ==============================================================================
+# CASE-MISMATCHED SETTING NAMES — the lookup is exact, the typo check is not
+# ==============================================================================
+
+context("crosstabs_config: case-mismatched setting names")
+
+test_that("a case variant is named, with the spelling the loader wants", {
+  out <- capture.output(
+    hits <- warn_case_mismatched_settings(list(Research_House = "TRL",
+                                               apply_weighting = "FALSE")))
+  expect_equal(hits, "Research_House")
+  expect_true(any(grepl("Research_House", out, fixed = TRUE)))
+  expect_true(any(grepl("research_house", out, fixed = TRUE)))
+  expect_false(any(grepl("apply_weighting", out, fixed = TRUE)))
+})
+
+test_that("a variant that already has a correct twin is marked, with the collision warning", {
+  out <- capture.output(
+    hits <- warn_case_mismatched_settings(list(analyst_name = "D", Analyst_Name = "D")))
+  expect_equal(hits, "Analyst_Name")
+  expect_true(any(grepl("[duplicate]", out, fixed = TRUE)))
+  expect_true(any(grepl("DELETE", out, fixed = TRUE)))
+})
+
+test_that("correctly named settings, and genuine unknowns, are left alone", {
+  # An unknown name is the typo check's job, not this one — no double-reporting.
+  expect_silent(h <- warn_case_mismatched_settings(
+    list(apply_weighting = "FALSE", nonsense_setting = "x")))
+  expect_equal(length(h), 0)
+  expect_equal(length(capture.output(warn_case_mismatched_settings(list()))), 0)
+})
+
+test_that("the CCPB case-variant labels are all recognised as canonical settings", {
+  # Regression guard for the live CCPB configs: these four rows carry values
+  # that never reached a run because the sheet capitalises them.
+  for (nm in c("research_house", "project_name", "analyst_name", "generate_stats_pack")) {
+    expect_true(nm %in% TABS_KNOWN_SETTINGS, info = nm)
+  }
+  out <- capture.output(hits <- warn_case_mismatched_settings(
+    list(Generate_Stats_Pack = "Y", Project_Name = "P",
+         Analyst_Name = "D", Research_House = "TRL")))
+  expect_equal(length(hits), 4)
 })

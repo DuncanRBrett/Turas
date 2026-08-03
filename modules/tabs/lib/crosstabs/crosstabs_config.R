@@ -759,6 +759,199 @@ resolve_question_mapping <- function(raw_path, waves_source, project_root, confi
 }
 
 
+#' Spreadsheet column letters to a column number ("A" -> 1, "AB" -> 28)
+#'
+#' @param letters_ref Column letters from a cell reference
+#' @return Integer column number
+#' @keywords internal
+excel_col_number <- function(letters_ref) {
+  chars <- strsplit(toupper(letters_ref), "")[[1]]
+  Reduce(function(acc, ch) acc * 26L + match(ch, LETTERS), chars, 0L)
+}
+
+
+#' Warn about setting rows whose Value cell was swallowed by a merged range
+#'
+#' The Settings sheet formats its SECTION HEADERS ("WEIGHTING", "DISPLAY
+#' OPTIONS") as a row merged across A:E. When a real setting row picks up that
+#' formatting by accident there is no longer a Value cell to read: readxl returns
+#' NA, `load_config_sheet()` drops the setting entirely, and the run falls back to
+#' the default without a word. That is how CCPB W2026 lost `question_mapping` and
+#' shipped a Tracking tab with 14 prior waves loaded and nothing paired to them.
+#'
+#' Section headers are merged exactly the same way, so a merge is only reported
+#' when its column-A text is a KNOWN setting name — headers never are.
+#'
+#' Diagnostic only: it reads the file again and never alters the config or throws.
+#'
+#' @param config_file Path to the config workbook
+#' @param sheet_name Sheet to inspect (default "Settings")
+#' @param known Setting names to match against (default TABS_KNOWN_SETTINGS)
+#' @return Character vector of affected setting names, invisibly
+#' @keywords internal
+warn_merged_setting_rows <- function(config_file, sheet_name = "Settings",
+                                     known = TABS_KNOWN_SETTINGS) {
+  if (!requireNamespace("openxlsx", quietly = TRUE)) return(invisible(character(0)))
+  hits <- tryCatch({
+    wb <- openxlsx::loadWorkbook(config_file)
+    idx <- which(names(wb) == sheet_name)
+    if (!length(idx)) return(invisible(character(0)))
+    merges <- wb$worksheets[[idx]]$mergeCells
+    refs <- regmatches(merges, regexpr("[A-Z]+[0-9]+:[A-Z]+[0-9]+", merges))
+    refs <- refs[!is.na(refs) & nzchar(refs)]
+    if (!length(refs)) return(invisible(character(0)))
+
+    raw <- openxlsx::read.xlsx(config_file, sheet = sheet_name, colNames = FALSE,
+                               skipEmptyRows = FALSE)
+    labels <- as.character(raw[[1]])
+    found <- list()
+    for (ref in refs) {
+      parts <- regmatches(ref, regexec("^([A-Z]+)([0-9]+):([A-Z]+)([0-9]+)$", ref))[[1]]
+      if (length(parts) != 5) next
+      # Only a merge that starts in the Setting column AND swallows the Value
+      # column hides a value; A:A or B:E leave column B readable.
+      if (excel_col_number(parts[2]) != 1L || excel_col_number(parts[4]) < 2L) next
+      row <- as.integer(parts[3])
+      if (is.na(row) || row > length(labels)) next
+      name <- tolower(trimws(labels[row]))
+      if (is.na(name) || !nzchar(name) || !(name %in% known)) next
+      found[[length(found) + 1]] <- list(name = name, row = row, ref = ref)
+    }
+    # Sheet order, not the arbitrary order the merges are stored in — the
+    # operator is going to walk down the sheet fixing them.
+    found[order(vapply(found, function(h) h$row, integer(1)))]
+  }, error = function(e) list())
+
+  if (!length(hits)) return(invisible(character(0)))
+  cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+  cat(sprintf("│ Context: config '%s' sheet\n", sheet_name))
+  cat("│ These setting rows are merged across columns, so they have\n")
+  cat("│ no Value cell and are being IGNORED — whatever you meant to\n")
+  cat("│ set there is not reaching the run:\n")
+  for (h in hits) {
+    cat(sprintf("│   %-28s (row %d, merged %s)\n", h$name, h$row, h$ref))
+  }
+  cat("│ How to fix: unmerge each row in Excel, then type the value\n")
+  cat("│ into column B the way the other setting rows do.\n")
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  invisible(vapply(hits, function(h) h$name, character(1)))
+}
+
+
+#' Warn about setting names that differ from the canonical one only by case
+#'
+#' `get_config_value()` looks settings up with an exact `[[name]]`, so a sheet
+#' that says `Research_House` never answers a request for `research_house` — the
+#' run silently takes the default. The typo check above cannot see this: it
+#' lower-cases before comparing, so a case variant looks perfectly valid.
+#'
+#' When the canonical spelling is ALSO present the variant is merely redundant,
+#' and that is said explicitly — renaming it would produce two identically named
+#' rows, which `load_config_sheet()` refuses outright.
+#'
+#' @param config The loaded settings list (names are the sheet's labels)
+#' @param known Canonical setting names (default TABS_KNOWN_SETTINGS)
+#' @return Character vector of affected sheet labels, invisibly
+#' @keywords internal
+warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
+  labels <- names(config)
+  if (!length(labels)) return(invisible(character(0)))
+  canonical <- tolower(trimws(labels))
+  off <- which(!(labels %in% known) & canonical %in% known)
+  if (!length(off)) return(invisible(character(0)))
+
+  cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+  cat("│ Context: config 'Settings' sheet — case mismatch\n")
+  cat("│ These settings are spelled differently from the name the\n")
+  cat("│ loader looks up, so their values are being IGNORED and the\n")
+  cat("│ defaults are used instead:\n")
+  for (i in off) {
+    twin <- canonical[i] %in% labels
+    cat(sprintf("│   %-22s should be %-22s%s\n", labels[i], canonical[i],
+                if (twin) " [duplicate]" else ""))
+  }
+  cat("│ How to fix: rename the Setting cell to the lower-case name.\n")
+  if (any(canonical[off] %in% labels)) {
+    cat("│ Rows marked [duplicate] already have a correctly named twin —\n")
+    cat("│ DELETE those rows rather than renaming them, or the sheet will\n")
+    cat("│ hold the same setting twice and the run will refuse.\n")
+  }
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  invisible(labels[off])
+}
+
+
+# Every setting name the tabs config recognises. Used to flag typos, and to
+# tell a mis-formatted setting row apart from a section header (see
+# warn_merged_setting_rows).
+TABS_KNOWN_SETTINGS <- c(
+  # Weighting
+  "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
+  "show_weighted_base", "weight_label",
+  "default_weight", "weight_column_exists",
+  "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
+  # Display — frequencies and percentages
+  "decimal_separator", "show_frequency", "show_percent_column", "show_percent_row",
+  "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
+  "decimal_places", "decimal_places_percent", "decimal_places_ratings",
+  "decimal_places_index", "decimal_places_numeric",
+  # Statistics
+  "show_standard_deviation", "show_net_positive", "show_numeric_median",
+  "show_numeric_mode", "show_numeric_outliers", "exclude_outliers_from_stats", "outlier_method",
+  "test_net_differences", "zero_division_as_blank",
+  # Significance testing
+  "enable_significance_testing", "alpha", "significance_level",
+  "significance_min_base", "bonferroni_correction", "enable_chi_square",
+  "alpha_secondary", "alpha_default",
+  # Checkpointing
+  "enable_checkpointing",
+  # Qualitative confidentiality & disclosure control
+  "qual_workbook", "qual_confidentiality_mode", "qual_demographic_cuts", "qual_noteworthy_default",
+  "qual_verbatim_scope", "qual_join_id_column", "min_reporting_base", "qual_tag_dimensions",
+  # Sample composition & index summary
+  "create_sample_composition", "create_index_summary",
+  "index_summary_show_sections", "index_summary_show_base_sizes",
+  "index_summary_show_composites", "index_summary_decimal_places",
+  # Stats pack
+  "generate_stats_pack",
+  # HTML report
+  "html_report", "html_report_v2", "html_report_v2_tracking",
+  "html_report_v2_microdata",
+  "waves_source", "question_mapping", "wave_order", "sampling_method",
+  "population_size", "wave",
+  # Reader report (narrative summary, rides on html_report_v2)
+  "generate_reader_report", "reader_ai_prose",
+  "brand_colour", "accent_colour", "project_title", "project_name",
+  "company_name", "client_name", "research_house",
+  "researcher_logo_path", "client_logo_path", "logo_path",
+  "chart_bar_colour", "chart_palette_preset", "heatmap_colour",
+  "chart_series_colour_1", "chart_series_colour_2", "chart_series_colour_3",
+  "chart_series_colour_4", "chart_series_colour_5", "chart_series_colour_6",
+  "chart_series_colour_7", "chart_series_colour_8",
+  "embed_frequencies",
+  "include_summary", "fieldwork_dates", "show_charts",
+  # Dashboard
+  "dashboard_metrics", "dashboard_scale_mean", "dashboard_scale_index",
+  "dashboard_green_net", "dashboard_amber_net",
+  "dashboard_green_mean", "dashboard_amber_mean",
+  "dashboard_green_index", "dashboard_amber_index",
+  "dashboard_green_custom", "dashboard_amber_custom", "dashboard_sort_gauges",
+  "priority_metric",
+  # Descriptors
+  "index_descriptor", "mean_descriptor", "nps_descriptor",
+  # Analyst / report metadata
+  "analyst_name", "analyst_email", "analyst_phone", "verbatim_filename", "closing_notes",
+  # Ranking
+  "ranking_completeness_threshold_pct", "ranking_gap_threshold_pct", "ranking_tie_threshold_pct",
+  "ranking_min_base",
+  # AI Insights
+  "enable_ai_insights", "ai_model",
+  # File path settings (loaded separately but may appear in Settings sheet)
+  "data_file", "structure_file", "output_file", "output_filename",
+  "output_format", "output_folder", "output_subfolder"
+)
+
+
 #'
 #' Main entry point for loading all configuration.
 #' Loads settings, builds config object, and returns all needed paths.
@@ -782,72 +975,7 @@ load_crosstabs_config <- function(config_file) {
   validate_dual_significance_config(config_obj)
 
   # Check for unrecognised settings — typos are silently ignored otherwise
-  .KNOWN_SETTINGS <- c(
-    # Weighting
-    "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
-    "show_weighted_base", "weight_label",
-    "default_weight", "weight_column_exists",
-    "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
-    # Display — frequencies and percentages
-    "decimal_separator", "show_frequency", "show_percent_column", "show_percent_row",
-    "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
-    "decimal_places", "decimal_places_percent", "decimal_places_ratings",
-    "decimal_places_index", "decimal_places_numeric",
-    # Statistics
-    "show_standard_deviation", "show_net_positive", "show_numeric_median",
-    "show_numeric_mode", "show_numeric_outliers", "exclude_outliers_from_stats", "outlier_method",
-    "test_net_differences", "zero_division_as_blank",
-    # Significance testing
-    "enable_significance_testing", "alpha", "significance_level",
-    "significance_min_base", "bonferroni_correction", "enable_chi_square",
-    "alpha_secondary", "alpha_default",
-    # Checkpointing
-    "enable_checkpointing",
-    # Qualitative confidentiality & disclosure control
-    "qual_workbook", "qual_confidentiality_mode", "qual_demographic_cuts", "qual_noteworthy_default",
-    "qual_verbatim_scope", "qual_join_id_column", "min_reporting_base", "qual_tag_dimensions",
-    # Sample composition & index summary
-    "create_sample_composition", "create_index_summary",
-    "index_summary_show_sections", "index_summary_show_base_sizes",
-    "index_summary_show_composites", "index_summary_decimal_places",
-    # Stats pack
-    "generate_stats_pack",
-    # HTML report
-    "html_report", "html_report_v2", "html_report_v2_tracking",
-    "html_report_v2_microdata",
-    "waves_source", "question_mapping", "wave_order", "sampling_method",
-    "population_size", "wave",
-    # Reader report (narrative summary, rides on html_report_v2)
-    "generate_reader_report", "reader_ai_prose",
-    "brand_colour", "accent_colour", "project_title", "project_name",
-    "company_name", "client_name", "research_house",
-    "researcher_logo_path", "client_logo_path", "logo_path",
-    "chart_bar_colour", "chart_palette_preset", "heatmap_colour",
-    "chart_series_colour_1", "chart_series_colour_2", "chart_series_colour_3",
-    "chart_series_colour_4", "chart_series_colour_5", "chart_series_colour_6",
-    "chart_series_colour_7", "chart_series_colour_8",
-    "embed_frequencies",
-    "include_summary", "fieldwork_dates", "show_charts",
-    # Dashboard
-    "dashboard_metrics", "dashboard_scale_mean", "dashboard_scale_index",
-    "dashboard_green_net", "dashboard_amber_net",
-    "dashboard_green_mean", "dashboard_amber_mean",
-    "dashboard_green_index", "dashboard_amber_index",
-    "dashboard_green_custom", "dashboard_amber_custom", "dashboard_sort_gauges",
-    "priority_metric",
-    # Descriptors
-    "index_descriptor", "mean_descriptor", "nps_descriptor",
-    # Analyst / report metadata
-    "analyst_name", "analyst_email", "analyst_phone", "verbatim_filename", "closing_notes",
-    # Ranking
-    "ranking_completeness_threshold_pct", "ranking_gap_threshold_pct", "ranking_tie_threshold_pct",
-    "ranking_min_base",
-    # AI Insights
-    "enable_ai_insights", "ai_model",
-    # File path settings (loaded separately but may appear in Settings sheet)
-    "data_file", "structure_file", "output_file", "output_filename",
-    "output_format", "output_folder", "output_subfolder"
-  )
+  .KNOWN_SETTINGS <- TABS_KNOWN_SETTINGS
   user_settings <- names(settings$config)
   unknown_settings <- setdiff(tolower(trimws(user_settings)), .KNOWN_SETTINGS)
   if (length(unknown_settings) > 0) {
@@ -857,6 +985,14 @@ load_crosstabs_config <- function(config_file) {
     }
     cat("  These settings will be ignored. Check spelling against the template.\n\n")
   }
+
+  # A setting that never arrives is invisible to the check above — it isn't an
+  # unknown name, it simply isn't in the list. The commonest cause is a row
+  # merged into section-header shape, which leaves no Value cell to read.
+  warn_merged_setting_rows(config_file)
+  # And one that arrives under the wrong spelling is invisible too: the check
+  # above lower-cases before comparing, but the lookup does not.
+  warn_case_mismatched_settings(settings$config)
 
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)
