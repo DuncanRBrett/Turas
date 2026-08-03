@@ -838,6 +838,49 @@ warn_merged_setting_rows <- function(config_file, sheet_name = "Settings",
 }
 
 
+#' Warn about setting names that differ from the canonical one only by case
+#'
+#' `get_config_value()` looks settings up with an exact `[[name]]`, so a sheet
+#' that says `Research_House` never answers a request for `research_house` — the
+#' run silently takes the default. The typo check above cannot see this: it
+#' lower-cases before comparing, so a case variant looks perfectly valid.
+#'
+#' When the canonical spelling is ALSO present the variant is merely redundant,
+#' and that is said explicitly — renaming it would produce two identically named
+#' rows, which `load_config_sheet()` refuses outright.
+#'
+#' @param config The loaded settings list (names are the sheet's labels)
+#' @param known Canonical setting names (default TABS_KNOWN_SETTINGS)
+#' @return Character vector of affected sheet labels, invisibly
+#' @keywords internal
+warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
+  labels <- names(config)
+  if (!length(labels)) return(invisible(character(0)))
+  canonical <- tolower(trimws(labels))
+  off <- which(!(labels %in% known) & canonical %in% known)
+  if (!length(off)) return(invisible(character(0)))
+
+  cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+  cat("│ Context: config 'Settings' sheet — case mismatch\n")
+  cat("│ These settings are spelled differently from the name the\n")
+  cat("│ loader looks up, so their values are being IGNORED and the\n")
+  cat("│ defaults are used instead:\n")
+  for (i in off) {
+    twin <- canonical[i] %in% labels
+    cat(sprintf("│   %-22s should be %-22s%s\n", labels[i], canonical[i],
+                if (twin) " [duplicate]" else ""))
+  }
+  cat("│ How to fix: rename the Setting cell to the lower-case name.\n")
+  if (any(canonical[off] %in% labels)) {
+    cat("│ Rows marked [duplicate] already have a correctly named twin —\n")
+    cat("│ DELETE those rows rather than renaming them, or the sheet will\n")
+    cat("│ hold the same setting twice and the run will refuse.\n")
+  }
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  invisible(labels[off])
+}
+
+
 # Every setting name the tabs config recognises. Used to flag typos, and to
 # tell a mis-formatted setting row apart from a section header (see
 # warn_merged_setting_rows).
@@ -947,6 +990,9 @@ load_crosstabs_config <- function(config_file) {
   # unknown name, it simply isn't in the list. The commonest cause is a row
   # merged into section-header shape, which leaves no Value cell to read.
   warn_merged_setting_rows(config_file)
+  # And one that arrives under the wrong spelling is invisible too: the check
+  # above lower-cases before comparing, but the lookup does not.
+  warn_case_mismatched_settings(settings$config)
 
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)

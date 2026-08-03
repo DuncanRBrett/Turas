@@ -456,3 +456,47 @@ test_that("TABS_KNOWN_SETTINGS is the shared list, not a private copy", {
                   %in% TABS_KNOWN_SETTINGS))
   expect_false(any(duplicated(TABS_KNOWN_SETTINGS)))
 })
+
+# ==============================================================================
+# CASE-MISMATCHED SETTING NAMES — the lookup is exact, the typo check is not
+# ==============================================================================
+
+context("crosstabs_config: case-mismatched setting names")
+
+test_that("a case variant is named, with the spelling the loader wants", {
+  out <- capture.output(
+    hits <- warn_case_mismatched_settings(list(Research_House = "TRL",
+                                               apply_weighting = "FALSE")))
+  expect_equal(hits, "Research_House")
+  expect_true(any(grepl("Research_House", out, fixed = TRUE)))
+  expect_true(any(grepl("research_house", out, fixed = TRUE)))
+  expect_false(any(grepl("apply_weighting", out, fixed = TRUE)))
+})
+
+test_that("a variant that already has a correct twin is marked, with the collision warning", {
+  out <- capture.output(
+    hits <- warn_case_mismatched_settings(list(analyst_name = "D", Analyst_Name = "D")))
+  expect_equal(hits, "Analyst_Name")
+  expect_true(any(grepl("[duplicate]", out, fixed = TRUE)))
+  expect_true(any(grepl("DELETE", out, fixed = TRUE)))
+})
+
+test_that("correctly named settings, and genuine unknowns, are left alone", {
+  # An unknown name is the typo check's job, not this one — no double-reporting.
+  expect_silent(h <- warn_case_mismatched_settings(
+    list(apply_weighting = "FALSE", nonsense_setting = "x")))
+  expect_equal(length(h), 0)
+  expect_equal(length(capture.output(warn_case_mismatched_settings(list()))), 0)
+})
+
+test_that("the CCPB case-variant labels are all recognised as canonical settings", {
+  # Regression guard for the live CCPB configs: these four rows carry values
+  # that never reached a run because the sheet capitalises them.
+  for (nm in c("research_house", "project_name", "analyst_name", "generate_stats_pack")) {
+    expect_true(nm %in% TABS_KNOWN_SETTINGS, info = nm)
+  }
+  out <- capture.output(hits <- warn_case_mismatched_settings(
+    list(Generate_Stats_Pack = "Y", Project_Name = "P",
+         Analyst_Name = "D", Research_House = "TRL")))
+  expect_equal(length(hits), 4)
+})
