@@ -153,6 +153,18 @@
       "port": 8780
     },
     {
+      "name": "research-guide",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8783",
+        "--directory",
+        "/Users/duncan/Dev/Turas/docs/research_guide"
+      ],
+      "port": 8783
+    },
+    {
       "name": "trendline-harness",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
