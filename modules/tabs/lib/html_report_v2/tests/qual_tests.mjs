@@ -291,6 +291,68 @@ const poolU = qual.collectPool(colIsland, { "Q1#0": 1 }, {}, { "Q1#0": 1 });
 assert(poolU.items.length === 1 && poolU.items[0].saved === true && poolU.items[0].hubbed === true,
   "collectPool: a shortlisted + hubbed mark is ONE item carrying both flags");
 
+// A mark on a comment whose verbatim this report does NOT publish (verbatim scope
+// "theme all, show some": themed + demographically tagged, text withheld) has no
+// quote to show. It used to render "[quote hidden in this copy]", which reads as a
+// fault; it is now excluded and COUNTED, so the cover states it rather than hiding it.
+const scopeIsland = {
+  demographics: [{ label: "Campus" }],
+  questions: [
+    { code: "Q1", title: "Why recommend?", type: "themed", themes: [],
+      records: [
+        { idx: 0, tier: 0, sentiment: null, themeVals: {}, suppressed: true,
+          demos: { Campus: "Worcester" }, text: null },
+        { idx: 1, tier: 0, sentiment: 1, themeVals: {}, demos: { Campus: "Durban" }, text: "shown" }
+      ] }
+  ]
+};
+const poolS = qual.collectPool(scopeIsland, { "Q1#0": 1, "Q1#1": 1 }, {}, {});
+assert(poolS.items.length === 1 && poolS.items[0].idx === 1,
+  "collectPool: an unpublished verbatim is not pooled; the published one is");
+assert(poolS.withheld === 1, "collectPool: the unpublished mark is counted as withheld");
+assert(poolS.orphans === 0,
+  "collectPool: withheld is NOT an orphan — the record exists, only its text is unpublished");
+const poolNone = qual.collectPool(colIsland, { "Q1#0": 1 }, {}, {});
+assert(poolNone.withheld === 0, "collectPool: nothing withheld when every marked verbatim is published");
+
+// The star on a collection card is a CONTROL, not a badge: you can drop a comment
+// from the shortlist where you are reading it. It reuses the [data-qual-save]
+// handler that wires the question cards, so there is one toggle path.
+const colItem = { qcode: "Q1", idx: 0, saved: true, highlighted: false,
+  question: { code: "Q1", title: "Why recommend?", themes: [] },
+  record: { idx: 0, tier: 0, sentiment: 1, themeVals: {}, demos: {}, text: "great value" } };
+const cardOn = qual._collectionCard(colItem, {});
+assert(cardOn.indexOf('data-qual-unmark="Q1#0"') !== -1,
+  "collection card: carries an explicit Remove control, not a clickable star");
+assert(cardOn.indexOf("✕ Remove") !== -1, "collection card: the control is labelled, not a glyph");
+// a comment kept in the collection ONLY by a highlight must be removable too — the
+// old star-only control left it sitting there looking as though nothing happened
+const cardHl = qual._collectionCard(
+  Object.assign({}, colItem, { saved: false, highlighted: true }), {});
+assert(cardHl.indexOf('data-qual-unmark="Q1#0"') !== -1,
+  "collection card: a highlight-only comment can be removed as well");
+const cardHub = qual._collectionCard(
+  Object.assign({}, colItem, { saved: false, highlighted: false, hubbed: true }), {});
+assert(cardHub.indexOf("data-qual-unmark") !== -1,
+  "collection card: a hub-only comment can be removed as well");
+
+// Remove means removed: the collection is the union of shortlist + highlights +
+// hubs, so clearing only the shortlist left a highlighted comment sitting in the
+// list as though the click had done nothing. clearMarks clears all three.
+qual.toggleSave("QX", 3);
+qual.addHighlight("QX", 3, 0, 5);
+const hubId = qual.hubCreate("Gate hub");
+qual.hubToggleMark(hubId, "QX", 3);
+assert(qual.isSaved("QX", 3) && qual.getHighlights("QX", 3).length === 1 &&
+  !!qual.hubMarksUnion()["QX#3"], "clearMarks fixture: all three marks set");
+qual.clearMarks("QX", 3);
+assert(!qual.isSaved("QX", 3), "clearMarks: the shortlist star is cleared");
+assert(qual.getHighlights("QX", 3).length === 0, "clearMarks: highlighted passages are cleared");
+assert(!qual.hubMarksUnion()["QX#3"], "clearMarks: hub membership is cleared");
+qual.clearMarks("QX", 99);   // never marked
+assert(!qual.isSaved("QX", 99), "clearMarks on an unmarked comment is a safe no-op");
+qual.hubDelete(hubId);   // the hub store is shared across this file — leave it as found
+
 const gq = qual.groupCollection(colIsland, pool.items, "question");
 assert(gq.length === 2 && gq[0].key === "Q1" && gq[1].key === "Q2", "groupCollection question: groups in island order");
 assert(gq[0].items.length === 2 && gq[0].label === "Why recommend?", "groupCollection question: Q1 holds its 2 marks, labelled by title");

@@ -542,6 +542,10 @@
     if (arr.length) s[k] = arr; else delete s[k];
     hlPersist();
   };
+  qual.clearHighlights = function (qcode, idx) {
+    var s = hlStore(), k = qcode + "#" + idx;
+    if (s[k]) { delete s[k]; hlPersist(); }
+  };
   qual.highlightsAll = function () { return hlStore(); };   // report.saveCopy embeds this
 
   /** Wrap the stored ranges in <mark> (escaping each piece) — pure, node-testable. */
@@ -803,17 +807,22 @@
     Object.keys(savedMap).forEach(function (k) { if (savedMap[k]) keys[k] = 1; });
     Object.keys(hlMap).forEach(function (k) { if (hlMap[k] && hlMap[k].length) keys[k] = 1; });
     Object.keys(hubMap).forEach(function (k) { if (hubMap[k]) keys[k] = 1; });
-    var items = [], orphans = 0;
+    var items = [], orphans = 0, withheld = 0;
     Object.keys(keys).forEach(function (key) {
       var m = qual.splitMark(key);
       var slot = m && res[m.qcode];
       var rec = slot && slot.byIdx[m.idx];
       if (!rec) { orphans++; return; }
+      // A record whose verbatim this report does not publish (qual_verbatim_scope
+      // "theme all, show some" — themed and demographically tagged, text withheld)
+      // has nothing to contribute to a collection of quotes. It used to render as
+      // "[quote hidden in this copy]", which reads like a fault. Counted, not shown.
+      if (rec.text == null) { withheld++; return; }
       items.push({ qcode: m.qcode, idx: m.idx, record: rec, question: slot.q,
                    saved: !!savedMap[key], highlighted: !!(hlMap[key] && hlMap[key].length),
                    hubbed: !!hubMap[key] });
     });
-    return { items: items, orphans: orphans };
+    return { items: items, orphans: orphans, withheld: withheld };
   };
 
   /**
@@ -996,6 +1005,19 @@
     var s = hubsStore(), out = {};
     s.order.forEach(function (id) { Object.keys(s.byId[id].marks).forEach(function (k) { out[k] = 1; }); });
     return out;
+  };
+  /** Take one comment out of the collection entirely — shortlist, highlighted
+   *  passages and hub memberships. The collection IS the union of those three, so
+   *  clearing only the shortlist leaves a highlighted comment sitting there looking
+   *  as though the control did nothing. One button, one meaning. */
+  qual.clearMarks = function (qcode, idx) {
+    var key = qcode + "#" + idx;
+    if (qual.isSaved(qcode, idx)) qual.toggleSave(qcode, idx);
+    qual.clearHighlights(qcode, idx);
+    var s = hubsStore();
+    s.order.forEach(function (id) {
+      if (s.byId[id].marks[key]) qual.hubToggleMark(id, qcode, idx);
+    });
   };
   qual.hubSetInsight = function (id, text) {
     var h = hubsStore().byId[id];
@@ -1894,6 +1916,7 @@
       opts + "</select></div>";
   }
 
+  /** One collected comment as a card. Exposed for the node gate. */
   function collectionCard(it, ctx) {
     ctx = ctx || {};
     var q = it.question, r = it.record, qcode = it.qcode, key = qcode + "#" + r.idx;
@@ -1906,8 +1929,15 @@
       .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
     var tags = ctx.dropTags ? "" : (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
+    // The star is a control, not a badge — you can drop a comment from the
+    // shortlist where you are reading it, instead of hunting it down on its own
+    // question card. Reuses the [data-qual-save] handler that wires the question
+    // cards, so there is one toggle path, not two.
     var flags = (it.saved ? '<span class="ql-cflag" title="shortlisted">★</span>' : "") +
-                (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "");
+      (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "") +
+      '<button class="ql-cremove" data-qual-unmark="' + esc(qcode) + "#" + esc(r.idx) +
+      '" title="Remove this comment from your collection — clears its shortlist star, ' +
+      'any highlighted passage and any hub it is filed in">✕ Remove</button>';
     return '<div class="ql-quote ' + sent + ' ql-ccard" data-hl-key="' + esc(key) + '">' +
       '<div class="ql-qbody">' +
         '<div class="ql-csrc"><button class="ql-cjump" data-col-jump="' + esc(qcode) +
@@ -1921,6 +1951,7 @@
         ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "") +
       '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
+  qual._collectionCard = collectionCard;   // node gate
 
   function collectionMain(island, st, cutFilters, pool) {
     var total = pool.items.length;
@@ -2206,6 +2237,15 @@
       });
     });
     // shortlist: star a comment / show only the shortlist / export the visible set
+    // remove a comment from the collection outright (shortlist + highlights + hubs)
+    host.querySelectorAll("[data-qual-unmark]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var m = qual.splitMark(b.getAttribute("data-qual-unmark"));
+        if (!m) return;
+        qual.clearMarks(m.qcode, m.idx);
+        qual.render(host);
+      });
+    });
     host.querySelectorAll("[data-qual-save]").forEach(function (b) {
       b.addEventListener("click", function () {
         var v = b.getAttribute("data-qual-save"), at = v.lastIndexOf("#");

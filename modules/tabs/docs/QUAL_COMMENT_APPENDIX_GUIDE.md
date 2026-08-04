@@ -43,13 +43,26 @@ Open each sheet and code by hand. Everything here survives every re-run of the b
 
 - **Noteworthy tier** — put one code in the `Noteworthy` column (case-insensitive):
   `n` = Noteworthy · `m` = Must-read · `p` = Priority ("lead with in a presentation").
-  Any other non-blank mark counts as Noteworthy. Blank = ordinary comment.
+  Any other non-blank mark counts as Noteworthy.
+- **Blank is a valid, deliberate state — and it is the normal one.** A blank
+  `Noteworthy` cell means "an ordinary comment": not flagged, but **its text still
+  shows** in the report. Most comments should end up blank. An unremarkable but
+  genuine answer ("We order weekly, so we seldom run short", "The service is good")
+  belongs here — *not* in `hide`.
 - **Hide a comment** — the one reserved word `hide` (or `hidden`) in the same
   `Noteworthy` column withholds *that comment's* text from the report while still
   counting it in the theme distribution. It is not noteworthy (it's the opposite),
-  so it never counts as a tier mark. Use it to drop an uninformative or identifying
-  comment without distorting the numbers. See `qual_verbatim_scope` in §3 for
-  showing only the noteworthy comments across the whole report.
+  so it never counts as a tier mark. Reserve it for comments that are **not a real
+  answer** — non-answers ("No.", "Not sure", "Don't know"), gibberish, blank-ish
+  punctuation — or for text that would identify someone. See `qual_verbatim_scope`
+  in §3 for showing only the noteworthy comments across the whole report.
+
+> **The distinction that catches people:** blank and `hide` both mean "not
+> noteworthy", so it is tempting to treat them as the same thing. They are not.
+> Blank still publishes the verbatim; `hide` suppresses it. Coding every dull
+> comment as `hide` silently strips the ordinary voice out of the report and leaves
+> only the complaints and the raves. If in doubt, leave it blank — that is what
+> `qual_verbatim_scope = noteworthy` is for when you want a curated few.
 - **Overall Sentiment** — `1` positive / `2` mixed / `3` negative (legend sits above the header).
 - **Themes** — add a column per theme to the **right of the verbatim** (from col E), header =
   the theme name, and code `1`/`2`/`3` per comment. The prevalence board and theme filters
@@ -74,7 +87,7 @@ Two sheets in the project's `*_Crosstab_Config.xlsx`.
 | `qual_noteworthy_default` | `all` | Which tier the filter opens on: `all` / `noteworthy` / `must_read` / `priority`. |
 | `qual_verbatim_scope` | `all` | Which comments ship readable text (build-time curation). `all` = every comment except those marked `hide`. `noteworthy` = only tier 1+ comments are readable; the rest are counted but not shown. **Theme all, show some** — use `noteworthy` to ship a curated handful of quotes from a large body of comments while the numbers reflect them all. |
 | `min_reporting_base` | `1` | Disclosure k (used by both the audience gate and the `safe` tag k-anonymisation). `1` = off. Set a real floor (e.g. `30`, matching `significance_min_base`) for a client-facing report with tags. |
-| `qual_tag_dimensions` | *(blank)* | Comment tags from the **host survey** (see §5): a comma list of `Column` or `Column:Label`, e.g. `S03:Centre, S11:Channel`. Blank = only the comment workbook's own demographic columns are tagged. |
+| `qual_tag_dimensions` | *(blank)* | Comment tags from the **host survey** (see §5): a comma list of `Column` or `Column:Label`, e.g. `S01:Centre, S09:Channel`. Values show as their Survey_Structure DisplayText; the Label is unchecked, so verify it against the Questions sheet. Blank = only the comment workbook's own demographic columns are tagged. |
 | `qual_join_id_column` | *(blank)* | Only set if the respondent-id column doesn't auto-detect. |
 
 ### Selection sheet (per open-end row)
@@ -114,6 +127,45 @@ order:
 
 ---
 
+## 4b. Keeping it current (new interviews + backcheck edits)
+
+Two different things change after the first build, and they are handled differently.
+
+**New interviews.** Just re-run the builder. It appends only respondents it hasn't seen
+(matched by ResponseID) and never touches an existing row, so all your coding survives:
+
+```bash
+python3 scripts/build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --columns "…"
+```
+
+Close the appendix in Excel first, and let OneDrive finish syncing afterwards — if it's
+open, Excel's copy overwrites the update the next time it saves.
+
+**A comment's text changed** (a backcheck correction, say). The builder deliberately does
+*not* rewrite existing rows, so these never flow through on a normal run. Handle them in
+two steps — because a difference can run either way: the data may hold a correction, or
+your appendix may hold text you cleaned by hand, and only you can tell which should win.
+
+```bash
+# 1. see what differs — writes a review list, changes nothing
+python3 scripts/build_comment_appendix.py … --report-changes
+
+# 2. open that list, mark 'y' under "Apply? (y)" on rows where the DATA should win
+#    (leave blank to keep your version), then apply just those:
+python3 scripts/build_comment_appendix.py … --apply-changes "… changes 20260719_092150.xlsx"
+```
+
+The review list gives you Question, ResponseID, your current text and the new text side by
+side. Applying rewrites **only the verbatim cell** on rows you approved — Noteworthy,
+Overall Sentiment and every theme column are left exactly as they are — and it writes a
+backup first.
+
+One judgement it can't make for you: where a comment was *materially* reworded, your
+existing sentiment/theme coding may no longer fit. Treat the review list as a prompt to
+re-check the coding on those rows, not just a text swap.
+
+---
+
 ## 5. NPS "why?" split + host-survey tags (advanced)
 
 Two optional capabilities for comment questions. Both ride the same respondent-id join and
@@ -147,12 +199,22 @@ The comment workbook often carries no demographics, but the join makes every hos
 variable reachable per comment. `qual_tag_dimensions` turns chosen host columns into tags:
 
 ```
-qual_tag_dimensions = S03:Centre, S11:Channel     # Column:Label, comma-separated
+qual_tag_dimensions = S01:Centre, S09:Channel     # Column:Label, comma-separated
 ```
 
-Each comment then shows `Centre: Worcester DC · Channel: Presell`. In the report a **🏷 Tags**
+Each comment then shows `Centre: Metro South · Channel: 11 - Spaza`. In the report a **🏷 Tags**
 control lets the reader hide all tags or toggle a single dimension (it can only *hide* — never
 reveal more than the analyst allowed).
+
+Values are shown as the column's **DisplayText** from Survey_Structure, matched on trimmed
+OptionText exactly as the crosstab processors match — so a column storing codes (`11`, `12`)
+tags with the words the crosstab row uses, not the code. A value with no option in the
+structure is tagged raw and named in a console warning, which is usually the first sign of
+structure/data drift.
+
+**The Label is only what the chip says.** Nothing checks it against the Questions sheet, so
+`S11:Channel` will cheerfully print "Channel: Presell" over a Sales Method column. Read the
+label back off the Questions sheet before you ship the report.
 
 ### 5c. Confidentiality with tags (important on small bases)
 
