@@ -1261,6 +1261,9 @@
   // ---- render ----------------------------------------------------------------
 
   qual.render = function (host) {
+    // A re-render replaces the cards the chip was pointing at, so it can only be
+    // stale from here on — including the re-render the tab switch itself triggers.
+    hlRemovePop();
     var island = TR.QUAL, d2 = TR.d2;
     if (!island || !island.questions || !island.questions.length) {
       host.innerHTML = '<div class="page"><p class="ql-empty">No qualitative data in this report.</p></div>';
@@ -2320,6 +2323,46 @@
   var _hlPop = null;
   function hlRemovePop() { if (_hlPop) { _hlPop.remove(); _hlPop = null; } }
 
+  // The chip lives on document.body at position:fixed / z-index:50, so nothing in
+  // the report clips it. It used to be cleared ONLY by the next mouseup inside the
+  // drawer — so selecting a passage and then leaving (switching to Crosstabs,
+  // scrolling, clicking anywhere else) stranded it on top of whatever came next.
+  // These dismissors are global and registered once, not per render.
+  var _hlDismissWired = false;
+  function hlWireDismissors() {
+    if (_hlDismissWired || typeof document === "undefined") return;
+    _hlDismissWired = true;
+    // Capture phase: the press that switches tab or scrolls a pane still clears the
+    // chip, even when that handler stops propagation.
+    document.addEventListener("mousedown", function (e) {
+      if (!_hlPop) return;
+      var t = e.target;
+      if (t && t.closest && t.closest(".ql-hlpop")) return;   // the chip itself
+      hlRemovePop();
+    }, true);
+    // Nothing selected means nothing to highlight — covers keyboard and programmatic
+    // collapses that never produce a mouse event.
+    document.addEventListener("selectionchange", function () {
+      if (!_hlPop) return;
+      var sel = typeof window !== "undefined" && window.getSelection && window.getSelection();
+      if (!sel || sel.isCollapsed) hlRemovePop();
+    });
+    if (typeof window !== "undefined") {
+      // Positioned from a viewport rect, so it drifts off its passage on any scroll.
+      window.addEventListener("scroll", hlRemovePop, true);
+      window.addEventListener("resize", hlRemovePop);
+    }
+  }
+
+  // Exposed for the regression test — the chip's lifecycle is otherwise reachable
+  // only through a real text selection.
+  qual._hl = {
+    wire: hlWireDismissors,
+    show: function (rect, onApply) { hlShowPop(rect, onApply); },
+    remove: hlRemovePop,
+    showing: function () { return !!_hlPop; },
+  };
+
   function closestQtext(node) {
     var el = node && (node.nodeType === 1 ? node : node.parentElement);
     return el && el.closest ? el.closest(".ql-qtext") : null;
@@ -2349,6 +2392,7 @@
   }
 
   function wireHighlights(host) {
+    hlWireDismissors();
     var drawer = host.querySelector(".ql-drawer");
     if (!drawer || typeof window === "undefined") return;
     // Select a passage -> offer to highlight it (within a single comment's text).
