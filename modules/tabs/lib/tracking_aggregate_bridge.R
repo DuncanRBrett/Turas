@@ -11,7 +11,7 @@
 # table of figures instead of the classic tracker's microdata-derived trends. The
 # consumer contract (locked by test_tracking_segment_bridge.R + the JS gate):
 #   mean  -> waveQ.stats.index   (+ .mean mirror, + .sd ONLY when recorded)
-#   nps   -> waveQ.stats.nps
+#   nps   -> waveQ.stats.nps     (+ .sd ONLY when recorded)
 #   prop  -> waveQ.rows[norm(category)].pct   (+ .n when a base is known)
 #   base  -> waveQ.base
 # The renderer decides mean-vs-proportion from the CURRENT question's row kind;
@@ -25,7 +25,9 @@
 #     untested (never a fabricated arrow);
 #   - a proportion carries its base -> a real pooled-z test wherever a base
 #     exists, and no base -> no test;
-#   - an NPS net never carries the promoter/detractor split -> "no test".
+#   - an NPS net carries an sd ONLY when the values table records one (the spread
+#     of the wave's per-respondent +100/0/-100 scores), so a wave loaded from a
+#     published net alone still plots untested.
 # It NEVER invents a base, an sd, or a category. A proportion metric with no
 # resolvable tracked category is SKIPPED with a console warning, not mis-keyed.
 #
@@ -200,9 +202,15 @@ aggregate_wave_contributions <- function(values, mapping = NULL, waves_meta = NU
         q <- list(match_key = mkey, title = title, base = base_out, stats = stats)
 
       } else if (identical(mtype, "nps")) {
-        # nps: net only; no sd, no index -> "no test" by construction.
-        q <- list(match_key = mkey, title = title, base = base_out,
-                  stats = list(nps = v))
+        # nps: the net, plus an sd ONLY when the values table records one — the
+        # same honest rule as the mean path. An NPS net IS testable when a
+        # wave supplies the spread of its per-respondent +100/0/-100 scores
+        # (the renderer treats NPS as a mean-kind row, so waves.sdAtWave reads
+        # stats.sd and the Welch test runs). A blank sd still means "no test",
+        # which is every wave loaded from a published net alone.
+        stats <- list(nps = v)
+        if (!is.na(sd_v[i])) stats$sd <- as.numeric(sd_v[i])
+        q <- list(match_key = mkey, title = title, base = base_out, stats = stats)
 
       } else if (identical(mtype, "proportion")) {
         cat_val <- info$category %||% NA_character_

@@ -352,10 +352,16 @@
       '<button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> How wave-on-wave changes are tested' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
+      // The spread a Welch test needs has THREE sources (waves.sdAtWave), and
+      // which one a wave uses is a property of that wave, not of the report — so
+      // this names all three rather than only the published-breakdown case, and
+      // says plainly that a wave carrying none of them is not tested.
       "<p>Change between waves is tested with the right test for the number: a " +
-      "two-proportion z-test for percentages; a Welch t-test for means, indexes " +
-      "and NPS. For those, the spread comes from each wave's published breakdown " +
-      "— the same counts that give the mean.</p></div></div>");
+      "two-proportion z-test for percentages, and a Welch t-test for means, " +
+      "indexes and NPS. The spread those tests need comes from whichever the " +
+      "wave carries — its respondent-level data, a standard deviation recorded " +
+      "with it, or its published breakdown. A wave carrying none of those is " +
+      "charted but not tested.</p></div></div>");
     host.innerHTML = html.join("");
 
     host.querySelectorAll("[data-callout]").forEach(function (el) {

@@ -87,14 +87,34 @@ test_that("mean question carries exactly the locked island fields", {
                   c("match_key", "title", "base", "stats"))
 })
 
-test_that("NPS carries nps only — no sd, no index (net alone can't be tested)", {
-  q2 <- res[[2]]$questions[[2]]                           # HQ2 nps, 2025
+test_that("NPS with NO recorded sd carries the net only — a published net can't be tested", {
+  q2 <- res[[2]]$questions[[2]]                           # HQ2 nps, 2025 (sd = NA)
   expect_equal(q2$stats$nps, 65)
   expect_equal(q2$match_key, "hq2")
   expect_null(q2$stats$sd)
   expect_null(q2$stats$index)
   expect_null(q2$stats$mean)
   expect_setequal(names(q2), c("match_key", "title", "base", "stats"))
+})
+
+
+test_that("NPS carries an sd WHEN the values table records one, so the net can test", {
+  # An NPS net is testable once a wave supplies the spread of its per-respondent
+  # +100/0/-100 scores: the renderer treats NPS as a mean-kind row, so
+  # waves.sdAtWave() reads stats.sd and the Welch test runs. Recording the sd is
+  # the ONLY thing that switches it on — the rule stays "honest when recorded".
+  with_sd <- values
+  with_sd$sd[with_sd$metric_id == "HQ2" & with_sd$wave == "2025"] <- 48.02
+  out <- aggregate_wave_contributions(with_sd, mapping, waves_meta)
+
+  q2025 <- out[[2]]$questions[[2]]
+  expect_equal(q2025$stats$nps, 65)
+  expect_equal(q2025$stats$sd, 48.02)
+  expect_null(q2025$stats$index)                # still a net, never an index
+  expect_null(q2025$stats$mean)
+
+  q2011 <- out[[1]]$questions[[2]]              # the wave with no sd is untouched
+  expect_null(q2011$stats$sd)
 })
 
 test_that("proportion emits a rows[norm(category)] row; n only when base known", {
