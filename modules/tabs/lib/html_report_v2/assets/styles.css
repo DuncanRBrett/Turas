@@ -297,7 +297,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .gauge .gt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11.5px; color: var(--ink); margin-top: 8px; }
 /* B3: insight line in the title area — ONE clipped line above the question
    line (which drops to the secondary tone), so the A1 slots never overlap. */
-.gauge .gi { display: block; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gauge .gi { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.35; }
 .gauge .gi + .gt { margin-top: 2px; color: var(--muted); }
 .gi-src, .qh-src { font-size: 9px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); background: var(--soft); border-radius: 5px; padding: 1px 5px; margin-left: 5px; vertical-align: 1px; white-space: nowrap; }
 .gauge .gq { font-size: 10px; font-weight: 700; color: var(--faint); flex: none; }
@@ -828,6 +828,24 @@ table.ws td.sparkcell { padding: 1px 8px; }
    than the brand-edged portraits. */
 .tko-edge-steady { border-left-color: #64748b; }
 .tko-on-steady { color: #64748b; }
+/* Synopsis strip — where the group stands, above where it lags and leads. The
+   anchor carries the declared headline questions as absolute values; the tally
+   carries the raw ahead/level/behind split, rated and share counted apart. */
+.tko-syn { display: flex; flex-wrap: wrap; gap: 8px 26px; align-items: flex-start;
+  margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.tko-syn-anchor, .tko-syn-tally { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.tko-anc { display: flex; flex-direction: column; line-height: 1.25; }
+.tko-anc-k { font-size: 10px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--muted); }
+.tko-anc-v { font-size: 19px; font-weight: 700; color: var(--ink); }
+.tko-anc-r { font-size: 10.5px; color: var(--faint); }
+.tko-tal { display: flex; flex-direction: column; line-height: 1.3; }
+.tko-tal-k { font-size: 10px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--muted); }
+.tko-tal-v { font-size: 12px; color: var(--ink); }
+.tko-tal-n { color: var(--faint); }
+@media (max-width: 720px) { .tko-syn { gap: 10px 14px; } }
+.tko-lean { font-size: 12.5px; font-weight: 600; color: var(--ink); margin: 0 0 2px; }
 .tko-portrait { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; }
 @media (max-width: 720px) { .tko-portrait { grid-template-columns: 1fr; } }
 .tko-side { min-width: 0; }
@@ -855,8 +873,6 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-mspark svg { width: 100%; height: auto; display: block; }
 .tko-mrow { font-size: 13px; font-weight: 600; margin: 3px 0; }
 .tko-mrow.tko-mv-up { color: var(--tko-protect); } .tko-mrow.tko-mv-down { color: var(--red); }
-.tko-pfoot { margin-top: 11px; }
-.tko-pfoot .linklike { font-size: 12px; font-weight: 600; }
 
 /* ── Qualitative tab ─────────────────────────────────────────────────────── */
 /* Closed<->open jump: the "💬 comments" affordance on a linked card, and the
@@ -1048,6 +1064,12 @@ table.ws td.sparkcell { padding: 1px 8px; }
   padding: 0; cursor: pointer; overflow-wrap: anywhere; text-align: left; }
 .ql-cjump:hover { text-decoration: underline; }
 .ql-cflag { font-size: 11px; color: var(--accent); }
+/* an explicit control on a collection card — takes the comment out of the
+   collection, rather than a star you have to know is clickable */
+.ql-cremove { margin-left: auto; background: none; border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 7px; cursor: pointer; font: inherit;
+  font-size: 10.5px; font-weight: 600; color: var(--muted); line-height: 1.5; }
+.ql-cremove:hover, .ql-cremove:focus-visible { color: var(--red); border-color: var(--red); }
 .ql-cthemes { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
 .ql-cchip { font-size: 11px; color: var(--brand); background: var(--bg); border: 1px solid var(--brand);
   border-radius: 999px; padding: 1px 8px; }

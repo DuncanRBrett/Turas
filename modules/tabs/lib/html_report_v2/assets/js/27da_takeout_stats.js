@@ -187,4 +187,46 @@
   }
   takeout._bimodalStat = bimodalStat;
 
+  /** Full ahead / level / behind counts for one column's gaps, split by kind.
+   *
+   *  RAW comparison — a gap counts whichever side of the overall it falls, with
+   *  no materiality floor. The portrait's hits/gains counts apply that floor and
+   *  so understate the misses on a group that is behind everywhere by a little;
+   *  this is the honest denominator to show beside them.
+   *
+   *  Rated indexes and KeyShare rows are counted SEPARATELY: pooling them hides
+   *  the case where a group is ordinary on how it is rated and well ahead on what
+   *  actually gets done (or the reverse).
+   */
+  function tallyGaps(gaps) {
+    var blank = function () { return { ahead: 0, level: 0, behind: 0, n: 0 }; };
+    var out = { rated: blank(), share: blank() };
+    (gaps || []).forEach(function (gp) {
+      if (gp.value === null || gp.value === undefined ||
+          gp.total === null || gp.total === undefined) return;
+      var side = gp.isPct ? out.share : out.rated;
+      side.n++;
+      if (gp.value > gp.total) side.ahead++;
+      else if (gp.value < gp.total) side.behind++;
+      else side.level++;
+    });
+    return out;
+  }
+  takeout._tallyGaps = tallyGaps;
+
+  /** The declared headline questions for one column, in the analyst's order.
+   *  Reads the same gaps the card is built from, so every anchor number is a
+   *  real cell that appears in the crosstabs. Codes with no gap (below the base
+   *  floor for this column, say) are dropped rather than shown empty. */
+  function anchorFrom(gaps, codes) {
+    if (!codes || !codes.length) return [];
+    var byCode = {};
+    (gaps || []).forEach(function (gp) {
+      if (gp.code && byCode[gp.code] === undefined) byCode[gp.code] = gp;
+    });
+    return codes.map(function (c) { return byCode[c]; })
+      .filter(function (gp) { return !!gp; });
+  }
+  takeout._anchorFrom = anchorFrom;
+
 })(typeof window !== "undefined" ? window : globalThis);

@@ -843,11 +843,19 @@ run("KeyShare portraits render as percentages, and the tension sentence speaks s
   const seed = takeout.ui.portraitTension(port);
   assert(seed.indexOf("leads every depot on “Correct delivery day” (84% vs 71% overall)") !== -1,
     "tension sentence quotes the share cells: " + seed);
-  assert(seed.indexOf("questions scored") !== -1, "the count names the scanned set, not the questionnaire");
+  assert(seed.indexOf("questions scored") === -1,
+    "the seed no longer repeats the count — the card's own line carries it");
   const html = takeout.readView.html(t);
-  assert(html.indexOf('tko-rv">84%<') !== -1 && html.indexOf("/ 71%") !== -1,
-    "portrait row shows the two real % cells");
-  assert(html.indexOf('tko-rv">84.0<') === -1 && html.indexOf("/ 71.0") === -1,
+  assert(/on \d+ of \d+ areas with a rating or frequency comparison/.test(html),
+    "the card states how the group falls across the whole scanned set");
+  // the % contract still holds where rows are drawn (the steady card, and any
+  // share in the anchor): a share is 84%, never 84.0
+  const row = takeout.ui.portraitRow(
+    { label: "Correct delivery day", value: 84, rest: 71, scaleMax: 100, isPct: true }, "high");
+  assert(row.indexOf('tko-rv">84%<') !== -1 && row.indexOf("/ 71%") !== -1,
+    "a share row shows the two real % cells");
+  // the VALUE cell, not the bar's CSS width (which is legitimately "84.0%")
+  assert(row.indexOf('tko-rv">84.0<') === -1 && row.indexOf("/ 71.0") === -1,
     "a share value never renders as a decimal index");
 });
 
@@ -964,6 +972,73 @@ run("empty state is scope-honest: 'nothing found' only when something was scanne
       gaps: [{ title: "Q", value: 3.99, total: 4.0, scaleMax: 5 }] }] }));
   assert(genuine.indexOf("No clear cross-question pattern stands out") !== -1,
     "a scanned-but-flat study keeps the honest null headline");
+});
+
+run("synopsis tally: raw ahead/level/behind, rated and share counted apart", () => {
+  // 3 rated (1 ahead, 1 level, 1 behind) + 2 shares (both behind). A level
+  // question must land in neither ahead nor behind.
+  const t = takeout._tallyGaps([
+    { value: 4.2, total: 4.0, scaleMax: 5 },
+    { value: 4.0, total: 4.0, scaleMax: 5 },
+    { value: 3.5, total: 4.0, scaleMax: 5 },
+    { value: 40, total: 55, scaleMax: 100, isPct: true },
+    { value: 51, total: 55, scaleMax: 100, isPct: true }
+  ]);
+  assert(t.rated.n === 3 && t.share.n === 2, "kinds counted apart");
+  assert(t.rated.ahead === 1 && t.rated.level === 1 && t.rated.behind === 1,
+    "rated split 1/1/1");
+  assert(t.share.ahead === 0 && t.share.level === 0 && t.share.behind === 2,
+    "both shares behind");
+  const empty = takeout._tallyGaps([{ value: null, total: 4 }, { value: 4 }]);
+  assert(empty.rated.n === 0, "a gap with no value on either side is not counted");
+  assert(takeout._tallyGaps().rated.n === 0, "no gaps at all is safe");
+});
+
+run("synopsis tally is RAW — it does not apply the materiality floor", () => {
+  // Every gap is tiny but negative: the portrait's own hits count filters these
+  // out, the tally must not. This is the Metro South case — behind everywhere
+  // by a little, and the filtered count says so far less loudly.
+  const gaps = [];
+  for (let i = 0; i < 8; i++) gaps.push({ value: 3.99, total: 4.0, scaleMax: 5 });
+  const t = takeout._tallyGaps(gaps);
+  assert(t.rated.behind === 8, "all 8 counted behind, floor or no floor");
+  const built = takeout.buildPatterns({ scope: { rated: 8, shares: 0 },
+    columns: [{ column: "A", group: "G", base: 40, gaps: gaps }] });
+  const portrait = (built.patterns || []).filter((p) => p.kind === "portrait")[0];
+  if (portrait) assert(portrait.hits < 8, "the materiality floor does filter hits");
+});
+
+run("synopsis anchor: declared headline questions, in order, real cells only", () => {
+  const gaps = [
+    { code: "Q02", title: "Ease", value: 4.4, total: 4.1, scaleMax: 5 },
+    { code: "Q78", title: "Overall", value: 9.2, total: 9.0, scaleMax: 10 },
+    { code: "Q79", title: "Recommend", value: 90, total: 79, scaleMax: 100 }
+  ];
+  const a = takeout._anchorFrom(gaps, ["Q78", "Q79"]);
+  assert(a.length === 2, "only the declared codes");
+  assert(a[0].code === "Q78" && a[1].code === "Q79", "in the analyst's order");
+  assert(takeout._anchorFrom(gaps, ["Q78", "Q404"]).length === 1,
+    "a code with no cell for this column is dropped, never shown empty");
+  assert(takeout._anchorFrom(gaps, null).length === 0, "no declaration -> no anchor");
+  assert(takeout._anchorFrom(null, ["Q78"]).length === 0, "no gaps -> no anchor");
+});
+
+run("portrait card renders the synopsis strip above lags/leads", () => {
+  const gaps = [
+    { code: "Q78", title: "Overall rating", value: 3.2, total: 4.2, scaleMax: 5 },
+    { code: "Q79", title: "Recommend", value: 40, total: 70, scaleMax: 100, isPct: true },
+    { title: "Service", value: 3.0, total: 4.3, scaleMax: 5 },
+    { title: "Value", value: 4.9, total: 4.2, scaleMax: 5 }
+  ];
+  TR.AGG = { project: { takeout_headline: ["Q78", "Q79"] },
+    banner_groups: [], questions: [] };
+  const built = takeout.buildPatterns({ scope: { rated: 3, shares: 1 },
+    columns: [{ column: "Metro South", group: "Centre", base: 200, gaps: gaps }] });
+  const html = takeout.readView.html(built);
+  assert(html.indexOf("tko-syn") !== -1, "the strip is rendered");
+  assert(html.indexOf("Ratings") !== -1, "rated tally labelled");
+  assert(html.indexOf("ahead") !== -1 && html.indexOf("behind") !== -1,
+    "ahead and behind both stated, not just the flattering side");
 });
 
 console.log("Source structure check (<=" + MAX_ACTIVE_LINES + " active lines/file):");

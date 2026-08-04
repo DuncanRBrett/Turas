@@ -1,7 +1,7 @@
 /**
  * Pattern recognition — controller / tab. Orchestrates the deterministic engine
  * and the single Read layout, and owns all interaction wiring (inline editing,
- * deep-links, the "how sure" explainer, and reset-to-engine). Thin by design:
+ * the "how sure" explainer, and reset-to-engine). Thin by design:
  * gather -> build -> render -> wire. Registered as a top-level tab in 24_shell.js
  * (id stays "takeout"; the visible label is "Patterns").
  */
@@ -70,9 +70,6 @@
       }
     });
     host.addEventListener("click", function (e) {
-      // deep-link a pattern to the tab that shows its detail
-      var go = e.target.closest("[data-goto]");
-      if (go && TR.shell && TR.shell.goTab) { TR.shell.goTab(go.getAttribute("data-goto")); return; }
       // toggle the "how sure are these numbers?" explainer panel
       if (e.target.closest("[data-howsure]")) { toggleHowSure(host); return; }
       if (e.target.closest("[data-tko-reset]")) {

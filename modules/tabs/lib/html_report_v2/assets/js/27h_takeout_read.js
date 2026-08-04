@@ -1,11 +1,11 @@
 /**
  * Pattern recognition — Read view. One editable big-picture answer, the headline
- * indices, then the cross-question patterns: the group under strain, which split
- * matters most, the weakest and strongest areas, and what moved. Each takeaway is
- * editable so the message lands in the client's language.
+ * indices, then the cross-question patterns: one card per breakout group, the
+ * weakest and strongest areas, and what moved. Each takeaway is editable so the
+ * message lands in the client's language.
  *
  * Pure HTML builder: takes the patterns object, returns a string. The controller
- * (27k) injects it and wires editing, deep-links and the "how sure" panel.
+ * (27k) injects it and wires editing and the "how sure" panel.
  */
 (function (global) {
   "use strict";
@@ -61,25 +61,16 @@
 
   /** Evidence + note for a pattern card. */
   function bodyHtml(p, cls) {
-    if (p.kind === "portrait") {
-      // Balanced by construction: where the group lags AND where it leads, equal
-      // billing. One side may be empty (a uniformly strong/weak group).
-      var lo = (p.lows || []).map(function (e) { return ui.portraitRow(e, "low"); }).join("");
-      var hi = (p.highs || []).map(function (e) { return ui.portraitRow(e, "high"); }).join("");
-      var blocks = "";
-      if (lo) blocks += '<div class="tko-side"><div class="tko-sidehd tko-sidehd-low">Where it lags</div>' + lo + "</div>";
-      if (hi) blocks += '<div class="tko-side"><div class="tko-sidehd tko-sidehd-high">Where it leads</div>' + hi + "</div>";
-      return '<div class="tko-portrait">' + blocks + "</div>";
-    }
-    if (p.kind === "steady") {
-      // Even its extremes are modest — show the sharpest dip and lead as proof
-      // of flatness, plus the sign-test working when the gate ran.
-      var srows = (p.lows || []).map(function (e) { return ui.portraitRow(e, "low"); }).join("") +
-        (p.highs || []).map(function (e) { return ui.portraitRow(e, "high"); }).join("");
-      var swork = "Largest gaps either way shown above — none survive the " +
-        "consistency test" + (p.signP !== null && p.signP !== undefined
-          ? " (sign-test p = " + p.signP.toFixed(2) + ")" : "") + ".";
-      return srows + '<div class="tko-cap">' + swork + "</div>";
+    if (p.kind === "portrait" || p.kind === "steady") {
+      // Where it stands, and nothing else. The lags/leads bars used to sit here:
+      // engine-picked extremes, a handful out of thirty, that read as though they
+      // were the story. The counts say how the group falls across everything it
+      // was scored on; the named example belongs in the editable sentence, in the
+      // analyst's words rather than the engine's.
+      // A steady group gets the SAME card — it is read beside the ones with a
+      // lean, so it has to be comparable at a glance, and its flatness is already
+      // visible in the counts without quoting the sign test at the reader.
+      return ui.synopsis(p);
     }
     if (p.kind === "group") {
       var rows = (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
@@ -129,20 +120,6 @@
     return rows + (spark ? '<div class="tko-mspark">' + spark + "</div>" : "");
   }
 
-  /** Deep-link target per pattern kind. */
-  function footHtml(p) {
-    var map = { group: ["findings", "see the breakouts →"], split: ["findings", "see the breakdown →"],
-      comove: ["crosstabs", "see the questions →"], odd: ["findings", "see the breakouts →"],
-      bimodal: ["crosstabs", "see the distributions →"],
-      weak: ["dashboard", "see the questions →"], strong: ["dashboard", "see the questions →"],
-      moved: ["moved", "see tracking →"] };
-    var go = ((p.kind === "portrait" || p.kind === "steady")
-      ? ["findings", "see the breakouts →"] : map[p.id]) ||
-      ["dashboard", "see detail →"];
-    return '<div class="tko-pfoot"><button class="linklike" data-goto="' + go[0] + '">' +
-      go[1] + "</button></div>";
-  }
-
   /** Caption under a confident-null card — the working that shows it was a real
    *  test, not a pattern that simply wasn't computed. */
   function nullCaption(p) {
@@ -177,7 +154,7 @@
       '<div class="tko-ptag tko-on-' + meta.cls + '">' + fmt.escapeHtml(meta.tag) + "</div>" +
       pin + headHtml(p) +
       ui.editable(key, "takeaway", take, "tko-take", "Takeaway — editable", seed) +
-      bodyHtml(p, meta.cls) + footHtml(p) + "</article>";
+      bodyHtml(p, meta.cls) + "</article>";
   }
 
   /** Provenance line — the glass-box audit trail. When the FDR family is present

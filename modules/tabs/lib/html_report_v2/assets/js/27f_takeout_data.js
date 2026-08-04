@@ -98,6 +98,8 @@
     return t.slice(0, 20) + "…";
   }
 
+  takeout._shortLabel = shortLabel;   // the card anchor reuses the apex wording
+
   /** The favourable top-box: the first NET row that is not a computed difference
    *  (Turas builds NETs favourable-first). Returns {pct,label} or null when the
    *  question carries no NET (pure mean / NPS / numeric) — then the index shows
@@ -206,6 +208,7 @@
     return proj.low_base_threshold || 30;
   }
   takeout._reportingFloor = reportingFloor;   // exposed for the node gate
+  takeout._headlineCodes = headlineOverride;  // 27e reads it for the card anchor
 
   /** The Patterns tab summarises the PUBLISHED full-sample view (the shell hides
    *  the filter bar on it for exactly that reason), so every model it reads must
@@ -244,7 +247,10 @@
           var key = g.name + "::" + col.label;
           var c = cols[key] || (cols[key] = { column: col.label, group: g.name, base: 0, gaps: [] });
           if (col.base > c.base) c.base = col.base;   // largest base seen — for reliability weighting
-          c.gaps.push({ title: q.title, value: v, total: total, scaleMax: max });
+          // code rides along so the card can pick out the declared headline
+          // questions (patterns_headline) as its absolute anchor
+          c.gaps.push({ code: q.code, title: q.title, value: v, total: total,
+            scaleMax: max });
         });
       });
     });
@@ -269,7 +275,8 @@
           var key = g.name + "::" + col.label;
           var c = cols[key] || (cols[key] = { column: col.label, group: g.name, base: 0, gaps: [] });
           if (col.base > c.base) c.base = col.base;
-          c.gaps.push({ title: s.q.title, value: v, total: total, scaleMax: 100, isPct: true });
+          c.gaps.push({ code: s.q.code, title: s.q.title, value: v, total: total,
+            scaleMax: 100, isPct: true });
         });
       });
     });

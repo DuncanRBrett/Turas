@@ -106,14 +106,20 @@
    *  the group's lean and, against it, its sharpest counter-spike (or its dip when
    *  thriving). Quotes the real question; cites the two real cells. */
   ui.portraitTension = function (p) {
-    var strained = p.lean === "strained";
+    // Lean word from the SAME raw tally the card prints, not from p.lean.
+    // p.lean weighs materiality-filtered gaps, which can disagree with the plain
+    // count sitting beside it — CCPB's Country South came out "under strain"
+    // while carrying the study's highest overall rating and 17 of 28 above.
+    // p.lean still drives ranking; this only governs the words.
+    var t = p.tally || {}, rated = t.rated || {}, share = t.share || {};
+    var up = (rated.ahead || 0) + (share.ahead || 0);
+    var down = (rated.behind || 0) + (share.behind || 0);
+    var strained = (up || down) ? down > up : p.lean === "strained";
     var hi = p.highs && p.highs[0], lo = p.lows && p.lows[0];
-    var majCount = strained ? p.hits : p.gains;
-    // "questions scored" = the scan's actual reach (rated indexes + declared
-    // key shares), so the count never reads as the whole questionnaire.
-    var lead = p.subject + (strained ? " is under strain — below the overall on "
-      : " is the strong group — above the overall on ") + majCount + " of the " + p.total +
-      " questions scored";
+    // The count lives on the synopsis strip above; repeating it here would say
+    // the same thing twice on a card whose whole point is that it says one
+    // thing. The sentence carries what the strip cannot — the named example.
+    var lead = p.subject + (strained ? " is under strain" : " is the strong group");
     if (strained && hi) {
       // An index counter-spike reads as a rating; a KeyShare one as a lead on
       // the share. Both quote the two real cells.
@@ -218,6 +224,66 @@
   /** Which banner cut the standout group came from (Campus / Department / …). */
   ui.bannerChip = function (group) {
     return group ? '<span class="tko-chip tko-bg">' + fmt.escapeHtml(group) + "</span>" : "";
+  };
+
+  /** The synopsis strip: where this group actually stands, before any story
+   *  about it. Two parts, both plain counts.
+   *
+   *  ANCHOR — the declared headline questions (patterns_headline) as absolute
+   *  values with the overall beside them, so the card opens on "9.2 against
+   *  9.2" rather than on a relative claim.
+   *
+   *  TALLY — ahead / level / behind, RAW (no materiality floor), with rated
+   *  indexes and KeyShare rows counted apart. A group can be unremarkable on
+   *  how it is rated and well ahead on what gets done; one pooled count cannot
+   *  say that. Rendered only for the side that has questions.
+   */
+  function tallyLine(label, t) {
+    if (!t || !t.n) return "";
+    return '<span class="tko-tal"><span class="tko-tal-k">' + label + "</span>" +
+      '<span class="tko-tal-v"><b>' + t.ahead + "</b> ahead · " + t.level +
+      " level · <b>" + t.behind + "</b> behind<span class='tko-tal-n'> of " +
+      t.n + "</span></span></span>";
+  }
+
+  ui.synopsis = function (p) {
+    // Headline titles are full question text ("Please rate CCPB on their
+    // overall performance"), which truncates to noise in a narrow label. Reuse
+    // the apex's own shortener so the card reads "Overall" / "Recommendation".
+    var short = function (title) {
+      return takeout._shortLabel ? takeout._shortLabel({ title: title }) : title;
+    };
+    var anchor = (p.anchor || []).map(function (a) {
+      return '<span class="tko-anc"><span class="tko-anc-k">' +
+        fmt.escapeHtml(short(a.title)) +
+        '</span><span class="tko-anc-v">' + portraitCell(a, a.value) +
+        '</span><span class="tko-anc-r">vs ' + portraitCell(a, a.rest === undefined
+          ? a.total : a.rest) + "</span></span>";
+    }).join("");
+    var t = p.tally || {};
+    var tallies = tallyLine("Ratings", t.rated) + tallyLine("Frequencies", t.share);
+    if (!anchor && !tallies) return "";
+    return '<div class="tko-syn">' +
+      (anchor ? '<div class="tko-syn-anchor">' + anchor + "</div>" : "") +
+      (tallies ? '<div class="tko-syn-tally">' + tallies + "</div>" : "") + "</div>" +
+      ui.leanLine(p);
+  };
+
+  /** The roll-up: which way this group falls, over everything it was scored on.
+   *  Ties are kept in the denominator — "29 of 31" counts every area compared,
+   *  not just the ones that moved, so the reader can see how much did not. No
+   *  test is claimed: the crosstabs carry significance question by question,
+   *  and this line is here to show the shape, not to prove it. */
+  ui.leanLine = function (p) {
+    var t = p.tally || {}, r = t.rated || {}, s = t.share || {};
+    var n = (r.n || 0) + (s.n || 0);
+    if (!n) return "";
+    var up = (r.ahead || 0) + (s.ahead || 0);
+    var down = (r.behind || 0) + (s.behind || 0);
+    if (!up && !down) return "";
+    var word = up >= down ? "Above" : "Below";
+    return '<div class="tko-lean">' + word + " on " + Math.max(up, down) +
+      " of " + n + " areas with a rating or frequency comparison.</div>";
   };
 
   /** Apex KPI wave change: a sparkline when history exists, else a ▲/▼ chip. */

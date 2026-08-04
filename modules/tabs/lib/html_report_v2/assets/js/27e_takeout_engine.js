@@ -30,7 +30,11 @@
     MIN_SPLIT_DIFF: 0.02,     // a breakout must differentiate groups by >=2% of scale to "matter"
     SPLIT_LEAD_RATIO: 1.25,   // ...and lead the next breakout by this much to be THE split (else none dominates)
     EVIDENCE_MAX: 4,          // rows of supporting evidence shown per pattern
-    PORTRAIT_MAX: 3,          // group portraits shown on the page (ranked by tension)
+    // One card per breakout column, not a top-3. At 3 the CCPB centre that
+    // mattered most was cut: a group behind on everything scores ZERO tension
+    // (no counter-spike), so storyScore ranks it last and the slice dropped it.
+    // 8 covers a normal banner group; a wider one still truncates, in rank order.
+    PORTRAIT_MAX: 8,
     STEADY_MAX: 1,            // "steady group" cards (a scanned group with no lean —
                               //   not standing out IS its story); the rest go to the
                               //   "also scanned" footnote
@@ -95,6 +99,8 @@
   // The pure number-crunching lives in 27da_takeout_stats.js (loaded first);
   // alias the few this engine uses so the pattern logic below reads cleanly.
   var bhFDR = takeout._bhFDR, signTest = takeout._signTest, bimodalStat = takeout._bimodalStat;
+  /** Declared headline codes (27f owns the config read; it loads after this). */
+  function headCodes() { return takeout._headlineCodes && takeout._headlineCodes(); }
 
   /**
    * GROUP pattern: which breakout column sits consistently below the overall
@@ -219,6 +225,10 @@
         lean: strained ? "strained" : "thriving",
         lows: lows.slice(0, CONST.EVIDENCE_MAX), highs: highs.slice(0, CONST.EVIDENCE_MAX),
         hits: lows.length, gains: highs.length, total: c.gaps.length,
+        // hits/gains apply the materiality floor; tally is the raw ahead /
+        // level / behind split, rated and share counted apart. anchor is the
+        // declared headline questions, so the card opens on an absolute number.
+        tally: takeout._tallyGaps(c.gaps), anchor: takeout._anchorFrom(c.gaps, headCodes()),
         counterSpike: counterSpike, tensionScore: tensionScore, characterScore: characterScore,
         storyScore: characterScore + tensionScore,   // notable for tension OR extremeness
         uniform: counterSpike === 0,                  // top/bottom on (nearly) everything
@@ -609,6 +619,7 @@
         subject: c.column, group: c.group, base: c.base,
         below: lows.length, above: highs.length, total: c.gaps.length,
         lows: lows.slice(0, 2), highs: highs.slice(0, 2),
+        tally: takeout._tallyGaps(c.gaps), anchor: takeout._anchorFrom(c.gaps, headCodes()),
         signP: g ? g.signP : null });
     });
     flat.sort(function (a, b) { return (b.base || 0) - (a.base || 0); });
@@ -625,7 +636,10 @@
         return x.banner === split.subject && x.consistent;
       }).length : null;
       if (gate) split.consistent = consistentGroups >= CONST.SPLIT_MIN_CONSISTENT;
-      if (!gate || split.consistent) { split.sigGaps = consistentGroups; patterns.push(split); }
+      // The split pointer is no longer a card — it said "differences run most
+      // by Centre" beside four Centre cards that already showed exactly that.
+      // Still computed so the gate's consistency count keeps its meaning.
+      if (!gate || split.consistent) { split.sigGaps = consistentGroups; }
     }
 
     // Weakest / strongest AREA — only commensurable themes (same scale family).

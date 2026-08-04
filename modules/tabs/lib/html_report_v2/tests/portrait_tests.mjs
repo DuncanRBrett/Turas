@@ -112,8 +112,10 @@ run("uniform extremeness is a story too — top on nearly everything is not buri
   eq(ps[0].subject, "Star", "uniform-extreme group leads the faint tension");
   eq(ps[0].counterSpike, 0, "Star has no tension — it's pure extremeness");
   assert(ps[0].uniform === true, "flagged uniform");
-  assert(takeout.ui.portraitTension(ps[0]).indexOf("5 of the 5 questions scored") !== -1,
-    "narrative calls out the sweep (5 of the 5 questions scored)");
+  // the sweep is called out on the card's own lean line — the seed sentence no
+  // longer repeats the count (it carries the named example instead)
+  assert(takeout.ui.leanLine(ps[0]).indexOf("on 5 of 5 areas") !== -1,
+    "card calls out the sweep: " + takeout.ui.leanLine(ps[0]));
 });
 
 run("commensurable areas only — mixed-scale theme is dropped", () => {
@@ -128,14 +130,15 @@ run("commensurable areas only — mixed-scale theme is dropped", () => {
   assert(areas.indexOf("Perceptions") === -1, "mixed-scale Perceptions dropped (no cross-scale average)");
 });
 
-run("buildPatterns: portraits + split pointer; co-moving/odd/bimodal not cards", () => {
+run("buildPatterns: portraits only; split/co-moving/odd/bimodal not cards", () => {
   const t = takeout.buildPatterns({ columns: columns });
   const kinds = t.patterns.map((p) => p.kind);
   assert(kinds.indexOf("portrait") !== -1, "portraits present");
   assert(kinds.indexOf("comove") === -1, "co-moving retired");
   assert(kinds.indexOf("odd") === -1 && kinds.indexOf("bimodal") === -1, "odd/bimodal not cards");
-  const split = t.patterns.find((p) => p.kind === "split");
-  assert(split && split.subject === "Campus", "split pointer = Campus");
+  // the split pointer is no longer a card: it restated, beside the portraits,
+  // the very thing the portraits already show
+  assert(!t.patterns.some((p) => p.kind === "split"), "split is not a card");
   assert(t.rigor !== undefined, "rigor summary present for the footer");
   assert(t.patterns.filter((p) => p.kind === "portrait").length <= takeout.CONST.PORTRAIT_MAX,
     "portrait cap respected");
