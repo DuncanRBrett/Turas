@@ -358,7 +358,7 @@
       // says plainly that a wave carrying none of them is not tested.
       "<p>Change between waves is tested with the right test for the number: a " +
       "two-proportion z-test for percentages, and a Welch t-test for means, " +
-      "indexes and NPS. To be tested, a wave has to carry what the test needs — " +
+      "indexes and NPS. To be tested, a wave has to carry what the test needs: " +
       "a base for a percentage, and for a mean its spread as well, taken from " +
       "the wave's respondent-level data, a standard deviation recorded with it, " +
       "or its published breakdown. Waves that carry neither are charted but not " +

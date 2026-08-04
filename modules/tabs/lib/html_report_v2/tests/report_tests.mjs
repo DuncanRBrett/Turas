@@ -134,11 +134,11 @@ run("analyst + contact render from the config-fed island meta", () => {
 run("the standard report-construction note replaces the old disclaimer field", () => {
   const h = boot(undefined, { analyst: "D", closing: "OLD CLOSING TEXT" }).report.aboutHtml();
   assert(h.indexOf("Report construction") >= 0, "the note's heading renders");
-  assert(h.indexOf("conventional statistical software, not an AI system") >= 0,
-    "the deterministic-software claim renders");
-  assert(h.indexOf("no AI model takes part in any calculation") >= 0,
-    "the no-AI-in-calculation claim renders");
-  assert(h.indexOf("says so and names the model") >= 0, "the AI-disclosure promise renders");
+  assert(h.indexOf("Every number here is produced by code") >= 0,
+    "the deterministic claim renders");
+  assert(h.indexOf("It calculates nothing") >= 0,
+    "AI is stated to calculate nothing");
+  assert(h.indexOf("labelled and the model named") >= 0, "the AI-disclosure promise renders");
   assert(h.indexOf("reviewed and validated by the report author") >= 0,
     "the author-validation line renders");
   assert(h.indexOf("Disclaimers / confidentiality") < 0, "the old disclaimer field is gone");
@@ -169,16 +169,41 @@ run("the construction note describes BOTH engines, not just R", () => {
     "the old R-only phrasing is gone");
 });
 
-run("the reproducibility claim is scoped to what Turas computes", () => {
+run("the reproducibility claim is scoped to what the software computes", () => {
   // Waves loaded from published figures have no source data to reproduce them
-  // from — which is precisely why no significance is claimed against them.
+  // from, which is precisely why no significance is claimed against them.
   const h = boot(undefined, undefined).report.aboutHtml();
-  assert(h.indexOf("Every figure Turas computes is deterministic") >= 0,
-    "the claim is scoped to Turas-computed figures");
+  assert(h.indexOf("Every number here is produced by code") >= 0,
+    "the claim is scoped to code-produced figures");
   assert(h.indexOf("carried forward from earlier waves") >= 0,
     "historical figures are called out as not recalculated");
-  assert(h.indexOf("claims no significance against them") >= 0,
+  assert(h.indexOf("no significance is claimed against them") >= 0,
     "and the consequence is stated");
+});
+
+run("AI is described as a working tool, covering every route it reaches the report by", () => {
+  // The old note promised "the report says so and names the model" for any AI
+  // report content, but that promise is wired to TR.ai.methodologyHtml(), which
+  // fires only when Turas's own insights run. AI-drafted comment marks and
+  // config-authored sections arrive by other routes and never triggered it, so
+  // the note claimed a completeness it could not deliver.
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("We use AI as a working tool") >= 0,
+    "AI in the workflow is acknowledged, not only AI as a product feature");
+  assert(h.indexOf("first-pass drafting and sifting") >= 0,
+    "the actual first-pass uses are named");
+  assert(h.indexOf("accountable for what") >= 0,
+    "author accountability carries the assurance — it stays true as AI use grows");
+  assert(h.indexOf("not an AI system") < 0,
+    "the negative identity claim is gone; it ages badly and protests too much");
+});
+
+run("the construction note contains no em dashes", () => {
+  // Duncan's house style. Also the tell readers most associate with AI-written
+  // prose, which is a poor look on the paragraph explaining our use of AI.
+  const h = boot(undefined, undefined).report.aboutHtml();
+  const note = h.slice(h.indexOf("Report construction"));
+  assert(note.indexOf("—") < 0, "an em dash crept into the report-construction note");
 });
 
 run("methodology names BOTH tests and the Bonferroni correction", () => {
