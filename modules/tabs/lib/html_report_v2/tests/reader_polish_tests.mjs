@@ -117,18 +117,55 @@ run("A1: gauge card renders the fixed slots in order — ghead(score,code) · ba
   assert(gv < gq && gq < bar, "code sits top-right within the head, before the bar");
 });
 
-run("A1: ONE meta row carries Δ chip + 💬 pill + 📌 pin, pin last", () => {
+run("A1: ONE meta row carries Δ chip + 📌 pin, pin last; no 💬 pill", () => {
   const sb = viewsSandbox();
   const { q, model } = gaugeFixture();
   const html = sb.TR.views._gaugeCardHtml(q, model);
   const metaRow = html.slice(at(html, '<span class="gmeta">', "meta row"));
   const chip = at(metaRow, 'class="delta', "Δ chip in meta row");
-  const pill = at(metaRow, "ql-jumpbtn", "💬 pill in meta row");
   const pin = at(metaRow, "snap-pin", "📌 pin in meta row");
-  assert(chip < pill && pill < pin, "meta row order must be Δ · 💬 · 📌");
-  // the pill/pin must NOT render inside the gauge button (over the score)
+  assert(chip < pin, "meta row order must be Δ · 📌");
+  // the dashboard no longer carries the comments pill — a gauge card is a
+  // number, and the jump belongs on the crosstab question card where the
+  // verbatims are the point. It must not come back by accident.
+  assert(html.indexOf("ql-jumpbtn") === -1, "no 💬 pill on a dashboard gauge card");
+  // the pin must NOT render inside the gauge button (over the score)
   const btnEnd = html.indexOf("</button>");
-  assert(html.indexOf("ql-jumpbtn") > btnEnd, "pill is outside the gauge button");
+  assert(html.indexOf("snap-pin") > btnEnd, "pin is outside the gauge button");
+});
+
+run("the band legend states the thresholds the cards are ACTUALLY coloured on", () => {
+  const sb = viewsSandbox();
+  const bl = sb.TR.views.bandLegend;
+  const txt = (h) => h.replace(/<[^>]+>/g, "").replace(/&ge;/g, ">=")
+    .replace(/&ndash;/g, "-").replace(/&lt;/g, "<");
+  // configured raw thresholds -> quote them, never "% of each scale's maximum"
+  const raw = txt(bl([{ gauge_green: 8.6, gauge_amber: 8 }]));
+  assert(raw.indexOf(">=8.6") !== -1 && raw.indexOf("8.0-8.5") !== -1 &&
+    raw.indexOf("<8.0") !== -1, "raw bands quoted: " + raw);
+  assert(raw.indexOf("of each scale's maximum") === -1,
+    "a configured study is NOT banded on % of scale");
+  // none configured -> the % fallback, which is what gaugeColour then uses
+  assert(txt(bl([{ gauge_green: null, gauge_amber: null }]))
+    .indexOf("of each scale's maximum") !== -1, "unconfigured falls back to %");
+  // both present (CCPB: rated touchpoints + NPS) -> both stated
+  const both = txt(bl([{ gauge_green: 8.6, gauge_amber: 8 },
+    { gauge_green: null, gauge_amber: null }]));
+  assert(both.indexOf(">=8.6") !== -1 && both.indexOf("NPS-style") !== -1,
+    "both bases stated when both occur: " + both);
+  // conflicting thresholds -> name the basis rather than invent one sentence
+  assert(txt(bl([{ gauge_green: 8.6, gauge_amber: 8 }, { gauge_green: 7, gauge_amber: 5 }]))
+    .indexOf("set for each metric") !== -1, "mixed thresholds claim no single band");
+});
+
+run("the analyst insight on a gauge card WRAPS — never one ellipsised line", () => {
+  const gi = CSS.match(/\.gauge \.gi\s*\{[^}]*\}/);
+  assert(gi, ".gauge .gi rule exists");
+  assert(gi[0].indexOf("white-space: nowrap") === -1,
+    "a nowrap insight truncates to an ellipsis the reader can never open");
+  assert(gi[0].indexOf("text-overflow: ellipsis") === -1, "no single-line ellipsis");
+  assert(gi[0].indexOf("-webkit-line-clamp: 3") !== -1,
+    "the insight is clamped to 3 lines, which fits the 120 chars the JS allows");
 });
 
 run("A1: no absolutely-positioned pill/pin can overlap the score (CSS contract)", () => {

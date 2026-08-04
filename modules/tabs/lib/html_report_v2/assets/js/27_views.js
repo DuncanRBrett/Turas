@@ -43,6 +43,42 @@
     return "#b3372f";
   }
 
+  /** Describe the bands the cards are ACTUALLY coloured on.
+   *
+   *  gaugeColour uses each question's configured raw thresholds when it has
+   *  them and only falls back to % of scale when it does not, so a fixed
+   *  "≥75% / 50–74% / <50%" sentence is wrong the moment a study configures
+   *  dashboard_green_mean. Reads the same fields the colouring reads.
+   *
+   *  A study can carry both (CCPB: 28 rated touchpoints on 8.6/8.0, plus two
+   *  NPS metrics with no raw thresholds), so both are stated when both occur.
+   *  Mixed raw thresholds across questions -> no single sentence is true, and
+   *  it falls back to naming the basis rather than inventing numbers.
+   */
+  function bandLegend(qs) {
+    var pairs = {}, anyPct = false;
+    (qs || []).forEach(function (q) {
+      if (q.gauge_green == null || q.gauge_amber == null) { anyPct = true; return; }
+      pairs[q.gauge_green + "|" + q.gauge_amber] = [q.gauge_green, q.gauge_amber];
+    });
+    var keys = Object.keys(pairs);
+    var pct = "<span class='gl g'>strong &ge;75%</span> " +
+      "<span class='gl a'>moderate 50&ndash;74%</span> " +
+      "<span class='gl r'>weak &lt;50%</span> of each scale's maximum";
+    if (!keys.length) return pct;
+    if (keys.length > 1) {
+      return "banded on the thresholds set for each metric in the study configuration";
+    }
+    var g = pairs[keys[0]][0], a = pairs[keys[0]][1];
+    var one = function (v) { return Number(v).toFixed(1); };
+    var raw = "<span class='gl g'>strong &ge;" + one(g) + "</span> " +
+      "<span class='gl a'>moderate " + one(a) + "&ndash;" + one(g - 0.1) + "</span> " +
+      "<span class='gl r'>weak &lt;" + one(a) + "</span>";
+    return raw + (anyPct ? ", and NPS-style metrics on % of scale " +
+      "(strong &ge;75%, moderate 50&ndash;74%, weak &lt;50%)" : "");
+  }
+  views.bandLegend = bandLegend;
+
   function indexQuestions() {
     // A rated touchpoint carries a summary mean and sits on a known scale:
     // scale / nps questions, PLUS composite indices (e.g. Q_Engage / Q_Value)
@@ -194,7 +230,6 @@
       "</span></button>" +
       '<span class="gmeta">' + nHtml +
       (row ? TR.render.deltaChip(row.delta) : "") +
-      ((TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(q.code) : "") +
       '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
       fmt.escapeHtml(q.code + " — " + short) + '" data-snap-context="' +
       fmt.escapeHtml((q.category || "") + " · index") +
@@ -220,8 +255,7 @@
     });
     var html = ['<div class="page"><div class="dash-intro card">' +
       "<h2>Experience dashboard</h2><p>Index scores for every rated touchpoint " +
-      "— <span class='gl g'>strong ≥75%</span> <span class='gl a'>moderate 50–74%</span> " +
-      "<span class='gl r'>weak &lt;50%</span> of each scale's maximum. " +
+      "— " + bandLegend(qs) + ". " +
       (TR.d2.filtersActive() ? "<strong>Filtered audience — recomputed live.</strong> " : "") +
       deltaIntro(hasDelta) + "Click any card or cell to open the full table.</p>" +
       moeChipHtml(qs, heatModels) + "</div>"];

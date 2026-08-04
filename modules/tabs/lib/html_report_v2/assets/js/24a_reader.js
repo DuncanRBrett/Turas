@@ -401,11 +401,15 @@
       "80% level. Composite columns may overlap, so they are never compared with one another.</li>" +
       "<li><strong>▲ / ▼ chips</strong> on a Total column or card — change vs the most recent " +
       "prior wave carrying that question; an outlined chip is a significant change.</li></ul>");
+    // Read the bands off the questions, like the dashboard does — a study that
+    // configures dashboard_green_mean is not banded on % of scale, and saying
+    // so here would contradict the cards the reader is looking at.
+    var bandTxt = (TR.views && TR.views.bandLegend && TR.views.indexQuestions)
+      ? TR.views.bandLegend(TR.views.indexQuestions()).replace(/<[^>]+>/g, "")
+      : "strong \u226575%, moderate 50\u201374%, weak <50% of each scale's maximum";
     sections.push("<h3>Score bands</h3><ul>" +
-      "<li>Index cards and heatmap cells band by % of each scale's maximum: " +
-      "<strong>strong ≥75%</strong> · <strong>moderate 50–74%</strong> · " +
-      "<strong>weak &lt;50%</strong> — the band is always written or bordered, " +
-      "never colour alone.</li>" +
+      "<li>Index cards and heatmap cells band as " + fmt.escapeHtml(bandTxt) +
+      " — the band is always written or bordered, never colour alone.</li>" +
       "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> " +
       "(gold edge) are score-weighted means.</li></ul>");
     var pub = publishedTotalBase() || (TR.MICRO && TR.MICRO.n);
