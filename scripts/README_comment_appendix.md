@@ -37,6 +37,27 @@ rows**, so all Noteworthy/Must-read/Priority marks, sentiment codes and theme co
 survive. It writes a **timestamped backup** before saving, skips the save entirely on a
 no-op run, and **refuses (touching nothing)** if it cannot find the comment columns.
 
+## Updating: new interviews vs changed comments
+
+**New interviews** — just re-run. It appends only respondents it hasn't seen and never
+touches an existing row.
+
+**A comment's text changed in the data** (e.g. a backcheck correction) — the builder does
+not rewrite existing rows, so use the two-step review:
+
+| Flag | What it does |
+|------|--------------|
+| `--report-changes [FILE]` | Writes a review list of every comment whose text differs between the data and the appendix — Question, ResponseID, current text, new text, and a blank `Apply? (y)` column. Changes nothing. Defaults to `<appendix> changes <timestamp>.xlsx`. |
+| `--apply-changes FILE` | Rewrites the verbatim **only** on the rows you marked in that file. Every coding column (Noteworthy, Overall Sentiment, themes) is untouched. Backs up first. |
+
+Why two steps: a difference can run either way — the data may carry a backcheck
+correction, or the appendix may hold text you cleaned by hand (stray question-number
+prefixes, typos). A blanket "data wins" would silently undo that cleanup, so approval is
+per row. Both modes are surgical: neither appends new respondents.
+
+Where a comment was *materially* reworded, re-check that row's sentiment/theme coding —
+the text changed, so your coding of it may no longer fit.
+
 ## Choosing the comment columns
 
 In priority order — the tool always prints the resolved columns with per-column counts,

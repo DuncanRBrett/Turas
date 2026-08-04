@@ -144,5 +144,59 @@ added, kept = bca.update_sheet(wsS, bca.comment_pairs(df, idc, "Q1Comment"))
 check(added == 0 and kept == 4, "update finds the 'ID'-headed sheet and adds nothing")
 
 
+# ---- changed-comment review (backcheck edits) -------------------------------
+
+tmp2 = Path(tempfile.mkdtemp())
+apx3 = tmp2 / "chg.xlsx"
+d1 = pd.DataFrame({"Response ID": [1, 2, 3],
+                   "QComment": ["original one", "original two", "original three"]})
+bca.build_appendix(d1, "Response ID", apx3, ["QComment"], "ResponseID")["wb"].save(apx3)
+
+# analyst codes id 1, and hand-cleans id 2's text in the appendix
+wb3 = openpyxl.load_workbook(apx3)
+ws3 = wb3["QComment"]
+hr3 = bca.find_header_row(ws3)
+ws3.cell(hr3 + 1, 2).value = "p"                 # Priority mark on id 1
+ws3.cell(hr3 + 2, 3).value = "cleaned two"       # his own edit on id 2
+wb3.save(apx3)
+
+# the data now carries a backcheck correction on id 1, and still the raw text on id 2
+d2 = pd.DataFrame({"Response ID": [1, 2, 3],
+                   "QComment": ["corrected one", "original two", "original three"]})
+chg = bca.find_text_changes(d2, "Response ID", ["QComment"], openpyxl.load_workbook(apx3))
+found = {(c["id"], c["current"], c["new"]) for c in chg}
+check(len(chg) == 2, "find_text_changes finds differences in both directions")
+check(("1", "original one", "corrected one") in found, "detects the data-side backcheck correction")
+check(("2", "cleaned two", "original two") in found, "detects where the appendix was hand-cleaned")
+
+d3 = pd.DataFrame({"Response ID": [1], "QComment": [""]})
+check(bca.find_text_changes(d3, "Response ID", ["QComment"], openpyxl.load_workbook(apx3)) == [],
+      "a blank comment in the data is never proposed as a change")
+
+# report -> approve ONLY the backcheck row -> apply
+rep = tmp2 / "review.xlsx"
+bca.write_change_report(chg, rep)
+wbr = openpyxl.load_workbook(rep)
+wsr = wbr["Changes"]
+check([c.value for c in wsr[1]] == bca.CHANGE_REPORT_HEADERS, "review file carries the expected headers")
+for r in range(2, wsr.max_row + 1):
+    if str(wsr.cell(r, 2).value).strip() == "1":
+        wsr.cell(r, 5).value = "y"
+wbr.save(rep)
+check(bca.read_change_decisions(rep) == {("QComment", "1")},
+      "read_change_decisions returns only the marked row")
+
+wb4 = openpyxl.load_workbook(apx3)
+chg4 = bca.find_text_changes(d2, "Response ID", ["QComment"], wb4)
+applied = bca.apply_text_changes(wb4, chg4, bca.read_change_decisions(rep))
+wb4.save(apx3)
+ws5 = openpyxl.load_workbook(apx3)["QComment"]
+hr5 = bca.find_header_row(ws5)
+check(applied == 1, "apply_text_changes applies only the approved row")
+check(ws5.cell(hr5 + 1, 3).value == "corrected one", "approved row took the data text")
+check(ws5.cell(hr5 + 2, 3).value == "cleaned two", "unapproved row kept the hand-cleaned text")
+check(ws5.cell(hr5 + 1, 2).value == "p", "coding on the updated row is untouched")
+
+
 print("\n" + ("FAILED" if _failed else "OK"), "— %d passed, %d failed" % (_passed, _failed))
 raise SystemExit(1 if _failed else 0)

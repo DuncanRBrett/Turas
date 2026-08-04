@@ -11,7 +11,13 @@ WHAT IT PRODUCES
 One worksheet per comment column (sheet name = column name), in the Turas layout:
 
     col A  <id header>         <- join key (matches the survey's respondent id)
-    col B  Noteworthy          <- tier code: n=Noteworthy, m=Must-read, p=Priority
+    col B  Noteworthy          <- tier code: n=Noteworthy, m=Must-read, p=Priority.
+                                  BLANK is the normal state: not flagged, but the
+                                  text STILL SHOWS in the report.
+                                  "hide" is different — it suppresses the text (the
+                                  comment still counts in the numbers). Reserve it
+                                  for non-answers ("No.", "Not sure") and gibberish,
+                                  NOT for ordinary dull comments: those stay blank.
     col C  <verbatim>          <- the comment text (header = the column name)
     col D  Overall Sentiment   <- coded 1/2/3 (see the legend block above the header)
     col E+ (optional)          <- theme columns you add, coded 1/2/3
@@ -37,6 +43,15 @@ CHOOSING THE COMMENT COLUMNS (in priority order)
                          prints its picks and requires --yes before writing
 The resolved columns are always printed with per-column counts, so you can confirm.
 
+WHEN A COMMENT'S TEXT CHANGES (backcheck edits)
+-----------------------------------------------
+A normal run never rewrites an existing row, so a comment corrected in the data after the
+first build does not flow through. Review those in two steps — a difference can run either
+way (the data may hold a correction; the appendix may hold text you cleaned by hand):
+  --report-changes [FILE]  write a review list of every differing comment; change nothing
+  --apply-changes FILE     rewrite the verbatim ONLY on rows you marked 'y'; coding untouched
+Both are surgical: neither appends new respondents.
+
 USAGE
 -----
     python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --columns "Q1Comment,Q2Comment"
@@ -44,6 +59,8 @@ USAGE
     python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --auto           # preview
     python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --auto --yes      # write
     python3 build_comment_appendix.py ... --dry-run                                          # never write
+    python3 build_comment_appendix.py ... --report-changes                                   # review list
+    python3 build_comment_appendix.py ... --apply-changes "… changes 20260719_092150.xlsx"
 
 Docs: scripts/README_comment_appendix.md
 """
@@ -57,6 +74,15 @@ from pathlib import Path
 
 import openpyxl
 import pandas as pd
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
+
+# ---- project preset ---------------------------------------------------------
+# A configured copy of this script (one per project, sitting next to its data) may
+# fill these in so it runs with no arguments. Any CLI flag overrides them.
+DEFAULT_DATA = None          # path to the survey data workbook
+DEFAULT_APPENDIX = None      # path to the comment appendix workbook
+DEFAULT_COLUMNS = None       # list of comment columns for this project
 
 # ---- layout + detection constants -------------------------------------------
 
@@ -244,6 +270,96 @@ def update_sheet(ws, records):
     return added, len(existing) - added
 
 
+# ---- changed-comment review (backcheck edits) -------------------------------
+# The builder never rewrites an existing row, so a comment corrected in the data
+# after you first built the appendix does NOT flow through. These helpers surface
+# those differences for review and then apply only the ones you approve — because a
+# difference can run either way: the data may carry a backcheck correction, or your
+# appendix may hold text you cleaned by hand. Only a human can tell them apart.
+
+CHANGE_REPORT_HEADERS = ["Question", "ResponseID", "Current text (appendix)",
+                         "New text (data)", "Apply? (y)"]
+
+
+def sheet_rows_by_id(ws):
+    """{id -> (row_index, verbatim_text)} for a sheet's data rows; {} if no header row."""
+    hr = find_header_row(ws)
+    if hr is None:
+        return {}
+    out = {}
+    for r in range(hr + 1, ws.max_row + 1):
+        rid = norm(ws.cell(r, COL_ID).value)
+        if rid and rid not in out:                       # first occurrence wins
+            out[rid] = (r, norm(ws.cell(r, COL_VERBATIM).value))
+    return out
+
+
+def find_text_changes(df, id_col, columns, wb):
+    """Rows whose comment text in the DATA differs from the text held in the appendix.
+
+    Compares only ids present in BOTH, and only when the data's text is non-blank — the
+    builder never proposes blanking a comment you already hold. Returns a list of
+    {sheet, id, row, current, new}: the review list."""
+    changes = []
+    for col in dict.fromkeys(columns):
+        if col not in wb.sheetnames or col not in df.columns:
+            continue
+        data_map = {}
+        for rid, txt in zip(df[id_col], df[col]):
+            if pd.isna(rid):
+                continue
+            data_map[norm(fmt_id(rid))] = "" if pd.isna(txt) else str(txt).strip()
+        for rid, (row, current) in sheet_rows_by_id(wb[col]).items():
+            new = data_map.get(rid)
+            if new is None or new == "" or new == current:
+                continue
+            changes.append({"sheet": col, "id": rid, "row": row,
+                            "current": current, "new": new})
+    return changes
+
+
+def write_change_report(changes, path):
+    """Write the review workbook: one row per difference, with a blank Apply? column."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Changes"
+    ws.append(CHANGE_REPORT_HEADERS)
+    for c in changes:
+        ws.append([c["sheet"], c["id"], c["current"], c["new"], ""])
+    for i, w in enumerate([18, 12, 60, 60, 10], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    for row in ws.iter_rows(min_row=2, min_col=3, max_col=4):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.freeze_panes = "A2"
+    wb.save(path)
+    return len(changes)
+
+
+def read_change_decisions(path):
+    """{(sheet, id)} for the rows marked in the Apply? column (any non-blank mark)."""
+    wb = openpyxl.load_workbook(path, read_only=True)
+    rows = list(wb[wb.sheetnames[0]].iter_rows(values_only=True))
+    out = set()
+    for r in rows[1:]:                                   # skip the header row
+        if not r or len(r) < 5:
+            continue
+        sheet, rid, mark = norm(r[0]), norm(r[1]), norm(r[4])
+        if sheet and rid and mark:
+            out.add((sheet, rid))
+    return out
+
+
+def apply_text_changes(wb, changes, decisions):
+    """Rewrite the verbatim cell for approved rows only; every coding column untouched."""
+    applied = 0
+    for c in changes:
+        if (c["sheet"], c["id"]) in decisions:
+            wb[c["sheet"]].cell(c["row"], COL_VERBATIM).value = c["new"]
+            applied += 1
+    return applied
+
+
 # ---- orchestration ----------------------------------------------------------
 
 def build_appendix(df, id_col, appendix_path, columns, id_header):
@@ -286,10 +402,67 @@ def reorder_sheets(wb, columns):
     wb._sheets = [wb[name] for name in wanted + extras]
 
 
+def run_report_changes(df, id_col, columns, appendix_path, out_path):
+    """--report-changes: write the review list of differing comments; write nothing else."""
+    appendix = Path(appendix_path)
+    if not appendix.exists():
+        print("ERROR: appendix not found: %s" % appendix)
+        return 2
+    changes = find_text_changes(df, id_col, columns, openpyxl.load_workbook(appendix))
+    if not changes:
+        print("No comment text differs between the data and the appendix — nothing to review.")
+        return 0
+    if not out_path:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = appendix.with_name("%s changes %s.xlsx" % (appendix.stem, stamp))
+    write_change_report(changes, out_path)
+    by_sheet = {}
+    for c in changes:
+        by_sheet[c["sheet"]] = by_sheet.get(c["sheet"], 0) + 1
+    print("Comment text differs on %d row(s):" % len(changes))
+    for sh in sorted(by_sheet):
+        print("   %-24s %d" % (sh, by_sheet[sh]))
+    print("\nReview list: %s" % Path(out_path).name)
+    print("Mark 'y' in the 'Apply? (y)' column on each row where the DATA version should win;")
+    print("leave it blank to keep the appendix text. Then re-run with --apply-changes on that file.")
+    return 0
+
+
+def run_apply_changes(df, id_col, columns, appendix_path, review_path, no_backup):
+    """--apply-changes: rewrite only the approved verbatims; all coding left untouched."""
+    appendix = Path(appendix_path)
+    wb = openpyxl.load_workbook(appendix)
+    changes = find_text_changes(df, id_col, columns, wb)
+    decisions = read_change_decisions(review_path)
+    if not decisions:
+        print("No rows marked in %s — nothing applied." % Path(review_path).name)
+        return 0
+    applied = apply_text_changes(wb, changes, decisions)
+    if applied == 0:
+        print("None of the marked rows still differ — appendix left untouched.")
+        return 0
+    if not no_backup:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = appendix.with_name("%s (backup %s)%s" % (appendix.stem, stamp, appendix.suffix))
+        shutil.copy2(appendix, backup)
+        print("Backup:  %s" % backup.name)
+    wb.save(appendix)
+    print("Applied %d text update(s). Noteworthy / sentiment / theme coding left as-is —"
+          " re-check the coding on any comment that changed materially." % applied)
+    print("Saved:   %s" % appendix.name)
+    return 0
+
+
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description="Reusable Turas Comment Appendix builder (incremental, non-destructive).")
-    ap.add_argument("--data", required=True, help="survey data workbook (.xlsx)")
-    ap.add_argument("--appendix", required=True, help="comment appendix workbook to create/update (.xlsx)")
+    ap.add_argument("--data", default=DEFAULT_DATA, required=DEFAULT_DATA is None,
+                    help="survey data workbook (.xlsx)")
+    ap.add_argument("--appendix", default=DEFAULT_APPENDIX, required=DEFAULT_APPENDIX is None,
+                    help="comment appendix workbook to create/update (.xlsx)")
+    ap.add_argument("--report-changes", nargs="?", const="", default=None, metavar="FILE",
+                    help="write a review list of comments whose text changed in the data; writes nothing else")
+    ap.add_argument("--apply-changes", metavar="FILE",
+                    help="apply the rows you marked in a --report-changes file (text only; coding untouched)")
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--columns", help="explicit comma-separated comment columns")
     src.add_argument("--columns-file", help="file with one comment column per line (# and blanks ignored)")
@@ -320,6 +493,8 @@ def main(argv=None):
         explicit = [c for c in args.columns.split(",")]
     elif args.columns_file:
         explicit = read_columns_file(args.columns_file)
+    elif DEFAULT_COLUMNS:
+        explicit = list(DEFAULT_COLUMNS)
     structure_codes = open_end_codes_from_structure(args.structure) if args.structure else None
     pattern = args.pattern if args.pattern else None
 
@@ -340,6 +515,13 @@ def main(argv=None):
     if mode == "auto" and not args.yes and not args.dry_run:
         print("Auto-detected columns above — re-run with --yes to write them (or --columns to be explicit).")
         return 0
+
+    # Changed-comment review modes — both are surgical and never append new respondents.
+    if args.apply_changes:
+        return run_apply_changes(df, id_col, columns, args.appendix,
+                                 args.apply_changes, args.no_backup)
+    if args.report_changes is not None:
+        return run_report_changes(df, id_col, columns, args.appendix, args.report_changes)
 
     summary = build_appendix(df, id_col, args.appendix, columns, args.id_header)
     for m in summary["missing"]:
