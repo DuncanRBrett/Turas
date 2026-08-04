@@ -282,5 +282,52 @@ run("a custom banner whose question was dropped renders Total only, no crash", (
   eq(spec.columns.length, 1, "Total only");
 });
 
+run("display precision: value and change use the config's DECIMAL PLACES", () => {
+  TR.AGG = { project: { format: { percent_decimals: 0, rating_decimals: 1 } } };
+  const pt = (v, cur) => ({ wave: "w", year: 2025, value: v, base: 753, sd: 1.2, current: !!cur });
+  // a mean: 9.136 -> 9.160 is +0.024 raw, but the reader sees 9.1 and 9.2
+  const m = TR.waves.cellsFor([pt(9.136), pt(9.160, true)], false, "95", 1);
+  eq(m[0].value, 9.1, "prior mean shown at 1 decimal");
+  eq(m[1].value, 9.2, "current mean shown at 1 decimal");
+  eq(m[1].change_prev, 0.1, "change is the difference of the two SHOWN figures");
+  // an NPS at 0 places: 78.272 -> 79.42 reads 78 -> 79, change +1
+  const n = TR.waves.cellsFor([pt(78.272), pt(79.42, true)], true, "95", 0);
+  eq(n[0].value, 78, "prior NPS at 0 decimals");
+  eq(n[1].value, 79, "current NPS at 0 decimals");
+  eq(n[1].change_prev, 1, "NPS change reconciles with the two shown figures");
+});
+
+run("display precision falls back sanely when a report predates project.format", () => {
+  TR.AGG = { project: {} };
+  eq(TR.fmt.decimalsFor(true), 1, "means default to 1 decimal");
+  eq(TR.fmt.decimalsFor(false), 0, "percentages default to 0");
+  eq(TR.fmt.score(9.16), "9.2", "fmt.score still rounds to 1 without config");
+});
+
+run("SIGNIFICANCE still reads the RAW values, never the rounded ones", () => {
+  TR.AGG = { project: { format: { percent_decimals: 0, rating_decimals: 1 } } };
+  const pt = (v, cur) => ({ wave: "w", year: 2025, value: v, base: 4000,
+    sd: 0.5, effBase: 4000, current: !!cur });
+  // 9.14 -> 9.16 rounds to 9.1 -> 9.2, i.e. a SHOWN change of +0.1, while the
+  // real move is 0.02. On a large base the raw Welch test must judge the real
+  // move — the displayed rounding must not manufacture significance.
+  const c = TR.waves.cellsFor([pt(9.14), pt(9.16, true)], false, "95", 1);
+  eq(c[1].change_prev, 0.1, "the SHOWN change is 0.1");
+  assert(c[1].sig_prev === false,
+    "a 0.02 move is not significant, however it displays");
+  // and a real move stays significant even though it displays identically
+  const d = TR.waves.cellsFor([pt(8.60), pt(9.16, true)], false, "95", 1);
+  assert(d[1].sig_prev === true, "a real 0.56 move on n=4000 is significant");
+});
+
+run("an NPS takes PERCENT places, not ratings places (it is mean-KIND, 0-100)", () => {
+  TR.AGG = { project: { format: { percent_decimals: 0, rating_decimals: 1 } } };
+  eq(TR.fmt.decimalsForQ({ type: "scale", scale_max: 10 }, true), 1, "a rating -> 1");
+  eq(TR.fmt.decimalsForQ({ type: "nps", scale_max: 100 }, true), 0, "an NPS -> 0");
+  eq(TR.fmt.decimalsForQ({ scale_max: 100 }, true), 0, "0-100 scale alone is enough");
+  eq(TR.fmt.decimalsForQ(null, true), 1, "no question -> the ratings default");
+  eq(TR.fmt.decimalsForQ({ type: "scale", scale_max: 10 }, false), 0, "a proportion row -> 0");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

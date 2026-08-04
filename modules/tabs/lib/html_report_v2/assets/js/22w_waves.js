@@ -15,7 +15,7 @@
  */
 (function (global) {
   "use strict";
-  var TR = global.TR;
+  var TR = global.TR, fmt = TR.fmt;
 
   var waves = TR.waves = {};
 
@@ -460,7 +460,7 @@
    * mode defaults to "on" when omitted, so a bare cellsFor(points, canSig)
    * keeps the strong-only behaviour (and 95%/single output is byte-identical).
    */
-  waves.cellsFor = function (points, canSig, mode) {
+  waves.cellsFor = function (points, canSig, mode, decimals) {
     var on = mode !== "off";        // significance display master switch
     var dual = mode === "dual";     // also flag the 80% (soft) band
     var level = function (a, b) {
@@ -481,17 +481,30 @@
         ? (a.x !== null && a.x !== undefined && b.x !== null && b.x !== undefined)
         : (a.sd !== null && a.sd !== undefined && b.sd !== null && b.sd !== undefined);
     };
+    // Display precision: the reader must be able to reproduce a change by
+    // subtracting the two figures on screen, so both ENDPOINTS are rounded
+    // first and the difference taken after. level() above still reads the raw
+    // points — significance is computed on the underlying values, exactly as
+    // the crosstab does (it tests counts and bases, never the rounded cell).
+    var dp = decimals == null ? fmt.decimalsFor(!canSig) : decimals;
+    var disp = function (v) {
+      return (v == null || isNaN(v)) ? null : Number(Number(v).toFixed(dp));
+    };
+    var gap = function (a, b) {
+      var x = disp(a), y = disp(b);
+      return (x === null || y === null) ? null : Number((x - y).toFixed(dp));
+    };
     return points.map(function (p, i) {
       var prev = i > 0 ? points[i - 1] : null;
       var first = i > 0 ? points[0] : null;
       var lp = prev ? level(p, prev) : 0;
       var lb = first ? level(p, first) : 0;
-      return { wave: p.wave, year: p.year, value: p.value, base: p.base,
+      return { wave: p.wave, year: p.year, value: disp(p.value), base: p.base,
         x: p.x, sd: p.sd, current: !!p.current,
-        change_prev: prev ? p.value - prev.value : null,
+        change_prev: prev ? gap(p.value, prev.value) : null,
         sig_prev: on && lp === 2, soft_prev: dual && lp === 1,
         tested_prev: !!prev && testable(p, prev),   // inputs present for a wave-on-wave test
-        change_base: first ? p.value - first.value : null,
+        change_base: first ? gap(p.value, first.value) : null,
         sig_base: on && lb === 2, soft_base: dual && lb === 1 };
     });
   };
@@ -544,13 +557,27 @@
         if (isMean && !row.diff) return meanSigBetween(curPoint, point);
         return false;
       };
+      // Same rule as cellsFor: round both ends, then subtract. `cur` already
+      // arrives rounded (the data layer copies the published cell) but the
+      // history does not, so subtracting them raw mixes two precisions and
+      // produces a change the published figures cannot reproduce.
+      var ddp = fmt.decimalsForQ(q, isMean);
+      var dround = function (v) {
+        return (v == null || isNaN(v)) ? null : Number(Number(v).toFixed(ddp));
+      };
+      var dgap = function (a, b) {
+        var x = dround(a), y = dround(b);
+        return (x === null || y === null) ? null : Number((x - y).toFixed(ddp));
+      };
       var latest = series[series.length - 1];
-      row.delta = { prev: latest.value, wave: latest.wave, year: latest.year,
-        diff: cur - latest.value, isMean: isMean, sig: sigVs(latest) };
+      row.delta = { prev: dround(latest.value), wave: latest.wave,
+        year: latest.year, diff: dgap(cur, latest.value), isMean: isMean,
+        sig: sigVs(latest) };
       var first = series[0];
       if (first.year !== latest.year) {
-        row.deltaBase = { prev: first.value, wave: first.wave, year: first.year,
-          diff: cur - first.value, isMean: isMean, sig: sigVs(first) };
+        row.deltaBase = { prev: dround(first.value), wave: first.wave,
+          year: first.year, diff: dgap(cur, first.value), isMean: isMean,
+          sig: sigVs(first) };
       }
     });
     return viewModel;

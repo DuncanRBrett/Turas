@@ -114,7 +114,7 @@
       ' — click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
       fmt.escapeHtml(m.short || m.title) + "</span>" +   // full question text — wraps, never ellipsed
-      '<span class="kpi-value">' + trk.fmtVal(last.value, true) +
+      '<span class="kpi-value">' + trk.fmtVal(last.value, m.isMean, m.q) +
       '<span class="kpi-type">' + card.type + "</span></span>" +
       chip + '<span class="kpi-spark">' + TR.render.sparkline(
         card.cells.map(function (c) {
@@ -185,8 +185,8 @@
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
       fmt.escapeHtml(c.metric.label) + " — " +
-      trk.fmtVal(c.prev.value, c.metric.isMean) + " in " + trk.yLabel(c.prev.year) +
-      " → <strong>" + trk.fmtVal(c.cur.value, c.metric.isMean) +
+      trk.fmtVal(c.prev.value, c.metric.isMean, c.metric.q) + " in " + trk.yLabel(c.prev.year) +
+      " → <strong>" + trk.fmtVal(c.cur.value, c.metric.isMean, c.metric.q) +
       "</strong> in " + trk.yLabel(c.cur.year) + "</span></button>";
   }
 

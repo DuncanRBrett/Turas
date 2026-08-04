@@ -42,10 +42,15 @@
 
   /* ---------------- shared helpers (used by 27u/27v) ---------------- */
 
-  trk.fmtVal = function (v, isMean) {
+  trk.fmtVal = function (v, isMean, q) {
     if (v === null || v === undefined) return "–";
-    // fmt.score = the ONE mean/index display rule (matches the dashboard)
-    return isMean ? fmt.score(v) : Math.round(v) + "%";
+    // ONE display rule, from the config's DECIMAL PLACES block — the same
+    // places the crosstab rounds to, so a tracking figure always reconciles
+    // with the published table. Pass the question where you have it: an NPS is
+    // a mean-kind row on a 0-100 scale and takes the PERCENT places (79, not
+    // 79.4); without it the mean/proportion split is the best guess available.
+    var dp = fmt.decimalsForQ(q, isMean);
+    return isMean ? Number(v).toFixed(dp) : Number(v).toFixed(dp) + "%";
   };
 
   trk.years = function () {
@@ -280,7 +285,8 @@
     }
     // honour the report's significance setting (off / 95% / 95%+80%): "dual"
     // adds soft_prev/soft_base, "off" suppresses all sig flags.
-    return TR.waves.cellsFor(points, canSig, TR.d2.state.sigMode);
+    return TR.waves.cellsFor(points, canSig, TR.d2.state.sigMode,
+      fmt.decimalsForQ(metric.q, metric.isMean));
   };
 
   /* ---- thresholds + cell colouring (tracker defaults, overridable) ---- */

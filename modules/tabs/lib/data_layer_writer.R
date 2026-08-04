@@ -174,6 +174,21 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(wo) == 1L && !is.na(wo)) {
     proj$wave_order <- wo
   }
+  # Display precision (config DECIMAL PLACES). The crosstab rounds to these for
+  # display and tests on the underlying counts; the renderer must use the SAME
+  # places or a tab can show a figure — or a wave-on-wave change — that the
+  # published table cannot reproduce. Significance is unaffected: it never reads
+  # these. Defaults match the config template, so an older config is unchanged.
+  dp <- function(key, fallback) {
+    v <- suppressWarnings(as.numeric(config_obj[[key]]))
+    if (length(v) == 1L && !is.na(v) && v >= 0 && v <= 4) v else fallback
+  }
+  proj$format <- list(
+    percent_decimals = dp("decimal_places_percent", 0),
+    rating_decimals  = dp("decimal_places_ratings", 1),
+    index_decimals   = dp("decimal_places_index", 1)
+  )
+
   # Tab-visibility flags (V12). Crosstabs is always shown; tabList() filters the
   # rest against these. Defaults TRUE so existing reports are unchanged; a tab
   # still self-hides when its island is absent (e.g. Qualitative without DATA_QUAL).

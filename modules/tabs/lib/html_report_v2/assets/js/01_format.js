@@ -60,11 +60,43 @@
       safe + ' at 95% confidence">' + safe + "</sup>";
   };
 
+  /** Display precision from the config's DECIMAL PLACES block. The crosstab
+   *  rounds to these and tests on the underlying counts; every tab must use the
+   *  SAME places or it can show a figure the published table cannot reproduce.
+   *  Falls back to the config template's defaults when a report predates the
+   *  project.format block. */
+  fmt.decimalsFor = function (isMean) {
+    var f = TR.AGG && TR.AGG.project && TR.AGG.project.format;
+    if (isMean) return (f && f.rating_decimals != null) ? f.rating_decimals : 1;
+    return (f && f.percent_decimals != null) ? f.percent_decimals : 0;
+  };
+
+  /** Display precision for a specific metric.
+   *
+   *  An NPS is a mean-KIND row but a percentage-SCALED metric (type "nps",
+   *  scale_max 100), and the crosstab rounds it with decimal_places_percent —
+   *  CCPB publishes 79, not 79.4. Keying purely off "is it a mean row" gives an
+   *  NPS the ratings precision and reintroduces a digit the table never had. */
+  fmt.decimalsForQ = function (q, isMean) {
+    if (!isMean) return fmt.decimalsFor(false);
+    if (q && (q.type === "nps" || q.scale_max === 100)) return fmt.decimalsFor(false);
+    return fmt.decimalsFor(true);
+  };
+
+  /** Round a value to the display precision — what the reader can actually see.
+   *  Wave-on-wave CHANGE is the difference of two of these, never of the raw
+   *  values, so the change reconciles with the two figures on screen. */
+  fmt.toDisplay = function (value, isMean) {
+    if (value == null || (typeof value === "number" && isNaN(value))) return null;
+    return Number(Number(value).toFixed(fmt.decimalsFor(isMean)));
+  };
+
   /** Index/mean score display — ONE rule everywhere a score card shows a
-   *  mean (dashboard gauges, heatmap, tracking): 1 decimal, en dash for null. */
-  fmt.score = function (value) {
+   *  mean (dashboard gauges, heatmap, tracking); en dash for null. */
+  fmt.score = function (value, decimals) {
     if (value == null || (typeof value === "number" && isNaN(value))) return "–";
-    return Number(value).toFixed(1);
+    var dp = decimals == null ? fmt.decimalsFor(true) : decimals;
+    return Number(value).toFixed(dp);
   };
 
   /** Base sizes with thin-space thousands separator: 12345 -> "12 345". */

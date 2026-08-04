@@ -155,7 +155,7 @@
       return '<td class="wv cb-' + band + (c.current ? " curw" : "") +
         '" title="base n=' + fmt.base(c.base) +
         (low ? " — below threshold, excluded from significance" : "") + '">' +
-        trk().fmtVal(c.value, metric.isMean) + (low ? " ⚠" : "") + "</td>";
+        trk().fmtVal(c.value, metric.isMean, metric.q) + (low ? " ⚠" : "") + "</td>";
     }
     var change = display === "prev" ? c.change_prev : c.change_base;
     var sig = display === "prev" ? c.sig_prev : c.sig_base;
@@ -168,7 +168,7 @@
       : soft ? (dir ? "hm-up soft" : "hm-down soft") : "chg";
     var mark = sig ? (dir ? "▲" : "▼") : soft ? (dir ? "△" : "▽") : "";
     return '<td class="wv ' + cls +
-      '" title="' + trk().fmtVal(c.value, metric.isMean) + " in " + c.year +
+      '" title="' + trk().fmtVal(c.value, metric.isMean, metric.q) + " in " + c.year +
       (sig ? " · significant at 95%"
         : soft ? " · significant at 80% (not 95%)" : "") + '">' +
       mark + trk().changeText(change, metric.isMean).replace("pp", "") + "</td>";
