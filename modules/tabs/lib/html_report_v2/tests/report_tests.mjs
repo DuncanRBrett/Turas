@@ -22,7 +22,12 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
 // A fresh module load with project.diagnostics / project.report_meta set to
 // the given objects (either may be undefined, as on a report without them).
-function boot(diagnostics, reportMeta) {
+// `projectExtra` merges into project (alpha, bonferroni, ...) and `prev` sets
+// TR.PREV, so the methodology block can be exercised across configurations.
+// The REAL 21_stats.js is loaded alongside: the methodology note reports the
+// project's configured significance level and whether Bonferroni is on, and
+// re-deriving those in a stub would let the note and the engine drift apart.
+function boot(diagnostics, reportMeta, projectExtra, prev) {
   const sandbox = {
     console,
     localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }
@@ -33,10 +38,14 @@ function boot(diagnostics, reportMeta) {
   sandbox.TR = {
     fmt: { escapeHtml: (s) => String(s == null ? "" : s) },
     ai: { execSummaryHtml: () => "", methodologyHtml: () => "" },
-    AGG: { project: { name: "proj", diagnostics: diagnostics, report_meta: reportMeta } }
+    AGG: { project: Object.assign(
+      { name: "proj", diagnostics: diagnostics, report_meta: reportMeta },
+      projectExtra || {}) }
   };
-  vm.runInContext(readFileSync(path.join(JS_DIR, "32_report.js"), "utf8"),
-    sandbox, { filename: "32_report.js" });
+  if (prev) sandbox.TR.PREV = prev;
+  for (const f of ["21_stats.js", "32_report.js"]) {
+    vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), sandbox, { filename: f });
+  }
   return sandbox.TR;
 }
 
@@ -143,6 +152,68 @@ run("the producing company interpolates into the note, with a TRL fallback", () 
   const f = boot(undefined, undefined).report.aboutHtml();
   assert(f.indexOf("produced by The Research LampPost using Turas Analytics") >= 0,
     "falls back to The Research LampPost when report_meta is absent");
+});
+
+run("the construction note describes BOTH engines, not just R", () => {
+  // "Statistical analysis runs in R" was true of the published figures only.
+  // Every COMPUTED view and all wave significance are recalculated in the
+  // browser, so a reader told "it runs in R" would be told something untrue.
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("published figures are computed in R") >= 0,
+    "R is scoped to the published figures");
+  assert(h.indexOf("recalculates it as you click") >= 0,
+    "the in-browser recompute is disclosed");
+  assert(h.indexOf("works with no internet connection") >= 0,
+    "the self-contained claim is stated plainly");
+  assert(h.indexOf("Statistical analysis runs in R, and") < 0,
+    "the old R-only phrasing is gone");
+});
+
+run("the reproducibility claim is scoped to what Turas computes", () => {
+  // Waves loaded from published figures have no source data to reproduce them
+  // from — which is precisely why no significance is claimed against them.
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("Every figure Turas computes is deterministic") >= 0,
+    "the claim is scoped to Turas-computed figures");
+  assert(h.indexOf("carried forward from earlier waves") >= 0,
+    "historical figures are called out as not recalculated");
+  assert(h.indexOf("claims no significance against them") >= 0,
+    "and the consequence is stated");
+});
+
+run("methodology names BOTH tests and the Bonferroni correction", () => {
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("two-proportion pooled z-test") >= 0, "the proportion test is named");
+  assert(h.indexOf("Welch t-test") >= 0,
+    "the Welch test is named — means/indexes/NPS use it and it was omitted before");
+  assert(h.indexOf("Bonferroni correction") >= 0,
+    "Bonferroni is disclosed; it materially raises the bar for a letter");
+});
+
+run("methodology drops Bonferroni from the text when the project disables it", () => {
+  const h = boot(undefined, undefined, { bonferroni: false }).report.aboutHtml();
+  assert(h.indexOf("Bonferroni") < 0, "no Bonferroni claim when it is switched off");
+  assert(h.indexOf("Welch t-test") >= 0, "the rest of the note is unaffected");
+});
+
+run("methodology reports the CONFIGURED level, not a hard-coded 95%", () => {
+  const dflt = boot(undefined, undefined).report.aboutHtml();
+  assert(dflt.indexOf("compared at the 95% level") >= 0, "0.05 default reads as 95%");
+  const ninety = boot(undefined, undefined, { alpha: 0.10 }).report.aboutHtml();
+  assert(ninety.indexOf("compared at the 90% level") >= 0,
+    "alpha 0.10 reads as 90% — a fixed 95% would describe letters the report never shows");
+  assert(ninety.indexOf("compared at the 95% level") < 0, "and 95% is not also claimed");
+});
+
+run("the wave-test caveat appears only when there IS wave history", () => {
+  const none = boot(undefined, undefined).report.aboutHtml();
+  assert(none.indexOf("Wave-on-wave change is tested") < 0,
+    "no tracking history -> no wave sentence");
+  const tracked = boot(undefined, undefined, undefined,
+    { waves: [{ wave: "2025" }, { wave: "W2026", current: true }] }).report.aboutHtml();
+  assert(tracked.indexOf("Wave-on-wave change is tested") >= 0, "with history it renders");
+  assert(tracked.indexOf("single planned comparison") >= 0,
+    "and explains why wave tests take no Bonferroni divisor");
 });
 
 run("no meta -> fields are omitted but the note and methodology still render", () => {
