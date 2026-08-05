@@ -6,7 +6,6 @@
 #   Write crosstab results to Excel workbook with proper formatting
 #
 # FUNCTIONS:
-#   - write_crosstab_workbook() - Main writer
 #   - create_excel_styles() - Style definitions
 #   - write_banner_headers() - Write banner headers
 #   - write_base_rows() - Write base size rows
@@ -71,81 +70,6 @@ if (!exists("find_turas_root", mode = "function")) {
   source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
 
   rm(.turas_root, .shared_lib_path, .find_root)
-}
-
-
-# ==============================================================================
-# MAIN EXCEL WRITER
-# ==============================================================================
-
-#' Write Crosstab Workbook
-#'
-#' Creates complete Excel workbook with crosstab results.
-#'
-#' @param output_file Character, output file path
-#' @param all_results List, all question results
-#' @param banner_info List, banner structure
-#' @param config List, configuration
-#' @param project_info List, project metadata
-#' @return TRUE if successful
-#' @export
-write_crosstab_workbook <- function(output_file, all_results, banner_info,
-                                   config, project_info = NULL) {
-  
-  log_message("Creating Excel workbook...", level = "INFO", verbose = config$verbose)
-  
-  # Create workbook
-  wb <- openxlsx::createWorkbook()
-  
-  # Create styles
-  styles <- create_excel_styles(
-    decimal_separator = config$decimal_separator,
-    decimal_places_percent = config$decimal_places_percent,
-    decimal_places_ratings = config$decimal_places_ratings,
-    decimal_places_index = config$decimal_places_index,
-    decimal_places_numeric = config$decimal_places_numeric
-  )
-  
-  # Add main results sheet
-  sheet_name <- "Crosstabs"
-  openxlsx::addWorksheet(wb, sheet_name)
-  
-  # Write banner headers
-  current_row <- write_banner_headers(wb, sheet_name, banner_info, styles)
-  
-  # Write each question
-  for (i in seq_along(all_results)) {
-    result <- all_results[[i]]
-    
-    if (!is.null(result$table) && nrow(result$table) > 0) {
-      current_row <- write_question_table(
-        wb, sheet_name, result, banner_info, styles, current_row, config
-      )
-      current_row <- current_row + 2  # Add spacing
-    }
-  }
-  
-  # Set column widths
-  openxlsx::setColWidths(wb, sheet_name, cols = 1, widths = 40)
-  openxlsx::setColWidths(wb, sheet_name, cols = 2, widths = 10)
-  openxlsx::setColWidths(wb, sheet_name, 
-                        cols = 3:(3 + length(banner_info$internal_keys) - 1),
-                        widths = 12)
-  
-  # Save workbook
-  safe_execute(
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE),
-    default = FALSE,
-    error_msg = sprintf("Failed to save Excel file: %s", output_file)
-  )
-  
-  log_message(
-    sprintf("Excel file created: %s", output_file),
-    level = "INFO",
-    verbose = config$verbose
-  )
-  
-  return(TRUE)
 }
 
 # ==============================================================================
@@ -1288,7 +1212,6 @@ get_excel_writer_info <- function() {
     date = "2025-10-25",
     description = "Excel workbook writer for crosstab results",
     functions = c(
-      "write_crosstab_workbook",
       "create_excel_styles",
       "write_banner_headers",
       "write_question_table",

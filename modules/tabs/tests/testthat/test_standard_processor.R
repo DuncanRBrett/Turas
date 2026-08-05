@@ -8,8 +8,7 @@
 #   3. add_boxcategory_summaries() — BoxCategory aggregation
 #   4. add_summary_statistic() — Rating mean, Likert index, NPS score
 #   5. add_net_positive_row() — Top-bottom net calculation
-#   6. dispatch_question() — routing by Variable_Type
-#   7. calculate_chi_square_row() — chi-square test
+#   6. calculate_chi_square_row() — chi-square test
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_standard_processor.R")
@@ -109,7 +108,6 @@ rm(.rc_lines, .rc_start, .rc_end, .rc_next)
 # Source the module under test
 source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))   # box_category_scores (NET POSITIVE order)
 source(file.path(turas_root, "modules/tabs/lib/standard_processor.R"))
-source(file.path(turas_root, "modules/tabs/lib/question_dispatcher.R"))
 
 # Source numeric processor (needed by dispatcher)
 source(file.path(turas_root, "modules/tabs/lib/numeric_processor.R"))
@@ -710,112 +708,6 @@ test_that("box ordering falls back to DisplayOrder when no OptionValue", {
     stringsAsFactors = FALSE
   )
   expect_equal(get_sorted_boxcategories(qo), c("Low", "High"))
-})
-
-
-# ==============================================================================
-# 6. dispatch_question — routing
-# ==============================================================================
-
-context("dispatch_question — routing")
-
-test_that("dispatches Single_Response to standard processor", {
-  data <- make_processor_test_data()
-  b <- make_processor_banner(data)
-  config <- make_processor_config()
-
-  question_info <- data.frame(
-    QuestionCode = "Q1",
-    Variable_Type = "Single_Response",
-    Columns = "Q1",
-    stringsAsFactors = FALSE
-  )
-
-  question_options <- data.frame(
-    OptionText = c("Satisfied", "Neutral", "Dissatisfied"),
-    DisplayText = c("Satisfied", "Neutral", "Dissatisfied"),
-    ShowInOutput = c("Y", "Y", "Y"),
-    DisplayOrder = c(1, 2, 3),
-    stringsAsFactors = FALSE
-  )
-
-  result <- dispatch_question(
-    data, question_info, question_options,
-    b$banner, b$indices, b$weights, b$bases, config
-  )
-
-  expect_true(is.data.frame(result))
-  expect_true(nrow(result) > 0)
-  expect_true("Frequency" %in% result$RowType)
-})
-
-test_that("dispatches Rating with box categories and summary stats", {
-  data <- make_processor_test_data()
-  b <- make_processor_banner(data)
-  config <- make_processor_config()
-
-  question_info <- data.frame(
-    QuestionCode = "Q_Rating",
-    Variable_Type = "Rating",
-    Columns = "Q_Rating",
-    stringsAsFactors = FALSE
-  )
-
-  question_options <- data.frame(
-    OptionText = c("1", "2", "3", "4", "5"),
-    DisplayText = c("Very Dissatisfied", "Dissatisfied", "Neutral", "Satisfied", "Very Satisfied"),
-    ShowInOutput = c("Y", "Y", "Y", "Y", "Y"),
-    DisplayOrder = c(1, 2, 3, 4, 5),
-    BoxCategory = c("Bottom 2 Box", "Bottom 2 Box", NA, "Top 2 Box", "Top 2 Box"),
-    stringsAsFactors = FALSE
-  )
-
-  selection_row <- data.frame(
-    QuestionCode = "Q_Rating",
-    CreateIndex = "Y",
-    stringsAsFactors = FALSE
-  )
-
-  result <- dispatch_question(
-    data, question_info, question_options,
-    b$banner, b$indices, b$weights, b$bases, config,
-    selection_row = selection_row
-  )
-
-  expect_true(is.data.frame(result))
-  # Should include individual options, box categories, and summary stats
-  row_types <- unique(result$RowType)
-  expect_true("Frequency" %in% row_types)
-  expect_true("Column %" %in% row_types)
-})
-
-test_that("dispatches Multi_Mention correctly", {
-  data <- make_processor_test_data()
-  b <- make_processor_banner(data)
-  config <- make_processor_config()
-
-  question_info <- data.frame(
-    QuestionCode = "Q_MM",
-    Variable_Type = "Multi_Mention",
-    Columns = "3",
-    stringsAsFactors = FALSE
-  )
-
-  question_options <- data.frame(
-    OptionText = c("TV", "Radio"),
-    DisplayText = c("TV", "Radio"),
-    ShowInOutput = c("Y", "Y"),
-    DisplayOrder = c(1, 2),
-    stringsAsFactors = FALSE
-  )
-
-  result <- dispatch_question(
-    data, question_info, question_options,
-    b$banner, b$indices, b$weights, b$bases, config
-  )
-
-  expect_true(is.data.frame(result))
-  expect_true(nrow(result) > 0)
 })
 
 

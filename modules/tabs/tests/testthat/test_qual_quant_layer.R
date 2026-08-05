@@ -60,7 +60,7 @@ local({
   me <- grep("^# MAIN EXECUTION", rc)
   eval(parse(text = rc[ws[1]:(me[1] - 2)]), envir = globalenv())
   for (f in c("config_loader.R", "validation.R", "standard_processor.R", "numeric_processor.R",
-              "question_dispatcher.R", "question_orchestrator.R", "composite_processor.R",
+              "question_orchestrator.R", "composite_processor.R",
               "crosstabs/crosstabs_config.R", "report_shared.R",
               "data_layer_writer.R", "microdata_writer.R", "qual_quant_layer.R")) {
     source(f, local = FALSE)
