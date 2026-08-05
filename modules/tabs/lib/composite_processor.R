@@ -686,7 +686,9 @@ process_composite_question <- function(composite_def, data, questions_df,
       calculation_type = calc_type,  # Use calc_type instead of composite_def$CalculationType
       calc_weights = calc_weights,
       banner_info = banner_info,
-      config = config
+      config = config,
+      questions_df = questions_df,
+      options_df = options_df
     )
 
     if (!is.null(sig_row)) {
@@ -716,19 +718,27 @@ process_composite_question <- function(composite_def, data, questions_df,
 #' @param calc_weights Calculation weights
 #' @param banner_info Banner structure
 #' @param config Configuration
+#' @param questions_df Optional Questions sheet, for option-based scoring
+#' @param options_df Optional Options sheet, for option-based scoring
 #' @return Data frame with significance row or NULL
 #' @keywords internal
 test_composite_significance <- function(data, composite_code, source_questions,
                                         calculation_type, calc_weights,
-                                        banner_info, config) {
+                                        banner_info, config,
+                                        questions_df = NULL, options_df = NULL) {
 
-  # Calculate composite values for full dataset (for variance calculation)
+  # Calculate composite values for full dataset (for variance calculation).
+  # These MUST be scored the same way the published value was — pass the
+  # structure through, or a worded source yields all-NA here and the composite
+  # is significance-tested against nothing while its printed value is fine.
   composite_values <- calculate_composite_values(
     data_subset = data,
     source_questions = source_questions,
     calculation_type = calculation_type,
     weights = calc_weights,
-    weight_vector = NULL  # Get vector, not mean
+    weight_vector = NULL,  # Get vector, not mean
+    questions_df = questions_df,
+    options_df = options_df
   )
 
   # Add to data temporarily

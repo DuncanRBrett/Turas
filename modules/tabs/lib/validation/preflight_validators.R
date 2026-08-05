@@ -139,20 +139,16 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
     # So collect every candidate coding and treat a data value as defined if it
     # matches ANY of them. A value the config genuinely never declares still
     # matches none, and is still reported.
-    candidate_cols <- c("OptionCode", "OptionValue", "OptionText")
-    candidate_cols <- candidate_cols[
-      candidate_cols %in% names(q_options) &
-      vapply(candidate_cols, function(cc) {
-        cc %in% names(q_options) && !all(is.na(q_options[[cc]]))
-      }, logical(1))
-    ]
-    if (length(candidate_cols) == 0) next
-
-    values_of <- function(cc) {
+    candidate_cols <- intersect(c("OptionCode", "OptionValue", "OptionText"),
+                                names(q_options))
+    defined_by_col <- list()
+    for (cc in candidate_cols) {
       v <- as.character(q_options[[cc]])
-      v[!is.na(v) & v != ""]
+      v <- v[!is.na(v) & v != ""]
+      if (length(v) > 0) defined_by_col[[cc]] <- v
     }
-    defined_by_col <- stats::setNames(lapply(candidate_cols, values_of), candidate_cols)
+    if (length(defined_by_col) == 0) next
+
     defined_values <- unique(unlist(defined_by_col, use.names = FALSE))
 
     # Get actual data values (non-NA)
@@ -183,9 +179,21 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
       )
     }
 
-    # Defined options not in data (possibly unused codes)
+    # Defined options not in data (possibly unused codes).
+    #
+    # Absence only means something when the option had a fair chance of being
+    # picked. On a pilot export an unused scale point is arithmetic, not a
+    # config error — and reporting one per question buries the warnings that
+    # matter. Gate on the conventional expected-cell floor of 5: with a base of
+    # n spread over k options, an option is expected about n/k times, so below
+    # 5 the check is uninformative and stays quiet. The Undefined check above is
+    # NOT gated — a value the config cannot describe is a fault at any base.
+    answered_base <- sum(!is.na(survey_data[[col_name]]) &
+                         trimws(as.character(survey_data[[col_name]])) != "")
+    expected_per_option <- answered_base / max(length(unused_pool), 1L)
+
     unused_opts <- setdiff(unused_pool, data_values)
-    if (length(unused_opts) > 0) {
+    if (length(unused_opts) > 0 && expected_per_option >= 5) {
       error_log <- log_issue(
         error_log, "Preflight", "Unused Option Values",
         sprintf("Question '%s': %d option value(s) defined but never occur in data: %s",

@@ -501,7 +501,9 @@ test_that("unused options are named in the coding the data actually speaks", {
           "check_option_values_vs_data not available")
 
   fx <- make_worded_likert()
-  survey_data <- data.frame(Q22 = "Neutral", stringsAsFactors = FALSE)
+  # 15 answers over 3 options clears the expected-per-option floor of 5, so the
+  # two nobody chose are worth reporting.
+  survey_data <- data.frame(Q22 = rep("Neutral", 15), stringsAsFactors = FALSE)
 
   result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,
                                         fx$selection, new_error_log())
@@ -511,6 +513,38 @@ test_that("unused options are named in the coding the data actually speaks", {
   # The labels nobody picked, not the scale positions 1/3/5.
   expect_true(grepl("Not at all well", unused$Description[1]))
   expect_true(grepl("Very well", unused$Description[1]))
+})
+
+test_that("unused options stay quiet when the base is too thin to mean anything", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  fx <- make_worded_likert()
+  # 3 answers over 3 options: expected 1 per option, so silence is arithmetic.
+  survey_data <- data.frame(Q22 = c("Neutral", "Neutral", "Neutral"),
+                            stringsAsFactors = FALSE)
+
+  result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,
+                                        fx$selection, new_error_log())
+
+  expect_equal(nrow(result[result$Issue_Type == "Unused Option Values", ]), 0)
+})
+
+test_that("an undefined data value is reported however thin the base", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  fx <- make_worded_likert()
+  # One respondent — the unused check is gated off, the undefined one is not.
+  survey_data <- data.frame(Q22 = "Brilliant", stringsAsFactors = FALSE)
+
+  result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,
+                                        fx$selection, new_error_log())
+
+  expect_equal(nrow(result[result$Issue_Type == "Unused Option Values", ]), 0)
+  undefined <- result[result$Issue_Type == "Undefined Data Values", ]
+  expect_equal(nrow(undefined), 1)
+  expect_true(grepl("Brilliant", undefined$Description[1]))
 })
 
 test_that("numeric-coded data is unaffected by the OptionText fallback", {
