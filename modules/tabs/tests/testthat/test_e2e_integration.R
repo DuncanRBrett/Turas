@@ -7,7 +7,7 @@
 #   2. Data loading — load_crosstabs_data()
 #   3. Analysis — run_crosstabs_analysis()
 #   4. Excel output — create_crosstabs_workbook()
-#   5. HTML output — generate_html_report()
+#   5. Interactive report data layer — write_data_layer()
 #
 # These tests are slower (Excel I/O) but prove the complete system works.
 #
@@ -180,8 +180,8 @@ tabs_source("crosstabs", "data_setup.R")
 tabs_source("crosstabs", "analysis_runner.R")
 tabs_source("crosstabs", "workbook_builder.R")
 
-# --- 10. HTML report module (needed for HTML output test) ---
-tabs_source("html_report", "99_html_report_main.R")
+# --- 10. Shared report helpers (row/banner shape + chart palette) ---
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
 
 # ==============================================================================
@@ -423,80 +423,6 @@ test_that("output Crosstabs sheet contains data rows", {
                    nrow(ct_data), n_selected))
 })
 
-
-# ==============================================================================
-# 5. HTML OUTPUT TEST
-# ==============================================================================
-
-context("E2E: HTML output")
-
-test_that("generates HTML report when enabled", {
-  skip_if_not(file.exists(demo_config_file), "Demo config file not found")
-
-  tmp_output <- tempfile(pattern = "turas_e2e_html_", fileext = ".xlsx")
-  tmp_html <- sub("\\.xlsx$", ".html", tmp_output)
-  on.exit({
-    unlink(tmp_output)
-    unlink(tmp_html)
-  }, add = TRUE)
-
-  # Run full pipeline
-  config_result <- load_crosstabs_config(demo_config_file)
-  data_result <- load_crosstabs_data(config_result)
-  analysis_result <- run_crosstabs_analysis(
-    config_result, data_result,
-    checkpoint_frequency = CHECKPOINT_FREQUENCY,
-    total_column = TOTAL_COLUMN
-  )
-
-  # Only run if html_report is enabled in config (or force-enable it)
-  config_result$config_obj$html_report <- TRUE
-
-  # Create workbook first (HTML test is separate)
-  workbook_result <- create_crosstabs_workbook(
-    all_results = analysis_result$all_results,
-    composite_results = analysis_result$composite_results,
-    composite_defs = data_result$composite_defs,
-    survey_structure = data_result$survey_structure,
-    survey_data = data_result$survey_data,
-    banner_info = analysis_result$banner_info,
-    config_obj = config_result$config_obj,
-    error_log = analysis_result$error_log,
-    trs_state = NULL,
-    run_status = analysis_result$run_status,
-    skipped_questions = analysis_result$skipped_questions,
-    partial_questions = analysis_result$partial_questions,
-    processed_questions = analysis_result$processed_questions,
-    crosstab_questions = data_result$crosstab_questions,
-    effective_n = data_result$effective_n,
-    master_weights = data_result$master_weights,
-    output_path = tmp_output,
-    script_version = SCRIPT_VERSION,
-    total_column = TOTAL_COLUMN,
-    very_small_base = VERY_SMALL_BASE_SIZE
-  )
-
-  # Generate HTML report
-  html_result <- tryCatch({
-    generate_html_report(
-      all_results = analysis_result$all_results,
-      banner_info = analysis_result$banner_info,
-      config_obj = config_result$config_obj,
-      output_path = tmp_html,
-      survey_structure = data_result$survey_structure
-    )
-  }, error = function(e) {
-    skip(paste("HTML report generation failed:", e$message))
-  })
-
-  expect_true(!is.null(html_result), info = "HTML report should return a result")
-  expect_equal(html_result$status, "PASS",
-    info = paste("HTML report status:", html_result$status))
-  expect_true(file.exists(tmp_html),
-    info = "HTML file should exist on disk")
-  expect_true(file.info(tmp_html)$size > 1000,
-    info = "HTML file should have substantial content (>1KB)")
-})
 
 
 # ==============================================================================

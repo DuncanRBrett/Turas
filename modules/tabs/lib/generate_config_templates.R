@@ -411,10 +411,6 @@ generate_crosstab_config_template <- function(output_path,
     list(
       section_name = "HTML REPORT",
       fields = list(
-        list(name = "html_report", default = "FALSE", required = TRUE,
-             description = "Generate an interactive HTML report in addition to the Excel output.",
-             valid_values_text = "TRUE or FALSE",
-             dropdown = c("TRUE", "FALSE")),
         list(name = "brand_colour", default = "#323367", required = TRUE,
              description = "Primary brand colour for HTML report (hex code). Used for headers and charts.",
              valid_values_text = "Hex colour code (e.g. #323367)"),

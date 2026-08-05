@@ -754,21 +754,20 @@ check_data_column_coverage <- function(selection_df, questions_df, survey_data,
 
 
 # ==============================================================================
-# CHECK 13: LOGO FILE EXISTENCE (HTML REPORT)
+# CHECK 13: LOGO FILE EXISTENCE (REPORT BRANDING)
 # ==============================================================================
 
 #' Check Logo Files Exist
 #'
-#' When html_report is enabled, verifies that configured logo files actually exist.
-#' Upgrades the console-only warning from crosstabs_config.R to a logged issue.
+#' Verifies that configured logo files actually exist. Upgrades the console-only
+#' warning from crosstabs_config.R to a logged issue. Unconditional since the
+#' classic report was retired: the interactive report carries the same logos, so
+#' a missing file is a branding fault on the deliverable that always ships.
 #'
 #' @param config List, configuration object
 #' @param error_log Data frame, error log
 #' @return Updated error_log
 check_preflight_logo_files <- function(config, error_log) {
-  html_report <- !is.null(config$html_report) && isTRUE(config$html_report)
-  if (!html_report) return(error_log)
-
   logo_fields <- list(
     researcher_logo_path = "Researcher logo",
     client_logo_path = "Client logo",
@@ -779,7 +778,7 @@ check_preflight_logo_files <- function(config, error_log) {
     path <- config[[field]]
     if (!is.null(path) && nzchar(path) && !file.exists(path)) {
       error_log <- log_issue(error_log, "Preflight", "Warning",
-        sprintf("HTML report enabled but %s file not found: '%s'. The report will render without this logo.",
+        sprintf("%s file not found: '%s'. The report will render without this logo.",
                 logo_fields[[field]], basename(path)),
         severity = "Warning")
     }
@@ -790,21 +789,20 @@ check_preflight_logo_files <- function(config, error_log) {
 
 
 # ==============================================================================
-# CHECK 14: COLOUR CODE VALIDATION (HTML REPORT)
+# CHECK 14: COLOUR CODE VALIDATION (REPORT BRANDING)
 # ==============================================================================
 
 #' Check Colour Codes Are Valid Hex
 #'
-#' Validates that brand_colour, accent_colour, and chart_bar_colour are
-#' valid hex colour codes when html_report is enabled.
+#' Validates that brand_colour, accent_colour, and chart_bar_colour are valid
+#' hex colour codes. Unconditional since the classic report was retired: the
+#' interactive report reads the same three fields, and only well-formed hex
+#' reaches its renderer — junk simply disappears without this warning.
 #'
 #' @param config List, configuration object
 #' @param error_log Data frame, error log
 #' @return Updated error_log
 check_preflight_colour_codes <- function(config, error_log) {
-  html_report <- !is.null(config$html_report) && isTRUE(config$html_report)
-  if (!html_report) return(error_log)
-
   hex_pattern <- "^#[0-9A-Fa-f]{6}$"
 
   colour_fields <- list(

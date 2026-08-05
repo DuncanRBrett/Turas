@@ -104,7 +104,6 @@ build_tabs_diagnostics <- function(config_result, data_result,
     "Minimum Base Size"          = as.character(min_base_val),
     "Bonferroni Correction"      = if (sig_enabled && isTRUE(config_obj$bonferroni_correction)) "Applied" else "Not applied",
     "Interactive Report"         = if (isTRUE(config_obj$html_report_v2)) "Generated" else "Not requested",
-    "Classic HTML Report"        = if (isTRUE(config_obj$html_report)) "Generated" else "Not requested",
     "AI Insights"                = if (isTRUE(config_obj$enable_ai_insights)) "Enabled" else "Disabled",
     "TRS Status"                 = run_result$status %||% "PASS",
     "TRS Events"                 = trs_summary

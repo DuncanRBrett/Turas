@@ -197,3 +197,35 @@ test_that("html_report_v2_explicit marks whether the sheet set the value", {
   expect_false(build_config_object(list())$html_report_v2_explicit)
   expect_false(build_config_object(list(html_report_v2 = "FALSE"))$html_report_v2)
 })
+
+context("config contract — retired settings are named, not ignored (classic report)")
+
+test_that("a config still carrying html_report is answered by name", {
+  out <- capture.output(announce_retired_settings(list(html_report = "TRUE")))
+  txt <- paste(out, collapse = " ")
+  expect_match(txt, "SETTING RETIRED")
+  expect_match(txt, "html_report")
+  expect_match(txt, "html_report_v2", fixed = TRUE)
+})
+
+test_that("case and whitespace do not hide a retired setting", {
+  expect_equal(announce_retired_settings(list(` HTML_Report ` = "Y")), "html_report")
+})
+
+test_that("a config without the retired setting prints nothing", {
+  expect_equal(capture.output(announce_retired_settings(list(alpha = 0.05))), character(0))
+})
+
+test_that("the retired setting is out of the whitelist but never reported as a typo", {
+  # It must not be blessed as a working setting...
+  expect_false("html_report" %in% TABS_KNOWN_SETTINGS)
+  # ...and must not fall into the unrecognised-typo list while retirement runs.
+  unknown <- setdiff("html_report",
+                     c(TABS_KNOWN_SETTINGS, names(TABS_RETIRED_SETTINGS)))
+  expect_equal(unknown, character(0))
+})
+
+test_that("the retired setting no longer reaches config_obj", {
+  obj <- suppressWarnings(build_config_object(list(html_report = "TRUE")))
+  expect_null(obj$html_report)
+})

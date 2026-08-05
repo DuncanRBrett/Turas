@@ -219,12 +219,13 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Stats pack (contractual deliverable — defaults to Y)
     generate_stats_pack = get_config_value(config, "generate_stats_pack", "Y"),
 
-    # V10.3 HTML Report settings
-    html_report = safe_logical(get_config_value(config, "html_report", FALSE), default = FALSE),
+    # (html_report — the classic HTML report — is RETIRED. It is not read here
+    # any more; a config that still carries the row is answered by name in
+    # TABS_RETIRED_SETTINGS rather than silently ignored.)
 
     # V11 data-centric report (data-layer JSON for the v2 renderer).
     # Additive: when TRUE, a *_data.json island is written alongside the
-    # existing Excel/HTML outputs. Old paths are untouched when FALSE.
+    # Excel workbook. The workbook is untouched when FALSE.
     html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE), default = FALSE),
     # Whether the Settings sheet EXPLICITLY set html_report_v2 (I16): an
     # explicit FALSE must beat the GUI's default-ON — a confidentiality-driven
@@ -1048,6 +1049,50 @@ warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
 }
 
 
+# Settings that used to do something and no longer do. A retired name is NOT a
+# typo, so it must not be reported as one — the operator wrote it deliberately
+# and is entitled to know that the run ignored it, and why. Each entry is the
+# sentence the loader prints (see announce_retired_settings).
+#
+# Retirement runs for one release: the name is answered here by name, then the
+# entry is deleted and the name falls through to the ordinary "unrecognised
+# setting" warning. Retired 2026-08 (remove after the next release):
+TABS_RETIRED_SETTINGS <- c(
+  html_report = paste(
+    "the classic HTML report is retired — the interactive report",
+    "(html_report_v2) is the deliverable. No HTML file is written for this",
+    "setting. Delete the row from the Settings sheet."
+  )
+)
+
+
+#' Announce any retired settings the config still carries
+#'
+#' Prints a boxed console notice naming each retired setting found, so a run
+#' that used to produce an extra deliverable cannot quietly stop producing it.
+#' Console output is mandatory here: tabs runs inside the Shiny app, where a
+#' silent behaviour change is invisible to the operator.
+#'
+#' @param config Named list of raw Settings values (as loaded from the sheet)
+#' @param retired Named character vector of retirement messages
+#'
+#' @return Invisibly, the retired setting names that were present
+#' @export
+announce_retired_settings <- function(config, retired = TABS_RETIRED_SETTINGS) {
+  if (length(config) == 0 || length(retired) == 0) return(invisible(character(0)))
+  present <- intersect(tolower(trimws(names(config))), names(retired))
+  if (length(present) == 0) return(invisible(character(0)))
+
+  cat("\n┌─── SETTING RETIRED ───────────────────────────────────┐\n")
+  for (nm in present) {
+    cat(sprintf("│ %s: %s\n", nm, retired[[nm]]))
+  }
+  cat("│ The run continues; this setting had no effect.\n")
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  invisible(present)
+}
+
+
 # Every setting name the tabs config recognises. Used to flag typos, and to
 # tell a mis-formatted setting row apart from a section header (see
 # warn_merged_setting_rows).
@@ -1086,8 +1131,8 @@ TABS_KNOWN_SETTINGS <- c(
   "index_summary_show_composites", "index_summary_decimal_places",
   # Stats pack
   "generate_stats_pack",
-  # HTML report
-  "html_report", "html_report_v2", "html_report_v2_tracking",
+  # HTML report (html_report itself is retired — see TABS_RETIRED_SETTINGS)
+  "html_report_v2", "html_report_v2_tracking",
   "html_report_v2_microdata",
   "waves_source", "question_mapping", "wave_order", "sampling_method",
   "population_size", "wave",
@@ -1152,10 +1197,17 @@ load_crosstabs_config <- function(config_file) {
   # vocabulary to "Not specified".
   validate_config_settings(config_obj, settings$config)
 
-  # Check for unrecognised settings — typos are silently ignored otherwise
+  # A setting that used to work and no longer does gets named, not ignored —
+  # live configs (CCPB among them) still carry html_report = True.
+  announce_retired_settings(settings$config)
+
+  # Check for unrecognised settings — typos are silently ignored otherwise.
+  # Retired names are deliberate, not typos, so they are excluded here; they
+  # rejoin this list when their retirement entry is removed.
   .KNOWN_SETTINGS <- TABS_KNOWN_SETTINGS
   user_settings <- names(settings$config)
-  unknown_settings <- setdiff(tolower(trimws(user_settings)), .KNOWN_SETTINGS)
+  unknown_settings <- setdiff(tolower(trimws(user_settings)),
+                              c(.KNOWN_SETTINGS, names(TABS_RETIRED_SETTINGS)))
   if (length(unknown_settings) > 0) {
     cat("\n  WARNING: Unrecognised settings in config (may be typos):\n")
     for (us in unknown_settings) {

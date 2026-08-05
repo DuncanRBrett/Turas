@@ -315,9 +315,6 @@ run_tabs_gui <- function() {
                       icon = icon("play-circle"),
                       disabled = is_running()),
           div(style = "margin-top: 12px;",
-            checkboxInput("html_report_classic",
-                         "Also create the classic report (the previous HTML report)",
-                         value = FALSE),
             checkboxInput("prepare_deliverable",
                          "Prepare client deliverable (minify for delivery)",
                          value = FALSE),
@@ -403,11 +400,9 @@ run_tabs_gui <- function() {
         # Set config_file as global variable (script expects this)
         assign("config_file", file.path(data$path, current_config), envir = .GlobalEnv)
 
-        # The interactive report is the default output. The classic HTML report
-        # is opt-in; this GUI choice overrides the config's html_report setting.
+        # The interactive report is the output. (An explicit html_report_v2 =
+        # FALSE in the config still wins — see run_crosstabs, I16.)
         assign("TURAS_HTML_REPORT_V2", TRUE, envir = .GlobalEnv)
-        assign("TURAS_HTML_REPORT_CLASSIC",
-               isTRUE(input$html_report_classic), envir = .GlobalEnv)
 
         # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",

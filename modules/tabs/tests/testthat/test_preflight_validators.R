@@ -423,17 +423,27 @@ test_that("check_preflight_colour_codes detects invalid hex colour", {
   skip_if(!exists("check_preflight_colour_codes", mode = "function"),
           "check_preflight_colour_codes not available")
 
-  config <- list(html_report = TRUE, brand_colour = "not-hex", accent_colour = "#323367")
+  config <- list(brand_colour = "not-hex", accent_colour = "#323367")
   result <- check_preflight_colour_codes(config, new_error_log())
   expect_true(nrow(result) > 0)
 })
 
-test_that("check_preflight_colour_codes skips when html_report is FALSE", {
+test_that("the colour check no longer waits on a report toggle to run", {
+  # It used to fire only when the (now retired) classic html_report was on, so
+  # junk brand colours reached the interactive report unflagged.
   skip_if(!exists("check_preflight_colour_codes", mode = "function"),
           "check_preflight_colour_codes not available")
 
-  config <- list(html_report = FALSE, brand_colour = "not-hex")
-  result <- check_preflight_colour_codes(config, new_error_log())
+  result <- check_preflight_colour_codes(list(brand_colour = "not-hex"), new_error_log())
+  expect_true(nrow(result) > 0)
+})
+
+test_that("valid colours produce no issues", {
+  skip_if(!exists("check_preflight_colour_codes", mode = "function"),
+          "check_preflight_colour_codes not available")
+
+  result <- check_preflight_colour_codes(
+    list(brand_colour = "#323367", accent_colour = "#CC9900"), new_error_log())
   expect_equal(nrow(result), 0)
 })
 

@@ -182,16 +182,11 @@ print_config_summary <- function(config_obj, n_questions, n_respondents, n_banne
               if(config_obj$enable_significance_testing)
                 sprintf("Yes (alpha=%.3f)", config_obj$alpha) else "No"))
 
-  # Output features
-  html_report <- !is.null(config_obj$html_report) && isTRUE(config_obj$html_report)
-  show_charts <- !is.null(config_obj$show_charts) && isTRUE(config_obj$show_charts)
-  include_summary <- !is.null(config_obj$include_summary) && isTRUE(config_obj$include_summary)
-
-  cat(sprintf("  HTML report:             %s\n", if(html_report) "Yes" else "No"))
-  if (html_report) {
-    cat(sprintf("  Charts:                  %s\n", if(show_charts) "Yes" else "No"))
-    cat(sprintf("  Dashboard:               %s\n", if(include_summary) "Yes" else "No"))
-  }
+  # Output features. The interactive report is decided later in the run (the
+  # GUI's default and an explicit config opt-out both feed into it), so this
+  # header states what is settled here: the workbook.
+  cat(sprintf("  Interactive report:      %s\n",
+              if (isTRUE(config_obj$html_report_v2)) "Yes (config)" else "Set at run time"))
 
   cat(sprintf("  Estimated time:          %s\n",
               estimate_runtime(n_questions, n_respondents, n_banner_cols)))

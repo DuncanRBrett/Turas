@@ -134,7 +134,6 @@ make_test_config <- function() {
     show_numeric_mode = FALSE,
     show_numeric_outliers = FALSE,
     outlier_method = "IQR",
-    html_report = FALSE,
     bonferroni_correction = FALSE,
     verbose = FALSE
   )
@@ -601,7 +600,6 @@ context("preflight — check_preflight_colour_codes")
 
 test_that("passes with valid hex colours", {
   config <- make_test_config()
-  config$html_report <- TRUE
   config$brand_colour <- "#323367"
   config$accent_colour <- "#CC9900"
   log <- new_error_log()
@@ -612,7 +610,6 @@ test_that("passes with valid hex colours", {
 
 test_that("rejects invalid hex colour", {
   config <- make_test_config()
-  config$html_report <- TRUE
   config$brand_colour <- "not-a-colour"
   log <- new_error_log()
   result <- check_preflight_colour_codes(config, log)
@@ -620,15 +617,16 @@ test_that("rejects invalid hex colour", {
   expect_true(nrow(issues) > 0)
 })
 
-test_that("skips colour check when html_report disabled", {
+test_that("checks colours whatever the report settings say", {
+  # The check was gated on the classic html_report setting until that report
+  # was retired; the interactive report reads the same fields, so junk hex is
+  # now flagged unconditionally.
   config <- make_test_config()
-  config$html_report <- FALSE
   config$brand_colour <- "not-valid"
   log <- new_error_log()
   result <- check_preflight_colour_codes(config, log)
-  # Should not produce colour-related errors
-  errors <- result[result$Severity == "Error", ]
-  expect_equal(nrow(errors), 0)
+  issues <- result[grepl("colour|color|hex", result$Description, ignore.case = TRUE), ]
+  expect_true(nrow(issues) > 0)
 })
 
 

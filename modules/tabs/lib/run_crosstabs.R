@@ -186,11 +186,9 @@ tabs_source("crosstabs", "workbook_builder.R")
 # writer below classifies rows through these, so they load before it.
 source(file.path(script_dir, "report_shared.R"))
 
-# V10.3: HTML Report module (loaded conditionally, sources its own submodules)
-tabs_source("html_report", "99_html_report_main.R")
-
 # V11: data-layer writer for the data-centric report v2.
 source(file.path(script_dir, "score_utils.R"))
+source(file.path(script_dir, "ai_insights_step.R"))
 source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "stats_diagnostics.R"))
 source(file.path(script_dir, "patterns_echo.R"))
@@ -655,55 +653,12 @@ workbook_result <- create_crosstabs_workbook(
 )
 
 # ==============================================================================
-# STEP 4b: GENERATE THE CLASSIC HTML REPORT (opt-in)
-# ==============================================================================
-# The interactive report (Step 4d) is the default output. The CLASSIC HTML
-# report is opt-in: when the GUI ran it sets TURAS_HTML_REPORT_CLASSIC, which
-# overrides the config's html_report; non-GUI / config-driven runs keep the
-# config value. (The Excel workbook is always written, above.)
-
-.classic_flag <- get0("TURAS_HTML_REPORT_CLASSIC", ifnotfound = NA)
-if (!(length(.classic_flag) == 1 && is.na(.classic_flag))) {
-  config_result$config_obj$html_report <- isTRUE(.classic_flag)
-}
-
-if (isTRUE(config_result$config_obj$html_report)) {
-  html_output_path <- sub("\\.xlsx$", ".html", config_result$output_path)
-
-  html_result <- tryCatch({
-    generate_html_report(
-      all_results = analysis_result$all_results,
-      banner_info = analysis_result$banner_info,
-      config_obj = config_result$config_obj,
-      output_path = html_output_path,
-      survey_structure = data_result$survey_structure
-    )
-  }, error = function(e) {
-    cat("\n[WARNING] HTML report generation failed:", e$message, "\n")
-    cat("  Traceback:\n")
-    cat(paste("  ", traceback(e), collapse = "\n"), "\n")
-    cat("  The Excel output was not affected.\n\n")
-    NULL
-  })
-
-  if (!is.null(html_result) && html_result$status == "PASS") {
-    cat(sprintf("  HTML Report: %s (%.1f MB)\n",
-        html_result$output_file, html_result$file_size_mb))
-
-    # Minify for client delivery (if requested via Shiny checkbox)
-    if (exists("turas_prepare_deliverable", mode = "function")) {
-      turas_prepare_deliverable(html_output_path)
-    }
-  }
-}
-
-# ==============================================================================
 # STEP 4d: THE INTERACTIVE REPORT (default output)
 # ==============================================================================
 # Emits a *_data.json island AND a self-contained *_report.html (renderer + data
-# inlined) alongside the Excel. This is the default deliverable; the classic
-# Excel/HTML writers above are byte-identical whether this runs or not — this
-# block only ever WRITES NEW FILES, never modifies the classic outputs.
+# inlined) alongside the Excel. This is the deliverable; the Excel workbook
+# written above is byte-identical whether this runs or not — this block only
+# ever WRITES NEW FILES, never modifies the workbook.
 
 # Enabled by the config Settings sheet (html_report_v2) OR the GUI (which builds
 # it by default — TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
@@ -742,6 +697,17 @@ if (.html_report_v2_on) {
   .qual_wb <- trimws(as.character(config_result$config_obj$qual_workbook %||% ""))
   .qual_wb_set <- nzchar(.qual_wb) && .qual_wb != "NA"
   .qual_integrated <- FALSE
+
+  # 0) AI insights sidecar (opt-in, enable_ai_insights). Must run BEFORE the
+  #    data layer: build_dl_ai() reads the sidecar file off disk to carry the
+  #    callouts and executive summary into the report. This step used to live
+  #    inside the classic HTML report; it belongs to the interactive report,
+  #    which is the only thing that reads its output.
+  invisible(generate_ai_insights_sidecar(
+    all_results = analysis_result$all_results,
+    banner_info = analysis_result$banner_info,
+    config_obj  = config_result$config_obj
+  ))
 
   # 1) JSON data layer (sidecar; also embedded in the report, and the input
   #    a future wave-tracking config will read).

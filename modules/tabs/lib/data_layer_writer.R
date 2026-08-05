@@ -11,10 +11,10 @@
 # structures (net_members, index_scores, ...) are omitted in this first cut and
 # added when microdata/live-filtering land.
 #
-# Row classification reuses the HTML transformer's helpers
-# (normalize_question_table, detect_available_stats, classify_row_labels) so the
-# JSON and HTML reports can never drift on what counts as a category / NET /
-# mean row. Requires html_report/01_data_transformer.R to be sourced.
+# Row classification runs through the shared helpers in report_shared.R
+# (normalize_question_table, detect_available_stats, classify_row_labels), which
+# must be sourced first — they define what counts as a category / NET / mean row
+# for every consumer of a question table.
 # ==============================================================================
 
 # Null-coalesce — defined locally only if the tabs helper is not already in scope
@@ -73,8 +73,7 @@ build_sig_note <- function(alpha = 0.05, sampling_method = "Not_Specified") {
 #'
 #' Supports SVG / PNG / JPG. Returns NULL when the path is missing, the file
 #' does not exist, the format is unsupported, or base64enc is unavailable — the
-#' renderer then falls back to the brand dot. (The classic HTML report has its
-#' own equivalent embed_logo; sharing them is a safe future refactor.)
+#' renderer then falls back to the brand dot.
 #'
 #' @param path Absolute path to a logo image, or NULL
 #' @return A "data:...;base64,..." string, or NULL
@@ -245,19 +244,19 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   }
   # Inline researcher / client logos as data URIs when configured; omit (the
   # renderer shows the brand dot) otherwise. researcher_logo_path falls back to
-  # the legacy single logo_path, mirroring the classic report.
+  # the legacy single logo_path.
   researcher <- encode_logo_data_uri(config_obj$researcher_logo_path %||% config_obj$logo_path)
   if (!is.null(researcher)) proj$researcher_logo <- researcher
   client_logo <- encode_logo_data_uri(config_obj$client_logo_path)
   if (!is.null(client_logo)) proj$client_logo <- client_logo
 
-  # Chart colours — mirror the classic report's configured palette so v2 charts
-  # follow the colour scheme instead of a flat brand ramp. The resolved 7-colour
+  # Chart colours — carry the configured palette so v2 charts follow the colour
+  # scheme instead of a flat brand ramp. The resolved 7-colour
   # palette (chart_palette_preset + any per-sentiment overrides) lets the
   # renderer colour categories semantically (negative -> red, positive -> green);
   # chart_series carries configured banner-series colours for multi-column
   # charts; chart_bar_colour is the single-series bar default. get_palette_colours
-  # (the classic chart builder) is sourced alongside the writer — guard so the
+  # comes from report_shared.R, sourced alongside the writer — guard so the
   # writer still works without it (the renderer then keeps its brand-shade
   # fallback). Only well-formed hex values are carried so template placeholder
   # text (e.g. "Optional") never reaches the renderer.
@@ -276,7 +275,7 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
 
   # Report metadata — pre-fills the v2 Report tab's Background & method,
   # Executive summary and (read-only) About from the config's Comments sheet
-  # and closing section, mirroring the classic report. Background/exec stay
+  # and closing section. Background/exec stay
   # editable (analyst can refine); the analyst's edits persist. Carried only
   # when at least one field is set.
   cfg_chr <- function(key) {
@@ -479,7 +478,7 @@ build_dl_banner_groups <- function(banner_info) {
   if (blank) "" else as.character(cc[1])
 }
 
-#' Unique non-blank categories in the classic report's order
+#' Unique non-blank categories in the workbook's category order
 #'
 #' Ordered by the Selection sheet's CategoryOrder (numeric) then
 #' first-appearance, like the crosstab workbook (workbook_builder.R).
@@ -502,7 +501,7 @@ build_dl_banner_groups <- function(banner_info) {
   uniq[order(key, seq_along(uniq))]
 }
 
-#' Question codes grouped by category, in the classic report's order
+#' Question codes grouped by category, in the workbook's category order
 #'
 #' Categories ordered by CategoryOrder then appearance; questions keep their
 #' within-category (Selection) order; uncategorised questions sort last. This
@@ -522,7 +521,7 @@ build_dl_banner_groups <- function(banner_info) {
 
 #' Build the categories[] array of the data layer
 #'
-#' Unique non-blank question categories, in the classic report's order
+#' Unique non-blank question categories, in the workbook's category order
 #' (CategoryOrder then first-appearance).
 #'
 #' @param all_results The tabs results list
@@ -692,8 +691,8 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       }
       kind <- if (cl == "net") "net" else "category"
       # Box-category rows (e.g. "Good (9 - 10)", "Top 2 Box") carry a real
-      # Frequency in the source, so the "Counts" toggle shows n= just like the
-      # classic report. Only a true "NET POSITIVE" row is a percentage-point
+      # Frequency in the source, so the "Counts" toggle shows n= for them.
+      # Only a true "NET POSITIVE" row is a percentage-point
       # difference, not a count — it keeps a null n, matching the renderer's
       # computed path which also nulls that row's n.
       is_net_diff <- kind == "net" && grepl("^NET POSITIVE", lbl, ignore.case = TRUE)
@@ -751,7 +750,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # smaller base than the survey total, and the base on its own never says WHY
   # — so the analyst's label travels with the question and the card states the
   # audience next to the n. FilterLabel wins when both are set; the raw filter
-  # expression is the fallback (same rule as the classic report and Excel).
+  # expression is the fallback (the same rule the Excel workbook applies).
   # A label with no BaseFilter is legitimate: the routing happened in the
   # questionnaire, so the data arrives already restricted.
   filter_label_val <- q_result$filter_label
@@ -772,7 +771,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # questions with no summary-stat row (they are not on the dashboard).
   # scale_max feeds the gauge/heatmap normalisation; gauge_green/gauge_amber
   # are the project's configured colour thresholds (raw values, e.g. >=7
-  # green / >=5 amber) so the v2 dashboard colours match the classic report.
+  # green / >=5 amber).
   #
   # Only rated touchpoints (scale / nps) get a scale_max. A Numeric open-count
   # (e.g. "how many hours did you lose?") carries a Mean row but has no scale
@@ -884,8 +883,8 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
 #'
 #' Keyed by question code; each value a list of \code{{banner, text}} entries
 #' (banner NA = general, serialises to JSON null). These pre-fill the v2
-#' report's per-question insight box, mirroring the classic report; the
-#' analyst's own edits in the report override them. Returns NULL when no
+#' report's per-question insight box; the analyst's own edits in the report
+#' override them. Returns NULL when no
 #' comments are configured, so the key is omitted and existing reports are
 #' byte-identical.
 #'
@@ -941,7 +940,8 @@ build_dl_comments <- function(config_obj) {
 
 #' Per-question AI insights from the AI sidecar (file I/O)
 #'
-#' Reads the AI insights JSON sidecar that the classic HTML report generates
+#' Reads the AI insights JSON sidecar the run refreshes before this point
+#' (generate_ai_insights_sidecar in ai_insights_step.R)
 #' (\code{<config>_ai_insights.json}) and shapes it for the v2 data layer: the
 #' per-question callouts the model flagged as noteworthy, the executive summary,
 #' and a human-readable model attribution. Returns NULL when AI insights are
@@ -1022,8 +1022,8 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   project <- build_dl_project(config_obj, tracking_enabled = tracking_enabled)
   low_base <- project$low_base_threshold
 
-  # Group questions by category in the classic report's order (CategoryOrder
-  # then appearance) so the v2 report opens on, and groups by, the same sections.
+  # Group questions by category (CategoryOrder then appearance) so the v2
+  # report groups by the same sections the workbook does.
   questions <- list()
   for (q_code in .dl_ordered_codes(all_results)) {
     q <- build_dl_question(all_results[[q_code]], banner_info, config_obj, low_base,
