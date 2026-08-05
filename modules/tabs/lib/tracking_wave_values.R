@@ -427,7 +427,10 @@ reconcile_wave_values <- function(values, published, tol_mean = 0.05, tol_pct = 
   got <- pub[values$metric_id]
   tol <- ifelse(values$metric_type == "mean", tol_mean, tol_pct)
   diff <- values$value - got
-  ok <- !is.na(got) & abs(diff) <= tol + 1e-9
+  # unname: `got` carries names (with NA names for metrics that have no
+  # published figure); a single NA name would otherwise become data.frame row
+  # names and abort with "row names contain missing values" (review 2026-08).
+  ok <- unname(!is.na(got) & abs(diff) <= tol + 1e-9)
 
   out <- data.frame(metric_id = values$metric_id, metric_type = values$metric_type,
                     computed = values$value, published = unname(got), diff = unname(diff),
@@ -446,8 +449,73 @@ reconcile_wave_values <- function(values, published, tol_mean = 0.05, tol_pct = 
   if (any(!comparable)) {
     cat(sprintf("  (%d metric(s) had no published figure to check against)\n", sum(!comparable)))
   }
+  # An empty comparable slice must not pass vacuously — all(logical(0)) is TRUE,
+  # which turned "nothing was cross-checked" into "Clean." (review 2026-08, C5).
+  if (sum(comparable) == 0L) {
+    msg <- "no published figures for this wave - nothing was cross-checked"
+    cat(sprintf("[TURAS] WARNING: %s\n", msg))
+    return(list(status = "PARTIAL", result = out, message = msg))
+  }
   list(status = if (all(ok[comparable])) "PASS" else "PARTIAL",
        result = out, message = msg)
+}
+
+
+#' Splice Recovered Wave Values Into a Values Table
+#'
+#' Replaces the target wave's rows with the recovered figures and INSERTS rows
+#' for computed metrics the table has no (metric_id, wave) row for. The splice
+#' used to replace only, so recovering a wave absent from the table silently
+#' wrote nothing (production review 2026-08, C5). History rows are never touched.
+#'
+#' @param values The full values table (data frame with at least metric_id and
+#'   wave columns; base/sd columns are added when missing).
+#' @param computed A `wave_values_from_microdata()` result data frame
+#'   (metric_id, wave, metric_type, value, base, sd, ...).
+#' @param wave The wave label being recovered.
+#'
+#' @return A list with structure:
+#'   \item{status}{"PASS"}
+#'   \item{values}{the spliced table}
+#'   \item{replaced}{number of existing rows updated}
+#'   \item{inserted}{number of new rows appended}
+#'
+#' @export
+splice_wave_values <- function(values, computed, wave) {
+  if (!is.data.frame(values) || !all(c("metric_id", "wave") %in% names(values))) {
+    return(.twv_refuse("DATA_VALUES_INVALID",
+                       "`values` must be a data frame with metric_id and wave columns",
+                       "Pass the values table as read from its CSV."))
+  }
+  if (!is.data.frame(computed) || nrow(computed) == 0) {
+    return(.twv_refuse("DATA_MISSING", "`computed` must be a non-empty data frame",
+                       "Pass the $result of wave_values_from_microdata()."))
+  }
+  for (col in c("metric_type", "base", "sd")) {
+    if (!(col %in% names(values))) values[[col]] <- NA
+  }
+  replaced <- 0L
+  inserted <- 0L
+  for (i in seq_len(nrow(computed))) {
+    r <- computed[i, ]
+    hit <- values$metric_id == r$metric_id & as.character(values$wave) == as.character(wave)
+    if (any(hit)) {
+      values$value[hit] <- r$value
+      values$base[hit]  <- r$base
+      values$sd[hit]    <- r$sd
+      replaced <- replaced + sum(hit)
+    } else {
+      add <- data.frame(metric_id = r$metric_id, wave = as.character(wave),
+                        metric_type = r$metric_type, value = r$value,
+                        base = r$base, sd = r$sd, stringsAsFactors = FALSE)
+      for (col in setdiff(names(values), names(add))) add[[col]] <- NA
+      values <- rbind(values, add[, names(values), drop = FALSE])
+      inserted <- inserted + 1L
+    }
+  }
+  cat(sprintf("[TURAS] splice: %d row(s) replaced, %d inserted for wave %s\n",
+              replaced, inserted, as.character(wave)))
+  list(status = "PASS", values = values, replaced = replaced, inserted = inserted)
 }
 
 

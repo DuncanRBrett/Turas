@@ -264,3 +264,84 @@ test_that("reconcile accepts a data frame and reports metrics with no published 
   expect_equal(rec$status, "PASS")                       # the comparable ones agree
   expect_equal(sum(is.na(rec$result$published)), 3)      # YN, NPS, MM had none
 })
+
+
+# ==============================================================================
+# C5 (production review 2026-08): reconcile must not pass vacuously; the splice
+# must insert a wave the table has never held; a single missing publish must
+# not crash reconcile.
+# ==============================================================================
+
+test_that("reconcile goes PARTIAL, not PASS, when NO metric has a published figure", {
+  vals <- data.frame(metric_id = c("A", "B"), wave = "2019",
+                     metric_type = c("mean", "proportion"),
+                     value = c(9.3, 32.5), base = c(750, 764),
+                     sd = c(1.15, NA), stringsAsFactors = FALSE)
+  # empty published slice — exactly what the recovery script passes for a wave
+  # absent from the values table
+  pub <- data.frame(metric_id = character(0), value = numeric(0),
+                    stringsAsFactors = FALSE)
+  rec <- reconcile_wave_values(vals, pub)
+  expect_equal(rec$status, "PARTIAL")
+  expect_match(rec$message, "nothing was cross-checked")
+})
+
+test_that("reconcile survives exactly ONE metric with no published figure", {
+  # A single NA name used to become data.frame row names and abort with
+  # "row names contain missing values"; multiple NAs collided and were
+  # discarded, which is why the existing 3-missing test never caught it.
+  vals <- data.frame(metric_id = c("A", "B"), wave = "2025",
+                     metric_type = c("mean", "mean"),
+                     value = c(9.3, 8.1), base = c(750, 750),
+                     sd = c(1.1, 1.2), stringsAsFactors = FALSE)
+  rec <- reconcile_wave_values(vals, c(A = 9.3))
+  expect_equal(rec$status, "PASS")
+  expect_equal(sum(is.na(rec$result$published)), 1)
+})
+
+test_that("splice INSERTS rows for a wave the values table has never held", {
+  values <- data.frame(metric_id = c("A", "B"), wave = "2024",
+                       metric_type = c("mean", "mean"),
+                       value = c(9.0, 8.0), base = c(NA, NA),
+                       sd = c(NA, NA), stringsAsFactors = FALSE)
+  computed <- data.frame(metric_id = c("A", "B"), wave = "2025",
+                         metric_type = c("mean", "mean"),
+                         value = c(9.3, 8.2), base = c(750, 750),
+                         sd = c(1.1, 1.3), n = c(750, 750),
+                         stringsAsFactors = FALSE)
+  sp <- splice_wave_values(values, computed, "2025")
+  expect_equal(sp$status, "PASS")
+  expect_equal(sp$inserted, 2L)
+  expect_equal(sp$replaced, 0L)
+  new_rows <- sp$values[as.character(sp$values$wave) == "2025", , drop = FALSE]
+  expect_equal(nrow(new_rows), 2L)
+  expect_equal(new_rows$value[new_rows$metric_id == "A"], 9.3)
+  expect_equal(new_rows$sd[new_rows$metric_id == "B"], 1.3)
+  # history untouched
+  expect_equal(sp$values$value[sp$values$metric_id == "A" & sp$values$wave == "2024"], 9.0)
+})
+
+test_that("splice REPLACES existing rows and leaves other waves alone", {
+  values <- data.frame(metric_id = c("A", "A", "B"), wave = c("2024", "2025", "2025"),
+                       metric_type = "mean",
+                       value = c(9.0, 9.9, 7.7), base = NA, sd = NA,
+                       stringsAsFactors = FALSE)
+  computed <- data.frame(metric_id = "A", wave = "2025", metric_type = "mean",
+                         value = 9.3, base = 750, sd = 1.1, n = 750,
+                         stringsAsFactors = FALSE)
+  sp <- splice_wave_values(values, computed, "2025")
+  expect_equal(sp$replaced, 1L)
+  expect_equal(sp$inserted, 0L)
+  expect_equal(sp$values$value[sp$values$metric_id == "A" & sp$values$wave == "2025"], 9.3)
+  expect_equal(sp$values$base[sp$values$metric_id == "A" & sp$values$wave == "2025"], 750)
+  expect_equal(sp$values$value[sp$values$metric_id == "A" & sp$values$wave == "2024"], 9.0)
+  expect_equal(sp$values$value[sp$values$metric_id == "B" & sp$values$wave == "2025"], 7.7)
+})
+
+test_that("splice refuses on a values table without the contract columns", {
+  bad <- data.frame(x = 1)
+  computed <- data.frame(metric_id = "A", wave = "2025", metric_type = "mean",
+                         value = 9.3, base = 750, sd = 1.1,
+                         stringsAsFactors = FALSE)
+  expect_equal(splice_wave_values(bad, computed, "2025")$status, "REFUSED")
+})

@@ -113,21 +113,17 @@ rec <- reconcile_wave_values(res$result, pub)
 utils::write.csv(rec$result, paste0(P$output_csv, ".recon.csv"), row.names = FALSE, na = "")
 
 # ---- splice into the values table -----------------------------------------
-# History is copied through untouched; only this wave's rows are replaced. A
-# metric that could not be computed keeps whatever the table already held, so a
-# skipped metric degrades to "untested", never to a wrong number.
+# History is copied through untouched; this wave's rows are replaced, and a
+# computed metric the table has no row for is INSERTED (a recovered wave absent
+# from the table used to vanish silently — review 2026-08, C5). A metric that
+# could not be computed keeps whatever the table already held, so a skipped
+# metric degrades to "untested", never to a wrong number.
 keep <- !(values$metric_id %in% (P$drop %||% character(0)))
 values <- values[keep, , drop = FALSE]
-for (col in c("base", "sd")) if (!(col %in% names(values))) values[[col]] <- NA
 
-for (i in seq_len(nrow(res$result))) {
-  r <- res$result[i, ]
-  hit <- values$metric_id == r$metric_id & as.character(values$wave) == as.character(P$wave)
-  if (!any(hit)) next
-  values$value[hit] <- r$value
-  values$base[hit]  <- r$base
-  values$sd[hit]    <- r$sd
-}
+spliced <- splice_wave_values(values, res$result, P$wave)
+if (identical(spliced$status, "REFUSED")) quit(status = 1)
+values <- spliced$values
 # na = "" keeps a missing base/sd an EMPTY cell, matching the values-table
 # convention. A literal "NA" would still parse, but it reads as a value.
 utils::write.csv(values[, c("metric_id", "wave", "metric_type", "value", "base", "sd")],
@@ -136,7 +132,13 @@ utils::write.csv(values[, c("metric_id", "wave", "metric_type", "value", "base",
 cat("\nwrote:", P$output_csv, "\n")
 cat("wrote:", paste0(P$output_csv, ".recon.csv"), "\n")
 if (!identical(rec$status, "PASS") || !identical(res$status, "PASS")) {
-  cat("\nNOT CLEAN — resolve the metrics named above before regenerating sidecars.\n")
+  if (is.data.frame(rec$result) && all(is.na(rec$result$published))) {
+    cat("\nNOT CROSS-CHECKED — the values table had no published figures for this wave.\n")
+    cat("The computed values were written; verify them against the wave's report\n")
+    cat("before regenerating sidecars.\n")
+  } else {
+    cat("\nNOT CLEAN — resolve the metrics named above before regenerating sidecars.\n")
+  }
   quit(status = 1)
 }
 cat("\nClean. Regenerate sidecars with write_aggregate_wave_sidecars(), then rerun the wave.\n")
