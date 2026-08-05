@@ -907,7 +907,16 @@ if (.html_report_v2_on) {
           build_integrated_qual_island(.qual_wb, config_result$config_obj,
                                         data_result$survey_data, unions = .qual_unions,
                                         survey_structure = data_result$survey_structure),
-          turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+          turas_refusal = function(e) {
+            # A refused comment workbook must be UNMISSABLE, not a message that
+            # scrolls past while the tab silently vanishes from the deliverable.
+            cat("\n############################################################\n")
+            cat("##  QUALITATIVE TAB NOT BUILT - comment workbook refused  ##\n")
+            cat("############################################################\n")
+            cat(conditionMessage(e))
+            cat("\n  Fix the workbook and re-run. The refusal above names the sheet and rows.\n\n")
+            NULL
+          },
           error = function(e) {
             cat("\n[WARNING] Qualitative join failed:", conditionMessage(e), "\n")
             cat("  The main report still builds; trying the standalone comment report.\n\n")
@@ -1011,16 +1020,22 @@ if (.html_report_v2_on) {
   # *_qual_report.html is only emitted when that join did not integrate (no host id
   # column, no matches, or the main report did not build). Wrapped so a qual failure
   # never affects the Excel/HTML/v2 outputs.
+  .qual_standalone_ok <- FALSE
   if (.qual_wb_set && !isTRUE(.qual_integrated)) {
     tryCatch({
       qual_out <- sub("\\.xlsx$", "_qual_report.html", v2_out)
       qr <- build_qual_report_v2(.qual_wb, qual_out, config_result$config_obj)
-      if (!is.null(qr) && identical(qr$status, "PASS") &&
-          exists("turas_prepare_deliverable", mode = "function")) {
-        turas_prepare_deliverable(qr$output_file)
+      if (!is.null(qr) && identical(qr$status, "PASS")) {
+        .qual_standalone_ok <- TRUE
+        if (exists("turas_prepare_deliverable", mode = "function")) {
+          turas_prepare_deliverable(qr$output_file)
+        }
       }
     },
     turas_refusal = function(e) {
+      cat("\n############################################################\n")
+      cat("##  QUALITATIVE REPORT NOT BUILT - workbook refused       ##\n")
+      cat("############################################################\n")
       cat(conditionMessage(e))
       cat("\n  The main Excel/HTML/v2 outputs were not affected.\n\n")
     },
@@ -1149,6 +1164,20 @@ if (config_result$config_obj$enable_significance_testing) {
 }
 cat("  Output:", workbook_result$output_path, "\n")
 cat("  Duration:", format_seconds(as.numeric(elapsed)), "\n")
+
+# Qualitative status in the CLOSING summary: a configured comment workbook that
+# failed to join must never end a run looking clean — the refusal box further
+# up scrolls out of sight (this is exactly how a missing tab shipped unnoticed).
+if (exists(".qual_wb_set") && isTRUE(.qual_wb_set)) {
+  if (isTRUE(.qual_integrated)) {
+    cat("  Qualitative: integrated into the report\n")
+  } else if (exists(".qual_standalone_ok") && isTRUE(.qual_standalone_ok)) {
+    cat("  Qualitative: JOIN FAILED - standalone comment report only (see refusal above)\n")
+  } else {
+    cat("  Qualitative: *** NOT BUILT *** - the comment workbook was refused.\n")
+    cat("               Search the console above for [REFUSE] to see the exact sheet and rows.\n")
+  }
+}
 
 if (nrow(analysis_result$error_log) > 0) {
   cat("  Issues:", nrow(analysis_result$error_log), "(see Error Log)\n")
