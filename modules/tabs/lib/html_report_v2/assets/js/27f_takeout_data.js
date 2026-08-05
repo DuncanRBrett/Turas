@@ -448,8 +448,14 @@
     var micro = TR.MICRO;
     if (!micro || !micro.scores) return null;
     var weights = micro.weights || null;
+    // Same eligibility as the odd-one-out cell family: rated small-range scales
+    // only. NPS microdata is bucketed −100/0/+100 (score_utils.R) — the binning
+    // below dropped the −100 camp and the remaining two lumps read as a
+    // fabricated "two camps" split; a 0–100 composite's 101-bin histogram makes
+    // the camp gate meaningless. Both stay out (production review 2026-08, C4).
     var qs = views.indexQuestions().filter(function (q) {
-      return micro.scores[q.code] && micro.scores[q.code].length;
+      return micro.scores[q.code] && micro.scores[q.code].length &&
+        q.type !== "nps" && touchpointMax(q) <= 10;
     });
     if (!qs.length) return null;
     var nResp = micro.n || micro.scores[qs[0].code].length;

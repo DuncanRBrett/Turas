@@ -464,22 +464,58 @@ run("ODD-ONE-OUT family excludes NPS/score scales (F1: no cross-scale fabricatio
 });
 
 run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
-  // A 0–10 recommend scale split into hard camps at 0 (detractors) and 10
-  // (promoters). "round(v) - 1" dropped v=0, so the detractor camp vanished and
-  // the split read as unimodal. The bottom camp must now be counted.
-  const N = 40, nps = [];
-  for (let i = 0; i < N; i++) nps.push(i < 20 ? 0 : 10);
+  // A 0–10 RATED scale split into hard camps at 0 and 10. "round(v) - 1"
+  // dropped v=0, so the bottom camp vanished and the split read as unimodal.
+  // The bottom camp must be counted. (Typed "scale", not "nps": NPS questions
+  // are excluded from this scan entirely — see the C4 test below.)
+  const N = 40, sc = [];
+  for (let i = 0; i < N; i++) sc.push(i < 20 ? 0 : 10);
+  TR.conf = { fpcActiveReport: () => false };
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [] };
+  TR.MICRO = { n: N, weights: null, scores: { Q_REC: sc } };
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q_REC", title: "Recommend (0-10 rated)", category: "", type: "scale", scale_max: 10 }])
+  };
+  const g = takeout.gather();
+  const q = g.bimodal && g.bimodal.questions && g.bimodal.questions.find((x) => x.code === "Q_REC");
+  assert(q, "Q_REC scanned for bimodality");
+  assert(q.counts[0] > 0, "the 0-camp is counted, not dropped");
+  assert(q.scaleMax === 11, "0-based scale binned over 0..10 (11 bins), got " + q.scaleMax);
+});
+
+run("BIMODALITY excludes production-encoded NPS — no fabricated two-camp claim (C4)", () => {
+  // Production NPS microdata is bucketed −100/0/+100 with scale_max 100
+  // (score_utils.R / data_layer_writer.R). The old binning dropped every
+  // detractor (idx −100) and the passive/promoter lumps then flagged as "two
+  // camps behind a calm average" — a false claim built from a distribution
+  // missing a third of respondents. NPS must not enter the scan at all.
+  const N = 60, nps = [];
+  for (let i = 0; i < N; i++) nps.push(i < 18 ? -100 : i < 36 ? 0 : 100); // 30/30/40 split
   TR.conf = { fpcActiveReport: () => false };
   TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [] };
   TR.MICRO = { n: N, weights: null, scores: { Q_NPS: nps } };
   TR.views = {
-    indexQuestions: () => ([{ code: "Q_NPS", title: "Recommend", category: "", type: "nps", scale_max: 10 }])
+    indexQuestions: () => ([{ code: "Q_NPS", title: "Recommend", category: "", type: "nps", scale_max: 100 }])
   };
   const g = takeout.gather();
-  const q = g.bimodal && g.bimodal.questions && g.bimodal.questions.find((x) => x.code === "Q_NPS");
-  assert(q, "Q_NPS scanned for bimodality");
-  assert(q.counts[0] > 0, "the 0-camp (detractors) is counted, not dropped");
-  assert(q.scaleMax === 11, "0-based scale binned over 0..10 (11 bins), got " + q.scaleMax);
+  const scanned = g.bimodal && g.bimodal.questions && g.bimodal.questions.find((x) => x.code === "Q_NPS");
+  assert(!scanned, "an NPS question must not enter the bimodality scan");
+});
+
+run("BIMODALITY excludes 0-100 composite/score metrics (C4 companion)", () => {
+  // A 0-100 score metric's 101-bin histogram makes the two-camp gate
+  // meaningless — same eligibility as the odd-one-out cell family.
+  const N = 40, sc = [];
+  for (let i = 0; i < N; i++) sc.push(i < 20 ? 20 : 80);
+  TR.conf = { fpcActiveReport: () => false };
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [] };
+  TR.MICRO = { n: N, weights: null, scores: { Q_COMP: sc } };
+  TR.views = {
+    indexQuestions: () => ([{ code: "Q_COMP", title: "Composite", category: "", type: "scale", scale_max: 100 }])
+  };
+  const g = takeout.gather();
+  const scanned = g.bimodal && g.bimodal.questions && g.bimodal.questions.find((x) => x.code === "Q_COMP");
+  assert(!scanned, "a 0-100 scale must not enter the bimodality scan");
 });
 
 run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (audit #1)", () => {
