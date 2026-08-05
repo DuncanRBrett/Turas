@@ -1133,5 +1133,61 @@ run("peer chips: an exact tie at the top crowns no one (I6)", () => {
   });
 });
 
+
+run("portrayAll: EVERY column of a selected banner gets a card (CCPB 4-centres case)", () => {
+  // Duncan 2026-08-05: with patterns_banner set, 3 of 4 centres showed — the
+  // 4th (mixed: material gaps, no consistent lean) fell between portrait and
+  // steady into the also-scanned note. Under a positive selection every
+  // column cards: portrait, steady or MIXED, uncapped, nothing in also-scanned.
+  const up4 = [], calm8 = [];
+  for (let i = 0; i < 4; i++) up4.push({ title: "Up " + i, value: 4.6, total: 3.8, scaleMax: 5 });
+  for (let i = 0; i < 4; i++) up4.push({ title: "Down " + i, value: 3.0, total: 3.8, scaleMax: 5 });
+  for (let i = 0; i < 8; i++) calm8.push({ title: "Q" + i, value: 3.82, total: 3.8, scaleMax: 5 });
+  const cols = [
+    { column: "North", group: "Centre", base: 40, gaps: up4.map((g) => (
+      { title: g.title, value: g.total + 0.5, total: g.total, scaleMax: 5 })) },
+    { column: "South", group: "Centre", base: 40, gaps: up4.map((g) => (
+      { title: g.title, value: g.total - 0.5, total: g.total, scaleMax: 5 })) },
+    { column: "Mixed", group: "Centre", base: 40, gaps: up4 },
+    { column: "Calm", group: "Centre", base: 40, gaps: calm8 }
+  ];
+  const fdr = { K: 32, groupCount: 4, questionCount: 8,
+    cells: [{ welchP: 0.001, nIn: 40, flooredG: false }],
+    groups: [
+      { banner: "Centre", group: "North", base: 40, below: 0, above: 8, qn: 8, meanGap: 0.5 },
+      { banner: "Centre", group: "South", base: 40, below: 8, above: 0, qn: 8, meanGap: -0.5 },
+      { banner: "Centre", group: "Mixed", base: 40, below: 4, above: 4, qn: 8, meanGap: 0 },
+      { banner: "Centre", group: "Calm", base: 40, below: 0, above: 8, qn: 8, meanGap: 0.004 }
+    ] };
+  const t = takeout.buildPatterns({ columns: cols, fdr: fdr, portrayAll: true });
+  const carded = t.patterns.filter((p) => p.kind === "portrait" || p.kind === "steady")
+    .map((p) => p.subject);
+  ["North", "South", "Mixed", "Calm"].forEach((name) =>
+    assert(carded.indexOf(name) !== -1, name + " must be carded, got: " + carded.join(", ")));
+  const mixed = t.patterns.filter((p) => p.mixed)[0];
+  assert(mixed && mixed.subject === "Mixed", "the lean-less material group cards as MIXED");
+  assert(takeout.ui.patternSeed(mixed).indexOf("mixed picture") !== -1,
+    "mixed seed claims only its counts");
+  assert(takeout.ui.patternMeta(mixed.id).tag === "Mixed picture", "mixed kicker tag");
+  assert((t.noStory || []).length === 0, "nothing hides in also-scanned under portrayAll");
+  // and WITHOUT portrayAll the previous contract holds (mixed -> also-scanned)
+  const t2 = takeout.buildPatterns({ columns: cols, fdr: fdr });
+  assert((t2.noStory || []).some((g) => g.subject === "Mixed"),
+    "legacy default unchanged: mixed goes to also-scanned");
+});
+
+run("gather sets portrayAll only when patterns_banner matches a banner", () => {
+  TR.MICRO = null; TR.PREV = null;
+  TR.views = { indexQuestions: () => [] };
+  TR.conf = { fpcActiveReport: () => false };
+  TR.AGG = { project: { patterns_banner: ["Centre"] },
+    banner_groups: [{ id: "S03", name: "Centre" }] };
+  assert(takeout.gather().portrayAll === true, "matched selection -> portrayAll");
+  TR.AGG.project.patterns_banner = ["Centres"];   // typo
+  assert(takeout.gather().portrayAll === false, "typo -> no portrayAll (echo warns)");
+  TR.AGG.project.patterns_banner = [];
+  assert(takeout.gather().portrayAll === false, "unset -> legacy behaviour");
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

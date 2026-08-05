@@ -540,12 +540,18 @@
     inputs = inputs || {};
     var patterns = [];
     var gate = fdrGate(inputs.fdr);
+    // A positive patterns_banner selection means EVERY column of the selected
+    // banner gets a card (portrait / steady / mixed), uncapped — the tab is an
+    // overview of that banner, so a group must never silently vanish into the
+    // also-scanned note (Duncan, 2026-08-05: 3 of 4 centres showed).
+    var portrayAll = !!inputs.portrayAll;
 
     // Centrepiece: ranked group portraits (tension-led). The top few become cards;
     // #1 seeds the GPS line. Replaces the one-group "under strain" card and folds
     // the old "most positive group" line into each portrait's highs.
     var ports = portraits(inputs.columns, gate);
-    ports.slice(0, CONST.PORTRAIT_MAX).forEach(function (p) { patterns.push(p); });
+    ports.slice(0, portrayAll ? ports.length : CONST.PORTRAIT_MAX)
+      .forEach(function (p) { patterns.push(p); });
 
     // Groups scanned but with NO eligible portrait, on banners that did produce
     // one — the reader who sees 3 of 4 centres will ask where the 4th went. Not
@@ -561,7 +567,12 @@
       portrayedBanners[p.group] = true;
       eligibleKey[p.group + "::" + p.subject] = true;
     });
-    var flat = [], noStoryExtra = [];
+    if (portrayAll) {
+      // Every scanned banner is portrayed — even one where no group earned a
+      // portrait still cards all its columns (steady/mixed).
+      (inputs.columns || []).forEach(function (c) { portrayedBanners[c.group] = true; });
+    }
+    var flat = [], mixedCards = [], noStoryExtra = [];
     (inputs.columns || []).forEach(function (c) {
       if (!portrayedBanners[c.group]) return;
       if (eligibleKey[c.group + "::" + c.column]) return;
@@ -573,19 +584,32 @@
         if (frac < 0) lows.push(row); else if (frac > 0) highs.push(row);
         if (Math.abs(frac) >= CONST.MIN_STRAIN_GAP) material++;
       });
-      // "Steady" is a claim — "close to the overall almost everywhere". A group
-      // that failed portrait eligibility on OTHER grounds (sign test flat, too
-      // few standouts) but carries material gaps is polarized, not steady
-      // (review 2026-08, I6): it goes to the also-scanned note, unclaimed.
-      if (material > 0) {
-        noStoryExtra.push({ subject: c.column, group: c.group, base: c.base });
-        return;
-      }
       lows.sort(function (a, b) { return a.frac - b.frac; });
       highs.sort(function (a, b) { return b.frac - a.frac; });
       var g = gate ? (gate.groups.filter(function (x) {
         return x.banner === c.group && x.group === c.column;
       })[0] || null) : null;
+      // "Steady" is a claim — "close to the overall almost everywhere". A group
+      // that failed portrait eligibility on OTHER grounds (sign test flat, too
+      // few standouts) but carries material gaps is polarized/mixed, not steady
+      // (review 2026-08, I6). Under portrayAll it still gets a card — a MIXED
+      // one that claims only its counts; otherwise it goes to the also-scanned
+      // note, unclaimed.
+      if (material > 0) {
+        if (portrayAll) {
+          mixedCards.push({ id: "mixed:" + c.group + "::" + c.column, kind: "portrait",
+            mixed: true, subject: c.column, group: c.group, base: c.base,
+            lean: null, lows: lows.slice(0, CONST.EVIDENCE_MAX),
+            highs: highs.slice(0, CONST.EVIDENCE_MAX),
+            hits: lows.length, gains: highs.length, total: c.gaps.length,
+            tally: takeout._tallyGaps(c.gaps),
+            anchor: takeout._anchorFrom(c.gaps, headCodes()),
+            consistent: g ? g.consistent : null, signP: g ? g.signP : null });
+        } else {
+          noStoryExtra.push({ subject: c.column, group: c.group, base: c.base });
+        }
+        return;
+      }
       flat.push({ id: "steady:" + c.group + "::" + c.column, kind: "steady",
         subject: c.column, group: c.group, base: c.base,
         below: lows.length, above: highs.length, total: c.gaps.length,
@@ -594,9 +618,10 @@
         signP: g ? g.signP : null });
     });
     flat.sort(function (a, b) { return (b.base || 0) - (a.base || 0); });
-    var steadyCards = flat.slice(0, CONST.STEADY_MAX);
+    var steadyCards = flat.slice(0, portrayAll ? flat.length : CONST.STEADY_MAX);
     steadyCards.forEach(function (p) { patterns.push(p); });
-    var noStory = flat.slice(CONST.STEADY_MAX).map(function (p) {
+    mixedCards.forEach(function (p) { patterns.push(p); });
+    var noStory = flat.slice(portrayAll ? flat.length : CONST.STEADY_MAX).map(function (p) {
       return { subject: p.subject, group: p.group, base: p.base };
     }).concat(noStoryExtra);
 

@@ -529,8 +529,27 @@
     } catch (e) { /* shares module absent — rated items alone stamp reliability */ }
     var reliability = gatherReliability(relItems);
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
+    // A POSITIVE banner selection (patterns_banner matched at least one group)
+    // means the tab is an overview of THAT banner: every one of its columns
+    // gets a card — portrait, steady or mixed — with no caps and no
+    // also-scanned overflow (Duncan, 2026-08-05: "it should show every column
+    // in a banner").
+    var portrayAll = false;
+    var incSel = (TR.AGG && TR.AGG.project && TR.AGG.project.patterns_banner) || [];
+    if (!Array.isArray(incSel)) incSel = [incSel];
+    if (incSel.length) {
+      var allG = (TR.AGG && TR.AGG.banner_groups) || [];
+      var normSel = (takeout._shares && takeout._shares._normLabel) ||
+        function (s) { return String(s || "").trim().toLowerCase(); };
+      var wantSel = {};
+      incSel.forEach(function (x) { wantSel[normSel(x)] = true; });
+      portrayAll = allG.some(function (g) {
+        return wantSel[normSel(g.name)] || wantSel[normSel(g.id)];
+      });
+    }
     return { columns: columns, levels: lv.levels, apex: lv.apex, comove: comove, fdr: fdr,
       bimodal: bimodal, reliability: reliability, lowBaseThreshold: lowBase,
+      portrayAll: portrayAll,
       scope: { rated: ratedCount, shares: shareItems.length } };
   };
 

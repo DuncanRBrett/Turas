@@ -28,6 +28,12 @@
     if (typeof id === "string" && id.indexOf("portrait:") === 0) {
       return { tag: "In focus", cls: "focus" };
     }
+    // A mixed group (ups and downs, no consistent lean) under a positively
+    // selected banner: carded so the overview shows EVERY column, tagged for
+    // what it is.
+    if (typeof id === "string" && id.indexOf("mixed:") === 0) {
+      return { tag: "Mixed picture", cls: "steady" };
+    }
     if (typeof id === "string" && id.indexOf("steady:") === 0) {
       return { tag: "The steady one", cls: "steady" };
     }
@@ -292,6 +298,16 @@
 
   /** Templated takeaway for a pattern (the one editable line per card). */
   ui.patternSeed = function (p) {
+    if (p.kind === "portrait" && p.mixed) {
+      // The mixed card claims only its counts — no lean, no "steady", no
+      // manufactured story. The tension sentence would invent one.
+      var mt = p.tally || {}, mr = mt.rated || {}, ms = mt.share || {};
+      var mUp = (mr.ahead || 0) + (ms.ahead || 0);
+      var mDown = (mr.behind || 0) + (ms.behind || 0);
+      var mN = (mr.n || 0) + (ms.n || 0);
+      return p.subject + " is a mixed picture — ahead on " + mUp + " and behind on " +
+        mDown + " of " + mN + " compared areas, with no consistent one-way story.";
+    }
     if (p.kind === "portrait") return ui.portraitTension(p);
     if (p.kind === "steady") {
       // The claim is steadiness, proven by the group's own spread — never a lean.
@@ -349,7 +365,8 @@
    *  reads), then the strongest / weakest areas when a study is tagged. */
   ui.answerSeed = function (patterns) {
     var list = patterns || [];
-    var port = list.filter(function (p) { return p.kind === "portrait"; })[0];
+    // never seed the big-picture line from a MIXED card — it has no lean to claim
+    var port = list.filter(function (p) { return p.kind === "portrait" && !p.mixed; })[0];
     var split = list.filter(function (p) { return p.kind === "split"; })[0];
     var bits = [];
     if (port) {
