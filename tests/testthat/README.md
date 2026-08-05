@@ -7,7 +7,6 @@ They live at the project root because they are not specific to any single module
 
 - **TRS compliance** (`test_trs_refusal.R`) -- verifies the Turas Refusal System works correctly
 - **Shared utilities** (`test_shared_config.R`, `test_shared_formatting.R`, `test_shared_validation.R`, `test_shared_weights.R`) -- tests for `modules/shared/lib/` functions used by multiple modules
-- **HTML infrastructure** (`test_html_guard.R`, `test_html_table_builder.R`, `test_html_transformer.R`) -- shared HTML report building blocks
 - **Code quality scans** (`test_no_silent_trycatch.R`) -- automated checks for anti-patterns across the codebase
 - **Module smoke tests** (`test_module_smoke.R`) -- basic load/init checks across all modules
 
