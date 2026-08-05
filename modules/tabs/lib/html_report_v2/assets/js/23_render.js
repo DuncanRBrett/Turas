@@ -100,11 +100,18 @@
     });
   };
 
+  // Config-precision formatters (review 2026-08, I13): the crosstab tab and its
+  // export matrix hard-coded whole-% / 1dp means, ignoring DECIMAL PLACES — an
+  // NPS published as 79 displayed "79.0", and percent_decimals=1 workbooks
+  // (46.3%) displayed "46%". Means resolve per model: an NPS/0-100 metric takes
+  // percent precision (fmt.decimalsForQ), everything else ratings precision.
   function fmtPct(v) {
-    return v === null || v === undefined ? "–" : Math.round(v) + "%";
+    return v === null || v === undefined
+      ? "–" : Number(v).toFixed(fmt.decimalsFor(false)) + "%";
   }
-  function fmtMean(v) {
-    return v === null || v === undefined ? "–" : Number(v).toFixed(1);
+  function fmtMean(v, model) {
+    if (v === null || v === undefined) return "–";
+    return Number(v).toFixed(fmt.decimalsForQ(model || null, true));
   }
 
   /** Heatmap tint: brand colour with alpha scaled by value. */
@@ -269,7 +276,7 @@
           ? heat(row.kind === "mean" ? cell.mean : cell.pct, 100) : "";
         var body;
         if (row.kind === "mean") {
-          body = '<span class="mv">' + fmtMean(cell.mean) + "</span>";
+          body = '<span class="mv">' + fmtMean(cell.mean, model) + "</span>";
         } else {
           body = '<span class="v">' + fmtPct(cell.pct) + "</span>";
         }
@@ -377,7 +384,7 @@
       if (opts.categoriesOnly && row.kind !== "category") return;
       var cells = [row.label];
       row.cells.forEach(function (cell) {
-        var value = row.kind === "mean" ? fmtMean(cell.mean) : fmtPct(cell.pct);
+        var value = row.kind === "mean" ? fmtMean(cell.mean, model) : fmtPct(cell.pct);
         cells = cells.concat(perCol(
           value + (cell.sig ? " " + cell.sig : ""),
           cell.ci ? round1(cell.ci.lo) : "",
@@ -586,7 +593,7 @@
         body.push(S.el("rect", { x: LABEL, y: barY, width: w, height: barH,
           fill: catColours ? catColours[ri] : palette[k % palette.length], rx: 3 }));
         body.push(S.text(LABEL + w + 6, barY + barH * 0.78,
-          (meanScale ? fmtMean(v) : fmtPct(v)) +
+          (meanScale ? fmtMean(v, model) : fmtPct(v)) +
           (cols.length === 1 && cell && cell.sig
             ? " " + (/^[▲▼▵▿]/.test(cell.sig) ? "" : "▲") + cell.sig : ""),
           { "font-size": cols.length > 1 ? 10 : 11.5, "font-weight": 600,

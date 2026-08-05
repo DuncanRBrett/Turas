@@ -60,6 +60,12 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
   if (grepl("</script", bundle, fixed = TRUE)) {
     stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '</script' — cannot inline safely.")
   }
+  # "<!--" in inline script text opens the HTML double-escaped state (the same
+  # hole escape_island closes for the data islands) — refuse rather than ship
+  # a bundle whose parsing depends on what follows.
+  if (grepl("<!--", bundle, fixed = TRUE)) {
+    stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '<!--' — cannot inline safely.")
+  }
   bundle
 }
 
@@ -84,8 +90,15 @@ build_report_v2_html <- function(data_json, config_obj,
     if (!file.exists(p)) stop(sprintf("[IO_REPORT_V2_ASSET_MISSING] %s", p))
   }
 
-  # Defend against "</" sequences inside embedded JSON breaking out of <script>
-  escape_island <- function(txt) gsub("</", "<\\/", txt, fixed = TRUE)
+  # Defend the <script> islands against ANY markup-significant sequence in the
+  # embedded JSON. "</" alone is not enough: per the HTML parser, "<!--"
+  # followed by "<script" enters the script double-escaped state, after which
+  # the island's own closing tag no longer closes it and the NEXT island (or
+  # the {{JS}} bundle) is swallowed — a respondent pasting an HTML email
+  # template into an open-end was sufficient for a blank report (review
+  # 2026-08, I14). Escaping every "<" as the JSON unicode escape u003c
+  # (identical after JSON.parse) makes "</", "<!--" and "<script" unformable.
+  escape_island <- function(txt) gsub("<", "\\\\u003c", txt)
   escape_html <- function(txt) {
     txt <- gsub("&", "&amp;", txt, fixed = TRUE)
     txt <- gsub("<", "&lt;", txt, fixed = TRUE)

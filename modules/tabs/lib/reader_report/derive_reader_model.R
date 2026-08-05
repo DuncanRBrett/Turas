@@ -264,7 +264,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
     claims[[length(claims) + 1L]] <- list(lead = "The direction.",
       body = sprintf("Of the %d tracked items, %s lower than %s%s.",
                      n_tracked,
-                     if (n_down == n_tracked) sprintf("every one is", n_down) else sprintf("%d are", n_down),
+                     if (n_down == n_tracked) "every one is" else sprintf("%d are", n_down),
                      ref_year,
                      if (!is.null(steepest)) sprintf("; the steepest fall is “%s” (%s)",
                        steepest$short, format(steepest$delta, nsmall = 2)) else ""))

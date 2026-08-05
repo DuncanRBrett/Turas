@@ -329,5 +329,56 @@ run("an NPS takes PERCENT places, not ratings places (it is mean-KIND, 0-100)", 
   eq(TR.fmt.decimalsForQ({ type: "scale", scale_max: 10 }, false), 0, "a proportion row -> 0");
 });
 
+
+run("crosstab tableHtml honours DECIMAL PLACES — no fake NPS decimal (I13)", () => {
+  // The island stores what the engine published: NPS 79 (percent places, 0dp),
+  // rating mean 4.3 (rating places, 1dp). The crosstab tab hard-coded
+  // toFixed(1), re-adding a digit the published table never had ("79.0").
+  TR.AGG = { project: { format: { percent_decimals: 0, rating_decimals: 1 } } };
+  const npsModel = {
+    code: "QN", title: "Recommend", type: "nps", scale_max: 100,
+    columns: [{ label: "Total", letter: "A", base: 100 }],
+    rows: [{ kind: "mean", label: "NPS Score",
+      cells: [{ mean: 79, n: null, pct: null, sig: "" }] }]
+  };
+  const html = TR.render.tableHtml(npsModel, {});
+  assert(html.indexOf(">79<") >= 0, "NPS renders as 79, got: " + html.match(/class="mv">[^<]*/));
+  assert(html.indexOf("79.0") < 0, "no fake decimal on an integer-published NPS");
+
+  const ratingModel = {
+    code: "QR", title: "Rating", type: "scale", scale_max: 10,
+    columns: [{ label: "Total", letter: "A", base: 100 }],
+    rows: [{ kind: "mean", label: "Mean",
+      cells: [{ mean: 4.3, n: null, pct: null, sig: "" }] }]
+  };
+  const rhtml = TR.render.tableHtml(ratingModel, {});
+  assert(rhtml.indexOf(">4.3<") >= 0, "rating mean keeps its 1dp");
+});
+
+run("crosstab tableHtml shows percent_decimals=1 percentages (I13)", () => {
+  TR.AGG = { project: { format: { percent_decimals: 1, rating_decimals: 1 } } };
+  const m = {
+    code: "Q1", title: "Q", type: "single", scale_max: null,
+    columns: [{ label: "Total", letter: "A", base: 100 }],
+    rows: [{ kind: "category", label: "Yes",
+      cells: [{ mean: null, n: 46, pct: 46.3, sig: "" }] }]
+  };
+  const html = TR.render.tableHtml(m, {});
+  assert(html.indexOf("46.3%") >= 0, "1dp percent renders 46.3%, got: " + html.match(/class="v">[^<]*/));
+});
+
+run("crosstab export matrix uses the same config precision (I13)", () => {
+  TR.AGG = { project: { format: { percent_decimals: 0, rating_decimals: 1 } } };
+  const m = {
+    code: "QN", title: "Recommend", type: "nps", scale_max: 100,
+    columns: [{ label: "Total", letter: "A", base: 100 }],
+    rows: [{ kind: "mean", label: "NPS Score",
+      cells: [{ mean: 79, n: null, pct: null, sig: "" }] }]
+  };
+  const mat = TR.render.matrix(m, {});
+  const flat = JSON.stringify(mat);
+  assert(flat.indexOf("79.0") < 0, "matrix carries 79, not 79.0: " + flat.slice(0, 200));
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

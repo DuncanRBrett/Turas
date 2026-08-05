@@ -651,6 +651,9 @@
     // it state the audience beside the base.
     viewModel.audience = TR.d2.audienceNote(q) || null;
     viewModel.type = q.type;
+    // scale_max travels with type so display formatters can resolve the
+    // NPS/0-100 percent-precision exception (fmt.decimalsForQ) from the model.
+    viewModel.scale_max = q.scale_max;
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();
     // An audience filter makes the current wave a subgroup, but prior waves are

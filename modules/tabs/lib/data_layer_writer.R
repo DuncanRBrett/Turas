@@ -1024,7 +1024,17 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   for (q_code in .dl_ordered_codes(all_results)) {
     q <- build_dl_question(all_results[[q_code]], banner_info, config_obj, low_base,
                            survey_structure)
-    if (!is.null(q)) questions[[length(questions) + 1]] <- q
+    if (!is.null(q)) {
+      questions[[length(questions) + 1]] <- q
+    } else {
+      # A malformed/empty table must not vanish silently: the Excel workbook
+      # still carries this question, so an unnamed skip here ships an HTML
+      # report that quietly disagrees with it (review 2026-08, I15).
+      cat(sprintf(paste0(
+        "  [NOTE] Question %s: results table is missing or malformed - ",
+        "omitted from the v2 report (the Excel workbook may still carry it).\n"),
+        q_code))
+    }
   }
   questions <- .validate_linked_open(questions, all_results, survey_structure)
 

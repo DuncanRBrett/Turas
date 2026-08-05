@@ -170,9 +170,28 @@ test_that("escapes </ inside the embedded JSON so it cannot break the script", {
   dl <- build_data_layer(list(Q1 = q), make_dl_banner_info(), make_dl_config())
   json <- serialize_data_layer(dl)
   html <- build_report_v2_html(json, make_dl_config(), assets_dir)
-  # the literal </script must not survive inside the data island
+  # the literal </script must not survive inside the data island: every "<"
+  # is emitted as the JSON escape \u003c (parse-identical)
   expect_false(grepl("</script> attempt", html, fixed = TRUE))
-  expect_true(grepl("<\\/script", html, fixed = TRUE))
+  expect_true(grepl("\\u003c\\/script> attempt", html, fixed = TRUE))
+})
+
+test_that("a verbatim with '<!--' + '<script' cannot enter the double-escaped state (I14)", {
+  # Per the HTML parser, "<!--" followed by "<script" inside a <script> element
+  # enters the double-escaped state: the island's own </script> no longer
+  # closes it and it swallows the next island — DATA_QUAL poison swallowed the
+  # {{JS}} tag and shipped a BLANK report. A respondent pasting an HTML email
+  # template into an open-end is a sufficient trigger.
+  q <- make_dl_q_single()
+  q$question_text <- "pasted <!--<script src=x> from an email template"
+  dl <- build_data_layer(list(Q1 = q), make_dl_banner_info(), make_dl_config())
+  json <- serialize_data_layer(dl)
+  html <- build_report_v2_html(json, make_dl_config(), assets_dir)
+  expect_false(grepl("<!--<script", html, fixed = TRUE))
+  expect_true(grepl("\\u003c!--\\u003cscript", html, fixed = TRUE))
+  # and the escape is parse-identical JSON: the reader sees the original text
+  esc <- gsub("<", "\\\\u003c", '{"t":"pasted <!--<script src=x> here"}')
+  expect_equal(jsonlite::fromJSON(esc)$t, "pasted <!--<script src=x> here")
 })
 
 test_that("a verbatim containing a template token cannot corrupt the report (single-pass fill)", {

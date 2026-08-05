@@ -1021,3 +1021,19 @@ test_that("a table without RowSource still keys by label alone (unchanged)", {
   expect_length(sat_rows, 1)
   expect_equal(sat_rows[[1]]$pct[[1]], 30)
 })
+
+
+test_that("a question with a malformed table is skipped BY NAME on the console (I15)", {
+  # The Excel workbook still carries such a question, so an unnamed skip ships
+  # an HTML report that silently disagrees with it.
+  good <- make_dl_q_single()
+  broken <- list(question_code = "Q_BROKEN", question_text = "Broken",
+                 question_type = "Single_Response", table = NULL, bases = NULL)
+  out <- capture.output(
+    dl <- build_data_layer(list(Q1 = good, Q_BROKEN = broken),
+                           make_dl_banner_info(), make_dl_config())
+  )
+  expect_true(any(grepl("Q_BROKEN", out)))
+  expect_true(any(grepl("omitted from the v2 report", out)))
+  expect_equal(length(dl$questions), 1L)
+})
