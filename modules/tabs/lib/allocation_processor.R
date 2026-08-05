@@ -265,7 +265,7 @@ build_allocation_sig_row <- function(value_sets, weight_sets, banner_info,
   add_significance_row(
     test_data,
     banner_info,
-    "rating",
+    "mean",
     internal_keys,
     alpha              = config$alpha,
     bonferroni         = config$bonferroni_correction,

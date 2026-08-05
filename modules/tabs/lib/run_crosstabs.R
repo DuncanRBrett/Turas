@@ -294,7 +294,21 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
           alpha = alpha_adj
         )
       } else {
-        list(significant = FALSE, p_value = NA_real_, higher = FALSE)
+        # An unknown row_type must refuse, not return an all-blank Sig row that
+        # reads as "tested, nothing significant" (production review 2026-08, C1).
+        tabs_refuse(
+          code = "CALC_UNKNOWN_SIG_ROW_TYPE",
+          title = "Unknown Significance Row Type",
+          problem = sprintf(
+            "run_significance_tests_for_row was called with row_type '%s', which has no test.",
+            row_type
+          ),
+          why_it_matters = "Returning no test here would emit a blank Sig row that reads as 'tested, nothing significant'.",
+          how_to_fix = c(
+            "This is an internal error - please report it",
+            "Valid row types: proportion, topbox, mean, index"
+          )
+        )
       }
 
       # Primary significance decision (uses pre-compared $significant from test)

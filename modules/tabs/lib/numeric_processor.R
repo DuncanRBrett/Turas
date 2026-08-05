@@ -311,7 +311,7 @@ process_numeric_question <- function(data, question_info, question_options,
     }
     
     sig_row <- add_significance_row(
-      test_data, banner_info, "rating", internal_keys,
+      test_data, banner_info, "mean", internal_keys,
       alpha = config$alpha,
       config$bonferroni_correction,
       config$significance_min_base,
