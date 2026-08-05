@@ -117,6 +117,31 @@ Set `sampling_method = Census` as well, so the report speaks "confidence interva
 
 ---
 
+## Confidentiality Ship (Disclosure Control)
+
+For anonymity-sensitive studies (staff climate surveys, small insider
+populations) the tabs config has two dials that work together:
+
+| Setting | What it does |
+|---------|--------------|
+| `min_reporting_base` | Hides identifying detail on screen for any cut smaller than k (crosstab columns, comment demographic tags). 1 = off; ~10 for a sensitive sample. |
+| `html_report_v2_microdata` | TRUE embeds the anonymised per-respondent island that powers live filters and computed views. **FALSE is the confidential ship**: the file carries published aggregates only. |
+
+**The rule:** the on-screen gate is a viewing convenience. Wherever the
+k-gate is a *promise* to respondents, the copy that leaves your hands must be
+built with `html_report_v2_microdata = FALSE` — with the island present, the
+withheld numbers and per-comment demographics are reconstructable from the
+page source (View Source), whatever the screen shows. The build prints a
+boxed DISCLOSURE WARNING whenever `min_reporting_base > 1` and the island
+still ships, so you cannot send the wrong copy unwarned.
+
+Typical setup: your own working config keeps microdata TRUE (full
+interactivity); a second config for the client copy sets it FALSE. The Excel
+workbook applies the same k-gate on every sheet (Crosstabs, Index_Summary,
+Sample Composition, Summary) in all cases.
+
+---
+
 ## Typical Workflow
 
 1. **Prepare data** — Clean survey data in Excel/CSV format

@@ -43,8 +43,13 @@ Gate caveats (findings in their own right): the 9 R skips are the **entire e2e i
 | I17-I21 | 8d1eea85 — qual workbook verified not trusted; hide fails closed; 1e5 join; stale qual pins re-gate; withheld count rendered |
 | I22, I23, I3 (mean half) | f757d973 — NA weights refuse, proportions weight, categories skip by name; pulse counts honestly; wave chip tests raw means (fixture verified decisive) |
 
-**OPEN — needs Duncan's decision:** C3 (data-time vs render-time disclosure
-model for the v2 page source; C2's Excel side is fixed either way).
+**C3 — DECIDED by Duncan (2026-08-05) and implemented:** render-time
+suppression is a viewing convenience; **microdata = N is the confidential
+ship**. The build now prints a boxed DISCLOSURE WARNING whenever
+min_reporting_base > 1 and the microdata island still ships (naming the
+page-source leak and the FALSE setting), the qual source-disclosure warning
+names the microdata island as a leak regardless of the tag dial, and the
+operator guide + template help document the model.
 
 **OPEN — logged residuals:** I20 idx→stable-key migration for reader marks
 (the island is anonymised by design, so ResponseID cannot be embedded as-is;

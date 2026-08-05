@@ -134,20 +134,27 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
 qual_warn_source_disclosure <- function(config_obj) {
   k <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
   if (!(length(k) == 1L && !is.na(k) && k > 1)) return(invisible(NULL))
-  # "block" ships no tags; "safe" ships only k-anonymised tags — both are source-safe.
-  # Only "allow" leaves full per-comment demographics in the page source.
-  tags_in_source <- !(identical(config_obj$qual_demographic_cuts, "block") ||
-                      identical(config_obj$qual_demographic_cuts, "safe"))
+  # "block" ships no tags; "safe" ships only k-anonymised tags. BUT: whenever
+  # the microdata island ships too, every comment's idx keys into DATA_MICRO's
+  # per-respondent banner values, so full demographics are reconstructable from
+  # the page source WHATEVER the tag dial says (production review 2026-08, C3).
+  # Only microdata = N makes the tag dials source-safe.
+  micro_ships <- !isFALSE(config_obj$html_report_v2_microdata)
+  tags_in_source <- micro_ships ||
+    !(identical(config_obj$qual_demographic_cuts, "block") ||
+      identical(config_obj$qual_demographic_cuts, "safe"))
   text_in_source <- identical(config_obj$qual_confidentiality_mode, "full")
   if (!tags_in_source && !text_in_source) return(invisible(NULL))
   cat("\n┌─── TURAS DISCLOSURE WARNING ────────────────────────────────┐\n")
   cat("│ min_reporting_base =", k, "gates the on-screen and quant views, but\n")
-  cat("│ the comment island still carries identifying detail in the PAGE SOURCE:\n")
-  if (tags_in_source) cat("│  • demographic tags  (qual_demographic_cuts = 'allow')\n")
+  cat("│ the page source still carries identifying detail:\n")
+  if (micro_ships) cat("│  • per-comment demographics via the MICRODATA island (any tag dial)\n")
+  if (!micro_ships && tags_in_source) cat("│  • demographic tags  (qual_demographic_cuts = 'allow')\n")
   if (text_in_source) cat("│  • raw verbatims     (qual_confidentiality_mode = 'full')\n")
   cat("│ A sub-k cut is then reconstructable via View-Source / Save-As.\n")
-  cat("│ For a source-safe report set qual_demographic_cuts = 'safe' (k-anon tags)\n")
-  cat("│ or 'block' (no tags), and a non-'full' text mode. Leave as-is for INTERNAL use.\n")
+  cat("│ The CONFIDENTIAL ship is html_report_v2_microdata = FALSE plus\n")
+  cat("│ qual_demographic_cuts = 'safe' or 'block' and a non-'full' text mode.\n")
+  cat("│ Leave as-is for INTERNAL use.\n")
   cat("└─────────────────────────────────────────────────────────────┘\n\n")
   invisible(NULL)
 }

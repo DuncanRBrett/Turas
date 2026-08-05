@@ -842,6 +842,22 @@ if (.html_report_v2_on) {
         cat("\n[WARNING] Disclosure threshold (min_reporting_base =", .mrb,
             ") is set but the microdata island is unavailable.\n")
         cat("  The report hides ALL identifying detail (fail-closed). Restore the microdata to re-enable filtered views.\n\n")
+      } else if (!is.null(micro) && .mrb_set) {
+        # Duncan's C3 decision (production review 2026-08): render-time
+        # suppression is a viewing convenience; microdata = N is the
+        # confidential ship. A k-gated build that still carries microdata must
+        # say so in terms the operator can act on before the file leaves.
+        cat("\n┌─── TURAS DISCLOSURE WARNING ────────────────────────────────┐\n")
+        cat("│ min_reporting_base =", .mrb, "hides sub-k cells ON SCREEN, but this\n")
+        cat("│ build carries the microdata island: the withheld numbers and every\n")
+        cat("│ respondent's coded banner values sit in the PAGE SOURCE (View Source).\n")
+        cat("│\n")
+        cat("│ For a deliverable where the k-gate is a PROMISE (anonymity-sensitive\n")
+        cat("│ studies), ship the confidential build instead:\n")
+        cat("│   html_report_v2_microdata = FALSE\n")
+        cat("│ (published figures only - live filters and computed views are off).\n")
+        cat("│ This copy is fine as the analyst's own working copy.\n")
+        cat("└─────────────────────────────────────────────────────────────┘\n\n")
       }
 
       # Tabs-integrated tracker (OFF by default): emit this wave's contribution,

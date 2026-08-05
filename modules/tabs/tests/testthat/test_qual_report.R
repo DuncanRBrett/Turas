@@ -161,22 +161,35 @@ test_that("qual_warn_source_disclosure warns on a leaky protected config, quiet 
   out <- capture.output(qual_warn_source_disclosure(list(
     min_reporting_base = 10, qual_demographic_cuts = "allow", qual_confidentiality_mode = "full")))
   expect_true(any(grepl("DISCLOSURE WARNING", out)))
-  expect_true(any(grepl("demographic tags", out)))
+  # with the microdata island shipping, the microdata line subsumes the tag line
+  expect_true(any(grepl("MICRODATA island", out)))
   expect_true(any(grepl("raw verbatims", out)))
 
-  # Source-safe protected config (block + non-full text) -> silent.
+  # Source-safe protected config (block + non-full text + NO microdata) -> silent.
+  # C3 decision (2026-08): the tag dials are only source-safe when the microdata
+  # island does not ship - per-comment demographics are otherwise reconstructable
+  # from DATA_MICRO whatever the dial says.
   out2 <- capture.output(qual_warn_source_disclosure(list(
-    min_reporting_base = 10, qual_demographic_cuts = "block", qual_confidentiality_mode = "redacted")))
+    min_reporting_base = 10, qual_demographic_cuts = "block",
+    qual_confidentiality_mode = "redacted", html_report_v2_microdata = FALSE)))
   expect_equal(length(out2), 0L)
+
+  # The same dials WITH microdata -> warns, naming the microdata island.
+  out2b <- capture.output(qual_warn_source_disclosure(list(
+    min_reporting_base = 10, qual_demographic_cuts = "block",
+    qual_confidentiality_mode = "redacted", html_report_v2_microdata = TRUE)))
+  expect_true(any(grepl("MICRODATA island", out2b)))
+  expect_true(any(grepl("html_report_v2_microdata = FALSE", out2b)))
 
   # Disclosure off (k = 1) -> silent regardless of the other dials.
   out3 <- capture.output(qual_warn_source_disclosure(list(
     min_reporting_base = 1, qual_demographic_cuts = "allow", qual_confidentiality_mode = "full")))
   expect_equal(length(out3), 0L)
 
-  # "safe" (k-anonymised tags) + a non-full text mode is source-safe -> silent.
+  # "safe" (k-anonymised tags) + non-full text + no microdata is source-safe -> silent.
   out4 <- capture.output(qual_warn_source_disclosure(list(
-    min_reporting_base = 10, qual_demographic_cuts = "safe", qual_confidentiality_mode = "redacted")))
+    min_reporting_base = 10, qual_demographic_cuts = "safe",
+    qual_confidentiality_mode = "redacted", html_report_v2_microdata = FALSE)))
   expect_equal(length(out4), 0L)
 
   # "safe" + full text warns about the TEXT only, not the tags.
