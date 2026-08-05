@@ -91,9 +91,9 @@ generate_crosstab_config_template <- function(output_path,
              description = "Name of the output Excel workbook.",
              valid_values_text = "Filename ending in .xlsx"),
         list(name = "output_format", default = "xlsx", required = TRUE,
-             description = "Output file format: Excel workbook or separate CSV files.",
-             valid_values_text = "xlsx or csv",
-             dropdown = c("xlsx", "csv"))
+             description = "Output file format. Excel workbook is the only writer.",
+             valid_values_text = "xlsx",
+             dropdown = c("xlsx"))
       )
     ),
 

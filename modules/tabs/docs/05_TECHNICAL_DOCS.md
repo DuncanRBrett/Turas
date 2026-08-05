@@ -120,25 +120,27 @@ modules/tabs/
 │   │   ├── workbook_builder.R       # Excel workbook assembly (~657 lines)
 │   │   └── checkpoint.R             # Checkpoint/resume system (~146 lines)
 │   │
-│   └── html_report/              # HTML report system (V10.3+)
-│       ├── 00_html_guard.R          # HTML report input validation (~181 lines)
-│       ├── 01_data_transformer.R    # Transform results for HTML (~533 lines)
-│       ├── 02_table_builder.R       # Build HTML <table> elements (~327 lines)
-│       ├── 03_page_builder.R        # Assemble complete HTML page (~2,097 lines)
-│       ├── 04_html_writer.R         # Write HTML to file (~111 lines)
-│       ├── 05_dashboard_transformer.R # Extract dashboard metrics (~503 lines)
-│       ├── 06_dashboard_builder.R   # Build dashboard components (~1,951 lines)
-│       ├── 07_chart_builder.R       # Inline SVG chart generation (~608 lines)
-│       ├── 99_html_report_main.R    # HTML report entry point (~434 lines)
-│       └── js/                      # Client-side JavaScript
-│           ├── core_navigation.js      # Navigation, search, help (~572 lines)
-│           ├── chart_picker.js         # Chart column picker, export (~613 lines)
-│           ├── table_export_init.js    # CSV/Excel export, sort (~443 lines)
-│           ├── pinned_views.js         # View pinning, Markdown editor (~1,381 lines)
-│           └── slide_export.js         # Slide PNG export (~479 lines)
+│   ├── report_shared.R          # Row/banner shape helpers + chart palette
+│   ├── data_layer_writer.R      # Results -> the data-agg JSON island
+│   ├── microdata_writer.R       # Anonymised per-respondent island
+│   ├── tracking_island.R        # Wave history island
+│   ├── qual_*.R                 # Coded-comment workbook -> qual island
+│   │
+│   ├── html_report_v2/          # The interactive report
+│   │   ├── build_report_v2.R        # Bundler: template + assets + islands -> one file
+│   │   ├── assets/template.html     # Page shell with island placeholders
+│   │   ├── assets/styles.css        # All report CSS
+│   │   ├── assets/js/               # The renderer (~42 modules, load-ordered by name)
+│   │   └── tests/                   # Node test suites for the renderer
+│   │
+│   └── reader_report/           # The narrative Reader report
+│       ├── derive_reader_model.R    # What the Reader says, derived from the data layer
+│       ├── reader_ai_prose.R        # Optional AI drafting (aggregates only)
+│       └── build_reader_report.R    # Renders the Reader HTML
 ```
 
-Total lines of code: approximately 36,330 (R: 32,840 + JS: 3,490).
+The classic (pre-rendered) HTML report was retired in August 2026 and its
+code deleted; git history holds it.
 
 ### Dependencies
 
@@ -152,43 +154,38 @@ serialization
 **Internal Dependencies:** Integrates with `/modules/shared/lib/` for
 common utilities (validation_utils, config_utils, formatting_utils).
 
-### HTML Report Subsystem
+### Interactive Report Subsystem
 
-The HTML report is generated as a post-processing step after Excel output. The pipeline is:
+The report is built after the Excel workbook, from the same results. The
+pipeline is:
 
 ```
-Config → Data Transform → Page Build → Dashboard Build → JS Injection → Single-File Output
+all_results → data layer (JSON islands) → bundler → single self-contained HTML
 ```
 
-**R files (in `lib/html_report/`):**
-| File | Purpose |
-|------|---------|
-| `99_html_report_main.R` | Orchestrator — coordinates all HTML report generation |
-| `01_data_transformer.R` | Transforms crosstab results into HTML-ready data structures |
-| `02_chart_builder.R` | Generates SVG charts (bar, stacked bar, line) |
-| `03_page_builder.R` | Assembles HTML pages with CSS, tables, and navigation |
-| `04_added_slides_builder.R` | Builds the Added Slides tab from config and in-browser content |
-| `05_significance_builder.R` | Generates significance findings summary |
-| `06_dashboard_builder.R` | Builds the Summary Dashboard with gauges and heatmaps |
-| `07_comments_builder.R` | Injects analyst comments into question pages |
-| `08_pin_builder.R` | Builds the Pinned Views infrastructure |
+**R side:**
 
-**JS files (in `lib/html_report/js/`):**
 | File | Purpose |
 |------|---------|
-| `core_navigation.js` | Tab switching, search, sidebar, keyboard navigation |
-| `table_interactions.js` | Heatmap toggle, sort, banner switching, clipboard copy |
-| `chart_manager.js` | Chart rendering, resize handling, visibility toggling |
-| `pinned_views.js` | Pin/unpin, reorder, SVG-to-PNG export, state persistence |
-| `table_export_init.js` | Initialization, PNG export, DOMContentLoaded setup |
+| `data_layer_writer.R` | Turns results into the `data-agg` island: questions, columns, stats, project metadata |
+| `microdata_writer.R` | Anonymised per-respondent island that powers live filtering and custom banners |
+| `tracking_island.R` | Wave history island for the Tracking tab |
+| `qual_*.R` | Reads a coded-comment workbook and builds the qualitative island |
+| `ai_insights_step.R` | Refreshes the AI insights sidecar the data layer reads (opt-in) |
+| `html_report_v2/build_report_v2.R` | Inlines template, CSS, renderer and islands into one file |
+
+**Renderer:** `lib/html_report_v2/assets/js/` — around 42 dependency-free
+modules, concatenated in filename order (namespace and format first, then
+data/stats/model, then the tabs). Its own Node test suites live in
+`lib/html_report_v2/tests/`.
 
 **Key design decisions:**
-- Single self-contained HTML file — all CSS, JS, and data inline (no external dependencies)
-- SVG-native charts — no canvas; enables clean PNG export via SVG serialization
-- `BRAND_COLOUR` global JS variable — set once at page load, consumed by all chart/style functions
-- Clipboard API detection with `execCommand` fallback for older browsers
+- Single self-contained HTML file — CSS, JS and data inline, no external requests
+- Data, not pre-rendered tables — the reader can refilter and rebanner offline
+- Zero JavaScript dependencies — no build step, no framework, no CDN
+- Islands are escaped on the way in, so verbatim text cannot break the page
 
-Cross-reference: [HTML Report Technical Manual](TABS_HTML_REPORT_TECHNICAL_MANUAL.md) for full implementation details.
+Cross-reference: [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for the report's architecture, and `modules/tabs/lib/html_report_v2/` for the renderer itself.
 
 ------------------------------------------------------------------------
 
@@ -360,8 +357,8 @@ consistency between config, structure, and data:
 - `check_open_end_selection()` - Open_End questions selected for crosstabs
 - `check_base_filter_variables()` - Filter expression variable verification
 - `check_data_column_coverage()` - Data columns exist for selected questions
-- `check_preflight_logo_files()` - Logo files exist when HTML report enabled
-- `check_preflight_colour_codes()` - Valid hex colour codes for HTML report
+- `check_preflight_logo_files()` - Configured logo files exist
+- `check_preflight_colour_codes()` - Valid hex colour codes for report branding
 - `check_preflight_dashboard_scales()` - Dashboard threshold ordering
 - `check_preflight_bonferroni()` - Bonferroni with few columns advisory
 
@@ -719,34 +716,35 @@ Sections included dynamically:
   `banner_info$column_letters`
 - **FORMATTING** - Decimal separator and places
 
-### HTML Report System (html_report/)
+### Interactive Report (html_report_v2/)
 
-Self-contained interactive HTML report generated alongside Excel output
-when `html_report=TRUE`.
+Self-contained interactive HTML report written alongside the Excel output.
 
 **Architecture:**
 
 ```
-99_html_report_main.R    # Entry point: guard → transform → build → write
-├── 00_html_guard.R      # Input validation (TRS pattern)
-├── 01_data_transformer.R # Transform all_results → HTML-ready structures
-├── 02_table_builder.R   # Build <table> elements with data attributes
-├── 03_page_builder.R    # Assemble complete HTML page (CSS + JS + HTML)
-├── 04_html_writer.R     # Write self-contained HTML file
-├── 05_dashboard_transformer.R # Extract headline metrics for dashboard
-├── 06_dashboard_builder.R     # Build gauge charts, heatmap, findings
-└── 07_chart_builder.R   # Pure SVG chart generation (zero dependencies)
+data_layer_writer.R          # all_results -> the data-agg island (aggregates)
+├── microdata_writer.R       # anonymised per-respondent island (live filtering)
+├── tracking_island.R        # wave history island (Tracking tab)
+├── qual_assemble.R + kin    # coded comments -> qualitative island
+└── html_report_v2/build_report_v2.R
+    # inlines template.html + styles.css + assets/js/* + every island
+    # into one file, escaping island content so data cannot break the page
 ```
 
-**JavaScript modules (js/):**
+**Renderer modules (`assets/js/`, concatenated in filename order):**
 
-| File | Responsibility |
+| Group | Responsibility |
 |------|---------------|
-| core_navigation.js | Question navigation, search, banner switching, help overlay |
-| chart_picker.js | Column picker for charts, SVG rebuild, PNG export |
-| table_export_init.js | CSV/Excel export, column toggle, column sort |
-| pinned_views.js | View capture, pin cards, Markdown editor |
-| slide_export.js | Slide PNG export (1280x720 at 3x resolution) |
+| `00`–`03` | Namespace, number/label formatting, SVG helpers |
+| `13`–`14` | ZIP and PPTX part writers (offline export) |
+| `20`–`23z` | Data contract, statistics, confidence, disclosure gate, view model, rendering, XLSX/chart export |
+| `24`–`26` | Page shell, Reader hand-off, question cards, audience filter |
+| `27*` | The tabs: Differences, Group overview, Qualitative, Tracking, Visualise |
+| `28`–`32` | Insights, AI callouts, custom banners, composites, export, Story, self-test, Report tab |
+
+See [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for the data
+contract and governance.
 
 ### Crosstabs Submodules (crosstabs/)
 
@@ -816,14 +814,13 @@ Phase 4 refactoring extracted orchestration into focused submodules:
    - Write Crosstabs sheet (all question tables)
    - Save workbook
 
-6. HTML REPORT (if html_report=TRUE)
-   - Guard: validate inputs and packages
-   - Transform: convert all_results to HTML-ready structures
-   - Dashboard: extract headline metrics, sig findings
-   - Tables: build HTML tables with heatmap data attributes
-   - Charts: generate inline SVG charts
-   - Page: assemble complete self-contained HTML
-   - Write: save HTML file
+6. INTERACTIVE REPORT (unless html_report_v2 = FALSE)
+   - AI insights sidecar refresh (only when enable_ai_insights)
+   - Data layer: all_results -> the data-agg JSON island (+ sidecar file)
+   - Microdata island: anonymised per-respondent rows (unless microdata = N)
+   - Optional islands: previous wave, tracking history, qualitative comments
+   - Bundle: template + CSS + renderer + islands -> one self-contained file
+   - Reader report (opt-in): narrative summary beside the crosstab
 ```
 
 ### Memory Management

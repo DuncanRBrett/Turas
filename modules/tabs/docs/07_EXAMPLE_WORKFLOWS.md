@@ -91,9 +91,8 @@ RespondentID | Weight | Gender | Age_Group | Q01_Awareness | Q02_Preference
 ### Step 4: Run the Analysis
 
 ``` r
-source("turas.R")
-turas_load("tabs")
-result <- run_tabs_analysis("path/to/brand_tracking")
+source("modules/tabs/run_tabs.R")
+run_tabs_analysis("path/to/brand_tracking/Crosstab_Config.xlsx")
 ```
 
 ### Expected Output
@@ -567,14 +566,14 @@ size and processing time.
 
 For extremely large analyses, split into multiple runs:
 
-``` r
-# Run questions 1-50
-config1 <- modify_config(base_config, questions = 1:50, output = "Results_Batch1.xlsx")
-run_tabs_analysis(project_path, config = config1)
+Make one config workbook per batch — set `Include = N` on the questions a
+batch leaves out, and give each its own `output_filename` — then run them
+in turn:
 
-# Run questions 51-100
-config2 <- modify_config(base_config, questions = 51:100, output = "Results_Batch2.xlsx")
-run_tabs_analysis(project_path, config = config2)
+``` r
+source("modules/tabs/run_tabs.R")
+run_tabs_analysis("path/to/project/Config_Batch1.xlsx")
+run_tabs_analysis("path/to/project/Config_Batch2.xlsx")
 ```
 
 ### Expected Performance
@@ -717,11 +716,12 @@ Process in batches - Disable unused features
 
 ------------------------------------------------------------------------
 
-## Workflow: Generating an HTML Report
+## Workflow: Branding the Interactive Report
 
 ### The Scenario
 
-You want to generate an interactive HTML report alongside your Excel crosstabs, with custom branding and a cool colour palette.
+The interactive HTML report is written alongside your Excel crosstabs on
+every GUI run. You want it in the client's colours, with a cool palette.
 
 ### Settings Sheet Configuration
 
@@ -729,7 +729,6 @@ Add these settings to your Settings sheet:
 
 | Setting | Value |
 |---------|-------|
-| `html_report` | Y |
 | `brand_colour` | #1a5276 |
 | `accent_colour` | #2ecc71 |
 | `chart_palette_preset` | cool |
@@ -740,7 +739,7 @@ Add these settings to your Settings sheet:
 
 ### Running the Analysis
 
-Run Tabs as normal — the HTML report is generated automatically alongside the Excel file.
+Run Tabs as normal — the report is written alongside the Excel file.
 
 ### Viewing the Report
 

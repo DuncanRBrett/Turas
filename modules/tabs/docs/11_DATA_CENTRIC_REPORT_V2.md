@@ -1,14 +1,17 @@
 # Tabs Data-Centric Report v2 (+ confidence, + tracking)
 
-The data-centric report v2 is a single, self-contained, offline HTML report that
-the tabs module can emit **alongside** the classic Excel and HTML outputs. Unlike
-the classic report (pre-rendered tables), it embeds the data as JSON "islands"
-and a small renderer that recomputes views in the browser — so the reader can
-filter the audience, build custom banners, and (for trackers) explore wave
-history, all without leaving the file or contacting a server.
+The data-centric report v2 is a single, self-contained, offline HTML report the
+tabs module emits **alongside** the Excel workbook. Rather than pre-rendering
+tables, it embeds the data as JSON "islands" plus a small renderer that
+recomputes views in the browser — so the reader can filter the audience, build
+custom banners, and (for trackers) explore wave history, all without leaving the
+file or contacting a server.
 
-It is **additive and off by default**. When disabled, the classic Excel/HTML
-outputs are byte-for-byte unchanged.
+This is the report Turas ships. (An earlier pre-rendered HTML report — the
+"classic" report — was retired in August 2026 and its code deleted; a config
+that still sets `html_report` is told so on load.) The report is written
+whenever the GUI runs; a config can force it on or off with `html_report_v2`,
+and the Excel workbook is byte-for-byte the same either way.
 
 ---
 
@@ -18,7 +21,7 @@ Each option is a superset of the one before it. All are off by default.
 
 | Option | What the reader gets | Turn it on with |
 |--------|----------------------|-----------------|
-| **1. Classic** | The existing Excel workbook + classic HTML report | (always on) |
+| **1. Workbook only** | The Excel workbook | (always written) |
 | **2. New-look v2 + confidence** | A self-contained v2 report: dashboard, crosstabs, differences, **live audience filter**, **"+ Custom…" banners**, stability/confidence intervals | `html_report_v2 = Y` |
 | **3. New-look + tracking** | Option 2 **plus a Tracking tab** (Summary / Explorer / Visualise) built from wave history | `html_report_v2 = Y` **and** `html_report_v2_tracking = Y` (+ a `waves_source`) |
 
@@ -112,8 +115,8 @@ tab marks with lowercase letters; thresholds are `stats.Z95` / `stats.Z80`.
 
 #### Narrative pulled from the config (Comments sheet → report)
 
-Like the classic report, the v2 report fills its narrative from the config's
-**Comments sheet** — nothing is hand-retyped:
+The report fills its narrative from the config's **Comments sheet** — nothing
+is hand-retyped:
 
 - **Per-question insights**: each question's comment is carried in
   `AGG.comments[code] = [{banner, text}]` and pre-fills that question's *Analyst
@@ -133,8 +136,8 @@ without a Comments sheet is byte-identical to before.
 The data layer emits `questions[]` grouped by category in the Selection sheet's
 order — categories by `CategoryOrder` (then first-appearance), questions in
 their within-category order, uncategorised last — exactly like the crosstab
-workbook (`workbook_builder.R`). So the v2 report opens on, and groups by, the
-same sections as the classic report (e.g. an "Overall metrics" category with
+workbook (`workbook_builder.R`). So the report opens on, and groups by, the
+same sections as the workbook (e.g. an "Overall metrics" category with
 `CategoryOrder = 1` leads, and `state.activeQ` defaults to its first question).
 `categories[]` carries the same order; the renderer's `d2.categories()` groups
 by `questions[]` appearance, so nothing else needs to know the order. A config

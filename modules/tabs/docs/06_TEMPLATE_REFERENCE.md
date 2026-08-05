@@ -26,12 +26,14 @@ the output.
 
 ## Template Structure
 
-The template has four sheets:
+The template has six sheets:
 
-1.  **Instructions** - Usage guidance (not read by Tabs)
-2.  **Settings** - Analysis configuration parameters
-3.  **Selection** - Which questions to analyze and use as banners
-4.  **Base Filters** - Example filter syntax (reference only)
+1.  **Settings** - Analysis configuration parameters
+2.  **Selection** - Which questions to analyze and use as banners
+3.  **Base Filters Reference** - Example filter syntax (reference only)
+4.  **Comments** - Per-question commentary, background and executive summary
+5.  **AddedSlides** - Narrative slides carried into the report
+6.  **Population** - Per-subgroup universe sizes (finite population correction)
 
 ------------------------------------------------------------------------
 
@@ -56,8 +58,12 @@ headers in the template are for your reference only.
 to your project folder.
 
 **Examples:** - `Survey_Structure.xlsx` (same folder as config) -
-`Config/Survey_Structure.xlsx` (in a subfolder) - `-` (use hyphen if the
-structure file is in the same directory with default name)
+`Config/Survey_Structure.xlsx` (in a subfolder)
+
+Give the real filename. There is no shorthand: the value is resolved
+against the project folder as written, so a placeholder such as `-` is
+looked up literally and the run refuses with "Survey Structure file not
+found".
 
 **If it's wrong:** Tabs will fail with "Survey Structure file not
 found".
@@ -90,11 +96,13 @@ Output folder if it doesn't exist.
 
 #### output_format
 
-**What it does:** Controls the output file format.
+**What it does:** Names the output file format. Excel is the only writer
+Tabs has — a config asking for `csv` still receives an .xlsx workbook,
+and the run says so.
 
 **Required:** Yes
 
-**What to enter:** Either `xlsx` or `csv`.
+**What to enter:** `xlsx`
 
 **Default:** `xlsx`
 
@@ -806,14 +814,14 @@ Likert questions.
 
 Net positive = percentage positive minus percentage negative.
 
-### HTML Report Settings
+### Report Settings
 
 These settings control the interactive HTML report generated alongside
-the Excel output.
+the Excel output. (`html_report`, the retired classic report's switch, is
+no longer read — a config that still carries it is told so on load.)
 
 | Setting | Description | Values | Default |
 |----|----|----|----|
-| `html_report` | Generate an HTML report | Y / N | Y |
 | `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
 | `accent_colour` | Secondary accent colour (hex) — also the default heatmap tint source | Any hex colour | #CC9900 |
 | `heatmap_colour` | Crosstab heatmap cell tint colour. Defaults to `accent_colour`. Set explicitly to override without changing other colours. | Any hex colour | *(accent_colour)* |
@@ -835,7 +843,7 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 
 | Setting | Description | Values | Default |
 |----|----|----|----|
-| `html_report_v2` | Also build the interactive v2 report (`*_report_v2.html`) | TRUE / FALSE | FALSE |
+| `html_report_v2` | Also build the interactive report (`*_report.html`) | TRUE / FALSE | FALSE |
 | `sampling_method` | Sample design — drives honest CI vocabulary. Probability designs (Random / Stratified / Cluster / Census) → CI/MOE; everything else → stability/PE | Not_Specified / Random / Stratified / Cluster / Census / Quota / Online_Panel / Convenience | Not_Specified |
 | `wave` | Wave label (v2 header + tracking trend label) | Text, e.g. `Wave 25 - May 2026` | (none) |
 | `html_report_v2_tracking` | Add a Tracking tab built from per-wave microdata. Needs `html_report_v2=TRUE` + a `waves_source` | TRUE / FALSE | FALSE |
@@ -1206,11 +1214,11 @@ used by Tabs (and potentially other Turas modules).
 
 The template has five sheets:
 
-1.  **Instructions** - Usage guidance (not read by Tabs)
-2.  **Project** - Project metadata and settings
-3.  **Questions** - All survey questions
-4.  **Options** - Response options for each question
-5.  **Composite_Metrics** - Calculated composite scores
+1.  **Project** - Project metadata and settings
+2.  **Questions** - All survey questions
+3.  **Options** - Response options for each question
+4.  **Composite_Metrics** - Calculated composite scores
+5.  **Variable Type Reference** - What each Variable_Type does (reference only)
 
 ------------------------------------------------------------------------
 

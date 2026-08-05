@@ -356,20 +356,26 @@ Tabs reports three types of base sizes:
 
 ### Excel Workbook
 
-The output is an Excel workbook with multiple sheets:
+The output is an Excel workbook with these sheets:
+
+**Summary sheet:** Project information, the settings the run used, and
+the question list with base sizes.
+
+**Guide sheet:** How to read the report — row types, significance
+letters, weighting and index scores, adapted to what the run enabled.
+
+**Crosstabs sheet:** Every question's crosstab, one after another. There
+is no sheet per question.
 
 **Index_Summary sheet (optional):** A summary of all index/mean scores
 across questions. Useful for quickly comparing averages across banner
 columns.
 
-**Question sheets:** One sheet per question analyzed. Each sheet
-contains the full crosstab for that question.
-
-**Metadata sheet:** Contains analysis settings, timestamps, and file
-paths for documentation purposes.
-
-**Sample_Composition sheet (optional):** Shows the demographic breakdown
+**Sample Composition sheet (optional):** Shows the demographic breakdown
 of your sample across banner columns.
+
+**Error Log and Run_Status sheets:** Validation issues found during the
+run, and the TRS pass / partial / refused status with timings.
 
 ### Table Layout
 
@@ -571,37 +577,44 @@ format.
 
 ------------------------------------------------------------------------
 
-## HTML Report
+## The Interactive Report
 
-The HTML report is a self-contained interactive output generated
-alongside the Excel crosstabs. For the complete guide, see
-[HTML Report Guide](08_HTML_REPORT_GUIDE.md).
+A single self-contained HTML file written beside the Excel workbook. It
+embeds the results as JSON and recomputes views in the browser, so the
+reader can filter the audience and build banners without a server. For
+the full account see
+[Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md).
+
+(The earlier pre-rendered HTML report — the "classic" report — was
+retired in August 2026. A config that still sets `html_report` is told so
+on load and the setting does nothing.)
 
 ### Key Features
 
--   **Dashboard gauges** with configurable RAG thresholds for Net
-    Positive, Rating Mean, and Index metrics
--   **Semantic chart palettes** — choose from `warm`, `cool`, or
-    `research` presets via `chart_palette_preset`
--   **Significance findings** — auto-generated summary of statistically
-    significant differences
--   **Pinned views** — pin any table or chart to a curated presentation
-    view; export as PNG
--   **Added Slides** — create editorial content with Markdown text and
-    embedded images
--   **Clipboard copy** — one-click copy of any table to clipboard for
-    pasting into Excel/PowerPoint
+-   **Dashboard** with configurable RAG thresholds for Net Positive,
+    Rating Mean, and Index metrics
+-   **Live audience filter and custom banners** recomputed in the browser
+-   **Semantic chart palettes** — `warm`, `cool`, `research`, `teal`,
+    `red` or `brand` via `chart_palette_preset`
+-   **Differences and Group overview tabs** — where the significant
+    movements are, and how a selected banner's groups compare
+-   **Qualitative tab** — coded verbatims joined to the crosstab by
+    ResponseID, when a comment workbook is configured
+-   **Tracking tab** — wave history, when tracking is configured
+-   **Pins, Story and export** — pin any table or chart into a curated
+    presentation view; copy tables to the clipboard; export to PPTX
 
 ### Configuration
 
 | Setting | Purpose | Default |
 |---------|---------|---------|
-| `html_report` | Generate HTML report (Y/N) | Y |
+| `html_report_v2` | Build the interactive report (TRUE/FALSE) | FALSE in config; the GUI turns it on |
+| `html_report_v2_microdata` | Embed the anonymised microdata island (needed for live filtering) | TRUE |
+| `html_report_v2_tracking` | Add the Tracking tab (needs a `waves_source`) | FALSE |
 | `brand_colour` | Primary brand hex colour | #323367 |
-| `accent_colour` | Secondary accent hex colour | #0d8a8a |
-| `chart_palette_preset` | Chart colour scheme (warm/cool/research/teal/red/brand) | warm |
-| `logo_path` | Path to logo image for report header | (none) |
-| `show_charts` | Include charts in HTML report | Y |
+| `accent_colour` | Secondary accent hex colour | #CC9900 |
+| `chart_palette_preset` | Chart colour scheme | warm |
+| `researcher_logo_path` / `client_logo_path` | Logos for the report header | (none) |
 
 See [Template Reference](06_TEMPLATE_REFERENCE.md) for the full
 settings list.

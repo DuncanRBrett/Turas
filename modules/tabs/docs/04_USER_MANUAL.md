@@ -54,9 +54,9 @@ with dropdown validation, colour-coded cells, and built-in help text:
 ``` r
 source("modules/tabs/lib/generate_config_templates.R")
 
-# Generate both templates in your project folder
-generate_survey_structure_template("path/to/your/project/")
-generate_crosstab_config_template("path/to/your/project/")
+# Generate both templates in your project folder. generate_all_templates
+# takes the FOLDER; the two single-template functions take a full FILE path.
+generate_all_templates("path/to/your/project")
 ```
 
 The generated templates include:
@@ -272,19 +272,17 @@ automatically
 For scripted or batch processing:
 
 ``` r
-# Load Turas and the Tabs module
 setwd("path/to/Turas")
-source("launch_turas.R")
-launch_turas()
+source("modules/tabs/run_tabs.R")
 
-# Run analysis
-result <- run_tabs_analysis("path/to/your/project")
+# Point it at a config workbook, not a project folder.
+ok <- run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
 
-# Check for errors
-if (result$validation$has_errors) {
-  print(result$validation$error_log$errors)
-} else {
-  cat("Success! Output:", result$output_file, "\n")
+if (!ok) {
+  # Every refusal and warning is already printed to the console — Turas
+  # convention is that errors must be visible where the run happened.
+  # The workbook's Error Log and Run_Status sheets hold the same detail.
+  stop("Tabs run did not complete — see the console output above.")
 }
 ```
 
@@ -321,9 +319,8 @@ checks that catch configuration mistakes early:
     valid columns
 -   **Weight variable:** Validates the weight column exists and contains
     valid values
--   **Logo files:** When HTML report is enabled, warns if logo files are
-    missing
--   **Colour codes:** Validates hex colour codes for HTML report
+-   **Logo files:** Warns if configured logo files are missing
+-   **Colour codes:** Validates hex colour codes used for report
     branding
 -   **Dashboard scales:** Warns if green/amber thresholds are inverted
 
@@ -451,18 +448,19 @@ the data.
 
 ------------------------------------------------------------------------
 
-## Working with the HTML Report
+## Working with the Interactive Report
 
-When `html_report` is set to `TRUE` in your Settings sheet, Tabs generates
-an interactive HTML report alongside the Excel output.
+Tabs writes a self-contained interactive HTML report beside the Excel
+workbook. The GUI builds it on every run; a config can force it on or off
+with `html_report_v2`.
 
-### Key HTML Report Settings
+### Key Report Settings
 
-These settings in your config's Settings sheet control how the HTML report looks:
+These settings in your config's Settings sheet control how the report looks:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `html_report` | FALSE | Set to TRUE to generate the HTML report |
+| `html_report_v2` | (GUI: on) | TRUE forces the report on; FALSE forces it off, even from the GUI |
 | `brand_colour` | #323367 | Primary brand colour (hex) — used for headers, gauges, and accents |
 | `accent_colour` | #CC9900 | Secondary accent colour (hex) |
 | `chart_palette_preset` | warm | Colour palette for ordinal/scale charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `red` (Coca-Cola-inspired muted red), or `brand` (monochromatic gradient from brand_colour) |
@@ -641,10 +639,9 @@ Run each one separately to get different output files.
 -   **Verify significance makes sense.** If nothing is significant, you
     may have small bases or low variability.
 
-### HTML Report Output
+### Interactive Report Output
 
-When `html_report=TRUE` is set in your config, Tabs generates an
-interactive HTML report alongside the Excel output. The HTML report
+Tabs writes an interactive HTML report alongside the Excel output. It
 includes:
 
 -   **Summary dashboard** with gauge charts and heatmap grids
@@ -659,7 +656,8 @@ includes:
 The HTML file is completely self-contained (no external dependencies)
 and can be shared with anyone who has a web browser.
 
-See [HTML Report Guide](08_HTML_REPORT_GUIDE.md) for full details.
+See [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for full
+details.
 
 ### Console Output
 

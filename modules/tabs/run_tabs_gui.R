@@ -318,6 +318,15 @@ run_tabs_gui <- function() {
             checkboxInput("prepare_deliverable",
                          "Prepare client deliverable (minify for delivery)",
                          value = FALSE),
+            # The deliverable watermark. The run block below has always read
+            # input$client_name; until now there was no such input, so every
+            # deliverable went out unwatermarked.
+            conditionalPanel("input.prepare_deliverable == true",
+              div(style = "max-width: 420px; margin: 0 auto 8px;",
+                textInput("client_name", NULL, value = "",
+                          placeholder = "Client name for the deliverable watermark (optional)")
+              )
+            ),
             checkboxInput("generate_reader_report",
                          "Also create the Reader report (narrative summary that links into the tables)",
                          value = FALSE),

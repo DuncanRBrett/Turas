@@ -107,8 +107,8 @@ HTML report with:
     slides for presentation export
 
 The HTML file works offline, opens in any modern browser, and can be
-shared as a single file. See [HTML Report Guide](08_HTML_REPORT_GUIDE.md)
-for details.
+shared as a single file. See
+[Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for details.
 
 ## How Does It Work?
 
@@ -155,12 +155,14 @@ testing.
 Tabs is designed for cross-tabulation analysis. For other needs,
 consider:
 
--   **Multi-wave tracking:** Use the Tracker module if you need to
-    compare results across survey waves over time
+-   **Multi-wave tracking:** Tabs has its own Tracking tab for waves it
+    has run; use the Tracker module for a standalone longitudinal study
 -   **Statistical modeling:** Use standard R packages like lm() or glm()
     for regression analysis
--   **Text analysis:** Tabs doesn't process open-ended verbatim
-    responses
+-   **Coding open ends:** Tabs reports verbatims — the Qualitative tab
+    reads a coded-comment workbook, joins it to the crosstab by
+    ResponseID and carries themes, sentiment and quotes into the report
+    — but the coding itself happens outside Tabs
 
 ## Getting Started
 

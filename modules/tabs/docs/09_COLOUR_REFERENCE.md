@@ -1,7 +1,7 @@
-# Turas HTML Report - Colour Reference
+# Turas Tabs - Report Colour Reference
 
-> Complete reference for all colours used in the HTML report module.
-> Covers what is configurable, what is hardcoded, and why.
+> Reference for the colours the tabs report uses: what the config controls,
+> what is fixed by design, and why.
 
 ---
 
@@ -15,21 +15,10 @@ These colours are set per-project in the crosstab configuration and flow through
 |-------|---------|--------|
 | `brand_colour` | `#323367` (deep navy) | Hex 6-digit |
 
-**Used in (~40+ CSS rules via `gsub("BRAND", ...)` substitution):**
-
-- Sidebar: active item indicator, active question code text
-- Header: bottom border accent
-- Search box: focus border
-- Banner tabs: active tab background
-- Toggle controls: checkbox accent colour
-- Question title card: banner name label, stat label
-- Column chips: hover border, active chip text
-- Insight toggle: hover border and text colour
-- Insight editor: left border accent
-- Help overlay: heading colour, keyboard shortcut badges
-- Footer: link colour
-- Charts: fallback bar colour (when no semantic match), brand-derived shades
-- Dashboard: section headers, gauge labels, heatmap headers, significance cards
+**Used in:** the report's own accent throughout — sidebar and header
+chrome, active tabs and chips, focus states, dashboard section headings
+and gauge labels — and as the first series colour in charts, with
+brand-derived shades filling later series.
 
 ### 1.2 Accent Colour
 
@@ -79,7 +68,10 @@ These control *when* the traffic light colours change, not the colours themselve
 |-------|---------|--------|
 | `chart_bar_colour` | Falls back to `brand_colour` | Hex 6-digit |
 
-**Used in:** Horizontal bar charts (nominal questions). When only a single banner column is displayed, this colour is used directly. When multiple banner columns are selected and no custom series colours are defined, this colour is used as the seed for auto-generating a distinct palette via HSL rotation.
+**Used in:** the single-series default. With one banner column charted,
+this colour replaces the brand colour at the front of the series palette.
+It has no effect when `chart_series_colour_*` values are set — those take
+the lead (see below).
 
 ### 1.6 Custom Series Colours (Banner Breaks)
 
@@ -96,19 +88,15 @@ Optional per-series colour overrides for nominal bar charts with multiple banner
 | `chart_series_colour_7` | Optional | Colour for 7th banner series |
 | `chart_series_colour_8` | Optional | Colour for 8th banner series |
 
-**Three modes of operation:**
+**How they resolve:** configured colours lead the series palette in the
+order given; any further columns fall back to the report's built-in
+sequence (brand, accent, brand shades, then distinguishable defaults).
+Blank and malformed values are dropped before the palette is built, so a
+placeholder like "Optional" left in the template cannot reach a chart.
 
-1. **No series colours defined** → auto-generates a distinct palette from `chart_bar_colour` using dynamic HSL rotation. Supports any number of series (1 to 20+) with evenly-spaced hues (`360/N` degrees apart) and alternating lightness for adjacent differentiation.
-
-2. **All series colours defined (dense)** → uses custom colours directly. If there are more series than defined colours, colours cycle back to the start (with a console warning).
-
-3. **Some series colours defined, others blank (hybrid)** → custom colours are used at their defined positions. Blank positions are auto-filled with generated colours that **avoid hues similar to your custom colours**, ensuring visual distinction across all series.
-
-**Stacked bar charts are never affected** — they always use `chart_palette_preset` and the semantic colour mapping, regardless of series colour settings.
-
-**Interaction with other settings:**
-- `chart_palette_preset` controls stacked bars only — completely independent of series colours.
-- `chart_bar_colour` is still used as the single-column fallback and as the seed for auto-generation when no series colours are defined.
+**Sentiment charts are never affected** — stacked bars for ordinal and
+scale questions always colour from `chart_palette_preset`, whatever the
+series colours say.
 
 **Example 1 — Full corporate palette:**
 
@@ -134,7 +122,9 @@ Optional per-series colour overrides for nominal bar charts with multiple banner
 
 Leave all `chart_series_colour_*` fields blank. The system generates a visually distinct palette from `chart_bar_colour` for any number of banner series.
 
-**Report Hub:** Custom series colours carry through automatically. The colours are embedded in each tab report's HTML/JS data, and the report hub passes them through without modification.
+**Report Hub:** Custom series colours carry through automatically. They
+are embedded in each report's data island, and the report hub passes them
+through without modification.
 
 ---
 
@@ -144,7 +134,10 @@ These are hardcoded by design because they carry universal meaning.
 
 ### 2.1 Semantic Chart Palette (Configurable Presets)
 
-Used in stacked bar charts for ordinal/scale questions. Colours map to survey response sentiment via `get_semantic_colour()` in `07_chart_builder.R`. Five presets are available, selected via the `chart_palette_preset` config field.
+Used in stacked bar charts for ordinal/scale questions. The presets are
+resolved by `get_palette_colours()` in `lib/report_shared.R` and carried
+into the report's data layer, so the workbook and the report agree.
+Selected via the `chart_palette_preset` config field.
 
 #### Warm Preset (default)
 
@@ -239,96 +232,16 @@ Used for gauge arcs, heatmap cell tints, and significance cards.
 
 ---
 
-## 3. Hardcoded Colours - UI Chrome
+## Note on scope
 
-These are structural/neutral colours used for backgrounds, borders, and text throughout the report. They form a consistent neutral palette that works with any brand colour.
-
-### 3.1 Text Colours
-
-| Colour | Hex | Usage |
-|--------|-----|-------|
-| Near-black | `#1a2744` | Slide titles, dark headings |
-| Dark charcoal | `#1e293b` | Primary body text, question titles |
-| Dark grey | `#374151` | Secondary text, chart labels, insight text |
-| Medium grey | `#5c4a3a` | Chart value labels on light backgrounds |
-| Steel grey | `#64748b` | Metadata text, axis labels, chart legends |
-| Cool grey | `#94a3b8` | Tertiary text, timestamps, subtle labels |
-| Coral red | `#e8614d` | Filter warnings, remove/delete actions |
-
-### 3.2 Background Colours
-
-| Colour | Hex | Usage |
-|--------|-----|-------|
-| White | `#ffffff` | Page background, card backgrounds, canvas fill |
-| Off-white | `#fafbfc` | Alternating table rows (even) |
-| Warm cream | `#fef9e7` | NET row background |
-| Warm beige | `#f5f0e8` | Mean/summary row background |
-| Light grey | `#f8f9fa` | Table header background, sidebar |
-| Pale grey | `#f8f9fb` / `#f8fafa` | Insight editor background |
-| Ice grey | `#f1f5f9` | Print layout table headers |
-| Soft blue-grey | `#f9fafb` | Base row background |
-| Light teal | `#f0fafa` | Priority metric pill background |
-
-### 3.3 Border Colours
-
-| Colour | Hex | Usage |
-|--------|-----|-------|
-| Light border | `#e2e8f0` | Card borders, divider lines, table cell borders, pin button default |
-| Medium border | `#d0e8e8` | Priority metric pill stroke |
-| Table border | `#ccc` | Print mode table wrapper |
-
-### 3.4 Slide Export Colours
-
-Used when rendering SVG slides for PNG export.
-
-| Element | Colour | Source |
-|---------|--------|--------|
-| Slide background | `#ffffff` | Hardcoded |
-| Title text | `#1a2744` | Hardcoded |
-| Metadata text | `#94a3b8` | Hardcoded |
-| Table header row | `#1a2744` (bg), `#ffffff` (text) | Hardcoded |
-| Table even rows | `#fafbfc` | Hardcoded |
-| Table borders | `#e2e8f0` | Hardcoded |
-| Insight accent bar | `#323367` | Hardcoded (default brand) |
-| Insight text | `#374151` | Hardcoded |
-
-### 3.5 Pinned Views Colours
-
-Colours now use the global `BRAND_COLOUR` variable instead of hardcoded `#323367`.
-
-| Element | Colour | Source |
-|---------|--------|--------|
-| Pin button (active) | `BRAND_COLOUR` text + border | Dynamic via JS variable |
-| Pin button (inactive) | `#94a3b8` text, `#e2e8f0` border | Hardcoded |
-| Pinned card border | `#e2e8f0` | Hardcoded |
-| Pinned card code | `BRAND_COLOUR` | Dynamic via JS variable |
-| Pinned card title | `#1e293b` | Hardcoded |
-| Pinned card meta | `#94a3b8` | Hardcoded |
-| Insight accent border | `BRAND_COLOUR` | Dynamic via JS variable |
-| Remove button text | `#e8614d` | Hardcoded |
-
-### 3.6 Insights HTML Export Colours
-
-| Element | Colour | Source |
-|---------|--------|--------|
-| Body text | `#1e293b` | Hardcoded |
-| Metadata text | `#64748b` | Hardcoded |
-| Question code | `#323367` | Hardcoded (default brand) |
-| Insight left border | `#323367` | Hardcoded (default brand) |
-| Insight background | `#f8f9fb` | Hardcoded |
-| Banner label | `#94a3b8` | Hardcoded |
+Sections describing the retired classic report's own CSS (UI chrome, slide
+export, pinned-view and insight-export colours) were removed when that report
+was deleted in August 2026. What remains is what the config still controls and
+what the interactive report still reads.
 
 ---
 
-## 4. Known Colour Gap
-
-### JS Brand Colour - RESOLVED
-
-**RESOLVED in v10.8.0**: All JS files now use the global `BRAND_COLOUR` variable injected from R via `<script>var BRAND_COLOUR = "...";</script>`. The hardcoded `#323367` references in `pinned_views.js`, `slide_export.js`, `chart_picker.js`, and `core_navigation.js` have been replaced.
-
----
-
-## 5. Quick Config Reference
+## 3. Quick Config Reference
 
 Minimum configuration for colour customisation:
 

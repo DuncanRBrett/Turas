@@ -1,6 +1,6 @@
 # Turas Tabs Module
 
-**Version:** 10.1 **Date:** 21 March 2026
+**Version:** 10.8 **Date:** 5 August 2026
 
 Cross-tabulation and survey data analysis engine for market research.
 
@@ -49,7 +49,7 @@ Both template files are available in the `templates/` subfolder of this document
 -   Configurable Excel output with professional formatting
 -   Optional self-contained, interactive **data-centric report v2** (live audience
     filter, custom banners, confidence intervals, and an optional Tracking tab) —
-    additive and off by default; see [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md)
+    additive and off by default; see [11_DATA_CENTRIC_REPORT_V2.md](docs/11_DATA_CENTRIC_REPORT_V2.md)
 
 ## Documentation
 
@@ -57,13 +57,14 @@ This documentation pack contains everything you need:
 
 | Document | Purpose |
 |----|----|
-| [02_TABS_OVERVIEW.md](02_TABS_OVERVIEW.md) | High-level introduction and capabilities |
-| [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) | Complete feature reference |
-| [04_USER_MANUAL.md](04_USER_MANUAL.md) | Step-by-step usage instructions |
-| [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) | Developer and architecture reference |
-| [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) | Detailed template field specifications |
-| [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) | Real-world usage examples |
-| [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md) | The interactive v2 report: options, TR.MICRO/tracking contracts, enabling, governance |
+| [02_TABS_OVERVIEW.md](docs/02_TABS_OVERVIEW.md) | High-level introduction and capabilities |
+| [03_REFERENCE_GUIDE.md](docs/03_REFERENCE_GUIDE.md) | Complete feature reference |
+| [04_USER_MANUAL.md](docs/04_USER_MANUAL.md) | Step-by-step usage instructions |
+| [05_TECHNICAL_DOCS.md](docs/05_TECHNICAL_DOCS.md) | Developer and architecture reference |
+| [06_TEMPLATE_REFERENCE.md](docs/06_TEMPLATE_REFERENCE.md) | Detailed template field specifications |
+| [07_EXAMPLE_WORKFLOWS.md](docs/07_EXAMPLE_WORKFLOWS.md) | Real-world usage examples |
+| [09_COLOUR_REFERENCE.md](docs/09_COLOUR_REFERENCE.md) | What the config's colour settings control |
+| [11_DATA_CENTRIC_REPORT_V2.md](docs/11_DATA_CENTRIC_REPORT_V2.md) | The interactive report: options, TR.MICRO/tracking contracts, enabling, governance |
 
 ## Dependencies
 
@@ -125,6 +126,6 @@ Output is named `{output}_stats_pack.xlsx`.
 
 ## Getting Help
 
-Start with the [User Manual](04_USER_MANUAL.md) for step-by-step guidance, or jump to [Example Workflows](07_EXAMPLE_WORKFLOWS.md) to see practical usage patterns.
+Start with the [User Manual](docs/04_USER_MANUAL.md) for step-by-step guidance, or jump to [Example Workflows](docs/07_EXAMPLE_WORKFLOWS.md) to see practical usage patterns.
 
-For template configuration details, the [Template Reference](06_TEMPLATE_REFERENCE.md) explains every field and option.
+For template configuration details, the [Template Reference](docs/06_TEMPLATE_REFERENCE.md) explains every field and option.

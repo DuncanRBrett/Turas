@@ -1,6 +1,6 @@
 # Turas Tabs Module
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.8 **Date:** 5 August 2026
 
 Cross-tabulation and survey data analysis engine for market research.
 
@@ -10,21 +10,24 @@ Turas Tabs transforms survey data into professional cross-tabulation reports. Po
 
 ## Quick Start
 
-The fastest way to get started:
+The recommended route is the Turas launcher (from the Turas root directory):
 
 ``` r
-# From the Turas root directory
-source("turas.R")
-turas_load("tabs")
-
-# Run analysis
-run_tabs_analysis("path/to/your/project")
+source("launch_turas.R")
+launch_turas()          # click the Tabs tile, browse to your project folder
 ```
 
-Or use the graphical interface:
+For a scripted (non-GUI) run, point the entry script at a config workbook:
 
 ``` r
-source("modules/tabs/run_tabs_gui.R")
+source("modules/tabs/run_tabs.R")
+run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
+```
+
+A complete synthetic demo lives in `examples/tabs/demo_survey/` — run it with:
+
+``` r
+run_tabs_analysis("examples/tabs/demo_survey/Demo_Crosstab_Config.xlsx")
 ```
 
 ## What You Need
@@ -35,7 +38,7 @@ Before running an analysis, you'll need three things:
 2.  **Tabs_Config.xlsx** - Specifies analysis settings and which questions to analyze
 3.  **Data file** - Your survey responses (Excel, CSV, or SPSS format)
 
-Both template files are available in the `templates/` subfolder of this documentation.
+Both template files are in `modules/tabs/templates/`.
 
 ## Key Features
 
@@ -57,6 +60,8 @@ This documentation pack contains everything you need:
 | [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) | Developer and architecture reference |
 | [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) | Detailed template field specifications |
 | [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) | Real-world usage examples |
+| [09_COLOUR_REFERENCE.md](09_COLOUR_REFERENCE.md) | What the config's colour settings control |
+| [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md) | The interactive report: options, contracts, enabling, governance |
 
 ## Dependencies
 
@@ -75,15 +80,17 @@ install.packages(c("haven", "data.table"))  # optional
 
 ```         
 modules/tabs/
-├── run_tabs.R              # Main entry point
+├── run_tabs.R              # Scripted entry point
 ├── run_tabs_gui.R          # GUI interface
 ├── lib/                    # Core processing library
-│   ├── run_crosstabs.R
-│   ├── config_loader.R
-│   ├── validation.R
+│   ├── run_crosstabs.R     # Orchestrator
+│   ├── crosstabs/          # Config, data setup, analysis, workbook
+│   ├── html_report_v2/     # The interactive report (renderer + assets)
+│   ├── reader_report/      # The narrative Reader report
 │   └── ...
-└── docs/                   # This documentation
-    └── templates/          # Config and structure templates
+├── templates/              # Config and structure templates
+├── docs/                   # This documentation
+└── tests/                  # testthat suites
 ```
 
 ## Getting Help

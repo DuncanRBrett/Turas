@@ -171,12 +171,29 @@ check_numeric_settings <- function(config, error_log) {
 }
 
 #' Validate and normalize output format
+#'
+#' There is one writer: the Excel workbook. "csv" was offered by the template
+#' and accepted here for a long time, but no CSV writer was ever built — a
+#' config asking for it silently received .xlsx. It is still accepted (so an
+#' existing config keeps running) but says plainly what it will get.
+#'
 #' @keywords internal
 check_output_format <- function(config, error_log, verbose) {
   output_format <- get_config_value(config, "output_format", "excel")
-  valid_formats <- c("excel", "xlsx", "csv")
+  valid_formats <- c("excel", "xlsx")
 
-  if (!output_format %in% valid_formats) {
+  if (identical(tolower(trimws(as.character(output_format))), "csv")) {
+    error_log <- log_issue(
+      error_log, "Validation", "Output Format Not Available",
+      paste("output_format = 'csv' is not implemented — tabs writes an Excel",
+            "workbook. The run continues and produces .xlsx. Set output_format",
+            "to xlsx to silence this."),
+      "", "Warning"
+    )
+    if (verbose) {
+      cat("  [WARNING] output_format 'csv' is not implemented — writing .xlsx.\n")
+    }
+  } else if (!output_format %in% valid_formats) {
     error_log <- log_issue(
       error_log, "Validation", "Invalid Output Format",
       sprintf("output_format '%s' not recognized. Valid formats: %s. Using 'xlsx' as default.",
