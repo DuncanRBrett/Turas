@@ -25,7 +25,7 @@
         '</div><div class="tko-kpi-foot"><span class="tko-kpi-band tko-band-' + (m.band || "na") +
         '">' + fmt.escapeHtml(m.band || "—") + "</span>" + ui.apexTrend(m) + "</div></div>";
     }).join("");
-    return '<div class="tko-apex"><div class="tko-kicker">Pattern recognition · ' +
+    return '<div class="tko-apex"><div class="tko-kicker">Group overview · ' +
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +
       '<div class="tko-eyebrow">The big picture</div>' +
       ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer — editable", seed) +
@@ -36,11 +36,6 @@
   function headHtml(p) {
     if (p.kind === "portrait" || p.kind === "steady") {
       return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
-    }
-    if (p.kind === "area") {
-      // No synthetic cross-question average in the heading — the member rows below
-      // carry the real numbers (the "where does 40.8 come from?" fix).
-      return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>";
     }
     if (p.kind === "group") {
       return '<div class="tko-ph">' + fmt.escapeHtml(p.subject) + "</div>" + ui.bannerChip(p.group);
@@ -77,17 +72,6 @@
       var note = p.secondary
         ? '<div class="tko-note">Most positive group: ' + fmt.escapeHtml(p.secondary) + ".</div>" : "";
       return rows + note;
-    }
-    if (p.kind === "area") {
-      var arows = (p.evidence || []).map(function (m) { return ui.areaRow(m, cls); }).join("");
-      // Scoring basis, stated: summary-led areas rank on the tagged overall
-      // rating; a multi-question area with no overall declared falls back to a
-      // flat average — say so rather than let it pass as a rated number.
-      var basis = (!p.summary && p.members > 1)
-        ? '<div class="tko-cap">Ranked on the plain average of its ' + p.members +
-          " questions — no overall rating is declared for this area.</div>" : "";
-      var an = p.moving < 0 ? '<div class="tko-note">Several items slipping since last wave.</div>' : "";
-      return arows + basis + an;
     }
     if (p.kind === "split") {
       // Navigation pointer only — no synthetic average-index rows (the "4.4 / 3.7
@@ -221,10 +205,13 @@
     var names = list.map(function (g) {
       return g.subject + " (n = " + fmt.base(g.base) + ")";
     }).join(", ");
+    // Neutral wording: this list now also carries groups whose gaps did not
+    // hold up as a consistent story (incl. polarized ones the steady card
+    // refuses to claim) — "close to the overall" would overclaim for them.
     return '<div class="tko-cap tko-nostory">Also scanned: ' + fmt.escapeHtml(names) +
-      (list.length === 1 ? " — it sits" : " — they sit") +
-      " close to the overall on most questions, with no consistent lean either way. " +
-      "No portrait is honest reporting, not a gap.</div>";
+      " — no consistent story held up beyond chance for " +
+      (list.length === 1 ? "it" : "them") +
+      ". No portrait is honest reporting, not a gap.</div>";
   }
 
   read.html = function (t) {

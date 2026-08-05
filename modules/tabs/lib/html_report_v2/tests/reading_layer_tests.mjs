@@ -72,7 +72,7 @@ console.log("Reading layer (bundle B) — suite:");
 run("B1: full report — READ group first, ANALYSE after, exact order", () => {
   const sb = shellSandbox({ tracking: true, qual: true });
   eq(sb.TR.shell.tabGroups(), [
-    { label: "Read", tabs: [["dashboard", "Dashboard"], ["takeout", "Patterns"],
+    { label: "Read", tabs: [["dashboard", "Dashboard"], ["takeout", "Group overview"],
       ["moved", "Tracking"], ["qualitative", "Qualitative"], ["story", "Story"]] },
     { label: "Analyse", tabs: [["crosstabs", "Crosstabs"],
       ["findings", "Differences"], ["report", "Report"]] }

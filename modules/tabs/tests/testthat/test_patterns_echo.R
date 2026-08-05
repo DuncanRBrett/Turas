@@ -123,24 +123,32 @@ test_that("KeyShare: score-difference NETs never bind; rated + classification fl
 
 # ---- areas / AreaSummary -----------------------------------------------------
 
-test_that("areas: summary-led ✓, flat fallback ·, dup ⚠, untagged summary ⚠, mixed scales ⚠", {
+test_that("areas retired: AreaSummary declarations are named as no longer acting", {
   qs <- list(
     mk_rated("Q46", category = "Coolers", area_summary = TRUE),
     mk_rated("Q44", category = "Coolers"),
-    mk_rated("Q39", category = "Signwriting"),
-    mk_rated("Q40", category = "Signwriting"),
-    mk_rated("Q27", category = "Salesperson", area_summary = TRUE),
-    mk_rated("Q28", category = "Salesperson", area_summary = TRUE),   # duplicate
-    mk_rated("Q99", area_summary = TRUE),                              # untagged
-    mk_rated("Q78", category = "Overall", scale_max = 10),
-    mk_rated("Q79", category = "Overall", scale_max = 100)             # mixed scales
+    mk_rated("Q27", category = "Salesperson", area_summary = TRUE)
   )
   audit <- audit_patterns_config(mk_dl(qs))
-  expect_true(grepl("^✓ scores on its overall, Q46", val_of(audit, "Area 'Coolers'")))
-  expect_true(grepl("^· flat average of 2 questions", val_of(audit, "Area 'Signwriting'")))
-  expect_true(grepl("^⚠ 2 questions marked", val_of(audit, "Area 'Salesperson'")))
-  expect_true(grepl("^⚠ ignored — no Category/Theme", val_of(audit, "AreaSummary Q99")))
-  expect_true(grepl("^⚠ mixed scales", val_of(audit, "Area 'Overall'")))
+  expect_true(grepl("RETIRED", val_of(audit, "AreaSummary")))
+  expect_true(grepl("2 question", val_of(audit, "AreaSummary")))
+  # and no per-area race rows are echoed any more
+  labels <- vapply(audit$rows, function(r) r[1], character(1))
+  expect_false(any(grepl("^Area '", labels)))
+})
+
+test_that("patterns_banner: a matching selection echoes ✓; a typo warns with the fallback named", {
+  qs <- list(mk_rated("Q1"))
+  dl <- mk_dl(qs, project = list(patterns_banner = I(c("Centre"))))
+  dl$banner_groups <- list(list(id = "S03", name = "Centre"),
+                           list(id = "S09", name = "Channel"))
+  audit <- audit_patterns_config(dl)
+  expect_true(grepl("^✓ 'Centre'", val_of(audit, "Banner selected")))
+
+  dl2 <- mk_dl(qs, project = list(patterns_banner = I(c("Centres"))))
+  dl2$banner_groups <- dl$banner_groups
+  audit2 <- audit_patterns_config(dl2)
+  expect_true(grepl("falls back to ALL banners", val_of(audit2, "Banner selected")))
 })
 
 # ---- attach ------------------------------------------------------------------

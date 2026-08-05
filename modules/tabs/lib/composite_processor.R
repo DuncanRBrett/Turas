@@ -284,20 +284,86 @@ validate_composite_definitions <- function(composite_defs, questions_df, survey_
   ))
 }
 
+#' Score map for one composite source question: data value -> number
+#'
+#' A composite's sources are answers, and an answer is only sometimes a number.
+#' A Likert stores words and carries its score in `Index_Weight`; a Rating or NPS
+#' stores the point itself, with `OptionValue` as an override. Without this map
+#' `calculate_composite_values()` coerces the raw column and a whole battery of
+#' "TRUE"/"FALSE"/"Not sure" becomes NA — see its `options_df` note.
+#'
+#' Mirrors `derive_index_scores()` in score_utils.R (Rating -> option value,
+#' Likert -> Index_Weight), but keys on OptionText, because that is what the data
+#' holds. Options flagged `ExcludeFromIndex = Y` are dropped, as they are in
+#' `calculate_rating_mean()`.
+#'
+#' @param q_code Source QuestionCode
+#' @param questions_df Questions sheet
+#' @param options_df Options sheet
+#' @return Named numeric vector OptionText -> score, or NULL when the question
+#'   has no usable option scoring (caller then coerces the raw column)
+#' @keywords internal
+composite_source_score_map <- function(q_code, questions_df, options_df) {
+  if (is.null(questions_df) || is.null(options_df)) return(NULL)
+  if (!all(c("QuestionCode", "OptionText") %in% names(options_df))) return(NULL)
+
+  q_row <- questions_df[!is.na(questions_df$QuestionCode) &
+                        questions_df$QuestionCode == q_code, , drop = FALSE]
+  if (nrow(q_row) == 0) return(NULL)
+  var_type <- as.character(q_row$Variable_Type[1])
+
+  qopt <- options_df[!is.na(options_df$QuestionCode) &
+                     options_df$QuestionCode == q_code, , drop = FALSE]
+  if (nrow(qopt) == 0) return(NULL)
+  if ("ExcludeFromIndex" %in% names(qopt)) {
+    qopt <- qopt[is.na(qopt$ExcludeFromIndex) | qopt$ExcludeFromIndex != "Y", , drop = FALSE]
+  }
+  if (nrow(qopt) == 0) return(NULL)
+
+  scores <- vapply(seq_len(nrow(qopt)), function(i) {
+    row_i <- qopt[i, , drop = FALSE]
+    if (identical(var_type, "Likert")) {
+      iw <- if ("Index_Weight" %in% names(row_i)) row_i$Index_Weight else NA
+      suppressWarnings(as.numeric(iw))
+    } else {
+      # Rating / NPS / Single_Response: OptionValue when present, else the
+      # OptionText itself. option_numeric_value() is the canonical lookup
+      # (score_utils.R) and is loaded by the time any composite runs.
+      suppressWarnings(as.numeric(option_numeric_value(row_i)))
+    }
+  }, numeric(1))
+
+  keys <- trimws(as.character(qopt$OptionText))
+  keep <- !is.na(scores) & !is.na(keys) & nzchar(keys)
+  if (!any(keep)) return(NULL)
+  stats::setNames(scores[keep], keys[keep])
+}
+
+
 #' Calculate Composite Values
 #'
-#' Calculate composite score for respondent data
+#' Calculate composite score for respondent data.
+#'
+#' When `questions_df` and `options_df` are supplied, each source question's
+#' answers are mapped through its Options (Index_Weight for a Likert, OptionValue
+#' or OptionText for a Rating/NPS) before averaging. Without them the raw column
+#' is coerced with `as.numeric()`, which is correct only for genuinely numeric
+#' sources — a Likert holding words coerces to all-NA and the composite silently
+#' becomes a blank cell.
 #'
 #' @param data_subset Survey data subset
 #' @param source_questions Character vector of source question codes
 #' @param calculation_type "Mean", "Sum", or "WeightedMean"
 #' @param weights Numeric vector of calculation weights (for WeightedMean)
 #' @param weight_vector Survey weights for this subset (optional)
+#' @param questions_df Optional Questions sheet, for option-based scoring
+#' @param options_df Optional Options sheet, for option-based scoring
 #' @return Numeric: composite value (weighted mean if weight_vector provided, else vector)
 #' @keywords internal
 calculate_composite_values <- function(data_subset, source_questions,
                                        calculation_type, weights = NULL,
-                                       weight_vector = NULL) {
+                                       weight_vector = NULL,
+                                       questions_df = NULL, options_df = NULL) {
 
   # Validate calculation_type
   if (is.null(calculation_type) || length(calculation_type) == 0) {
@@ -325,20 +391,46 @@ calculate_composite_values <- function(data_subset, source_questions,
   source_values_matrix <- matrix(NA_real_, nrow = nrow(data_subset),
                                   ncol = length(source_questions))
 
+  # Sources that hold data but contribute nothing — the shape that used to ship
+  # a blank composite without a word.
+  unscored <- character(0)
+
   for (i in seq_along(source_questions)) {
     q_code <- source_questions[i]
 
     if (q_code %in% names(data_subset)) {
-      # Get numeric values
-      values <- data_subset[[q_code]]
+      raw <- data_subset[[q_code]]
 
-      # Convert to numeric if needed
-      if (!is.numeric(values)) {
-        values <- suppressWarnings(as.numeric(as.character(values)))
+      score_map <- composite_source_score_map(q_code, questions_df, options_df)
+      values <- if (!is.null(score_map)) {
+        unname(score_map[trimws(as.character(raw))])
+      } else if (is.numeric(raw)) {
+        raw
+      } else {
+        suppressWarnings(as.numeric(as.character(raw)))
       }
+
+      has_data <- any(!is.na(raw) & nzchar(trimws(as.character(raw))))
+      if (has_data && all(is.na(values))) unscored <- c(unscored, q_code)
 
       source_values_matrix[, i] <- values
     }
+  }
+
+  if (length(unscored) > 0) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: composite metric — source question(s) scored nothing\n")
+    cat("│ These sources hold answers, but not one of them could be\n")
+    cat("│ turned into a number, so they contribute NOTHING to the\n")
+    cat("│ composite (and if they are its only sources, the score is\n")
+    cat("│ blank):\n")
+    for (u in unscored) cat(sprintf("│   %s\n", u))
+    cat("│ How to fix: a composite scores a Likert from Index_Weight and\n")
+    cat("│ a Rating/NPS from OptionValue (else OptionText). Check the\n")
+    cat("│ Options sheet defines those for these questions, and that\n")
+    cat("│ OptionText matches the data exactly. A source whose answers\n")
+    cat("│ are words with no Index_Weight cannot be averaged.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
   }
 
   # Calculate composite based on type
@@ -408,10 +500,12 @@ calculate_composite_values <- function(data_subset, source_questions,
 #' @param questions_df Questions data frame
 #' @param banner_info Banner structure
 #' @param config Configuration list
+#' @param options_df Options sheet, so worded sources are scored through their
+#'   Options rather than coerced raw. Omit only for genuinely numeric sources.
 #' @return List with question_table and metadata
 #' @keywords internal
 process_composite_question <- function(composite_def, data, questions_df,
-                                       banner_info, config) {
+                                       banner_info, config, options_df = NULL) {
 
   # Parse source questions
   source_questions <- strsplit(composite_def$SourceQuestions, ",")[[1]]
@@ -512,13 +606,18 @@ process_composite_question <- function(composite_def, data, questions_df,
       survey_weights <- rep(1, nrow(data_subset))
     }
 
-    # Calculate composite value
+    # Calculate composite value. questions_df/options_df let the sources be
+    # scored through their Options (Index_Weight for a Likert, OptionValue for a
+    # Rating) instead of coerced raw — without them a battery of worded answers
+    # averages to NA and the composite ships blank.
     composite_value <- calculate_composite_values(
       data_subset = data_subset,
       source_questions = source_questions,
       calculation_type = calc_type,  # Use calc_type instead of composite_def$CalculationType
       weights = calc_weights,
-      weight_vector = survey_weights
+      weight_vector = survey_weights,
+      questions_df = questions_df,
+      options_df = options_df
     )
 
     banner_results[[key]] <- composite_value
@@ -803,10 +902,12 @@ test_composite_significance <- function(data, composite_code, source_questions,
 #' @param questions_df Questions data frame
 #' @param banner_info Banner structure
 #' @param config Configuration
+#' @param options_df Options sheet, so worded sources are scored through their
+#'   Options rather than coerced raw. Omit only for genuinely numeric sources.
 #' @return List of composite results
 #' @export
 process_all_composites <- function(composite_defs, data, questions_df,
-                                    banner_info, config) {
+                                    banner_info, config, options_df = NULL) {
 
   if (is.null(composite_defs) || nrow(composite_defs) == 0) {
     return(list())
@@ -830,7 +931,8 @@ process_all_composites <- function(composite_defs, data, questions_df,
         data = data,
         questions_df = questions_df,
         banner_info = banner_info,
-        config = config
+        config = config,
+        options_df = options_df
       )
 
       composite_results[[comp_code]] <- result

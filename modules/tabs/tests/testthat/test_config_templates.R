@@ -267,7 +267,13 @@ test_that("crosstab config Selection sheet has expected columns", {
   generate_crosstab_config_template(tmp)
   selection <- openxlsx::read.xlsx(tmp, sheet = "Selection", startRow = 3)
 
-  expected_cols <- c("QuestionCode", "Include", "UseBanner", "KeyShare", "AreaSummary")
+  # AreaSummary/Theme retired with the area cards (2026-08-05); Category stays
+  expected_cols <- c("QuestionCode", "Include", "UseBanner", "KeyShare", "Category")
+  retired_cols <- c("AreaSummary", "Theme")
+  for (col in retired_cols) {
+    expect_false(col %in% names(selection),
+                 info = sprintf("Retired column '%s' must not regenerate", col))
+  }
   for (col in expected_cols) {
     expect_true(col %in% names(selection),
                 info = sprintf("Missing column '%s' in Selection sheet", col))
@@ -499,4 +505,68 @@ test_that("the CCPB case-variant labels are all recognised as canonical settings
     list(Generate_Stats_Pack = "Y", Project_Name = "P",
          Analyst_Name = "D", Research_House = "TRL")))
   expect_equal(length(hits), 4)
+})
+
+
+# ==============================================================================
+# TESTS: the template must not seed a config that refuses to run
+# (regression: ASSA 2026-08)
+# ==============================================================================
+#
+# The Selection sheet used to ship an example row `Total | N | Y | ... | Total`
+# captioned "always include as first banner". build_banner_structure() creates
+# the Total column itself and starts banner questions at column 2, so that row
+# names a question the Questions sheet does not have — which
+# check_banner_variables() logs as a BLOCKING Error. Anyone who filled the
+# template in around the example rows got a config that refused to run.
+
+read_template_selection <- function(path) {
+  sel <- openxlsx::read.xlsx(path, sheet = "Selection", startRow = 3,
+                             colNames = TRUE, skipEmptyRows = FALSE)
+  sel[!is.na(sel$QuestionCode) & !grepl("^\\[", sel$QuestionCode), , drop = FALSE]
+}
+
+test_that("the crosstab template seeds no Total row", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+  generate_crosstab_config_template(tmp)
+
+  sel <- read_template_selection(tmp)
+
+  expect_false("Total" %in% sel$QuestionCode)
+  expect_true(nrow(sel) > 0)   # the other examples are still there
+})
+
+test_that("every banner example in the template is a real example question", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+  generate_crosstab_config_template(tmp)
+
+  sel <- read_template_selection(tmp)
+  banners <- sel$QuestionCode[!is.na(sel$UseBanner) & toupper(sel$UseBanner) == "Y"]
+
+  # Whatever the examples are, each must also appear as a question example, or
+  # the shipped template is a config that cannot pass preflight.
+  ss <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(ss), add = TRUE)
+  generate_survey_structure_template(ss)
+  q <- openxlsx::read.xlsx(ss, sheet = "Questions", startRow = 3, colNames = TRUE,
+                           skipEmptyRows = FALSE)
+  q <- q[!is.na(q$QuestionCode) & !grepl("^\\[", q$QuestionCode), , drop = FALSE]
+
+  expect_true(all(banners %in% q$QuestionCode))
+})
+
+test_that("banner DisplayOrder starts at 2, leaving column 1 for Total", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+  generate_crosstab_config_template(tmp)
+
+  sel <- read_template_selection(tmp)
+  orders <- suppressWarnings(as.numeric(
+    sel$DisplayOrder[!is.na(sel$UseBanner) & toupper(sel$UseBanner) == "Y"]))
+  orders <- orders[!is.na(orders)]
+
+  expect_true(length(orders) > 0)
+  expect_true(min(orders) >= 2)
 })

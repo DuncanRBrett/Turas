@@ -118,16 +118,15 @@ run("uniform extremeness is a story too — top on nearly everything is not buri
     "card calls out the sweep: " + takeout.ui.leanLine(ps[0]));
 });
 
-run("commensurable areas only — mixed-scale theme is dropped", () => {
-  const levels = [
+run("area cards are RETIRED — no weak/strong pattern, engine export gone", () => {
+  // Duncan 2026-08-05: the strongest/weakest area race was nuanced past
+  // usefulness. The tab is a group-vs-peers overview only.
+  assert(takeout._areaPatterns === undefined, "areaPatterns no longer exported");
+  const t = takeout.buildPatterns({ columns: columns, levels: [
     { title: "Recognition A", theme: "Recognition", value: 3.1, scaleMax: 5 },
-    { title: "Recognition B", theme: "Recognition", value: 3.3, scaleMax: 5 },
-    { title: "Recommend", theme: "Perceptions", value: 45, scaleMax: 100 },
-    { title: "Trust", theme: "Perceptions", value: 3.2, scaleMax: 5 }     // different scale
-  ];
-  const areas = takeout._areaPatterns(levels).map((a) => a.subject);
-  assert(areas.indexOf("Recognition") !== -1, "commensurable Recognition kept");
-  assert(areas.indexOf("Perceptions") === -1, "mixed-scale Perceptions dropped (no cross-scale average)");
+    { title: "Recognition B", theme: "Recognition", value: 3.3, scaleMax: 5 }
+  ] });
+  assert(!t.patterns.some((p) => p.kind === "area"), "no area card is built");
 });
 
 run("buildPatterns: portraits only; split/co-moving/odd/bimodal not cards", () => {

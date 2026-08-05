@@ -77,11 +77,28 @@
    */
   function scanBannerGroups() {
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
+    var norm = (takeout._shares && takeout._shares._normLabel) ||
+      function (s) { return String(s || "").trim().toLowerCase(); };
+    // patterns_banner (config): the POSITIVE selection — the tab is an overview
+    // of the named banner group(s) only (Duncan, 2026-08-05: "limited to the
+    // selected banner"; comma-separated for a second banner later). Matched on
+    // label or id like the exclude lever; validated by patterns_echo, so a
+    // typo is reported, not silently everything-or-nothing. Unset -> every
+    // banner group, as before.
+    var inc = (TR.AGG && TR.AGG.project && TR.AGG.project.patterns_banner) || [];
+    if (!Array.isArray(inc)) inc = [inc];
+    if (inc.length) {
+      var want = {};
+      inc.forEach(function (x) { want[norm(x)] = true; });
+      var picked = groups.filter(function (g) {
+        return want[norm(g.name)] || want[norm(g.id)];
+      });
+      if (picked.length) groups = picked;
+      // no match: fall through to the full set — patterns_echo names the typo
+    }
     var ex = (TR.AGG && TR.AGG.project && TR.AGG.project.patterns_exclude_banners) || [];
     if (!Array.isArray(ex)) ex = [ex];
     if (!ex.length) return groups;
-    var norm = (takeout._shares && takeout._shares._normLabel) ||
-      function (s) { return String(s || "").trim().toLowerCase(); };
     var set = {};
     ex.forEach(function (x) { set[norm(x)] = true; });
     return groups.filter(function (g) { return !set[norm(g.name)] && !set[norm(g.id)]; });

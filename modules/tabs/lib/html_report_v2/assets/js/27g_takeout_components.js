@@ -19,8 +19,6 @@
     comove: { tag: "Questions that move together", cls: "comove" },
     odd: { tag: "The odd one out", cls: "odd" },
     bimodal: { tag: "Hidden disagreement", cls: "bimodal" },
-    weak: { tag: "Weakest area", cls: "weak" },
-    strong: { tag: "Strongest area", cls: "strong" },
     moved: { tag: "What moved", cls: "moved" }
   };
   ui.patternMeta = function (id) {
@@ -45,14 +43,6 @@
   /** One member row inside an AREA card: the question label on its own line (full,
    *  always wraps — never truncated), then a scale bar + value beneath, plus a
    *  move chip when it shifted. cls colours the bar by pattern kind. */
-  ui.areaRow = function (m, cls) {
-    var pct = m.scaleMax ? Math.min(100, Math.max(0, m.value / m.scaleMax * 100)) : 0;
-    var tag = m.summary ? ' <span class="tko-peer">overall</span>' : "";
-    return '<div class="tko-row"><div class="tko-rl">' + fmt.escapeHtml(m.label) + tag + "</div>" +
-      '<div class="tko-rmeter"><span class="tko-track"><span class="tko-fill tko-' + cls +
-      '" style="width:' + pct.toFixed(1) + '%"></span></span>' +
-      '<span class="tko-rv">' + Number(m.value).toFixed(1) + ui.moveChip(m.delta) + "</span></div></div>";
-  };
 
   /** One row inside the GROUP card: the question label on its own line (full,
    *  always wraps), then the column's standing vs the rest beneath — its bar in
@@ -343,24 +333,6 @@
       if (p.nullResult) return "No hidden disagreement — every question's average reflects a single camp, not two.";
       return p.flaggedCount + (p.flaggedCount === 1 ? " question splits" : " questions split") +
         " the room into two camps the average hides — read the distribution, not the mean.";
-    }
-    if (p.id === "weak") {
-      // Summary-led area: quote the real overall rating. Flat fallback keeps
-      // the qualitative line (its ranking average is not a number anyone rated).
-      if (p.summary) {
-        return p.subject + " is the weakest area — rated " +
-          Number(p.summary.value).toFixed(1) + " overall" +
-          (p.moving < 0 ? ", and slipping." : ".");
-      }
-      return p.subject + " is the weakest area — its questions cluster low" +
-        (p.moving < 0 ? ", and are slipping." : ".");
-    }
-    if (p.id === "strong") {
-      if (p.summary) {
-        return p.subject + " is the strongest area — rated " +
-          Number(p.summary.value).toFixed(1) + " overall.";
-      }
-      return p.subject + " is the strongest area — what is holding things together.";
     }
     if (p.id === "moved") {
       if (p.stable) return "Broadly stable — nothing shifted materially since the last wave.";

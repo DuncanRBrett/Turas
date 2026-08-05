@@ -156,12 +156,27 @@
     var by = {};
     (columns || []).forEach(function (c) {
       c.gaps.forEach(function (gp) {
-        var key = c.group + "||" + gp.title;
+        // Key by question CODE (title only as a fallback for old islands):
+        // duplicate question titles used to merge into one race, printing
+        // "highest of 6" in a 3-column banner (review 2026-08, I6).
+        var key = c.group + "||" + (gp.code || gp.title);
         var e = by[key] || (by[key] = { count: 0, hi: null, lo: null });
         e.count++;
-        if (e.hi === null || gp.value > e.hi.value) e.hi = { col: c.column, value: gp.value };
-        if (e.lo === null || gp.value < e.lo.value) e.lo = { col: c.column, value: gp.value };
+        if (e.hi === null || gp.value > e.hi.value) {
+          e.hi = { col: c.column, value: gp.value, tied: false };
+        } else if (e.hi && gp.value === e.hi.value) {
+          e.hi.tied = true;    // an exact tie crowns no one (I6)
+        }
+        if (e.lo === null || gp.value < e.lo.value) {
+          e.lo = { col: c.column, value: gp.value, tied: false };
+        } else if (e.lo && gp.value === e.lo.value) {
+          e.lo.tied = true;
+        }
       });
+    });
+    Object.keys(by).forEach(function (k) {
+      if (by[k].hi && by[k].hi.tied) by[k].hi = null;
+      if (by[k].lo && by[k].lo.tied) by[k].lo = null;
     });
     return by;
   }
@@ -321,66 +336,13 @@
     });
   }
 
-  /** Evidence rows for an area: the summary question pinned first (it IS the
-   *  area's score), then components weakest- or strongest-first. */
-  function areaEvidence(theme, weakest) {
-    var summary = theme.summary || null;
-    var rest = theme.members.filter(function (m) { return m !== summary; })
-      .sort(function (a, b) {
-        return weakest ? areaScore(a) - areaScore(b) : areaScore(b) - areaScore(a);
-      });
-    return (summary ? [summary] : []).concat(rest).slice(0, CONST.EVIDENCE_MAX)
-      .map(function (m) {
-        return { label: m.title, value: m.value, scaleMax: m.scaleMax,
-          delta: m.delta || null, topBox: m.topBox || null, summary: m === summary };
-      });
-  }
-
-  /** An area can only be summarised when its questions share a scale family —
-   *  otherwise rolling them up (e.g. an NPS 0–100 with a 1–5 index) averages
-   *  apples and oranges, the exact fault Duncan flagged. Same scaleMax = same
-   *  family. (Later: a config Scale_Family tag overrides this auto-detection.) */
-  function commensurable(members) {
-    var sm = members[0] && members[0].scaleMax;
-    return members.every(function (m) { return m.scaleMax === sm; });
-  }
-
-  /** WEAKEST and STRONGEST area patterns. An area = any tagged theme (one
-   *  question is enough); it scores on its summary question (see groupByTheme).
-   *  Only themes whose questions share a scale qualify (no cross-scale average),
-   *  and the strongest/weakest RACE runs within one scale family — an NPS-only
-   *  area (0-100) must never be crowned against 0-10 rating areas. The race
-   *  takes the family with the most areas (ties: more member questions, then
-   *  the smaller scale); other families sit out. */
-  function areaPatterns(levels) {
-    var themes = groupByTheme(levels).filter(function (t) {
-      return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS &&
-        commensurable(t.members);
-    });
-    if (themes.length < 1) return [];
-    var fams = {};
-    themes.forEach(function (t) { (fams[t.scaleMax] || (fams[t.scaleMax] = [])).push(t); });
-    var famTotal = function (k) {
-      return fams[k].reduce(function (s, t) { return s + t.members.length; }, 0);
-    };
-    var famKey = Object.keys(fams).sort(function (a, b) {
-      return (fams[b].length - fams[a].length) || (famTotal(b) - famTotal(a)) || (a - b);
-    })[0];
-    var race = fams[famKey];
-    var ranked = race.slice().sort(function (a, b) { return a.score - b.score; });
-    var weak = ranked[0], strong = ranked[ranked.length - 1];
-    var make = function (t, isWeak) {
-      return { id: isWeak ? "weak" : "strong", kind: "area", subject: t.name,
-        section: t.section, score: t.score, avg: t.avg, scaleMax: t.scaleMax,
-        members: t.members.length, moving: t.moving, raceSize: race.length,
-        summary: t.summary ? { label: t.summary.title, value: t.summary.value,
-          scaleMax: t.summary.scaleMax } : null,
-        evidence: areaEvidence(t, isWeak) };
-    };
-    var out = [make(weak, true)];
-    if (strong !== weak) out.push(make(strong, false));   // need >=2 distinct areas for both
-    return out;
-  }
+  // WEAKEST / STRONGEST area cards RETIRED (Duncan, 2026-08-05): the area race
+  // was nuanced past usefulness — a single tagged theme got crowned "weakest",
+  // and the flat-fallback copy asserted "its questions cluster low" on the
+  // absolute level (review 2026-08, I6). The tab is a group-vs-peers overview;
+  // areas were the one card family not about a GROUP. groupByTheme stays for
+  // the dashboard; Theme/AreaSummary config columns are noted as retired by
+  // patterns_echo.
 
   /**
    * MOVEMENT pattern: the headline metrics that moved since last wave — biggest
@@ -599,17 +561,26 @@
       portrayedBanners[p.group] = true;
       eligibleKey[p.group + "::" + p.subject] = true;
     });
-    var flat = [];
+    var flat = [], noStoryExtra = [];
     (inputs.columns || []).forEach(function (c) {
       if (!portrayedBanners[c.group]) return;
       if (eligibleKey[c.group + "::" + c.column]) return;
-      var lows = [], highs = [];
+      var lows = [], highs = [], material = 0;
       c.gaps.forEach(function (gp) {
         var frac = (gp.value - gp.total) / (gp.scaleMax || 1);
         var row = { label: gp.title, value: gp.value, rest: gp.total,
           scaleMax: gp.scaleMax, frac: frac, isMean: !gp.isPct, isPct: !!gp.isPct };
         if (frac < 0) lows.push(row); else if (frac > 0) highs.push(row);
+        if (Math.abs(frac) >= CONST.MIN_STRAIN_GAP) material++;
       });
+      // "Steady" is a claim — "close to the overall almost everywhere". A group
+      // that failed portrait eligibility on OTHER grounds (sign test flat, too
+      // few standouts) but carries material gaps is polarized, not steady
+      // (review 2026-08, I6): it goes to the also-scanned note, unclaimed.
+      if (material > 0) {
+        noStoryExtra.push({ subject: c.column, group: c.group, base: c.base });
+        return;
+      }
       lows.sort(function (a, b) { return a.frac - b.frac; });
       highs.sort(function (a, b) { return b.frac - a.frac; });
       var g = gate ? (gate.groups.filter(function (x) {
@@ -627,7 +598,7 @@
     steadyCards.forEach(function (p) { patterns.push(p); });
     var noStory = flat.slice(CONST.STEADY_MAX).map(function (p) {
       return { subject: p.subject, group: p.group, base: p.base };
-    });
+    }).concat(noStoryExtra);
 
     // Which cut divides the data most — a navigation pointer, NO synthetic average.
     var split = splitPattern(inputs.columns);
@@ -642,8 +613,8 @@
       if (!gate || split.consistent) { split.sigGaps = consistentGroups; }
     }
 
-    // Weakest / strongest AREA — only commensurable themes (same scale family).
-    areaPatterns(inputs.levels || []).forEach(function (p) { patterns.push(p); });
+    // Weakest / strongest AREA cards retired (see the note at the old
+    // areaPatterns site) — the tab is a group-vs-peers overview only.
 
     // Movement (trackers) — unchanged.
     var moved = movementPattern(inputs.apex || []);
@@ -682,7 +653,6 @@
   takeout.buildPatterns = buildPatterns;
 
   takeout._groupPattern = groupPattern;
-  takeout._areaPatterns = areaPatterns;
   takeout._groupByTheme = groupByTheme;
 
 })(typeof window !== "undefined" ? window : globalThis);

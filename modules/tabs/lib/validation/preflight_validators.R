@@ -126,25 +126,49 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
     q_options <- options_df[options_df$QuestionCode == q_code, ]
     if (nrow(q_options) == 0) next
 
-    # Determine option value column
-    opt_val_col <- if ("OptionCode" %in% names(q_options) &&
-                       !all(is.na(q_options$OptionCode))) {
-      "OptionCode"
-    } else if ("OptionValue" %in% names(q_options) &&
-               !all(is.na(q_options$OptionValue))) {
-      "OptionValue"
-    } else {
-      next
-    }
+    # Which column holds the value the DATA is supposed to match?
+    #
+    # OptionText is the answer, by definition ("EXACT value from data file").
+    # OptionCode and OptionValue are alternative codings that only SOMETIMES
+    # carry it — OptionValue in particular is the numeric a mean is computed
+    # from, and on a Likert it routinely holds the scale position 1..5 while the
+    # data holds the words. Preferring it there made every real answer read as
+    # undefined and every option as unused: 53 spurious warnings on one study,
+    # loud enough to bury a true one.
+    #
+    # So collect every candidate coding and treat a data value as defined if it
+    # matches ANY of them. A value the config genuinely never declares still
+    # matches none, and is still reported.
+    candidate_cols <- c("OptionCode", "OptionValue", "OptionText")
+    candidate_cols <- candidate_cols[
+      candidate_cols %in% names(q_options) &
+      vapply(candidate_cols, function(cc) {
+        cc %in% names(q_options) && !all(is.na(q_options[[cc]]))
+      }, logical(1))
+    ]
+    if (length(candidate_cols) == 0) next
 
-    defined_values <- as.character(q_options[[opt_val_col]])
-    defined_values <- defined_values[!is.na(defined_values) & defined_values != ""]
+    values_of <- function(cc) {
+      v <- as.character(q_options[[cc]])
+      v[!is.na(v) & v != ""]
+    }
+    defined_by_col <- stats::setNames(lapply(candidate_cols, values_of), candidate_cols)
+    defined_values <- unique(unlist(defined_by_col, use.names = FALSE))
 
     # Get actual data values (non-NA)
     data_values <- as.character(survey_data[[col_name]])
     data_values <- unique(data_values[!is.na(data_values) & data_values != ""])
 
     if (length(data_values) == 0 || length(defined_values) == 0) next
+
+    # "Unused" is only meaningful against the coding the data actually speaks —
+    # reporting the unmatched 1..5 of a Likert's OptionValue alongside its
+    # matched labels would reinstate half the noise. Pick the candidate that
+    # covers the most of the data and judge unused options against that one.
+    coverage <- vapply(defined_by_col,
+                       function(v) sum(data_values %in% v), integer(1))
+    matched_col <- names(coverage)[which.max(coverage)]
+    unused_pool <- defined_by_col[[matched_col]]
 
     # Data values not in options (missing option definitions)
     missing_opts <- setdiff(data_values, defined_values)
@@ -160,7 +184,7 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
     }
 
     # Defined options not in data (possibly unused codes)
-    unused_opts <- setdiff(defined_values, data_values)
+    unused_opts <- setdiff(unused_pool, data_values)
     if (length(unused_opts) > 0) {
       error_log <- log_issue(
         error_log, "Preflight", "Unused Option Values",

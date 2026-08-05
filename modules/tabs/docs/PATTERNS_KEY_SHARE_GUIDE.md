@@ -1,6 +1,17 @@
-# Patterns and closed questions — the KeyShare column
+# Group overview and closed questions — the KeyShare column
 
 **Status:** live from 2026-07-17 (branch `feature/tabs-patterns-key-share`).
+
+> **Amendment (2026-08-05).** The tab is now called **Group overview** and is
+> a group-vs-peers overview only: for the selected banner's groups, how many
+> questions each sits ahead of and behind its peers on. The **strongest /
+> weakest AREA cards are retired** — the area race was nuanced past usefulness
+> — so the Selection columns `Theme` and `AreaSummary` no longer act (the
+> config echo says so when a config still carries them). A new Settings row
+> **`patterns_banner`** names the banner group(s) to portray (e.g. `Centre`;
+> comma-separated for a second banner); blank scans every banner as before.
+> The `patterns_*` setting names are unchanged. KeyShare below is unchanged
+> and still feeds the group portraits.
 
 The Patterns tab used to read one kind of question: rated scales with an index. On an engagement study that covers nearly everything. On a study like CCPB CSAT — 95 questions, 58 of them Single_Response — it read about a quarter of the survey and was silent on the rest.
 

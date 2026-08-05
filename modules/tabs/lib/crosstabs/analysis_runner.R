@@ -358,7 +358,8 @@ process_composites <- function(composite_defs, survey_data, survey_structure,
       data = survey_data,
       questions_df = survey_structure$questions,
       banner_info = banner_info,
-      config = config_obj
+      config = config_obj,
+      options_df = survey_structure$options
     )
   }, error = function(e) {
     tabs_refuse(

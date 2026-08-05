@@ -92,19 +92,37 @@ audit_patterns_config <- function(dl) {
   shares_declared <- Filter(function(q) nzchar(as.character(q$key_share %||% "")), questions)
   summaries_declared <- Filter(function(q) isTRUE(q$area_summary), questions)
   excl <- as.character(proj$patterns_exclude_banners %||% character(0))
+  incl <- as.character(proj$patterns_banner %||% character(0))
   head_codes <- as.character(proj$takeout_headline %||% character(0))
-  active <- length(excl) > 0 || length(head_codes) > 0 ||
+  active <- length(excl) > 0 || length(incl) > 0 || length(head_codes) > 0 ||
     length(shares_declared) > 0 || length(summaries_declared) > 0
   if (!active) return(list(active = FALSE, rows = list(), n_check = 0L))
 
-  # -- excluded banners ---------------------------------------------------------
   b_names <- vapply(banners, function(b) as.character(b$name %||% ""), character(1))
   b_ids   <- vapply(banners, function(b) as.character(b$id %||% ""), character(1))
+
+  # -- selected banner(s) (patterns_banner: the positive lever) -----------------
+  # A typo here means the Group overview silently falls back to EVERY banner —
+  # the exact everything-or-nothing this echo exists to catch.
+  for (e in incl) {
+    hit <- which(vapply(b_names, .pe_norm, character(1)) == .pe_norm(e) |
+                 vapply(b_ids, .pe_norm, character(1)) == .pe_norm(e))
+    if (length(hit) > 0) {
+      add("Banner selected", sprintf("✓ '%s' (%s) — the Group overview portrays this banner",
+                                     e, b_ids[hit[1]]))
+    } else {
+      add("Banner selected", sprintf(
+        "⚠ '%s' matches no banner — the overview falls back to ALL banners. Check spelling (banners: %s)",
+        e, paste(b_names, collapse = ", ")))
+    }
+  }
+
+  # -- excluded banners ---------------------------------------------------------
   for (e in excl) {
     hit <- which(vapply(b_names, .pe_norm, character(1)) == .pe_norm(e) |
                  vapply(b_ids, .pe_norm, character(1)) == .pe_norm(e))
     if (length(hit) > 0) {
-      add("Banner excluded", sprintf("✓ '%s' (%s) — out of the Patterns scan",
+      add("Banner excluded", sprintf("✓ '%s' (%s) — out of the Group overview scan",
                                      e, b_ids[hit[1]]))
     } else {
       add("Banner excluded", sprintf(
@@ -151,44 +169,14 @@ audit_patterns_config <- function(dl) {
     }
   }
 
-  # -- areas / AreaSummary ------------------------------------------------------
-  rated <- Filter(.pe_is_rated, questions)
-  theme_of <- function(q) {
-    t <- as.character(q$theme %||% "")
-    if (nzchar(t)) t else as.character(q$category %||% "")
-  }
-  for (q in summaries_declared) {
-    code <- as.character(q$code %||% "")
-    if (!.pe_is_rated(q)) {
-      add(paste("AreaSummary", code),
-          "⚠ ignored — areas read rated questions only")
-    } else if (!nzchar(theme_of(q))) {
-      add(paste("AreaSummary", code),
-          "⚠ ignored — no Category/Theme tag, so it belongs to no area")
-    }
-  }
-  themes <- unique(vapply(rated, theme_of, character(1)))
-  themes <- themes[nzchar(themes)]
-  for (t in themes) {
-    members <- Filter(function(q) theme_of(q) == t, rated)
-    if (length(members) < 2) next                    # a single question scores on itself
-    flags <- Filter(function(q) isTRUE(q$area_summary), members)
-    scales <- unique(vapply(members, function(q) as.numeric(q$scale_max %||% 0), numeric(1)))
-    if (length(scales) > 1) {
-      add(paste0("Area '", t, "'"),
-          "⚠ mixed scales — sits out of the strongest/weakest race")
-    } else if (length(flags) > 1) {
-      add(paste0("Area '", t, "'"), sprintf(
-        "⚠ %d questions marked AreaSummary — the first in question order wins",
-        length(flags)))
-    } else if (length(flags) == 1) {
-      add(paste0("Area '", t, "'"), sprintf("✓ scores on its overall, %s",
-        as.character(flags[[1]]$code %||% "")))
-    } else {
-      add(paste0("Area '", t, "'"), sprintf(
-        "· flat average of %d questions — no overall declared (AreaSummary)",
-        length(members)))
-    }
+  # -- areas RETIRED (Duncan, 2026-08-05) ---------------------------------------
+  # The strongest/weakest area cards were dropped — the tab is a group-vs-peers
+  # overview only. AreaSummary declarations are named as retired so a config
+  # carrying them knows they no longer act (never silently ignored).
+  if (length(summaries_declared) > 0) {
+    add("AreaSummary", sprintf(
+      "· %d question(s) marked AreaSummary — the area cards are RETIRED; the mark no longer acts",
+      length(summaries_declared)))
   }
 
   n_check <- sum(vapply(rows, function(r) grepl("^⚠", r[2]), logical(1)))

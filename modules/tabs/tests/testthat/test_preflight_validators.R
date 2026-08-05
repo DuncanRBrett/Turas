@@ -436,3 +436,117 @@ test_that("check_preflight_colour_codes skips when html_report is FALSE", {
   result <- check_preflight_colour_codes(config, new_error_log())
   expect_equal(nrow(result), 0)
 })
+
+
+# ==============================================================================
+# check_option_values_vs_data — matching against the right coding
+# (regression: ASSA 2026-08)
+# ==============================================================================
+#
+# The check used to prefer OptionCode, then OptionValue, and never fell back to
+# OptionText. On a Likert whose data holds words and whose Options carry the
+# scale position in OptionValue — an ordinary setup — every real answer read as
+# an "Undefined Data Value" and every option as an "Unused Option Value". One
+# study produced 53 such warnings, loud enough to bury a true one.
+
+# A Likert answered in words, with OptionValue carrying the scale position.
+make_worded_likert <- function() {
+  list(
+    questions = data.frame(QuestionCode = "Q22", Variable_Type = "Likert",
+                           Columns = 1, stringsAsFactors = FALSE),
+    options = data.frame(
+      QuestionCode = rep("Q22", 3),
+      OptionText   = c("Not at all well", "Neutral", "Very well"),
+      OptionValue  = c(1, 3, 5),
+      Index_Weight = c(-100, 0, 100),
+      stringsAsFactors = FALSE
+    ),
+    selection = data.frame(QuestionCode = "Q22", Include = "Y",
+                           stringsAsFactors = FALSE)
+  )
+}
+
+test_that("check_option_values_vs_data is silent when data matches OptionText", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  fx <- make_worded_likert()
+  survey_data <- data.frame(Q22 = c("Not at all well", "Neutral", "Very well"),
+                            stringsAsFactors = FALSE)
+
+  result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,
+                                        fx$selection, new_error_log())
+
+  expect_equal(nrow(result), 0)
+})
+
+test_that("check_option_values_vs_data still reports a genuinely undefined value", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  fx <- make_worded_likert()
+  survey_data <- data.frame(Q22 = c("Not at all well", "Brilliant"),
+                            stringsAsFactors = FALSE)
+
+  result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,
+                                        fx$selection, new_error_log())
+
+  undefined <- result[result$Issue_Type == "Undefined Data Values", ]
+  expect_equal(nrow(undefined), 1)
+  expect_true(grepl("Brilliant", undefined$Description[1]))
+})
+
+test_that("unused options are named in the coding the data actually speaks", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  fx <- make_worded_likert()
+  survey_data <- data.frame(Q22 = "Neutral", stringsAsFactors = FALSE)
+
+  result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,
+                                        fx$selection, new_error_log())
+
+  unused <- result[result$Issue_Type == "Unused Option Values", ]
+  expect_equal(nrow(unused), 1)
+  # The labels nobody picked, not the scale positions 1/3/5.
+  expect_true(grepl("Not at all well", unused$Description[1]))
+  expect_true(grepl("Very well", unused$Description[1]))
+})
+
+test_that("numeric-coded data is unaffected by the OptionText fallback", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  questions_df <- make_questions_df(codes = "Q1", types = "Single", columns = 1)
+  options_df <- data.frame(QuestionCode = c("Q1", "Q1"),
+                           OptionText = c("1", "2"),
+                           OptionValue = c(1, 2),
+                           stringsAsFactors = FALSE)
+  selection_df <- make_selection_df(codes = "Q1")
+  survey_data <- data.frame(Q1 = c("1", "2", "3"), stringsAsFactors = FALSE)
+
+  result <- check_option_values_vs_data(questions_df, options_df, survey_data,
+                                        selection_df, new_error_log())
+
+  undefined <- result[result$Issue_Type == "Undefined Data Values", ]
+  expect_equal(nrow(undefined), 1)
+  expect_true(grepl("3", undefined$Description[1]))
+})
+
+test_that("a question with no usable option coding is skipped, not crashed on", {
+  skip_if(!exists("check_option_values_vs_data", mode = "function"),
+          "check_option_values_vs_data not available")
+
+  questions_df <- make_questions_df(codes = "Q1", types = "Single", columns = 1)
+  options_df <- data.frame(QuestionCode = c("Q1", "Q1"),
+                           OptionText = c(NA_character_, NA_character_),
+                           stringsAsFactors = FALSE)
+  selection_df <- make_selection_df(codes = "Q1")
+  survey_data <- data.frame(Q1 = c("a", "b"), stringsAsFactors = FALSE)
+
+  expect_silent(
+    result <- check_option_values_vs_data(questions_df, options_df, survey_data,
+                                          selection_df, new_error_log())
+  )
+  expect_equal(nrow(result), 0)
+})

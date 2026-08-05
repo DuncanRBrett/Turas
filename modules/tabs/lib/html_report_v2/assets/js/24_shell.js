@@ -23,7 +23,7 @@
     var on = function (flag) { return flags[flag] !== false; };
     var read = [];
     if (on("dashboard")) read.push(["dashboard", "Dashboard"]);
-    if (on("patterns")) read.push(["takeout", "Patterns"]);
+    if (on("patterns")) read.push(["takeout", "Group overview"]);
     if (TR.d2.tracking().enabled && on("tracking")) read.push(["moved", "Tracking"]);
     if (TR.d2.qualitative && TR.d2.qualitative().enabled) read.push(["qualitative", "Qualitative"]);
     read.push(["story", "Story"]);

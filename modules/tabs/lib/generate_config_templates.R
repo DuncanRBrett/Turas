@@ -544,22 +544,32 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
-    # ---- PATTERNS TAB (OPTIONAL) ----
-    # The full Patterns surface is these two Settings rows plus two Selection
-    # columns (KeyShare, AreaSummary). Every declaration is validated at
-    # generation time and echoed in the console + the Report tab's diagnostics
-    # panel, so a typo is reported instead of silently doing nothing.
+    # ---- GROUP OVERVIEW TAB (OPTIONAL; settings keep the patterns_ prefix) ----
+    # The tab is a group-vs-peers overview of the selected banner: how many
+    # questions each group sits ahead of / behind its peers on. Its surface is
+    # these three Settings rows plus the Selection KeyShare column. Every
+    # declaration is validated and echoed in the console + the Report tab's
+    # diagnostics panel, so a typo is reported instead of silently doing
+    # nothing. (The strongest/weakest AREA cards were retired 2026-08 - the
+    # old Theme/AreaSummary Selection columns no longer act and the echo says
+    # so when a config still carries them.)
     list(
-      section_name = "PATTERNS TAB (OPTIONAL)",
+      section_name = "GROUP OVERVIEW TAB (OPTIONAL)",
       fields = list(
+        list(name = "patterns_banner", default = "", required = FALSE,
+             description = paste("Group overview tab: the banner group(s) to portray (label or id,",
+               "comma-separated for more than one, e.g. 'Centre'). The tab is an overview of the",
+               "SELECTED banner's groups - how many questions each sits ahead of and behind its",
+               "peers on. Blank = every banner group is scanned."),
+             valid_values_text = "A banner label/id, or blank for all"),
         list(name = "patterns_exclude_banners", default = "", required = FALSE,
-             description = paste0("Banners the Patterns tab must skip, comma-separated (label or code, ",
+             description = paste0("Banners the Group overview tab must skip, comma-separated (label or code, ",
                "e.g. Interviewer). Operational cuts are fieldwork QC, not client story — without this ",
                "the tab's lead portrait can be an interviewer effect. The banner still works everywhere ",
                "else (crosstabs, Differences); it just never becomes a portrait. Blank = scan every banner."),
              valid_values_text = "Comma-separated banner labels/codes, or leave blank"),
         list(name = "patterns_headline", default = "", required = FALSE,
-             description = paste0("Pin the Patterns apex KPI tiles to these question codes, in order ",
+             description = paste0("Pin the Group overview apex KPI tiles to these question codes, in order ",
                "(e.g. Q78, Q79). Blank = auto-detect from question titles, which on a study with many ",
                "section ratings can pick the wrong ones and crowd out the true headline."),
              valid_values_text = "Comma-separated question codes, or leave blank")
@@ -766,19 +776,11 @@ generate_crosstab_config_template <- function(output_path,
     list(name = "CategoryOrder", width = 14, required = FALSE,
          description = "Order of the category in the report (1 = first). Set on any one question in the category; blank categories order by first appearance.",
          integer_range = c(1, 100)),
-    list(name = "Theme", width = 20, required = FALSE,
-         description = "Theme/area label for the Patterns tab's area cards (often the same as Category). Questions sharing a Theme are scored together as an area. Blank = question joins no area."),
     list(name = "KeyShare", width = 22, required = FALSE,
          description = paste("Single/Multi questions only: the exact option, box or NET label whose share",
-           "summarises this question for the Patterns tab - where a HIGHER share is BETTER",
+           "summarises this question for the Group overview tab - where a HIGHER share is BETTER",
            "(e.g. 'Always' on delivery day, 'Not a problem' on language). Blank = question",
-           "stays out of the Patterns scan. Ignored on rated questions (their index is used).")),
-    list(name = "AreaSummary", width = 13, required = FALSE,
-         description = paste("Y marks THE question that summarises its Category/Theme area for the",
-           "Patterns tab (the section-overall rating, e.g. 'satisfaction with the coolers",
-           "overall'). The area then scores on this question; sibling questions become the",
-           "explanation, not equal votes in an average. One per area."),
-         dropdown = c("Y", "N")),
+           "stays out of the Group overview scan. Ignored on rated questions (their index is used).")),
     list(name = "BaseFilter", width = 35, required = FALSE,
          description = "R expression to filter respondents (e.g. Q1 == \"Male\" or !is.na(Q20)). Leave blank for no filter."),
     list(name = "FilterLabel", width = 30, required = FALSE,
@@ -801,19 +803,19 @@ generate_crosstab_config_template <- function(output_path,
          description = "Reference only - question wording for your convenience. Not used in processing.")
   )
 
-  # Example selection rows
+  # Example selection rows.
+  # NO "Total" row: build_banner_structure() creates the Total column itself and
+  # starts the banner questions at column 2. A Selection row saying
+  # QuestionCode=Total, UseBanner=Y names a question that is not in the Questions
+  # sheet, which check_banner_variables() reports as a BLOCKING error — so the
+  # template used to ship a config that refused to run until the row was deleted.
+  # DisplayOrder therefore starts at 2, the slot after Total.
   selection_examples <- list(
-    list(QuestionCode = "Total", Include = "N", UseBanner = "Y",
-         BannerBoxCategory = "N", BannerLabel = "Total",
-         DisplayOrder = 1, CreateIndex = "N", BaseFilter = "",
-         FilterLabel = "",
-         QuestionText = "Total sample (always include as first banner)",
-         CommentSheet = "", CommentLink = "", SplitDimension = "", NpsScoreQuestion = ""),
     list(QuestionCode = "Q_Gender", Include = "N", UseBanner = "Y",
          BannerBoxCategory = "N", BannerLabel = "Gender",
          DisplayOrder = 2, CreateIndex = "N", BaseFilter = "",
          FilterLabel = "",
-         QuestionText = "Example: demographic banner question",
+         QuestionText = "Example: demographic banner question (Total is column 1 automatically - never add a Total row)",
          CommentSheet = "", CommentLink = "", SplitDimension = "", NpsScoreQuestion = ""),
     list(QuestionCode = "Q_Satisfaction", Include = "Y", UseBanner = "N",
          BannerBoxCategory = "", BannerLabel = "",

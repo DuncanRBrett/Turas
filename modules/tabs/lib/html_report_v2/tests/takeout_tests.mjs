@@ -118,75 +118,7 @@ run("SPLIT pattern: null when no single breakout dominates", () => {
   assert(takeout._splitPattern(columns) === null, "two equally-differentiating splits -> none named");
 });
 
-run("AREA patterns rank weakest and strongest theme", () => {
-  const lv = (code, theme, value) => ({ code, title: code, section: "Engagement", theme,
-    value, scaleMin: 0, scaleMax: 5, delta: null });
-  const levels = [
-    lv("Q08", "Recognition & voice", 3.4), lv("Q11", "Recognition & voice", 3.7),
-    lv("Q12", "Belonging & purpose", 4.4), lv("Q13", "Belonging & purpose", 4.5)
-  ];
-  const ps = takeout._areaPatterns(levels);
-  const weak = ps.filter((p) => p.id === "weak")[0];
-  const strong = ps.filter((p) => p.id === "strong")[0];
-  assert(weak && weak.subject === "Recognition & voice", "weakest area is Recognition & voice");
-  close(weak.avg, 3.55, 1e-9, "weak area average");
-  assert(strong && strong.subject === "Belonging & purpose", "strongest area is Belonging & purpose");
-  close(strong.avg, 4.45, 1e-9, "strong area average");
-});
-
-run("AREA patterns: a single tagged question IS an area; untagged still excluded", () => {
-  const levels = [
-    { code: "Q1", title: "Q1", section: "", theme: "", value: 3, scaleMax: 5 },
-    { code: "Q2", title: "Q2", section: "", theme: "", value: 4, scaleMax: 5 }
-  ];
-  assert(takeout._areaPatterns(levels).length === 0, "untagged levels yield no area pattern");
-  const lone = [{ code: "Q1", title: "Invoicing", section: "S", theme: "Invoicing", value: 9.2, scaleMax: 10 }];
-  const ps = takeout._areaPatterns(lone);
-  assert(ps.length === 1 && ps[0].subject === "Invoicing", "one tagged question is an area");
-  close(ps[0].score, 0.92, 1e-9, "the area's score IS its question's rating");
-  assert(ps[0].summary && ps[0].summary.value === 9.2, "sole member doubles as the summary");
-});
-
-run("the area scores on its overall question, not a flat average (the coolers case)", () => {
-  const lv = (title, theme, value, scaleMax, summary) =>
-    ({ code: title, title, theme, value, scaleMax, summary: !!summary });
-  const levels = [
-    lv("Ease of ordering", "Orders", 9.5, 10),
-    lv("Delivery overall", "Deliveries", 8.8, 10), lv("Delivery team", "Deliveries", 8.9, 10),
-    lv("Cooler order ease", "Coolers", 8.0, 10), lv("Complaint response", "Coolers", 7.5, 10),
-    lv("Technicians", "Coolers", 9.2, 10), lv("Placement time", "Coolers", 7.6, 10),
-    lv("Coolers overall", "Coolers", 9.0, 10, true),      // the declared AreaSummary
-    lv("Sign order ease", "Signwriting", 7.9, 10), lv("Progress updates", "Signwriting", 7.3, 10),
-    lv("Responsiveness", "Signwriting", 6.6, 10), lv("Professionalism", "Signwriting", 8.2, 10),
-    lv("Condition", "Signwriting", 8.6, 10),
-    lv("Eyethu recommend", "Eyethu", 40, 100)             // NPS-only area — sits out of the race
-  ];
-  const cool = takeout._groupByTheme(levels).filter((t) => t.name === "Coolers")[0];
-  close(cool.score, 0.90, 1e-9, "Coolers scores on its overall (9.0), NOT the flat 8.46 mean");
-  assert(cool.summary && cool.summary.title === "Coolers overall", "summary is the declared question");
-  const ps = takeout._areaPatterns(levels);
-  const weak = ps.filter((p) => p.id === "weak")[0], strong = ps.filter((p) => p.id === "strong")[0];
-  assert(strong.subject === "Orders", "a one-question 9.5 area wins, got " + strong.subject);
-  assert(weak.subject === "Signwriting", "weakest by its questions, got " + weak.subject);
-  assert(strong.raceSize === 4 && weak.raceSize === 4,
-    "the NPS-only Eyethu area sits OUT of a 0-10 race (raceSize 4)");
-  assert(takeout.ui.patternSeed(strong).indexOf("rated 9.5 overall") !== -1,
-    "strongest seed quotes the real overall rating");
-  assert(takeout.ui.patternSeed(weak).indexOf("cluster low") !== -1,
-    "flat-fallback area keeps the qualitative line (no invented rating)");
-  // evidence: the summary pins first with its marker; flat areas disclose their basis
-  const coolLevels = levels.filter((l) => l.theme === "Coolers" || l.theme === "Orders");
-  const ps2 = takeout._areaPatterns(coolLevels);   // Coolers (0.90) is weakest vs Orders (0.95)
-  const weakCool = ps2.filter((p) => p.id === "weak")[0];
-  assert(weakCool.subject === "Coolers" && weakCool.evidence[0].summary === true &&
-    weakCool.evidence[0].label === "Coolers overall", "summary row pinned first");
-  TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
-  const html = takeout.readView.html(takeout.buildPatterns({ levels, scope: { rated: 14, shares: 0 } }));
-  assert(html.indexOf("no overall rating is declared for this area") !== -1,
-    "a flat-average area states its basis on the card");
-});
-
-run("buildPatterns assembles portraits + areas + movement, and degrades gracefully", () => {
+run("buildPatterns assembles portraits + movement — area cards retired", () => {
   const empty = takeout.buildPatterns({});
   assert(empty.patterns.length === 0, "nothing in, nothing out — no crash");
   const t = takeout.buildPatterns({
@@ -209,7 +141,8 @@ run("buildPatterns assembles portraits + areas + movement, and degrades graceful
   });
   const ids = t.patterns.map((p) => p.id);
   assert(t.patterns.some((p) => p.kind === "portrait"), "portrait present");
-  assert(ids.indexOf("weak") !== -1 && ids.indexOf("strong") !== -1, "weak + strong areas present");
+  assert(!t.patterns.some((p) => p.kind === "area"),
+    "area cards retired — tagged themes build NO weak/strong card");
   assert(ids.indexOf("moved") !== -1, "movement pattern present");
 });
 
@@ -370,7 +303,8 @@ run("save-copy round-trips Patterns curation (K1)", () => {
 run("every takeout module loaded and exposes its API", () => {
   ["buildPatterns", "gather", "compute", "render"].forEach((fn) =>
     assert(typeof takeout[fn] === "function", fn + " is a function"));
-  assert(takeout.ui && typeof takeout.ui.areaRow === "function", "ui atoms present");
+  assert(takeout.ui && typeof takeout.ui.synopsis === "function", "ui atoms present");
+  assert(takeout.ui.areaRow === undefined, "areaRow retired with the area cards");
   assert(takeout.readView && typeof takeout.readView.html === "function", "read view present");
 });
 
@@ -419,10 +353,8 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, read view"
 
   const t = takeout.compute();
   assert(t.patterns.some((p) => p.kind === "portrait"), "portrait built");
-  assert(t.patterns.some((p) => p.id === "weak"), "weakest-area pattern built");
+  assert(!t.patterns.some((p) => p.kind === "area"), "no area card (retired)");
   const read = takeout.readView.html(t);
-  assert(read.indexOf("Recognition &amp; voice") !== -1, "weakest area named");
-  assert(read.indexOf("Belonging &amp; purpose") !== -1, "strongest area named");
   assert(read.indexOf("Cape Town") !== -1, "group under strain named");
   assert(read.indexOf("Satisfaction") !== -1, "satisfaction leads the apex");
   assert(read.indexOf("69% agree") !== -1, "apex shows index + top-box");
@@ -1096,6 +1028,110 @@ for (const file of readdirSync(JS_DIR).filter((f) => /takeout.*\.js$/.test(f)).s
   run(file + " (" + n + " active lines)", () =>
     assert(n <= MAX_ACTIVE_LINES, file + " has " + n + " active lines (max " + MAX_ACTIVE_LINES + ")"));
 }
+
+
+run("patterns_banner: the Group overview portrays ONLY the selected banner", () => {
+  TR.AGG = { project: { patterns_banner: ["Centre"] },
+    banner_groups: [{ id: "S03", name: "Centre" }, { id: "S09", name: "Channel" },
+                    { id: "S11", name: "Sales Method" }] };
+  const picked = takeout._scanBannerGroups().map((g) => g.name);
+  assert(picked.length === 1 && picked[0] === "Centre",
+    "only the selected banner is scanned, got: " + picked.join(", "));
+});
+
+run("patterns_banner: a typo falls back to ALL banners (echo names it, scan stays honest)", () => {
+  TR.AGG = { project: { patterns_banner: ["Centres"] },   // typo
+    banner_groups: [{ id: "S03", name: "Centre" }, { id: "S09", name: "Channel" }] };
+  assert(takeout._scanBannerGroups().length === 2,
+    "no silent empty tab on a typo — full set + echo warning");
+});
+
+run("patterns_banner: exclude still applies after the positive selection", () => {
+  TR.AGG = { project: { patterns_banner: ["Centre", "Channel"],
+    patterns_exclude_banners: ["Channel"] },
+    banner_groups: [{ id: "S03", name: "Centre" }, { id: "S09", name: "Channel" }] };
+  const picked = takeout._scanBannerGroups().map((g) => g.name);
+  assert(picked.length === 1 && picked[0] === "Centre", "include then exclude");
+});
+
+run("steady gate: a polarized group (material gaps, no lean) is NOT called steady", () => {
+  // Review I6: a group at ±0.8 on a 5-pt scale with ups and downs cancelling
+  // used to earn "nobody's problem child". Material gaps now disqualify it —
+  // it goes to the also-scanned note, unclaimed.
+  const gaps = [];
+  for (let i = 0; i < 4; i++) gaps.push({ title: "Up " + i, value: 4.6, total: 3.8, scaleMax: 5 });
+  for (let i = 0; i < 4; i++) gaps.push({ title: "Down " + i, value: 3.0, total: 3.8, scaleMax: 5 });
+  const calm = [];
+  for (let i = 0; i < 8; i++) calm.push({ title: "Q" + i, value: 3.82, total: 3.8, scaleMax: 5 });
+  const t = takeout.buildPatterns({ columns: [
+    // a portrayed group so the banner qualifies for steady slots at all
+    { column: "Strained", group: "Centre", base: 40, gaps: gaps.map((g) => (
+      { title: g.title, value: g.total - 0.5, total: g.total, scaleMax: 5 })) },
+    { column: "Polarized", group: "Centre", base: 40, gaps: gaps },
+    { column: "Calm", group: "Centre", base: 40, gaps: calm }
+  ], fdr: { K: 24, groupCount: 3, questionCount: 8,
+    cells: [{ welchP: 0.001, nIn: 40, flooredG: false }],
+    groups: [
+      { banner: "Centre", group: "Strained", base: 40, below: 8, above: 0, qn: 8, meanGap: -0.5 },
+      // the I6 shape: the sign test is FLAT (4 below, 4 above cancel) but the
+      // gaps themselves are material — polarized, not steady
+      { banner: "Centre", group: "Polarized", base: 40, below: 4, above: 4, qn: 8, meanGap: 0 },
+      { banner: "Centre", group: "Calm", base: 40, below: 0, above: 8, qn: 8, meanGap: 0.004 }
+    ] } });
+  const steady = t.patterns.filter((p) => p.kind === "steady");
+  assert(!steady.some((p) => p.subject === "Polarized"),
+    "material ups-and-downs are not 'steady'");
+  assert(steady.some((p) => p.subject === "Calm"),
+    "a genuinely flat group still earns the steady card");
+  assert((t.noStory || []).some((g) => g.subject === "Polarized"),
+    "the polarized group is named in also-scanned, not missing");
+});
+
+run("peer chips: duplicate question TITLES with distinct codes race separately (I6)", () => {
+  const columns = [
+    { column: "A", group: "G", base: 40, gaps: [
+      { code: "Q1", title: "Overall", value: 4.5, total: 4.0, scaleMax: 5 },
+      { code: "Q2", title: "Overall", value: 3.0, total: 4.0, scaleMax: 5 }] },
+    { column: "B", group: "G", base: 40, gaps: [
+      { code: "Q1", title: "Overall", value: 4.0, total: 4.0, scaleMax: 5 },
+      { code: "Q2", title: "Overall", value: 3.5, total: 4.0, scaleMax: 5 }] },
+    { column: "C", group: "G", base: 40, gaps: [
+      { code: "Q1", title: "Overall", value: 3.8, total: 4.0, scaleMax: 5 },
+      { code: "Q2", title: "Overall", value: 3.2, total: 4.0, scaleMax: 5 }] }
+  ];
+  const by = takeout._peerExtremes ? takeout._peerExtremes(columns) : null;
+  if (by) {
+    assert(by["G||Q1"] && by["G||Q1"].count === 3, "each code is its own 3-way race");
+    assert(by["G||Q1"].hi.col === "A" && by["G||Q2"].hi.col === "B",
+      "extremes resolve per question code, not per merged title");
+  } else {
+    // engine keeps peerExtremes private: assert through the portrait rows
+    const t = takeout.buildPatterns({ columns: columns });
+    const a = t.patterns.filter((p) => p.subject === "A")[0];
+    assert(a, "portrait for A");
+    const all = (a.lows || []).concat(a.highs || []);
+    all.forEach((r) => assert(r.peerCount === undefined || r.peerCount <= 3,
+      "no merged race can exceed the column count, got " + r.peerCount));
+  }
+});
+
+run("peer chips: an exact tie at the top crowns no one (I6)", () => {
+  const columns = [
+    { column: "A", group: "G", base: 40, gaps: [
+      { code: "Q1", title: "Overall", value: 4.5, total: 4.0, scaleMax: 5 }] },
+    { column: "B", group: "G", base: 40, gaps: [
+      { code: "Q1", title: "Overall", value: 4.5, total: 4.0, scaleMax: 5 }] },
+    { column: "C", group: "G", base: 40, gaps: [
+      { code: "Q1", title: "Overall", value: 3.0, total: 4.0, scaleMax: 5 }] }
+  ];
+  const t = takeout.buildPatterns({ columns: columns });
+  ["A", "B"].forEach((name) => {
+    const p = t.patterns.filter((x) => x.subject === name)[0];
+    if (!p) return;
+    (p.highs || []).forEach((r) =>
+      assert(!r.peerTop, name + " must not be crowned highest on a tie"));
+  });
+});
 
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

@@ -57,6 +57,9 @@ source(file.path(turas_root, "modules/tabs/lib/banner.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
 source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
+# score_utils supplies option_numeric_value(), the canonical OptionValue-else-
+# OptionText lookup that composite_source_score_map() reuses for Rating/NPS.
+source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
 
 
@@ -559,4 +562,170 @@ test_that("banner subgroup means differ from total", {
 
   # Males should score higher than females
   expect_true(male_val > female_val)
+})
+
+
+# ==============================================================================
+# 6. Label-valued sources (regression: ASSA 2026-08)
+# ==============================================================================
+#
+# calculate_composite_values() used to coerce the raw data column with
+# as.numeric(). A composite over a Likert battery whose answers are words
+# ("TRUE"/"FALSE"/"Not sure") therefore averaged NA, the run logged
+# "✓ Completed", and the Index_Summary cell shipped BLANK with no warning.
+# Sources are now scored through their Options, and a source that scores
+# nothing says so.
+
+context("composite sources scored through Options")
+
+# Two Q21-style true/false statements with opposite answer keys, scored
+# 100 for the correct answer and 0 otherwise.
+make_tf_structure <- function() {
+  list(
+    questions = data.frame(
+      QuestionCode  = c("Q21a", "Q21b"),
+      Variable_Type = c("Likert", "Likert"),
+      stringsAsFactors = FALSE
+    ),
+    options = data.frame(
+      QuestionCode = rep(c("Q21a", "Q21b"), each = 3),
+      OptionText   = rep(c("TRUE", "FALSE", "Not sure"), 2),
+      DisplayText  = rep(c("TRUE", "FALSE", "Not sure"), 2),
+      Index_Weight = c(100, 0, 0,    # Q21a: True is correct
+                       0, 100, 0),   # Q21b: False is correct
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+make_tf_data <- function() {
+  data.frame(
+    Q21a = c("TRUE", "FALSE", "Not sure", "TRUE"),
+    Q21b = c("TRUE", "TRUE",  "FALSE",    "Not sure"),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("a Likert composite scores from Index_Weight instead of going blank", {
+  st <- make_tf_structure()
+
+  result <- calculate_composite_values(
+    make_tf_data(), c("Q21a", "Q21b"), "Mean",
+    questions_df = st$questions, options_df = st$options
+  )
+
+  # Per respondent: (100+0)/2, (0+0)/2, (0+100)/2, (100+0)/2
+  expect_equal(result, c(50, 0, 50, 50))
+  expect_false(any(is.na(result)))
+})
+
+test_that("without the structure a worded source is reported, not silently NA", {
+  output <- capture.output(
+    result <- calculate_composite_values(make_tf_data(), c("Q21a", "Q21b"), "Mean"),
+    type = "output"
+  )
+
+  expect_true(all(is.na(result)))
+  expect_true(any(grepl("scored nothing", output, fixed = TRUE)))
+  expect_true(any(grepl("Q21a", output, fixed = TRUE)))
+  expect_true(any(grepl("Q21b", output, fixed = TRUE)))
+})
+
+test_that("a Rating source maps its text answers through OptionValue", {
+  questions <- data.frame(QuestionCode = c("QA", "QB"),
+                          Variable_Type = c("Rating", "Rating"),
+                          stringsAsFactors = FALSE)
+  options <- data.frame(QuestionCode = rep(c("QA", "QB"), each = 3),
+                        OptionText  = rep(c("0", "5", "10"), 2),
+                        OptionValue = rep(c(0, 5, 10), 2),
+                        stringsAsFactors = FALSE)
+  data <- data.frame(QA = c("0", "10"), QB = c("10", "10"), stringsAsFactors = FALSE)
+
+  result <- calculate_composite_values(data, c("QA", "QB"), "Mean",
+                                       questions_df = questions, options_df = options)
+
+  expect_equal(result, c(5, 10))
+})
+
+test_that("ExcludeFromIndex options score NA rather than dragging the mean down", {
+  questions <- data.frame(QuestionCode = "QX", Variable_Type = "Likert",
+                          stringsAsFactors = FALSE)
+  options <- data.frame(
+    QuestionCode = rep("QX", 3),
+    OptionText   = c("Low", "High", "Do not know"),
+    Index_Weight = c(-100, 100, 0),
+    ExcludeFromIndex = c(NA, NA, "Y"),
+    stringsAsFactors = FALSE
+  )
+  data <- data.frame(QX = c("High", "Do not know"), stringsAsFactors = FALSE)
+
+  result <- calculate_composite_values(data, "QX", "Mean",
+                                       questions_df = questions, options_df = options)
+
+  expect_equal(result[1], 100)
+  expect_true(is.na(result[2]))   # excluded, not scored as 0
+})
+
+test_that("numeric sources are unaffected when no structure is supplied", {
+  data <- data.frame(Q1 = c(1, 2, 3), Q2 = c(5, 4, 3))
+
+  expect_equal(calculate_composite_values(data, c("Q1", "Q2"), "Mean"), c(3, 3, 3))
+  expect_silent(calculate_composite_values(data, c("Q1", "Q2"), "Mean"))
+})
+
+test_that("numeric sources are unaffected when a structure IS supplied", {
+  # Numeric questions carry no options; the raw column must still be used.
+  questions <- data.frame(QuestionCode = c("Q1", "Q2"),
+                          Variable_Type = c("Numeric", "Numeric"),
+                          stringsAsFactors = FALSE)
+  options <- data.frame(QuestionCode = character(), OptionText = character(),
+                        stringsAsFactors = FALSE)
+  data <- data.frame(Q1 = c(1, 2, 3), Q2 = c(5, 4, 3))
+
+  expect_equal(
+    calculate_composite_values(data, c("Q1", "Q2"), "Mean",
+                               questions_df = questions, options_df = options),
+    c(3, 3, 3)
+  )
+})
+
+test_that("composite_source_score_map returns NULL when it cannot score", {
+  questions <- data.frame(QuestionCode = "QZ", Variable_Type = "Likert",
+                          stringsAsFactors = FALSE)
+  # Likert with no Index_Weight column at all -> nothing to score from.
+  options <- data.frame(QuestionCode = rep("QZ", 2), OptionText = c("Yes", "No"),
+                        stringsAsFactors = FALSE)
+
+  expect_null(composite_source_score_map("QZ", questions, options))
+  expect_null(composite_source_score_map("QZ", NULL, options))
+  expect_null(composite_source_score_map("NOT_A_QUESTION", questions, options))
+})
+
+test_that("process_composite_question fills the Total column for a Likert battery", {
+  st <- make_tf_structure()
+  data <- cbind(make_tf_data(),
+                data.frame(Gender = c("Male", "Female", "Male", "Female"),
+                           stringsAsFactors = FALSE))
+
+  b <- make_composite_banner(data)
+  config <- make_composite_config()
+
+  composite_def <- data.frame(
+    CompositeCode = "COMP_KNOWLEDGE",
+    CompositeLabel = "Knowledge score",
+    CalculationType = "Mean",
+    SourceQuestions = "Q21a,Q21b",
+    Weights = NA,
+    stringsAsFactors = FALSE
+  )
+
+  result <- process_composite_question(
+    composite_def, data, st$questions, b$banner, config, options_df = st$options
+  )
+
+  metric <- result$question_table[result$question_table$RowType %in% c("Index", "Average"), ]
+  expect_true(nrow(metric) > 0)
+  total <- suppressWarnings(as.numeric(metric[["TOTAL::Total"]][1]))
+  # Mean of 50, 0, 50, 50
+  expect_equal(total, 37.5)
 })

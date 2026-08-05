@@ -64,7 +64,7 @@
       // Patterns + Tracking deliberately ignore the live filter — they read the
       // full published sample (prior waves have no microdata to filter).
       bits.push('<span class="aud-cut">' +
-        (tab === "takeout" ? "Patterns reads" : "Tracking shows") +
+        (tab === "takeout" ? "Group overview reads" : "Tracking shows") +
         ' the <strong>full published sample</strong> — the audience filter does ' +
         "not apply on this tab</span>");
       var pub = TR.d2.hasMicrodata() ? TR.MICRO.n : publishedTotalBase();

@@ -325,6 +325,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Comma/semicolon-separated; parsed in the data layer.
     patterns_headline = get_config_value(config, "patterns_headline", NULL),
     patterns_exclude_banners = get_config_value(config, "patterns_exclude_banners", NULL),
+    # The POSITIVE banner selection for the Group overview tab: name the banner
+    # group(s) to portray (e.g. "Centre"; comma-separated for a second banner).
+    # Unset -> every banner group, as before.
+    patterns_banner = get_config_value(config, "patterns_banner", NULL),
 
     # Free-text fieldwork caveat appended to the "how sure" design sentence in
     # the v2 report (e.g. substitution rules, replaced clusters, low response).
@@ -1070,7 +1074,7 @@ TABS_KNOWN_SETTINGS <- c(
   # blind to them)
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
   "show_qualitative", "patterns_headline", "patterns_exclude_banners",
-  "sampling_note",
+  "patterns_banner", "sampling_note",
   # Checkpointing
   "enable_checkpointing",
   # Qualitative confidentiality & disclosure control

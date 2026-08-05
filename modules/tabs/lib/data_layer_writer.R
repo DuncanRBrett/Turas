@@ -209,6 +209,10 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(ph) > 0) proj$takeout_headline <- I(ph)
   pxb <- .dl_split_csv(config_obj$patterns_exclude_banners)
   if (length(pxb) > 0) proj$patterns_exclude_banners <- I(pxb)
+  # patterns_banner: the POSITIVE selection — the Group overview portrays only
+  # the named banner group(s) (label or id; comma-separated for more than one).
+  pb <- .dl_split_csv(config_obj$patterns_banner)
+  if (length(pb) > 0) proj$patterns_banner <- I(pb)
   # Fieldwork caveat for the "how sure" panel (substitution etc.) — plain text,
   # escaped at render; carried only when non-empty so old islands are unchanged.
   sn <- config_obj$sampling_note
