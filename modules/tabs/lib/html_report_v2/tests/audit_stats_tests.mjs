@@ -44,7 +44,7 @@ const TR = sandbox.TR;
 let passed = 0, failed = 0;
 function run(name, fn) {
   try { fn(); passed++; console.log("  ✓ " + name); }
-  catch (e) { failed++; console.log("  ✗ " + name + "\n    " + e.message); }
+  catch (e) { failed++; console.log("  ✗ " + name + "\n    " + (process.env.TRACE ? e.stack : e.message)); }
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function eq(a, b, msg) { if (a !== b) throw new Error(msg + ": expected " + JSON.stringify(b) + ", got " + JSON.stringify(a)); }
@@ -378,6 +378,49 @@ run("crosstab export matrix uses the same config precision (I13)", () => {
   const mat = TR.render.matrix(m, {});
   const flat = JSON.stringify(mat);
   assert(flat.indexOf("79.0") < 0, "matrix carries 79, not 79.0: " + flat.slice(0, 200));
+});
+
+
+run("attachDeltas tests a mean's RAW current value, not the rounded cell (I3)", () => {
+  // Prior wave: mean 8.8, sd 1.0, n 800. Current raw mean 8.86 (published cell
+  // rounds to 8.9). Welch criticals at these bases: ~0.098 (95%), ~0.064 (80%).
+  //   raw delta 0.06     -> not significant at ANY level (the truth)
+  //   rounded delta 0.10 -> "significant at 95%" (the old, wrong input)
+  // The chip must agree with the Tracking tab, which tests raw scores.
+  const scores = [];
+  for (let i = 0; i < 400; i++) scores.push(7.86);
+  for (let i = 0; i < 400; i++) scores.push(9.86);   // mean 8.86, sd ~1.0
+  setProject({ name: "I3", low_base_threshold: 30, weighted: false });
+  TR.AGG.questions = [
+    { code: "QM", title: "Overall rating", type: "scale", scale_max: 10, category: "T",
+      bases: [{ n: 800, low: false }],
+      rows: [
+        { kind: "category", label: "7.86", pct: [50], n: [400], sig: [""] },
+        { kind: "category", label: "9.86", pct: [50], n: [400], sig: [""] },
+        { kind: "mean", label: "Mean", pct: [8.9], n: [null], sig: [""] }
+      ] }
+  ];
+  TR.AGG.columns = [{ label: "Total", letter: "", group: null }];
+  TR.AGG.banner_groups = [];
+  TR.PREV = { waves: [
+    { wave: "2025", year: 2025, current: false, segments: [],
+      questions: [{ match_key: "overall rating", title: "Overall rating",
+        base: 800, stats: { mean: 8.8, sd: 1.0 } }] },
+    { wave: "2026", year: 2026, current: true, segments: [],
+      questions: [{ code: "QM", match_key: "overall rating", title: "Overall rating",
+        base: 800, score_type: "mean", scores: scores, weights: null }] }
+  ] };
+  TR.MICRO = null;
+  if (TR.d2) TR.d2._qIndex = null;
+  if (TR.waves.reset) TR.waves.reset();
+  const model = TR.model.forQuestion("QM", null, [], {});
+  const row = model.rows[2];
+  assert(row.delta, "the mean row carries a wave delta");
+  assert(!row.delta.sig,
+    "raw delta 0.06 is not significant - the rounded cell's 0.10 must not flip it (got sig=" +
+    JSON.stringify(row.delta.sig) + ")");
+  // the DISPLAYED delta still reconciles with the published figures (rounded ends)
+  eq(row.delta.diff, 0.1, "displayed delta subtracts the rounded ends (8.9 - 8.8)");
 });
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");

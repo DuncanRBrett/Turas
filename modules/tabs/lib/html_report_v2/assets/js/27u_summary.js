@@ -230,8 +230,12 @@
           : last.soft_prev ? (dir ? "hm-up soft" : "hm-down soft") : "hm-flat";
         var mark = last.sig_prev ? (dir ? "▲" : "▼")
           : last.soft_prev ? (dir ? "△" : "▽") : "";
+        // "not significant" is a claim a TEST made — an untestable pair (no
+        // base/spread on one side) must say so instead (review 2026-08, I23).
         var lvlTip = last.sig_prev ? " · significant at 95%"
-          : last.soft_prev ? " · significant at 80% (not 95%)" : " · not significant";
+          : last.soft_prev ? " · significant at 80% (not 95%)"
+          : last.tested_prev ? " · not significant"
+          : " · not testable (this wave pair lacks the base or spread a test needs)";
         return '<td class="wv ' + cls + '" title="' +
           trk.fmtVal(prev.value, false) + " (" + trk.yLabel(prev.year) + ") → " +
           trk.fmtVal(last.value, false) + " (" + trk.yLabel(last.year) + ")" +
@@ -263,9 +267,20 @@
     }
     var cards = kpiCards();
     var changes = sigChanges();
-    var tested = trk.metricList("key").filter(function (m) {
+    // "Stable" is a TESTED verdict: a metric whose wave pair could not be
+    // tested (no base/spread in the history) must not be counted as stable —
+    // it gets its own "not testable" tally (review 2026-08, I23).
+    var keyMetrics = trk.metricList("key").filter(function (m) {
       return !m.diff;
-    }).length;
+    });
+    var tested = 0, notTestable = 0;
+    keyMetrics.forEach(function (m) {
+      var last = lastCell(trk.points(m, null));
+      if (!last || last.change_prev === null || last.change_prev === undefined) {
+        return;   // no comparison at all (new metric) — in no tally
+      }
+      if (last.tested_prev) tested++; else notTestable++;
+    });
     var totalUp = changes.filter(function (c) {
       return c.segment === "Total" && c.change >= 0;
     }).length;
@@ -277,8 +292,7 @@
     // inside "stable" (soft_prev is false whenever sig_prev is true, so a
     // strong move is never also counted here).
     var totalSoft = TR.d2.state.sigMode === "dual"
-      ? trk.metricList("key").filter(function (m) { return !m.diff; })
-          .filter(function (m) {
+      ? keyMetrics.filter(function (m) {
             var last = lastCell(trk.points(m, null));
             return last && last.soft_prev;
           }).length
@@ -303,6 +317,10 @@
       '<span class="pulse-chip">→ ' +
       Math.max(tested - totalUp - totalDown - totalSoft, 0) +
       " stable</span>" +
+      (notTestable ? '<span class="pulse-chip" title="These metrics have a ' +
+        'previous value but the history carries no base or spread, so no ' +
+        'wave-on-wave test could run">· ' + notTestable +
+        " not testable this wave</span>" : "") +
       '<label class="trk-sigctl" title="Significance level shown across the ' +
       'Tracking tab (shared with the Crosstabs tab)">Significance ' +
       '<select data-trk-sigmode>' +

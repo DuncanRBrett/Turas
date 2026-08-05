@@ -126,5 +126,53 @@ globalThis.TR.AGG = { project: { wave: "H1 2026", wave_order: "2026" } };
 assert(render.currentYear() === 2026,
   "G2: a string wave_order (config cells arrive as strings) is parsed");
 
+
+// ---- I23: the pulse separates "stable" (tested) from "not testable" ---------
+// A no-SD history used to render "0 increases · 0 decreases · N stable" —
+// untested metrics counted as findings; matrix tooltips said "not significant"
+// when no test ran.
+{
+  const mkCell = (over) => Object.assign({ value: 8, year: 2026, current: true,
+    change_prev: -0.5, sig_prev: false, soft_prev: false, tested_prev: false,
+    base: 100 }, over);
+  const M_TESTED = { key: "A::1", code: "A", title: "Tested metric", label: "Index",
+    isMean: false, diff: false };
+  const M_UNTESTED = { key: "B::1", code: "B", title: "Untestable metric", label: "Index",
+    isMean: false, diff: false };
+  const M_NOPREV = { key: "C::1", code: "C", title: "New metric", label: "Index",
+    isMean: false, diff: false };
+  const cellsByKey = {
+    "A::1": [ { value: 8.5, year: 2025 }, mkCell({ tested_prev: true }) ],
+    "B::1": [ { value: 8.5, year: 2025 }, mkCell({ tested_prev: false }) ],
+    "C::1": [ mkCell({ change_prev: null }) ]
+  };
+  globalThis.TR.d2 = { state: { sigMode: "95" } };
+  globalThis.TR.PREV = { waves: [ { wave: "2025", current: false } ] };
+  globalThis.TR.AGG = { project: { wave: "W2026" }, banner_groups: [], questions: [ { code: "A" } ] };
+  globalThis.TR.fmt = globalThis.TR.fmt || {};
+  TR.fmt.escapeHtml = TR.fmt.escapeHtml || ((s) => String(s));
+  globalThis.TR.waves = { segments: () => [] };
+  globalThis.TR.trk = {
+    state: {},
+    publishedModel: () => ({ prevWave: { wave: "2025" } }),   // history pairs
+    metricList: () => [M_TESTED, M_UNTESTED, M_NOPREV],
+    metricByKey: (k) => null,
+    points: (m) => cellsByKey[m.key] || [],
+    kpiType: () => "mean", band: () => "mid",
+    fmtVal: (v) => String(v), yLabel: (y) => String(y),
+    changeText: (c) => String(c), metricShort: (m) => m.title
+  };
+  const host = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  globalThis.TR.trkSummary.render(host);
+  const html = host.innerHTML;
+  assert(html.indexOf("1 stable") >= 0,
+    "I23: only the TESTED flat metric counts as stable (got: " +
+    (html.match(/\d+ stable/) || ["none"])[0] + ")");
+  assert(html.indexOf("1 not testable this wave") >= 0,
+    "I23: the untestable comparison gets its own tally, not 'stable'");
+  assert(html.indexOf("0 significant increases") >= 0,
+    "I23: sig counts unchanged");
+}
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

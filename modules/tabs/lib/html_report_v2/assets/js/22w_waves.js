@@ -552,6 +552,21 @@
       var curEff = (col0.baseEff != null && col0.baseEff > 0) ? col0.baseEff : curBase;
       var curPoint = { value: cur, base: curBase, x: curX, effBase: curEff,
         sd: isMean && !row.diff ? sdFromModel(q, row, viewModel) : undefined };
+      // I3 (review 2026-08): a mean row's TEST inputs come from the microdata
+      // recompute when available — full precision, the same inputs the
+      // Tracking tab tests — never the display-rounded published cell. The
+      // DISPLAYED delta below still subtracts rounded ends (dgap), so what the
+      // reader sees reconciles with the published figures; only the sig call
+      // uses the raw values, and the chip can no longer disagree with the
+      // Tracking tab on the same movement.
+      if (isMean && !row.diff) {
+        var rawCur = waves.currentPoint(q);
+        if (rawCur && rawCur.value !== null && rawCur.value !== undefined) {
+          curPoint = { value: rawCur.value, base: rawCur.base, x: null,
+            effBase: (rawCur.effBase != null && rawCur.effBase > 0) ? rawCur.effBase : rawCur.base,
+            sd: rawCur.sd };
+        }
+      }
       var sigVs = function (point) {
         if (canSig) return sigBetween(curPoint, point);
         if (isMean && !row.diff) return meanSigBetween(curPoint, point);

@@ -345,3 +345,58 @@ test_that("splice refuses on a values table without the contract columns", {
                          stringsAsFactors = FALSE)
   expect_equal(splice_wave_values(bad, computed, "2025")$status, "REFUSED")
 })
+
+
+# ==============================================================================
+# I22 (production review 2026-08): NA weights refuse; proportions weight;
+# an unresolvable category skips by name.
+# ==============================================================================
+
+test_that("an NA in the weight column REFUSES - never NA-under-PASS (I22)", {
+  d <- data.frame(RATE = c(9, 8, 10, 7), W = c(1, NA, 1.2, 0.8),
+                  stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(
+    d, data.frame(QuestionCode = "RATE", TrackingSpecs = "mean",
+                  stringsAsFactors = FALSE), NULL, wave = "2025", weights = "W")
+  expect_equal(m$status, "REFUSED")
+  expect_equal(m$code, "DATA_WEIGHT_INVALID")
+})
+
+test_that("proportions honour weights (they were silently ignored - I22)", {
+  d <- data.frame(YN = c("Yes", "Yes", "No", "No"), W = c(10, 10, 1, 1),
+                  stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(
+    d, data.frame(QuestionCode = "YN", TrackingSpecs = "category:Yes",
+                  stringsAsFactors = FALSE), NULL, wave = "2025", weights = "W")
+  expect_equal(m$status, "PASS")
+  r <- NULL; for (i in seq_len(nrow(m$result))) if (m$result$metric_id[i] == "YN") r <- m$result[i, ]
+  expect_equal(r$value, 20 / 22 * 100, tolerance = 1e-9)   # 90.9 weighted, not 50 raw
+  expect_equal(r$base, 4)                                  # base stays the respondent count
+})
+
+test_that("an unresolvable category SKIPS AND NAMES instead of computing 0% (I22)", {
+  d <- data.frame(Q1 = c("Agree", "Neutral", "Disagree"), stringsAsFactors = FALSE)
+  opts <- data.frame(QuestionCode = "Q1",
+                     OptionText = c("Agree", "Neutral", "Disagree"),
+                     BoxCategory = c("", "", ""), stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(
+    d, data.frame(QuestionCode = "Q1", TrackingSpecs = "category:NET POSITIVE",
+                  stringsAsFactors = FALSE), opts, wave = "2025")
+  expect_false(identical(m$status, "PASS"))
+  expect_true("Q1" %in% m$skipped$metric_id)
+  expect_true(any(grepl("NET POSITIVE", m$skipped$reason)))
+})
+
+test_that("a genuine 0% category (option exists, nobody chose it) still computes (I22)", {
+  d <- data.frame(Q1 = c("Agree", "Neutral"), stringsAsFactors = FALSE)
+  opts <- data.frame(QuestionCode = "Q1",
+                     OptionText = c("Agree", "Neutral", "Disagree"),
+                     BoxCategory = c("", "", ""), stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(
+    d, data.frame(QuestionCode = "Q1", TrackingSpecs = "category:Disagree",
+                  stringsAsFactors = FALSE), opts, wave = "2025")
+  expect_equal(m$status, "PASS")
+  r <- NULL; for (i in seq_len(nrow(m$result))) if (m$result$metric_id[i] == "Q1") r <- m$result[i, ]
+  expect_equal(r$value, 0)
+  expect_equal(r$base, 2)
+})

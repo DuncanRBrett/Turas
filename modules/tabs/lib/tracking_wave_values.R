@@ -225,19 +225,56 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
     hits <- rowSums(!is.na(data[, cols$member_cols, drop = FALSE])) > 0 & answered
     base <- sum(answered)
     if (base == 0) { skipped$add(code, "nobody answered the question"); return(NULL) }
-    return(list(metric_type = "proportion", value = sum(hits) / base * 100,
+    # Weighted wave -> weighted percentage (the weights argument was silently
+    # ignored on proportion paths; review 2026-08, I22). base stays the
+    # respondent count, matching the mean path's base semantics.
+    w <- if (is.null(weights)) rep(1, nrow(data)) else weights
+    wbase <- sum(w[answered])
+    if (!is.finite(wbase) || wbase <= 0) {
+      skipped$add(code, "weights sum to zero over the answered base"); return(NULL)
+    }
+    return(list(metric_type = "proportion", value = sum(w[hits]) / wbase * 100,
                 base = base, sd = NULL, n = sum(hits)))
   }
 
   # Single-response proportion. DK / NA stay IN the base: that is what the
   # published percentages are formed on (verified on CCPB Q11).
   vals <- data[[code]]
+
+  # An unresolvable category must SKIP AND NAME, never compute 0% under PASS
+  # (review 2026-08, I22). A category resolves through a BoxCategory (NET), an
+  # OptionText, or a value actually present in this wave's data column (e.g.
+  # category:10 on a rating). A label matching NONE of the three is a typo or
+  # a NET whose tags are missing from the supplied structure. Without a
+  # structure the data-value test alone applies only when it can (documented
+  # literal-label fallback stands otherwise).
+  opts_src <- net_options %||% options
+  if (!is.null(opts_src) && is.data.frame(opts_src) && nrow(opts_src) > 0 &&
+      all(c("QuestionCode", "OptionText") %in% names(opts_src))) {
+    roots <- sub("_[0-9]+$", "", trimws(as.character(opts_src$QuestionCode)))
+    q_opts <- tracking_norm(opts_src$OptionText[roots == code])
+    in_structure <- length(q_opts) == 0 || any(q_opts %in% members)
+    in_data <- any(tracking_norm(vals) %in% members, na.rm = TRUE)
+    if (!in_structure && !in_data) {
+      skipped$add(code, sprintf(
+        "category '%s' matches no BoxCategory, no OptionText and no data value of %s",
+        label, code))
+      return(NULL)
+    }
+  }
   answered <- !is.na(vals)
   base <- sum(answered)
   if (base == 0) { skipped$add(code, "nobody answered the question"); return(NULL) }
-  hits <- sum(answered & tracking_norm(vals) %in% members)
-  list(metric_type = "proportion", value = hits / base * 100,
-       base = base, sd = NULL, n = hits)
+  # Weighted wave -> weighted percentage (weights were silently ignored here;
+  # review 2026-08, I22). base stays the respondent count.
+  hit_rows <- answered & tracking_norm(vals) %in% members
+  w <- if (is.null(weights)) rep(1, length(vals)) else weights
+  wbase <- sum(w[answered])
+  if (!is.finite(wbase) || wbase <= 0) {
+    skipped$add(code, "weights sum to zero over the answered base"); return(NULL)
+  }
+  list(metric_type = "proportion", value = sum(w[hit_rows]) / wbase * 100,
+       base = base, sd = NULL, n = sum(hit_rows))
 }
 
 
@@ -317,6 +354,15 @@ wave_values_from_microdata <- function(data, mapping, options = NULL, wave,
     if (length(wcol) != nrow(data)) {
       return(.twv_refuse("DATA_WEIGHT_LENGTH", "weights must be one per row",
                          "Pass a vector the same length as nrow(data)."))
+    }
+    # A missing/invalid weight must refuse, not silently NA every mean under
+    # PASS (review 2026-08, I22): "skipped and NAMED, never guessed" is this
+    # file's own contract.
+    n_bad <- sum(!is.finite(wcol) | wcol < 0)
+    if (n_bad > 0) {
+      return(.twv_refuse("DATA_WEIGHT_INVALID",
+                         sprintf("%d weight value(s) are missing or invalid (NA/negative/non-numeric)", n_bad),
+                         "Fill or filter the weight column before recovery - a missing weight silently voids every weighted statistic."))
     }
   }
 
