@@ -51,13 +51,34 @@ page-source leak and the FALSE setting), the qual source-disclosure warning
 names the microdata island as a leak regardless of the tag dial, and the
 operator guide + template help document the model.
 
+**Classic-report retirement + M4/M16 (2026-08-05, on main).** The classic HTML
+report is retired and deleted (`lib/html_report/`, 14 R + 9 JS files): the
+loader now names `html_report` as retired instead of ignoring it, the setting
+is out of the whitelist and out of `build_config_object`, and the GUI's classic
+checkbox is gone. Two things were rescued from inside it first — AI-insights
+generation (the v2 data layer reads the sidecar it writes; now
+`lib/ai_insights_step.R`, called from run_crosstabs) and the row/palette
+helpers the data layer classifies through (now `lib/report_shared.R`). The
+logo-file and hex-colour preflight checks were gated on `html_report`, so they
+had stopped firing for the report that ships; both are now unconditional.
+**M4** dead code deleted (`write_crosstab_workbook`, `question_dispatcher.R`).
+**M16** docs batch done, plus the classic report's own manuals and the stale
+code inventory. Suites at that point: R 3,327 pass / 0 fail / 0 warn / 0 skip
+(3,587 before the classic suites were deleted with their code); all 25 JS
+suites green.
+
 **OPEN — logged residuals:** I20 idx→stable-key migration for reader marks
 (the island is anonymised by design, so ResponseID cannot be embedded as-is;
 scheduled as its own step); I3's weighted-proportion chip still reconstructs
 its count from the rounded percentage; I1/I2 (FPC in the R engine, n_eff
 alignment, Sig.2 carried not recomputed) remain the cross-engine batch on the
-growth path; I6 (Patterns copy edges), I24 (option-level pairing report) and
-the MINOR/M16 docs batch are unfixed and unchanged.
+growth path; I6 (Patterns copy edges) and I24 (option-level pairing report) are
+unfixed and unchanged. **M3** (two divergent `format_output_value` definitions,
+the later-sourced one winning) was left alone deliberately: deleting the losing
+copy is a behaviour change on the default branch and deserves its own check.
+The `html_report` retirement entry should come out of `TABS_RETIRED_SETTINGS`
+after the next release, at which point the name falls through to the ordinary
+unrecognised-setting warning.
 
 ------------------------------------------------------------------------
 

@@ -53,8 +53,8 @@ What would require significant rework: - **Data-time disclosure (C3)** — suppr
 |-----------------|------------------------|--------------------------------|
 | Dual significance engines (R + JS) | v2 must work offline from the island | Shrink by carrying more R results in the island (step 2 enabler) |
 | Sidecar/island built twice (O1) | Sidecar predates the island | When the first sidecar consumer lands |
-| Dead code: question_dispatcher, write_crosstab_workbook, dead patterns card paths | Rebuilds left remnants | Delete in the next touch of each file |
-| Docs describing a scripted API that doesn't exist (C6/M16) | GUI became the real path | Rewrite entry-point docs in the C6 batch; solo-op requires docs that match reality (WAY_FORWARD.md) |
+| Dead patterns card paths | Rebuilds left remnants | Delete in the next touch of the file (question_dispatcher and write_crosstab_workbook were deleted 2026-08-05) |
+| Docs describing a scripted API that doesn't exist (C6/M16) | GUI became the real path | DONE 2026-08-05: entry-point docs corrected, classic-report manuals and the stale code inventory deleted |
 
 ## External dependencies to watch
 
