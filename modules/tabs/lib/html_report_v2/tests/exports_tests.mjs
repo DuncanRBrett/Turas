@@ -251,6 +251,9 @@ function storyDeckSetup() {
   TR.report = { sectionText: (s) =>
     s === "exec" ? "Overall service holds up.\nSecond paragraph." : "" };
   TR.conf = { methodNote: () => "Wilson 95%" };
+  // I20 gate: a qualitative pin only renders while its quotes are still
+  // published — this fixture's island publishes everything.
+  TR.qual = { textPublished: () => true };
 }
 
 const quotePin = { kind: "snapshot", source: "qualitative",

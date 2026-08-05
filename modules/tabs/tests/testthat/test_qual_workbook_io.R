@@ -125,3 +125,74 @@ test_that("a workbook with no question sheets raises DATA_QUAL_NO_QUESTIONS", {
   expect_s3_class(err, "turas_refusal")
   expect_equal(err$code, "DATA_QUAL_NO_QUESTIONS")
 })
+
+
+# ==============================================================================
+# Production review 2026-08 — I17/I18 integrity refusals at the I/O boundary
+# ==============================================================================
+
+write_one_sheet_workbook <- function(rows) {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Open")
+  openxlsx::writeData(wb, "Open", as.data.frame(rows), colNames = FALSE)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  path
+}
+
+test_that("a duplicated ResponseID in one sheet refuses (I17)", {
+  path <- write_one_sheet_workbook(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("7", NA, "First"),
+    c("7", NA, "Second under the same ID")
+  ))
+  on.exit(unlink(path), add = TRUE)
+  expect_error(qual_read_workbook(path), class = "turas_refusal")
+})
+
+test_that("a comment row with text but no ResponseID refuses (I17)", {
+  path <- write_one_sheet_workbook(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("1", NA, "Fine"),
+    c(NA, "p", "A priority comment that would have vanished silently")
+  ))
+  on.exit(unlink(path), add = TRUE)
+  expect_error(qual_read_workbook(path), class = "turas_refusal")
+})
+
+test_that("a hide-like marker that is not exactly hide/hidden refuses (I18)", {
+  path <- write_one_sheet_workbook(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("1", "hide!", "The analyst meant to withhold this")
+  ))
+  on.exit(unlink(path), add = TRUE)
+  expect_error(qual_read_workbook(path), class = "turas_refusal")
+})
+
+test_that("an ambiguous verbatim column refuses naming the candidates (I17)", {
+  path <- write_one_sheet_workbook(rbind(
+    c("ID", "Noteworthy", "How was the programme for you?", "Analyst working notes"),
+    c("1", NA, "The sessions were engaging and well paced overall",
+      "Private long note that must never ship as a respondent quote anywhere"),
+    c("2", NA, "Too much admin at the start of every module",
+      "Second long private working note about this respondent's context")
+  ))
+  on.exit(unlink(path), add = TRUE)
+  err <- tryCatch({ qual_read_workbook(path); NULL }, error = function(e) e)
+  expect_false(is.null(err))
+  expect_match(conditionMessage(err), "AMBIGUOUS|ambiguous")
+})
+
+test_that("unrecognised tier-1 markers and hide counts are reported, not refused (I18)", {
+  path <- write_one_sheet_workbook(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("1", "x", "Legacy mark - promoted to tier 1, reported"),
+    c("2", "hide", "Withheld properly"),
+    c("3", NA, "Plain")
+  ))
+  on.exit(unlink(path), add = TRUE)
+  out <- capture.output(res <- qual_read_workbook(path))
+  expect_equal(res$status, "PASS")
+  expect_true(any(grepl("unrecognised noteworthy", out)))
+  expect_true(any(grepl("hide-marked", out)))
+})

@@ -175,8 +175,18 @@ qual_find_host_id_column <- function(survey_data, id_col = NULL) {
 #' blank workbook id never collides with a blank host id.
 #' @return A named integer vector: trimmed ResponseID -> 0-based row index.
 qual_host_id_to_idx <- function(survey_data, id_col) {
-  ids <- trimws(as.character(survey_data[[id_col]]))
-  keep <- nzchar(ids) & !is.na(ids) & ids != "NA"
+  raw <- survey_data[[id_col]]
+  # A numeric ID column must not go through as.character(): doubles >= 1e5
+  # render scientifically ("1e+05" vs the workbook's "100000") and those
+  # respondents' comments silently unjoin (review 2026-08, I19).
+  ids <- if (is.numeric(raw)) {
+    trimws(vapply(raw, function(v) {
+      if (is.na(v)) NA_character_ else format(v, scientific = FALSE, trim = TRUE)
+    }, character(1)))
+  } else {
+    qual_id_norm(raw)
+  }
+  keep <- !is.na(ids) & nzchar(ids) & ids != "NA"
   idx <- (seq_along(ids) - 1L)[keep]
   ids <- ids[keep]
   dup <- duplicated(ids)

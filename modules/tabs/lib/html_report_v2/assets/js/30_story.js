@@ -377,10 +377,33 @@
   /** Evidence-only body of an item (no head/controls/commentary) — the cover
    *  (24a) renders findings through the SAME renderers as the story tab, so
    *  each pin's disclosure gates travel with it. "" when nothing resolves. */
+  /** A frozen qualitative pin is STALE once any quote it froze is no longer
+   *  published by the current island (hide-marked since, scope tightened,
+   *  confidentiality mode changed, island absent from this copy). The whole
+   *  frozen payload — html included — must not render: priority pins
+   *  re-resolve on every render for exactly this reason (review 2026-08, I20). */
+  function qualPinStale(item) {
+    if (!item || item.source !== "qualitative") return false;
+    if (!item.quotes || !item.quotes.length) return false;
+    if (!TR.qual || !TR.qual.textPublished) return true;
+    for (var i = 0; i < item.quotes.length; i++) {
+      if (!TR.qual.textPublished(item.quotes[i].text)) return true;
+    }
+    return false;
+  }
+  story2._qualPinStale = qualPinStale;   // exposed for the node gate
+
+  var QUAL_STALE_NOTE = "This pinned collection references comments this copy " +
+    "no longer publishes — re-pin it from the Qualitative tab.";
+
   story2.itemBodyHtml = function (item) {
     if (item.kind === "divider") return "";
     if (item.kind === "exhibit") return TR.exhibit.panelsHtml(item);
     if (item.kind === "snapshot") {
+      if (qualPinStale(item)) {
+        return '<div class="snap-body"><p class="si-ctx">' +
+          fmt.escapeHtml(QUAL_STALE_NOTE) + "</p></div>";
+      }
       return '<div class="snap-body">' + (item.html || "") + "</div>";
     }
     if (item.kind === "heatmap" || item.kind === "composite") {
@@ -516,14 +539,19 @@
             fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
     }
     if (item.kind === "snapshot") {
-      // pinned "as it looks" — the card's own HTML, re-shown verbatim
+      // pinned "as it looks" — the card's own HTML, re-shown verbatim (unless a
+      // rebuild withheld any of its quotes, in which case the frozen payload
+      // must not render — I20)
+      var snapBody = qualPinStale(item)
+        ? '<p class="si-ctx">' + fmt.escapeHtml(QUAL_STALE_NOTE) + "</p>"
+        : (item.html || "");
       return '<div class="card story-item story-snapshot" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". " +
         fmt.escapeHtml((item.source || "PIN").toUpperCase()) + "</span><strong>" +
         fmt.escapeHtml(TR.charts.clip(item.title || "Pinned card", 90)) + "</strong>" +
         (item.context ? '<span class="si-ctx">' + fmt.escapeHtml(item.context) + "</span>" : "") +
         buttons + "</div>" +
-        '<div class="snap-body">' + (item.html || "") + "</div>" +
+        '<div class="snap-body">' + snapBody + "</div>" +
         '<textarea class="si-note" placeholder="Commentary for this slide…">' +
         fmt.escapeHtml(item.note || "") + "</textarea></div>";
     }
@@ -725,6 +753,13 @@
         return;
       }
       if (item.kind === "snapshot") {
+        // A stale qualitative pin exports a placeholder, never its frozen
+        // (since-withheld) quotes — mirror of the stale-composite rule (I20).
+        if (qualPinStale(item)) {
+          slides.push(TR.exporter.dividerSlide(item.title || "Pinned card",
+            QUAL_STALE_NOTE));
+          return;
+        }
         // WP4: a structured quotes payload renders in quote typography; old
         // pins (no payload) keep the one-column table fallback unchanged
         if (item.quotes && item.quotes.length && TR.exporter.quoteSlide) {
@@ -785,6 +820,10 @@
         contextLine(item) + (item.note ? " · " + item.note : ""), null, compositeMatrix(item));
     }
     if (item.kind === "snapshot") {
+      if (qualPinStale(item)) {
+        return TR.exporter.cardSvgRaw(item.title || "Pinned card",
+          QUAL_STALE_NOTE, null, null);
+      }
       return TR.exporter.cardSvgRaw(item.title || "Pinned card",
         (item.context || "") + (item.note ? " · " + item.note : ""), null, snapshotMatrix(item));
     }
@@ -911,10 +950,13 @@
         '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>" +
         quoteBlockHtml(item);
     } else if (item.kind === "snapshot") {
+      var presentBody = qualPinStale(item)
+        ? '<p class="pr-ctx">' + fmt.escapeHtml(QUAL_STALE_NOTE) + "</p>"
+        : (item.html || "");
       body = "<h1>" + fmt.escapeHtml(item.title || "Pinned card") + "</h1>" +
         (item.context ? '<p class="pr-ctx">' + fmt.escapeHtml(item.context) + "</p>" : "") +
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
-        '<div class="pr-table snap-body">' + (item.html || "") + "</div>";
+        '<div class="pr-table snap-body">' + presentBody + "</div>";
     } else if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
       // a stale composite pin (null matrix) must not crash present mode —

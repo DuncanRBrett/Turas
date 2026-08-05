@@ -409,5 +409,46 @@ run("D2: image-deck/PNG card title = pin title when set, default when not", () =
   at(without, "Q2 — Flat short", "title-less pins keep the existing default");
 });
 
+
+/* ---------------- I20: stale qualitative pins never render frozen quotes --- */
+
+run("I20: a qualitative pin goes stale when any frozen quote is no longer published", () => {
+  const sb = coverSandbox({});
+  const TR = sb.TR;
+  TR.qual = { textPublished: (text) => text === "still here" };
+  const freshPin = { kind: "snapshot", source: "qualitative", title: "Hub",
+    context: "", html: "<div>Q</div>", lines: [], note: "",
+    quotes: [{ text: "still here", q: "Q1" }] };
+  const stalePin = { kind: "snapshot", source: "qualitative", title: "Hub",
+    context: "", html: "<div>“withheld words”</div>", lines: [], note: "",
+    quotes: [{ text: "still here", q: "Q1" }, { text: "withheld words", q: "Q1" }] };
+  eq(TR.story2._qualPinStale(freshPin), false, "every quote published -> not stale");
+  eq(TR.story2._qualPinStale(stalePin), true, "one withheld quote -> stale");
+  const nonQual = { kind: "snapshot", source: "card", html: "<div>x</div>", quotes: [] };
+  eq(TR.story2._qualPinStale(nonQual), false, "non-qual snapshots are never gated");
+});
+
+run("I20: a stale pin's body renders the notice, never the frozen html", () => {
+  const sb = coverSandbox({});
+  const TR = sb.TR;
+  TR.qual = { textPublished: () => false };   // disclosure tightened: nothing published
+  const pin = { kind: "snapshot", source: "qualitative", title: "Hub",
+    context: "", html: "<div>“the withheld verbatim”</div>", lines: [], note: "",
+    quotes: [{ text: "the withheld verbatim", q: "Q1" }] };
+  const body = TR.story2.itemBodyHtml(pin);
+  assert(body.indexOf("the withheld verbatim") < 0, "frozen quote text must not render");
+  assert(body.indexOf("no longer publishes") >= 0, "the stale notice renders instead");
+});
+
+run("I20: a copy with NO qual island treats qualitative pins as stale", () => {
+  const sb = coverSandbox({});
+  const TR = sb.TR;
+  TR.qual = undefined;   // island absent from this copy
+  const pin = { kind: "snapshot", source: "qualitative", title: "Hub",
+    context: "", html: "<div>“secret”</div>", lines: [], note: "",
+    quotes: [{ text: "secret", q: "Q1" }] };
+  eq(TR.story2._qualPinStale(pin), true, "no island -> frozen quotes must not surface");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);

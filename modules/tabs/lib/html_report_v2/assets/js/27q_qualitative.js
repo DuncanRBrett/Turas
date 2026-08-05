@@ -284,6 +284,24 @@
     return (agg && typeof agg.headline === "string" && agg.headline.trim()) ? agg.headline.trim() : "";
   };
 
+  /** Whether this exact verbatim text is still PUBLISHED by the current island
+   *  (a record with non-null text). The Story tab refuses to render a frozen
+   *  qualitative pin whose quotes a rebuild has since withheld — hub pins used
+   *  to carry withheld text past a disclosure-tightening rebuild while
+   *  priority pins re-resolved (review 2026-08, I20). No island (an
+   *  aggregates-only or qual-less copy) publishes nothing. */
+  qual.textPublished = function (text) {
+    var island = TR.QUAL;
+    if (!island || !island.questions || text == null) return false;
+    for (var i = 0; i < island.questions.length; i++) {
+      var recs = island.questions[i].records || [];
+      for (var j = 0; j < recs.length; j++) {
+        if (recs[j].text === text) return true;
+      }
+    }
+    return false;
+  };
+
   /** Comment count for a qual question code (within the cut when filters given). */
   qual.commentCount = function (qcode, filters) {
     var island = TR.QUAL;
@@ -2034,6 +2052,13 @@
     if (pool.orphans) cover += ' · <span class="ql-orphan" title="These marks point at comments not present ' +
       'in this data run — re-mark to refresh them">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
+    // The cover states the withholding — a marked comment whose verbatim this
+    // copy does not publish must not simply vanish from the collection
+    // ("reads like the control did nothing"; review 2026-08, I21).
+    if (pool.withheld) cover += ' · <span class="ql-orphan" title="These marked comments are counted in ' +
+      'every distribution, but this copy of the report does not publish their text ' +
+      '(confidentiality scope)">' + pool.withheld +
+      " marked comment" + (pool.withheld === 1 ? "" : "s") + " withheld in this copy</span>";
     qual._colview = { island: island, items: shown, hub: activeHub, coverPlain: coverPlain,
                       safeDemos: safeDemos, dropTags: hubBelowK };
 

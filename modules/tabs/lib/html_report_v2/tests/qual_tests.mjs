@@ -1110,5 +1110,55 @@ assert(npsBlock.indexOf('<div class="si-qband">Detractor</div>') >= 0,
 assert(qual.priorityBlockHtml(qual.priorityQuotes("Q28")).indexOf("si-qband") < 0,
   "priorityBlockHtml: a single-band question keeps its flat list");
 
+
+// ---- I20: textPublished — the Story tab's stale-pin gate ----------------------
+TR.QUAL = colIsland;
+assert(qual.textPublished("great value") === true,
+  "textPublished: a record's text currently in the island is published");
+assert(qual.textPublished("not in any record") === false,
+  "textPublished: unknown text is not published");
+assert(qual.textPublished(null) === false, "textPublished: null text is never published");
+{
+  const savedIsland = TR.QUAL;
+  TR.QUAL = null;
+  assert(qual.textPublished("great value") === false,
+    "textPublished: a copy with no qual island publishes nothing");
+  TR.QUAL = savedIsland;
+}
+
+// ---- I21: the collection COVER states the withheld count (not just the pool) --
+{
+  TR.QUAL = {
+    textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
+    demographics: [{ label: "Campus" }],
+    questions: [{ code: "QW", title: "Open feedback", type: "raw", themes: [],
+      base: { answered: 2 },
+      records: [
+        { idx: 0, tier: 1, sentiment: 1, themeVals: {}, demos: {}, text: "published text" },
+        { idx: 1, tier: 1, sentiment: 3, themeVals: {}, demos: {}, text: null, suppressed: true }
+      ] }]
+  };
+  TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
+    questionByCode: () => null, filterDescription: () => "" };
+  TR.disclosure = null;
+  const oldSaved = qual.savedAll, oldHl = qual.highlightsAll, oldHub = qual.hubMarksUnion;
+  qual.savedAll = () => ({ "QW#0": 1, "QW#1": 1 });   // one published, one withheld
+  qual.highlightsAll = () => ({});
+  qual.hubMarksUnion = () => ({});
+  const chost = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  qual._state = null;
+  qual.render(chost);                      // initialise state on this island
+  qual._state.view = "collection";
+  qual.render(chost);
+  const colHtml = chost.innerHTML;
+  assert(colHtml.indexOf("withheld in this copy") >= 0,
+    "collection cover STATES the withholding (dc94b822 computed it but never rendered it)");
+  assert(colHtml.indexOf("1 marked comment withheld") >= 0,
+    "collection cover carries the withheld count");
+  assert(colHtml.indexOf("published text") >= 0,
+    "the published marked comment still renders in the collection");
+  qual.savedAll = oldSaved; qual.highlightsAll = oldHl; qual.hubMarksUnion = oldHub;
+}
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

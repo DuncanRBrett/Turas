@@ -48,6 +48,36 @@ QUAL_MUSTREAD_MARKERS <- c("m", "must read", "must-read", "must", "must-read!", 
 # is the one reserved exception to "any non-blank marker is at least noteworthy".
 QUAL_HIDE_MARKERS <- c("hide", "hidden")
 
+# Recognised tier-1 markers. Any OTHER non-blank value still promotes to tier 1
+# (documented catch-all), but is reported on the console by the I/O wrapper so a
+# stray value is visible. A hide-LIKE value that is not an exact hide marker
+# ("hide!", "hid", "hide this one") REFUSES instead: promoting an intended
+# suppression to "feature this" is the exact inversion of the analyst's intent
+# (production review 2026-08, I18).
+QUAL_NOTEWORTHY_TIER1_MARKERS <- c("n", "y", "yes", "note", "noteworthy")
+
+#' Whether a marker looks like a hide attempt but is not an exact hide marker.
+#' @param marker The raw noteworthy cell value.
+#' @return TRUE for hide-like typos ("hide!", "hid", "hide this one").
+qual_hide_like_invalid <- function(marker) {
+  m <- tolower(trimws(marker))
+  nzchar(m) && grepl("^hid", m) && !(m %in% QUAL_HIDE_MARKERS)
+}
+
+#' Normalise an ID cell: a scientifically-formatted number ("1e+05") re-expands
+#' to its plain digits so both sides of the ResponseID join speak the same
+#' string (review 2026-08, I19).
+#' @param x Character vector of raw ID cells.
+#' @return Trimmed character vector with scientific notation expanded.
+qual_id_norm <- function(x) {
+  v <- trimws(as.character(x))
+  sci <- !is.na(v) & grepl("^[0-9]+(\\.[0-9]+)?e\\+?[0-9]+$", v, ignore.case = TRUE)
+  v[sci] <- vapply(v[sci], function(s) {
+    format(suppressWarnings(as.numeric(s)), scientific = FALSE, trim = TRUE)
+  }, character(1))
+  v
+}
+
 # A column is the overall-sentiment column only if at least this fraction of its
 # rows are populated (sentiment is dense; themes are sparse).
 QUAL_SENTIMENT_DENSITY_MIN <- 0.5
@@ -151,6 +181,18 @@ qual_detect_verbatim_col <- function(header, col_values, exclude) {
     nb <- col_values[[c]][nzchar(col_values[[c]])]
     if (length(nb)) mean(nchar(nb)) else 0
   }, numeric(1))
+  # The fallback must not GUESS between two prose columns: an analyst's added
+  # notes column with longer text used to silently BECOME the verbatims
+  # (review 2026-08, I17). Contenders = every column whose text is prose-length
+  # and within half of the longest; more than one -> ambiguous, refuse upstream
+  # (name the verbatim column "Comment" to resolve).
+  best <- max(mean_len)
+  contenders <- candidates[mean_len >= max(best * 0.5, 20)]
+  if (length(contenders) > 1) {
+    out <- NA_integer_
+    attr(out, "ambiguous") <- header[contenders]
+    return(out)
+  }
   candidates[[which.max(mean_len)]]
 }
 
@@ -304,7 +346,7 @@ qual_verbatim_hidden <- function(marker) {
 #' @return `list(record, dropped)`; `record` is NULL for a fully-blank trailing row.
 qual_record_from_row <- function(r, roles) {
   cell <- function(c) if (!is.na(c) && length(r) >= c) r[[c]] else ""
-  id <- cell(roles$id); text <- cell(roles$verbatim)
+  id <- qual_id_norm(cell(roles$id)); text <- cell(roles$verbatim)
   # A repeated header row (some sheets stack sub-tables) is not a respondent — skip it
   # without counting, so its header labels never leak in as data.
   if (grepl(QUAL_ID_PATTERN, id, ignore.case = TRUE)) return(list(record = NULL, dropped = 0L))
@@ -335,20 +377,49 @@ qual_record_from_row <- function(r, roles) {
   list(record = record, dropped = dropped)
 }
 
-#' Extract all per-respondent records below the header, accumulating dropped-code count.
-#' @return `list(records, dropped_codes)`.
+#' Extract all per-respondent records below the header, accumulating dropped-code
+#' count and the sheet's integrity findings (review 2026-08, I17/I18): blank-ID
+#' rows (which later stages silently drop), duplicated IDs (which collide reader
+#' marks and inflate bases), hide-like invalid markers (which would SHIP the
+#' verbatim the analyst meant to withhold), unrecognised markers (promoted to
+#' tier 1 — reported, not refused), and the hide-marked count.
+#' @return `list(records, dropped_codes, integrity)`.
 qual_extract_records <- function(rows, header_row, roles) {
   records <- list(); dropped <- 0L
+  blank_id_rows <- integer(0)
+  hide_like <- character(0)
+  unrecognised <- character(0)
+  n_hidden <- 0L
   n <- length(rows)
   if (header_row >= 1L && header_row < n) {
     for (i in seq.int(header_row + 1L, n)) {
       built <- qual_record_from_row(rows[[i]], roles)
       if (is.null(built$record)) next
       dropped <- dropped + built$dropped
-      records[[length(records) + 1L]] <- built$record
+      rec <- built$record
+      if (!nzchar(rec$id) && nzchar(rec$text)) {
+        blank_id_rows <- c(blank_id_rows, i)
+      }
+      marker <- tolower(trimws(rec$noteworthy_marker))
+      if (qual_hide_like_invalid(marker)) {
+        hide_like <- c(hide_like, trimws(rec$noteworthy_marker))
+      } else if (rec$hidden) {
+        n_hidden <- n_hidden + 1L
+      } else if (nzchar(marker) && rec$noteworthy_tier == 1L &&
+                 !(marker %in% QUAL_NOTEWORTHY_TIER1_MARKERS)) {
+        unrecognised <- c(unrecognised, trimws(rec$noteworthy_marker))
+      }
+      records[[length(records) + 1L]] <- rec
     }
   }
-  list(records = records, dropped_codes = dropped)
+  ids <- vapply(records, function(r) r$id, character(1))
+  ids <- ids[nzchar(ids)]
+  dup_ids <- unique(ids[duplicated(ids)])
+  list(records = records, dropped_codes = dropped,
+       integrity = list(blank_id_rows = blank_id_rows, dup_ids = dup_ids,
+                        hide_like_markers = unique(hide_like),
+                        unrecognised_markers = table(unrecognised),
+                        n_hidden = n_hidden))
 }
 
 #' Derive a stable, non-empty question code from a sheet name (slug).
@@ -382,6 +453,11 @@ qual_classify_sheet <- function(rows, sheet_name) {
   header <- rows[[header_row]]
   roles <- qual_classify_columns(header, rows, header_row)
   if (is.na(roles$verbatim)) {
+    amb <- attr(roles$verbatim, "ambiguous")
+    if (!is.null(amb)) {
+      return(list(skip = TRUE, reason = "verbatim_ambiguous",
+                  sheet = sheet_name, ambiguous_columns = amb))
+    }
     return(list(skip = TRUE, reason = "no_verbatim", sheet = sheet_name))
   }
   title <- qual_extract_title(rows, header_row, roles, header)
@@ -390,6 +466,7 @@ qual_classify_sheet <- function(rows, sheet_name) {
   list(skip = FALSE, sheet = sheet_name, code = qual_sheet_code(sheet_name),
        title = title, type = if (length(roles$themes)) "themed" else "raw",
        header_row = header_row, roles = roles, records = extracted$records,
+       integrity = extracted$integrity,
        meta = list(dropped_codes = extracted$dropped_codes,
                    n_records = length(extracted$records),
                    n_themes = length(roles$themes), n_demos = length(roles$demos)))

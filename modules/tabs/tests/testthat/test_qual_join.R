@@ -303,3 +303,16 @@ test_that("an absolute qual_workbook passes through regardless of config_file_pa
   abs_wb <- file.path(abs_path, "Comments.xlsx")
   expect_equal(qual_resolve_workbook_path(abs_wb, list(config_file_path = "/some/Config.xlsx")), abs_wb)
 })
+
+
+test_that("numeric host IDs >= 1e5 join without scientific notation (I19)", {
+  # as.character(1e5) is "1e+05" while the workbook side reads "100000" —
+  # those respondents' comments silently unjoined (production review 2026-08).
+  survey <- data.frame(ResponseID = c(100000, 200000, 42), stringsAsFactors = FALSE)
+  map <- qual_host_id_to_idx(survey, "ResponseID")
+  expect_true("100000" %in% names(map))
+  expect_true("200000" %in% names(map))
+  expect_false(any(grepl("e\\+", names(map))))
+  expect_equal(unname(map[["100000"]]), 0L)
+  expect_equal(unname(map[["42"]]), 2L)
+})

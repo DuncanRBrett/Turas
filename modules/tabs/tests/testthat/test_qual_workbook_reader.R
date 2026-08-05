@@ -286,3 +286,96 @@ test_that("a repeated header row inside the data is skipped, not read as a respo
   expect_false(any(vapply(q$records,                          # no leaked header label as a value
                           function(r) identical(r$demos[["Region"]], "Region"), logical(1))))
 })
+
+
+# ==============================================================================
+# Production review 2026-08 — I17/I18/I19 hardening
+# ==============================================================================
+
+test_that("verbatim fallback refuses to guess between two prose columns (I17)", {
+  amb_sheet <- make_sheet(
+    c("ID", "Noteworthy", "What did you think of the programme?", "Analyst working notes"),
+    c("1", "", "The sessions were engaging and well paced overall",
+      "Check this one against the LMS export before publishing; wording may identify the campus"),
+    c("2", "", "Too much admin at the start of every module",
+      "Second long private note that must never ship as a respondent quote in any report")
+  )
+  q <- qual_classify_sheet(amb_sheet, "Open")
+  expect_true(q$skip)
+  expect_equal(q$reason, "verbatim_ambiguous")
+  expect_gte(length(q$ambiguous_columns), 2)
+})
+
+test_that("a named Comment column beats the length fallback — notes column is a cut, not the verbatim", {
+  named_sheet <- make_sheet(
+    c("ID", "Noteworthy", "Comment", "Analyst working notes"),
+    c("1", "", "Engaging sessions", "A much longer analyst-only note that would win on mean length"),
+    c("2", "", "Too much admin", "Another long analyst-only working note about this respondent")
+  )
+  q <- qual_classify_sheet(named_sheet, "Open")
+  expect_false(q$skip)
+  expect_equal(q$records[[1]]$text, "Engaging sessions")
+})
+
+test_that("a single prose column still resolves via the fallback (SACS shape unchanged)", {
+  q <- qual_classify_sheet(sacs_sheet, "Culture")
+  expect_false(q$skip)
+})
+
+test_that("integrity: blank IDs on rows with text are collected (I17)", {
+  s <- make_sheet(
+    c("ID", "Noteworthy", "Comment"),
+    c("1", "", "First comment"),
+    c("",  "p", "Priority comment with no ID"),
+    c("3", "", "Third comment")
+  )
+  q <- qual_classify_sheet(s, "Open")
+  expect_false(q$skip)
+  expect_equal(length(q$integrity$blank_id_rows), 1L)
+})
+
+test_that("integrity: duplicated IDs within one sheet are collected (I17)", {
+  s <- make_sheet(
+    c("ID", "Noteworthy", "Comment"),
+    c("7", "", "First"),
+    c("7", "", "Second under the same ID"),
+    c("8", "", "Third")
+  )
+  q <- qual_classify_sheet(s, "Open")
+  expect_equal(q$integrity$dup_ids, "7")
+})
+
+test_that("integrity: hide-like markers are flagged, exact hide counts as hidden (I18)", {
+  s <- make_sheet(
+    c("ID", "Noteworthy", "Comment"),
+    c("1", "hide",          "Withheld properly"),
+    c("2", "hide!",         "Meant to be withheld - the old reader made this MORE visible"),
+    c("3", "hide this one", "Also meant to be withheld"),
+    c("4", "x",             "Legacy tier-1 mark"),
+    c("5", "p",             "Priority")
+  )
+  q <- qual_classify_sheet(s, "Open")
+  expect_equal(q$integrity$n_hidden, 1L)
+  expect_setequal(q$integrity$hide_like_markers, c("hide!", "hide this one"))
+  expect_true("x" %in% names(q$integrity$unrecognised_markers))
+  # recognised marks are not reported as unrecognised
+  expect_false("p" %in% names(q$integrity$unrecognised_markers))
+})
+
+test_that("qual_hide_like_invalid: exact markers pass, hide-like typos flag", {
+  expect_false(qual_hide_like_invalid("hide"))
+  expect_false(qual_hide_like_invalid(" HIDDEN "))
+  expect_true(qual_hide_like_invalid("hide!"))
+  expect_true(qual_hide_like_invalid("hid"))
+  expect_true(qual_hide_like_invalid("hide this one"))
+  expect_false(qual_hide_like_invalid(""))
+  expect_false(qual_hide_like_invalid("p"))
+})
+
+test_that("qual_id_norm expands scientific notation so the join key matches (I19)", {
+  expect_equal(qual_id_norm("1e+05"), "100000")
+  expect_equal(qual_id_norm("2.5e+05"), "250000")
+  expect_equal(qual_id_norm("100000"), "100000")
+  expect_equal(qual_id_norm(" R-42 "), "R-42")
+  expect_equal(qual_id_norm("e5"), "e5")   # not a number - untouched
+})

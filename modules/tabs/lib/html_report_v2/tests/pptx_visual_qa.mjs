@@ -75,6 +75,8 @@ function setupFixture() {
       "too slow, and their KPI recovery is the most fragile."
     : "" };
   TR.conf = { methodNote: () => "Wilson 95%", modelIntervalKind: () => "props" };
+  // I20 gate: qualitative pins render only while their quotes are published.
+  TR.qual = { textPublished: () => true };
   TR.views = {
     _indexQuestions: () => [],
     _heatMatrix: () => ({
