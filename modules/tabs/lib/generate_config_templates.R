@@ -122,19 +122,9 @@ generate_crosstab_config_template <- function(output_path,
              dropdown = c("TRUE", "FALSE")),
         list(name = "weight_label", default = "Weighted", required = TRUE,
              description = "Label displayed for weighted count rows in output tables.",
-             valid_values_text = "Any descriptive text"),
-        list(name = "weight_na_threshold", default = 10, required = TRUE,
-             description = "Maximum % of missing weight values before a warning is issued.",
-             valid_values_text = "0 to 100 (percentage)",
-             integer_range = c(0, 100)),
-        list(name = "weight_zero_threshold", default = 5, required = TRUE,
-             description = "Maximum % of zero weight values before a warning is issued.",
-             valid_values_text = "0 to 100 (percentage)",
-             integer_range = c(0, 100)),
-        list(name = "weight_deff_warning", default = 3, required = TRUE,
-             description = "Design Effect threshold: warn if DEFF exceeds this value (high = low efficiency).",
-             valid_values_text = "1 to 10 (typical: 2-3)",
-             integer_range = c(1, 10))
+             valid_values_text = "Any descriptive text")
+        # weight_na_threshold / weight_zero_threshold / weight_deff_warning were
+        # removed: no code has ever read them (production review 2026-08, I9).
       )
     ),
 

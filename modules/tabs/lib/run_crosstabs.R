@@ -704,8 +704,15 @@ if (isTRUE(config_result$config_obj$html_report)) {
 
 # Enabled by the config Settings sheet (html_report_v2) OR the GUI (which builds
 # it by default — TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
-.html_report_v2_on <- isTRUE(config_result$config_obj$html_report_v2) ||
-  isTRUE(get0("TURAS_HTML_REPORT_V2", ifnotfound = FALSE))
+# An EXPLICIT config value wins in both directions (a confidentiality-driven
+# html_report_v2 = FALSE must not be overridden, I16); when the config is
+# silent, the GUI's default-ON flag applies.
+.html_report_v2_on <- if (isTRUE(config_result$config_obj$html_report_v2_explicit)) {
+  isTRUE(config_result$config_obj$html_report_v2)
+} else {
+  isTRUE(config_result$config_obj$html_report_v2) ||
+    isTRUE(get0("TURAS_HTML_REPORT_V2", ifnotfound = FALSE))
+}
 config_result$config_obj$html_report_v2 <- .html_report_v2_on   # reflect actual decision in the run summary
 
 # Reader report (narrative summary, separate file). Enabled by the config Settings

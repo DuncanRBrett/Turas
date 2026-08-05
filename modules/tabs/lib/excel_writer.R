@@ -1542,12 +1542,13 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
     current_row <- current_row + 1
   }
 
-  # Add base sizes at bottom if enabled
-  show_base <- if ("index_summary_show_base_sizes" %in% names(config)) {
-    isTRUE(config$index_summary_show_base_sizes) ||
-      toupper(trimws(as.character(config$index_summary_show_base_sizes))) == "Y"
-  } else {
-    TRUE  # Default
+  # Add base sizes at bottom if enabled. Read via get_config_value: the key can
+  # now be present-with-NULL on config_obj (absent from the Settings sheet),
+  # and the old `%in% names()` guard then fed NULL into `||` and crashed.
+  show_base <- {
+    raw <- get_config_value(config, "index_summary_show_base_sizes", TRUE)
+    isTRUE(raw) ||
+      (is.character(raw) && toupper(trimws(raw[1])) %in% c("Y", "YES", "TRUE", "T", "1"))
   }
 
   if (show_base) {

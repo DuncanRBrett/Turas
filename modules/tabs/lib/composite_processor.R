@@ -837,10 +837,22 @@ process_all_composites <- function(composite_defs, data, questions_df,
       message(sprintf("  ✓ Completed: %s", comp_code))
 
     }, error = function(e) {
-      error_detail <- sprintf("Error processing composite '%s': %s\n  Traceback: %s",
-                             comp_code, e$message,
-                             paste(as.character(sys.calls()), collapse = "\n  "))
-      cat(sprintf("  [WARNING] %s\n", error_detail))
+      # A composite is a contractual metric: an error must not demote to a
+      # one-line warning while the run stays PASS (review 2026-08, I12). Box it
+      # for the Shiny console and record a REFUSED entry — the analysis runner
+      # turns any such entry into run_status PARTIAL.
+      cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+      cat("│ Context: Composite processing\n")
+      cat("│ Code: CALC_COMPOSITE_FAILED\n")
+      cat(sprintf("│ Composite: %s\n", comp_code))
+      cat(sprintf("│ Message: %s\n", e$message))
+      cat("│ Consequence: this composite is ABSENT from every output sheet.\n")
+      cat("│ How to fix: check its definition and source questions, then re-run.\n")
+      cat("└───────────────────────────────────────────────────────┘\n\n")
+      composite_results[[comp_code]] <<- list(
+        status = "REFUSED", code = "CALC_COMPOSITE_FAILED",
+        message = e$message, question_table = NULL
+      )
     })
   }
 

@@ -35,9 +35,14 @@ build_tabs_diagnostics <- function(config_result, data_result,
 
   config_obj <- config_result$config_obj
 
-  # Data receipt
+  # Data receipt. The data file is declared on the STRUCTURE workbook's
+  # Project sheet (data_setup.R), not in Settings — read it from where the run
+  # actually found it, falling back to a Settings override (review 2026-08, I4).
+  project_data_file <- tryCatch(
+    get_config_value(data_result$survey_structure$project, "data_file", NULL),
+    error = function(e) NULL)
   data_receipt <- list(
-    file_name = basename(config_obj$data_file %||% "unknown"),
+    file_name = basename(config_obj$data_file %||% project_data_file %||% "unknown"),
     n_rows    = nrow(data_result$survey_data),
     n_cols    = ncol(data_result$survey_data)
   )
@@ -64,7 +69,9 @@ build_tabs_diagnostics <- function(config_result, data_result,
   # Significance testing parameters
   sig_enabled  <- isTRUE(config_obj$enable_significance_testing)
   alpha_val    <- config_obj$alpha %||% 0.05
-  min_base_val <- config_obj$min_base %||% 30
+  # real key: significance_min_base ("min_base" was never populated -> the
+  # contractual Declaration always printed 30; review 2026-08, I4)
+  min_base_val <- config_obj$significance_min_base %||% 30
 
   # TRS summary
   run_result <- workbook_result$run_result
@@ -98,14 +105,14 @@ build_tabs_diagnostics <- function(config_result, data_result,
     "Bonferroni Correction"      = if (sig_enabled && isTRUE(config_obj$bonferroni_correction)) "Applied" else "Not applied",
     "Interactive Report"         = if (isTRUE(config_obj$html_report_v2)) "Generated" else "Not requested",
     "Classic HTML Report"        = if (isTRUE(config_obj$html_report)) "Generated" else "Not requested",
-    "AI Insights"                = if (isTRUE(config_obj$ai_insights)) "Enabled" else "Disabled",
+    "AI Insights"                = if (isTRUE(config_obj$enable_ai_insights)) "Enabled" else "Disabled",
     "TRS Status"                 = run_result$status %||% "PASS",
     "TRS Events"                 = trs_summary
   )
 
   config_echo <- list(
-    data_file      = config_obj$data_file,
-    structure_file = config_obj$structure_file,
+    data_file      = config_obj$data_file %||% project_data_file,
+    structure_file = config_obj$structure_file %||% config_result$structure_file_path,
     output_file    = config_result$output_path,
     apply_weighting = config_obj$apply_weighting,
     weight_variable = config_obj$weight_variable,

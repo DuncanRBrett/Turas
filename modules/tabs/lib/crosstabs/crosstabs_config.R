@@ -157,23 +157,23 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
                                  default_min_base = .DEFAULT_MIN_BASE) {
   list(
     # Weighting settings
-    apply_weighting = safe_logical(get_config_value(config, "apply_weighting", FALSE)),
+    apply_weighting = safe_logical(get_config_value(config, "apply_weighting", FALSE), default = FALSE),
     weight_variable = get_config_value(config, "weight_variable", NULL),
-    show_unweighted_n = safe_logical(get_config_value(config, "show_unweighted_n", TRUE)),
-    show_effective_n = safe_logical(get_config_value(config, "show_effective_n", TRUE)),
-    show_weighted_base = safe_logical(get_config_value(config, "show_weighted_base", TRUE)),
+    show_unweighted_n = safe_logical(get_config_value(config, "show_unweighted_n", TRUE), default = TRUE),
+    show_effective_n = safe_logical(get_config_value(config, "show_effective_n", TRUE), default = TRUE),
+    show_weighted_base = safe_logical(get_config_value(config, "show_weighted_base", TRUE), default = TRUE),
     weight_label = get_config_value(config, "weight_label", "Weighted"),
 
     # Display settings
     decimal_separator = get_config_value(config, "decimal_separator", "."),
-    show_frequency = safe_logical(get_config_value(config, "show_frequency", TRUE)),
-    show_percent_column = safe_logical(get_config_value(config, "show_percent_column", TRUE)),
-    show_percent_row = safe_logical(get_config_value(config, "show_percent_row", FALSE)),
+    show_frequency = safe_logical(get_config_value(config, "show_frequency", TRUE), default = TRUE),
+    show_percent_column = safe_logical(get_config_value(config, "show_percent_column", TRUE), default = TRUE),
+    show_percent_row = safe_logical(get_config_value(config, "show_percent_row", FALSE), default = FALSE),
 
     # Box category settings
-    boxcategory_frequency = safe_logical(get_config_value(config, "boxcategory_frequency", FALSE)),
-    boxcategory_percent_column = safe_logical(get_config_value(config, "boxcategory_percent_column", TRUE)),
-    boxcategory_percent_row = safe_logical(get_config_value(config, "boxcategory_percent_row", FALSE)),
+    boxcategory_frequency = safe_logical(get_config_value(config, "boxcategory_frequency", FALSE), default = FALSE),
+    boxcategory_percent_column = safe_logical(get_config_value(config, "boxcategory_percent_column", TRUE), default = TRUE),
+    boxcategory_percent_row = safe_logical(get_config_value(config, "boxcategory_percent_row", FALSE), default = FALSE),
 
     # Decimal places
     decimal_places_percent = safe_numeric(get_config_value(config, "decimal_places_percent", 0)),
@@ -182,10 +182,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     decimal_places_numeric = safe_numeric(get_config_value(config, "decimal_places_numeric", 1)),
 
     # Significance testing
-    enable_significance_testing = safe_logical(get_config_value(config, "enable_significance_testing", TRUE)),
+    enable_significance_testing = safe_logical(get_config_value(config, "enable_significance_testing", TRUE), default = TRUE),
     alpha = safe_numeric(get_config_value(config, "alpha", default_alpha)),
     significance_min_base = safe_numeric(get_config_value(config, "significance_min_base", default_min_base)),
-    bonferroni_correction = safe_logical(get_config_value(config, "bonferroni_correction", TRUE)),
+    bonferroni_correction = safe_logical(get_config_value(config, "bonferroni_correction", TRUE), default = TRUE),
 
     # Dual significance level toggle (optional — V10.10)
     # Set alpha_secondary to enable a second significance level in HTML reports.
@@ -197,35 +197,39 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     alpha_default = get_config_value(config, "alpha_default", "primary"),
 
     # Checkpointing
-    enable_checkpointing = safe_logical(get_config_value(config, "enable_checkpointing", TRUE)),
+    enable_checkpointing = safe_logical(get_config_value(config, "enable_checkpointing", TRUE), default = TRUE),
 
     # Output formatting
-    zero_division_as_blank = safe_logical(get_config_value(config, "zero_division_as_blank", TRUE)),
+    zero_division_as_blank = safe_logical(get_config_value(config, "zero_division_as_blank", TRUE), default = TRUE),
 
     # V9.9.5 features
-    show_standard_deviation = safe_logical(get_config_value(config, "show_standard_deviation", FALSE)),
-    test_net_differences = safe_logical(get_config_value(config, "test_net_differences", FALSE)),
-    create_sample_composition = safe_logical(get_config_value(config, "create_sample_composition", FALSE)),
-    enable_chi_square = safe_logical(get_config_value(config, "enable_chi_square", FALSE)),
-    show_net_positive = safe_logical(get_config_value(config, "show_net_positive", FALSE)),
+    show_standard_deviation = safe_logical(get_config_value(config, "show_standard_deviation", FALSE), default = FALSE),
+    test_net_differences = safe_logical(get_config_value(config, "test_net_differences", FALSE), default = FALSE),
+    create_sample_composition = safe_logical(get_config_value(config, "create_sample_composition", FALSE), default = FALSE),
+    enable_chi_square = safe_logical(get_config_value(config, "enable_chi_square", FALSE), default = FALSE),
+    show_net_positive = safe_logical(get_config_value(config, "show_net_positive", FALSE), default = FALSE),
 
     # V10.0.0 numeric question settings
-    show_numeric_median = safe_logical(get_config_value(config, "show_numeric_median", FALSE)),
-    show_numeric_mode = safe_logical(get_config_value(config, "show_numeric_mode", FALSE)),
-    show_numeric_outliers = safe_logical(get_config_value(config, "show_numeric_outliers", TRUE)),
-    exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE)),
+    show_numeric_median = safe_logical(get_config_value(config, "show_numeric_median", FALSE), default = FALSE),
+    show_numeric_mode = safe_logical(get_config_value(config, "show_numeric_mode", FALSE), default = FALSE),
+    show_numeric_outliers = safe_logical(get_config_value(config, "show_numeric_outliers", TRUE), default = TRUE),
+    exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE), default = FALSE),
     outlier_method = get_config_value(config, "outlier_method", "IQR"),
 
     # Stats pack (contractual deliverable — defaults to Y)
     generate_stats_pack = get_config_value(config, "generate_stats_pack", "Y"),
 
     # V10.3 HTML Report settings
-    html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
+    html_report = safe_logical(get_config_value(config, "html_report", FALSE), default = FALSE),
 
     # V11 data-centric report (data-layer JSON for the v2 renderer).
     # Additive: when TRUE, a *_data.json island is written alongside the
     # existing Excel/HTML outputs. Old paths are untouched when FALSE.
-    html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE)),
+    html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE), default = FALSE),
+    # Whether the Settings sheet EXPLICITLY set html_report_v2 (I16): an
+    # explicit FALSE must beat the GUI's default-ON — a confidentiality-driven
+    # opt-out was silently overridden before. Internal, not a Settings name.
+    html_report_v2_explicit = !is.null(get_config_value(config, "html_report_v2", NULL)),
     # V13 confidentiality dial (ON by default = today's behaviour). FALSE omits
     # the anonymised per-respondent DATA_MICRO island from the v2 report — the
     # aggregates-only ship for insider populations (small staff surveys) where
@@ -237,7 +241,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # V11 tabs-integrated tracker (OFF by default). When TRUE AND a waves_source
     # resolves, the v2 report gains a Tracking tab built from anonymised per-wave
     # microdata. Independent of the standalone tracker module, which is untouched.
-    html_report_v2_tracking = safe_logical(get_config_value(config, "html_report_v2_tracking", FALSE)),
+    html_report_v2_tracking = safe_logical(get_config_value(config, "html_report_v2_tracking", FALSE), default = FALSE),
     # Folder holding prior waves' *_wave.json tracking contributions (emitted by
     # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
     waves_source = get_config_value(config, "waves_source", ""),
@@ -250,8 +254,12 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     wave_order = get_config_value(config, "wave_order", ""),
     # Sample design — drives honest confidence vocabulary in the v2 report
     # (probability designs speak CI/MOE; non-probability designs speak the
-    # softened SI/PE). Cautious default: Not_Specified -> SI/PE.
-    sampling_method = get_config_value(config, "sampling_method", "Not_Specified"),
+    # softened SI/PE). Cautious default: Not_Specified -> SI/PE. The value is
+    # normalised to its canonical token here ("stratified" -> "Stratified");
+    # an unrecognised token refuses in validate_config_settings (I5) — it
+    # would otherwise silently flip the whole report's confidence vocabulary.
+    sampling_method = normalise_sampling_method(
+      get_config_value(config, "sampling_method", "Not_Specified")),
     # Total universe size for a census / full-invite design — drives the finite
     # population correction (FPC) on the Total column and the report's overall
     # response/coverage rate. Per-subgroup populations live in the optional
@@ -302,11 +310,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Tab-visibility flags (V12, generic). Crosstabs is always on; each other tab
     # is includable per report. The flags ride into the data layer; tabList()
     # filters against them (a tab also self-hides when its island is absent).
-    show_dashboard = safe_logical(get_config_value(config, "show_dashboard", TRUE)),
-    show_patterns = safe_logical(get_config_value(config, "show_patterns", TRUE)),
-    show_differences = safe_logical(get_config_value(config, "show_differences", TRUE)),
-    show_tracking = safe_logical(get_config_value(config, "show_tracking", TRUE)),
-    show_qualitative = safe_logical(get_config_value(config, "show_qualitative", TRUE)),
+    show_dashboard = safe_logical(get_config_value(config, "show_dashboard", TRUE), default = TRUE),
+    show_patterns = safe_logical(get_config_value(config, "show_patterns", TRUE), default = TRUE),
+    show_differences = safe_logical(get_config_value(config, "show_differences", TRUE), default = TRUE),
+    show_tracking = safe_logical(get_config_value(config, "show_tracking", TRUE), default = TRUE),
+    show_qualitative = safe_logical(get_config_value(config, "show_qualitative", TRUE), default = TRUE),
 
     # Patterns-tab levers (optional). patterns_headline pins the apex KPI tiles
     # to these question codes, in order (e.g. "Q78, Q79") — otherwise the tab
@@ -342,24 +350,24 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     chart_series_colour_6 = get_config_value(config, "chart_series_colour_6", NULL),
     chart_series_colour_7 = get_config_value(config, "chart_series_colour_7", NULL),
     chart_series_colour_8 = get_config_value(config, "chart_series_colour_8", NULL),
-    embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE)),
+    embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE), default = TRUE),
 
     # V10.4 Summary Dashboard settings
-    include_summary = safe_logical(get_config_value(config, "include_summary", TRUE)),
+    include_summary = safe_logical(get_config_value(config, "include_summary", TRUE), default = TRUE),
     fieldwork_dates = get_config_value(config, "fieldwork_dates", NULL),
     dashboard_metrics = get_config_value(config, "dashboard_metrics", "NET POSITIVE"),
 
     # V10.4.2 Dashboard colour breaks & scales (all optional, sensible defaults)
-    dashboard_scale_mean    = safe_numeric(get_config_value(config, "dashboard_scale_mean", 10)),
-    dashboard_scale_index   = safe_numeric(get_config_value(config, "dashboard_scale_index", 10)),
-    dashboard_green_net     = safe_numeric(get_config_value(config, "dashboard_green_net", 30)),
-    dashboard_amber_net     = safe_numeric(get_config_value(config, "dashboard_amber_net", 0)),
-    dashboard_green_mean    = safe_numeric(get_config_value(config, "dashboard_green_mean", 7)),
-    dashboard_amber_mean    = safe_numeric(get_config_value(config, "dashboard_amber_mean", 5)),
-    dashboard_green_index   = safe_numeric(get_config_value(config, "dashboard_green_index", 7)),
-    dashboard_amber_index   = safe_numeric(get_config_value(config, "dashboard_amber_index", 5)),
-    dashboard_green_custom  = safe_numeric(get_config_value(config, "dashboard_green_custom", 60)),
-    dashboard_amber_custom  = safe_numeric(get_config_value(config, "dashboard_amber_custom", 40)),
+    dashboard_scale_mean    = safe_numeric(get_config_value(config, "dashboard_scale_mean", 10), 10),
+    dashboard_scale_index   = safe_numeric(get_config_value(config, "dashboard_scale_index", 10), 10),
+    dashboard_green_net     = safe_numeric(get_config_value(config, "dashboard_green_net", 30), 30),
+    dashboard_amber_net     = safe_numeric(get_config_value(config, "dashboard_amber_net", 0), 0),
+    dashboard_green_mean    = safe_numeric(get_config_value(config, "dashboard_green_mean", 7), 7),
+    dashboard_amber_mean    = safe_numeric(get_config_value(config, "dashboard_amber_mean", 5), 5),
+    dashboard_green_index   = safe_numeric(get_config_value(config, "dashboard_green_index", 7), 7),
+    dashboard_amber_index   = safe_numeric(get_config_value(config, "dashboard_amber_index", 5), 5),
+    dashboard_green_custom  = safe_numeric(get_config_value(config, "dashboard_green_custom", 60), 60),
+    dashboard_amber_custom  = safe_numeric(get_config_value(config, "dashboard_amber_custom", 40), 40),
     dashboard_sort_gauges   = get_config_value(config, "dashboard_sort_gauges", "desc"),
 
     # V10.4.3 Row descriptors (shown below summary stat rows in HTML crosstabs)
@@ -368,7 +376,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     nps_descriptor = get_config_value(config, "nps_descriptor", NULL),
 
     # V10.5.0 Inline SVG charts
-    show_charts = safe_logical(get_config_value(config, "show_charts", FALSE)),
+    show_charts = safe_logical(get_config_value(config, "show_charts", FALSE), default = FALSE),
 
     # V10.6.0 Report enhancements
     priority_metric = get_config_value(config, "priority_metric", NULL),
@@ -381,7 +389,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     closing_notes = get_config_value(config, "closing_notes", NULL),
 
     # V10.9.0 AI Insights (optional, default FALSE)
-    enable_ai_insights = safe_logical(get_config_value(config, "enable_ai_insights", FALSE)),
+    enable_ai_insights = safe_logical(get_config_value(config, "enable_ai_insights", FALSE), default = FALSE),
 
     # AI model selection — friendly label ("Sonnet 4.6"/"Opus 4.8") or an exact
     # model ID. Resolved in the AI layer; blank uses the sidecar/default model.
@@ -394,9 +402,153 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # nothing leaves the machine). reader_ai_prose sends AGGREGATES ONLY to the
     # model to draft the prose — never microdata or verbatims — and stays off
     # unless the operator explicitly turns it on.
-    generate_reader_report = safe_logical(get_config_value(config, "generate_reader_report", FALSE)),
-    reader_ai_prose = safe_logical(get_config_value(config, "reader_ai_prose", FALSE))
+    generate_reader_report = safe_logical(get_config_value(config, "generate_reader_report", FALSE), default = FALSE),
+    reader_ai_prose = safe_logical(get_config_value(config, "reader_ai_prose", FALSE), default = FALSE),
+
+    # Index summary (I9): these Settings were whitelisted but never carried
+    # into config_obj, so their downstream get_config_value() reads always saw
+    # the default — setting create_index_summary = N did nothing, silently.
+    # NULL-when-absent defers to each consumer's own default (create_index_
+    # summary's default is composites-driven in create_index_summary_safe).
+    create_index_summary = get_config_value(config, "create_index_summary", NULL),
+    index_summary_show_sections = {
+      raw <- get_config_value(config, "index_summary_show_sections", NULL)
+      if (is.null(raw)) NULL else safe_logical(raw, default = TRUE)
+    },
+    index_summary_show_base_sizes = {
+      raw <- get_config_value(config, "index_summary_show_base_sizes", NULL)
+      if (is.null(raw)) NULL else safe_logical(raw, default = TRUE)
+    },
+    index_summary_show_composites = {
+      raw <- get_config_value(config, "index_summary_show_composites", NULL)
+      if (is.null(raw)) NULL else safe_logical(raw, default = TRUE)
+    },
+    index_summary_decimal_places = {
+      raw <- get_config_value(config, "index_summary_decimal_places", NULL)
+      if (is.null(raw)) NULL else safe_numeric(raw, 1)
+    },
+
+    # Ranking thresholds (I9): same gap — whitelisted, documented, never carried.
+    ranking_tie_threshold_pct = {
+      raw <- get_config_value(config, "ranking_tie_threshold_pct", NULL)
+      if (is.null(raw)) NULL else safe_numeric(raw, 5)
+    },
+    ranking_gap_threshold_pct = {
+      raw <- get_config_value(config, "ranking_gap_threshold_pct", NULL)
+      if (is.null(raw)) NULL else safe_numeric(raw, 5)
+    },
+    ranking_completeness_threshold_pct = {
+      raw <- get_config_value(config, "ranking_completeness_threshold_pct", NULL)
+      if (is.null(raw)) NULL else safe_numeric(raw, 80)
+    },
+    ranking_min_base = {
+      raw <- get_config_value(config, "ranking_min_base", NULL)
+      if (is.null(raw)) NULL else safe_numeric(raw, 30)
+    },
+
+    # General decimal-places fallback (I9): read by the workbook builder as the
+    # default for cells with no type-specific setting; was never carried.
+    decimal_places = {
+      raw <- get_config_value(config, "decimal_places", NULL)
+      if (is.null(raw)) NULL else safe_numeric(raw, 1)
+    },
+
+    # Study identification (I4/I9): the stats pack Declaration and the v2/qual
+    # report headers read these from config_obj; they were never carried.
+    project_name = get_config_value(config, "project_name", NULL),
+    data_file = get_config_value(config, "data_file", NULL),
+    structure_file = get_config_value(config, "structure_file", NULL)
   )
+}
+
+#' Validate the statistical settings after build_config_object
+#'
+#' A junk cell in a statistical setting must refuse AT LOAD, naming the cell —
+#' not crash mid-run inside a z-test where the orchestrator re-brands it as a
+#' per-question DATA_ fault (production review 2026-08, I11). An unrecognised
+#' sampling_method must refuse rather than silently soften the report's whole
+#' confidence vocabulary (I5).
+#'
+#' @param config_obj The built config object
+#' @param raw_settings The raw settings list (to quote the offending cell)
+#' @return Invisible TRUE, or a TRS refusal
+#' @keywords internal
+validate_config_settings <- function(config_obj, raw_settings = NULL) {
+  quote_raw <- function(key) {
+    raw <- if (!is.null(raw_settings)) raw_settings[[key]] else NULL
+    if (is.null(raw)) "" else sprintf(" (Settings sheet value: '%s')", as.character(raw)[1])
+  }
+  bad <- function(key, why) {
+    tabs_refuse(
+      code = "CFG_INVALID_SETTING",
+      title = "Invalid Configuration Setting",
+      problem = sprintf("Setting '%s' %s%s.", key, why, quote_raw(key)),
+      why_it_matters = "Statistical settings drive every test in the run; a junk value would fail mid-run or silently change what the report claims.",
+      how_to_fix = c(
+        sprintf("Fix the '%s' row on the config Settings sheet", key),
+        "Numbers must use '.' as the decimal separator (0.05, not 0,05)"
+      )
+    )
+  }
+
+  a <- config_obj$alpha
+  if (!is.numeric(a) || length(a) != 1 || is.na(a) || a <= 0 || a >= 1) {
+    bad("alpha", "must be a number strictly between 0 and 1")
+  }
+  mb <- config_obj$significance_min_base
+  if (!is.numeric(mb) || length(mb) != 1 || is.na(mb) || mb < 1) {
+    bad("significance_min_base", "must be a number >= 1")
+  }
+  krb <- config_obj$min_reporting_base
+  if (!is.numeric(krb) || length(krb) != 1 || is.na(krb) || krb < 1) {
+    bad("min_reporting_base", "must be a number >= 1 (1 = disclosure control off)")
+  }
+  for (key in c("decimal_places_percent", "decimal_places_ratings",
+                "decimal_places_index", "decimal_places_numeric")) {
+    d <- config_obj[[key]]
+    if (!is.numeric(d) || length(d) != 1 || is.na(d) || d < 0 || d > 6) {
+      bad(key, "must be a whole number between 0 and 6")
+    }
+  }
+  sm <- config_obj$sampling_method
+  if (!is.null(sm) && nzchar(sm) && !(sm %in% .TABS_SAMPLING_TOKENS)) {
+    tabs_refuse(
+      code = "CFG_INVALID_SETTING",
+      title = "Unrecognised sampling_method",
+      problem = sprintf("sampling_method '%s' is not a recognised design token.", sm),
+      why_it_matters = "An unrecognised design would silently become 'Not specified' and flip the whole report from confidence-interval to stability-interval vocabulary.",
+      how_to_fix = c(
+        sprintf("Use one of: %s", paste(.TABS_SAMPLING_TOKENS, collapse = ", ")),
+        "Case does not matter - 'stratified' resolves to 'Stratified'"
+      )
+    )
+  }
+  invisible(TRUE)
+}
+
+# Canonical sampling-method tokens (must match the v2 renderer's METHOD_KEYS in
+# 21c_confidence.js and the template dropdown). Self_Selected is the JS synonym
+# for Convenience.
+.TABS_SAMPLING_TOKENS <- c("Not_Specified", "Random", "Stratified", "Cluster",
+                           "Census", "Quota", "Online_Panel", "Convenience",
+                           "Self_Selected")
+
+#' Normalise a sampling_method value to its canonical token
+#'
+#' Case/whitespace-insensitive: "stratified" and " STRATIFIED " both resolve to
+#' "Stratified", so a casing slip cannot silently soften the report's whole
+#' confidence vocabulary to "Not specified". A token with no canonical match is
+#' returned trimmed as-is — validate_config_settings() refuses on it.
+#'
+#' @param x Raw Settings-sheet value
+#' @return Canonical token, or the trimmed original when unrecognised
+#' @keywords internal
+normalise_sampling_method <- function(x) {
+  if (is.null(x) || length(x) == 0 || is.na(x[1])) return("Not_Specified")
+  v <- trimws(as.character(x[1]))
+  if (!nzchar(v)) return("Not_Specified")
+  hit <- .TABS_SAMPLING_TOKENS[tolower(.TABS_SAMPLING_TOKENS) == tolower(gsub("[ -]", "_", v))]
+  if (length(hit) == 1) hit else v
 }
 
 
@@ -610,7 +762,18 @@ load_population_sheet <- function(config_file) {
                 nrow(frame)))
     frame
   }, error = function(e) {
-    cat(sprintf("  [WARNING] Could not read Population sheet: %s\n", e$message))
+    # A malformed Population sheet is a STATISTICS-affecting failure: FPC
+    # silently switching off changes every interval and sig letter on a census
+    # project. Loud box, not a one-line warning (review 2026-08, I12).
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Context: Config loader - Population sheet\n")
+    cat("│ Code: CFG_POPULATION_SHEET_UNREADABLE\n")
+    cat(sprintf("│ Message: Population sheet exists but could not be read: %s\n", e$message))
+    cat("│ Consequence: FINITE POPULATION CORRECTION IS OFF for this run -\n")
+    cat("│   intervals and significance will NOT be census-corrected.\n")
+    cat("│ How to fix: repair the Population sheet (Group + Population columns),\n")
+    cat("│   or delete the sheet to declare no subgroup universes.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
     NULL
   })
 }
@@ -888,8 +1051,6 @@ TABS_KNOWN_SETTINGS <- c(
   # Weighting
   "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
   "show_weighted_base", "weight_label",
-  "default_weight", "weight_column_exists",
-  "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
   # Display — frequencies and percentages
   "decimal_separator", "show_frequency", "show_percent_column", "show_percent_row",
   "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
@@ -900,9 +1061,16 @@ TABS_KNOWN_SETTINGS <- c(
   "show_numeric_mode", "show_numeric_outliers", "exclude_outliers_from_stats", "outlier_method",
   "test_net_differences", "zero_division_as_blank",
   # Significance testing
-  "enable_significance_testing", "alpha", "significance_level",
+  "enable_significance_testing", "alpha",
   "significance_min_base", "bonferroni_correction", "enable_chi_square",
   "alpha_secondary", "alpha_default",
+  # v2 tab visibility + Patterns levers + fieldwork caveat (I7: these were read
+  # by build_config_object but missing here, so a fresh template config was
+  # warned at for settings that work, and the merged-row/case diagnostics were
+  # blind to them)
+  "show_dashboard", "show_patterns", "show_differences", "show_tracking",
+  "show_qualitative", "patterns_headline", "patterns_exclude_banners",
+  "sampling_note",
   # Checkpointing
   "enable_checkpointing",
   # Qualitative confidentiality & disclosure control
@@ -973,6 +1141,12 @@ load_crosstabs_config <- function(config_file) {
 
   # Validate dual significance level config (if alpha_secondary is set)
   validate_dual_significance_config(config_obj)
+
+  # Validate the statistical settings (I11/I5): junk in alpha or the bases used
+  # to crash deep inside a z-test re-branded as a per-question DATA_ fault; an
+  # unrecognised sampling_method silently flipped the report's whole confidence
+  # vocabulary to "Not specified".
+  validate_config_settings(config_obj, settings$config)
 
   # Check for unrecognised settings — typos are silently ignored otherwise
   .KNOWN_SETTINGS <- TABS_KNOWN_SETTINGS

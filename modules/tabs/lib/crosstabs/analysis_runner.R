@@ -554,6 +554,24 @@ run_crosstabs_analysis <- function(config_result, data_result,
     config_result$config_obj
   )
 
+  # A failed composite (REFUSED entry) makes the run PARTIAL — a contractual
+  # metric is absent from the deliverable (review 2026-08, I12).
+  failed_comps <- names(Filter(
+    function(x) is.list(x) && identical(x$status, "REFUSED"), composite_results))
+  if (length(failed_comps) > 0) {
+    run_status <- "PARTIAL"
+    for (fc in failed_comps) {
+      partial_questions[[fc]] <- list(sections = list(list(
+        section = "Composite",
+        error = if (is.null(composite_results[[fc]]$message)) "processing failed" else composite_results[[fc]]$message
+      )))
+    }
+    composite_results <- composite_results[setdiff(names(composite_results), failed_comps)]
+    cat(sprintf("\n  [TURAS] %d composite(s) FAILED and are absent from the output: %s\n",
+                length(failed_comps), paste(failed_comps, collapse = ", ")))
+    cat("  Run status: PARTIAL\n\n")
+  }
+
   # Add composites to results
   all_results <- add_composites_to_results(all_results, composite_results, banner_info)
 

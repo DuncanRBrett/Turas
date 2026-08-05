@@ -80,7 +80,11 @@ run_tabs_gui <- function() {
   detect_config_files <- function(project_dir) {
     if (!dir.exists(project_dir)) return(character(0))
     files <- list.files(project_dir, pattern = "\\.xlsx$", full.names = FALSE, ignore.case = TRUE)
-    config_patterns <- c("Crosstab_Config", "Survey_Structure", "Config")
+    # A structure workbook is an INPUT to a config, not a runnable config —
+    # pre-selecting Survey_Structure.xlsx gave every fresh project a spurious
+    # failed run on its first click (review 2026-08, I16).
+    files <- files[!grepl("Structure", files, ignore.case = TRUE)]
+    config_patterns <- c("Crosstab_Config", "Config")
     detected <- character(0)
     for (pattern in config_patterns) {
       matches <- grep(pattern, files, value = TRUE, ignore.case = TRUE)
