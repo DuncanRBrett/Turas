@@ -182,11 +182,14 @@ tabs_source("crosstabs", "data_setup.R")
 tabs_source("crosstabs", "analysis_runner.R")
 tabs_source("crosstabs", "workbook_builder.R")
 
+# Shared report helpers (row/banner shape + chart palette) — the data-layer
+# writer below classifies rows through these, so they load before it.
+source(file.path(script_dir, "report_shared.R"))
+
 # V10.3: HTML Report module (loaded conditionally, sources its own submodules)
 tabs_source("html_report", "99_html_report_main.R")
 
-# V11: data-layer writer for the data-centric report v2 (reuses the HTML
-# transformer's row helpers, so it must load after the html_report module).
+# V11: data-layer writer for the data-centric report v2.
 source(file.path(script_dir, "score_utils.R"))
 source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "stats_diagnostics.R"))

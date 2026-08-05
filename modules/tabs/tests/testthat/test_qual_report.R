@@ -51,7 +51,7 @@ local({
   eval(parse(text = rc[ws[1]:(me[1] - 2)]), envir = globalenv())
   for (f in c("config_loader.R", "validation.R", "standard_processor.R", "numeric_processor.R",
               "question_dispatcher.R", "question_orchestrator.R", "composite_processor.R",
-              "crosstabs/crosstabs_config.R", "html_report/01_data_transformer.R",
+              "crosstabs/crosstabs_config.R", "report_shared.R",
               "data_layer_writer.R", "microdata_writer.R", "html_report_v2/build_report_v2.R",
               "qual_workbook_reader.R", "qual_unions.R", "qual_workbook_io.R", "qual_assemble.R",
               "qual_island_builder.R", "qual_quant_layer.R", "qual_report.R")) source(f, local = FALSE)

@@ -37,7 +37,7 @@ detect_turas_root <- function() {
 turas_root <- detect_turas_root()
 .tabs_lib_dir <- file.path(turas_root, "modules/tabs/lib")
 assign(".tabs_lib_dir", .tabs_lib_dir, envir = globalenv())
-source(file.path(turas_root, "modules/tabs/lib/html_report/99_html_report_main.R"))
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/data_layer_writer.R"))
 source(file.path(turas_root, "modules/tabs/lib/microdata_writer.R"))

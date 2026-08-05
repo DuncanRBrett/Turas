@@ -395,7 +395,7 @@ context("Bug Fix #7: BannerLabel takes priority over QuestionText")
 
 test_that("build_banner_groups uses BannerLabel when available", {
   # Source the data transformer
-  source(file.path(turas_root, "modules/tabs/lib/html_report/01_data_transformer.R"))
+  source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
   # Create mock banner_info with BannerLabel in banner_headers
   # Note: internal_keys typically starts with TOTAL::Total, so Gender keys
@@ -431,7 +431,7 @@ test_that("build_banner_groups uses BannerLabel when available", {
 })
 
 test_that("build_banner_groups falls back to QuestionText when no BannerLabel", {
-  source(file.path(turas_root, "modules/tabs/lib/html_report/01_data_transformer.R"))
+  source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
   banner_info <- list(
     banner_questions = "Q5",
@@ -467,7 +467,7 @@ test_that("build_banner_groups falls back to QuestionText when no BannerLabel", 
 })
 
 test_that("build_banner_groups falls back to code when no label at all", {
-  source(file.path(turas_root, "modules/tabs/lib/html_report/01_data_transformer.R"))
+  source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
   banner_info <- list(
     banner_questions = "Q99",

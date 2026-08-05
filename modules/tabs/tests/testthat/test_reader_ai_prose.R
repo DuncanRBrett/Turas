@@ -36,7 +36,7 @@ for (f in c("modules/shared/lib/trs_refusal.R", "modules/tabs/lib/00_guard.R",
   "modules/tabs/lib/crosstabs/crosstabs_config.R")) source(file.path(turas_root, f))
 .tabs_lib_dir <- file.path(turas_root, "modules/tabs/lib")
 assign(".tabs_lib_dir", .tabs_lib_dir, envir = globalenv())
-for (f in c("modules/tabs/lib/html_report/99_html_report_main.R",
+for (f in c("modules/tabs/lib/report_shared.R",
   "modules/tabs/lib/score_utils.R", "modules/tabs/lib/data_layer_writer.R",
   "modules/tabs/lib/reader_report/derive_reader_model.R",
   # real number check + model alias, so the verification path is genuine

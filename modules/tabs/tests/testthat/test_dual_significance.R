@@ -54,7 +54,7 @@ source(file.path(turas_root, "modules/tabs/lib/logging_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/config_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
-source(file.path(turas_root, "modules/tabs/lib/html_report/01_data_transformer.R"))
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
 # Extract significance functions from run_crosstabs.R without side effects
 # (avoids sourcing the full orchestrator and its check_dependencies() call)

@@ -86,6 +86,12 @@ if (length(.hr_missing) > 0) {
   }
 }
 
+# Shared report helpers (row/banner shape + chart palette) live one level up in
+# lib/ — the transformer and the v2 data layer both classify rows through them.
+.hr_shared <- file.path(dirname(.html_report_dir), "report_shared.R")
+if (file.exists(.hr_shared)) source(.hr_shared)
+rm(.hr_shared)
+
 for (.hr_file in .hr_required_files) {
   .hr_path <- file.path(.html_report_dir, .hr_file)
   source(.hr_path)

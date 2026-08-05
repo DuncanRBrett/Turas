@@ -43,7 +43,7 @@ turas_root <- detect_turas_root()
 
 # Source chart builder (which contains get_palette_colours and chart data assembly)
 source(file.path(turas_root, "modules/shared/lib/trs_refusal.R"))
-source(file.path(turas_root, "modules/tabs/lib/html_report/07_chart_builder.R"))
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
 # ==============================================================================
 # HELPERS
