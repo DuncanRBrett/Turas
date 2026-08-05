@@ -121,6 +121,7 @@ assign("format_seconds", format_seconds, envir = globalenv())
 # --- 6. Constants from run_crosstabs.R ---
 assign("TOTAL_COLUMN", "Total", envir = globalenv())
 assign("SIG_ROW_TYPE", "Sig.", envir = globalenv())
+assign("SIG2_ROW_TYPE", "Sig.2", envir = globalenv())
 assign("BASE_ROW_LABEL", "Base (n=)", envir = globalenv())
 assign("UNWEIGHTED_BASE_LABEL", "Base (unweighted)", envir = globalenv())
 assign("WEIGHTED_BASE_LABEL", "Base (weighted)", envir = globalenv())
