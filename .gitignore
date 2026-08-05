@@ -29,6 +29,8 @@ renv/.gitignore
 # EXCEPTION: Allow synthetic example/demo inputs (the tabs e2e gate loads these)
 !examples/**/*.xlsx
 !examples/**/*.csv
+# ...but never their generated outputs
+examples/**/Output/
 
 # EXCEPTION: Allow template files
 !templates/**/*.xlsx

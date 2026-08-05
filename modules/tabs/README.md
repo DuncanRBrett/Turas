@@ -10,21 +10,24 @@ Turas Tabs transforms survey data into professional cross-tabulation reports. Po
 
 ## Quick Start
 
-The fastest way to get started:
+The recommended route is the Turas launcher (from the Turas root directory):
 
 ``` r
-# From the Turas root directory
-source("turas.R")
-turas_load("tabs")
-
-# Run analysis
-run_tabs_analysis("path/to/your/project")
+source("launch_turas.R")
+launch_turas()          # click the Tabs tile, browse to your project folder
 ```
 
-Or use the graphical interface:
+For a scripted (non-GUI) run, point the entry script at a config workbook:
 
 ``` r
-source("modules/tabs/run_tabs_gui.R")
+source("modules/tabs/run_tabs.R")
+run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
+```
+
+A complete synthetic demo lives in `examples/tabs/demo_survey/` — run it with:
+
+``` r
+run_tabs_analysis("examples/tabs/demo_survey/Demo_Crosstab_Config.xlsx")
 ```
 
 ## What You Need

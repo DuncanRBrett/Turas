@@ -59,23 +59,20 @@ All modules support an optional **stats pack** — a diagnostic workbook saved a
 
 ### Enabling the stats pack
 
-| Method | How |
-|--------|-----|
-| **GUI checkbox** | Tick "Generate stats pack" in the module panel before running |
-| **Config file** | Set `Generate_Stats_Pack = Y` in the Settings sheet |
-| **R option** | `options(turas.generate_stats_pack = TRUE)` — used by the legacy Tabs module |
-
-> **Note for Tabs module:** The config field documents intent but the stats pack is currently triggered by the R option only.
+Set `generate_stats_pack` in the config Settings sheet (lowercase — setting
+names are case-sensitive). **For Tabs it defaults to Y**: the stats pack ships
+with every run unless you set `generate_stats_pack = N`.
 
 ### Study identification fields
 
-Add optional identity information to the config Settings sheet under the **STUDY IDENTIFICATION** section. These fields appear on the stats pack Declaration sheet for sign-off and provenance purposes.
+Add optional identity information to the config Settings sheet. These fields
+appear on the stats pack Declaration sheet for sign-off and provenance purposes.
 
 | Field | Purpose |
 |-------|---------|
-| `Project_Name` | Project name |
-| `Analyst_Name` | Analyst name |
-| `Research_House` | Research organisation or white-label partner name |
+| `project_name` | Project name (STUDY IDENTIFICATION section) |
+| `analyst_name` | Analyst name (ANALYST & CLOSING SECTION) |
+| `research_house` | Research organisation or white-label partner name |
 
 ---
 
@@ -123,34 +120,40 @@ Set `sampling_method = Census` as well, so the report speaks "confidence interva
 ## Typical Workflow
 
 1. **Prepare data** — Clean survey data in Excel/CSV format
-2. **Create config** — Copy a template config from `examples/{module}/` and fill in your settings
+2. **Create config** — Copy the module's template from `modules/{module}/templates/`
+   (for Tabs: `Crosstab_Config_Template.xlsx` + `Survey_Structure_Template.xlsx`)
+   and fill in your settings
 3. **Launch Turas** — `source("launch_turas.R"); launch_turas()`
 4. **Select module** — Click the module tile in the launcher
-5. **Browse to config** — Use the file browser to select your config Excel file
+5. **Browse to project** — Point the module at your project folder; detected
+   config workbooks appear as checkboxes
 6. **Run** — Click the Run button; watch the console for progress
 7. **Check output** — Results are saved to the output folder specified in your config
+
+For a scripted (non-GUI) Tabs run:
+
+```r
+source("modules/tabs/run_tabs.R")
+run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
+```
 
 ---
 
 ## Where to Find Examples
 
-Every module has working examples with sample data:
+The Tabs module ships a complete synthetic demo project (also the fixture for
+its end-to-end test suite):
 
 ```
 examples/
-  tabs/demo_survey/          — Demo crosstab config + data
-  tracker/demo/              — Demo tracking config
-  maxdiff/                   — MaxDiff config + design
-  conjoint/                  — Conjoint config + choice sets
-  pricing/                   — Pricing config + price data
-  segment/                   — Segmentation config
-  keydriver/                 — Key driver config
-  catdriver/                 — Categorical driver config
-  confidence/                — Confidence interval config
-  weighting/                 — Weighting config + targets
+  tabs/demo_survey/    — Demo_Crosstab_Config.xlsx + Demo_Survey_Structure.xlsx
+                         + Demo_Survey_Data.xlsx (regenerate with generate_demo.R)
+  tabs/basic/          — minimal structure + config + CSV data
 ```
 
-To test a module, point it at the example config and run it.
+To test the module, point it at `examples/tabs/demo_survey/Demo_Crosstab_Config.xlsx`
+and run it. Other modules ship worked examples in their own `modules/{module}/`
+docs and test fixtures.
 
 ---
 

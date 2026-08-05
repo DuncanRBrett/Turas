@@ -1,92 +1,99 @@
 # ==============================================================================
-# TURAS>TABS - CROSSTABULATION MODULE
+# TURAS>TABS - CROSSTABULATION MODULE - SCRIPTED ENTRY POINT
 # ==============================================================================
-# Click "Source" in RStudio to run
+# Runs one crosstab config through the same engine the Shiny GUI uses.
+#
+# Usage:
+#   source("modules/tabs/run_tabs.R")
+#   run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
+#
+# The recommended route is still the GUI (source("launch_turas.R");
+# launch_turas()) — it detects configs, shows progress and captures the
+# console. This wrapper exists for scripted/batch runs.
 # ==============================================================================
 
-# Load Turas if not already loaded
-if (!exists("TURAS_HOME")) {
-  # Try to find turas.R
-  search_paths <- c(
-    "../..",  # If running from modules/tabs/
-    "..",     # If running from modules/
-    "."       # If running from Turas root
-  )
-  
-  for (path in search_paths) {
-    if (file.exists(file.path(path, "turas.R"))) {
-      source(file.path(path, "turas.R"))
-      break
-    }
-  }
-  
-  if (!exists("TURAS_HOME")) {
+#' Run one tabs analysis from a crosstab config workbook
+#'
+#' Sets the global `config_file` the engine expects, sources
+#' `modules/tabs/lib/run_crosstabs.R` from its own directory (the engine
+#' resolves its siblings relative to the working directory), and restores
+#' the working directory and globals afterwards.
+#'
+#' @param config_file Path to a Crosstab_Config .xlsx (as built from
+#'   modules/tabs/templates/Crosstab_Config_Template.xlsx).
+#'
+#' @return Invisibly, TRUE on success; FALSE after a refusal/error (details
+#'   are printed to the console — Turas convention: errors must be visible).
+run_tabs_analysis <- function(config_file) {
+  if (missing(config_file) || is.null(config_file) || !nzchar(config_file)) {
     cat("\n=== TURAS ERROR ===\n")
-    cat("Code: ENV_TURAS_HOME_NOT_SET\n")
-    cat("Message: TURAS_HOME environment variable is not set. The Turas framework has not been loaded.\n")
-    cat("Fix: Run turas.R from the Turas root directory first: source('turas.R')\n")
-    cat("==================\n\n")
-    stop("TURAS_HOME not set. Source turas.R first.", call. = FALSE)
+    cat("Code: CFG_CONFIG_PATH_MISSING\n")
+    cat("Message: run_tabs_analysis() needs the path to a crosstab config workbook.\n")
+    cat("Fix: run_tabs_analysis(\"path/to/My_Crosstab_Config.xlsx\")\n")
+    cat("===================\n\n")
+    return(invisible(FALSE))
   }
-}
+  if (!file.exists(config_file)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: IO_CONFIG_NOT_FOUND\n")
+    cat("Message: Config file does not exist:", config_file, "\n")
+    cat("Fix: Check the path. Build a new config from modules/tabs/templates/Crosstab_Config_Template.xlsx.\n")
+    cat("===================\n\n")
+    return(invisible(FALSE))
+  }
 
-# Load Tabs module
-turas_load("tabs")
-
-#' Main entry point for Tabs analysis
-run_tabs_analysis <- function(project_path = NULL) {
-  
-  cat("\n")
-  cat("=======================================\n")
-  cat("       TURAS>TABS ANALYSIS             \n")
-  cat("=======================================\n\n")
-  
-  # Select project if not provided
-  if (is.null(project_path)) {
-    project_path <- turas_select_project()
-    if (is.null(project_path)) {
-      cat("No project selected.\n")
-      return(invisible(NULL))
+  # Resolve modules/tabs/lib relative to this script's own location.
+  this_file <- tryCatch(normalizePath(sys.frame(1)$ofile), error = function(e) NULL)
+  if (is.null(this_file)) {
+    args <- commandArgs(trailingOnly = FALSE)
+    fa <- sub("^--file=", "", grep("^--file=", args, value = TRUE))
+    if (length(fa)) this_file <- normalizePath(fa[1])
+  }
+  tabs_lib_dir <- if (!is.null(this_file)) {
+    file.path(dirname(this_file), "lib")
+  } else {
+    # Sourced without a file record (e.g. pasted into the console): fall back
+    # to the repo layout relative to the working directory.
+    candidates <- c("modules/tabs/lib", "tabs/lib", "lib")
+    hit <- candidates[file.exists(file.path(candidates, "run_crosstabs.R"))]
+    if (!length(hit)) {
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Code: IO_ENGINE_NOT_FOUND\n")
+      cat("Message: Cannot locate modules/tabs/lib/run_crosstabs.R from the working directory.\n")
+      cat("Fix: setwd() to the Turas root, or source this file with source(\"modules/tabs/run_tabs.R\").\n")
+      cat("===================\n\n")
+      return(invisible(FALSE))
     }
+    hit[1]
   }
-  
-  # Set working directory to project
-  old_wd <- setwd(project_path)
-  on.exit(setwd(old_wd))
-  
-  cat("\nProject:", basename(project_path), "\n")
-  cat("Path:", project_path, "\n\n")
-  
-  # Check for required files
-  required_files <- c(
-    "Survey_Structure.xlsx",
-    "Tabs_Config.xlsx"
-  )
-  
-  missing_files <- required_files[!file.exists(required_files)]
-  
-  if (length(missing_files) > 0) {
-    cat("Missing required files:\n")
-    for (file in missing_files) {
-      cat("  x", file, "\n")
+
+  old_wd <- getwd()
+  had_config <- exists("config_file", envir = .GlobalEnv)
+  old_config <- if (had_config) get("config_file", envir = .GlobalEnv) else NULL
+  on.exit({
+    setwd(old_wd)
+    if (had_config) {
+      assign("config_file", old_config, envir = .GlobalEnv)
+    } else if (exists("config_file", envir = .GlobalEnv)) {
+      rm("config_file", envir = .GlobalEnv)
     }
-    cat("\nPlease add the required files and try again.\n")
-    return(invisible(NULL))
-  }
-  
-  # Run analysis (placeholder - will be implemented during migration)
-  cat("Loading configuration...\n")
-  cat("Loading survey structure...\n")
-  cat("Loading data...\n")
-  cat("Running crosstabulation...\n")
-  cat("Writing output...\n")
-  
-  cat("\nAnalysis complete!\n")
-  cat("Output saved to:", file.path(project_path, "Output"), "\n\n")
-}
+  }, add = TRUE)
 
-# Run if sourced interactively
-if (interactive()) {
-  run_tabs_analysis()
-}
+  # The engine reads the global `config_file` and resolves its sibling scripts
+  # from the working directory — the same contract the GUI uses (run_tabs_gui.R).
+  assign("config_file", normalizePath(config_file), envir = .GlobalEnv)
+  setwd(tabs_lib_dir)
 
+  ok <- tryCatch({
+    source("run_crosstabs.R", local = FALSE)
+    TRUE
+  }, error = function(e) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: CALC_TABS_RUN_FAILED\n")
+    cat("Message:", conditionMessage(e), "\n")
+    cat("Fix: Read the refusal/output above this box — the engine names the failing step.\n")
+    cat("===================\n\n")
+    FALSE
+  })
+  invisible(ok)
+}
