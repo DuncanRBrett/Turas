@@ -58,6 +58,7 @@ source(file.path(turas_root, "modules/tabs/lib/data_loader.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
 source(file.path(turas_root, "modules/tabs/lib/excel_writer.R"))
+source(file.path(turas_root, "modules/tabs/lib/summary_builder.R"))
 source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
 
@@ -665,4 +666,139 @@ test_that("k = 1 (off) reports the Female column in full — no marker, no note"
 
   # No confidentiality note in the Guide
   expect_false(any(grepl("CONFIDENTIALITY", r$guide)))
+})
+
+
+test_that("k = 10 withholds the sub-k column on EVERY sheet, not just Crosstabs (C2)", {
+  # Production review 2026-08, C2: Index_Summary restated a withheld column's
+  # means and printed its exact n at the sheet foot; Sample Composition printed
+  # the category's exact counts; the Summary question list printed a withheld
+  # Total's exact base. Same gate, same marker, every sheet.
+  config <- make_wb_test_config()
+  config$min_reporting_base <- 10
+  config$significance_min_base <- 30
+  config$create_sample_composition <- TRUE
+  config$create_index_summary <- "Y"
+  config$index_summary_show_base_sizes <- "Y"
+
+  # Survey data with EXACTLY 3 Female respondents (the sub-k cut)
+  n <- 100
+  data <- data.frame(
+    ID = seq_len(n),
+    Gender = c(rep("Male", 97), rep("Female", 3)),
+    Q1 = rep(c("Satisfied", "Neutral"), length.out = n),
+    stringsAsFactors = FALSE
+  )
+
+  banner_info <- make_wb_test_banner_info()
+  banner_info$banner_questions <- data.frame(
+    QuestionCode = "Gender", Variable_Name = "Gender",
+    Variable_Label = "Gender", stringsAsFactors = FALSE
+  )
+  banner_info$base_sizes <- list(
+    "TOTAL::Total"   = list(unweighted = 100, weighted = 100),
+    "Gender::Male"   = list(unweighted = 97,  weighted = 97),
+    "Gender::Female" = list(unweighted = 3,   weighted = 3)
+  )
+  banner_info$banner_info$Gender$is_boxcategory <- FALSE
+  banner_info$banner_info$Gender$columns <- c("Male", "Female")
+  banner_info$banner_info$Gender$options <- data.frame(
+    DisplayText = c("Male", "Female"), OptionText = c("Male", "Female"),
+    stringsAsFactors = FALSE
+  )
+
+  survey_structure <- make_wb_test_survey_structure()
+  survey_structure$questions <- data.frame(
+    QuestionCode = c("Q1", "Gender"),
+    Variable_Type = c("Single_Response", "Single_Response"),
+    stringsAsFactors = FALSE
+  )
+
+  # Q1: full-sample question with an Average row (feeds Index_Summary) whose
+  # Female mean (6.9) is a distinctive leak needle. Q2: a filtered question
+  # whose TOTAL base is itself sub-k (3) — the Summary-list leak.
+  results <- make_disc_results(female_base = 3)
+  avg_row <- data.frame(
+    RowLabel = "Mean", RowType = "Average",
+    "TOTAL::Total" = 5.5, "Gender::Male" = 5.4, "Gender::Female" = 6.9,
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+  results$Q1$table <- rbind(results$Q1$table, avg_row)
+  results$Q2 <- list(
+    question_code = "Q2",
+    question_text = "Filtered follow-up",
+    question_type = "Single_Response",
+    table = data.frame(
+      RowLabel = c("Yes", "Yes"), RowType = c("Frequency", "Column %"),
+      "TOTAL::Total" = c(3, 100.0), "Gender::Male" = c(3, 100.0),
+      "Gender::Female" = c(0, NA_real_),
+      check.names = FALSE, stringsAsFactors = FALSE
+    ),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 3, weighted = 3, effective = 3),
+      "Gender::Male"   = list(unweighted = 3, weighted = 3, effective = 3),
+      "Gender::Female" = list(unweighted = 0, weighted = 0, effective = 0)
+    ),
+    base_filter = "Q1 == 'Special'"
+  )
+
+  tmp <- tempfile(fileext = ".xlsx")
+  create_crosstabs_workbook(
+    all_results = results,
+    composite_results = list(), composite_defs = NULL,
+    survey_structure = survey_structure,
+    survey_data = data,
+    banner_info = banner_info,
+    config_obj = config, error_log = create_error_log(),
+    trs_state = NULL, run_status = "PASS",
+    skipped_questions = list(), partial_questions = list(),
+    processed_questions = c("Q1", "Q2"),
+    crosstab_questions = data.frame(
+      Variable_Name = c("Q1", "Q2"),
+      Variable_Label = c("How satisfied?", "Filtered follow-up"),
+      Variable_Type = c("Single_Response", "Single_Response"),
+      stringsAsFactors = FALSE
+    ),
+    effective_n = 100, master_weights = rep(1, 100),
+    output_path = tmp, script_version = "10.2.0"
+  )
+
+  sheets <- openxlsx::getSheetNames(tmp)
+  read_sheet <- function(s) {
+    m <- openxlsx::read.xlsx(tmp, sheet = s, colNames = FALSE, skipEmptyRows = FALSE)
+    as.character(unlist(m))
+  }
+
+  # Index_Summary: the Female mean and the Female n must be withheld
+  expect_true("Index_Summary" %in% sheets)
+  isum <- read_sheet("Index_Summary")
+  expect_false(any(isum == "6.9", na.rm = TRUE))   # the withheld mean
+  expect_false(any(isum == "3", na.rm = TRUE))     # the withheld base (footer)
+  expect_true(any(isum == "n<10", na.rm = TRUE))   # the marker took their place
+  expect_true(any(isum == "5.4", na.rm = TRUE))    # safe column untouched
+
+  # Sample Composition: the Female category's exact counts must be withheld
+  expect_true("Sample Composition" %in% sheets)
+  scomp <- openxlsx::read.xlsx(tmp, sheet = "Sample Composition",
+                               colNames = FALSE, skipEmptyRows = FALSE)
+  fem_row <- which(apply(scomp, 1, function(r) "Female" %in% as.character(r)))
+  expect_true(length(fem_row) >= 1)
+  fem_vals <- as.character(unlist(scomp[fem_row, ]))
+  expect_false(any(fem_vals == "3", na.rm = TRUE))
+  expect_true(any(fem_vals == "n<10", na.rm = TRUE))
+  male_row <- which(apply(scomp, 1, function(r) "Male" %in% as.character(r)))
+  expect_true(any(as.character(unlist(scomp[male_row, ])) == "97", na.rm = TRUE))
+
+  # Summary: Q2's withheld Total base (3) must not be stated in the question
+  # list. Assert on Q2's own row — a bare "3" appears legitimately elsewhere
+  # on the sheet (e.g. the banner column count).
+  smry_df <- openxlsx::read.xlsx(tmp, sheet = "Summary",
+                                 colNames = FALSE, skipEmptyRows = FALSE)
+  q2_row <- which(apply(smry_df, 1, function(r) any(grepl("Filtered follow-up", as.character(r)))))
+  expect_true(length(q2_row) >= 1)
+  q2_vals <- as.character(unlist(smry_df[q2_row, ]))
+  expect_true(any(q2_vals == "n<10", na.rm = TRUE))
+  expect_false(any(q2_vals == "3", na.rm = TRUE))
+
+  unlink(tmp)
 })

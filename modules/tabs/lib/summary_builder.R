@@ -45,12 +45,14 @@ build_index_summary_table <- function(results_list, composite_results,
     message(sprintf("  Metric rows columns: %s", paste(names(metric_rows), collapse = ", ")))
   }
 
-  # Extract composite rows
+  # Extract composite rows (results_list rides along so each composite can
+  # borrow its source question's bases for the disclosure gate)
   composite_rows <- extract_composite_rows(
     composite_results,
     banner_info,
     composite_defs,
-    config
+    config,
+    results_list = results_list
   )
 
   # Combine (column-safe: metric_rows and composite_rows may have different columns)
@@ -183,6 +185,15 @@ extract_metric_rows <- function(results_list, banner_info, config) {
         }
       }
 
+      # Disclosure control: the Crosstabs sheet withholds this question's sub-k
+      # columns, so the Index_Summary must not restate their means/boxes three
+      # sheets away (production review 2026-08, C2). Same gate, same marker.
+      sup <- disclosure_suppressed_columns(question_result$bases, banner_info, config)
+      if (length(sup)) {
+        marker <- disclosure_marker(config$min_reporting_base)
+        for (ci in sup) all_rows[[internal_keys[ci]]] <- marker
+      }
+
       metric_list[[length(metric_list) + 1]] <- all_rows
     }
   }
@@ -230,10 +241,14 @@ extract_metric_rows <- function(results_list, banner_info, config) {
 #' @param banner_info Banner structure
 #' @param composite_defs Composite definitions
 #' @param config Configuration
+#' @param results_list All question results — lets a composite borrow its first
+#'   source question's bases for the disclosure gate (composites share their
+#'   sources' respondent pool)
 #' @return Data frame with composite rows
 #' @keywords internal
 extract_composite_rows <- function(composite_results, banner_info,
-                                    composite_defs, config) {
+                                    composite_defs, config,
+                                    results_list = NULL) {
 
   # Check if composites should be shown
   show_composites <- get_config_value(config, "index_summary_show_composites", TRUE)
@@ -266,6 +281,7 @@ extract_composite_rows <- function(composite_results, banner_info,
 
   for (comp_code in names(composite_results)) {
     comp_result <- composite_results[[comp_code]]
+    comp_def <- NULL
 
     if (is.null(comp_result$question_table)) {
       next
@@ -299,8 +315,10 @@ extract_composite_rows <- function(composite_results, banner_info,
         section <- NA_character_
       }
 
-      # Add source questions info to the label
-      if (!is.null(comp_def$SourceQuestions) && length(comp_def$SourceQuestions) > 0 && !is.na(comp_def$SourceQuestions[1])) {
+      # Add source questions info to the label (comp_def is NULL when no
+      # composite_defs were supplied — referencing it unguarded crashed, M6)
+      if (!is.null(comp_def) && nrow(comp_def) > 0 &&
+          !is.null(comp_def$SourceQuestions) && length(comp_def$SourceQuestions) > 0 && !is.na(comp_def$SourceQuestions[1])) {
         source_codes <- trimws(strsplit(as.character(comp_def$SourceQuestions[1]), ",")[[1]])
         metric_row$RowLabel <- paste0(metric_row$RowLabel, " (", paste(source_codes, collapse = ", "), ")")
       }
@@ -315,6 +333,24 @@ extract_composite_rows <- function(composite_results, banner_info,
         if (!key %in% names(metric_row)) {
           metric_row[[key]] <- NA_character_
         }
+      }
+
+      # Disclosure control (C2): borrow the first source question's bases —
+      # composites share their sources' respondent pool — and withhold the
+      # same sub-k columns the Crosstabs sheet withholds.
+      comp_bases <- NULL
+      if (!is.null(results_list) && !is.null(comp_result$metadata$source_questions)) {
+        for (src_q in comp_result$metadata$source_questions) {
+          if (!is.null(results_list[[src_q]]) && !is.null(results_list[[src_q]]$bases)) {
+            comp_bases <- results_list[[src_q]]$bases
+            break
+          }
+        }
+      }
+      sup <- disclosure_suppressed_columns(comp_bases, banner_info, config)
+      if (length(sup)) {
+        marker <- disclosure_marker(config$min_reporting_base)
+        for (ci in sup) metric_row[[internal_keys[ci]]] <- marker
       }
 
       composite_list[[length(composite_list) + 1]] <- metric_row

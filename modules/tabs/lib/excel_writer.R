@@ -844,6 +844,15 @@ add_question_list <- function(wb, all_results, config, styles, start_row,
         base_display <- as.character(total_base)
       }
 
+      # Disclosure control (C2): a filtered question whose Total column the
+      # Crosstabs sheet withholds must not state its exact base here.
+      k_disc <- suppressWarnings(as.numeric(config$min_reporting_base))
+      uw <- suppressWarnings(as.numeric(base_info$unweighted))
+      if (length(k_disc) == 1 && !is.na(k_disc) && k_disc > 1 &&
+          length(uw) == 1 && !is.na(uw) && uw >= 1 && uw < k_disc) {
+        base_display <- disclosure_marker(k_disc)
+      }
+
       base_warning <- ""
       if (eff_base < very_small_base_size) {
         base_warning <- paste0("WARNING: Very small base (n<", very_small_base_size, ")")
@@ -1189,6 +1198,16 @@ create_sample_composition_sheet <- function(wb, data, banner_info, master_weight
 
         # Calculate composition stats (delegated to helper)
         comp_stats <- calculate_composition_stats(row_idx, data, master_weights, config)
+
+        # Disclosure control (C2): a sub-k category's exact counts must not
+        # print here while the Crosstabs sheet withholds that column. The gate
+        # matches disclosure_suppressed_columns: unweighted n in [1, k-1].
+        k_disc <- suppressWarnings(as.numeric(config$min_reporting_base))
+        if (length(k_disc) == 1 && !is.na(k_disc) && k_disc > 1 &&
+            comp_stats$Unweighted_n >= 1 && comp_stats$Unweighted_n < k_disc) {
+          marker <- disclosure_marker(k_disc)
+          comp_stats <- lapply(comp_stats, function(x) marker)
+        }
 
         # Combine with Variable and Category labels
         comp_row <- c(
@@ -1545,10 +1564,16 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
     openxlsx::writeData(wb, "Index_Summary", "Unweighted n:",
                         startCol = 1, startRow = current_row)
 
+    # Disclosure control (C2): a sub-k banner column's exact n must not print
+    # here while the Crosstabs sheet withholds it. Same gate, same marker.
+    sup_banner <- disclosure_suppressed_columns(banner_info$base_sizes,
+                                                banner_info, config)
+    base_marker <- disclosure_marker(config$min_reporting_base)
+
     for (j in seq_along(internal_keys)) {
       key <- internal_keys[j]
       if (!is.null(banner_info$base_sizes[[key]])) {
-        n <- banner_info$base_sizes[[key]]$unweighted
+        n <- if (j %in% sup_banner) base_marker else banner_info$base_sizes[[key]]$unweighted
         openxlsx::writeData(wb, "Index_Summary", n,
                             startCol = j + 1, startRow = current_row)
       }
@@ -1567,8 +1592,8 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
       for (j in seq_along(internal_keys)) {
         key <- internal_keys[j]
         if (!is.null(banner_info$base_sizes[[key]])) {
-          n <- banner_info$base_sizes[[key]]$weighted
-          openxlsx::writeData(wb, "Index_Summary", round(n, 0),
+          n <- if (j %in% sup_banner) base_marker else round(banner_info$base_sizes[[key]]$weighted, 0)
+          openxlsx::writeData(wb, "Index_Summary", n,
                               startCol = j + 1, startRow = current_row)
         }
       }

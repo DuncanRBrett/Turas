@@ -226,8 +226,12 @@ create_index_summary_safe <- function(wb, all_results, composite_results,
   # Default to TRUE if composites are defined, otherwise FALSE
   default_create_summary <- !is.null(composite_defs) && nrow(composite_defs) > 0
   create_index_summary <- get_config_value(config_obj, "create_index_summary", default_create_summary)
+  # The config sheet supplies "Y"/"N" strings; normalise before the logical test
+  if (is.character(create_index_summary)) {
+    create_index_summary <- toupper(trimws(create_index_summary)) %in% c("Y", "YES", "TRUE", "T", "1")
+  }
 
-  if (!create_index_summary) return(invisible(NULL))
+  if (!isTRUE(create_index_summary)) return(invisible(NULL))
 
   tryCatch({
     log_message("Building index summary...", "INFO")
@@ -339,55 +343,9 @@ create_run_status_sheet <- function(wb, trs_state, run_status,
 # DISCLOSURE CONTROL (workbook)
 # ==============================================================================
 
-#' Confidentiality marker for a withheld column
-#'
-#' The label written into a suppressed column's base cells, e.g. "n<10".
-#'
-#' @param k Numeric, the confidentiality threshold (min_reporting_base)
-#' @return Character scalar marker
-#' @keywords internal
-disclosure_marker <- function(k) {
-  k_int <- suppressWarnings(as.integer(round(as.numeric(k))))
-  if (length(k_int) == 0 || is.na(k_int)) "n<k" else sprintf("n<%d", k_int)
-}
-
-#' Banner columns to withhold for disclosure control
-#'
-#' Returns the 1-based indices (into \code{banner_info$internal_keys} /
-#' \code{$columns}) of banner columns whose UNWEIGHTED reporting base falls in
-#' \code{[1, k-1]}, where \code{k = config$min_reporting_base}. Such a column
-#' describes a handful of identifiable people, so the distributed \code{.xlsx}
-#' must withhold its cells and base — the standalone workbook is a distinct code
-#' path from the HTML report and does not inherit the JS render-time gate.
-#'
-#' A base of 0 is already empty (nothing to hide) and is never flagged;
-#' \code{k <= 1} disables the control and returns \code{integer(0)}, so
-#' unprotected workbooks stay byte-identical. Suppression is decided per question
-#' (each question carries its own per-column bases).
-#'
-#' NOTE (follow-up, per the production-review brief): this first pass blanks the
-#' small columns only. It does NOT yet strip significance letters that point AT a
-#' withheld column (letters restart per banner group, so a global strip would be
-#' unsafe across banners), nor apply complementary subtraction suppression across
-#' a banner group. Neither is a leak of the withheld column's own values.
-#'
-#' @param question_bases List keyed by internal_key, each with \code{$unweighted}
-#' @param banner_info List with \code{internal_keys}
-#' @param config List with \code{min_reporting_base}
-#' @return Integer vector of 1-based column indices to withhold (possibly empty)
-#' @keywords internal
-disclosure_suppressed_columns <- function(question_bases, banner_info, config) {
-  k <- suppressWarnings(as.numeric(config$min_reporting_base))
-  if (length(k) == 0 || is.na(k) || k <= 1) return(integer(0))
-  if (is.null(question_bases)) return(integer(0))
-  keys <- banner_info$internal_keys
-  idx <- integer(0)
-  for (i in seq_along(keys)) {
-    b <- suppressWarnings(as.numeric(question_bases[[keys[i]]]$unweighted))
-    if (length(b) == 1 && !is.na(b) && b >= 1 && b < k) idx <- c(idx, i)
-  }
-  idx
-}
+# disclosure_marker() and disclosure_suppressed_columns() moved to
+# excel_utils.R so the summary/composition writers share the same gate
+# (production review 2026-08, C2).
 
 # ==============================================================================
 # CROSSTABS SHEET
