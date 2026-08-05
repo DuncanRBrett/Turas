@@ -162,64 +162,36 @@ qual_read_workbook <- function(path, module = "TABS") {
 #' @param module Module label for refusal display.
 #' @return Invisibly NULL; refuses on integrity failures.
 qual_check_workbook_integrity <- function(path, parsed, module = "TABS") {
+  # Collect EVERY problem across EVERY sheet before refusing, so one pass over
+  # the workbook fixes everything — refusing at the first offending sheet made
+  # the operator fix one sheet per re-run (Duncan, CCPB 2026-08-05).
+  problems <- character(0)
+
   amb <- Filter(function(s) identical(s$reason, "verbatim_ambiguous"), parsed$skipped)
-  if (length(amb)) {
-    detail <- vapply(amb, function(s) {
-      sprintf("%s (candidate columns: %s)", s$sheet,
-              paste(s$ambiguous_columns, collapse = " / "))
-    }, character(1))
-    turas_refuse(
-      code = "DATA_QUAL_VERBATIM_AMBIGUOUS", title = "Verbatim column is ambiguous",
-      problem = sprintf("Sheet(s) in '%s' have more than one prose-length column and no 'Comment' header: %s",
-                        basename(path), paste(detail, collapse = "; ")),
-      why_it_matters = paste("The reader would have to GUESS which column holds the respondent",
-                             "verbatims - guessing wrong ships an analyst's working notes as quotes."),
-      how_to_fix = c("Name the verbatim column 'Comment' (or 'Verbatim') on those sheets.",
-                     "Move analyst working-notes columns to the LEFT of the ID column or delete them."),
-      module = module
-    )
+  for (s in amb) {
+    problems <- c(problems, sprintf(
+      "%s: verbatim column is AMBIGUOUS (candidates: %s) - name it 'Comment'",
+      s$sheet, paste(s$ambiguous_columns, collapse = " / ")))
   }
 
   for (q in parsed$questions) {
     integ <- q$integrity
     if (is.null(integ)) next
-    if (length(integ$hide_like_markers)) {
-      turas_refuse(
-        code = "DATA_QUAL_HIDE_MARKER_INVALID", title = "Hide marker not recognised",
-        problem = sprintf("Sheet '%s' has noteworthy marks that LOOK like hide but are not exact: %s",
-                          q$sheet, paste(sQuote(integ$hide_like_markers), collapse = ", ")),
-        why_it_matters = paste("Only 'hide'/'hidden' withhold a verbatim. Anything else is promoted",
-                               "to noteworthy - the report would SHIP the exact comments the analyst",
-                               "meant to suppress."),
-        how_to_fix = c("Change those cells to exactly 'hide' (or 'hidden').",
-                       "Valid marks: hide, n (noteworthy), m (must-read), p (priority)."),
-        module = module
-      )
+    if (length(integ$dup_ids)) {
+      problems <- c(problems, sprintf(
+        "%s: duplicated ResponseID(s): %s - keep one row per respondent (merge or delete)",
+        q$sheet, paste(integ$dup_ids, collapse = ", ")))
     }
     if (length(integ$blank_id_rows)) {
-      turas_refuse(
-        code = "DATA_QUAL_BLANK_ID", title = "Comment row without a ResponseID",
-        problem = sprintf("Sheet '%s' has %d comment row(s) with text but no ID (row %s)",
-                          q$sheet, length(integ$blank_id_rows),
-                          paste(integ$blank_id_rows, collapse = ", ")),
-        why_it_matters = paste("A row without an ID cannot join the survey and is silently dropped",
-                               "from every output - including any priority comment on it."),
-        how_to_fix = c("Restore the ResponseID on those rows (check against the export),",
-                       "or delete the rows if they are not respondent comments."),
-        module = module
-      )
+      problems <- c(problems, sprintf(
+        "%s: %d comment row(s) with text but no ResponseID (sheet row %s) - restore the ID or delete the row",
+        q$sheet, length(integ$blank_id_rows),
+        paste(integ$blank_id_rows, collapse = ", ")))
     }
-    if (length(integ$dup_ids)) {
-      turas_refuse(
-        code = "DATA_QUAL_DUPLICATE_ID", title = "Duplicated ResponseID in one sheet",
-        problem = sprintf("Sheet '%s' repeats ResponseID(s): %s",
-                          q$sheet, paste(integ$dup_ids, collapse = ", ")),
-        why_it_matters = paste("Duplicates share one internal index: bases inflate, and a reader's",
-                               "shortlist or highlight lands on the OTHER duplicate's text."),
-        how_to_fix = c("Keep one row per respondent per sheet (merge or delete the duplicate).",
-                       "If two comments are genuine, combine them into one cell."),
-        module = module
-      )
+    if (length(integ$hide_like_markers)) {
+      problems <- c(problems, sprintf(
+        "%s: hide-LIKE mark(s) that are not exactly 'hide'/'hidden': %s - these would SHIP as noteworthy",
+        q$sheet, paste(sQuote(integ$hide_like_markers), collapse = ", ")))
     }
     if (length(integ$unrecognised_markers)) {
       um <- integ$unrecognised_markers
@@ -231,6 +203,29 @@ qual_check_workbook_integrity <- function(path, parsed, module = "TABS") {
       cat(sprintf("[TABS/qual] %s: %d comment(s) hide-marked - counted, text withheld.\n",
                   q$sheet, integ$n_hidden))
     }
+  }
+
+  if (length(problems)) {
+    turas_refuse(
+      code = "DATA_QUAL_WORKBOOK_INTEGRITY",
+      title = "Comment workbook integrity check failed",
+      problem = sprintf(
+        "%d issue(s) across %d sheet(s) of '%s'. EVERY issue is listed below - one pass over the workbook fixes them all.",
+        length(problems),
+        length(unique(sub(":.*$", "", problems))),
+        basename(path)),
+      why_it_matters = paste(
+        "Each issue corrupts the report silently: duplicated IDs inflate bases and collide",
+        "reader marks; a row without an ID is dropped from every output; a hide-like typo",
+        "PROMOTES the comment the analyst meant to withhold; an ambiguous verbatim column",
+        "makes the reader guess which column holds respondent quotes."),
+      how_to_fix = c(
+        "Work through the list in Details - each line names the sheet, the rows/IDs and the fix.",
+        "Valid noteworthy marks: hide, hidden, n (noteworthy), m (must-read), p (priority).",
+        "Then re-run - the check re-verifies the whole workbook."),
+      details = paste(problems, collapse = "\n  "),
+      module = module
+    )
   }
   invisible(NULL)
 }

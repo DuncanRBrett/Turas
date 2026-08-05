@@ -196,3 +196,42 @@ test_that("unrecognised tier-1 markers and hide counts are reported, not refused
   expect_true(any(grepl("unrecognised noteworthy", out)))
   expect_true(any(grepl("hide-marked", out)))
 })
+
+
+test_that("ALL integrity problems across ALL sheets report in ONE refusal", {
+  # Refusing at the first offending sheet made the operator fix one sheet per
+  # re-run (CCPB 2026-08-05: Q08, then Q13, then Q25). One pass must name all.
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  for (nm in c("Q08Comment", "Q13Comment", "Q25Comment")) openxlsx::addWorksheet(wb, nm)
+  openxlsx::writeData(wb, "Q08Comment", as.data.frame(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("9", NA, "First"),
+    c("9", NA, "Duplicate of nine")
+  )), colNames = FALSE)
+  openxlsx::writeData(wb, "Q13Comment", as.data.frame(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("540", NA, "Fine"),
+    c("607", "hide!", "Hide-like typo"),
+    c(NA, "p", "Text with no ID")
+  )), colNames = FALSE)
+  openxlsx::writeData(wb, "Q25Comment", as.data.frame(rbind(
+    c("ID", "Noteworthy", "Comment"),
+    c("3", NA, "Fine"),
+    c("3", NA, "Another duplicate")
+  )), colNames = FALSE)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  on.exit(unlink(path), add = TRUE)
+
+  err <- tryCatch({ qual_read_workbook(path); NULL }, error = function(e) e)
+  expect_false(is.null(err))
+  msg <- conditionMessage(err)
+  # every sheet and every issue type, in the one message
+  expect_match(msg, "Q08Comment", fixed = TRUE)
+  expect_match(msg, "Q13Comment", fixed = TRUE)
+  expect_match(msg, "Q25Comment", fixed = TRUE)
+  expect_match(msg, "duplicated ResponseID")
+  expect_match(msg, "no ResponseID")
+  expect_match(msg, "hide-LIKE", fixed = TRUE)
+  expect_match(msg, "4 issue\\(s\\) across 3 sheet\\(s\\)")
+})
