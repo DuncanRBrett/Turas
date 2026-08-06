@@ -123,8 +123,13 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "weight_label", default = "Weighted", required = TRUE,
              description = "Label displayed for weighted count rows in output tables.",
              valid_values_text = "Any descriptive text")
-        # weight_na_threshold / weight_zero_threshold / weight_deff_warning were
-        # removed: no code has ever read them (production review 2026-08, I9).
+        # weight_na_threshold / weight_zero_threshold / weight_deff_warning are
+        # NOT in this generated template (removed as believed dead in an earlier
+        # review pass) — but weight_validators.R:178-180 DOES read all three,
+        # with defaults 10/5/3 when the Settings row is absent. Reconciled in
+        # docs (production review 2026-08, I10): documented as optional,
+        # not-in-template settings rather than restored here, since restoring
+        # them changes the generated template's shape. See 06_TEMPLATE_REFERENCE.md.
       )
     ),
 

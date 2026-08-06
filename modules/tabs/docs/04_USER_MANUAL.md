@@ -480,12 +480,26 @@ required.
 
 ### Report Navigation
 
-The report has four tabs across the top:
+The tab bar is split into two groups:
 
-1. **Summary** — Dashboard with headline gauges and significant findings
-2. **Crosstabs** — Interactive tables with search and banner switching
-3. **Added Slides** — Editorial content and insights
-4. **Pinned Views** — Your curated presentation collection
+**Read**
+
+- **Dashboard** — Headline gauges, heatmap grid, and significant findings
+- **Group overview** — How each banner group compares to its peers across every question
+- **Tracking** *(appears when wave history is configured)* — Wave-on-wave trends
+- **Qualitative** *(appears when a comment workbook is configured)* — Coded comment themes and a verbatim quote drawer
+- **Story** — Your ordered, annotated narrative of pinned questions and exhibits, presentable full-screen or exportable to editable PowerPoint
+
+**Analyse**
+
+- **Crosstabs** — Interactive tables with search, banner switching, and heatmap colouring
+- **Differences** — Significant banner gaps, written as plain-English findings
+- **Report** — Background & method, executive summary, added slides, and About
+
+Any tab can be switched off per-report from Settings
+(`show_dashboard`, `show_patterns`, `show_tracking`, `show_qualitative`,
+`show_differences`). See
+[Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for the full picture.
 
 ### Using Charts and Tables
 
@@ -496,19 +510,30 @@ The report has four tabs across the top:
 - **Export as PNG** — Click the camera icon to download a table as an image
 - **Chart palette** — Set `chart_palette_preset` in your config to change the ordinal chart colours across the entire report
 
-### Adding Slides
+### Added Slides
 
-You can create narrative slides directly in the browser using the "Add
-Slide" button on the Added Slides tab. Slides support rich text
-formatting (bold, italic, headings, bullets, blockquotes). You can also
-pre-seed slides from the **AddedSlides** sheet in your config file,
-including embedded images (see [Template Reference](06_TEMPLATE_REFERENCE.md)).
+On the **Report** tab, the "Added slides" card lets you bring in material
+from outside the crosstab data — e.g. slides exported as images from a
+qualitative phase (in PowerPoint: right-click a slide → *Save as
+Picture*), or short text blocks with a caption. Use **+ Import image** or
+**+ Text block**, then edit the caption inline. Added slides persist in
+the browser and travel inside any saved copy of the report.
 
-### Pinning Views
+For narrative that should come from the config instead of being typed in
+the browser — background & method, executive summary — use the
+**Comments** sheet's reserved `_BACKGROUND` / `_EXECUTIVE_SUMMARY` rows;
+see [Template Reference](06_TEMPLATE_REFERENCE.md). The config's
+**AddedSlides** sheet is a separate, older mechanism that is not
+currently wired into this report — filling it in has no effect here.
 
-Pin any chart or table by clicking the pin icon. Pinned items appear in
-the Pinned Views tab, where you can reorder them and export the entire
-collection as PNG images for use in presentations.
+### The Story Tab
+
+Pin any chart, table, or dashboard heatmap by clicking its pin icon
+(📌) — pinned items collect on the **Story** tab as an ordered,
+annotated narrative. Add section dividers, reorder items, present the
+story full-screen, or export it as a native, editable PowerPoint deck.
+The story persists in the browser and travels inside any saved copy of
+the report.
 
 ------------------------------------------------------------------------
 
@@ -534,7 +559,7 @@ apply_weighting to FALSE if you don't need weights
 
 ### "Base size too small for significance testing"
 
-A banner column has fewer respondents than the minimum_base threshold.
+A banner column has fewer respondents than the significance_min_base threshold.
 Either: - This is expected (small segments don't get tested) - Reduce
 significance_min_base in Settings (not recommended below 20) - Combine
 segments to increase base sizes

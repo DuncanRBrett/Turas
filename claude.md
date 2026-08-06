@@ -403,7 +403,7 @@ jsonlite::write_json(
 
 ```r
 # ✅ GOOD - Relative to project root
-input_path <- file.path("examples", "tabs", "basic", "survey_data.csv")
+input_path <- file.path("examples", "tabs", "demo_survey", "Demo_Survey_Data.xlsx")
 
 # ✅ GOOD - From config
 output_path <- file.path(config$output_dir, config$output_filename)

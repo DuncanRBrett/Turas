@@ -22,7 +22,7 @@
 # V10.1 - Phase 2/3 utility extraction
 # ==============================================================================
 
-SCRIPT_VERSION <- "10.2"
+SCRIPT_VERSION <- "10.8.1"
 
 # ==============================================================================
 # TRS GUARD LAYER - Must be loaded FIRST
@@ -593,7 +593,7 @@ format_output_value <- function(value, type = "frequency",
 if (exists("turas_print_start_banner", mode = "function")) {
   turas_print_start_banner("TABS", SCRIPT_VERSION)
 } else {
-  print_toolkit_header("Crosstab Analysis - Turas v10.2")
+  print_toolkit_header("Crosstab Analysis - Turas v10.8.1")
 }
 
 # Validate config file exists
@@ -1133,7 +1133,7 @@ if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function"
 } else {
   cat("\n")
   cat(paste(rep("=", 80), collapse=""), "\n")
-  cat("ANALYSIS COMPLETE - TURAS V10.2 (REFACTORED)\n")
+  cat("ANALYSIS COMPLETE - TURAS V10.8.1 (REFACTORED)\n")
   cat(paste(rep("=", 80), collapse=""), "\n\n")
 
   if (analysis_result$run_status == "PARTIAL") {

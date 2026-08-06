@@ -6,11 +6,14 @@ editor_options:
 
 # Turas Tabs - Template Reference
 
-**Version:** 10.8 **Date:** 14 March 2026
+**Version:** 10.8.1 **Date:** 6 August 2026
 
-This document explains every field in both configuration templates. When
-you're filling in a template and wondering "what does this field do?",
-this is your reference.
+This document explains every field in the Survey_Structure template, and
+the Crosstab Config template's settings that have a dedicated entry
+below. When you're filling in a template and wondering "what does this
+field do?", start here — for a setting with no entry of its own, check
+the Additional Settings Reference at the end of the Settings Sheet
+section.
 
 The templates are in the `templates/` subfolder: -
 `Crosstab_Config_Template.xlsx` - Analysis configuration -
@@ -211,7 +214,9 @@ weighted.
 **What it does:** Sets the percentage of NA (missing) weights that
 triggers a warning.
 
-**Required:** Yes
+**Required:** No — **not included in the generated template.** The
+validator (`weight_validators.R`) still reads this key with the default
+below if you add the row yourself; it just isn't pre-filled for you.
 
 **What to enter:** A number from 0 to 100.
 
@@ -226,7 +231,8 @@ problem with your data or weight variable specification.
 **What it does:** Sets the percentage of zero weights that triggers a
 warning.
 
-**Required:** Yes
+**Required:** No — **not included in the generated template**, same as
+`weight_na_threshold` above; still read if added by hand.
 
 **What to enter:** A number from 0 to 100.
 
@@ -241,7 +247,8 @@ problem.
 **What it does:** Sets the Design Effect (DEFF) threshold that triggers
 a warning.
 
-**Required:** Yes
+**Required:** No — **not included in the generated template**, same as
+`weight_na_threshold` above; still read if added by hand.
 
 **What to enter:** A number from 1 to 10.
 
@@ -536,14 +543,17 @@ conservative about claiming differences are real.
 
 ### Ranking Settings
 
-These settings only affect Ranking question types.
+These settings only affect Ranking question types. **None of the four
+are included in the generated Crosstab_Config template** — add the
+Setting row yourself if you need to override a default; the engine
+validates and reads them either way.
 
 #### ranking_tie_threshold_pct
 
 **What it does:** Sets the percentage of tied rankings that triggers a
 warning.
 
-**Required:** Yes
+**Required:** No — not in the generated template (see above).
 
 **What to enter:** A number from 0 to 100.
 
@@ -558,7 +568,7 @@ data quality issues or ambiguous instructions.
 **What it does:** Sets the percentage of ranking gaps that triggers a
 warning.
 
-**Required:** Yes
+**Required:** No — not in the generated template (see above).
 
 **What to enter:** A number from 0 to 100.
 
@@ -572,7 +582,7 @@ data problems.
 
 **What it does:** Sets the expected completion rate for rankings.
 
-**Required:** Yes
+**Required:** No — not in the generated template (see above).
 
 **What to enter:** A number from 0 to 100.
 
@@ -585,7 +595,9 @@ completed all ranking positions, Tabs warns you.
 
 **What it does:** Reserved for future use.
 
-**Note:** This setting is not currently implemented and has no effect.
+**Note:** Not in the generated template. Validated and accepted at load
+like its three siblings above, but not currently read by any ranking
+calculation — setting it has no effect yet.
 
 ------------------------------------------------------------------------
 
@@ -953,6 +965,96 @@ Promoter sheets is reassembled into one question via the Selection sheet's
 
 ------------------------------------------------------------------------
 
+## Additional Settings Reference
+
+These settings **are** in the generated template — each has a row with
+its own default and help text — but don't have a dedicated `####` entry
+above. Descriptions below are the template's own help text.
+
+### Significance display
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `alpha_secondary` | *(blank)* | Second significance level for the HTML report toggle. Leave blank to disable; must differ from `alpha`. E.g. `0.10` adds a 90% confidence toggle alongside the primary level. |
+| `alpha_default` | `primary` | Which level the HTML report opens on when `alpha_secondary` is set — `primary` or `secondary`. |
+
+### Weighting
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `show_weighted_base` | `TRUE` | Show the weighted base row (the % denominator). Turn off for simpler client tables — the unweighted count and effective base still show. |
+
+### Summary dashboard
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `include_summary` | `TRUE` | Include a visual summary dashboard in the HTML report with gauge charts. |
+| `dashboard_metrics` | `NET POSITIVE` | Metric types to display in dashboard gauges. Comma-separated for multiple: `NET POSITIVE`, `MEAN`, `NPS`, `INDEX`, or a custom box-category label. |
+| `dashboard_scale_mean` | `10` | Scale maximum for mean values in the dashboard (e.g. 10 for a 1–10 scale). |
+| `dashboard_scale_index` | `10` | Scale maximum for index values in the dashboard. |
+| `dashboard_green_custom` | `60` | A custom metric ≥ this value shows GREEN. |
+| `dashboard_amber_custom` | `40` | A custom metric ≥ this value (but below green) shows AMBER; below shows RED. |
+
+### Chart colours
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `chart_bar_colour` | `#323367` | Colour for bar charts in the HTML report. |
+| `chart_series_colour_1` … `chart_series_colour_8` | *(blank)* | Custom colour for the 1st–8th banner series in bar charts. Leave any blank to auto-generate a distinct hue; if all 8 are set and more than 8 series exist, colours cycle. |
+
+### HTML report
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `embed_frequencies` | `TRUE` | Include frequency data (counts) in the HTML report tables. |
+| `researcher_logo_path` | *(blank)* | Path to researcher/company logo file (PNG, SVG, or JPG). |
+| `client_logo_path` | *(blank)* | Path to client logo file (PNG, SVG, or JPG). |
+
+### Data-Centric Report v2 (optional)
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `html_report_v2_microdata` | `TRUE` | Embed the anonymised per-respondent microdata island in the v2 report (coded answer indices + weights — no names, IDs or text). Powers the live filter, custom banners and COMPUTED views. Set `FALSE` for a confidentiality ship to insider populations (e.g. a small staff survey sent to the employer): the file then carries published aggregates only, and the live features plus the Tracking tab switch off for that build. **`FALSE` is required wherever `min_reporting_base` is a promise** — with the island present, sub-k detail is reconstructable from the page source. Tip: keep `TRUE` for your own working copy and build the client copy with `FALSE` from a second config. |
+| `population_size` | *(blank)* | Total universe size for a census / full-invite study (e.g. all staff or students invited). Enables the finite population correction in the v2 report: intervals narrow as coverage of the universe rises, and a small base that is most of a known group is no longer flagged unstable. Per-group sizes go in the optional Population sheet. Blank = no correction. |
+| `sampling_note` | *(blank)* | Fieldwork caveat appended to the "How sure can I be of these numbers?" sentence in the v2 report — e.g. substitution when a selected store was unavailable, replaced clusters, low response. Plain text, one or two sentences. |
+
+### Group overview tab (optional)
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `patterns_banner` | *(blank)* | The banner group(s) the Group overview tab portrays (label or id, comma-separated for more than one). The tab is an overview of the SELECTED banner's groups. Blank = every banner group is scanned. |
+| `patterns_exclude_banners` | *(blank)* | Banners the Group overview tab must skip, comma-separated (label or code, e.g. `Interviewer`) — operational cuts are fieldwork QC, not client story. The banner still works everywhere else (crosstabs, Differences); it just never becomes a portrait. |
+| `patterns_headline` | *(blank)* | Pin the Group overview apex KPI tiles to these question codes, in order. Blank = auto-detect from question titles, which on a study with many section ratings can pick the wrong ones. |
+
+### Reader report (optional)
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `generate_reader_report` | `FALSE` | Also build the narrative Reader report (a `*_Reader.html` file) — a plain-language summary beside the crosstab that deep-links into its tables. Requires `html_report_v2 = TRUE`. Deterministic and on-device by default: no data leaves this machine. |
+| `reader_ai_prose` | `FALSE` | Draft the Reader narrative with an AI model instead of the built-in template (only used when `generate_reader_report = TRUE`). Requires an Anthropic API key in the `ANTHROPIC_API_KEY` environment variable. Only aggregate figures are sent — never microdata or verbatims — and every number the model writes is checked against the data. Falls back to the on-device narrative (and says so) if the model is unavailable. |
+
+### Row descriptors (HTML report)
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `index_descriptor` | *(blank)* | Explanatory label shown below Index score rows, e.g. "Weighted mean on 0–10 scale". |
+| `mean_descriptor` | *(blank)* | Explanatory label shown below Mean score rows, e.g. "Average rating (1–5 scale)". |
+| `nps_descriptor` | *(blank)* | Explanatory label shown below NPS score rows, e.g. "Promoters minus Detractors". |
+
+### Analyst & closing section / study identification
+
+| Setting | Default | Description |
+|---------|---------|--------------|
+| `analyst_email` | *(blank)* | Analyst email shown in the closing section. |
+| `analyst_phone` | *(blank)* | Analyst phone number shown in the closing section. |
+| `verbatim_filename` | *(blank)* | Path to a verbatim comments file for inclusion in the report. |
+| `closing_notes` | *(blank)* | Custom text for the closing section of the HTML report. |
+| `generate_stats_pack` | `Y` | Generate a diagnostic stats pack workbook alongside the main output (`{output}_stats_pack.xlsx`). Stats packs are contractual deliverables on some engagements. |
+| `project_name` | *(blank)* | Project name — appears in the stats pack Declaration sheet for identification and sign-off. Leave blank if not using the stats pack. |
+| `research_house` | *(blank)* | Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name. |
+
+------------------------------------------------------------------------
+
 ## Selection Sheet
 
 The Selection sheet tells Tabs which questions to analyze and how.
@@ -1103,19 +1205,14 @@ order) — and rated questions, where CreateIndex already summarises them
 **See:** `PATTERNS_KEY_SHARE_GUIDE.md` for worked examples from live
 studies.
 
-### Column: AreaSummary
+### Column: AreaSummary — RETIRED
 
-**What it does:** Marks THE question that summarises its Category/Theme
-area for the Patterns tab — the section-overall rating (e.g.
-"satisfaction with the coolers overall"). The area then scores and ranks
-on this question; its sibling questions become the explanation beneath
-it, not equal votes in a flat average.
-
-**Required:** No. One per area. A single-question area needs no marker —
-its own rating is the area's score. A multi-question area with no marker
-falls back to the plain average of its questions, and the card says so.
-
-**What to enter:** `Y` on the summary question's row; blank elsewhere.
+**This column is absent from the generated Selection template and has no
+effect.** The strongest/weakest AREA cards it fed were retired in
+2026-08; if a config still carries an `AreaSummary` mark, the Group
+overview tab's console + diagnostics echo says so rather than acting on
+it silently (see `patterns_echo.R`). Remove the column from older
+configs — there is nothing to migrate it to.
 
 ### Column: BaseFilter
 
@@ -1922,32 +2019,59 @@ If one bin ends at 34, the next should start at 35.
 
 ## AddedSlides Sheet
 
-The AddedSlides sheet allows you to pre-seed editorial slides that
-appear in the Added Slides tab of the HTML report.
+> **Not currently wired into the interactive (v2) report.** The loader
+> below reads this sheet into `config_obj$qualitative_slides`, but
+> nothing downstream consumes that value — it was built for the retired
+> classic HTML report and was never reconnected after that report was
+> deleted in August 2026. Filling in this sheet has no visible effect on
+> the report Turas ships today. For narrative that should come from the
+> config, use the **Comments** sheet's `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
+> rows below; for supplementary exhibits, use the v2 Report tab's
+> in-browser "Added slides" card (import an image or a text block —
+> see [User Manual](04_USER_MANUAL.md)).
 
-| Column       | Description                                    | Required |
-|--------------|------------------------------------------------|----------|
-| `slide_id`   | Unique identifier for the slide                | Yes      |
-| `title`      | Slide heading displayed in the report          | Yes      |
-| `content`    | Slide body text (supports Markdown formatting) | Yes      |
-| `image_path` | Path to an image file to embed in the slide    | No       |
+If this is fixed to feed the v2 report, the sheet's actual columns
+(`load_qualitative_sheet()` in `lib/crosstabs/crosstabs_config.R`) are:
+
+| Column         | Description                                    | Required |
+|----------------|-------------------------------------------------|----------|
+| `slide_title`  | Slide heading                                  | Yes      |
+| `content`      | Slide body text                                | Yes      |
+| `display_order`| Sort order (blank = sheet row order)           | No       |
+| `image_path`   | Path to an image file to embed in the slide    | No       |
 
 **Notes:** - Image paths can be relative (to the config file location)
-or absolute - Supported image formats: PNG, JPG, GIF, SVG - Large images
-are automatically scaled to fit the slide area - Slides appear in the
-order listed in the sheet
+or absolute - Supported image formats: PNG, JPG, GIF, SVG, WEBP - Slides
+appear in `display_order`, or sheet order when blank
 
 ------------------------------------------------------------------------
 
 ## Comments Sheet
 
 The Comments sheet allows you to attach analyst commentary to specific
-questions in the HTML report.
+questions in the HTML report, and to author the v2 Report tab's
+narrative sections.
 
-| Column         | Description                                     | Required |
-|----------------|-------------------------------------------------|----------|
-| `QuestionCode` | The question code to attach the comment to      | Yes      |
-| `Comment`      | The commentary text (supports basic formatting) | Yes      |
+| Column         | Description                                                          | Required |
+|----------------|-----------------------------------------------------------------------|----------|
+| `QuestionCode` | The question code to attach the comment to (or a reserved code, below) | Yes      |
+| `Comment`      | The commentary text                                                   | Yes      |
+| `Banner`       | Restrict this comment to one banner group (blank = shows for all)     | No       |
+| `Headline`     | A one-line analyst headline for the question (Comment may be blank on a headline-only row) | No |
 
 Comments appear as highlighted notes below the question table in the
-HTML report.
+HTML report. A question can carry more than one comment row when each
+targets a different `Banner`.
+
+**Reserved QuestionCode values** feed the v2 Report tab instead of a
+question card:
+
+| QuestionCode | Fills |
+|--------------|-------|
+| `_BACKGROUND` | The Report tab's *Background & method* card |
+| `_EXECUTIVE_SUMMARY` | The Report tab's *Executive summary* card |
+
+Both are read-only in the report (edit the config to change them) and
+each is pinnable (📌) to the Story. See
+[Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) ("Narrative
+pulled from the config" section).

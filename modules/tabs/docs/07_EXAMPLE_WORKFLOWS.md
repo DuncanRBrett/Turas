@@ -649,15 +649,15 @@ Start broad, then narrow down to interesting segments:
 ``` r
 # First pass: High-level analysis
 # Banner: Total, Gender
-result1 <- run_tabs_analysis(project, config1)
+result1 <- run_tabs_analysis(config1)
 
 # Second pass: More detail
 # Banner: Total, Gender, Age, Region
-result2 <- run_tabs_analysis(project, config2)
+result2 <- run_tabs_analysis(config2)
 
 # Third pass: Deep dive into interesting segment
 # Filter: Males 18-34 only
-result3 <- run_tabs_analysis(project, config3)
+result3 <- run_tabs_analysis(config3)
 ```
 
 ### Pattern 2: Compare Subgroups
@@ -744,37 +744,47 @@ Run Tabs as normal — the report is written alongside the Excel file.
 ### Viewing the Report
 
 Open the `.html` file in your browser. You'll see:
-1. A **Summary Dashboard** with gauges for each rating and net-positive question
-2. The **Crosstabs Explorer** with all your tables and charts in the branded colour scheme
-3. The **Added Slides** tab (empty by default — add content in-browser or via the AddedSlides sheet)
-4. The **Pinned Views** tab (pin any chart or table to build a presentation)
+1. The **Dashboard** with gauges for each rating and net-positive question, in the branded colour scheme
+2. **Crosstabs** with all your tables and charts, searchable and banner-switchable
+3. The **Story** tab (empty by default — pin any chart, table, or dashboard view to build a presentation, exportable to PowerPoint)
+4. The **Report** tab, where an "Added slides" card lets you import images or text blocks alongside the config's background, executive summary and About sections
 
 ------------------------------------------------------------------------
 
-## Workflow: Adding Custom Slides
+## Workflow: Adding Narrative to Your Report
 
 ### The Scenario
 
-You want to add executive summary slides and commentary to your HTML report before sharing with the client.
+You want to add an executive summary, background/method note, and
+supporting slides to your HTML report before sharing with the client.
 
-### Option 1: Pre-seed from Config
+### Background, Method & Executive Summary — from Config
 
-Add an **AddedSlides** sheet to your config file:
+Add a **Comments** sheet to your config file with two reserved rows:
 
-| slide_id | title | content | image_path |
-|-----------|-------|---------|------------|
-| exec_summary | Executive Summary | Key findings from Q1 2026... | images/summary_chart.png |
-| methodology | Methodology | Online survey of n=1,000 adults... | |
-| recommendations | Recommendations | Based on the findings, we recommend... | |
+| QuestionCode | Comment | Banner | Headline |
+|--------------|---------|--------|----------|
+| _BACKGROUND | This survey was conducted among 500 adults nationally in Q1 2026... | | |
+| _EXECUTIVE_SUMMARY | Key finding: overall satisfaction increased by 5 points year-on-year... | | |
 
-### Option 2: Create In-Browser
+These fill the **Report** tab's *Background & method* and *Executive
+summary* cards automatically — nothing needs retyping in the browser.
+Both are pinnable (📌) to the **Story**.
 
-1. Open the HTML report
-2. Navigate to the **Added Slides** tab
-3. Click **Add Slide**
-4. Enter a title and content using Markdown formatting
-5. Save — the slide is stored in the HTML file itself
+### Added Slides — In-Browser
 
-### Combining Both Approaches
+For supplementary exhibits (e.g. slides exported as images from a
+qualitative phase, or short text blocks):
 
-Pre-seeded slides from config appear first, followed by any slides created in-browser. You can pin slides from either source to the Pinned Views tab for export.
+1. Open the HTML report and go to the **Report** tab
+2. Under **Added slides**, click **+ Import image** or **+ Text block**
+3. Caption it — the slide is stored in the HTML file itself
+
+(The config's **AddedSlides** sheet pre-seeds slides for a retired
+report and is not wired into this one — use the in-browser method above.)
+
+### Building the Story
+
+Pin any chart, table, dashboard view, or the Background/Executive
+summary cards (📌) — pinned items collect on the **Story** tab in order,
+ready to present full-screen or export as an editable PowerPoint deck.

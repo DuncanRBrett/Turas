@@ -95,16 +95,21 @@ The Excel output is formatted and ready for delivery:
 Alongside the standard Excel output, Tabs generates a self-contained
 HTML report with:
 
--   **Summary Dashboard** — Headline metrics displayed as gauges with
-    RAG (red/amber/green) thresholds, heatmap grids, and significant
+-   **Dashboard** — Headline metrics displayed as gauges with RAG
+    (red/amber/green) thresholds, heatmap grids, and significant
     findings
--   **Crosstabs Explorer** — Full interactive tables with search,
-    banner switching, heatmap colouring, and export to clipboard/PNG
--   **Added Slides** — Narrative content created in-browser or
-    pre-seeded from the AddedSlides config sheet, with support for
-    embedded images
--   **Pinned Views** — Curated collection of pinned charts, tables, and
-    slides for presentation export
+-   **Group overview** — How each banner group compares to its peers
+    across every question
+-   **Crosstabs** — Full interactive tables with search, banner
+    switching, heatmap colouring, and export to clipboard/PNG
+-   **Differences** — Significant banner gaps written as plain-English
+    findings
+-   **Story** — An ordered, annotated narrative built by pinning
+    charts, tables, and dashboard views, exportable to PowerPoint
+-   **Report** — Background & method, executive summary, added slides,
+    and About
+-   **Tracking** and **Qualitative** tabs appear automatically when
+    wave history or a comment workbook is configured
 
 The HTML file works offline, opens in any modern browser, and can be
 shared as a single file. See

@@ -1,6 +1,6 @@
 # Turas Tabs Module
 
-**Version:** 10.8 **Date:** 5 August 2026
+**Version:** 10.8.1 **Date:** 5 August 2026
 
 Cross-tabulation and survey data analysis engine for market research.
 
@@ -38,7 +38,7 @@ Before running an analysis, you'll need three things:
 2.  **Tabs_Config.xlsx** - Specifies analysis settings and which questions to analyze
 3.  **Data file** - Your survey responses (Excel, CSV, or SPSS format)
 
-Both template files are available in the `templates/` subfolder of this documentation.
+Both template files are available in the `templates/` subfolder of this module (`modules/tabs/templates/`).
 
 ## Key Features
 
@@ -90,8 +90,8 @@ modules/tabs/
 │   ├── config_loader.R
 │   ├── validation.R
 │   └── ...
-└── docs/                   # This documentation
-    └── templates/          # Config and structure templates
+├── docs/                   # This documentation
+└── templates/              # Config and structure templates
 ```
 
 ## Stats Pack
@@ -118,6 +118,7 @@ Output is named `{output}_stats_pack.xlsx`.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 10.8.1 | June 2026 | Current version. This table was not kept current through 10.3–10.8 — see version-tagged comments in the code (e.g. `crosstabs_config.R`) and `git log modules/tabs/` for the detail: dashboard settings (10.4), inline SVG charts (10.5), report enhancements (10.6), closing section & qualitative content (10.7), Report-tab background/executive-summary + AddedSlides rename (10.8), config loader cleanup (10.8.1). |
 | 10.2 | May 2026 | Added `Allocation` question type for constant-sum / budget-allocation questions; fixed `Variable_Type` dropdown (`Single_Mention` → `Single_Response`) |
 | 10.1 | March 2026 | Added `Generate_Stats_Pack` field and STUDY IDENTIFICATION section to config template; documented stats pack support |
 | 10.0 | December 2025 | Initial production release |
