@@ -51,8 +51,9 @@
   }
 
   /** Published view: columns restricted to Total + the chosen banner group.
-   *  With dual=true, 80%-level lowercase letters are computed from the
-   *  published counts and appended to the published 95% letters. */
+   *  With dual=true, 80%-level lowercase letters are carried from R's Sig.2 row
+   *  (sig2 minus sig) and appended to the published 95% letters; islands built
+   *  before sig2 carriage fall back to recomputing them from published counts. */
   function publishedModel(q, bannerId, dual) {
     var cols = [0].concat(TR.d2.groupCols(bannerId));
     var threshold = lowThreshold();
@@ -88,10 +89,26 @@
     var letters = columns.map(function (c) { return c.letter; });
     var rows = q.rows.map(function (r, qri) {
       var low80 = null;
-      // 80% letters recompute from the published counts for proportion rows — categories AND
-      // NET/box rows (a NET POSITIVE diff carries a null count, so its cell is 0/0 and earns
-      // no letter, matching R). Means are not recomputed here (no per-column SD in the model).
-      if (dual && (r.kind === "category" || r.kind === "net")) {
+      // 80% letters are CARRIED from R's Sig.2 row, like the 95% letters above them.
+      // Excel's Sig.2 is a superset (every 95% letter is also an 80% letter), so the
+      // lowercase set is sig2 minus sig. Recomputing them here instead used the
+      // published Frequency row, which format_output_value rounds to 0dp — enough to
+      // flip a marginal p~=0.20 call, so the workbook and the report disagreed on the
+      // same pair. Mean rows carry sig2 too, so they get their 80% letters here for
+      // the first time.
+      if (dual && r.sig2) {
+        low80 = cols.map(function (ci) {
+          var hi = String(r.sig[ci] || "");
+          return String(r.sig2[ci] || "").split("").filter(function (ch) {
+            return ch !== "-" && hi.indexOf(ch) === -1;
+          }).join("").toLowerCase();
+        });
+      } else if (dual && (r.kind === "category" || r.kind === "net")) {
+        // Fallback for islands built before sig2 carriage (no sig2 key): recompute
+        // from the published counts for proportion rows — categories AND NET/box rows
+        // (a NET POSITIVE diff carries a null count, so its cell is 0/0 and earns no
+        // letter, matching R). Means are not recomputed here (no per-column SD in the
+        // model), which is why they had no 80% letters at all on this path.
         var cells = cols.map(function (ci) {
           return sigCell(r.n[ci], q.bases[ci]);
         });

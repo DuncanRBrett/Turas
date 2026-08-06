@@ -628,16 +628,43 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       } else NA_real_
     }, numeric(1), USE.NAMES = FALSE)
   }
-  sig_for <- function(lbl, src) {
-    sel <- table[!is.na(table$RowLabel) & !is.na(table$RowType) &
-                 table$RowLabel == lbl & row_src == src &
-                 table$RowType == "Sig.", , drop = FALSE]
+  # The letters of one Sig-style row, cell by cell. "-" (the Total column's
+  # placeholder) reads as "no letters" in the island.
+  sig_cells <- function(sel) {
     vapply(keys, function(k) {
       if (nrow(sel) > 0 && k %in% names(table)) {
         v <- as.character(sel[1, k])
         if (is.na(v) || v == "" || v == "-") "" else v
       } else ""
     }, character(1), USE.NAMES = FALSE)
+  }
+  # sig_type is "Sig." (primary) or "Sig.2" (secondary, dual-alpha runs only).
+  sig_for <- function(lbl, src, sig_type = "Sig.") {
+    sig_cells(table[!is.na(table$RowLabel) & !is.na(table$RowType) &
+                    table$RowLabel == lbl & row_src == src &
+                    table$RowType == sig_type, , drop = FALSE])
+  }
+  # Which letters belong to a MEAN-kind row.
+  #
+  # A "summary" block (standard_processor / numeric_processor) is emitted as the
+  # headline statistic (Average | Index | Score), THEN Median / Mode / Std Dev /
+  # Outliers, THEN its Sig. row — so normalize_question_table's forward-fill
+  # labels that Sig. row with whichever descriptive row came last. Matching on
+  # label alone would hang the mean's letters on Std Dev, which is never tested.
+  # The block's sig row tests the headline statistic, so it goes there and
+  # nowhere else. Composite blocks put their sig row directly under the row it
+  # tests, so they still match on label.
+  mean_sig_for <- function(lbl, src, rtype, sig_type = "Sig.") {
+    if (identical(src, "summary")) {
+      if (!rtype %in% c("Average", "Index", "Score")) return(rep("", length(keys)))
+      sel <- table[!is.na(table$RowType) & row_src == "summary" &
+                   table$RowType == sig_type, , drop = FALSE]
+      # Exactly one sig row per summary block. Anything else is a shape we do
+      # not recognise — carry nothing rather than guess which row it tests.
+      if (nrow(sel) != 1) return(rep("", length(keys)))
+      return(sig_cells(sel))
+    }
+    sig_for(lbl, src, sig_type)
   }
   null_vec  <- function() as.list(rep(NA_real_, length(keys)))  # serialises to [null,...]
   empty_sig <- function() as.list(rep("", length(keys)))
@@ -677,9 +704,19 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       if (is.na(metric_type) && mrt[1] %in% c("Average", "Mean", "Index", "Score")) {
         metric_type <- mrt[1]
       }
-      rows[[length(rows) + 1]] <- list(
+      # Mean rows carry R's letters like every other row (D1: the R engine is
+      # the source of truth for every published statistic). Before this they
+      # carried none, so the published view showed a bare Average while the
+      # workbook lettered it — and the 80% set-difference below would have read
+      # a 95% result as an 80%-only one.
+      mrow <- list(
         kind = "mean", label = lbl,
-        pct = as.list(vals_for(lbl, src, mrt[1])), n = null_vec(), sig = empty_sig())
+        pct = as.list(vals_for(lbl, src, mrt[1])), n = null_vec(),
+        sig = if (stats$has_sig) as.list(mean_sig_for(lbl, src, mrt[1])) else empty_sig())
+      if (stats$has_sig2) {
+        mrow$sig2 <- as.list(mean_sig_for(lbl, src, mrt[1], "Sig.2"))
+      }
+      rows[[length(rows) + 1]] <- mrow
     } else {
       pr <- vals_for(lbl, src, primary_stat)
       if (all(is.na(pr))) {
@@ -696,11 +733,16 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       # difference, not a count — it keeps a null n, matching the renderer's
       # computed path which also nulls that row's n.
       is_net_diff <- kind == "net" && grepl("^NET POSITIVE", lbl, ignore.case = TRUE)
-      rows[[length(rows) + 1]] <- list(
+      crow <- list(
         kind = kind, label = lbl,
         pct = as.list(pr),
         n   = if (is_net_diff) null_vec() else as.list(vals_for(lbl, src, "Frequency")),
         sig = if (stats$has_sig) as.list(sig_for(lbl, src)) else empty_sig())
+      # Dual-alpha runs carry the Sig.2 row verbatim so the published view shows
+      # R's 80% letters instead of recomputing them from the 0dp-rounded counts
+      # (D4). Absent on single-alpha runs -> byte-identical island.
+      if (stats$has_sig2) crow$sig2 <- as.list(sig_for(lbl, src, "Sig.2"))
+      rows[[length(rows) + 1]] <- crow
     }
   }
 

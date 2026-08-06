@@ -88,6 +88,28 @@ All notable changes to TURAS are documented in this file.
   - Confidence: `write_confidence_output()` 203 -> 48 lines
 
 ### Fixed
+- **Tabs: the mean test and the proportion test now size on the same effective
+  base.** `calculate_effective_n()` returned an integer-rounded Kish n_eff while
+  `calculate_effective_base()` — the one the proportion tests actually ride —
+  returned the fraction. On one column of one table an n_eff of 29.6 therefore
+  failed a `significance_min_base` of 30 for the % rows and passed it for the
+  Average row above them. n_eff is now fractional everywhere in R (rounding
+  happens at display), which also aligns R with the v2 report's JS engine.
+  *Behaviour change:* mean pairs whose n_eff rounded up across `min_base` stop
+  testing, and marginal Welch p-values move slightly. Weighted studies only.
+- **Tabs: the interactive report's 80% significance letters now come from R.**
+  On a dual-alpha run the published view recomputed the secondary letters from
+  the published Frequency row — which is rounded to 0 decimal places — so a
+  marginal p≈0.20 pair could earn a letter in the Excel workbook and not in the
+  report, or the reverse. The data layer now carries the workbook's `Sig.2` row
+  verbatim (`sig2`) and the report renders it, exactly as it already did for the
+  95% letters. Reports built before this fall back to the old recompute.
+- **Tabs: mean rows show their significance letters in the interactive report.**
+  R has always tested means, but the data layer carried no letters for
+  mean/Index/Score rows, so the workbook lettered them and the report did not.
+  They are now carried at both alpha levels. Letters attach to the headline
+  statistic, never to the Standard Deviation row beneath it (the workbook
+  appends the `Sig.` row after Std Dev, so a naive label match landed there).
 - CatDriver: `run_bootstrap_ci()` call corrected to `run_bootstrap_or()`
 - **Segment (classic v1 report): silently-dropped sections.** Production bug
   audit fixed the class where a section vanishes because its analytic crashes

@@ -49,12 +49,53 @@ detect_turas_root <- function() {
 
 turas_root <- detect_turas_root()
 
-source(file.path(turas_root, "modules/shared/lib/trs_refusal.R"))
-source(file.path(turas_root, "modules/tabs/lib/00_guard.R"))
-source(file.path(turas_root, "modules/tabs/lib/validation_utils.R"))
-source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
-source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
-source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
+PARITY_DIR <- file.path(turas_root, "modules/tabs/tests/fixtures/parity_project")
+
+# The whole tabs pipeline, in the same order test_e2e_integration.R loads it.
+# Shared with the island regenerator so the harness and the committed island
+# can never be built by different code. The loader sources the lib files into
+# the global environment (they must be visible to each other), so turas_root has
+# to be there too — under testthat this file's top level is NOT globalenv.
+assign("turas_root", turas_root, envir = globalenv())
+
+# The fixture workbooks are gitignored (*.xlsx across the repo); the generator
+# that writes them is what lives in git, and it is deterministic. Write them if
+# this is a fresh checkout.
+source(file.path(PARITY_DIR, "generate_parity_project.R"))
+ensure_parity_project(PARITY_DIR)
+
+source(file.path(PARITY_DIR, "load_tabs_pipeline.R"))
+
+
+# ==============================================================================
+# THE PARITY FIXTURE, RUN ONCE
+# ==============================================================================
+#
+# See generate_parity_project.R for the fixture's design and every hand-derived
+# number in it. Running the pipeline is the slow part, so each config runs once
+# and every test reads the cached result.
+
+.parity_cache <- new.env(parent = emptyenv())
+
+parity_run <- function(config_name = "Parity_Crosstab_Config.xlsx") {
+  if (!is.null(.parity_cache[[config_name]])) return(.parity_cache[[config_name]])
+  config_result <- load_crosstabs_config(file.path(PARITY_DIR, config_name))
+  data_result   <- load_crosstabs_data(config_result)
+  analysis      <- run_crosstabs_analysis(
+    config_result, data_result,
+    checkpoint_frequency = 10, total_column = "Total"
+  )
+  results <- setNames(
+    analysis$all_results,
+    vapply(analysis$all_results, function(r) r$question_code, character(1))
+  )
+  island <- build_data_layer(results, analysis$banner_info, config_result$config_obj,
+                             survey_structure = data_result$survey_structure)
+  out <- list(config = config_result, data = data_result,
+              analysis = analysis, results = results, island = island)
+  .parity_cache[[config_name]] <- out
+  out
+}
 
 
 # ==============================================================================
@@ -175,4 +216,175 @@ test_that("unit weights still return exactly n (no design effect)", {
   expect_equal(calculate_effective_n(rep(2.5, 40)), 40)   # constant, any scale
   expect_equal(calculate_effective_n(numeric(0)), 0)
   expect_equal(calculate_effective_n(c(NA, NA)), 0)
+})
+
+
+# ==============================================================================
+# R-2. CARRIAGE INTEGRITY (D4)
+# ==============================================================================
+#
+# The island must carry R's letters, not a paraphrase of them. For every
+# question, every row's `sig` has to equal that row's Sig. row in the crosstab
+# table and `sig2` its Sig.2 row, cell for cell. If the writer ever drifts —
+# picks the wrong row, drops the Total placeholder differently, silently blanks
+# a column — this fails.
+
+context("R-2: carriage integrity")
+
+# The Sig-style row that belongs to a given (label, source) in the raw table.
+# Mirrors the writer's own resolution, including the summary-block special case
+# documented in data_layer_writer.R's mean_sig_for(): a summary block's Sig. row
+# is appended AFTER the Std Dev row, so the label forward-fill labels it
+# "Standard Deviation" — it still tests the headline statistic.
+expected_sig_cells <- function(table, keys, lbl, src, kind, rtype, sig_type) {
+  blank <- rep("", length(keys))
+  row_src <- if ("RowSource" %in% names(table)) {
+    s <- trimws(as.character(table$RowSource)); ifelse(is.na(s), "", s)
+  } else rep("", nrow(table))
+
+  if (identical(kind, "mean") && identical(src, "summary")) {
+    if (!rtype %in% c("Average", "Index", "Score")) return(blank)
+    sel <- table[!is.na(table$RowType) & row_src == "summary" &
+                 table$RowType == sig_type, , drop = FALSE]
+  } else {
+    sel <- table[!is.na(table$RowLabel) & !is.na(table$RowType) &
+                 table$RowLabel == lbl & row_src == src &
+                 table$RowType == sig_type, , drop = FALSE]
+  }
+  if (nrow(sel) != 1) return(blank)
+  vapply(keys, function(k) {
+    if (!k %in% names(table)) return("")
+    v <- as.character(sel[1, k])
+    if (is.na(v) || v == "" || v == "-") "" else v
+  }, character(1), USE.NAMES = FALSE)
+}
+
+# The RowType a mean row was built from — the writer's mrt[1].
+mean_rtype_for <- function(table, lbl, src) {
+  mean_types <- c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare")
+  row_src <- if ("RowSource" %in% names(table)) {
+    s <- trimws(as.character(table$RowSource)); ifelse(is.na(s), "", s)
+  } else rep("", nrow(table))
+  types <- unique(table$RowType[!is.na(table$RowLabel) &
+                                table$RowLabel == lbl & row_src == src])
+  intersect(types, mean_types)[1]
+}
+
+test_that("the fixture produces the shape the parity harness assumes", {
+  run <- parity_run()
+  expect_equal(run$analysis$run_status, "PASS")
+  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3"))
+  # Dual alpha is on: 0.05 primary, 0.20 secondary.
+  expect_equal(run$config$config_obj$alpha, 0.05)
+  expect_equal(run$config$config_obj$alpha_secondary, 0.20)
+  # Four cohort columns plus Total, in the documented order.
+  expect_equal(vapply(run$island$columns, function(c) c$label, character(1)),
+               c("Total", "Alpha", "Beta", "Gamma", "Delta"))
+  # Column universes: Alpha a full census, Beta correctable, Gamma below the
+  # 5% floor, Delta unresolved (no Population row -> no field at all).
+  pop <- lapply(run$island$columns, function(c) c$population)
+  expect_equal(pop[[2]], 40)
+  expect_equal(pop[[3]], 150)
+  expect_equal(pop[[4]], 5000)
+  expect_null(pop[[5]])
+  # Q3 is routed, so its bases are Q1's Yes counts.
+  q3 <- Filter(function(q) q$code == "Q3", run$island$questions)[[1]]
+  expect_equal(vapply(q3$bases, function(b) b$n, numeric(1)), c(113, 24, 39, 20, 30))
+})
+
+test_that("every row's sig equals its Sig. row, cell for cell", {
+  run <- parity_run()
+  keys <- run$analysis$banner_info$internal_keys
+  checked <- 0L
+  for (q in run$island$questions) {
+    tbl <- normalize_question_table(run$results[[q$code]]$table)
+    for (r in q$rows) {
+      src <- if (identical(r$kind, "mean")) "summary" else NULL
+      # Resolve the row's source from the table rather than assuming it.
+      srcs <- unique(trimws(as.character(
+        tbl$RowSource[!is.na(tbl$RowLabel) & tbl$RowLabel == r$label])))
+      src <- srcs[1]
+      rtype <- if (identical(r$kind, "mean")) mean_rtype_for(tbl, r$label, src) else NA_character_
+      expected <- expected_sig_cells(tbl, keys, r$label, src, r$kind, rtype, "Sig.")
+      expect_equal(unlist(r$sig), expected,
+                   info = paste(q$code, r$label, "Sig."))
+      checked <- checked + 1L
+    }
+  }
+  expect_gt(checked, 10L)   # the fixture really did produce rows to check
+})
+
+test_that("every row's sig2 equals its Sig.2 row, cell for cell", {
+  run <- parity_run()
+  keys <- run$analysis$banner_info$internal_keys
+  for (q in run$island$questions) {
+    tbl <- normalize_question_table(run$results[[q$code]]$table)
+    for (r in q$rows) {
+      expect_false(is.null(r$sig2),
+                   info = paste(q$code, r$label, "carries sig2 on a dual-alpha run"))
+      srcs <- unique(trimws(as.character(
+        tbl$RowSource[!is.na(tbl$RowLabel) & tbl$RowLabel == r$label])))
+      src <- srcs[1]
+      rtype <- if (identical(r$kind, "mean")) mean_rtype_for(tbl, r$label, src) else NA_character_
+      expected <- expected_sig_cells(tbl, keys, r$label, src, r$kind, rtype, "Sig.2")
+      expect_equal(unlist(r$sig2), expected,
+                   info = paste(q$code, r$label, "Sig.2"))
+    }
+  }
+})
+
+test_that("Sig.2 is a superset of Sig. on every row", {
+  # Excel's secondary row is tested at the looser alpha from the SAME p-value,
+  # so a 95% letter is always also an 80% letter. The JS derives the lowercase
+  # set as sig2 minus sig, which is only meaningful if that holds.
+  run <- parity_run()
+  for (q in run$island$questions) {
+    for (r in q$rows) {
+      for (i in seq_along(r$sig)) {
+        hi <- strsplit(as.character(r$sig[[i]]), "")[[1]]
+        lo <- strsplit(as.character(r$sig2[[i]]), "")[[1]]
+        expect_true(all(hi %in% lo),
+                    info = paste(q$code, r$label, "col", i, "-",
+                                 r$sig[[i]], "not within", r$sig2[[i]]))
+      }
+    }
+  }
+})
+
+test_that("a summary block's letters land on the mean, never on Std Dev", {
+  # standard_processor emits [Average, Standard Deviation, Sig., Sig.2], so the
+  # label forward-fill labels both sig rows "Standard Deviation". Matching on
+  # label alone would hang the mean's letters on a row that is never tested.
+  run <- parity_run()
+  q2 <- Filter(function(q) q$code == "Q2", run$island$questions)[[1]]
+  mean_row <- Filter(function(r) r$label == "Mean", q2$rows)[[1]]
+  sd_row   <- Filter(function(r) r$label == "Standard Deviation", q2$rows)[[1]]
+
+  # Hand-check against the fixture's own table: the Sig. row of Q2's summary
+  # block carries "C" under Beta (Beta's mean is significantly above Gamma's).
+  expect_equal(unlist(mean_row$sig),  c("", "", "C", "", ""))
+  expect_equal(unlist(mean_row$sig2), c("", "C", "C", "", "C"))
+  expect_equal(unlist(sd_row$sig),  rep("", 5))
+  expect_equal(unlist(sd_row$sig2), rep("", 5))
+})
+
+test_that("the committed island matches a fresh rebuild", {
+  # The JS half of this harness renders the committed parity_island.json. If the
+  # writer changes and the island is not regenerated, the two engines are being
+  # tested against different data — so pin them together here.
+  skip_if_not(requireNamespace("jsonlite", quietly = TRUE), "jsonlite not available")
+  committed_path <- file.path(PARITY_DIR, "parity_island.json")
+  skip_if_not(file.exists(committed_path), "committed island not found")
+
+  run <- parity_run()
+  fresh <- jsonlite::fromJSON(
+    jsonlite::toJSON(run$island, auto_unbox = TRUE, digits = 8, null = "null", na = "null"),
+    simplifyVector = FALSE)
+  committed <- jsonlite::fromJSON(readLines(committed_path, warn = FALSE),
+                                  simplifyVector = FALSE)
+
+  expect_equal(committed$questions, fresh$questions,
+    info = paste("Regenerate with:",
+                 "Rscript modules/tabs/tests/fixtures/parity_project/regenerate_parity_island.R"))
+  expect_equal(committed$columns, fresh$columns)
 })
