@@ -957,6 +957,13 @@ Promoter sheets is reassembled into one question via the Selection sheet's
 
 The Selection sheet tells Tabs which questions to analyze and how.
 
+**The Y/N columns (Include, UseBanner, BannerBoxCategory, CreateIndex).**
+Case and surrounding spaces do not matter: `Y`, `y`, `Yes` and `TRUE` all mean
+yes; `N`, `n`, `No` and `FALSE` all mean no. A blank cell means no. Anything
+else — `maybe`, `x`, a stray character — stops the run with
+`CFG_INVALID_FLAG_VALUE` naming the row, rather than being read as "no" and
+dropping the question from the deliverable in silence.
+
 ### Column: QuestionCode
 
 **What it does:** Identifies the question.
@@ -1564,6 +1571,13 @@ binning
 
 The Options sheet lists all response options for each question.
 
+**The Y/N columns (ShowInOutput, ExcludeFromIndex).** Case and surrounding
+spaces do not matter: `Y`, `y`, `Yes` and `TRUE` all mean yes; `N`, `n`, `No`
+and `FALSE` all mean no. A blank ShowInOutput means **show** the option; a blank
+ExcludeFromIndex means **keep** it in the index. Anything else stops the run with
+`CFG_INVALID_FLAG_VALUE` naming the row, rather than being read as "no" and
+hiding a response option in silence.
+
 ### Column: QuestionCode
 
 **What it does:** Links this option to a question.
@@ -1625,15 +1639,17 @@ order they're listed.
 
 **What it does:** Controls whether this option appears in the output.
 
-**Required:** Yes
+**Required:** No
 
-**What to enter:** `Y` or leave blank.
+**What to enter:** `Y` or `N`, or leave blank.
 
 -   `Y` = Include in output
--   Blank = Exclude from output
+-   `N` = Exclude from output
+-   Blank = Include in output (showing the option is the default)
 
 **When to exclude:** You might have internal codes or "Don't know"
-responses you don't want to display.
+responses you don't want to display. Set those to `N` — leaving the cell
+blank shows them.
 
 ### Column: ExcludeFromIndex
 

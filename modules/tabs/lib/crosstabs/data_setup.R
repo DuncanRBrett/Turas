@@ -12,6 +12,7 @@
 #   - load_and_validate_data() - Load and validate survey data
 #   - setup_weights() - Configure weighting
 #   - load_question_selection() - Load and validate question selection
+#   - normalise_flag_column()   - Canonicalise a Y/N gate column
 #
 # DEPENDENCIES:
 #   - data_loader.R (for load_survey_structure, load_survey_data_smart)
@@ -24,6 +25,89 @@
 #   - logging_utils.R (for log_message)
 #
 # ==============================================================================
+
+# ==============================================================================
+# Y/N GATE COLUMNS
+# ==============================================================================
+
+# The Selection sheet's Include / UseBanner / BannerBoxCategory / CreateIndex and
+# the Options sheet's ShowInOutput / ExcludeFromIndex gate what reaches the
+# deliverable. The engine reads them with an exact `== "Y"` test in a dozen
+# places (data_setup.R, banner.R, standard_processor.R, cell_calculator.R,
+# score_utils.R, composite_processor.R, microdata_writer.R) while several
+# preflight validators read `toupper(...) == "Y"`. A lowercase "y" therefore
+# passed validation and was then dropped in silence — one cell, one table quietly
+# missing from a client workbook. Each sheet is read in exactly one place —
+# load_question_selection() for Selection, prepare_options_columns() for
+# Options — so normalising there closes the gap for every reader at once.
+#
+# The vocabulary matches what workbook_builder.R (create_index_summary) and
+# excel_writer.R already accept, so the same word means the same thing in every
+# corner of the module.
+.TABS_FLAG_TRUE_TOKENS  <- c("Y", "YES", "TRUE", "T", "1")
+.TABS_FLAG_FALSE_TOKENS <- c("N", "NO", "FALSE", "F", "0")
+
+#' Normalise a Y/N Gate Column to Canonical "Y" / "N"
+#'
+#' Case- and whitespace-insensitive. A blank cell (NA or whitespace only) takes
+#' \code{default}, which is how the templates document these columns. Any other
+#' token refuses rather than defaulting: an unreadable gate value is the exact
+#' condition that used to drop a question without a word, so it stops the run
+#' where the operator can still fix the cell.
+#'
+#' @param values Raw column, any type
+#' @param column Character, column name (for the refusal)
+#' @param sheet Character, sheet the column lives on (for the refusal)
+#' @param default Character, "Y" or "N" — the meaning of a blank cell
+#' @param row_codes Optional character vector of QuestionCodes, same length as
+#'   \code{values}, used to name the offending rows in the refusal
+#' @return Character vector of "Y" / "N", same length as \code{values}
+#' @export
+normalise_flag_column <- function(values, column, sheet, default = "N",
+                                  row_codes = NULL) {
+  raw <- as.character(values)
+  tokens <- toupper(trimws(raw))
+  blank <- is.na(tokens) | !nzchar(tokens)
+
+  result <- rep(NA_character_, length(tokens))
+  result[blank] <- default
+  result[!blank & tokens %in% .TABS_FLAG_TRUE_TOKENS] <- "Y"
+  result[!blank & tokens %in% .TABS_FLAG_FALSE_TOKENS] <- "N"
+
+  bad <- which(is.na(result))
+  if (length(bad) > 0) {
+    labels <- if (!is.null(row_codes) && length(row_codes) == length(tokens)) {
+      sprintf("row %d (%s): '%s'", bad, as.character(row_codes)[bad], raw[bad])
+    } else {
+      sprintf("row %d: '%s'", bad, raw[bad])
+    }
+    tabs_refuse(
+      code = "CFG_INVALID_FLAG_VALUE",
+      title = paste0("Unrecognised ", column, " Value"),
+      problem = sprintf(
+        "The %s sheet's %s column contains %d value(s) that are neither yes nor no.",
+        sheet, column, length(bad)
+      ),
+      why_it_matters = paste0(
+        "This column decides what reaches the deliverable. A value Turas cannot ",
+        "read would be treated as 'no' and the affected row would be dropped ",
+        "without appearing anywhere in the output."
+      ),
+      how_to_fix = c(
+        paste0("Open the ", sheet, " sheet and set ", column, " to Y or N"),
+        "Leave the cell blank to accept the default",
+        paste0("Accepted values (any case): ",
+               paste(c(.TABS_FLAG_TRUE_TOKENS, .TABS_FLAG_FALSE_TOKENS),
+                     collapse = ", "))
+      ),
+      expected = paste0("Y, N or blank (blank = ", default, ")"),
+      observed = paste(labels, collapse = "; ")
+    )
+  }
+
+  result
+}
+
 
 # ==============================================================================
 # SURVEY STRUCTURE
@@ -72,13 +156,20 @@ prepare_options_columns <- function(options) {
     options$ExcludeFromIndex <- NA_character_
   }
 
-  # Convert to character if not already
-  options$ShowInOutput <- as.character(options$ShowInOutput)
-  options$ExcludeFromIndex <- as.character(options$ExcludeFromIndex)
-
-  # Apply defaults
-  options$ShowInOutput[is.na(options$ShowInOutput)] <- "Y"
-  options$ExcludeFromIndex[is.na(options$ExcludeFromIndex)] <- "N"
+  # Canonicalise to "Y"/"N" and apply defaults. Blank means show the option and
+  # count it in the index; anything unreadable refuses rather than silently
+  # hiding a response option or dropping it from an index.
+  row_codes <- if ("QuestionCode" %in% names(options)) {
+    as.character(options$QuestionCode)
+  } else {
+    NULL
+  }
+  options$ShowInOutput <- normalise_flag_column(
+    options$ShowInOutput, "ShowInOutput", "Options",
+    default = "Y", row_codes = row_codes)
+  options$ExcludeFromIndex <- normalise_flag_column(
+    options$ExcludeFromIndex, "ExcludeFromIndex", "Options",
+    default = "N", row_codes = row_codes)
 
   # Convert Index_Weight to numeric for Likert index calculations
   if ("Index_Weight" %in% names(options)) {
@@ -242,11 +333,15 @@ load_question_selection <- function(config_file) {
     }
   }
 
-  # Apply defaults
-  selection_df$Include[is.na(selection_df$Include)] <- "N"
-  selection_df$UseBanner[is.na(selection_df$UseBanner)] <- "N"
-  selection_df$BannerBoxCategory[is.na(selection_df$BannerBoxCategory)] <- "N"
-  selection_df$CreateIndex[is.na(selection_df$CreateIndex)] <- "N"
+  # Canonicalise the gate columns to "Y"/"N" and apply defaults. Every downstream
+  # reader — the engine's exact `== "Y"` tests and preflight's `toupper()` ones —
+  # then sees the same value, so a lowercase "y" can no longer pass validation
+  # and be dropped by the engine.
+  for (flag in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex")) {
+    selection_df[[flag]] <- normalise_flag_column(
+      selection_df[[flag]], flag, "Selection",
+      default = "N", row_codes = selection_df$QuestionCode)
+  }
 
   # Filter to included questions
   crosstab_questions <- selection_df[selection_df$Include == "Y", ]

@@ -190,7 +190,7 @@ existing design discloses it on purpose — `note()`'s wording is literally
 note beside it prints the number would achieve nothing; whether the audience
 count should be disclosed at all is a design question, not this fix.
 
-### C3. Case-sensitive `"Y"` gates silently drop questions, banners and index rows — and preflight validates them case-insensitively
+### C3. Case-sensitive `"Y"` gates silently drop questions, banners and index rows — and preflight validates them case-insensitively — FIXED 2026-08-06 (Job C3)
 **Files:** `lib/crosstabs/data_setup.R:252`, `lib/banner.R:55,194,207`,
 `lib/standard_processor.R:75,661` vs `lib/validation/preflight_validators.R:107,433-434,367`
 Executed repros: Selection `Include = "y"` or `"Yes"` → question silently
@@ -203,6 +203,76 @@ cell means one table quietly missing from the client deliverable.
 **Fix:** one normalisation (`toupper(trimws(...))`) applied to these flag
 columns at `load_question_selection`, so engine and validators read the same
 value. Contained; needs failing-first tests per column.
+
+**FIXED 2026-08-06.** New `normalise_flag_column()` in
+`lib/crosstabs/data_setup.R` canonicalises a gate column to exactly `"Y"` /
+`"N"`, case- and whitespace-insensitively. Every downstream reader — the
+engine's exact `== "Y"` tests and preflight's `toupper(...) == "Y"` ones —
+then sees the same value, so no reader needed touching.
+
+**The finding named one load site; there are two, and six columns, not four.**
+`ShowInOutput` and `ExcludeFromIndex` live on the Survey Structure's Options
+sheet, not the Selection sheet, so `load_question_selection` cannot reach them —
+they are normalised in `prepare_options_columns()`, the Options sheet's single
+load site (`load_crosstabs_data` calls it before validation, so preflight sees
+the normalised frame too). Two columns beyond the briefed four are in the same
+family and were fixed with them:
+- **`BannerBoxCategory`** (`banner.R:189`, exact `== "Y"`) — a lowercase `y`
+  silently downgraded a box/category banner to a plain one.
+- **`ExcludeFromIndex`** — worse than the briefed class, because here *two
+  engine paths disagreed with each other* rather than engine-vs-preflight:
+  `cell_calculator.R:344`, `score_utils.R:157`, `composite_processor.R:319` and
+  `microdata_writer.R:418` read `!= "Y"`, while `summary_builder.R:302` and
+  `tracking_wave_values.R:74` read `toupper(trimws(...)) == "Y"`. A lowercase
+  `y` meant one thing in the mean and another in the summary.
+
+**Decision on the vocabulary (the question the handover asked).** `Y`, `YES`,
+`TRUE`, `T`, `1` all mean yes; `N`, `NO`, `FALSE`, `F`, `0` all mean no; blank
+(NA or whitespace only) takes the column's documented default — `N` everywhere
+except `ShowInOutput`, whose blank means show. Anything else **refuses**
+(`CFG_INVALID_FLAG_VALUE`) naming the sheet, the column, the row number, the
+QuestionCode and the offending value.
+
+This departs from the handover's recommendation ("`Y` only; warn on any other
+non-blank, non-`N` token") in two ways, deliberately:
+1. **Refuse, not warn.** The handover cited "the sampling_method pattern", but
+   `sampling_method` *refuses* on an unknown token — it does not warn. A bare
+   warning is also the exact failure mode this review lists as IMPORTANT I3
+   ("`safe_logical` warns one scrollback line and defaults FALSE"). Refusing at
+   load, before any computation, costs one edit and a re-run.
+2. **Accept the everyday spellings.** A warn branch is needed regardless (no
+   accept-list can be exhaustive), so the only real question is its width. The
+   chosen set is not invented — `workbook_builder.R:231` (create_index_summary)
+   and `excel_writer.R:1476` already accept exactly `c("Y","YES","TRUE","T","1")`
+   after `toupper(trimws())`. The same word now means the same thing everywhere
+   in the module.
+
+**Regression risk, stated plainly:** a config carrying an unreadable token in
+one of these six columns now stops instead of running. Such a config is today
+silently dropping that row, so the refusal surfaces a real defect rather than
+breaking working work — but it is a behaviour change on live configs. Verified
+against every shipped artefact: freshly generated Crosstab_Config and
+Survey_Structure templates, the demo config and structure, and all four
+`Parity_*` fixtures load without refusing.
+
+One documentation error in the same family was corrected: `06_TEMPLATE_REFERENCE.md`
+said a blank `ShowInOutput` **excludes** the option. It includes it —
+`prepare_options_columns` defaults blank to `"Y"` and every filter reads
+`== "Y" | is.na(...)`. An operator following the doc would have blanked cells
+expecting options to disappear and shipped them instead.
+
+Files: `lib/crosstabs/data_setup.R`, `docs/06_TEMPLATE_REFERENCE.md`. Tests:
+new `tests/testthat/test_selection_flags.R`, 31 assertions; **18 proved failing
+against the pre-fix code** by revert-run-restore, and each of the six columns
+failed on *behaviour* (question dropped, banner absent, option hidden, the two
+index paths disagreeing) rather than on the new function being missing.
+Verified end-to-end on the shipped demo: with `Region` set to lowercase `y` in
+both Include and UseBanner, the pre-fix engine ran to completion and reported
+**25 questions / 12 banner columns** with Region in neither; after the fix the
+same config gives **26 questions / 16 banner columns** with `Region::Gauteng`
+… `Region::Eastern Cape` in the banner and Region as a stub. Gates after: tabs
+R **3,773 / 0 / 0 / 0**, **29** JS suites green, project-root 571 pass / 3 fail
+at its documented baseline.
 
 ---
 
@@ -400,6 +470,10 @@ end-to-end from the docs alone.
 were fixed in this review; three specific ships remain unsafe until their
 open CRITICALs land.**
 
+**Status 2026-08-06: all three open CRITICALs (C1, C2, C3) have now landed and
+every deploy condition above is lifted. The IMPORTANT and MINOR lists are
+untouched — I1–I12 and the M-tier remain open.**
+
 The statistical core's ordinary path is genuinely trustworthy: 3,733 R + 28 JS
 gate assertions, hand-derived known answers, a cross-engine parity fixture,
 and six adversarial fresh-context reviews that confirmed the letter/test
@@ -415,9 +489,12 @@ config until C1 lands~~ — **C1 landed 2026-08-06; this condition is lifted**;
 sub-k audiences until C2 lands~~ — **C2 landed 2026-08-06; this condition is
 lifted for the base row, the exports and the explainer. The audience-level
 count under a reader's own filter is still stated by design (see C2's
-"deliberately left alone")**; (3) normalise the Y-flag columns (C3) before
+"deliberately left alone")**; (3) ~~normalise the Y-flag columns (C3) before
 the next hand-built config, or lowercase `y` cells will silently drop
-questions/banners with preflight approving. For anonymity-critical work also
+questions/banners with preflight approving~~ — **C3 landed 2026-08-06; this
+condition is lifted. Note the behaviour change: an unreadable value in
+Include/UseBanner/BannerBoxCategory/CreateIndex/ShowInOutput/ExcludeFromIndex
+now refuses at load instead of being read as "no".** For anonymity-critical work also
 take I4 (confidentiality dials fail open) and note the F3 fix means
 regenerated comment reports now honour the confidential ship.
 
@@ -459,13 +536,15 @@ the withheld group in prose). Gates are unchanged for the next job: tabs R
 **3,742 / 0 / 0 / 0** and **29** JS suites — the 21 new checks were appended to
 `disclosure_tests.mjs` rather than added as a new suite.
 
-**Job C3 — Y-flag normalisation (CRITICAL C3).** One `toupper(trimws(...))`
-normalisation applied to Include/UseBanner/ShowInOutput/CreateIndex at
-`load_question_selection`, so engine (`data_setup.R:252`, `banner.R:55,194,207`,
-`standard_processor.R:75,661`) and preflight read the same value. Failing-first
-test per column. Decide and document: does `"Yes"` count as yes, or warn-and-
-drop? (Recommend: `Y` after normalisation only; warn on any other non-blank,
-non-`N` token — mirrors the sampling_method pattern.)
+**Job C3 — Y-flag normalisation (CRITICAL C3). DONE 2026-08-06** — see the
+annotation under C3 above. It was wider than briefed: two load sites, not one
+(the Options sheet's `ShowInOutput`/`ExcludeFromIndex` are out of
+`load_question_selection`'s reach and normalise in `prepare_options_columns`),
+and six columns, not four. `"Yes"`/`"TRUE"`/`"1"` count as yes; an unreadable
+token refuses rather than warning — the reasoning, and the departure from this
+brief's recommendation, is recorded under C3. Baseline for the next job: tabs R
+**3,773 / 0 / 0 / 0** and **29** JS suites (the 31 new checks are a new
+`test_selection_flags.R`; the JS suite count is unchanged — C3 is R-only).
 
 **Job I-batch (config honesty — I2, I3, I4).** Extend the raw-cell refusal
 family (see `validate_config_settings` and `test_config_contract.R`) to
