@@ -987,11 +987,33 @@ calculate_t_test_stats <- function(mean1, mean2, var1, var2, eff_n1, eff_n2) {
   # Standard error
   se <- sqrt(var1/eff_n1 + var2/eff_n2)
 
-  if (se == 0 || is.na(se)) {
+  # A zero or unreadable standard error is not evidence of "no difference"
+  # (production review 2026-08, M-B). Returning p = 1 said the test ran and found
+  # nothing, so two columns of all-5s and all-3s — and, since the NPS rows moved
+  # to the +-100 buckets, an all-promoter column against an all-detractor one —
+  # reported the same p as two identical columns.
+  #
+  # The split:
+  #   * means EQUAL      -> the groups really are the same; p = 1 is honest.
+  #   * means DIFFER     -> the t-test is undefined here. Zero SAMPLE variance is
+  #                         not zero SAMPLING variance: five respondents who all
+  #                         happen to be promoters carry real uncertainty that a
+  #                         within-group SD of 0 cannot express, so claiming
+  #                         p = 0 would be as wrong as claiming p = 1. It is
+  #                         reported as a failed test (p = NA), which is what the
+  #                         degenerate-df branch below already does, and what the
+  #                         v2 JS engine has always done (`stats.meanZ` returns
+  #                         null at se == 0).
+  #   * se unreadable    -> a variance that could not be computed is a failed
+  #                         computation, never a completed test.
+  # No letter appears in any of these cases, before or after — what changes is
+  # that the module stops reporting a p-value it did not calculate.
+  if (is.na(se) || se == 0) {
+    testable <- !is.na(se) && !is.na(mean1) && !is.na(mean2) && mean1 == mean2
     return(list(
-      p_value = 1,
+      p_value = if (testable) 1 else NA_real_,
       higher = (mean1 > mean2),
-      failed = FALSE
+      failed = !testable
     ))
   }
 

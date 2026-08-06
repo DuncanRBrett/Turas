@@ -707,7 +707,7 @@ create_crosstabs_workbook <- function(all_results,
 
   # Create Guide sheet (how to read this report)
   tryCatch(
-    create_guide_sheet(wb, config_obj, banner_info, styles),
+    create_guide_sheet(wb, config_obj, banner_info, styles, very_small_base),
     error = function(e) {
       log_message(sprintf("Guide sheet skipped: %s", e$message), "WARNING")
     }

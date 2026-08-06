@@ -550,7 +550,13 @@ create_summary_row <- function(stat_result, stat_values, internal_keys, config) 
 #' @keywords internal
 create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
                                           banner_row_indices, internal_keys, config) {
-  sd_values <- setNames(numeric(length(internal_keys)), internal_keys)
+  # NA, not 0 (production review 2026-08, M-A). A standard deviation needs two
+  # observations. Initialising to 0 meant an EMPTY column and a ONE-PERSON column
+  # both published "0.0" — a positive claim that the column has no spread, which
+  # is unknowable from one respondent and meaningless with none. The numeric
+  # processor has always NA-initialised the same statistic, so the two processors
+  # published different answers to the same situation; they now agree.
+  sd_values <- setNames(rep(NA_real_, length(internal_keys)), internal_keys)
 
   for (key in internal_keys) {
     row_idx <- banner_row_indices[[key]]
@@ -569,9 +575,11 @@ create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
           sd_values[key] <- sd(v)
         } else {
           mean_val <- sum(v * w) / sum(w)
-          # V10.8: Bessel-corrected weighted variance (sample, not population)
+          # V10.8: Bessel-corrected weighted variance (sample, not population).
+          # A non-positive denominator (total weight <= 1) leaves the variance
+          # undefined — NA, not 0, for the same reason as the initialiser (M-A).
           denom <- sum(w) - 1
-          var_val <- if (denom > 0) sum(w * (v - mean_val)^2) / denom else 0
+          var_val <- if (denom > 0) sum(w * (v - mean_val)^2) / denom else NA_real_
           sd_values[key] <- sqrt(var_val)
         }
       }

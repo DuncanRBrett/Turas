@@ -616,3 +616,62 @@ test_that("Crosstabs sheet contains expected data", {
   expect_true(nrow(sheet_data) > 0)
   expect_true(ncol(sheet_data) > 1)
 })
+
+# ==============================================================================
+# GUIDE SHEET — the legend must describe the workbook that ships (M-C)
+# ==============================================================================
+#
+# Production review 2026-08, M-C. The Guide documented "*" and "**" as small-base
+# markers. No writer has ever produced either. Meanwhile "**" DOES appear in the
+# workbook — appended to a chi-square row to mean SIGNIFICANT — so the Guide
+# defined the one marker a reader might actually meet as the opposite of its real
+# meaning. A reader seeing "** " beside a chi-square would have concluded the
+# result rested on a very small base.
+
+context("excel_output: the Guide describes the real markers (M-C)")
+
+guide_text <- function(config, ...) {
+  wb <- openxlsx::createWorkbook()
+  create_guide_sheet(wb, config, make_test_banner_info(), create_excel_styles(), ...)
+  m <- openxlsx::read.xlsx(wb, sheet = "Guide", colNames = FALSE,
+                           skipEmptyRows = FALSE)
+  paste(as.character(unlist(m)), collapse = " | ")
+}
+
+test_that("the Guide no longer invents asterisk base-size markers", {
+  txt <- guide_text(make_test_config())
+  expect_false(grepl("asterisk", txt, ignore.case = TRUE))
+  expect_false(grepl("double asterisk", txt, ignore.case = TRUE))
+})
+
+test_that("it describes the warnings the Summary sheet actually writes", {
+  config <- make_test_config()
+  config$significance_min_base <- 30
+  txt <- guide_text(config, very_small_base = 10)
+  expect_true(grepl("CAUTION: Small base (n<30)", txt, fixed = TRUE))
+  expect_true(grepl("WARNING: Very small base (n<10)", txt, fixed = TRUE))
+  expect_true(grepl("Summary sheet", txt, fixed = TRUE))
+})
+
+test_that("the quoted thresholds follow the config and the writer, not a literal", {
+  config <- make_test_config()
+  config$significance_min_base <- 50
+  txt <- guide_text(config, very_small_base = 15)
+  expect_true(grepl("n<50", txt, fixed = TRUE))
+  expect_true(grepl("n<15", txt, fixed = TRUE))
+  expect_false(grepl("n<30", txt, fixed = TRUE))
+})
+
+test_that("** is documented as the chi-square marker, only when chi-square is on", {
+  config <- make_test_config()
+  config$enable_significance_testing <- TRUE
+  config$enable_chi_square <- TRUE
+  on_txt <- guide_text(config)
+  expect_true(grepl("Chi-square (**)", on_txt, fixed = TRUE))
+  expect_true(grepl("not a base-size warning", on_txt, fixed = TRUE))
+
+  # A report that cannot contain the marker must not document it — the same
+  # defect class, one step removed.
+  config$enable_chi_square <- FALSE
+  expect_false(grepl("Chi-square (**)", guide_text(config), fixed = TRUE))
+})

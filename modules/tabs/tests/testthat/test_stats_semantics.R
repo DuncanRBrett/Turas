@@ -204,18 +204,21 @@ test_that("a genuine NPS gap is still detected", {
   expect_true(res$higher)
 })
 
-test_that("KNOWN LIMIT: two uniform NPS columns are not tested (M-B)", {
-  # Recorded, not fixed here. weighted_t_test_means returns p = 1 when both
-  # groups have zero variance (open finding M-B), so a column where everyone is
-  # a promoter against one where everyone is a detractor — NPS +100 vs -100,
-  # the widest gap the metric allows — draws no letter.
+test_that("two uniform NPS columns are UNTESTABLE, not 'no different' (M-B)", {
+  # A column where everyone is a promoter against one where everyone is a
+  # detractor — NPS +100 vs -100, the widest gap the metric allows — has zero
+  # variance on both sides, so the Welch t-test is undefined.
   #
   # The +-100 buckets make that case reachable on real data in a way the raw
   # 0-10 ratings did not: "every respondent in this column is a promoter" is an
   # ordinary small-column outcome, while "every respondent gave exactly the same
-  # rating" is rare. M-B therefore bites NPS rows harder after this fix than
-  # before it. This test exists so the behaviour is pinned and visible rather
-  # than discovered in a deliverable.
+  # rating" is rare.
+  #
+  # Still no letter — a within-group SD of 0 cannot express the real sampling
+  # uncertainty of five respondents who happen to agree, so claiming p = 0 would
+  # be as wrong as claiming p = 1. What changed (M-B, fixed 2026-08-06) is that
+  # the module no longer REPORTS p = 1, which said the test ran and found
+  # nothing. It is a failed test, and p is NA.
   a <- data.frame(Q = rep(10, 40), stringsAsFactors = FALSE)
   b <- data.frame(Q = rep(0, 40), stringsAsFactors = FALSE)
   ra <- calculate_nps_score(a, "Q", rep(1, 40))
@@ -225,8 +228,8 @@ test_that("KNOWN LIMIT: two uniform NPS columns are not tested (M-B)", {
 
   res <- weighted_t_test_means(ra$values, rb$values, ra$weights, rb$weights,
                                min_base = 30, alpha = 0.05)
-  expect_false(res$significant)
-  expect_equal(res$p_value, 1)
+  expect_false(res$significant)          # unchanged: no letter, before or after
+  expect_true(is.na(res$p_value))        # changed: was a false 1
 })
 
 test_that("the Standard Deviation row is the SD of the tested values", {
@@ -837,4 +840,98 @@ test_that("a question with no BoxCategory has no count matrix", {
     data.frame(QuestionCode = "Q", Variable_Type = "Single_Response",
                Columns = 1L, stringsAsFactors = FALSE),
     question_options, list("TOTAL::Total" = 1:2), c(1, 1), "TOTAL::Total"))
+})
+
+# ==============================================================================
+# M-A / M-B — the two statistics that reported a number they had not computed
+# ==============================================================================
+#
+# Production review 2026-08. Both were "executed" findings: an SD row that
+# published 0.0 for columns it could not describe, and a t-test that published
+# p = 1 for comparisons it could not make.
+
+context("stats semantics: the SD row on columns too small to have one (M-A)")
+
+ma_sd_row <- function(values, weights = NULL) {
+  keys <- names(values)
+  if (is.null(weights)) weights <- lapply(values, function(v) rep(1, length(v)))
+  idx <- lapply(values, function(v) if (length(v)) seq_along(v) else integer(0))
+  create_standard_deviation_row(values, weights, idx, keys,
+                               list(decimal_places_ratings = 1))
+}
+
+test_that("an empty column and a one-person column publish no SD, not 0.0", {
+  # 0.0 is a positive claim that the column has no spread — unknowable from one
+  # respondent, meaningless with none.
+  row <- ma_sd_row(list(Empty = numeric(0), One = 5, Three = c(4, 5, 6)))
+  expect_true(is.na(row$Empty))
+  expect_true(is.na(row$One))
+  expect_equal(as.numeric(row$Three), 1)     # sd(4,5,6) = 1, unchanged
+})
+
+test_that("a genuinely constant column still reports 0 — that IS its SD", {
+  # Three respondents who all answered 5 have a real, computable SD of zero.
+  # The fix must not confuse "no spread" with "not enough data to say".
+  row <- ma_sd_row(list(Flat = c(5, 5, 5)))
+  expect_equal(as.numeric(row$Flat), 0)
+})
+
+test_that("the standard and numeric processors now agree on the same situation", {
+  # They disagreed: standard_processor initialised to 0, numeric_processor to NA.
+  row <- ma_sd_row(list(One = 5))
+  numeric_equivalent <- NA_real_            # numeric_processor: sd only when n > 1
+  expect_equal(is.na(row$One), is.na(numeric_equivalent))
+})
+
+test_that("a weighted column whose total weight cannot carry Bessel gives NA", {
+  # denom = sum(w) - 1 <= 0 leaves the sample variance undefined; it used to
+  # collapse to sqrt(0) = 0.
+  row <- ma_sd_row(list(Tiny = c(4, 6)), weights = list(Tiny = c(0.3, 0.4)))
+  expect_true(is.na(row$Tiny))
+})
+
+context("stats semantics: zero-variance comparisons are untestable (M-B)")
+
+test_that("two constant columns with DIFFERENT means report a failed test", {
+  res <- weighted_t_test_means(rep(5, 40), rep(3, 40), rep(1, 40), rep(1, 40),
+                               min_base = 30, alpha = 0.05)
+  expect_true(is.na(res$p_value))
+  expect_false(res$significant)
+})
+
+test_that("two constant columns with the SAME mean report p = 1 — they really are alike", {
+  res <- weighted_t_test_means(rep(5, 40), rep(5, 40), rep(1, 40), rep(1, 40),
+                               min_base = 30, alpha = 0.05)
+  expect_equal(res$p_value, 1)
+  expect_false(res$significant)
+})
+
+test_that("a maximal difference and no difference no longer report the same p", {
+  # The whole of M-B in one assertion.
+  differ <- weighted_t_test_means(rep(5, 40), rep(3, 40), rep(1, 40), rep(1, 40),
+                                  min_base = 30, alpha = 0.05)
+  same   <- weighted_t_test_means(rep(5, 40), rep(5, 40), rep(1, 40), rep(1, 40),
+                                  min_base = 30, alpha = 0.05)
+  expect_false(identical(differ$p_value, same$p_value))
+})
+
+test_that("an ordinary comparison is completely unaffected", {
+  res <- weighted_t_test_means(c(4, 5, 6, 5, 4, 6, 5, 5, 4, 6, 5, 5, 4, 6, 5,
+                                 5, 4, 6, 5, 5, 4, 6, 5, 5, 4, 6, 5, 5, 4, 6),
+                               c(1, 2, 3, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2,
+                                 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3),
+                               rep(1, 30), rep(1, 30), min_base = 20, alpha = 0.05)
+  expect_false(is.na(res$p_value))
+  expect_true(res$p_value < 0.05)
+  expect_true(res$significant)
+  expect_true(res$higher)
+})
+
+test_that("R now agrees with the v2 JS engine, which never claimed p = 1", {
+  # stats.meanZ (21_stats.js) returns null at se == 0 and always has; R was the
+  # engine reporting a p-value for a test it had not run.
+  res <- weighted_t_test_means(rep(100, 12), rep(-100, 12), rep(1, 12), rep(1, 12),
+                               min_base = 10, alpha = 0.05)
+  expect_true(is.na(res$p_value))
+  expect_false(res$significant)
 })

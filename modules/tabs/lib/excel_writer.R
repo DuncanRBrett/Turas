@@ -1547,9 +1547,13 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
 #' @param config_obj List, configuration object
 #' @param banner_info List, banner information (for letter assignments)
 #' @param styles List, style objects from create_excel_styles()
+#' @param very_small_base Numeric, the base below which the Summary sheet prints
+#'   its "Very small base" warning — the Guide must quote the same number the
+#'   writer uses (production review 2026-08, M-C)
 #' @return Invisible NULL
 #' @export
-create_guide_sheet <- function(wb, config_obj, banner_info, styles) {
+create_guide_sheet <- function(wb, config_obj, banner_info, styles,
+                               very_small_base = 10) {
 
   openxlsx::addWorksheet(wb, "Guide")
 
@@ -1649,6 +1653,14 @@ create_guide_sheet <- function(wb, config_obj, banner_info, styles) {
     add_entry("Minimum base",
               sprintf("Significance tests are only performed when the column base size is at least %d. Columns with smaller bases are excluded from testing.", min_base))
 
+    # The one place a double asterisk really appears in the workbook. Stated only
+    # when chi-square is switched on, so a report that cannot contain the marker
+    # does not document it (production review 2026-08, M-C).
+    if (cfg_bool("enable_chi_square")) {
+      add_entry("Chi-square (**)",
+                "A chi-square row tests whether the whole table of box categories differs across the banner. A double asterisk (**) at the end of that row means the result is significant — it is a significance marker, not a base-size warning.")
+    }
+
     add_row("", "")
   }
 
@@ -1678,9 +1690,25 @@ create_guide_sheet <- function(wb, config_obj, banner_info, styles) {
   add_row("", "")
 
   # === BASE SIZE WARNINGS ===
+  # These describe what the SUMMARY sheet actually writes — words in the
+  # question list, styled amber and red — not asterisks. The old entries
+  # documented "*" and "**" markers that no writer has ever produced, while "**"
+  # DOES appear in the workbook meaning a SIGNIFICANT chi-square: the Guide
+  # defined the one marker a reader might meet as the opposite of its real
+  # meaning (production review 2026-08, M-C).
   add_section("BASE SIZE WARNINGS")
-  add_entry("Small base (*)", "An asterisk (*) next to a base size indicates a small base. Results should be interpreted with caution.")
-  add_entry("Very small base (**)", "A double asterisk (**) indicates a very small base. Results are indicative only and should not be used for decision-making.")
+  gs_small <- suppressWarnings(as.numeric(cfg_val("significance_min_base", 30)))
+  if (length(gs_small) != 1 || is.na(gs_small)) gs_small <- 30
+  gs_vsmall <- suppressWarnings(as.numeric(very_small_base))
+  if (length(gs_vsmall) != 1 || is.na(gs_vsmall)) gs_vsmall <- 10
+  add_entry("Where they appear",
+            "The Summary sheet lists every question with its base size. A question whose base is low carries a warning in words beside it; the crosstab tables themselves are not marked.")
+  add_entry(sprintf("CAUTION: Small base (n<%d)", as.integer(gs_small)),
+            sprintf("The question's effective base is below %d. Percentages move a long way on a few answers, so read the direction rather than the exact number.",
+                    as.integer(gs_small)))
+  add_entry(sprintf("WARNING: Very small base (n<%d)", as.integer(gs_vsmall)),
+            sprintf("The question's effective base is below %d. Results are indicative only and should not be used for decision-making.",
+                    as.integer(gs_vsmall)))
   add_row("", "")
 
   # === CONFIDENTIALITY / DISCLOSURE CONTROL ===

@@ -768,15 +768,78 @@ Files: `lib/summary_builder.R` (the one fix). Tests: 88 assertions in
 
 ## MINOR — open
 
-- **M-A.** SD row prints 0.0 for empty/single-respondent columns
+- **M-A. FIXED 2026-08-06.** SD row prints 0.0 for empty/single-respondent columns
   (`standard_processor.R:553,564`); numeric processor NA-initialises the same
   stat — the two disagree. Executed.
-- **M-B.** Two zero-variance groups with different means: p=1, silently "not
+- **M-B. FIXED 2026-08-06.** Two zero-variance groups with different means: p=1, silently "not
   significant" (`weighting.R:988-996`). All-5s vs all-3s gets no letter. Executed.
-- **M-C.** Excel Guide sheet documents "*"/"**" small-base markers no writer
+- **M-C. FIXED 2026-08-06.** Excel Guide sheet documents "*"/"**" small-base markers no writer
   produces, while "**" does appear meaning significant chi-square
   (`excel_writer.R:1682-1683` vs `standard_processor.R:1359`) — the Guide's
   definition inverts its meaning.
+
+**M-A / M-B / M-C FIXED 2026-08-06.** All three reproduced by execution first.
+M-A and M-B are the same defect in two places: a statistic reporting a number it
+had not computed.
+
+**M-A — the SD row now says nothing where it knows nothing.** `sd_values` was
+initialised to **0**, so an EMPTY column and a ONE-PERSON column both published
+`0.0` — a positive claim that the column has no spread, which is unknowable from
+one respondent and meaningless with none. It NA-initialises now, matching the
+numeric processor, which has always done so; the two processors published
+different answers to the same situation and now agree. The weighted branch's
+`denom <= 0` case went the same way (an undefined Bessel variance was collapsing
+to `sqrt(0)`). A genuinely constant column — three respondents who all answered
+5 — still reports `0`, because that is its real SD; the fix distinguishes "no
+spread" from "not enough data to say". Verified at the deliverable level: the
+cell is **blank** in a real `.xlsx` (not the literal text "NA"), and `null` on
+the v2 island, which renders as an empty cell with no "null"/"NaN" leaking.
+*Visible change: any deliverable that printed `0.0` under an empty or
+one-person column now prints blank.*
+
+**M-B — an untestable comparison stops reporting a p-value.** `se == 0` returned
+`p = 1, failed = FALSE`: the test ran and found nothing. So all-5s against
+all-3s reported the same p as all-5s against all-5s, and — since the NPS rows
+moved to the ±100 buckets — an all-promoter column against an all-detractor one
+did too. The zero-SE branch now splits:
+- means **equal** → `p = 1`. The groups really are alike; that is honest.
+- means **differ** → `failed = TRUE`, so `p = NA`. The t-test is undefined here.
+- `se` **unreadable** → `failed = TRUE` as well. A variance that could not be
+  computed is a failed computation, never a completed test. (This second coat is
+  not in the finding; it sat in the same `if`.)
+
+**p = 0 was considered and rejected.** Zero *sample* variance is not zero
+*sampling* variance: five respondents who all happen to be promoters carry real
+uncertainty that a within-group SD of 0 cannot express, so "infinitely
+significant" would be as wrong as "no difference". **No letter appears in any of
+these cases, before or after** — this is an honest-reporting fix, not a change to
+a published figure. It also brings R into line with the v2 JS engine, which has
+always returned `null` from `stats.meanZ` at `se == 0`; R was the outlier.
+
+*Recorded, not done:* surfacing "untestable" to the operator would mean threading
+a per-cell flag up to run level — new plumbing an M-tier fix does not justify.
+The p-value is now honest; nothing announces it.
+
+**M-C — the Guide described markers that do not exist, and inverted the one that
+does.** It documented `*` and `**` as small-base markers. No writer has ever
+produced either. Meanwhile `**` **does** appear in the workbook, appended to a
+chi-square row to mean SIGNIFICANT (`standard_processor.R:1469`) — so a reader
+meeting the only asterisks the workbook contains would have concluded the result
+rested on a very small base. The section now describes what the Summary sheet
+actually writes: `CAUTION: Small base (n<30)` and `WARNING: Very small base
+(n<10)` in words, styled amber and red, against the **effective** base — with
+both thresholds read from the config and the writer rather than hard-coded, so
+the Guide cannot drift from the numbers it quotes. `**` is documented in the
+significance section as the chi-square marker, **gated on `enable_chi_square`**
+so a report that cannot contain it does not document it.
+
+Files: `lib/standard_processor.R`, `lib/weighting.R`, `lib/excel_writer.R`,
+`lib/crosstabs/workbook_builder.R` (passes the very-small-base threshold to the
+Guide). Tests: 9 blocks appended to `test_stats_semantics.R` and 4 to
+`test_excel_output.R`, plus the I-stats session's pinned M-B test rewritten to
+the new semantics; **17 assertions proved failing** against the pre-fix code by
+revert-run-restore. Gates after: tabs R **4,518 / 0 / 0 / 0** (from 4,490),
+**31** JS suites green, project-root at its documented 3-failure baseline.
 - **M-D.** `examples/tabs/basic/` still refuses to load (known; self-declared
   POC). Repo-root CLAUDE.md references its `survey_data.csv`; actual file is
   `data.csv`. Delete the folder or fix the config.
