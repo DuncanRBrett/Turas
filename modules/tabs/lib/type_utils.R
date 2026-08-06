@@ -98,6 +98,14 @@ safe_numeric <- function(x, na_value = NA_real_) {
 }
 
 
+# The module's single yes/no vocabulary. Every gate column (Selection sheet's
+# Include/UseBanner/..., Options sheet's ShowInOutput/ExcludeFromIndex — see
+# normalise_flag_column in crosstabs/data_setup.R), every Y/N Settings cell and
+# safe_logical() below all read the same words, so the same token means the same
+# thing in every corner of the module (production review 2026-08, C3).
+.TABS_FLAG_TRUE_TOKENS  <- c("Y", "YES", "TRUE", "T", "1")
+.TABS_FLAG_FALSE_TOKENS <- c("N", "NO", "FALSE", "F", "0")
+
 #' Safely convert to logical
 #'
 #' USAGE: Convert config settings to TRUE/FALSE
@@ -128,12 +136,12 @@ safe_logical <- function(x, default = FALSE) {
   x_upper <- toupper(trimws(as.character(x)))
 
   # Check TRUE values
-  if (x_upper %in% c("TRUE", "T", "Y", "YES", "1")) {
+  if (x_upper %in% .TABS_FLAG_TRUE_TOKENS) {
     return(TRUE)
   }
 
   # Check FALSE values
-  if (x_upper %in% c("FALSE", "F", "N", "NO", "0")) {
+  if (x_upper %in% .TABS_FLAG_FALSE_TOKENS) {
     return(FALSE)
   }
 

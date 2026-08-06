@@ -287,13 +287,15 @@ HTML can disagree on NPS letters; the Excel letter answers "is the mean rating
 different", not "is the NPS different". Fix: store ±100 bucket values as the
 test values for NPS rows.
 
-**I2. `population_size` junk silently disables the FPC.** `crosstabs_config.R:268-272`
+**I2. `population_size` junk silently disables the FPC — FIXED 2026-08-06 (Job I-batch).**
+`crosstabs_config.R:268-272`
 turns any unparseable value (e.g. `"5,000"` with a comma) into NULL with no
 message — on a census project every interval widens and letters can change.
 The Population *sheet* path refuses loudly; the Settings cell doesn't. Fix: add
 `population_size` to the raw-cell validation family (I11 pattern).
 
-**I3. Junk `apply_weighting` silently runs unweighted.** `safe_logical` warns one
+**I3. Junk `apply_weighting` silently runs unweighted — FIXED 2026-08-06 (Job I-batch).**
+`safe_logical` warns one
 scrollback line and defaults FALSE; all weight preflight checks then skip
 (`preflight_validators.R:532`). Every number in the deliverable is
 wrong-by-weighting. Same class: `generate_stats_pack = "TRUE"` (Y/N setting)
@@ -301,13 +303,83 @@ silently switches the contractual stats pack off; junk `alpha_secondary`
 silently disables dual-sig; `ranking_*`/`decimal_places` junk silently defaults
 (the M9 fix covered the ten dashboard cells only).
 
-**I4. Qual confidentiality dials fail open on a case slip.** `demographic_cuts
+**I4. Qual confidentiality dials fail open on a case slip — FIXED 2026-08-06 (Job I-batch).**
+`demographic_cuts
 = "Block"` (capital) means *allow*; `qual_verbatim_scope = "Noteworthy"` means
 *all* (`qual_quant_layer.R:37-39`, `qual_island_builder.R:95-99`). Executed.
 And `qual_demographic_cuts = "safe"` is a silent no-op at the default
 `min_reporting_base = 1` (k>1 never triggers) — raw demographic tag combos ship
 believing they're k-protected. Fix: validate these enums at load (refuse
 unknown tokens, the sampling_method pattern) and warn when safe-mode has k=1.
+
+**I2/I3/I4 FIXED 2026-08-06.** All three are one defect wearing three coats: a
+Settings cell the loader could not read silently became the DEFAULT — the value
+the operator was overriding. The fix closes the whole class at the one place
+that already refuses on junk statistical settings (`validate_config_settings`),
+rather than the six cells the findings name.
+
+**What now refuses at load, naming the cell and quoting its value:**
+- **Every numeric setting** (`.TABS_NUMERIC_SETTINGS`, 26 keys — the M9
+  dashboard ten plus `alpha`, `alpha_secondary`, the bases, all five
+  `decimal_places*`, the four `ranking_*`, `index_summary_decimal_places`,
+  `population_size`, `wave_order`). The raw cell is tested, because the parsed
+  value cannot tell junk from a real default.
+- **Every Y/N toggle** (`.TABS_LOGICAL_SETTINGS`, 40 keys — everything read
+  through `safe_logical`, `apply_weighting` among them).
+- **The two Y/N settings read as strings** (`.TABS_FLAG_SETTINGS`):
+  `generate_stats_pack` and `create_index_summary`, both of which gate on an
+  exact `== "Y"` downstream and are now canonicalised to `"Y"`/`"N"` in
+  `build_config_object`, so `TRUE`/`yes`/`1` in the cell all mean yes. This is
+  C3's vocabulary (`.TABS_FLAG_TRUE_TOKENS`/`.TABS_FLAG_FALSE_TOKENS`), moved to
+  `type_utils.R` beside `safe_logical` — which now reads the same two vectors,
+  so the converter and the validator cannot drift.
+- **`population_size` ≤ 1**, which the template already documents as invalid
+  ("whole number greater than 1, or leave blank").
+- **All four qualitative dials** (`.TABS_QUAL_ENUMS`), normalised
+  case-insensitively first (`"Block"` → `"block"`, `"Must Read"` →
+  `"must_read"`) and refusing only on a genuinely unknown word. The finding
+  names two dials; `qual_confidentiality_mode` and `qual_noteworthy_default`
+  are the same enum family and fell through the same way (a mis-cased `"Full"`
+  silently shipped no text at all), so they were fixed with them.
+
+**A blank cell still means "use the documented default", silently** — including
+`""`, whitespace, and the literal string `"NA"` (readxl keeps that as text).
+That is what keeps every existing config byte-identical.
+
+**The warning I4 asked for.** `qual_demographic_cuts = "safe"` with
+`min_reporting_base = 1` prints a boxed console warning rather than refusing —
+it is a legitimate operator choice, and it only fires when a `qual_workbook` is
+actually configured. The claim in the box was verified by execution: with four
+respondents of whom one is the only "Admin + <1yr" person, `safe` at the default
+k=1 ships `Dept=Admin, Tenure=<1yr` on that comment; at k=2 both tags are
+withheld.
+
+**Regression risk, stated plainly:** a config carrying an unreadable value in
+any of these ~70 cells now stops instead of running. Such a config is today
+silently running the *other* way — unweighted, uncorrected, stats-pack-less or
+with a confidentiality gate open — so the refusal surfaces a real defect; but it
+is a behaviour change on live configs. Verified against every shipped artefact:
+the generated `Crosstab_Config_Template.xlsx`, the demo config, and all four
+`Parity_*` configs load and validate clean. Live client configs (CCPB, VAS —
+OneDrive, outside the repo) were **not** checked and should be opened once.
+
+Files: `lib/crosstabs/crosstabs_config.R`, `lib/type_utils.R`,
+`lib/crosstabs/data_setup.R` (vocabulary moved out, no behaviour change).
+Tests: 227 assertions appended to `test_config_contract.R`, including two drift
+guards that parse `build_config_object` and fail if a new toggle or numeric
+setting is added without joining its list, and one that reads
+`qual_island_builder.R`'s own `QUAL_*` constants so the config cannot refuse a
+token the island accepts. **16 of the 17 new blocks were proved failing against
+the pre-fix code** by revert-run-restore (30 assertion failures + 9 errors); the
+block that passed pre-fix is the byte-identical-behaviour guard, which is the
+point. Gates after: tabs R **4,000 / 0 / 0 / 0** (3,773 + exactly the 227 new
+assertions), **29** JS suites green, project-root **571 pass / 3 fail** at its
+documented baseline.
+
+**Not done (same class, recorded):** the non-qual enum settings —
+`outlier_method`, `dashboard_sort_gauges`, `chart_palette_preset` — still fall
+through to their defaults on an unknown token. `alpha_default` already refuses
+case-insensitively, but only when `alpha_secondary` is set.
 
 **I5. FPC missing from two paths that sit beside corrected rows.** NET POSITIVE
 (`standard_processor.R:1054-1091`) and composites (`composite_processor.R:871`)
@@ -546,12 +618,16 @@ brief's recommendation, is recorded under C3. Baseline for the next job: tabs R
 **3,773 / 0 / 0 / 0** and **29** JS suites (the 31 new checks are a new
 `test_selection_flags.R`; the JS suite count is unchanged — C3 is R-only).
 
-**Job I-batch (config honesty — I2, I3, I4).** Extend the raw-cell refusal
-family (see `validate_config_settings` and `test_config_contract.R`) to
-`population_size`; make junk `apply_weighting`/`generate_stats_pack`/
-`alpha_secondary` refuse instead of default; validate the qual enum dials
-(`qual_demographic_cuts`, `qual_verbatim_scope`) against known tokens and warn
-when `"safe"` runs with k=1. All same established pattern; one session.
+**Job I-batch (config honesty — I2, I3, I4). DONE 2026-08-06** — see the
+annotation under I2/I3/I4 above. It was wider than briefed by design: the six
+named cells are instances of one class, so the refusal now covers every numeric
+setting (26), every Y/N toggle (40), the two string-read Y/N settings and all
+four qual dials, with the yes/no vocabulary moved beside `safe_logical` so the
+converter and the validator share it. Baseline for the next job: tabs R
+**4,000 / 0 / 0 / 0** and **29** JS suites (the 227 new checks are appended to
+`test_config_contract.R`; the JS suite count is unchanged — this batch is
+R-only). Note the behaviour change: an unreadable value in any of those cells
+now refuses at load instead of being read as the default.
 
 **Job I-stats (I1, I5, I6 — statistical semantics).** NPS rows store ±100
 bucket values for testing; thread `fpc_mul` through NET POSITIVE and

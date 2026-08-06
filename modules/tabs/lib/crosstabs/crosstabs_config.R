@@ -216,8 +216,14 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE), default = FALSE),
     outlier_method = get_config_value(config, "outlier_method", "IQR"),
 
-    # Stats pack (contractual deliverable — defaults to Y)
-    generate_stats_pack = get_config_value(config, "generate_stats_pack", "Y"),
+    # Stats pack (contractual deliverable — defaults to Y). Canonicalised to
+    # "Y"/"N" because the consumer tests `toupper(...) == "Y"` exactly: a
+    # perfectly reasonable `TRUE` in the cell read as "not Y" and switched the
+    # contractual deliverable off in silence (production review 2026-08, I3).
+    # An unreadable token is left as typed so validate_config_settings can
+    # quote it and refuse.
+    generate_stats_pack = normalise_flag_setting(
+      get_config_value(config, "generate_stats_pack", "Y"), default = "Y"),
 
     # (html_report — the classic HTML report — is RETIRED. It is not read here
     # any more; a config that still carries the row is answered by name in
@@ -235,8 +241,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # the anonymised per-respondent DATA_MICRO island from the v2 report — the
     # aggregates-only ship for insider populations (small staff surveys) where
     # coded records + banner cuts could re-identify individuals. Only an
-    # explicit FALSE disables: blank/junk cells keep the island (default TRUE
-    # passed to safe_logical too, so a stringified-"NA" cell cannot flip it).
+    # explicit FALSE disables: a blank or stringified-"NA" cell keeps the island
+    # (default TRUE passed to safe_logical too, so it cannot flip it). A cell
+    # that is neither blank nor readable as yes/no refuses in
+    # validate_config_settings rather than defaulting the island back ON (I3).
     html_report_v2_microdata = safe_logical(
       get_config_value(config, "html_report_v2_microdata", TRUE), default = TRUE),
     # V11 tabs-integrated tracker (OFF by default). When TRUE AND a waves_source
@@ -279,14 +287,26 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # The three confidentiality dials: text level (hidden default / redacted / full),
     # demographic association (allow / block), and the noteworthy-tier default view.
     # qual_join_id_column overrides the auto-detected host response-id column.
+    # Each dial is normalised to its canonical lowercase token, then refused in
+    # validate_config_settings if it is not one of them (I4). Every consumer
+    # compares with identical(), so "Block" used to mean ALLOW and "Noteworthy"
+    # used to mean ALL — a capital letter silently opened a confidentiality gate.
     qual_workbook = get_config_value(config, "qual_workbook", ""),
-    qual_confidentiality_mode = get_config_value(config, "qual_confidentiality_mode", "hidden"),
-    qual_demographic_cuts = get_config_value(config, "qual_demographic_cuts", "allow"),
-    qual_noteworthy_default = get_config_value(config, "qual_noteworthy_default", "all"),
+    qual_confidentiality_mode = normalise_enum_setting(
+      get_config_value(config, "qual_confidentiality_mode", "hidden"),
+      .TABS_QUAL_ENUMS$qual_confidentiality_mode, "hidden"),
+    qual_demographic_cuts = normalise_enum_setting(
+      get_config_value(config, "qual_demographic_cuts", "allow"),
+      .TABS_QUAL_ENUMS$qual_demographic_cuts, "allow"),
+    qual_noteworthy_default = normalise_enum_setting(
+      get_config_value(config, "qual_noteworthy_default", "all"),
+      .TABS_QUAL_ENUMS$qual_noteworthy_default, "all"),
     # Verbatim scope: which comments ship readable text. "all" = every comment except
     # hide-marked ones; "noteworthy" = only tier >= 1 (noteworthy/must-read/priority).
     # Withheld comments still count in the distribution — only their text is withheld.
-    qual_verbatim_scope = get_config_value(config, "qual_verbatim_scope", "all"),
+    qual_verbatim_scope = normalise_enum_setting(
+      get_config_value(config, "qual_verbatim_scope", "all"),
+      .TABS_QUAL_ENUMS$qual_verbatim_scope, "all"),
     qual_join_id_column = get_config_value(config, "qual_join_id_column", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
     # Must be populated here — config_obj is an explicit whitelist, not the raw settings.
@@ -415,7 +435,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # the default — setting create_index_summary = N did nothing, silently.
     # NULL-when-absent defers to each consumer's own default (create_index_
     # summary's default is composites-driven in create_index_summary_safe).
-    create_index_summary = get_config_value(config, "create_index_summary", NULL),
+    # Y/N flag (create_index_summary_safe reads the flag vocabulary), so it is
+    # canonicalised like generate_stats_pack; NULL when absent so the
+    # composites-driven default still holds.
+    create_index_summary = normalise_flag_setting(
+      get_config_value(config, "create_index_summary", NULL), default = NULL),
     index_summary_show_sections = {
       raw <- get_config_value(config, "index_summary_show_sections", NULL)
       if (is.null(raw)) NULL else safe_logical(raw, default = TRUE)
@@ -466,6 +490,63 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
   )
 }
 
+#' Is a raw Settings cell blank (= "use the documented default")?
+#'
+#' A cleared cell is dropped by the loader entirely, but a cell can still arrive
+#' as "", whitespace, or the literal text "NA" (readxl keeps "NA" as a string).
+#' All of those mean "not set" and must never be read as junk.
+#'
+#' @param raw The raw Settings value
+#' @return TRUE when the cell carries no value
+#' @keywords internal
+is_blank_setting <- function(raw) {
+  if (is.null(raw) || length(raw) == 0) return(TRUE)
+  r1 <- raw[[1]]
+  if (is.null(r1) || (length(r1) == 1 && is.na(r1))) return(TRUE)
+  v <- trimws(as.character(r1))
+  !nzchar(v) || identical(toupper(v), "NA")
+}
+
+#' Normalise a Y/N Settings cell to canonical "Y" / "N"
+#'
+#' Case- and whitespace-insensitive, on the module's single yes/no vocabulary
+#' (\code{.TABS_FLAG_TRUE_TOKENS} / \code{.TABS_FLAG_FALSE_TOKENS} in
+#' type_utils.R). A blank cell takes \code{default}; an unreadable token is
+#' returned trimmed as typed so validate_config_settings() can quote and refuse
+#' it, exactly as normalise_sampling_method() does.
+#'
+#' @param x Raw Settings-sheet value
+#' @param default Value for a blank/absent cell
+#' @return "Y", "N", \code{default}, or the trimmed original
+#' @keywords internal
+normalise_flag_setting <- function(x, default = NULL) {
+  if (is_blank_setting(x)) return(default)
+  v <- trimws(as.character(x[[1]]))
+  u <- toupper(v)
+  if (u %in% .TABS_FLAG_TRUE_TOKENS) return("Y")
+  if (u %in% .TABS_FLAG_FALSE_TOKENS) return("N")
+  v
+}
+
+#' Normalise an enum Settings cell to its canonical token
+#'
+#' Case-insensitive, and spaces/hyphens resolve to underscores ("must read" ->
+#' "must_read"), like normalise_sampling_method(). An unrecognised token is
+#' returned trimmed as typed; validate_config_settings() refuses on it rather
+#' than letting it fall through to the permissive default.
+#'
+#' @param x Raw Settings-sheet value
+#' @param tokens Character vector of canonical tokens
+#' @param default Value for a blank/absent cell
+#' @return A canonical token, \code{default}, or the trimmed original
+#' @keywords internal
+normalise_enum_setting <- function(x, tokens, default) {
+  if (is_blank_setting(x)) return(default)
+  v <- trimws(as.character(x[[1]]))
+  hit <- tokens[tolower(tokens) == tolower(gsub("[ -]", "_", v))]
+  if (length(hit) == 1) hit else v
+}
+
 #' Validate the statistical settings after build_config_object
 #'
 #' A junk cell in a statistical setting must refuse AT LOAD, naming the cell —
@@ -473,6 +554,15 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
 #' per-question DATA_ fault (production review 2026-08, I11). An unrecognised
 #' sampling_method must refuse rather than silently soften the report's whole
 #' confidence vocabulary (I5).
+#'
+#' The same argument covers every OTHER cell whose junk value silently became a
+#' default (I2/I3/I4): a Y/N toggle warned one scrollback line and ran the
+#' opposite way (`apply_weighting` — every published number wrong-by-weighting),
+#' an unparseable number became the default it was meant to override
+#' (`population_size` switching the FPC off on a census project,
+#' `alpha_secondary` switching dual significance off), and a mis-cased
+#' confidentiality dial opened the gate it was set to close
+#' (`qual_demographic_cuts = "Block"` meant ALLOW).
 #'
 #' @param config_obj The built config object
 #' @param raw_settings The raw settings list (to quote the offending cell)
@@ -483,7 +573,8 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
     raw <- if (!is.null(raw_settings)) raw_settings[[key]] else NULL
     if (is.null(raw)) "" else sprintf(" (Settings sheet value: '%s')", as.character(raw)[1])
   }
-  bad <- function(key, why) {
+  bad <- function(key, why,
+                  hint = "Numbers must use '.' as the decimal separator (0.05, not 0,05)") {
     tabs_refuse(
       code = "CFG_INVALID_SETTING",
       title = "Invalid Configuration Setting",
@@ -491,10 +582,15 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
       why_it_matters = "Statistical settings drive every test in the run; a junk value would fail mid-run or silently change what the report claims.",
       how_to_fix = c(
         sprintf("Fix the '%s' row on the config Settings sheet", key),
-        "Numbers must use '.' as the decimal separator (0.05, not 0,05)"
+        hint,
+        "Leave the cell blank to accept the documented default"
       )
     )
   }
+  # A Y/N cell's fix is a different sentence from a number's.
+  flag_hint <- sprintf("Accepted values (any case): %s",
+                       paste(c(.TABS_FLAG_TRUE_TOKENS, .TABS_FLAG_FALSE_TOKENS),
+                             collapse = ", "))
 
   a <- config_obj$alpha
   if (!is.numeric(a) || length(a) != 1 || is.na(a) || a <= 0 || a >= 1) {
@@ -515,18 +611,53 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
       bad(key, "must be a whole number between 0 and 6")
     }
   }
-  # Dashboard scales and gauge thresholds (M9). These take safe_numeric() with a
-  # fallback, so a junk cell silently BECAME the default — a 0-5 project that
-  # typed "five" got a scale maximum of 10 and every gauge read at half
-  # strength. The parsed value cannot tell junk from a real default, so the junk
-  # test reads the raw cell; blank or absent still means "use the default".
-  for (key in .TABS_DASHBOARD_NUMERIC_SETTINGS) {
+  # Every numeric setting that takes safe_numeric() with a fallback (M9, I2, I3).
+  # A junk cell silently BECAME the default: a 0-5 project that typed "five" got
+  # a scale maximum of 10 and every gauge read at half strength; a
+  # population_size of "5,000" switched the finite population correction off on
+  # a census project; an alpha_secondary of "ten percent" switched dual
+  # significance off. The parsed value cannot tell junk from a real default, so
+  # the test reads the raw cell; blank or absent still means "use the default".
+  for (key in .TABS_NUMERIC_SETTINGS) {
     raw <- if (!is.null(raw_settings)) raw_settings[[key]] else NULL
-    if (is.null(raw) || length(raw) == 0) next
-    raw1 <- raw[1]
-    if (is.na(raw1) || !nzchar(trimws(as.character(raw1)))) next
-    if (is.na(suppressWarnings(as.numeric(raw1)))) {
+    if (is_blank_setting(raw)) next
+    if (is.na(suppressWarnings(as.numeric(raw[[1]])))) {
       bad(key, "must be a number")
+    }
+  }
+  # Y/N toggles (I3). safe_logical() prints one scrollback line and returns the
+  # default, so `apply_weighting = "Yes please"` ran the whole study unweighted
+  # — every published number wrong — with all the weight preflight checks
+  # skipped because they gate on the parsed FALSE.
+  for (key in .TABS_LOGICAL_SETTINGS) {
+    raw <- if (!is.null(raw_settings)) raw_settings[[key]] else NULL
+    if (is_blank_setting(raw)) next
+    if (is.logical(raw[[1]])) next
+    tok <- toupper(trimws(as.character(raw[[1]])))
+    if (!(tok %in% c(.TABS_FLAG_TRUE_TOKENS, .TABS_FLAG_FALSE_TOKENS))) {
+      bad(key, "must be yes or no", hint = flag_hint)
+    }
+  }
+  # The Y/N settings consumers read as STRINGS rather than through safe_logical:
+  # generate_stats_pack gates a contractual deliverable on an exact `== "Y"`, so
+  # a cell reading TRUE switched the stats pack off in silence.
+  for (key in .TABS_FLAG_SETTINGS) {
+    v <- config_obj[[key]]
+    if (is.null(v) || !nzchar(as.character(v)[1])) next
+    if (!(as.character(v)[1] %in% c("Y", "N"))) {
+      bad(key, "must be yes or no", hint = flag_hint)
+    }
+  }
+  # population_size (I2). Parsed, it is NULL both when absent and when junk, so
+  # the range test has to read the raw cell too. The template documents "whole
+  # number greater than 1, or leave blank"; anything else would silently mean
+  # "no finite population correction" on precisely the census projects that
+  # asked for one.
+  raw_pop <- if (!is.null(raw_settings)) raw_settings[["population_size"]] else NULL
+  if (!is_blank_setting(raw_pop)) {
+    pop <- suppressWarnings(as.numeric(raw_pop[[1]]))
+    if (!is.na(pop) && pop <= 1) {
+      bad("population_size", "must be a whole number greater than 1 (leave it blank for no finite population correction)")
     }
   }
   # A scale maximum divides every gauge and heatmap cell; zero or negative makes
@@ -551,6 +682,61 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
       )
     )
   }
+
+  # The qualitative confidentiality dials (I4). Every consumer compares with
+  # identical(), so an unrecognised token fell through to the PERMISSIVE branch:
+  # "Block" meant allow, "Noteworthy" meant show every verbatim. A dial set to
+  # close a gate silently opened it, on exactly the anonymity-sensitive projects
+  # that set it. Case and separators are normalised first, so only a genuinely
+  # unknown word reaches this refusal.
+  for (key in names(.TABS_QUAL_ENUMS)) {
+    v <- config_obj[[key]]
+    if (is.null(v) || length(v) == 0 || is.na(v[1]) || !nzchar(as.character(v)[1])) next
+    tokens <- .TABS_QUAL_ENUMS[[key]]
+    if (!(as.character(v)[1] %in% tokens)) {
+      tabs_refuse(
+        code = "CFG_INVALID_SETTING",
+        title = sprintf("Unrecognised %s", key),
+        problem = sprintf("Setting '%s' is '%s', which is not one of its allowed values.",
+                          key, as.character(v)[1]),
+        why_it_matters = paste0(
+          "This is a confidentiality dial. An unrecognised value would fall ",
+          "through to the most permissive setting - demographic tags or ",
+          "verbatim text shipping in a report that was configured to withhold them."
+        ),
+        how_to_fix = c(
+          sprintf("Set '%s' to one of: %s", key, paste(tokens, collapse = ", ")),
+          "Case does not matter - the value is read case-insensitively",
+          "Leave the cell blank to accept the documented default"
+        ),
+        expected = paste(tokens, collapse = ", "),
+        observed = as.character(v)[1]
+      )
+    }
+  }
+
+  # "safe" k-anonymises demographic tag COMBINATIONS against min_reporting_base
+  # — but the anonymiser only engages when k > 1 (qual_island_builder.R), and
+  # min_reporting_base defaults to 1. So the source-safe-looking combination
+  # 'safe' + default k ships every raw tag combination while reading as
+  # protected. This is the operator's choice to make, so it warns rather than
+  # refusing; it only fires when a comment workbook is actually configured.
+  qw <- config_obj$qual_workbook
+  if (identical(config_obj$qual_demographic_cuts, "safe") &&
+      !is.null(qw) && length(qw) == 1 && !is.na(qw) && nzchar(as.character(qw))) {
+    k <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
+    if (!(length(k) == 1L && !is.na(k) && k > 1)) {
+      cat("\n┌─── TURAS DISCLOSURE WARNING ────────────────────┐\n")
+      cat("│ qual_demographic_cuts = 'safe' but min_reporting_base = ",
+          format(config_obj$min_reporting_base), "\n", sep = "")
+      cat("│ 'safe' k-anonymises comment tag COMBINATIONS against that threshold,\n")
+      cat("│ and a threshold of 1 anonymises nothing - every raw tag combination\n")
+      cat("│ (e.g. 'Admin + <1yr + Cape Town', which may be one person) ships.\n")
+      cat("│ How to fix: set min_reporting_base to your disclosure floor (e.g. 10),\n")
+      cat("│   or set qual_demographic_cuts = 'block' to ship no tags at all.\n")
+      cat("└────────────────────────────────────────────┘\n\n")
+    }
+  }
   invisible(TRUE)
 }
 
@@ -563,6 +749,60 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "dashboard_green_mean", "dashboard_amber_mean",
   "dashboard_green_index", "dashboard_amber_index",
   "dashboard_green_custom", "dashboard_amber_custom"
+)
+
+# EVERY Settings cell that must parse as a number (I2/I3). The dashboard family
+# above plus the statistical, display, ranking and universe settings — each read
+# through safe_numeric()/as.numeric() with a fallback, so junk in the cell
+# became the value the operator was overriding. test_config_contract.R parses
+# build_config_object and fails if a numeric setting is added without joining
+# this list.
+.TABS_NUMERIC_SETTINGS <- c(
+  .TABS_DASHBOARD_NUMERIC_SETTINGS,
+  "alpha", "alpha_secondary", "significance_min_base", "min_reporting_base",
+  "decimal_places_percent", "decimal_places_ratings", "decimal_places_index",
+  "decimal_places_numeric", "decimal_places", "index_summary_decimal_places",
+  "ranking_tie_threshold_pct", "ranking_gap_threshold_pct",
+  "ranking_completeness_threshold_pct", "ranking_min_base",
+  "population_size", "wave_order"
+)
+
+# EVERY Settings cell read through safe_logical() (I3). safe_logical prints a
+# single scrollback line and returns the default, so an unreadable toggle ran
+# the analysis the other way with nothing in the deliverable saying so.
+# test_config_contract.R parses build_config_object and fails if a toggle is
+# added without joining this list.
+.TABS_LOGICAL_SETTINGS <- c(
+  "apply_weighting", "show_unweighted_n", "show_effective_n", "show_weighted_base",
+  "show_frequency", "show_percent_column", "show_percent_row",
+  "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
+  "enable_significance_testing", "bonferroni_correction", "enable_checkpointing",
+  "zero_division_as_blank", "show_standard_deviation", "test_net_differences",
+  "create_sample_composition", "enable_chi_square", "show_net_positive",
+  "show_numeric_median", "show_numeric_mode", "show_numeric_outliers",
+  "exclude_outliers_from_stats",
+  "html_report_v2", "html_report_v2_microdata", "html_report_v2_tracking",
+  "show_dashboard", "show_patterns", "show_differences", "show_tracking",
+  "show_qualitative", "embed_frequencies", "include_summary", "show_charts",
+  "enable_ai_insights", "generate_reader_report", "reader_ai_prose",
+  "index_summary_show_sections", "index_summary_show_base_sizes",
+  "index_summary_show_composites"
+)
+
+# Y/N settings whose consumers read the STRING (an exact `== "Y"` or the flag
+# vocabulary) rather than a converted logical. They are canonicalised to "Y"/"N"
+# in build_config_object so every consumer agrees, and refuse on any other token.
+.TABS_FLAG_SETTINGS <- c("generate_stats_pack", "create_index_summary")
+
+# The qualitative confidentiality dials and their allowed tokens (I4). These
+# MUST match QUAL_TEXT_MODES / QUAL_VERBATIM_SCOPES / QUAL_NOTEWORTHY_DEFAULTS
+# in qual_island_builder.R and the template dropdowns — test_config_contract.R
+# reads both files and fails on drift.
+.TABS_QUAL_ENUMS <- list(
+  qual_confidentiality_mode = c("hidden", "redacted", "full"),
+  qual_demographic_cuts     = c("allow", "safe", "block"),
+  qual_noteworthy_default   = c("all", "noteworthy", "must_read", "priority"),
+  qual_verbatim_scope       = c("all", "noteworthy")
 )
 
 # Canonical sampling-method tokens (must match the v2 renderer's METHOD_KEYS in

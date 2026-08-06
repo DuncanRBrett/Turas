@@ -18,6 +18,7 @@
 #   - data_loader.R (for load_survey_structure, load_survey_data_smart)
 #   - validation_utils.R (for validate_data_frame)
 #   - config_utils.R (for get_config_value)
+#   - type_utils.R (for the .TABS_FLAG_*_TOKENS yes/no vocabulary)
 #   - path_utils.R (for resolve_path)
 #   - weighting.R (for get_weight_vector, validate_weights, etc.)
 #   - composite_processor.R (for load_composite_definitions)
@@ -43,9 +44,9 @@
 #
 # The vocabulary matches what workbook_builder.R (create_index_summary) and
 # excel_writer.R already accept, so the same word means the same thing in every
-# corner of the module.
-.TABS_FLAG_TRUE_TOKENS  <- c("Y", "YES", "TRUE", "T", "1")
-.TABS_FLAG_FALSE_TOKENS <- c("N", "NO", "FALSE", "F", "0")
+# corner of the module. It lives beside safe_logical() in type_utils.R
+# (.TABS_FLAG_TRUE_TOKENS / .TABS_FLAG_FALSE_TOKENS) because the Y/N Settings
+# cells validate against the same words (production review 2026-08, I3).
 
 #' Normalise a Y/N Gate Column to Canonical "Y" / "N"
 #'
