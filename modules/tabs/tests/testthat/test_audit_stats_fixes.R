@@ -68,6 +68,12 @@ source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
 source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
 source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
+# build_fpc_multipliers() / resolve_column_populations(): every significance call
+# in standard_processor.R goes through them. Without this the file only ran
+# under tools/run_all_tests.R, where a sibling test file had already sourced
+# report_shared.R into the global environment — the test_file() invocation
+# documented in this header errored.
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
 # Shared utility functions (from shared_functions.R), sourced inline to avoid
 # the module orchestrator side effects (same convention as sibling test files)

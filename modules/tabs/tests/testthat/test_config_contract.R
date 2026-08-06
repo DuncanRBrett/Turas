@@ -146,6 +146,91 @@ test_that("a clean default config validates", {
   expect_true(validate_config_settings(obj))
 })
 
+context("config contract — dashboard scales and thresholds (M9)")
+
+# M9 (production review 2026-08). The dashboard numerics take the safe_numeric
+# path with a fallback: junk in the cell became the DEFAULT, silently. A 0-5
+# project that typed "five" got a scale maximum of 10 and every gauge read at
+# half strength, with nothing anywhere saying so. These settings are statistical
+# settings — they decide what colour the client sees — so they refuse at load
+# like their siblings above.
+
+test_that("junk dashboard_scale_mean refuses instead of silently becoming 10", {
+  raw <- list(dashboard_scale_mean = "five")
+  obj <- suppressWarnings(build_config_object(raw))
+  # The silent substitution that makes this invisible without validation:
+  expect_equal(obj$dashboard_scale_mean, 10)
+  err <- tryCatch({ validate_config_settings(obj, raw); NULL }, error = function(e) e)
+  expect_false(is.null(err))
+  expect_match(conditionMessage(err), "dashboard_scale_mean")
+  expect_match(conditionMessage(err), "five", fixed = TRUE)
+})
+
+test_that("junk gauge thresholds refuse, naming the cell", {
+  for (key in c("dashboard_green_mean", "dashboard_amber_mean",
+                "dashboard_green_index", "dashboard_amber_index",
+                "dashboard_green_net", "dashboard_amber_net",
+                "dashboard_green_custom", "dashboard_amber_custom",
+                "dashboard_scale_index")) {
+    raw <- setNames(list("seven-ish"), key)
+    obj <- suppressWarnings(build_config_object(raw))
+    err <- tryCatch({ validate_config_settings(obj, raw); NULL }, error = function(e) e)
+    expect_false(is.null(err), info = paste(key, "did not refuse"))
+    expect_match(conditionMessage(err), key)
+  }
+})
+
+test_that("a scale maximum of zero or below refuses (it normalises every gauge)", {
+  for (v in list(0, -5)) {
+    raw <- list(dashboard_scale_mean = v)
+    obj <- build_config_object(raw)
+    expect_error(validate_config_settings(obj, raw), class = "turas_refusal",
+                 info = paste("scale", v, "did not refuse"))
+  }
+})
+
+test_that("blank and absent dashboard cells still take the default without complaint", {
+  # A cleared cell means "use the default", not "refuse" — these settings are
+  # optional and most configs never carry them.
+  expect_true(validate_config_settings(build_config_object(list()), list()))
+  for (v in list("", "  ", NA)) {
+    raw <- list(dashboard_scale_mean = v, dashboard_green_mean = v)
+    obj <- suppressWarnings(build_config_object(raw))
+    expect_true(validate_config_settings(obj, raw),
+                info = paste("blank-ish value refused:", format(v)))
+    expect_equal(obj$dashboard_scale_mean, 10)
+  }
+})
+
+test_that("real dashboard values validate and reach config_obj intact", {
+  raw <- list(dashboard_scale_mean = 5, dashboard_green_mean = 4,
+              dashboard_amber_mean = 3, dashboard_amber_net = -10)
+  obj <- build_config_object(raw)
+  expect_true(validate_config_settings(obj, raw))
+  expect_equal(obj$dashboard_scale_mean, 5)
+  expect_equal(obj$dashboard_green_mean, 4)
+  # A NET threshold is a percentage-point difference and may legitimately be
+  # negative — the range rule applies to scale maxima only.
+  expect_equal(obj$dashboard_amber_net, -10)
+})
+
+test_that("junk significance_min_base refuses, so low_base_threshold is never null", {
+  # The island's low_base_threshold is read straight off this setting
+  # (data_layer_writer.R build_dl_project). A junk cell would carry NA into it
+  # and silently disarm every low-base flag in the v2 report; the refusal here
+  # is what makes that unreachable.
+  raw <- list(significance_min_base = "thirty")
+  obj <- suppressWarnings(build_config_object(raw))
+  expect_true(is.na(obj$significance_min_base))
+  err <- tryCatch({ validate_config_settings(obj, raw); NULL }, error = function(e) e)
+  expect_false(is.null(err))
+  expect_match(conditionMessage(err), "significance_min_base")
+  # A valid setting reaches config_obj as a usable number.
+  ok <- build_config_object(list(significance_min_base = 50))
+  expect_true(validate_config_settings(ok))
+  expect_equal(ok$significance_min_base, 50)
+})
+
 context("config contract — sampling_method (I5)")
 
 test_that("case slips normalise to the canonical token", {

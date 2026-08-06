@@ -63,6 +63,12 @@ source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
 # Source weighting (needed for significance testing)
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
 
+# Source report_shared (build_fpc_multipliers / resolve_column_populations —
+# process_standard_question calls them on every significance path). Without it
+# the file only ran under tools/run_all_tests.R, where a sibling file had
+# already sourced it into the global environment.
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
+
 # Define shared utility functions (from shared_functions.R)
 # Sourced inline to avoid shared_functions.R's module orchestrator side effects
 # Assigned to globalenv so standard_processor.R functions can find them
@@ -165,7 +171,11 @@ make_processor_banner <- function(data) {
   indices <- indices_result$row_indices  # Extract row_indices (as analysis_runner.R does)
   weights <- rep(1, nrow(data))
   bases <- calculate_banner_bases(indices_result, weights, is_weighted = FALSE)
-  list(banner = banner, indices = indices, weights = weights, bases = bases)
+  # indices_result is carried too: calculate_banner_bases() reads $row_indices
+  # off it, so a test building weighted bases must pass the whole object, not
+  # the already-unwrapped `indices`.
+  list(banner = banner, indices = indices, indices_result = indices_result,
+       weights = weights, bases = bases)
 }
 
 # Standard config for processing
@@ -842,6 +852,87 @@ test_that("significance disabled produces no Sig. rows", {
   expect_false("Sig." %in% result$RowType)
 })
 
+# M8 (production review 2026-08): the significance letters are a statistical
+# result, not a decoration of the percent row. A report that hides the column-%
+# row to publish counts only still tests the same proportions on the same
+# bases, so it must still get the same letters.
+test_that("proportion Sig. letters survive show_percent_column = N", {
+  # A deliberate, unmissable gender split so the letters are non-empty and the
+  # comparison below is testing letters, not two empty strings.
+  data <- data.frame(
+    Gender = rep(c("Male", "Female"), each = 100),
+    Q1 = c(rep("Satisfied", 90), rep("Dissatisfied", 10),
+           rep("Satisfied", 20), rep("Dissatisfied", 80)),
+    stringsAsFactors = FALSE
+  )
+  b <- make_processor_banner(data)
+
+  question_info <- data.frame(
+    QuestionCode = "Q1",
+    Variable_Type = "Single_Response",
+    Columns = "Q1",
+    stringsAsFactors = FALSE
+  )
+  question_options <- data.frame(
+    OptionText = c("Satisfied", "Dissatisfied"),
+    DisplayText = c("Satisfied", "Dissatisfied"),
+    ShowInOutput = c("Y", "Y"),
+    DisplayOrder = c(1, 2),
+    stringsAsFactors = FALSE
+  )
+
+  run_with <- function(show_pct) {
+    config <- make_processor_config()
+    config$show_frequency <- TRUE
+    config$show_percent_column <- show_pct
+    process_standard_question(
+      data, question_info, question_options,
+      b$banner, b$indices, b$weights, b$bases, config
+    )
+  }
+
+  shown <- run_with(TRUE)
+  hidden <- run_with(FALSE)
+
+  sig_shown <- shown[shown$RowType == "Sig.", , drop = FALSE]
+  sig_hidden <- hidden[hidden$RowType == "Sig.", , drop = FALSE]
+
+  # The letters exist at all when the percent column is hidden...
+  expect_equal(nrow(sig_hidden), nrow(sig_shown))
+  expect_true(nrow(sig_hidden) > 0)
+  # ...and they are the same letters, column for column.
+  sig_cols <- setdiff(names(sig_shown), c("RowLabel", "RowType", "RowSource"))
+  for (col in sig_cols) {
+    expect_equal(sig_hidden[[col]], sig_shown[[col]],
+                 info = paste("Sig letters differ in column", col))
+  }
+  # The split is real, so at least one letter was actually earned.
+  expect_true(any(nzchar(unlist(sig_hidden[, sig_cols])) &
+                    unlist(sig_hidden[, sig_cols]) != "-"))
+
+  # With the percent row gone, the letters sit under the row that still shows —
+  # the frequency row for that option.
+  first_sig <- which(hidden$RowType == "Sig.")[1]
+  expect_equal(hidden$RowType[first_sig - 1], "Frequency")
+
+  # And hiding the percent column removes only the percent rows.
+  expect_false("Column %" %in% hidden$RowType)
+  expect_true("Frequency" %in% hidden$RowType)
+
+  # With every display row switched off there is nothing for the letters to
+  # annotate, so no bare Sig. row is emitted.
+  config_blank <- make_processor_config()
+  config_blank$show_frequency <- FALSE
+  config_blank$show_percent_column <- FALSE
+  config_blank$show_percent_row <- FALSE
+  config_blank$show_net_positive <- FALSE
+  blank <- process_standard_question(
+    data, question_info, question_options,
+    b$banner, b$indices, b$weights, b$bases, config_blank
+  )
+  expect_false(!is.null(blank) && "Sig." %in% blank$RowType)
+})
+
 
 # ==============================================================================
 # 8. Weighted processing
@@ -860,7 +951,7 @@ test_that("weighted frequencies differ from unweighted", {
   weights <- runif(nrow(data), 0.5, 2.0)
 
   # Recalculate bases with weights
-  bases_weighted <- calculate_banner_bases(b$indices, weights, is_weighted = TRUE)
+  bases_weighted <- calculate_banner_bases(b$indices_result, weights, is_weighted = TRUE)
 
   question_info <- data.frame(
     QuestionCode = "Q1",

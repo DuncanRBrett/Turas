@@ -67,6 +67,18 @@ code inventory. Suites at that point: R 3,327 pass / 0 fail / 0 warn / 0 skip
 (3,587 before the classic suites were deleted with their code); all 25 JS
 suites green.
 
+**M8, M9 and M11 are now FIXED** (2026-08-06, branch
+`fix/tabs-i20-reader-mark-rekeying`), plus the `test_audit_stats_fixes.R`
+`source()` rider noted above. Tabs R suite 3,602 pass / 0 fail / 0 warn /
+0 skip (3,552 before the batch); all 28 JS suites green. Each fix was proved to
+fail against the pre-fix code before being accepted.
+
+| Finding | What changed |
+|---------|--------------|
+| **M8** | The proportion significance block required `show_percent_column`, so a report published as counts-only lost every proportion letter — a display toggle deciding a statistical result. The test is on the column proportions (count / base) either way and the base row is unchanged, so the same letters now attach whether or not the percent row is shown; they are appended after the option's shown rows, which puts them under the **frequency** row when the percent column is hidden. A new `option_shows_a_row` guard means an option with frequency, column % and row % all off still emits nothing — no bare Sig. row with nothing to annotate. Verified end to end: the counts-only Excel table carries the letters, and the v2 island's category rows carry them too (the sig row forward-fills to the frequency row's label, so pairing and row count are unchanged). |
+| **M9** | Half of this was already closed and is now pinned by a test: junk in `significance_min_base` refuses at load (I11), so the island's `low_base_threshold` can never carry NA and the low-base ⚠ flags cannot silently disappear. The live half was different from the write-up — the dashboard numerics do **not** go NA. Each takes `safe_numeric(x, default)`, so junk silently *became the default*: a 0-5 project that typed "five" got a scale maximum of 10 and every gauge read at half strength, saying nothing. `validate_config_settings` now refuses on an unparseable cell in any of the ten `dashboard_scale_*` / `dashboard_green_*` / `dashboard_amber_*` settings, naming the cell and quoting its value, and on a scale maximum of zero or below (it divides every gauge). The junk test reads the raw cell, because the parsed value can no longer tell junk from a genuine default; blank, whitespace and absent all still mean "use the default" and never refuse. |
+| **M11** | `d2.categories()` grouped questions in a plain `{}`, so a Selection Category named `constructor` / `toString` / `valueOf` hit the inherited property, the group was never created, and the next line pushed into `undefined` — the v2 boot crashed on a category name the analyst is entitled to type. The same file's `d2.questionByCode()` returned the *inherited function* for an absent poison code instead of null, handing a function on as if it were a question. Both maps are now `Object.create(null)`. New `tests/poison_keys_tests.mjs` covers every `Object.prototype` name as a category and as a code. |
+
 **I20 is now FIXED** (2026-08-06), to the binding design in
 `I20_READER_MARK_REKEYING_DESIGN.md`. Its other half was already closed
 (`qual.textPublished` re-gates every frozen qualitative pin at render,
@@ -109,6 +121,7 @@ own `source()` list omits `report_shared.R`, so the file only runs under
 `testthat::test_file()` invocation its own header documents. And three failures
 in Shared Infrastructure predate this batch on `main` — a module-registry count
 that expects 14 against a repo with 16, and a missing `docs/adr` directory.
+*(The `source()` gap is now closed — see the M8/M9/M11 batch below.)*
 
 **I1 and I2 are now FIXED** — the cross-engine statistics batch landed on main
 as `a013112d` (fractional n_eff), `049fc1c2` (Sig.2 and mean-row carriage) and
@@ -229,10 +242,10 @@ unrecognised-setting warning.
 - **M5.** v2 pivot keeps first row per (label, source, type) — duplicate option labels show both rows in Excel, one in v2 (`data_layer_writer.R:619-627`).
 - **M6.** `extract_composite_rows` references `comp_def` outside its NULL guard (`summary_builder.R:303`) — crash-shaped, loud.
 - **M7.** Dual-alpha: composite rows never get a Sig.2 row (`composite_processor.R:762`).
-- **M8.** Excel proportion sig letters silently vanish when `show_percent_column = N` (`standard_processor.R:225`).
-- **M9.** Junk `significance_min_base` → island `low_base_threshold` null → all low-base ⚠ flags silently gone in v2 (`type_utils.R:94-97`, `data_layer_writer.R:144,722`); same silent-NA path drops dashboard questions on junk `dashboard_scale_*`/`gauge_*`.
+- **M8.** Excel proportion sig letters silently vanish when `show_percent_column = N` (`standard_processor.R:225`). — **FIXED**: the letters no longer depend on a display toggle; they attach to the frequency row when the percent column is hidden, and an option showing no rows at all emits none.
+- **M9.** Junk `significance_min_base` → island `low_base_threshold` null → all low-base ⚠ flags silently gone in v2 (`type_utils.R:94-97`, `data_layer_writer.R:144,722`); same silent-NA path drops dashboard questions on junk `dashboard_scale_*`/`gauge_*`. — **FIXED**, with the diagnosis corrected: the `significance_min_base` half was already unreachable (I11 refuses it at load — now pinned by a test), and the dashboard settings never went NA. They silently took the *default* instead, so junk in any of the ten dashboard scale/threshold cells now refuses at load naming the cell, as does a scale maximum of zero or below. Blank still means "use the default".
 - **M10.** `decimal_places_index` carried on the island, read by nothing; 0-100 declared rating scales take percent decimals via the `scale_max === 100` NPS proxy (`01_format.js:82`).
-- **M11.** A Selection Category named `constructor`/`toString`/`valueOf` crashes the v2 boot (`20_data.js:180-188` plain-object membership test).
+- **M11.** A Selection Category named `constructor`/`toString`/`valueOf` crashes the v2 boot (`20_data.js:180-188` plain-object membership test). — **FIXED**: both maps in that file are null-prototype now (`categories()` and the `questionByCode` index, which had the same defect — it returned the inherited function for an absent poison code instead of null).
 - **M12.** Patterns: exact tie at top still crowned "highest of N" (`27e:162-163`); reliability ribbon can print "\>100% response" (unclamped, `27f:312`); one empty banner column silently removes that banner's sign-test gate (`27f:393` + `27e:240`); census ribbon MoE ignores the FPC the rest of the report applies (`27g:423-425`).
 - **M13.** Qual: priority-pin tag gate counts records, hub gate counts respondents — different privacy units (`27q:351-353` vs :1032-1036); band reconciliation silently no-ops when the score question is a composite (`qual_unions.R:227-229`); openxlsx turns a literal "NA" verbatim cell into a missing cell (`qual_workbook_io.R:25`).
 - **M14.** Tracking: sidecar dedupe by mtime — a copied stale sidecar beats the genuine newer one (`tracking_island.R:396-399`); occurrence-suffixed duplicate titles swap histories on reorder (:154-171); wave-column detection ties to the first column (:107-116); multi-mention member columns for a recovered wave mapped via the *current* wave's structure (`tracking_wave_values.R:112-124`).

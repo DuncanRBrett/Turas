@@ -515,6 +515,29 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
       bad(key, "must be a whole number between 0 and 6")
     }
   }
+  # Dashboard scales and gauge thresholds (M9). These take safe_numeric() with a
+  # fallback, so a junk cell silently BECAME the default — a 0-5 project that
+  # typed "five" got a scale maximum of 10 and every gauge read at half
+  # strength. The parsed value cannot tell junk from a real default, so the junk
+  # test reads the raw cell; blank or absent still means "use the default".
+  for (key in .TABS_DASHBOARD_NUMERIC_SETTINGS) {
+    raw <- if (!is.null(raw_settings)) raw_settings[[key]] else NULL
+    if (is.null(raw) || length(raw) == 0) next
+    raw1 <- raw[1]
+    if (is.na(raw1) || !nzchar(trimws(as.character(raw1)))) next
+    if (is.na(suppressWarnings(as.numeric(raw1)))) {
+      bad(key, "must be a number")
+    }
+  }
+  # A scale maximum divides every gauge and heatmap cell; zero or negative makes
+  # the whole dashboard meaningless rather than merely wrong.
+  for (key in c("dashboard_scale_mean", "dashboard_scale_index")) {
+    sc <- config_obj[[key]]
+    if (!is.null(sc) && (!is.numeric(sc) || length(sc) != 1 || is.na(sc) || sc <= 0)) {
+      bad(key, "must be a number greater than 0")
+    }
+  }
+
   sm <- config_obj$sampling_method
   if (!is.null(sm) && nzchar(sm) && !(sm %in% .TABS_SAMPLING_TOKENS)) {
     tabs_refuse(
@@ -530,6 +553,17 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   }
   invisible(TRUE)
 }
+
+# The dashboard settings that must parse as numbers. Every one of them is read
+# through safe_numeric() with a fallback, so an unparseable cell would otherwise
+# become the default in silence (M9).
+.TABS_DASHBOARD_NUMERIC_SETTINGS <- c(
+  "dashboard_scale_mean", "dashboard_scale_index",
+  "dashboard_green_net", "dashboard_amber_net",
+  "dashboard_green_mean", "dashboard_amber_mean",
+  "dashboard_green_index", "dashboard_amber_index",
+  "dashboard_green_custom", "dashboard_amber_custom"
+)
 
 # Canonical sampling-method tokens (must match the v2 renderer's METHOD_KEYS in
 # 21c_confidence.js and the template dropdown). Self_Selected is the JS synonym

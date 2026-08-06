@@ -152,7 +152,10 @@
 
   d2.questionByCode = function (code) {
     if (!d2._qIndex) {
-      d2._qIndex = {};
+      // Null-prototype: question codes come from the Selection sheet, so a code
+      // of "toString" or "constructor" would otherwise read back as the
+      // inherited function and be handed on as if it were a question (M11).
+      d2._qIndex = Object.create(null);
       TR.AGG.questions.forEach(function (q) { d2._qIndex[q.code] = q; });
     }
     return d2._qIndex[code] || null;
@@ -177,7 +180,11 @@
 
   /** Ordered categories with their question codes. */
   d2.categories = function () {
-    var seen = {}, order = [];
+    // Null-prototype: a Selection Category named "constructor" / "toString" /
+    // "valueOf" hit the inherited property on a plain {}, so the group was
+    // never created and the next line pushed into undefined — the v2 boot
+    // crashed on a category name the analyst was entitled to type (M11).
+    var seen = Object.create(null), order = [];
     TR.AGG.questions.forEach(function (q) {
       if (!seen[q.category]) {
         seen[q.category] = { title: q.category, codes: [] };

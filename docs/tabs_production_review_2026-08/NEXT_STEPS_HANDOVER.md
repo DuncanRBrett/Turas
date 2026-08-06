@@ -67,7 +67,27 @@ review doc updated (I20 moves from OPEN to FIXED), guide updated.
 
 ---
 
-## Job B — M8 / M9 / M11: three silent failures, one contained batch
+## Job B — M8 / M9 / M11: three silent failures, one contained batch — **DONE (2026-08-06)**
+
+All three fixed with the rider, each proved to fail against the pre-fix code
+first. R suite 3,602 pass / 0 fail / 0 warn / 0 skip; all 28 JS suites green.
+The M9 diagnosis needed correcting — see `PRODUCTION_REVIEW.md`'s batch table:
+the `significance_min_base` half was already closed by I11, and the dashboard
+settings were silently taking the *default*, not going NA. Two things found on
+the way and deliberately left alone:
+
+- `examples/tabs/basic/tabs_config.xlsx` does not load at all — its Settings
+  sheet has no `Setting`/`Value` headers, so it refuses with
+  `CFG_INVALID_STRUCTURE` before any of this batch's validation runs. A shipped
+  example that cannot be run. Unrelated to M8/M9/M11.
+- A counts-only config (`show_percent_column = N`) puts the raw frequency into
+  the v2 island's `pct` field, because `build_dl_question`'s `primary_stat`
+  falls back to Frequency. Pre-existing, unchanged by M8, and worth its own
+  look — the renderer labels that value as a percentage.
+
+The rest of this section is the original brief.
+
+
 
 These need no design decisions. For each: reproduce with a failing test
 first, then fix.

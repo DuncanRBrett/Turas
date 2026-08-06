@@ -178,6 +178,13 @@ process_standard_question <- function(data, question_info, question_options,
   # Process each option
   results_list <- list()
 
+  # Does an option publish any row at all? A report with frequency, column %
+  # and row % all switched off shows nothing for the option, so a bare Sig. row
+  # would have nothing to annotate (M8).
+  option_shows_a_row <- isTRUE(config$show_frequency) ||
+    isTRUE(config$show_percent_column) ||
+    isTRUE(config$show_percent_row)
+
   for (option_idx in seq_len(nrow(display_options))) {
     current_option <- display_options[option_idx, ]
     option_text <- current_option$OptionText
@@ -227,8 +234,16 @@ process_standard_question <- function(data, question_info, question_options,
       results_list[[length(results_list) + 1]] <- row_pct_row
     }
     
-    # Significance testing for proportions
-    if (config$show_percent_column && config$enable_significance_testing) {
+    # Significance testing for proportions.
+    #
+    # M8 (production review 2026-08): this used to require show_percent_column,
+    # so a report published as counts-only silently lost every proportion
+    # letter — a display toggle deciding a statistical result. The test is on
+    # the column proportions (count / base) either way, and the base row is
+    # unchanged, so the letters are the same letters. They are appended after
+    # the option's shown rows, which puts them under the frequency row when the
+    # percent column is hidden.
+    if (option_shows_a_row && config$enable_significance_testing) {
       test_data <- list()
       total_key <- paste0("TOTAL::", TOTAL_COLUMN)
       
