@@ -101,6 +101,53 @@ run("peer annotation — Cape Town is bottom on lows, top on its spike", () => {
   eq(ct.lows[0].peerBottom, true, "bottom campus on its worst question");
 });
 
+run("peer annotation survives real island gaps, which always carry a code", () => {
+  // The fixture above omits `code`, so both the peer index and its lookup fall
+  // back to the title and agree by accident. A real island always carries codes
+  // (27f_takeout_data.js pushes q.code onto every gap) — and when the index
+  // keyed on code while the lookup still keyed on title, EVERY lookup missed,
+  // peerCount fell to 0, and the "highest of N" / "leads every X" annotations
+  // in 27g silently stopped printing. Same fixture, codes attached: the
+  // annotations must be identical (review 2026-08, I6).
+  const coded = columns.map((c) => ({ ...c,
+    gaps: c.gaps.map((gp, i) => ({ ...gp, code: "Q" + (i + 1) })) }));
+  const ct = takeout._portraits(coded, null).find((p) => p.subject === "Cape Town");
+  eq(ct.highs[0].peerTop, true, "top campus on the quality spike, codes present");
+  eq(ct.lows[0].peerBottom, true, "bottom campus on its worst question, codes present");
+  eq(ct.highs[0].peerCount, 3, "raced against all three campuses, not zero");
+});
+
+run("peer races are per question CODE — a repeated title is not one race", () => {
+  // Two DIFFERENT questions sharing a title in a 3-column banner used to merge
+  // into a single 6-runner race and print "highest of 6" (review 2026-08, I6).
+  const dup = columns.slice(0, 3).map((c) => ({ ...c,
+    gaps: [{ ...c.gaps[0], code: "Q1", title: "Same wording" },
+           { ...c.gaps[4], code: "Q9", title: "Same wording" }] }));
+  const ct = takeout._portraits(dup, null).find((p) => p.subject === "Cape Town");
+  const shown = (ct.lows || []).concat(ct.highs || []);
+  assert(shown.length > 0, "Cape Town still earns a portrait");
+  shown.forEach((r) => eq(r.peerCount, 3, "each race has three runners, not six"));
+});
+
+run("a column missing from the gate is gated OUT, not waved through (M12)", () => {
+  // A column that clears no question's base floor contributes no cells to the
+  // FDR family (27f: both arms must clear the floor), so it never reaches
+  // groupAgg and has no gate entry. Reading that absence as "no gate present"
+  // let the thinnest column in the banner skip the sign test every other column
+  // had to pass — the one column least entitled to a claim.
+  const gate = { groups: [
+    { banner: "Campus", group: "Cape Town", consistent: true, signP: 0.01, dir: "below" },
+    { banner: "Campus", group: "Durban", consistent: true, signP: 0.02, dir: "above" }] };
+  const named = takeout._portraits(columns, gate).map((p) => p.subject);
+  assert(named.indexOf("Marketing") === -1,
+    "Marketing has no gate entry, so it earns no portrait (got " + named.join(", ") + ")");
+  assert(named.indexOf("Cape Town") !== -1, "a gated-and-consistent column still earns one");
+  // With no gate at all, nothing is claimed about consistency and the
+  // materiality floor alone decides — unchanged.
+  assert(takeout._portraits(columns, null).map((p) => p.subject).indexOf("Marketing") !== -1,
+    "gate-less runs are untouched");
+});
+
 run("uniform extremeness is a story too — top on nearly everything is not buried", () => {
   // A group top on every metric (no counter-spike, zero tension) must still
   // out-rank a group with only a faint tension — character carries it.

@@ -292,7 +292,14 @@
     if (!weighted && eff === p.base && p.x !== null && p.x !== undefined) {
       return { x: p.x, base: p.base };
     }
-    return { x: p.value / 100 * eff, base: eff };
+    // pRaw is the unrounded proportion when the point's source has one (the
+    // current wave does; a published prior wave does not). Without it the
+    // weighted branch rebuilt the count from the DISPLAY-rounded cell, so on a
+    // 0dp report the test saw 47% for anything from 46.5 to 47.5 — the rounding
+    // trap, and the reason this chip could disagree with the Tracking tab on the
+    // same movement (review 2026-08, I3).
+    var pct = (p.pRaw !== null && p.pRaw !== undefined) ? p.pRaw : p.value;
+    return { x: pct / 100 * eff, base: eff };
   }
 
   /* ---------- spread of mean-kind metrics (from published distributions) --- */
@@ -552,6 +559,18 @@
       var curEff = (col0.baseEff != null && col0.baseEff > 0) ? col0.baseEff : curBase;
       var curPoint = { value: cur, base: curBase, x: curX, effBase: curEff,
         sd: isMean && !row.diff ? sdFromModel(q, row, viewModel) : undefined };
+      // The proportion half of I3. `cur` is the published cell, rounded for
+      // display, but the island carries the exact weighted proportion: cell.n is
+      // the WEIGHTED count and col0.baseW the weighted base — the same pair
+      // 22_model.js:367 already divides for Wilson intervals. Carry it so the
+      // TEST reads full precision; the displayed delta below still subtracts
+      // rounded ends, so what the reader sees reconciles with the published
+      // figures. History points keep their published value — a prior wave has no
+      // finer source — exactly as the mean half of I3 left them.
+      if (canSig && col0.baseW > 0 &&
+          row.cells[0].n !== null && row.cells[0].n !== undefined) {
+        curPoint.pRaw = row.cells[0].n / col0.baseW * 100;
+      }
       // I3 (review 2026-08): a mean row's TEST inputs come from the microdata
       // recompute when available — full precision, the same inputs the
       // Tracking tab tests — never the display-rounded published cell. The

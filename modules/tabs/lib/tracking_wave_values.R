@@ -212,7 +212,17 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
   # Multi_Mention: the question has no single column, so an "any of" NET over
   # the member columns. Base = answered the question at all.
   if (!(code %in% names(data))) {
-    cols <- .twv_mm_columns(net_options %||% options, data, code, members)
+    # Two different questions are being asked of two different structures here.
+    # WHICH option texts belong to the NET is the tracking definition's business
+    # (net_options, above) — that is the whole point of declaring the NET against
+    # one wave's structure. But WHICH data column carries which option text is a
+    # fact about THIS wave's data, so it must be read from THIS wave's own
+    # structure. Resolving the columns through net_options mapped a recovered
+    # wave's Q03_3 by the CURRENT wave's option order, so any wave whose options
+    # were reordered or renumbered silently counted the wrong mentions
+    # (review 2026-08, M14). net_options remains the fallback for a recovery run
+    # given no structure of its own.
+    cols <- .twv_mm_columns(options %||% net_options, data, code, members)
     if (length(cols$all_cols) == 0) {
       skipped$add(code, sprintf("no column '%s' and no '%s_n' columns", code, code))
       return(NULL)

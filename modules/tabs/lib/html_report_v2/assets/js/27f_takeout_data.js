@@ -300,6 +300,15 @@
     return Object.keys(cols).map(function (k) { return cols[k]; });
   }
 
+  /** The base a margin is sized on: the finite-population-corrected effective
+   *  base when a universe is known, else the effective base untouched. Mirrors
+   *  22_model.js's ciBase. Infinity (full census) -> maxMoePct 0 -> "±0.0pp". */
+  function fpcSized(effBase, nActual, pop) {
+    var c = TR.conf || {};
+    return (pop > 1 && typeof c.fpcBase === "function")
+      ? c.fpcBase(effBase, nActual, pop) : effBase;
+  }
+
   /** Sample size, precision, and response rate for the reliability stamp. */
   function gatherReliability(items) {
     var n = 0, nEff = null;
@@ -320,13 +329,24 @@
       n: n,
       // Weighted studies size precision on the Kish effective base, exactly as
       // every significance test does; the displayed n stays the respondent count.
-      moePct: typeof conf.maxMoePct === "function" && n ? conf.maxMoePct(nEff || n) : null,
+      // And when a universe is configured the base is finite-population corrected
+      // first, exactly as the crosstab base row (23_render.js) and every interval
+      // (22_model.js ciBase) already do — a census ribbon claiming ±2.7pp while
+      // the table beneath it says ±0.0pp was the report disagreeing with itself
+      // (review 2026-08, M12). fpcBase is a no-op without a usable population or
+      // below the coverage floor, so ordinary samples are unchanged.
+      moePct: typeof conf.maxMoePct === "function" && n
+        ? conf.maxMoePct(fpcSized(nEff || n, n, pop)) : null,
       census: census,
       design: design,
       population: pop,
       // Meaningful as a RESPONSE rate only when everyone was invited (census);
       // for a sample it is coverage of the universe and the ribbon words it so.
-      responseRate: (pop && n) ? Math.round(n / pop * 100) : null,
+      // Clamped: an achieved base above a stale or understated population_size
+      // printed "108% response", which reads as a data error in the one ribbon
+      // whose whole job is to make the reader trust the numbers (M12). Same
+      // clamp conf.responseRate() already applies.
+      responseRate: (pop && n) ? Math.min(100, Math.round(n / pop * 100)) : null,
       sampleNote: census ? "census" : (design || "sample"),
       sigNote: labels.is_probability === false ? "stability interval" : "confidence"
     };

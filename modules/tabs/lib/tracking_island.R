@@ -112,7 +112,24 @@ detect_wave_column <- function(mapping, data_layer) {
     sum(as.character(mapping[[wc]]) %in% dl_codes, na.rm = TRUE)
   }, integer(1))
   if (max(hits) == 0) return(NULL)
-  wave_cols[which.max(hits)]
+  # which.max() silently takes the FIRST column on a tie, so two waves whose
+  # mapping columns match this data equally well resolved to whichever happened
+  # to be leftmost — and every metric then keyed off the wrong wave without a
+  # word (review 2026-08, M14). A tie is a real ambiguity in the mapping: say so.
+  tied <- wave_cols[hits == max(hits)]
+  if (length(tied) > 1) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Tabs tracking — ambiguous wave column\n")
+    cat(sprintf("│ %d Question_Mapping wave columns match this data equally\n", length(tied)))
+    cat(sprintf("│ well (%d of %d question codes each): %s\n",
+                max(hits), length(dl_codes), paste(tied, collapse = ", ")))
+    cat(sprintf("│ Using '%s' — the leftmost. If that is the wrong wave,\n", tied[1]))
+    cat("│ every tracked metric is keyed off the wrong column.\n")
+    cat("│ How to fix: make each wave column list only ITS wave's\n")
+    cat("│ question codes, so exactly one column matches this run.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  }
+  tied[1]
 }
 
 
@@ -151,20 +168,33 @@ tracking_metrics <- function(data_layer, mapping = NULL) {
   # mirroring the renderer's ensureIndexes (22w_waves.js) and extract_waves.py —
   # an unsuffixed duplicate key made two questions collide in the wave index
   # and one silently showed the other's trend.
+  #
+  # The suffix is ordered by question CODE, not by position in the data layer.
+  # It used to be positional, so moving two same-titled questions past each other
+  # between waves handed each the other's key — and with it, the other's history
+  # (review 2026-08, M14). Codes are stable across a reorder; positions are not.
+  # INSERTING a new same-titled question whose code sorts earlier still shifts
+  # the suffixes, which is why the warning points at question_mapping: a
+  # canonical key is the only way to track duplicate titles reliably.
+  titles <- vapply(data_layer$questions, function(q) tracking_norm(q$title), character(1))
+  codes <- vapply(data_layer$questions, function(q) as.character(q$code), character(1))
+  suffix <- integer(length(titles))
+  for (t in unique(titles)) {
+    idx <- which(titles == t)
+    if (length(idx) < 2L) next
+    idx <- idx[order(codes[idx])]
+    suffix[idx] <- seq_along(idx) - 1L
+    cat(sprintf(
+      "  [WARNING] Tracking: %d questions share the normalised title '%s' (%s) — keyed '%s' then '%s' by question code to keep their trends separate. Set 'question_mapping' to track them by a canonical key instead.\n",
+      length(idx), t, paste(codes[idx], collapse = ", "), t,
+      paste(sprintf("%s#%d", t, seq_len(length(idx) - 1L)), collapse = ", ")))
+  }
+
   out <- list()
-  seen <- list()
-  for (q in data_layer$questions) {
-    key <- tracking_norm(q$title)
-    seen_key <- paste0("k:", key)   # prefixed: a blank title can't defeat the lookup
-    k <- seen[[seen_key]] %||% 0L
-    seen[[seen_key]] <- k + 1L
-    if (k > 0L) {
-      cat(sprintf(
-        "  [WARNING] Tracking: duplicate normalised question title '%s' (question %s) — keyed as '%s#%d' to keep trends separate.\n",
-        key, as.character(q$code), key, k))
-      key <- paste0(key, "#", k)
-    }
-    out[[length(out) + 1]] <- list(code = as.character(q$code),
+  for (i in seq_along(data_layer$questions)) {
+    q <- data_layer$questions[[i]]
+    key <- if (suffix[i] == 0L) titles[i] else paste0(titles[i], "#", suffix[i])
+    out[[length(out) + 1]] <- list(code = codes[i],
       key = key, title = as.character(q$title),
       score_type = if (identical(q$type, "nps")) "nps" else "mean")
   }
@@ -240,6 +270,125 @@ tracking_wave_keys <- function(w) {
 }
 
 
+#' The option labels a live question offers for cross-wave row pairing
+#'
+#' The renderer resolves a prior wave's row by `TR.model.norm(label)` against
+#' that wave's `rows` map (22w_waves.js rowValue), so these are the keys that
+#' have to match. Category and NET rows only — mean-kind rows pair at question
+#' level, through the metric key.
+#'
+#' @param q A data-layer question
+#' @return Character vector of normalised option labels
+#' @keywords internal
+tracking_option_labels <- function(q) {
+  rows <- q$rows %||% list()
+  if (!length(rows)) return(character(0))
+  keep <- vapply(rows, function(r) {
+    identical(r$kind, "category") || identical(r$kind, "net")
+  }, logical(1))
+  if (!any(keep)) return(character(0))
+  labs <- vapply(rows[keep], function(r) tracking_norm(r$label), character(1))
+  unique(labs[!is.na(labs) & nzchar(labs)])
+}
+
+
+#' Report how many of this wave's OPTION rows pair with the prior waves
+#'
+#' A proportion trend pairs row by row, on the normalised option label alone —
+#' so renaming "Very satisfied" to "Extremely satisfied", or dropping a NET
+#' member, silently truncates that row's trend. The question-level report below
+#' cannot see it: it checks the mean/NPS metrics this wave contributes, and a
+#' proportion trend contributes no metric at all. Nothing checked these, which
+#' is why a renamed option read as "no movement" rather than "no comparison"
+#' (review 2026-08, I24).
+#'
+#' Silent by design when no prior wave carries `rows` — a mean-only tracker has
+#' no option pairing to report on.
+#'
+#' @param data_layer The built data layer (the live option labels)
+#' @param priors The prior wave contributions
+#' @param mapping Optional Question_Mapping body (same keying as tracking_metrics)
+#' @param max_report Most questions to name individually before summarising
+#' @return list(questions, checked, matched, unmatched), invisibly
+#' @keywords internal
+tracking_report_option_pairing <- function(data_layer, priors, mapping = NULL,
+                                           max_report = 5L) {
+  out <- list(questions = list(), checked = 0L, matched = 0L, unmatched = 0L)
+  if (is.null(data_layer) || !length(data_layer$questions) || !length(priors)) {
+    return(invisible(out))
+  }
+
+  # Every option row the history offers, per cross-wave key.
+  prior_rows <- list()
+  for (w in priors) {
+    for (q in (w$questions %||% list())) {
+      if (is.null(q$rows) || !length(q$rows)) next
+      k <- as.character(q$match_key %||% q$title_norm %||% "")[1]
+      if (is.na(k) || !nzchar(k)) next
+      prior_rows[[k]] <- unique(c(prior_rows[[k]], names(q$rows)))
+    }
+  }
+  if (!length(prior_rows)) return(invisible(out))   # no proportion history to pair against
+
+  by_code <- list()
+  for (q in data_layer$questions) by_code[[as.character(q$code)]] <- q
+
+  for (mt in tracking_metrics(data_layer, mapping)) {
+    have <- prior_rows[[mt$key]]
+    if (is.null(have) || !length(have)) next
+    q <- by_code[[as.character(mt$code)]]
+    if (is.null(q)) next
+    live <- tracking_option_labels(q)
+    if (!length(live)) next
+    miss <- setdiff(live, have)
+    out$checked <- out$checked + length(live)
+    out$matched <- out$matched + (length(live) - length(miss))
+    out$unmatched <- out$unmatched + length(miss)
+    if (length(miss)) {
+      out$questions[[length(out$questions) + 1]] <- list(
+        code = as.character(mt$code), title = as.character(mt$title),
+        live = length(live), unmatched = miss)
+    }
+  }
+  if (out$checked == 0L) return(invisible(out))
+
+  if (out$unmatched == 0L) {
+    cat(sprintf("  Tracking: all %d tracked option row(s) matched history.\n", out$checked))
+    return(invisible(out))
+  }
+
+  shown <- utils::head(out$questions, max_report)
+  for (h in shown) {
+    labels <- utils::head(h$unmatched, 6L)
+    more <- length(h$unmatched) - length(labels)
+    cat(sprintf(
+      "  [NOTE] Tracking: '%s' — %d of %d option(s) found no prior wave row, so those trends are empty: %s%s\n",
+      h$title, length(h$unmatched), h$live,
+      paste(sprintf("\"%s\"", labels), collapse = ", "),
+      if (more > 0) sprintf(" (+%d more)", more) else ""))
+  }
+  if (length(out$questions) > length(shown)) {
+    cat(sprintf("  [NOTE] Tracking: %d further question(s) have unmatched option rows.\n",
+                length(out$questions) - length(shown)))
+  }
+  # Every option of every question missing is the shape of a renamed scale or a
+  # wave keyed a different way — not a handful of edits.
+  if (out$matched == 0L) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Tabs tracking — no option row matched history\n")
+    cat(sprintf("│ %d tracked option row(s) were checked and NONE pair with\n", out$checked))
+    cat("│ a prior wave, so every proportion trend is empty. The\n")
+    cat("│ Tracking tab will show no movement, which reads as 'nothing\n")
+    cat("│ changed' when the truth is 'nothing was compared'.\n")
+    cat("│ How to fix: option rows pair on the normalised label alone.\n")
+    cat("│ Restore the prior wording, or rebuild the prior waves'\n")
+    cat("│ sidecars from data that uses the current wording.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  }
+  invisible(out)
+}
+
+
 #' Report how many of this wave's metrics pair with the prior waves
 #'
 #' The cross-wave key changes SHAPE with the config: `tracking_metrics()` keys by
@@ -256,12 +405,20 @@ tracking_wave_keys <- function(w) {
 #'
 #' @param current_contribution This wave's contribution
 #' @param priors The prior wave contributions (already de-duplicated)
-#' @return list(current, priors, matched, unmatched), invisibly
+#' @param data_layer Optional built data layer — supplying it also checks the
+#'   OPTION rows a proportion trend pairs on (see tracking_report_option_pairing)
+#' @param mapping Optional Question_Mapping body, for the option-level check
+#' @return list(current, priors, matched, unmatched, options), invisibly
 #' @keywords internal
-tracking_report_pairing <- function(current_contribution, priors) {
+tracking_report_pairing <- function(current_contribution, priors,
+                                    data_layer = NULL, mapping = NULL) {
+  # Option rows first: they are checked even when this wave contributes no
+  # mean/NPS metric at all, which is exactly the proportion-only tracker the
+  # question-level report below has nothing to say about.
+  opts <- tracking_report_option_pairing(data_layer, priors, mapping)
   cur_keys <- tracking_wave_keys(current_contribution)
   out <- list(current = length(cur_keys), priors = length(priors),
-              matched = 0L, unmatched = length(cur_keys))
+              matched = 0L, unmatched = length(cur_keys), options = opts)
   if (!length(priors) || !length(cur_keys)) return(invisible(out))
 
   prior_keys <- unique(unlist(lapply(priors, tracking_wave_keys), use.names = FALSE))
@@ -294,9 +451,13 @@ tracking_report_pairing <- function(current_contribution, priors) {
 }
 
 
+#' @param data_layer Optional built data layer, so the build-time pairing report
+#'   can also check the option rows a proportion trend pairs on (I24)
+#' @param mapping Optional Question_Mapping body, for that same check
 #' @return A tracking-island list, or NULL when there is no current contribution
 #' @export
-build_tracking_island <- function(current_contribution, prior_contributions = list()) {
+build_tracking_island <- function(current_contribution, prior_contributions = list(),
+                                  data_layer = NULL, mapping = NULL) {
   if (is.null(current_contribution)) return(NULL)
   current_contribution$current <- TRUE
   priors <- lapply(prior_contributions, function(w) {
@@ -323,8 +484,9 @@ build_tracking_island <- function(current_contribution, prior_contributions = li
   }
 
   # Loud when this wave pairs with nothing — an unmatched tracker renders as
-  # zeros, which read as findings rather than as a missing comparison.
-  tracking_report_pairing(current_contribution, priors)
+  # zeros, which read as findings rather than as a missing comparison. With a
+  # data layer the option rows a proportion trend pairs on are checked too.
+  tracking_report_pairing(current_contribution, priors, data_layer, mapping)
 
   waves <- c(priors, list(current_contribution))
 
@@ -359,6 +521,14 @@ serialize_tracking_island <- function(island) {
 write_wave_contribution <- function(contribution, output_path) {
   if (is.null(contribution)) return(invisible(NULL))
   if (!requireNamespace("jsonlite", quietly = TRUE)) return(invisible(NULL))
+  # Provenance for the dedupe. read_wave_contributions used to resolve two
+  # sidecars for the same wave by file mtime — but an mtime is when the file was
+  # last COPIED, not when its numbers were produced, so dropping a stale backup
+  # into waves_source made it beat the genuine newer run (review 2026-08, M14).
+  # Stamped here, at the one moment that means "this sidecar was produced now".
+  if (is.null(contribution$built)) {
+    contribution$built <- format(Sys.time(), "%Y-%m-%dT%H:%M:%S", tz = "UTC")
+  }
   json <- jsonlite::toJSON(contribution, auto_unbox = TRUE, na = "null",
                            null = "null", digits = 6, pretty = FALSE)
   written <- tryCatch({
@@ -376,8 +546,14 @@ write_wave_contribution <- function(contribution, output_path) {
 #' Reads every *_wave.json under `waves_source` (skipping the current run's own
 #' file when given). Malformed files are skipped with a warning. When two
 #' sidecars carry the SAME wave label (a re-run of a wave under a different
-#' output filename left its stale sidecar behind), only the newest file is
-#' kept — otherwise the duplicate would enter the island as extra "history".
+#' output filename left its stale sidecar behind), only the newest is kept —
+#' otherwise the duplicate would enter the island as extra "history".
+#'
+#' "Newest" is the sidecar's own recorded `built` stamp, not the file's mtime:
+#' an mtime is when the file was last copied, so a stale backup dropped into the
+#' folder used to outrank the genuine newer run (review 2026-08, M14). Sidecars
+#' written before the stamp existed fall back to mtime, and the dedupe note says
+#' which rule decided.
 #'
 #' @param waves_source Folder containing prior *_wave.json contributions
 #' @param exclude_path Optional path to skip (this run's own contribution)
@@ -393,23 +569,37 @@ read_wave_contributions <- function(waves_source, exclude_path = NULL) {
     files <- files[normalizePath(files, mustWork = FALSE) !=
                    normalizePath(exclude_path, mustWork = FALSE)]
   }
-  # Newest first, so the first contribution seen per wave label wins the dedupe.
-  if (length(files) > 1) {
-    files <- files[order(file.mtime(files), decreasing = TRUE)]
-  }
-  out <- list()
-  seen_labels <- character(0)
+
+  # Read first, then order — the ordering key lives INSIDE the file.
+  recs <- list()
   for (f in files) {
     c <- tryCatch(jsonlite::read_json(f, simplifyVector = FALSE), error = function(e) NULL)
     if (is.null(c) || is.null(c$questions)) {
       cat(sprintf("  [WARNING] Skipped unreadable wave contribution: %s\n", basename(f)))
       next
     }
+    stamp <- suppressWarnings(as.POSIXct(as.character(c$built %||% NA_character_),
+                                         format = "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
+    stamped <- length(stamp) == 1 && !is.na(stamp)
+    recs[[length(recs) + 1]] <- list(
+      contrib = c, file = f, stamped = stamped,
+      when = if (stamped) stamp else as.POSIXct(file.mtime(f), tz = "UTC"))
+  }
+  if (length(recs) > 1) {
+    recs <- recs[order(vapply(recs, function(r) as.numeric(r$when), numeric(1)),
+                       decreasing = TRUE)]
+  }
+
+  out <- list()
+  seen_labels <- character(0)
+  for (r in recs) {
+    c <- r$contrib
     lbl <- as.character(c$wave %||% "")
     if (nzchar(lbl) && lbl %in% seen_labels) {
       cat(sprintf(
-        "  [NOTE] Tracking: skipped stale duplicate of wave '%s' (%s) — a newer sidecar for that wave was kept.\n",
-        lbl, basename(f)))
+        "  [NOTE] Tracking: skipped stale duplicate of wave '%s' (%s) — a newer sidecar for that wave was kept (by %s).\n",
+        lbl, basename(r$file),
+        if (r$stamped) "recorded build time" else "file date, which a copy resets"))
       next
     }
     if (nzchar(lbl)) seen_labels <- c(seen_labels, lbl)

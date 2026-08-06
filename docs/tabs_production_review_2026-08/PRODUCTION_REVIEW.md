@@ -69,9 +69,27 @@ suites green.
 
 **OPEN — logged residuals:** I20 idx→stable-key migration for reader marks
 (the island is anonymised by design, so ResponseID cannot be embedded as-is;
-scheduled as its own step); I3's weighted-proportion chip still reconstructs
-its count from the rounded percentage; I6 (Patterns copy edges) and I24
-(option-level pairing report) are unfixed and unchanged.
+scheduled as its own step — design first, implementation after).
+
+**I3 (proportion half), I6, I24, M12 and M14 are now FIXED** (2026-08-06,
+branch `fix/tabs-prodreview-batch-2`). Tabs R suite 3,441 pass / 0 fail / 0 skip
+/ 0 warn (was 3,394); all 26 JS suites green. Every fix was verified to fail
+against the pre-fix code before being accepted.
+
+| Finding | What changed |
+|---------|--------------|
+| **I6** | I6's own earlier fix was half-landed: `peerExtremes` indexed on `gp.code \|\| gp.title` but the single lookup still keyed on `gp.title`. Real islands always carry codes, so every lookup missed, `peerCount` was always 0, and the `peerCount > 2` gate meant "highest of N" / "leads every X" had silently stopped printing. Key construction is now one `peerKey()` used by both sides. The old test passed only because its fixture omitted `code`; the suite now covers the real island shape. The other two I6 edges were already closed — the steady-card gate rode along with the Group-overview rework, and the single-theme "weakest area" claim went with the Areas retirement. |
+| **I3** (proportion) | `sigPair` rebuilt a weighted report's count from the DISPLAY-rounded cell, so a 0dp report tested 47% for anything from 46.5 to 47.5. The current point now carries `pRaw`, the exact weighted proportion `cell.n / col.baseW` — the same pair `22_model.js:367` already divides for Wilson intervals. Displayed deltas still subtract rounded ends; history keeps its published value, as the mean half left it. |
+| **I24** | New `tracking_report_option_pairing()`: proportion trends pair row by row on the normalised option label alone and contribute no mean/NPS metric, so the question-level report never looked at them. Live option labels are now compared against each prior wave's `rows` keys, unmatched labels are named per question, and a total miss gets a warning box. `build_tracking_island()` takes the data layer to do it. Silent when no prior wave carries rows. |
+| **M12** | Response rate clamped (a stale `population_size` printed "108% response"). The reliability ribbon's MoE now applies the FPC the crosstab base row and every interval already apply, so a census reads ±0.0pp instead of contradicting the table beneath it. A banner column that cleared no base floor contributes no cells, so it has no gate entry — that absence read as "no gate" and let the thinnest column skip the sign test every other column passed; in the fixture it ranked *first*. The exact-tie edge was already closed. |
+| **M14** | Sidecar dedupe follows a recorded `built` stamp written at save time, not `file.mtime` — an mtime is when a file was last *copied*, so a stale backup used to outrank the genuine newer run; unstamped sidecars fall back to mtime and the note says which rule ran. Duplicate-title occurrence suffixes are ordered by question code, not by position, so reordering questions no longer hands each the other's history (inserting a lower-sorting code still shifts them — the warning points at `question_mapping`, the only reliable key). An ambiguous wave column now warns and names the candidates instead of silently taking the leftmost. A recovered wave's multi-mention member *columns* resolve through that wave's own structure; only NET *membership* comes from the tracking definition. |
+
+Two things found on the way, both left alone deliberately: `test_audit_stats_fixes.R`'s
+own `source()` list omits `report_shared.R`, so the file only runs under
+`tools/run_all_tests.R` (which sources everything) and not via the
+`testthat::test_file()` invocation its own header documents. And three failures
+in Shared Infrastructure predate this batch on `main` — a module-registry count
+that expects 14 against a repo with 16, and a missing `docs/adr` directory.
 
 **I1 and I2 are now FIXED** — the cross-engine statistics batch landed on main
 as `a013112d` (fractional n_eff), `049fc1c2` (Sig.2 and mean-row carriage) and

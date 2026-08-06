@@ -400,3 +400,87 @@ test_that("a genuine 0% category (option exists, nobody chose it) still computes
   expect_equal(r$value, 0)
   expect_equal(r$base, 2)
 })
+
+
+# ==============================================================================
+# M14 (review 2026-08) — a recovered wave's multi-mention COLUMNS are resolved
+# through that wave's OWN structure. Which option texts make up the NET is the
+# tracking definition's business (net_options); which data column carries which
+# option text is a fact about this wave's data. Reading the column map from
+# net_options meant a wave whose options were renumbered counted the wrong
+# mentions, silently and under PASS.
+# ==============================================================================
+
+test_that("multi-mention member columns follow THIS wave's structure, not the NET's (M14)", {
+  # This wave's data: MM_1 holds Tue, MM_2 holds Mon. The tracking NET
+  # ("Weekday start" = Mon only) is declared against the CURRENT wave, where the
+  # numbering is the other way round.
+  d <- data.frame(
+    MM_1 = c("Tue", "Tue", "Tue", NA),
+    MM_2 = c(NA, "Mon", NA, NA),
+    MM_3 = c(NA, NA, NA, "None"),
+    stringsAsFactors = FALSE)
+  this_wave <- data.frame(
+    QuestionCode = c("MM_1", "MM_2", "MM_3"),
+    OptionText   = c("Tue", "Mon", "None"),
+    BoxCategory  = c("", "Weekday start", ""), stringsAsFactors = FALSE)
+  net_defs <- data.frame(                       # the CURRENT wave's numbering
+    QuestionCode = c("MM_1", "MM_2", "MM_3"),
+    OptionText   = c("Mon", "Tue", "None"),
+    BoxCategory  = c("Weekday start", "", ""), stringsAsFactors = FALSE)
+  map <- data.frame(QuestionCode = "MM", TrackingSpecs = "category:Weekday start",
+                    stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(d, map, this_wave, wave = "2024",
+                                  net_options = net_defs)
+  expect_equal(m$status, "PASS")
+  r <- NULL; for (i in seq_len(nrow(m$result))) if (m$result$metric_id[i] == "MM") r <- m$result[i, ]
+  expect_equal(r$base, 4)                       # answered any of MM_1..MM_3
+  # Mon lives in MM_2 in THIS wave -> 1 of 4. Resolving the columns through
+  # net_defs would have counted MM_1 (Tue) and reported 3 of 4.
+  expect_equal(r$value, 25)
+})
+
+test_that("the NET's MEMBERSHIP still comes from the tracking definition (M14)", {
+  # Same data, but this wave's own structure tags a DIFFERENT option as the NET.
+  # Membership must follow net_options (Mon), not this wave's tag (Tue) — that
+  # is the whole point of declaring the NET against one wave's structure.
+  d <- data.frame(
+    MM_1 = c("Tue", "Tue", "Tue", NA),
+    MM_2 = c(NA, "Mon", NA, NA),
+    MM_3 = c(NA, NA, NA, "None"),
+    stringsAsFactors = FALSE)
+  this_wave <- data.frame(
+    QuestionCode = c("MM_1", "MM_2", "MM_3"),
+    OptionText   = c("Tue", "Mon", "None"),
+    BoxCategory  = c("Weekday start", "", ""), stringsAsFactors = FALSE)
+  net_defs <- data.frame(
+    QuestionCode = c("MM_1", "MM_2", "MM_3"),
+    OptionText   = c("Mon", "Tue", "None"),
+    BoxCategory  = c("Weekday start", "", ""), stringsAsFactors = FALSE)
+  map <- data.frame(QuestionCode = "MM", TrackingSpecs = "category:Weekday start",
+                    stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(d, map, this_wave, wave = "2024",
+                                  net_options = net_defs)
+  expect_equal(m$status, "PASS")
+  r <- NULL; for (i in seq_len(nrow(m$result))) if (m$result$metric_id[i] == "MM") r <- m$result[i, ]
+  expect_equal(r$value, 25)                     # still Mon, still MM_2 in this wave
+})
+
+test_that("with no structure of its own, a recovery run falls back to the NET's (M14)", {
+  d <- data.frame(
+    MM_1 = c("Mon", "Mon", NA, NA),
+    MM_2 = c(NA, "Tue", "Tue", NA),
+    MM_3 = c(NA, NA, NA, "None"),
+    stringsAsFactors = FALSE)
+  net_defs <- data.frame(
+    QuestionCode = c("MM_1", "MM_2", "MM_3"),
+    OptionText   = c("Mon", "Tue", "None"),
+    BoxCategory  = c("Weekday start", "", ""), stringsAsFactors = FALSE)
+  map <- data.frame(QuestionCode = "MM", TrackingSpecs = "category:Weekday start",
+                    stringsAsFactors = FALSE)
+  m <- wave_values_from_microdata(d, map, NULL, wave = "2024", net_options = net_defs)
+  expect_equal(m$status, "PASS")
+  r <- NULL; for (i in seq_len(nrow(m$result))) if (m$result$metric_id[i] == "MM") r <- m$result[i, ]
+  expect_equal(r$base, 4)
+  expect_equal(r$value, 50)                     # Mon in MM_1: rows 1 and 2
+})

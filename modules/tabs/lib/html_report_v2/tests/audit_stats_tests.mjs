@@ -440,5 +440,42 @@ run("attachDeltas tests a mean's RAW current value, not the rounded cell (I3)", 
   eq(row.delta.diff, 0.1, "displayed delta subtracts the rounded ends (8.9 - 8.8)");
 });
 
+
+run("attachDeltas tests a WEIGHTED proportion's raw share, not the rounded cell (I3)", () => {
+  // The proportion half of I3. Weighted report, n_eff 600 both waves, prior 50%.
+  // The published cell rounds to 56%, but the exact weighted share is 55.5%
+  // (5550/10000):
+  //   rounded 56.0% -> pooled z ≈ 2.08 -> "significant at 95%" (the old input)
+  //   raw     55.5% -> pooled z ≈ 1.91 -> not significant (the truth)
+  // A 0dp weighted report hides half a point in every cell; the test must not.
+  setProject({ name: "I3p", low_base_threshold: 30, weighted: true });
+  TR.AGG.questions = [
+    { code: "QP", title: "Uses the service", type: "single", category: "T",
+      bases: [{ n: 800, nWeighted: 10000, nEff: 600, low: false }],
+      rows: [
+        { kind: "category", label: "Yes", pct: [56], n: [5550], sig: [""] },
+        { kind: "category", label: "No", pct: [44], n: [4450], sig: [""] }
+      ] }
+  ];
+  TR.AGG.columns = [{ label: "Total", letter: "", group: null }];
+  TR.AGG.banner_groups = [];
+  TR.PREV = { waves: [
+    { wave: "2025", year: 2025, current: false, segments: [],
+      questions: [{ match_key: "uses the service", title: "Uses the service",
+        base: 600, rows: { yes: { pct: 50 }, no: { pct: 50 } } }] }
+  ] };
+  TR.MICRO = null;
+  if (TR.d2) TR.d2._qIndex = null;
+  if (TR.waves.reset) TR.waves.reset();
+  const model = TR.model.forQuestion("QP", null, [], {});
+  const row = model.rows[0];
+  assert(row.delta, "the Yes row carries a wave delta");
+  assert(!row.delta.sig,
+    "raw 55.5% vs 50% is not significant — the rounded 56% must not flip it (got sig=" +
+    JSON.stringify(row.delta.sig) + ")");
+  // the DISPLAYED delta still reconciles with the published figures
+  eq(row.delta.diff, 6, "displayed delta subtracts the published cells (56 - 50)");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

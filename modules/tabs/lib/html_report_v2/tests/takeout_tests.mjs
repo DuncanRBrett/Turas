@@ -640,6 +640,54 @@ run("reliability MoE sizes on the Kish effective base on weighted studies (audit
   close(takeout.gather().reliability.moePct, 3.4648, 1e-3, "unweighted falls back to base n=800");
 });
 
+run("reliability MoE applies the FPC the rest of the report applies (M12)", () => {
+  // The crosstab base row sizes its margin on col.ciBase = fpcBase(...) and every
+  // interval does the same (22_model.js:84). The ribbon did not, so a census read
+  // "±2.7pp worst-case" directly above a table of ±0.0pp. Stubs mirror the real
+  // 21c_confidence.js formulas; 21c's own suite pins those.
+  const maxMoePct = (n) => 1.96 * Math.sqrt(0.25 / n) * 100;
+  const fpcMul = (nA, N) => (!(N > 1) || !(nA > 0)) ? 1
+    : (nA / N <= 0.05 ? 1 : (nA >= N ? Infinity : (N - 1) / (N - nA)));
+  const fpcBase = (nEff, nA, N) => (fpcMul(nA, N) === Infinity ? Infinity : nEff * fpcMul(nA, N));
+  const relFor = (base, pop) => {
+    TR.conf = { fpcActiveReport: () => false, labels: () => ({}), maxMoePct: maxMoePct, fpcBase: fpcBase };
+    TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+    TR.AGG = { project: pop ? { population_size: pop } : {}, banner_groups: [] };
+    TR.MICRO = null;
+    TR.views = {
+      indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+      _meanRow: (m) => m.rows[0] };
+    TR.model = { forQuestion: () => ({ columns: [{ label: "Total", base: base }],
+      rows: [{ kind: "mean", cells: [{ mean: 3.8 }] }] }) };
+    return takeout.gather().reliability;
+  };
+  close(relFor(800, null).moePct, 3.4648, 1e-3, "no universe -> uncorrected, unchanged");
+  close(relFor(800, 100000).moePct, 3.4648, 1e-3, "0.8% coverage is below the floor -> uncorrected");
+  // 400 of 1000 = 40% coverage: mul = 999/600 = 1.665, effective 666 -> 3.7965pp.
+  close(relFor(400, 1000).moePct, 3.7965, 1e-3, "material coverage narrows the margin");
+  assert(relFor(1000, 1000).moePct === 0, "a full census is measured, not estimated -> ±0.0pp");
+});
+
+run("reliability response rate is clamped — never '108% response' (M12)", () => {
+  const relFor = (base, pop) => {
+    TR.conf = { fpcActiveReport: () => false, labels: () => ({}),
+      maxMoePct: (n) => 1.96 * Math.sqrt(0.25 / n) * 100, fpcBase: (e) => e };
+    TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+    TR.AGG = { project: { population_size: pop }, banner_groups: [] };
+    TR.MICRO = null;
+    TR.views = {
+      indexQuestions: () => ([{ code: "Q1", title: "Q1", type: "scale", scale_max: 5, rows: [{ kind: "mean" }] }]),
+      _meanRow: (m) => m.rows[0] };
+    TR.model = { forQuestion: () => ({ columns: [{ label: "Total", base: base }],
+      rows: [{ kind: "mean", cells: [{ mean: 3.8 }] }] }) };
+    return takeout.gather().reliability;
+  };
+  // A stale or understated population_size used to print a rate above 100 in the
+  // one ribbon whose job is to make the reader trust the numbers.
+  assert(relFor(650, 600).responseRate === 100, "achieved base above the universe clamps to 100");
+  assert(relFor(300, 600).responseRate === 50, "an ordinary rate is untouched");
+});
+
 run("rigor footer states a hit inline, never points at nonexistent cards (audit #3)", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   const cells = [];

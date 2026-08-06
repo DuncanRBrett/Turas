@@ -868,7 +868,7 @@ if (.html_report_v2_on) {
           wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
           write_wave_contribution(contrib, wave_path)
           priors <- read_wave_contributions(config_result$config_obj$waves_source, wave_path)
-          island <- build_tracking_island(contrib, priors)
+          island <- build_tracking_island(contrib, priors, dl, mapping)
           if (!is.null(island) && length(island$waves) > 1) {
             prev_json <- serialize_tracking_island(island)
             TRUE

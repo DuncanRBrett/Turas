@@ -152,14 +152,19 @@
    * can say a group is the highest / lowest of its peers (e.g. "the highest of any
    * campus"). Cheap peer-relative annotation, no config — the §9 sharpening.
    */
+  // Key by question CODE (title only as a fallback for old islands): duplicate
+  // question titles used to merge into one race, printing "highest of 6" in a
+  // 3-column banner (review 2026-08, I6). ONE definition, because building this
+  // key at the index and at the lookup separately is exactly how the two drifted
+  // apart — the lookup kept reading the title, every lookup missed, and the
+  // "highest of N" annotations silently stopped printing.
+  function peerKey(group, gp) { return group + "||" + (gp.code || gp.title); }
+
   function peerExtremes(columns) {
     var by = {};
     (columns || []).forEach(function (c) {
       c.gaps.forEach(function (gp) {
-        // Key by question CODE (title only as a fallback for old islands):
-        // duplicate question titles used to merge into one race, printing
-        // "highest of 6" in a 3-column banner (review 2026-08, I6).
-        var key = c.group + "||" + (gp.code || gp.title);
+        var key = peerKey(c.group, gp);
         var e = by[key] || (by[key] = { count: 0, hi: null, lo: null });
         e.count++;
         if (e.hi === null || gp.value > e.hi.value) {
@@ -209,7 +214,7 @@
       var lows = [], highs = [];
       c.gaps.forEach(function (gp) {
         var frac = (gp.value - gp.total) / (gp.scaleMax || 1);
-        var peer = peers[c.group + "||" + gp.title] || { count: 0 };
+        var peer = peers[peerKey(c.group, gp)] || { count: 0 };
         // isPct marks a KeyShare row (a favourable %, not an index mean) so the
         // card and the tension sentence format it as "62% / 71%", never "62.0".
         var row = { label: gp.title, value: gp.value, rest: gp.total, scaleMax: gp.scaleMax,
@@ -229,7 +234,14 @@
       var minority = strained ? highs : lows;
       var counterSpike = minority.length ? Math.abs(minority[0].frac) : 0;
       var weight = Math.min(1, (c.base || 0) / CONST.STRAIN_RELIABLE_BASE);
+      // A column that cleared no question's base floor contributes NO cells to
+      // the family (27f: both arms must clear it), so it never reaches groupAgg
+      // and has no gate entry. Reading that absence as "no gate" let the thinnest
+      // column in the banner walk past the sign test the others had to pass —
+      // the one column least entitled to a claim (review 2026-08, M12). Gate
+      // present + no entry = not consistent; only a gate-less run stays null.
       var g = cons[c.group + "::" + c.column];
+      var consistent = gate ? (g ? g.consistent : false) : null;
       // character = how much the group stands out overall (its dominant direction's
       // average gap, base-weighted) — high for a uniformly extreme group AND for a
       // strong-leaning one. tension = the counter-spike against that lean.
@@ -247,7 +259,7 @@
         counterSpike: counterSpike, tensionScore: tensionScore, characterScore: characterScore,
         storyScore: characterScore + tensionScore,   // notable for tension OR extremeness
         uniform: counterSpike === 0,                  // top/bottom on (nearly) everything
-        consistent: g ? g.consistent : null, signP: g ? g.signP : null, dir: g ? g.dir : null };
+        consistent: consistent, signP: g ? g.signP : null, dir: g ? g.dir : null };
     });
     var eligible = made.filter(function (p) {
       if ((p.hits + p.gains) < CONST.MIN_GROUP_HITS) return false;     // too few standouts

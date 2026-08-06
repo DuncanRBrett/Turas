@@ -239,7 +239,28 @@ test_that("no-mapping metrics occurrence-suffix duplicate titles (mirrors 22w en
   out <- capture.output(m <- tracking_metrics(dl))
   keys <- vapply(m, function(x) x$key, character(1))
   expect_equal(keys, c("overall rating", "overall rating#1", "overall rating#2"))
-  expect_true(any(grepl("duplicate normalised question title", out)))
+  expect_true(any(grepl("share the normalised title", out)))
+  expect_true(any(grepl("question_mapping", out)))    # the reliable way to track them
+})
+
+test_that("duplicate-title keys survive a reorder — they follow the CODE (M14)", {
+  # The suffix used to come from position in the data layer, so moving two
+  # same-titled questions past each other handed each the other's key, and with
+  # it the other's history. Same three questions, reordered: same keys.
+  mk <- function(...) list(questions = list(...))
+  q <- function(code) list(code = code, title = "Overall rating", type = "scale")
+  keys_of <- function(dl) {
+    m <- suppressWarnings(capture.output(res <- tracking_metrics(dl)))
+    stats::setNames(vapply(res, function(x) x$key, character(1)),
+                    vapply(res, function(x) x$code, character(1)))
+  }
+  a <- keys_of(mk(q("Q1"), q("Q2"), q("Q3")))
+  b <- keys_of(mk(q("Q3"), q("Q1"), q("Q2")))          # same questions, reordered
+  expect_equal(a[["Q1"]], b[["Q1"]])
+  expect_equal(a[["Q2"]], b[["Q2"]])
+  expect_equal(a[["Q3"]], b[["Q3"]])
+  expect_equal(unname(a[["Q1"]]), "overall rating")    # lowest code keeps the bare key
+  expect_equal(unname(a[["Q3"]]), "overall rating#2")
 })
 
 test_that("unique titles stay unsuffixed with no warning", {
@@ -280,6 +301,88 @@ test_that("build_tracking_island drops a stale prior carrying the current wave's
   expect_true(isTRUE(island$waves[[2]]$current))
   expect_equal(as.numeric(island$waves[[2]]$questions[[1]]$scores), c(6, 8))
   expect_true(any(grepl("stale prior contribution", out)))
+})
+
+test_that("the sidecar dedupe follows the recorded build time, not the file date (M14)", {
+  # A stale backup copied into waves_source gets a FRESH mtime, so ordering on
+  # mtime handed the copy the win over the genuine newer run. The build stamp
+  # travels inside the file, so a copy carries its original (older) stamp.
+  dir <- file.path(tempdir(), paste0("m14_dedupe_", as.integer(runif(1, 1, 1e6))))
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+  mk <- function(vals) {
+    micro <- list(n = 2, scores = list(Q1 = I(vals)), weights = I(c(1, 1)))
+    dl <- list(questions = list(list(code = "Q1", title = "Overall rating", type = "scale")))
+    wave_contribution(dl, micro, list(wave = "Wave 2025", wave_order = 2025))
+  }
+  genuine <- mk(c(6, 8)); genuine$built <- "2026-08-05T09:00:00"
+  stale   <- mk(c(1, 2)); stale$built   <- "2024-01-01T09:00:00"
+  invisible(capture.output({
+    write_wave_contribution(genuine, file.path(dir, "genuine_wave.json"))
+    Sys.sleep(1.1)                                    # the COPY is written last
+    write_wave_contribution(stale, file.path(dir, "stale_copy_wave.json"))
+  }))
+  mt <- file.mtime(c(file.path(dir, "genuine_wave.json"), file.path(dir, "stale_copy_wave.json")))
+  expect_true(mt[2] > mt[1])                          # the stale file IS the newer file
+  out <- capture.output(got <- read_wave_contributions(dir))
+  expect_equal(length(got), 1)
+  expect_equal(as.numeric(got[[1]]$questions[[1]]$scores), c(6, 8))   # genuine kept
+  expect_true(any(grepl("recorded build time", out)))
+})
+
+test_that("write_wave_contribution stamps a sidecar that has no build time", {
+  dir <- file.path(tempdir(), paste0("m14_stamp_", as.integer(runif(1, 1, 1e6))))
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+  micro <- list(n = 2, scores = list(Q1 = I(c(6, 8))), weights = I(c(1, 1)))
+  dl <- list(questions = list(list(code = "Q1", title = "Overall rating", type = "scale")))
+  contrib <- wave_contribution(dl, micro, list(wave = "W", wave_order = 2025))
+  expect_null(contrib$built)                          # the builder stays deterministic
+  p <- file.path(dir, "w_wave.json")
+  invisible(capture.output(write_wave_contribution(contrib, p)))
+  got <- jsonlite::read_json(p, simplifyVector = FALSE)
+  expect_true(grepl("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$", as.character(got$built)))
+})
+
+test_that("an unstamped sidecar still dedupes, and the note says which rule ran (M14)", {
+  dir <- file.path(tempdir(), paste0("m14_legacy_", as.integer(runif(1, 1, 1e6))))
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+  legacy <- function(vals, path) {
+    writeLines(jsonlite::toJSON(list(wave = "Wave 2025", year = 2025, segments = list(),
+      questions = list(list(code = "Q1", match_key = "overall rating", title = "x",
+                            base = 2, score_type = "mean", scores = as.list(vals)))),
+      auto_unbox = TRUE), path)
+  }
+  legacy(c(1, 2), file.path(dir, "old_wave.json"))
+  Sys.sleep(1.1)
+  legacy(c(6, 8), file.path(dir, "new_wave.json"))
+  out <- capture.output(got <- read_wave_contributions(dir))
+  expect_equal(length(got), 1)
+  expect_equal(as.numeric(got[[1]]$questions[[1]]$scores), c(6, 8))   # newest file wins
+  expect_true(any(grepl("file date, which a copy resets", out)))
+})
+
+test_that("two wave columns matching equally well is a warning, not a silent pick (M14)", {
+  dl <- list(questions = list(list(code = "Q1", title = "A", type = "scale"),
+                              list(code = "Q2", title = "B", type = "scale")))
+  mapping <- data.frame(QuestionCode = c("K1", "K2"), QuestionText = c("A", "B"),
+                        TrackingSpecs = c("", ""),
+                        Wave25 = c("Q1", "Q2"), Wave26 = c("Q1", "Q2"),
+                        stringsAsFactors = FALSE)
+  out <- capture.output(wc <- detect_wave_column(mapping, dl))
+  expect_equal(wc, "Wave25")                          # leftmost, as before
+  expect_true(any(grepl("ambiguous wave column", out)))
+  expect_true(any(grepl("Wave25, Wave26", out)))
+})
+
+test_that("an unambiguous wave column resolves quietly", {
+  dl <- list(questions = list(list(code = "Q1", title = "A", type = "scale")))
+  mapping <- data.frame(QuestionCode = "K1", QuestionText = "A", TrackingSpecs = "",
+                        Wave25 = "Q1", Wave26 = "QX", stringsAsFactors = FALSE)
+  out <- capture.output(wc <- detect_wave_column(mapping, dl))
+  expect_equal(wc, "Wave25")
+  expect_false(any(grepl("WARNING", out)))
 })
 
 test_that("read_wave_contributions keeps only the NEWEST sidecar per wave label", {
@@ -373,4 +476,98 @@ test_that("a first wave (no history) is not a mismatch", {
   expect_equal(res$matched, 0)
   expect_equal(res$priors, 0)
   expect_equal(length(out), 0)                   # nothing to say, says nothing
+})
+
+
+# ---------------------------------------------------------------------------
+# I24 — option-level pairing. A proportion trend pairs row by row on the
+# normalised option label alone (22w_waves.js rowValue), and contributes no
+# mean/NPS metric, so the question-level report above never looked at it: a
+# renamed option silently truncated that trend and read as "no movement".
+# ---------------------------------------------------------------------------
+
+# A data layer carrying one proportion question with the given option labels.
+ti_dl <- function(code, title, labels, kinds = NULL) {
+  if (is.null(kinds)) kinds <- rep("category", length(labels))
+  list(questions = list(list(
+    code = code, title = title, type = "single",
+    rows = c(lapply(seq_along(labels), function(i) {
+      list(kind = kinds[i], label = labels[i])
+    }), list(list(kind = "mean", label = "Mean"))))))
+}
+
+# A prior wave whose question publishes those option rows.
+ti_prior_rows <- function(wave, year, key, labels) {
+  rows <- stats::setNames(lapply(labels, function(l) list(pct = 50)),
+                          tracking_norm(labels))
+  list(wave = wave, year = year, segments = list(),
+       questions = list(list(match_key = key, title = key, base = 400, rows = rows)))
+}
+
+test_that("tracking_option_labels reads category and NET rows, never the mean", {
+  dl <- ti_dl("Q1", "Satisfaction", c("Very satisfied", "Satisfied", "Top 2 Box"),
+              kinds = c("category", "category", "net"))
+  expect_equal(tracking_option_labels(dl$questions[[1]]),
+               c("very satisfied", "satisfied", "top 2 box"))
+  expect_equal(tracking_option_labels(list(rows = list())), character(0))
+})
+
+test_that("a renamed option is NAMED, not silently dropped from the trend", {
+  dl <- ti_dl("Q1", "Satisfaction", c("Extremely satisfied", "Satisfied", "Dissatisfied"))
+  priors <- list(ti_prior_rows("2025", 2025, "satisfaction",
+                               c("Very satisfied", "Satisfied", "Dissatisfied")))
+  out <- capture.output(res <- tracking_report_option_pairing(dl, priors))
+  expect_equal(res$checked, 3)
+  expect_equal(res$matched, 2)
+  expect_equal(res$unmatched, 1)
+  expect_true(any(grepl("1 of 3 option", out)))
+  expect_true(any(grepl("extremely satisfied", out)))   # the label that broke
+  expect_false(any(grepl("WARNING", out)))              # partial: a note, not a warning
+})
+
+test_that("every option unmatched warns loudly and says what to do", {
+  dl <- ti_dl("Q1", "Satisfaction", c("Strongly agree", "Agree"))
+  priors <- list(ti_prior_rows("2025", 2025, "satisfaction", c("Top box", "Second box")))
+  out <- capture.output(res <- tracking_report_option_pairing(dl, priors))
+  expect_equal(res$matched, 0)
+  expect_true(any(grepl("no option row matched history", out)))
+  expect_true(any(grepl("normalised label", out)))
+})
+
+test_that("a full option match says so quietly", {
+  dl <- ti_dl("Q1", "Satisfaction", c("Agree", "Disagree"))
+  priors <- list(ti_prior_rows("2025", 2025, "satisfaction", c("Agree", "Disagree")))
+  out <- capture.output(res <- tracking_report_option_pairing(dl, priors))
+  expect_equal(res$unmatched, 0)
+  expect_true(any(grepl("all 2 tracked option row", out)))
+})
+
+test_that("a mean-only history reports nothing about options", {
+  dl <- ti_dl("Q78", "q78", c("Agree", "Disagree"))
+  out <- capture.output(res <- tracking_report_option_pairing(
+    dl, list(ti_contrib("2025", 2025, c("q78")))))
+  expect_equal(res$checked, 0)
+  expect_equal(length(out), 0)                   # no rows in history -> silent
+})
+
+test_that("the option check runs even when this wave contributes no metric", {
+  # A proportion-only tracker: nothing carries microdata scores, so the
+  # question-level report has an empty current contribution and says nothing —
+  # exactly the case that had no check at all before.
+  dl <- ti_dl("Q1", "Satisfaction", c("Extremely satisfied", "Satisfied"))
+  priors <- list(ti_prior_rows("2025", 2025, "satisfaction",
+                               c("Very satisfied", "Satisfied")))
+  out <- capture.output(res <- tracking_report_pairing(
+    list(wave = "W2026", year = 2026, questions = list()), priors, dl))
+  expect_equal(res$options$unmatched, 1)
+  expect_true(any(grepl("extremely satisfied", out)))
+})
+
+test_that("build_tracking_island forwards the data layer to the option check", {
+  dl <- ti_dl("Q78", "q78", c("Renamed option", "Agree"))
+  priors <- list(ti_prior_rows("2025", 2025, "q78", c("Agree", "Disagree")))
+  out <- capture.output(island <- build_tracking_island(
+    ti_contrib("W2026", 2026, c("q78")), priors, dl))
+  expect_equal(length(island$waves), 2)          # island still builds
+  expect_true(any(grepl("renamed option", out)))
 })
