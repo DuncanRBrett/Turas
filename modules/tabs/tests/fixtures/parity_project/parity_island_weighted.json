@@ -523,6 +523,320 @@
       }
     },
     {
+      "code": "Q5",
+      "title": "How satisfied are you overall?",
+      "category": "Satisfaction",
+      "theme": "",
+      "key_share": "",
+      "type": "scale",
+      "bases": [
+        {
+          "n": 200,
+          "low": false,
+          "nWeighted": 276,
+          "nEff": 173.77497947
+        },
+        {
+          "n": 40,
+          "low": false,
+          "nWeighted": 79.6,
+          "nEff": 37.04490178
+        },
+        {
+          "n": 60,
+          "low": false,
+          "nWeighted": 60,
+          "nEff": 55.55555556
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 74.4,
+          "nEff": 46.31325301
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 62,
+          "nEff": 46.31325301
+        }
+      ],
+      "rows": [
+        {
+          "kind": "category",
+          "label": "1",
+          "pct": [
+            17,
+            10,
+            0,
+            20,
+            40
+          ],
+          "n": [
+            47,
+            8,
+            0,
+            15,
+            24
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "B",
+            "B"
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "B",
+            "B"
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "2",
+          "pct": [
+            17,
+            10,
+            0,
+            20,
+            41
+          ],
+          "n": [
+            48,
+            8,
+            0,
+            15,
+            25
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "B",
+            "B"
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "B",
+            "BC"
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "3",
+          "pct": [
+            29,
+            41,
+            80,
+            0,
+            0
+          ],
+          "n": [
+            81,
+            33,
+            48,
+            0,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "CD",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "CD",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "4",
+          "pct": [
+            18,
+            19,
+            10,
+            30,
+            10
+          ],
+          "n": [
+            50,
+            15,
+            6,
+            22,
+            6
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "B",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "5",
+          "pct": [
+            18,
+            21,
+            10,
+            30,
+            9
+          ],
+          "n": [
+            51,
+            16,
+            6,
+            22,
+            6
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "B",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "net",
+          "label": "Bottom 2 Box",
+          "pct": [
+            34,
+            19,
+            0,
+            40,
+            80
+          ],
+          "n": [
+            94,
+            15,
+            0,
+            29,
+            50
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "B",
+            "BC"
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "B",
+            "BC"
+          ]
+        },
+        {
+          "kind": "net",
+          "label": "Top 2 Box",
+          "pct": [
+            37,
+            40,
+            20,
+            60,
+            20
+          ],
+          "n": [
+            101,
+            32,
+            12,
+            45,
+            12
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "net",
+          "label": "NET POSITIVE (Top 2 Box - Bottom 2 Box)",
+          "pct": [
+            2,
+            21,
+            20,
+            21,
+            -60
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "D",
+            "D",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "D",
+            "D",
+            ""
+          ]
+        }
+      ],
+      "scale_max": null,
+      "gauge_green": null,
+      "gauge_amber": null,
+      "index_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      },
+      "net_diffs": {
+        "7": {
+          "plus": 6,
+          "minus": 5
+        }
+      }
+    },
+    {
       "code": "Q3",
       "title": "The service is good value for money",
       "category": "Value",

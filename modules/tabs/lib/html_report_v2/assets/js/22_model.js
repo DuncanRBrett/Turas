@@ -275,11 +275,22 @@
         : netOrRowCounts(q, q.rows[diff.plus], diff.plus, columns, mask, tabs);
       var minusCells = boxes ? TR.stats.boxCounts(q.code, diff.minus, columns, mask)
         : netOrRowCounts(q, q.rows[diff.minus], diff.minus, columns, mask, tabs);
+      // Letters on a NET POSITIVE row test the PRINTED net, via the mean of the
+      // per-respondent +-100 score (review 2026-08, I5) — matching what the R
+      // engine writes into the published view, so a filtered recompute and the
+      // published table do not letter the same row differently. Only available
+      // when box membership is carried; the net_members fallback has no
+      // per-respondent box, so it stays unlettered rather than guessing.
+      var netSig = boxes
+        ? TR.stats.sigLetters(
+          TR.stats.netScoreMeans(q.code, diff.plus, diff.minus, columns, mask),
+          letters, threshold, true, dual)
+        : null;
       return diffRow(plusCells.map(function (p, i) {
         var m = minusCells[i];
         var pct = (p.wbase && m.wbase)
           ? (p.n / p.wbase - m.n / m.wbase) * 100 : null;
-        return { pct: pct, n: null, mean: null, sig: "" };
+        return { pct: pct, n: null, mean: null, sig: netSig ? netSig[i] : "" };
       }));
     }
     if (boxes) {

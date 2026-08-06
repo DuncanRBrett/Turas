@@ -152,6 +152,13 @@ build_tabs_diagnostics <- function(config_result, data_result,
       "Letters therefore answer 'do these NPS scores differ', not 'do the ",
       "underlying 0-10 ratings differ'.")
   }
+  if (isTRUE(safe_logical(config_obj$show_net_positive, default = FALSE))) {
+    assumptions[["NET POSITIVE significance"]] <- paste0(
+      "Tested on a per-respondent net score (+100 top box, -100 bottom box, ",
+      "0 otherwise), whose weighted mean is the published NET POSITIVE. ",
+      "Letters therefore answer 'do these nets differ', not 'do the top boxes ",
+      "differ'.")
+  }
   if (isTRUE(safe_logical(config_obj$enable_chi_square, default = FALSE))) {
     assumptions[["Chi-square test"]] <- paste0(
       "Pearson's chi-square on the BoxCategory counts as computed, without ",

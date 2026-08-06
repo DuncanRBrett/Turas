@@ -436,12 +436,20 @@ type uses, so there is still one definition of the correction.
   `idx_b` is now one helper (`composite_subset_indices()`), so the bases the
   correction reads and the rows each test reads cannot be different people.
 
-**The related item is now documented rather than changed.** The NET POSITIVE
-Sig. row tests the TOP BOX proportion alone, not the printed top-minus-bottom;
-two columns with the same top box and different bottom boxes print different
-NET POSITIVE values and cannot letter against each other. Changing it means
-testing a difference of two dependent proportions — a different test, so a
-design decision, left open. Recorded in the function's roxygen.
+**The related item was documented, then answered and CHANGED — 2026-08-06,
+later the same day.** It was written up as a standalone brief
+(`NET_POSITIVE_SIG_QUESTION.md`, commit 94e29cc7), handed to a fresh session,
+and decided: the NET POSITIVE row's letters now test the printed
+top-minus-bottom, through the weighted mean of a per-respondent ±100 score
+(+100 top box, −100 bottom box, 0 otherwise) — the same device the NPS Score
+row uses. The key fact that settled it: the score's variance,
+`t + b − (t − b)²`, IS the correlated-difference variance, so the multinomial
+covariance is carried by the score and no bespoke statistics are needed.
+Decision, derivation, before/after letters and what was built:
+`NET_POSITIVE_SIG_DECISION.md`. On the parity fixture it removes one letter
+(two columns printing the identical +20 no longer letter each other) and adds
+one (two columns with the identical 20% top box, printing +20 against −60, now
+do).
 
 **I6. Chi-square row: display-rounded weighted counts, no design correction,
 not weight-scale invariant — FIXED 2026-08-06 (Job I-stats).** `standard_processor.R:1308-1314` reads counts
@@ -749,6 +757,12 @@ each column's effective base with known-answer tests against base R.
    fixture — they are covered by unit and end-to-end tests in
    `test_stats_semantics.R`, but not by the cross-engine gate. That is the next
    honest addition to it.
+
+   **Update, 2026-08-06 (NET POSITIVE decision session):** NET POSITIVE is now
+   in the fixture. Q5 carries both boxes and a distribution engineered so that
+   both failure modes of the old top-box test appear on one table; the gate
+   asserts on it in R-6 (`test_cross_engine_stats.R`) and JS-5
+   (`parity_stats_tests.mjs`). Composites and chi-square remain outside it.
 
 Files: `lib/cell_calculator.R`, `lib/standard_processor.R`,
 `lib/composite_processor.R`, `lib/question_orchestrator.R`,

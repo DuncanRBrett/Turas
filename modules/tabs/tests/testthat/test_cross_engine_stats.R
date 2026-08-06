@@ -17,6 +17,8 @@
 #   R-3  The no-population guardrail — fpc_mul defaults are inert
 #   R-5  The NPS Score row (I1) — the values R tests are the values it prints,
 #        and the report reproduces them from the same +-100 buckets
+#   R-6  The NET POSITIVE row (I5) — its letters test the printed net, via the
+#        same +-100 score device, and the census column is still excluded
 #
 # Every expected value below is hand-derived in the comment above it. A parity
 # gate that re-blesses whatever the code produced is a tautology, not a gate.
@@ -278,7 +280,8 @@ mean_rtype_for <- function(table, lbl, src) {
 test_that("the fixture produces the shape the parity harness assumes", {
   run <- parity_run()
   expect_equal(run$analysis$run_status, "PASS")
-  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3", "Q4"))
+  # Q5 carries the NET POSITIVE row (review 2026-08, I5).
+  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3", "Q4", "Q5"))
   # Dual alpha is on: 0.05 primary, 0.20 secondary.
   expect_equal(run$config$config_obj$alpha, 0.05)
   expect_equal(run$config$config_obj$alpha_secondary, 0.20)
@@ -673,4 +676,110 @@ test_that("the engine's NPS values ARE the values it tests", {
   expect_equal(res$values, c(100, 100, 0, -100, -100, -100))
   expect_equal(res$value, sum(res$values * res$weights) / sum(res$weights),
                tolerance = 1e-12)
+})
+
+
+# ==============================================================================
+# R-6. THE NET POSITIVE ROW (review 2026-08, I5)
+# ==============================================================================
+#
+# Q5 prints top box MINUS bottom box, and since I5 its letters test THAT
+# difference — through the per-respondent +-100 net score, whose weighted mean
+# is the printed net. Before I5 the letters came from a z-test of the top box
+# alone, so the row tested a quantity it did not print.
+#
+# The fixture's distribution puts both failure modes of the old test on one
+# table (generate_parity_project.R, Q5_DIST):
+#
+#   Column   n   top   bottom   top%   bottom%   NET     n_eff (FPC)
+#   ------   --  ---   ------   ----   -------   ----    -----------
+#   Alpha    40   16      8      40%     20%     +20     Inf (census)
+#   Beta     60   12      0      20%      0%     +20     99.333333
+#   Gamma    50   30     20      60%     40%     +20     50
+#   Delta    50   10     40      20%     80%     -60     50
+#
+# Score variances are the Bessel-corrected sample variance of each column's
+# +-100 vector, i.e. (t + b - (t - b)^2) * 100^2 * n/(n-1):
+#   Beta  (0.20 + 0.00 - 0.20^2) * 1e4 * 60/59 = 1627.118644
+#   Gamma (0.60 + 0.40 - 0.20^2) * 1e4 * 50/49 = 9795.918367
+#   Delta (0.20 + 0.80 - 0.60^2) * 1e4 * 50/49 = 6530.612245
+#
+#   Beta vs Delta   SE = sqrt(1627.118644/99.333333 + 6530.612245/50) = 12.124054
+#                   t  = 80 / 12.124054 = 6.598452   ->  p = 4.0e-09   ("D")
+#   Gamma vs Delta  SE = sqrt(9795.918367/50 + 6530.612245/50) = 18.070158
+#                   t  = 80 / 18.070158 = 4.427245   ->  p = 2.6e-05   ("D")
+#   Beta vs Gamma   both means are exactly +20  ->  t = 0, p = 1        (nothing)
+#
+# WHAT THIS CHANGED ON THIS TABLE (captured by regenerating the island against
+# the pre-I5 engine, revert-run-restore):
+#
+#   before   Total .   Alpha .   Beta .    Gamma BD   Delta .
+#   after    Total .   Alpha .   Beta D    Gamma D    Delta .
+#
+#   - Gamma LOSES "B": Gamma and Beta print the SAME +20, and the old test
+#     lettered Gamma over Beta on a 60%-vs-20% top-box gap. A letter under two
+#     identical printed numbers.
+#   - Beta GAINS "D": Beta and Delta have the SAME 20% top box, so the old test
+#     saw z = 0 and could never letter them — while the page showed +20
+#     against -60.
+#   - Gamma keeps "D" and Alpha (the census) letters nothing, either way.
+
+context("R-6: NET POSITIVE tests the printed net")
+
+np_row <- function(island, kind) {
+  q5 <- Filter(function(q) q$code == "Q5", island$questions)[[1]]
+  Filter(function(r) grepl("^NET POSITIVE", r$label), q5$rows)[[1]][[kind]]
+}
+
+test_that("the published NET POSITIVE values are top box minus bottom box", {
+  run <- parity_run()
+  # Total: top 68/200 = 34%, bottom 68/200 = 34%  ->  0
+  expect_equal(unlist(np_row(run$island, "pct")), c(0, 20, 20, 20, -60))
+})
+
+test_that("a column with the same top box but a different net now letters", {
+  run <- parity_run()
+  sig <- unlist(np_row(run$island, "sig"))
+  # Beta vs Delta: identical 20% top boxes, t = 6.598 on the net.
+  expect_equal(sig[[3]], "D")
+})
+
+test_that("a column with the same printed net no longer letters", {
+  run <- parity_run()
+  sig <- unlist(np_row(run$island, "sig"))
+  # Gamma's letters are "D" alone — the "B" the top-box test used to print
+  # against a column showing the identical +20 is gone.
+  expect_equal(sig[[4]], "D")
+  expect_false(grepl("B", sig[[4]], fixed = TRUE))
+})
+
+test_that("the census column is excluded from NET POSITIVE pairing", {
+  run <- parity_run()
+  sig <- unlist(np_row(run$island, "sig"))
+  expect_equal(sig[[2]], "")
+  expect_false(any(grepl("A", sig, fixed = TRUE)))
+  expect_equal(sig[[1]], "")   # Total is never tested
+})
+
+test_that("the dual-alpha row is a superset of the 95% row", {
+  run <- parity_run()
+  sig  <- unlist(np_row(run$island, "sig"))
+  sig2 <- unlist(np_row(run$island, "sig2"))
+  for (i in seq_along(sig)) {
+    hi <- strsplit(sig[[i]], "")[[1]]
+    lo <- strsplit(sig2[[i]], "")[[1]]
+    expect_true(all(hi %in% lo))
+  }
+})
+
+test_that("the weighted run tests the weighted net on the effective base", {
+  run <- parity_run("Parity_Crosstab_Config_Weighted.xlsx")
+  pct <- unlist(np_row(run$island, "pct"))
+  sig <- unlist(np_row(run$island, "sig"))
+  # The weights shift the published nets a point or two; the ordering, and so
+  # the letters, are unchanged.
+  expect_equal(pct[[5]], -60)
+  expect_equal(sig[[3]], "D")
+  expect_equal(sig[[4]], "D")
+  expect_equal(sig[[2]], "")
 })

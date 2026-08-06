@@ -170,6 +170,50 @@ run("boxCounts keeps no-box answers (Neutral) in the denominator", () => {
   eq(c.n, 2, "box-0 hits");            // 2/5 = 40%, not 2/4 = 50%
 });
 
+/* ---------------- 6b. netScoreMeans (NET POSITIVE) ---------------- */
+
+run("netScoreMeans scores +-100 off box membership and means to the printed net", () => {
+  setProject({});
+  // 6 respondents: 3 in the favourable box (row 1), 2 in the unfavourable box
+  // (row 0), 1 answered into NO box. Printed net = (3 - 2)/6 * 100 = 16.6667,
+  // and the score mean must equal it — that equality is the whole method
+  // (review 2026-08, I5).
+  TR.MICRO = {
+    n: 6,
+    answers: { Q1: [4, 4, 4, 1, 1, 3] },
+    boxes: { Q1: [1, 1, 1, 0, 0, null] },
+    banner_vars: {}
+  };
+  const mask = new Uint8Array(6).fill(1);
+  const m = TR.stats.netScoreMeans("Q1", 1, 0, [{ member: null }], mask)[0];
+
+  close(m.mean, 100 / 6, 1e-9, "mean IS the printed net");
+  eq(m.k, 6, "the no-box respondent stays in the base");
+  // Population variance = sum(w s^2)/wbase - mean^2 = 50000/6 - (100/6)^2
+  //                     = 8333.333333 - 277.777778 = 8055.555556
+  // Sample variance      = 8055.555556 * 6/5 = 9666.666667  ->  sd = 98.319208
+  close(m.sd, Math.sqrt(9666.6666667), 1e-6, "sd is the Bessel-scaled score sd");
+});
+
+run("netScoreMeans variance equals the correlated-proportions variance", () => {
+  setProject({});
+  // The identity the decision rests on: for X in {+1,0,-1} with P(+1)=t and
+  // P(-1)=b, Var(X) = t + b - (t - b)^2, which is exactly n * Var(p_top -
+  // p_bottom) under the multinomial. Here t = 0.5, b = 0.25 (8 respondents):
+  //   t + b - (t - b)^2 = 0.75 - 0.0625 = 0.6875  ->  6875 on the +-100 scale.
+  TR.MICRO = {
+    n: 8,
+    answers: { Q1: [4, 4, 4, 4, 1, 1, 3, 3] },
+    boxes: { Q1: [1, 1, 1, 1, 0, 0, null, null] },
+    banner_vars: {}
+  };
+  const mask = new Uint8Array(8).fill(1);
+  const m = TR.stats.netScoreMeans("Q1", 1, 0, [{ member: null }], mask)[0];
+  close(m.mean, 25, 1e-9, "net = 50% - 25% = +25");
+  // sd is the SAMPLE sd (population variance scaled by k/(k-1) = 8/7).
+  close(m.sd * m.sd * 7 / 8, 6875, 1e-6, "population variance = t + b - (t-b)^2");
+});
+
 /* ---------------- 7 + 8 + 9. model-level fixtures ---------------- */
 
 // Unweighted population report: Total + B (census: base === N) + C + D.

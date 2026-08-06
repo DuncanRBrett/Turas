@@ -89,6 +89,22 @@ if (!exists("batch_rbind")) {
     do.call(rbind, row_list)
   }, envir = globalenv())
 }
+# add_net_positive_significance routes through add_significance_row (the same
+# wrapper every mean row uses) since review 2026-08 I5; extract it and its test
+# runner out of the orchestrator by text, as test_standard_processor.R does.
+if (!exists("SIG_ROW_TYPE")) assign("SIG_ROW_TYPE", "Sig.", envir = globalenv())
+if (!exists("SIG2_ROW_TYPE")) assign("SIG2_ROW_TYPE", "Sig.2", envir = globalenv())
+if (!exists("DEFAULT_ALPHA")) assign("DEFAULT_ALPHA", 0.05, envir = globalenv())
+if (!exists("DEFAULT_MIN_BASE")) assign("DEFAULT_MIN_BASE", 30, envir = globalenv())
+if (!exists("add_significance_row")) {
+  .rc_lines <- readLines(file.path(turas_root, "modules/tabs/lib/run_crosstabs.R"))
+  .rc_start <- grep("^run_significance_tests_for_row <- function", .rc_lines)
+  .rc_end   <- grep("^add_significance_row <- function", .rc_lines)
+  .rc_next  <- grep("^(#' Write question table|write_question_table_fast)", .rc_lines)
+  .rc_next  <- .rc_next[.rc_next > .rc_end[1]][1] - 1
+  eval(parse(text = .rc_lines[.rc_start[1]:.rc_next]), envir = globalenv())
+  rm(.rc_lines, .rc_start, .rc_end, .rc_next)
+}
 source(file.path(turas_root, "modules/tabs/lib/standard_processor.R"))
 source(file.path(turas_root, "modules/tabs/lib/numeric_processor.R"))
 # ranking.R resolves its own sub-files through .tabs_lib_dir
@@ -289,6 +305,7 @@ make_fpc_banner <- function(data) {
   banner <- create_banner_structure(selection_df, survey_structure)
   idx <- create_banner_row_indices(data, banner)
   list(banner = banner,
+       indices = idx$row_indices,
        bases = calculate_banner_bases(idx, rep(1, nrow(data)), is_weighted = FALSE))
 }
 
@@ -327,46 +344,79 @@ test_that("the fixture's universes resolve to the multipliers claimed above", {
 })
 
 test_that("NET POSITIVE letters take the same FPC as the rows above them", {
-  # Top-box counts, chosen so that ONE letter appears and ONE disappears:
+  # Box counts, chosen so that ONE letter appears and ONE disappears:
   #
-  #   Alpha 34/40 = 85%   Beta 39/60 = 65%   Gamma 20/50 = 40%   Delta 30/50 = 60%
+  #   Column   n    top   bottom   middle   NET POSITIVE
+  #   ------   --   ---   ------   ------   ------------
+  #   Alpha    40    30      8        2      +55.0
+  #   Beta     60    37     12       11      +41.666667
+  #   Gamma    50    20     20       10        0.0
+  #   Delta    50    25     10       15      +30.0
   #
-  # Alpha vs Gamma, uncorrected (pooled p = 54/90 = 0.6):
-  #   SE = sqrt(0.6*0.4*(1/40 + 1/50)) = 0.10392305
-  #   z  = 0.45 / 0.10392305 = 4.330127  ->  p = 1.4902e-05 < 0.00833333
-  #   So before the fix Alpha printed "C" — on a column where every member of
-  #   the universe was interviewed and there is no sampling error to test.
-  #   With the FPC, Alpha's multiplier is Inf and the pair is not tested at all.
+  # Since review 2026-08 (I5) these letters test the printed net through the
+  # per-respondent +-100 score, so the pairs are Welch t-tests of those score
+  # means, not z-tests of the top box. Each column's score variance is the
+  # Bessel-corrected sample variance of its own +-100 vector:
   #
-  # Beta vs Gamma, uncorrected (pooled p = 59/110 = 0.53636364):
-  #   SE = sqrt(0.53636364*0.46363636*(1/60 + 1/50)) = 0.09548921
-  #   z  = 0.25 / 0.09548921 = 2.618097  ->  p = 0.0088417 > 0.00833333  (no letter)
+  #   population variance = (t + b - (t - b)^2) * 100^2, x n/(n-1)
+  #   Alpha (0.75 + 0.20 - 0.55^2) * 1e4 * 40/39 = 6641.0256
+  #   Beta  (0.616667 + 0.20 - 0.416667^2) * 1e4 * 60/59 = 6539.5480
+  #   Gamma (0.40 + 0.40 - 0)  * 1e4 * 50/49 = 8163.2653
+  #   Delta (0.50 + 0.20 - 0.30^2) * 1e4 * 50/49 = 6224.4898
+  #
+  # Alpha vs Gamma, uncorrected:
+  #   SE = sqrt(6641.0256/40 + 8163.2653/50) = 18.146378
+  #   t  = 55 / 18.146378 = 3.030903, df = 86.69  ->  p = 0.003214 < 0.00833333
+  #   So without the correction Alpha prints "C" — on a column where every
+  #   member of the universe was interviewed and there is no sampling error to
+  #   test. With the FPC, Alpha's multiplier is Inf and the pair is not tested.
+  #
+  # Beta vs Gamma, uncorrected:
+  #   SE = sqrt(6539.5480/60 + 8163.2653/50) = 16.500229
+  #   t  = 41.666667 / 16.500229 = 2.525217, df = 99.45 -> p = 0.013143 (no letter)
   #   Corrected, Beta's effective base is 60 * 149/90 = 99.333333:
-  #   SE = sqrt(0.53636364*0.46363636*(1/99.333333 + 1/50)) = 0.08646976
-  #   z  = 0.25 / 0.08646976 = 2.891176  ->  p = 0.0038374 < 0.00833333  ("C")
+  #   SE = sqrt(6539.5480/99.333333 + 8163.2653/50) = 15.136040
+  #   t  = 41.666667 / 15.136040 = 2.752843, df = 89.25 -> p = 0.007157  ("C")
   #
-  # The two p-values are confirmed below against base R's pnorm, not against the
-  # function under test.
+  # Every other pair is comfortably non-significant either way (the widest is
+  # Delta vs Gamma at p = 0.080). The two p-values that straddle the threshold
+  # are confirmed below against base R's pt(), not against the function under
+  # test.
   alpha_adj <- 0.05 / 6
-  z_p <- function(z) 2 * (1 - pnorm(abs(z)))
-  expect_equal(z_p(0.45 / sqrt(0.6 * 0.4 * (1 / 40 + 1 / 50))), 1.490234e-05,
-               tolerance = 1e-6)
-  expect_lt(z_p(0.45 / sqrt(0.6 * 0.4 * (1 / 40 + 1 / 50))), alpha_adj)
-  p_beta_plain <- z_p(0.25 / sqrt((59 / 110) * (51 / 110) * (1 / 60 + 1 / 50)))
-  p_beta_fpc   <- z_p(0.25 / sqrt((59 / 110) * (51 / 110) * (1 / (60 * 149 / 90) + 1 / 50)))
+  welch_p <- function(m1, v1, n1, m2, v2, n2) {
+    se2 <- v1 / n1 + v2 / n2
+    tt <- (m1 - m2) / sqrt(se2)
+    df <- se2^2 / ((v1 / n1)^2 / (n1 - 1) + (v2 / n2)^2 / (n2 - 1))
+    2 * pt(-abs(tt), df)
+  }
+  V <- c(Alpha = 6641.025641, Beta = 6539.547980,
+         Gamma = 8163.265306, Delta = 6224.489796)
+  p_alpha_gamma <- welch_p(55, V[["Alpha"]], 40, 0, V[["Gamma"]], 50)
+  p_beta_plain  <- welch_p(125 / 3, V[["Beta"]], 60, 0, V[["Gamma"]], 50)
+  p_beta_fpc    <- welch_p(125 / 3, V[["Beta"]], 60 * 149 / 90, 0, V[["Gamma"]], 50)
+  expect_equal(p_alpha_gamma, 0.003214, tolerance = 1e-4)
+  expect_lt(p_alpha_gamma, alpha_adj)
   expect_gt(p_beta_plain, alpha_adj)
   expect_lt(p_beta_fpc, alpha_adj)
 
   data <- data.frame(Cohort = fpc_cohort_column(), stringsAsFactors = FALSE)
   fx <- make_fpc_banner(data)
   keys <- fx$banner$internal_keys
-  top    <- setNames(c(103, 34, 39, 20, 30), keys)   # Total = 34+39+20+30
-  bottom <- setNames(c(40, 3, 10, 20, 7), keys)
+
+  # The +-100 score vector, laid out in the same row order as fpc_cohort_column()
+  # (Alpha's 40 rows, then Beta's 60, Gamma's 50, Delta's 50).
+  box_scores <- function(n, top, bot) c(rep(100, top), rep(-100, bot),
+                                        rep(0, n - top - bot))
+  net_scores <- c(box_scores(40, 30,  8), box_scores(60, 37, 12),
+                  box_scores(50, 20, 20), box_scores(50, 25, 10))
+  weights <- rep(1, nrow(data))
 
   with_pop <- add_net_positive_significance(
-    top, bottom, fx$bases, keys, fx$banner, fpc_config(TRUE), is_weighted = FALSE)
+    net_scores, fx$indices, weights, fx$bases, keys, fx$banner,
+    fpc_config(TRUE), is_weighted = FALSE)
   no_pop <- add_net_positive_significance(
-    top, bottom, fx$bases, keys, fx$banner, fpc_config(FALSE), is_weighted = FALSE)
+    net_scores, fx$indices, weights, fx$bases, keys, fx$banner,
+    fpc_config(FALSE), is_weighted = FALSE)
 
   # No universe configured: the pre-fix letters, unchanged. This is the
   # guarantee that reports without a Population sheet are untouched.

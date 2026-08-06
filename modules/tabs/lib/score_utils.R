@@ -50,6 +50,66 @@ nps_bucket_score <- function(v) {
 }
 
 
+#' Per-respondent NET POSITIVE score: +100 top box, -100 bottom box, 0 otherwise
+#'
+#' The weighted mean of these scores IS the published NET POSITIVE row
+#' (top% - bottom%), so the row's significance letters can test the quantity the
+#' row prints instead of the top box alone (review 2026-08, I5; decision in
+#' docs/tabs_production_review_2026-08/NET_POSITIVE_SIG_DECISION.md). Same
+#' device as \code{nps_bucket_score()} above, and for the same reason.
+#'
+#' Why the mean of this score is the right test rather than a bespoke variance
+#' formula: top box and bottom box are two cells of one multinomial, negatively
+#' correlated, so the independent-proportions difference formula does not apply.
+#' For X in {+1, 0, -1} with P(+1) = t and P(-1) = b,
+#'   E[X] = t - b   and   Var(X) = E[X^2] - E[X]^2 = t + b - (t - b)^2,
+#' which is exactly Var(p_top - p_bottom) * n under the multinomial. The
+#' covariance is carried by the score itself, so the existing weighted-t path
+#' needs no new statistics.
+#'
+#' EVERY row in \code{data} gets a score, including respondents who did not
+#' answer (NA) and those in an unboxed middle category — both score 0. That is
+#' deliberate: the published row divides top and bottom counts by the column's
+#' BASE (banner bases are the base-filtered column, not the answered base), so
+#' the score must share that denominator or the tested quantity would not be
+#' the printed one.
+#'
+#' @param data Data frame, the question's base-filtered survey data
+#' @param question_info One-row data frame of question metadata (QuestionCode)
+#' @param question_options Data frame of options carrying BoxCategory
+#' @param top_category Character, the favourable BoxCategory name
+#' @param bottom_category Character, the unfavourable BoxCategory name
+#' @return Numeric vector, one score per row of \code{data} (never NA)
+#' @export
+net_positive_scores <- function(data, question_info, question_options,
+                                top_category, bottom_category) {
+  scores <- numeric(nrow(data))
+  question_col <- as.character(question_info$QuestionCode)
+  if (!(question_col %in% names(data))) return(scores)
+
+  answers <- data[[question_col]]
+  texts_for <- function(category) {
+    as.character(question_options$OptionText[
+      !is.na(question_options$BoxCategory) &
+        question_options$BoxCategory == category
+    ])
+  }
+
+  # safe_equal is the same comparison calculate_boxcategory_counts() uses, so a
+  # respondent counted in a box there scores for that box here.
+  mark <- function(category, value) {
+    for (option_text in texts_for(category)) {
+      hit <- safe_equal(answers, option_text) & !is.na(answers)
+      scores[hit] <<- value
+    }
+  }
+  mark(bottom_category, -100)
+  mark(top_category, 100)
+
+  scores
+}
+
+
 #' Mean option score per BoxCategory — the favourability score
 #'
 #' Each box's mean option score, using the SAME signal as the Index

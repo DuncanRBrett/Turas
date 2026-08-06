@@ -428,6 +428,38 @@
     });
   };
 
+  /**
+   * Mean +-100 NET POSITIVE score per column: +100 in the favourable box, -100
+   * in the unfavourable box, 0 for any other response in the base. That mean IS
+   * the printed net (top% - bottom%), so a NET POSITIVE row's letters test the
+   * number the row shows — the device the NPS Score row already uses, and the
+   * one the R engine adopted for this row (review 2026-08, I5; decision in
+   * docs/tabs_production_review_2026-08/NET_POSITIVE_SIG_DECISION.md).
+   *
+   * Testing the printed difference is not a two-independent-proportions z-test:
+   * the two boxes are cells of one multinomial and are negatively correlated.
+   * The score carries that covariance itself — for X in {+1,0,-1} with
+   * P(+1)=t, P(-1)=b, Var(X) = t + b - (t-b)^2, exactly Var(p_top - p_bottom)*n.
+   *
+   * Base rule mirrors boxCounts(): an answer belonging to no box still counts
+   * in the base (and scores 0), so the mean shares the printed row's
+   * denominator. Returns the {mean, sd, k} shape sigLetters(isMean) expects.
+   */
+  stats.netScoreMeans = function (qcode, plusRi, minusRi, columns, mask) {
+    var boxes = TR.MICRO.boxes[qcode];
+    var answers = TR.MICRO.answers && TR.MICRO.answers[qcode];
+    return columns.map(function (col) {
+      return weightedMeanColumn(function (r) {
+        var b = boxes[r];
+        var a = answers ? answers[r] : undefined;
+        if ((b === null || b === undefined) && (a === null || a === undefined)) return null;
+        if (b === plusRi) return 100;
+        if (b === minusRi) return -100;
+        return 0;
+      }, mask, col);
+    });
+  };
+
   /* ---------- significance ---------- */
 
   /**

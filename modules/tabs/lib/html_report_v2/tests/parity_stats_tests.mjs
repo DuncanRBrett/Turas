@@ -26,6 +26,8 @@
  *   JS-3  DOCUMENTED divergence: the JS mean test is a z-test where R runs a
  *         Welch t. Decisions must agree outside a band around alpha; pairs
  *         inside the band are logged, not failed.
+ *   JS-5  NET POSITIVE (I5): the published view renders R's net-based letters
+ *         verbatim, and a recompute scores the same +-100 per respondent.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/parity_stats_tests.mjs
  */
@@ -491,6 +493,65 @@ run("the mean divergence never reaches a proportion row", () => {
       String(raw.sig2[ci] || "").replace(/-/g, "").split("").sort().join(""),
       "NET row col " + ci + " is exact, not tolerant");
   });
+});
+
+// Q5 is the NET POSITIVE question (review 2026-08, I5). Its letters test the
+// PRINTED net — the mean of the per-respondent +-100 score — in both engines:
+// R computes them into the island, this engine renders them, and the computed
+// (filtered / custom banner) path recomputes the same score through
+// TR.stats.netScoreMeans. A disagreement would show up here as the published
+// view lettering a row the recompute leaves bare, or vice versa.
+run("the NET POSITIVE row renders R's net-based letters verbatim", () => {
+  loadIsland(island);
+  const m = TR.model.forQuestion("Q5", "Cohort", [], { dual: true });
+  const np = m.rows.filter((r) => /^NET POSITIVE/.test(r.label))[0];
+  assert(np, "Q5 carries a NET POSITIVE row");
+  assert(np.diff, "it is a diff row (top box minus bottom box)");
+
+  // Published nets, from the fixture (generate_parity_project.R, Q5_DIST):
+  //   Total 0   Alpha +20   Beta +20   Gamma +20   Delta -60
+  eq(m.columns.map((c, i) => np.cells[i].pct).join(","), "0,20,20,20,-60",
+    "published NET POSITIVE values");
+
+  // Beta and Delta share a 20% top box, so the pre-I5 top-box test could never
+  // letter them; Beta and Gamma print the SAME +20, and it used to letter them.
+  const raw = rawRow(island, "Q5", np.label);
+  m.columns.forEach((c, ci) => {
+    eq((np.cells[ci].sig || "").replace(/[a-z]/g, ""),
+      String(raw.sig[ci] || "").replace(/-/g, ""),
+      "col " + ci + " renders the carried letter verbatim");
+  });
+  eq(np.cells[2].sig.replace(/[a-z]/g, ""), "D", "Beta letters Delta on the net");
+  eq(np.cells[3].sig.replace(/[a-z]/g, ""), "D", "Gamma letters Delta, and no longer Beta");
+  eq(np.cells[1].sig || "", "", "Alpha is a census — excluded from pairing");
+});
+
+run("a NET POSITIVE recompute scores the same +-100 the R engine does", () => {
+  // The published island carries no microdata, so the computed path is
+  // exercised against the same distribution rebuilt as per-respondent boxes:
+  // Beta's 60 (12 top, 0 bottom) and Delta's 50 (10 top, 40 bottom). The score
+  // means must be the published +20 and -60 — the equality that makes the two
+  // engines test the same quantity.
+  loadIsland(island);
+  const boxes = [], answers = [];
+  const push = (n, top, bot) => {
+    for (let i = 0; i < n; i++) {
+      const b = i < top ? 1 : (i < top + bot ? 0 : null);
+      boxes.push(b);
+      answers.push(b === 1 ? 4 : (b === 0 ? 1 : 3));
+    }
+  };
+  push(60, 12, 0);            // Beta
+  push(50, 10, 40);           // Delta
+  TR.MICRO = { n: 110, answers: { Q5: answers }, boxes: { Q5: boxes },
+    banner_vars: {} };
+  const beta = { member: boxes.map((_, i) => (i < 60 ? 1 : 0)) };
+  const delta = { member: boxes.map((_, i) => (i >= 60 ? 1 : 0)) };
+  const mask = new Uint8Array(110).fill(1);
+  const means = TR.stats.netScoreMeans("Q5", 1, 0, [beta, delta], mask);
+  eq(Math.round(means[0].mean * 1e6) / 1e6, 20, "Beta recomputes to +20");
+  eq(Math.round(means[1].mean * 1e6) / 1e6, -60, "Delta recomputes to -60");
+  TR.MICRO = null;
 });
 
 console.log("\n" + (failed === 0 ? "✓ " : "✗ ") + passed + " passed, " + failed + " failed");

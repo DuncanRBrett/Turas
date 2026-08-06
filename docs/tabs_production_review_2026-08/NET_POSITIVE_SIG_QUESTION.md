@@ -2,8 +2,10 @@
 
 **Raised:** 2026-08-06, out of Job I-stats (finding I5) in
 `FINAL_REVIEW_2026-08-06.md`.
-**Status:** open decision. Nothing is blocked on it; the current behaviour is
-unchanged and now documented in code.
+**Status:** ANSWERED and IMPLEMENTED, 2026-08-06 — see
+`NET_POSITIVE_SIG_DECISION.md` (option 3: score the respondents +100/−100/0 and
+test the mean). This document is kept as the brief that framed the question;
+read the decision for what was built and what it changed.
 **For:** a fresh session (Fable). Brief it with THIS document only — the session
 that raised it already leans one way and should not frame the answer.
 

@@ -1051,19 +1051,28 @@ create_net_positive_row <- function(top_category, bottom_category, row_counts_to
 
 #' Add NET POSITIVE significance testing
 #'
-#' WHAT THESE LETTERS TEST (recorded, not changed — review 2026-08, I5). The
-#' printed NET POSITIVE row is top box MINUS bottom box, but the letters come
-#' from \code{run_net_difference_tests()$net1}, which is a z-test on the TOP BOX
-#' proportion alone. Two columns with the same top box and different bottom
-#' boxes therefore print different NET POSITIVE values and cannot letter against
-#' each other. Changing it would mean testing a difference of two dependent
-#' proportions, which is a different test, not a different argument — a design
-#' decision, left open deliberately.
+#' WHAT THESE LETTERS TEST (review 2026-08, I5; decision recorded in
+#' docs/tabs_production_review_2026-08/NET_POSITIVE_SIG_DECISION.md). The row
+#' prints top box MINUS bottom box, and these letters test that difference —
+#' via the weighted mean of a per-respondent score (+100 top box, -100 bottom
+#' box, 0 otherwise, \code{net_positive_scores()}), whose mean IS the printed
+#' net. The same device the NPS Score row uses.
+#'
+#' Until this change the letters came from \code{run_net_difference_tests()$net1},
+#' a z-test of the TOP BOX alone: two columns with the same top box and
+#' different bottom boxes printed different nets and could never letter against
+#' each other, while two columns printing the SAME net could. Testing the
+#' printed difference directly is not a matter of z-testing it as two
+#' independent proportions — top and bottom box are two cells of one
+#' multinomial and are negatively correlated — but the score's variance carries
+#' that covariance exactly (derivation in \code{net_positive_scores()}), so the
+#' existing weighted-t path is the whole implementation.
 #'
 #' @keywords internal
-add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
-                                         banner_bases, internal_keys, banner_info,
-                                         config, is_weighted) {
+add_net_positive_significance <- function(net_scores, banner_row_indices,
+                                          master_weights, banner_bases,
+                                          internal_keys, banner_info,
+                                          config, is_weighted) {
   test_data <- list()
   total_key <- paste0("TOTAL::", TOTAL_COLUMN)
 
@@ -1077,59 +1086,33 @@ add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
 
   for (key in internal_keys) {
     if (key != total_key) {
-      base_info <- banner_bases[[key]]
+      row_idx <- banner_row_indices[[key]]
+      if (length(row_idx) == 0) next
       test_data[[key]] <- list(
-        fpc_mul = if (key %in% names(fpc_muls)) unname(fpc_muls[[key]]) else 1,
-        count1 = row_counts_top[key],
-        count2 = row_counts_bottom[key],
-        base = if (!is.null(base_info$weighted)) {
-          base_info$weighted
-        } else {
-          base_info$unweighted
-        },
-        eff_n = if (!is.null(base_info$effective)) {
-          base_info$effective
-        } else {
-          base_info$unweighted
-        }
+        values = net_scores[row_idx],
+        weights = master_weights[row_idx]
       )
     }
   }
 
-  dual_mode <- !is.null(config$alpha_secondary)
-
-  # Single call: p-values computed once; secondary threshold applied inside
-  # run_net_difference_tests when alpha2 is provided (V10.10 performance fix).
-  net_sig_results <- run_net_difference_tests(
-    test_data, banner_info, internal_keys,
+  # "mean" routes to weighted_t_test_means(), which already applies the Kish
+  # effective base, the FPC (including the Inf census exclusion), the min-base
+  # gate and the per-group Bonferroni divisor — the same wrapper every other
+  # mean row in the report goes through.
+  sig_rows <- add_significance_row(
+    test_data, banner_info, "mean", internal_keys,
     alpha = config$alpha,
     config$bonferroni_correction,
     config$significance_min_base,
     is_weighted = is_weighted,
-    alpha2 = config$alpha_secondary
+    alpha_secondary = config$alpha_secondary,
+    fpc_muls = fpc_muls
   )
 
-  if (is.null(net_sig_results)) return(NULL)
+  if (is.null(sig_rows)) return(NULL)
 
-  sig_row <- data.frame(
-    RowLabel = if (dual_mode) alpha_to_confidence_label(config$alpha) else "",
-    RowType = "Sig.",
-    stringsAsFactors = FALSE
-  )
-  for (key in internal_keys) sig_row[[key]] <- net_sig_results$net1[[key]]
-  sig_row$RowSource <- "net_positive"
-
-  if (!dual_mode) return(sig_row)
-
-  sig_row2 <- data.frame(
-    RowLabel = alpha_to_confidence_label(config$alpha_secondary),
-    RowType = "Sig.2",
-    stringsAsFactors = FALSE
-  )
-  for (key in internal_keys) sig_row2[[key]] <- net_sig_results$net1_2[[key]]
-  sig_row2$RowSource <- "net_positive"
-
-  rbind(sig_row, sig_row2)
+  sig_rows$RowSource <- "net_positive"
+  sig_rows
 }
 
 #' Add Net Positive Row
@@ -1205,10 +1188,14 @@ add_net_positive_row <- function(existing_table, data, question_info,
   # Add net positive row to table
   existing_table <- rbind(existing_table, net_positive_row)
 
-  # Add significance testing if enabled (delegated to helper)
+  # Add significance testing if enabled (delegated to helper). The letters test
+  # the printed net through a per-respondent +-100 score, so the scoring runs
+  # off the SAME two categories the counts above came from (review 2026-08, I5).
   if (config$enable_significance_testing) {
     sig_row <- add_net_positive_significance(
-      row_counts_top, row_counts_bottom,
+      net_positive_scores(data, question_info, question_options,
+                          categories$top, categories$bottom),
+      banner_row_indices, master_weights,
       banner_bases, internal_keys, banner_info,
       config, is_weighted
     )

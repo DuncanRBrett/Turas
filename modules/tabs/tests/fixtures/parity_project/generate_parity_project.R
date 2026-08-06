@@ -62,6 +62,10 @@
 # distribution through nps_bucket_score() — so it is where a scale disagreement
 # would show up as different published letters.
 #
+# Q5 is a 1-5 rating with BOTH boxes, added for review 2026-08 finding I5. It is
+# the fixture's only NET POSITIVE row, and its distribution puts both failure
+# modes of the old top-box-only test on one table (see Q5_DIST below).
+#
 # The weighted config uses the same data with a Weight column that varies by
 # cohort, so every carried statistic rides a real Kish effective base.
 # ==============================================================================
@@ -130,6 +134,32 @@ Q4_DIST <- rbind(
 )
 Q4_SCORES <- c(10L, 8L, 5L)
 
+# Q5 is a 1-5 rating carrying BOTH a Top 2 Box and a Bottom 2 Box, so it is the
+# only question in the fixture that produces a NET POSITIVE row (review 2026-08,
+# I5). Its distribution is built to make the two failure modes of the old
+# top-box-only test visible on ONE table:
+#
+#   Column   n   bottom(1,2)  middle(3)  top(4,5)   top%   bottom%   NET
+#   ------   --  -----------  ---------  --------   ----   -------   ----
+#   Alpha    40       8          16         16      40%      20%     +20
+#   Beta     60       0          48         12      20%       0%     +20
+#   Gamma    50      20           0         30      60%      40%     +20
+#   Delta    50      40           0         10      20%      80%     -60
+#
+#   Beta vs Delta — IDENTICAL top boxes (20%), nets 80 points apart. The old
+#     test compared top boxes, saw z = 0, and could never letter them.
+#   Beta vs Gamma — IDENTICAL nets (+20), top boxes 40 points apart. The old
+#     test lettered Gamma over Beta under two identical printed numbers.
+#
+# Both are ordinary data, not corner cases, which is why the fixture carries
+# them permanently rather than a unit test carrying them alone.
+Q5_DIST <- rbind(
+  Alpha = c( 4L,  4L, 16L,  8L,  8L),
+  Beta  = c( 0L,  0L, 48L,  6L,  6L),
+  Gamma = c(10L, 10L,  0L, 15L, 15L),
+  Delta = c(20L, 20L,  0L,  5L,  5L)
+)
+
 # Weights, one constant per cohort plus a deliberate within-cohort split so the
 # Kish effective base is genuinely below the raw n (a constant weight would make
 # n_eff == n and quietly test nothing).
@@ -152,6 +182,8 @@ build_survey_data <- function() {
     q3 <- c(q3_yes, rep(NA_character_, n - n_yes))
     # Q4: NPS answers laid out in order, counts from Q4_DIST.
     q4 <- rep(Q4_SCORES, times = Q4_DIST[coh, ])
+    # Q5: the NET POSITIVE rating, counts from Q5_DIST.
+    q5 <- rep(1:5, times = Q5_DIST[coh, ])
     w <- rep(COHORT_WEIGHT[[coh]], n)
     w[seq(3, n, by = 3)] <- w[seq(3, n, by = 3)] * WEIGHT_BUMP
 
@@ -162,6 +194,7 @@ build_survey_data <- function() {
       Q2 = q2,
       Q3 = q3,
       Q4 = q4,
+      Q5 = q5,
       Weight = w,
       stringsAsFactors = FALSE
     )
@@ -191,20 +224,22 @@ build_structure_workbook <- function(path) {
   )
 
   questions <- data.frame(
-    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4"),
+    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5"),
     QuestionText = c("Cohort",
                      "Have you used the service in the last month?",
                      "How would you rate the service?",
                      "The service is good value for money",
-                     "How likely are you to recommend us?"),
+                     "How likely are you to recommend us?",
+                     "How satisfied are you overall?"),
     Variable_Type = c("Single_Response", "Single_Response", "Rating",
-                      "Single_Response", "NPS"),
-    Columns = c(1L, 1L, 1L, 1L, 1L),
-    Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy"),
+                      "Single_Response", "NPS", "Rating"),
+    Columns = c(1L, 1L, 1L, 1L, 1L, 1L),
+    Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy",
+                 "Satisfaction"),
     # Optional columns the data-layer writer reads. Present-but-blank rather
     # than absent, so the fixture does not warn its way through every run.
-    ShortLabel = c("", "", "", "", ""),
-    LinkedOpenQuestion = c("", "", "", "", ""),
+    ShortLabel = c("", "", "", "", "", ""),
+    LinkedOpenQuestion = c("", "", "", "", "", ""),
     stringsAsFactors = FALSE
   )
 
@@ -233,7 +268,12 @@ build_structure_workbook <- function(path) {
     opt("Q3", c("Agree", "Disagree"), 1:2),
     # Q4's three NPS answers. No Index_Weight: an NPS question is scored through
     # nps_bucket_score() (+-100), not through the Likert index weights.
-    opt("Q4", as.character(Q4_SCORES), 1:3)
+    opt("Q4", as.character(Q4_SCORES), 1:3),
+    # Q5 carries BOTH boxes, so it is the fixture's only NET POSITIVE row. 3 is
+    # a deliberately unboxed middle: an answer in no box still counts in the
+    # base and scores 0.
+    opt("Q5", as.character(1:5), 1:5,
+        box = c("Bottom 2 Box", "Bottom 2 Box", NA, "Top 2 Box", "Top 2 Box"))
   )
 
   wb <- createWorkbook()
@@ -281,7 +321,9 @@ build_config_workbook <- function(path, output_filename, weighted,
     bonferroni_correction = "TRUE",
     create_index_summary = "Y",
     show_standard_deviation = "TRUE",
-    show_net_positive = "FALSE",
+    # Q5 is the only question with two BoxCategories, so it is the only one
+    # that produces a NET POSITIVE row (review 2026-08, I5).
+    show_net_positive = "TRUE",
     # No html_report row: the classic report is retired and the setting now
     # raises a pre-flight issue.
     project_title = "Cross-Engine Parity Fixture",
@@ -299,17 +341,18 @@ build_config_workbook <- function(path, output_filename, weighted,
   )
 
   selection <- data.frame(
-    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4"),
-    Include = c("N", "Y", "Y", "Y", "Y"),
-    UseBanner = c("Y", "N", "N", "N", "N"),
-    BannerLabel = c("Cohort", "", "", "", ""),
-    DisplayOrder = c(1L, NA, NA, NA, NA),
+    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5"),
+    Include = c("N", "Y", "Y", "Y", "Y", "Y"),
+    UseBanner = c("Y", "N", "N", "N", "N", "N"),
+    BannerLabel = c("Cohort", "", "", "", "", ""),
+    DisplayOrder = c(1L, NA, NA, NA, NA, NA),
     # Q4's Score row is native to the NPS type and does not need CreateIndex.
-    CreateIndex = c("N", "N", "Y", "N", "N"),
+    CreateIndex = c("N", "N", "Y", "N", "N", "N"),
     # Q3 is routed: only respondents who answered Yes to Q1 were asked it.
-    BaseFilter = c("", "", "", "Q1 == 'Yes'", ""),
-    FilterLabel = c("", "", "", "Used the service in the last month", ""),
-    Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy"),
+    BaseFilter = c("", "", "", "Q1 == 'Yes'", "", ""),
+    FilterLabel = c("", "", "", "Used the service in the last month", "", ""),
+    Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy",
+                 "Satisfaction"),
     stringsAsFactors = FALSE
   )
 
