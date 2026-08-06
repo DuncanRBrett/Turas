@@ -339,3 +339,70 @@ corrections**: a new project can be run from the docs alone (verified by
 execution), but I8/I9/I10 will each cost a future operator real time, and two
 of them (AddedSlides columns, report-tab descriptions) describe things that
 are simply false.
+
+---
+
+## Handover — running the fix jobs from this doc alone
+
+Each job below is sized for one fresh session (Opus 4.8, high effort, with the
+fable-method skill, unless noted). Brief the session with THIS document only —
+do not reuse the review session's context.
+
+**Shared context for every job:**
+- Baseline at handover, main @ 4ccd6291: tabs R suite **3,733 / 0 / 0 / 0**
+  (`Rscript tools/run_all_tests.R --module=tabs`, or
+  `testthat::test_dir("modules/tabs/tests/testthat")` — both work now), 26 JS
+  suites in `modules/tabs/lib/html_report_v2/tests/` + 2 in
+  `modules/tabs/tests/js/`, all green. Anything below that is a regression.
+- Every fix: write the test first and **prove it fails against the pre-fix
+  code** (revert-run-restore). No `stop()` — TRS refusals with console output
+  (CLAUDE.md). Annotate this doc's finding when done.
+- Do not push; Duncan verifies via `launch_turas()` and regenerates
+  deliverables himself. Run `git status` first and commit only your own files.
+
+**Job C1 — island stat labelling (CRITICAL C1).** Carry `primary_stat` (and a
+per-row marker when the fall-through substitutes) on the v2 island;
+`23_render.js` must stop labelling non-column-% values with "%". Touches
+`data_layer_writer.R:567-571,691-697`, `22_model.js`, `23_render.js`,
+`29_export.js`; check Patterns (`27f`) reads of `cell.pct`. Repro probes from
+this review: scratchpad `probe_counts_only.R` / `probe_counts_only.mjs`
+(rebuild from the finding if expired). Largest of the jobs.
+
+**Job C2 — sub-k base masking in v2 (CRITICAL C2).** Mask `col.base` for
+suppressed columns in `tableHtml` and `render.matrix` the way
+`excel_writer.R:496-506` does ("n<k"). Small, contained, JS + one JS test.
+
+**Job C3 — Y-flag normalisation (CRITICAL C3).** One `toupper(trimws(...))`
+normalisation applied to Include/UseBanner/ShowInOutput/CreateIndex at
+`load_question_selection`, so engine (`data_setup.R:252`, `banner.R:55,194,207`,
+`standard_processor.R:75,661`) and preflight read the same value. Failing-first
+test per column. Decide and document: does `"Yes"` count as yes, or warn-and-
+drop? (Recommend: `Y` after normalisation only; warn on any other non-blank,
+non-`N` token — mirrors the sampling_method pattern.)
+
+**Job I-batch (config honesty — I2, I3, I4).** Extend the raw-cell refusal
+family (see `validate_config_settings` and `test_config_contract.R`) to
+`population_size`; make junk `apply_weighting`/`generate_stats_pack`/
+`alpha_secondary` refuse instead of default; validate the qual enum dials
+(`qual_demographic_cuts`, `qual_verbatim_scope`) against known tokens and warn
+when `"safe"` runs with k=1. All same established pattern; one session.
+
+**Job I-stats (I1, I5, I6 — statistical semantics).** NPS rows store ±100
+bucket values for testing; thread `fpc_mul` through NET POSITIVE and
+composites; decide the chi-square question (unrounded counts + effective-n
+scaling at minimum, plus a known-answer test). These change published letters —
+each needs a before/after diff on the parity fixture and a note in the stats
+pack Declaration if behaviour changes. Escalate to Fable if any of the three
+turns into a design question.
+
+**Job D — docs batch (I8, I9, I10, M-D..M-G) — Sonnet 5, medium effort.**
+Rewrite the report-navigation sections of 04/02/07 against the shipping v2
+report; fix AddedSlides columns; sweep the template's settings into 06 (or
+soften the "every field" claim); reconcile the `weight_validators.R:178-180`
+vs generator-comment contradiction; the M-tier doc/example fixes. Pure
+execution against this doc's findings list.
+
+**Job T — test blind spots (I12) — optional but cheap insurance.** rid-bearing
+fixtures for the qual JS suite; value assertions for Index_Summary; a
+chi-square known-answer test (lands with Job I-stats); behavioural tests for
+`27d_diffs.js`.
