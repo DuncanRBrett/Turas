@@ -69,7 +69,12 @@ suites green.
 
 **OPEN — logged residuals:** I20 idx→stable-key migration for reader marks
 (the island is anonymised by design, so ResponseID cannot be embedded as-is;
-scheduled as its own step — design first, implementation after).
+scheduled as its own step — design first, implementation after). The design
+is done: `I20_READER_MARK_REKEYING_DESIGN.md` in this folder — persisted
+random per-respondent tokens (`rid`) minted R-side into a
+`*_reader_keys.json` sidecar beside the config, marks re-keyed
+`qcode#@<rid>`, one-time idx→rid localStorage migration stamped `_v: 2`.
+Implementation (with its §5 test plan) is the remaining step.
 
 **I3 (proportion half), I6, I24, M12 and M14 are now FIXED** (2026-08-06,
 branch `fix/tabs-prodreview-batch-2`). Tabs R suite 3,441 pass / 0 fail / 0 skip
