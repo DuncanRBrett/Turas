@@ -104,6 +104,44 @@ test_that("build_qual_report_v2 writes a report carrying a non-null DATA_QUAL is
 })
 
 # ==============================================================================
+# CONFIDENTIALITY: html_report_v2_microdata = FALSE is the confidential ship —
+# the standalone comment report must honour it exactly as run_crosstabs does
+# (final review 2026-08). The microdata island carries banner_vars, which
+# rejoins per-respondent demographics to every comment via idx in View-Source.
+# ==============================================================================
+
+extract_micro_island <- function(html) {
+  micro <- sub('.*<script type="application/json" id="data-micro">', "", html)
+  trimws(sub("</script>.*", "", micro))
+}
+
+test_that("html_report_v2_microdata = FALSE keeps microdata out of the comment report", {
+  wb <- write_comment_workbook()
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(c(wb, out)), add = TRUE)
+  cfg <- build_config_object(list(project_name = "CommentTest",
+                                  qual_confidentiality_mode = "redacted",
+                                  qual_demographic_cuts = "safe",
+                                  html_report_v2_microdata = FALSE,
+                                  significance_min_base = 5))
+  res <- build_qual_report_v2(wb, out, cfg)
+  expect_equal(res$status, "PASS")
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  # The island must be the null placeholder — "banner_vars" appears in the
+  # bundled renderer source, so the check has to read the island itself.
+  expect_equal(extract_micro_island(html), "null")
+})
+
+test_that("the default ship still carries the microdata island", {
+  r <- build_report("full")
+  on.exit(unlink(c(r$wb, r$out)), add = TRUE)
+  micro <- extract_micro_island(r$html)
+  expect_true(nzchar(micro) && !identical(micro, "null"))
+  expect_match(micro, "banner_vars", fixed = TRUE)
+})
+
+# ==============================================================================
 # CONFIDENTIALITY: the text dial controls whether verbatims reach the HTML
 # ==============================================================================
 

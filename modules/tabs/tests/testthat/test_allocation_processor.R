@@ -675,5 +675,61 @@ test_that("calculate_allocation_base counts all-zero allocators and skips all-NA
 })
 
 # ==============================================================================
+# 7. Weight alignment when answers are missing (final review 2026-08)
+# ==============================================================================
+#
+# collect_allocation_values() drops NA answers, so the weights must be dropped
+# at the SAME positions. Truncating the weight vector to the value count pairs
+# answers with other respondents' weights whenever an NA sits mid-segment.
+
+context("allocation weights stay aligned to answering respondents")
+
+test_that("collected weights are the answering respondents' weights", {
+  data <- data.frame(Q1_1 = c(1, NA, 2, 3, 4), stringsAsFactors = FALSE)
+  idx  <- list("TOTAL::Total" = 1:5)
+  master_weights <- c(1, 10, 1, 1, 1)  # the non-answering respondent carries weight 10
+
+  vals <- collect_allocation_values(data, "Q1_1", idx)
+  wts  <- collect_allocation_weights(master_weights, idx, data, "Q1_1")
+
+  expect_equal(vals[["TOTAL::Total"]], c(1, 2, 3, 4))
+  expect_equal(wts[["TOTAL::Total"]],  c(1, 1, 1, 1))
+})
+
+test_that("weighted mean with a mid-segment NA matches the hand-computed answer", {
+  # Answering respondents all carry weight 1 -> weighted mean = (1+2+3+4)/4 = 2.5.
+  # The truncation bug paired value 2 with the absent respondent's weight of 10:
+  # (1*1 + 2*10 + 3*1 + 4*1) / 13 = 2.154.
+  data <- data.frame(Q1_1 = c(1, NA, 2, 3, 4), stringsAsFactors = FALSE)
+  idx  <- list("TOTAL::Total" = 1:5)
+  master_weights <- c(1, 10, 1, 1, 1)
+
+  value_sets  <- collect_allocation_values(data, "Q1_1", idx)
+  weight_sets <- collect_allocation_weights(master_weights, idx, data, "Q1_1")
+
+  row <- build_allocation_mean_row(
+    "Brand A", value_sets, weight_sets,
+    "TOTAL::Total",
+    make_alloc_config(), is_weighted = TRUE
+  )
+
+  expect_equal(as.numeric(row[["TOTAL::Total"]]), 2.5)
+})
+
+test_that("misaligned value/weight sets refuse instead of silently truncating", {
+  value_sets  <- list("TOTAL::Total" = c(1, 2, 3))
+  weight_sets <- list("TOTAL::Total" = c(1, 1, 1, 1, 1))
+
+  expect_error(
+    build_allocation_mean_row(
+      "Brand A", value_sets, weight_sets,
+      "TOTAL::Total",
+      make_alloc_config(), is_weighted = TRUE
+    ),
+    class = "turas_refusal"
+  )
+})
+
+# ==============================================================================
 # END OF TEST FILE
 # ==============================================================================

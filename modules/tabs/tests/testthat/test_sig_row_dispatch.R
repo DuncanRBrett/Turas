@@ -51,9 +51,11 @@ source(file.path(turas_root, "modules/tabs/lib/path_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/logging_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/config_utils.R"))
+source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))  # alpha_to_confidence_label
 source(file.path(turas_root, "modules/tabs/lib/excel_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/filter_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))  # build_fpc_multipliers
 
 # batch_rbind copied from shared_functions.R (the orchestrator can't be sourced
 # under testthat — same approach as test_standard_processor.R)
@@ -253,4 +255,74 @@ test_that("an allocation column with a significant group difference gets letters
   expect_false(is.null(sig_row))
   expect_equal(sig_row[[KEY_A]][1], "B")
   expect_equal(sig_row[[KEY_B]][1], "")
+})
+
+# ==============================================================================
+# 5. Letters stay on their columns when a column has no data
+#    (final review 2026-08)
+# ==============================================================================
+#
+# The processors drop banner columns with no test data before dispatch
+# (standard_processor.R, numeric_processor.R, allocation_processor.R). The
+# letters vector must be subset the same way: indexing the full-length letters
+# with a subset-length logical recycles, shifting every letter after the
+# dropped column onto the wrong column.
+
+context("add_significance_row — letter alignment when a column drops")
+
+KEY_N <- "GRP3::North"
+KEY_M <- "GRP3::Central"
+KEY_S <- "GRP3::South"
+
+make_banner_info_3 <- function() {
+  list(
+    internal_keys = c(KEY_T, KEY_N, KEY_M, KEY_S),
+    banner_info = list(
+      GRP3 = list(
+        internal_keys = c(KEY_N, KEY_M, KEY_S),
+        # unnamed and positional, exactly as create_banner_structure builds them
+        letters = c("A", "B", "C")
+      )
+    )
+  )
+}
+
+test_that("an empty middle column does not shift the letters of later columns", {
+  td <- list()
+  td[[KEY_N]] <- list(values = VALUES_A, weights = rep(1, 40))
+  td[[KEY_S]] <- list(values = VALUES_B, weights = rep(1, 40))
+  # KEY_M (letter B) has no data for this question and is absent from td
+
+  result <- add_significance_row(
+    td, make_banner_info_3(), "mean", c(KEY_T, KEY_N, KEY_M, KEY_S),
+    alpha = 0.05, bonferroni_correction = FALSE, min_base = 30,
+    is_weighted = FALSE, alpha_secondary = NULL
+  )
+
+  expect_false(is.null(result))
+  # North beats South, whose column letter is C. The recycled index used to
+  # return "B" — the letter of the EMPTY column.
+  expect_equal(result[[KEY_N]][1], "C")
+  expect_equal(result[[KEY_M]][1], "")
+  expect_equal(result[[KEY_S]][1], "")
+})
+
+test_that("dual-alpha letters stay aligned too when a column drops", {
+  td <- list()
+  td[[KEY_N]] <- list(values = VALUES_A, weights = rep(1, 40))
+  td[[KEY_S]] <- list(values = VALUES_B, weights = rep(1, 40))
+
+  result <- add_significance_row(
+    td, make_banner_info_3(), "mean", c(KEY_T, KEY_N, KEY_M, KEY_S),
+    alpha = 0.05, bonferroni_correction = FALSE, min_base = 30,
+    is_weighted = FALSE, alpha_secondary = 0.20
+  )
+
+  expect_false(is.null(result))
+  sig1 <- result[result$RowType == "Sig.", ]
+  sig2 <- result[result$RowType == "Sig.2", ]
+  expect_equal(sig1[[KEY_N]][1], "C")
+  expect_equal(sig2[[KEY_N]][1], "C")
+  expect_equal(sig1[[KEY_M]][1], "")
+  expect_equal(sig2[[KEY_M]][1], "")
 })

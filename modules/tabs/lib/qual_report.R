@@ -279,7 +279,16 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
   quant$agg$project <- build_dl_project(config_obj, tracking_enabled = FALSE)
   quant$agg$project$name <- paste0(quant$agg$project$name, " — Comments")
 
+  # html_report_v2_microdata = FALSE is the confidential ship: the microdata
+  # island's banner_vars would rejoin per-respondent demographics to every
+  # comment via idx in View-Source, defeating "safe"/k-anonymised tags. The
+  # main report gates on this flag in run_crosstabs; the standalone comment
+  # report must honour it the same way (final review 2026-08).
+  micro_wanted <- !isFALSE(config_obj$html_report_v2_microdata)
+  if (!micro_wanted) {
+    cat("  Microdata island: OMITTED by config (html_report_v2_microdata = FALSE).\n")
+  }
   write_html_report_v2(serialize_data_layer(quant$agg), config_obj, output_path,
-                       micro_json = serialize_microdata(quant$micro),
+                       micro_json = serialize_microdata(if (micro_wanted) quant$micro else NULL),
                        qual_json = serialize_data_qual(island))
 }

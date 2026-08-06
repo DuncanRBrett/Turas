@@ -421,9 +421,15 @@ add_significance_row <- function(test_data, banner_info, row_type, internal_colu
     banner_test_data <- test_data[names(test_data) %in% banner_cols]
 
     if (length(banner_test_data) > 1) {
+      # Subset the letters to the columns that actually carry test data.
+      # Indexing the full-length letters with a subset-length logical recycles,
+      # shifting every letter after a dropped (empty) column onto the wrong
+      # column (final review 2026-08).
       banner_structure <- list(
         column_names = names(banner_test_data),
-        letters      = banner_info$banner_info[[banner_code]]$letters
+        letters      = banner_info$banner_info[[banner_code]]$letters[
+          match(names(banner_test_data), banner_cols)
+        ]
       )
       # Single call: p-values computed once; both alpha thresholds applied
       # inside run_significance_tests_for_row when alpha2 is provided.

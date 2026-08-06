@@ -79,7 +79,8 @@ process_allocation_question <- function(data, question_info, question_options,
     col_name    <- paste0(code, "_", i)
     label       <- option_labels[i]
     value_sets  <- collect_allocation_values(data, col_name, banner_row_indices)
-    weight_sets <- collect_allocation_weights(master_weights, banner_row_indices)
+    weight_sets <- collect_allocation_weights(master_weights, banner_row_indices,
+                                              data, col_name)
 
     mean_row <- build_allocation_mean_row(
       label, value_sets, weight_sets, internal_keys, config, is_weighted
@@ -165,17 +166,36 @@ collect_allocation_values <- function(data, col_name, banner_row_indices) {
 
 #' Collect Weights per Banner Segment (Aligned to Valid Values)
 #'
-#' Returns a named list of weight vectors aligned to each banner segment's
-#' full row index (NA alignment is done later alongside the values).
+#' Returns a named list of weight vectors aligned position-for-position with
+#' what collect_allocation_values() returns for the same column: weights are
+#' dropped at exactly the positions where the answer is NA. Truncating instead
+#' of masking paired answers with other respondents' weights whenever an NA
+#' sat mid-segment (final review 2026-08).
 #'
 #' @param master_weights Numeric vector, weights for all rows
 #' @param banner_row_indices List, row indices per banner key
-#' @return Named list of weight vectors
+#' @param data Data frame containing the allocation column (for NA alignment)
+#' @param col_name Character, the allocation column name (for NA alignment)
+#' @return Named list of weight vectors, aligned to the non-NA values
 #' @export
-collect_allocation_weights <- function(master_weights, banner_row_indices) {
+collect_allocation_weights <- function(master_weights, banner_row_indices,
+                                       data = NULL, col_name = NULL) {
+  raw_col <- if (!is.null(data) && !is.null(col_name) && col_name %in% names(data)) {
+    data[[col_name]]
+  } else {
+    NULL
+  }
+  # A requested-but-absent column yields numeric(0) per segment, mirroring
+  # collect_allocation_values() so the pair stays aligned.
+  col_requested_but_missing <- !is.null(data) && !is.null(col_name) &&
+    !(col_name %in% names(data))
+
   lapply(banner_row_indices, function(row_idx) {
-    if (length(row_idx) == 0L) return(numeric(0))
-    master_weights[row_idx]
+    if (length(row_idx) == 0L || col_requested_but_missing) return(numeric(0))
+    w <- master_weights[row_idx]
+    if (is.null(raw_col)) return(w)
+    vals <- suppressWarnings(as.numeric(raw_col[row_idx]))
+    w[!is.na(vals)]
   })
 }
 
@@ -217,10 +237,10 @@ build_allocation_mean_row <- function(label, value_sets, weight_sets,
     values  <- value_sets[[key]]
     weights <- weight_sets[[key]]
 
-    # Align weights to valid (non-NA) positions
-    if (length(weights) > length(values)) {
-      weights <- weights[seq_along(values)]
-    }
+    # collect_allocation_weights() aligns weights to the non-NA values; a
+    # length mismatch here means the collectors were called inconsistently.
+    # Truncating instead would pair answers with other respondents' weights.
+    check_allocation_alignment(values, weights, key)
 
     mean_val <- compute_allocation_weighted_mean(values, weights, is_weighted)
     row[[key]] <- format_output_value(
@@ -231,6 +251,37 @@ build_allocation_mean_row <- function(label, value_sets, weight_sets,
   }
 
   row
+}
+
+#' Refuse When Values and Weights Have Drifted Out of Alignment
+#'
+#' collect_allocation_values() and collect_allocation_weights() drop NA
+#' answers at the same positions, so equal lengths are an invariant. A
+#' mismatch means the collectors were called on different columns (or one
+#' without the data/col_name arguments) and any mean or test computed from
+#' the pair would use other respondents' weights.
+#'
+#' @param values Numeric vector, NA-filtered allocation answers
+#' @param weights Numeric vector, weights for the same respondents
+#' @param key Character, banner key (for the error message)
+#' @return Invisible TRUE when aligned; refuses otherwise
+check_allocation_alignment <- function(values, weights, key) {
+  if (length(weights) != length(values)) {
+    tabs_refuse(
+      code = "BUG_ALLOC_WEIGHTS_MISALIGNED",
+      title = "Allocation Weights Misaligned",
+      problem = sprintf(
+        "Column '%s': %d values but %d weights after NA alignment.",
+        key, length(values), length(weights)
+      ),
+      why_it_matters = "Means and significance tests would pair answers with other respondents' weights, producing wrong numbers under PASS.",
+      how_to_fix = c(
+        "This is an internal error - please report it",
+        "collect_allocation_values() and collect_allocation_weights() must be called with the same data and column"
+      )
+    )
+  }
+  invisible(TRUE)
 }
 
 #' Build Significance Row for One Allocation Option
@@ -258,7 +309,9 @@ build_allocation_sig_row <- function(value_sets, weight_sets, banner_info,
     weights <- weight_sets[[key]]
 
     if (length(values) == 0L) next
-    if (length(weights) > length(values)) weights <- weights[seq_along(values)]
+    # Same invariant as build_allocation_mean_row: aligned or refuse — a
+    # truncated weight vector feeds the t-test wrong respondent weights.
+    check_allocation_alignment(values, weights, key)
 
     test_data[[key]] <- list(values = values, weights = weights)
   }
@@ -299,6 +352,7 @@ get_allocation_processor_info <- function() {
       "collect_allocation_values",
       "collect_allocation_weights",
       "compute_allocation_weighted_mean",
+      "check_allocation_alignment",
       "build_allocation_mean_row",
       "build_allocation_sig_row",
       "get_allocation_processor_info"
