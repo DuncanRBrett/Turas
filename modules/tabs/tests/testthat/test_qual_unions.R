@@ -28,6 +28,7 @@ detect_turas_root <- function() {
 }
 
 .root <- detect_turas_root()
+source(file.path(.root, "modules/shared/lib/trs_refusal.R"))         # turas_refuse (I7 gate)
 source(file.path(.root, "modules/tabs/lib/qual_workbook_reader.R"))  # qual_sheet_code
 source(file.path(.root, "modules/tabs/lib/qual_unions.R"))
 source(file.path(.root, "modules/tabs/lib/qual_assemble.R"))         # respondent master
@@ -233,6 +234,86 @@ test_that("the score wins over sheet-of-origin, and mismatches reassign", {
   expect_equal(band_of("11"), "Promoter")    # score agrees with sheet
   expect_equal(band_of("12"), "Passive")     # score OVERRIDES the promoter sheet
   expect_equal(band_of("77"), "Promoter")    # not in survey -> keeps sheet-of-origin
+})
+
+# ---- cross-member duplicate ResponseIDs (production review 2026-08, I7) ------
+#
+# The workbook integrity gate refuses on an ID duplicated WITHIN a sheet and
+# cannot see across sheets. A union concatenates its members, so the same defect
+# crossing a sheet boundary used to arrive unchecked: the respondent is counted
+# twice, sits in two bands at once, and — because both records inherit one idx
+# and one rid — collides on the IDENTICAL reader-mark key.
+
+union_qs <- function(det = list(mk_rec("54", "must improve energy")),
+                     pro = list(mk_rec("11", "best service"))) {
+  list(mk_reader_q("DetractorComment", det), mk_reader_q("PromoterComment", pro))
+}
+union_sel <- function(sheets = "DetractorComment:Detractor; PromoterComment:Promoter",
+                      code = "Q79") {
+  qual_selection_unions(data.frame(QuestionCode = code, CommentSheet = sheets,
+                                   CommentLink = code, stringsAsFactors = FALSE))
+}
+
+test_that("one respondent in two member sheets REFUSES rather than double-counting", {
+  qs <- union_qs(pro = list(mk_rec("54", "best service"), mk_rec("11", "great")))
+  expect_error(qual_apply_sheet_unions(qs, union_sel()), class = "turas_refusal")
+})
+
+test_that("the refusal names the union, the ResponseID and BOTH sheets", {
+  qs <- union_qs(pro = list(mk_rec("54", "best service"), mk_rec("11", "great")))
+  err <- tryCatch(qual_apply_sheet_unions(qs, union_sel()), error = function(e) e)
+  txt <- paste(unlist(err), collapse = " ")
+  expect_match(txt, "DATA_QUAL_UNION_DUPLICATE_ID")
+  expect_match(txt, "54")
+  expect_match(txt, "DetractorComment")
+  expect_match(txt, "PromoterComment")
+})
+
+test_that("every duplicate across every union is listed in ONE refusal", {
+  # One pass over the workbook must fix them all — the principle the per-sheet
+  # gate already follows.
+  qs <- list(
+    mk_reader_q("DetractorComment", list(mk_rec("54", "a"), mk_rec("8", "b"))),
+    mk_reader_q("PromoterComment",  list(mk_rec("54", "c"), mk_rec("8", "d"))))
+  err <- tryCatch(qual_apply_sheet_unions(qs, union_sel()), error = function(e) e)
+  txt <- paste(unlist(err), collapse = " ")
+  expect_match(txt, "54")
+  expect_match(txt, "'8'")
+  expect_match(txt, "2 duplicated ResponseID")
+})
+
+test_that("the same ID in a NON-member sheet is untouched — sheets are separate questions", {
+  # Q02Comment is its own question; sharing a respondent with a union member is
+  # ordinary (one person answers two open-ends) and must not refuse.
+  qs <- c(union_qs(), list(mk_reader_q("Q02Comment", list(mk_rec("54", "unrelated")))))
+  out <- qual_apply_sheet_unions(qs, union_sel())
+  expect_equal(length(out), 2L)                       # Q02Comment + the union
+})
+
+test_that("a respondent appearing once per union across TWO unions is fine", {
+  qs <- list(
+    mk_reader_q("DetractorComment", list(mk_rec("54", "a"))),
+    mk_reader_q("PromoterComment",  list(mk_rec("11", "b"))),
+    mk_reader_q("LapsedComment",    list(mk_rec("54", "c"))),
+    mk_reader_q("ActiveComment",    list(mk_rec("11", "d"))))
+  unions <- c(union_sel(), union_sel("LapsedComment:Lapsed; ActiveComment:Active", "Q80"))
+  out <- qual_apply_sheet_unions(qs, unions)
+  expect_equal(length(out), 2L)                       # both unions built, no refusal
+})
+
+test_that("a clean union still reassembles exactly as before (no regression)", {
+  out <- qual_apply_sheet_unions(union_qs(), union_sel())
+  expect_equal(length(out), 1L)
+  expect_equal(length(out[[1]]$records), 2L)
+  expect_equal(sort(vapply(out[[1]]$records, function(r) r$band, character(1))),
+               c("Detractor", "Promoter"))
+})
+
+test_that("a blank ResponseID in two sheets is not treated as a duplicate", {
+  # Blank IDs are the per-sheet gate's business (it refuses on them); two blanks
+  # are not evidence of one respondent in two bands.
+  qs <- union_qs(det = list(mk_rec("", "a")), pro = list(mk_rec("", "b")))
+  expect_silent(qual_apply_sheet_unions(qs, union_sel()))
 })
 
 test_that("derivation is a no-op when the score question is absent from the survey", {

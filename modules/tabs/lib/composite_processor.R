@@ -97,8 +97,18 @@ load_composite_definitions <- function(survey_structure_file) {
       composite_defs$Weights <- trimws(composite_defs$Weights)
     }
 
+    # ExcludeFromSummary is a Y/N gate like the Selection and Options sheets', and
+    # is normalised the same way (production review 2026-08, I12b). It used to be
+    # read with a bare toupper(trimws(x)) == "Y" in summary_builder.R, so "Yes"
+    # read as NO and a composite the operator asked to hide shipped to the client
+    # anyway, without a word. Blank means include; anything unreadable refuses
+    # here rather than silently publishing.
     if (!"ExcludeFromSummary" %in% names(composite_defs)) {
       composite_defs$ExcludeFromSummary <- NA_character_
+    } else {
+      composite_defs$ExcludeFromSummary <- normalise_flag_column(
+        composite_defs$ExcludeFromSummary, "ExcludeFromSummary", "Composite_Metrics",
+        default = "N", row_codes = composite_defs$CompositeCode)
     }
 
     if (!"SectionLabel" %in% names(composite_defs)) {
@@ -125,6 +135,11 @@ load_composite_definitions <- function(survey_structure_file) {
     return(composite_defs)
 
   }, error = function(e) {
+    # A TRS refusal raised INSIDE this block already names its own cause and fix —
+    # re-signal it untouched. Wrapping it as a read error told an operator who had
+    # typed an unreadable ExcludeFromSummary value to go looking for a corrupt
+    # file (production review 2026-08, I12b).
+    if (inherits(e, "turas_refusal")) stop(e)
     tabs_refuse(
       code = "IO_READ_ERROR",
       title = "Error Loading Composite_Metrics Sheet",

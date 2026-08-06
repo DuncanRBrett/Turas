@@ -113,17 +113,85 @@ qual_selection_unions <- function(selection_df) {
   unions
 }
 
+#' Refuse when one respondent appears in more than one member sheet of a union.
+#'
+#' The workbook integrity gate (`qual_check_workbook_integrity`) refuses on a
+#' ResponseID duplicated WITHIN a sheet, and cannot see across sheets — but a
+#' union concatenates its members, so the same defect crossing a sheet boundary
+#' arrived unchecked (production review 2026-08, I7). It is the same defect with
+#' the same consequences, and on a union it is slightly worse: the two records
+#' share an `idx` AND a `rid`, so they collide on the IDENTICAL reader-mark key
+#' (`qcode#@<rid>`) — shortlisting one shortlists both, and the collection's
+#' record index keeps only one of them. The respondent also sits in two bands at
+#' once, so the split view contradicts itself.
+#'
+#' Every offending union and id is collected before refusing, so one pass over
+#' the workbook fixes them all — the principle the per-sheet gate already follows.
+#'
+#' @param unions Union specs from `qual_selection_unions()`.
+#' @param by_code Named list of classified questions, keyed by question code.
+#' @param module Module label for refusal display.
+#' @return Invisibly NULL; refuses on any cross-member duplicate.
+qual_check_union_duplicates <- function(unions, by_code, module = "TABS") {
+  problems <- character(0)
+  for (u in unions) {
+    seen <- list()                                 # respondent id -> sheets it appears in
+    for (m in u$members) {
+      mq <- by_code[[m$code]]
+      if (is.null(mq)) next
+      ids <- unique(vapply(mq$records, function(r) as.character(r$id), character(1)))
+      for (id in ids) {
+        if (is.na(id) || !nzchar(id)) next
+        seen[[id]] <- c(seen[[id]], m$sheet)
+      }
+    }
+    dups <- Filter(function(sheets) length(sheets) > 1L, seen)
+    for (id in names(dups)) {
+      problems <- c(problems, sprintf(
+        "%s: ResponseID '%s' appears in %s - keep one row per respondent across the union",
+        u$code, id, paste(dups[[id]], collapse = " AND ")))
+    }
+  }
+  if (!length(problems)) return(invisible(NULL))
+  turas_refuse(
+    code = "DATA_QUAL_UNION_DUPLICATE_ID",
+    title = "One respondent appears in two sheets of the same comment union",
+    problem = sprintf(
+      "%d duplicated ResponseID(s) across the member sheets of %d union(s). EVERY one is listed below - one pass over the workbook fixes them all.",
+      length(problems), length(unique(sub(":.*$", "", problems)))),
+    why_it_matters = paste(
+      "A union concatenates its member sheets, so the respondent is counted twice: the",
+      "question's base inflates, and the two records share one identity - the SAME reader-mark",
+      "key - so shortlisting or highlighting one silently marks both and the collection can",
+      "only reach one of them. The respondent also lands in two bands at once, so the",
+      "segmented view says they are (for example) both a Detractor and a Promoter."),
+    how_to_fix = c(
+      "Each line names the union, the ResponseID and the two sheets it sits in.",
+      "Decide which sheet the respondent belongs in - usually the one matching their score -",
+      "and delete or merge the other row.",
+      "Then re-run - the check re-verifies every union."),
+    details = paste(problems, collapse = "\n  "),
+    module = module
+  )
+}
+
 #' Reassemble member sheets into single union questions, stamping each record's band.
 #'
 #' @param questions The classified per-sheet questions from `qual_read_workbook()`.
 #' @param unions Union specs from `qual_selection_unions()`.
+#' @param module Module label for refusal display.
 #' @return The questions list with each union's members replaced by one union question
 #'   (records concatenated, `band` stamped; `split = list(dim, bands)`; type "themed"
 #'   iff any member carried themes, else "raw"). Non-member questions pass through.
-qual_apply_sheet_unions <- function(questions, unions) {
+#'   Refuses when one respondent appears in two member sheets (I7).
+qual_apply_sheet_unions <- function(questions, unions, module = "TABS") {
   if (!length(unions)) return(questions)
   by_code <- list()
   for (q in questions) by_code[[q$code]] <- q
+  # Before anything is concatenated: the per-sheet integrity gate cannot see a
+  # respondent who appears in two DIFFERENT member sheets, and the union is where
+  # that becomes one inflated question with colliding reader marks.
+  qual_check_union_duplicates(unions, by_code, module)
   consumed <- character(0)
   built <- list()
   for (u in unions) {

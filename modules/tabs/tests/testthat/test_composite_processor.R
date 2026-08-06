@@ -64,6 +64,7 @@ source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
 # which the composite significance path uses to correct its bases on a census
 # project (review 2026-08, I5).
 source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
+source(file.path(turas_root, "modules/tabs/lib/crosstabs/data_setup.R"))  # normalise_flag_column
 source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
 
 
@@ -732,4 +733,67 @@ test_that("process_composite_question fills the Total column for a Likert batter
   total <- suppressWarnings(as.numeric(metric[["TOTAL::Total"]][1]))
   # Mean of 50, 0, 50, 50
   expect_equal(total, 37.5)
+})
+
+# ==============================================================================
+# ExcludeFromSummary is a Y/N gate, normalised at its single load site
+# ==============================================================================
+#
+# Production review 2026-08, I12b. The Composites sheet was not among C3's six
+# gate columns, so ExcludeFromSummary reached summary_builder.R as a raw cell and
+# was read there with a bare toupper(trimws(x)) == "Y". "Yes" therefore meant NO,
+# and a composite the operator had asked to hide shipped to the client anyway
+# without a word. It is now canonicalised to exactly "Y"/"N" in
+# load_composite_definitions, on the same vocabulary as every other gate column.
+
+context("composite_processor: ExcludeFromSummary vocabulary (I12b)")
+
+.write_composite_structure <- function(exclude) {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Composite_Metrics")
+  openxlsx::writeData(wb, "Composite_Metrics", data.frame(
+    CompositeCode = "COMP_SAT", CompositeLabel = "Satisfaction",
+    CalculationType = "Mean", SourceQuestions = "Q1,Q2",
+    ExcludeFromSummary = exclude, stringsAsFactors = FALSE))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  path
+}
+
+test_that("every yes token loads as the canonical Y", {
+  for (token in c("Y", "y", "Yes", "YES", "TRUE", "T", "1", " yes ")) {
+    path <- .write_composite_structure(token)
+    defs <- load_composite_definitions(path)
+    expect_equal(defs$ExcludeFromSummary[1], "Y", info = token)
+    unlink(path)
+  }
+})
+
+test_that("every no token — and a blank cell — loads as the canonical N", {
+  for (token in c("N", "n", "No", "FALSE", "F", "0", "", NA_character_)) {
+    path <- .write_composite_structure(token)
+    defs <- load_composite_definitions(path)
+    expect_equal(defs$ExcludeFromSummary[1], "N",
+                 info = if (is.na(token)) "NA" else token)
+    unlink(path)
+  }
+})
+
+test_that("an unreadable token refuses at load rather than publishing in silence", {
+  path <- .write_composite_structure("maybe")
+  expect_error(load_composite_definitions(path), class = "turas_refusal")
+  unlink(path)
+})
+
+test_that("a sheet with no ExcludeFromSummary column is unaffected", {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Composite_Metrics")
+  openxlsx::writeData(wb, "Composite_Metrics", data.frame(
+    CompositeCode = "COMP_SAT", CompositeLabel = "Satisfaction",
+    CalculationType = "Mean", SourceQuestions = "Q1,Q2", stringsAsFactors = FALSE))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  defs <- load_composite_definitions(path)
+  expect_true(all(is.na(defs$ExcludeFromSummary)))
+  unlink(path)
 })

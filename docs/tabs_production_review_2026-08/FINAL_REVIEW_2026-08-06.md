@@ -499,21 +499,57 @@ as one warning line. `build_config_object` always sets the key, so it does not
 bite a real run.
 
 **I7. Union workbooks: one ResponseID in two member sheets = duplicate records
-sharing one idx/rid.** The per-sheet integrity gate can't see cross-sheet
+sharing one idx/rid — FIXED 2026-08-06.** The per-sheet integrity gate can't see cross-sheet
 duplicates (`qual_unions.R:129-160`); executed: base inflated, same reader
 token on both records. Fix: extend the dup check across union members.
 
-**I8. Docs describe the retired classic report as current.**
+**FIXED 2026-08-06.** New `qual_check_union_duplicates()` runs inside
+`qual_apply_sheet_unions()` **before** anything is concatenated, and refuses
+(`DATA_QUAL_UNION_DUPLICATE_ID`) naming the union, the ResponseID and both
+sheets. It collects every offending union and id first, so one pass over the
+workbook fixes them all — the principle `qual_check_workbook_integrity` already
+follows, and it refuses rather than warning for the same reason that gate does:
+this is the same defect, just crossing a sheet boundary.
+
+**Reproduced by execution, and it is worse than recorded.** Respondent 54 in
+both the Detractor and Promoter sheets gave a union of **3 records for 2
+respondents** — and the two records share not only the `rid` but the **`idx`**,
+so they resolve to the *identical* reader-mark key `QUAL_Q79#@<rid>`.
+Shortlighting or highlighting one silently marks both, and `collectPool`'s
+`byRef` index can only reach one of them. The respondent is also simultaneously
+a Detractor and a Promoter in the band view, so the segmented report
+contradicts itself.
+
+**Deliberately narrow:** the check is per-union. The same respondent answering a
+union member *and* an unrelated comment sheet is ordinary (one person, two
+open-ends) and does not refuse; nor does the same respondent appearing once in
+each of two different unions. Blank IDs are the per-sheet gate's business and
+are not treated as duplicates of each other.
+
+Files: `lib/qual_unions.R`, `lib/qual_report.R` (passes `module` through for the
+refusal banner). Tests: 7 blocks appended to `test_qual_unions.R`, **6 proved
+failing** against the pre-fix code by revert-run-restore; the 7th is the
+no-regression guard that a clean union still reassembles unchanged.
+
+**I8. Docs describe the retired classic report as current — FIXED 2026-08-06 (Job D, commit e2b2ef4e).**
 `04_USER_MANUAL.md:481-511`, `02_TABS_OVERVIEW.md:93-107`,
 `07_EXAMPLE_WORKFLOWS.md:744-750` describe Summary/Crosstabs/Added
 Slides/Pinned Views tabs and an "Add Slide" button; the shipping v2 report has
 Dashboard/Group overview/Story/Crosstabs/Differences/Report. A new user hunts
 for UI that doesn't exist.
 
-**I9. AddedSlides documented with wrong column names.** Docs say
+**I9. AddedSlides documented with wrong column names — FIXED 2026-08-06 (Job D, commit e2b2ef4e).** Docs say
 `slide_id/title/content`; the loader requires `slide_title/content`
 (`crosstabs_config.R:844-855`) and silently skips otherwise — slides built
 from the docs never appear.
+
+Verified 2026-08-06: `06_TEMPLATE_REFERENCE.md` now documents
+`slide_title` / `content` / `display_order` / `image_path`, matching
+`load_qualitative_sheet`'s `required_cols`. Both 06 and
+`07_EXAMPLE_WORKFLOWS.md` additionally state that the sheet is **not wired
+into the shipping v2 report** and point at the in-browser "Added slides"
+card instead — which is the honest position: `load_added_slides` is defined
+and called from nowhere.
 
 **I10. Template Reference drift.** Three weighting settings documented as
 "Required: Yes" were removed from the template as never-read — but
@@ -523,6 +559,17 @@ contradict; reconcile). ~25 shipped settings undocumented in the core docs
 Banner/Headline and the `_BACKGROUND`/`_EXECUTIVE_SUMMARY` convention
 undocumented; four ranking settings documented but absent from the template;
 documented `AreaSummary` column absent from the template.
+
+**FIXED 2026-08-06 (Job D, commit e2b2ef4e).** All five parts verified in the
+docs on 2026-08-06: the three weighting settings now read "Required: No — not
+included in the generated template… still read if added by hand", which
+resolves the contradiction with `weight_validators.R` by documenting rather
+than restoring (restoring would change the template's shape);
+`population_size` and `patterns_banner` are documented; the Comments sheet's
+`Banner` and `Headline` columns and the `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
+convention are documented; the four `ranking_*` settings are documented with
+the same "not in the generated template" note; and `AreaSummary` is documented
+as **RETIRED** rather than as a live column.
 
 **I11. Dead-but-whitelisted settings defeat the typo warning.** `heatmap_colour`
 (re-whitelisted in 2026-08 specifically to cure its silent no-op — still a
@@ -606,12 +653,27 @@ Q9 stays flush. The fix trims *around* the indent rather than through it, and th
 two tests that catch it were proved failing against the pre-fix code. Display
 only — no number changes anywhere.
 
-**Recorded, not fixed:** `ExcludeFromSummary` (Composites sheet) still tests a
-bare `toupper(trimws(x)) == "Y"`, so `"Yes"` reads as NO and a composite the
-operator asked to hide ships anyway, silently. It was not among C3's six columns
-and closing it belongs with that vocabulary work, not with a test job; it is
-pinned by a named test so the divergence is visible rather than discovered in a
-deliverable.
+**A second defect found and fixed, 2026-08-06 (same session, after the job).**
+`ExcludeFromSummary` (Composites sheet) was read with a bare
+`toupper(trimws(x)) == "Y"`, so `"Yes"` meant NO and a composite the operator
+had asked to hide **shipped to the client anyway, without a word**. It was not
+among C3's six gate columns. It is now normalised at its single load site
+(`load_composite_definitions`) through the same `normalise_flag_column()` and
+the same vocabulary as every other gate column — `Y`/`YES`/`TRUE`/`T`/`1` mean
+hide, `N`/`NO`/`FALSE`/`F`/`0` and blank mean keep, anything else refuses.
+
+**One thing had to be fixed with it, or the refusal would have lied.** The whole
+body of `load_composite_definitions` sits inside a `tryCatch` whose handler
+re-labels any error as `IO_READ_ERROR` — "Error Loading Composite_Metrics Sheet…
+verify the Excel file is not corrupted". A `CFG_INVALID_FLAG_VALUE` refusal
+raised inside it was therefore caught and rewritten, sending an operator who had
+typed one bad cell off to hunt a corrupt file. The handler now re-signals a
+`turas_refusal` untouched and only wraps genuine read errors.
+
+Files: `lib/composite_processor.R`. Tests: 4 blocks appended to
+`test_composite_processor.R` (**15 assertion failures** against the pre-fix code
+by revert-run-restore), plus the reader-end vocabulary block in
+`test_summary_builder.R`.
 
 **Not done:** behavioural tests for `ai_insights_step.R`, the second half of
 (c). It degrades to console warnings by design and its failure mode is a missing

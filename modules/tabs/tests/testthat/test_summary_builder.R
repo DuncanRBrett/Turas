@@ -51,6 +51,10 @@ source(file.path(turas_root, "modules/tabs/lib/config_utils.R"))
 # disclosure_suppressed_columns() / disclosure_marker() — the sub-k gate the
 # metric and composite extractors apply (production review 2026-08, C2).
 source(file.path(turas_root, "modules/tabs/lib/excel_utils.R"))
+# normalise_flag_column() + the shared yes/no vocabulary — ExcludeFromSummary is
+# canonicalised at load, so the reader tests the word it actually receives.
+source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
+source(file.path(turas_root, "modules/tabs/lib/crosstabs/data_setup.R"))
 source(file.path(turas_root, "modules/tabs/lib/summary_builder.R"))
 
 # ==============================================================================
@@ -303,17 +307,27 @@ test_that("ExcludeFromSummary drops the composite, case- and space-insensitively
   }
 })
 
-test_that("PINNED: ExcludeFromSummary does NOT accept the C3 yes-vocabulary", {
-  # Recorded, not fixed (production review 2026-08, I12b). C3 gave the Selection
-  # and Options sheets a shared vocabulary — Y / YES / TRUE / T / 1 all mean yes,
-  # anything else refuses. The Composites sheet's ExcludeFromSummary was not in
-  # C3's six columns and still tests a bare toupper(trimws(x)) == "Y", so "Yes"
-  # reads as NO and the composite ships to a client who asked to hide it — with
-  # no warning. Pinned here so the divergence is visible rather than discovered
-  # in a deliverable; closing it is a config-vocabulary job, not a test job.
-  out <- extract_composite_rows(sb_composite(), sb_banner(),
-                                sb_comp_defs(exclude = "Yes"), list())
-  expect_equal(nrow(out), 1)
+test_that("the reader honours the whole C3 yes-vocabulary, normalised at load", {
+  # The Composites sheet was not among C3's six columns, so ExcludeFromSummary
+  # was read with a bare toupper(trimws(x)) == "Y": "Yes" meant NO and the
+  # composite the operator asked to hide shipped anyway, silently. The column is
+  # now normalised at its single load site (composite_processor.R
+  # load_composite_definitions) to exactly "Y"/"N", so the reader sees one word.
+  # This asserts the reader end; the load end is in test_composite_processor.R.
+  for (token in .TABS_FLAG_TRUE_TOKENS) {
+    canonical <- normalise_flag_column(token, "ExcludeFromSummary",
+                                       "Composite_Metrics", default = "N")
+    out <- extract_composite_rows(sb_composite(), sb_banner(),
+                                  sb_comp_defs(exclude = canonical), list())
+    expect_equal(nrow(out), 0, info = token)
+  }
+  for (token in .TABS_FLAG_FALSE_TOKENS) {
+    canonical <- normalise_flag_column(token, "ExcludeFromSummary",
+                                       "Composite_Metrics", default = "N")
+    out <- extract_composite_rows(sb_composite(), sb_banner(),
+                                  sb_comp_defs(exclude = canonical), list())
+    expect_equal(nrow(out), 1, info = token)
+  }
 })
 
 test_that("index_summary_show_composites = FALSE returns an empty banner-shaped frame", {

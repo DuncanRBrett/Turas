@@ -87,7 +87,7 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
   read_result <- qual_read_workbook(qual_path, module)          # TRS-refuses on a bad file
   # Reassemble any band-split open-ends (e.g. NPS Detractor/Passive/Promoter sheets) into
   # one question with a per-record band, BEFORE the join keys them to the host survey.
-  read_result$questions <- qual_apply_sheet_unions(read_result$questions, unions)
+  read_result$questions <- qual_apply_sheet_unions(read_result$questions, unions, module)
   joined <- qual_resolve_against_survey(read_result$questions, survey_data,
                                         id_col = config_obj$qual_join_id_column)
   if (!identical(joined$status, "PASS")) {
