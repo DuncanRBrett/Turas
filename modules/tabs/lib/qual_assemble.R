@@ -166,7 +166,27 @@ qual_find_host_id_column <- function(survey_data, id_col = NULL) {
     return(if (length(ci)) ci[[1]] else NA_character_)
   }
   anchor <- grepl(QUAL_HOST_ID_PATTERN, nms, ignore.case = TRUE)
-  if (any(anchor)) return(nms[which(anchor)[1]])
+  if (any(anchor)) {
+    hits <- nms[which(anchor)]
+    # More than one column answers to "ID" — the first one WINS, silently, and a
+    # row-counter called "ID" sorts before the real "ResponseID" in plenty of
+    # exports (production review 2026-08, M-I). If the two happen to share
+    # values the comments join to the WRONG respondents while every diagnostic
+    # still reads healthy, so the ambiguity has to be said out loud, with the
+    # setting that settles it.
+    if (length(hits) > 1L) {
+      cat("\n┌─── QUALITATIVE: AMBIGUOUS RESPONSE-ID COLUMN ─────────┐\n")
+      cat(sprintf("│ %d host columns look like a response id: %s\n",
+                  length(hits), paste(hits, collapse = ", ")))
+      cat(sprintf("│ Using the first one: '%s'.\n", hits[[1]]))
+      cat("│ If that is a row counter rather than the survey's ResponseID,\n")
+      cat("│ the comments will join to the WRONG respondents and nothing\n")
+      cat("│ else will look wrong.\n")
+      cat("│ Fix: set qual_join_id_column in Settings to the right column.\n")
+      cat("└───────────────────────────────────────────────────────┘\n\n")
+    }
+    return(hits[[1]])
+  }
   NA_character_
 }
 

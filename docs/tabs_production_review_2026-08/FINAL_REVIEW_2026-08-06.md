@@ -840,32 +840,78 @@ Guide). Tests: 9 blocks appended to `test_stats_semantics.R` and 4 to
 the new semantics; **17 assertions proved failing** against the pre-fix code by
 revert-run-restore. Gates after: tabs R **4,518 / 0 / 0 / 0** (from 4,490),
 **31** JS suites green, project-root at its documented 3-failure baseline.
-- **M-D.** `examples/tabs/basic/` still refuses to load (known; self-declared
+- **M-D. FIXED (Job D, e2b2ef4e).** `examples/tabs/basic/` still refuses to load (known; self-declared
   POC). Repo-root CLAUDE.md references its `survey_data.csv`; actual file is
   `data.csv`. Delete the folder or fix the config.
-- **M-E.** Demo config carries the retired `html_report` setting → every demo
+- **M-E. FIXED (Job D + I11, 4c3f9fd6).** Demo config carries the retired `html_report` setting → every demo
   run prints the retirement box. Delete the row from
   `Demo_Crosstab_Config.xlsx`.
-- **M-F.** Version signals disagree: docs say 10.8; start banner prints 10.2
+- **M-F. FIXED (Job D, e2b2ef4e).** Version signals disagree: docs say 10.8; start banner prints 10.2
   (`run_crosstabs.R:25`), closing banner 10.8.1 (`:1182`); README history stops
   at 10.2. One constant.
-- **M-G.** `minimum_base` named in troubleshooting doesn't exist
+- **M-G. FIXED (Job D, e2b2ef4e).** `minimum_base` named in troubleshooting doesn't exist
   (`significance_min_base` is the real name); two-argument
   `run_tabs_analysis(project, config)` calls survive in 07's Pattern 1;
   module README's structure diagram puts templates under docs/.
 - **M-H.** Year-less wave labels order the trend axis by sidecar build time,
   newest first (PLAUSIBLE, `tracking_island.R:493-497`); blank wave labels
   bypass both stale-wave protections (PLAUSIBLE, `:475,598`).
-- **M-I.** Host response-id auto-detection takes the first `^(response ?)?id$`
+- **M-I. FIXED 2026-08-06.** Host response-id auto-detection takes the first `^(response ?)?id$`
   match with no ambiguity warning (`qual_assemble.R:168-170`) — a row-counter
   `ID` column can silently win over the real ResponseID (PLAUSIBLE; the
   overlapping-values case joins comments to wrong respondents while diagnostics
   look healthy). `qual_join_id_column` exists; nothing prompts its use.
 - **M-J.** A filter retaining 0 rows warns instead of refusing per-question
   (`filter_utils.R:113-118`); NAs in filters silently become FALSE.
-- **M-K.** Composite disclosure gate borrows the first source question's bases
+- **M-K. FIXED 2026-08-06.** Composite disclosure gate borrows the first source question's bases
   (`summary_builder.R:341-354`) — wrong-column judgment possible when sources
   have different routed bases (PLAUSIBLE).
+**M-D / M-E / M-F / M-G verified done 2026-08-06.** Job D fixed all four and
+never annotated the headings, the same omission as I8/I9/I10. Checked against the
+code, not the commit message: the basic example now **loads** (executed);
+`Demo_Crosstab_Config.xlsx` carries no `html_report` row, and the I11 work took
+it out of `generate_demo.R` too so a regeneration cannot put it back;
+`SCRIPT_VERSION` is one constant at 10.8.1 that both banners read, with the
+README history matching; `minimum_base` and the two-argument
+`run_tabs_analysis(project, config)` calls are gone from the docs and the README
+diagram puts `templates/` at the top level.
+
+**M-I FIXED 2026-08-06.** `qual_find_host_id_column` took the first column
+matching the `^(response ?)?id$` anchor and said nothing when several matched — a
+row counter called `ID` sorts before the real `ResponseID` in plenty of exports.
+**The pick is deliberately unchanged** (first match, so no existing project
+moves); what changed is that two or more candidates now print a boxed console
+notice naming every candidate, the one being used, the consequence — comments
+joining to the wrong respondents while every diagnostic still reads healthy — and
+`qual_join_id_column`, the setting that settles it. Silent when one column
+matches, when none does, and when the setting is set.
+
+**M-K FIXED 2026-08-06 — and it was tractable because the number already
+existed.** The Index_Summary disclosure gate borrowed the FIRST source question's
+bases. Composites do share their sources' respondent pool, but sources can be
+routed differently — one asked of everyone, another of a sub-audience — so the
+borrowed base could name the wrong column as sub-k, in **both** directions:
+withholding a column that is safe, and publishing one that should have been
+withheld.
+
+The composite's significance path had been computing the right quantity since
+I5 — its own per-column unweighted base, respondents with a scoreable composite
+value — but only locally, and only when significance testing was on. That
+computation is now the helper `composite_column_bases()`, which the FPC path and
+the new `result$bases` both call, so the correction and the disclosure gate
+cannot disagree about who is in a column. `extract_composite_rows` prefers
+`comp_result$bases` and keeps the borrow **only** as a fallback for a result
+built before this.
+
+Files: `lib/qual_assemble.R`, `lib/composite_processor.R`, `lib/summary_builder.R`.
+Tests: 4 blocks in `test_qual_join.R`, 4 in `test_summary_builder.R` (the
+consumer), 3 in `test_composite_processor.R` (the producer). Proved failing
+against the pre-fix code in three separate reverts — the M-K consumer tests pass
+against a broken producer and vice versa, so both halves were reverted
+independently (4, 3 and 5 failures). Gates after: tabs R **4,548 / 0 / 0 / 0**
+(from 4,518), **31** JS suites green, project-root at its documented 3-failure
+baseline.
+
 - **M-L.** Prior review's still-open MINORs reconfirmed on main: M1, M2, M5,
   M6 (`extract_composite_rows` comp_def outside NULL guard — crash-shaped,
   loud), M7, M10, M13, M15 (dead `weighting_variable` fallback;

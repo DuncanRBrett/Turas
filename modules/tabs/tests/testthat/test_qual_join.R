@@ -83,6 +83,46 @@ test_that("the host response-id column auto-detects via the anchor and the overr
   expect_true(is.na(qual_find_host_id_column(sd2, "NA")))   # config "NA" => unset
 })
 
+# Production review 2026-08, M-I. Several host columns can answer to the "ID"
+# anchor — a row counter called "ID" sorts before the real "ResponseID" in plenty
+# of exports. The first match won SILENTLY, and if the two columns happen to
+# share values the comments join to the WRONG respondents while every join
+# diagnostic still reads healthy. The pick is unchanged (first match, so no
+# existing project moves); what changed is that the ambiguity is now said out
+# loud, naming the candidates and the setting that settles it.
+
+test_that("one anchor match resolves silently, as before", {
+  sd <- data.frame(`Response ID` = c("1", "2"), Q1 = c("a", "b"),
+                   check.names = FALSE, stringsAsFactors = FALSE)
+  expect_silent(col <- qual_find_host_id_column(sd))
+  expect_equal(col, "Response ID")
+})
+
+test_that("two columns answering to the anchor warn, naming both and the fix (M-I)", {
+  sd <- data.frame(ID = 1:2, `Response ID` = c("101", "102"), Q1 = c("a", "b"),
+                   check.names = FALSE, stringsAsFactors = FALSE)
+  out <- capture.output(col <- qual_find_host_id_column(sd))
+  txt <- paste(out, collapse = " ")
+  expect_equal(col, "ID")                       # the pick itself is unchanged
+  expect_match(txt, "AMBIGUOUS RESPONSE-ID COLUMN")
+  expect_match(txt, "ID")
+  expect_match(txt, "Response ID", fixed = TRUE)
+  expect_match(txt, "qual_join_id_column", fixed = TRUE)
+})
+
+test_that("an explicit qual_join_id_column settles it with no warning", {
+  sd <- data.frame(ID = 1:2, `Response ID` = c("101", "102"),
+                   check.names = FALSE, stringsAsFactors = FALSE)
+  expect_silent(col <- qual_find_host_id_column(sd, "Response ID"))
+  expect_equal(col, "Response ID")
+})
+
+test_that("no anchor match stays silent and returns NA", {
+  sd <- data.frame(respondent_uid = c("1", "2"), stringsAsFactors = FALSE)
+  expect_silent(col <- qual_find_host_id_column(sd))
+  expect_true(is.na(col))
+})
+
 test_that("ResponseID maps to the correct 0-based host row, first occurrence wins", {
   sd <- host_survey()
   m <- qual_host_id_to_idx(sd, "Response ID")

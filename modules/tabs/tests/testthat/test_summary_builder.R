@@ -523,3 +523,67 @@ test_that("a sub-k column is withheld across the whole assembled sheet (C2)", {
   expect_true(all(vals == "n<10"))
   expect_false(any(vals %in% c("6.9", "62", "70")))
 })
+
+# ==============================================================================
+# M-K — the composite's disclosure gate judges on the composite's OWN base
+# ==============================================================================
+#
+# Production review 2026-08, M-K (PLAUSIBLE at the time; reproduced here). The
+# gate used to borrow the FIRST source question's bases. Composites do share
+# their sources' respondent pool, but sources can be routed differently — one
+# asked of everyone, another of a sub-audience — so the borrowed base could name
+# the wrong column as sub-k. Both directions are wrong: withholding a column that
+# is safe, and publishing one that should have been withheld. The composite now
+# carries its own per-column bases (the people with a scoreable composite value,
+# the same base its finite population correction reads) and the gate uses them.
+
+context("summary_builder: composite disclosure uses its own bases (M-K)")
+
+sb_comp_with_bases <- function(bases) {
+  out <- sb_composite()
+  out$ENGAGE$bases <- bases
+  out
+}
+
+sb_bases <- function(total, male, female) {
+  list("TOTAL::Total"   = list(unweighted = total),
+       "Gender::Male"   = list(unweighted = male),
+       "Gender::Female" = list(unweighted = female))
+}
+
+test_that("the composite's own base withholds the column that is really sub-k", {
+  # The composite reaches only 4 women; the borrowed source question reached 50.
+  out <- extract_composite_rows(
+    sb_comp_with_bases(sb_bases(100, 50, 4)), sb_banner(), sb_comp_defs(),
+    list(min_reporting_base = 10),
+    results_list = list(Q1 = sb_question(female_base = 50)))
+  expect_equal(out[["Gender::Female"]], "n<10")
+  expect_equal(out[["Gender::Male"]], 75)     # safe column untouched
+})
+
+test_that("a safe composite column is NOT withheld because a source was thin", {
+  # The mirror error: the source question was routed to 3 women, the composite
+  # covers 60. Borrowing the source's base withheld a column with 60 people in it.
+  out <- extract_composite_rows(
+    sb_comp_with_bases(sb_bases(200, 100, 60)), sb_banner(), sb_comp_defs(),
+    list(min_reporting_base = 10),
+    results_list = list(Q1 = sb_question(female_base = 3)))
+  expect_equal(out[["Gender::Female"]], 70)   # published, as it should be
+  expect_false(any(unlist(out[SB_KEYS]) == "n<10", na.rm = TRUE))
+})
+
+test_that("a composite carrying no bases still falls back to the source's", {
+  # Back-compatibility: a result built before the composite carried its own.
+  out <- extract_composite_rows(
+    sb_composite(), sb_banner(), sb_comp_defs(),
+    list(min_reporting_base = 10),
+    results_list = list(Q1 = sb_question(female_base = 3)))
+  expect_equal(out[["Gender::Female"]], "n<10")
+})
+
+test_that("with no threshold set nothing is withheld either way", {
+  out <- extract_composite_rows(
+    sb_comp_with_bases(sb_bases(100, 50, 4)), sb_banner(), sb_comp_defs(), list(),
+    results_list = list(Q1 = sb_question()))
+  expect_equal(out[["Gender::Female"]], 70)
+})

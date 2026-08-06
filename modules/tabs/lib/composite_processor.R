@@ -711,8 +711,25 @@ process_composite_question <- function(composite_def, data, questions_df,
     }
   }
 
+  # The composite's OWN per-column bases, so the Index_Summary's disclosure gate
+  # judges on the people actually in this composite rather than borrowing the
+  # first source question's bases (production review 2026-08, M-K). Sources can
+  # be routed differently — one asked of everyone, another of a sub-audience —
+  # in which case the borrowed base named the wrong column as sub-k, withholding
+  # a safe column or, worse, publishing a withheld one.
+  comp_bases <- tryCatch(
+    composite_column_bases(
+      calculate_composite_values(
+        data_subset = data, source_questions = source_questions,
+        calculation_type = calc_type, weights = calc_weights,
+        weight_vector = NULL, questions_df = questions_df,
+        options_df = options_df),
+      data, banner_info),
+    error = function(e) NULL)
+
   return(list(
     question_table = result_table,
+    bases = comp_bases,
     metadata = list(
       composite_code = composite_def$CompositeCode,
       source_questions = source_questions,
@@ -734,6 +751,27 @@ process_composite_question <- function(composite_def, data, questions_df,
 #' @param banner_info List, banner structure
 #' @param data Data frame, survey data (with the composite column attached)
 #' @param key Character, one internal banner key
+
+#' The composite's own per-column unweighted base
+#'
+#' Respondents in the column who have a scoreable composite value. This is the
+#' base the finite population correction reads and — since M-K — the base the
+#' Index_Summary's disclosure gate reads, so the two cannot disagree about who
+#' is in a column.
+#'
+#' @param values Per-respondent composite values over the FULL data frame
+#' @param data The full survey data (row order matches \code{values})
+#' @param banner_info Banner structure
+#' @return Named list, one \code{list(unweighted = n)} per internal key
+#' @keywords internal
+composite_column_bases <- function(values, data, banner_info) {
+  keys <- banner_info$internal_keys
+  stats::setNames(lapply(keys, function(k) {
+    idx <- composite_subset_indices(banner_info, data, k)
+    list(unweighted = sum(!is.na(values[idx])))
+  }), keys)
+}
+
 #' @return Integer vector of row indices (possibly empty)
 #' @keywords internal
 composite_subset_indices <- function(banner_info, data, key) {
@@ -831,12 +869,7 @@ test_composite_significance <- function(data, composite_code, source_questions,
   # respondents with a scoreable composite value — matching the definition
   # build_fpc_multipliers() documents for every other row type. All-1 (inert)
   # with no universe configured, so non-population reports are unchanged.
-  composite_bases <- setNames(
-    lapply(internal_keys, function(k) {
-      list(unweighted = sum(!is.na(composite_values[key_indices[[k]]])))
-    }),
-    internal_keys
-  )
+  composite_bases <- composite_column_bases(composite_values, data, banner_info)
   fpc_muls <- build_fpc_multipliers(
     composite_bases, resolve_column_populations(banner_info, config), internal_keys)
 

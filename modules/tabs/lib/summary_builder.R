@@ -45,8 +45,8 @@ build_index_summary_table <- function(results_list, composite_results,
     message(sprintf("  Metric rows columns: %s", paste(names(metric_rows), collapse = ", ")))
   }
 
-  # Extract composite rows (results_list rides along so each composite can
-  # borrow its source question's bases for the disclosure gate)
+  # Extract composite rows (results_list rides along only as the fallback for a
+  # composite result built before it carried its own bases — see M-K)
   composite_rows <- extract_composite_rows(
     composite_results,
     banner_info,
@@ -335,11 +335,17 @@ extract_composite_rows <- function(composite_results, banner_info,
         }
       }
 
-      # Disclosure control (C2): borrow the first source question's bases —
-      # composites share their sources' respondent pool — and withhold the
-      # same sub-k columns the Crosstabs sheet withholds.
-      comp_bases <- NULL
-      if (!is.null(results_list) && !is.null(comp_result$metadata$source_questions)) {
+      # Disclosure control (C2): withhold the same sub-k columns the Crosstabs
+      # sheet withholds. The composite's OWN per-column bases are used when it
+      # carries them — the people who actually have a scoreable composite value,
+      # which is the same base its finite population correction reads
+      # (production review 2026-08, M-K). Borrowing the first source question's
+      # bases was a guess, and a wrong one whenever the sources are routed
+      # differently: it could withhold a safe column, or publish a withheld one.
+      # The borrow survives only as a fallback for a result built before this.
+      comp_bases <- comp_result$bases
+      if (is.null(comp_bases) && !is.null(results_list) &&
+          !is.null(comp_result$metadata$source_questions)) {
         for (src_q in comp_result$metadata$source_questions) {
           if (!is.null(results_list[[src_q]]) && !is.null(results_list[[src_q]]$bases)) {
             comp_bases <- results_list[[src_q]]$bases

@@ -797,3 +797,62 @@ test_that("a sheet with no ExcludeFromSummary column is unaffected", {
   expect_true(all(is.na(defs$ExcludeFromSummary)))
   unlink(path)
 })
+
+# ==============================================================================
+# The composite carries its OWN per-column bases (M-K)
+# ==============================================================================
+#
+# Production review 2026-08, M-K. The Index_Summary's disclosure gate used to
+# borrow the FIRST source question's bases, which is a different set of people
+# whenever the sources are routed differently. The composite now publishes the
+# base its own significance path already computed — respondents in the column
+# with a scoreable composite value — so the gate and the finite population
+# correction read one definition.
+
+context("composite_processor: the composite's own bases (M-K)")
+
+test_that("the result carries a base for every banner column", {
+  data <- make_composite_test_data()
+  b <- make_composite_banner(data)
+  result <- process_composite_question(
+    make_composite_defs()[1, ], data, make_composite_questions(), b$banner,
+    make_composite_config())
+
+  expect_true("bases" %in% names(result))
+  expect_setequal(names(result$bases), b$banner$internal_keys)
+  for (k in b$banner$internal_keys) {
+    expect_true(is.numeric(result$bases[[k]]$unweighted), info = k)
+    expect_false(is.na(result$bases[[k]]$unweighted), info = k)
+  }
+})
+
+test_that("the base counts respondents with a scoreable composite value", {
+  data <- make_composite_test_data()
+  b <- make_composite_banner(data)
+  result <- process_composite_question(
+    make_composite_defs()[1, ], data, make_composite_questions(), b$banner,
+    make_composite_config())
+
+  total <- result$bases[["TOTAL::Total"]]$unweighted
+  expect_true(total > 0)
+  expect_true(total <= nrow(data))          # never more people than were asked
+  # The banner columns partition the sample, so they cannot exceed the Total.
+  for (k in setdiff(names(result$bases), "TOTAL::Total")) {
+    expect_true(result$bases[[k]]$unweighted <= total, info = k)
+  }
+})
+
+test_that("a respondent with no scoreable source does not count toward the base", {
+  # Blank every source for the first two respondents: the composite cannot be
+  # computed for them, so they leave its base — which is exactly the difference
+  # between the composite's own base and a source question's.
+  data <- make_composite_test_data()
+  srcs <- c("Q_Sat1", "Q_Sat2", "Q_Sat3")
+  for (s in srcs) data[[s]][1:2] <- NA
+  b <- make_composite_banner(data)
+  result <- process_composite_question(
+    make_composite_defs()[1, ], data, make_composite_questions(), b$banner,
+    make_composite_config())
+
+  expect_equal(result$bases[["TOTAL::Total"]]$unweighted, nrow(data) - 2L)
+})
