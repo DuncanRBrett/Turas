@@ -105,10 +105,25 @@ validate_filter_result <- function(filter_result, data, filter_expression) {
     )
   }
 
-  # Replace NAs with FALSE
+  # Replace NAs with FALSE — and say how many (production review 2026-08, M-J).
+  # This is the right rule (R's own subset() does the same: an unknown answer is
+  # not a match), but it was silent, so a filter on a routed question quietly
+  # EXCLUDED every respondent who never saw it. A base that came out smaller than
+  # expected looked like the filter's doing rather than the NAs', and the two
+  # need different fixes. Only reported when it happens, so an ordinary filter
+  # over a complete column stays quiet.
+  n_na <- sum(is.na(filter_result))
+  if (n_na > 0) {
+    cat(sprintf(
+      "  [NOTE] Filter '%s': %d row(s) could not be judged (missing values) and are EXCLUDED.\n",
+      filter_expression, n_na
+    ))
+  }
   filter_result[is.na(filter_result)] <- FALSE
 
-  # Check if any rows retained
+  # Check if any rows retained. A warning, not a refusal: a question nobody
+  # qualified for is a legitimate survey outcome, not a config error (Duncan,
+  # 2026-08-06, deciding M-J's open half).
   n_retained <- sum(filter_result)
   if (n_retained == 0) {
     cat(sprintf(

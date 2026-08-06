@@ -291,6 +291,34 @@ test_that("returns all rows for empty or NA filter", {
   expect_equal(nrow(apply_base_filter(data, NULL)), 5)
 })
 
+# Production review 2026-08, M-J. NAs becoming FALSE is the right rule — R's own
+# subset() does the same, an unknown answer is not a match — but it was silent,
+# so a filter on a routed question quietly excluded everyone who never saw it and
+# the shrunken base looked like the filter's doing. Duncan's call on the other
+# half (2026-08-06): a 0-row filter WARNS rather than refusing, because a
+# question nobody qualified for is a legitimate survey outcome.
+
+test_that("rows that cannot be judged are excluded, and the count is stated (M-J)", {
+  data <- data.frame(Q = c(5, NA, 7, NA, 9))
+  out <- capture.output(result <- apply_base_filter(data, "Q >= 6"))
+  expect_equal(nrow(result), 2)                       # 7 and 9; the NAs are out
+  txt <- paste(out, collapse = " ")
+  expect_match(txt, "2 row(s) could not be judged", fixed = TRUE)
+  expect_match(txt, "EXCLUDED", fixed = TRUE)
+})
+
+test_that("a filter over a complete column says nothing", {
+  data <- data.frame(Q = c(5, 6, 7))
+  expect_silent(apply_base_filter(data, "Q >= 6"))
+})
+
+test_that("a filter retaining no one WARNS and does not refuse", {
+  data <- data.frame(Q = c(1, 2, 3))
+  out <- capture.output(result <- apply_base_filter(data, "Q > 99"))
+  expect_equal(nrow(result), 0)                       # returns, does not stop
+  expect_match(paste(out, collapse = " "), "retains 0 rows", fixed = TRUE)
+})
+
 test_that("handles numeric comparisons", {
   data <- data.frame(Age = c(18, 25, 35, 45, 65))
   result <- apply_base_filter(data, "Age >= 30")

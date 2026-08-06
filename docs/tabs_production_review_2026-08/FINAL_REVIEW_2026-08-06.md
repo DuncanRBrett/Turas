@@ -861,8 +861,24 @@ revert-run-restore. Gates after: tabs R **4,518 / 0 / 0 / 0** (from 4,490),
   `ID` column can silently win over the real ResponseID (PLAUSIBLE; the
   overlapping-values case joins comments to wrong respondents while diagnostics
   look healthy). `qual_join_id_column` exists; nothing prompts its use.
-- **M-J.** A filter retaining 0 rows warns instead of refusing per-question
+- **M-J. FIXED 2026-08-06.** A filter retaining 0 rows warns instead of refusing per-question
   (`filter_utils.R:113-118`); NAs in filters silently become FALSE.
+**M-J FIXED 2026-08-06.** Two halves, and Duncan settled the first:
+**the 0-row filter WARNS and does not refuse** — a question nobody qualified for
+is a legitimate survey outcome, not a config error, so stopping the run over it
+would be wrong. That behaviour is unchanged and now carries the reasoning in a
+comment plus a test, so it reads as a decision rather than an oversight.
+
+The second half was the silent one. NAs becoming FALSE is the right rule — R's
+own `subset()` does the same, an unknown answer is not a match — but nothing said
+how many. A filter on a routed question therefore EXCLUDED every respondent who
+never saw it, and the smaller-than-expected base looked like the filter's doing
+rather than the missing values', which are two different fixes. The count is now
+stated (`N row(s) could not be judged (missing values) and are EXCLUDED`), only
+when it is non-zero, so an ordinary filter over a complete column stays quiet.
+Files: `lib/filter_utils.R`. Tests: 3 blocks in `test_utilities.R`, 2 proved
+failing pre-fix.
+
 - **M-K. FIXED 2026-08-06.** Composite disclosure gate borrows the first source question's bases
   (`summary_builder.R:341-354`) — wrong-column judgment possible when sources
   have different routed bases (PLAUSIBLE).
