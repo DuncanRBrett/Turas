@@ -331,22 +331,32 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
 }
 
 # ==============================================================================
-# EFFECTIVE SAMPLE SIZE (V9.9.4: DOCUMENTED ROUNDING & ZERO EXCLUSION)
+# EFFECTIVE SAMPLE SIZE (V10.11: FRACTIONAL, ZERO EXCLUSION DOCUMENTED)
 # ==============================================================================
 
 #' Calculate effective sample size for weighted data (Kish 1965)
 #'
 #' METHODOLOGY:
 #' Uses Kish's design effect formula: n_eff = (Σw)² / Σw²
-#' 
+#'
 #' V9.9.3 NUMERIC STABILITY:
 #' For extreme weights, scales by w/mean(w) internally (scale-invariant)
 #' This prevents numeric overflow with very large weights
-#' 
+#'
+#' V10.11: THE RESULT IS FRACTIONAL — IT IS A STATISTIC, NOT A COUNT.
+#' It used to be integer-rounded here, which put the mean test on a different
+#' base from the proportion test on the very same column: proportions ride
+#' \code{calculate_effective_base()} (cell_calculator.R), which has always been
+#' fractional, while means recomputed n_eff through this function. An n_eff of
+#' 29.6 therefore failed a min_base of 30 for proportions and passed it for
+#' means. Rounding now happens where the number is DISPLAYED (the Excel base
+#' rows, the sample-composition sheet, the weight summary), never inside a
+#' statistic. This also aligns R with the v2 JS engine, which is fractional
+#' throughout (21_stats.js effectiveBase).
+#'
 #' V9.9.4 DOCUMENTATION:
 #' - Zero weights are excluded (only weights > 0 are used)
-#' - Result is rounded to integer (downstream SE/df calculations use rounded value)
-#' 
+#'
 #' INTERPRETATION:
 #' - n_eff = n when all weights equal (unweighted)
 #' - n_eff < n when weights vary (reduced precision)
@@ -356,7 +366,7 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
 #' REFERENCE: Kish, L. (1965). Survey Sampling. New York: John Wiley & Sons.
 #'
 #' @param weights Numeric vector, weights
-#' @return Integer, effective sample size (rounded)
+#' @return Numeric, effective sample size (fractional — round at display time)
 #' @export
 #' @examples
 #' eff_n <- calculate_effective_n(weights)
@@ -368,12 +378,12 @@ calculate_effective_n <- function(weights) {
   weights <- weights[!is.na(weights) & is.finite(weights) & weights > 0]
   
   if (length(weights) == 0) {
-    return(0L)
+    return(0)
   }
-  
+
   # If all weights are 1, effective n = actual n (no design effect)
   if (all(weights == 1)) {
-    return(as.integer(length(weights)))
+    return(as.numeric(length(weights)))
   }
   
   # V9.9.3: Scale-safe calculation for extreme weights
@@ -391,14 +401,15 @@ calculate_effective_n <- function(weights) {
     sum_weights_squared <- sum(weights^2)
     
     if (sum_weights_squared == 0) {
-      return(0L)
+      return(0)
     }
-    
+
     n_effective <- (sum_weights^2) / sum_weights_squared
   }
-  
-  # Return as integer (downstream SE/df use this rounded value)
-  return(as.integer(round(n_effective)))
+
+  # Fractional by design: this feeds SE, df and min_base gates. Display sites
+  # round (format_output_value / the base rows / summarize_weights).
+  return(n_effective)
 }
 
 # ==============================================================================
@@ -1487,7 +1498,8 @@ summarize_weights <- function(weights, label = "Weight Summary") {
     cat("  Sum:              ", format(round(sum(nonzero_weights), 1), big.mark = ","), "\n")
   }
   
-  cat("  Effective n:      ", format(eff_n, big.mark = ","), "\n")
+  # Display site: n_eff is fractional (V10.11) — round for the console summary.
+  cat("  Effective n:      ", format(round(eff_n, 0), big.mark = ","), "\n")
   
   if (!is.na(design_effect)) {
     cat("  Design effect:    ", round(design_effect, 2), "\n")

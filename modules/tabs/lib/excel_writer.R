@@ -1035,7 +1035,9 @@ calculate_composition_stats <- function(row_idx, data, master_weights, config) {
     } else {
       NA_real_
     }
-    comp_row$Effective_n <- calculate_effective_n(valid_weights)
+    # Display site: calculate_effective_n is fractional (V10.11) — the sample
+    # composition sheet shows a whole n, like every other base row.
+    comp_row$Effective_n <- round(calculate_effective_n(valid_weights), 0)
   }
 
   return(comp_row)
