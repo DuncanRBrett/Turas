@@ -126,7 +126,13 @@
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].kind !== "net") continue;
       if (q.net_diffs && q.net_diffs[String(i)] !== undefined) continue;  // skip NET POSITIVE
-      var cell = model.rows[i] && model.rows[i].cells[0];
+      var mrow = model.rows[i];
+      var cell = mrow && mrow.cells[0];
+      // A top box is a SHARE of the column. On a counts-only / row-%-only
+      // question the same slot holds a headcount or a row percentage, and the
+      // apex printed it as "142% top box" (review 2026-08, C1) — such a
+      // question simply carries no top-box share.
+      if (mrow && !TR.fmt.isColPctStat(mrow.stat)) return null;
       if (cell && cell.pct !== null && cell.pct !== undefined) {
         return { pct: cell.pct, label: rows[i].label };
       }
@@ -282,6 +288,9 @@
         try { model = publishedModel(views, s.q.code, g.id); } catch (e) { return; }
         var row = model.rows[s.ri];
         if (!row || !row.cells) return;
+        // The scan weighs every gap as a fraction of a 0–100 share scale, so a
+        // row holding counts or row percentages cannot join it (C1).
+        if (!TR.fmt.isColPctStat(row.stat)) return;
         var total = row.cells[0] && row.cells[0].pct;
         if (total === null || total === undefined) return;
         model.columns.forEach(function (col, i) {

@@ -78,7 +78,7 @@ the same console OMITTED notice as the main report. Regression tests (flag off
 
 ## CRITICAL — still open (fix before the next new-project run that touches them)
 
-### C1. Counts-only and row-%-only configs ship numbers labelled as percentages
+### C1. Counts-only and row-%-only configs ship numbers labelled as percentages — FIXED 2026-08-06 (Job C1)
 **Files:** `lib/data_layer_writer.R:567-571,691-697`; `assets/js/23_render.js:108-110`
 `build_dl_question` falls through Column % → Row % → Frequency into the
 island's `pct` field, and the island carries no field naming the quantity; the
@@ -95,6 +95,37 @@ than recorded — it also covers row-% and per-row mixing.)
 the island; renderer refuses the "%" label for anything that is not a column
 percentage. Until fixed: **do not ship a v2 report from a counts-only or
 row-%-only config.** Excel is unaffected.
+
+**FIXED 2026-08-06.** `build_dl_question` now emits `stat` on the question
+(`"Column %"` | `"Row %"` | `"Frequency"` | `"Average"`) and `stat` on any row
+whose value the fall-through substituted — **only when it is not `"Column %"`**,
+so every ordinary island is byte-identical and an absent field reads as the
+column percentage. The vocabulary lives in `TR.fmt` (`statOf` / `isPctStat` /
+`isColPctStat` / `statName` / `value`) because every display and scan layer
+needs it. Counts now print as counts in the crosstab, the TSV, the export
+matrix, the SVG and native-PPTX charts (plain axis format, data-driven max) and
+the reader's plain-language sentences, with the unit named in the table's corner
+cell and the matrix head. Everything that assumes a column proportion is gated:
+Wilson intervals, the mean-CI and tracking/wave SD derivations (which read the
+category distribution), data bars, the heat tint, wave trending + delta chips,
+the Differences pp gaps, Patterns top-box + KeyShare eligibility and gathering,
+and the confidence explainer's worked example. A row percentage keeps its "%"
+but declares its denominator and takes no Wilson interval. A filtered / custom-
+banner recompute is always a column percentage, so the model reports
+`stat: "Column %"` + `statWas`, and the table says "published as Counts (n)"
+rather than swapping unit in silence. Files: `lib/data_layer_writer.R`,
+`01_format.js`, `21c_confidence.js`, `22_model.js`, `22w_waves.js`,
+`23_render.js`, `23z_charts.js`, `24a_reader.js`, `25_cards.js`, `27d_diffs.js`,
+`27f_takeout_data.js`, `27fa_takeout_shares.js`, `27t_tracking.js`,
+`29_export.js`, `30x_exhibit.js`, `styles.css`. Tests: 4 in
+`test_data_layer_writer.R` (3 proved failing pre-fix), a new 16-check
+`tests/stat_label_tests.mjs` (13 proved failing pre-fix) and one in
+`takeout_tests.mjs` (proved failing pre-fix). Gates after: tabs R suite
+**3,742 / 0 / 0 / 0**, 29 JS suites green, project-root suite at its documented
+3-failure baseline. Verified end-to-end by generating a real v2 report with one
+counts-only and one column-% question and running its own bundle in headless
+Chrome: `142  80 B  62` under "Counts (n)", `71%  80% B  62%` untouched.
+Schema documented in `modules/tabs/docs/11_DATA_CENTRIC_REPORT_V2.md`.
 
 ### C2. A sub-k column's exact base prints in the v2 report while Excel masks it
 **Files:** `assets/js/22_model.js:541-565`, `23_render.js:208-209,357`
@@ -326,8 +357,9 @@ session (letters shifting past an empty column, allocation weight
 misalignment, the comment report's microdata bypass) are fixed with
 failing-first regression tests.
 
-Conditions: (1) do not ship a v2 report from a counts-only or row-%-only
-config until C1 lands; (2) do not treat the v2 HTML as disclosure-safe for
+Conditions: (1) ~~do not ship a v2 report from a counts-only or row-%-only
+config until C1 lands~~ — **C1 landed 2026-08-06; this condition is lifted**;
+(2) do not treat the v2 HTML as disclosure-safe for
 sub-k audiences until C2 lands; (3) normalise the Y-flag columns (C3) before
 the next hand-built config, or lowercase `y` cells will silently drop
 questions/banners with preflight approving. For anonymity-critical work also
@@ -360,13 +392,10 @@ do not reuse the review session's context.
 - Do not push; Duncan verifies via `launch_turas()` and regenerates
   deliverables himself. Run `git status` first and commit only your own files.
 
-**Job C1 — island stat labelling (CRITICAL C1).** Carry `primary_stat` (and a
-per-row marker when the fall-through substitutes) on the v2 island;
-`23_render.js` must stop labelling non-column-% values with "%". Touches
-`data_layer_writer.R:567-571,691-697`, `22_model.js`, `23_render.js`,
-`29_export.js`; check Patterns (`27f`) reads of `cell.pct`. Repro probes from
-this review: scratchpad `probe_counts_only.R` / `probe_counts_only.mjs`
-(rebuild from the finding if expired). Largest of the jobs.
+**Job C1 — island stat labelling (CRITICAL C1). DONE 2026-08-06** — see the
+annotation under C1 above. Baseline for the next job is therefore tabs R
+**3,742 / 0 / 0 / 0** and **29** JS suites (the new `stat_label_tests.mjs`
+joins the 26 + 2).
 
 **Job C2 — sub-k base masking in v2 (CRITICAL C2).** Mask `col.base` for
 suppressed columns in `tableHtml` and `render.matrix` the way

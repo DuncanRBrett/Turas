@@ -368,7 +368,11 @@
     if (!scores) return null;
     var pairs = [];
     Object.keys(scores).forEach(function (ri) {
-      var cell = viewModel.rows[ri] && viewModel.rows[ri].cells[0];
+      var srow = viewModel.rows[ri];
+      // The SD is derived from the category DISTRIBUTION, which only holds as
+      // column percentages — a counts-only row would inflate it (2026-08, C1).
+      if (srow && !TR.fmt.isColPctStat(srow.stat)) return;
+      var cell = srow && srow.cells[0];
       if (cell && cell.pct !== null && cell.pct !== undefined) {
         pairs.push({ p: cell.pct, s: scores[ri] });
       }
@@ -545,6 +549,11 @@
     viewModel.rows.forEach(function (row, ri) {
       var isMean = row.kind === "mean";
       if (isMean && TR.model.isStdDevRow(row.label)) return;   // untracked (no SD history)
+      // A tracked proportion is a share of its column: the delta chip, the wave
+      // table and the trendline all frame it as one, and a prior wave built
+      // under a different config may not even be in the same unit. A row that
+      // holds counts or row percentages is therefore not trended (2026-08, C1).
+      if (!isMean && !TR.fmt.isColPctStat(row.stat)) return;
       var series = waves.series(q, row, ri, null);
       if (!series.length) return;
       row.waves = series;

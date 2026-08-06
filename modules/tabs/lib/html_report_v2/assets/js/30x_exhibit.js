@@ -285,9 +285,15 @@
     // and native-PPTX renderers label them "7.6" on a rating axis, not "8%".
     var keptMean = compSplit.keep.length > 0 &&
       compSplit.keep.every(function (e) { return e.row.kind === "mean"; });
+    // Carry the reported statistic only when every charted question agrees on
+    // it, so a composite of counts-only questions labels counts as counts; a
+    // mixed set falls back to the default and the panel stays as it was (C1).
+    var stats = compSplit.keep.map(function (e) { return e.m.stat || "Column %"; });
+    var keptStat = stats.length && stats.every(function (s) { return s === stats[0]; })
+      ? stats[0] : "Column %";
     return { code: "COMPOSITE", title: "This wave", source: "published",
       chartKind: "detail", lowBaseThreshold: 30,
-      valueKind: keptMean ? "mean" : "pct",
+      valueKind: keptMean ? "mean" : "pct", stat: keptStat,
       columns: [{ label: "Total", letter: "", base: null, low: false }],
       rows: compSplit.keep.map(function (e) {
         return { kind: "category", label: shortLabel(e.m, e.row),

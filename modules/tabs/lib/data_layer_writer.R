@@ -564,6 +564,12 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   cls   <- classify_row_labels(table, q_result$question_type)
   keys  <- banner_info$internal_keys
 
+  # The quantity that lands in each row's `pct` array. A config that turns the
+  # column percentage off (show_percent_column = N) puts ROW percentages or raw
+  # FREQUENCIES there instead — the island used to carry no field naming it, so
+  # the v2 renderer labelled every one of them "%" and a counts-only table
+  # shipped "142%" (review 2026-08, C1). `stat` travels with the values so the
+  # renderer, the exports and the Patterns scan know what they are holding.
   primary_stat <- if (stats$has_col_pct) "Column %"
                   else if (stats$has_row_pct) "Row %"
                   else if (stats$has_freq) "Frequency"
@@ -689,11 +695,17 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       rows[[length(rows) + 1]] <- mrow
     } else {
       pr <- vals_for(lbl, src, primary_stat)
+      # A row absent from the question's primary statistic substitutes another
+      # one — so a single row can hold a different quantity from its neighbours
+      # (a Frequency-only row sitting among column percentages). Record which,
+      # so the renderer labels THAT row for what it is instead of printing a
+      # count with a percent sign beside real percentages (C1).
+      row_stat <- primary_stat
       if (all(is.na(pr))) {
         for (fb in c("Column %", "Row %", "Frequency")) {
           if (fb == primary_stat) next
           alt <- vals_for(lbl, src, fb)
-          if (!all(is.na(alt))) { pr <- alt; break }
+          if (!all(is.na(alt))) { pr <- alt; row_stat <- fb; break }
         }
       }
       kind <- if (cl == "net") "net" else "category"
@@ -712,6 +724,9 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       # R's 80% letters instead of recomputing them from the 0dp-rounded counts
       # (D4). Absent on single-alpha runs -> byte-identical island.
       if (stats$has_sig2) crow$sig2 <- as.list(sig_for(lbl, src, "Sig.2"))
+      # Emitted only when this row differs from the question's own statistic, so
+      # an ordinary column-% report stays byte-identical.
+      if (!identical(row_stat, primary_stat)) crow$stat <- row_stat
       rows[[length(rows) + 1]] <- crow
     }
   }
@@ -839,6 +854,10 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     gauge_green = gauge_green,
     gauge_amber = gauge_amber
   )
+  # What the rows' `pct` arrays actually hold. Emitted only when it is NOT the
+  # column percentage (the overwhelming default), so every report built from an
+  # ordinary config is byte-identical and the reader defaults to "Column %".
+  if (!identical(primary_stat, "Column %")) out$stat <- primary_stat
   if (!is.null(index_scores)) out$index_scores <- index_scores
   if (!is.null(net_diffs)) out$net_diffs <- net_diffs
   # AreaSummary: the question that summarises its area/theme (Patterns tab).

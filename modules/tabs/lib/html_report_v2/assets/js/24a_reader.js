@@ -145,12 +145,16 @@
     return { primary: primaryLevel(), secondary: secondaryLevel() };
   };
 
-  /** The cell's displayed value as text (mean 1dp, % rounded) — null when absent. */
-  function valText(kind, cell) {
+  /** The cell's displayed value as text (mean 1dp, % rounded) — null when
+   *  absent. `row` supplies the statistic, so a counts-only question's sentence
+   *  says "Male (80)" and not "Male (80%)" (review 2026-08, C1). */
+  function valText(kind, cell, row) {
     if (!cell) return null;
     var v = kind === "mean" ? cell.mean : cell.pct;
     if (v === null || v === undefined) return null;
-    return kind === "mean" ? Number(v).toFixed(1) : Math.round(v) + "%";
+    if (kind === "mean") return Number(v).toFixed(1);
+    return TR.fmt.isPctStat((row && row.stat) || TR.fmt.COL_PCT)
+      ? Math.round(v) + "%" : TR.fmt.base(v);
   }
 
   function joinList(items) {
@@ -167,7 +171,7 @@
   reader.letterSentence = function (model, row, ci) {
     var cell = row.cells[ci], col = model.columns[ci];
     if (!cell || !cell.sig || !col) return "";
-    var own = valText(row.kind, cell);
+    var own = valText(row.kind, cell, row);
     if (own === null) return "";
     var byLetter = {};
     model.columns.forEach(function (c, i) {
@@ -178,7 +182,7 @@
       chars.forEach(function (ch) {
         var ti = byLetter[ch.toUpperCase()];
         if (ti === undefined) return;
-        var tv = valText(row.kind, row.cells[ti]);
+        var tv = valText(row.kind, row.cells[ti], row);
         out.push(model.columns[ti].label + (tv === null ? "" : " (" + tv + ")"));
       });
       return out;
@@ -214,7 +218,7 @@
     if (!cell || !cell.sig || !col) return "";
     var sig = String(cell.sig);
     if (!/[▲▼▵▿]/.test(sig)) return "";
-    var own = valText(row.kind, cell);
+    var own = valText(row.kind, cell, row);
     if (own === null) return "";
     var dir = /[▼▿]/.test(sig) ? "lower" : "higher";
     var head = col.label + " (" + own + ")";

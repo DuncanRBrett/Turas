@@ -315,6 +315,10 @@
     var rows = data.rows || [];
     if (!rows.length) return "";
     var axisMax = data.axisMax || 100;
+    // Counts-only questions get plain tick labels, not "%" (2026-08, C1).
+    var tick = TR.fmt.isPctStat(TR.fmt.statOf(model, null))
+      ? function (v) { return Math.round(v) + "%"; }
+      : function (v) { return TR.fmt.base(v); };
     // WP2 emphasis model: first charted column in brand, the rest in the
     // muted context greys; value labels only on the emphasis column.
     var seriesHex = function (k) {
@@ -334,7 +338,7 @@
       var gx = plotX + plotW * f;
       xml += fillRect(next(), { x: gx, y: box.y, w: 0.008, h: usableH }, STYLE.FAINT);
       xml += textBox(next(), { x: gx - 0.3, y: box.y + usableH + 0.02, w: 0.6, h: 0.2 },
-        [para(Math.round(axisMax * f) + "%", { size: SIZE.footer, colour: GREY, align: "ctr" })]);
+        [para(tick(axisMax * f), { size: SIZE.footer, colour: GREY, align: "ctr" })]);
     });
     rows.forEach(function (r, i) {
       var cy = box.y + i * rowH + rowH / 2;
@@ -817,7 +821,12 @@
     // A composite of 0–10 means charts RATINGS: one-decimal labels on a fixed
     // 0–max axis, not the default "0%" percentage format.
     var meanScale = model.valueKind === "mean";
-    var lblFmt = meanScale ? "0.0" : null;
+    // A counts-only question (show_percent_column = N) charts headcounts, so
+    // the data labels and the value axis take a plain number format instead of
+    // the default 0"%" — a bar of 142 was labelled "142%" (2026-08, C1).
+    var countScale = !meanScale &&
+      !TR.fmt.isPctStat(TR.fmt.statOf(model, null));
+    var lblFmt = meanScale ? "0.0" : countScale ? "0" : null;
     // Honest axes (WP2): means run over the question's declared scale when the
     // source carries Scale_Min/Scale_Max, else the data-driven fixed max as
     // before; percent axes anchor at 0 with niceMax capped at 100 and floored
@@ -825,7 +834,10 @@
     var sc = meanScale ? declaredScale : null;
     var meanMin = sc ? sc.min : 0;
     var meanMax = sc ? sc.max : cr.axisMax;
-    var pctMax = Math.max(25, Math.min(100, cr.axisMax || 100));
+    // A percentage axis anchors at 0 and is capped at 100; a count axis must
+    // follow the data (a 142-count bar cannot live on a 0–100 axis).
+    var pctMax = countScale ? (cr.axisMax || 100)
+      : Math.max(25, Math.min(100, cr.axisMax || 100));
     var series = (type === "stacked" || type === "stackedcol")
       ? chartSeriesStacked(model, rows, cols)
       : chartSeries(model, rows, cols, type,
@@ -837,7 +849,7 @@
       plot = '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>' +
         '<c:varyColors val="0"/>' + series +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
-      axesXml = chartAxes("b", "l", meanScale ? "General" : null, false,
+      axesXml = chartAxes("b", "l", meanScale || countScale ? "General" : null, false,
         meanScale ? meanMin : 0, meanScale ? meanMax : pctMax);
     } else if (type === "stacked") {
       plot = '<c:barChart><c:barDir val="bar"/><c:grouping val="percentStacked"/>' +
@@ -876,7 +888,7 @@
       plot = '<c:barChart><c:barDir val="bar"/><c:grouping val="clustered"/>' +
         '<c:varyColors val="0"/>' + series +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
-      axesXml = chartAxes("l", "b", meanScale ? "General" : null, false,
+      axesXml = chartAxes("l", "b", meanScale || countScale ? "General" : null, false,
         meanScale ? meanMin : 0, meanScale ? meanMax : pctMax);
     }
     var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +

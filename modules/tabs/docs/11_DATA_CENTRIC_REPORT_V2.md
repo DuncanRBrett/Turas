@@ -64,6 +64,28 @@ The v2 renderer carries three JSON islands:
 Published figures are always the record; recomputed (filtered / custom-banner /
 historical) figures are badged as computed.
 
+### Which statistic a question reports (`stat`)
+
+Each `data-agg` question puts ONE quantity in its rows' `pct` array. Normally
+that is the **column percentage** — but a config with `show_percent_column = N`
+puts row percentages or raw frequencies there instead, and a single row that has
+no column percentage substitutes another statistic of its own.
+
+- `question.stat` — `"Column %"` | `"Row %"` | `"Frequency"` | `"Average"`.
+- `row.stat` — set only when that row differs from its question's.
+
+Both are **emitted only when they are not `"Column %"`**, so an ordinary report's
+island is byte-identical and a reader that finds neither treats the values as
+column percentages (which every report built before this field did carry).
+
+`TR.fmt.statOf / isPctStat / isColPctStat / statName / value` are the single
+vocabulary. Anything that assumes a column proportion — the "%" suffix, Wilson
+intervals, data bars, the heat tint, wave trending, the Differences pp gaps, the
+Patterns/KeyShare share scans and the confidence explainer's worked example —
+must gate on it. A filtered/custom-banner recompute always produces column
+percentages, so its model reports `stat: "Column %"` plus `statWas` naming what
+the question published, and the table says so rather than silently changing unit.
+
 ### The `TR.MICRO` data contract
 
 ```jsonc

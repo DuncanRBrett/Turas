@@ -197,6 +197,12 @@
       // so the loop index is the question row index used to recompute the rest.
       model.rows.forEach(function (row, ri) {
         if (row.kind === "mean") return;       // means handled below (recomputed)
+        // Every proportion finding here is a percentage-POINT gap between
+        // column shares. On a counts-only / row-%-only question the same slot
+        // holds a headcount or a row percentage, so the row stays out rather
+        // than reporting "a 62pp gap" that is really 62 people (2026-08, C1).
+        // Mean/index standouts are unaffected — they recompute below.
+        if (!TR.fmt.isColPctStat(row.stat)) return;
         // For rating scales the top-box NETs (+ the index) are the meaningful
         // standouts; individual scale points (Neutral, Very Satisfied…) read as
         // wrong sitting next to a top-box that already contains them, so suppress

@@ -139,11 +139,17 @@
           }
         });
         var top = topNetIndex(TR.d2.questionByCode(q.code), model);
-        if (top >= 0) out.push(metricEntry(q, model, model.rows[top], top));
+        if (top >= 0 && TR.fmt.isColPctStat(model.rows[top].stat)) {
+          out.push(metricEntry(q, model, model.rows[top], top));
+        }
         return;
       }
       model.rows.forEach(function (row, ri) {
         if (!row.waves || !row.waves.length) return;
+        // A tracked proportion is a share of its column, displayed and tested
+        // as one. A counts-only / row-%-only row holds something else, so it is
+        // not tracked as a percentage (review 2026-08, C1). Means still track.
+        if (row.kind !== "mean" && !TR.fmt.isColPctStat(row.stat)) return;
         out.push(metricEntry(q, model, row, ri));
       });
     });
@@ -254,7 +260,11 @@
     }
     var pairs = [];
     Object.keys(scores).forEach(function (ri) {
-      var cell = model.rows[ri] && model.rows[ri].cells[ci];
+      var srow = model.rows[ri];
+      // The SD comes out of the category DISTRIBUTION, which only holds as
+      // column percentages (C1) — a counts row would inflate it wildly.
+      if (srow && !TR.fmt.isColPctStat(srow.stat)) return;
+      var cell = srow && srow.cells[ci];
       if (cell && cell.pct !== null && cell.pct !== undefined) {
         pairs.push({ p: cell.pct, s: scores[ri] });
       }

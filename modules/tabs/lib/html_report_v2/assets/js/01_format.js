@@ -105,6 +105,52 @@
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F");
   };
 
+  /* ---------------- reported statistic (review 2026-08, C1) ----------------
+   * A crosstab config that turns the column percentage off
+   * (show_percent_column = N) puts ROW percentages or raw FREQUENCIES in the
+   * same value slot, and the data layer used to carry no field naming which —
+   * so the v2 report labelled every one of them "%" and a counts-only table
+   * shipped "142%", "80% B". The statistic now travels on the island (a
+   * question's `stat`, or a row's own when it had to substitute), and the
+   * vocabulary lives here because every layer that displays or scans a value
+   * needs it: model, renderer, charts, exports, Patterns, Differences,
+   * Tracking and the reader.
+   */
+  fmt.COL_PCT = "Column %";
+
+  /** The statistic behind a row's values: the row's own, else the model's,
+   *  else the overwhelming default (which is also what every report built
+   *  before this field existed carries). */
+  fmt.statOf = function (model, row) {
+    return (row && row.stat) || (model && model.stat) || fmt.COL_PCT;
+  };
+
+  /** True when the value is a percentage of SOME denominator — it gets a "%". */
+  fmt.isPctStat = function (stat) {
+    return stat === undefined || stat === null ||
+      stat === fmt.COL_PCT || stat === "Row %";
+  };
+
+  /** True when the value is a COLUMN percentage — the only quantity a Wilson
+   *  interval, a data bar, a pp gap or a favourable-share scan may be built on. */
+  fmt.isColPctStat = function (stat) {
+    return stat === undefined || stat === null || stat === fmt.COL_PCT;
+  };
+
+  /** Plain-English name of a statistic, for a table's unit note. */
+  fmt.statName = function (stat) {
+    if (stat === "Row %") return "Row % (of the row total)";
+    if (stat === "Frequency") return "Counts (n)";
+    return stat;
+  };
+
+  /** A row value as text: counts as counts, percentages with a "%". */
+  fmt.value = function (v, stat) {
+    if (v === null || v === undefined) return "–";
+    return fmt.isPctStat(stat)
+      ? Number(v).toFixed(fmt.decimalsFor(false)) + "%" : fmt.base(v);
+  };
+
   /** Filename-safe slug, capped at 48 characters. */
   fmt.slug = function (text) {
     return String(text || "export").replace(/[^a-zA-Z0-9]+/g, "_")

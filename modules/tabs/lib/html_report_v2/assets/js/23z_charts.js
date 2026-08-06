@@ -23,6 +23,18 @@
   function fmtMean(v) {
     return v === null || v === undefined ? "–" : Number(v).toFixed(1);
   }
+  /** True when the model's values are counts, not percentages of anything —
+   *  a counts-only config (show_percent_column = N). Stacked / pie charts are
+   *  unaffected: they normalise to their own total, so their labels are real
+   *  shares whatever the inputs are. (Review 2026-08, C1.) */
+  function countScale(model) {
+    return !TR.fmt.isPctStat(TR.fmt.statOf(model, null));
+  }
+  /** Chart-label value: a count as a count, anything else as a percentage. */
+  function fmtVal(v, counts) {
+    if (v === null || v === undefined) return "–";
+    return counts ? TR.fmt.base(v) : fmtPct(v);
+  }
 
   /**
    * Repel 1-D label positions so neighbours never overlap: forward sweep
@@ -75,6 +87,7 @@
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
     var meanScale = model.valueKind === "mean";   // ratings, not percentages
+    var counts = !meanScale && countScale(model);
     var W = 660, plotH = 170, padT = 16, padB = 58, padL = 10;
     var palette = render.palette();
     // Single series: colour columns by category (semantic); multi-column keeps
@@ -97,7 +110,8 @@
           fill: catColours ? catColours[i] : palette[k % palette.length], rx: 3 }));
         if (cols.length === 1 || v >= data.axisMax * 0.12) {
           body.push(S.text(cx - groupW / 2 + k * barW + (barW - 2) / 2,
-            padT + plotH - h - 4, meanScale ? fmtMean(v) : fmtPct(v),
+            padT + plotH - h - 4,
+            meanScale ? fmtMean(v) : fmtVal(v, counts || !TR.fmt.isPctStat(r.stat)),
             { "text-anchor": "middle", "font-size": 9.5,
               "font-weight": 600, fill: "#1c2333" }));
         }
@@ -319,6 +333,7 @@
   render.dotChart = function (model, cols) {
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
+    var dotCounts = countScale(model);
     var W = 660, LABEL = 210, VAL = 30, rowH = 24;
     var plotW = W - LABEL - VAL;
     var x = S.linear(data.axisMax, plotW);
@@ -346,7 +361,7 @@
     });
     [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
       body.push(S.text(LABEL + plotW * f, y + 10,
-        Math.round(data.axisMax * f) + "%",
+        fmtVal(data.axisMax * f, dotCounts),
         { "text-anchor": "middle", "font-size": 9.5, fill: "#9aa1b1" }));
     });
     y += 20;

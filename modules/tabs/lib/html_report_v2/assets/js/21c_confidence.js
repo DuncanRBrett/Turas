@@ -270,6 +270,10 @@
       q.rows.forEach(function (r, ri) {
         if (r.kind !== "net") return;
         if (q.net_diffs && q.net_diffs[String(ri)]) return;
+        // The worked example reads "a 42% based on 200 answers would sit
+        // between …". A counts-only / row-%-only question carries no such
+        // percentage, and quoting its headcount invented one (2026-08, C1).
+        if (!TR.fmt.isColPctStat(r.stat || q.stat)) return;
         var pct = r.pct && r.pct[0];
         if (pct === null || pct === undefined) return;
         if (best && (base < best.n || (base === best.n && pct <= best.pct))) {

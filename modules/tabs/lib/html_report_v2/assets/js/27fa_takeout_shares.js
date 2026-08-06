@@ -70,6 +70,11 @@
     var out = [];
     (((TR.AGG || {}).questions) || []).forEach(function (q) {
       if (!q.key_share || rated[q.code] || isClass(q)) return;
+      // A KeyShare is a SHARE of the column. A question reporting counts or row
+      // percentages (show_percent_column = N) carries no such share, so it is
+      // not eligible — rather than joining the scan with a headcount read as a
+      // percentage (review 2026-08, C1).
+      if (!TR.fmt.isColPctStat(q.stat)) return;
       var ri = resolveRow(q);
       if (ri >= 0) out.push({ q: q, ri: ri });
     });

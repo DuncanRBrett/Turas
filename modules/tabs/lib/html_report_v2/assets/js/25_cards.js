@@ -61,6 +61,9 @@
     var model = TR.model.forQuestion(s.activeQ, s.banner, s.filters, opts);
     if (model) {
       model.chartKind = cards2.resolveChartKind(model);
+      // "pct" covers column AND row percentages (both label with a "%"); a
+      // counts-only question charts as counts — the chart builders read the
+      // model's own `stat` for that (C1).
       model.valueKind = model.chartKind === "mean" ? "mean" : "pct";
       model.hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
     }

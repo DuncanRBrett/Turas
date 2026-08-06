@@ -1037,3 +1037,80 @@ test_that("a question with a malformed table is skipped BY NAME on the console (
   expect_true(any(grepl("omitted from the v2 report", out)))
   expect_equal(length(dl$questions), 1L)
 })
+
+
+# ==============================================================================
+# REPORTED STATISTIC (review 2026-08, CRITICAL C1)
+# ==============================================================================
+# A config that turns the column percentage off (show_percent_column = N) puts
+# ROW percentages or raw FREQUENCIES into the same `pct` slot. The island
+# carried nothing naming the quantity, so the v2 renderer labelled all of them
+# "%" and a counts-only run shipped "142%", "80% B". `stat` now names it — and
+# is emitted ONLY when it is not the column percentage, so every ordinary
+# config produces a byte-identical island.
+
+# Counts-only: Frequency + Sig. rows, no Column % anywhere.
+make_dl_q_counts_only <- function() {
+  list(
+    question_code = "Q_CNT", question_text = "Are you aware?",
+    question_type = "Single_Choice", category = "Awareness",
+    table = data.frame(
+      RowLabel  = c("Yes", "Yes", "No", "No"),
+      RowType   = c("Frequency", "Sig.", "Frequency", "Sig."),
+      RowSource = rep("individual", 4),
+      "TOTAL::Total"   = c("142", "", "58", ""),
+      "Gender::Male"   = c("80", "B", "20", ""),
+      "Gender::Female" = c("62", "", "38", "A"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 200),
+      "Gender::Male"   = list(unweighted = 100),
+      "Gender::Female" = list(unweighted = 100)))
+}
+
+test_that("a counts-only question names its statistic on the island", {
+  q <- build_dl_question(make_dl_q_counts_only(), make_dl_banner_info(),
+                         make_dl_config(), low_base = 30)
+  expect_equal(q$stat, "Frequency")
+  # the values ARE the raw counts — the point of the flag
+  expect_equal(unlist(q$rows[[1]]$pct), c(142, 80, 62))
+})
+
+test_that("a row-%-only question names its statistic on the island", {
+  qdef <- make_dl_q_counts_only()
+  qdef$table$RowType <- c("Row %", "Sig.", "Row %", "Sig.")
+  q <- build_dl_question(qdef, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_equal(q$stat, "Row %")
+})
+
+test_that("an ordinary column-% question emits NO stat key (byte-identical)", {
+  q <- build_dl_question(make_dl_q_single(), make_dl_banner_info(),
+                         make_dl_config(), low_base = 30)
+  expect_false("stat" %in% names(q))
+  expect_false(any(vapply(q$rows, function(r) "stat" %in% names(r), logical(1))))
+})
+
+test_that("a Frequency-only row among column %s carries its own stat", {
+  # The fall-through substitutes Frequency for a row with no Column % — that
+  # row's 37 people rendered as "37%" beside a real 37.0% (C1).
+  qdef <- list(
+    question_code = "Q_MIX", question_text = "Mixed", category = "Awareness",
+    question_type = "Single_Choice",
+    table = data.frame(
+      RowLabel  = c("Yes", "Yes", "Other"),
+      RowType   = c("Frequency", "Column %", "Frequency"),
+      RowSource = rep("individual", 3),
+      "TOTAL::Total"   = c("74", "37.0", "37"),
+      "Gender::Male"   = c("40", "40.0", "20"),
+      "Gender::Female" = c("34", "34.0", "17"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 200),
+      "Gender::Male"   = list(unweighted = 100),
+      "Gender::Female" = list(unweighted = 100)))
+  q <- build_dl_question(qdef, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_false("stat" %in% names(q))                 # question is column %
+  expect_false("stat" %in% names(q$rows[[1]]))       # "Yes" is a column %
+  expect_equal(q$rows[[2]]$stat, "Frequency")        # "Other" is a headcount
+  expect_equal(unlist(q$rows[[2]]$pct), c(37, 20, 17))
+})

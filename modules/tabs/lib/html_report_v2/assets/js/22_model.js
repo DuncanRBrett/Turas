@@ -27,6 +27,12 @@
   }
   model.isStdDevRow = isStdDevRow;
 
+  // What a question's (or one row's) `pct` values ACTUALLY are — the vocabulary
+  // lives in TR.fmt (review 2026-08, C1) because every display and scan layer
+  // needs it, not just the model.
+  var COL_PCT = TR.fmt.COL_PCT;
+  function statOf(q) { return TR.fmt.statOf(null, q); }
+
   /** Normalise a label/title for cross-wave matching (mirrors pipeline). */
   model.norm = function (text) {
     return String(text || "").toLowerCase().replace(/\s+/g, " ")
@@ -121,6 +127,9 @@
       }
       return {
         kind: r.kind, label: r.label, indexDesc: r.index_desc || null,
+        // A row that had to substitute another statistic carries its own; the
+        // rest inherit the question's (C1).
+        stat: r.stat || statOf(q),
         diff: !!(q.net_diffs && q.net_diffs[String(qri)]),
         cells: cols.map(function (ci, i) {
           return { pct: r.kind === "mean" ? null : r.pct[ci],
@@ -130,7 +139,7 @@
         })
       };
     });
-    return { source: "published", columns: columns, rows: rows };
+    return { source: "published", columns: columns, rows: rows, stat: statOf(q) };
   }
 
   /**
@@ -213,6 +222,10 @@
       }));
     });
     return { source: "computed", columns: columns, rows: rows,
+      stat: COL_PCT,
+      // Set when the recompute changed the unit (published counts / row %s ->
+      // column %s), so the card can say so instead of silently swapping.
+      statWas: statOf(q) === COL_PCT ? null : statOf(q),
       notRecomputable: !canRecompute,
       maskCount: TR.stats.maskCount(mask), custom: !!spec.custom,
       composite: !!spec.composite,
@@ -223,9 +236,14 @@
     return TR.stats.indexMeans(q, columns, mask);
   }
 
+  // Every computed value is a COLUMN percentage — TR.stats.tabulate divides each
+  // row's (weighted) count by the column's own base. So a question published as
+  // row percentages or as raw counts changes units the moment a filter or custom
+  // banner is applied; the stat travels with the value and the renderer relabels
+  // rather than printing the new number under the old unit (C1).
   function rowModel(r, cells) {
     return { kind: r.kind, label: r.label,
-      indexDesc: r.index_desc || null, cells: cells };
+      indexDesc: r.index_desc || null, stat: COL_PCT, cells: cells };
   }
 
   /** Build a NET row model from a {wbase, n, effBase}[] counts array. */
@@ -327,7 +345,13 @@
           if (cell.mean === null || cell.mean === undefined) return;
           var pairs = [];
           Object.keys(scores).forEach(function (ri) {
-            var catCell = viewModel.rows[ri] && viewModel.rows[ri].cells[ci];
+            var catRow = viewModel.rows[ri];
+            var catCell = catRow && catRow.cells[ci];
+            // The SD is derived from the category distribution, which only means
+            // anything as COLUMN percentages. On a counts-only / row-%-only
+            // question those cells hold something else, and feeding them here
+            // produced an interval around the mean out of the wrong quantity (C1).
+            if (catRow && !TR.fmt.isColPctStat(catRow.stat)) return;
             if (catCell && catCell.pct !== null && catCell.pct !== undefined) {
               pairs.push({ p: catCell.pct, s: scores[ri] });
             }
@@ -346,6 +370,11 @@
         });
         return;
       }
+      // A Wilson interval is an interval around a COLUMN proportion. Attaching
+      // one to a raw count or a row percentage (whose denominator is the row,
+      // not this column's base) states a precision that was never computed —
+      // it printed "80 (71.1–86.7)" beside a count of 80 (C1).
+      if (!TR.fmt.isColPctStat(row.stat)) return;
       row.cells.forEach(function (cell, ci) {
         if (cell.pct === null || cell.pct === undefined) return;
         var col = viewModel.columns[ci];

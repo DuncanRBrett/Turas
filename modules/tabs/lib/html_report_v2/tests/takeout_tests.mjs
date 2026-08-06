@@ -834,6 +834,32 @@ run("KeyShare strain gathering: the declared share joins as a real % cell (known
   assert(g.reliability.n === 80, "share-only study still stamps n from the Total base, got " + g.reliability.n);
 });
 
+run("KeyShare skips a counts-only question — a headcount is not a share (C1)", () => {
+  // Same fixture as above, but the question reports FREQUENCIES
+  // (show_percent_column = N). The scan weighs every gap as a fraction of a
+  // 0–100 share scale, so 62 people must never join it as "62%".
+  TR.conf = { fpcActiveReport: () => false };
+  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  TR.AGG = { project: { low_base_threshold: 30 },
+    banner_groups: [{ id: "B", name: "Depot" }],
+    questions: [{ code: "Q12", title: "Correct delivery day", key_share: "Always",
+      stat: "Frequency",
+      rows: [{ kind: "category", label: "Always" }, { kind: "category", label: "Sometimes" }] }] };
+  TR.MICRO = null;
+  TR.views = { indexQuestions: () => [], _meanRow: () => null };
+  TR.model = { forQuestion: () => ({
+    stat: "Frequency",
+    columns: [{ label: "Total", base: 80 }, { label: "A", base: 40 }, { label: "B2", base: 40 }],
+    rows: [
+      { kind: "category", stat: "Frequency", cells: [{ pct: 71 }, { pct: 62 }, { pct: 80 }] },
+      { kind: "category", stat: "Frequency", cells: [{ pct: 29 }, { pct: 38 }, { pct: 20 }] }
+    ] }) };
+  const g = takeout.gather();
+  assert(g.columns.length === 0,
+    "no columns gathered from a counts-only question, got " + g.columns.length);
+  assert(g.scope.shares === 0, "and the scan reports no share questions");
+});
+
 run("KeyShare portraits render as percentages, and the tension sentence speaks share", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   // Depot A: strained on two rated questions, yet leads every depot on the share.

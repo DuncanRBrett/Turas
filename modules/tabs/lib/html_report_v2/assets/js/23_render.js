@@ -105,14 +105,31 @@
   // NPS published as 79 displayed "79.0", and percent_decimals=1 workbooks
   // (46.3%) displayed "46%". Means resolve per model: an NPS/0-100 metric takes
   // percent precision (fmt.decimalsForQ), everything else ratings precision.
-  function fmtPct(v) {
-    return v === null || v === undefined
-      ? "–" : Number(v).toFixed(fmt.decimalsFor(false)) + "%";
-  }
+  // The percentage side of that now lives in fmtValue, below.
   function fmtMean(v, model) {
     if (v === null || v === undefined) return "–";
     return Number(v).toFixed(fmt.decimalsForQ(model || null, true));
   }
+  // Review 2026-08 (C1): a config with show_percent_column = N puts ROW
+  // percentages or raw FREQUENCIES in the same value slot, and every one of them
+  // used to be printed with a "%" — a counts-only workbook shipped "142%",
+  // "80% B". The statistic travels on the model; the vocabulary is TR.fmt's.
+  var statOf = fmt.statOf, isPct = fmt.isPctStat, fmtValue = fmt.value;
+  render.statOf = statOf;
+  render.fmtValue = fmtValue;
+  /** Plain-English name of a non-default statistic, for the table's corner cell
+   *  and the export note; "" for the ordinary column percentage. */
+  render.statNote = function (model) {
+    // A filtered / custom-banner recompute always produces COLUMN percentages.
+    // When the published question reported something else, say so — otherwise
+    // the numbers silently change unit as the reader applies a filter (C1).
+    if (model && model.statWas) {
+      return "Column % — recomputed (published as " +
+        fmt.statName(model.statWas) + ")";
+    }
+    var stat = statOf(model, null);
+    return stat === fmt.COL_PCT ? "" : fmt.statName(stat);
+  };
 
   /** Heatmap tint: brand colour with alpha scaled by value. */
   function heat(value, max) {
@@ -142,7 +159,10 @@
     return ' xpl" tabindex="0" data-explain="' + esc + '" aria-label="' + esc;
   }
 
-  function deltaChip(delta) {
+  /** @param {boolean} [pctLike=true] - false when the row holds counts, so the
+   *  prior-wave tooltip does not append a "%" to a headcount (C1). */
+  function deltaChip(delta, pctLike) {
+    if (pctLike === undefined) pctLike = true;
     if (!delta || delta.diff === null) return "";
     var up = delta.diff >= 0;
     var size = delta.isMean ? Math.abs(delta.diff).toFixed(1)
@@ -153,7 +173,8 @@
       (delta.sig ? " sig" : "") +
       (sentence ? explainAttrs(sentence) : '" title="' +
         (delta.year || "prior wave") + ": " +
-        (delta.isMean ? delta.prev.toFixed(1) : Math.round(delta.prev) + "%") +
+        (delta.isMean ? delta.prev.toFixed(1)
+          : Math.round(delta.prev) + (pctLike ? "%" : "")) +
         (delta.sig ? " · significant change" : "")) + '">' +
       (up ? "▲" : "▼") + size + "</span>";
   }
@@ -163,7 +184,12 @@
   render.tableHtml = function (model, opts) {
     opts = opts || {};
     var sort = model.sorted || null;
-    var out = ['<table class="ct"><thead><tr><th class="lab">Response</th>'];
+    // The corner cell names the quantity whenever it is NOT the column
+    // percentage, so a counts-only or row-%-only table says so on its face.
+    var unit = render.statNote(model);
+    var out = ['<table class="ct"><thead><tr><th class="lab">Response' +
+      (unit ? '<div class="cunit">' + fmt.escapeHtml(unit) + "</div>" : "") +
+      "</th>"];
     model.columns.forEach(function (col, i) {
       var arrow = sort && sort.col === i
         ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
@@ -268,17 +294,21 @@
         fmt.escapeHtml(row.label) +
         (row.indexDesc ? '<div class="idxd">' + fmt.escapeHtml(row.indexDesc) + "</div>" : "") +
         "</td>");
+      var rowStat = statOf(model, row);
+      var rowIsPct = isPct(rowStat);
       row.cells.forEach(function (cell, i) {
         // magnitude mode: "bars" (default) | "heat" (background tint) | "off".
         // true (older pins) -> bars; the heat tint only when explicitly "heat".
         var mag = opts.heatmap === true ? "bars" : (opts.heatmap || "off");
-        var style = mag === "heat"
+        // The tint is scaled against a 0–100 maximum, which only holds for a
+        // percentage — a count of 142 would peg every cell at full strength.
+        var style = mag === "heat" && (row.kind === "mean" || rowIsPct)
           ? heat(row.kind === "mean" ? cell.mean : cell.pct, 100) : "";
         var body;
         if (row.kind === "mean") {
           body = '<span class="mv">' + fmtMean(cell.mean, model) + "</span>";
         } else {
-          body = '<span class="v">' + fmtPct(cell.pct) + "</span>";
+          body = '<span class="v">' + fmtValue(cell.pct, rowStat) + "</span>";
         }
         if (cell.sig) {
           // B2: with "Explain significance" on, the marker becomes a focusable
@@ -304,7 +334,9 @@
               fmt.escapeHtml(cell.sig) + "</span>";
           }
         }
-        if (i === 0 && opts.showDeltas && row.delta) body += deltaChip(row.delta);
+        if (i === 0 && opts.showDeltas && row.delta) {
+          body += deltaChip(row.delta, rowIsPct);
+        }
         if (opts.intervals && cell.ci) {
           body += '<div class="civ" title="95% ' + ivLabels.interval_name +
             ": the value would likely land between " +
@@ -317,8 +349,11 @@
           body += '<div class="fq">' + (cell.n === null || cell.n === undefined
             ? "" : "n=" + fmt.base(cell.n)) + "</div>";
         }
-        // magnitude data bar under category % cells (doesn't obscure the text)
-        if (mag === "bars" && row.kind !== "mean" && cell.pct !== null && cell.pct !== undefined) {
+        // magnitude data bar under category % cells (doesn't obscure the text).
+        // The bar's width IS the value read as a percentage of 100, so a count
+        // row gets none — 142 would simply fill the track (C1).
+        if (mag === "bars" && row.kind !== "mean" && rowIsPct &&
+            cell.pct !== null && cell.pct !== undefined) {
           body += '<div class="dbar"><div class="dbf" style="width:' +
             Math.max(0, Math.min(cell.pct, 100)).toFixed(0) + '%"></div></div>';
         }
@@ -339,7 +374,10 @@
     var perCol = function (label, lo, hi) {
       return iv ? [label, lo, hi] : [label];
     };
-    var head = ["Response"];
+    // Same unit note as the on-screen corner cell, so a pasted / PPTX'd table
+    // never reads a column of counts as percentages.
+    var unitNote = render.statNote(model);
+    var head = [unitNote ? "Response — " + unitNote : "Response"];
     model.columns.forEach(function (col) {
       var label = col.label + (col.letter ? " (" + col.letter + ")" : "");
       head = head.concat(perCol(label, label + " lo", label + " hi"));
@@ -383,8 +421,10 @@
     model.rows.forEach(function (row) {
       if (opts.categoriesOnly && row.kind !== "category") return;
       var cells = [row.label];
+      var rowStat = statOf(model, row);
       row.cells.forEach(function (cell) {
-        var value = row.kind === "mean" ? fmtMean(cell.mean, model) : fmtPct(cell.pct);
+        var value = row.kind === "mean" ? fmtMean(cell.mean, model)
+          : fmtValue(cell.pct, rowStat);
         cells = cells.concat(perCol(
           value + (cell.sig ? " " + cell.sig : ""),
           cell.ci ? round1(cell.ci.lo) : "",
@@ -561,6 +601,7 @@
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
     var meanScale = model.valueKind === "mean";   // ratings, not percentages
+    var barNote = statOf(model, null);            // counts chart as counts (C1)
     var W = 660, LABEL = 210, VAL = 64;
     var barH = cols.length > 1 ? 13 : 20;
     var groupGap = 9;
@@ -593,7 +634,7 @@
         body.push(S.el("rect", { x: LABEL, y: barY, width: w, height: barH,
           fill: catColours ? catColours[ri] : palette[k % palette.length], rx: 3 }));
         body.push(S.text(LABEL + w + 6, barY + barH * 0.78,
-          (meanScale ? fmtMean(v, model) : fmtPct(v)) +
+          (meanScale ? fmtMean(v, model) : fmtValue(v, statOf(model, r))) +
           (cols.length === 1 && cell && cell.sig
             ? " " + (/^[▲▼▵▿]/.test(cell.sig) ? "" : "▲") + cell.sig : ""),
           { "font-size": cols.length > 1 ? 10 : 11.5, "font-weight": 600,
@@ -602,7 +643,8 @@
       });
       y += rowH + groupGap;
     });
-    var note = "0–" + data.axisMax + (meanScale ? " rating scale" : "% scale");
+    var note = "0–" + data.axisMax + (meanScale ? " rating scale"
+      : isPct(barNote) ? "% scale" : " count scale");
     if (cols.length === 1 && model.columns[cols[0]]) {
       note += " · " + model.columns[cols[0]].label;
     }
