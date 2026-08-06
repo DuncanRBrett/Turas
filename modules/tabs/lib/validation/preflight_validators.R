@@ -831,22 +831,25 @@ check_preflight_colour_codes <- function(config, error_log) {
 
 #' Check Dashboard Scale Thresholds
 #'
-#' When include_summary is enabled, validates that dashboard colour break
-#' thresholds are logically ordered (green > amber) and not unreasonable.
+#' Validates that the dashboard colour break thresholds are logically ordered
+#' (green > amber). Runs unconditionally: it used to be gated on
+#' `include_summary`, which was retired with the classic HTML report — and a
+#' retired setting is absent from `config_obj`, so the gate would have read NULL
+#' and returned early forever, silently killing the check for the pairs that ARE
+#' live (production review 2026-08, I11). The pairs always have defaults, so
+#' there is always something to check, and green <= amber is always worth saying.
+#'
+#' Only the mean and index pairs remain: the net and custom pairs drove the
+#' retired classic dashboard and are read by nothing.
 #'
 #' @param config List, configuration object
 #' @param error_log Data frame, error log
 #' @return Updated error_log
 check_preflight_dashboard_scales <- function(config, error_log) {
-  include_summary <- !is.null(config$include_summary) && isTRUE(config$include_summary)
-  if (!include_summary) return(error_log)
-
-  # Check green > amber for each metric type
+  # Check green > amber for each metric type the interactive dashboard reads
   scale_pairs <- list(
-    list(green = "dashboard_green_net", amber = "dashboard_amber_net", label = "Net Positive"),
     list(green = "dashboard_green_mean", amber = "dashboard_amber_mean", label = "Mean"),
-    list(green = "dashboard_green_index", amber = "dashboard_amber_index", label = "Index"),
-    list(green = "dashboard_green_custom", amber = "dashboard_amber_custom", label = "Custom")
+    list(green = "dashboard_green_index", amber = "dashboard_amber_index", label = "Index")
   )
 
   for (pair in scale_pairs) {

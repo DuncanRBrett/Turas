@@ -634,15 +634,10 @@ context("preflight — check_preflight_dashboard_scales")
 
 test_that("passes with valid dashboard thresholds", {
   config <- make_test_config()
-  config$include_summary <- TRUE
-  config$dashboard_green_net <- 30
-  config$dashboard_amber_net <- 0
   config$dashboard_green_mean <- 7
   config$dashboard_amber_mean <- 5
   config$dashboard_green_index <- 7
   config$dashboard_amber_index <- 5
-  config$dashboard_green_custom <- 60
-  config$dashboard_amber_custom <- 40
   log <- new_error_log()
   result <- check_preflight_dashboard_scales(config, log)
   errors <- result[result$Severity == "Error", ]
@@ -651,13 +646,41 @@ test_that("passes with valid dashboard thresholds", {
 
 test_that("warns on inverted thresholds", {
   config <- make_test_config()
-  config$include_summary <- TRUE
-  config$dashboard_green_net <- 0
-  config$dashboard_amber_net <- 30  # Inverted: amber > green
+  config$dashboard_green_mean <- 5
+  config$dashboard_amber_mean <- 7   # Inverted: amber > green
   log <- new_error_log()
   result <- check_preflight_dashboard_scales(config, log)
   warnings <- result[result$Severity == "Warning", ]
   expect_true(nrow(warnings) > 0)
+})
+
+test_that("the check runs WITHOUT include_summary — it is retired (I11)", {
+  # It used to be gated on include_summary, which the classic HTML report owned.
+  # Retiring that setting means config$include_summary is NULL, so the gate would
+  # have returned early forever and silently killed the check for the mean and
+  # index pairs, which are live. Exactly the failure class this review closes.
+  config <- make_test_config()
+  config$include_summary <- NULL
+  config$dashboard_green_index <- 3
+  config$dashboard_amber_index <- 9   # inverted
+  log <- new_error_log()
+  result <- check_preflight_dashboard_scales(config, log)
+  warnings <- result[result$Severity == "Warning", ]
+  expect_true(nrow(warnings) > 0)
+  expect_true(any(grepl("Index", warnings$Description)))
+})
+
+test_that("the retired net and custom pairs are no longer checked", {
+  # Warning about the ordering of two numbers nothing reads is noise that
+  # trains an operator to ignore the preflight.
+  config <- make_test_config()
+  config$dashboard_green_net <- 0
+  config$dashboard_amber_net <- 30       # inverted, but retired
+  config$dashboard_green_custom <- 10
+  config$dashboard_amber_custom <- 90    # inverted, but retired
+  log <- new_error_log()
+  result <- check_preflight_dashboard_scales(config, log)
+  expect_equal(nrow(result[result$Severity == "Warning", ]), 0)
 })
 
 

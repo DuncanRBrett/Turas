@@ -148,6 +148,14 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     sig_note           = build_sig_note(alpha, sm),
     tracking           = list(enabled = isTRUE(tracking_enabled), default_scope = "all")
   )
+  # The crosstab heat tint's base colour. Emitted ONLY when the operator set it,
+  # so an island from a config that never mentions heatmap_colour is byte-identical
+  # to the ones already committed and the tint stays on the brand colour
+  # (production review 2026-08, I11 — the setting was whitelisted, templated and
+  # documented, and read by nothing).
+  if (!blank(config_obj$heatmap_colour)) {
+    proj$heatmap_colour <- as.character(config_obj$heatmap_colour)
+  }
   # Total universe size (finite population correction). Carried only when a
   # usable value is configured; the renderer derives the overall response /
   # coverage rate from it (TR.MICRO.n / population_size) and corrects the Total

@@ -272,6 +272,26 @@ test_that("Patterns levers: headline + banner exclusion emitted as arrays, omitt
   expect_null(dl0$project$patterns_exclude_banners)
 })
 
+test_that("heatmap_colour reaches the island only when the config sets it (I11)", {
+  # The setting was whitelisted, templated and documented — and read by nothing,
+  # so it was a silent no-op. It is now carried to the report, but ONLY when set:
+  # an island from a config that never mentions it must stay byte-identical, and
+  # the tint must stay on the brand colour for every existing report.
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(heatmap_colour = "#B02020"))
+  expect_identical(dl$project$heatmap_colour, "#B02020")
+
+  dl0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_null(dl0$project$heatmap_colour)
+  expect_false("heatmap_colour" %in% names(dl0$project))
+
+  for (v in list("", "   ", NA)) {
+    dlb <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+      make_dl_config(heatmap_colour = v))
+    expect_null(dlb$project$heatmap_colour, info = format(v))
+  }
+})
+
 test_that("sampling_note is carried trimmed, omitted when blank/NA", {
   dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(sampling_note = "  Substitution was allowed. "))

@@ -29,23 +29,30 @@ brand-derived shades filling later series.
 **Used in:**
 
 - CSS variable `--ct-accent` (available for future use)
-- **Crosstab heatmap cell tint** (default source — see `heatmap_colour` below)
 - Total column header text in crosstab tables
 
 ### 1.3 Heatmap Colour
 
 | Field | Default | Format |
 |-------|---------|--------|
-| `heatmap_colour` | *(accent_colour)* | Hex 6-digit |
+| `heatmap_colour` | *(brand_colour)* | Hex 6-digit |
 
-**What it does:** Controls the tint colour used for heatmap cell backgrounds in crosstab tables. RGB is extracted from this hex value and blended with white at varying alpha levels (0.08–0.43) proportional to the cell's value.
+**What it does:** Sets the base colour of the crosstab heat tint. RGB is taken
+from the hex value and applied as a background alpha that scales with the cell's
+own value (0 up to 0.45 at 100%), so a 73% cell reads clearly darker than a 3%
+one.
 
 **Resolution order:**
 1. `heatmap_colour` — explicit override per project
-2. `accent_colour` — default source (warm cream for standard TRL configs with `#CC9900`)
-3. Hard fallback `#CC9900`
+2. `brand_colour` — the default
+3. Hard fallback (the built-in brand default)
 
-**Why decoupled from brand_colour:** The previous behaviour (using `brand_colour` as the heatmap tint) produced cool-blue heatmaps for the standard deep-navy brand. Defaulting to `accent_colour` gives a warm cream tint that reads more neutrally and is easier to scan. Set `heatmap_colour` explicitly if you want a different tint without changing your brand or accent colours.
+**Corrected 2026-08:** this section previously described the retired classic
+report — it said the tint defaulted to `accent_colour`, and `heatmap_colour` was
+in fact read by nothing at all, so setting it did precisely nothing (production
+review 2026-08, I11). The interactive report tints on `brand_colour` unless
+`heatmap_colour` is set, which now works. Setting it changes the tint on the
+next regeneration without touching your brand or accent colours.
 
 ### 1.4 Dashboard Threshold Cutoffs
 
@@ -53,14 +60,13 @@ These control *when* the traffic light colours change, not the colours themselve
 
 | Field | Default | Controls |
 |-------|---------|----------|
-| `dashboard_green_net` | `30` | NET Positive green threshold |
-| `dashboard_amber_net` | `0` | NET Positive amber threshold |
 | `dashboard_green_mean` | `7` | Mean score green threshold |
 | `dashboard_amber_mean` | `5` | Mean score amber threshold |
 | `dashboard_green_index` | `7` | Index score green threshold |
 | `dashboard_amber_index` | `5` | Index score amber threshold |
-| `dashboard_green_custom` | `60` | Custom metric green threshold |
-| `dashboard_amber_custom` | `40` | Custom metric amber threshold |
+
+The NET Positive and Custom pairs were retired in 2026-08 along with the classic
+HTML report; the interactive report's gauges read the mean and index pairs only.
 
 ### 1.5 Chart Bar Colour
 

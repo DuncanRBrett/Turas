@@ -167,10 +167,11 @@ test_that("junk dashboard_scale_mean refuses instead of silently becoming 10", {
 })
 
 test_that("junk gauge thresholds refuse, naming the cell", {
+  # The net and custom pairs left this list when they were retired (I11) — a
+  # setting nothing reads cannot corrupt a number, and it now refuses to be
+  # whitelisted at all.
   for (key in c("dashboard_green_mean", "dashboard_amber_mean",
                 "dashboard_green_index", "dashboard_amber_index",
-                "dashboard_green_net", "dashboard_amber_net",
-                "dashboard_green_custom", "dashboard_amber_custom",
                 "dashboard_scale_index")) {
     raw <- setNames(list("seven-ish"), key)
     obj <- suppressWarnings(build_config_object(raw))
@@ -203,15 +204,15 @@ test_that("blank and absent dashboard cells still take the default without compl
 })
 
 test_that("real dashboard values validate and reach config_obj intact", {
+  # A colour break may legitimately be negative (an index can sit below zero) —
+  # the range rule applies to scale maxima only.
   raw <- list(dashboard_scale_mean = 5, dashboard_green_mean = 4,
-              dashboard_amber_mean = 3, dashboard_amber_net = -10)
+              dashboard_amber_mean = 3, dashboard_amber_index = -10)
   obj <- build_config_object(raw)
   expect_true(validate_config_settings(obj, raw))
   expect_equal(obj$dashboard_scale_mean, 5)
   expect_equal(obj$dashboard_green_mean, 4)
-  # A NET threshold is a percentage-point difference and may legitimately be
-  # negative — the range rule applies to scale maxima only.
-  expect_equal(obj$dashboard_amber_net, -10)
+  expect_equal(obj$dashboard_amber_index, -10)
 })
 
 test_that("junk significance_min_base refuses, so low_base_threshold is never null", {
@@ -619,4 +620,93 @@ test_that("the warning is silent when k protects, when the dial is off, or with 
                           qual_workbook = "02 Data/Comments.xlsx")), "")
   # No comment workbook -> the dial is inert, so the warning would be noise.
   expect_equal(quiet(list(qual_demographic_cuts = "safe")), "")
+})
+
+# ==============================================================================
+# I11 — a dead setting must not bless itself onto the whitelist
+# ==============================================================================
+#
+# Production review 2026-08, I11. A name on TABS_KNOWN_SETTINGS is declared to be
+# a real setting, so it never raises the "unrecognised setting" warning. Fifteen
+# names sat there reading nothing: the classic HTML report's leftovers, and
+# `output_folder`/`output_file`, which were never read by Tabs at all. The
+# practical cost was the neighbourhood, not the name — an operator who wrote
+# `output_folder` meaning `output_subfolder` was told nothing and found the
+# workbook in the default folder.
+#
+# They are now retired: named and answered by announce_retired_settings, off the
+# whitelist, out of build_config_object, off the template and out of the demo.
+
+context("config contract — dead settings are retired, not whitelisted (I11)")
+
+.I11_RETIRED <- c(
+  "embed_frequencies", "include_summary", "show_charts", "dashboard_metrics",
+  "dashboard_sort_gauges", "dashboard_green_net", "dashboard_amber_net",
+  "dashboard_green_custom", "dashboard_amber_custom", "index_descriptor",
+  "mean_descriptor", "nps_descriptor", "priority_metric",
+  "output_folder", "output_file")
+
+test_that("every retired name is off the whitelist", {
+  for (k in .I11_RETIRED) expect_false(k %in% TABS_KNOWN_SETTINGS, info = k)
+})
+
+test_that("every retired name is answered by name, not treated as a typo", {
+  for (k in .I11_RETIRED) {
+    expect_true(k %in% names(TABS_RETIRED_SETTINGS), info = k)
+    expect_true(nzchar(TABS_RETIRED_SETTINGS[[k]]), info = k)
+  }
+})
+
+test_that("a retired setting prints the boxed notice and names its replacement", {
+  out <- capture.output(announce_retired_settings(list(output_folder = "Output")))
+  txt <- paste(out, collapse = " ")
+  expect_match(txt, "SETTING RETIRED")
+  expect_match(txt, "output_folder")
+  expect_match(txt, "output_subfolder")          # the live setting it points at
+  expect_match(txt, "The run continues")
+})
+
+test_that("the retired list and the whitelist are disjoint", {
+  # A name on both would be announced AND blessed — the worst of both.
+  expect_equal(intersect(names(TABS_RETIRED_SETTINGS), TABS_KNOWN_SETTINGS),
+               character(0))
+})
+
+test_that("build_config_object no longer carries a retired key", {
+  # A NULL-valued key is still PRESENT in names(), which is what flips
+  # `%in% names(config)` guards — so absence has to be asserted on names().
+  obj <- build_config_object(list())
+  for (k in .I11_RETIRED) expect_false(k %in% names(obj), info = k)
+})
+
+test_that("the retired numeric settings left the validation lists with their readers", {
+  for (k in c("dashboard_green_net", "dashboard_amber_net",
+              "dashboard_green_custom", "dashboard_amber_custom")) {
+    expect_false(k %in% .TABS_NUMERIC_SETTINGS, info = k)
+  }
+  for (k in c("embed_frequencies", "include_summary", "show_charts")) {
+    expect_false(k %in% .TABS_LOGICAL_SETTINGS, info = k)
+  }
+  # …and the pairs the interactive dashboard DOES read are still guarded.
+  for (k in c("dashboard_green_mean", "dashboard_amber_mean",
+              "dashboard_green_index", "dashboard_amber_index",
+              "dashboard_scale_mean", "dashboard_scale_index")) {
+    expect_true(k %in% .TABS_NUMERIC_SETTINGS, info = k)
+  }
+})
+
+test_that("the shipped demo config carries no retired setting", {
+  # Otherwise every demo run boxes a RETIRED notice — which is exactly the
+  # signal the notice exists to make meaningful (M-E).
+  demo <- file.path(turas_root, "examples/tabs/demo_survey/Demo_Crosstab_Config.xlsx")
+  skip_if_not(file.exists(demo), "demo config not present")
+  s <- openxlsx::read.xlsx(demo, sheet = "Settings", colNames = FALSE,
+                           skipEmptyRows = FALSE)
+  keys <- tolower(trimws(as.character(s[[1]])))
+  expect_equal(intersect(keys, names(TABS_RETIRED_SETTINGS)), character(0))
+})
+
+test_that("heatmap_colour stays whitelisted — it is wired now, not dead", {
+  expect_true("heatmap_colour" %in% TABS_KNOWN_SETTINGS)
+  expect_false("heatmap_colour" %in% names(TABS_RETIRED_SETTINGS))
 })

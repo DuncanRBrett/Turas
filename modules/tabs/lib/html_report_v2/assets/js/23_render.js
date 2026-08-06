@@ -40,6 +40,14 @@
   TR.charts.accentOf = function () {
     return (TR.AGG && TR.AGG.project.accent_colour) || TR.DEFAULT_ACCENT;
   };
+  /** The crosstab heat tint's base colour. `heatmap_colour` overrides the brand
+   *  colour when the config sets it; the field is ABSENT on every report that
+   *  does not, so an unset report tints exactly as it always has (production
+   *  review 2026-08, I11 — the setting was whitelisted and documented but read
+   *  by nothing, so it was a silent no-op). */
+  TR.charts.heatOf = function () {
+    return (TR.AGG && TR.AGG.project.heatmap_colour) || TR.charts.brandOf();
+  };
   TR.charts.clip = function (label, max) {
     var s = String(label == null ? "" : label);
     return s.length > max ? s.slice(0, max - 1) + "…" : s;
@@ -160,7 +168,7 @@
     // the differentiating, so a moderate 0.45 ceiling keeps the darkened n=
     // count legible on the heaviest cells.
     var alpha = Math.max(0, Math.min(value / max, 1)) * 0.45;
-    var brand = TR.charts.brandOf().replace("#", "");
+    var brand = TR.charts.heatOf().replace("#", "");
     var r = parseInt(brand.substr(0, 2), 16), g = parseInt(brand.substr(2, 2), 16),
         b = parseInt(brand.substr(4, 2), 16);
     return "background:rgba(" + r + "," + g + "," + b + "," + alpha.toFixed(3) + ");";

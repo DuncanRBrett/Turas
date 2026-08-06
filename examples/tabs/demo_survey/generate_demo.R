@@ -641,22 +641,17 @@ settings_df <- data.frame(
     "bonferroni_correction",
     # Summary
     "create_index_summary", "show_standard_deviation", "show_net_positive",
-    # HTML Report
-    "html_report", "project_title", "brand_colour", "fieldwork_dates",
-    "embed_frequencies", "include_summary",
-    # Dashboard
-    "dashboard_metrics",
+    # Report branding (html_report itself is retired — the interactive report
+    # is the deliverable; a retired row would box a RETIRED notice on every
+    # demo run, which is exactly what the notice exists to prevent)
+    "project_title", "brand_colour", "fieldwork_dates",
+    # Dashboard gauges — only the scales and the mean/index colour breaks are
+    # read; the net and custom pairs were retired with the classic report (I11)
     "dashboard_scale_mean", "dashboard_scale_index",
-    "dashboard_green_net", "dashboard_amber_net",
     "dashboard_green_mean", "dashboard_amber_mean",
     "dashboard_green_index", "dashboard_amber_index",
-    "dashboard_green_custom", "dashboard_amber_custom",
-    # Index descriptor
-    "index_descriptor",
     # Charts
-    "show_charts", "chart_palette_preset",
-    # Priority metric on charts
-    "priority_metric"
+    "chart_palette_preset"
   ),
   Value = c(
     # File paths
@@ -673,23 +668,15 @@ settings_df <- data.frame(
     "TRUE", "0.05", "30", "TRUE",
     # Summary
     "Y", "FALSE", "TRUE",
-    # HTML Report
-    "TRUE", "Turas Demo: Customer Experience Survey 2025",
+    # Report branding
+    "Turas Demo: Customer Experience Survey 2025",
     "#0d8a8a", "Jan - Feb 2025",
-    "TRUE", "TRUE",
     # Dashboard
-    "NPS Score, NET POSITIVE, Mean, Good or excellent",
     "10", "5",
-    "30", "0",
     "7", "5",
     "4", "3",
-    "60", "40",
-    # Index descriptor
-    "Strongly disagree(1) = 1 to Strongly agree(5) = 5",
     # Charts
-    "TRUE", "warm",
-    # Priority metric on charts
-    "Mean, NPS Score"
+    "warm"
   ),
   stringsAsFactors = FALSE
 )

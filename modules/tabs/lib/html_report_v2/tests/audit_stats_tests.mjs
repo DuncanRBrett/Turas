@@ -521,5 +521,44 @@ run("attachDeltas tests a WEIGHTED proportion's raw share, not the rounded cell 
   eq(row.delta.diff, 6, "displayed delta subtracts the published cells (56 - 50)");
 });
 
+/* ---- heatmap_colour: a documented setting that read nothing (I11) ---------
+ * The crosstab heat tint took TR.charts.brandOf() unconditionally, so
+ * `heatmap_colour` — whitelisted, shipped in the template and documented as
+ * "set explicitly to override without changing other colours" — was a silent
+ * no-op. The island now carries the field ONLY when the config sets it, so an
+ * unset report must tint exactly as before.
+ */
+run("heatOf falls back to the brand colour when the island carries no override", () => {
+  setProject({ brand_colour: "#123456" });
+  eq(TR.charts.heatOf(), "#123456", "unset -> brand colour, byte-identical to before");
+});
+
+run("heatOf uses heatmap_colour when the config set one", () => {
+  setProject({ brand_colour: "#123456", heatmap_colour: "#B02020" });
+  eq(TR.charts.heatOf(), "#B02020", "the override wins");
+  eq(TR.charts.brandOf(), "#123456", "…without disturbing the brand colour");
+});
+
+run("the tint actually renders in the override colour, not the brand colour", () => {
+  // brandOf is #123456 = rgb(18,52,86); the override is #B02020 = rgb(176,32,32).
+  setProject({ brand_colour: "#123456", heatmap_colour: "#B02020" });
+  const model = { columns: [{ label: "Total", letter: "", base: 100 }],
+    rows: [{ kind: "category", label: "Yes", stat: "Column %",
+             cells: [{ pct: 100, n: 100, sig: "" }] }] };
+  const html = TR.render.tableHtml(model, { heatmap: "heat" });
+  assert(/176\s*,\s*32\s*,\s*32/.test(html),
+    "the override colour reaches the cell background: " + (html.match(/rgba\([^)]*\)/) || [])[0]);
+  assert(!/18\s*,\s*52\s*,\s*86/.test(html), "and the brand colour does not");
+});
+
+run("with no override the tint is the brand colour, as it always was", () => {
+  setProject({ brand_colour: "#123456" });
+  const model = { columns: [{ label: "Total", letter: "", base: 100 }],
+    rows: [{ kind: "category", label: "Yes", stat: "Column %",
+             cells: [{ pct: 100, n: 100, sig: "" }] }] };
+  const html = TR.render.tableHtml(model, { heatmap: "heat" });
+  assert(/18\s*,\s*52\s*,\s*86/.test(html), "brand colour tints the cell");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

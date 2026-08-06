@@ -375,36 +375,19 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     chart_series_colour_6 = get_config_value(config, "chart_series_colour_6", NULL),
     chart_series_colour_7 = get_config_value(config, "chart_series_colour_7", NULL),
     chart_series_colour_8 = get_config_value(config, "chart_series_colour_8", NULL),
-    embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE), default = TRUE),
-
-    # V10.4 Summary Dashboard settings
-    include_summary = safe_logical(get_config_value(config, "include_summary", TRUE), default = TRUE),
     fieldwork_dates = get_config_value(config, "fieldwork_dates", NULL),
-    dashboard_metrics = get_config_value(config, "dashboard_metrics", "NET POSITIVE"),
 
-    # V10.4.2 Dashboard colour breaks & scales (all optional, sensible defaults)
+    # Dashboard gauge scales and colour breaks. Only the mean and index pairs are
+    # read (data_layer_writer.R build_dl_dashboard); the net and custom pairs drove
+    # the retired classic report and are retired with it, as are embed_frequencies,
+    # include_summary, show_charts, dashboard_metrics, dashboard_sort_gauges, the
+    # three row descriptors and priority_metric (production review 2026-08, I11).
     dashboard_scale_mean    = safe_numeric(get_config_value(config, "dashboard_scale_mean", 10), 10),
     dashboard_scale_index   = safe_numeric(get_config_value(config, "dashboard_scale_index", 10), 10),
-    dashboard_green_net     = safe_numeric(get_config_value(config, "dashboard_green_net", 30), 30),
-    dashboard_amber_net     = safe_numeric(get_config_value(config, "dashboard_amber_net", 0), 0),
     dashboard_green_mean    = safe_numeric(get_config_value(config, "dashboard_green_mean", 7), 7),
     dashboard_amber_mean    = safe_numeric(get_config_value(config, "dashboard_amber_mean", 5), 5),
     dashboard_green_index   = safe_numeric(get_config_value(config, "dashboard_green_index", 7), 7),
     dashboard_amber_index   = safe_numeric(get_config_value(config, "dashboard_amber_index", 5), 5),
-    dashboard_green_custom  = safe_numeric(get_config_value(config, "dashboard_green_custom", 60), 60),
-    dashboard_amber_custom  = safe_numeric(get_config_value(config, "dashboard_amber_custom", 40), 40),
-    dashboard_sort_gauges   = get_config_value(config, "dashboard_sort_gauges", "desc"),
-
-    # V10.4.3 Row descriptors (shown below summary stat rows in HTML crosstabs)
-    index_descriptor = get_config_value(config, "index_descriptor", NULL),
-    mean_descriptor = get_config_value(config, "mean_descriptor", NULL),
-    nps_descriptor = get_config_value(config, "nps_descriptor", NULL),
-
-    # V10.5.0 Inline SVG charts
-    show_charts = safe_logical(get_config_value(config, "show_charts", FALSE), default = FALSE),
-
-    # V10.6.0 Report enhancements
-    priority_metric = get_config_value(config, "priority_metric", NULL),
 
     # V10.7.0 Closing section & qualitative content
     analyst_name = get_config_value(config, "analyst_name", NULL),
@@ -743,12 +726,12 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
 # The dashboard settings that must parse as numbers. Every one of them is read
 # through safe_numeric() with a fallback, so an unparseable cell would otherwise
 # become the default in silence (M9).
+# The net and custom pairs left this list when they were retired (I11) — a
+# setting nothing reads cannot have its value corrupted.
 .TABS_DASHBOARD_NUMERIC_SETTINGS <- c(
   "dashboard_scale_mean", "dashboard_scale_index",
-  "dashboard_green_net", "dashboard_amber_net",
   "dashboard_green_mean", "dashboard_amber_mean",
-  "dashboard_green_index", "dashboard_amber_index",
-  "dashboard_green_custom", "dashboard_amber_custom"
+  "dashboard_green_index", "dashboard_amber_index"
 )
 
 # EVERY Settings cell that must parse as a number (I2/I3). The dashboard family
@@ -783,7 +766,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "exclude_outliers_from_stats",
   "html_report_v2", "html_report_v2_microdata", "html_report_v2_tracking",
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
-  "show_qualitative", "embed_frequencies", "include_summary", "show_charts",
+  "show_qualitative",
   "enable_ai_insights", "generate_reader_report", "reader_ai_prose",
   "index_summary_show_sections", "index_summary_show_base_sizes",
   "index_summary_show_composites"
@@ -1323,19 +1306,88 @@ warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
 }
 
 
-# Settings that used to do something and no longer do. A retired name is NOT a
-# typo, so it must not be reported as one — the operator wrote it deliberately
+# Settings that no longer do anything — either because the feature they drove was
+# retired, or because they were never read in the first place. A name here is NOT
+# a typo, so it must not be reported as one: the operator wrote it deliberately
 # and is entitled to know that the run ignored it, and why. Each entry is the
 # sentence the loader prints (see announce_retired_settings).
 #
 # Retirement runs for one release: the name is answered here by name, then the
 # entry is deleted and the name falls through to the ordinary "unrecognised
-# setting" warning. Retired 2026-08 (remove after the next release):
+# setting" warning. Retired 2026-08 (remove after the next release).
+#
+# A dead name must NOT stay on TABS_KNOWN_SETTINGS. While it does, it silently
+# blesses itself and defeats the typo warning for its whole neighbourhood — an
+# operator who wrote `output_folder` meaning `output_subfolder` was told nothing
+# and found the workbook in the default folder (production review 2026-08, I11).
 TABS_RETIRED_SETTINGS <- c(
   html_report = paste(
     "the classic HTML report is retired — the interactive report",
     "(html_report_v2) is the deliverable. No HTML file is written for this",
     "setting. Delete the row from the Settings sheet."
+  ),
+
+  # --- drove the classic HTML report, retired 2026-08 with it ----------------
+  embed_frequencies = paste(
+    "drove the classic HTML report, which is retired. The interactive report",
+    "shows frequencies from show_frequency. Delete the row."
+  ),
+  include_summary = paste(
+    "drove the classic HTML report's summary page, which is retired. Use",
+    "show_dashboard for the interactive report's dashboard. Delete the row."
+  ),
+  show_charts = paste(
+    "drove the classic HTML report, which is retired. The interactive report",
+    "always draws its charts. Delete the row."
+  ),
+  dashboard_metrics = paste(
+    "drove the classic HTML report's dashboard, which is retired. The",
+    "interactive report picks its dashboard metrics from the questions",
+    "themselves. Delete the row."
+  ),
+  dashboard_sort_gauges = paste(
+    "drove the classic HTML report's dashboard, which is retired. Delete the row."
+  ),
+  dashboard_green_net = paste(
+    "was a classic-report dashboard threshold and is read by nothing. The",
+    "interactive report's gauges use dashboard_green_mean / dashboard_green_index",
+    "(and their amber pairs). Delete the row."
+  ),
+  dashboard_amber_net = paste(
+    "was a classic-report dashboard threshold and is read by nothing. See",
+    "dashboard_amber_mean / dashboard_amber_index. Delete the row."
+  ),
+  dashboard_green_custom = paste(
+    "was a classic-report dashboard threshold and is read by nothing. See",
+    "dashboard_green_mean / dashboard_green_index. Delete the row."
+  ),
+  dashboard_amber_custom = paste(
+    "was a classic-report dashboard threshold and is read by nothing. See",
+    "dashboard_amber_mean / dashboard_amber_index. Delete the row."
+  ),
+  index_descriptor = paste(
+    "labelled a scale in the classic HTML report, which is retired. Delete the row."
+  ),
+  mean_descriptor = paste(
+    "labelled a scale in the classic HTML report, which is retired. Delete the row."
+  ),
+  nps_descriptor = paste(
+    "labelled a scale in the classic HTML report, which is retired. Delete the row."
+  ),
+  priority_metric = paste(
+    "marked a metric for the classic HTML report's charts, which is retired.",
+    "Delete the row."
+  ),
+
+  # --- never read by anything, at any point ---------------------------------
+  output_folder = paste(
+    "is not read by Tabs and never has been. The output location is",
+    "output_subfolder (a folder inside the project). Delete the row and set",
+    "output_subfolder instead."
+  ),
+  output_file = paste(
+    "is not read by Tabs and never has been. The workbook name is",
+    "output_filename. Delete the row and set output_filename instead."
   )
 )
 
@@ -1419,17 +1471,11 @@ TABS_KNOWN_SETTINGS <- c(
   "chart_series_colour_1", "chart_series_colour_2", "chart_series_colour_3",
   "chart_series_colour_4", "chart_series_colour_5", "chart_series_colour_6",
   "chart_series_colour_7", "chart_series_colour_8",
-  "embed_frequencies",
-  "include_summary", "fieldwork_dates", "show_charts",
-  # Dashboard
-  "dashboard_metrics", "dashboard_scale_mean", "dashboard_scale_index",
-  "dashboard_green_net", "dashboard_amber_net",
+  "fieldwork_dates", # Dashboard
+  "dashboard_scale_mean", "dashboard_scale_index",
   "dashboard_green_mean", "dashboard_amber_mean",
   "dashboard_green_index", "dashboard_amber_index",
-  "dashboard_green_custom", "dashboard_amber_custom", "dashboard_sort_gauges",
-  "priority_metric",
   # Descriptors
-  "index_descriptor", "mean_descriptor", "nps_descriptor",
   # Analyst / report metadata
   "analyst_name", "analyst_email", "analyst_phone", "verbatim_filename", "closing_notes",
   # Ranking
@@ -1438,8 +1484,8 @@ TABS_KNOWN_SETTINGS <- c(
   # AI Insights
   "enable_ai_insights", "ai_model",
   # File path settings (loaded separately but may appear in Settings sheet)
-  "data_file", "structure_file", "output_file", "output_filename",
-  "output_format", "output_folder", "output_subfolder"
+  "data_file", "structure_file", "output_filename",
+  "output_format", "output_subfolder"
 )
 
 

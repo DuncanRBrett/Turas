@@ -326,10 +326,11 @@ build_config_workbook <- function(path, output_filename, weighted,
     show_net_positive = "TRUE",
     # No html_report row: the classic report is retired and the setting now
     # raises a pre-flight issue.
+    # No include_summary / show_charts rows either: both drove the classic
+    # report and were retired with it (review 2026-08, I11), so they would now
+    # box a RETIRED notice on every parity run.
     project_title = "Cross-Engine Parity Fixture",
-    brand_colour = "#323367",
-    include_summary = "TRUE",
-    show_charts = "FALSE"
+    brand_colour = "#323367"
   )
   if (dual_alpha) settings$alpha_secondary <- "0.20"
   if (with_population) settings$population_size <- "5000"

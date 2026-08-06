@@ -571,7 +571,7 @@ convention are documented; the four `ranking_*` settings are documented with
 the same "not in the generated template" note; and `AreaSummary` is documented
 as **RETIRED** rather than as a live column.
 
-**I11. Dead-but-whitelisted settings defeat the typo warning.** `heatmap_colour`
+**I11. Dead-but-whitelisted settings defeat the typo warning — FIXED 2026-08-06.** `heatmap_colour`
 (re-whitelisted in 2026-08 specifically to cure its silent no-op — still a
 no-op), `output_folder`/`output_file` (read nowhere; an operator misspelling
 `output_subfolder` gets no warning and output lands in the default folder),
@@ -579,6 +579,81 @@ plus the classic-report leftovers (`embed_frequencies`, `show_charts`,
 `dashboard_metrics`, `dashboard_sort_gauges`, `*_descriptor`,
 `include_summary`, `dashboard_green_net/amber_net/green_custom/amber_custom`).
 Remove from the whitelist or wire to consumers.
+
+**FIXED 2026-08-06.** The finding offers both dispositions, and both were used:
+`heatmap_colour` is **wired**, the other fifteen are **retired**.
+
+**The audit.** Every candidate was checked for a real consumer — a read of
+`config_obj$<name>` outside the loader — repo-wide, not just in `modules/tabs/lib`.
+Result: `dashboard_scale_mean/index` and the `green/amber_mean` and
+`green/amber_index` pairs are live (`data_layer_writer.R build_dl_dashboard`);
+everything else in the list reads nothing. **`priority_metric` is a sixteenth
+member the finding does not name** — its `ai_extraction.R` namesake is an
+unrelated per-question derived value, not this setting — and it was retired with
+the rest.
+
+**`heatmap_colour` is now wired.** New `TR.charts.heatOf()` (`23_render.js`) is
+what the heat tint reads; `data_layer_writer.R` carries the field on the island
+**only when the config sets it**, so an island from a config that never mentions
+it is byte-identical and every existing report tints on `brand_colour` exactly
+as before (verified: the parity harness regenerated clean). **The docs were
+wrong in two ways and are corrected:** `06` and `09` both said the tint defaults
+to `accent_colour` — it never did, it has always been `brand_colour` — and `09`
+still described the retired classic report's alpha ramp. *Visible change: a
+config that sets `heatmap_colour` gets a different tint on the next
+regeneration. That is the point, and it is what the re-whitelisting intended.*
+
+**The other fifteen are retired**, using the mechanism the classic-report
+retirement already built: named and answered by `announce_retired_settings`
+(which the typo warner deliberately skips), off `TABS_KNOWN_SETTINGS`, out of
+`build_config_object`, out of `.TABS_NUMERIC_SETTINGS` / `.TABS_LOGICAL_SETTINGS`,
+off the generated template, and out of the docs. Each message names the live
+setting that replaced it where one exists — `output_folder` → `output_subfolder`,
+`output_file` → `output_filename`, `include_summary` → `show_dashboard`. The two
+path settings say "is not read by Tabs and never has been" rather than claiming
+a retirement they never earned.
+
+**One trap, and it is the kind this review exists to catch.**
+`check_preflight_dashboard_scales` was gated on `include_summary`. Retiring that
+setting makes `config$include_summary` NULL, so the gate would have returned
+early **forever** — silently killing the green-vs-amber ordering check for the
+mean and index pairs, which are live. The validator is now unconditional (its
+pairs always have defaults, so there is always something to check) and the two
+retired pairs are dropped from it, so it no longer warns about the ordering of
+two numbers nothing reads.
+
+**Also cleaned, or the fix would have announced itself forever:** the demo config
+carried nine of the retired names and `generate_demo.R` still *wrote*
+`html_report` — Job D removed that row from the shipped workbook without
+updating the generator, so a regeneration would have reintroduced it. Both are
+fixed and the demo now loads silently. The parity fixture generator carried
+`include_summary` and `show_charts`; removed.
+
+**Behaviour changes, stated plainly:** a live config carrying any of the sixteen
+names now prints a boxed RETIRED notice (the run continues, nothing is refused);
+a config that sets `heatmap_colour` changes its heat tint on regeneration; and
+the ordering warning for the net/custom thresholds is gone. Live client configs
+(CCPB, VAS — OneDrive, outside the repo) were **not** checked, the same caveat
+the I-batch recorded; the likely effect there is a RETIRED box naming rows that
+should be deleted.
+
+Verified end-to-end by loading configs through `load_crosstabs_config`: the
+shipped demo is silent, while a config carrying `output_folder`,
+`include_summary` and a genuine typo (`show_pecent_column`) prints the RETIRED
+box for the first two — naming `output_subfolder` and `show_dashboard` — and the
+typo warning for the third.
+
+Files: `lib/crosstabs/crosstabs_config.R`, `lib/data_layer_writer.R`,
+`lib/generate_config_templates.R`, `lib/validation/preflight_validators.R`,
+`assets/js/23_render.js`, `templates/Crosstab_Config_Template.xlsx`,
+`docs/06_TEMPLATE_REFERENCE.md`, `docs/04_USER_MANUAL.md`,
+`docs/09_COLOUR_REFERENCE.md`, `examples/tabs/demo_survey/generate_demo.R` + its
+config, and the parity fixture generator. Tests: 8 new blocks in
+`test_config_contract.R`, 1 in `test_data_layer_writer.R`, 2 in
+`test_validation.R`, 4 checks in `audit_stats_tests.mjs`; the heatmap wiring and
+the validator re-gate were each proved failing against the pre-fix code.
+Gates after: tabs R **4,490 / 0 / 0 / 0**, **31** JS suites green, project-root
+at its documented 3-failure baseline.
 
 **I12. Test blind spots (where a real bug would ship green) — FIXED 2026-08-06 (Job T).**
 (a) The main qual JS suite tests a pre-I20 island shape — 86 fixtures, zero

@@ -390,8 +390,8 @@ msr_fixture <- function(merge_rows = integer(0), merge_cols = 1:5) {
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Settings")
   df <- data.frame(
-    Setting = c("apply_weighting", "WEIGHTING", "question_mapping", "priority_metric"),
-    Value   = c("FALSE", NA, "map.xlsx", "Mean"),
+    Setting = c("apply_weighting", "WEIGHTING", "question_mapping", "sampling_note"),
+    Value   = c("FALSE", NA, "map.xlsx", "Substitution allowed"),
     stringsAsFactors = FALSE)
   openxlsx::writeData(wb, "Settings", df)          # header row 1, data rows 2-5
   for (r in merge_rows) openxlsx::mergeCells(wb, "Settings", cols = merge_cols, rows = r)
@@ -441,10 +441,10 @@ test_that("a merge that leaves the Value cell readable is not reported", {
 })
 
 test_that("several broken rows are listed together, in sheet order", {
-  f <- msr_fixture(merge_rows = c(5, 4))           # priority_metric + question_mapping
+  f <- msr_fixture(merge_rows = c(5, 4))           # sampling_note + question_mapping
   on.exit(unlink(f), add = TRUE)
   out <- capture.output(hits <- warn_merged_setting_rows(f))
-  expect_equal(hits, c("question_mapping", "priority_metric"))   # row 4 before row 5
+  expect_equal(hits, c("question_mapping", "sampling_note"))     # row 4 before row 5
 })
 
 test_that("an unreadable file or missing sheet is silent, never an error", {
@@ -458,7 +458,7 @@ test_that("an unreadable file or missing sheet is silent, never an error", {
 
 test_that("TABS_KNOWN_SETTINGS is the shared list, not a private copy", {
   expect_true(is.character(TABS_KNOWN_SETTINGS))
-  expect_true(all(c("question_mapping", "priority_metric", "qual_verbatim_scope")
+  expect_true(all(c("question_mapping", "sampling_note", "qual_verbatim_scope")
                   %in% TABS_KNOWN_SETTINGS))
   expect_false(any(duplicated(TABS_KNOWN_SETTINGS)))
 })

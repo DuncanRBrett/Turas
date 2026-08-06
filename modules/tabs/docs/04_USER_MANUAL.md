@@ -465,9 +465,6 @@ These settings in your config's Settings sheet control how the report looks:
 | `accent_colour` | #CC9900 | Secondary accent colour (hex) |
 | `chart_palette_preset` | warm | Colour palette for ordinal/scale charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `red` (Coca-Cola-inspired muted red), or `brand` (monochromatic gradient from brand_colour) |
 | `chart_bar_colour` | (brand) | Colour for simple bar charts (hex) |
-| `include_summary` | TRUE | Include the summary dashboard tab with gauges |
-| `show_charts` | FALSE | Include inline SVG charts alongside tables |
-| `embed_frequencies` | TRUE | Show frequency counts in HTML tables |
 
 See the [Template Reference](06_TEMPLATE_REFERENCE.md) for the full list of settings including dashboard thresholds, analyst details, and closing section options.
 

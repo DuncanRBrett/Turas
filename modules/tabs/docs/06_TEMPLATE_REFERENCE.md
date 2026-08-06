@@ -836,10 +836,9 @@ no longer read — a config that still carries it is told so on load.)
 |----|----|----|----|
 | `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
 | `accent_colour` | Secondary accent colour (hex) — also the default heatmap tint source | Any hex colour | #CC9900 |
-| `heatmap_colour` | Crosstab heatmap cell tint colour. Defaults to `accent_colour`. Set explicitly to override without changing other colours. | Any hex colour | *(accent_colour)* |
+| `heatmap_colour` | Base colour for the crosstab heat tint. Leave blank and the tint uses `brand_colour`; set it to tint in a different colour without changing anything else. | Any hex colour | *(brand_colour)* |
 | `chart_palette_preset` | Chart colour scheme | warm / cool / research / teal / red / brand | warm |
 | `logo_path` | Path to logo image for report header | File path (relative or absolute) | (none) |
-| `show_charts` | Include charts in HTML report | Y / N | Y |
 | `project_title` | Report title displayed in header | Text | (from config) |
 | `company_name` | Researcher/company name | Text | (none) |
 | `client_name` | Client name for report branding | Text | (none) |
@@ -867,14 +866,10 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 
 | Setting | Description | Values | Default |
 |----|----|----|----|
-| `dashboard_green_net` | Green threshold for Net Positive gauges | Number (0-100) | 50 |
-| `dashboard_amber_net` | Amber threshold for Net Positive gauges | Number (0-100) | 30 |
 | `dashboard_green_mean` | Green threshold for Rating Mean gauges | Number | 4.0 |
 | `dashboard_amber_mean` | Amber threshold for Rating Mean gauges | Number | 3.0 |
 | `dashboard_green_index` | Green threshold for Index gauges | Number | 110 |
 | `dashboard_amber_index` | Amber threshold for Index gauges | Number | 90 |
-| `dashboard_sort_gauges` | Sort dashboard gauges by value | Y / N | N |
-| `priority_metric` | Default metric for dashboard display | net / mean / index | net |
 
 ### AI Insights
 
@@ -988,12 +983,8 @@ above. Descriptions below are the template's own help text.
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `include_summary` | `TRUE` | Include a visual summary dashboard in the HTML report with gauge charts. |
-| `dashboard_metrics` | `NET POSITIVE` | Metric types to display in dashboard gauges. Comma-separated for multiple: `NET POSITIVE`, `MEAN`, `NPS`, `INDEX`, or a custom box-category label. |
 | `dashboard_scale_mean` | `10` | Scale maximum for mean values in the dashboard (e.g. 10 for a 1–10 scale). |
 | `dashboard_scale_index` | `10` | Scale maximum for index values in the dashboard. |
-| `dashboard_green_custom` | `60` | A custom metric ≥ this value shows GREEN. |
-| `dashboard_amber_custom` | `40` | A custom metric ≥ this value (but below green) shows AMBER; below shows RED. |
 
 ### Chart colours
 
@@ -1006,7 +997,6 @@ above. Descriptions below are the template's own help text.
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `embed_frequencies` | `TRUE` | Include frequency data (counts) in the HTML report tables. |
 | `researcher_logo_path` | *(blank)* | Path to researcher/company logo file (PNG, SVG, or JPG). |
 | `client_logo_path` | *(blank)* | Path to client logo file (PNG, SVG, or JPG). |
 
@@ -1037,9 +1027,6 @@ above. Descriptions below are the template's own help text.
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `index_descriptor` | *(blank)* | Explanatory label shown below Index score rows, e.g. "Weighted mean on 0–10 scale". |
-| `mean_descriptor` | *(blank)* | Explanatory label shown below Mean score rows, e.g. "Average rating (1–5 scale)". |
-| `nps_descriptor` | *(blank)* | Explanatory label shown below NPS score rows, e.g. "Promoters minus Detractors". |
 
 ### Analyst & closing section / study identification
 
@@ -1391,16 +1378,6 @@ name.
 **What to enter:** Relative path from your project folder.
 
 **Example:** `Data/survey_data.xlsx`
-
-### Setting: output_folder
-
-**What it does:** Specifies where outputs are saved.
-
-**Required:** Yes
-
-**What to enter:** Folder path relative to project.
-
-**Default:** `Output`
 
 ### Setting: total_sample
 
