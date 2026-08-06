@@ -707,6 +707,35 @@ process_composite_question <- function(composite_def, data, questions_df,
   ))
 }
 
+#' Row indices for one banner column, for composite testing
+#'
+#' \code{banner_info$subsets} is the fast path; when it carries no entry for a
+#' key (or an empty one) the key is parsed back to its banner question and value
+#' and the rows are found in the data — the same fallback the main composite
+#' calculation uses. Extracted so the per-column bases the finite population
+#' correction is built from and the rows each pairwise test reads are resolved
+#' by one piece of code rather than two copies.
+#'
+#' @param banner_info List, banner structure
+#' @param data Data frame, survey data (with the composite column attached)
+#' @param key Character, one internal banner key
+#' @return Integer vector of row indices (possibly empty)
+#' @keywords internal
+composite_subset_indices <- function(banner_info, data, key) {
+  idx <- banner_info$subsets[[key]]
+  if (!is.null(idx) && length(idx) > 0) return(idx)
+
+  if (grepl("^TOTAL::", key)) return(seq_len(nrow(data)))
+
+  key_parts <- strsplit(key, "::")[[1]]
+  if (length(key_parts) < 2) return(seq_len(nrow(data)))
+
+  banner_question <- key_parts[1]
+  banner_value <- key_parts[length(key_parts)]
+  if (!banner_question %in% names(data)) return(integer(0))
+  which(as.character(data[[banner_question]]) == banner_value)
+}
+
 #' Test Composite Significance
 #'
 #' Run significance testing for composite scores across banner columns
@@ -773,6 +802,29 @@ test_composite_significance <- function(data, composite_code, source_questions,
   names(key_banner) <- internal_keys
   group_sizes <- table(key_banner[key_banner != "TOTAL"])
 
+  # Row indices for every banner column, resolved once. Same fallback the main
+  # composite calculation uses when banner_info$subsets has no entry for a key.
+  key_indices <- setNames(
+    lapply(internal_keys, function(k) composite_subset_indices(banner_info, data, k)),
+    internal_keys
+  )
+
+  # Finite population correction, per banner column (review 2026-08, I5).
+  # A composite is a mean row sitting among category rows that are already
+  # corrected; before this it was the one row on a census table that kept its
+  # letters. n_actual is this composite's own UNWEIGHTED base in the column —
+  # respondents with a scoreable composite value — matching the definition
+  # build_fpc_multipliers() documents for every other row type. All-1 (inert)
+  # with no universe configured, so non-population reports are unchanged.
+  composite_bases <- setNames(
+    lapply(internal_keys, function(k) {
+      list(unweighted = sum(!is.na(composite_values[key_indices[[k]]])))
+    }),
+    internal_keys
+  )
+  fpc_muls <- build_fpc_multipliers(
+    composite_bases, resolve_column_populations(banner_info, config), internal_keys)
+
   # Test each within-group pair (skip if fewer than 2 keys)
   n_keys <- length(internal_keys)
   for (i in seq_len(max(0L, n_keys - 1L))) {
@@ -787,48 +839,11 @@ test_composite_significance <- function(data, composite_code, source_questions,
         next
       }
 
-      # Get subsets - handle NULL subsets like main calculation does
-      idx_a <- banner_info$subsets[[key_a]]
-      idx_b <- banner_info$subsets[[key_b]]
-
-      # Handle NULL subsets (same logic as main composite calculation)
-      if (is.null(idx_a) || length(idx_a) == 0) {
-        if (grepl("^TOTAL::", key_a)) {
-          idx_a <- seq_len(nrow(data))
-        } else {
-          key_parts_a <- strsplit(key_a, "::")[[1]]
-          if (length(key_parts_a) >= 2) {
-            banner_question_a <- key_parts_a[1]
-            banner_value_a <- key_parts_a[length(key_parts_a)]
-            if (banner_question_a %in% names(data)) {
-              idx_a <- which(as.character(data[[banner_question_a]]) == banner_value_a)
-            } else {
-              idx_a <- integer(0)
-            }
-          } else {
-            idx_a <- seq_len(nrow(data))
-          }
-        }
-      }
-
-      if (is.null(idx_b) || length(idx_b) == 0) {
-        if (grepl("^TOTAL::", key_b)) {
-          idx_b <- seq_len(nrow(data))
-        } else {
-          key_parts_b <- strsplit(key_b, "::")[[1]]
-          if (length(key_parts_b) >= 2) {
-            banner_question_b <- key_parts_b[1]
-            banner_value_b <- key_parts_b[length(key_parts_b)]
-            if (banner_question_b %in% names(data)) {
-              idx_b <- which(as.character(data[[banner_question_b]]) == banner_value_b)
-            } else {
-              idx_b <- integer(0)
-            }
-          } else {
-            idx_b <- seq_len(nrow(data))
-          }
-        }
-      }
+      # Get subsets - handle NULL subsets like main calculation does.
+      # Resolved once per key above, so the bases the FPC is built from and the
+      # rows the test reads can never be two different sets of respondents.
+      idx_a <- key_indices[[key_a]]
+      idx_b <- key_indices[[key_b]]
 
       # Skip comparison if either subset is empty
       if (length(idx_a) == 0 || length(idx_b) == 0) {
@@ -874,7 +889,9 @@ test_composite_significance <- function(data, composite_code, source_questions,
         weights1 = weights_a,
         weights2 = weights_b,
         min_base = min_base,
-        alpha = test_alpha
+        alpha = test_alpha,
+        fpc_mul1 = if (key_a %in% names(fpc_muls)) unname(fpc_muls[[key_a]]) else 1,
+        fpc_mul2 = if (key_b %in% names(fpc_muls)) unname(fpc_muls[[key_b]]) else 1
       )
 
       if (!is.null(sig_result) && sig_result$significant) {

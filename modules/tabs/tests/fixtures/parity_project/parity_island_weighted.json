@@ -101,7 +101,8 @@
   "categories": [
     "Usage",
     "Satisfaction",
-    "Value"
+    "Value",
+    "Advocacy"
   ],
   "questions": [
     {
@@ -631,6 +632,216 @@
       "gauge_amber": null,
       "filter_label": "Used the service in the last month",
       "base_filter": "Q1 == 'Yes'"
+    },
+    {
+      "code": "Q4",
+      "title": "How likely are you to recommend us?",
+      "category": "Advocacy",
+      "theme": "",
+      "key_share": "",
+      "type": "nps",
+      "bases": [
+        {
+          "n": 200,
+          "low": false,
+          "nWeighted": 276,
+          "nEff": 173.77497947
+        },
+        {
+          "n": 40,
+          "low": false,
+          "nWeighted": 79.6,
+          "nEff": 37.04490178
+        },
+        {
+          "n": 60,
+          "low": false,
+          "nWeighted": 60,
+          "nEff": 55.55555556
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 74.4,
+          "nEff": 46.31325301
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 62,
+          "nEff": 46.31325301
+        }
+      ],
+      "rows": [
+        {
+          "kind": "category",
+          "label": "10",
+          "pct": [
+            40,
+            60,
+            50,
+            9,
+            40
+          ],
+          "n": [
+            109,
+            48,
+            30,
+            7,
+            24
+          ],
+          "sig": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ],
+          "sig2": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "8",
+          "pct": [
+            19,
+            19,
+            20,
+            10,
+            30
+          ],
+          "n": [
+            54,
+            15,
+            12,
+            8,
+            19
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "5",
+          "pct": [
+            41,
+            21,
+            30,
+            80,
+            30
+          ],
+          "n": [
+            113,
+            16,
+            18,
+            60,
+            19
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "mean",
+          "label": "NPS Score",
+          "pct": [
+            -1,
+            40,
+            20,
+            -71,
+            9
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ],
+          "sig2": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "mean",
+          "label": "Standard Deviation",
+          "pct": [
+            89.9,
+            81.2,
+            87.9,
+            63,
+            83.7
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "scale_max": 100,
+      "gauge_green": null,
+      "gauge_amber": null,
+      "index_scores": {
+        "10": 100,
+        "8": 0,
+        "5": -100
+      }
     }
   ]
 }

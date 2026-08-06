@@ -56,6 +56,12 @@
 # what makes the min_base gate visible on a real table rather than only in a
 # unit test.
 #
+# Q4 is an NPS question, added for review 2026-08 finding I1. Its Score row is
+# the one statistic whose per-respondent values the two engines derive
+# independently — R from calculate_nps_score(), JS from the category
+# distribution through nps_bucket_score() — so it is where a scale disagreement
+# would show up as different published letters.
+#
 # The weighted config uses the same data with a Weight column that varies by
 # cohort, so every carried statistic rides a real Kish effective base.
 # ==============================================================================
@@ -98,6 +104,32 @@ Q2_DIST <- rbind(
 # Q3 "Agree" counts, among that cohort's Q1 == "Yes" respondents only.
 Q3_AGREE <- c(Alpha = 14L, Beta = 27L, Gamma = 8L, Delta = 18L)
 
+# Q4 is an NPS question (review 2026-08, I1). Three answers only — 10, 8 and 5,
+# one per bucket — so the crosstab stays small and every NPS below is derivable
+# in one line. Counts are (promoters at 10, passives at 8, detractors at 5):
+#
+#   Alpha  24 /  8 /  8  (n=40)  NPS = (24- 8)/40*100 =  40   mean rating 8.6
+#   Beta   30 / 12 / 18  (n=60)  NPS = (30-18)/60*100 =  20   mean rating 8.1
+#   Gamma   5 /  5 / 40  (n=50)  NPS = ( 5-40)/50*100 = -70   mean rating 5.8
+#   Delta  20 / 15 / 15  (n=50)  NPS = (20-15)/50*100 =  10   mean rating 7.9
+#
+# Gamma is set far enough below the rest to earn primary-alpha letters (the
+# Bonferroni-adjusted threshold is 0.05/6 = 0.00833), so the row carries real
+# letters rather than a table of empty strings the two engines could agree on
+# by doing nothing. Alpha is the census column and takes none.
+#
+# The Score row's Sig. letters are what the R engine writes into the island and
+# what the JS engine recomputes from the +-100 bucket scores. Before I1 the R
+# side t-tested the raw 0-10 ratings instead, so the two engines could letter
+# this row differently — the disagreement this question now gates against.
+Q4_DIST <- rbind(
+  Alpha = c(24L,  8L,  8L),
+  Beta  = c(30L, 12L, 18L),
+  Gamma = c( 5L,  5L, 40L),
+  Delta = c(20L, 15L, 15L)
+)
+Q4_SCORES <- c(10L, 8L, 5L)
+
 # Weights, one constant per cohort plus a deliberate within-cohort split so the
 # Kish effective base is genuinely below the raw n (a constant weight would make
 # n_eff == n and quietly test nothing).
@@ -118,6 +150,8 @@ build_survey_data <- function() {
     n_yes <- Q1_YES[[coh]]
     q3_yes <- c(rep("Agree", Q3_AGREE[[coh]]), rep("Disagree", n_yes - Q3_AGREE[[coh]]))
     q3 <- c(q3_yes, rep(NA_character_, n - n_yes))
+    # Q4: NPS answers laid out in order, counts from Q4_DIST.
+    q4 <- rep(Q4_SCORES, times = Q4_DIST[coh, ])
     w <- rep(COHORT_WEIGHT[[coh]], n)
     w[seq(3, n, by = 3)] <- w[seq(3, n, by = 3)] * WEIGHT_BUMP
 
@@ -127,6 +161,7 @@ build_survey_data <- function() {
       Q1 = q1,
       Q2 = q2,
       Q3 = q3,
+      Q4 = q4,
       Weight = w,
       stringsAsFactors = FALSE
     )
@@ -156,18 +191,20 @@ build_structure_workbook <- function(path) {
   )
 
   questions <- data.frame(
-    QuestionCode = c("Cohort", "Q1", "Q2", "Q3"),
+    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4"),
     QuestionText = c("Cohort",
                      "Have you used the service in the last month?",
                      "How would you rate the service?",
-                     "The service is good value for money"),
-    Variable_Type = c("Single_Response", "Single_Response", "Rating", "Single_Response"),
-    Columns = c(1L, 1L, 1L, 1L),
-    Category = c("Demographics", "Usage", "Satisfaction", "Value"),
+                     "The service is good value for money",
+                     "How likely are you to recommend us?"),
+    Variable_Type = c("Single_Response", "Single_Response", "Rating",
+                      "Single_Response", "NPS"),
+    Columns = c(1L, 1L, 1L, 1L, 1L),
+    Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy"),
     # Optional columns the data-layer writer reads. Present-but-blank rather
     # than absent, so the fixture does not warn its way through every run.
-    ShortLabel = c("", "", "", ""),
-    LinkedOpenQuestion = c("", "", "", ""),
+    ShortLabel = c("", "", "", "", ""),
+    LinkedOpenQuestion = c("", "", "", "", ""),
     stringsAsFactors = FALSE
   )
 
@@ -193,7 +230,10 @@ build_structure_workbook <- function(path) {
     opt("Q2", as.character(1:5), 1:5,
         box = c(NA, NA, NA, "Top 2 Box", "Top 2 Box"),
         weights = c(0, 25, 50, 75, 100)),
-    opt("Q3", c("Agree", "Disagree"), 1:2)
+    opt("Q3", c("Agree", "Disagree"), 1:2),
+    # Q4's three NPS answers. No Index_Weight: an NPS question is scored through
+    # nps_bucket_score() (+-100), not through the Likert index weights.
+    opt("Q4", as.character(Q4_SCORES), 1:3)
   )
 
   wb <- createWorkbook()
@@ -259,16 +299,17 @@ build_config_workbook <- function(path, output_filename, weighted,
   )
 
   selection <- data.frame(
-    QuestionCode = c("Cohort", "Q1", "Q2", "Q3"),
-    Include = c("N", "Y", "Y", "Y"),
-    UseBanner = c("Y", "N", "N", "N"),
-    BannerLabel = c("Cohort", "", "", ""),
-    DisplayOrder = c(1L, NA, NA, NA),
-    CreateIndex = c("N", "N", "Y", "N"),
+    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4"),
+    Include = c("N", "Y", "Y", "Y", "Y"),
+    UseBanner = c("Y", "N", "N", "N", "N"),
+    BannerLabel = c("Cohort", "", "", "", ""),
+    DisplayOrder = c(1L, NA, NA, NA, NA),
+    # Q4's Score row is native to the NPS type and does not need CreateIndex.
+    CreateIndex = c("N", "N", "Y", "N", "N"),
     # Q3 is routed: only respondents who answered Yes to Q1 were asked it.
-    BaseFilter = c("", "", "", "Q1 == 'Yes'"),
-    FilterLabel = c("", "", "", "Used the service in the last month"),
-    Category = c("Demographics", "Usage", "Satisfaction", "Value"),
+    BaseFilter = c("", "", "", "Q1 == 'Yes'", ""),
+    FilterLabel = c("", "", "", "Used the service in the last month", ""),
+    Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy"),
     stringsAsFactors = FALSE
   )
 

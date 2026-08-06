@@ -60,6 +60,10 @@ source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
 # score_utils supplies option_numeric_value(), the canonical OptionValue-else-
 # OptionText lookup that composite_source_score_map() reuses for Rating/NPS.
 source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
+# report_shared supplies resolve_column_populations() + build_fpc_multipliers(),
+# which the composite significance path uses to correct its bases on a census
+# project (review 2026-08, I5).
+source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
 
 

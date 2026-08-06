@@ -278,7 +278,7 @@ at its documented baseline.
 
 ## IMPORTANT — open
 
-**I1. NPS significance letters test the wrong statistic (Excel engine).**
+**I1. NPS significance letters test the wrong statistic (Excel engine) — FIXED 2026-08-06 (Job I-stats).**
 `cell_calculator.R:512-518` stores raw 0–10 scores; the Sig row t-tests those,
 while the printed row is promoters−detractors and the v2 JS engine tests ±100
 bucket scores (whose mean IS the NPS). Executed: two columns with identical
@@ -286,6 +286,38 @@ NPS 0 got a significance letter (p=0.001) from the raw-scale test. Excel and
 HTML can disagree on NPS letters; the Excel letter answers "is the mean rating
 different", not "is the NPS different". Fix: store ±100 bucket values as the
 test values for NPS rows.
+
+**FIXED 2026-08-06.** `calculate_nps_score()` now returns the per-respondent
+±100 buckets as `$values`, through `nps_bucket_score()` (score_utils.R) — the
+module's single definition of the bucket, already shared by the microdata writer
+and the v2 JS engine. Reproduced first: two columns both scoring NPS 0, one made
+of 10s and 0s and one of 9s and 6s, drew a letter at **p = 0.043**; after, p = 1.
+
+**Two things beyond the brief, both deliberate.**
+1. **The published value is now derived from the tested vector** (its weighted
+   mean) rather than computed a second way beside it. For the integer 0–10
+   answers real NPS data carries this is arithmetically identical to
+   promoters−detractors — verified against the existing value tests, which are
+   unchanged. An out-of-range answer (negative, or a 6.5 after a coding slip)
+   now leaves the NPS base instead of being counted as a detractor, which is
+   what the microdata and the v2 report have always done. Excel and HTML now
+   bucket every answer the same way.
+2. **The Standard Deviation row moves to the same ±100 scale.** `$values` feeds
+   the SD row as well as the test, and splitting them would leave a published SD
+   that no longer explains the letters beside it — the class of defect this
+   review exists to close. On a column of 24 promoters / 8 passives / 8
+   detractors the row now prints **81.0** where it printed **1.9**; the v2
+   report's own mean-CI has always derived its SD from the ±100 distribution, so
+   this is the workbook catching up to the report, not a new number.
+   **This is a visible change to a published figure on every NPS deliverable**
+   and the one call here Duncan may want to reverse; it is one line.
+
+**Recorded, not fixed:** the ±100 buckets make open finding **M-B** (two
+zero-variance groups test at p = 1) bite NPS rows harder. "Every respondent in
+this column is a promoter" is an ordinary small-column outcome; "every
+respondent gave exactly the same rating" was rare. NPS +100 against NPS −100
+draws no letter. Pinned by a named test so it is visible rather than discovered
+in a deliverable.
 
 **I2. `population_size` junk silently disables the FPC — FIXED 2026-08-06 (Job I-batch).**
 `crosstabs_config.R:268-272`
@@ -381,7 +413,7 @@ documented baseline.
 through to their defaults on an unknown token. `alpha_default` already refuses
 case-insensitively, but only when `alpha_secondary` is set.
 
-**I5. FPC missing from two paths that sit beside corrected rows.** NET POSITIVE
+**I5. FPC missing from two paths that sit beside corrected rows — FIXED 2026-08-06 (Job I-stats).** NET POSITIVE
 (`standard_processor.R:1054-1091`) and composites (`composite_processor.R:871`)
 never pass `fpc_mul` — on a census project category rows correctly lose
 letters, NET POSITIVE and composite rows keep them. (Extends the known
@@ -389,12 +421,74 @@ I1-residual list, which named composites/ranking but not NET POSITIVE.)
 Related, deliberate-looking but undocumented: NET POSITIVE letters test the
 top box only, not the printed top-minus-bottom (header calls it "Option A").
 
+**FIXED 2026-08-06.** Both now build their multipliers through the same
+`build_fpc_multipliers()` + `resolve_column_populations()` pair every other row
+type uses, so there is still one definition of the correction.
+- **NET POSITIVE** takes `fpc_mul` into its `test_data`, which
+  `run_net_difference_tests()` already reads. On a four-column fixture the fix
+  simultaneously **removes** a letter (the census column stopped lettering a
+  20-point gap it had no sampling error to test) and **adds** one (a corrected
+  column crossed the Bonferroni-adjusted threshold, p 0.008842 → 0.003838).
+- **Composites** pass `fpc_mul1`/`fpc_mul2` to `weighted_t_test_means()`.
+  `n_actual` is the composite's own unweighted base per column — respondents
+  with a scoreable value — matching the definition `build_fpc_multipliers()`
+  documents. The subset resolution that had been copy-pasted for `idx_a` and
+  `idx_b` is now one helper (`composite_subset_indices()`), so the bases the
+  correction reads and the rows each test reads cannot be different people.
+
+**The related item is now documented rather than changed.** The NET POSITIVE
+Sig. row tests the TOP BOX proportion alone, not the printed top-minus-bottom;
+two columns with the same top box and different bottom boxes print different
+NET POSITIVE values and cannot letter against each other. Changing it means
+testing a difference of two dependent proportions — a different test, so a
+design decision, left open. Recorded in the function's roxygen.
+
 **I6. Chi-square row: display-rounded weighted counts, no design correction,
-not weight-scale invariant.** `standard_processor.R:1308-1314` reads counts
+not weight-scale invariant — FIXED 2026-08-06 (Job I-stats).** `standard_processor.R:1308-1314` reads counts
 back out of formatted display rows — the one place display rounding feeds a
 statistical decision; population-projected weights manufacture significance
 (executed: ×10 weights flip p 0.315→0.0015). Also the single significance path
 with no known-answer test anywhere in the suite.
+
+**FIXED 2026-08-06, at the brief's stated minimum: unrounded counts +
+effective-n scaling + a known-answer test.** All three defects were reproduced
+by execution first.
+- **Unrounded counts.** New `boxcategory_count_matrix()` recomputes the
+  BoxCategory counts through `calculate_boxcategory_counts()` — the same
+  function that produces the published Frequency rows — and the orchestrator
+  passes that matrix in. Executed: a weighted table whose true counts were
+  28.4/21.6 shipped **p = 0.2301** where its own numbers give **p = 0.1738**.
+- **Effective-n scaling.** Each column's counts are multiplied by
+  `effective base / weighted base` (`chi_square_design_scales()`) before
+  anything reads the matrix — before the sparse-category filter and the
+  expected-frequency checks, so all three describe the same table. This is a
+  first-order design correction and it makes the test invariant to the scale of
+  the weights, which is the runaway the review found: executed, the same design
+  at ×10 weights gave **χ² 4.0 → 40.0** and now gives 4.0 either way.
+- **Known-answer tests.** The 2×2 and a 3×2 are checked against base R's
+  `chisq.test(correct = FALSE)`, closing the I12(d) blind spot.
+
+**Both corrections are exactly inert on an unweighted run** (integer counts,
+effective base == weighted base == unweighted base), so unweighted workbooks are
+unchanged — verified by an explicit byte-identical test. Weighted chi-square
+rows do change, always downward: a weighted design never carries more
+information than the people interviewed.
+
+**A third behaviour change, found in the adversarial pass and kept.** Because the
+counts are now recomputed rather than read off the published rows, the
+chi-square row no longer depends on `boxcategory_frequency` being switched on.
+Executed: with `boxcategory_frequency = N` the pre-fix engine printed **no
+chi-square row at all**; it now prints the same χ² = 3.60, p = 0.0578 it prints
+with the toggle on. That is the M8 principle (a display toggle must not decide a
+statistical result) arriving here for free — but a config with
+`boxcategory_frequency = N` and `enable_chi_square = Y` **gains a row it never
+had**. Pinned by a test.
+
+**Recorded, not fixed (adjacent, found while here):** a config missing
+`test_net_differences` errors inside `validate_net_difference_requirements`
+(`!NULL`) rather than defaulting — caught by the caller's `tryCatch` and printed
+as one warning line. `build_config_object` always sets the key, so it does not
+bite a real run.
 
 **I7. Union workbooks: one ResponseID in two member sheets = duplicate records
 sharing one idx/rid.** The per-sheet integrity gate can't see cross-sheet
@@ -629,13 +723,53 @@ converter and the validator share it. Baseline for the next job: tabs R
 R-only). Note the behaviour change: an unreadable value in any of those cells
 now refuses at load instead of being read as the default.
 
-**Job I-stats (I1, I5, I6 — statistical semantics).** NPS rows store ±100
-bucket values for testing; thread `fpc_mul` through NET POSITIVE and
-composites; decide the chi-square question (unrounded counts + effective-n
-scaling at minimum, plus a known-answer test). These change published letters —
-each needs a before/after diff on the parity fixture and a note in the stats
-pack Declaration if behaviour changes. Escalate to Fable if any of the three
-turns into a design question.
+**Job I-stats (I1, I5, I6 — statistical semantics). DONE 2026-08-06** — see the
+annotations under I1, I5 and I6 above. All three landed at or above the brief:
+NPS rows test (and print an SD for) the ±100 buckets, the FPC reaches NET
+POSITIVE and composites, and the chi-square row reads unrounded counts scaled to
+each column's effective base with known-answer tests against base R.
+
+**Two things a next session needs to know.**
+1. **Duncan has one call to make.** The NPS Standard Deviation row moves from the
+   0–10 rating scale to the ±100 bucket scale (81.0 where it printed 1.9). It is
+   the coherent choice — it is the SD of the statistic printed above it, and it
+   is what the v2 report's own confidence interval has always used — but it is a
+   visible change to a published figure and it is one line to reverse. Nothing
+   else in this batch changes a number on a non-census, unweighted, non-NPS run.
+2. **The parity fixture's before/after diff was empty, and that was the
+   finding.** The fixture carried no NPS question, no NET POSITIVE, no composite
+   and no chi-square, so the gate could not have caught any of these three. The
+   island regenerated byte-identical — useful as a no-collateral-damage proof and
+   nothing more. **Q4, an NPS question, was therefore added to the fixture** with
+   hand-derived NPS scores (40 / 20 / −70 / 10, Total −1) and real letters at
+   both alphas, and both halves of the gate now assert on it: R-5 in
+   `test_cross_engine_stats.R`, plus two runs in `parity_stats_tests.mjs` that
+   prove the JS engine rebuilds the same ±100 scores from the published
+   distribution. NET POSITIVE, composites and chi-square are still not in the
+   fixture — they are covered by unit and end-to-end tests in
+   `test_stats_semantics.R`, but not by the cross-engine gate. That is the next
+   honest addition to it.
+
+Files: `lib/cell_calculator.R`, `lib/standard_processor.R`,
+`lib/composite_processor.R`, `lib/question_orchestrator.R`,
+`lib/stats_diagnostics.R`, plus the parity fixture generator, its two committed
+islands and both halves of the parity harness. Tests: new
+`tests/testthat/test_stats_semantics.R` (94 assertions; **25 failures/errors
+against the pre-fix code** by revert-run-restore, including an end-to-end one
+that fails on the NUMBER — the engine shipped χ² 3.64 where the corrected answer
+is 2.21 — rather than on a missing function), 4 new R-5 blocks in
+`test_cross_engine_stats.R`, 4 new blocks in `test_stats_diagnostics.R`, 2 new
+runs in `parity_stats_tests.mjs`.
+
+**Declaration.** Two method notes were added to the stats pack's Assumptions,
+each stated only when the run contains that statistic, so a study with neither
+gets the Declaration it got before: *NPS significance* (what the letters test,
+and that the SD row is on the same scale) and *Chi-square test* (unrounded
+counts, plus the effective-base scaling sentence on weighted runs only).
+
+Gates after: tabs R **4,160 / 0 / 0 / 0** (4,000 + 160 new assertions), **29** JS
+suites green, project-root at its documented 3-failure baseline. That is the
+baseline for the next job.
 
 **Job D — docs batch (I8, I9, I10, M-D..M-G) — Sonnet 5, medium effort.**
 Rewrite the report-navigation sections of 04/02/07 against the shipping v2

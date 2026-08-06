@@ -1050,6 +1050,16 @@ create_net_positive_row <- function(top_category, bottom_category, row_counts_to
 }
 
 #' Add NET POSITIVE significance testing
+#'
+#' WHAT THESE LETTERS TEST (recorded, not changed — review 2026-08, I5). The
+#' printed NET POSITIVE row is top box MINUS bottom box, but the letters come
+#' from \code{run_net_difference_tests()$net1}, which is a z-test on the TOP BOX
+#' proportion alone. Two columns with the same top box and different bottom
+#' boxes therefore print different NET POSITIVE values and cannot letter against
+#' each other. Changing it would mean testing a difference of two dependent
+#' proportions, which is a different test, not a different argument — a design
+#' decision, left open deliberately.
+#'
 #' @keywords internal
 add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
                                          banner_bases, internal_keys, banner_info,
@@ -1057,10 +1067,19 @@ add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
   test_data <- list()
   total_key <- paste0("TOTAL::", TOTAL_COLUMN)
 
+  # Same per-column finite population correction the category rows and the NET
+  # difference rows above this one already use (review 2026-08, I5). Without it
+  # a census column correctly lost its letters on every category row and kept
+  # them on the NET POSITIVE row printed underneath — one table, two universes.
+  # All-1 (inert) when no Population sheet or population_size is configured.
+  fpc_muls <- build_fpc_multipliers(
+    banner_bases, resolve_column_populations(banner_info, config), internal_keys)
+
   for (key in internal_keys) {
     if (key != total_key) {
       base_info <- banner_bases[[key]]
       test_data[[key]] <- list(
+        fpc_mul = if (key %in% names(fpc_muls)) unname(fpc_muls[[key]]) else 1,
         count1 = row_counts_top[key],
         count2 = row_counts_bottom[key],
         base = if (!is.null(base_info$weighted)) {
@@ -1273,6 +1292,79 @@ calculate_boxcategory_counts <- function(data, question_info, question_options,
 # CHI-SQUARE TEST FOR BOXCATEGORY RESULTS
 # ==============================================================================
 
+#' Raw BoxCategory counts for one question, as a matrix
+#'
+#' One row per BoxCategory, one column per banner column, holding the UNROUNDED
+#' (weighted, if the run is weighted) counts \code{calculate_boxcategory_counts()}
+#' produces. The published Frequency rows are the same numbers put through
+#' \code{format_output_value(..., "frequency")}, i.e. rounded to whole people for
+#' display; this is the matrix a statistical test should read (review 2026-08, I6).
+#'
+#' @param data Data frame, survey data (already base-filtered for the question)
+#' @param question_info Data frame row, question metadata
+#' @param question_options Data frame, response options with BoxCategory
+#' @param banner_row_indices List, row indices by banner column
+#' @param master_weights Numeric vector, weights
+#' @param internal_keys Character vector of banner keys
+#' @return Numeric matrix (categories x keys) with category names as rownames,
+#'   or NULL when the question declares no BoxCategories
+#' @export
+boxcategory_count_matrix <- function(data, question_info, question_options,
+                                     banner_row_indices, master_weights,
+                                     internal_keys) {
+  box_categories <- unique(question_options$BoxCategory)
+  box_categories <- box_categories[!is.na(box_categories) & box_categories != ""]
+  if (length(box_categories) == 0) return(NULL)
+
+  counts <- t(vapply(box_categories, function(category) {
+    calculate_boxcategory_counts(
+      data, question_info, question_options, banner_row_indices,
+      master_weights, internal_keys, category
+    )[internal_keys]
+  }, numeric(length(internal_keys))))
+
+  # vapply drops to a vector when there is exactly one key; restore the shape.
+  counts <- matrix(counts, nrow = length(box_categories),
+                   dimnames = list(as.character(box_categories), internal_keys))
+  counts
+}
+
+#' Per-column design scaling for the chi-square matrix
+#'
+#' The multiplier that turns a column of weighted counts into effective counts:
+#' \code{effective base / weighted base}. Pearson's chi-square reads its inputs
+#' as a raw sample size, so on a weighted table it answers a question about the
+#' weighted total rather than about the people interviewed — with population-
+#' projected weights it manufactures significance without limit (executed: the
+#' same design at x10 weights moved p from 0.0455 to 0.0000). Scaling each
+#' column to its Kish effective base makes the test invariant to the scale of
+#' the weights and spends the precision the design effect actually left.
+#'
+#' Returns all-1 when there are no bases, when the run is unweighted (effective
+#' == weighted == unweighted, so the scaling is exactly inert), or for any column
+#' whose bases are missing or non-positive.
+#'
+#' @param banner_bases List of per-key bases (\code{$weighted}, \code{$effective},
+#'   \code{$unweighted}), or NULL
+#' @param keys Character vector of banner keys
+#' @return Named numeric vector of multipliers, one per key
+#' @keywords internal
+chi_square_design_scales <- function(banner_bases, keys) {
+  out <- setNames(rep(1, length(keys)), keys)
+  if (is.null(banner_bases)) return(out)
+
+  for (key in keys) {
+    info <- banner_bases[[key]]
+    if (is.null(info)) next
+    pick <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+    wb <- suppressWarnings(as.numeric(pick(info$weighted, info$unweighted)))[1]
+    en <- suppressWarnings(as.numeric(pick(info$effective, info$unweighted)))[1]
+    if (is.na(wb) || is.na(en) || wb <= 0 || en <= 0) next
+    out[key] <- en / wb
+  }
+  out
+}
+
 #' Calculate Chi-Square Test Row for BoxCategory Results
 #'
 #' Performs chi-square test on BoxCategory frequency rows with smart filtering
@@ -1282,16 +1374,32 @@ calculate_boxcategory_counts <- function(data, question_info, question_options,
 #' - Min expected: 0.5 (was 1.0) - allows smaller cells
 #' - Low expected %: 40% (was 20%) - more permissive for small groups
 #'
+#' WHAT THE TEST READS (review 2026-08, I6). \code{box_counts} — the unrounded
+#' counts from \code{boxcategory_count_matrix()} — is the input, scaled per
+#' column to its effective base. Reading the published Frequency rows instead
+#' made this the one significance decision in the module fed by a display
+#' rounding: executed, a weighted table whose true counts were 28.4/21.6 shipped
+#' p = 0.2301 where the numbers it was computed from give p = 0.1738. Both
+#' corrections are exactly inert on an unweighted run (integer counts, effective
+#' base == weighted base), so unweighted workbooks are unchanged.
+#'
 #' @param boxcategory_results Data frame with BoxCategory summary rows
 #' @param banner_info List with banner structure metadata (needs $internal_keys)
 #' @param config Configuration object (needs $alpha)
 #' @param total_column_name Character, name of total column (default "Total")
 #' @param question_code Character, question code for error messages (optional)
+#' @param box_counts Numeric matrix from \code{boxcategory_count_matrix()}. NULL
+#'   falls back to the published Frequency rows, which are exact only on an
+#'   unweighted run — the engine always passes the matrix.
+#' @param banner_bases List of per-key bases, for the effective-base scaling.
+#'   NULL means no scaling (an unweighted table, or a direct unit call).
 #' @return Data frame with single chi-square row, or NULL if test not applicable
 #' @export
 calculate_chi_square_row <- function(boxcategory_results, banner_info, config,
                                      total_column_name = "Total",
-                                     question_code = NULL) {
+                                     question_code = NULL,
+                                     box_counts = NULL,
+                                     banner_bases = NULL) {
 
   # Validate inputs
   if (is.null(boxcategory_results) || !is.data.frame(boxcategory_results) ||
@@ -1304,20 +1412,35 @@ calculate_chi_square_row <- function(boxcategory_results, banner_info, config,
   }
 
   chi_square_row <- tryCatch({
-    # Get BoxCategory FREQUENCY rows
-    box_freq_rows <- boxcategory_results[
-      boxcategory_results$RowType == "Frequency",
-    ]
+    if (!is.null(box_counts)) {
+      # The counts as computed, before display rounding.
+      keys <- intersect(banner_info$internal_keys, colnames(box_counts))
+      obs_matrix <- box_counts[, keys, drop = FALSE]
+      box_freq_rows <- data.frame(RowLabel = rownames(box_counts),
+                                  stringsAsFactors = FALSE)
+    } else {
+      # Get BoxCategory FREQUENCY rows
+      box_freq_rows <- boxcategory_results[
+        boxcategory_results$RowType == "Frequency",
+      ]
+      obs_matrix <- as.matrix(box_freq_rows[, banner_info$internal_keys, drop = FALSE])
+    }
 
     if (nrow(box_freq_rows) >= 2) {
-      # Extract numeric matrix
-      obs_matrix <- as.matrix(box_freq_rows[, banner_info$internal_keys, drop = FALSE])
       storage.mode(obs_matrix) <- "double"
 
       # Remove Total column
       total_key <- paste0("TOTAL::", total_column_name)
       if (total_key %in% colnames(obs_matrix)) {
         obs_matrix <- obs_matrix[, colnames(obs_matrix) != total_key, drop = FALSE]
+      }
+
+      # Scale each column to its effective base BEFORE anything reads the
+      # matrix, so the sparse-category filter, the expected-frequency checks and
+      # the test itself all describe the same table. Inert when unweighted.
+      scales <- chi_square_design_scales(banner_bases, colnames(obs_matrix))
+      if (any(scales != 1)) {
+        obs_matrix <- sweep(obs_matrix, 2, scales[colnames(obs_matrix)], "*")
       }
 
       if (ncol(obs_matrix) >= 2 && nrow(obs_matrix) >= 2) {

@@ -138,6 +138,31 @@ build_tabs_diagnostics <- function(config_result, data_result,
       100 * FPC_MIN_COVERAGE)
   }
 
+  # Method notes for the two statistics whose basis changed in the 2026-08
+  # review (I1, I6). Each is stated only when the run actually contains that
+  # statistic, so a study with neither has a Declaration identical to before.
+  question_types <- tryCatch(
+    as.character(data_result$survey_structure$questions$Variable_Type),
+    error = function(e) character(0))
+  if (any(!is.na(question_types) & question_types == "NPS")) {
+    assumptions[["NPS significance"]] <- paste0(
+      "Tested on the per-respondent Net Promoter score (+100 promoter, ",
+      "0 passive, -100 detractor), whose weighted mean is the published NPS. ",
+      "The Standard Deviation row for an NPS question is on the same scale. ",
+      "Letters therefore answer 'do these NPS scores differ', not 'do the ",
+      "underlying 0-10 ratings differ'.")
+  }
+  if (isTRUE(safe_logical(config_obj$enable_chi_square, default = FALSE))) {
+    assumptions[["Chi-square test"]] <- paste0(
+      "Pearson's chi-square on the BoxCategory counts as computed, without ",
+      "the rounding applied for display",
+      if (is_weighted) {
+        paste0(". Each column's counts are scaled to its Kish effective base, ",
+               "so the test is sized on the people interviewed and is ",
+               "unaffected by the scale of the weights.")
+      } else ".")
+  }
+
   config_echo <- list(
     data_file      = config_obj$data_file %||% project_data_file,
     structure_file = config_obj$structure_file %||% config_result$structure_file_path,

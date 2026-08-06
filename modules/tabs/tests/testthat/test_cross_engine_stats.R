@@ -15,6 +15,8 @@
 #   R-2  Carriage integrity (D4) — the island carries R's letters verbatim
 #   R-1  Finite population correction through the tabs path (D2)
 #   R-3  The no-population guardrail — fpc_mul defaults are inert
+#   R-5  The NPS Score row (I1) — the values R tests are the values it prints,
+#        and the report reproduces them from the same +-100 buckets
 #
 # Every expected value below is hand-derived in the comment above it. A parity
 # gate that re-blesses whatever the code produced is a tautology, not a gate.
@@ -276,7 +278,7 @@ mean_rtype_for <- function(table, lbl, src) {
 test_that("the fixture produces the shape the parity harness assumes", {
   run <- parity_run()
   expect_equal(run$analysis$run_status, "PASS")
-  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3"))
+  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3", "Q4"))
   # Dual alpha is on: 0.05 primary, 0.20 secondary.
   expect_equal(run$config$config_obj$alpha, 0.05)
   expect_equal(run$config$config_obj$alpha_secondary, 0.20)
@@ -597,4 +599,78 @@ test_that("without a population the letters are the uncorrected ones", {
   q2 <- Filter(function(q) q$code == "Q2", run$island$questions)[[1]]
   mean_row <- Filter(function(r) r$label == "Mean", q2$rows)[[1]]
   expect_equal(unlist(mean_row$sig2), c("", "C", "C", "", "C"))
+})
+
+
+# ==============================================================================
+# R-5. THE NPS SCORE ROW (review 2026-08, I1)
+# ==============================================================================
+#
+# Q4's per-respondent values are the one statistic the two engines derive
+# independently: R from calculate_nps_score(), the v2 model from the published
+# category distribution through nps_bucket_score(). R used to store the raw 0-10
+# ratings as the values it tested and printed an SD for, so the same NPS row
+# could be lettered one way in the workbook and another in the report. These
+# tests pin the published numbers; the JS half
+# (parity_stats_tests.mjs, "the NPS Score row is the mean of the +-100 buckets")
+# pins that the report reproduces them.
+#
+# Hand-derived from the fixture (generate_parity_project.R), counts of
+# (promoters at 10 / passives at 8 / detractors at 5):
+#   Alpha  24 /  8 /  8   NPS = (24- 8)/40*100 =  40
+#   Beta   30 / 12 / 18   NPS = (30-18)/60*100 =  20
+#   Gamma   5 /  5 / 40   NPS = ( 5-40)/50*100 = -70
+#   Delta  20 / 15 / 15   NPS = (20-15)/50*100 =  10
+#   Total  79 promoters and 81 detractors of 200 -> (79-81)/200*100 = -1
+
+context("R-5: NPS rows test the NPS")
+
+test_that("the NPS Score row publishes promoters minus detractors", {
+  run <- parity_run()
+  q4 <- Filter(function(q) q$code == "Q4", run$island$questions)[[1]]
+  score <- Filter(function(r) r$label == "NPS Score", q4$rows)[[1]]
+
+  # A mean-kind row carries its values in `pct` like any other row — the JS
+  # model is what re-labels them cell.mean.
+  expect_equal(score$kind, "mean")
+  expect_equal(unlist(score$pct), c(-1, 40, 20, -70, 10))
+})
+
+test_that("the NPS Standard Deviation is on the +-100 bucket scale", {
+  run <- parity_run()
+  q4 <- Filter(function(q) q$code == "Q4", run$island$questions)[[1]]
+  sd_row <- Filter(function(r) r$label == "Standard Deviation", q4$rows)[[1]]
+
+  # Alpha: 24 at +100, 8 at 0, 8 at -100, mean 40.
+  #   sum of squared deviations = 24*60^2 + 8*40^2 + 8*140^2 = 256000
+  #   sample variance = 256000/39 = 6564.103  ->  sd = 81.0192, shown as 81.0
+  expect_equal(sd_row$pct[[2]], round(sqrt(256000 / 39), 1))
+  expect_equal(sd_row$pct[[2]], 81)
+  # The 0-10 ratings would give 1.9 — the number this row printed before I1.
+  expect_gt(sd_row$pct[[2]], 50)
+})
+
+test_that("the NPS letters take the FPC like every other mean row", {
+  run <- parity_run()
+  q4 <- Filter(function(q) q$code == "Q4", run$island$questions)[[1]]
+  score <- Filter(function(r) r$label == "NPS Score", q4$rows)[[1]]
+
+  # Alpha is a full census: excluded from pairing, and named by nobody.
+  expect_equal(score$sig[[2]], "")
+  expect_false(any(grepl("A", unlist(score$sig), fixed = TRUE)))
+  # Beta (+20) and Delta (+10) both clear Gamma (-70) at the Bonferroni-adjusted
+  # 95% threshold; Gamma, lowest of the four, earns nothing.
+  expect_equal(score$sig[[3]], "C")
+  expect_equal(score$sig[[5]], "C")
+  expect_equal(score$sig[[4]], "")
+})
+
+test_that("the engine's NPS values ARE the values it tests", {
+  # Directly, not through the island: the guarantee that the Sig. row and the
+  # Standard Deviation row describe the number printed above them.
+  data <- data.frame(Q = c(10, 10, 8, 5, 5, 5), stringsAsFactors = FALSE)
+  res <- calculate_nps_score(data, "Q", c(1, 2, 1, 1, 1, 1))
+  expect_equal(res$values, c(100, 100, 0, -100, -100, -100))
+  expect_equal(res$value, sum(res$values * res$weights) / sum(res$weights),
+               tolerance = 1e-12)
 })

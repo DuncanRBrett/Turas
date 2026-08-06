@@ -118,7 +118,7 @@ run("the fixture island loads and the default view is 'published'", () => {
 
 run("every proportion row's 95% letters are the carried sig, character for character", () => {
   loadIsland(weightedIsland);
-  ["Q1", "Q2", "Q3"].forEach((code) => {
+  ["Q1", "Q2", "Q3", "Q4"].forEach((code) => {
     const m = TR.model.forQuestion(code, "Cohort", [], { dual: true });
     m.rows.forEach((row) => {
       const raw = rawRow(weightedIsland, code, row.label);
@@ -134,7 +134,7 @@ run("every proportion row's 95% letters are the carried sig, character for chara
 
 run("the 80% letters are sig2 MINUS sig, lowercased — not a recompute", () => {
   loadIsland(weightedIsland);
-  ["Q1", "Q2", "Q3"].forEach((code) => {
+  ["Q1", "Q2", "Q3", "Q4"].forEach((code) => {
     const m = TR.model.forQuestion(code, "Cohort", [], { dual: true });
     m.rows.forEach((row) => {
       const raw = rawRow(weightedIsland, code, row.label);
@@ -189,6 +189,56 @@ run("mean rows carry BOTH alphas — the 80% letters they never had", () => {
 // label forward-fill labels it "Standard Deviation". If the writer matched on
 // label alone, the mean's letters would render on the SD row — which reports
 // spread and is never tested.
+// Q4 is the NPS question (review 2026-08, I1). Its per-respondent values are
+// the one statistic the two engines derive INDEPENDENTLY — R from
+// calculate_nps_score(), JS from the published category distribution through
+// nps_bucket_score() — so a scale disagreement shows up here as different
+// published letters. Before I1 the R side t-tested the raw 0-10 ratings.
+run("the NPS Score row is the mean of the +-100 buckets, in both engines", () => {
+  const npsIsland = readIsland("parity_island.json");
+  loadIsland(npsIsland);
+  const m = TR.model.forQuestion("Q4", "Cohort", [], { dual: true });
+  const score = rowByLabel(m, "NPS Score");
+  eq(score.kind, "mean", "the NPS Score row is a mean-kind row");
+
+  // Hand-derived from the fixture's distribution (generate_parity_project.R):
+  //   Alpha 24/8/8   -> (24- 8)/40*100 =  40
+  //   Beta  30/12/18 -> (30-18)/60*100 =  20
+  //   Gamma  5/5/40  -> ( 5-40)/50*100 = -70
+  //   Delta 20/15/15 -> (20-15)/50*100 =  10
+  //   Total 79 promoters, 81 detractors of 200 -> -1
+  eq(score.cells.map((c) => c.mean).join(","), "-1,40,20,-70,10", "published NPS");
+
+  // The JS side rebuilds the same per-respondent scores from the distribution.
+  const scores = TR.waves.scoreMap(m, score);
+  assert(scores !== null, "the model resolves a score map for an NPS question");
+  const byLabel = {};
+  Object.keys(scores).forEach((ri) => { byLabel[m.rows[ri].label] = scores[ri]; });
+  eq(byLabel["10"], 100, "10 is a promoter");
+  eq(byLabel["8"], 0, "8 is a passive");
+  eq(byLabel["5"], -100, "5 is a detractor");
+
+  // And the letters R carried are the ones the reader sees. Alpha is a census
+  // (excluded); Beta and Delta both beat Gamma at 95%.
+  eq(score.cells[1].sig || "", "", "Alpha: a census is excluded from pairing");
+  eq(score.cells[2].sig, "C", "Beta beats Gamma");
+  eq(score.cells[3].sig || "", "", "Gamma earns nothing");
+  eq(score.cells[4].sig, "C", "Delta beats Gamma");
+});
+
+run("the NPS SD is on the bucket scale, not the 0-10 rating scale", () => {
+  loadIsland(readIsland("parity_island.json"));
+  const m = TR.model.forQuestion("Q4", "Cohort", [], { dual: true });
+  const sd = rowByLabel(m, "Standard Deviation");
+  // Alpha: 24 at +100, 8 at 0, 8 at -100, mean 40.
+  //   sum of squared deviations = 24*60^2 + 8*40^2 + 8*140^2 = 256000
+  //   sample variance = 256000/39 = 6564.10  ->  sd = 81.02
+  // The raw 0-10 ratings would give 1.87 — the number this row used to print
+  // underneath an NPS of 40.
+  eq(sd.cells[1].mean, 81, "Alpha SD on the +-100 scale");
+  assert(sd.cells[1].mean > 50, "an NPS SD is never a 0-10-scale number");
+});
+
 run("the Standard Deviation row carries no letters at either alpha", () => {
   loadIsland(weightedIsland);
   const m = TR.model.forQuestion("Q2", "Cohort", [], { dual: true });
@@ -310,7 +360,7 @@ function jsLetters(model, row, dual) {
 
 run("JS-computed proportion letters equal R's carried letters at 95%", () => {
   loadIsland(island);
-  ["Q1", "Q2", "Q3"].forEach((code) => {
+  ["Q1", "Q2", "Q3", "Q4"].forEach((code) => {
     const m = TR.model.forQuestion(code, "Cohort", [], { dual: false });
     m.rows.forEach((row) => {
       if (row.kind === "mean") return;              // JS-3 covers means
@@ -327,7 +377,7 @@ run("JS-computed proportion letters equal R's carried letters at 95%", () => {
 
 run("JS-computed proportion letters equal R's carried letters at 80%", () => {
   loadIsland(island);
-  ["Q1", "Q2", "Q3"].forEach((code) => {
+  ["Q1", "Q2", "Q3", "Q4"].forEach((code) => {
     const m = TR.model.forQuestion(code, "Cohort", [], { dual: true });
     m.rows.forEach((row) => {
       if (row.kind === "mean") return;

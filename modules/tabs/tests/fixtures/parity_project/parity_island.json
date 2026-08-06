@@ -95,7 +95,8 @@
   "categories": [
     "Usage",
     "Satisfaction",
-    "Value"
+    "Value",
+    "Advocacy"
   ],
   "questions": [
     {
@@ -595,6 +596,206 @@
       "gauge_amber": null,
       "filter_label": "Used the service in the last month",
       "base_filter": "Q1 == 'Yes'"
+    },
+    {
+      "code": "Q4",
+      "title": "How likely are you to recommend us?",
+      "category": "Advocacy",
+      "theme": "",
+      "key_share": "",
+      "type": "nps",
+      "bases": [
+        {
+          "n": 200,
+          "low": false
+        },
+        {
+          "n": 40,
+          "low": false
+        },
+        {
+          "n": 60,
+          "low": false
+        },
+        {
+          "n": 50,
+          "low": false
+        },
+        {
+          "n": 50,
+          "low": false
+        }
+      ],
+      "rows": [
+        {
+          "kind": "category",
+          "label": "10",
+          "pct": [
+            40,
+            60,
+            50,
+            10,
+            40
+          ],
+          "n": [
+            79,
+            24,
+            30,
+            5,
+            20
+          ],
+          "sig": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ],
+          "sig2": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "8",
+          "pct": [
+            20,
+            20,
+            20,
+            10,
+            30
+          ],
+          "n": [
+            40,
+            8,
+            12,
+            5,
+            15
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "5",
+          "pct": [
+            40,
+            20,
+            30,
+            80,
+            30
+          ],
+          "n": [
+            81,
+            8,
+            18,
+            40,
+            15
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "mean",
+          "label": "NPS Score",
+          "pct": [
+            -1,
+            40,
+            20,
+            -70,
+            10
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ],
+          "sig2": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "mean",
+          "label": "Standard Deviation",
+          "pct": [
+            89.7,
+            81,
+            87.9,
+            64.7,
+            83.9
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "scale_max": 100,
+      "gauge_green": null,
+      "gauge_amber": null,
+      "index_scores": {
+        "10": 100,
+        "8": 0,
+        "5": -100
+      }
     }
   ]
 }

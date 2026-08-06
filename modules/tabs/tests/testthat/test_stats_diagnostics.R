@@ -31,6 +31,9 @@ turas_root <- detect_turas_root()
 
 # stats_diagnostics.R is standalone function defs; it uses %||% at call time only.
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+# type_utils supplies safe_logical(), which the Declaration's chi-square note
+# reads the enable_chi_square toggle through — the same reader the engine uses.
+source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/stats_diagnostics.R"))
 
 # ---- build_tabs_diagnostics: payload assembly from mock run objects ----------
@@ -192,4 +195,71 @@ test_that("subgroup universes are counted from the Population frame", {
   b <- fpc_payload(population_size = 5000, population_frame = frame)$assumptions
   expect_equal(b[["Universe size"]], "5,000")
   expect_equal(b[["Subgroup universes"]], "3 declared on the Population sheet")
+})
+
+
+# ---- Method notes for the 2026-08 statistical-semantics changes (I1, I6) -----
+#
+# Both are behaviour changes to published significance letters, so the
+# contractual Declaration has to say what was tested. Each is stated only when
+# the run actually contains that statistic: a study with neither gets exactly
+# the Declaration it got before.
+
+method_payload <- function(question_types = character(0), ...) {
+  extra <- list(...)
+  config_obj <- modifyList(list(
+    data_file = "study.xlsx", apply_weighting = FALSE,
+    enable_significance_testing = TRUE, alpha = 0.05,
+    significance_min_base = 30, bonferroni_correction = TRUE), extra)
+  structure_stub <- if (length(question_types)) {
+    list(questions = data.frame(
+      QuestionCode = paste0("Q", seq_along(question_types)),
+      Variable_Type = question_types, stringsAsFactors = FALSE))
+  } else NULL
+  build_tabs_diagnostics(
+    list(config_obj = config_obj, output_path = "out.xlsx"),
+    list(survey_data = data.frame(a = 1:200), effective_n = 200,
+         survey_structure = structure_stub),
+    list(all_results = vector("list", 3), skipped_questions = list(),
+         partial_questions = list()),
+    list(project_name = "Method", run_result = list(status = "PASS", events = list())),
+    Sys.time() - 1, "10.2")
+}
+
+test_that("a study with no NPS and no chi-square declares neither note", {
+  a <- method_payload(c("Rating", "Single_Response"))$assumptions
+  expect_null(a[["NPS significance"]])
+  expect_null(a[["Chi-square test"]])
+})
+
+test_that("an NPS question declares what its letters test", {
+  a <- method_payload(c("Rating", "NPS"))$assumptions
+  note <- a[["NPS significance"]]
+  expect_false(is.null(note))
+  expect_true(grepl("+100 promoter", note, fixed = TRUE))
+  expect_true(grepl("-100 detractor", note, fixed = TRUE))
+  expect_true(grepl("Standard Deviation row", note, fixed = TRUE))
+  # The point of the note: it is NOT a test of the 0-10 ratings.
+  expect_true(grepl("not 'do the", note, fixed = TRUE))
+})
+
+test_that("chi-square declares its inputs, and says more when weighted", {
+  unweighted <- method_payload(c("Rating"), enable_chi_square = "Y")$assumptions
+  note <- unweighted[["Chi-square test"]]
+  expect_false(is.null(note))
+  expect_true(grepl("without the rounding applied for display", note, fixed = TRUE))
+  expect_false(grepl("Kish effective base", note, fixed = TRUE))
+
+  weighted <- method_payload(c("Rating"), enable_chi_square = TRUE,
+                             apply_weighting = TRUE,
+                             weight_variable = "w")$assumptions
+  wnote <- weighted[["Chi-square test"]]
+  expect_true(grepl("Kish effective base", wnote, fixed = TRUE))
+  expect_true(grepl("scale of the weights", wnote, fixed = TRUE))
+})
+
+test_that("chi-square off means no chi-square note at all", {
+  expect_null(method_payload(c("Rating"))$assumptions[["Chi-square test"]])
+  expect_null(method_payload(c("Rating"),
+                             enable_chi_square = "N")$assumptions[["Chi-square test"]])
 })

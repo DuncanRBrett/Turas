@@ -454,16 +454,36 @@ calculate_likert_index <- function(data, question_col, options_info, weights) {
 }
 
 #' Calculate NPS Score
-#' 
+#'
 #' Calculates Net Promoter Score (0-10 scale)
 #' Promoters (9-10) - Detractors (0-6) / Total
-#' 
+#'
 #' NOTE: 0 is a VALID score (detractor) and must be included in base
-#' 
+#'
+#' THE VALUES THIS RETURNS ARE +-100 BUCKET SCORES, NOT RAW RATINGS (review
+#' 2026-08, I1). \code{$values} feeds two things and only two: the Standard
+#' Deviation row and the summary Sig. row's t-test. The published statistic is
+#' the NET of promoters and detractors, so a t-test on raw 0-10 ratings answers
+#' "is the mean RATING different" — a different question, with a different
+#' answer. Executed before the fix: two columns both scoring NPS 0 (one made of
+#' 10s and 0s, one of 9s and 6s) drew a significance letter at p = 0.043.
+#'
+#' \code{nps_bucket_score()} (score_utils.R) is the module's single definition of
+#' the bucket, shared with the microdata writer and the v2 JS engine, so Excel
+#' and the HTML report now letter NPS rows from the same numbers. Its weighted
+#' mean IS the NPS, so the published value is derived from the same vector the
+#' test uses rather than computed a second way beside it. For the integer 0-10
+#' answers real NPS data carries, that value is identical to the promoters-minus-
+#' detractors arithmetic it replaces; an out-of-range answer (negative, or above
+#' 10 after a coding slip) now leaves the NPS base instead of being counted as a
+#' detractor, which is what the microdata and the v2 report have always done.
+#'
 #' @param data Survey data
 #' @param question_col Question column name
 #' @param weights Weight vector
-#' @return List with statistic info or NULL
+#' @return List with statistic info or NULL. \code{$values} are +-100 bucket
+#'   scores (100 promoter / 0 passive / -100 detractor), one per respondent in
+#'   the NPS base.
 #' @export
 calculate_nps_score <- function(data, question_col, weights) {
   
@@ -501,23 +521,35 @@ calculate_nps_score <- function(data, question_col, weights) {
     return(NULL)
   }
   
-  # Calculate NPS
-  promoters <- sum(valid_weights[numeric_responses >= 9])
-  detractors <- sum(valid_weights[numeric_responses <= 6])
+  # Per-respondent +-100 bucket scores. One definition of the bucket for the
+  # whole module (score_utils.R); an answer it cannot bucket (out of the 0-10
+  # range) leaves the NPS base rather than being scored as a detractor.
+  bucket_scores <- vapply(numeric_responses, nps_bucket_score, numeric(1))
+  scored <- !is.na(bucket_scores)
+  bucket_scores <- bucket_scores[scored]
+  valid_weights <- valid_weights[scored]
+
+  if (length(bucket_scores) == 0) {
+    return(NULL)
+  }
+
   total_valid <- sum(valid_weights)
-  
+
   if (total_valid > 0) {
-    nps_score <- ((promoters - detractors) / total_valid) * 100
-    
+    # The weighted mean of the buckets IS %promoters - %detractors. Deriving the
+    # published value from the tested vector is what guarantees the Sig. row and
+    # the Standard Deviation row describe the number printed above them.
+    nps_score <- sum(bucket_scores * valid_weights) / total_valid
+
     return(list(
       stat_name = "NPS Score",
       stat_label = SCORE_ROW_TYPE,
       value = nps_score,
-      values = numeric_responses,
+      values = bucket_scores,
       weights = valid_weights
     ))
   }
-  
+
   return(NULL)
 }
 

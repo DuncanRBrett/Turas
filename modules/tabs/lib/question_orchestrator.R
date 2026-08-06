@@ -493,8 +493,16 @@ process_single_question <- function(question_code, prepared_data,
     }
 
     if (enable_chi && !is.null(boxcategory_results) && nrow(boxcategory_results) > 0) {
+      # Recomputed rather than read back out of the published Frequency rows,
+      # which are rounded to whole people for display (review 2026-08, I6).
+      # banner_bases carries the effective bases the columns are scaled to.
       chi_square_row <- calculate_chi_square_row(
-        boxcategory_results, banner_info, config, total_column, question_code
+        boxcategory_results, banner_info, config, total_column, question_code,
+        box_counts = boxcategory_count_matrix(
+          filtered_data, question_info, question_options,
+          banner_row_indices, question_weights, banner_info$internal_keys
+        ),
+        banner_bases = banner_bases
       )
     }
 
