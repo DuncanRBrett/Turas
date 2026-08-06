@@ -1,0 +1,167 @@
+{
+  "textMode": "full",
+  "demographicCuts": "allow",
+  "noteworthyDefault": "all",
+  "verbatimScope": "noteworthy",
+  "n": 5,
+  "questions": [
+    {
+      "code": "Q1",
+      "title": "Why that score?",
+      "type": "themed",
+      "sheet": "Q1",
+      "base": {
+        "answered": 4,
+        "asked": null
+      },
+      "themes": [
+        {
+          "id": 0,
+          "label": "Price"
+        },
+        {
+          "id": 1,
+          "label": "Service"
+        }
+      ],
+      "records": [
+        {
+          "idx": 0,
+          "text": "Great value for the price",
+          "noteworthy": true,
+          "tier": 3,
+          "sentiment": 1,
+          "rating": null,
+          "themeVals": {
+            "0": 1
+          },
+          "rid": "079e4881d8081b95",
+          "band": "Promoter",
+          "demos": {
+            "Dept": "Admin",
+            "Tenure": "5+ yrs"
+          }
+        },
+        {
+          "idx": 1,
+          "text": "Support is slow to respond",
+          "noteworthy": true,
+          "tier": 3,
+          "sentiment": 3,
+          "rating": null,
+          "themeVals": {
+            "1": 3
+          },
+          "rid": "6114fa4913c202e9",
+          "band": "Detractor",
+          "demos": {
+            "Dept": "Finance",
+            "Tenure": "1-4 yrs"
+          }
+        },
+        {
+          "idx": 2,
+          "text": null,
+          "noteworthy": false,
+          "tier": 0,
+          "sentiment": 2,
+          "rating": null,
+          "themeVals": {
+            "1": 2
+          },
+          "rid": "c12ff726ab5bafb2",
+          "suppressed": true,
+          "band": "Passive",
+          "demos": {
+            "Dept": "Admin",
+            "Tenure": "1-4 yrs"
+          }
+        },
+        {
+          "idx": 3,
+          "text": null,
+          "noteworthy": true,
+          "tier": 2,
+          "sentiment": null,
+          "rating": null,
+          "themeVals": [],
+          "rid": "b83cbfe30a035957",
+          "suppressed": true,
+          "band": "Detractor",
+          "demos": {
+            "Dept": "Finance",
+            "Tenure": "5+ yrs"
+          }
+        }
+      ],
+      "meta": {
+        "dropped_codes": 0,
+        "n_records": 4,
+        "pii_scrubbed": false,
+        "redactions": 0
+      },
+      "split": {
+        "dim": "NPS",
+        "bands": ["Detractor", "Passive", "Promoter"]
+      }
+    },
+    {
+      "code": "Q2",
+      "title": "Anything else?",
+      "type": "raw",
+      "sheet": "Q2",
+      "base": {
+        "answered": 2,
+        "asked": null
+      },
+      "themes": [],
+      "records": [
+        {
+          "idx": 0,
+          "text": "More parking please",
+          "noteworthy": true,
+          "tier": 1,
+          "sentiment": null,
+          "rating": null,
+          "themeVals": [],
+          "rid": "079e4881d8081b95",
+          "demos": {
+            "Dept": "Admin",
+            "Tenure": "5+ yrs"
+          }
+        },
+        {
+          "idx": 4,
+          "text": null,
+          "noteworthy": false,
+          "tier": 0,
+          "sentiment": null,
+          "rating": null,
+          "themeVals": [],
+          "rid": "a0c2ab08fd264630",
+          "suppressed": true,
+          "demos": {
+            "Dept": "Finance",
+            "Tenure": "1-4 yrs"
+          }
+        }
+      ],
+      "meta": {
+        "dropped_codes": 0,
+        "n_records": 2,
+        "pii_scrubbed": false,
+        "redactions": 0
+      }
+    }
+  ],
+  "demographics": [
+    {
+      "label": "Dept",
+      "values": ["Admin", "Finance"]
+    },
+    {
+      "label": "Tenure",
+      "values": ["1-4 yrs", "5+ yrs"]
+    }
+  ]
+}

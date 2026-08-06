@@ -687,8 +687,17 @@ format_summary_for_excel <- function(metrics_df, banner_info, config) {
     }
   }
 
-  # Clean up display
-  metrics_df$RowLabel <- trimws(metrics_df$RowLabel)
+  # Clean up display. Trim AROUND the nesting indent, not through it: the two
+  # spaces organize_by_composite_groups puts on a composite's source questions are
+  # the sheet's only nesting cue — write_index_summary_sheet writes the label
+  # string verbatim into column 1 and applies no indent style — so a blanket
+  # trimws() left every source question flush against the margin, indistinguishable
+  # from an unrelated standalone one (production review 2026-08, I12b).
+  label <- metrics_df$RowLabel
+  present <- !is.na(label)
+  indent <- ifelse(grepl("^  ", label[present]), "  ", "")
+  label[present] <- paste0(indent, trimws(label[present]))
+  metrics_df$RowLabel <- label
 
   # Get decimal places setting
   decimal_places <- get_config_value(config, "index_summary_decimal_places", 1)
