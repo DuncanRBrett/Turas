@@ -127,7 +127,7 @@ counts-only and one column-% question and running its own bundle in headless
 Chrome: `142  80 B  62` under "Counts (n)", `71%  80% B  62%` untouched.
 Schema documented in `modules/tabs/docs/11_DATA_CENTRIC_REPORT_V2.md`.
 
-### C2. A sub-k column's exact base prints in the v2 report while Excel masks it
+### C2. A sub-k column's exact base prints in the v2 report while Excel masks it — FIXED 2026-08-06 (Job C2)
 **Files:** `assets/js/22_model.js:541-565`, `23_render.js:208-209,357`
 `applyDisclosureSuppression` blanks cells and strips letters but never masks
 `col.base`. Executed repro: `min_reporting_base = 10`, a 4-person column →
@@ -137,6 +137,58 @@ Two deliverables of one run enforce different disclosure standards; the HTML
 leaks the headcount of an identifiable subgroup.
 **Fix:** mask `col.base` for suppressed columns in `tableHtml`/`matrix` the way
 `write_base_rows` does.
+
+**FIXED 2026-08-06.** New `render.baseMarker(col)` (`23_render.js`) returns
+`"n<k"` for a suppressed column and `null` for every other, mirroring
+`excel_utils.R disclosure_marker()`; it is the single site the display layers
+call, so an unprotected report (nothing ever flagged) is byte-identical. The
+leak was on **four** surfaces, not one, and two of them were not the base
+number itself:
+1. **All three base rows** — unweighted, weighted and Kish effective — in
+   `tableHtml`, matching what `write_base_rows`'s `mark_suppressed` masks in the
+   workbook (it marks all three too).
+2. **`render.matrix`**, so the clipboard, the TSV, the XLSX download
+   (`23y_xlsx.js` coerces only clean numerics — `"n<10"` lands as an inline
+   string, as in Excel) and the PPTX matrix carry the marker as well.
+3. **The base row's derivations, which invert to the exact base.** The
+   worst-case margin is `98/√n`, so `±49.0pp` *is* `n=4`; a census column's
+   coverage note ("2% of 200") reads the same way. A suppressed column now
+   prints the marker alone — masking the number and keeping its arithmetic
+   would have disclosed it anyway.
+4. **The confidence explainer's "small groups swing more" bullet**
+   (`21c_confidence.js smallColumnExample`), which was the worst of the four
+   and is not in the finding above: it picks the **smallest** column of the
+   default banner group *by construction*, so on any protected report it
+   preferentially names the withheld group and its headcount in prose —
+   verified in a real browser as "**Legal has only 4 respondents**" while the
+   crosstab beside it said `n<10`. It now skips columns `TR.disclosure.cellOk()`
+   would withhold and falls back to the smallest disclosable column (or drops
+   the bullet when none qualifies, as it already does with no banner groups).
+
+Also masked: the wave strip's current-wave base cell (`23za_trend.js`), which
+prints `columns[0].base` on the same card and is suppressed in the
+whole-audience-below-k case. Files: `23_render.js`, `21c_confidence.js`,
+`23za_trend.js`, `styles.css` (one muted `.supb` rule — the marker is a
+withholding, not the amber low-base warning). Tests: 21 checks appended to
+`tests/disclosure_tests.mjs` in their own model+render sandbox (the existing
+section is a 21d-only unit suite); 12 proved failing against the pre-fix code
+by revert-run-restore. Gates after: tabs R **3,742 / 0 / 0 / 0** (unchanged —
+JS-only), **29** JS suites green, project-root at its documented 3-failure
+baseline. Verified end-to-end by generating a real v2 report through
+`build_data_layer` → `serialize_data_layer` → `build_report_v2_html` with
+`min_reporting_base = 10` and a 4-person banner column, and reading its own
+bundle in headless Chrome — before: `4 ⚠  ±49.0pp` in the table, `4 ⚠` in the
+TSV, "Legal has only 4 respondents"; after: `n<10`, `n<10`, "Sales has only 196
+respondents", with the safe columns (`200 ±6.9pp`, `196 ±7.0pp`) untouched.
+
+**Deliberately left alone** (recorded, not fixed): the question card's
+`COMPUTED · n=3` badge (`25_cards.js:521`) and the filter bar's own
+`TR.disclosure.note()` both state the **audience** base under the reader's own
+filter. That is a different quantity from a banner column's headcount, and the
+existing design discloses it on purpose — `note()`'s wording is literally
+"Audience too small (n=3…) — broaden the filter". Masking the badge while the
+note beside it prints the number would achieve nothing; whether the audience
+count should be disclosed at all is a design question, not this fix.
 
 ### C3. Case-sensitive `"Y"` gates silently drop questions, banners and index rows — and preflight validates them case-insensitively
 **Files:** `lib/crosstabs/data_setup.R:252`, `lib/banner.R:55,194,207`,
@@ -359,8 +411,11 @@ failing-first regression tests.
 
 Conditions: (1) ~~do not ship a v2 report from a counts-only or row-%-only
 config until C1 lands~~ — **C1 landed 2026-08-06; this condition is lifted**;
-(2) do not treat the v2 HTML as disclosure-safe for
-sub-k audiences until C2 lands; (3) normalise the Y-flag columns (C3) before
+(2) ~~do not treat the v2 HTML as disclosure-safe for
+sub-k audiences until C2 lands~~ — **C2 landed 2026-08-06; this condition is
+lifted for the base row, the exports and the explainer. The audience-level
+count under a reader's own filter is still stated by design (see C2's
+"deliberately left alone")**; (3) normalise the Y-flag columns (C3) before
 the next hand-built config, or lowercase `y` cells will silently drop
 questions/banners with preflight approving. For anonymity-critical work also
 take I4 (confidentiality dials fail open) and note the F3 fix means
@@ -397,9 +452,12 @@ annotation under C1 above. Baseline for the next job is therefore tabs R
 **3,742 / 0 / 0 / 0** and **29** JS suites (the new `stat_label_tests.mjs`
 joins the 26 + 2).
 
-**Job C2 — sub-k base masking in v2 (CRITICAL C2).** Mask `col.base` for
-suppressed columns in `tableHtml` and `render.matrix` the way
-`excel_writer.R:496-506` does ("n<k"). Small, contained, JS + one JS test.
+**Job C2 — sub-k base masking in v2 (CRITICAL C2). DONE 2026-08-06** — see the
+annotation under C2 above. It was wider than briefed (all three base rows, the
+invertible ±pp margin and coverage note, and the confidence explainer naming
+the withheld group in prose). Gates are unchanged for the next job: tabs R
+**3,742 / 0 / 0 / 0** and **29** JS suites — the 21 new checks were appended to
+`disclosure_tests.mjs` rather than added as a new suite.
 
 **Job C3 — Y-flag normalisation (CRITICAL C3).** One `toupper(trimws(...))`
 normalisation applied to Include/UseBanner/ShowInOutput/CreateIndex at

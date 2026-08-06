@@ -293,6 +293,15 @@
   /**
    * Smallest column of the default banner group on the fullest question —
    * the honest "small groups swing more" example (e.g. Durban n=75).
+   *
+   * Disclosure control (C2): this picks the SMALLEST column by construction, so
+   * it is the sentence most likely to name a below-k group and its exact size —
+   * "Legal has only 4 respondents" — while the crosstab beside it withholds that
+   * very base as "n<10". Columns the control would withhold are therefore not
+   * eligible as the example; when none of the group's columns is disclosable the
+   * bullet is dropped, as it already is on a report with no banner groups.
+   * cellOk() is the same predicate the cell suppression uses, and is a no-op
+   * when the control is off (k <= 1), so unprotected reports are unchanged.
    */
   function smallColumnExample() {
     var groups = TR.AGG.banner_groups || [];
@@ -303,10 +312,13 @@
       if (b && (!q || b > q.bases[0].n)) q = qq;
     });
     if (!q) return null;
+    var showable = function (b) {
+      return !(TR.disclosure && TR.disclosure.cellOk) || TR.disclosure.cellOk(b);
+    };
     var smallest = null;
     TR.d2.groupCols(groups[0].id).forEach(function (ci) {
       var b = q.bases && q.bases[ci] && q.bases[ci].n;
-      if (b && (!smallest || b < smallest.n)) {
+      if (b && showable(b) && (!smallest || b < smallest.n)) {
         smallest = { label: TR.AGG.columns[ci].label, n: b,
           population: TR.AGG.columns[ci].population };
       }

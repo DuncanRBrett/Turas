@@ -137,8 +137,14 @@
       out.push('<td class="wv' + (low ? " lowb" : "") + '">' +
         fmt.base(h.base) + (low ? " ⚠" : "") + "</td>");
     });
-    out.push('<td class="wv cur">' + fmt.base(model.columns[0].base) +
-      "</td><td></td></tr>");
+    // The current wave's base is the same quantity the crosstab's base row
+    // prints one table below, so it carries the same disclosure marker when
+    // that column is withheld (C2) — otherwise masking the table alone would
+    // be undone by the strip above it.
+    var curMark = render.baseMarker(model.columns[0]);
+    out.push('<td class="wv cur">' +
+      (curMark ? '<span class="supb">' + fmt.escapeHtml(curMark) + "</span>"
+        : fmt.base(model.columns[0].base)) + "</td><td></td></tr>");
     rows.forEach(function (r) {
       var isMean = r.kind === "mean";
       var byYear = {};

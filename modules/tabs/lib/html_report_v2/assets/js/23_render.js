@@ -12,6 +12,26 @@
 
   var render = TR.render = {};
 
+  /* ---- disclosure control: a withheld column's base ----
+   * applyDisclosureSuppression (22_model.js) blanks a sub-k column's cells and
+   * strips the letters pointing at it, but the base row is a disclosure in its
+   * own right: "4" names the headcount of an identifiable subgroup. The
+   * workbook for the same run withholds it as "n<10" (excel_writer.R
+   * write_base_rows -> disclosure_marker), so the two deliverables of one run
+   * would otherwise enforce different standards.
+   *
+   * Returns the marker for a suppressed column and null for every other, so an
+   * unprotected report (k <= 1 — nothing is ever flagged) renders byte-identically.
+   * TR.disclosure is guarded: the flag only ever arrives from a model built with
+   * it loaded, and "n<k" mirrors disclosure_marker()'s own unknown-k branch. */
+  var WITHHELD_TITLE = "Withheld: this column's base is below the confidentiality " +
+    "threshold, so its exact size is not disclosed";
+  render.baseMarker = function (col) {
+    if (!col || !col.suppressed) return null;
+    var k = (TR.disclosure && TR.disclosure.minBase) ? TR.disclosure.minBase() : null;
+    return (k && k > 1) ? "n<" + k : "n<k";
+  };
+
   /* brand helpers shared with the v1 pptx packager */
   TR.charts = TR.charts || {};
   TR.charts.brandOf = function () {
@@ -208,6 +228,13 @@
     });
     out.push("</tr></thead><tbody>");
     var ivLabels = opts.intervals ? TR.conf.labels() : null;
+    var baseCell = function (col, value) {
+      var mark = render.baseMarker(col);
+      return mark
+        ? '<span class="supb" title="' + fmt.escapeHtml(WITHHELD_TITLE) + '">' +
+          fmt.escapeHtml(mark) + "</span>"
+        : value;
+    };
     // Weighted designs: the primary row is the unweighted sample size (it anchors
     // the low-base flag); the weighted + Kish effective bases follow beneath, so
     // the reader can see the report IS weighted and read the design effect. The
@@ -218,6 +245,15 @@
     out.push('<tr class="rb"><td class="lab">' +
       (wtd ? "Base (unweighted)" : "Base (n=)") + "</td>");
     model.columns.forEach(function (col) {
+      // A withheld column prints the marker alone: its worst-case margin
+      // (98/√n) and its coverage note ("2% of 200") each invert to the exact
+      // base, so masking the number and keeping its derivations would disclose
+      // it anyway. Nothing below runs for a suppressed column, which is why an
+      // unprotected report is untouched.
+      if (col.suppressed) {
+        out.push("<td>" + baseCell(col, "") + "</td>");
+        return;
+      }
       // Worst-case margin is sized on the finite-population-corrected effective
       // base when a universe is known (Infinity -> ±0.0pp for a full census).
       var moeBase = col.ciBase != null ? col.ciBase : col.base;
@@ -266,8 +302,8 @@
       if (wproj.show_weighted_base !== false) {
         out.push('<tr class="rb"><td class="lab">Base (weighted)</td>');
         model.columns.forEach(function (col) {
-          out.push("<td>" +
-            (col.baseW != null ? fmt.base(col.baseW) : "–") + "</td>");
+          out.push("<td>" + baseCell(col,
+            col.baseW != null ? fmt.base(col.baseW) : "–") + "</td>");
         });
         out.push("</tr>");
       }
@@ -276,8 +312,8 @@
           'size — significance and confidence intervals are sized on this, not ' +
           'the raw count">Effective base</td>');
         model.columns.forEach(function (col) {
-          out.push("<td>" +
-            (col.baseEff != null ? fmt.base(col.baseEff) : "–") + "</td>");
+          out.push("<td>" + baseCell(col,
+            col.baseEff != null ? fmt.base(col.baseEff) : "–") + "</td>");
         });
         out.push("</tr>");
       }
@@ -389,18 +425,21 @@
     // as unweighted counts.
     var wproj = (TR.AGG && TR.AGG.project) || {};
     var wtd = !!wproj.weighted;
+    // A withheld column's base is masked here too, or the exact headcount the
+    // on-screen table refuses to print would ride out in the clipboard, the
+    // XLSX and the PPTX matrix instead (C2).
     var baseCells = [wtd ? "Base (unweighted)" : "Base (n=)"];
     model.columns.forEach(function (col) {
-      baseCells = baseCells.concat(
-        perCol(fmt.base(col.base) + (col.low ? " ⚠" : ""), "", ""));
+      baseCells = baseCells.concat(perCol(render.baseMarker(col) ||
+        (fmt.base(col.base) + (col.low ? " ⚠" : "")), "", ""));
     });
     var body = [{ kind: "base", cells: baseCells }];
     if (wtd) {
       var baseRow = function (label, key) {
         var cells = [label];
         model.columns.forEach(function (col) {
-          cells = cells.concat(
-            perCol(col[key] != null ? fmt.base(col[key]) : "–", "", ""));
+          cells = cells.concat(perCol(render.baseMarker(col) ||
+            (col[key] != null ? fmt.base(col[key]) : "–"), "", ""));
         });
         body.push({ kind: "base", cells: cells });
       };
