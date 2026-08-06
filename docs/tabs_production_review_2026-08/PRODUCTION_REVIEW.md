@@ -70,10 +70,18 @@ suites green.
 **OPEN — logged residuals:** I20 idx→stable-key migration for reader marks
 (the island is anonymised by design, so ResponseID cannot be embedded as-is;
 scheduled as its own step); I3's weighted-proportion chip still reconstructs
-its count from the rounded percentage; I1/I2 (FPC in the R engine, n_eff
-alignment, Sig.2 carried not recomputed) remain the cross-engine batch on the
-growth path; I6 (Patterns copy edges) and I24 (option-level pairing report) are
-unfixed and unchanged. **M3** (two divergent `format_output_value` definitions,
+its count from the rounded percentage; I6 (Patterns copy edges) and I24
+(option-level pairing report) are unfixed and unchanged.
+
+**I1 and I2 are now FIXED** — the cross-engine statistics batch landed on main
+as `a013112d` (fractional n_eff), `049fc1c2` (Sig.2 and mean-row carriage) and
+`f9ab50d4` (FPC in the R tests, published-view overlay retired), against
+`CROSS_ENGINE_STATS_SPEC.md` in this folder. It also leaves behind a permanent
+parity gate: a synthetic census fixture
+(`modules/tabs/tests/fixtures/parity_project/`), an R suite
+(`test_cross_engine_stats.R`) and a JS suite (`parity_stats_tests.mjs`) that
+render the same R-generated island. Suites after the batch: R 3,508 pass / 0
+fail / 0 warn / 0 skip; confidence 1,063 pass / 0 fail; 26 JS suites green. **M3** (two divergent `format_output_value` definitions,
 the later-sourced one winning) was left alone deliberately: deleting the losing
 copy is a behaviour change on the default branch and deserves its own check.
 The `html_report` retirement entry should come out of `TABS_RETIRED_SETTINGS`
@@ -114,9 +122,11 @@ unrecognised-setting warning.
 
 ### Statistical honesty and cross-output agreement
 
-**I1. FPC parity gap (previously suspected — now confirmed open).** The R/Excel engine has no FPC anywhere (zero callers; FPC exists only in template help text, `generate_config_templates.R:526`). The v2 report narrows intervals and re-letters significance on the FPC-corrected base (`22_model.js:371`, `21c_confidence.js:186-210`). A census project shows different sig letters in Excel vs HTML. *Fix: port the FPC gate into the R engine (known roadmap item) or annotate the Excel output as uncorrected.*
+**I1. FPC parity gap (previously suspected — now confirmed open). FIXED — `f9ab50d4`.** The R/Excel engine had no FPC anywhere (zero callers; FPC existed only in template help text, `generate_config_templates.R:526`). The v2 report narrowed intervals and re-lettered significance on the FPC-corrected base (`22_model.js:371`, `21c_confidence.js:186-210`). A census project showed different sig letters in Excel vs HTML. *Fixed by putting the correction in R and taking it out of the report:* `calculate_fpc_factor()` / `apply_fpc()` / `FPC_MIN_COVERAGE` moved unchanged from the confidence module to `modules/shared/lib/fpc.R`; `weighted_z_test_proportions()` and `weighted_t_test_means()` gained `fpc_mul1`/`fpc_mul2` (default 1, so a report with no population is unchanged); a full-census column is excluded from pairing; `min_base` gates on the corrected base; the NET path passes the same multipliers; weighted studies are corrected too, closing the FPC plan's own out-of-scope gap. The v2 published-view re-lettering overlay (`applyFpcSignificance`) is deleted — it worked from display-rounded percentages and was gated off for weighted designs. FPC intervals, `ciBase`, coverage-aware low-base flags and the PUBLISHED·FPC badge all stay. The stats pack Declaration now states the universe, the coverage and the correction. *Known uncorrected paths, left deliberately:* two callers of `weighted_t_test_means()` outside the crosstab dispatch keep the inert default of 1 — composite (profile) metrics (`composite_processor.R:871`) and ranking mean-rank tests (`ranking/ranking_metrics.R:451`). Neither has a per-column universe to correct against in its current shape, and the default is a no-op rather than a silent half-correction. On a census project their letters are the uncorrected ones; correcting them is a follow-up, not a regression.
 
-**I2. The two significance engines can diverge on weighted studies.** R mean tests use integer-rounded Kish n_eff (`weighting.R:400-401`) with population variance; v2 uses unrounded effBase with n−1 scaling (`21_stats.js:378,96`). Within R itself, proportions get fractional effective bases (`cell_calculator.R:600`) while means get rounded ones — n_eff 29.6 fails min_base 30 for proportions but passes for means. v2's 80% (Sig.2) letters are recomputed from published integer-rounded counts (`22_model.js:94-103`) while R tested unrounded counts — marginal p≈0.20 calls can flip between the Excel Sig.2 row and the HTML lowercase letters. *Fix: align n_eff treatment (fractional everywhere), and carry the R Sig.2 row into the data layer instead of recomputing.*
+**I2. The two significance engines can diverge on weighted studies. FIXED — `a013112d` (n_eff), `049fc1c2` (Sig.2 carriage).** R mean tests used integer-rounded Kish n_eff (`weighting.R:400-401`) with population variance; v2 uses unrounded effBase with n−1 scaling (`21_stats.js:378,96`). Within R itself, proportions got fractional effective bases (`cell_calculator.R:600`) while means got rounded ones — n_eff 29.6 failed min_base 30 for proportions but passed for means. v2's 80% (Sig.2) letters were recomputed from published integer-rounded counts (`22_model.js:94-103`) while R tested unrounded counts. *Fixed:* `calculate_effective_n()` returns the fraction (display sites round at format time), so means and proportions gate on the same base and R matches the JS engine; and the data layer carries the workbook's `Sig.2` row verbatim as `sig2`, from which the report derives its lowercase letters as `sig2` minus `sig` — no recompute, no rounding trap. Mean rows carry letters for the first time, at both alphas (they were tested in R and blank in the report). Islands without `sig2` keep the old recompute as a fallback.
+
+**Residual divergence, bounded and documented (spec D6).** Under live filters and custom banners — where there is no R counterpart to disagree with, and the view is badged *computed* — the JS engine keeps `meanZ` as a z-test where R runs a Welch t, keeps sample-variance scaling `effBase/(effBase-1)` where R uses population variance, and pools weighted proportions on effective bases where R pools on weighted counts. The parity harness pins exact agreement on proportions and asserts the mean divergence only outside a documented band (`parity_stats_tests.mjs`, JS-2 / JS-3). Aligning the mean test is an optional follow-up, not part of this batch.
 
 **I3. The wave-strip significance chip tests display-rounded values — the known rounding trap, live.** `22w_waves.js:545-558` feeds the published (rounded) cell into the wave-on-wave test; for weighted reports the count is reconstructed from the 0dp-rounded percentage. The Tracking tab recomputes from microdata and can disagree with the crosstab chip on the same movement. Aggregate history stored at 1dp has the same exposure, unwarned (`22w:379-390,497-501`). *Fix: put raw values on the wave contribution (as the tracking tab already consumes) and feed `attachDeltas` from them.*
 

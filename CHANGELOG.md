@@ -87,7 +87,32 @@ All notable changes to TURAS are documented in this file.
   - Segment: `validate_segment_config()` 330 -> 38 lines
   - Confidence: `write_confidence_output()` 203 -> 48 lines
 
+- **Tabs (v2 report): the published view no longer re-letters significance for
+  population reports.** That overlay recomputed the letters from
+  display-rounded percentages, and was switched off entirely for weighted
+  designs — so a weighted census silently kept uncorrected letters. With R
+  correcting at source it was a second, worse computation of the same thing,
+  and it is gone. FPC confidence intervals, the corrected interval base,
+  coverage-aware low-base flags, the census framing and the PUBLISHED·FPC badge
+  are all unchanged. Filtered and custom-banner views keep standard
+  significance, as before — a sub-population's universe is unknown.
+
 ### Fixed
+- **Tabs: significance testing is finite-population corrected — in the Excel
+  workbook as well as the report.** For a census / full-invite study the
+  interactive report has narrowed its intervals on the FPC-corrected base for a
+  while, but the workbook — the deliverable of record — tested on the raw base,
+  so Excel and HTML could letter the same pair differently. The correction now
+  happens once, in the R engine, and the letters are carried everywhere from
+  there. Weighted census studies are corrected for the first time. Two visible
+  consequences on a census report: a **fully counted column carries no
+  significance letters** (there is no sampling error left to test), and a
+  corrected column earns letters more readily than the same data without a
+  population configured. `calculate_fpc_factor()`, `apply_fpc()` and the 5%
+  coverage floor moved unchanged from the confidence module to
+  `modules/shared/lib/fpc.R` so both modules share one definition. With no
+  Population configuration nothing changes. See the FPC section of
+  `OPERATOR_GUIDE.md`.
 - **Tabs: the mean test and the proportion test now size on the same effective
   base.** `calculate_effective_n()` returned an integer-rounded Kish n_eff while
   `calculate_effective_base()` — the one the proportion tests actually ride —

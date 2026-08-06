@@ -78,7 +78,14 @@ appear on the stats pack Declaration sheet for sign-off and provenance purposes.
 
 ## Finite Population Correction (Census Surveys)
 
-For a **census / full-invite** study — you tried to reach a whole, known, finite group (all staff, an entire student body) rather than sampling from a large frame — the tabs **v2 interactive report** can apply a finite population correction (FPC). It sizes the statistics on what was actually reached: confidence intervals **narrow as a group's coverage of its universe rises** (reaching zero for a full census), significance is tested on that corrected base, and a small base that is most of its known group is no longer flagged "unstable" (it shows `xx% of N` instead). The reported percentages and means never change — only the intervals and the significance flags.
+For a **census / full-invite** study — you tried to reach a whole, known, finite group (all staff, an entire student body) rather than sampling from a large frame — Turas can apply a finite population correction (FPC). It sizes the statistics on what was actually reached: confidence intervals **narrow as a group's coverage of its universe rises** (reaching zero for a full census), significance is tested on that corrected base, and a small base that is most of its known group is no longer flagged "unstable" (it shows `xx% of N` instead). The reported percentages and means never change — only the intervals and the significance flags.
+
+**It applies to the Excel workbook too, not just the interactive report.** The correction is computed once, in the R engine, so the `Sig.` and `Sig.2` rows in the workbook and the letters in the report are the same letters. Two consequences worth knowing before you read a census deliverable:
+
+- **A fully counted column carries no significance letters at all.** If you reached everyone in a group, there is no sampling error left to test — the difference you can see is simply the difference. Turas leaves that column out of the pairwise tests rather than reporting a p-value for a number that is not an estimate. It still shows its percentages, its base and its interval (which collapses to the point estimate).
+- **A corrected column earns letters more easily.** A smaller standard error means a difference that fell just short of significance on an uncorrected base can clear it. This is the correction doing its job, but it does mean a census report is not directly comparable to the same data run without a population configured.
+
+Weighted census studies are corrected too: the correction and the design effect stack, so the test rides the weighted effective base with the correction applied to it.
 
 > FPC corrects **sampling** error only. It does nothing about **non-response bias** — whether the people who did not answer differ from those who did. The report's design note states the response rate and this caveat; you should still check whether low-response groups look different before leaning on group-level findings.
 
@@ -112,7 +119,8 @@ Set `sampling_method = Census` as well, so the report speaks "confidence interva
 
 ### Safe by design
 
-- **No population configured** → the report behaves exactly as before (standard intervals). FPC is purely additive.
+- **No population configured** → the report and the workbook behave exactly as before (standard intervals, uncorrected significance). FPC is purely additive.
+- **Under a filter or a custom banner** → the interactive report reverts to standard significance, because a filtered sub-population's universe is unknown. Those views are already badged *computed*; the correction belongs to the published cuts you configured a universe for.
 - **Incomplete data** → groups with a known `N` are corrected; groups without keep a standard interval. Any `Population` row that matches **no** report column (a typo or stale label) is reported on the console (`matched X of Y subgroup rows…` plus the offending labels), so nothing is silently skipped.
 
 ---
