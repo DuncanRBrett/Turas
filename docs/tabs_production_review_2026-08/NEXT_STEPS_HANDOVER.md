@@ -26,7 +26,17 @@ be separate sessions (separate commits, separate verification).
 
 ---
 
-## Job A — I20 implementation: reader-mark re-keying
+## Job A — I20 implementation: reader-mark re-keying — **DONE (2026-08-06)**
+
+Landed to the design, with its §5 test list in full: 8 R areas in the new
+`test_qual_reader_keys.R` (plus island-shape regressions in
+`test_qual_island_builder.R` and an end-to-end sidecar test in
+`test_qual_report.R`), and 9 JS areas in the new
+`html_report_v2/tests/qual_rekey_tests.mjs`. R suite 3,516 pass / 0 fail /
+0 warn / 0 skip; 27 JS suites green. Review doc and OPERATOR_GUIDE updated;
+three implementation notes recorded in the design's new §7. **Job B below is
+untouched and still open.** The rest of this section is the original brief.
+
 
 **The design is done and is binding: `I20_READER_MARK_REKEYING_DESIGN.md` in
 this folder.** Read it end to end before writing code; it names the files,

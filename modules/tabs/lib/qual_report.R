@@ -12,7 +12,8 @@
 # here; only the banner/index source (qual_assemble.R) would change.
 #
 # Depends on (sourced by the pipeline): qual_workbook_io.R, qual_assemble.R,
-# qual_island_builder.R, qual_quant_layer.R, data_layer_writer.R, microdata_writer.R,
+# qual_island_builder.R, qual_reader_keys.R, qual_quant_layer.R, data_layer_writer.R,
+# microdata_writer.R,
 # html_report_v2/build_report_v2.R, trs_refusal.R, jsonlite.
 #
 # Run the tests with:
@@ -108,12 +109,18 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
                                   survey_structure)
   read_result$questions <- tagged$questions
   joined$master <- tagged$master
+  # Stable reader keys (I20): an opaque token per respondent so a shortlist star,
+  # a highlighted passage or a hub membership stays on ITS comment across a
+  # re-export. A missing/corrupt sidecar returns map = NULL and the island simply
+  # builds without rids (the JS then keys marks by idx, exactly as before).
+  reader_keys <- qual_reader_keys(names(joined$master$id_to_idx), config_obj)
   island <- qual_build_data_qual(read_result$questions, joined$master, list(
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
     noteworthy_default = config_obj$qual_noteworthy_default,
     verbatim_scope = config_obj$qual_verbatim_scope,
-    min_reporting_base = config_obj$min_reporting_base))   # k for "safe" tag anonymisation
+    min_reporting_base = config_obj$min_reporting_base),   # k for "safe" tag anonymisation
+    rid_map = reader_keys$map)
   list(status = "PASS", json = serialize_data_qual(island), island = island,
        matched = joined$matched, total = joined$total, id_column = joined$id_column)
 }
@@ -255,12 +262,16 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
     project_name = config_obj$project_name))
   if (is.null(quant$agg)) qual_refuse_no_themes(qual_path, module)
 
+  # Stable reader keys (I20) — see build_integrated_qual_island. Phase 1 and Phase 2
+  # share one keying rule: the ids are `names(master$id_to_idx)` in both.
+  reader_keys <- qual_reader_keys(names(master$id_to_idx), config_obj)
   island <- qual_build_data_qual(read_result$questions, master, list(
     text_mode = config_obj$qual_confidentiality_mode,
     demographic_cuts = config_obj$qual_demographic_cuts,
     noteworthy_default = config_obj$qual_noteworthy_default,
     verbatim_scope = config_obj$qual_verbatim_scope,
-    min_reporting_base = config_obj$min_reporting_base))   # k for "safe" tag anonymisation
+    min_reporting_base = config_obj$min_reporting_base),   # k for "safe" tag anonymisation
+    rid_map = reader_keys$map)
 
   # The quant run used a minimal unweighted/dual-sig config; re-brand the project
   # from the user's config (logos, colours, the show_* tab flags) and mark it as

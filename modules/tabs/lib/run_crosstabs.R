@@ -204,6 +204,7 @@ source(file.path(script_dir, "qual_unions.R"))
 source(file.path(script_dir, "qual_workbook_io.R"))
 source(file.path(script_dir, "qual_assemble.R"))
 source(file.path(script_dir, "qual_island_builder.R"))
+source(file.path(script_dir, "qual_reader_keys.R"))
 source(file.path(script_dir, "qual_quant_layer.R"))
 source(file.path(script_dir, "qual_report.R"))
 

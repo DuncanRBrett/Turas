@@ -67,14 +67,28 @@ code inventory. Suites at that point: R 3,327 pass / 0 fail / 0 warn / 0 skip
 (3,587 before the classic suites were deleted with their code); all 25 JS
 suites green.
 
-**OPEN — logged residuals:** I20 idx→stable-key migration for reader marks
-(the island is anonymised by design, so ResponseID cannot be embedded as-is;
-scheduled as its own step — design first, implementation after). The design
-is done: `I20_READER_MARK_REKEYING_DESIGN.md` in this folder — persisted
-random per-respondent tokens (`rid`) minted R-side into a
-`*_reader_keys.json` sidecar beside the config, marks re-keyed
-`qcode#@<rid>`, one-time idx→rid localStorage migration stamped `_v: 2`.
-Implementation (with its §5 test plan) is the remaining step.
+**I20 is now FIXED** (2026-08-06), to the binding design in
+`I20_READER_MARK_REKEYING_DESIGN.md`. Its other half was already closed
+(`qual.textPublished` re-gates every frozen qualitative pin at render,
+`8d1eea85`); this is the idx→stable-key migration. Tabs R suite 3,516 pass /
+0 fail / 0 skip / 0 warn (was 3,441); 27 JS suites green (26 + the new
+`qual_rekey_tests.mjs`). Every part was verified to fail against the pre-fix
+code first.
+
+| Piece | What changed |
+|---|---|
+| **R — the token** | New `lib/qual_reader_keys.R`. `qual_reader_keys(ids, config_obj)` loads or mints an append-only `<config>_reader_keys.json` sidecar of 16-hex random per-respondent tokens, beside the config exactly like the AI-insights sidecar. Never deletes an entry (a respondent who drops out of an export and returns re-attaches to their old marks); never re-mints over an unreadable sidecar (that would orphan every mark); restores the global RNG so minting cannot shift a seeded draw elsewhere in the run. No config path, an unreadable sidecar or a failed write each degrade loudly — boxed console warning — to the pre-I20 island, so nothing ever mis-attaches. |
+| **R — the island** | `rid` rides each record beside `idx` through default-NULL parameters (`qual_build_data_qual` → `qual_build_question_island` → `qual_build_record_island`). `idx` changes nowhere, so the banner filter masks still join on it. Both entry points in `qual_report.R` wire the map; the same id universe (`names(master$id_to_idx)`) keys Phase 1 and Phase 2. `rid` is uniform random, so it ships under every privacy dial. |
+| **JS — keying** | One rule in `27q_qualitative.js`: `markKeyFor(qcode, rec)` → `qcode#@<rid>` when the record carries a token, `qcode#<idx>` when it does not. Shortlist, highlights and hubs all key through it; `splitMark`/`recordIndex` resolve by that ref, and a record index by `idx` is deliberately NOT kept as a fallback — a stray positional key must read as an orphan, never silently grab whoever now sits at that position. Legacy output is byte-identical (gated). |
+| **JS — migration** | One `migrateMarkStore(stored, kind)` inside the three store loaders, gated on a `_v` stamp. A version-less idx store meeting a rid-bearing island is re-keyed once through that island's own idx assignment and persisted immediately with `_owns` exactly as found (migration is not a reader change); hubs rewrite only their `marks`, leaving `seq`/`order`/`name`/`insight` alone. Unresolved idx keys are dropped with one `console.info` naming the count; already-rid keys pass through untouched, so a saved copy's embedded state is a no-op. A `_v: 2` store read against a rid-less island is left completely alone — never re-keyed back toward idx. |
+| **Docs** | OPERATOR_GUIDE gains "The Reader-Key Sidecar": what it is, that it must not be deleted or the config renamed, that it travels with the project, and the §3.4 one-rebuild rule — after this ships, rebuild each project once from unchanged data before the next real re-export. |
+
+**Known and documented** (design §3.4): the shim maps old keys through the
+*current* island's idx assignment, which is right precisely when the first
+rid-bearing rebuild uses the same data the marks were made against. If that
+first rebuild also changes the roster, legacy marks migrate to the wrong
+respondents once — exactly as they would have mis-attached under the status
+quo. There is no client-side detection; the operator rule is in the guide.
 
 **I3 (proportion half), I6, I24, M12 and M14 are now FIXED** (2026-08-06,
 branch `fix/tabs-prodreview-batch-2`). Tabs R suite 3,441 pass / 0 fail / 0 skip
@@ -191,7 +205,7 @@ unrecognised-setting warning.
 
 **I19. The ResponseID join breaks silently on numeric IDs ≥ 1e5.** `as.character()` on a double ID column yields "1e+05" vs the workbook's "100000" — those respondents' comments silently unjoin while the run stays PASS (`qual_assemble.R:178,330`; reproduced). *Fix: `format(…, scientific = FALSE, trim = TRUE)` on both sides; test with 6-digit IDs.*
 
-**I20. Reader marks and hub pins are keyed by positional `idx` and survive rebuilds in localStorage.** Re-export the data with one respondent added/removed and shortlists/highlights/hub memberships silently re-attach to *different respondents' comments* (`27q:463,532,946`; `qual_assemble.R:45-53,177-184`). Hub-exhibit pins additionally freeze verbatim text into the snapshot, so a disclosure-tightening rebuild (new hide mark, mode full→hidden) does not reach pinned quotes — Story, present mode and the PPTX quote slide still carry the withheld text (`27q:1082-1093`, `30_story.js:21-60,730-736`), while priority pins re-resolve on every render precisely to avoid this. *Fix: key marks by ResponseID (stable), and make hub exhibits re-resolve like priority pins do (or stamp a data-version and orphan the pin on mismatch).*
+**I20. Reader marks and hub pins are keyed by positional `idx` and survive rebuilds in localStorage.** Re-export the data with one respondent added/removed and shortlists/highlights/hub memberships silently re-attach to *different respondents' comments* (`27q:463,532,946`; `qual_assemble.R:45-53,177-184`). Hub-exhibit pins additionally freeze verbatim text into the snapshot, so a disclosure-tightening rebuild (new hide mark, mode full→hidden) does not reach pinned quotes — Story, present mode and the PPTX quote slide still carry the withheld text (`27q:1082-1093`, `30_story.js:21-60,730-736`), while priority pins re-resolve on every render precisely to avoid this. *Fix: key marks by ResponseID (stable), and make hub exhibits re-resolve like priority pins do (or stamp a data-version and orphan the pin on mismatch).* — **FIXED** (both halves): pins re-gate through `qual.textPublished` (`8d1eea85`); marks now key on a persisted random `rid` token, with a one-time localStorage migration. ResponseID itself is deliberately *not* embedded — the island is readable in View-Source, so a shipped id would rejoin an "anonymous" comment to a named respondent. See the summary table above and `I20_READER_MARK_REKEYING_DESIGN.md`.
 
 **I21. dc94b822's withheld-from-collection count is computed but never rendered** (found independently by two reviewers): `collectPool` returns `withheld`, the collection cover surfaces only `orphans` (`27q:810-825` vs :2034-2036) — a shortlisted comment withheld by a rebuild silently vanishes, the exact failure the commit set out to fix; its test asserts only the counter. *Fix: render the count on the cover; extend the test to the rendered cover.*
 

@@ -1,7 +1,11 @@
 # I20 — Reader-mark re-keying: design
 
-**Status:** DESIGN — approved for implementation (Fable design 2026-08-06;
-implementation is a separate step).
+**Status:** IMPLEMENTED 2026-08-06, to this design. R suite 3,516 pass / 0 fail
+/ 0 warn / 0 skip; 27 JS suites green (the new one is
+`html_report_v2/tests/qual_rekey_tests.mjs`). Three implementation notes are
+recorded at the end (§7): a refinement of §3.3 rule 4, the `_v` stamp's
+persist rule, and the RNG restore around minting.
+
 **Scope:** the open residual of I20 only — the idx→stable-key migration for
 reader marks. The other half of I20 (frozen hub pins carrying withheld text
 past a disclosure-tightening rebuild) is already fixed: `qual.textPublished`
@@ -273,3 +277,38 @@ travels with the config) and the one-rebuild caveat from §3.4.
   code, not respondent; unaffected by roster changes.
 - Cross-wave mark continuity — a different feature with real privacy
   trade-offs; not requested, not designed here.
+
+---
+
+## 7. Implementation notes (2026-08-06)
+
+Two places where building it made the design more specific. Neither changes the
+shape or the privacy argument.
+
+**7.1 §3.3 rule 4 — "unresolved keys are dropped" applies to *legacy* keys only.**
+A key already in rid form (`qcode#@…`) passes through the shim untouched; only a
+key whose suffix is positional is looked up in the map, and only that lookup can
+fail and drop. Read literally, rule 4 would have destroyed a saved copy's
+embedded state: `savedAll()`/`highlightsAll()` emit marks with no `_v` stamp (the
+stamp is a store field, not a mark), so a new saved copy's `userState` is
+rid-keyed *and* version-less — exactly the shape rule 1 triggers on. Every one of
+its keys would then have missed the idx-keyed map and been dropped. The `@`
+prefix already exists to make the two forms unambiguous by inspection (§3.2), so
+using it here costs nothing and makes the design's own "the seed path routes
+through the same normaliser anyway, as cheap defence" true rather than harmful.
+Gated by `qual_rekey_tests.mjs` 9b.
+
+**7.2 The `_v` stamp has to survive an ordinary persist, and must not be written
+in legacy mode.** Once a store is migrated, every later reader edit rewrites it —
+so `savedPersist`/`hlPersist`/`hubsPersist` stamp `_v: 2` too, or the next load
+would re-migrate an already-rid-keyed store and drop all of it. The stamp is
+written **only while the island carries rids**: stamping in legacy mode would
+mark an idx-keyed store as migrated, and a later rid-bearing rebuild (the
+corrupt-sidecar case, once fixed) would then never migrate it. `normalizeHubs`
+carries `_v` through for the same reason. Gated by tests 3d and 8b.
+
+**7.3 Minting restores the RNG.** `sample()` advances the global RNG state, and
+a Turas run may hold a seed for a bootstrap elsewhere. `qual_reader_keys()`
+saves and restores `.Random.seed` around minting (removing it again if there was
+none), so adding respondents to a project cannot shift an unrelated seeded
+result. Gated in `test_qual_reader_keys.R`.

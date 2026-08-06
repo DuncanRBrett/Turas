@@ -108,9 +108,12 @@ qual_verbatim_shows <- function(rec, scope) {
 #' @param scope Verbatim scope ("all" or "noteworthy") — governs whether THIS record's
 #'   text ships. A withheld record is emitted with text = null and suppressed = TRUE, so
 #'   it still counts in the distribution but is never listed as a readable comment.
+#' @param rid The respondent's opaque reader-key token (`qual_reader_keys`), or NULL.
+#'   Emitted only when non-NULL, so an island built without the sidecar is byte-identical
+#'   to the pre-I20 shape and the JS stays on legacy idx keying.
 #' @return list(record, redactions).
 qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_labels,
-                                      scope = "all") {
+                                      scope = "all", rid = NULL) {
   shows <- qual_verbatim_shows(rec, scope)
   # A withheld verbatim never enters the island as text (build-time confidentiality /
   # curation) — no text mode, no PII scrub needed, nothing readable in the page source.
@@ -126,6 +129,10 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
     noteworthy = isTRUE(rec$noteworthy), tier = rec$noteworthy_tier,
     sentiment = rec$sentiment, rating = rec$rating, themeVals = theme_vals
   )
+  # The stable reader key. Uniform random, so it discloses nothing under any privacy
+  # dial (block / safe / hidden / aggregates-only) — it is the ONE field that survives
+  # a re-export, which is what stops a reader mark drifting onto another respondent.
+  if (!is.null(rid) && length(rid) == 1L && !is.na(rid) && nzchar(rid)) record$rid <- as.character(rid)
   # suppressed = withheld from the readable list (scope or hide). Emitted only when true
   # so the JS drops it from the comment list while still counting it everywhere else;
   # absent (the common case) reads as false, keeping the island lean.
@@ -235,9 +242,11 @@ qual_kanon_tags_by_group <- function(rows, ids, bands, labels, k) {
 #' @param demo_map Optional named list (respondent id -> k-anonymised demos) used by the
 #'   "safe" tagging mode; when supplied it replaces each record's raw demographics.
 #' @param scope Verbatim scope ("all" or "noteworthy"), passed to each record build.
+#' @param rid_map Optional named character vector (respondent id -> reader token) from
+#'   `qual_reader_keys()`. NULL (the default) builds the pre-I20 island shape.
 #' @return The per-question island list (code, title, type, base, themes, records, meta).
 qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labels = character(0),
-                                       demo_map = NULL, scope = "all") {
+                                       demo_map = NULL, scope = "all", rid_map = NULL) {
   themes <- question$roles$themes
   theme_list <- lapply(seq_along(themes),
                        function(i) list(id = i - 1L, label = themes[[i]]$label))
@@ -251,7 +260,10 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
     slot <- unname(id_to_idx[rec$id])
     if (length(slot) != 1L || is.na(slot)) next
     if (!is.null(demo_map)) rec$demos <- demo_map[[as.character(rec$id)]]   # "safe" mode k-anon tags
-    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels, scope)
+    # Same single-bracket lookup discipline as id_to_idx: an id the sidecar has never
+    # seen yields NA, which the record builder drops (that record simply keeps idx keying).
+    rid <- if (is.null(rid_map)) NULL else unname(rid_map[as.character(rec$id)])
+    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels, scope, rid)
     records[[length(records) + 1L]] <- built$record
     redactions <- redactions + built$redactions
   }
@@ -273,13 +285,16 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
 #' @param questions List of classified questions from `qual_read_workbook()`.
 #' @param master The respondent master from `qual_build_respondent_master()`.
 #' @param config List with `text_mode`, `demographic_cuts`, `noteworthy_default`.
+#' @param rid_map Optional named character vector (respondent id -> reader token) from
+#'   `qual_reader_keys()`. When supplied each record carries a stable `rid` beside its
+#'   `idx`, so reader marks survive a re-export. NULL builds the pre-I20 island shape.
 #' @return The DATA_QUAL island list (textMode, demographicCuts, noteworthyDefault, n, questions).
 #' @examples
 #' \dontrun{
 #'   island <- qual_build_data_qual(res$questions, master,
 #'                                  list(text_mode = "hidden", demographic_cuts = "allow"))
 #' }
-qual_build_data_qual <- function(questions, master, config = list()) {
+qual_build_data_qual <- function(questions, master, config = list(), rid_map = NULL) {
   text_mode <- qual_validate_text_mode(qual_cfg(config, "text_mode", "hidden"))
   raw_cuts <- qual_cfg(config, "demographic_cuts", "allow")
   cuts <- if (identical(raw_cuts, "block")) "block" else
@@ -324,7 +339,8 @@ qual_build_data_qual <- function(questions, master, config = list()) {
     }
   }
   islands <- lapply(questions,
-                    function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels, demo_map, scope))
+                    function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels,
+                                                           demo_map, scope, rid_map))
   out <- list(textMode = text_mode, demographicCuts = cuts, noteworthyDefault = default_tier,
               verbatimScope = scope, n = master$n, questions = islands)
   if (length(demo_labels)) {

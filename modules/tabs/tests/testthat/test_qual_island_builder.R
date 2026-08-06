@@ -294,3 +294,35 @@ test_that("qual_verbatim_shows encodes the gate (hide always wins; scope picks t
   expect_false(qual_verbatim_shows(ord, "noteworthy"))
   expect_false(qual_verbatim_shows(hid, "noteworthy"))
 })
+
+# ==============================================================================
+# READER KEYS (I20) — the rid parameters are additive and default to absent
+# ==============================================================================
+#
+# Every rid parameter defaults to NULL, so every pre-I20 caller (and every test
+# above) builds the island it always built. This pins that: the shape only gains
+# `rid` when a map is actually supplied.
+
+test_that("the pre-I20 call shape produces records with no rid field", {
+  island <- qual_build_data_qual(list(themed_question(records)), master,
+                                 list(text_mode = "full"))
+  for (r in island$questions[[1]]$records) expect_false("rid" %in% names(r))
+})
+
+test_that("a rid_map stamps each record's token without disturbing idx", {
+  island <- qual_build_data_qual(list(themed_question(records)), master,
+                                 list(text_mode = "full"),
+                                 rid_map = c("1" = "aaaaaaaaaaaaaaaa", "2" = "bbbbbbbbbbbbbbbb"))
+  r0 <- first_record(island$questions[[1]], 0L)
+  r1 <- first_record(island$questions[[1]], 1L)
+  expect_equal(r0$rid, "aaaaaaaaaaaaaaaa")
+  expect_equal(r1$rid, "bbbbbbbbbbbbbbbb")
+  expect_equal(r0$idx, 0L)                      # idx is untouched — the masks still join on it
+  expect_equal(r1$idx, 1L)
+})
+
+test_that("qual_build_question_island keeps its pre-I20 arity", {
+  q <- qual_build_question_island(themed_question(records), master$id_to_idx, "full")
+  expect_equal(q$base$answered, 2L)
+  for (r in q$records) expect_false("rid" %in% names(r))
+})

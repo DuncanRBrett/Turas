@@ -439,6 +439,129 @@
       }).join("") + "</div>";
   };
 
+  // ---- stable mark keys + the one-time re-key (I20) ---------------------------
+  // A reader mark keys on the respondent's opaque `rid` token when the island
+  // carries one (`qcode#@<rid>`), and on the positional `idx` when it does not
+  // (`qcode#<idx>`). `idx` shifts whenever the data is re-exported — add one
+  // respondent, or merely reorder the export, and an idx-keyed mark silently
+  // re-attaches to a DIFFERENT respondent's comment. `rid` does not move.
+  //
+  // The "@" prefix keeps the two forms unambiguous by inspection (a hex token can
+  // be all digits), so a key never has to be guessed at. Legacy mode is the
+  // ABSENCE of the feature, not a second code path: an island built before this
+  // shipped — or by a build whose reader-key sidecar was missing or corrupt —
+  // produces byte-identical keys to the ones it always produced.
+
+  /** The key suffix for a record; a bare idx or an already-built suffix passes through. */
+  function markRef(rec) {
+    if (rec != null && typeof rec === "object") {
+      return rec.rid != null ? "@" + rec.rid : String(rec.idx);
+    }
+    return String(rec);
+  }
+  /** The mark key for a comment: qcode#@<rid>, or qcode#<idx> in legacy mode. */
+  function markKeyFor(qcode, rec) { return qcode + "#" + markRef(rec); }
+  qual.markRef = markRef;                 // node gate + the render handlers
+  qual.markKeyFor = markKeyFor;
+
+  // Store meta fields — never marks, never embedded in a saved copy.
+  var STORE_META = { _owns: 1, _v: 1 };
+  var MARK_STORE_V = 2;                   // stores keyed by rid carry _v: 2
+
+  var rekeyCache;                         // undefined = unbuilt; null = island has no rids
+  /** legacy key -> rid key, built once per load from THIS island's idx assignment
+   *  (which is exactly what the legacy key was). null when no record carries a rid. */
+  function rekeyMap() {
+    if (rekeyCache !== undefined) return rekeyCache;
+    var map = null;
+    (((typeof TR !== "undefined" && TR.QUAL) || {}).questions || []).forEach(function (q) {
+      (q.records || []).forEach(function (r) {
+        if (r.rid == null) return;
+        if (!map) map = {};
+        map[q.code + "#" + r.idx] = q.code + "#@" + r.rid;
+      });
+    });
+    rekeyCache = map;
+    return map;
+  }
+  qual._resetRekey = function () { rekeyCache = undefined; };   // node gate
+
+  /** True while this report's marks are rid-keyed — i.e. a persist should stamp _v. */
+  function ridKeyed() { return !!rekeyMap(); }
+  function stampVersion(out) { if (ridKeyed()) out._v = MARK_STORE_V; return out; }
+
+  function writeStore(key, obj) {
+    try {
+      if (typeof localStorage !== "undefined" && TR.d2) {
+        localStorage.setItem(TR.d2.storeKey(key), JSON.stringify(obj));
+      }
+    } catch (e) { /* storage blocked — the store stays in memory */ }
+  }
+
+  /**
+   * Re-key a legacy idx-keyed store onto the rids, once.
+   *   kind "flat" — the shortlist / highlight stores ({ key: value } + _owns).
+   *   kind "hubs" — the hub store; only each hub's `marks` map is rewritten,
+   *                 seq / order / name / insight are carried verbatim.
+   * A store already stamped `_v` is returned untouched (idempotent by
+   * construction), and a `_v` store read against a rid-less island is NEVER
+   * re-keyed back toward idx — its marks are invisible until a rid-bearing
+   * island returns (the corrupt-sidecar case), but they are not destroyed.
+   * Ownership (`_owns`) is preserved exactly as found: migration is not a reader
+   * change, and claiming ownership here would stop the island seed merging.
+   * A key already in rid form passes through untouched; an idx key with no
+   * matching record in this run is dropped (it points at nothing renderable) and
+   * the count is logged once.
+   * @return { store, changed, dropped }
+   */
+  function migrateMarkStore(stored, kind) {
+    var unchanged = { store: stored, changed: false, dropped: 0 };
+    if (!stored || typeof stored !== "object") return unchanged;
+    if (stored._v) return unchanged;
+    var map = rekeyMap();
+    if (!map) return unchanged;
+    var dropped = 0;
+    var rekeyOne = function (k) {
+      var at = k.lastIndexOf("#");
+      if (at >= 0 && k.charAt(at + 1) === "@") return k;   // already rid-keyed
+      return map[k] || null;                               // null -> unresolved, dropped
+    };
+    var rekeyMarks = function (marks) {
+      var out = {};
+      Object.keys(marks).forEach(function (k) {
+        var to = rekeyOne(k);
+        if (to) out[to] = marks[k]; else dropped++;
+      });
+      return out;
+    };
+    var out;
+    if (kind === "hubs") {
+      var byId = (stored.byId && typeof stored.byId === "object") ? stored.byId : {};
+      var outById = {};
+      Object.keys(byId).forEach(function (id) {
+        var h = byId[id] || {}, copy = {};
+        Object.keys(h).forEach(function (p) { copy[p] = h[p]; });
+        if (h.marks && typeof h.marks === "object") copy.marks = rekeyMarks(h.marks);
+        outById[id] = copy;
+      });
+      out = { seq: stored.seq, order: stored.order, byId: outById };
+    } else {
+      out = {};
+      Object.keys(stored).forEach(function (k) {
+        if (k === "_owns") { out._owns = stored._owns; return; }
+        var to = rekeyOne(k);
+        if (to) out[to] = stored[k]; else dropped++;
+      });
+    }
+    out._v = MARK_STORE_V;
+    if (dropped && typeof console !== "undefined" && console.info) {
+      console.info("Turas: " + dropped + " reader mark(s) dropped — the comments they " +
+        "pointed at are not in this data run.");
+    }
+    return { store: out, changed: true, dropped: dropped };
+  }
+  qual._migrateMarkStore = migrateMarkStore;   // node gate
+
   // ---- shortlist: star a comment; survives "Save copy" -----------------------
   // Mirrors the insights/notes store: seed from the saved-copy island
   // (TR.userState.qualSaved), let the reader's own localStorage edits win, and
@@ -454,35 +577,37 @@
       var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(SAVED_KEY));
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // I20: a legacy idx-keyed store is re-keyed onto the rids ONCE, before
+    // anything reads it, and persisted straight away with its ownership as found.
+    var mig = migrateMarkStore(own, "flat");
+    if (mig.changed) { own = mig.store; writeStore(SAVED_KEY, own); }
     // Ownership marker: once the reader changes anything here, the persisted
     // localStorage state carries _owns:true and is authoritative — the island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
     if (own && own._owns) {
-      Object.keys(own).forEach(function (k) { if (k !== "_owns") savedCache[k] = own[k]; });
+      Object.keys(own).forEach(function (k) { if (!STORE_META[k]) savedCache[k] = own[k]; });
       return savedCache;
     }
-    if (TR.userState && TR.userState.qualSaved) {
-      Object.keys(TR.userState.qualSaved).forEach(function (k) { if (k !== "_owns") savedCache[k] = TR.userState.qualSaved[k]; });
+    var seed = TR.userState && TR.userState.qualSaved;
+    if (seed) {
+      seed = migrateMarkStore(seed, "flat").store;   // cheap defence; a rid-keyed seed is a no-op
+      Object.keys(seed).forEach(function (k) { if (!STORE_META[k]) savedCache[k] = seed[k]; });
     }
-    if (own) Object.keys(own).forEach(function (k) { if (k !== "_owns") savedCache[k] = own[k]; });
+    if (own) Object.keys(own).forEach(function (k) { if (!STORE_META[k]) savedCache[k] = own[k]; });
     return savedCache;
   }
   function savedPersist() {
-    try {
-      if (typeof localStorage !== "undefined" && TR.d2) {
-        var out = { _owns: true };   // every persist here is a reader change
-        Object.keys(savedStore()).forEach(function (k) { out[k] = savedStore()[k]; });
-        localStorage.setItem(TR.d2.storeKey(SAVED_KEY), JSON.stringify(out));
-      }
-    } catch (e) { /* storage blocked — the shortlist stays in memory */ }
+    var out = stampVersion({ _owns: true });   // every persist here is a reader change
+    Object.keys(savedStore()).forEach(function (k) { out[k] = savedStore()[k]; });
+    writeStore(SAVED_KEY, out);
   }
-  function savedKey(qcode, idx) { return qcode + "#" + idx; }
+  function savedKey(qcode, rec) { return markKeyFor(qcode, rec); }
 
-  qual.isSaved = function (qcode, idx) { return !!savedStore()[savedKey(qcode, idx)]; };
-  qual.toggleSave = function (qcode, idx) {
-    var s = savedStore(), k = savedKey(qcode, idx);
+  qual.isSaved = function (qcode, rec) { return !!savedStore()[savedKey(qcode, rec)]; };
+  qual.toggleSave = function (qcode, rec) {
+    var s = savedStore(), k = savedKey(qcode, rec);
     if (s[k]) delete s[k]; else s[k] = 1;
     savedPersist();
     return !!s[k];
@@ -495,11 +620,12 @@
     return Object.keys(s).filter(function (k) { return k.indexOf(pre) === 0; }).length;
   };
   qual.savedFilter = function (records, qcode) {
-    return (records || []).filter(function (r) { return qual.isSaved(qcode, r.idx); });
+    return (records || []).filter(function (r) { return qual.isSaved(qcode, r); });
   };
 
   // ---- highlight a passage inside a comment (survives "Save copy") -----------
-  // Stores character ranges [start,end] into the comment's exact text, keyed qcode#idx,
+  // Stores character ranges [start,end] into the comment's exact text, keyed by the
+  // mark key (qcode#@rid, or qcode#idx in legacy mode),
   // seeded from the saved-copy island + per-report localStorage (like the shortlist).
   // renderHighlighted() wraps the ranges in <mark>; the selection wiring lives in wire().
 
@@ -513,29 +639,31 @@
       var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(HL_KEY));
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
+    // I20: the same one-time re-key as the shortlist — the stored range arrays
+    // ride across verbatim, only their keys change.
+    var mig = migrateMarkStore(own, "flat");
+    if (mig.changed) { own = mig.store; writeStore(HL_KEY, own); }
     // Ownership marker: once the reader changes anything here, the persisted
     // localStorage state carries _owns:true and is authoritative — the island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
     if (own && own._owns) {
-      Object.keys(own).forEach(function (k) { if (k !== "_owns") hlCache[k] = own[k]; });
+      Object.keys(own).forEach(function (k) { if (!STORE_META[k]) hlCache[k] = own[k]; });
       return hlCache;
     }
-    if (TR.userState && TR.userState.qualHighlights) {
-      Object.keys(TR.userState.qualHighlights).forEach(function (k) { if (k !== "_owns") hlCache[k] = TR.userState.qualHighlights[k]; });
+    var seed = TR.userState && TR.userState.qualHighlights;
+    if (seed) {
+      seed = migrateMarkStore(seed, "flat").store;   // cheap defence; a rid-keyed seed is a no-op
+      Object.keys(seed).forEach(function (k) { if (!STORE_META[k]) hlCache[k] = seed[k]; });
     }
-    if (own) Object.keys(own).forEach(function (k) { if (k !== "_owns") hlCache[k] = own[k]; });
+    if (own) Object.keys(own).forEach(function (k) { if (!STORE_META[k]) hlCache[k] = own[k]; });
     return hlCache;
   }
   function hlPersist() {
-    try {
-      if (typeof localStorage !== "undefined" && TR.d2) {
-        var out = { _owns: true };   // every persist here is a reader change
-        Object.keys(hlStore()).forEach(function (k) { out[k] = hlStore()[k]; });
-        localStorage.setItem(TR.d2.storeKey(HL_KEY), JSON.stringify(out));
-      }
-    } catch (e) { /* storage blocked — highlights stay in memory */ }
+    var out = stampVersion({ _owns: true });   // every persist here is a reader change
+    Object.keys(hlStore()).forEach(function (k) { out[k] = hlStore()[k]; });
+    writeStore(HL_KEY, out);
   }
   function hlMerge(ranges) {
     var sorted = ranges.slice().sort(function (a, b) { return a[0] - b[0]; });
@@ -547,21 +675,21 @@
     });
     return out;
   }
-  qual.getHighlights = function (qcode, idx) { return hlStore()[qcode + "#" + idx] || []; };
-  qual.addHighlight = function (qcode, idx, start, end) {
+  qual.getHighlights = function (qcode, rec) { return hlStore()[markKeyFor(qcode, rec)] || []; };
+  qual.addHighlight = function (qcode, rec, start, end) {
     if (!(end > start)) return;
-    var s = hlStore(), k = qcode + "#" + idx;
+    var s = hlStore(), k = markKeyFor(qcode, rec);
     s[k] = hlMerge((s[k] || []).concat([[start, end]]));
     hlPersist();
   };
-  qual.removeHighlight = function (qcode, idx, start) {
-    var s = hlStore(), k = qcode + "#" + idx;
+  qual.removeHighlight = function (qcode, rec, start) {
+    var s = hlStore(), k = markKeyFor(qcode, rec);
     var arr = (s[k] || []).filter(function (r) { return r[0] !== start; });
     if (arr.length) s[k] = arr; else delete s[k];
     hlPersist();
   };
-  qual.clearHighlights = function (qcode, idx) {
-    var s = hlStore(), k = qcode + "#" + idx;
+  qual.clearHighlights = function (qcode, rec) {
+    var s = hlStore(), k = markKeyFor(qcode, rec);
     if (s[k]) { delete s[k]; hlPersist(); }
   };
   qual.highlightsAll = function () { return hlStore(); };   // report.saveCopy embeds this
@@ -662,7 +790,7 @@
   qual.curatedSplit = function (records, qcode) {
     var curated = [], rest = [];
     (records || []).forEach(function (r) {
-      var marked = qual.isSaved(qcode, r.idx) || qual.getHighlights(qcode, r.idx).length > 0;
+      var marked = qual.isSaved(qcode, r) || qual.getHighlights(qcode, r).length > 0;
       (marked ? curated : rest).push(r);
     });
     return { curated: curated, rest: rest };
@@ -688,7 +816,7 @@
       return a.idx - b.idx;                          // stable, deterministic tie-break
     };
     // 1. the analyst's shortlist leads, outright — even two same-sentiment picks
-    var saved = pool.filter(function (r) { return qual.isSaved(qcode, r.idx); }).sort(byTier);
+    var saved = pool.filter(function (r) { return qual.isSaved(qcode, r); }).sort(byTier);
     var chosen = saved.slice(0, cap);
     if (chosen.length >= cap) return chosen;
     var taken = {}; chosen.forEach(function (r) { taken[r.idx] = 1; });
@@ -779,41 +907,49 @@
   // every highlighted (✎) comment, gathered across all questions into one place. It
   // reads the existing shortlist + highlight stores and NEVER mutates them, so the
   // marks can't be lost by anything the collection does. Both stores are keyed
-  // qcode#idx; a key that no longer resolves to a record (a mark left over from an
+  // the mark key; a key that no longer resolves to a record (a mark left over from an
   // earlier data run) is counted as an orphan and skipped, so a stale mark degrades
   // to an honest footnote instead of a broken card. Pure + node-testable.
 
   var NO_THEME = "No theme";
 
-  /** Index every question's records by idx, for O(1) resolution of a qcode#idx key. */
+  /** Index every question's records by mark ref (the rid token, or the idx in legacy
+   *  mode), for O(1) resolution of a mark key. Deliberately NOT indexed by idx as a
+   *  fallback: in a rid-keyed report a stray idx key must read as an orphan, not
+   *  silently resolve to whoever happens to sit at that position now. */
   function recordIndex(island) {
     var map = {};
     ((island && island.questions) || []).forEach(function (q) {
-      var byIdx = {};
-      (q.records || []).forEach(function (r) { byIdx[r.idx] = r; });
-      map[q.code] = { q: q, byIdx: byIdx };
+      var byRef = {};
+      (q.records || []).forEach(function (r) { byRef[markRef(r)] = r; });
+      map[q.code] = { q: q, byRef: byRef };
     });
     return map;
   }
 
-  /** Split a "qcode#idx" mark key into {qcode, idx}, or null if malformed. The idx is
-   *  the trailing integer after the LAST '#' (a qcode itself never contains '#'). */
+  /** Split a mark key into {qcode, idx, rid, ref}, or null if malformed. Everything
+   *  after the LAST '#' is the ref (a qcode itself never contains '#'): "@<token>"
+   *  for a rid key, the trailing integer for a legacy idx key. `ref` is what the
+   *  mark functions take; `idx` is null on a rid key (the position is not encoded). */
   qual.splitMark = function (key) {
     var s = key == null ? "" : String(key), at = s.lastIndexOf("#");
     if (at < 0) return null;
-    var qcode = s.slice(0, at), idx = parseInt(s.slice(at + 1), 10);
-    if (!qcode || isNaN(idx)) return null;
-    return { qcode: qcode, idx: idx };
+    var qcode = s.slice(0, at), ref = s.slice(at + 1);
+    if (!qcode || !ref) return null;
+    if (ref.charAt(0) === "@") return { qcode: qcode, idx: null, rid: ref.slice(1), ref: ref };
+    var idx = parseInt(ref, 10);
+    if (isNaN(idx)) return null;
+    return { qcode: qcode, idx: idx, rid: null, ref: String(idx) };
   };
 
   /**
    * Aggregate the pool into collected items across all questions.
-   *   savedMap : { "qcode#idx": 1 }              (the shortlist store)
-   *   hlMap    : { "qcode#idx": [[start,end]..] } (the highlight store)
-   *   hubMap   : { "qcode#idx": 1 }              (union of every hub's members)
+   *   savedMap : { "<markKey>": 1 }            (the shortlist store)
+   *   hlMap    : { "<markKey>": [[start,end]..] } (the highlight store)
+   *   hubMap   : { "<markKey>": 1 }            (union of every hub's members)
    * Returns { items: [...], orphans: N }. Each item is
    *   { qcode, idx, record, question, saved, highlighted, hubbed }
-   * de-duplicated by qcode#idx. A comment counts as pooled if it is shortlisted,
+   * de-duplicated by mark key. A comment counts as pooled if it is shortlisted,
    * highlighted OR filed in any hub — so "add to a hub" is itself a way to save a
    * comment (shortlist + hub in one), no separate ★ needed. Orphans (keys with no
    * matching record) are counted once over the union. Pure — no DOM, no storage.
@@ -829,14 +965,16 @@
     Object.keys(keys).forEach(function (key) {
       var m = qual.splitMark(key);
       var slot = m && res[m.qcode];
-      var rec = slot && slot.byIdx[m.idx];
+      var rec = slot && slot.byRef[m.ref];
       if (!rec) { orphans++; return; }
       // A record whose verbatim this report does not publish (qual_verbatim_scope
       // "theme all, show some" — themed and demographically tagged, text withheld)
       // has nothing to contribute to a collection of quotes. It used to render as
       // "[quote hidden in this copy]", which reads like a fault. Counted, not shown.
       if (rec.text == null) { withheld++; return; }
-      items.push({ qcode: m.qcode, idx: m.idx, record: rec, question: slot.q,
+      // idx comes from the RECORD (the respondent's position in this run), key from
+      // the store — in legacy mode they are the same two halves they always were.
+      items.push({ qcode: m.qcode, idx: rec.idx, key: key, record: rec, question: slot.q,
                    saved: !!savedMap[key], highlighted: !!(hlMap[key] && hlMap[key].length),
                    hubbed: !!hubMap[key] });
     });
@@ -918,7 +1056,7 @@
   };
 
   // ---- named reader hubs: named lenses over the pool -------------------------
-  // A hub is a NAMED SET of marks (qcode#idx) — a VIEW over the pool, never a
+  // A hub is a NAMED SET of marks (mark keys) — a VIEW over the pool, never a
   // container: adding a comment to a hub, or renaming/deleting a hub, never touches a
   // mark, and the same mark can sit in several hubs. Reader hubs live in per-report
   // localStorage (mirroring the shortlist). qual.hubsAll() is exposed for the step-2
@@ -942,7 +1080,12 @@
       h.name = (typeof h.name === "string" && h.name) ? h.name : "Untitled hub";
       if (typeof h.insight !== "string") h.insight = "";
     });
-    return { seq: seq, order: order, byId: byId };
+    var out = { seq: seq, order: order, byId: byId };
+    // The re-key stamp must survive normalisation — a store that lost it would be
+    // migrated a second time, and its (already rid-keyed) marks would all resolve
+    // to nothing. See migrateMarkStore.
+    if (s._v) out._v = s._v;
+    return out;
   }
   function hubsStore() {
     if (hubsCache) return hubsCache;
@@ -951,17 +1094,15 @@
       var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(HUBS_KEY));
       if (raw) seed = JSON.parse(raw);                            // the reader's own set wins entirely
     } catch (e) { /* island / empty */ }
-    hubsCache = normalizeHubs(seed);
+    var mig = migrateMarkStore(seed, "hubs");   // I20: one-time re-key of each hub's marks
+    hubsCache = normalizeHubs(mig.store);
+    if (mig.changed) hubsPersist();
     return hubsCache;
   }
   function hubsPersist() {
-    try {
-      if (typeof localStorage !== "undefined" && TR.d2) {
-        localStorage.setItem(TR.d2.storeKey(HUBS_KEY), JSON.stringify(hubsStore()));
-      }
-    } catch (e) { /* storage blocked — hubs stay in memory */ }
+    writeStore(HUBS_KEY, stampVersion(hubsStore()));
   }
-  function markKey(qcode, idx) { return qcode + "#" + idx; }
+  function markKey(qcode, rec) { return markKeyFor(qcode, rec); }
 
   qual.hubsAll = function () { return hubsStore(); };            // report.saveCopy will embed this (step 2)
   qual.hubList = function () {
@@ -996,14 +1137,14 @@
     hubsPersist();
     return true;
   };
-  qual.hubHasMark = function (id, qcode, idx) {
+  qual.hubHasMark = function (id, qcode, rec) {
     var h = hubsStore().byId[id];
-    return !!(h && h.marks[markKey(qcode, idx)]);
+    return !!(h && h.marks[markKey(qcode, rec)]);
   };
-  qual.hubToggleMark = function (id, qcode, idx) {
+  qual.hubToggleMark = function (id, qcode, rec) {
     var h = hubsStore().byId[id];
     if (!h) return false;
-    var k = markKey(qcode, idx);
+    var k = markKey(qcode, rec);
     if (h.marks[k]) delete h.marks[k]; else h.marks[k] = 1;
     hubsPersist();
     return !!h.marks[k];
@@ -1012,12 +1153,12 @@
     var h = hubsStore().byId[id];
     return h ? h.marks : {};
   };
-  qual.hubsForMark = function (qcode, idx) {
-    var s = hubsStore(), k = markKey(qcode, idx), out = [];
+  qual.hubsForMark = function (qcode, rec) {
+    var s = hubsStore(), k = markKey(qcode, rec), out = [];
     s.order.forEach(function (id) { if (s.byId[id].marks[k]) out.push({ id: id, name: s.byId[id].name }); });
     return out;
   };
-  /** { "qcode#idx": 1 } over every hub's members — the hub contribution to the pool, so
+  /** { "<markKey>": 1 } over every hub's members — the hub contribution to the pool, so
    *  a comment filed only in a hub still shows up in the collection. */
   qual.hubMarksUnion = function () {
     var s = hubsStore(), out = {};
@@ -1028,13 +1169,13 @@
    *  passages and hub memberships. The collection IS the union of those three, so
    *  clearing only the shortlist leaves a highlighted comment sitting there looking
    *  as though the control did nothing. One button, one meaning. */
-  qual.clearMarks = function (qcode, idx) {
-    var key = qcode + "#" + idx;
-    if (qual.isSaved(qcode, idx)) qual.toggleSave(qcode, idx);
-    qual.clearHighlights(qcode, idx);
+  qual.clearMarks = function (qcode, rec) {
+    var key = markKeyFor(qcode, rec);
+    if (qual.isSaved(qcode, rec)) qual.toggleSave(qcode, rec);
+    qual.clearHighlights(qcode, rec);
     var s = hubsStore();
     s.order.forEach(function (id) {
-      if (s.byId[id].marks[key]) qual.hubToggleMark(id, qcode, idx);
+      if (s.byId[id].marks[key]) qual.hubToggleMark(id, qcode, rec);
     });
   };
   qual.hubSetInsight = function (id, text) {
@@ -1146,17 +1287,17 @@
       var r = e.record, sent = SENT[r.sentiment] || "neu";
       var text = r.text == null
         ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-        : qual.renderHighlighted(r.text, qual.getHighlights(e.qcode, r.idx));
+        : qual.renderHighlighted(r.text, qual.getHighlights(e.qcode, r));
       var word = SENT_WORD[r.sentiment]
         ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
       // Tags honour opts.dropTags (below-k hub rule) AND the reader tag toggle, "Label: value".
       var tags = (opts.dropTags || qst.tagsOff || !r.demos) ? "" : Object.keys(r.demos)
         .filter(function (k) { return r.demos[k] != null && !(qst.tagHide && qst.tagHide[k]); })
         .map(function (k) { return '<span class="ql-tag">' + esc(k) + ": " + esc(r.demos[k]) + "</span>"; }).join("");
-      var saved = saveable && qual.isSaved(e.qcode, r.idx);
+      var saved = saveable && qual.isSaved(e.qcode, r);
       var save = saveable
         ? '<button class="ql-fsave' + (saved ? " on" : "") + '" data-focus-save="' +
-          esc(e.qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved +
+          esc(qual.markKeyFor(e.qcode, r)) + '" aria-pressed="' + saved +
           '" title="Shortlist this comment (s)">' + (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>"
         : "";
       return '<blockquote class="ql-fq ' + sent + (i === pos ? " cur" : "") + '" data-fi="' + i + '" tabindex="0">' +
@@ -1212,8 +1353,9 @@
     // Toggle the shortlist on a focus card and update its button in place (focus manages
     // its own DOM; the drawer re-syncs on close via opts.onClose).
     function toggleFocusSave(btn) {
-      var val = btn.getAttribute("data-focus-save"), at = val.lastIndexOf("#");
-      var on = qual.toggleSave(val.slice(0, at), parseInt(val.slice(at + 1), 10));
+      var m = qual.splitMark(btn.getAttribute("data-focus-save"));
+      if (!m) return;
+      var on = qual.toggleSave(m.qcode, m.ref);
       btn.classList.toggle("on", on);
       btn.setAttribute("aria-pressed", on);
       btn.textContent = on ? "✓ Shortlisted" : "＋ Shortlist";
@@ -1587,7 +1729,7 @@
         return '<div class="ql-champq ' + (SENT[c.sentiment] || "neu") + '">' +
           '<span class="ql-champtext">“' + esc(c.text) + '”</span>' +
           '<span class="ql-champid">#' + esc(c.idx) +
-          (qual.isSaved(q.code, c.idx) ? " · shortlisted" : "") + "</span></div>";
+          (qual.isSaved(q.code, c) ? " · shortlisted" : "") + "</span></div>";
       }).join("") : "";
       return '<div class="ql-tcard"><div class="ql-trow">' +
         '<button class="ql-prow' + sel + '" data-theme="' + r.id + '" title="' + esc(title) + '">' +
@@ -1814,9 +1956,10 @@
   // the whole list below k), so demographic tags are safe to show here.
   function quoteCard(r, qcode) {
     var sent = SENT[r.sentiment] || "neu";
+    var key = markKeyFor(qcode, r);      // rid-keyed where the island carries one
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));   // select-to-highlight
+      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r));   // select-to-highlight
     var star = r.tier >= 3 ? '<span class="ql-star priority" title="priority">★</span>'
              : r.tier >= 2 ? '<span class="ql-star must" title="must-read">★</span>'
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
@@ -1827,18 +1970,18 @@
     var tags = (!qst.tagsOff && r.demos ? Object.keys(r.demos) : [])
       .filter(function (k) { return r.demos[k] != null && !(qst.tagHide && qst.tagHide[k]); })
       .map(function (k) { return '<span class="ql-tag">' + esc(k) + ": " + esc(r.demos[k]) + "</span>"; }).join("");
-    var saved = qual.isSaved(qcode, r.idx);
+    var saved = qual.isSaved(qcode, r);
     var save = '<button class="ql-save' + (saved ? " on" : "") + '" data-qual-save="' +
-      esc(qcode) + "#" + esc(r.idx) + '" aria-pressed="' + saved + '" title="' +
+      esc(key) + '" aria-pressed="' + saved + '" title="' +
       (saved ? "Remove from your shortlist" : "Add to your shortlist") + '">' +
       (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>";
     // sentiment word beside the edge accent — the coding is never colour-only
     var sentWord = SENT_WORD[r.sentiment]
       ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
-    return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(qcode) + "#" + esc(r.idx) + '">' + star +
+    return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(key) + '">' + star +
       '<div class="ql-qbody"><span class="ql-qtext">' + text + '</span>' +
       (tags ? '<div class="ql-tags">' + tags + '</div>' : '') +
-      hubControlHtml(qcode + "#" + r.idx) + '</div>' +
+      hubControlHtml(key) + '</div>' +
       '<div class="ql-qfoot">' + save + sentWord + '<span class="ql-qid">#' + esc(r.idx) + "</span></div></div>";
   }
 
@@ -1917,7 +2060,7 @@
     var m = qual.splitMark(key);
     if (!m) return "";
     var inIds = {};
-    var chips = qual.hubsForMark(m.qcode, m.idx).map(function (h) {
+    var chips = qual.hubsForMark(m.qcode, m.ref).map(function (h) {
       inIds[h.id] = 1;
       return '<span class="ql-hubchip">' + esc(h.name) +
         '<button class="ql-hubx" data-hubremove="' + esc(h.id) + '" data-hubkey="' + esc(key) +
@@ -1937,11 +2080,12 @@
   /** One collected comment as a card. Exposed for the node gate. */
   function collectionCard(it, ctx) {
     ctx = ctx || {};
-    var q = it.question, r = it.record, qcode = it.qcode, key = qcode + "#" + r.idx;
+    var q = it.question, r = it.record, qcode = it.qcode;
+    var key = it.key || markKeyFor(qcode, r);
     var sent = SENT[r.sentiment] || "neu";
     var text = (r.text == null)
       ? '<span class="ql-hidden">[quote hidden in this copy]</span>'
-      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r.idx));
+      : qual.renderHighlighted(r.text, qual.getHighlights(qcode, r));
     var byId = {}; (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
     var chips = Object.keys(r.themeVals || {}).filter(function (id) { return r.themeVals[id] != null && byId[id]; })
       .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
@@ -1953,7 +2097,7 @@
     // cards, so there is one toggle path, not two.
     var flags = (it.saved ? '<span class="ql-cflag" title="shortlisted">★</span>' : "") +
       (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "") +
-      '<button class="ql-cremove" data-qual-unmark="' + esc(qcode) + "#" + esc(r.idx) +
+      '<button class="ql-cremove" data-qual-unmark="' + esc(key) +
       '" title="Remove this comment from your collection — clears its shortlist star, ' +
       'any highlighted passage and any hub it is filed in">✕ Remove</button>';
     return '<div class="ql-quote ' + sent + ' ql-ccard" data-hl-key="' + esc(key) + '">' +
@@ -1978,7 +2122,7 @@
     // pool-resolved membership — its marks that are actually in the pool right now.
     if (st.hub != null && !qual.hubGet(st.hub)) st.hub = null;
     var poolKeys = {};
-    pool.items.forEach(function (it) { poolKeys[it.qcode + "#" + it.idx] = 1; });
+    pool.items.forEach(function (it) { poolKeys[it.key] = 1; });
     var resolved = {};
     qual.hubList().forEach(function (h) {
       var marks = qual.hubMarks(h.id), n = 0;
@@ -2004,7 +2148,7 @@
     var cutDesc = (cutFilters && TR.d2 && TR.d2.filterDescription) ? TR.d2.filterDescription() : "";
     var shown;
     if (activeHub) {
-      shown = pool.items.filter(function (it) { return activeHub.marks[it.qcode + "#" + it.idx]; });
+      shown = pool.items.filter(function (it) { return activeHub.marks[it.key]; });
     } else {
       if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) {
         qual._colview = { island: island, items: [] };
@@ -2267,14 +2411,15 @@
       b.addEventListener("click", function () {
         var m = qual.splitMark(b.getAttribute("data-qual-unmark"));
         if (!m) return;
-        qual.clearMarks(m.qcode, m.idx);
+        qual.clearMarks(m.qcode, m.ref);
         qual.render(host);
       });
     });
     host.querySelectorAll("[data-qual-save]").forEach(function (b) {
       b.addEventListener("click", function () {
-        var v = b.getAttribute("data-qual-save"), at = v.lastIndexOf("#");
-        qual.toggleSave(v.slice(0, at), parseInt(v.slice(at + 1), 10));
+        var m = qual.splitMark(b.getAttribute("data-qual-save"));
+        if (!m) return;
+        qual.toggleSave(m.qcode, m.ref);
         st.showRest = true;   // marking a comment must never collapse the list you're reading
         qual.render(host);
       });
@@ -2341,9 +2486,9 @@
         if (!m) return;
         if (val === "new") {
           var name = (typeof prompt !== "undefined") ? prompt("New hub name:") : null;
-          if (name && name.trim()) qual.hubToggleMark(qual.hubCreate(name), m.qcode, m.idx);
+          if (name && name.trim()) qual.hubToggleMark(qual.hubCreate(name), m.qcode, m.ref);
         } else if (val.indexOf("hub:") === 0) {
-          qual.hubToggleMark(val.slice(4), m.qcode, m.idx);   // only not-in hubs are offered -> adds
+          qual.hubToggleMark(val.slice(4), m.qcode, m.ref);   // only not-in hubs are offered -> adds
         }
         qual.render(host);
       });
@@ -2351,7 +2496,7 @@
     host.querySelectorAll("[data-hubremove]").forEach(function (b) {
       b.addEventListener("click", function () {
         var m = qual.splitMark(b.getAttribute("data-hubkey"));
-        if (m) qual.hubToggleMark(b.getAttribute("data-hubremove"), m.qcode, m.idx);   // in-hub -> removes
+        if (m) qual.hubToggleMark(b.getAttribute("data-hubremove"), m.qcode, m.ref);   // in-hub -> removes
         qual.render(host);
       });
     });
@@ -2473,9 +2618,10 @@
       var start = hlOffset(qt, range.startContainer, range.startOffset);
       var end = hlOffset(qt, range.endContainer, range.endOffset);
       if (start < 0 || end <= start) return;
-      var key = card.getAttribute("data-hl-key"), at = key.lastIndexOf("#");
+      var m = qual.splitMark(card.getAttribute("data-hl-key"));
+      if (!m) return;
       hlShowPop(range.getBoundingClientRect(), function () {
-        qual.addHighlight(key.slice(0, at), parseInt(key.slice(at + 1), 10), start, end);
+        qual.addHighlight(m.qcode, m.ref, start, end);
         hlRemovePop();
         if (qual._state) qual._state.showRest = true;   // highlighting must not collapse the list either
         qual.render(host);
@@ -2489,8 +2635,9 @@
       if (sel && !sel.isCollapsed) return;
       var card = m.closest("[data-hl-key]");
       if (!card) return;
-      var key = card.getAttribute("data-hl-key"), at = key.lastIndexOf("#");
-      qual.removeHighlight(key.slice(0, at), parseInt(key.slice(at + 1), 10), parseInt(m.getAttribute("data-s"), 10));
+      var mk = qual.splitMark(card.getAttribute("data-hl-key"));
+      if (!mk) return;
+      qual.removeHighlight(mk.qcode, mk.ref, parseInt(m.getAttribute("data-s"), 10));
       qual.render(host);
     });
   }

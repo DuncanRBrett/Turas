@@ -150,6 +150,49 @@ Sample Composition, Summary) in all cases.
 
 ---
 
+## The Reader-Key Sidecar (comment reports)
+
+Any project with a coded-comment workbook grows one extra file beside its
+config:
+
+```
+My_Crosstab_Config.xlsx
+My_Crosstab_Config_reader_keys.json     <- the reader-key sidecar
+```
+
+**What it is.** Readers mark comments in the report — a shortlist star, a
+highlighted passage, a named hub. Those marks live in the reader's browser and
+have to point at a specific comment. The sidecar holds one opaque random token
+per respondent, and that token is what the marks attach to. It is the *only*
+thing that makes a mark survive a re-export.
+
+**What it is not.** It carries no survey answers and no verbatim text — just
+respondent id → random token. It never travels into a report, a deck or an
+Excel file. Only the token side of it is ever published, and a token on its own
+means nothing to anyone without this file.
+
+**Rules:**
+
+- **Do not delete it, and do not rename the config.** The sidecar is found by
+  the config's name. Lose either one and every reader mark in every copy of
+  that report detaches. There is no way to rebuild it.
+- **It travels with the project.** Keep it in the project folder alongside the
+  config (OneDrive syncs it like any other file). If you copy a project to a
+  new folder, copy this file too.
+- **It only grows.** New respondents get new tokens; respondents who drop out
+  of an export keep theirs, so if they come back their old marks still fit.
+- **If it goes missing or unreadable**, the build says so in a boxed console
+  warning and carries on. The report is fine, but marks made against it are not
+  durable. Restore the file (or delete it to start clean) and rebuild.
+
+**One-off, the first time you rebuild a project after upgrading:** run the
+rebuild on the *unchanged* data before your next real re-export. Existing marks
+are re-attached to their new tokens using the current data's row order, so that
+first rebuild has to match the data the marks were made against. After that,
+re-export freely — that is the whole point of the change.
+
+---
+
 ## Typical Workflow
 
 1. **Prepare data** — Clean survey data in Excel/CSV format

@@ -54,7 +54,8 @@ local({
               "crosstabs/crosstabs_config.R", "report_shared.R",
               "data_layer_writer.R", "microdata_writer.R", "html_report_v2/build_report_v2.R",
               "qual_workbook_reader.R", "qual_unions.R", "qual_workbook_io.R", "qual_assemble.R",
-              "qual_island_builder.R", "qual_quant_layer.R", "qual_report.R")) source(f, local = FALSE)
+              "qual_island_builder.R", "qual_reader_keys.R", "qual_quant_layer.R",
+              "qual_report.R")) source(f, local = FALSE)
 })
 
 # ---- Synthetic coded-comment workbook (one themed sheet with a Group cut) ------
@@ -133,6 +134,44 @@ test_that("a project-relative qual_workbook resolves against the config folder",
   on.exit(unlink(out), add = TRUE)
   res <- build_qual_report_v2("comments.xlsx", out, cfg)          # RELATIVE path
   expect_equal(res$status, "PASS")                                # resolved against config folder
+})
+
+# ==============================================================================
+# READER KEYS (I20): the pipeline mints the sidecar and the island carries rids
+# ==============================================================================
+
+test_that("a configured run writes the reader-key sidecar and ships rids in the island", {
+  proj <- file.path(tempdir(), paste0("rkproj_", paste0(sample(letters, 8L, TRUE), collapse = "")))
+  dir.create(proj, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(proj, recursive = TRUE), add = TRUE)
+  write_comment_workbook(file.path(proj, "comments.xlsx"))
+  cfg <- build_config_object(list(project_name = "ReaderKeys", qual_confidentiality_mode = "full"))
+  cfg$config_file_path <- file.path(proj, "MyConfig.xlsx")
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(out), add = TRUE)
+
+  res <- build_qual_report_v2("comments.xlsx", out, cfg)
+  expect_equal(res$status, "PASS")
+
+  sidecar <- file.path(proj, "MyConfig_reader_keys.json")
+  expect_true(file.exists(sidecar))
+  keys <- jsonlite::fromJSON(sidecar, simplifyVector = FALSE)$keys
+  expect_true(length(keys) > 0)
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_match(html, '"rid":', fixed = TRUE)                    # tokens reached the page
+  for (token in unlist(keys, use.names = FALSE)) {
+    expect_match(token, "^[0-9a-f]{16}$")
+    expect_true(grepl(paste0('"rid":"', token, '"'), html, fixed = TRUE))
+  }
+  # The sidecar stays in the project folder — the report never names or embeds it.
+  expect_false(grepl("reader_keys", html, fixed = TRUE))
+
+  # Rebuilding the same project reuses the tokens (that is the whole point).
+  out2 <- tempfile(fileext = ".html")
+  on.exit(unlink(out2), add = TRUE)
+  build_qual_report_v2("comments.xlsx", out2, cfg)
+  expect_equal(jsonlite::fromJSON(sidecar, simplifyVector = FALSE)$keys, keys)
 })
 
 test_that("a workbook with no themed questions is refused with a typed code", {
