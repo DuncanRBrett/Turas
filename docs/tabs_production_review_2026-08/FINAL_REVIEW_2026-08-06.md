@@ -879,6 +879,60 @@ when it is non-zero, so an ordinary filter over a complete column stays quiet.
 Files: `lib/filter_utils.R`. Tests: 3 blocks in `test_utilities.R`, 2 proved
 failing pre-fix.
 
+**M-H INVESTIGATED 2026-08-06 — both halves reproduced by execution; NOT fixed.**
+It was listed PLAUSIBLE. Both halves are real.
+
+*(a) A blank wave label bypasses both stale-wave guards.* Reproduced: a stale
+prior sidecar labelled `""` against a current wave labelled `""` leaves **2**
+waves in the island where the same case with a real label correctly collapses to
+**1**. Both guards test `nzchar(lbl)` — the self-exclusion in
+`build_tracking_island` and the dedupe in `read_wave_contributions`, where a
+blank label also never joins `seen_labels`, so any number of blank sidecars all
+survive. Straightforward to fix; the only question is warn vs refuse on a blank
+wave label, and a tracker with no wave label is arguably a config error.
+
+*(b) A year-less tracker draws its trend axis BACKWARDS.* Reproduced end to end
+through the real reader: three sidecars labelled "Autumn/Spring/Summer Pulse"
+with no year, built in that chronological order, come out of
+`read_wave_contributions` **newest-first** (it sorts by build stamp
+`decreasing = TRUE`) and the assembled axis reads
+`Summer -> Spring -> Autumn -> Winter`. `wave_order_key()` returns NA when there
+is neither a `wave_order` setting nor a 4-digit year in the label; the assembly
+maps NA to `Inf` and `order()` is stable, so those waves simply keep the order
+they arrived in — which is reverse chronological.
+
+**The mechanism to fix it already exists:** `wave_order` is exactly the setting
+for "my wave labels carry no year", and it is documented and whitelisted. So the
+safe fix is a **warning** — name the waves with no order key, say the axis order
+is the order the files were read in, and point at `wave_order`. Changing the
+fallback ORDER itself is the design call, and it is not free: it would move the
+trend axis on any existing year-less tracker, so it wants Duncan's decision
+rather than a session's judgement.
+
+**M-L TRIAGED 2026-08-06 — it is eight findings from the PRIOR review, not one,
+and one of them is already fixed.** Checked against current main:
+- **M6 — already FIXED.** `extract_composite_rows` has its `comp_def` NULL guard
+  (`summary_builder.R:320`) and a Job T test covers the no-composite_defs case.
+  It should come off this list.
+- **M7 — open.** Composites still get no Sig.2 row: no `alpha_secondary` anywhere
+  in `composite_processor.R`. On a dual-alpha project every other row type
+  carries an 80% row and composites do not. Self-contained, real.
+- **M10a — open, and it is an I11-family item.** `index_decimals` is written onto
+  the island (`data_layer_writer.R:196`) and read by no JS. Same disposition
+  question as I11: wire it or drop it.
+- **M10b — open.** `01_format.js:82` treats `q.scale_max === 100` as NPS for
+  decimal purposes, so a declared 0–100 rating scale takes percent decimals.
+- **M15a — open, trivial.** `microdata_writer.R:249` falls back to
+  `config_obj$weighting_variable`, a key that has never existed. Dead branch.
+- **M15b — open, trivial, and now slightly worse.** `reader_ai_prose.R:255` reads
+  `config_obj$ai_provider`, which `build_config_object` never sets, so it always
+  falls back to "anthropic"; post-I11 an operator who adds the row also gets a
+  typo warning and still no effect.
+- **M1, M2, M5, M13 — not yet triaged.** Each is its own investigation: M1 is
+  Excel-vs-v2 base-row asymmetry plus a half-rounding difference (R half-to-even
+  vs JS half-up), M2 and M5 are cross-engine ordering/dedupe questions, and M13
+  is three unrelated qualitative issues bundled under one letter.
+
 - **M-K. FIXED 2026-08-06.** Composite disclosure gate borrows the first source question's bases
   (`summary_builder.R:341-354`) — wrong-column judgment possible when sources
   have different routed bases (PLAUSIBLE).
