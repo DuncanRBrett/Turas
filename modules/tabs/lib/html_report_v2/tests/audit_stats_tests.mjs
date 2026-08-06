@@ -13,9 +13,10 @@
  *   5. Standard-deviation rows are untracked (was trending SD against MEANs).
  *   6. boxCounts uses the FULL answered base as denominator (no-box answers
  *      like Neutral stay in the base).
- *   7. FPC re-letter: census columns (ciBase Infinity) are excluded rather
- *      than NaN-erasing every pairing; disclosure-suppressed columns are
- *      excluded rather than tested as phantom 0%.
+ *   7. FPC on the published view: intervals narrow on the FPC-corrected base,
+ *      and significance is NOT recomputed here — R applies the correction in
+ *      its own tests and the letters are carried. Disclosure-suppressed
+ *      columns still neither earn nor grant a letter.
  *   8. Mean confidence intervals size on the Kish effective base.
  *   9. A saved custom banner whose question no longer exists renders Total
  *      only instead of crashing (missing-spec guard parity with composites).
@@ -196,27 +197,43 @@ function loadPopulationFixture(overrides) {
           { n: 400, low: false }
         ],
         rows: [
-          { kind: "category", label: "Yes", pct: [47, 40, 50, 42], n: [400, 20, 200, 168], sig: ["", "", "", ""] },
-          { kind: "category", label: "No",  pct: [53, 60, 50, 58], n: [450, 30, 200, 232], sig: ["", "", "", ""] }
+          // sig[] is what R published. The census column (HQ) carries none and
+          // is named by none — R excludes a full census from pairing.
+          { kind: "category", label: "Yes", pct: [47, 40, 50, 42], n: [400, 20, 200, 168], sig: ["", "", "D", ""] },
+          { kind: "category", label: "No",  pct: [53, 60, 50, 58], n: [450, 30, 200, 232], sig: ["", "", "", "C"] }
         ] }
     ]
   };
   if (TR.d2) TR.d2._qIndex = null;
 }
 
-run("FPC re-letter: census column excluded (no NaN), others still letter", () => {
+// The published view USED to re-letter a population report here, from the
+// display-rounded %s and each column's FPC ciBase. That overlay is retired: R
+// applies the FPC inside its own tests, so the carried letters are already
+// corrected — at both alphas, on weighted designs too, and from the unrounded
+// counts. This pins that the view now passes them through untouched.
+run("FPC: the published view carries R's letters and does not re-letter", () => {
   loadPopulationFixture();
   const model = TR.model.forQuestion("Q1", "Site", [], {});
-  const yes = model.rows[0];
-  // C (50%) vs D (42%): z 2.27 -> C earns D's letter at the FPC-shrunk bases
-  assert(yes.cells[2].sig.indexOf("D") !== -1,
-    "C must letter vs D (got " + JSON.stringify(yes.cells[2].sig) + ")");
-  // The census column neither earns nor grants letters — and never NaNs the row
+  const yes = model.rows[0], no = model.rows[1];
+  eq(yes.cells[2].sig, "D", "C keeps exactly the letter R published");
+  eq(no.cells[3].sig, "C", "and so does D on the No row");
+  // The census column neither earns nor grants a letter — R excluded it.
   eq(yes.cells[1].sig, "", "census column has no letters");
-  assert(yes.cells[2].sig.indexOf("B") === -1, "no letter can reference the census column");
+  assert(yes.cells[2].sig.indexOf("B") === -1, "no letter references the census column");
 });
 
-run("FPC re-letter: a disclosure-suppressed column is never a phantom 0%", () => {
+run("FPC: the census column still gets an infinite ciBase for its interval", () => {
+  loadPopulationFixture();
+  const model = TR.model.forQuestion("Q1", "Site", [], { intervals: true });
+  // HQ: base 50 of a universe of 50 -> nothing left to be uncertain about.
+  eq(model.columns[1].ciBase, Infinity, "census ciBase is Infinity");
+  // North: 400 of 10000 is 4% coverage — below FPC_MIN_COVERAGE (5%), so the
+  // correction does not engage and the interval base is the raw base.
+  eq(model.columns[2].ciBase, 400, "a below-floor column keeps its raw base");
+});
+
+run("a disclosure-suppressed column neither earns nor grants a letter", () => {
   loadPopulationFixture({ min_reporting_base: 60 });   // HQ base 50 -> suppressed
   const model = TR.model.forQuestion("Q1", "Site", [], {});
   const yes = model.rows[0];

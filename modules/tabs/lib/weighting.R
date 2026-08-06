@@ -806,13 +806,20 @@ calculate_weighted_mean <- function(values, weights) {
 #' @param is_weighted Logical, whether data is weighted (explicit flag, no heuristics)
 #' @param min_base Integer, minimum base size for testing (default: 30)
 #' @param alpha Numeric, significance level (e.g., 0.05 for 95% CI, default: 0.05)
+#' @param fpc_mul1 Numeric, finite population correction multiplier for group 1's
+#'   effective base — \code{apply_fpc(1, n_actual, N)}, so 1 means no correction
+#'   and \code{Inf} means a full census. Default 1 keeps every existing caller
+#'   byte-identical.
+#' @param fpc_mul2 Numeric, the same for group 2.
 #' @return List with $significant (logical), $p_value (numeric), $higher (logical)
 #' @export
-weighted_z_test_proportions <- function(count1, base1, count2, base2, 
+weighted_z_test_proportions <- function(count1, base1, count2, base2,
                                        eff_n1 = NULL, eff_n2 = NULL,
                                        is_weighted = FALSE,
                                        min_base = 30,
-                                       alpha = 0.05) {
+                                       alpha = 0.05,
+                                       fpc_mul1 = 1,
+                                       fpc_mul2 = 1) {
   # V9.9.4: Parameter validation (makes function hard to misuse)
   if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
     tabs_refuse(
@@ -868,11 +875,24 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
   
-  # Determine sample sizes to use
+  # Determine sample sizes to use. The FPC multiplier applies to whichever base
+  # the test actually rides — the Kish effective base when weighted, the raw base
+  # when not — so weighting and the correction stack instead of competing.
   n1 <- if (is_weighted && !is.null(eff_n1)) eff_n1 else base1
   n2 <- if (is_weighted && !is.null(eff_n2)) eff_n2 else base2
-  
-  # Check minimum base size
+  n1 <- .fpc_scale_base(n1, fpc_mul1)
+  n2 <- .fpc_scale_base(n2, fpc_mul2)
+
+  # A full census (multiplier Inf) has no sampling error left to test: it is
+  # excluded from pairing entirely, granting no letters and earning none. Mirrors
+  # the v2 report's sizeAt() and keeps Inf out of the SE, which would NaN the
+  # whole row. (FPC plan decision: a measured population is not an estimate.)
+  if (!is.finite(n1) || !is.finite(n2)) {
+    return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
+  }
+
+  # Check minimum base size — on the CORRECTED base, so the gate agrees with the
+  # instability flag, which is also raised against the corrected base.
   if (n1 < min_base || n2 < min_base) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
@@ -926,6 +946,25 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
 # ==============================================================================
 # STATISTICAL TEST HELPERS (INTERNAL)
 # ==============================================================================
+
+#' Apply a finite population correction multiplier to a base
+#'
+#' The multiplier comes from \code{apply_fpc(1, n_actual, N)} in
+#' modules/shared/lib/fpc.R and is 1 whenever the correction does not engage —
+#' no configured universe, or coverage below FPC_MIN_COVERAGE — so a report
+#' without a Population sheet is byte-identical. \code{Inf} (a full census)
+#' passes straight through for the caller to detect.
+#'
+#' @param n Numeric base (raw or Kish effective)
+#' @param mul Numeric multiplier
+#' @return Numeric corrected base
+#' @keywords internal
+.fpc_scale_base <- function(n, mul) {
+  if (is.null(mul) || length(mul) != 1L || is.na(mul)) return(n)
+  if (is.infinite(mul)) return(Inf)
+  if (mul == 1) return(n)
+  n * mul
+}
 
 #' Prepare analytic sample for statistical testing
 #' @keywords internal
@@ -1008,12 +1047,18 @@ calculate_t_test_stats <- function(mean1, mean2, var1, var2, eff_n1, eff_n2) {
 #' @param weights2 Numeric vector, weights for group 2 (NULL = unweighted)
 #' @param min_base Integer, minimum base size for testing (default: 30)
 #' @param alpha Numeric, significance level (default: 0.05)
+#' @param fpc_mul1 Numeric, finite population correction multiplier for group 1's
+#'   internally computed effective n — \code{apply_fpc(1, n_actual, N)}. Default
+#'   1 keeps every existing caller byte-identical; \code{Inf} is a full census.
+#' @param fpc_mul2 Numeric, the same for group 2.
 #' @return List with $significant (logical), $p_value (numeric), $higher (logical)
 #' @export
 weighted_t_test_means <- function(values1, values2,
                                  weights1 = NULL, weights2 = NULL,
                                  min_base = 30,
-                                 alpha = 0.05) {
+                                 alpha = 0.05,
+                                 fpc_mul1 = 1,
+                                 fpc_mul2 = 1) {
   # V9.9.4: Parameter validation
   if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
     tabs_refuse(
@@ -1067,11 +1112,18 @@ weighted_t_test_means <- function(values1, values2,
   values2 <- sample$values2
   weights2 <- sample$weights2
 
-  # Calculate effective sample sizes
-  eff_n1 <- calculate_effective_n(weights1)
-  eff_n2 <- calculate_effective_n(weights2)
+  # Calculate effective sample sizes, then apply the finite population
+  # correction to the n this test actually uses for its SE and its df.
+  eff_n1 <- .fpc_scale_base(calculate_effective_n(weights1), fpc_mul1)
+  eff_n2 <- .fpc_scale_base(calculate_effective_n(weights2), fpc_mul2)
 
-  # Check minimum base size
+  # A full census column is excluded from pairing — no sampling error to test.
+  # Also keeps Inf out of the Welch df, which would NaN the p-value.
+  if (!is.finite(eff_n1) || !is.finite(eff_n2)) {
+    return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
+  }
+
+  # Check minimum base size — on the CORRECTED base (see the z-test).
   if (eff_n1 < min_base || eff_n2 < min_base) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
@@ -1396,6 +1448,13 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
         letter <- banner_letters[j]
         has_letter <- length(letter) > 0 && letter != "-"
 
+        # Same finite population correction the category rows get, from the same
+        # per-column multipliers. A NET tested on an uncorrected base while the
+        # categories above it are corrected is the exact inconsistency this batch
+        # exists to remove.
+        fpc_i <- if (is.null(data_i$fpc_mul)) 1 else data_i$fpc_mul
+        fpc_j <- if (is.null(data_j$fpc_mul)) 1 else data_j$fpc_mul
+
         # Test net1: col_i vs col_j — p_value computed once, used for both thresholds
         r1 <- weighted_z_test_proportions(
           data_i$count1, data_i$base,
@@ -1403,7 +1462,8 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
           data_i$eff_n, data_j$eff_n,
           is_weighted = is_weighted,
           min_base = min_base,
-          alpha = alpha_adj
+          alpha = alpha_adj,
+          fpc_mul1 = fpc_i, fpc_mul2 = fpc_j
         )
         if (r1$significant && r1$higher && has_letter)
           higher1 <- c(higher1, letter)
@@ -1417,7 +1477,8 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
           data_i$eff_n, data_j$eff_n,
           is_weighted = is_weighted,
           min_base = min_base,
-          alpha = alpha_adj
+          alpha = alpha_adj,
+          fpc_mul1 = fpc_i, fpc_mul2 = fpc_j
         )
         if (r2$significant && r2$higher && has_letter)
           higher2 <- c(higher2, letter)

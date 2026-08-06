@@ -125,111 +125,57 @@ calculate_effective_n <- function(weights) {
 # ==============================================================================
 # FINITE POPULATION CORRECTION (FPC)
 # ==============================================================================
+#
+# calculate_fpc_factor(), apply_fpc() and FPC_MIN_COVERAGE now live in
+# modules/shared/lib/fpc.R. They moved there UNCHANGED when the tabs crosstab
+# engine needed them for its pairwise significance tests: one definition, so a
+# census cannot mean one thing to a confidence interval and another to a
+# significance letter. This module's API is identical — the functions are simply
+# defined in a file two directories up.
+#
+# Sourced defensively here rather than left to a caller, because this module is
+# loaded through three different paths (00_main.R's source_module_files(), the
+# testthat setup.R whitelist, and the shared import_all.R) and the FPC has to be
+# present on all three.
 
-# Material-coverage floor. Below this sampling fraction (n / N) the finite
-# population correction is negligible and — more to the point — the study is a
-# SAMPLE, not a census, so no correction is applied. Mirrors FPC_MIN_COVERAGE in
-# the v2 report's JS (21c_confidence.js) so the Excel crosstabs, the stats pack
-# and the interactive report always agree on when the FPC engages.
-FPC_MIN_COVERAGE <- 0.05
-
-#' Finite population correction factor
-#'
-#' When a sample of \code{n} respondents is drawn (without replacement) from a
-#' \emph{known finite population} of \code{N}, its standard error is smaller than
-#' the infinite-population formula implies. This returns the multiplier applied
-#' to that standard error:
-#'
-#' FORMULA: FPC = sqrt( (N - n) / (N - 1) )   ( ≈ sqrt(1 - n/N) for large N )
-#'
-#' Use this for census / full-invite designs with partial response, and for
-#' small subgroups (e.g. a Masters cohort of 27 with 20 responding) where the
-#' sample is a large share of its universe. FPC corrects \emph{sampling} error
-#' only — it does nothing about non-response bias.
-#'
-#' EDGE CASES (return a neutral, non-destructive value rather than refusing, to
-#' match \code{calculate_effective_n}'s kernel style):
-#' - \code{N} missing / NA / non-finite / <= 1: returns 1 (no correction).
-#' - \code{n} missing / NA / <= 0: returns 1 (no correction).
-#' - Coverage \code{n / N <= FPC_MIN_COVERAGE} (5%): returns 1 — a thin sample is
-#'   not a census, and the correction would be negligible, so none is applied.
-#' - \code{n >= N} (full census, incl. rounding over-coverage): returns 0 — there
-#'   is nothing left to be uncertain about once everyone is measured.
-#'
-#' @param n Numeric. Number of respondents in the base (unweighted count).
-#' @param N Numeric. Known population size for that base.
-#'
-#' @return Numeric in [0, 1]. The standard-error multiplier.
-#'
-#' @examples
-#' calculate_fpc_factor(20, 27)   # ~0.520 — Masters cohort, near-complete count
-#' calculate_fpc_factor(167, 556) # ~0.840 — 30% response, modest correction
-#' calculate_fpc_factor(50, NA)   # 1 — no population known, no correction
-#' @export
-calculate_fpc_factor <- function(n, N) {
-  if (is.null(N) || length(N) != 1L || is.na(N) || !is.finite(N) || N <= 1) {
-    return(1)
+if (!exists("apply_fpc", mode = "function")) {
+  .fpc_candidates <- c(
+    tryCatch({
+      ofile <- sys.frame(1)$ofile
+      if (!is.null(ofile)) {
+        file.path(dirname(ofile), "..", "..", "shared", "lib", "fpc.R")
+      } else NULL
+    }, error = function(e) NULL),
+    file.path(getwd(), "modules", "shared", "lib", "fpc.R"),
+    file.path(getwd(), "..", "..", "shared", "lib", "fpc.R"),
+    file.path(getwd(), "..", "shared", "lib", "fpc.R"),
+    if (nzchar(Sys.getenv("TURAS_HOME"))) {
+      file.path(Sys.getenv("TURAS_HOME"), "modules", "shared", "lib", "fpc.R")
+    } else NULL
+  )
+  .fpc_candidates <- Filter(Negate(is.null), .fpc_candidates)
+  .fpc_found <- FALSE
+  for (.fpc_path in .fpc_candidates) {
+    if (file.exists(.fpc_path)) {
+      source(.fpc_path)
+      .fpc_found <- TRUE
+      break
+    }
   }
-  if (is.null(n) || length(n) != 1L || is.na(n) || !is.finite(n) || n <= 0) {
-    return(1)
+  if (!.fpc_found) {
+    # Loud, not silent. Without the FPC every interval and every significance
+    # letter on a census study is wrong in the same direction — too wide, too
+    # few letters — and nothing downstream would notice.
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Context: Confidence module - finite population correction\n")
+    cat("│ Code: IO_SHARED_FPC_MISSING\n")
+    cat("│ Message: modules/shared/lib/fpc.R could not be found.\n")
+    cat("│ Consequence: FINITE POPULATION CORRECTION IS UNAVAILABLE -\n")
+    cat("│   census studies will report uncorrected intervals.\n")
+    cat("│ How to fix: restore modules/shared/lib/fpc.R.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
   }
-  if (n / N <= FPC_MIN_COVERAGE) {
-    return(1)   # thin sample: correction negligible -> treat as infinite-population
-  }
-  if (n >= N) {
-    return(0)
-  }
-  sqrt((N - n) / (N - 1))
-}
-
-
-#' Apply finite population correction to an effective base
-#'
-#' Re-expresses the FPC as an inflated \emph{effective base} so it composes with
-#' the rest of the module: feed the result straight into Wilson / mean-CI / z-
-#' and t-tests exactly where a Kish effective-n already flows, and every interval
-#' and significance test becomes finite-population aware in one consistent step.
-#'
-#' FORMULA: n_eff_fpc = n_eff * (N - 1) / (N - n_actual)
-#'
-#' The sampling fraction uses \code{n_actual} (the real respondent count), while
-#' the variance base uses \code{n_eff} (which equals \code{n_actual} unweighted,
-#' or the Kish effective-n when weighted) — so weighting and FPC stack correctly.
-#'
-#' EDGE CASES:
-#' - No usable population (NA / non-finite / <= 1): returns \code{n_eff} unchanged
-#'   ⇒ byte-identical to a report with no population configured.
-#' - Coverage \code{n_actual / N <= FPC_MIN_COVERAGE} (5%): returns \code{n_eff}
-#'   unchanged — a thin sample is treated as an infinite-population sample.
-#' - \code{n_actual >= N} (full census): returns \code{Inf} ⇒ a zero-width
-#'   interval downstream (Wilson/mean-CI collapse to the point estimate).
-#'
-#' @param n_eff Numeric. The effective base to correct (actual n, or Kish n_eff).
-#' @param n_actual Numeric. Unweighted respondent count for the base.
-#' @param N Numeric. Known population size for the base.
-#'
-#' @return Numeric. The FPC-adjusted effective base (\code{Inf} for a full census).
-#'
-#' @examples
-#' apply_fpc(20, 20, 27)   # ~74.3 — n_eff inflates, interval roughly halves
-#' apply_fpc(20, 20, NA)   # 20 — unchanged, no correction
-#' apply_fpc(27, 27, 27)   # Inf — full census, zero-width interval
-#' @export
-apply_fpc <- function(n_eff, n_actual, N) {
-  if (is.null(N) || length(N) != 1L || is.na(N) || !is.finite(N) || N <= 1) {
-    return(n_eff)
-  }
-  if (is.null(n_actual) || length(n_actual) != 1L || is.na(n_actual) ||
-      !is.finite(n_actual) || n_actual <= 0) {
-    return(n_eff)
-  }
-  if (n_actual / N <= FPC_MIN_COVERAGE) {
-    return(n_eff)   # thin sample: correction negligible -> effective base unchanged
-  }
-  if (n_actual >= N) {
-    return(Inf)
-  }
-  n_eff * (N - 1) / (N - n_actual)
+  rm(list = intersect(ls(), c(".fpc_candidates", ".fpc_found", ".fpc_path")))
 }
 
 

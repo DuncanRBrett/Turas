@@ -109,6 +109,35 @@ build_tabs_diagnostics <- function(config_result, data_result,
     "TRS Events"                 = trs_summary
   )
 
+  # Finite population correction. Stated only when a universe is actually
+  # configured, so a sample study's Declaration is unchanged. Reads the real
+  # config keys (population_size, the Population sheet) rather than a flag that
+  # might not reflect what the engine did — the lesson of review finding I4.
+  pop_size <- suppressWarnings(as.numeric(config_obj$population_size))
+  pop_size <- if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) pop_size else NULL
+  pop_frame <- config_obj$population_frame
+  n_subgroups <- if (!is.null(pop_frame) && is.data.frame(pop_frame)) nrow(pop_frame) else 0L
+
+  if (!is.null(pop_size) || n_subgroups > 0) {
+    if (!is.null(pop_size)) {
+      assumptions[["Universe size"]] <- format(round(pop_size), big.mark = ",")
+      n_resp <- suppressWarnings(as.numeric(data_used$n_respondents))
+      if (length(n_resp) == 1L && !is.na(n_resp) && n_resp > 0) {
+        assumptions[["Coverage of universe"]] <- sprintf("%.1f%%", 100 * n_resp / pop_size)
+      }
+    }
+    if (n_subgroups > 0) {
+      assumptions[["Subgroup universes"]] <-
+        sprintf("%d declared on the Population sheet", n_subgroups)
+    }
+    assumptions[["Finite population correction"]] <- sprintf(
+      paste0("Applied — significance and intervals use finite-population-",
+             "corrected effective bases. Coverage at or below %.0f%% is left ",
+             "uncorrected; a fully counted column is reported without ",
+             "significance letters."),
+      100 * FPC_MIN_COVERAGE)
+  }
+
   config_echo <- list(
     data_file      = config_obj$data_file %||% project_data_file,
     structure_file = config_obj$structure_file %||% config_result$structure_file_path,

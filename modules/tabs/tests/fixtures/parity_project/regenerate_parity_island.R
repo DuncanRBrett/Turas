@@ -37,9 +37,14 @@ turas_root <- detect_turas_root()
 FIXTURE_DIR <- file.path(turas_root, "modules/tabs/tests/fixtures/parity_project")
 
 # The workbooks are gitignored (*.xlsx) — the deterministic generator is what
-# lives in git, so write them if this is a fresh checkout.
-source(file.path(FIXTURE_DIR, "generate_parity_project.R"))
-ensure_parity_project(FIXTURE_DIR)
+# lives in git, so write them if this is a fresh checkout. Sourced in a local
+# environment: the generator defines its own FIXTURE_DIR, which would otherwise
+# clobber the absolute one resolved above.
+local({
+  gen_env <- new.env(parent = globalenv())
+  sys.source(file.path(FIXTURE_DIR, "generate_parity_project.R"), envir = gen_env)
+  gen_env$ensure_parity_project(FIXTURE_DIR)
+})
 
 source(file.path(FIXTURE_DIR, "load_tabs_pipeline.R"))
 

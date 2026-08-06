@@ -93,6 +93,77 @@ if (!exists("turas_refuse", mode = "function")) {
 
 
 # ==============================================================================
+# SOURCE SHARED FINITE POPULATION CORRECTION
+# ==============================================================================
+#
+# apply_fpc() / calculate_fpc_factor() / FPC_MIN_COVERAGE, shared with the
+# confidence module (modules/shared/lib/fpc.R). The crosstab significance tests
+# size on the FPC-corrected effective base when a column's universe is known, so
+# a census reported in the workbook, in the stats pack and in the interactive
+# report all engage the correction on identical terms.
+#
+# Same multi-path resolution as trs_refusal.R above — the working directory
+# differs between the GUI, a Turas-root run and a testthat run.
+
+if (!exists("apply_fpc", mode = "function")) {
+  fpc_script_dir <- tryCatch({
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile)) file.path(dirname(ofile), "../../shared/lib/fpc.R") else NULL
+  }, error = function(e) NULL)
+
+  # Walk up from the working directory looking for the Turas root. testthat runs
+  # from modules/{module}/tests/testthat, the GUI from modules/tabs/lib, a
+  # console session from the root — a fixed set of "../.." guesses misses at
+  # least one of those, and a missing FPC is not a failure mode worth risking.
+  fpc_walk <- local({
+    found <- NULL
+    dir <- getwd()
+    for (i in 1:10) {
+      cand <- file.path(dir, "modules", "shared", "lib", "fpc.R")
+      if (file.exists(cand)) { found <- cand; break }
+      parent <- dirname(dir)
+      if (identical(parent, dir)) break
+      dir <- parent
+    }
+    found
+  })
+
+  fpc_paths <- c(
+    fpc_script_dir,
+    fpc_walk,
+    file.path(getwd(), "../../shared/lib/fpc.R"),
+    file.path(getwd(), "modules/shared/lib/fpc.R"),
+    file.path(Sys.getenv("TURAS_HOME"), "modules/shared/lib/fpc.R"),
+    if (exists("script_dir")) file.path(script_dir, "../../shared/lib/fpc.R") else NULL
+  )
+  fpc_paths <- fpc_paths[!sapply(fpc_paths, is.null)]
+
+  fpc_loaded <- FALSE
+  for (path in fpc_paths) {
+    if (file.exists(path)) {
+      source(path)
+      fpc_loaded <- TRUE
+      break
+    }
+  }
+
+  # No silent fallback. A missing FPC would leave every census column testing on
+  # its raw base — fewer letters than the data supports, with nothing to say so.
+  if (!fpc_loaded) {
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Context: Tabs guard layer - finite population correction\n")
+    cat("│ Code: IO_SHARED_FPC_MISSING\n")
+    cat("│ Message: modules/shared/lib/fpc.R could not be found.\n")
+    cat("│ Consequence: SIGNIFICANCE TESTING CANNOT RUN - a population-\n")
+    cat("│   configured report would silently test on uncorrected bases.\n")
+    cat("│ How to fix: restore modules/shared/lib/fpc.R.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    stop("[IO_SHARED_FPC_MISSING] modules/shared/lib/fpc.R not found")
+  }
+}
+
+
+# ==============================================================================
 # TABS-SPECIFIC REFUSAL WRAPPER
 # ==============================================================================
 

@@ -464,3 +464,141 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
     other        = "#c5c0b8"
   )
 }
+
+
+# ==============================================================================
+# POPULATION FRAME RESOLUTION (finite population correction)
+# ==============================================================================
+# One resolver, two callers. The data-layer writer uses it to stamp each column
+# with its universe N; the significance engine uses it to size that column's
+# tests on the FPC-corrected base. They MUST agree — a column whose interval
+# narrows but whose letters do not (or the reverse) is worse than no correction.
+
+#' Resolve a banner column's known population from the Population frame
+#'
+#' Matches a column's subgroup label (and, when given, its banner) against the
+#' optional Population sheet. A banner-scoped row wins over an unscoped one; the
+#' match is case-insensitive on trimmed labels. Returns NULL when no usable
+#' population is found, so callers omit the field entirely (no correction).
+#'
+#' @param col_label The column's display label (e.g. "Masters")
+#' @param banner_label The column's banner question label, or NA
+#' @param frame The population frame (data.frame banner/group/population) or NULL
+#' @return Numeric population (> 1) or NULL
+#' @export
+.resolve_column_population <- function(col_label, banner_label, frame) {
+  if (is.null(frame) || nrow(frame) == 0 || is.null(col_label) || is.na(col_label)) {
+    return(NULL)
+  }
+  norm <- function(x) tolower(trimws(as.character(x)))
+  same_group <- norm(frame$group) == norm(col_label)
+  if (!any(same_group)) return(NULL)
+  cand <- frame[same_group, , drop = FALSE]
+  # Prefer a row whose Banner matches this column's banner label; otherwise an
+  # unscoped (blank-Banner) row.
+  if (!is.null(banner_label) && !is.na(banner_label)) {
+    scoped <- !is.na(cand$banner) & norm(cand$banner) == norm(banner_label)
+    if (any(scoped)) return(cand$population[which(scoped)[1]])
+  }
+  unscoped <- is.na(cand$banner)
+  if (any(unscoped)) return(cand$population[which(unscoped)[1]])
+  # A scoped row for a different banner only — not a match for this column.
+  NULL
+}
+
+
+#' Resolve every banner column's known universe N
+#'
+#' The per-key form of \code{.resolve_column_population()}: the Total column
+#' takes the study's \code{population_size}, each banner column its Population
+#' sheet match. Returns \code{NA_real_} for a column with no usable universe, so
+#' callers treat it as "no correction" without a special case.
+#'
+#' Both consumers of a column's universe go through here — the data-layer writer
+#' (which stamps \code{population} on each column so intervals narrow) and the
+#' significance engine (which sizes that column's tests on the FPC-corrected
+#' base). A second implementation is how a report ends up with narrower
+#' intervals and unchanged letters.
+#'
+#' @param banner_info Banner structure from create_banner_structure()
+#' @param config_obj Tabs config object (reads population_frame, population_size)
+#' @return Named numeric vector over banner_info$internal_keys; NA where unknown
+#' @export
+resolve_column_populations <- function(banner_info, config_obj = NULL) {
+  keys <- banner_info$internal_keys
+  out  <- setNames(rep(NA_real_, length(keys)), keys)
+  if (is.null(config_obj) || length(keys) == 0) return(out)
+
+  frame    <- config_obj$population_frame
+  pop_size <- suppressWarnings(as.numeric(config_obj$population_size))
+  pop_size <- if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) pop_size else NA_real_
+
+  # banner_code -> the human label the Population sheet's Banner column uses.
+  banner_label_by_code <- list()
+  if (!is.null(frame)) {
+    groups <- tryCatch(build_banner_groups(banner_info), error = function(e) NULL)
+    if (!is.null(groups)) {
+      for (lbl in names(groups)) {
+        code <- groups[[lbl]]$banner_code
+        if (!is.null(code)) banner_label_by_code[[as.character(code)]] <- lbl
+      }
+    }
+  }
+
+  k2d <- banner_info$key_to_display
+  c2b <- banner_info$column_to_banner
+
+  for (i in seq_along(keys)) {
+    key <- keys[i]
+    grp_code <- if (!is.null(c2b) && key %in% names(c2b)) unname(c2b[[key]]) else NA_character_
+    is_total <- identical(key, "TOTAL::Total") || identical(grp_code, "TOTAL")
+    if (is_total) {
+      out[i] <- pop_size
+      next
+    }
+    label <- if (!is.null(k2d) && key %in% names(k2d)) unname(k2d[[key]]) else key
+    banner_label <- if (!is.na(grp_code)) banner_label_by_code[[as.character(grp_code)]] else NULL
+    pop <- .resolve_column_population(label, banner_label, frame)
+    if (!is.null(pop) && is.finite(pop) && pop > 1) out[i] <- as.numeric(pop)
+  }
+  out
+}
+
+
+#' FPC multipliers for one question's banner columns
+#'
+#' The number each column's effective base is multiplied by before it is tested:
+#' \code{apply_fpc(1, n_actual, N)}, i.e. \code{(N - 1) / (N - n_actual)} when the
+#' correction engages. 1 when the universe is unknown or coverage is below
+#' \code{FPC_MIN_COVERAGE}; \code{Inf} at a full census, which the tests read as
+#' "no sampling error left — exclude this column from pairing".
+#'
+#' n_actual is the column's UNWEIGHTED base FOR THIS QUESTION: a routed question
+#' covers less of the same universe than an all-respondent one, so its columns
+#' are corrected less.
+#'
+#' @param question_bases Named list of per-key bases with an $unweighted field
+#' @param col_populations Named numeric vector from resolve_column_populations()
+#' @param keys Character vector of internal keys (defaults to the bases' names)
+#' @return Named numeric vector of multipliers, one per key (all 1 with no config)
+#' @export
+build_fpc_multipliers <- function(question_bases, col_populations, keys = NULL) {
+  if (is.null(keys)) keys <- names(question_bases)
+  out <- setNames(rep(1, length(keys)), keys)
+  if (is.null(col_populations) || length(col_populations) == 0) return(out)
+
+  for (i in seq_along(keys)) {
+    key <- keys[i]
+    N <- if (key %in% names(col_populations)) unname(col_populations[[key]]) else NA_real_
+    if (is.na(N)) next
+    base_info <- question_bases[[key]]
+    n_actual <- if (!is.null(base_info) && !is.null(base_info$unweighted)) {
+      suppressWarnings(as.numeric(base_info$unweighted[1]))
+    } else NA_real_
+    if (is.na(n_actual)) next
+    # apply_fpc(1, ...) IS the multiplier — deriving it here instead would be a
+    # second implementation of the floor and the census rule.
+    out[i] <- apply_fpc(1, n_actual, N)
+  }
+  out
+}

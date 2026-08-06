@@ -316,7 +316,9 @@ process_numeric_question <- function(data, question_info, question_options,
       config$bonferroni_correction,
       config$significance_min_base,
       is_weighted = is_weighted,
-      alpha_secondary = config$alpha_secondary
+      alpha_secondary = config$alpha_secondary,
+      fpc_muls = build_fpc_multipliers(
+        banner_bases, resolve_column_populations(banner_info, config), internal_keys)
     )
     
     if (!is.null(sig_row)) {

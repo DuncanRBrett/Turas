@@ -63,6 +63,12 @@ process_standard_question <- function(data, question_info, question_options,
   question_col <- question_info$QuestionCode
   is_multi_mention <- question_info$Variable_Type == "Multi_Mention"
   internal_keys <- banner_info$internal_keys
+
+  # Finite population correction, per banner column, for this question's bases.
+  # build_fpc_multipliers() returns all-1 when no universe is configured, so a
+  # report with no Population sheet is byte-identical to one before the FPC.
+  fpc_muls <- build_fpc_multipliers(
+    banner_bases, resolve_column_populations(banner_info, config), internal_keys)
   
   # Filter options by ShowInOutput
   display_options <- question_options[
@@ -251,7 +257,8 @@ process_standard_question <- function(data, question_info, question_options,
         config$bonferroni_correction,
         config$significance_min_base,
         is_weighted = is_weighted,
-        alpha_secondary = config$alpha_secondary
+        alpha_secondary = config$alpha_secondary,
+        fpc_muls = fpc_muls
       )
       
       if (!is.null(sig_row)) {
@@ -339,7 +346,9 @@ create_boxcategory_column_percent <- function(category, row_counts, banner_bases
       config$bonferroni_correction,
       config$significance_min_base,
       is_weighted = is_weighted,
-      alpha_secondary = config$alpha_secondary
+      alpha_secondary = config$alpha_secondary,
+      fpc_muls = build_fpc_multipliers(
+        banner_bases, resolve_column_populations(banner_info, config), internal_keys)
     )
 
     if (!is.null(sig_row)) {
@@ -575,7 +584,8 @@ create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
 #' Add significance testing row for summary statistics
 #' @keywords internal
 add_summary_significance_row <- function(stat_value_sets, stat_weight_sets,
-                                        internal_keys, banner_info, config, is_weighted) {
+                                        internal_keys, banner_info, config, is_weighted,
+                                        fpc_muls = NULL) {
   test_data <- list()
   total_key <- paste0("TOTAL::", TOTAL_COLUMN)
 
@@ -594,7 +604,8 @@ add_summary_significance_row <- function(stat_value_sets, stat_weight_sets,
     config$bonferroni_correction,
     config$significance_min_base,
     is_weighted = is_weighted,
-    alpha_secondary = config$alpha_secondary
+    alpha_secondary = config$alpha_secondary,
+    fpc_muls = fpc_muls
   )
 
   return(sig_row)
@@ -671,7 +682,9 @@ add_summary_statistic <- function(data, question_info, question_options,
   if (test_enabled) {
     sig_row <- add_summary_significance_row(
       banner_stats$stat_value_sets, banner_stats$stat_weight_sets,
-      internal_keys, banner_info, config, is_weighted
+      internal_keys, banner_info, config, is_weighted,
+      fpc_muls = build_fpc_multipliers(
+        banner_bases, resolve_column_populations(banner_info, config), internal_keys)
     )
 
     if (!is.null(sig_row)) {
@@ -726,7 +739,7 @@ validate_net_difference_requirements <- function(existing_table, config, questio
 #' Build test data structure for net difference tests
 #' @keywords internal
 build_net_test_data <- function(row_counts_net1, row_counts_net2,
-                                banner_bases, internal_keys) {
+                                banner_bases, internal_keys, fpc_muls = NULL) {
   net_test_data <- list()
   total_key <- paste0("TOTAL::", TOTAL_COLUMN)
 
@@ -735,6 +748,10 @@ build_net_test_data <- function(row_counts_net1, row_counts_net2,
       base_info <- banner_bases[[key]]
 
       net_test_data[[key]] <- list(
+        # Same per-column FPC multiplier the category rows above the NET use.
+        fpc_mul = if (!is.null(fpc_muls) && key %in% names(fpc_muls)) {
+          unname(fpc_muls[[key]])
+        } else 1,
         count1 = row_counts_net1[key],
         count2 = row_counts_net2[key],
         base = if (!is.null(base_info$weighted)) {
@@ -843,7 +860,9 @@ add_net_significance_rows <- function(existing_table, data, question_info,
   # Build test data (delegated to helper)
   net_test_data <- build_net_test_data(
     row_counts_net1, row_counts_net2,
-    banner_bases, internal_keys
+    banner_bases, internal_keys,
+    fpc_muls = build_fpc_multipliers(
+      banner_bases, resolve_column_populations(banner_info, config), internal_keys)
   )
 
   dual_mode     <- !is.null(config$alpha_secondary)

@@ -88,7 +88,9 @@ process_allocation_question <- function(data, question_info, question_options,
 
     if (isTRUE(config$enable_significance_testing)) {
       sig_row <- build_allocation_sig_row(
-        value_sets, weight_sets, banner_info, internal_keys, config, is_weighted
+        value_sets, weight_sets, banner_info, internal_keys, config, is_weighted,
+        fpc_muls = build_fpc_multipliers(
+          banner_bases, resolve_column_populations(banner_info, config), internal_keys)
       )
       if (!is.null(sig_row)) {
         results_list[[length(results_list) + 1]] <- sig_row
@@ -245,7 +247,8 @@ build_allocation_mean_row <- function(label, value_sets, weight_sets,
 #' @return Single-row data frame or NULL
 #' @export
 build_allocation_sig_row <- function(value_sets, weight_sets, banner_info,
-                                     internal_keys, config, is_weighted) {
+                                     internal_keys, config, is_weighted,
+                                     fpc_muls = NULL) {
   total_key <- paste0("TOTAL::", ALLOCATION_TOTAL_COLUMN)
   test_data <- list()
 
@@ -271,7 +274,8 @@ build_allocation_sig_row <- function(value_sets, weight_sets, banner_info,
     bonferroni         = config$bonferroni_correction,
     min_base           = config$significance_min_base,
     is_weighted        = is_weighted,
-    alpha_secondary    = config$alpha_secondary
+    alpha_secondary    = config$alpha_secondary,
+    fpc_muls           = fpc_muls
   )
 }
 

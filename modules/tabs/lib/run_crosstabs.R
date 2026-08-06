@@ -277,6 +277,15 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
     for (j in seq_along(row_data)) {
       if (i == j) next
 
+      # Finite population correction, per column. Each test entry may carry an
+      # fpc_mul built by build_fpc_multipliers() (report_shared.R); absent means
+      # 1, which is the no-population, no-correction default.
+      # (Explicit NULL checks rather than %||%: the test harnesses extract this
+      # function out of the file by text, so it must not depend on operators
+      # defined elsewhere in it.)
+      fpc_i <- if (is.null(row_data[[i]]$fpc_mul)) 1 else row_data[[i]]$fpc_mul
+      fpc_j <- if (is.null(row_data[[j]]$fpc_mul)) 1 else row_data[[j]]$fpc_mul
+
       test_result <- if (row_type %in% c("proportion", "topbox")) {
         weighted_z_test_proportions(
           row_data[[i]]$count, row_data[[i]]$base,
@@ -284,14 +293,16 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
           row_data[[i]]$eff_n, row_data[[j]]$eff_n,
           is_weighted = is_weighted,
           min_base = min_base,
-          alpha = alpha_adj
+          alpha = alpha_adj,
+          fpc_mul1 = fpc_i, fpc_mul2 = fpc_j
         )
       } else if (row_type %in% c("mean", "index")) {
         weighted_t_test_means(
           row_data[[i]]$values, row_data[[j]]$values,
           row_data[[i]]$weights, row_data[[j]]$weights,
           min_base = min_base,
-          alpha = alpha_adj
+          alpha = alpha_adj,
+          fpc_mul1 = fpc_i, fpc_mul2 = fpc_j
         )
       } else {
         # An unknown row_type must refuse, not return an all-blank Sig row that
@@ -360,6 +371,10 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
 #' @param is_weighted Logical
 #' @param alpha_secondary Numeric or NULL. When non-NULL, a secondary sig row
 #'   is calculated and appended. Default NULL (feature disabled).
+#' @param fpc_muls Named numeric vector of finite population correction
+#'   multipliers by internal key, from \code{build_fpc_multipliers()}
+#'   (report_shared.R). NULL — the default — means no correction anywhere, which
+#'   is what a report with no Population configuration gets.
 #' @return Data frame with one sig row (primary only) or two rows (primary +
 #'   secondary), or NULL if fewer than two columns in test_data.
 #' @export
@@ -368,8 +383,19 @@ add_significance_row <- function(test_data, banner_info, row_type, internal_colu
                                  bonferroni_correction = TRUE,
                                  min_base = DEFAULT_MIN_BASE,
                                  is_weighted = FALSE,
-                                 alpha_secondary = NULL) {
+                                 alpha_secondary = NULL,
+                                 fpc_muls = NULL) {
   if (is.null(test_data) || length(test_data) < 2) return(NULL)
+
+  # Stamp each column's FPC multiplier onto its test entry, so every test path
+  # (here, and the NET path in weighting.R) reads it from the same place.
+  if (!is.null(fpc_muls)) {
+    for (col_key in names(test_data)) {
+      if (col_key %in% names(fpc_muls)) {
+        test_data[[col_key]]$fpc_mul <- unname(fpc_muls[[col_key]])
+      }
+    }
+  }
 
   # When dual-alpha is active, label rows with the confidence level so Excel
   # output is self-documenting. When single-alpha, blank label preserves the

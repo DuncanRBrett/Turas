@@ -372,72 +372,6 @@
     });
   }
 
-  /**
-   * Re-letter significance on the FPC-corrected effective base, in the DEFAULT
-   * (published) view of a population report. Works ENTIRELY from the published
-   * figures already in the model — the shown % and the column's ciBase — so the
-   * reported numbers never move; only which differences earn a letter changes.
-   * (Microdata is deliberately not used here: a column's published base and its
-   * microdata count can differ, and the published figures are the report of
-   * record.) Proportions recompute from the shown %; means derive their SD the
-   * same way attachIntervals does (TR.waves.scoreMap + sdFromPairs — the one
-   * shared SD source). Columns with no known universe keep ciBase === base, so
-   * their letters are unchanged. Unweighted designs only (gated by the caller);
-   * a weighted base's design effect is not in the published layer.
-   */
-  function applyFpcSignificance(viewModel, q, dual) {
-    var threshold = viewModel.lowBaseThreshold;
-    var letters = viewModel.columns.map(function (c) { return c.letter; });
-    var sizeAt = function (ci) {
-      var c = viewModel.columns[ci];
-      var b = (c && c.ciBase != null) ? c.ciBase : (c ? c.base : null);
-      // A full census (ciBase Infinity) has no sampling error to test; excluding
-      // it also keeps Infinity out of propZ/meanZ, which would NaN every pairing.
-      return b === Infinity ? null : b;
-    };
-    viewModel.rows.forEach(function (row) {
-      if (row.diff) return;                       // differences carry no test
-      if (row.kind === "mean") {
-        if (isStdDevRow(row.label)) return;
-        var scores = TR.waves.scoreMap(q, row);
-        if (!scores) return;
-        var cells = row.cells.map(function (cell, ci) {
-          var pairs = [];
-          Object.keys(scores).forEach(function (ri) {
-            var cc = viewModel.rows[ri] && viewModel.rows[ri].cells[ci];
-            if (cc && cc.pct !== null && cc.pct !== undefined) {
-              pairs.push({ p: cc.pct, s: scores[ri] });
-            }
-          });
-          var absent = cell.suppressed || cell.mean === null || cell.mean === undefined;
-          return { mean: cell.mean, sd: TR.waves.sdFromPairs(pairs), k: absent ? null : sizeAt(ci) };
-        });
-        var msig = TR.stats.sigLetters(cells, letters, threshold, true, dual);
-        row.cells.forEach(function (cell, ci) {
-          if (cell.mean !== null && cell.mean !== undefined) cell.sig = msig[ci];
-        });
-        return;
-      }
-      var pcells = row.cells.map(function (cell, ci) {
-        var base = sizeAt(ci);
-        // A missing or disclosure-suppressed cell is excluded from the test —
-        // treating it as 0% would letter visible columns against a phantom zero.
-        if (cell.suppressed || cell.pct === null || cell.pct === undefined || !base) {
-          return { x: null, base: null };
-        }
-        var col = viewModel.columns[ci];
-        // Prefer the exact published count over the rounded displayed % —
-        // reconstruction from cell.pct flips letters on borderline pairs.
-        var p = (cell.n != null && col && col.base) ? (cell.n / col.base) : (cell.pct / 100);
-        return { x: p * base, base: base };
-      });
-      var psig = TR.stats.sigLetters(pcells, letters, threshold, false, dual);
-      row.cells.forEach(function (cell, ci) {
-        if (cell.pct !== null && cell.pct !== undefined) cell.sig = psig[ci];
-      });
-    });
-  }
-
   /** Arrow for a z-score vs the rest, at the project's configured primary /
    *  secondary levels (single planned test per column — no Bonferroni). */
   function compositeArrow(z, dual) {
@@ -652,12 +586,10 @@
     }
     // Finite population correction applies to the DEFAULT (published) view of a
     // population report — never under a filter / custom banner, where a
-    // sub-population's universe is unknown. The published numbers stay verbatim;
-    // FPC narrows the intervals (attachIntervals reads each column's ciBase) and
-    // re-letters significance from the FPC-corrected base (unweighted designs —
-    // a weighted base's design effect isn't in the published layer; weighted
-    // reports still get the narrower intervals).
-    var weighted = !!(TR.AGG.project && TR.AGG.project.weighted);
+    // sub-population's universe is unknown. The published numbers stay verbatim
+    // and FPC narrows the intervals (attachIntervals reads each column's
+    // ciBase). Significance is not touched here: it arrives already corrected
+    // from R.
     viewModel.fpcDefault = !custom && !composite && !filtered && TR.conf.fpcActiveReport();
     viewModel.code = q.code;
     viewModel.title = q.title;
@@ -682,11 +614,16 @@
     // compute (or leak) anything for a cut too small to report.
     applyDisclosureSuppression(viewModel);
     TR.waves.attachDeltas(q, viewModel);
-    // Re-letter significance on the FPC base before hiding/sorting (per-cell, so
-    // it survives both). Unweighted population reports only.
-    if (viewModel.fpcDefault && !weighted) {
-      applyFpcSignificance(viewModel, q, opts.dual);
-    }
+    // NO FPC re-lettering here. R applies the finite population correction
+    // inside its own tests now, so the published letters this view carries are
+    // already FPC-corrected — at both alphas, on weighted designs too, and from
+    // the unrounded counts. Recomputing them here from the DISPLAY-rounded %s
+    // was a second, worse computation of the same thing, and it was gated off
+    // for weighted reports, so a weighted census silently kept uncorrected
+    // letters. FPC still reaches this view through ciBase: intervals narrow,
+    // the low-base flag is coverage-aware, and the census framing stands.
+    // Computed views (filter / custom banner) keep standard significance — a
+    // sub-population's universe is unknown.
     // Composite (profile) banners replace pairwise letters with vs-the-rest
     // arrows — only meaningful on the microdata recompute (its columns carry the
     // membership the test needs); a no-microdata fallback rendered the first

@@ -33,14 +33,15 @@
 #
 #   Beta  39/60 = 0.650      Gamma 20/50 = 0.400
 #   pooled p = 59/110 = 0.5363636
-#   no FPC:  SE = sqrt(0.5363636*0.4636364*(1/60 + 1/50))  = 0.0954893
-#            z  = 0.25 / 0.0954893 = 2.61810   ->  p = 0.008841
-#            0.008841 > 0.0083333  -> NOT significant at 95%
-#            0.008841 < 0.0333333  -> significant at 80%          (lowercase b)
+#   no FPC:  SE = sqrt(0.5363636*0.4636364*(1/60 + 1/50))  = 0.0954892
+#            z  = 0.25 / 0.0954892 = 2.61810   ->  p = 0.008842
+#            0.008842 > 0.0083333  -> NOT significant at 95%
+#            0.008842 < 0.0333333  -> significant at 80%    (lowercase c on Beta)
 #   with FPC: Beta's n_eff becomes 60 * 149/90 = 99.3333, Gamma's is unchanged
-#            SE = sqrt(0.5363636*0.4636364*(1/99.3333 + 1/50)) = 0.0864723
-#            z  = 0.25 / 0.0864723 = 2.89111   ->  p = 0.003838
-#            0.003838 < 0.0083333  -> significant at 95%          (uppercase B)
+#            (coverage 50/5000 = 1%, below the floor)
+#            SE = sqrt(0.5363636*0.4636364*(1/99.3333 + 1/50)) = 0.0864698
+#            z  = 0.25 / 0.0864698 = 2.89118   ->  p = 0.003838
+#            0.003838 < 0.0083333  -> significant at 95%    (uppercase C on Beta)
 #
 # That single pair is the executable form of three separate claims: the dual
 # alpha rows disagree in a way the reader can see, the FPC changes a published
@@ -304,6 +305,12 @@ generate_parity_project <- function(dir = FIXTURE_DIR) {
   build_config_workbook(file.path(dir, "Parity_Crosstab_Config_NoPop.xlsx"),
                         "Parity_Crosstabs_NoPop.xlsx", weighted = FALSE,
                         with_population = FALSE)
+  # The plainest report Turas can produce — unweighted, single alpha, no
+  # population. This is the batch's guardrail case: its output must be identical
+  # to what pre-batch main produced, because none of the new code paths engage.
+  build_config_workbook(file.path(dir, "Parity_Crosstab_Config_Plain.xlsx"),
+                        "Parity_Crosstabs_Plain.xlsx", weighted = FALSE,
+                        with_population = FALSE, dual_alpha = FALSE)
 
   invisible(dir)
 }
@@ -311,7 +318,7 @@ generate_parity_project <- function(dir = FIXTURE_DIR) {
 PARITY_WORKBOOKS <- c(
   "Parity_Survey_Data.xlsx", "Parity_Survey_Structure.xlsx",
   "Parity_Crosstab_Config.xlsx", "Parity_Crosstab_Config_Weighted.xlsx",
-  "Parity_Crosstab_Config_NoPop.xlsx"
+  "Parity_Crosstab_Config_NoPop.xlsx", "Parity_Crosstab_Config_Plain.xlsx"
 )
 
 #' Write the fixture workbooks if any of them is missing

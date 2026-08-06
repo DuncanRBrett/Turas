@@ -297,38 +297,6 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
 }
 
 
-#' Resolve a banner column's known population from the Population frame
-#'
-#' Matches a column's subgroup label (and, when given, its banner) against the
-#' optional Population sheet. A banner-scoped row wins over an unscoped one; the
-#' match is case-insensitive on trimmed labels. Returns NULL when no usable
-#' population is found, so callers omit the field entirely (no correction).
-#'
-#' @param col_label The column's display label (e.g. "Masters")
-#' @param banner_label The column's banner question label, or NA
-#' @param frame The population frame (data.frame banner/group/population) or NULL
-#' @return Numeric population (> 1) or NULL
-#' @keywords internal
-.resolve_column_population <- function(col_label, banner_label, frame) {
-  if (is.null(frame) || nrow(frame) == 0 || is.null(col_label) || is.na(col_label)) {
-    return(NULL)
-  }
-  norm <- function(x) tolower(trimws(as.character(x)))
-  same_group <- norm(frame$group) == norm(col_label)
-  if (!any(same_group)) return(NULL)
-  cand <- frame[same_group, , drop = FALSE]
-  # Prefer a row whose Banner matches this column's banner label; otherwise an
-  # unscoped (blank-Banner) row.
-  if (!is.null(banner_label) && !is.na(banner_label)) {
-    scoped <- !is.na(cand$banner) & norm(cand$banner) == norm(banner_label)
-    if (any(scoped)) return(cand$population[which(scoped)[1]])
-  }
-  unscoped <- is.na(cand$banner)
-  if (any(unscoped)) return(cand$population[which(unscoped)[1]])
-  # A scoped row for a different banner only — not a match for this column.
-  NULL
-}
-
 #' Build the columns[] array of the data layer
 #'
 #' One entry per banner column (Total first), in banner_info$internal_keys
@@ -347,11 +315,13 @@ build_dl_columns <- function(banner_info, config_obj = NULL) {
   k2d     <- banner_info$key_to_display
   c2b     <- banner_info$column_to_banner
 
-  # Population inputs (all optional). Build a banner_code -> human label map so a
-  # column can be matched to the Population sheet's Banner column.
-  frame    <- config_obj$population_frame
-  pop_size <- suppressWarnings(as.numeric(config_obj$population_size))
-  pop_size <- if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) pop_size else NULL
+  # Population inputs (all optional). resolve_column_populations() in
+  # report_shared.R is the ONE resolver — the significance engine calls it too,
+  # so a column's interval and its letters engage the FPC on the same terms.
+  frame <- config_obj$population_frame
+  col_pops <- resolve_column_populations(banner_info, config_obj)
+
+  # Banner-label map, kept here only for the unmatched-row diagnostic below.
   banner_label_by_code <- list()
   if (!is.null(frame)) {
     groups <- tryCatch(build_banner_groups(banner_info), error = function(e) NULL)
@@ -393,8 +363,8 @@ build_dl_columns <- function(banner_info, config_obj = NULL) {
     }
     # Attach the known population N: the study total for the Total column, the
     # frame match for a banner subgroup. Carried only when found.
-    pop <- if (is_total) pop_size else .resolve_column_population(label, banner_label, frame)
-    if (!is.null(pop) && is.finite(pop) && pop > 1) entry$population <- as.numeric(pop)
+    pop <- unname(col_pops[[as.character(key)]])
+    if (!is.na(pop) && is.finite(pop) && pop > 1) entry$population <- as.numeric(pop)
     entry
   })
 

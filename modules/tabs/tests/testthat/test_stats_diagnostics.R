@@ -126,3 +126,70 @@ test_that("diagnostics_for_island renders missing values as an em dash, never NA
   proj <- Filter(function(r) r[[1]] == "Project", decl)[[1]]
   expect_equal(proj[[2]], "—")   # em dash placeholder, not NA/empty
 })
+
+
+# ---- FPC declaration lines (cross-engine stats batch, D2) --------------------
+#
+# When a universe is configured the pack has to SAY the correction was applied,
+# because a reader comparing this report to an uncorrected one otherwise has no
+# way to know why the letters differ. Read from the real config keys — the
+# lesson of review finding I4, where a contractual Declaration line printed a
+# hard-coded value instead of the configured one.
+
+# FPC_MIN_COVERAGE lives in modules/shared/lib/fpc.R, which the tabs guard
+# sources; this test file loads stats_diagnostics.R on its own.
+if (!exists("FPC_MIN_COVERAGE")) {
+  source(file.path(turas_root, "modules/shared/lib/fpc.R"))
+}
+
+fpc_payload <- function(...) {
+  extra <- list(...)
+  config_obj <- modifyList(list(
+    data_file = "census.xlsx", apply_weighting = FALSE,
+    enable_significance_testing = TRUE, alpha = 0.05,
+    significance_min_base = 30, bonferroni_correction = TRUE), extra)
+  build_tabs_diagnostics(
+    list(config_obj = config_obj, output_path = "out.xlsx"),
+    list(survey_data = data.frame(a = 1:200, b = 1:200), effective_n = 200),
+    list(all_results = vector("list", 3), skipped_questions = list(),
+         partial_questions = list()),
+    list(project_name = "Parity", run_result = list(status = "PASS", events = list())),
+    Sys.time() - 1, "10.2")
+}
+
+test_that("no population configured leaves the Declaration untouched", {
+  a <- fpc_payload()$assumptions
+  expect_null(a[["Universe size"]])
+  expect_null(a[["Coverage of universe"]])
+  expect_null(a[["Subgroup universes"]])
+  expect_null(a[["Finite population correction"]])
+})
+
+test_that("a configured universe is declared, with its coverage", {
+  a <- fpc_payload(population_size = 5000)$assumptions
+  expect_equal(a[["Universe size"]], "5,000")
+  expect_equal(a[["Coverage of universe"]], "4.0%")     # 200 of 5,000
+  expect_true(grepl("finite-population-corrected effective bases",
+                    a[["Finite population correction"]], fixed = TRUE))
+  # The floor is stated from the shared constant, not typed into the sentence.
+  expect_true(grepl("5%", a[["Finite population correction"]], fixed = TRUE))
+  # And the census rule is spelled out, since it is why a column can go blank.
+  expect_true(grepl("without\\s+significance letters",
+                    a[["Finite population correction"]]))
+})
+
+test_that("subgroup universes are counted from the Population frame", {
+  frame <- data.frame(banner = c("Cohort", "Cohort", NA),
+                      group = c("Alpha", "Beta", "Gamma"),
+                      population = c(40, 150, 5000), stringsAsFactors = FALSE)
+  a <- fpc_payload(population_frame = frame)$assumptions
+  expect_equal(a[["Subgroup universes"]], "3 declared on the Population sheet")
+  # A Population sheet alone (no study total) still declares the correction.
+  expect_false(is.null(a[["Finite population correction"]]))
+  expect_null(a[["Universe size"]])
+
+  # Both together: the parity fixture's shape.
+  b <- fpc_payload(population_size = 5000, population_frame = frame)$assumptions
+  expect_equal(b[["Universe size"]], "5,000")
+  expect_equal(b[["Subgroup universes"]], "3 declared on the Population sheet")
+})

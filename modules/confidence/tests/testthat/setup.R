@@ -36,7 +36,10 @@ shared_files <- c(
   "data_utils.R", "config_utils.R", "logging_utils.R",
   "formatting_utils.R", "weights_utils.R", "turas_log.R",
   "trs_run_state.R", "trs_run_status_writer.R", "trs_banner.R",
-  "turas_save_workbook_atomic.R", "turas_excel_escape.R"
+  "turas_save_workbook_atomic.R", "turas_excel_escape.R",
+  # The finite population correction, shared with tabs (03_study_level.R also
+  # sources it defensively, so this line is explicitness, not a dependency).
+  "fpc.R"
 )
 for (f in shared_files) {
   fp <- file.path(shared_lib, f)

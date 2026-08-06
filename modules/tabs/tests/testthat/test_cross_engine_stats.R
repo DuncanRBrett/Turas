@@ -12,6 +12,9 @@
 #
 # Sections, in the order the spec's stages landed them:
 #   R-4  Fractional n_eff (D3) — means and proportions gate on the same base
+#   R-2  Carriage integrity (D4) — the island carries R's letters verbatim
+#   R-1  Finite population correction through the tabs path (D2)
+#   R-3  The no-population guardrail — fpc_mul defaults are inert
 #
 # Every expected value below is hand-derived in the comment above it. A parity
 # gate that re-blesses whatever the code produced is a tautology, not a gate.
@@ -360,10 +363,23 @@ test_that("a summary block's letters land on the mean, never on Std Dev", {
   mean_row <- Filter(function(r) r$label == "Mean", q2$rows)[[1]]
   sd_row   <- Filter(function(r) r$label == "Standard Deviation", q2$rows)[[1]]
 
-  # Hand-check against the fixture's own table: the Sig. row of Q2's summary
-  # block carries "C" under Beta (Beta's mean is significantly above Gamma's).
+  # INDEPENDENTLY DERIVED from the fixture's rating distribution — recomputed
+  # below from the counts in generate_parity_project.R, with no Turas code in
+  # the path, so this is a check and not a re-blessing of whatever came out.
+  #
+  #   counts per score 1..5   mean     population variance (Sigma w, w = 1)
+  #     Alpha  2 4 10 14 10   3.65     census -> excluded from pairing
+  #     Beta   2 6 13 24 15   3.7333   n_eff 60 * 149/90 = 99.3333
+  #     Gamma  8 12 10 12 8   3.0000   n_eff 50 (coverage 1%, below the floor)
+  #     Delta  4 6 10 18 12   3.5600   n_eff 50 (no universe configured)
+  #
+  #   Welch t on those, Bonferroni divisor choose(4,2) = 6:
+  #     Beta  vs Gamma  p = 0.0010152  < 0.0083333  -> 95%  (uppercase C)
+  #     Delta vs Gamma  p = 0.0293560  > 0.0083333, < 0.0333333 -> 80% only
+  #     Beta  vs Delta  p = 0.3882500  -> nothing
+  #     anything vs Alpha              -> excluded, a census is not an estimate
   expect_equal(unlist(mean_row$sig),  c("", "", "C", "", ""))
-  expect_equal(unlist(mean_row$sig2), c("", "C", "C", "", "C"))
+  expect_equal(unlist(mean_row$sig2), c("", "", "C", "", "C"))
   expect_equal(unlist(sd_row$sig),  rep("", 5))
   expect_equal(unlist(sd_row$sig2), rep("", 5))
 })
@@ -387,4 +403,198 @@ test_that("the committed island matches a fresh rebuild", {
     info = paste("Regenerate with:",
                  "Rscript modules/tabs/tests/fixtures/parity_project/regenerate_parity_island.R"))
   expect_equal(committed$columns, fresh$columns)
+})
+
+
+# ==============================================================================
+# R-1. FINITE POPULATION CORRECTION, THROUGH THE TABS PATH (D2)
+# ==============================================================================
+#
+# apply_fpc() has its own tests in the confidence module — these test the
+# WIRING: that a column's universe reaches the pairwise tests, that a census is
+# excluded from pairing rather than tested, that a below-floor column is left
+# alone, and that a corrected column flips a hand-computed marginal pair.
+
+context("R-1: FPC through the tabs tests")
+
+test_that("the shared FPC helper is what tabs uses (not a copy)", {
+  # D2's non-duplication rule: one definition, in modules/shared/lib/fpc.R.
+  expect_true(exists("apply_fpc", mode = "function"))
+  expect_true(exists("calculate_fpc_factor", mode = "function"))
+  expect_equal(FPC_MIN_COVERAGE, 0.05)
+  # No second definition anywhere in the tabs library.
+  tabs_r <- list.files(file.path(turas_root, "modules/tabs/lib"),
+                       pattern = "[.]R$", recursive = TRUE, full.names = TRUE)
+  defines <- vapply(tabs_r, function(f) {
+    any(grepl("^\\s*(apply_fpc|calculate_fpc_factor|FPC_MIN_COVERAGE)\\s*<-",
+              readLines(f, warn = FALSE)))
+  }, logical(1))
+  expect_equal(sum(defines), 0L,
+               info = paste("redefined in:", paste(basename(tabs_r[defines]), collapse = ", ")))
+})
+
+test_that("build_fpc_multipliers covers every FPC branch", {
+  # The parity fixture's four columns, hand-derived:
+  #   Alpha  n=40 N=40    coverage 1.00  -> Inf   (full census)
+  #   Beta   n=60 N=150   coverage 0.40  -> 149/90 = 1.6555556
+  #   Gamma  n=50 N=5000  coverage 0.01  -> 1     (below the 5% floor)
+  #   Delta  n=50 N=NA                   -> 1     (no universe configured)
+  bases <- list(
+    "TOTAL::Total" = list(unweighted = 200), "C::Alpha" = list(unweighted = 40),
+    "C::Beta" = list(unweighted = 60), "C::Gamma" = list(unweighted = 50),
+    "C::Delta" = list(unweighted = 50))
+  pops <- c("TOTAL::Total" = 5000, "C::Alpha" = 40, "C::Beta" = 150,
+            "C::Gamma" = 5000, "C::Delta" = NA_real_)
+  muls <- build_fpc_multipliers(bases, pops)
+
+  expect_true(is.infinite(muls[["C::Alpha"]]))
+  expect_equal(unname(muls[["C::Beta"]]), 149 / 90, tolerance = 1e-9)
+  expect_equal(unname(muls[["C::Gamma"]]), 1)
+  expect_equal(unname(muls[["C::Delta"]]), 1)
+  expect_equal(unname(muls[["TOTAL::Total"]]), 1)   # 200/5000 = 4%, below floor
+})
+
+test_that("no population configured leaves every multiplier at 1", {
+  bases <- list(a = list(unweighted = 50), b = list(unweighted = 50))
+  expect_equal(unname(build_fpc_multipliers(bases, NULL)), c(1, 1))
+  expect_equal(unname(build_fpc_multipliers(bases, c(a = NA_real_, b = NA_real_))), c(1, 1))
+})
+
+test_that("a census column is EXCLUDED from pairing, not tested", {
+  # 40 of 40 measured: there is no sampling error left, so the column neither
+  # earns a letter nor grants one. A 60% / 20% gap this wide would otherwise be
+  # significant several times over.
+  res <- weighted_z_test_proportions(
+    count1 = 24, base1 = 40, count2 = 10, base2 = 50,
+    is_weighted = FALSE, min_base = 30, alpha = 0.05,
+    fpc_mul1 = Inf, fpc_mul2 = 1
+  )
+  expect_false(res$significant)
+  expect_true(is.na(res$p_value))
+
+  # Either side being a census is enough.
+  res2 <- weighted_z_test_proportions(
+    count1 = 24, base1 = 40, count2 = 10, base2 = 50,
+    is_weighted = FALSE, min_base = 30, alpha = 0.05,
+    fpc_mul1 = 1, fpc_mul2 = Inf
+  )
+  expect_true(is.na(res2$p_value))
+
+  # And for means, where an Inf would otherwise NaN the Welch df.
+  res3 <- weighted_t_test_means(
+    rep(c(1, 2), 30), rep(c(4, 5), 30),
+    min_base = 30, alpha = 0.05, fpc_mul1 = Inf, fpc_mul2 = 1
+  )
+  expect_false(res3$significant)
+  expect_true(is.na(res3$p_value))
+})
+
+test_that("a below-floor column tests exactly as it did before the FPC", {
+  # Coverage 50/5000 = 1%, under FPC_MIN_COVERAGE, so the multiplier is 1 and
+  # the p-value must be identical to the uncorrected call, bit for bit.
+  args <- list(count1 = 30, base1 = 60, count2 = 20, base2 = 50,
+               is_weighted = FALSE, min_base = 30, alpha = 0.05)
+  plain <- do.call(weighted_z_test_proportions, args)
+  floored <- do.call(weighted_z_test_proportions,
+                     c(args, list(fpc_mul1 = apply_fpc(1, 50, 5000),
+                                  fpc_mul2 = apply_fpc(1, 50, 5000))))
+  expect_identical(plain$p_value, floored$p_value)
+  expect_identical(plain$significant, floored$significant)
+})
+
+test_that("a corrected column flips a hand-computed marginal pair", {
+  # The parity fixture's engineered pair, Q1 "Yes", Beta vs Gamma.
+  # Bonferroni divisor choose(4,2) = 6, so alpha_adj = 0.05/6 = 0.00833333.
+  #
+  #   p1 = 39/60 = 0.65   p2 = 20/50 = 0.40   pooled = 59/110 = 0.53636364
+  #   no FPC:  SE = sqrt(0.53636364*0.46363636*(1/60 + 1/50)) = 0.09548921
+  #            z  = 0.25/0.09548921 = 2.618097   -> p = 0.0088417
+  #            0.0088417 > 0.00833333  -> NOT significant
+  #   FPC on Beta only (Gamma is below the floor): mul = 149/90, n1 = 99.33333
+  #            SE = sqrt(0.53636364*0.46363636*(1/99.33333 + 1/50)) = 0.08646976
+  #            z  = 0.25/0.08646976 = 2.891176   -> p = 0.0038374
+  #            0.0038374 < 0.00833333  -> significant
+  alpha_adj <- 0.05 / 6
+
+  plain <- weighted_z_test_proportions(
+    39, 60, 20, 50, is_weighted = FALSE, min_base = 30, alpha = alpha_adj)
+  expect_false(plain$significant)
+  expect_equal(plain$p_value, 0.0088417, tolerance = 1e-6)
+
+  corrected <- weighted_z_test_proportions(
+    39, 60, 20, 50, is_weighted = FALSE, min_base = 30, alpha = alpha_adj,
+    fpc_mul1 = apply_fpc(1, 60, 150), fpc_mul2 = apply_fpc(1, 50, 5000))
+  expect_true(corrected$significant)
+  expect_true(corrected$higher)
+  expect_equal(corrected$p_value, 0.0038374, tolerance = 1e-6)
+})
+
+test_that("min_base gates on the CORRECTED base", {
+  # 22 respondents out of a universe of 40: coverage 55%, mul = 39/18 = 2.1667,
+  # so the corrected base is 47.67 — above a min_base of 30 that the raw 22
+  # fails. The instability flag is raised against the corrected base too, so the
+  # test gate has to agree with it.
+  mul <- apply_fpc(1, 22, 40)
+  expect_equal(mul, 39 / 18, tolerance = 1e-9)
+
+  raw <- weighted_z_test_proportions(18, 22, 6, 40, is_weighted = FALSE,
+                                     min_base = 30, alpha = 0.05)
+  expect_true(is.na(raw$p_value))          # 22 < 30: refused
+
+  corrected <- weighted_z_test_proportions(18, 22, 6, 40, is_weighted = FALSE,
+                                           min_base = 30, alpha = 0.05,
+                                           fpc_mul1 = mul, fpc_mul2 = 1)
+  expect_false(is.na(corrected$p_value))   # 47.67 >= 30: tested
+})
+
+test_that("the fixture's letters are FPC-corrected end to end", {
+  # The whole point, on a real table rather than a direct function call.
+  run <- parity_run()
+  q1 <- Filter(function(q) q$code == "Q1", run$island$questions)[[1]]
+  yes <- Filter(function(r) r$label == "Yes", q1$rows)[[1]]
+
+  # Beta (col 3) now carries an uppercase C at 95% — the flip derived above.
+  expect_equal(unlist(yes$sig), c("", "", "C", "", ""))
+  # The census column earns nothing and is named by nobody.
+  expect_equal(yes$sig[[2]], "")
+  expect_false(any(grepl("A", unlist(yes$sig), fixed = TRUE)))
+  expect_false(any(grepl("A", unlist(yes$sig2), fixed = TRUE)))
+})
+
+
+# ==============================================================================
+# R-3. THE NO-POPULATION GUARDRAIL
+# ==============================================================================
+#
+# Every fpc_mul defaults to 1, so a report with no Population configuration must
+# be untouched by this batch. The fixture ships a config identical to the main
+# one except that it has no Population sheet and no population_size.
+
+context("R-3: no-population guardrail")
+
+test_that("the no-population config resolves no universes at all", {
+  run <- parity_run("Parity_Crosstab_Config_NoPop.xlsx")
+  expect_null(run$config$config_obj$population_frame)
+  pops <- resolve_column_populations(run$analysis$banner_info, run$config$config_obj)
+  expect_true(all(is.na(pops)))
+  # And therefore no column carries a population in the island.
+  for (col in run$island$columns) expect_null(col$population)
+})
+
+test_that("without a population the letters are the uncorrected ones", {
+  run <- parity_run("Parity_Crosstab_Config_NoPop.xlsx")
+  q1 <- Filter(function(q) q$code == "Q1", run$island$questions)[[1]]
+  yes <- Filter(function(r) r$label == "Yes", q1$rows)[[1]]
+
+  # The pre-FPC answer for the engineered pair: nothing at 95%, Beta at 80%.
+  # (With the population configured this same pair reads c("","","C","","") —
+  # see R-1. That difference IS the correction, and nothing else changed.)
+  expect_equal(unlist(yes$sig),  c("", "", "", "", ""))
+  expect_equal(unlist(yes$sig2), c("", "", "C", "", ""))
+
+  # The census column is only a census when a universe says so; without one it
+  # is an ordinary column and can be lettered like any other.
+  q2 <- Filter(function(q) q$code == "Q2", run$island$questions)[[1]]
+  mean_row <- Filter(function(r) r$label == "Mean", q2$rows)[[1]]
+  expect_equal(unlist(mean_row$sig2), c("", "C", "C", "", "C"))
 })
