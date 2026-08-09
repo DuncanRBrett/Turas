@@ -154,7 +154,7 @@ Fine-tune rim weight calculation:
 - `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
 - `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`). A single number is read as the upper bound.
 
-There is no way to accept non-converged weights. If calibration cannot reach the targets, the run refuses — weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. To accept a looser fit deliberately, raise `convergence_tolerance`, which states how loose in a number you can report.
+There is no way to accept non-converged weights. If calibration cannot reach the targets, the run refuses — weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. To accept a looser fit deliberately, raise `convergence_tolerance`: it states how loose in a number you can report, and the resulting gap stays visible in the achieved margins table. On the worked case below, a tolerance of 0.09 lets raking converge, and the achieved margins then show the worst category landing 3.2 percentage points off its target — which is the kind of thing you want on the page, not buried.
 
 **Choosing `calibration_method`**
 

@@ -118,8 +118,17 @@ All notable changes to TURAS are documented in this file.
   (`CALC_NONPOSITIVE_WEIGHTS`) rather than a warning nothing read. Third,
   `calibration_method` and `weight_bounds` are documented in the README, user
   manual and template reference, along with the corrected
-  `convergence_tolerance` default (the docs said 0.01; the code reads 1e-7) and
-  the fact that `force_convergence` is read by no code at all.
+  `convergence_tolerance` default (the docs said 0.01; the code reads 1e-7).
+  Both settings now also ship as columns in the generated Excel template —
+  `calibration_method` as a raking/linear/logit dropdown — so a config author
+  starting from the template is prompted that they exist. In the same pass,
+  `force_convergence` was **removed**: it was offered as a Y/N dropdown in that
+  template and documented in three places, but no code read it, so setting it
+  did nothing and a non-converged run refused anyway. It is not being wired up.
+  Weights whose margins do not match the targets are not rim weights, and
+  shipping them unmarked is what TRS exists to prevent; to accept a looser fit
+  deliberately, raise `convergence_tolerance`, which states how loose in a
+  number you can report and leaves the gap visible in the achieved margins.
 - **Tabs: significance testing is finite-population corrected — in the Excel
   workbook as well as the report.** For a census / full-invite study the
   interactive report has narrowed its intervals on the FPC-corrected base for a
