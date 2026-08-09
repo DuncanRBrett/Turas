@@ -371,7 +371,41 @@ load_weighting_target_sheet <- function(config_file, available_sheets, weight_sp
     )
   }
 
-  targets[[numeric_col]] <- suppressWarnings(as.numeric(targets[[numeric_col]]))
+  # Coercing the target column with suppressWarnings() turned anything R could
+  # not read into NA without a word: "52%", a comma decimal, a stray space, and
+  # the Excel gotcha where a cell reading NA becomes the string "NA". The row
+  # then flowed on as a missing target, which downstream reads as "no target for
+  # this category" rather than "the target you wrote could not be read". Only
+  # cells that were already blank are allowed to become NA.
+  raw_values <- targets[[numeric_col]]
+  was_blank <- is.na(raw_values) | !nzchar(trimws(as.character(raw_values)))
+
+  coerced <- suppressWarnings(as.numeric(raw_values))
+  unreadable <- is.na(coerced) & !was_blank
+
+  if (any(unreadable)) {
+    label_cols <- intersect(c("weight_name", "variable", "category", "stratum_variable",
+                              "stratum_category"), names(targets))
+    describe <- function(i) {
+      bits <- vapply(label_cols, function(cl) sprintf("%s = %s", cl, targets[[cl]][i]),
+                     character(1))
+      sprintf("row %d (%s): '%s'", i, paste(bits, collapse = ", "),
+              as.character(raw_values)[i])
+    }
+
+    weighting_refuse(
+      code = "CFG_TARGET_NOT_NUMERIC",
+      title = sprintf("A %s target could not be read as a number", method_name),
+      problem = sprintf("These %s values in %s are not numeric: %s",
+                        numeric_col, sheet_name,
+                        paste(vapply(which(unreadable), describe, character(1)),
+                              collapse = "; ")),
+      why_it_matters = "An unreadable target used to become blank, which the engine treats as 'no target for this category' rather than 'the number you wrote could not be read'. The weights would then be calibrated to a distribution you did not specify.",
+      how_to_fix = sprintf("Write %s as a plain number: 52 rather than '52%%', a full stop rather than a comma for the decimal point, and no spaces or text. If you meant to leave the cell empty, clear it — note that a cell containing the letters NA is text, not an empty cell.", numeric_col)
+    )
+  }
+
+  targets[[numeric_col]] <- coerced
 
   if (verbose) message("  Loaded ", nrow(targets), " ", method_name, " target rows")
 

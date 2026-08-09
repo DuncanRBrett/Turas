@@ -118,6 +118,62 @@ validate_rim_inputs <- function(data, target_list, base_weights, cap_weights, ca
     )
   }
 
+  # The config path guards these in preflight and 00_guard.R, but the exported
+  # core is called directly too — by quick_rim_weight(), by other modules, and
+  # from the console. Both faults are silent rather than loud: the population
+  # vector is built from the intercept, so targets that do not sum to 1 are
+  # absorbed by the reference category, and a duplicated category reaches
+  # factor() as a raw error rather than a refusal.
+  for (var in names(target_list)) {
+    targets <- target_list[[var]]
+
+    if (is.null(names(targets)) || any(!nzchar(names(targets)))) {
+      weighting_refuse(
+        code = "CFG_UNNAMED_TARGETS",
+        title = "Rim targets are not named",
+        problem = sprintf("Targets for '%s' must be a named vector, where the names are the category values in the data.", var),
+        why_it_matters = "Categories are matched to the data by name. Without names there is nothing to match on, and position is not a safe substitute.",
+        how_to_fix = sprintf("Provide targets for '%s' as e.g. c(Male = 0.48, Female = 0.52).", var)
+      )
+    }
+
+    dup_cats <- unique(names(targets)[duplicated(names(targets))])
+    if (length(dup_cats) > 0) {
+      weighting_refuse(
+        code = "CFG_DUPLICATE_TARGET_CATEGORY",
+        title = "A rim target category is listed twice",
+        problem = sprintf("Variable '%s' has %s listed more than once.",
+                          var, paste(sprintf("'%s'", dup_cats), collapse = ", ")),
+        why_it_matters = "Two targets for one category means the intended distribution is ambiguous, and the duplicate would otherwise surface as a raw factor error with no indication of which category caused it.",
+        how_to_fix = sprintf("Give each category of '%s' exactly one target row.", var)
+      )
+    }
+
+    if (any(is.na(targets)) || any(targets < 0)) {
+      weighting_refuse(
+        code = "CFG_INVALID_TARGET_VALUE",
+        title = "A rim target is missing or negative",
+        problem = sprintf("Targets for '%s': %s",
+                          var,
+                          paste(sprintf("%s = %s", names(targets), targets), collapse = ", ")),
+        why_it_matters = "A target proportion must be a number of at least zero. A missing or negative target cannot describe a share of a population.",
+        how_to_fix = sprintf("Give every category of '%s' a target of 0 or more.", var)
+      )
+    }
+
+    total <- sum(targets)
+    if (abs(total - 1) > 0.005) {
+      weighting_refuse(
+        code = "CFG_TARGET_SUM_ERROR",
+        title = "Rim targets do not sum to 100%",
+        problem = sprintf("Targets for '%s' sum to %.4f (%.2f%%), not 1 (100%%).",
+                          var, total, total * 100),
+        why_it_matters = "The population vector is built from these proportions with the first category implied by the intercept, so a shortfall or excess is silently absorbed by that one category — the run would calibrate to a distribution nobody specified.",
+        how_to_fix = sprintf("Adjust the targets for '%s' so they sum to 1 (or to 100 if you are passing percentages — this function takes proportions).", var)
+      )
+    }
+  }
+
   if (!is.null(base_weights)) {
     if (length(base_weights) != nrow(data)) {
       weighting_refuse(
@@ -177,8 +233,13 @@ prepare_rim_data <- function(data, target_list, base_weights, verbose = FALSE) {
   rake_data <- data
 
   for (var in names(target_list)) {
-    rake_data[[var]] <- as.character(rake_data[[var]])
-    target_levels <- names(target_list[[var]])
+    # Trim both sides before matching. A leading space in an Excel target cell
+    # is invisible on screen and used to halt the whole run with an "unmatched
+    # value" refusal naming two strings that look identical. Case is still
+    # respected — "male" and "Male" are different answers and silently merging
+    # them would be a real error, where whitespace never is.
+    rake_data[[var]] <- trimws(as.character(rake_data[[var]]))
+    target_levels <- trimws(names(target_list[[var]]))
     rake_data[[var]] <- factor(rake_data[[var]], levels = target_levels)
 
     n_na <- sum(is.na(rake_data[[var]]))

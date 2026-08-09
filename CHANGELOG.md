@@ -98,6 +98,30 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: config and label hygiene, and numbers the suite actually checks
+  (W7, W8 / review M1–M6).** A target cell R could not read — `"52%"`, a comma
+  decimal, the Excel gotcha where a cell reading NA is the text "NA" — became a
+  blank target without a word, which the engine reads as "no target for this
+  category" rather than "the number you wrote could not be read"; it now refuses
+  naming the row and the value. Category labels are matched with surrounding
+  whitespace trimmed on both sides (case still respected — two spellings that
+  differ in case are two answers, where whitespace never is), and a design
+  category that is not in the data is a preflight Error rather than a Warning.
+  The exported cores now validate what the config path already did, for callers
+  that bypass it: rim targets that do not sum to 1 (previously absorbed silently
+  by the reference category), duplicate or unnamed target categories, negative
+  targets, and cell targets that are zero, negative or missing — a zero target
+  gives every respondent in that cell a weight of zero, removing them from every
+  base without appearing as missing. `validate_calculated_weights()` derived
+  DEFF and efficiency from a *rounded* n_eff, so it and `diagnose_weights()`
+  quoted different design effects for the same weights (1.5 against 1.32 on
+  `c(1,1,3)`); both now use the unrounded value, with the rounded one kept for
+  display. And the suite gained the numeric assertions it never had: exact Kish
+  n_eff and DEFF, analytic design weights for unequal strata, cell weights as
+  target-share over observed-share, every rim margin recomputed from the weights
+  themselves rather than read off the engine's own table, g-weights as
+  final/base, positional alignment asserted by row index, and a cap tested at a
+  bound the default would never produce.
 - **Weighting: the lookup file can be merged back safely (W4, W5, W6 / review
   C2c, H1, H3).** Three things the file that feeds tabs never checked. (1) In
   PARTIAL mode a failed weight was written as an entire all-NA column, which

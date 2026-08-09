@@ -90,6 +90,34 @@ calculate_cell_weights <- function(data,
     )
   }
 
+  # A missing or negative target has to be caught before the sum check, which
+  # uses na.rm = TRUE and would otherwise let an NA row through as long as the
+  # remaining rows happened to reach 100. A target of exactly 0 is caught too:
+  # it silently zero-weights real respondents, removing them from every base
+  # without them appearing as missing — the same failure as an NA weight,
+  # arrived at from the other direction.
+  bad_targets <- is.na(cell_targets$target_percent) | cell_targets$target_percent <= 0
+  if (any(bad_targets)) {
+    cell_label <- function(i) {
+      paste(sprintf("%s=%s", cell_variables,
+                    vapply(cell_variables, function(v) as.character(cell_targets[[v]][i]),
+                           character(1))),
+            collapse = ", ")
+    }
+    weighting_refuse(
+      code = "CFG_INVALID_TARGET_VALUE",
+      title = "A cell target is missing, zero or negative",
+      problem = sprintf("These cells have a target_percent that is not a positive number: %s",
+                        paste(vapply(which(bad_targets),
+                                     function(i) sprintf("%s (%s)", cell_label(i),
+                                                         as.character(cell_targets$target_percent[i])),
+                                     character(1)),
+                              collapse = "; ")),
+      why_it_matters = "A negative or missing target cannot describe a share of a population. A target of zero gives every respondent in that cell a weight of zero, which removes them from every weighted base and significance test without them appearing as missing cases.",
+      how_to_fix = "Give every cell a target_percent above zero. If a cell genuinely has no population share, remove its row from Cell_Targets and collapse those respondents into a neighbouring cell."
+    )
+  }
+
   # Validate target percentages sum to ~100
   total_pct <- sum(cell_targets$target_percent, na.rm = TRUE)
   if (abs(total_pct - 100) > RIM_TARGET_SUM_TOLERANCE) {
@@ -110,10 +138,13 @@ calculate_cell_weights <- function(data,
 
   n <- nrow(data)
 
-  # Convert data columns to character for matching
+  # Convert data columns to character for matching, trimming both sides. A
+  # leading space in an Excel target cell is invisible on screen and used to
+  # route every respondent in that cell to "undefined cell". Case is still
+  # respected, because two spellings that differ in case are two answers.
   for (var in cell_variables) {
-    data[[var]] <- as.character(data[[var]])
-    cell_targets[[var]] <- as.character(cell_targets[[var]])
+    data[[var]] <- trimws(as.character(data[[var]]))
+    cell_targets[[var]] <- trimws(as.character(cell_targets[[var]]))
   }
 
   # Missing data has to be found BEFORE the key is built. paste() turns NA into
@@ -273,7 +304,7 @@ calculate_cell_weights <- function(data,
         title = "Some respondents would get no cell weight",
         problem = paste(problems, collapse = "; "),
         why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream without being reported as a missing case — the base simply comes out smaller than the sample. A target cell with no respondents removes that share of the population from the weighted totals entirely.",
-        how_to_fix = "Either add the missing combinations to Cell_Targets, fix the category spellings so they match the data exactly (matching is case- and space-sensitive), collapse the sparse cells into larger ones, and check the cell variables for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count. If empty cells are unavoidable, rim weighting does not require every combination to be populated."
+        how_to_fix = "Either add the missing combinations to Cell_Targets, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), collapse the sparse cells into larger ones, and check the cell variables for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count. If empty cells are unavoidable, rim weighting does not require every combination to be populated."
       )
     }
 

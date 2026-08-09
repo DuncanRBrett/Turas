@@ -71,8 +71,12 @@ calculate_design_weights <- function(data,
     message("  Number of strata: ", length(population_sizes))
   }
 
-  # Get stratum values from data
-  stratum_values <- as.character(data[[stratum_variable]])
+  # Get stratum values from data. Both sides are trimmed before matching: a
+  # leading space in an Excel target cell is invisible on screen and used to
+  # send every respondent in that stratum to an NA weight. Case is still
+  # respected, because two spellings that differ in case are two answers.
+  stratum_values <- trimws(as.character(data[[stratum_variable]]))
+  names(population_sizes) <- trimws(names(population_sizes))
 
   # Initialize weight vector
   weights <- rep(NA_real_, nrow(data))
@@ -152,7 +156,7 @@ calculate_design_weights <- function(data,
         title = "Some respondents would get no design weight",
         problem = paste(problems, collapse = "; "),
         why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream, without being reported as a missing case — the base simply comes out smaller than the sample. A stratum with a population target but no respondents removes that share of the population from the weighted totals entirely.",
-        how_to_fix = sprintf("Either add the missing categories to Design_Targets for this weight, fix the category spellings so they match the data exactly (matching is case- and space-sensitive), and check '%s' for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count.", stratum_variable)
+        how_to_fix = sprintf("Either add the missing categories to Design_Targets for this weight, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), and check '%s' for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count.", stratum_variable)
       )
     }
 
@@ -280,7 +284,7 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
   weight_scale <- if (grossing) "population" else "sample"
 
   # Build stratum summary
-  stratum_values <- as.character(data[[stratum_variable]])
+  stratum_values <- trimws(as.character(data[[stratum_variable]]))
   stratum_summary <- data.frame(
     stratum = character(0),
     population_size = numeric(0),
