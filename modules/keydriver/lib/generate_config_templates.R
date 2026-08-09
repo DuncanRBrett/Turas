@@ -26,11 +26,35 @@ library(openxlsx)
 # SOURCE SHARED TEMPLATE INFRASTRUCTURE
 # ==============================================================================
 
-shared_path <- file.path(dirname(dirname(dirname(sys.frame(1)$ofile))), "shared", "template_styles.R")
-if (!file.exists(shared_path)) {
+# sys.frame(1)$ofile is only set when this file is sourced from inside another
+# sourced file. Sourcing it directly — the way the USAGE block above says to —
+# leaves it NULL, and dirname(NULL) raises "a character vector argument
+# expected" before the working-directory fallback below is ever reached.
+.tpl_ofile <- sys.frame(1)$ofile
+shared_path <- if (is.character(.tpl_ofile) && length(.tpl_ofile) == 1L) {
+  file.path(dirname(dirname(dirname(.tpl_ofile))), "shared", "template_styles.R")
+} else {
+  ""
+}
+if (!nzchar(shared_path) || !file.exists(shared_path)) {
   shared_path <- file.path("modules", "shared", "template_styles.R")
 }
-source(shared_path)
+# Last resort: walk up from the working directory. A testthat run starts in the
+# module's tests/testthat, where neither of the paths above resolves.
+if (!file.exists(shared_path)) {
+  .tpl_dir <- getwd()
+  for (.i in 1:10) {
+    .try <- file.path(.tpl_dir, "modules", "shared", "template_styles.R")
+    if (file.exists(.try)) { shared_path <- .try; break }
+    .tpl_dir <- dirname(.tpl_dir)
+  }
+  rm(list = intersect(c(".tpl_dir", ".i", ".try"), ls()))
+}
+# Already loaded by the caller is a perfectly good answer.
+if (!exists("write_table_sheet", mode = "function") || file.exists(shared_path)) {
+  source(shared_path)
+}
+rm(.tpl_ofile)
 
 
 # ==============================================================================

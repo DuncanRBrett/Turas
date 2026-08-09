@@ -205,6 +205,32 @@ load_config_table_sheet <- function(file_path, sheet_name, required_cols,
                        as.character(df[[1]]), ignore.case = TRUE)
     if (any(help_rows)) {
       df <- df[!help_rows, , drop = FALSE]
+
+      # The help row is text, so readxl typed every column it touches as
+      # character — and dropping the row afterwards does not undo that. A
+      # column of importance ratings would arrive as "8.2", "7.5" and the
+      # calling module would refuse it as non-numeric. Re-read with the help
+      # row skipped as well, so types are inferred from data only, and carry
+      # the header names across.
+      if (is.null(col_types)) {
+        n_help <- sum(help_rows)
+        retyped <- tryCatch(
+          suppressMessages(readxl::read_excel(
+            file_path, sheet = sheet_name,
+            # With col_names supplied, readxl treats the row after the skipped
+            # block as data — so skip the header row itself and the help rows.
+            skip = header_row + n_help,
+            col_names = names(df)
+          )),
+          error = function(e) NULL
+        )
+        # Only accept the re-read if it lines up with what we already have —
+        # otherwise keep the character version rather than risk a mismatch.
+        if (!is.null(retyped) && nrow(retyped) == nrow(df) &&
+            identical(names(retyped), names(df))) {
+          df <- retyped
+        }
+      }
     }
   }
 

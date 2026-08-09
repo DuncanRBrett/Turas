@@ -73,7 +73,13 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     )
   }
 
-  settings_df <- openxlsx::read.xlsx(config_file, sheet = "Settings")
+  # The generated template puts a title in row 1, a subtitle in row 2, the real
+  # column headers in row 3 and per-column help text in row 4. Reading at row 1
+  # takes the title as the header, so the module refused its own template. The
+  # shared loaders read row 1 first and fall back to scanning for the header row,
+  # so hand-built configs (headers in row 1) are unaffected.
+  settings_df <- as.data.frame(load_config_table_sheet(config_file, "Settings",
+                                                       required_cols = c("Setting", "Value")))
 
   # Validate settings structure
   if (!all(c("Setting", "Value") %in% names(settings_df))) {
@@ -162,7 +168,8 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     )
   }
 
-  variables_df <- openxlsx::read.xlsx(config_file, sheet = "Variables")
+  variables_df <- as.data.frame(load_config_table_sheet(config_file, "Variables",
+                                                        required_cols = "VariableName"))
 
   # Validate variables structure
   required_cols <- c("VariableName", "Type", "Label")
@@ -191,7 +198,8 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   driver_settings <- NULL
 
   if ("Driver_Settings" %in% available_sheets) {
-    driver_settings <- openxlsx::read.xlsx(config_file, sheet = "Driver_Settings")
+    driver_settings <- as.data.frame(load_config_table_sheet(config_file, "Driver_Settings",
+                                                             required_cols = "driver"))
 
     # Validate structure
     if (!all(c("driver", "type") %in% names(driver_settings))) {
@@ -517,7 +525,8 @@ load_slides_from_config <- function(config_file, project_root = NULL, slide_imag
 
   # Read the sheet
   slides_df <- tryCatch(
-    openxlsx::read.xlsx(config_file, sheet = "Slides"),
+    as.data.frame(load_config_table_sheet(config_file, "Slides",
+                                          required_cols = "slide_title")),
     error = function(e) {
       cat("   [WARNING] Could not read Slides sheet:", e$message, "\n")
       return(NULL)
