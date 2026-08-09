@@ -42,6 +42,17 @@ Rscript modules/weighting/run_weighting.R path/to/Weight_Config.xlsx
 
 ---
 
+## Documentation
+
+| Document | What it is for |
+|---|---|
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Running a job end to end, and every refusal code with its fix. Start here. |
+| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | Choosing a method, reading diagnostics, worked example |
+| [docs/TEMPLATE_REFERENCE.md](docs/TEMPLATE_REFERENCE.md) | Every config field, sheet by sheet |
+| [docs/CONFIG_EXAMPLE.md](docs/CONFIG_EXAMPLE.md) | A filled-in config to copy from |
+
+---
+
 ## Setting Up a Config File
 
 The config file is an Excel workbook (`Weight_Config.xlsx`) with required and optional sheets. All file paths are **relative to the config file location** (or absolute).

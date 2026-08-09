@@ -236,7 +236,7 @@ test_that("cap_weights is honoured at a bound that is not the default", {
 
   if (inherits(outcome, "turas_refusal")) {
     # The cap cannot be met while hitting the target, and the run says so.
-    expect_true(outcome$code %in% c("MODEL_NO_CONVERGENCE", "MODEL_BOUNDS_ERROR"))
+    expect_true(outcome$code %in% c("MODEL_NO_CONVERGENCE", "MODEL_BOUNDS_ISSUE"))
   } else {
     expect_lte(max(outcome$weights, na.rm = TRUE), 1.4 + 1e-8)
     expect_equal(outcome$bounds, c(0.5, 1.4))
