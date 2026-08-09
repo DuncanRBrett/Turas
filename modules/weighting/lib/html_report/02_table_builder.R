@@ -187,23 +187,28 @@ build_stratum_table <- function(stratum_summary) {
   for (i in seq_len(nrow(stratum_summary))) {
     r <- stratum_summary[i, ]
     rows <- paste0(rows, sprintf(
-      '<tr><td>%s</td><td class="wt-num">%s</td><td class="wt-num">%d</td><td class="wt-num">%.4f</td></tr>\n',
+      '<tr><td>%s</td><td class="wt-num">%s</td><td class="wt-num">%d</td><td class="wt-num">%.4f</td><td class="wt-num">%.4f</td></tr>\n',
       htmlEscape(r$stratum), format(r$population_size, big.mark = ","),
-      r$sample_size, r$weight
+      r$sample_size, r$weight, r$weight_population_scale %||% r$weight
     ))
   }
 
+  # The old wording said the weight IS population over sample. That is the
+  # arithmetic it comes from, but unless grossing is on the column is then
+  # normalised to sum to the sample size, so the two are different numbers and
+  # the table now carries both.
   callout <- '<div class="wt-callout" style="margin-bottom:12px;">
-    Each stratum&rsquo;s weight equals its population size divided by the number of respondents sampled from it.
-    Strata that are under-represented in the sample relative to the population receive weights greater than 1.0;
-    over-represented strata receive weights less than 1.0.
+    Each stratum&rsquo;s weight starts as its population size divided by the number of respondents sampled from it
+    (the Pop/Sample column). Unless grossing is switched on, those are then scaled so the weights sum to the sample
+    size, which is the Weight column and what the lookup file carries. Either way, strata under-represented in the
+    sample relative to the population carry proportionally more weight than over-represented ones.
   </div>'
 
   sprintf(
     '<h4>Stratum Details</h4>
     %s
     <table class="wt-table">
-      <thead><tr><th>Stratum</th><th>Population</th><th>Sample</th><th>Weight</th></tr></thead>
+      <thead><tr><th>Stratum</th><th>Population</th><th>Sample</th><th>Weight</th><th>Pop/Sample</th></tr></thead>
       <tbody>%s</tbody>
     </table>', callout, rows
   )

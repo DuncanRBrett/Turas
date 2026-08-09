@@ -151,31 +151,68 @@ test_that("cell weights refuse when a target cell has nobody in it", {
   expect_match(conditionMessage(refusal), "50.0%")
 })
 
-test_that("allow_unmatched turns the empty-cell refusal into a disclosed count", {
-  data <- data.frame(
-    Gender = c(rep("Male", 50), rep("Female", 50)),
-    Age = c(rep("Young", 50), rep("Old", 50)),
-    stringsAsFactors = FALSE
+empty_cell_fixture <- function() {
+  list(
+    data = data.frame(
+      Gender = c(rep("Male", 50), rep("Female", 50)),
+      Age = c(rep("Young", 50), rep("Old", 50)),
+      stringsAsFactors = FALSE
+    ),
+    targets = data.frame(
+      Gender = c("Male", "Male", "Female", "Female"),
+      Age = c("Young", "Old", "Young", "Old"),
+      target_percent = c(25, 25, 25, 25),
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+test_that("allow_unmatched does not silence the empty-target refusal", {
+  # These were one setting, so an analyst excluding a few respondents with a
+  # missing value also switched off the empty-cell guard. An empty target is a
+  # population-side problem and allow_unmatched is the respondent-side opt-in;
+  # it must not answer for the other.
+  f <- empty_cell_fixture()
+
+  refusal <- tryCatch(
+    calculate_cell_weights(f$data, f$targets, c("Gender", "Age"),
+                           allow_unmatched = TRUE, verbose = FALSE),
+    turas_refusal = function(e) e
   )
 
-  cell_targets <- data.frame(
-    Gender = c("Male", "Male", "Female", "Female"),
-    Age = c("Young", "Old", "Young", "Old"),
-    target_percent = c(25, 25, 25, 25),
-    stringsAsFactors = FALSE
-  )
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_UNWEIGHTED_ROWS")
+  expect_match(refusal$how_to_fix, "allow_empty_targets = YES")
+})
+
+test_that("allow_empty_targets redistributes the orphaned share instead of shrinking the base", {
+  # Two of four cells are empty and carry 50% of the population between them.
+  # The opt-in used to leave the weights summing to 50 on a sample of 100 —
+  # every weighted base in the report short by half, disclosed as "0 of 100
+  # respondents left with no weight". The share is now redistributed across the
+  # cells that do have respondents.
+  f <- empty_cell_fixture()
 
   result <- calculate_cell_weights(
-    data, cell_targets, c("Gender", "Age"),
-    allow_unmatched = TRUE, verbose = FALSE
+    f$data, f$targets, c("Gender", "Age"),
+    allow_empty_targets = TRUE, verbose = FALSE
   )
 
   expect_equal(result$n_cells_empty, 2)
   expect_true(all(c("Male x Old", "Female x Young") %in% result$empty_cells))
-  # Everyone in the sample is in a populated cell here, so nobody loses a weight
-  # — the loss is on the population side.
+
+  # Nobody in the sample loses a weight — the loss was on the population side.
   expect_equal(result$n_unweighted, 0)
   expect_false(any(is.na(result$weights)))
+
+  # The weighted base matches the sample, which is the whole point.
+  expect_equal(sum(result$weights), 100, tolerance = 1e-9)
+  expect_equal(result$n_base, 100)
+  expect_equal(result$empty_target_share, 50)
+  # 25% surviving x 2 cells = 50%, scaled by 100/50 = 2.
+  expect_equal(result$redistribution_factor, 2, tolerance = 1e-12)
+  # Each surviving cell now carries 50% of the population over 50 respondents.
+  expect_equal(unique(round(result$weights, 10)), 1, tolerance = 1e-9)
 })
 
 test_that("a missing value in a cell variable is reported as missing, not as an undefined cell", {

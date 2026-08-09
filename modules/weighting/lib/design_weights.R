@@ -32,6 +32,7 @@ calculate_design_weights <- function(data,
                                      stratum_variable,
                                      population_sizes,
                                      allow_unmatched = FALSE,
+                                     allow_empty_targets = FALSE,
                                      verbose = FALSE) {
 
   # Validate inputs
@@ -124,52 +125,77 @@ calculate_design_weights <- function(data,
   n_na_stratum <- sum(is.na(stratum_values))
   n_unweighted <- n_unmatched + n_na_stratum
 
-  if (n_unweighted > 0 || length(zero_sample_strata) > 0) {
+  # Two different problems, two different remedies. A respondent with no weight
+  # is the respondent side (allow_unmatched); a stratum with a population and no
+  # respondents is the population side (allow_empty_targets). They were one
+  # setting, so an analyst excluding a handful of missing values also switched
+  # off the empty-stratum guard without being asked.
+  population_total <- sum(population_sizes)
+  population_covered <- sum(population_sizes[setdiff(names(population_sizes),
+                                                     zero_sample_strata)])
 
-    problems <- character(0)
-    if (n_unmatched > 0) {
-      problems <- c(problems, sprintf(
-        "%d row%s (%.1f%%) are in strata with no population target: %s",
-        n_unmatched, if (n_unmatched == 1) "" else "s",
-        100 * n_unmatched / nrow(data),
-        paste(sprintf("'%s'", head(unmatched_cats, 10)), collapse = ", ")
-      ))
-    }
-    if (n_na_stratum > 0) {
-      problems <- c(problems, sprintf(
-        "%d row%s (%.1f%%) have a missing value in '%s'",
-        n_na_stratum, if (n_na_stratum == 1) "" else "s",
-        100 * n_na_stratum / nrow(data), stratum_variable
-      ))
-    }
-    if (length(zero_sample_strata) > 0) {
-      problems <- c(problems, sprintf(
-        "%d stratum/strata have a population target but nobody in the sample: %s",
-        length(zero_sample_strata),
-        paste(sprintf("'%s'", zero_sample_strata), collapse = ", ")
-      ))
-    }
+  problems <- character(0)
+  blocking <- character(0)
 
-    if (!isTRUE(allow_unmatched)) {
-      weighting_refuse(
-        code = "DATA_UNWEIGHTED_ROWS",
-        title = "Some respondents would get no design weight",
-        problem = paste(problems, collapse = "; "),
-        why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream, without being reported as a missing case — the base simply comes out smaller than the sample. A stratum with a population target but no respondents removes that share of the population from the weighted totals entirely.",
-        how_to_fix = sprintf("Either add the missing categories to Design_Targets for this weight, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), and check '%s' for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count.", stratum_variable)
+  if (n_unmatched > 0) {
+    problems <- c(problems, sprintf(
+      "%d row%s (%.1f%%) are in strata with no population target: %s",
+      n_unmatched, if (n_unmatched == 1) "" else "s",
+      100 * n_unmatched / nrow(data),
+      paste(sprintf("'%s'", head(unmatched_cats, 10)), collapse = ", ")
+    ))
+  }
+  if (n_na_stratum > 0) {
+    problems <- c(problems, sprintf(
+      "%d row%s (%.1f%%) have a missing value in '%s'",
+      n_na_stratum, if (n_na_stratum == 1) "" else "s",
+      100 * n_na_stratum / nrow(data), stratum_variable
+    ))
+  }
+  if (n_unweighted > 0 && !isTRUE(allow_unmatched)) {
+    blocking <- c(blocking, "allow_unmatched")
+  }
+
+  if (length(zero_sample_strata) > 0) {
+    problems <- c(problems, sprintf(
+      "%d stratum/strata have a population target but nobody in the sample, so %s of %s people (%.1f%%) have no one to represent them: %s",
+      length(zero_sample_strata),
+      format(population_total - population_covered, big.mark = ",", scientific = FALSE),
+      format(population_total, big.mark = ",", scientific = FALSE),
+      100 * (population_total - population_covered) / population_total,
+      paste(sprintf("'%s'", zero_sample_strata), collapse = ", ")
+    ))
+    if (!isTRUE(allow_empty_targets)) blocking <- c(blocking, "allow_empty_targets")
+  }
+
+  if (length(blocking) > 0) {
+    weighting_refuse(
+      code = "DATA_UNWEIGHTED_ROWS",
+      title = "This design weight cannot be calculated as specified",
+      problem = paste(problems, collapse = "; "),
+      why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream, without being reported as a missing case — the base simply comes out smaller than the sample. A stratum with a population target but no respondents is the mirror image: that share of the population has nobody to carry it.",
+      how_to_fix = sprintf(
+        "Best: add the missing categories to Design_Targets for this weight, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), and check '%s' for missing values. Otherwise set %s in Advanced_Settings. allow_unmatched leaves those respondents' weights blank and reports the count; allow_empty_targets proceeds on the strata that do have respondents — with grossing = N their populations are absorbed proportionally by the rest, and with grossing = Y the grossed total comes out short by the missing strata.",
+        stratum_variable,
+        paste(sprintf("%s = YES", blocking), collapse = " and ")
       )
-    }
+    )
+  }
 
+  if (length(problems) > 0) {
     # Opted in: the rows still get no weight, but nobody can say they were not
-    # told which ones or how many.
+    # told which ones, how many, or what it did to the base.
+    sum_raw <- sum(weights[!is.na(weights)])
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
     cat("│ Context: Weighting - design weights\n")
     cat("│ Code: DATA_UNWEIGHTED_ROWS_ALLOWED\n")
-    cat(sprintf("│ allow_unmatched = YES, so %d of %d respondents are being\n",
-                n_unweighted, nrow(data)))
-    cat("│ left with no weight and will not appear in any weighted\n")
-    cat("│ base built on this weight:\n")
     for (p in problems) cat(sprintf("│   - %s\n", p))
+    cat("│\n")
+    cat(sprintf("│ %d of %d respondents carry a weight, grossing to %s people\n",
+                nrow(data) - n_unweighted, nrow(data),
+                format(round(sum_raw), big.mark = ",", scientific = FALSE)))
+    cat(sprintf("│ against a stated population of %s.\n",
+                format(population_total, big.mark = ",", scientific = FALSE)))
     cat("│ How to fix: this is deliberate. Remove the opt-in to make it\n")
     cat("│ a refusal again.\n")
     cat("└───────────────────────────────────────────────────────┘\n\n")
@@ -185,6 +211,8 @@ calculate_design_weights <- function(data,
   attr(weights, "n_unweighted") <- n_unweighted
   attr(weights, "unmatched_categories") <- unmatched_cats
   attr(weights, "zero_sample_strata") <- zero_sample_strata
+  attr(weights, "population_total") <- population_total
+  attr(weights, "population_covered") <- population_covered
 
   return(weights)
 }
@@ -245,6 +273,7 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
   # An NA weight silently deflates every weighted base downstream, so it is a
   # refusal unless the config author has said otherwise in Advanced_Settings.
   allow_unmatched <- read_allow_unmatched_setting(config, weight_name)
+  allow_empty_targets <- read_allow_empty_targets_setting(config, weight_name)
 
   # Calculate weights
   weights <- calculate_design_weights(
@@ -252,6 +281,7 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     stratum_variable = stratum_variable,
     population_sizes = population_sizes,
     allow_unmatched = allow_unmatched,
+    allow_empty_targets = allow_empty_targets,
     verbose = verbose
   )
 
@@ -261,6 +291,8 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
   n_unweighted <- attr(weights, "n_unweighted") %||% 0
   unmatched_categories <- attr(weights, "unmatched_categories") %||% character(0)
   zero_sample_strata <- attr(weights, "zero_sample_strata") %||% character(0)
+  population_total_stated <- attr(weights, "population_total") %||% NA_real_
+  population_covered <- attr(weights, "population_covered") %||% NA_real_
   attributes(weights) <- NULL
 
   # A raw design weight is population / sample, so it arrives at population
@@ -283,6 +315,17 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
 
   weight_scale <- if (grossing) "population" else "sample"
 
+  # The scale factor the weight vector actually went through. The summary table
+  # below has to travel on the same scale as the weights: it was reporting
+  # population/sample while the lookup file carried the normalised column, so
+  # the module's own report and its deliverable disagreed by three orders of
+  # magnitude with nothing saying which was which.
+  scale_factor <- if (grossing || population_scale_sum == 0) {
+    1
+  } else {
+    sum(weights[!is.na(weights)]) / population_scale_sum
+  }
+
   # Build stratum summary
   stratum_values <- trimws(as.character(data[[stratum_variable]]))
   stratum_summary <- data.frame(
@@ -290,24 +333,48 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     population_size = numeric(0),
     sample_size = numeric(0),
     weight = numeric(0),
+    weight_population_scale = numeric(0),
     stringsAsFactors = FALSE
   )
 
   for (cat in names(population_sizes)) {
     sample_n <- sum(stratum_values == cat, na.rm = TRUE)
-    wt <- if (sample_n > 0) population_sizes[cat] / sample_n else NA_real_
+    raw_wt <- if (sample_n > 0) population_sizes[cat] / sample_n else NA_real_
 
     stratum_summary <- rbind(stratum_summary, data.frame(
       stratum = cat,
       population_size = population_sizes[cat],
       sample_size = sample_n,
-      weight = wt,
+      # As applied — this is what is in the lookup file.
+      weight = raw_wt * scale_factor,
+      # As calculated, before normalisation. Kept so a reader can still see the
+      # population/sample arithmetic the weight came from.
+      weight_population_scale = raw_wt,
       stringsAsFactors = FALSE
     ))
   }
 
-  # Validate calculated weights
-  weight_validation <- validate_calculated_weights(weights, weight_name)
+  # Validate calculated weights. A normalised design weight sums to the number
+  # of respondents carrying one; a grossed one sums to the population it covers,
+  # and there is nothing independent to check that against, so no expectation is
+  # asserted in that case.
+  n_carrying <- sum(!is.na(weights))
+  weight_validation <- validate_calculated_weights(
+    weights, weight_name,
+    expected_sum = if (grossing) NULL else n_carrying,
+    population_scale = grossing
+  )
+
+  if (verbose || grossing) {
+    cat(sprintf(
+      "\n  [%s] weight scale: %s — the column sums to %s across %d respondents%s\n",
+      weight_name, weight_scale,
+      format(round(sum(weights[!is.na(weights)]), 2), big.mark = ",", scientific = FALSE),
+      n_carrying,
+      if (grossing) sprintf(" (stated population %s)",
+                            format(population_total_stated, big.mark = ",", scientific = FALSE)) else ""
+    ))
+  }
 
   return(list(
     weights = weights,
@@ -319,6 +386,9 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     unmatched_categories = unmatched_categories,
     zero_sample_strata = zero_sample_strata,
     allow_unmatched = allow_unmatched,
+    allow_empty_targets = allow_empty_targets,
+    population_stated = population_total_stated,
+    population_covered = population_covered,
     # Which scale the weights are on, and what the un-normalised total was, so
     # the report can say "these sum to n" or "these gross to 47.2m" on its face.
     weight_scale = weight_scale,
@@ -342,29 +412,37 @@ print_design_summary <- function(result, weight_name) {
   cat(strrep("=", 70), "\n")
   cat("\nMethod: Design Weights (Stratified Sample)\n")
   cat("Stratum Variable: ", result$stratum_variable, "\n")
+  if (!is.null(result$weight_scale)) {
+    cat("Scale: ", result$weight_scale,
+        if (identical(result$weight_scale, "sample")) " (weights sum to the number of respondents)"
+        else " (weights gross to population counts)", "\n", sep = "")
+  }
   cat("\nStratum Details:\n")
-  cat(strrep("-", 60), "\n")
-  cat(sprintf("%-20s %12s %12s %12s\n",
-              "Stratum", "Population", "Sample", "Weight"))
-  cat(strrep("-", 60), "\n")
+  cat(strrep("-", 74), "\n")
+  cat(sprintf("%-20s %12s %12s %12s %14s\n",
+              "Stratum", "Population", "Sample", "Weight", "Pop/Sample"))
+  cat(strrep("-", 74), "\n")
 
   for (i in seq_len(nrow(result$stratum_summary))) {
     row <- result$stratum_summary[i, ]
-    cat(sprintf("%-20s %12s %12d %12.4f\n",
+    # "Weight" is what is in the lookup file. "Pop/Sample" is the arithmetic it
+    # came from, before normalisation — the two are the same only when grossing.
+    cat(sprintf("%-20s %12s %12d %12.4f %14.4f\n",
                 row$stratum,
-                format(row$population_size, big.mark = ","),
+                format(row$population_size, big.mark = ",", scientific = FALSE),
                 row$sample_size,
-                row$weight))
+                row$weight,
+                row$weight_population_scale %||% NA_real_))
   }
 
-  cat(strrep("-", 60), "\n")
+  cat(strrep("-", 74), "\n")
 
   # Total
   total_pop <- sum(result$stratum_summary$population_size)
   total_sample <- sum(result$stratum_summary$sample_size)
   cat(sprintf("%-20s %12s %12d\n",
               "TOTAL",
-              format(total_pop, big.mark = ","),
+              format(total_pop, big.mark = ",", scientific = FALSE),
               total_sample))
 
   cat("\n")

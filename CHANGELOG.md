@@ -98,6 +98,82 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: the design report and the lookup file no longer disagree about
+  the weights (review F1).** W5 normalises design weights to sum to n, but the
+  stratum summary was built from population ÷ sample *after* the vector had been
+  rescaled — so the console summary, the Excel diagnostics and the HTML report
+  all quoted, say, 6000 and 2000 while the lookup file carried 1.5 and 0.5. An
+  analyst reconciling one against the other could tell they disagreed but not
+  which was right. The summary now travels on the same scale as the weights, and
+  keeps the population ÷ sample arithmetic in its own `Pop/Sample` column so
+  nothing is lost. Under `grossing = Y` the two columns are identical, because
+  nothing was rescaled. The HTML callout that asserted "each stratum's weight
+  equals its population size divided by the number of respondents sampled from
+  it" — true before W5, false after — was corrected at the same time.
+- **Weighting: the escape hatch for an empty target no longer produces the
+  defect the refusal exists to prevent (review F2).** `allow_unmatched = Y` on a
+  cell weight with an unpopulated target cell left the weights summing to 50 on
+  a sample of 100 — every weighted base in the report short by half — and
+  announced it as "0 of 100 respondents are being left with no weight", which
+  was true and useless. Three changes. The setting is split in two:
+  `allow_unmatched` is the respondent side (an unmatched category, a missing
+  value in a weighting variable, a cell whose target is zero) and the new
+  `allow_empty_targets` is the population side (a target with a share and nobody
+  to carry it); setting one no longer answers for the other. Opting in to an
+  empty target now redistributes its share across the targets that do have
+  respondents, so the weighted base is whole, and the console says how much
+  moved and by what factor. And the disclosure leads with the number an analyst
+  can act on — how many respondents carry a weight and what the weighted base
+  actually is. Cell weights now calibrate to the respondents carrying a weight
+  rather than to `nrow(data)`, matching what rim has always done with its
+  complete cases.
+- **Weighting: the weighted base is checked (review F2).** Nothing anywhere
+  compared the sum of the weights against what the method said it should be, so
+  a weight that had quietly lost a quarter of its base still reported GOOD
+  quality. `validate_calculated_weights()` now takes an expected sum and fails
+  the weight if it is more than 0.01% out: rim asserts the total it calibrated
+  to, and normalised design and cell weights assert the respondents carrying a
+  weight. A grossed design weight is exempt — it sums to the population by
+  design, with nothing independent to check it against — and for the same reason
+  no longer trips the "maximum weight is very high (>10)" warning, which fired on
+  every grossed run and meant nothing.
+- **Weighting: one weight failing no longer takes the other weights with it
+  (review F3).** The per-weight handler re-threw any TRS refusal, and after W3
+  turned the design and cell NA-weight problems into refusals that covered most
+  real failures — so a single bad category in the fourth weight of a four-weight
+  config killed the other three, and the locked decision that a failed weight is
+  omitted from the lookup file (§0.4) was reachable only through non-refusal
+  errors. A refusal inside the weight loop is now printed, recorded on the run
+  state, and the weight is dropped from the lookup file while the rest are
+  calculated; the run comes back PARTIAL. Deliberately unchanged: errors that
+  are not specific to one weight — an unreadable config, a duplicated respondent
+  ID, a weight name colliding with a data column, anything preflight rejects —
+  are raised before the loop and still stop everything, and a single-weight
+  config still refuses outright.
+- **Weighting: a cell target of zero is judged on whether anyone is standing in
+  it (review F4).** W7 refused any `target_percent <= 0`, which blocks a sparse
+  interlocked cell that rounds to 0.0% against a real census table — ordinary in
+  a 400-cell design. Missing and negative targets still refuse. A zero target
+  with respondents in it still refuses, but as what it is: unweighted
+  respondents, answerable by `allow_unmatched`, since a zero weight removes them
+  from every base exactly as an NA weight would. A zero target nobody is standing
+  in now costs nothing and the run proceeds.
+- **Weighting: three smaller review findings.** An empty cell combination is a
+  preflight `Error` rather than a `Warning`, so it is caught where preflight
+  exists to catch it instead of by the engine two steps later (W7a was applied to
+  design but not to cell). Preflight and the rim engine now express the
+  target-sum tolerance from one constant, so a config summing to exactly 100.5
+  can no longer pass preflight and then be refused by the engine on floating
+  point. And `margin_tolerance` is validated in the exported core as well as on
+  the config path — a negative value used to reach the margin judgement and
+  report every run as off-target, including one that hit every margin exactly.
+- **Weighting: a golden-file regression test.** The suite had no comparison
+  against a known-good output — the gap the July review named in §5 and W8 did
+  not close, since hand-checked arithmetic catches wrong arithmetic but not a
+  changed pipeline. A committed 200-row fixture now runs end to end through
+  `run_weighting()` and is compared against an expected lookup file derived from
+  arithmetic rather than from the module, covering both a design and a rim weight
+  on the same study.
 - **Tabs: a Numeric question with option labels but no bins no longer stops the
   run.** A Numeric question can carry Options rows that are display labels — a
   frequency cascade's answer texts, say — on a structure whose Options sheet has

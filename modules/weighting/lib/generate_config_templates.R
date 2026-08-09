@@ -598,7 +598,13 @@ generate_weight_config_template <- function(output_path) {
       name = "allow_unmatched",
       width = 18,
       required = FALSE,
-      description = "Y or N. Default N. Design and cell weights refuse when any respondent would end up with no weight - an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. Set Y only if you have decided those respondents should be left out; their weights stay blank and the count is reported."
+      description = "Y or N. Default N. Design and cell weights refuse when any RESPONDENT would end up with no weight - an unmatched category, a missing value in a weighting variable, or a cell whose target is zero. Set Y only if you have decided those respondents should be left out; their weights stay blank, the count is reported, and the remaining weights sum to the respondents who kept one."
+    ),
+    list(
+      name = "allow_empty_targets",
+      width = 20,
+      required = FALSE,
+      description = "Y or N. Default N. The mirror image of allow_unmatched: design and cell weights refuse when a TARGET has a population share but nobody in the sample to carry it. Set Y to proceed - the orphaned share is redistributed across the targets that do have respondents, so the weighted base is not short, and the console says how much moved. Those respondents are then standing in for people the sample never reached, which must be stated wherever the numbers are quoted."
     ),
     list(
       name = "grossing",
@@ -617,6 +623,7 @@ generate_weight_config_template <- function(output_path) {
       weight_bounds = "0.3,3.0",
       margin_tolerance = 0.5,
       allow_unmatched = "N",
+      allow_empty_targets = "N",
       grossing = "N"
     )
   )

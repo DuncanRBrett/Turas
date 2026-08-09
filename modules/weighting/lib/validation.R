@@ -243,7 +243,9 @@ validate_rim_config <- function(data, rim_targets, weight_name) {
 #' @param label Character, label for reporting
 #' @return List with validation results and quality metrics
 #' @export
-validate_calculated_weights <- function(weights, label = "Weights") {
+validate_calculated_weights <- function(weights, label = "Weights",
+                                        expected_sum = NULL,
+                                        population_scale = FALSE) {
   results <- list(
     valid = TRUE,
     n_total = length(weights),
@@ -324,8 +326,31 @@ validate_calculated_weights <- function(weights, label = "Weights") {
     results$design_effect <- length(valid_weights) / effective_n
     results$efficiency <- 100 * effective_n / length(valid_weights)
 
-    # Quality warnings
-    if (results$max > 10) {
+    # The weighted base is the one number nothing was checking. A weight that
+    # sums to less than the respondents carrying it deflates every base,
+    # percentage and significance test built on it, and the module reported GOOD
+    # quality throughout. Only asserted where the caller knows what the sum
+    # should be — a grossed design weight sums to the population by design.
+    results$sum_weights <- sum_w
+    results$expected_sum <- expected_sum
+
+    if (!is.null(expected_sum) && is.finite(expected_sum) && expected_sum > 0) {
+      drift_pct <- 100 * abs(sum_w - expected_sum) / expected_sum
+      results$sum_drift_pct <- drift_pct
+
+      if (drift_pct > 0.01) {
+        results$valid <- FALSE
+        results$errors <- c(results$errors, sprintf(
+          "%s: the weights sum to %.4f but should sum to %.4f (%.3f%% out). Every weighted base built on this weight would be wrong by that much.",
+          label, sum_w, expected_sum, drift_pct
+        ))
+      }
+    }
+
+    # Quality warnings. A grossed weight is meant to be large — the mean is
+    # population/sample — so the extreme-weight check would fire on every
+    # grossed run and mean nothing.
+    if (!isTRUE(population_scale) && results$max > 10) {
       results$warnings <- c(results$warnings, sprintf(
         "%s: Maximum weight %.2f is very high (>10). Consider trimming.",
         label, results$max

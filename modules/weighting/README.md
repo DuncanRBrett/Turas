@@ -156,16 +156,17 @@ One row per weight to calculate:
 
 Fine-tune rim weight calculation:
 
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | grossing |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | allow_empty_targets | grossing |
 |-------------|---------------|----------------------|--------------------|---------------|------------------|-----------------|----------|
-| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | 0.5 | N | N |
+| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | 0.5 | N | N | N |
 
 - `max_iterations` — Maximum calibration iterations (default: 50)
 - `convergence_tolerance` — Stopping threshold (default: 0.0000001, i.e. 1e-7)
 - `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
 - `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`). A single number is read as the upper bound.
 - `margin_tolerance` — How far a weighted margin may sit from its target, in percentage points, before the run stops reporting itself as converged (default: `0.5`). The check is on the *achieved* margins, so a calibration that returned while a bound was binding is caught. Missing it makes the run PARTIAL and names the categories that missed; it does not change the weights.
-- `allow_unmatched` — `Y` or `N` (default `N`). Design and cell weighting refuse when any respondent would end up with no weight: an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. An NA weight removes that respondent from every weighted base downstream without appearing as a missing case. Set `Y` only when you have decided those respondents should be left out — their weights stay blank and the count is disclosed.
+- `allow_unmatched` — `Y` or `N` (default `N`). Design and cell weighting refuse when any **respondent** would end up with no weight: an unmatched category, a missing value in a weighting variable, or a cell whose target is zero. An NA weight removes that respondent from every weighted base downstream without appearing as a missing case. Set `Y` only when you have decided those respondents should be left out — their weights stay blank, the count is disclosed, and the remaining weights sum to the respondents who kept one.
+- `allow_empty_targets` — `Y` or `N` (default `N`). The mirror image: design and cell weighting refuse when a **target** has a population share but nobody in the sample to carry it. Set `Y` to proceed — the orphaned share is redistributed across the targets that do have respondents, so the weighted base is not short, and the console says how much moved. Those respondents are then standing in for people the sample never reached, which has to be stated wherever the numbers are quoted. This used to be folded into `allow_unmatched`, which meant excluding a few respondents with a missing value also switched off the empty-target guard.
 - `grossing` — Design weights only. `Y` or `N` (default `N`). A design weight is population / sample, so it naturally comes out at population scale (mean 20 on a 1-in-20 sample) while a rim weight sums to n. `N` normalises the design weight to sum to the sample size so both are on the same scale; `Y` keeps population scale for grossed-up counts and stamps it in the diagnostics. Kish n_eff is scale-invariant, so this changes weighted Ns on the report, not significance testing.
 
 There is no way to accept non-converged weights. If calibration cannot reach the targets, the run refuses — weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. To accept a looser fit deliberately, raise `convergence_tolerance`: it states how loose in a number you can report, and the resulting gap stays visible in the achieved margins table. On the worked case below, a tolerance of 0.09 lets raking converge, and the achieved margins then show the worst category landing 3.2 percentage points off its target — which is the kind of thing you want on the page, not buried.

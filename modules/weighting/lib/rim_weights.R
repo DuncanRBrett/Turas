@@ -161,8 +161,13 @@ validate_rim_inputs <- function(data, target_list, base_weights, cap_weights, ca
       )
     }
 
+    # Same tolerance the config guard and preflight use, expressed in
+    # proportions. The slack keeps a config that sits exactly on the limit from
+    # passing preflight and then being refused here on floating point.
+    sum_tol <- (if (exists("RIM_TARGET_SUM_TOLERANCE")) RIM_TARGET_SUM_TOLERANCE else 0.5) / 100
+
     total <- sum(targets)
-    if (abs(total - 1) > 0.005) {
+    if (abs(total - 1) > sum_tol + 1e-9) {
       weighting_refuse(
         code = "CFG_TARGET_SUM_ERROR",
         title = "Rim targets do not sum to 100%",
@@ -308,6 +313,21 @@ calculate_rim_weights <- function(data,
 
   # Validate inputs and compute bounds
   bounds <- validate_rim_inputs(data, target_list, base_weights, cap_weights, calibration_method)
+
+  # The config path checks this; the exported core did not, so a negative
+  # tolerance reached the margin judgement and reported every run — including a
+  # perfect one — as not converged.
+  if (length(margin_tolerance) != 1 || !is.numeric(margin_tolerance) ||
+      is.na(margin_tolerance) || margin_tolerance < 0) {
+    weighting_refuse(
+      code = "CFG_INVALID_MARGIN_TOLERANCE",
+      title = "Invalid margin_tolerance",
+      problem = sprintf("margin_tolerance must be a single non-negative number of percentage points; got '%s'.",
+                        paste(margin_tolerance, collapse = ", ")),
+      why_it_matters = "margin_tolerance decides whether the run reports its weighted margins as achieved. A negative or unreadable value makes every run report as off-target, including one that hit every margin exactly.",
+      how_to_fix = "Pass margin_tolerance as a number of percentage points, e.g. 0.5, or leave it at the default."
+    )
+  }
 
   if (verbose) {
     message("\nCalculating rim weights using survey::calibrate()...")
@@ -532,6 +552,11 @@ calculate_rim_weights <- function(data,
     n_used = nrow(rake_data),
     n_excluded = sum(!complete_idx),
     sum_weights = sum(final_weights),
+    # What the weights were calibrated TO, which is the sum of the starting
+    # weights — n for a plain rim run, the design total for rim-on-design. Kept
+    # separately from sum_weights so the caller has something independent to
+    # check the achieved total against.
+    target_sum = base_n,
     mean_weight = mean(final_weights),
     has_base_weights = !is.null(base_weights)
   )
@@ -709,8 +734,13 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
     verbose = verbose
   )
 
-  # Validate calculated weights
-  result$validation <- validate_calculated_weights(result$weights, weight_name)
+  # Rim calibrates so the weights sum to the sum of the starting weights — n for
+  # a plain rim run, the design total for rim-on-design. Asserting it turns any
+  # future slip into a refusal rather than a quietly wrong weighted base.
+  result$validation <- validate_calculated_weights(
+    result$weights, weight_name,
+    expected_sum = result$diagnostics$target_sum
+  )
   result$rim_variables <- rim_variables
   result$target_list <- target_list
 

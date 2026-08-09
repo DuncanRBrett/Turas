@@ -32,6 +32,10 @@ renv/.gitignore
 # ...but never their generated outputs
 examples/**/Output/
 
+# EXCEPTION: synthetic test fixtures are code, not data — a golden-file gate is
+# worthless if the fixture it compares against is not in the repo.
+!modules/*/tests/fixtures/**/*.csv
+
 # EXCEPTION: the VAS module's maps are code, not data. vas_category_map.csv is
 # the contract that says what to read for every category; vas_turas_columns.csv
 # defines the published dataset. Without these the module cannot run.

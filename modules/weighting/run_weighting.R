@@ -526,26 +526,45 @@ run_weighting <- function(config_file,
       res
 
     }, error = function(e) {
-      # If this is a turas_refusal, re-throw it
-      if (inherits(e, "turas_refusal")) {
+      # A failure in one weight used to take every other weight with it when it
+      # was a TRS refusal, which is most of them — so the locked decision that a
+      # failed weight is omitted from the lookup file (§0.4) was almost
+      # unreachable, and an operator with a four-weight config fixed one problem
+      # per run. A weight that cannot be calculated is now isolated: it is
+      # recorded on the run state, its column is left out of the lookup file,
+      # and the remaining weights still get calculated.
+      #
+      # This is deliberately only the per-weight loop. Config-level refusals —
+      # duplicate respondent IDs, weight-name collisions, an unreadable config,
+      # preflight — are raised before this loop and still stop the whole run,
+      # because none of them is specific to one weight.
+      if (n_weights == 1) {
+        # Nothing to carry on with; the refusal is the result.
         stop(e)
       }
 
-      # Non-refusal error: log as PARTIAL if other weights remain
-      if (n_weights > 1) {
-        turas_run_state_partial(
-          run_state,
-          code = "MODEL_WEIGHT_FAILED",
-          title = paste0("Weight '", weight_name, "' calculation failed"),
-          problem = conditionMessage(e),
-          fix = "Check configuration and data for this weight specification.",
-          stage = "weight_calculation"
-        )
-        return(NULL)
-      } else {
-        # Single weight - re-throw as this is fatal
-        stop(e)
+      is_refusal <- inherits(e, "turas_refusal")
+
+      if (is_refusal) {
+        # Nothing above this point has printed it, and the top-level handler
+        # will never see it now, so it has to be printed here or the operator
+        # gets a PARTIAL with no reason attached.
+        cat(conditionMessage(e))
       }
+
+      turas_run_state_partial(
+        run_state,
+        code = if (is_refusal) e$code else "MODEL_WEIGHT_FAILED",
+        title = paste0("Weight '", weight_name, "' could not be calculated"),
+        problem = if (is_refusal) (e$problem %||% conditionMessage(e)) else conditionMessage(e),
+        fix = if (is_refusal) {
+          paste(e$how_to_fix %||% "See the refusal above.", collapse = " ")
+        } else {
+          "Check configuration and data for this weight specification."
+        },
+        stage = "weight_calculation"
+      )
+      return(NULL)
     })
 
     if (is.null(result)) {

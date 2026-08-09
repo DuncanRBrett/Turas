@@ -344,20 +344,23 @@ generate_weighting_report <- function(weighting_results, output_file,
     if (!is.null(result$design_result) && !is.null(result$design_result$stratum_summary)) {
       report_lines <- c(report_lines,
         "STRATUM DETAILS:",
-        sprintf("  %-20s %12s %12s %12s",
-                "Stratum", "Population", "Sample", "Weight"),
-        strrep("-", 60)
+        sprintf("  %-20s %12s %12s %12s %14s",
+                "Stratum", "Population", "Sample", "Weight", "Pop/Sample"),
+        strrep("-", 74)
       )
 
       strata <- result$design_result$stratum_summary
       for (i in seq_len(nrow(strata))) {
         row <- strata[i, ]
+        # Weight is what the lookup file carries; Pop/Sample is the arithmetic
+        # it came from, before normalisation.
         report_lines <- c(report_lines,
-          sprintf("  %-20s %12s %12d %12.4f",
+          sprintf("  %-20s %12s %12d %12.4f %14.4f",
                   row$stratum,
                   format(row$population_size, big.mark = ","),
                   row$sample_size,
-                  row$weight)
+                  row$weight,
+                  row$weight_population_scale %||% NA_real_)
         )
       }
       report_lines <- c(report_lines, "")

@@ -478,13 +478,29 @@ test_that("a rim run judged against an impossible tolerance is not converged", {
   tl <- list(Gender = c(Male = 0.48, Female = 0.52),
              Region = c(A = 0.5, B = 0.5))
 
-  # A negative tolerance cannot be met by any margin, including a perfect one.
-  # This asserts that converged is derived from the comparison rather than
-  # fixed, without needing survey to misbehave.
-  res <- calculate_rim_weights(d, tl, margin_tolerance = -1, verbose = FALSE)
+  # A tolerance of zero can only be met by a margin that lands exactly, which
+  # floating-point calibration does not. This asserts that converged is derived
+  # from the comparison rather than fixed, without needing survey to misbehave.
+  # (A negative tolerance would do the same but is now refused as unreadable.)
+  res <- calculate_rim_weights(d, tl, margin_tolerance = 0, verbose = FALSE)
 
   expect_false(res$converged)
   expect_gt(nrow(res$off_target_margins), 0)
+})
+
+test_that("a negative margin_tolerance is refused by the exported core", {
+  skip_if_not(requireNamespace("survey", quietly = TRUE), "survey not available")
+
+  d <- data.frame(Gender = rep(c("Male", "Female"), 50), stringsAsFactors = FALSE)
+
+  refusal <- tryCatch(
+    calculate_rim_weights(d, list(Gender = c(Male = 0.48, Female = 0.52)),
+                          margin_tolerance = -1, verbose = FALSE),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "CFG_INVALID_MARGIN_TOLERANCE")
 })
 
 

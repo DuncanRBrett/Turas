@@ -277,7 +277,8 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | calibration_method | No | Text | raking | `raking`, `linear`, or `logit` |
 | weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
 | margin_tolerance | No | Number | 0.5 | Max gap (pp) between achieved and target margin before the run reports PARTIAL |
-| allow_unmatched | No | Y/N | N | Let design/cell weighting leave respondents unweighted instead of refusing |
+| allow_unmatched | No | Y/N | N | Let design/cell weighting leave *respondents* unweighted instead of refusing |
+| allow_empty_targets | No | Y/N | N | Let design/cell weighting proceed when a *target* has a population share but no respondents, redistributing that share across the rest |
 | grossing | No | Y/N | N | Keep design weights at population scale instead of normalising to sum = n |
 
 ### Parameter Guidelines
@@ -310,19 +311,25 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 - `Y` keeps population scale, for when you want grossed-up counts, and records the scale in the diagnostics.
 - Kish n_eff and DEFF are scale-invariant, so significance testing is identical either way. What changes is every weighted N on the face of the report.
 
-**allow_unmatched** (default: N)
-- Design and cell weighting refuse (`DATA_UNWEIGHTED_ROWS`) when any respondent would end up with an NA weight, and when a target cell or stratum has a population share but nobody in the sample. Rim weighting has always refused; the other two used to warn and carry on.
-- The refusal names the cause — unmatched category, missing value in a weighting variable, empty target cell — with counts and the categories involved.
-- `Y` is the deliberate opt-out. The run proceeds, those weights stay blank, and the count reaches the console and the diagnostics as `n_unweighted`. Use it when you have decided those respondents are out of scope, not to make an error message go away.
+**allow_unmatched** (default: N) — the respondent side
+- Design and cell weighting refuse (`DATA_UNWEIGHTED_ROWS`) when any respondent would end up with an NA weight: an unmatched category, a missing value in a weighting variable, or a cell whose target is zero. Rim weighting has always refused; the other two used to warn and carry on.
+- The refusal names the cause with counts and the categories involved.
+- `Y` is the deliberate opt-out. The run proceeds, those weights stay blank, the count reaches the console and the diagnostics as `n_unweighted`, and the surviving weights sum to the respondents who kept one rather than to the whole sample. Use it when you have decided those respondents are out of scope, not to make an error message go away.
+
+**allow_empty_targets** (default: N) — the population side
+- The mirror image, and a separate setting on purpose. Design and cell weighting refuse when a target cell or stratum has a population share and nobody in the sample to carry it: that share has no one to represent it, so the weighted totals would lose it.
+- `Y` proceeds and redistributes the orphaned share across the targets that do have respondents, in proportion to what they already carry, so the weighted base is not short. The console states how much moved and by what factor. For a grossed design weight nothing is redistributed — the grossed total simply comes out short by the missing strata, and the console says so.
+- Those respondents are then standing in for people the sample never reached. That is a methodological choice, and it belongs in the report wherever the numbers are quoted.
+- The two settings were one until the review of W1–W8: an analyst excluding three respondents with a missing age was also switching off the empty-target guard without being asked.
 
 **Accepting non-converged weights is not an option.** Calibration that cannot reach the targets refuses. Weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. Raise `convergence_tolerance` if you want a looser fit — that states how loose in a number you can report.
 
 ### Example
 
 ```
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | grossing |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | allow_empty_targets | grossing |
 |-------------|----------------|----------------------|--------------------|---------------|------------------|-----------------|----------|
-| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              | N               | N        |
+| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              | N               | N                   | N        |
 ```
 
 ---

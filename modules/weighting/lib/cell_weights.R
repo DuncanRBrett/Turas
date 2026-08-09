@@ -32,6 +32,7 @@ calculate_cell_weights <- function(data,
                                    cell_targets,
                                    cell_variables,
                                    allow_unmatched = FALSE,
+                                   allow_empty_targets = FALSE,
                                    verbose = FALSE) {
 
   # Validate inputs
@@ -92,11 +93,17 @@ calculate_cell_weights <- function(data,
 
   # A missing or negative target has to be caught before the sum check, which
   # uses na.rm = TRUE and would otherwise let an NA row through as long as the
-  # remaining rows happened to reach 100. A target of exactly 0 is caught too:
-  # it silently zero-weights real respondents, removing them from every base
-  # without them appearing as missing — the same failure as an NA weight,
-  # arrived at from the other direction.
-  bad_targets <- is.na(cell_targets$target_percent) | cell_targets$target_percent <= 0
+  # remaining rows happened to reach 100.
+  #
+  # A target of exactly 0 is not caught here. In a real interlocked design
+  # against a census table, a sparse cell rounding to 0.0% is ordinary, and
+  # refusing it blocks a legitimate study. What matters is not the zero but
+  # whether anybody is standing in that cell: an empty zero-share cell costs the
+  # weighting nothing, while a zero target with respondents in it would hand
+  # them a weight of zero and remove them from every base without their
+  # appearing as missing. That second case is an unweighted respondent, and it
+  # is handled with the other unweighted respondents below.
+  bad_targets <- is.na(cell_targets$target_percent) | cell_targets$target_percent < 0
   if (any(bad_targets)) {
     cell_label <- function(i) {
       paste(sprintf("%s=%s", cell_variables,
@@ -106,15 +113,15 @@ calculate_cell_weights <- function(data,
     }
     weighting_refuse(
       code = "CFG_INVALID_TARGET_VALUE",
-      title = "A cell target is missing, zero or negative",
-      problem = sprintf("These cells have a target_percent that is not a positive number: %s",
+      title = "A cell target is missing or negative",
+      problem = sprintf("These cells have a target_percent that is not a number of at least zero: %s",
                         paste(vapply(which(bad_targets),
                                      function(i) sprintf("%s (%s)", cell_label(i),
                                                          as.character(cell_targets$target_percent[i])),
                                      character(1)),
                               collapse = "; ")),
-      why_it_matters = "A negative or missing target cannot describe a share of a population. A target of zero gives every respondent in that cell a weight of zero, which removes them from every weighted base and significance test without them appearing as missing cases.",
-      how_to_fix = "Give every cell a target_percent above zero. If a cell genuinely has no population share, remove its row from Cell_Targets and collapse those respondents into a neighbouring cell."
+      why_it_matters = "A negative or missing target cannot describe a share of a population, so there is no distribution to weight towards.",
+      how_to_fix = "Give every cell a target_percent of zero or more. A cell with a genuine zero share is allowed; if respondents are standing in it, either give it its real share or collapse them into a neighbouring cell."
     )
   }
 
@@ -199,43 +206,149 @@ calculate_cell_weights <- function(data,
   # Create cell key for each target row
   target_keys <- build_keys(cell_targets)
 
-  # Initialize weight vector
+  pretty_key <- function(k) gsub(KEY_SEP, " x ", k, fixed = TRUE)
+
+  # ---------------------------------------------------------------------------
+  # Pass 1: count the sample in every target cell, and sort the problems into
+  # the two kinds they actually are.
+  #
+  # Respondent side — somebody would carry no weight: a missing value in a cell
+  # variable, a cell with no target at all, or a cell whose target is zero.
+  # Population side — a share of the population has nobody to carry it: a target
+  # cell with a share above zero and no respondents in it.
+  #
+  # These used to be one opt-in. They are two problems with two different
+  # remedies, and an analyst excluding three people with a missing age should not
+  # have to switch off the empty-target guard to do it.
+  # ---------------------------------------------------------------------------
+  cell_counts <- integer(nrow(cell_targets))
+  for (i in seq_len(nrow(cell_targets))) {
+    cell_counts[i] <- sum(!is.na(data_keys) & data_keys == target_keys[i])
+  }
+
+  is_empty_cell  <- cell_counts == 0 & cell_targets$target_percent > 0
+  is_zero_target <- cell_targets$target_percent == 0 & cell_counts > 0
+  is_usable_cell <- cell_counts > 0 & cell_targets$target_percent > 0
+
+  empty_cells <- target_keys[is_empty_cell]
+  empty_share <- sum(cell_targets$target_percent[is_empty_cell])
+
+  zero_target_keys <- target_keys[is_zero_target]
+  n_zero_target <- sum(cell_counts[is_zero_target])
+
+  matched <- !is.na(data_keys) & data_keys %in% target_keys
+  unmatched <- !is.na(data_keys) & !matched
+  n_unmatched <- sum(unmatched)
+  unmatched_keys <- if (n_unmatched > 0) unique(data_keys[unmatched]) else character(0)
+
+  # Respondents who will carry a weight. The weights are calibrated to sum to
+  # this rather than to nrow(data): a respondent who has been excluded should not
+  # still be inflating the weighted base, and rim already works this way — it
+  # calibrates to the complete cases it kept.
+  n_unweighted <- n_unmatched + n_na_rows + n_zero_target
+  n_base <- n - n_unweighted
+
+  # ---------------------------------------------------------------------------
+  # Pass 2: decide whether to proceed, and on what distribution.
+  # ---------------------------------------------------------------------------
+  problems <- character(0)
+  blocking <- character(0)
+
+  if (n_na_rows > 0) {
+    per_var <- na_in_variable[na_in_variable > 0]
+    problems <- c(problems, sprintf(
+      "%d row%s (%.1f%%) have a missing value in a cell variable (%s)",
+      n_na_rows, if (n_na_rows == 1) "" else "s", 100 * n_na_rows / n,
+      paste(sprintf("%s: %d", names(per_var), per_var), collapse = ", ")
+    ))
+  }
+  if (n_unmatched > 0) {
+    problems <- c(problems, sprintf(
+      "%d row%s (%.1f%%) are in cells with no target: %s",
+      n_unmatched, if (n_unmatched == 1) "" else "s", 100 * n_unmatched / n,
+      paste(sprintf("'%s'", pretty_key(head(unmatched_keys, 10))), collapse = ", ")
+    ))
+  }
+  if (n_zero_target > 0) {
+    problems <- c(problems, sprintf(
+      "%d row%s (%.1f%%) are in cells whose target is zero, so they would weight to nothing: %s",
+      n_zero_target, if (n_zero_target == 1) "" else "s", 100 * n_zero_target / n,
+      paste(sprintf("'%s'", pretty_key(head(zero_target_keys, 10))), collapse = ", ")
+    ))
+  }
+  if (n_unweighted > 0 && !isTRUE(allow_unmatched)) {
+    blocking <- c(blocking, "allow_unmatched")
+  }
+
+  if (length(empty_cells) > 0) {
+    problems <- c(problems, sprintf(
+      "%d target cell%s have nobody in the sample, so %.1f%% of the population has no one to represent it: %s",
+      length(empty_cells), if (length(empty_cells) == 1) "" else "s", empty_share,
+      paste(sprintf("'%s'", pretty_key(head(empty_cells, 10))), collapse = ", ")
+    ))
+    if (!isTRUE(allow_empty_targets)) blocking <- c(blocking, "allow_empty_targets")
+  }
+
+  if (length(blocking) > 0) {
+    weighting_refuse(
+      code = "DATA_UNWEIGHTED_ROWS",
+      title = "This cell weight cannot be calculated as specified",
+      problem = paste(problems, collapse = "; "),
+      why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream without being reported as a missing case — the base simply comes out smaller than the sample. A target cell with no respondents is the mirror image: that share of the population has nobody to carry it, so the weighted totals lose it.",
+      how_to_fix = paste0(
+        "Best: add the missing combinations to Cell_Targets, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), collapse the sparse cells into larger ones, and check the cell variables for missing values. If empty cells are unavoidable, rim weighting does not require every combination to be populated. Otherwise set ",
+        paste(sprintf("%s = YES", blocking), collapse = " and "),
+        " in Advanced_Settings. allow_unmatched leaves those respondents' weights blank and reports the count; allow_empty_targets redistributes the orphaned population share across the cells that do have respondents."
+      )
+    )
+  }
+
+  # Nothing left to weight towards. Only reachable when every populated cell has
+  # a zero target, which is a config describing no distribution at all.
+  surviving_share <- sum(cell_targets$target_percent[is_usable_cell])
+  if (surviving_share <= 0) {
+    weighting_refuse(
+      code = "CFG_NO_USABLE_TARGETS",
+      title = "No cell target has both a population share and respondents",
+      problem = sprintf("Of %d target cells, none has a target above zero with anybody in it.",
+                        nrow(cell_targets)),
+      why_it_matters = "There is no distribution left to weight towards, so no weight can be calculated.",
+      how_to_fix = "Check that the cell variables and Cell_Targets describe the same categories, and that the targets are percentages rather than proportions."
+    )
+  }
+
+  # The orphaned population share is redistributed across the cells that do have
+  # respondents, in proportion to what they already carry. Without this the
+  # opt-in produces exactly the defect the refusal exists to prevent: weights
+  # summing to less than the sample, and every weighted base short with nothing
+  # on its face to say why. In the ordinary case — no empty cells — the factor is
+  # 1 and nothing moves.
+  redistribution_factor <- 100 / surviving_share
+
+  # ---------------------------------------------------------------------------
+  # Pass 3: assign the weights.
+  # ---------------------------------------------------------------------------
   weights <- rep(NA_real_, n)
 
-  # Build cell summary
   cell_summary <- data.frame(
     cell = character(0),
     target_pct = numeric(0),
+    adjusted_pct = numeric(0),
     sample_count = integer(0),
     sample_pct = numeric(0),
     weight = numeric(0),
     stringsAsFactors = FALSE
   )
 
-  # Track issues
-  empty_cells <- character(0)
+  for (i in which(is_usable_cell)) {
+    cell_count <- cell_counts[i]
+    in_cell <- !is.na(data_keys) & data_keys == target_keys[i]
 
-  for (i in seq_len(nrow(cell_targets))) {
-    key <- target_keys[i]
-    target_pct <- cell_targets$target_percent[i]
-
-    # Find rows matching this cell. Rows with missing data carry an NA key and
-    # match nothing, so they are counted as missing rather than as members.
-    in_cell <- !is.na(data_keys) & data_keys == key
-    cell_count <- sum(in_cell)
-
-    if (cell_count == 0) {
-      empty_cells <- c(empty_cells, key)
-      next
-    }
-
-    # Calculate weight: (target_proportion * N) / cell_count
-    target_prop <- target_pct / 100
-    weight <- (target_prop * n) / cell_count
+    adjusted_pct <- cell_targets$target_percent[i] * redistribution_factor
+    weight <- (adjusted_pct / 100 * n_base) / cell_count
 
     weights[in_cell] <- weight
 
-    # Build summary row label
     cell_label <- paste(
       paste0(cell_variables, "=", cell_targets[i, cell_variables]),
       collapse = ", "
@@ -243,7 +356,8 @@ calculate_cell_weights <- function(data,
 
     cell_summary <- rbind(cell_summary, data.frame(
       cell = cell_label,
-      target_pct = target_pct,
+      target_pct = cell_targets$target_percent[i],
+      adjusted_pct = round(adjusted_pct, 4),
       sample_count = cell_count,
       sample_pct = round(100 * cell_count / n, 2),
       weight = round(weight, 4),
@@ -252,70 +366,33 @@ calculate_cell_weights <- function(data,
 
     if (verbose) {
       message(sprintf("    %s: target=%.1f%%, n=%d, weight=%.4f",
-                      cell_label, target_pct, cell_count, weight))
+                      cell_label, cell_targets$target_percent[i], cell_count, weight))
     }
   }
 
-  # Three ways a respondent ends up with no cell weight, each reported as itself
-  # rather than folded into "undefined cell". An NA weight removes that person
-  # from every weighted base downstream without appearing as a missing case, so
-  # by default this is a refusal — the same standard rim weighting already
-  # holds. An empty target cell is the mirror image: a share of the population
-  # that no respondent can carry, so the weighted total quietly loses it.
-  unmatched <- is.na(weights) & !is.na(data_keys)
-  n_unmatched <- sum(unmatched)
-  unmatched_keys <- if (n_unmatched > 0) unique(data_keys[unmatched]) else character(0)
+  sum_weights <- sum(weights, na.rm = TRUE)
 
-  pretty_key <- function(k) gsub(KEY_SEP, " x ", k, fixed = TRUE)
-
-  n_unweighted <- n_unmatched + n_na_rows
-
-  if (n_unweighted > 0 || length(empty_cells) > 0) {
-
-    problems <- character(0)
-    if (n_na_rows > 0) {
-      per_var <- na_in_variable[na_in_variable > 0]
-      problems <- c(problems, sprintf(
-        "%d row%s (%.1f%%) have a missing value in a cell variable (%s)",
-        n_na_rows, if (n_na_rows == 1) "" else "s", 100 * n_na_rows / n,
-        paste(sprintf("%s: %d", names(per_var), per_var), collapse = ", ")
-      ))
-    }
-    if (n_unmatched > 0) {
-      problems <- c(problems, sprintf(
-        "%d row%s (%.1f%%) are in cells with no target: %s",
-        n_unmatched, if (n_unmatched == 1) "" else "s", 100 * n_unmatched / n,
-        paste(sprintf("'%s'", pretty_key(head(unmatched_keys, 10))), collapse = ", ")
-      ))
-    }
-    if (length(empty_cells) > 0) {
-      empty_share <- sum(cell_targets$target_percent[target_keys %in% empty_cells],
-                         na.rm = TRUE)
-      problems <- c(problems, sprintf(
-        "%d target cell%s have nobody in the sample, so %.1f%% of the population has no one to represent it: %s",
-        length(empty_cells), if (length(empty_cells) == 1) "" else "s", empty_share,
-        paste(sprintf("'%s'", pretty_key(head(empty_cells, 10))), collapse = ", ")
-      ))
-    }
-
-    if (!isTRUE(allow_unmatched)) {
-      weighting_refuse(
-        code = "DATA_UNWEIGHTED_ROWS",
-        title = "Some respondents would get no cell weight",
-        problem = paste(problems, collapse = "; "),
-        why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream without being reported as a missing case — the base simply comes out smaller than the sample. A target cell with no respondents removes that share of the population from the weighted totals entirely.",
-        how_to_fix = "Either add the missing combinations to Cell_Targets, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), collapse the sparse cells into larger ones, and check the cell variables for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count. If empty cells are unavoidable, rim weighting does not require every combination to be populated."
-      )
-    }
-
+  # The disclosure has to lead with the number an analyst can act on: how much
+  # weighted base this weight actually carries against the sample it came from.
+  # Saying "0 respondents affected" and then listing a quarter of the population
+  # underneath it told them nothing.
+  if (length(problems) > 0) {
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
     cat("│ Context: Weighting - cell weights\n")
     cat("│ Code: DATA_UNWEIGHTED_ROWS_ALLOWED\n")
-    cat(sprintf("│ allow_unmatched = YES, so %d of %d respondents are being\n",
-                n_unweighted, n))
-    cat("│ left with no weight and will not appear in any weighted\n")
-    cat("│ base built on this weight:\n")
     for (p in problems) cat(sprintf("│   - %s\n", p))
+    cat("│\n")
+    cat(sprintf("│ %d of %d respondents carry a weight, and the weighted base\n",
+                n_base, n))
+    cat(sprintf("│ for this weight is %.2f.\n", sum_weights))
+    if (length(empty_cells) > 0) {
+      cat(sprintf("│ The orphaned %.1f%% was redistributed across the %d populated\n",
+                  empty_share, sum(is_usable_cell)))
+      cat(sprintf("│ cells (targets scaled by %.6f), so the base is not short —\n",
+                  redistribution_factor))
+      cat("│ but those cells now stand in for people the sample never\n")
+      cat("│ reached. Say so wherever these numbers are quoted.\n")
+    }
     cat("│ How to fix: this is deliberate. Remove the opt-in to make it\n")
     cat("│ a refusal again.\n")
     cat("└───────────────────────────────────────────────────────┘\n\n")
@@ -343,10 +420,19 @@ calculate_cell_weights <- function(data,
     # allow_unmatched was set — otherwise the run would have refused.
     n_unweighted = n_unweighted,
     n_missing_cell_data = n_na_rows,
+    n_zero_target_rows = n_zero_target,
     na_by_variable = na_in_variable,
     unmatched_cells = pretty_key(unmatched_keys),
     empty_cells = pretty_key(empty_cells),
-    allow_unmatched = isTRUE(allow_unmatched)
+    allow_unmatched = isTRUE(allow_unmatched),
+    allow_empty_targets = isTRUE(allow_empty_targets),
+    # What the weights actually add up to, and what they were meant to. The two
+    # differ only through a bug now that empty targets are redistributed, which
+    # is why the caller asserts it.
+    n_base = n_base,
+    sum_weights = sum_weights,
+    empty_target_share = empty_share,
+    redistribution_factor = redistribution_factor
   ))
 }
 
@@ -415,11 +501,16 @@ calculate_cell_weights_from_config <- function(data, config, weight_name,
     cell_targets = cell_targets,
     cell_variables = cell_variables,
     allow_unmatched = read_allow_unmatched_setting(config, weight_name),
+    allow_empty_targets = read_allow_empty_targets_setting(config, weight_name),
     verbose = verbose
   )
 
-  # Validate calculated weights
-  result$validation <- validate_calculated_weights(result$weights, weight_name)
+  # Cell weights are constructed to sum to the number of respondents carrying
+  # one. Asserting it here is cheap and turns any future arithmetic slip into a
+  # refusal rather than a quietly wrong weighted base in tabs.
+  result$validation <- validate_calculated_weights(
+    result$weights, weight_name, expected_sum = result$n_base
+  )
 
   return(result)
 }

@@ -578,24 +578,23 @@ get_advanced_setting <- function(config, weight_name, setting_name, default = NU
   return(value)
 }
 
-#' Read the allow_unmatched Opt-In for a Weight
+#' Read a Y/N Advanced Setting
 #'
-#' Design and cell weighting refuse when any respondent would end up with an NA
-#' weight, because an NA weight removes that respondent from every weighted base
-#' downstream without being reported as a missing case. \code{allow_unmatched}
-#' is the deliberate opt-out: the run proceeds, those weights stay NA, and the
-#' count is disclosed on the console and in diagnostics.
-#'
-#' Anything unreadable is refused rather than treated as "no", because the
-#' difference between the two answers is whether a silent base deflation is
-#' possible at all.
+#' The Y/N settings share one rule: read the value, accept the usual spellings
+#' of yes and no, and refuse anything else rather than guessing. Guessing is the
+#' one thing none of them may do — each decides whether a silent distortion of
+#' the weighted base is possible, so an unreadable value has to stop the run.
 #'
 #' @param config List, full configuration object
 #' @param weight_name Character, name of weight
-#' @return TRUE if the opt-in is set, FALSE otherwise
-#' @export
-read_allow_unmatched_setting <- function(config, weight_name) {
-  raw <- get_advanced_setting(config, weight_name, "allow_unmatched", "N")
+#' @param setting_name Character, the Advanced_Settings column to read
+#' @param code Character, TRS code to refuse with
+#' @param why_it_matters Character, what the setting decides
+#' @return TRUE or FALSE
+#' @keywords internal
+read_yes_no_setting <- function(config, weight_name, setting_name, code,
+                                why_it_matters) {
+  raw <- get_advanced_setting(config, weight_name, setting_name, "N")
 
   if (is.logical(raw) && length(raw) == 1 && !is.na(raw)) return(isTRUE(raw))
 
@@ -605,12 +604,66 @@ read_allow_unmatched_setting <- function(config, weight_name) {
   if (value %in% c("N", "NO", "FALSE", "F", "0", "")) return(FALSE)
 
   weighting_refuse(
+    code = code,
+    title = sprintf("Invalid %s setting", setting_name),
+    problem = sprintf("%s for weight '%s' is '%s'. Expected Y or N.",
+                      setting_name, weight_name, as.character(raw)[1]),
+    why_it_matters = why_it_matters,
+    how_to_fix = sprintf("Set %s to Y or N in Advanced_Settings, or remove the row to keep the default (N).",
+                         setting_name)
+  )
+}
+
+#' Read the allow_unmatched Opt-In for a Weight
+#'
+#' Design and cell weighting refuse when any \strong{respondent} would end up
+#' with an NA weight, because an NA weight removes that respondent from every
+#' weighted base downstream without being reported as a missing case.
+#' \code{allow_unmatched} is the deliberate opt-out: the run proceeds, those
+#' weights stay NA, and the count is disclosed on the console and in
+#' diagnostics.
+#'
+#' This covers the respondent side only — an unmatched category, a missing value
+#' in a weighting variable, or a cell whose target is zero. The mirror-image
+#' problem, a target with a population share and nobody to carry it, is
+#' \code{allow_empty_targets}. They used to be one setting, which meant an
+#' analyst excluding three people with a missing age also switched off the
+#' empty-target guard without being asked.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return TRUE if the opt-in is set, FALSE otherwise
+#' @export
+read_allow_unmatched_setting <- function(config, weight_name) {
+  read_yes_no_setting(
+    config, weight_name, "allow_unmatched",
     code = "CFG_INVALID_ALLOW_UNMATCHED",
-    title = "Invalid allow_unmatched setting",
-    problem = sprintf("allow_unmatched for weight '%s' is '%s'. Expected Y or N.",
-                      weight_name, as.character(raw)[1]),
-    why_it_matters = "allow_unmatched decides whether respondents with no weight stop the run or are silently left out of every weighted base. A value that cannot be read must not be guessed either way.",
-    how_to_fix = "Set allow_unmatched to Y or N in Advanced_Settings, or remove the row to keep the default (N — refuse)."
+    why_it_matters = "allow_unmatched decides whether respondents with no weight stop the run or are silently left out of every weighted base. A value that cannot be read must not be guessed either way."
+  )
+}
+
+#' Read the allow_empty_targets Opt-In for a Weight
+#'
+#' The mirror image of \code{allow_unmatched}. A target cell or stratum with a
+#' population share and no respondents cannot be represented by anybody, so by
+#' default the run refuses. Setting this to Y says: proceed, and redistribute
+#' that share across the targets that do have respondents, in proportion to what
+#' they already carry.
+#'
+#' Redistributing is what makes the opt-in usable. Without it the surviving
+#' weights sum to less than n and every weighted base in the report comes out
+#' short with nothing on its face to say why — which is the defect the refusal
+#' exists to prevent, arrived at through the escape hatch.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return TRUE if the opt-in is set, FALSE otherwise
+#' @export
+read_allow_empty_targets_setting <- function(config, weight_name) {
+  read_yes_no_setting(
+    config, weight_name, "allow_empty_targets",
+    code = "CFG_INVALID_ALLOW_EMPTY_TARGETS",
+    why_it_matters = "allow_empty_targets decides whether a population share nobody can carry stops the run or is redistributed across the rest. A value that cannot be read must not be guessed either way."
   )
 }
 
@@ -630,22 +683,10 @@ read_allow_unmatched_setting <- function(config, weight_name) {
 #' @return TRUE to keep population scale, FALSE to normalise to sum = n
 #' @export
 read_grossing_setting <- function(config, weight_name) {
-  raw <- get_advanced_setting(config, weight_name, "grossing", "N")
-
-  if (is.logical(raw) && length(raw) == 1 && !is.na(raw)) return(isTRUE(raw))
-
-  value <- toupper(trimws(as.character(raw)[1]))
-
-  if (value %in% c("Y", "YES", "TRUE", "T", "1")) return(TRUE)
-  if (value %in% c("N", "NO", "FALSE", "F", "0", "")) return(FALSE)
-
-  weighting_refuse(
+  read_yes_no_setting(
+    config, weight_name, "grossing",
     code = "CFG_INVALID_GROSSING",
-    title = "Invalid grossing setting",
-    problem = sprintf("grossing for weight '%s' is '%s'. Expected Y or N.",
-                      weight_name, as.character(raw)[1]),
-    why_it_matters = "grossing decides whether this weight sums to the sample size or to the population. Guessing it would put every weighted N in the report on an undeclared scale.",
-    how_to_fix = "Set grossing to Y or N in Advanced_Settings, or remove the row to keep the default (N — normalise to sum = n)."
+    why_it_matters = "grossing decides whether this weight sums to the sample size or to the population. Guessing it would put every weighted N in the report on an undeclared scale."
   )
 }
 

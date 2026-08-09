@@ -218,7 +218,10 @@ check_design_targets_vs_data <- function(design_df, data, error_log) {
 check_rim_targets_sum <- function(rim_df, error_log) {
   if (is.null(rim_df) || nrow(rim_df) == 0) return(error_log)
 
-  tolerance <- 0.5
+  # One constant, so preflight and the engine cannot disagree about whether a
+  # config is acceptable. They did at exactly 100.5: preflight passed it and the
+  # engine, working in proportions, refused it on floating point.
+  tolerance <- if (exists("RIM_TARGET_SUM_TOLERANCE")) RIM_TARGET_SUM_TOLERANCE else 0.5
 
   # Group by weight_name + variable
   combos <- unique(rim_df[, c("weight_name", "variable"), drop = FALSE])
@@ -328,7 +331,10 @@ check_rim_categories_vs_data <- function(rim_df, data, error_log) {
 check_cell_targets_sum <- function(cell_df, error_log) {
   if (is.null(cell_df) || nrow(cell_df) == 0) return(error_log)
 
-  tolerance <- 0.5
+  # One constant, so preflight and the engine cannot disagree about whether a
+  # config is acceptable. They did at exactly 100.5: preflight passed it and the
+  # engine, working in proportions, refused it on floating point.
+  tolerance <- if (exists("RIM_TARGET_SUM_TOLERANCE")) RIM_TARGET_SUM_TOLERANCE else 0.5
 
   unique_weights <- unique(as.character(cell_df$weight_name))
 
@@ -423,11 +429,14 @@ check_cell_combinations_vs_data <- function(cell_df, data, error_log) {
     combo_label <- paste(combo_parts, collapse = " + ")
 
     if (!any(match_mask)) {
+      # An Error, not a Warning: the cell engine refuses on this and preflight
+      # exists to say so before the engine runs. Matching ignores surrounding
+      # spaces but is case-sensitive, which is the usual cause.
       error_log <- log_preflight_issue(
         error_log, "Cell Combinations vs Data", "Cell Combination Not in Data",
-        sprintf("Weight '%s': combination %s has zero respondents in data.",
+        sprintf("Weight '%s': combination %s has zero respondents in data. Matching ignores surrounding spaces but is case-sensitive. If the empty cell is real, set allow_empty_targets = YES in Advanced_Settings to redistribute its share.",
                 wname, combo_label),
-        paste(wname, combo_label, sep = " / "), "Warning"
+        paste(wname, combo_label, sep = " / "), "Error"
       )
     }
   }

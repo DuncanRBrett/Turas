@@ -229,8 +229,15 @@ test_that("cap_weights is honoured at a bound that is not the default", {
   expect_equal(max(uncapped$weights, na.rm = TRUE), 2.0, tolerance = 1e-6)
   expect_equal(uncapped$bounds, c(0.3, 3.0))
 
+  # A bound that cannot be met makes survey emit its own "Failed to converge"
+  # warning before calibrate() errors and the engine turns it into a refusal.
+  # That warning is the expected route through this branch, not a loose end, so
+  # it is declared here rather than left to surface as an unexplained suite
+  # warning.
   outcome <- tryCatch(
-    calculate_rim_weights(data, targets, cap_weights = c(0.5, 1.4), verbose = FALSE),
+    suppressWarnings(
+      calculate_rim_weights(data, targets, cap_weights = c(0.5, 1.4), verbose = FALSE)
+    ),
     turas_refusal = function(e) e
   )
 
@@ -295,11 +302,11 @@ test_that("a negative rim target is refused", {
   expect_equal(refusal$code, "CFG_INVALID_TARGET_VALUE")
 })
 
-test_that("a zero or negative cell target is refused", {
+test_that("a missing or negative cell target is refused", {
   data <- data.frame(Gender = rep(c("Male", "Female"), 50),
                      stringsAsFactors = FALSE)
 
-  for (bad in list(c(100, 0), c(120, -20), c(100, NA))) {
+  for (bad in list(c(120, -20), c(100, NA))) {
     targets <- data.frame(Gender = c("Male", "Female"), target_percent = bad,
                           stringsAsFactors = FALSE)
     refusal <- tryCatch(
@@ -309,6 +316,59 @@ test_that("a zero or negative cell target is refused", {
     expect_s3_class(refusal, "turas_refusal")
     expect_equal(refusal$code, "CFG_INVALID_TARGET_VALUE")
   }
+})
+
+test_that("a zero cell target with respondents in it is refused as unweighted respondents", {
+  # A zero target hands everybody in that cell a weight of zero, which removes
+  # them from every base without their appearing as missing — the same failure
+  # as an NA weight. So it is refused, but as what it is: unweighted
+  # respondents, answerable by allow_unmatched, not a malformed target.
+  data <- data.frame(Gender = rep(c("Male", "Female"), 50),
+                     stringsAsFactors = FALSE)
+  targets <- data.frame(Gender = c("Male", "Female"), target_percent = c(100, 0),
+                        stringsAsFactors = FALSE)
+
+  refusal <- tryCatch(
+    calculate_cell_weights(data, targets, "Gender", verbose = FALSE),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_UNWEIGHTED_ROWS")
+  expect_match(conditionMessage(refusal), "target is zero")
+
+  # Opted in, those 50 respondents carry no weight and the other 50 sum to 50 —
+  # the base is the respondents who kept a weight, not the whole sample.
+  allowed <- calculate_cell_weights(data, targets, "Gender",
+                                    allow_unmatched = TRUE, verbose = FALSE)
+  expect_equal(sum(is.na(allowed$weights)), 50)
+  expect_equal(sum(allowed$weights, na.rm = TRUE), 50, tolerance = 1e-9)
+})
+
+test_that("a zero cell target nobody is standing in costs nothing", {
+  # The case the old <= 0 refusal blocked: a sparse census cell that rounds to
+  # 0.0% with no respondents in it. Nothing is lost and the run proceeds.
+  data <- data.frame(
+    Age = rep(c("18-34", "35+"), each = 50),
+    Gender = rep(c("M", "F"), 50),
+    stringsAsFactors = FALSE
+  )
+  targets <- data.frame(
+    Age = c("18-34", "18-34", "35+", "35+"),
+    Gender = c("M", "F", "M", "F"),
+    target_percent = c(30, 30, 40, 0),
+    stringsAsFactors = FALSE
+  )
+  # Nobody is 35+ and F in this sample, so the zero-target cell is also empty.
+  data <- data[!(data$Age == "35+" & data$Gender == "F"), ]
+
+  result <- calculate_cell_weights(data, targets, c("Age", "Gender"),
+                                   verbose = FALSE)
+
+  expect_equal(result$n_cells_empty, 0)     # a zero share is not an empty cell
+  expect_equal(result$n_unweighted, 0)
+  expect_false(any(is.na(result$weights)))
+  expect_equal(sum(result$weights), nrow(data), tolerance = 1e-9)
 })
 
 

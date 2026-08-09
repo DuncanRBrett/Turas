@@ -136,7 +136,8 @@ own `how_to_fix`; this is the index.
 |---|---|
 | `CFG_TARGET_NOT_NUMERIC` | A target cell is not a number: `52%`, a comma decimal, a stray space, or the letters `NA` (which is text, not an empty cell). The refusal names the row and the value. |
 | `CFG_TARGET_SUM_ERROR` | Targets for one variable do not sum to 100 (or to 1, through the direct API). The shortfall used to be absorbed silently by the first category. |
-| `CFG_INVALID_TARGET_VALUE` | A target is missing, negative, or — for cell weights — zero. A zero target gives every respondent in that cell a weight of zero, removing them from every base without their appearing as missing. |
+| `CFG_INVALID_TARGET_VALUE` | A target is missing or negative. A cell target of exactly zero is allowed — a sparse census cell rounding to 0.0% is ordinary — but if respondents are standing in that cell they refuse as `DATA_UNWEIGHTED_ROWS`, because a zero weight removes them from every base without their appearing as missing. |
+| `CFG_NO_USABLE_TARGETS` | Every populated cell has a zero target, so there is no distribution left to weight towards. Usually a percent/proportion mix-up or a category mismatch. |
 | `CFG_DUPLICATE_TARGET_CATEGORY` | One category listed twice for the same variable. |
 | `CFG_MISSING_TARGETS`, `CFG_NO_TARGETS`, `CFG_INCOMPLETE_TARGETS` | The targets sheet has no rows for this weight, or is missing combinations. |
 | `CFG_INVALID_POPULATION`, `CFG_INVALID_POPULATION_SIZES` | `population_size` must be a positive number. |
@@ -145,7 +146,7 @@ own `how_to_fix`; this is the index.
 
 | Code | Fix |
 |---|---|
-| `DATA_UNWEIGHTED_ROWS` | Someone would end up with no weight: a category with no target, a missing value in a weighting variable, or a target cell nobody is in. Fix the spelling or the targets, or set `allow_unmatched = Y` if those respondents are genuinely out of scope. Matching ignores surrounding spaces but **is case-sensitive**. |
+| `DATA_UNWEIGHTED_ROWS` | Two different problems share this code, and the refusal names which one you have. **Respondent side** — someone would end up with no weight: a category with no target, a missing value in a weighting variable, or a cell whose target is zero. The opt-in is `allow_unmatched = Y`; their weights stay blank and the rest sum to the respondents who kept one. **Population side** — a target has a share but nobody in the sample to carry it. The opt-in is `allow_empty_targets = Y`, which redistributes that share across the targets that do have respondents. Setting one does not answer for the other. Fix the spelling or the targets first: matching ignores surrounding spaces but **is case-sensitive**. |
 | `DATA_UNMATCHED_VALUES` | The rim equivalent: a data value with no target category. Rim also refuses on missing values in a rim variable. |
 | `DATA_DUPLICATE_IDS` | The ID column repeats. tabs joins on it, so a repeat puts weights on the wrong people and the merged file still looks well-formed. If the message says the column was defaulted to the first column, set `id_column` in the General sheet. |
 | `DATA_MISSING_ID` | Some rows have a blank ID. |
@@ -162,7 +163,7 @@ own `how_to_fix`; this is the index.
 | `MODEL_NO_CONVERGENCE` | Raking cannot reach the targets. In order: set `calibration_method = logit` with finite `weight_bounds`; widen the bounds; raise `max_iterations`; reduce the number of rim variables. A target needing a 3x+ stretch on one category often defeats raking at any bounds. |
 | `MODEL_BOUNDS_ISSUE`, `CFG_INVALID_BOUNDS*` | `weight_bounds` is malformed or too tight. Format is `lower,upper`, e.g. `0.3,3.0`. `logit` needs finite bounds on both sides. |
 | `CALC_NONPOSITIVE_WEIGHTS` | `linear` calibration produced zero or negative weights, which would remove those respondents from every base. Use `logit`, or raise the lower bound above zero. |
-| `CFG_INVALID_MARGIN_TOLERANCE` | `margin_tolerance` must be a non-negative number of percentage points. |
+| `CFG_INVALID_MARGIN_TOLERANCE` | `margin_tolerance` must be a non-negative number of percentage points. Checked on both the config path and the exported core. |
 
 ### Trimming
 
@@ -200,6 +201,24 @@ weights to sum to n so both are on the same scale; `grossing = Y` keeps
 population scale when you want grossed-up counts. Kish n_eff is scale-invariant,
 so significance testing is identical either way. Only the weighted Ns move.
 
+The stratum table in the report carries both numbers: **Weight** is what the
+lookup file contains, and **Pop/Sample** is the population-over-sample
+arithmetic it came from. They are the same figure only under `grossing = Y`.
+
+**One weight failing does not stop the others.** In a multi-weight config, a
+weight that cannot be calculated is reported, left out of the lookup file, and
+the remaining weights are still calculated — the run comes back PARTIAL. Errors
+that are not specific to one weight still stop everything: an unreadable config,
+a duplicated respondent ID, a weight name that collides with a data column, and
+anything preflight rejects. If *every* weight fails, the run refuses with
+`CALC_NO_WEIGHTS_PRODUCED` rather than writing a file of bare IDs.
+
+**Where the weighted base is checked.** Every method now states what its weights
+should add up to, and the run refuses if they do not: rim sums to the respondents
+it calibrated, a normalised design weight to the respondents carrying one, and a
+cell weight to the same. A grossed design weight is exempt — it sums to the
+population by design, and there is nothing independent to check it against.
+
 ---
 
 ## 8. Running the tests
@@ -208,5 +227,6 @@ so significance testing is identical either way. Only the weighted Ns move.
 Rscript -e 'testthat::test_dir("modules/weighting/tests/testthat", reporter = "summary")'
 ```
 
-One warning is expected: `test_trimming.R` deliberately trims 20% of weights to
-exercise the bias warning.
+Two warnings are expected, both the module's own trimming-bias warning fired on
+purpose: `test_trimming.R` and `test_config_templates.R` each trim 20% of weights
+to exercise it. Anything else is a loose end.
