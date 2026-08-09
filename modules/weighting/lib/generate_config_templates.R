@@ -587,6 +587,12 @@ generate_weight_config_template <- function(output_path) {
       width = 18,
       required = FALSE,
       description = "Weight range enforced DURING calibration, as lower,upper (e.g. 0.3,3.0). Default: 0.3,3.0. Must be finite on both sides if calibration_method is logit."
+    ),
+    list(
+      name = "margin_tolerance",
+      width = 18,
+      required = FALSE,
+      description = "How far a weighted margin may sit from its target, in percentage points, before the run stops calling itself converged and reports PARTIAL naming the categories that missed. Default: 0.5. Raise it only if you accept the gap - it changes what the run reports, not what the weights are."
     )
   )
 
@@ -596,7 +602,8 @@ generate_weight_config_template <- function(output_path) {
       max_iterations = 50,
       convergence_tolerance = 0.0000001,
       calibration_method = "raking",
-      weight_bounds = "0.3,3.0"
+      weight_bounds = "0.3,3.0",
+      margin_tolerance = 0.5
     )
   )
 

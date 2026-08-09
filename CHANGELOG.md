@@ -98,6 +98,23 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: a rim run stops claiming convergence it never checked (W2 /
+  review H4).** `calculate_rim_weights()` returned `converged = TRUE` with the
+  comment "TRUE if we got here". `survey::calibrate(force = FALSE)` does error
+  on hard non-convergence, but a bounds-constrained calibration can return while
+  a category sits well off its target — the bound binds, calibration stops, and
+  the run reported success. The achieved-margin arithmetic already existed but
+  was display-only; nothing compared it to the targets. Convergence is now
+  decided by `judge_margin_convergence()`, which reads the recomputed weighted
+  margins and asks whether any category sits further from its target than
+  `margin_tolerance` (new Advanced_Settings key, default 0.5 percentage points,
+  refused if unreadable). Missing it prints `CALC_MARGINS_NOT_ACHIEVED` naming
+  the worst categories and makes the run PARTIAL rather than PASS; the weights
+  are still written, because they are usable — they are simply not the weights
+  the config asked for. Unknown margins now count as not-converged rather than
+  as success. The judgement is a separate function so the rule is tested
+  directly instead of by trying to provoke a particular behaviour out of
+  `survey`.
 - **Weighting: post-hoc trimming no longer silently unpicks a rim calibration
   (W1 / review C1).** `apply_trimming = Y` capped the weights after the engine
   had finished and put nothing back: `rescale_after_trimming()` existed but had

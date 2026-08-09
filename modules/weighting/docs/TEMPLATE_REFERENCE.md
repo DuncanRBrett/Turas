@@ -276,6 +276,7 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | convergence_tolerance | No | Number | 1e-7 | Convergence precision threshold |
 | calibration_method | No | Text | raking | `raking`, `linear`, or `logit` |
 | weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
+| margin_tolerance | No | Number | 0.5 | Max gap (pp) between achieved and target margin before the run reports PARTIAL |
 
 ### Parameter Guidelines
 
@@ -296,14 +297,19 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 - Enforced during calibration, not by trimming afterwards
 - Widen before changing method, but note that widening alone does not fix a raking non-convergence
 
+**margin_tolerance** (default: 0.5 percentage points)
+- Judged on the *achieved* margins, recomputed from the final weights — not on whether `survey::calibrate()` returned. A calibration that stopped because a weight bound was binding can return while a category sits well off its target; before this check that was reported as converged.
+- Exceeding it makes the run PARTIAL (`CALC_MARGINS_NOT_ACHIEVED`) and names the categories that missed, worst first. The weights are still written — they are usable, they are just not the weights the config asked for.
+- Raising it changes what the run reports, not what the weights are. Raise it only when you have decided the gap is acceptable and want it recorded.
+
 **Accepting non-converged weights is not an option.** Calibration that cannot reach the targets refuses. Weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. Raise `convergence_tolerance` if you want a looser fit — that states how loose in a number you can report.
 
 ### Example
 
 ```
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
-|-------------|----------------|----------------------|--------------------|---------------|
-| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance |
+|-------------|----------------|----------------------|--------------------|---------------|------------------|
+| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              |
 ```
 
 ---

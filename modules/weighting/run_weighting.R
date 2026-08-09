@@ -472,6 +472,39 @@ run_weighting <- function(config_file,
         verbose = verbose
       )
 
+      # A rim weight is only finished when its weighted margins actually match
+      # the targets. calculate_rim_weights() now judges that on the achieved
+      # margins rather than on the calibrate() call returning, so a run whose
+      # bounds bound before the targets were reached lands here. It is a
+      # PARTIAL, not a PASS: the weights are usable but they are not the
+      # weights the config asked for, and the report must say so.
+      if (!is.null(res$rim_result) && !isTRUE(res$rim_result$converged)) {
+        off <- res$rim_result$off_target_margins
+        worst <- res$rim_result$max_abs_diff_pct
+        detail <- if (!is.null(off) && nrow(off) > 0) {
+          paste(
+            sprintf("%s = %s (target %.2f%%, achieved %.2f%%, %+.2f pp)",
+                    off$variable, off$category, off$target_pct,
+                    off$achieved_pct, off$diff_pct)[seq_len(min(nrow(off), 5))],
+            collapse = "; "
+          )
+        } else {
+          "achieved margins could not be computed"
+        }
+
+        turas_run_state_partial(
+          run_state,
+          code = "CALC_MARGINS_NOT_ACHIEVED",
+          title = paste0("Weight '", weight_name, "' did not reach its targets"),
+          problem = sprintf(
+            "Calibration returned, but the weighted margins are off target by up to %.2f pp (tolerance %.2f pp). Worst: %s",
+            worst, res$rim_result$margin_tolerance, detail
+          ),
+          fix = "Widen weight_bounds / raise cap_weights, set calibration_method = logit, or soften the target that needs the largest stretch. Raise margin_tolerance only if you accept the gap.",
+          stage = "weight_calculation"
+        )
+      }
+
       # Store final weights
       res$weights <- weights
       res

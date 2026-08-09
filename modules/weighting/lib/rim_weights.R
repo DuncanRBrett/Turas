@@ -239,6 +239,7 @@ calculate_rim_weights <- function(data,
                                   convergence_tolerance = 1e-7,
                                   cap_weights = NULL,
                                   calibration_method = "raking",
+                                  margin_tolerance = 0.5,
                                   verbose = FALSE) {
 
   # Check package availability
@@ -425,6 +426,45 @@ calculate_rim_weights <- function(data,
   # Calculate achieved margins
   margins <- calculate_achieved_margins(rake_data, target_list, final_weights)
 
+  # Convergence is a claim about the weights, not about whether the call
+  # returned. survey::calibrate() with force = FALSE errors on hard
+  # non-convergence, but a bounds-constrained calibration can return happily
+  # while a category sits well off its target — the bound binds and calibration
+  # stops. Reporting that as converged is how a rim run ships margins that do
+  # not match the config and says nothing. Judge it on the achieved margins.
+  judgement <- judge_margin_convergence(margins, margin_tolerance)
+  worst_diff <- judgement$max_abs_diff_pct
+  off_target <- judgement$off_target
+  converged <- judgement$converged
+
+  if (!converged) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Weighting - rim calibration\n")
+    cat("│ Code: CALC_MARGINS_NOT_ACHIEVED\n")
+    if (is.finite(worst_diff)) {
+      cat(sprintf("│ Calibration returned, but the weighted margins are off\n"))
+      cat(sprintf("│ target by up to %.2f pp (tolerance %.2f pp):\n",
+                  worst_diff, margin_tolerance))
+      for (r in seq_len(min(nrow(off_target), 8))) {
+        cat(sprintf("│   %s = %s: target %.2f%%, achieved %.2f%% (%+.2f pp)\n",
+                    off_target$variable[r], off_target$category[r],
+                    off_target$target_pct[r], off_target$achieved_pct[r],
+                    off_target$diff_pct[r]))
+      }
+      if (nrow(off_target) > 8) {
+        cat(sprintf("│   ... and %d more\n", nrow(off_target) - 8))
+      }
+    } else {
+      cat("│ Achieved margins could not be computed, so convergence\n")
+      cat("│ cannot be confirmed.\n")
+    }
+    cat("│ How to fix: the weight bounds are probably binding. Widen\n")
+    cat("│ weight_bounds / raise cap_weights, set calibration_method =\n")
+    cat("│ logit, or soften the target that needs the largest stretch.\n")
+    cat("│ Raise margin_tolerance only if you accept the gap.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  }
+
   # Build diagnostic info
   diagnostics <- list(
     n_total = nrow(data),
@@ -452,7 +492,10 @@ calculate_rim_weights <- function(data,
   return(list(
     weights = weights_full,
     g_weights = g_weights_full,         # Calibration factors (final/base)
-    converged = TRUE,                   # TRUE if we got here (calibrate errors otherwise)
+    converged = converged,              # Judged on achieved margins, not on return
+    max_abs_diff_pct = worst_diff,      # Worst |achieved - target|, percentage points
+    margin_tolerance = margin_tolerance,
+    off_target_margins = off_target,    # Rows outside tolerance, worst first
     iterations = NA_integer_,           # survey doesn't expose this
     margins = margins,
     design = calibrated,                # Full survey design object
@@ -545,6 +588,24 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
   # Get calibration method (new in v2.0)
   calib_method <- get_advanced_setting(config, weight_name, "calibration_method", "raking")
 
+  # How far a weighted margin may sit from its target before the run stops
+  # calling itself converged, in percentage points. 0.5 pp is tight enough that
+  # a binding bound shows up and loose enough that arithmetic noise does not.
+  margin_tol <- suppressWarnings(as.numeric(
+    get_advanced_setting(config, weight_name, "margin_tolerance", 0.5)
+  ))
+  if (length(margin_tol) != 1 || is.na(margin_tol) || margin_tol < 0) {
+    weighting_refuse(
+      code = "CFG_INVALID_MARGIN_TOLERANCE",
+      title = "Invalid margin_tolerance",
+      problem = sprintf("margin_tolerance for weight '%s' must be a single non-negative number of percentage points; got '%s'.",
+                        weight_name,
+                        paste(get_advanced_setting(config, weight_name, "margin_tolerance", 0.5), collapse = ", ")),
+      why_it_matters = "margin_tolerance decides whether the run reports its weighted margins as achieved. An unreadable value would leave that judgement undefined.",
+      how_to_fix = "Set margin_tolerance in Advanced_Settings to a number of percentage points, e.g. 0.5, or remove the row to use the default."
+    )
+  }
+
   # Get weight bounds (new in v2.0)
   # Can be single value or comma-separated "lower,upper"
   bounds_setting <- get_advanced_setting(config, weight_name, "weight_bounds", "0.3,3.0")
@@ -583,6 +644,7 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
     convergence_tolerance = conv_tol,
     cap_weights = bounds,
     calibration_method = calib_method,
+    margin_tolerance = margin_tol,
     verbose = verbose
   )
 
@@ -592,6 +654,50 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
   result$target_list <- target_list
 
   return(result)
+}
+
+#' Judge Whether the Achieved Margins Meet Their Targets
+#'
+#' Convergence is a claim about the weights, not about whether the calibration
+#' call returned. This decides it from the achieved margins: the run has
+#' converged when no category sits further from its target than the tolerance.
+#'
+#' Kept separate from the engine so the rule is testable on its own, without
+#' having to provoke a particular behaviour out of \code{survey::calibrate()}.
+#'
+#' @param margins Data frame from \code{calculate_achieved_margins()}, with at
+#'   least a \code{diff_pct} column. May be NULL or empty.
+#' @param tolerance Numeric, how far a margin may sit from its target before the
+#'   run stops calling itself converged, in percentage points.
+#' @return List with:
+#'   \item{converged}{TRUE only when a worst difference was computable and it is
+#'     within tolerance. An uncomputable margin is not converged — it is unknown,
+#'     and unknown must not read as success.}
+#'   \item{max_abs_diff_pct}{Worst absolute difference in percentage points, or
+#'     NA_real_ if none could be computed}
+#'   \item{off_target}{Rows outside tolerance, worst first; NULL if none could be
+#'     computed, a zero-row frame if all are within tolerance}
+#' @keywords internal
+judge_margin_convergence <- function(margins, tolerance) {
+
+  none <- list(converged = FALSE, max_abs_diff_pct = NA_real_, off_target = NULL)
+
+  if (is.null(margins) || !is.data.frame(margins) || nrow(margins) == 0) return(none)
+  if (!"diff_pct" %in% names(margins)) return(none)
+
+  usable <- is.finite(margins$diff_pct)
+  if (!any(usable)) return(none)
+
+  worst <- max(abs(margins$diff_pct[usable]))
+
+  off <- margins[usable & abs(margins$diff_pct) > tolerance, , drop = FALSE]
+  off <- off[order(-abs(off$diff_pct)), , drop = FALSE]
+
+  list(
+    converged = worst <= tolerance,
+    max_abs_diff_pct = worst,
+    off_target = off
+  )
 }
 
 #' Calculate Achieved Margins

@@ -388,3 +388,180 @@ test_that("linear calibration refuses when it produces zero or negative weights"
   )
   expect_true(all(ok$weights > 0))
 })
+
+
+# ==============================================================================
+# W2: convergence is judged on the achieved margins, not on the call returning
+# ==============================================================================
+
+make_margins <- function(diffs) {
+  data.frame(
+    variable    = paste0("V", seq_along(diffs)),
+    category    = paste0("C", seq_along(diffs)),
+    target_pct  = rep(50, length(diffs)),
+    achieved_pct = 50 + diffs,
+    diff_pct    = diffs,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("judge_margin_convergence converges only when every margin is inside tolerance", {
+  within <- judge_margin_convergence(make_margins(c(0.2, -0.4, 0.1)), tolerance = 0.5)
+  expect_true(within$converged)
+  expect_equal(within$max_abs_diff_pct, 0.4)
+  expect_equal(nrow(within$off_target), 0)
+
+  outside <- judge_margin_convergence(make_margins(c(0.2, -1.7, 0.9)), tolerance = 0.5)
+  expect_false(outside$converged)
+  expect_equal(outside$max_abs_diff_pct, 1.7)
+  expect_equal(nrow(outside$off_target), 2)
+  # Worst first, so a truncated console list shows the categories that matter.
+  expect_equal(outside$off_target$diff_pct[1], -1.7)
+  expect_equal(outside$off_target$diff_pct[2], 0.9)
+})
+
+test_that("judge_margin_convergence treats the tolerance as inclusive", {
+  exact <- judge_margin_convergence(make_margins(c(0.5, -0.5)), tolerance = 0.5)
+  expect_true(exact$converged)
+  expect_equal(nrow(exact$off_target), 0)
+
+  just_over <- judge_margin_convergence(make_margins(c(0.5000001)), tolerance = 0.5)
+  expect_false(just_over$converged)
+})
+
+test_that("judge_margin_convergence never reports unknown margins as converged", {
+  # No margins, no diff column, and all-NA differences are three ways of not
+  # knowing. None of them may read as success — that was the original defect,
+  # where converged was simply hardcoded TRUE.
+  for (m in list(NULL,
+                 data.frame(),
+                 data.frame(variable = "V1", category = "C1"),
+                 make_margins(c(NA_real_, NA_real_)))) {
+    j <- judge_margin_convergence(m, tolerance = 0.5)
+    expect_false(j$converged)
+    expect_true(is.na(j$max_abs_diff_pct))
+    expect_null(j$off_target)
+  }
+})
+
+test_that("a clean rim run reports converged with a computed worst margin", {
+  skip_if_not(requireNamespace("survey", quietly = TRUE), "survey not available")
+
+  set.seed(11)
+  d <- data.frame(
+    Gender = rep(c("Male", "Female"), c(120, 80)),
+    Region = rep(c("A", "B"), length.out = 200),
+    stringsAsFactors = FALSE
+  )
+  tl <- list(Gender = c(Male = 0.48, Female = 0.52),
+             Region = c(A = 0.5, B = 0.5))
+
+  res <- calculate_rim_weights(d, tl, verbose = FALSE)
+
+  expect_true(res$converged)
+  # The claim is now backed by a number, not by having reached this line.
+  expect_true(is.finite(res$max_abs_diff_pct))
+  expect_lt(res$max_abs_diff_pct, res$margin_tolerance)
+  expect_equal(res$margin_tolerance, 0.5)
+  expect_equal(nrow(res$off_target_margins), 0)
+})
+
+test_that("a rim run judged against an impossible tolerance is not converged", {
+  skip_if_not(requireNamespace("survey", quietly = TRUE), "survey not available")
+
+  set.seed(11)
+  d <- data.frame(
+    Gender = rep(c("Male", "Female"), c(120, 80)),
+    Region = rep(c("A", "B"), length.out = 200),
+    stringsAsFactors = FALSE
+  )
+  tl <- list(Gender = c(Male = 0.48, Female = 0.52),
+             Region = c(A = 0.5, B = 0.5))
+
+  # A negative tolerance cannot be met by any margin, including a perfect one.
+  # This asserts that converged is derived from the comparison rather than
+  # fixed, without needing survey to misbehave.
+  res <- calculate_rim_weights(d, tl, margin_tolerance = -1, verbose = FALSE)
+
+  expect_false(res$converged)
+  expect_gt(nrow(res$off_target_margins), 0)
+})
+
+
+test_that("margin_tolerance is read from Advanced_Settings, and a bad one is refused", {
+  skip_if_not_installed("survey")
+  skip_if_not_installed("openxlsx")
+
+  set.seed(7)
+  data <- data.frame(
+    Gender = rep(c("Male", "Female"), c(120, 80)),
+    stringsAsFactors = FALSE
+  )
+
+  build_config <- function(tolerance, tag) {
+    data_path <- file.path(tempdir(), paste0("margin_tol_", tag, ".csv"))
+    write.csv(data, data_path, row.names = FALSE)
+
+    config_path <- file.path(tempdir(), paste0("margin_tol_", tag, ".xlsx"))
+    wb <- openxlsx::createWorkbook()
+
+    openxlsx::addWorksheet(wb, "General")
+    openxlsx::writeData(wb, "General", data.frame(
+      Setting = c("project_name", "data_file", "save_diagnostics"),
+      Value = c("Margin tolerance", data_path, "N"),
+      stringsAsFactors = FALSE
+    ))
+
+    openxlsx::addWorksheet(wb, "Weight_Specifications")
+    openxlsx::writeData(wb, "Weight_Specifications", data.frame(
+      weight_name = "rim_weight", method = "rim",
+      description = "Gender only", apply_trimming = "N",
+      trim_method = NA, trim_value = NA, stringsAsFactors = FALSE
+    ))
+
+    openxlsx::addWorksheet(wb, "Rim_Targets")
+    openxlsx::writeData(wb, "Rim_Targets", data.frame(
+      weight_name = rep("rim_weight", 2),
+      variable = rep("Gender", 2),
+      category = c("Male", "Female"),
+      target_percent = c(48, 52),
+      stringsAsFactors = FALSE
+    ))
+
+    openxlsx::addWorksheet(wb, "Advanced_Settings")
+    openxlsx::writeData(wb, "Advanced_Settings", data.frame(
+      weight_name = "rim_weight",
+      margin_tolerance = tolerance,
+      stringsAsFactors = FALSE
+    ))
+
+    openxlsx::saveWorkbook(wb, config_path, overwrite = TRUE)
+    load_weighting_config(config_path, verbose = FALSE)
+  }
+
+  # A tolerance the config author chose is the one that gets applied.
+  cfg <- build_config(0.25, "ok")
+  res <- calculate_rim_weights_from_config(
+    data = data, config = cfg, weight_name = "rim_weight", verbose = FALSE
+  )
+  expect_equal(res$margin_tolerance, 0.25)
+  expect_true(res$converged)
+
+  # Absent, it falls back to the documented default rather than to "no check".
+  cfg_default <- build_config(NA, "default")
+  res_default <- calculate_rim_weights_from_config(
+    data = data, config = cfg_default, weight_name = "rim_weight", verbose = FALSE
+  )
+  expect_equal(res_default$margin_tolerance, 0.5)
+
+  # A value that cannot be read must not silently become "no check".
+  cfg_bad <- build_config("very tight", "bad")
+  refusal <- tryCatch(
+    suppressWarnings(calculate_rim_weights_from_config(
+      data = data, config = cfg_bad, weight_name = "rim_weight", verbose = FALSE
+    )),
+    turas_refusal = function(e) e
+  )
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "CFG_INVALID_MARGIN_TOLERANCE")
+})
