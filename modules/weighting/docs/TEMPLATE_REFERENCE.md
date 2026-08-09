@@ -266,30 +266,38 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | Column | Required | Type | Default | Description |
 |--------|----------|------|---------|-------------|
 | weight_name | Yes | Text | - | Must match Weight_Specifications |
-| max_iterations | No | Integer | 50 | Maximum raking iterations |
-| convergence_tolerance | No | Number | 0.001 | Convergence precision threshold |
-| force_convergence | No | Y/N | N | Accept non-converged weights |
+| max_iterations | No | Integer | 50 | Maximum calibration iterations |
+| convergence_tolerance | No | Number | 1e-7 | Convergence precision threshold |
+| calibration_method | No | Text | raking | `raking`, `linear`, or `logit` |
+| weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
 
 ### Parameter Guidelines
 
 **max_iterations** (default: 50)
 - Increase to 100 if convergence fails
-- Maximum useful: 200 (if not converged by then, likely won't)
+- Beyond 200, a target that has not converged usually needs a different `calibration_method`, not more iterations
 
-**convergence_tolerance** (default: 0.001)
+**convergence_tolerance** (default: 1e-7)
 - Smaller values = tighter convergence
-- 0.0001 for high-precision work
+- Loosening this will not rescue a target that raking cannot reach
 
-**force_convergence** (default: N)
-- Set to Y to use non-converged weights (not recommended)
-- Review diagnostics carefully if using this option
+**calibration_method** (default: raking)
+- `raking` — standard rim weighting; keeps weights positive. Start here.
+- `logit` — use when raking will not converge, which happens when one category needs a large stretch (3x+). Requires **finite** bounds on both sides; `0.3,Inf` is refused. Keeps every weight strictly inside the bounds.
+- `linear` — also converges on demanding targets, but can produce zero or negative weights. The engine refuses (`CALC_NONPOSITIVE_WEIGHTS`) rather than ship them. Give it a lower bound above zero.
+
+**weight_bounds** (default: 0.3,3.0)
+- Enforced during calibration, not by trimming afterwards
+- Widen before changing method, but note that widening alone does not fix a raking non-convergence
+
+**Accepting non-converged weights is not an option.** Calibration that cannot reach the targets refuses. Weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. Raise `convergence_tolerance` if you want a looser fit — that states how loose in a number you can report.
 
 ### Example
 
 ```
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|----------------|----------------------|-------------------|
-| pop_weight  | 100            | 0.001                | N                 |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
+|-------------|----------------|----------------------|--------------------|---------------|
+| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      |
 ```
 
 ---

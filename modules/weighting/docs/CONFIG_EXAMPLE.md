@@ -172,9 +172,9 @@ Example with Gender x Age cross-tabulation:
 - Smaller values = tighter convergence (1e-6 is fine for most cases)
 
 **calibration_method** (default: raking)
-- `raking` — standard iterative proportional fitting (recommended)
-- `linear` — linear calibration (allows negative weights unless bounded)
-- `logit` — logit calibration (bounded by weight_bounds)
+- `raking` — standard iterative proportional fitting (recommended starting point)
+- `linear` — linear calibration. Can produce zero or negative weights, which the engine refuses (`CALC_NONPOSITIVE_WEIGHTS`). Give it a lower bound above zero.
+- `logit` — logit calibration, bounded by weight_bounds. Requires **finite** bounds on both sides. This is the fallback when raking will not converge, which happens when one category needs a 3x+ stretch.
 
 **weight_bounds** (default: 0.3,3.0)
 - Format: `lower,upper` — minimum and maximum allowed weight values

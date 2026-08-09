@@ -141,6 +141,82 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
   })
 }
 
+#' Load a Table-Shaped Config Sheet, Finding the Header Row
+#'
+#' The table counterpart to \code{load_config_sheet()}, which does the same job
+#' for Setting/Value sheets. Branded config templates (see
+#' \code{write_table_sheet()} in \code{modules/shared/template_styles.R}) put a
+#' title in row 1, a subtitle in row 2, the real column headers in row 3 and
+#' per-column help text in row 4, so a plain \code{read_excel()} reads the title
+#' as the header row and the sheet looks like it has no columns at all.
+#' Hand-built and script-built configs put their headers in row 1. This reads
+#' both: row 1 first, and if the required columns are not there, it scans the
+#' next few rows for a row that carries them.
+#'
+#' Rows of template help text (\code{[REQUIRED] ...} / \code{[Optional] ...})
+#' and wholly blank rows are dropped, so what comes back is data.
+#'
+#' @param file_path Character, path to the Excel config file
+#' @param sheet_name Character, sheet to read
+#' @param required_cols Character vector of column names that identify the
+#'   header row. Use the few columns the sheet cannot do without — sheets with
+#'   variable columns (e.g. interlocked cell targets) should name only the fixed ones.
+#' @param max_scan_rows Integer, how many rows to scan for the header (default: 10)
+#' @param col_types Passed to \code{readxl::read_excel} (default: NULL = guess)
+#' @return A data frame. If the required columns are found nowhere, the row-1
+#'   read is returned unchanged so the caller's own missing-column refusal fires
+#'   with its module-specific wording.
+#' @export
+load_config_table_sheet <- function(file_path, sheet_name, required_cols,
+                                    max_scan_rows = 10, col_types = NULL) {
+  df <- readxl::read_excel(file_path, sheet = sheet_name, col_types = col_types)
+
+  # Headers in row 1 — the hand-built and script-built case
+  if (all(required_cols %in% names(df))) {
+    return(df)
+  }
+
+  # Otherwise scan for the row that carries the required column names
+  raw <- suppressMessages(readxl::read_excel(
+    file_path, sheet = sheet_name,
+    col_names = FALSE, n_max = max_scan_rows, col_types = "text"
+  ))
+
+  header_row <- NULL
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- as.character(unlist(raw[r, ]))
+    if (all(required_cols %in% row_vals)) {
+      header_row <- r
+      break
+    }
+  }
+
+  # Not found: hand back the row-1 read so the caller refuses in its own words
+  if (is.null(header_row)) {
+    return(df)
+  }
+
+  df <- readxl::read_excel(file_path, sheet = sheet_name,
+                           skip = header_row - 1, col_types = col_types)
+
+  if (nrow(df) > 0 && ncol(df) > 0) {
+    # Drop the template's per-column help text row
+    help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                       as.character(df[[1]]), ignore.case = TRUE)
+    if (any(help_rows)) {
+      df <- df[!help_rows, , drop = FALSE]
+    }
+  }
+
+  if (nrow(df) > 0) {
+    all_blank <- apply(df, 1, function(row) all(is.na(row) | trimws(row) == ""))
+    df <- df[!all_blank, , drop = FALSE]
+  }
+
+  df
+}
+
+
 #' Safely retrieve configuration value
 #'
 #' USAGE: Access config values with type safety and defaults

@@ -98,6 +98,59 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: the config template the module generates can now be loaded by the
+  module.** `write_table_sheet()` puts a title in row 1, a subtitle in row 2, the
+  real column headers in row 3 and per-column help text in row 4; the weighting
+  loader called `readxl::read_excel()` with no `skip`, so it took the title as
+  the header row. Every generated template — and both templates checked into
+  `docs/templates/` — was refused with `CFG_MISSING_COLUMNS` before any weighting
+  could run. Hand-built and script-built configs put headers in row 1 and were
+  unaffected, which is why nothing caught it: every test fixture and example
+  script builds configs that way, and the template tests read at `startRow = 3`
+  and never touched the loader. Tabs, brand, confidence and pricing had each
+  already solved this locally; the shared `load_config_sheet()` even did it for
+  Setting/Value sheets. Weighting simply never adopted it. The table-sheet
+  counterpart now lives beside it as `load_config_table_sheet()` in
+  `modules/shared/lib/config_utils.R` — it reads row 1 first, scans for the
+  header row if the required columns are not there, and drops template help text
+  and blank rows — and all five weighting read sites use it. A round-trip test
+  fills in a generated template and asserts the loader accepts it; that gate is
+  what was missing. Two further defects surfaced once the round trip ran: the
+  template's own `wgt_cell` example set `trim_value = 95` for percentile
+  trimming when the engine requires a proportion between 0 and 1, and the column
+  help text said the same, so anyone following the example got a refusal. Both
+  corrected, and the two checked-in template workbooks regenerated.
+- **Weighting: a rim target the default method cannot reach now says which lever
+  to pull, and zero weights never ship.** The rim engine has supported
+  `calibration_method` (`raking` / `linear` / `logit`) via the `Advanced_Settings`
+  sheet since v2.0, but no document mentioned it, so a config author had no way
+  to know the default could be changed. It matters: raking cannot always reach a
+  feasible target that needs a large stretch on one category — a real n=1101 case
+  with one region at 8% of sample against a 27% target never converged at any
+  bounds or iteration count, while `logit` solved it exactly. Three things
+  changed. The refusal that suggests `logit` was never actually reaching users:
+  `survey` reports non-convergence as a warning carrying the epsilon and then
+  errors with the bare string `"Calibration failed"`, which matched neither
+  pattern the handler looked for, so every non-convergence fell through to a
+  generic refusal that named no fix. Non-convergence is now recognised and the
+  achieved epsilon is quoted. Second, `linear` calibration parked 219 of 1101
+  respondents on a zero lower bound (and went negative when unbounded) — a zero
+  weight removes a respondent from every base, percentage and significance test
+  without appearing as a missing case, so this is now a refusal
+  (`CALC_NONPOSITIVE_WEIGHTS`) rather than a warning nothing read. Third,
+  `calibration_method` and `weight_bounds` are documented in the README, user
+  manual and template reference, along with the corrected
+  `convergence_tolerance` default (the docs said 0.01; the code reads 1e-7).
+  Both settings now also ship as columns in the generated Excel template —
+  `calibration_method` as a raking/linear/logit dropdown — so a config author
+  starting from the template is prompted that they exist. In the same pass,
+  `force_convergence` was **removed**: it was offered as a Y/N dropdown in that
+  template and documented in three places, but no code read it, so setting it
+  did nothing and a non-converged run refused anyway. It is not being wired up.
+  Weights whose margins do not match the targets are not rim weights, and
+  shipping them unmarked is what TRS exists to prevent; to accept a looser fit
+  deliberately, raise `convergence_tolerance`, which states how loose in a
+  number you can report and leaves the gap visible in the achieved margins.
 - **Tabs: significance testing is finite-population corrected — in the Excel
   workbook as well as the report.** For a census / full-invite study the
   interactive report has narrowed its intervals on the FPC-corrected base for a

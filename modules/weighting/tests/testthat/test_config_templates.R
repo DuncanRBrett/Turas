@@ -132,3 +132,124 @@ test_that("generate_all_weighting_templates returns TRS refusal for NULL dir", {
   expect_equal(result$status, "REFUSED")
   expect_equal(result$code, "IO_INVALID_PATH")
 })
+
+test_that("Advanced_Settings offers the settings the engine reads, and only those", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_weight_config_template(tmp)
+  adv <- openxlsx::read.xlsx(tmp, sheet = "Advanced_Settings", startRow = 3)
+
+  # calculate_rim_weights_from_config() reads each of these
+  for (col in c("weight_name", "max_iterations", "convergence_tolerance",
+                "calibration_method", "weight_bounds")) {
+    expect_true(col %in% names(adv),
+                info = sprintf("Missing column '%s' in Advanced_Settings", col))
+  }
+
+  # force_convergence was offered as a Y/N dropdown but read by nothing, so a
+  # config author could set it and silently get a refusal anyway. Removed.
+  expect_false("force_convergence" %in% names(adv))
+
+  # The example row must itself be a valid configuration.
+  # (Row 3 is the header, row 4 the help text, so the example starts at row 5 —
+  #  find it by weight_name rather than by position.)
+  example <- adv[!is.na(adv$weight_name) & adv$weight_name == "wgt_demo", , drop = FALSE]
+  expect_equal(nrow(example), 1)
+  expect_true(example$calibration_method[1] %in% c("raking", "linear", "logit"))
+  expect_match(as.character(example$weight_bounds[1]), "^[0-9.]+,[0-9.]+$")
+})
+
+# ==============================================================================
+# ROUND TRIP: the template the module generates must load in the module's loader
+# ==============================================================================
+# write_table_sheet() puts a title in row 1 and the real headers in row 3, so a
+# plain read_excel() takes the title as the header row and every generated
+# template was refused with CFG_MISSING_COLUMNS before it could weight anything.
+# Nothing caught it because every fixture and example script writes headers in
+# row 1, and the template tests above read at startRow = 3 and never touch the
+# loader. This test is that missing gate.
+
+#' Write a value into a Setting/Value sheet, finding the row by setting name
+#' rather than by a hardcoded coordinate (the layout is what is under test).
+#' @keywords internal
+set_template_setting <- function(wb, path, sheet, setting, value) {
+  raw <- suppressMessages(readxl::read_excel(path, sheet = sheet,
+                                             col_names = FALSE, col_types = "text"))
+  row_idx <- which(as.character(raw[[1]]) == setting)
+  if (length(row_idx) != 1) {
+    stop(sprintf("Expected exactly one '%s' row in %s, found %d",
+                 setting, sheet, length(row_idx)))
+  }
+  openxlsx::writeData(wb, sheet, value, startRow = row_idx[1], startCol = 2)
+}
+
+test_that("a filled-in generated template loads through load_weighting_config", {
+  skip_if_not_installed("openxlsx")
+  skip_if_not_installed("readxl")
+
+  tmp <- tempfile(fileext = ".xlsx")
+  data_path <- tempfile(fileext = ".csv")
+  on.exit(unlink(c(tmp, data_path)), add = TRUE)
+
+  write.csv(create_simple_survey(n = 50), data_path, row.names = FALSE)
+  generate_weight_config_template(tmp)
+
+  # Fill the two settings the template deliberately ships blank
+  wb <- openxlsx::loadWorkbook(tmp)
+  set_template_setting(wb, tmp, "General", "project_name", "Template Round Trip")
+  set_template_setting(wb, tmp, "General", "data_file", data_path)
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  config <- load_weighting_config(tmp, verbose = FALSE)
+
+  expect_equal(config$general$project_name, "Template Round Trip")
+
+  # The template's own worked example must survive the trip intact: three
+  # weights, each with the targets its method needs.
+  expect_true(all(c("wgt_demo", "wgt_design", "wgt_cell") %in%
+                    config$weight_specifications$weight_name))
+  expect_true(nrow(config$rim_targets) > 0)
+  expect_true(nrow(config$design_targets) > 0)
+  expect_true(nrow(config$cell_targets) > 0)
+
+  # Help text ("[REQUIRED] ...") must not arrive as data
+  expect_false(any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                         config$weight_specifications$weight_name)))
+
+  # Advanced_Settings carries the calibration settings the rim engine reads
+  expect_true(all(c("calibration_method", "weight_bounds") %in%
+                    names(config$advanced_settings)))
+})
+
+test_that("the checked-in template workbooks load once filled in", {
+  skip_if_not_installed("readxl")
+  skip_if_not_installed("openxlsx")
+
+  templates <- file.path(TURAS_ROOT, "modules", "weighting", "docs", "templates",
+                         c("Weight_Config.xlsx", "Weight_Config_Template.xlsx"))
+
+  data_path <- tempfile(fileext = ".csv")
+  on.exit(unlink(data_path), add = TRUE)
+  write.csv(create_simple_survey(n = 50), data_path, row.names = FALSE)
+
+  for (tpl in templates) {
+    skip_if(!file.exists(tpl), sprintf("%s not present", basename(tpl)))
+
+    # Work on a copy — never write to the shipped file from a test
+    work <- tempfile(fileext = ".xlsx")
+    file.copy(tpl, work, overwrite = TRUE)
+    on.exit(unlink(work), add = TRUE)
+
+    wb <- openxlsx::loadWorkbook(work)
+    set_template_setting(wb, work, "General", "project_name", "Shipped Template Check")
+    set_template_setting(wb, work, "General", "data_file", data_path)
+    openxlsx::saveWorkbook(wb, work, overwrite = TRUE)
+
+    config <- load_weighting_config(work, verbose = FALSE)
+    expect_equal(config$general$project_name, "Shipped Template Check",
+                 info = sprintf("%s did not load", basename(tpl)))
+    expect_true(nrow(config$weight_specifications) > 0,
+                info = sprintf("%s has no weight specifications", basename(tpl)))
+  }
+})

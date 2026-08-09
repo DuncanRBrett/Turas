@@ -119,7 +119,6 @@ advanced <- data.frame(
   weight_name = "population_weight",
   max_iterations = 100,
   convergence_tolerance = 1e-7,
-  force_convergence = "N",
   calibration_method = "raking",
   weight_bounds = "0.1,10.0",
   stringsAsFactors = FALSE
