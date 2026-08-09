@@ -1199,8 +1199,17 @@ run_catdriver_step_11_output <- function(model_result, importance, odds_ratios,
 generate_catdriver_stats_pack <- function(config, survey_data, result,
                                           run_result, start_time, verbose = TRUE) {
 
+  # The config asked for a stats pack. If the writer is unavailable we cannot
+  # produce one, and that must be visible regardless of the verbose setting.
   if (!exists("turas_write_stats_pack", mode = "function")) {
-    if (verbose) cat("  ! Stats pack writer not loaded - skipping\n")
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Catdriver - stats pack\n")
+    cat("│ Code: PKG_STATS_PACK_WRITER_UNAVAILABLE\n")
+    cat("│ generate_stats_pack = Y but turas_write_stats_pack() is\n")
+    cat("│ not loaded, so no stats pack was written.\n")
+    cat("│ How to fix: ensure modules/shared/lib/stats_pack_writer.R\n")
+    cat("│ is sourced (it is loaded by import_all.R).\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
     return(NULL)
   }
 

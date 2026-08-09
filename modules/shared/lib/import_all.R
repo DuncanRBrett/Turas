@@ -10,7 +10,7 @@
 #   shared_path <- dirname(sys.frame(1)$ofile)  # Get this file's directory
 #   source(file.path(shared_path, "import_all.R"))
 #
-# LOADS 18 utilities in dependency order:
+# LOADS 19 utilities in dependency order:
 #   1.  trs_refusal.R          (TRS v1.0 - must be first - no dependencies)
 #   2.  source_utils.R         (source_if_exists - no dependencies)
 #   3.  console_capture.R      (TRS v1.0 - Shiny GUI capture)
@@ -29,6 +29,7 @@
 #   16. turas_minify_verify.R  (minification verification)
 #   17. turas_minify_watermark.R (watermark encode/decode)
 #   18. turas_minify.R         (report minification pipeline)
+#   19. stats_pack_writer.R    (diagnostic stats pack workbook)
 # ==============================================================================
 
 # Determine this file's directory for relative sourcing
@@ -121,6 +122,12 @@ source(file.path(.shared_lib_path, "turas_minify_watermark.R"), local = FALSE)
 
 # 18. Report minification pipeline (depends on trs_refusal, watermark, verify)
 source(file.path(.shared_lib_path, "turas_minify.R"), local = FALSE)
+
+# 19. Stats pack writer (depends on turas_save_workbook_atomic, turas_excel_escape)
+# Loaded here so that any caller which has already sourced the shared infrastructure
+# still has turas_write_stats_pack available. Modules that source it themselves are
+# unaffected — sourcing twice is harmless.
+source(file.path(.shared_lib_path, "stats_pack_writer.R"), local = FALSE)
 
 # Clean up
 rm(.shared_lib_path)

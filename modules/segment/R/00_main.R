@@ -1069,8 +1069,17 @@ generate_segment_stats_pack <- function(config, data_list, cluster_result,
                                         validation_metrics, seed_used,
                                         run_result, output_folder, start_time) {
 
+  # The config asked for a stats pack. If the writer is unavailable we cannot
+  # produce one, and that must be visible rather than a one-line note.
   if (!exists("turas_write_stats_pack", mode = "function")) {
-    cat("  ! Stats pack writer not loaded - skipping\n")
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Segment - stats pack\n")
+    cat("│ Code: PKG_STATS_PACK_WRITER_UNAVAILABLE\n")
+    cat("│ generate_stats_pack = Y but turas_write_stats_pack() is\n")
+    cat("│ not loaded, so no stats pack was written.\n")
+    cat("│ How to fix: ensure modules/shared/lib/stats_pack_writer.R\n")
+    cat("│ is sourced (it is loaded by import_all.R).\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
     return(invisible(NULL))
   }
 

@@ -37,7 +37,10 @@ shared_files <- c(
   "data_utils.R", "config_utils.R", "logging_utils.R",
   "formatting_utils.R", "weights_utils.R", "turas_log.R",
   "trs_run_state.R", "trs_run_status_writer.R", "trs_banner.R",
-  "turas_save_workbook_atomic.R", "turas_excel_escape.R"
+  "turas_save_workbook_atomic.R", "turas_excel_escape.R",
+  # Must mirror import_all.R. generate_stats_pack defaults to Y, so without the
+  # writer every run_weighting() call returns PARTIAL.
+  "stats_pack_writer.R"
 )
 for (f in shared_files) {
   fp <- file.path(shared_lib, f)

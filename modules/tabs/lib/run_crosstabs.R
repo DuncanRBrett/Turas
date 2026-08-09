@@ -1061,7 +1061,19 @@ generate_tabs_stats_pack <- function(config_result, data_result,
                                      analysis_result, workbook_result,
                                      start_time, script_version) {
 
-  if (!exists("turas_write_stats_pack", mode = "function")) return(NULL)
+  # The config asked for a stats pack. If the writer is unavailable we cannot
+  # produce one, and that must be visible rather than a silent return.
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Tabs - stats pack\n")
+    cat("│ Code: PKG_STATS_PACK_WRITER_UNAVAILABLE\n")
+    cat("│ generate_stats_pack = Y but turas_write_stats_pack() is\n")
+    cat("│ not loaded, so no stats pack was written.\n")
+    cat("│ How to fix: ensure modules/shared/lib/stats_pack_writer.R\n")
+    cat("│ is sourced (it is loaded by import_all.R).\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    return(NULL)
+  }
 
   # Output path: derive from main output
   main_out <- config_result$output_path %||% "tabs_output.xlsx"
@@ -1099,7 +1111,10 @@ generate_stats_pack_flag <- isTRUE(
   toupper(config_result$config_obj$generate_stats_pack %||% "Y") == "Y"
 ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
-if (generate_stats_pack_flag && exists("turas_write_stats_pack", mode = "function")) {
+# The exists() check deliberately lives inside generate_tabs_stats_pack() rather
+# than here, so that a missing writer produces a visible warning instead of the
+# whole block being skipped without a word.
+if (generate_stats_pack_flag) {
   stats_pack_file <- tryCatch({
     generate_tabs_stats_pack(
       config_result  = config_result,

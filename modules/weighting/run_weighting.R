@@ -696,8 +696,29 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
                                           weight_results, run_state,
                                           start_time, verbose = TRUE) {
 
+  # The config asked for a stats pack. If the writer is unavailable we cannot
+  # produce one, and that must be visible — not an INFO line on a PASS run.
   if (!exists("turas_write_stats_pack", mode = "function")) {
-    if (verbose) message("[TRS INFO] WEIGHTING: Stats pack writer not loaded - skipping")
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Weighting - stats pack\n")
+    cat("│ Code: PKG_STATS_PACK_WRITER_UNAVAILABLE\n")
+    cat("│ generate_stats_pack = Y but turas_write_stats_pack() is\n")
+    cat("│ not loaded, so no stats pack was written.\n")
+    cat("│ How to fix: ensure modules/shared/lib/stats_pack_writer.R\n")
+    cat("│ is sourced (it is loaded by import_all.R).\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    # turas_run_state_partial() requires an environment. Guard it so a missing
+    # stats pack never escalates into a crash.
+    if (is.environment(run_state)) {
+      turas_run_state_partial(
+        run_state,
+        code = "PKG_STATS_PACK_WRITER_UNAVAILABLE",
+        title = "Stats pack requested but not written",
+        problem = "generate_stats_pack = Y but turas_write_stats_pack() is not loaded",
+        fix = "Ensure modules/shared/lib/stats_pack_writer.R is sourced (import_all.R loads it)",
+        stage = "stats_pack"
+      )
+    }
     return(NULL)
   }
 
