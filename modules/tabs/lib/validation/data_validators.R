@@ -337,6 +337,28 @@ check_numeric_min_max <- function(question_code, question_info, survey_data, err
   return(error_log)
 }
 
+#' Does this options table define numeric bins at all?
+#'
+#' A Numeric question can have Options rows without being binned — the rows are
+#' display labels, and the Options sheet carries no Min/Max columns. Bin
+#' validation only applies when both columns are present.
+#'
+#' @keywords internal
+has_bin_columns <- function(option_info) {
+  is.data.frame(option_info) && all(c("Min", "Max") %in% names(option_info))
+}
+
+#' Is a bin bound a single usable number?
+#'
+#' Guards the length-zero case as well as NA. A missing column yields
+#' numeric(0), and `is.na(numeric(0)) || ...` evaluates to NA rather than FALSE,
+#' which turns an `if` into an error instead of a skip.
+#'
+#' @keywords internal
+is_usable_bound <- function(x) {
+  length(x) == 1L && !is.na(x)
+}
+
 #' Check bin structure validity
 #' @keywords internal
 check_bin_structure <- function(question_code, option_info, error_log) {
@@ -372,17 +394,25 @@ check_bin_structure <- function(question_code, option_info, error_log) {
 check_bin_overlaps <- function(question_code, option_info, error_log) {
   if (nrow(option_info) < 2) return(error_log)
 
+  # Without Min and Max columns there are no bins to overlap. Reading
+  # option_info$Min when the column is absent gives NULL, and as.numeric(NULL)
+  # is numeric(0) — which makes is.na() return logical(0) and the || below
+  # evaluate to NA, so the `if` failed with "missing value where TRUE/FALSE
+  # needed" and took the whole validation down. check_bin_structure() has always
+  # guarded this; this function never did.
+  if (!has_bin_columns(option_info)) return(error_log)
+
   for (i in seq_len(nrow(option_info) - 1)) {
     bin1_min <- suppressWarnings(as.numeric(option_info$Min[i]))
     bin1_max <- suppressWarnings(as.numeric(option_info$Max[i]))
 
-    if (is.na(bin1_min) || is.na(bin1_max)) next
+    if (!is_usable_bound(bin1_min) || !is_usable_bound(bin1_max)) next
 
     for (j in (i + 1):nrow(option_info)) {
       bin2_min <- suppressWarnings(as.numeric(option_info$Min[j]))
       bin2_max <- suppressWarnings(as.numeric(option_info$Max[j]))
 
-      if (is.na(bin2_min) || is.na(bin2_max)) next
+      if (!is_usable_bound(bin2_min) || !is_usable_bound(bin2_max)) next
 
       if (bin1_min < bin2_max && bin2_min < bin1_max) {
         error_log <- log_issue(error_log, "Validation", "Overlapping Bins",
@@ -473,8 +503,16 @@ validate_numeric_question <- function(question_info, option_info, survey_data, e
               question_code, non_numeric_count), question_code, "Warning")
   }
 
-  # Validate bins if defined
-  if (nrow(option_info) > 0) {
+  # Validate bins if defined.
+  #
+  # Having Options rows is not the same as being binned. A Numeric question can
+  # carry display labels on a structure whose Options sheet has no Min/Max
+  # columns at all — that is a question with no bins, not a question with broken
+  # bins, and there is nothing here to check. Gating on the rows alone sent
+  # every such question into the bin checks, where check_bin_structure() logged
+  # a "Missing Bin Columns" Error per question and check_bin_overlaps() crashed
+  # the whole validation.
+  if (nrow(option_info) > 0 && has_bin_columns(option_info)) {
     error_log <- check_bin_structure(question_code, option_info, error_log)
     error_log <- check_bin_overlaps(question_code, option_info, error_log)
     error_log <- check_bin_coverage(question_code, option_info, survey_data, error_log)
