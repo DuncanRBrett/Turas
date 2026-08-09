@@ -186,6 +186,58 @@ test_that("the weighted base is checked against what it should be", {
   expect_null(quiet$expected_sum)
 })
 
+test_that("a weight that fails its own validation never reaches the lookup file", {
+  skip_if_not_installed("openxlsx")
+
+  # Every engine already validated the weights it produced, and run_weighting()
+  # never read the result — so a weight could fail its own arithmetic and still
+  # be written. The sum check added for F2 was inert for exactly this reason.
+  # Forced here by making one weight's validation come back invalid.
+  data <- data.frame(
+    id = 1:100,
+    Region = rep(c("North", "South"), each = 50),
+    Gender = rep(c("Male", "Female"), 50),
+    stringsAsFactors = FALSE
+  )
+
+  output_file <- file.path(tempdir(), "fu_invalid_out.csv")
+  unlink(output_file)
+
+  config_path <- fu_build_config(
+    "invalid", fu_write_data(data, "invalid"),
+    specs = rbind(fu_spec("good_weight", "design", "Region"),
+                  fu_spec("broken_weight", "design", "Gender")),
+    design_targets = data.frame(
+      weight_name = c(rep("good_weight", 2), rep("broken_weight", 2)),
+      stratum_variable = c(rep("Region", 2), rep("Gender", 2)),
+      stratum_category = c("North", "South", "Male", "Female"),
+      population_size = c(300000, 100000, 200000, 200000),
+      stringsAsFactors = FALSE
+    ),
+    output_file = output_file
+  )
+
+  original <- validate_calculated_weights
+  on.exit(assign("validate_calculated_weights", original, envir = globalenv()),
+          add = TRUE)
+  assign("validate_calculated_weights",
+         function(weights, label = "Weights", ...) {
+           if (identical(label, "broken_weight")) {
+             return(list(valid = FALSE,
+                         errors = "simulated: the weights sum to 47 but should sum to 100"))
+           }
+           original(weights, label, ...)
+         },
+         envir = globalenv())
+
+  result <- suppressWarnings(run_weighting(config_path, verbose = FALSE))
+
+  written <- read.csv(output_file, stringsAsFactors = FALSE)
+  expect_true("good_weight" %in% names(written))
+  expect_false("broken_weight" %in% names(written))
+  expect_true(result$status %in% c("PARTIAL", "REFUSED"))
+})
+
 test_that("rim checks its total against what it calibrated to, not against itself", {
   skip_if_not(requireNamespace("survey", quietly = TRUE), "survey not available")
 

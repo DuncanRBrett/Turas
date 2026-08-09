@@ -137,6 +137,15 @@ All notable changes to TURAS are documented in this file.
   design, with nothing independent to check it against — and for the same reason
   no longer trips the "maximum weight is very high (>10)" warning, which fired on
   every grossed run and meant nothing.
+- **Weighting: the weight validation is now read.** Every engine already called
+  `validate_calculated_weights()` and stored the answer on the weight, and
+  `run_weighting.R` never looked at it — so a weight could report negative
+  values, infinities, no usable weights at all, or (once the check above was
+  added) the wrong total, and still be written into the lookup file. A check
+  nobody acts on is the same defect as no check: it reads as reassurance and
+  provides none. An invalid weight is now refused, which under the per-weight
+  isolation above means it is named, dropped from the lookup file, and the other
+  weights still run.
 - **Weighting: one weight failing no longer takes the other weights with it
   (review F3).** The per-weight handler re-threw any TRS refusal, and after W3
   turned the design and cell NA-weight problems into refusals that covered most

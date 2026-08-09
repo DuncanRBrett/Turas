@@ -166,6 +166,7 @@ passes, because a zero share lost is no loss.
 |---|---|---|
 | F1 | The stratum summary is scaled to match the weights actually written, and keeps the population ÷ sample figure in its own `Pop/Sample` column. The HTML callout that asserted weight = population ÷ sample — true before W5, false after — was corrected. | `lib/design_weights.R`, `lib/output.R`, `lib/html_report/02_table_builder.R` |
 | F2 | `allow_unmatched` split into a respondent-side and a population-side opt-in (`allow_empty_targets`); the population-side opt-in redistributes the orphaned share so the base is whole; the disclosure leads with respondents-carrying-a-weight and the weighted base; cell weights calibrate to the respondents carrying a weight rather than to `nrow(data)`; `validate_calculated_weights()` gained an expected-sum assertion and a `population_scale` flag that silences the >10 warning on grossed weights. | `lib/cell_weights.R`, `lib/design_weights.R`, `lib/config_loader.R`, `lib/validation.R`, `lib/rim_weights.R` |
+| F2a | Found while answering "should these merge?": the expected-sum check was **inert**. Every engine called `validate_calculated_weights()` and stored the answer, and `run_weighting.R` never read it — the string `validation` did not appear in the file. So a weight could fail its own arithmetic and still be written. The result is now read and an invalid weight refuses. This was the same shape as the catdriver golden gate that skipped: a check that reads as reassurance and provides none. | `run_weighting.R` |
 | F3 | A refusal inside the weight loop is printed, recorded on the run state, and the weight is dropped; the rest are still calculated and the run is PARTIAL. | `run_weighting.R` |
 | F4 | `target_percent < 0` and `NA` refuse; zero is routed by occupancy. New `CFG_NO_USABLE_TARGETS` for a config where every populated cell has a zero target. | `lib/cell_weights.R` |
 | F5a | The empty cell-combination preflight check is an `Error`. | `lib/validation/preflight_validators.R` |
@@ -186,7 +187,7 @@ of a code changed.
 
 | Check | Result |
 |---|---|
-| Weighting suite | 742 expectations, 0 failures, 0 errors, 2 warnings — both the deliberate trimming-bias warning. Was 682/0/3 before this work. |
+| Weighting suite | 745 expectations, 0 failures, 0 errors, 2 warnings — both the deliberate trimming-bias warning. Was 682/0/3 before this work. |
 | Platform suite (`tests/testthat`) | 574 expectations, 3 failures — the same pre-existing `test_launcher.R` and `test_module_smoke.R` failures as before, unchanged. |
 | Every new test fails on the old code | Each test in `test_review_followups.R` targets behaviour that did not exist at `82642f2b`; the two pre-existing tests that encoded the behaviour being changed (`allow_unmatched` on empty cells, the `<= 0` cell target) were rewritten to the new specification rather than deleted. |
 | Live Electrum rim config, read-only | Config loaded and `calculate_rim_weights_from_config()` called on the data in memory — no pipeline run, nothing written. Passes the ID and weight-name guards, converges with a worst margin gap of 1e-4 pp, sums to 1101 on n = 1101, and reproduces `VAS_2024_weighted.csv` to a maximum absolute difference of **4.9e-15**. |

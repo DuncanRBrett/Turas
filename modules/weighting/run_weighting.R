@@ -467,6 +467,25 @@ run_weighting <- function(config_file,
         )
       }
 
+      # Every engine validates the weights it just produced — negative values,
+      # infinities, nothing usable, and the total the method says they should
+      # add up to. That result was stored on the weight and never read by
+      # anything, so a weight could fail its own validation and still be written
+      # into the lookup file. A check nobody acts on is the same defect as no
+      # check: it reads as reassurance and provides none.
+      weight_validation <- res$design_result$validation %||%
+        res$rim_result$validation %||% res$cell_result$validation
+
+      if (!is.null(weight_validation) && isFALSE(weight_validation$valid)) {
+        weighting_refuse(
+          code = "CALC_WEIGHT_INVALID",
+          title = paste0("Weight '", weight_name, "' failed its own validation"),
+          problem = paste(weight_validation$errors, collapse = "; "),
+          why_it_matters = "These weights would be written into the lookup file and merged back into the survey data, so every weighted base, percentage and significance test built on them would carry the fault. A weight that cannot pass its own arithmetic must not reach tabs.",
+          how_to_fix = "This usually means the targets and the data disagree in a way the earlier checks did not catch. Re-check the targets for this weight against the categories in the data, and the console output above for what the engine reported."
+        )
+      }
+
       # Apply trimming if configured
       trimming_result <- apply_trimming_from_config(
         weights = weights,
