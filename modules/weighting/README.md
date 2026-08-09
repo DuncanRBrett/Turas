@@ -145,17 +145,16 @@ One row per weight to calculate:
 
 Fine-tune rim weight calculation:
 
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | force_convergence |
-|-------------|---------------|----------------------|--------------------|---------------|-------------------|
-| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | N |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
+|-------------|---------------|----------------------|--------------------|---------------|
+| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 |
 
 - `max_iterations` — Maximum calibration iterations (default: 50)
 - `convergence_tolerance` — Stopping threshold (default: 0.0000001, i.e. 1e-7)
 - `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
 - `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`). A single number is read as the upper bound.
-- `force_convergence` — Documented historically but **not read by the engine**. Setting it has no effect; non-convergence always refuses.
 
-Add any of these columns to the sheet yourself — the generated template only ships the `max_iterations`, `convergence_tolerance` and `force_convergence` columns, but the loader reads whatever columns are present.
+There is no way to accept non-converged weights. If calibration cannot reach the targets, the run refuses — weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. To accept a looser fit deliberately, raise `convergence_tolerance`, which states how loose in a number you can report.
 
 **Choosing `calibration_method`**
 

@@ -570,14 +570,20 @@ generate_weight_config_template <- function(output_path) {
       name = "convergence_tolerance",
       width = 22,
       required = FALSE,
-      description = "Convergence threshold for rim/rake. Smaller = more precise but slower. Default: 0.001."
+      description = "Convergence threshold for rim/rake. Smaller = more precise but slower. Default: 0.0000001 (1e-7)."
     ),
     list(
-      name = "force_convergence",
+      name = "calibration_method",
       width = 20,
       required = FALSE,
-      description = "If Y, use the last iteration result even if convergence was not achieved.",
-      dropdown = c("Y", "N")
+      description = "How rim weights are fitted. Default: raking. Switch to logit when raking will not converge - a target needing a 3x+ stretch on one category often defeats raking at any bounds. logit needs FINITE weight_bounds on both sides. linear can produce zero or negative weights and is refused if it does.",
+      dropdown = c("raking", "linear", "logit")
+    ),
+    list(
+      name = "weight_bounds",
+      width = 18,
+      required = FALSE,
+      description = "Weight range enforced DURING calibration, as lower,upper (e.g. 0.3,3.0). Default: 0.3,3.0. Must be finite on both sides if calibration_method is logit."
     )
   )
 
@@ -585,15 +591,16 @@ generate_weight_config_template <- function(output_path) {
     list(
       weight_name = "wgt_demo",
       max_iterations = 50,
-      convergence_tolerance = 0.001,
-      force_convergence = "N"
+      convergence_tolerance = 0.0000001,
+      calibration_method = "raking",
+      weight_bounds = "0.3,3.0"
     )
   )
 
   write_table_sheet(
     wb, "Advanced_Settings", advanced_columns,
     title = "Advanced Weighting Settings",
-    subtitle = "Optional per-weight overrides for iteration limits and convergence. Leave blank to use defaults.",
+    subtitle = "Optional per-weight overrides for iteration limits, convergence and calibration method. Leave blank to use defaults.",
     example_rows = advanced_examples,
     num_blank_rows = 10
   )

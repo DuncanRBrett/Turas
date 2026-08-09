@@ -132,3 +132,30 @@ test_that("generate_all_weighting_templates returns TRS refusal for NULL dir", {
   expect_equal(result$status, "REFUSED")
   expect_equal(result$code, "IO_INVALID_PATH")
 })
+
+test_that("Advanced_Settings offers the settings the engine reads, and only those", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_weight_config_template(tmp)
+  adv <- openxlsx::read.xlsx(tmp, sheet = "Advanced_Settings", startRow = 3)
+
+  # calculate_rim_weights_from_config() reads each of these
+  for (col in c("weight_name", "max_iterations", "convergence_tolerance",
+                "calibration_method", "weight_bounds")) {
+    expect_true(col %in% names(adv),
+                info = sprintf("Missing column '%s' in Advanced_Settings", col))
+  }
+
+  # force_convergence was offered as a Y/N dropdown but read by nothing, so a
+  # config author could set it and silently get a refusal anyway. Removed.
+  expect_false("force_convergence" %in% names(adv))
+
+  # The example row must itself be a valid configuration.
+  # (Row 3 is the header, row 4 the help text, so the example starts at row 5 —
+  #  find it by weight_name rather than by position.)
+  example <- adv[!is.na(adv$weight_name) & adv$weight_name == "wgt_demo", , drop = FALSE]
+  expect_equal(nrow(example), 1)
+  expect_true(example$calibration_method[1] %in% c("raking", "linear", "logit"))
+  expect_match(as.character(example$weight_bounds[1]), "^[0-9.]+,[0-9.]+$")
+})

@@ -270,9 +270,6 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | convergence_tolerance | No | Number | 1e-7 | Convergence precision threshold |
 | calibration_method | No | Text | raking | `raking`, `linear`, or `logit` |
 | weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
-| force_convergence | No | Y/N | — | Not read by the engine |
-
-`calibration_method` and `weight_bounds` are not in the generated template. Add the columns to the sheet yourself — the loader reads whatever columns are present.
 
 ### Parameter Guidelines
 
@@ -293,8 +290,7 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 - Enforced during calibration, not by trimming afterwards
 - Widen before changing method, but note that widening alone does not fix a raking non-convergence
 
-**force_convergence**
-- Documented historically; no code reads it. Non-convergence always refuses.
+**Accepting non-converged weights is not an option.** Calibration that cannot reach the targets refuses. Weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. Raise `convergence_tolerance` if you want a looser fit — that states how loose in a number you can report.
 
 ### Example
 
