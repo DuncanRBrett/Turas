@@ -80,7 +80,13 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
       observed = available_sheets
     )
   }
-  settings <- openxlsx::read.xlsx(config_file, sheet = "Settings")
+  # The generated template puts a title in row 1, a subtitle in row 2, the real
+  # column headers in row 3 and per-column help text in row 4. Reading at row 1
+  # takes the title as the header, so the module refused its own template. The
+  # shared loader reads row 1 first and falls back to scanning for the header
+  # row, so hand-built configs (headers in row 1) are unaffected.
+  settings <- as.data.frame(load_config_table_sheet(config_file, "Settings",
+                                                    required_cols = c("Setting", "Value")))
   settings_list <- setNames(as.list(settings$Value), settings$Setting)
 
   # -----------------------------------------------------------------
@@ -129,7 +135,8 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
       observed = available_sheets
     )
   }
-  variables <- openxlsx::read.xlsx(config_file, sheet = "Variables")
+  variables <- as.data.frame(load_config_table_sheet(config_file, "Variables",
+                                                     required_cols = "VariableName"))
 
   # Validate variables sheet - base required columns
   required_cols <- c("VariableName", "Type", "Label")
@@ -214,7 +221,8 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   if ("Segments" %in% available_sheets) {
     # Sheet exists - must load successfully or refuse
     seg_df <- tryCatch(
-      openxlsx::read.xlsx(config_file, sheet = "Segments"),
+      as.data.frame(load_config_table_sheet(config_file, "Segments",
+                                            required_cols = "segment_name")),
       error = function(e) {
         keydriver_refuse(
           code = "CFG_SEGMENTS_READ_FAILED",
@@ -240,7 +248,8 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   if ("StatedImportance" %in% available_sheets) {
     # Sheet exists - must load successfully or refuse
     si_df <- tryCatch(
-      openxlsx::read.xlsx(config_file, sheet = "StatedImportance"),
+      as.data.frame(load_config_table_sheet(config_file, "StatedImportance",
+                                            required_cols = "driver")),
       error = function(e) {
         keydriver_refuse(
           code = "CFG_STATED_IMPORTANCE_READ_FAILED",
@@ -265,7 +274,8 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   custom_slides <- NULL
   if ("CustomSlides" %in% available_sheets) {
     cs_df <- tryCatch(
-      openxlsx::read.xlsx(config_file, sheet = "CustomSlides"),
+      as.data.frame(load_config_table_sheet(config_file, "CustomSlides",
+                                            required_cols = "slide_title")),
       error = function(e) NULL  # CustomSlides is optional — skip silently on read error
     )
     if (!is.null(cs_df) && nrow(cs_df) > 0) {
@@ -285,7 +295,8 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   insights <- NULL
   if ("Insights" %in% available_sheets) {
     ins_df <- tryCatch(
-      openxlsx::read.xlsx(config_file, sheet = "Insights"),
+      as.data.frame(load_config_table_sheet(config_file, "Insights",
+                                            required_cols = "section")),
       error = function(e) NULL  # Insights is optional — skip silently on read error
     )
     if (!is.null(ins_df) && nrow(ins_df) > 0) {
