@@ -950,6 +950,14 @@ run_cli <- function() {
   config_file <- args[1]
   verbose <- !("--quiet" %in% args)
 
+  # The refusal handler wraps run_weighting(), so it must exist before that call.
+  # run_weighting() loads shared infrastructure itself, but that happens too late
+  # for the wrapper - load it here first. Skipped when infrastructure is already
+  # present (GUI launcher, test setup).
+  if (!exists("with_refusal_handler", mode = "function")) {
+    load_shared_infrastructure(get_module_dir())
+  }
+
   result <- with_refusal_handler({
     run_weighting(
       config_file = config_file,
