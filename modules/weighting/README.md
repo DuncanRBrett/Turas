@@ -145,13 +145,28 @@ One row per weight to calculate:
 
 Fine-tune rim weight calculation:
 
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|---------------|----------------------|-------------------|
-| demo_wt | 100 | 0.001 | N |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | force_convergence |
+|-------------|---------------|----------------------|--------------------|---------------|-------------------|
+| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | N |
 
-- `max_iterations` — Maximum raking iterations (default: 50)
-- `convergence_tolerance` — Stopping threshold (default: 0.01)
-- `force_convergence` — `Y` to accept non-converged weights (not recommended)
+- `max_iterations` — Maximum calibration iterations (default: 50)
+- `convergence_tolerance` — Stopping threshold (default: 0.0000001, i.e. 1e-7)
+- `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
+- `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`). A single number is read as the upper bound.
+- `force_convergence` — Documented historically but **not read by the engine**. Setting it has no effect; non-convergence always refuses.
+
+Add any of these columns to the sheet yourself — the generated template only ships the `max_iterations`, `convergence_tolerance` and `force_convergence` columns, but the loader reads whatever columns are present.
+
+**Choosing `calibration_method`**
+
+`raking` is the default and is what most market research means by rim weighting. It keeps weights positive and is the right first choice.
+
+Move off `raking` when it fails to converge. Raking cannot always reach a target that needs a large stretch on one category, even when that target is perfectly feasible — no bound setting and no iteration count rescues it. A worked case, pinned in `tests/testthat/test_rim_weights.R`: an n=1101 sample where one region was 8% of the sample against a 27% target (a 3.3x stretch) never converged under `raking` — at bounds of `0.3,3.0`, `0.05,20`, and unbounded, and at up to 1000 iterations. The same target solved exactly under `logit` and under `linear`, hitting every margin to the decimal.
+
+- `logit` — the recommended fallback. Every weight stays strictly inside the bounds, so it cannot produce a zero or negative weight. **It requires finite bounds on both sides** — `0.3,Inf` is refused. Use something like `0.1,10.0`.
+- `linear` — converges on demanding targets too, but is not bounded below by zero in the way the other two are. It will park respondents exactly on a zero lower bound, and will go negative if bounds are unbounded. The engine refuses (`CALC_NONPOSITIVE_WEIGHTS`) rather than shipping those weights, because a zero weight silently removes a respondent from every base. If you use `linear`, give it a lower bound above zero.
+
+If calibration does not converge, the refusal (`MODEL_NO_CONVERGENCE`) prints the epsilon the algorithm reached and names `logit` as the first thing to try.
 
 #### Notes
 

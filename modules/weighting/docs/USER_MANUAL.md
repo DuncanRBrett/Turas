@@ -254,13 +254,17 @@ One row per weight to calculate:
 
 Fine-tune rim weight calculation:
 
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|---------------|----------------------|-------------------|
-| demo_wt | 100 | 0.001 | N |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | force_convergence |
+|-------------|---------------|----------------------|--------------------|---------------|-------------------|
+| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | N |
 
-- `max_iterations` — Maximum raking iterations (default: 50)
-- `convergence_tolerance` — Stopping threshold (default: 0.01)
-- `force_convergence` — `Y` to accept non-converged weights (not recommended)
+- `max_iterations` — Maximum calibration iterations (default: 50)
+- `convergence_tolerance` — Stopping threshold (default: 0.0000001, i.e. 1e-7)
+- `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
+- `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`)
+- `force_convergence` — Not read by the engine; setting it has no effect
+
+**When to change `calibration_method`:** `raking` is the default and suits most rim targets. If it will not converge — and a target that needs a 3x+ stretch on one category often will not, at any bounds or iteration count — switch to `logit` with finite bounds such as `0.1,10.0`. `linear` also converges on those targets but can produce zero or negative weights, which the engine refuses; give it a lower bound above zero if you use it. See the weighting module README for the full guidance.
 
 ### Notes Sheet (Optional)
 
@@ -555,9 +559,11 @@ Re-run. DEFF drops to 1.6, Max Weight = 4.0, Efficiency = 63%. This is acceptabl
 | Weight_Specs | apply_trimming | No | N | Y to enable trimming |
 | Weight_Specs | trim_method | If trimming | — | cap or percentile |
 | Weight_Specs | trim_value | If trimming | — | Max weight or percentile |
-| Advanced | max_iterations | No | 50 | Max raking iterations |
-| Advanced | convergence_tolerance | No | 0.01 | Convergence threshold |
-| Advanced | force_convergence | No | N | Accept non-converged |
+| Advanced | max_iterations | No | 50 | Max calibration iterations |
+| Advanced | convergence_tolerance | No | 1e-7 | Convergence threshold |
+| Advanced | calibration_method | No | raking | raking, linear, or logit |
+| Advanced | weight_bounds | No | 0.3,3.0 | Bounds during calibration, `lower,upper` |
+| Advanced | force_convergence | No | — | Not read by the engine |
 
 ### Diagnostic Thresholds
 

@@ -316,31 +316,56 @@ calculate_rim_weights <- function(data,
   }
 
   # Calibrate using survey package
+  #
+  # survey reports non-convergence in two places: grake() signals a WARNING
+  # carrying the achieved epsilon ("Failed to converge: eps=... in N iterations"),
+  # and calibrate() then errors with the bare string "Calibration failed", which
+  # says nothing about why. Record the warnings as they are signalled (without
+  # muffling them, so they still reach the console) so the refusal below can both
+  # recognise non-convergence and quote the epsilon the user needs to see.
+  calib_warnings <- character(0)
+
   calibrated <- tryCatch({
-    survey::calibrate(
-      design = svy_design,
-      formula = formula,
-      population = population,
-      calfun = tolower(calibration_method),
-      bounds = bounds,                    # Weight bounds DURING calibration
-      maxit = max_iterations,
-      epsilon = convergence_tolerance,
-      force = FALSE,                      # Error if doesn't converge
-      trim = NULL,                        # Don't trim (bounds handle it)
-      bounds.const = FALSE
+    withCallingHandlers(
+      survey::calibrate(
+        design = svy_design,
+        formula = formula,
+        population = population,
+        calfun = tolower(calibration_method),
+        bounds = bounds,                  # Weight bounds DURING calibration
+        maxit = max_iterations,
+        epsilon = convergence_tolerance,
+        force = FALSE,                    # Error if doesn't converge
+        trim = NULL,                      # Don't trim (bounds handle it)
+        bounds.const = FALSE
+      ),
+      warning = function(w) {
+        calib_warnings <<- c(calib_warnings, conditionMessage(w))
+      }
     )
   }, error = function(e) {
     # Provide helpful error message
     err_msg <- conditionMessage(e)
 
+    # Non-convergence: either survey said so outright, or it emitted the bare
+    # "Calibration failed" error alongside a grake "Failed to converge" warning.
+    converge_warnings <- grep("converge", calib_warnings, ignore.case = TRUE, value = TRUE)
+    is_non_convergence <- length(converge_warnings) > 0 ||
+      grepl("did not converge|calibration failed", err_msg, ignore.case = TRUE)
+
     # Check for common issues
-    if (grepl("did not converge", err_msg, ignore.case = TRUE)) {
+    if (is_non_convergence) {
+      detail <- if (length(converge_warnings) > 0) {
+        sprintf(" survey reported: %s.", paste(converge_warnings, collapse = "; "))
+      } else {
+        ""
+      }
       weighting_refuse(
         code = "MODEL_NO_CONVERGENCE",
         title = "Rim weighting did not converge",
-        problem = sprintf("Rim weighting did not converge after %d iterations. Original error: %s", max_iterations, err_msg),
+        problem = sprintf("Rim weighting with calibration_method = '%s' did not converge after %d iterations. Original error: %s.%s", calibration_method, max_iterations, err_msg, detail),
         why_it_matters = "Convergence is required to produce reliable weights that match target distributions.",
-        how_to_fix = sprintf("Try: 1) Increase max_iterations (currently %d), 2) Relax weight bounds (currently [%s, %s]), 3) Use calibration_method = 'logit', or 4) Reduce rim variables (currently %d)", max_iterations, bounds[1], bounds[2], length(target_list))
+        how_to_fix = sprintf("Try: 1) Set calibration_method = 'logit' with finite weight_bounds — raking often cannot reach targets that need a large stretch on any one category, where logit can, 2) Relax weight bounds (currently [%s, %s]), 3) Increase max_iterations (currently %d), or 4) Reduce rim variables (currently %d)", bounds[1], bounds[2], max_iterations, length(target_list))
       )
     } else if (grepl("bounds", err_msg, ignore.case = TRUE)) {
       weighting_refuse(
@@ -348,7 +373,7 @@ calculate_rim_weights <- function(data,
         title = "Weight bounds issue during calibration",
         problem = sprintf("Weight bounds issue during calibration. Original error: %s", err_msg),
         why_it_matters = "The specified weight bounds may be too restrictive for achieving the target distributions.",
-        how_to_fix = sprintf("Try: 1) Widen bounds (currently [%s, %s]), 2) Use calibration_method = 'linear' or 'logit', or 3) Check target proportions are realistic", bounds[1], bounds[2])
+        how_to_fix = sprintf("Try: 1) Widen bounds (currently [%s, %s]), 2) Use calibration_method = 'linear' or 'logit' — note logit requires FINITE bounds on both sides, or 3) Check target proportions are realistic", bounds[1], bounds[2])
       )
     } else {
       weighting_refuse(
@@ -363,6 +388,23 @@ calculate_rim_weights <- function(data,
 
   # Extract final weights
   final_weights <- weights(calibrated)
+
+  # Guard: linear calibration is not bounded below by zero the way raking and
+  # logit are. It can land respondents exactly on a zero lower bound, or go
+  # negative when bounds are unbounded — either way those respondents silently
+  # vanish from every weighted base downstream. Refuse rather than ship them.
+  n_nonpositive <- sum(final_weights <= 0, na.rm = TRUE)
+  if (n_nonpositive > 0) {
+    weighting_refuse(
+      code = "CALC_NONPOSITIVE_WEIGHTS",
+      title = "Calibration produced zero or negative weights",
+      problem = sprintf("calibration_method = '%s' produced %d weight%s of zero or less (out of %d, minimum %.4f).",
+                        calibration_method, n_nonpositive, if (n_nonpositive == 1) "" else "s",
+                        length(final_weights), min(final_weights, na.rm = TRUE)),
+      why_it_matters = "A zero or negative weight removes that respondent from every weighted base, percentage and significance test without appearing as a missing case. The reported sample size would overstate the respondents actually contributing to the numbers.",
+      how_to_fix = sprintf("Try: 1) Set calibration_method = 'logit', which keeps every weight strictly inside the bounds, 2) Raise the lower weight bound above zero (currently %s), or 3) Soften the target distribution — a category needing a very large stretch pushes the rest of the sample towards zero", bounds[1])
+    )
+  }
 
   # Calculate g-weights (calibration factors) if base weights were provided
   if (!is.null(base_weights)) {
