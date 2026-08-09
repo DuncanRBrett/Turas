@@ -98,6 +98,22 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Tabs: a Numeric question with option labels but no bins no longer stops the
+  run.** A Numeric question can carry Options rows that are display labels — a
+  frequency cascade's answer texts, say — on a structure whose Options sheet has
+  no `Min`/`Max` columns at all. Both the validator and the processor decided a
+  question was binned from the presence of option rows alone, then read
+  `option_info$Min` on a column that does not exist. In validation that made
+  `logical(0) || logical(0)` evaluate to NA and the surrounding `if` fail, which
+  surfaced as `CFG_ENV_INTERNAL_ERROR: missing value where TRUE/FALSE needed`
+  naming nothing; in processing it made `order(NULL)` raise "argument 1 is not a
+  vector", surfacing as `DATA_NUMERIC_QUESTION_FAILED` naming the question but
+  not the cause. Bins are now recognised by `Min` and `Max` being present, so a
+  labels-only question is a question with nothing to bin rather than a question
+  with broken bins — and it no longer logs a "Missing Bin Columns" Error per
+  question either. Real bins are unaffected: overlaps, bad ranges and coverage
+  are still checked and still binned. Found on a 550-question VAS reporting
+  structure with 374 Numeric questions.
 - **Weighting: config and label hygiene, and numbers the suite actually checks
   (W7, W8 / review M1–M6).** A target cell R could not read — `"52%"`, a comma
   decimal, the Excel gotcha where a cell reading NA is the text "NA" — became a
