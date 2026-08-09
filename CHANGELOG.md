@@ -98,6 +98,28 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: a rim target the default method cannot reach now says which lever
+  to pull, and zero weights never ship.** The rim engine has supported
+  `calibration_method` (`raking` / `linear` / `logit`) via the `Advanced_Settings`
+  sheet since v2.0, but no document mentioned it, so a config author had no way
+  to know the default could be changed. It matters: raking cannot always reach a
+  feasible target that needs a large stretch on one category — a real n=1101 case
+  with one region at 8% of sample against a 27% target never converged at any
+  bounds or iteration count, while `logit` solved it exactly. Three things
+  changed. The refusal that suggests `logit` was never actually reaching users:
+  `survey` reports non-convergence as a warning carrying the epsilon and then
+  errors with the bare string `"Calibration failed"`, which matched neither
+  pattern the handler looked for, so every non-convergence fell through to a
+  generic refusal that named no fix. Non-convergence is now recognised and the
+  achieved epsilon is quoted. Second, `linear` calibration parked 219 of 1101
+  respondents on a zero lower bound (and went negative when unbounded) — a zero
+  weight removes a respondent from every base, percentage and significance test
+  without appearing as a missing case, so this is now a refusal
+  (`CALC_NONPOSITIVE_WEIGHTS`) rather than a warning nothing read. Third,
+  `calibration_method` and `weight_bounds` are documented in the README, user
+  manual and template reference, along with the corrected
+  `convergence_tolerance` default (the docs said 0.01; the code reads 1e-7) and
+  the fact that `force_convergence` is read by no code at all.
 - **Tabs: significance testing is finite-population corrected — in the Excel
   workbook as well as the report.** For a census / full-invite study the
   interactive report has narrowed its intervals on the FPC-corrected base for a
