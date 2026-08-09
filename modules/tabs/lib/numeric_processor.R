@@ -58,7 +58,14 @@ process_numeric_question <- function(data, question_info, question_options,
   
   question_col <- question_info$QuestionCode
   internal_keys <- banner_info$internal_keys
-  has_bins <- nrow(question_options) > 0
+
+  # Having Options rows is not the same as being binned. Bins are defined by
+  # Min and Max; option rows without them are display labels, and there is no
+  # frequency distribution to build from them. Without this the run either fell
+  # over in categorize_numeric_bins() or produced an all-empty bin table under
+  # the question's name.
+  has_bins <- nrow(question_options) > 0 &&
+    all(c("Min", "Max") %in% names(question_options))
   
   results_list <- list()
   
@@ -527,13 +534,20 @@ detect_outliers_iqr <- function(values) {
 #' @return Character vector, bin labels for each value (NA if unbinned)
 #' @export
 categorize_numeric_bins <- function(values, option_info) {
-  if (nrow(option_info) == 0) {
+  # No rows, or no Min/Max columns, means no bins. A Numeric question can carry
+  # Options rows that are display labels rather than bin definitions — a
+  # frequency cascade's answer texts, say — and the Options sheet then has no
+  # Min/Max at all. option_info$Min is NULL in that case, and order(NULL) raises
+  # "argument 1 is not a vector", which surfaced as a bare
+  # DATA_NUMERIC_QUESTION_FAILED naming the question but not the cause.
+  if (nrow(option_info) == 0 ||
+      !all(c("Min", "Max") %in% names(option_info))) {
     return(rep(NA_character_, length(values)))
   }
-  
+
   # Initialize result
   result <- rep(NA_character_, length(values))
-  
+
   # Sort bins by Min for efficient processing
   option_info <- option_info[order(option_info$Min), ]
   

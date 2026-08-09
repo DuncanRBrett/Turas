@@ -159,3 +159,49 @@ test_that("has_bin_columns and is_usable_bound answer the edge cases", {
   expect_false(is_usable_bound(c(1, 2)))
   expect_true(is_usable_bound(0))
 })
+
+
+# ==============================================================================
+# The same premise in the processor, not just the validator
+# ==============================================================================
+# Validation was only half of it. categorize_numeric_bins() sorted the options by
+# option_info$Min, which is NULL when the column does not exist — and order(NULL)
+# raises "argument 1 is not a vector". That surfaced as
+# DATA_NUMERIC_QUESTION_FAILED naming the question and not the cause, on the
+# first Numeric question whose options were labels.
+
+source(file.path(turas_root, "modules/tabs/lib/numeric_processor.R"))
+
+test_that("categorize_numeric_bins returns no bins when there are no Min/Max columns", {
+  # Options as a frequency cascade writes them: answer texts, no bounds.
+  labels <- data.frame(
+    QuestionCode = rep("Q_TXN", 4),
+    OptionText = c("Once a week or more often", "A few times in a month",
+                   "Once per month", "Less than once per month"),
+    DisplayOrder = 1:4,
+    stringsAsFactors = FALSE
+  )
+
+  result <- categorize_numeric_bins(c(1, 2, 4, 8, NA), labels)
+
+  expect_equal(length(result), 5)
+  expect_true(all(is.na(result)))
+})
+
+test_that("categorize_numeric_bins still bins when Min/Max are there", {
+  bins <- data.frame(
+    OptionText = c("Low", "High"),
+    Min = c(0, 5), Max = c(4, 10),
+    DisplayOrder = 1:2,
+    stringsAsFactors = FALSE
+  )
+
+  expect_equal(categorize_numeric_bins(c(1, 7, 20), bins),
+               c("Low", "High", NA))
+})
+
+test_that("categorize_numeric_bins handles no options at all", {
+  empty <- data.frame(OptionText = character(0), Min = numeric(0),
+                      Max = numeric(0), stringsAsFactors = FALSE)
+  expect_true(all(is.na(categorize_numeric_bins(c(1, 2), empty))))
+})
