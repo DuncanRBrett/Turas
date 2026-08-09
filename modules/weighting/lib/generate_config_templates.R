@@ -599,6 +599,12 @@ generate_weight_config_template <- function(output_path) {
       width = 18,
       required = FALSE,
       description = "Y or N. Default N. Design and cell weights refuse when any respondent would end up with no weight - an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. Set Y only if you have decided those respondents should be left out; their weights stay blank and the count is reported."
+    ),
+    list(
+      name = "grossing",
+      width = 14,
+      required = FALSE,
+      description = "Design weights only. Y or N, default N. Design weights are population/sample, so they naturally arrive at population scale. N normalises them to sum to the sample size, matching rim weights, so two weights on one study cannot put weighted bases orders of magnitude apart. Y keeps population scale for grossed-up counts. Kish n_eff is scale-invariant either way, so significance testing is unaffected - what changes is every weighted N on the report."
     )
   )
 
@@ -610,7 +616,8 @@ generate_weight_config_template <- function(output_path) {
       calibration_method = "raking",
       weight_bounds = "0.3,3.0",
       margin_tolerance = 0.5,
-      allow_unmatched = "N"
+      allow_unmatched = "N",
+      grossing = "N"
     )
   )
 

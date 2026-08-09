@@ -580,6 +580,41 @@ read_allow_unmatched_setting <- function(config, weight_name) {
   )
 }
 
+#' Read the Grossing Opt-In for a Weight
+#'
+#' Design weights are population / sample, so they arrive at population scale.
+#' By default the module normalises them to sum = n, matching rim weights, so
+#' that two weights on one study cannot put weighted bases orders of magnitude
+#' apart with nothing saying which scale each column is on. \code{Grossing = YES}
+#' keeps population scale for anyone who wants grossed-up counts.
+#'
+#' Kish n_eff is scale-invariant, so this changes weighted Ns on the face of the
+#' report, not significance testing.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return TRUE to keep population scale, FALSE to normalise to sum = n
+#' @export
+read_grossing_setting <- function(config, weight_name) {
+  raw <- get_advanced_setting(config, weight_name, "grossing", "N")
+
+  if (is.logical(raw) && length(raw) == 1 && !is.na(raw)) return(isTRUE(raw))
+
+  value <- toupper(trimws(as.character(raw)[1]))
+
+  if (value %in% c("Y", "YES", "TRUE", "T", "1")) return(TRUE)
+  if (value %in% c("N", "NO", "FALSE", "F", "0", "")) return(FALSE)
+
+  weighting_refuse(
+    code = "CFG_INVALID_GROSSING",
+    title = "Invalid grossing setting",
+    problem = sprintf("grossing for weight '%s' is '%s'. Expected Y or N.",
+                      weight_name, as.character(raw)[1]),
+    why_it_matters = "grossing decides whether this weight sums to the sample size or to the population. Guessing it would put every weighted N in the report on an undeclared scale.",
+    how_to_fix = "Set grossing to Y or N in Advanced_Settings, or remove the row to keep the default (N — normalise to sum = n)."
+  )
+}
+
 #' Get Weight Specification by Name
 #'
 #' Retrieves the specification for a specific weight.

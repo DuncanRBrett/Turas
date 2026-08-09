@@ -259,6 +259,26 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
   zero_sample_strata <- attr(weights, "zero_sample_strata") %||% character(0)
   attributes(weights) <- NULL
 
+  # A raw design weight is population / sample, so it arrives at population
+  # scale — mean 20 on a 1-in-20 sample. Rim weights calibrate to sum ≈ n. Both
+  # were being written into the same lookup file, so two weights on one study
+  # could put weighted bases three orders of magnitude apart with nothing saying
+  # which scale a column was on. Kish n_eff is scale-invariant, so significance
+  # testing is unaffected either way; what moves is every weighted N on the face
+  # of the report.
+  #
+  # Default is therefore to normalise to sum = n, matching rim. Grossing = YES
+  # keeps population scale for anyone who wants grossed-up counts, and says so
+  # in the diagnostics rather than leaving the reader to infer it.
+  grossing <- read_grossing_setting(config, weight_name)
+  population_scale_sum <- sum(weights[!is.na(weights)])
+
+  if (!grossing) {
+    weights <- normalize_design_weights(weights)
+  }
+
+  weight_scale <- if (grossing) "population" else "sample"
+
   # Build stratum summary
   stratum_values <- as.character(data[[stratum_variable]])
   stratum_summary <- data.frame(
@@ -294,7 +314,13 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     n_unweighted = n_unweighted,
     unmatched_categories = unmatched_categories,
     zero_sample_strata = zero_sample_strata,
-    allow_unmatched = allow_unmatched
+    allow_unmatched = allow_unmatched,
+    # Which scale the weights are on, and what the un-normalised total was, so
+    # the report can say "these sum to n" or "these gross to 47.2m" on its face.
+    weight_scale = weight_scale,
+    grossing = grossing,
+    population_total = population_scale_sum,
+    sum_weights = sum(weights[!is.na(weights)])
   ))
 }
 

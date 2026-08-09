@@ -341,7 +341,8 @@ run_weighting <- function(config_file,
   data <- as.data.frame(data)
 
   # Resolve id_column: if not set in config, use first column of data
-  if (is.null(config$general$id_column)) {
+  id_auto_detected <- is.null(config$general$id_column)
+  if (id_auto_detected) {
     config$general$id_column <- names(data)[1]
     if (verbose) {
       message("  ID column: ", config$general$id_column, " (auto-detected: first column)")
@@ -351,6 +352,13 @@ run_weighting <- function(config_file,
       message("  ID column: ", config$general$id_column)
     }
   }
+
+  # The whole point of the lookup file is that tabs joins it back to the survey
+  # data on this column. A duplicated ID makes that join fan out: one weight row
+  # matches several respondents, or several weight rows match one, and the
+  # weights end up on the wrong people. Nothing downstream can detect it,
+  # because the merged file looks perfectly well-formed.
+  validate_id_column(data, config$general$id_column, id_auto_detected)
 
   if (verbose) {
     message("  Rows: ", nrow(data))
@@ -364,7 +372,15 @@ run_weighting <- function(config_file,
 
   weight_specs <- config$weight_specifications
   weight_names <- as.character(weight_specs$weight_name)
+
+  # data[[weight_name]] <- weights replaces an existing column without a word,
+  # and if the name matches the ID column it destroys the merge key.
+  validate_weight_names(data, weight_names, config$general$id_column)
+
   weight_results <- list()
+  # Weights that failed in PARTIAL mode. Their columns are never written, so the
+  # lookup file cannot hand tabs a column of blanks that looks like a weight.
+  failed_weights <- character(0)
   n_weights <- nrow(weight_specs)
 
   if (verbose) {
@@ -533,13 +549,31 @@ run_weighting <- function(config_file,
     })
 
     if (is.null(result)) {
-      # Weight failed but other weights may succeed (PARTIAL mode)
+      # Weight failed but other weights may succeed (PARTIAL mode).
+      #
+      # The column is deliberately NOT added to the data. An all-NA weight
+      # column in the lookup file is worse than a missing one: tabs merges it
+      # back, every respondent gets an NA weight, and the run it feeds either
+      # collapses or reports a zero base. A column that is absent is a question
+      # the analyst asks; a column that is present and all-NA is an answer they
+      # believe. The failure is already on the run state, and it is named here
+      # so the operator sees it in the console.
       weight_results[[weight_name]] <- list(
         weights = rep(NA_real_, nrow(data)),
         diagnostics = NULL,
         error = TRUE
       )
-      data[[weight_name]] <- NA_real_
+      failed_weights <- c(failed_weights, weight_name)
+
+      cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+      cat("│ Context: Weighting - output\n")
+      cat("│ Code: CALC_WEIGHT_OMITTED_FROM_OUTPUT\n")
+      cat(sprintf("│ Weight '%s' failed, so it is left out of the lookup\n", weight_name))
+      cat("│ file entirely rather than written as an all-blank column.\n")
+      cat("│ How to fix: see the failure reported above. Until it is\n")
+      cat("│ fixed, any tabs config asking for this weight will not\n")
+      cat("│ find it — which is the point.\n")
+      cat("└───────────────────────────────────────────────────────┘\n\n")
       next
     }
 
@@ -559,9 +593,26 @@ run_weighting <- function(config_file,
   # Write weight lookup file (ID + weight columns) if output file specified
   if (!is.null(config$general$output_file_resolved)) {
     output_file <- config$general$output_file_resolved
+
+    # Only the weights that were actually calculated. A failed weight has no
+    # column in `data`, and asking write_weighted_data() for it would either
+    # error or resurrect the all-NA column this fix exists to remove.
+    written_weight_names <- setdiff(weight_names, failed_weights)
+
+    if (length(written_weight_names) == 0) {
+      weighting_refuse(
+        code = "CALC_NO_WEIGHTS_PRODUCED",
+        title = "No weights could be calculated",
+        problem = sprintf("Every weight in the config failed: %s",
+                          paste(weight_names, collapse = ", ")),
+        why_it_matters = "The lookup file exists to carry weights back into the survey data. With no weights to write there is nothing to merge, and writing a file of IDs alone would look like a successful run.",
+        how_to_fix = "Fix the failures reported above and re-run. Each weight's own refusal says what it needs."
+      )
+    }
+
     write_weighted_data(data, output_file,
                         id_column = config$general$id_column,
-                        weight_names = weight_names,
+                        weight_names = written_weight_names,
                         verbose = verbose)
   }
 

@@ -278,6 +278,7 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
 | margin_tolerance | No | Number | 0.5 | Max gap (pp) between achieved and target margin before the run reports PARTIAL |
 | allow_unmatched | No | Y/N | N | Let design/cell weighting leave respondents unweighted instead of refusing |
+| grossing | No | Y/N | N | Keep design weights at population scale instead of normalising to sum = n |
 
 ### Parameter Guidelines
 
@@ -303,6 +304,12 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 - Exceeding it makes the run PARTIAL (`CALC_MARGINS_NOT_ACHIEVED`) and names the categories that missed, worst first. The weights are still written — they are usable, they are just not the weights the config asked for.
 - Raising it changes what the run reports, not what the weights are. Raise it only when you have decided the gap is acceptable and want it recorded.
 
+**grossing** (default: N — design weights only)
+- A design weight is population / sample, so it comes out at population scale: on a 1-in-20 sample the mean weight is 20. A rim weight on the same study calibrates to sum ≈ n, mean 1. Both used to be written into the same lookup file with nothing saying which scale a column was on, so two weighted bases on one report could differ by three orders of magnitude.
+- `N` normalises the design weight to sum to the sample size. Relative weighting is untouched — only the scale moves.
+- `Y` keeps population scale, for when you want grossed-up counts, and records the scale in the diagnostics.
+- Kish n_eff and DEFF are scale-invariant, so significance testing is identical either way. What changes is every weighted N on the face of the report.
+
 **allow_unmatched** (default: N)
 - Design and cell weighting refuse (`DATA_UNWEIGHTED_ROWS`) when any respondent would end up with an NA weight, and when a target cell or stratum has a population share but nobody in the sample. Rim weighting has always refused; the other two used to warn and carry on.
 - The refusal names the cause — unmatched category, missing value in a weighting variable, empty target cell — with counts and the categories involved.
@@ -313,9 +320,9 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 ### Example
 
 ```
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched |
-|-------------|----------------|----------------------|--------------------|---------------|------------------|-----------------|
-| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              | N               |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | grossing |
+|-------------|----------------|----------------------|--------------------|---------------|------------------|-----------------|----------|
+| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              | N               | N        |
 ```
 
 ---

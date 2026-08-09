@@ -98,6 +98,26 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: the lookup file can be merged back safely (W4, W5, W6 / review
+  C2c, H1, H3).** Three things the file that feeds tabs never checked. (1) In
+  PARTIAL mode a failed weight was written as an entire all-NA column, which
+  tabs merges back to give every respondent a blank weight under the name the
+  config asked for — a missing column is a question the analyst asks, a blank
+  column is an answer they believe. Failed weights are now left out and named on
+  the console (`CALC_WEIGHT_OMITTED_FROM_OUTPUT`); a run where every weight fails
+  refuses rather than writing a file of IDs alone. (2) Nothing checked the
+  respondent ID, even though the file exists to be joined on it — duplicates now
+  refuse (`DATA_DUPLICATE_IDS`, with different advice when the column was
+  defaulted to column 1), as do missing IDs and a weight_name that collides with
+  the ID column or an existing data column, which `data[[weight_name]] <-` used
+  to overwrite silently. (3) Design weights were never normalised in the main
+  pipeline, so a design weight arrived at population scale (mean 20 on a 1-in-20
+  sample) beside a rim weight summing to n — two weighted bases on one report
+  three orders of magnitude apart with nothing saying which scale each column
+  was on. Design weights now normalise to sum = n by default; `grossing = Y`
+  (new Advanced_Settings key) keeps population scale and records it. Kish n_eff
+  is scale-invariant, so significance testing is identical either way — what
+  moves is the weighted Ns on the face of the report.
 - **Weighting: a respondent who would get no design or cell weight stops the
   run (W3 / review C2a, C2b, H2, M5).** Rim weighting has always refused rather
   than emit an NA weight. Design and cell weighting warned and carried on, so
