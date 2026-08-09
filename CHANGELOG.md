@@ -98,6 +98,28 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: the config template the module generates can now be loaded by the
+  module.** `write_table_sheet()` puts a title in row 1, a subtitle in row 2, the
+  real column headers in row 3 and per-column help text in row 4; the weighting
+  loader called `readxl::read_excel()` with no `skip`, so it took the title as
+  the header row. Every generated template — and both templates checked into
+  `docs/templates/` — was refused with `CFG_MISSING_COLUMNS` before any weighting
+  could run. Hand-built and script-built configs put headers in row 1 and were
+  unaffected, which is why nothing caught it: every test fixture and example
+  script builds configs that way, and the template tests read at `startRow = 3`
+  and never touched the loader. Tabs, brand, confidence and pricing had each
+  already solved this locally; the shared `load_config_sheet()` even did it for
+  Setting/Value sheets. Weighting simply never adopted it. The table-sheet
+  counterpart now lives beside it as `load_config_table_sheet()` in
+  `modules/shared/lib/config_utils.R` — it reads row 1 first, scans for the
+  header row if the required columns are not there, and drops template help text
+  and blank rows — and all five weighting read sites use it. A round-trip test
+  fills in a generated template and asserts the loader accepts it; that gate is
+  what was missing. Two further defects surfaced once the round trip ran: the
+  template's own `wgt_cell` example set `trim_value = 95` for percentile
+  trimming when the engine requires a proportion between 0 and 1, and the column
+  help text said the same, so anyone following the example got a refusal. Both
+  corrected, and the two checked-in template workbooks regenerated.
 - **Weighting: a rim target the default method cannot reach now says which lever
   to pull, and zero weights never ship.** The rim engine has supported
   `calibration_method` (`raking` / `linear` / `logit`) via the `Advanced_Settings`

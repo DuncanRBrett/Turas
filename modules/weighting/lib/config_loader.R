@@ -119,7 +119,7 @@ load_weighting_general <- function(config_file, project_root, verbose = TRUE) {
   if (verbose) message("\nLoading General settings...")
 
   general_df <- tryCatch({
-    readxl::read_excel(config_file, sheet = "General")
+    load_config_table_sheet(config_file, "General", c("Setting", "Value"))
   }, error = function(e) {
     weighting_refuse(
       code = "IO_SHEET_READ_ERROR",
@@ -234,7 +234,8 @@ load_weight_specifications <- function(config_file, verbose = TRUE) {
   if (verbose) message("\nLoading Weight Specifications...")
 
   weight_specs_df <- tryCatch({
-    readxl::read_excel(config_file, sheet = "Weight_Specifications")
+    load_config_table_sheet(config_file, "Weight_Specifications",
+                            c("weight_name", "method"))
   }, error = function(e) {
     weighting_refuse(
       code = "IO_SHEET_READ_ERROR",
@@ -345,7 +346,7 @@ load_weighting_target_sheet <- function(config_file, available_sheets, weight_sp
   if (verbose) message(sprintf("\nLoading %s...", sheet_name))
 
   targets <- tryCatch({
-    readxl::read_excel(config_file, sheet = sheet_name)
+    load_config_table_sheet(config_file, sheet_name, required_cols)
   }, error = function(e) {
     weighting_refuse(
       code = "IO_SHEET_READ_ERROR",
@@ -380,12 +381,13 @@ load_weighting_target_sheet <- function(config_file, available_sheets, weight_sp
 
 #' Load an Optional Sheet (Advanced Settings)
 #' @keywords internal
-load_optional_sheet <- function(config_file, sheet_name, available_sheets, verbose = TRUE) {
+load_optional_sheet <- function(config_file, sheet_name, available_sheets, verbose = TRUE,
+                                required_cols = "weight_name") {
   if (!sheet_name %in% available_sheets) return(NULL)
   if (verbose) message(sprintf("\nLoading %s...", sheet_name))
 
   result <- tryCatch({
-    readxl::read_excel(config_file, sheet = sheet_name)
+    load_config_table_sheet(config_file, sheet_name, required_cols)
   }, error = function(e) {
     warning(sprintf("Failed to read '%s' sheet: %s\nUsing defaults.", sheet_name, conditionMessage(e)),
             call. = FALSE)
@@ -406,7 +408,7 @@ load_weighting_notes <- function(config_file, available_sheets, verbose = TRUE) 
   if (verbose) message("\nLoading Notes/Assumptions...")
 
   notes <- tryCatch({
-    readxl::read_excel(config_file, sheet = "Notes")
+    load_config_table_sheet(config_file, "Notes", c("Section", "Note"))
   }, error = function(e) {
     warning(sprintf("Failed to read 'Notes' sheet: %s", conditionMessage(e)), call. = FALSE)
     NULL

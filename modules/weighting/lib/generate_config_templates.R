@@ -317,7 +317,7 @@ generate_weight_config_template <- function(output_path) {
       name = "trim_value",
       width = 15,
       required = FALSE,
-      description = "Trimming threshold. For cap: max ratio (e.g. 5 = 5x mean). For percentile: percentile value (e.g. 95)."
+      description = "Trimming threshold. For cap: max ratio (e.g. 5 = 5x mean). For percentile: a proportion strictly between 0 and 1 (e.g. 0.95 for the 95th percentile), NOT 95."
     )
   )
 
@@ -344,7 +344,7 @@ generate_weight_config_template <- function(output_path) {
       description = "Cell weight gender x age",
       apply_trimming = "Y",
       trim_method = "percentile",
-      trim_value = 95
+      trim_value = 0.95
     )
   )
 
