@@ -91,9 +91,11 @@ assign(".whr_submodules_loaded", FALSE, envir = globalenv())
 #' @param output_path Character, path for the output .html file
 #' @param config List with optional brand_colour, accent_colour, etc.
 #' @return List with:
-#'   \item{status}{"PASS" or "REFUSED"}
-#'   \item{output_file}{Path to generated HTML file (if PASS)}
-#'   \item{file_size_mb}{File size in MB (if PASS)}
+#'   \item{status}{"PASS", "PARTIAL" or "REFUSED". PARTIAL means the file was
+#'     written but one or more tables failed to build and are missing from it.}
+#'   \item{output_file}{Path to generated HTML file (if PASS or PARTIAL)}
+#'   \item{file_size_mb}{File size in MB (if PASS or PARTIAL)}
+#'   \item{table_failures}{Character vector of table build failures (empty if none)}
 #' @export
 generate_weighting_html_report <- function(weighting_results, output_path,
                                             config = list()) {
@@ -160,13 +162,23 @@ generate_weighting_html_report <- function(weighting_results, output_path,
 
   tables <- list()
 
-  # Summary table
-  tables$summary_table <- tryCatch(
-    build_summary_table(html_data$weight_details),
-    error = function(e) {
-      cat(sprintf("    [WARNING] Summary table failed: %s\n", e$message))
+  # A table that fails to build is dropped from the report. That must never pass
+  # silently, so every failure is collected here and surfaced as a PARTIAL below.
+  table_failures <- character(0)
+
+  build_table_or_record <- function(label, expr) {
+    tryCatch(expr, error = function(e) {
+      msg <- sprintf("%s: %s", label, conditionMessage(e))
+      table_failures <<- c(table_failures, msg)
+      cat(sprintf("    [WARNING] %s\n", msg))
       ""
-    }
+    })
+  }
+
+  # Summary table
+  tables$summary_table <- build_table_or_record(
+    "Summary table failed",
+    build_summary_table(html_data$weight_details)
   )
 
   # Per-weight tables
@@ -174,37 +186,50 @@ generate_weighting_html_report <- function(weighting_results, output_path,
     wn <- detail$weight_name
 
     # Diagnostics
-    tables[[paste0("diagnostics_", wn)]] <- tryCatch(
-      build_diagnostics_table(detail$diagnostics),
-      error = function(e) { cat(sprintf("    [WARNING] Diagnostics table for %s failed: %s\n", wn, e$message)); "" }
+    tables[[paste0("diagnostics_", wn)]] <- build_table_or_record(
+      sprintf("Diagnostics table for '%s' failed", wn),
+      build_diagnostics_table(detail$diagnostics)
     )
 
     # Rim margins
     if (!is.null(detail$margins)) {
-      tables[[paste0("margins_", wn)]] <- tryCatch(
-        build_margins_table(detail$margins),
-        error = function(e) { cat(sprintf("    [WARNING] Margins table for %s failed: %s\n", wn, e$message)); "" }
+      tables[[paste0("margins_", wn)]] <- build_table_or_record(
+        sprintf("Margins table for '%s' failed", wn),
+        build_margins_table(detail$margins)
       )
     }
 
     # Design strata
     if (!is.null(detail$stratum_summary)) {
-      tables[[paste0("stratum_", wn)]] <- tryCatch(
-        build_stratum_table(detail$stratum_summary),
-        error = function(e) { cat(sprintf("    [WARNING] Stratum table for %s failed: %s\n", wn, e$message)); "" }
+      tables[[paste0("stratum_", wn)]] <- build_table_or_record(
+        sprintf("Stratum table for '%s' failed", wn),
+        build_stratum_table(detail$stratum_summary)
       )
     }
 
     # Cell details
     if (!is.null(detail$cell_summary)) {
-      tables[[paste0("cell_", wn)]] <- tryCatch(
-        build_cell_table(detail$cell_summary),
-        error = function(e) { cat(sprintf("    [WARNING] Cell table for %s failed: %s\n", wn, e$message)); "" }
+      tables[[paste0("cell_", wn)]] <- build_table_or_record(
+        sprintf("Cell table for '%s' failed", wn),
+        build_cell_table(detail$cell_summary)
       )
     }
   }
 
   cat(sprintf("    %d tables built\n", length(tables)))
+
+  if (length(table_failures) > 0) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Weighting HTML report - table build\n")
+    cat("│ Code: IO_HTML_TABLE_BUILD_FAILED\n")
+    cat(sprintf("│ %d of the report's tables could not be built and are\n",
+                length(table_failures)))
+    cat("│ missing from the HTML file:\n")
+    for (f in table_failures) cat(sprintf("│   - %s\n", f))
+    cat("│ How to fix: the report is incomplete. Check the messages\n")
+    cat("│ above before sending it to anyone.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  }
 
   # ==========================================================================
   # STEP 4: BUILD CHARTS
@@ -282,10 +307,16 @@ generate_weighting_html_report <- function(weighting_results, output_path,
   cat(paste(rep("-", 60), collapse = ""), "\n\n")
 
   list(
-    status = "PASS",
-    message = sprintf("Weighting HTML report generated: %d weights, %.1f KB",
-                      length(html_data$weight_details),
-                      write_result$file_size_bytes / 1024),
+    status = if (length(table_failures) > 0) "PARTIAL" else "PASS",
+    message = if (length(table_failures) > 0) {
+      sprintf("Weighting HTML report written but incomplete - %d table(s) failed to build: %s",
+              length(table_failures), paste(table_failures, collapse = "; "))
+    } else {
+      sprintf("Weighting HTML report generated: %d weights, %.1f KB",
+              length(html_data$weight_details),
+              write_result$file_size_bytes / 1024)
+    },
+    table_failures = table_failures,
     output_file = write_result$output_file,
     file_size_mb = write_result$file_size_mb,
     file_size_bytes = write_result$file_size_bytes,

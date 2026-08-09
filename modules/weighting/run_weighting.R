@@ -590,6 +590,21 @@ run_weighting <- function(config_file,
 
         if (html_result$status == "PASS") {
           html_report_file <- html_result$output_file
+        } else if (html_result$status == "PARTIAL") {
+          # The file was written but is missing one or more tables. Keep the path
+          # so the run summary still points at it, and register the shortfall.
+          html_report_file <- html_result$output_file
+          if (verbose) {
+            cat("\n  [WARNING] HTML report is incomplete:", html_result$message, "\n")
+          }
+          turas_run_state_partial(
+            run_state,
+            code = "IO_HTML_REPORT_INCOMPLETE",
+            title = "HTML report written but incomplete",
+            problem = html_result$message %||% "One or more tables failed to build",
+            fix = "Review the table build errors above before sending the report to anyone",
+            stage = "html_report"
+          )
         } else {
           if (verbose) {
             cat("\n  [WARNING] HTML report generation failed:", html_result$message, "\n")

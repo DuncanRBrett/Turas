@@ -21,12 +21,14 @@ build_summary_table <- function(weight_details) {
       "quality-poor"
     )
 
+    # Effective N is a non-integer double (e.g. 1097.59), so it must use %.0f.
+    # sprintf("%d", ...) errors on a fractional double and takes the whole table with it.
     rows <- paste0(rows, sprintf(
       '<tr>
         <td class="wt-label-col">%s</td>
         <td>%s</td>
         <td class="wt-num">%d</td>
-        <td class="wt-num">%d</td>
+        <td class="wt-num">%.0f</td>
         <td class="wt-num">%.4f</td>
         <td class="wt-num">%.4f</td>
         <td class="wt-num">%.4f</td>
@@ -78,6 +80,7 @@ build_diagnostics_table <- function(diagnostics) {
   diag <- diagnostics
   if (is.null(diag)) return("")
 
+  # Effective N is a non-integer double — see the note in build_summary_table().
   grid_html <- sprintf(
     '<div class="wt-diag-grid">
       <div class="wt-diag-card">
@@ -105,7 +108,7 @@ build_diagnostics_table <- function(diagnostics) {
       <div class="wt-diag-card">
         <h4>Effective Sample</h4>
         <table class="wt-table wt-table-compact">
-          <tr><td>Effective N</td><td class="wt-num">%d</td></tr>
+          <tr><td>Effective N</td><td class="wt-num">%.0f</td></tr>
           <tr><td>Design Effect</td><td class="wt-num">%.2f</td></tr>
           <tr><td>Efficiency</td><td class="wt-num">%.1f%%</td></tr>
         </table>
