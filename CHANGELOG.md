@@ -98,6 +98,107 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: config and label hygiene, and numbers the suite actually checks
+  (W7, W8 / review M1–M6).** A target cell R could not read — `"52%"`, a comma
+  decimal, the Excel gotcha where a cell reading NA is the text "NA" — became a
+  blank target without a word, which the engine reads as "no target for this
+  category" rather than "the number you wrote could not be read"; it now refuses
+  naming the row and the value. Category labels are matched with surrounding
+  whitespace trimmed on both sides (case still respected — two spellings that
+  differ in case are two answers, where whitespace never is), and a design
+  category that is not in the data is a preflight Error rather than a Warning.
+  The exported cores now validate what the config path already did, for callers
+  that bypass it: rim targets that do not sum to 1 (previously absorbed silently
+  by the reference category), duplicate or unnamed target categories, negative
+  targets, and cell targets that are zero, negative or missing — a zero target
+  gives every respondent in that cell a weight of zero, removing them from every
+  base without appearing as missing. `validate_calculated_weights()` derived
+  DEFF and efficiency from a *rounded* n_eff, so it and `diagnose_weights()`
+  quoted different design effects for the same weights (1.5 against 1.32 on
+  `c(1,1,3)`); both now use the unrounded value, with the rounded one kept for
+  display. And the suite gained the numeric assertions it never had: exact Kish
+  n_eff and DEFF, analytic design weights for unequal strata, cell weights as
+  target-share over observed-share, every rim margin recomputed from the weights
+  themselves rather than read off the engine's own table, g-weights as
+  final/base, positional alignment asserted by row index, and a cap tested at a
+  bound the default would never produce.
+- **Weighting: the lookup file can be merged back safely (W4, W5, W6 / review
+  C2c, H1, H3).** Three things the file that feeds tabs never checked. (1) In
+  PARTIAL mode a failed weight was written as an entire all-NA column, which
+  tabs merges back to give every respondent a blank weight under the name the
+  config asked for — a missing column is a question the analyst asks, a blank
+  column is an answer they believe. Failed weights are now left out and named on
+  the console (`CALC_WEIGHT_OMITTED_FROM_OUTPUT`); a run where every weight fails
+  refuses rather than writing a file of IDs alone. (2) Nothing checked the
+  respondent ID, even though the file exists to be joined on it — duplicates now
+  refuse (`DATA_DUPLICATE_IDS`, with different advice when the column was
+  defaulted to column 1), as do missing IDs and a weight_name that collides with
+  the ID column or an existing data column, which `data[[weight_name]] <-` used
+  to overwrite silently. (3) Design weights were never normalised in the main
+  pipeline, so a design weight arrived at population scale (mean 20 on a 1-in-20
+  sample) beside a rim weight summing to n — two weighted bases on one report
+  three orders of magnitude apart with nothing saying which scale each column
+  was on. Design weights now normalise to sum = n by default; `grossing = Y`
+  (new Advanced_Settings key) keeps population scale and records it. Kish n_eff
+  is scale-invariant, so significance testing is identical either way — what
+  moves is the weighted Ns on the face of the report.
+- **Weighting: a respondent who would get no design or cell weight stops the
+  run (W3 / review C2a, C2b, H2, M5).** Rim weighting has always refused rather
+  than emit an NA weight. Design and cell weighting warned and carried on, so
+  unmatched categories and missing values in weighting variables reached the
+  tabs lookup file as NA weights — and an NA weight removes that respondent from
+  every weighted base, percentage and significance test downstream without ever
+  appearing as a missing case. The base simply comes out smaller than the
+  sample. Both now refuse with `DATA_UNWEIGHTED_ROWS`, naming the cause, the
+  counts and the categories; `allow_unmatched = YES` (new Advanced_Settings key,
+  refused if unreadable) is the deliberate opt-out, which leaves the weights
+  blank, prints the count and carries it into diagnostics as `n_unweighted`. The
+  mirror-image case is covered too: a target cell or stratum with a population
+  share but nobody in the sample removes that share from the weighted totals
+  entirely, and now refuses with the share it would have cost. Two key bugs went
+  with it — a missing value in a cell variable became the literal string "NA" in
+  the paste-key and was reported as an undefined cell rather than as missing
+  data, and cell keys were joined with `|`, which survey categories can contain,
+  so two different cells could collide into one key and share a weight. Missing
+  values are now detected before the key is built, and the separator is the
+  ASCII unit separator, with a refusal if a category value somehow contains it.
+- **Weighting: a rim run stops claiming convergence it never checked (W2 /
+  review H4).** `calculate_rim_weights()` returned `converged = TRUE` with the
+  comment "TRUE if we got here". `survey::calibrate(force = FALSE)` does error
+  on hard non-convergence, but a bounds-constrained calibration can return while
+  a category sits well off its target — the bound binds, calibration stops, and
+  the run reported success. The achieved-margin arithmetic already existed but
+  was display-only; nothing compared it to the targets. Convergence is now
+  decided by `judge_margin_convergence()`, which reads the recomputed weighted
+  margins and asks whether any category sits further from its target than
+  `margin_tolerance` (new Advanced_Settings key, default 0.5 percentage points,
+  refused if unreadable). Missing it prints `CALC_MARGINS_NOT_ACHIEVED` naming
+  the worst categories and makes the run PARTIAL rather than PASS; the weights
+  are still written, because they are usable — they are simply not the weights
+  the config asked for. Unknown margins now count as not-converged rather than
+  as success. The judgement is a separate function so the rule is tested
+  directly instead of by trying to provoke a particular behaviour out of
+  `survey`.
+- **Weighting: post-hoc trimming no longer silently unpicks a rim calibration
+  (W1 / review C1).** `apply_trimming = Y` capped the weights after the engine
+  had finished and put nothing back: `rescale_after_trimming()` existed but had
+  zero callers module-wide, and nothing re-raked or re-checked the margins. On a
+  rim weight that meant the weights stopped summing to n, the raked margins
+  stopped holding, and the diagnostics still reported the raked margins as
+  achieved on a GOOD-quality run — every weighted base and percentage downstream
+  in tabs was wrong with nothing on the face of the report to show it. Now: a
+  rim or rake spec with `apply_trimming = Y` is refused with `CFG_TRIM_USE_CAP`,
+  which names `cap_weights` — the setting that reaches `survey::calibrate()` as
+  a bound and caps *during* calibration, leaving the margins intact. Design and
+  cell weights keep post-hoc trimming, but are now rescaled to their original
+  sum so the weighted base does not shrink, with the rescale factor and both
+  sums recorded in diagnostics; because rescaling lifts the capped weights back
+  above the nominal cap, the run says so on the console
+  (`CALC_TRIM_RESCALED_ABOVE_CAP`). The shipped template demonstrated the
+  refused combination on its own `wgt_demo` rim row — that example, and the
+  trimming guidance in README, USER_MANUAL, TEMPLATE_REFERENCE and
+  CONFIG_EXAMPLE, are corrected (including the percentile `trim_value`, which is
+  a proportion between 0 and 1, never 95).
 - **Weighting: the config template the module generates can now be loaded by the
   module.** `write_table_sheet()` puts a title in row 1, a subtitle in row 2, the
   real column headers in row 3 and per-column help text in row 4; the weighting

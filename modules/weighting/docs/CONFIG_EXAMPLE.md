@@ -66,16 +66,16 @@ If creating manually, your Excel file can have up to 7 sheets:
 
 | weight_name | method | description | apply_trimming | trim_method | trim_value |
 |------------|--------|-------------|----------------|-------------|------------|
-| design_wt | design | Segment design weights | N | | |
-| pop_weight | rim | Population demographics | Y | cap | 5 |
+| design_wt | design | Segment design weights | Y | cap | 5 |
+| pop_weight | rim | Population demographics | N | | |
 | cell_wt | cell | Age x Gender interlocked | N | | |
 
 **Column Meanings:**
 - `weight_name`: Name for the weight column (will be added to your data)
 - `method`: `design`, `rim` (or `rake`), or `cell`
-- `apply_trimming`: "Y" or "N" - cap extreme weights after calculation
-- `trim_method`: "cap" (hard maximum) or "percentile" (e.g., 95 = 95th percentile)
-- `trim_value`: Maximum weight value (for cap method) or percentile threshold
+- `apply_trimming`: "Y" or "N" - cap extreme weights after calculation. Design and cell weights only; a rim spec with "Y" is refused (`CFG_TRIM_USE_CAP`) because capping after raking breaks the calibrated margins. Cap a rim weight with `cap_weights` in Advanced_Settings instead.
+- `trim_method`: "cap" (hard maximum) or "percentile"
+- `trim_value`: for cap, the maximum weight value (e.g. 5). For percentile, a proportion strictly between 0 and 1 (e.g. 0.95), not 95.
 
 **Important:** The `weight_name` here must match in the corresponding targets sheet and Advanced_Settings.
 

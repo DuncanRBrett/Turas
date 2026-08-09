@@ -308,12 +308,21 @@ validate_calculated_weights <- function(weights, label = "Weights") {
     # Guard against division by zero in CV calculation
     results$cv <- if (results$mean > 0) sd(valid_weights) / results$mean else NA_real_
 
-    # Calculate design effect
+    # Calculate design effect.
+    #
+    # DEFF and efficiency are derived from the UNROUNDED Kish n_eff, matching
+    # diagnostics.R. Rounding first and dividing afterwards made this function
+    # and diagnose_weights() quote different design effects for the same
+    # weights — visibly so at small n, where rounding 25/11 = 2.2727 to 2 turns
+    # a DEFF of 1.32 into 1.5. The rounded value is kept for display.
     sum_w <- sum(valid_weights)
     sum_w2 <- sum(valid_weights^2)
-    results$effective_n <- round((sum_w^2) / sum_w2)
-    results$design_effect <- length(valid_weights) / results$effective_n
-    results$efficiency <- 100 * results$effective_n / length(valid_weights)
+    effective_n <- (sum_w^2) / sum_w2
+
+    results$effective_n <- effective_n
+    results$effective_n_display <- round(effective_n)
+    results$design_effect <- length(valid_weights) / effective_n
+    results$efficiency <- 100 * effective_n / length(valid_weights)
 
     # Quality warnings
     if (results$max > 10) {

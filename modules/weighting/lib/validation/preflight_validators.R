@@ -179,10 +179,10 @@ check_design_targets_vs_data <- function(design_df, data, error_log) {
     if (!strat_cat %in% data_values) {
       error_log <- log_preflight_issue(
         error_log, "Design Targets vs Data", "Stratum Category Not in Data",
-        sprintf("Weight '%s': stratum_category '%s' not found in column '%s'. Available values: %s.",
+        sprintf("Weight '%s': stratum_category '%s' not found in column '%s'. Available values: %s. Matching ignores surrounding spaces but is case-sensitive.",
                 wname, strat_cat, strat_var,
                 paste(utils::head(data_values[!is.na(data_values)], 10), collapse = ", ")),
-        paste(wname, strat_var, strat_cat, sep = " / "), "Warning"
+        paste(wname, strat_var, strat_cat, sep = " / "), "Error"
       )
     }
 

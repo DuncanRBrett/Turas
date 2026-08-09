@@ -145,8 +145,25 @@ trim_weights <- function(weights,
 #'
 #' Applies trimming based on weight specification from config.
 #'
+#' Post-hoc trimming caps weights AFTER they were calculated, which breaks
+#' whatever the calculation had just established. Two different things follow
+#' from that, depending on the method:
+#'
+#' \itemize{
+#'   \item \strong{rim/rake} — refused. Raking calibrates the weights so the
+#'     weighted margins hit the targets and the weights sum to n. Capping
+#'     afterwards destroys both, and nothing re-rakes. The correct mechanism
+#'     already exists: \code{cap_weights} is passed to \code{survey::calibrate}
+#'     as \code{bounds}, so the cap holds \emph{during} calibration and the
+#'     margins still come out right.
+#'   \item \strong{design/cell} — applied, then rescaled to restore the original
+#'     sum, and disclosed. These methods have no calibrated margins to break,
+#'     but an uncorrected trim still shrinks the weighted base.
+#' }
+#'
 #' @param weights Numeric vector of weights
-#' @param spec Named list, weight specification from config
+#' @param spec Named list, weight specification from config. \code{spec$method}
+#'   decides which of the two paths above applies.
 #' @param verbose Logical, print progress messages
 #' @param warn_threshold Numeric, percentage threshold for warning (default: 5)
 #' @return List with trimming results (or original weights if no trimming)
@@ -170,6 +187,30 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_thre
       threshold = NA_real_,
       trimming_applied = FALSE
     ))
+  }
+
+  # Rim weights are calibrated. Post-hoc capping breaks the calibration and
+  # nothing puts it back, so the run would ship weights whose margins no longer
+  # match the targets the config asked for while still reporting them as
+  # achieved. Refuse, and name the setting that does this correctly.
+  weight_method <- if (is.null(spec$method) || all(is.na(spec$method))) {
+    ""
+  } else {
+    tolower(as.character(spec$method)[1])
+  }
+
+  if (weight_method %in% c("rim", "rake")) {
+    weighting_refuse(
+      code = "CFG_TRIM_USE_CAP",
+      title = "Post-hoc trimming cannot be used with rim weights",
+      problem = sprintf(
+        "Weight '%s' is a %s weight with apply_trimming = Y. Rim weighting calibrates the weights so the weighted margins match the targets and the weights sum to n. Capping them afterwards breaks both, and nothing re-rakes them.",
+        if (is.null(spec$weight_name)) "(unnamed)" else as.character(spec$weight_name)[1],
+        weight_method
+      ),
+      why_it_matters = "The run would report the raked margins as achieved while shipping weights that no longer meet them. Every weighted base and percentage in the tabs report built on those weights would be wrong, with nothing on the face of the report to show it.",
+      how_to_fix = "Set apply_trimming = N and use cap_weights instead. cap_weights is passed to survey::calibrate() as the upper weight bound, so the cap applies DURING calibration and the margins still come out right. If you also need a floor, set weight_bounds."
+    )
   }
 
   # Get trimming parameters
@@ -200,6 +241,55 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_thre
   )
 
   result$trimming_applied <- TRUE
+
+  # Capping removes weight from the sample and puts none back, so the weights no
+  # longer sum to what they summed to before. For design weights that shrinks the
+  # grossed-up population; for cell weights it drops the weighted base below n.
+  # Restore the original sum, and record both sums so the disclosure below and
+  # the diagnostics can say what moved.
+  valid_before <- !is.na(weights) & is.finite(weights) & weights > 0
+  sum_before <- sum(weights[valid_before])
+
+  trimmed_weights <- result$weights
+  valid_trimmed <- !is.na(trimmed_weights) & is.finite(trimmed_weights) & trimmed_weights > 0
+  sum_trimmed <- sum(trimmed_weights[valid_trimmed])
+
+  result$weights <- rescale_after_trimming(weights, trimmed_weights)
+
+  valid_after <- !is.na(result$weights) & is.finite(result$weights) & result$weights > 0
+  sum_after <- sum(result$weights[valid_after])
+  scale_factor <- if (sum_trimmed > 0) sum_before / sum_trimmed else NA_real_
+
+  result$rescaled <- TRUE
+  result$sum_before <- sum_before
+  result$sum_trimmed <- sum_trimmed
+  result$sum_after <- sum_after
+  result$rescale_factor <- scale_factor
+  result$max_after_rescale <- if (any(valid_after)) max(result$weights[valid_after]) else NA_real_
+
+  # Rescaling restores the total but pushes the capped weights back above the
+  # cap. Say so rather than letting a "capped at 5" run ship a weight of 5.2.
+  if (!is.na(result$max_after_rescale) && !is.na(result$threshold) &&
+      result$max_after_rescale > result$threshold * (1 + 1e-8)) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Weighting - post-hoc trimming\n")
+    cat("│ Code: CALC_TRIM_RESCALED_ABOVE_CAP\n")
+    cat(sprintf("│ %d weight(s) were capped at %.4f, then every weight was\n",
+                result$n_trimmed, result$threshold))
+    cat(sprintf("│ rescaled by %.6f to restore the sum (%.2f -> %.2f -> %.2f).\n",
+                scale_factor, sum_before, sum_trimmed, sum_after))
+    cat(sprintf("│ The largest weight is now %.4f, above the cap.\n",
+                result$max_after_rescale))
+    cat("│ How to fix: this is the cost of capping after the fact. The\n")
+    cat("│ total is right and the cap is nominal. Soften the target if\n")
+    cat("│ the largest weight matters more than the total.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+  }
+
+  if (verbose) {
+    message(sprintf("  Rescaled after trimming: sum %.4f -> %.4f -> %.4f (factor %.6f)",
+                    sum_before, sum_trimmed, sum_after, scale_factor))
+  }
 
   # Warn if many weights trimmed (configurable threshold)
   if (result$pct_trimmed > warn_threshold) {

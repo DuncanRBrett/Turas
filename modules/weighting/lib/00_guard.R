@@ -259,3 +259,132 @@ guard_categories_match <- function(config_categories, data_categories, variable,
 
   invisible(TRUE)
 }
+
+
+# ==============================================================================
+# LOOKUP-FILE INTEGRITY GUARDS
+# ==============================================================================
+# The weighting module's deliverable is a lookup file of respondent IDs and
+# weight columns, which tabs merges back onto the survey data. Two things must
+# hold for that merge to be safe, and neither was checked.
+
+#' Validate the Respondent ID Column
+#'
+#' Refuses when the ID column cannot key the merge back into the survey data:
+#' when it is missing, when it is entirely blank, or when it repeats.
+#'
+#' A duplicated ID is the dangerous one. tabs joins the lookup file on this
+#' column, so a repeat makes the join fan out — one weight row matching several
+#' respondents, or several weight rows matching one — and the weights land on
+#' the wrong people. The merged file looks perfectly well-formed afterwards, so
+#' nothing downstream can catch it.
+#'
+#' @param data Data frame, the survey data as loaded
+#' @param id_column Character, resolved ID column name
+#' @param auto_detected Logical, TRUE when the column was defaulted to column 1
+#'   rather than named in the config. The advice differs: a defaulted column that
+#'   repeats usually means it is not an ID at all.
+#' @return TRUE invisibly if the column can key the merge; refuses otherwise
+#' @export
+validate_id_column <- function(data, id_column, auto_detected = FALSE) {
+
+  if (is.null(id_column) || is.na(id_column) || !nzchar(id_column)) {
+    weighting_refuse(
+      code = "CFG_MISSING_ID_COLUMN",
+      title = "No respondent ID column",
+      problem = "id_column is not set and no column could be defaulted to.",
+      why_it_matters = "The lookup file is keyed on the respondent ID so tabs can merge the weights back. Without one there is nothing to merge on.",
+      how_to_fix = "Set id_column in the General sheet to the column holding the respondent identifier."
+    )
+  }
+
+  if (!id_column %in% names(data)) {
+    weighting_refuse(
+      code = "CFG_INVALID_ID_COLUMN",
+      title = "Respondent ID column not found",
+      problem = sprintf("id_column '%s' is not a column in the data.", id_column),
+      why_it_matters = "The lookup file is keyed on the respondent ID so tabs can merge the weights back.",
+      how_to_fix = sprintf("Set id_column in the General sheet to one of: %s",
+                           paste(head(names(data), 15), collapse = ", "))
+    )
+  }
+
+  ids <- data[[id_column]]
+
+  n_missing <- sum(is.na(ids) | !nzchar(trimws(as.character(ids))))
+  if (n_missing > 0) {
+    weighting_refuse(
+      code = "DATA_MISSING_ID",
+      title = "Some respondents have no ID",
+      problem = sprintf("%d of %d rows have a missing or blank value in id_column '%s'.",
+                        n_missing, nrow(data), id_column),
+      why_it_matters = "A row with no ID cannot be matched back to a respondent, so its weight either goes nowhere or attaches to whichever other row shares the blank.",
+      how_to_fix = sprintf("Fill in '%s' for every row, or remove those rows from the data before weighting.", id_column)
+    )
+  }
+
+  dup_ids <- unique(ids[duplicated(ids)])
+  if (length(dup_ids) > 0) {
+    n_rows_affected <- sum(ids %in% dup_ids)
+
+    how <- if (auto_detected) {
+      sprintf("id_column was not set in the General sheet, so it defaulted to the first column ('%s') — and that column repeats, which usually means it is not a respondent identifier. Set id_column explicitly to the column holding the respondent ID.", id_column)
+    } else {
+      sprintf("Make '%s' unique before weighting: de-duplicate the data, or point id_column at a column that identifies each respondent exactly once.", id_column)
+    }
+
+    weighting_refuse(
+      code = "DATA_DUPLICATE_IDS",
+      title = "Respondent IDs are not unique",
+      problem = sprintf("id_column '%s' has %d repeated value%s across %d of %d rows. First few: %s",
+                        id_column, length(dup_ids), if (length(dup_ids) == 1) "" else "s",
+                        n_rows_affected, nrow(data),
+                        paste(head(as.character(dup_ids), 5), collapse = ", ")),
+      why_it_matters = "tabs merges this lookup file onto the survey data by respondent ID. A repeated ID makes that join fan out — one weight row matching several respondents, or several matching one — so weights land on the wrong people. The merged file looks well-formed afterwards, so nothing downstream can detect it.",
+      how_to_fix = how
+    )
+  }
+
+  invisible(TRUE)
+}
+
+#' Validate Weight Column Names Against the Data
+#'
+#' Refuses when a weight_name would overwrite a column that already exists.
+#' The weight is attached with \code{data[[weight_name]] <- weights}, which
+#' silently replaces an existing column — and if the name matches the ID column
+#' it destroys the merge key before the file is written.
+#'
+#' @param data Data frame, the survey data as loaded
+#' @param weight_names Character vector of weight names from the config
+#' @param id_column Character, resolved ID column name
+#' @return TRUE invisibly if the names are safe; refuses otherwise
+#' @export
+validate_weight_names <- function(data, weight_names, id_column) {
+
+  hits_id <- weight_names[weight_names == id_column]
+  if (length(hits_id) > 0) {
+    weighting_refuse(
+      code = "CFG_WEIGHT_NAME_IS_ID",
+      title = "A weight is named after the ID column",
+      problem = sprintf("weight_name '%s' is the same as id_column '%s'.",
+                        hits_id[1], id_column),
+      why_it_matters = "The weight is written into the data under that name, so it would overwrite the respondent IDs before the lookup file is saved — leaving a file whose key column contains weights.",
+      how_to_fix = "Rename the weight in Weight_Specifications to something other than the ID column."
+    )
+  }
+
+  hits_col <- intersect(weight_names, names(data))
+  if (length(hits_col) > 0) {
+    weighting_refuse(
+      code = "CFG_WEIGHT_NAME_COLLISION",
+      title = "A weight would overwrite an existing column",
+      problem = sprintf("These weight_names already exist as columns in the data: %s",
+                        paste(sprintf("'%s'", hits_col), collapse = ", ")),
+      why_it_matters = "The weight is attached with data[[weight_name]] <- weights, which replaces the existing column without a word. If that column was a previously calculated weight, the run would quietly ship the new one under the old one's name.",
+      how_to_fix = "Rename the weight in Weight_Specifications, or remove the existing column from the data file first. If you are deliberately recalculating a weight, write to a new name and retire the old column."
+    )
+  }
+
+  invisible(TRUE)
+}

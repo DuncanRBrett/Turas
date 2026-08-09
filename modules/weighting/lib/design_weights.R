@@ -31,6 +31,7 @@
 calculate_design_weights <- function(data,
                                      stratum_variable,
                                      population_sizes,
+                                     allow_unmatched = FALSE,
                                      verbose = FALSE) {
 
   # Validate inputs
@@ -70,8 +71,12 @@ calculate_design_weights <- function(data,
     message("  Number of strata: ", length(population_sizes))
   }
 
-  # Get stratum values from data
-  stratum_values <- as.character(data[[stratum_variable]])
+  # Get stratum values from data. Both sides are trimmed before matching: a
+  # leading space in an Excel target cell is invisible on screen and used to
+  # send every respondent in that stratum to an NA weight. Case is still
+  # respected, because two spellings that differ in case are two answers.
+  stratum_values <- trimws(as.character(data[[stratum_variable]]))
+  names(population_sizes) <- trimws(names(population_sizes))
 
   # Initialize weight vector
   weights <- rep(NA_real_, nrow(data))
@@ -106,41 +111,80 @@ calculate_design_weights <- function(data,
     weights[in_stratum] <- weight
   }
 
-  # Check for unmatched rows (categories in data not in population_sizes)
+  # An NA weight is not a small problem. The lookup file this run produces exists
+  # to be merged back into the survey data, and a respondent with an NA weight
+  # drops out of every weighted base, percentage and significance test in tabs
+  # without appearing anywhere as a missing case. Rim weighting already refuses
+  # rather than emit one; design weighting warned and emitted, so the deflated
+  # base reached the report unannounced. Two ways in, counted separately.
   unmatched <- is.na(weights) & !is.na(stratum_values)
   n_unmatched <- sum(unmatched)
+  unmatched_cats <- if (n_unmatched > 0) unique(stratum_values[unmatched]) else character(0)
 
-  if (n_unmatched > 0) {
-    unmatched_cats <- unique(stratum_values[unmatched])
-    warning(sprintf(
-      "%d rows (%d%%) have categories not in population_sizes: %s\nThese rows will have NA weights.",
-      n_unmatched,
-      round(100 * n_unmatched / nrow(data)),
-      paste(unmatched_cats, collapse = ", ")
-    ), call. = FALSE)
-  }
-
-  # Report zero sample strata
-  if (length(zero_sample_strata) > 0) {
-    warning(sprintf(
-      "Strata with population targets but no sample observations: %s",
-      paste(zero_sample_strata, collapse = ", ")
-    ), call. = FALSE)
-  }
-
-  # Report NA stratum values
   n_na_stratum <- sum(is.na(stratum_values))
-  if (n_na_stratum > 0) {
-    warning(sprintf(
-      "%d rows have NA stratum values. These will have NA weights.",
-      n_na_stratum
-    ), call. = FALSE)
+  n_unweighted <- n_unmatched + n_na_stratum
+
+  if (n_unweighted > 0 || length(zero_sample_strata) > 0) {
+
+    problems <- character(0)
+    if (n_unmatched > 0) {
+      problems <- c(problems, sprintf(
+        "%d row%s (%.1f%%) are in strata with no population target: %s",
+        n_unmatched, if (n_unmatched == 1) "" else "s",
+        100 * n_unmatched / nrow(data),
+        paste(sprintf("'%s'", head(unmatched_cats, 10)), collapse = ", ")
+      ))
+    }
+    if (n_na_stratum > 0) {
+      problems <- c(problems, sprintf(
+        "%d row%s (%.1f%%) have a missing value in '%s'",
+        n_na_stratum, if (n_na_stratum == 1) "" else "s",
+        100 * n_na_stratum / nrow(data), stratum_variable
+      ))
+    }
+    if (length(zero_sample_strata) > 0) {
+      problems <- c(problems, sprintf(
+        "%d stratum/strata have a population target but nobody in the sample: %s",
+        length(zero_sample_strata),
+        paste(sprintf("'%s'", zero_sample_strata), collapse = ", ")
+      ))
+    }
+
+    if (!isTRUE(allow_unmatched)) {
+      weighting_refuse(
+        code = "DATA_UNWEIGHTED_ROWS",
+        title = "Some respondents would get no design weight",
+        problem = paste(problems, collapse = "; "),
+        why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream, without being reported as a missing case — the base simply comes out smaller than the sample. A stratum with a population target but no respondents removes that share of the population from the weighted totals entirely.",
+        how_to_fix = sprintf("Either add the missing categories to Design_Targets for this weight, fix the category spellings so they match the data (matching ignores surrounding spaces but is case-sensitive), and check '%s' for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count.", stratum_variable)
+      )
+    }
+
+    # Opted in: the rows still get no weight, but nobody can say they were not
+    # told which ones or how many.
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Weighting - design weights\n")
+    cat("│ Code: DATA_UNWEIGHTED_ROWS_ALLOWED\n")
+    cat(sprintf("│ allow_unmatched = YES, so %d of %d respondents are being\n",
+                n_unweighted, nrow(data)))
+    cat("│ left with no weight and will not appear in any weighted\n")
+    cat("│ base built on this weight:\n")
+    for (p in problems) cat(sprintf("│   - %s\n", p))
+    cat("│ How to fix: this is deliberate. Remove the opt-in to make it\n")
+    cat("│ a refusal again.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
   }
 
   if (verbose) {
     n_valid <- sum(!is.na(weights) & weights > 0)
     message("  Weights assigned: ", n_valid, " of ", nrow(data), " rows")
   }
+
+  # Carried for diagnostics. Stripped by the config wrapper before the vector is
+  # attached to the data, so nothing leaks into the lookup file.
+  attr(weights, "n_unweighted") <- n_unweighted
+  attr(weights, "unmatched_categories") <- unmatched_cats
+  attr(weights, "zero_sample_strata") <- zero_sample_strata
 
   return(weights)
 }
@@ -198,16 +242,49 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     as.character(targets$stratum_category)
   )
 
+  # An NA weight silently deflates every weighted base downstream, so it is a
+  # refusal unless the config author has said otherwise in Advanced_Settings.
+  allow_unmatched <- read_allow_unmatched_setting(config, weight_name)
+
   # Calculate weights
   weights <- calculate_design_weights(
     data = data,
     stratum_variable = stratum_variable,
     population_sizes = population_sizes,
+    allow_unmatched = allow_unmatched,
     verbose = verbose
   )
 
+  # Read the counts off, then strip them: the vector is attached to the data as
+  # a column and written to the lookup file, and attributes have no business
+  # travelling with it.
+  n_unweighted <- attr(weights, "n_unweighted") %||% 0
+  unmatched_categories <- attr(weights, "unmatched_categories") %||% character(0)
+  zero_sample_strata <- attr(weights, "zero_sample_strata") %||% character(0)
+  attributes(weights) <- NULL
+
+  # A raw design weight is population / sample, so it arrives at population
+  # scale — mean 20 on a 1-in-20 sample. Rim weights calibrate to sum ≈ n. Both
+  # were being written into the same lookup file, so two weights on one study
+  # could put weighted bases three orders of magnitude apart with nothing saying
+  # which scale a column was on. Kish n_eff is scale-invariant, so significance
+  # testing is unaffected either way; what moves is every weighted N on the face
+  # of the report.
+  #
+  # Default is therefore to normalise to sum = n, matching rim. Grossing = YES
+  # keeps population scale for anyone who wants grossed-up counts, and says so
+  # in the diagnostics rather than leaving the reader to infer it.
+  grossing <- read_grossing_setting(config, weight_name)
+  population_scale_sum <- sum(weights[!is.na(weights)])
+
+  if (!grossing) {
+    weights <- normalize_design_weights(weights)
+  }
+
+  weight_scale <- if (grossing) "population" else "sample"
+
   # Build stratum summary
-  stratum_values <- as.character(data[[stratum_variable]])
+  stratum_values <- trimws(as.character(data[[stratum_variable]]))
   stratum_summary <- data.frame(
     stratum = character(0),
     population_size = numeric(0),
@@ -236,7 +313,18 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     weights = weights,
     validation = weight_validation,
     stratum_summary = stratum_summary,
-    stratum_variable = stratum_variable
+    stratum_variable = stratum_variable,
+    # Zero unless allow_unmatched was set — otherwise the run would have refused.
+    n_unweighted = n_unweighted,
+    unmatched_categories = unmatched_categories,
+    zero_sample_strata = zero_sample_strata,
+    allow_unmatched = allow_unmatched,
+    # Which scale the weights are on, and what the un-normalised total was, so
+    # the report can say "these sum to n" or "these gross to 47.2m" on its face.
+    weight_scale = weight_scale,
+    grossing = grossing,
+    population_total = population_scale_sum,
+    sum_weights = sum(weights[!is.na(weights)])
   ))
 }
 

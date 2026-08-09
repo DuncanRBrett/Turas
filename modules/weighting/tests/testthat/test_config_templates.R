@@ -253,3 +253,62 @@ test_that("the checked-in template workbooks load once filled in", {
                 info = sprintf("%s has no weight specifications", basename(tpl)))
   }
 })
+
+
+# ==============================================================================
+# TESTS: the template's own examples must not be refused by the engine
+# ==============================================================================
+
+test_that("no example weight spec pairs rim with post-hoc trimming", {
+  # apply_trimming = Y on a rim/rake spec is refused (CFG_TRIM_USE_CAP), because
+  # capping after calibration breaks the margins raking just achieved. The
+  # shipped template used to demonstrate exactly that combination, so anyone
+  # copying the example row got a refusal.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_weight_config_template(tmp)
+
+  specs <- as.data.frame(load_config_table_sheet(
+    tmp, "Weight_Specifications",
+    required_cols = c("weight_name", "method")
+  ))
+
+  offending <- specs[
+    tolower(as.character(specs$method)) %in% c("rim", "rake") &
+      toupper(as.character(specs$apply_trimming)) %in% "Y", , drop = FALSE
+  ]
+
+  expect_equal(
+    nrow(offending), 0,
+    info = paste("Rim example rows with apply_trimming = Y:",
+                 paste(offending$weight_name, collapse = ", "))
+  )
+})
+
+test_that("every example weight spec survives apply_trimming_from_config", {
+  # The stronger form of the check above: run each example row through the
+  # function that refuses, rather than asserting on its fields.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_weight_config_template(tmp)
+
+  specs <- as.data.frame(load_config_table_sheet(
+    tmp, "Weight_Specifications",
+    required_cols = c("weight_name", "method")
+  ))
+
+  weights <- c(0.5, 1.0, 2.0, 5.0, 10.0)
+
+  for (i in seq_len(nrow(specs))) {
+    spec <- as.list(specs[i, ])
+    err <- tryCatch({
+      apply_trimming_from_config(weights, spec, verbose = FALSE)
+      NULL
+    }, error = function(e) conditionMessage(e))
+
+    expect_null(err, info = sprintf("example row '%s' (%s) was refused: %s",
+                                    spec$weight_name, spec$method, err))
+  }
+})

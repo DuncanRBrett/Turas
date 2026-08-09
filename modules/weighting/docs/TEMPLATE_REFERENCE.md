@@ -99,7 +99,7 @@ Paths are resolved in this order:
 | weight_name      | Yes         | Text   | Column name for weight (added to data) |
 | method           | Yes         | Text   | `design`, `rim`, `rake`, or `cell`     |
 | description      | No          | Text   | Documentation only                     |
-| apply_trimming   | No          | Y/N    | Apply weight trimming (default: N)     |
+| apply_trimming   | No          | Y/N    | Post-hoc trimming. Design/cell only — refused on rim (default: N) |
 | trim_method      | If trimming | Text   | `cap` or `percentile`                  |
 | trim_value       | If trimming | Number | Trim threshold                         |
 
@@ -124,20 +124,26 @@ Paths are resolved in this order:
 
 ### Trimming Configuration
 
-**When apply_trimming = Y:**
+`apply_trimming` caps weights **after** they were calculated. That is correct for `design` and `cell` weights and wrong for `rim`/`rake`, which calibrate the weights so the margins hit the targets — a post-hoc cap breaks that calibration and nothing re-rakes. A rim spec with `apply_trimming = Y` is refused with `CFG_TRIM_USE_CAP`.
 
-| trim_method | trim_value Meaning            | Example                         |
-|-------------|-------------------------------|---------------------------------|
-| cap         | Maximum weight value          | `5` = cap weights at 5          |
-| percentile  | Upper percentile threshold    | `95` = cap at 95th percentile   |
+**Rim weights:** set `cap_weights` (or `weight_bounds`) in Advanced_Settings. Those reach `survey::calibrate()` as bounds, so the cap applies during calibration and the margins survive it.
+
+**When apply_trimming = Y (design and cell only):**
+
+| trim_method | trim_value Meaning            | Example                            |
+|-------------|-------------------------------|------------------------------------|
+| cap         | Maximum weight value          | `5` = cap weights at 5             |
+| percentile  | Upper percentile, as a proportion strictly between 0 and 1 | `0.95` = cap at the 95th percentile (NOT `95`) |
+
+After capping, the weights are rescaled to restore their original sum so the weighted base does not shrink. Rescaling lifts the capped weights back above the nominal cap; the console reports `CALC_TRIM_RESCALED_ABOVE_CAP` and the diagnostics carry the rescale factor and both sums.
 
 ### Example
 
 ```
 | weight_name    | method | description              | apply_trimming | trim_method | trim_value |
 |----------------|--------|--------------------------|----------------|-------------|------------|
-| segment_weight | design | Stratified by segment    | N              |             |            |
-| pop_weight     | rim    | Census demographics      | Y              | cap         | 5          |
+| segment_weight | design | Stratified by segment    | Y              | cap         | 5          |
+| pop_weight     | rim    | Census demographics      | N              |             |            |
 | cell_weight    | cell   | Age x Gender interlocked | N              |             |            |
 ```
 
@@ -270,6 +276,9 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | convergence_tolerance | No | Number | 1e-7 | Convergence precision threshold |
 | calibration_method | No | Text | raking | `raking`, `linear`, or `logit` |
 | weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
+| margin_tolerance | No | Number | 0.5 | Max gap (pp) between achieved and target margin before the run reports PARTIAL |
+| allow_unmatched | No | Y/N | N | Let design/cell weighting leave respondents unweighted instead of refusing |
+| grossing | No | Y/N | N | Keep design weights at population scale instead of normalising to sum = n |
 
 ### Parameter Guidelines
 
@@ -290,14 +299,30 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 - Enforced during calibration, not by trimming afterwards
 - Widen before changing method, but note that widening alone does not fix a raking non-convergence
 
+**margin_tolerance** (default: 0.5 percentage points)
+- Judged on the *achieved* margins, recomputed from the final weights — not on whether `survey::calibrate()` returned. A calibration that stopped because a weight bound was binding can return while a category sits well off its target; before this check that was reported as converged.
+- Exceeding it makes the run PARTIAL (`CALC_MARGINS_NOT_ACHIEVED`) and names the categories that missed, worst first. The weights are still written — they are usable, they are just not the weights the config asked for.
+- Raising it changes what the run reports, not what the weights are. Raise it only when you have decided the gap is acceptable and want it recorded.
+
+**grossing** (default: N — design weights only)
+- A design weight is population / sample, so it comes out at population scale: on a 1-in-20 sample the mean weight is 20. A rim weight on the same study calibrates to sum ≈ n, mean 1. Both used to be written into the same lookup file with nothing saying which scale a column was on, so two weighted bases on one report could differ by three orders of magnitude.
+- `N` normalises the design weight to sum to the sample size. Relative weighting is untouched — only the scale moves.
+- `Y` keeps population scale, for when you want grossed-up counts, and records the scale in the diagnostics.
+- Kish n_eff and DEFF are scale-invariant, so significance testing is identical either way. What changes is every weighted N on the face of the report.
+
+**allow_unmatched** (default: N)
+- Design and cell weighting refuse (`DATA_UNWEIGHTED_ROWS`) when any respondent would end up with an NA weight, and when a target cell or stratum has a population share but nobody in the sample. Rim weighting has always refused; the other two used to warn and carry on.
+- The refusal names the cause — unmatched category, missing value in a weighting variable, empty target cell — with counts and the categories involved.
+- `Y` is the deliberate opt-out. The run proceeds, those weights stay blank, and the count reaches the console and the diagnostics as `n_unweighted`. Use it when you have decided those respondents are out of scope, not to make an error message go away.
+
 **Accepting non-converged weights is not an option.** Calibration that cannot reach the targets refuses. Weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. Raise `convergence_tolerance` if you want a looser fit — that states how loose in a number you can report.
 
 ### Example
 
 ```
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
-|-------------|----------------|----------------------|--------------------|---------------|
-| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | grossing |
+|-------------|----------------|----------------------|--------------------|---------------|------------------|-----------------|----------|
+| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              | N               | N        |
 ```
 
 ---
@@ -350,8 +375,8 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 ```
 | weight_name    | method | description                | apply_trimming | trim_method | trim_value |
 |----------------|--------|----------------------------|----------------|-------------|------------|
-| segment_weight | design | Account segment weights    | N              |             |            |
-| demo_weight    | rim    | Demographic adjustment     | Y              | cap         | 5          |
+| segment_weight | design | Account segment weights    | Y              | cap         | 5          |
+| demo_weight    | rim    | Demographic adjustment     | N              |             |            |
 | cell_weight    | cell   | Age x Gender interlocked   | N              |             |            |
 ```
 

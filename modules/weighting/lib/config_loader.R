@@ -371,7 +371,41 @@ load_weighting_target_sheet <- function(config_file, available_sheets, weight_sp
     )
   }
 
-  targets[[numeric_col]] <- suppressWarnings(as.numeric(targets[[numeric_col]]))
+  # Coercing the target column with suppressWarnings() turned anything R could
+  # not read into NA without a word: "52%", a comma decimal, a stray space, and
+  # the Excel gotcha where a cell reading NA becomes the string "NA". The row
+  # then flowed on as a missing target, which downstream reads as "no target for
+  # this category" rather than "the target you wrote could not be read". Only
+  # cells that were already blank are allowed to become NA.
+  raw_values <- targets[[numeric_col]]
+  was_blank <- is.na(raw_values) | !nzchar(trimws(as.character(raw_values)))
+
+  coerced <- suppressWarnings(as.numeric(raw_values))
+  unreadable <- is.na(coerced) & !was_blank
+
+  if (any(unreadable)) {
+    label_cols <- intersect(c("weight_name", "variable", "category", "stratum_variable",
+                              "stratum_category"), names(targets))
+    describe <- function(i) {
+      bits <- vapply(label_cols, function(cl) sprintf("%s = %s", cl, targets[[cl]][i]),
+                     character(1))
+      sprintf("row %d (%s): '%s'", i, paste(bits, collapse = ", "),
+              as.character(raw_values)[i])
+    }
+
+    weighting_refuse(
+      code = "CFG_TARGET_NOT_NUMERIC",
+      title = sprintf("A %s target could not be read as a number", method_name),
+      problem = sprintf("These %s values in %s are not numeric: %s",
+                        numeric_col, sheet_name,
+                        paste(vapply(which(unreadable), describe, character(1)),
+                              collapse = "; ")),
+      why_it_matters = "An unreadable target used to become blank, which the engine treats as 'no target for this category' rather than 'the number you wrote could not be read'. The weights would then be calibrated to a distribution you did not specify.",
+      how_to_fix = sprintf("Write %s as a plain number: 52 rather than '52%%', a full stop rather than a comma for the decimal point, and no spaces or text. If you meant to leave the cell empty, clear it — note that a cell containing the letters NA is text, not an empty cell.", numeric_col)
+    )
+  }
+
+  targets[[numeric_col]] <- coerced
 
   if (verbose) message("  Loaded ", nrow(targets), " ", method_name, " target rows")
 
@@ -542,6 +576,77 @@ get_advanced_setting <- function(config, weight_name, setting_name, default = NU
   }
 
   return(value)
+}
+
+#' Read the allow_unmatched Opt-In for a Weight
+#'
+#' Design and cell weighting refuse when any respondent would end up with an NA
+#' weight, because an NA weight removes that respondent from every weighted base
+#' downstream without being reported as a missing case. \code{allow_unmatched}
+#' is the deliberate opt-out: the run proceeds, those weights stay NA, and the
+#' count is disclosed on the console and in diagnostics.
+#'
+#' Anything unreadable is refused rather than treated as "no", because the
+#' difference between the two answers is whether a silent base deflation is
+#' possible at all.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return TRUE if the opt-in is set, FALSE otherwise
+#' @export
+read_allow_unmatched_setting <- function(config, weight_name) {
+  raw <- get_advanced_setting(config, weight_name, "allow_unmatched", "N")
+
+  if (is.logical(raw) && length(raw) == 1 && !is.na(raw)) return(isTRUE(raw))
+
+  value <- toupper(trimws(as.character(raw)[1]))
+
+  if (value %in% c("Y", "YES", "TRUE", "T", "1")) return(TRUE)
+  if (value %in% c("N", "NO", "FALSE", "F", "0", "")) return(FALSE)
+
+  weighting_refuse(
+    code = "CFG_INVALID_ALLOW_UNMATCHED",
+    title = "Invalid allow_unmatched setting",
+    problem = sprintf("allow_unmatched for weight '%s' is '%s'. Expected Y or N.",
+                      weight_name, as.character(raw)[1]),
+    why_it_matters = "allow_unmatched decides whether respondents with no weight stop the run or are silently left out of every weighted base. A value that cannot be read must not be guessed either way.",
+    how_to_fix = "Set allow_unmatched to Y or N in Advanced_Settings, or remove the row to keep the default (N — refuse)."
+  )
+}
+
+#' Read the Grossing Opt-In for a Weight
+#'
+#' Design weights are population / sample, so they arrive at population scale.
+#' By default the module normalises them to sum = n, matching rim weights, so
+#' that two weights on one study cannot put weighted bases orders of magnitude
+#' apart with nothing saying which scale each column is on. \code{Grossing = YES}
+#' keeps population scale for anyone who wants grossed-up counts.
+#'
+#' Kish n_eff is scale-invariant, so this changes weighted Ns on the face of the
+#' report, not significance testing.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return TRUE to keep population scale, FALSE to normalise to sum = n
+#' @export
+read_grossing_setting <- function(config, weight_name) {
+  raw <- get_advanced_setting(config, weight_name, "grossing", "N")
+
+  if (is.logical(raw) && length(raw) == 1 && !is.na(raw)) return(isTRUE(raw))
+
+  value <- toupper(trimws(as.character(raw)[1]))
+
+  if (value %in% c("Y", "YES", "TRUE", "T", "1")) return(TRUE)
+  if (value %in% c("N", "NO", "FALSE", "F", "0", "")) return(FALSE)
+
+  weighting_refuse(
+    code = "CFG_INVALID_GROSSING",
+    title = "Invalid grossing setting",
+    problem = sprintf("grossing for weight '%s' is '%s'. Expected Y or N.",
+                      weight_name, as.character(raw)[1]),
+    why_it_matters = "grossing decides whether this weight sums to the sample size or to the population. Guessing it would put every weighted N in the report on an undeclared scale.",
+    how_to_fix = "Set grossing to Y or N in Advanced_Settings, or remove the row to keep the default (N — normalise to sum = n)."
+  )
 }
 
 #' Get Weight Specification by Name

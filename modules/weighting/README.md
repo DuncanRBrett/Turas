@@ -42,6 +42,17 @@ Rscript modules/weighting/run_weighting.R path/to/Weight_Config.xlsx
 
 ---
 
+## Documentation
+
+| Document | What it is for |
+|---|---|
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Running a job end to end, and every refusal code with its fix. Start here. |
+| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | Choosing a method, reading diagnostics, worked example |
+| [docs/TEMPLATE_REFERENCE.md](docs/TEMPLATE_REFERENCE.md) | Every config field, sheet by sheet |
+| [docs/CONFIG_EXAMPLE.md](docs/CONFIG_EXAMPLE.md) | A filled-in config to copy from |
+
+---
+
 ## Setting Up a Config File
 
 The config file is an Excel workbook (`Weight_Config.xlsx`) with required and optional sheets. All file paths are **relative to the config file location** (or absolute).
@@ -84,16 +95,16 @@ One row per weight to calculate:
 
 | weight_name | method | apply_trimming | trim_method | trim_value |
 |-------------|--------|----------------|-------------|------------|
-| design_wt | design | N | | |
-| demo_wt | rim | Y | cap | 5 |
+| design_wt | design | Y | cap | 5 |
+| demo_wt | rim | N | | |
 | cell_wt | cell | N | | |
 
 **Columns:**
 - `weight_name` — Name for the weight column added to your data. Must be unique.
 - `method` — One of: `design`, `rim`, `rake`, `cell`
-- `apply_trimming` — `Y` or `N`. Caps extreme weights to improve stability.
+- `apply_trimming` — `Y` or `N`. Caps extreme weights after calculation. **Design and cell weights only.** A rim weight with `apply_trimming = Y` is refused (`CFG_TRIM_USE_CAP`) — see below.
 - `trim_method` — `cap` (absolute cap) or `percentile` (trim to percentile range)
-- `trim_value` — For `cap`: maximum weight value (e.g., 5). For `percentile`: upper percentile (e.g., 95)
+- `trim_value` — For `cap`: maximum weight value (e.g., 5). For `percentile`: a proportion strictly between 0 and 1 (e.g., `0.95` for the 95th percentile) — **not** 95.
 
 ### Method-Specific Sheets
 
@@ -145,14 +156,17 @@ One row per weight to calculate:
 
 Fine-tune rim weight calculation:
 
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
-|-------------|---------------|----------------------|--------------------|---------------|
-| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched | grossing |
+|-------------|---------------|----------------------|--------------------|---------------|------------------|-----------------|----------|
+| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | 0.5 | N | N |
 
 - `max_iterations` — Maximum calibration iterations (default: 50)
 - `convergence_tolerance` — Stopping threshold (default: 0.0000001, i.e. 1e-7)
 - `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
 - `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`). A single number is read as the upper bound.
+- `margin_tolerance` — How far a weighted margin may sit from its target, in percentage points, before the run stops reporting itself as converged (default: `0.5`). The check is on the *achieved* margins, so a calibration that returned while a bound was binding is caught. Missing it makes the run PARTIAL and names the categories that missed; it does not change the weights.
+- `allow_unmatched` — `Y` or `N` (default `N`). Design and cell weighting refuse when any respondent would end up with no weight: an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. An NA weight removes that respondent from every weighted base downstream without appearing as a missing case. Set `Y` only when you have decided those respondents should be left out — their weights stay blank and the count is disclosed.
+- `grossing` — Design weights only. `Y` or `N` (default `N`). A design weight is population / sample, so it naturally comes out at population scale (mean 20 on a 1-in-20 sample) while a rim weight sums to n. `N` normalises the design weight to sum to the sample size so both are on the same scale; `Y` keeps population scale for grossed-up counts and stamps it in the diagnostics. Kish n_eff is scale-invariant, so this changes weighted Ns on the report, not significance testing.
 
 There is no way to accept non-converged weights. If calibration cannot reach the targets, the run refuses — weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. To accept a looser fit deliberately, raise `convergence_tolerance`: it states how loose in a number you can report, and the resulting gap stays visible in the achieved margins table. On the worked case below, a tolerance of 0.09 lets raking converge, and the achieved margins then show the worst category landing 3.2 percentage points off its target — which is the kind of thing you want on the page, not buried.
 
@@ -239,12 +253,15 @@ Every weight run produces diagnostic metrics:
 
 ### When to Apply Trimming
 
-Apply trimming (`apply_trimming = Y`) when:
-- Max weight exceeds 5
-- Design effect exceeds 2.0
-- A small number of respondents have disproportionate influence
+Trim when max weight exceeds 5, design effect exceeds 2.0, or a small number of respondents carry disproportionate influence. How you trim depends on the method, and the two routes are not interchangeable.
 
-Trimming introduces a small bias (weighted distribution won't perfectly match targets) but reduces variance. This is almost always a good trade-off.
+**Rim weights — use `cap_weights`, never `apply_trimming`.** Raking calibrates the weights so the weighted margins hit your targets and the weights sum to n. Capping them afterwards breaks both, and nothing re-rakes them: the run would report the raked margins as achieved while shipping weights that no longer meet them. `apply_trimming = Y` on a rim or rake spec is therefore refused with `CFG_TRIM_USE_CAP`.
+
+Set `cap_weights` in Advanced_Settings instead. It is passed to `survey::calibrate()` as the upper weight bound, so the cap applies *during* calibration and the margins still come out right. `weight_bounds` sets both ends.
+
+**Design and cell weights — `apply_trimming = Y` is the right route.** These methods have no calibrated margins to break. The weights are capped, then rescaled so they sum to what they summed to before, which keeps the weighted base honest. Rescaling pushes the capped weights back above the nominal cap; the run says so on the console (`CALC_TRIM_RESCALED_ABOVE_CAP`) and the diagnostics carry the rescale factor and both sums.
+
+Trimming trades a little bias for less variance. For design and cell weights that is usually worth it. For rim weights the same trade is available without the bias, through `cap_weights`.
 
 ---
 

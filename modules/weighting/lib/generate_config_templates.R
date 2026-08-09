@@ -303,7 +303,7 @@ generate_weight_config_template <- function(output_path) {
       name = "apply_trimming",
       width = 16,
       required = FALSE,
-      description = "Whether to cap extreme weights after calculation. Y or N.",
+      description = "Whether to cap extreme weights AFTER calculation. Y or N. Design and cell weights only — a rim weight is refused, because capping afterwards breaks the margins raking just calibrated. For rim, use cap_weights in Advanced_Settings, which caps DURING calibration and keeps the margins.",
       dropdown = c("Y", "N")
     ),
     list(
@@ -326,9 +326,12 @@ generate_weight_config_template <- function(output_path) {
       weight_name = "wgt_demo",
       method = "rim",
       description = "Demographic rim weighting",
-      apply_trimming = "Y",
-      trim_method = "cap",
-      trim_value = 5
+      # A rim weight caps during calibration via cap_weights in
+      # Advanced_Settings, never afterwards. apply_trimming = Y on a rim spec
+      # is refused, so the example must not show it.
+      apply_trimming = "N",
+      trim_method = "",
+      trim_value = ""
     ),
     list(
       weight_name = "wgt_design",
@@ -584,6 +587,24 @@ generate_weight_config_template <- function(output_path) {
       width = 18,
       required = FALSE,
       description = "Weight range enforced DURING calibration, as lower,upper (e.g. 0.3,3.0). Default: 0.3,3.0. Must be finite on both sides if calibration_method is logit."
+    ),
+    list(
+      name = "margin_tolerance",
+      width = 18,
+      required = FALSE,
+      description = "How far a weighted margin may sit from its target, in percentage points, before the run stops calling itself converged and reports PARTIAL naming the categories that missed. Default: 0.5. Raise it only if you accept the gap - it changes what the run reports, not what the weights are."
+    ),
+    list(
+      name = "allow_unmatched",
+      width = 18,
+      required = FALSE,
+      description = "Y or N. Default N. Design and cell weights refuse when any respondent would end up with no weight - an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. Set Y only if you have decided those respondents should be left out; their weights stay blank and the count is reported."
+    ),
+    list(
+      name = "grossing",
+      width = 14,
+      required = FALSE,
+      description = "Design weights only. Y or N, default N. Design weights are population/sample, so they naturally arrive at population scale. N normalises them to sum to the sample size, matching rim weights, so two weights on one study cannot put weighted bases orders of magnitude apart. Y keeps population scale for grossed-up counts. Kish n_eff is scale-invariant either way, so significance testing is unaffected - what changes is every weighted N on the report."
     )
   )
 
@@ -593,7 +614,10 @@ generate_weight_config_template <- function(output_path) {
       max_iterations = 50,
       convergence_tolerance = 0.0000001,
       calibration_method = "raking",
-      weight_bounds = "0.3,3.0"
+      weight_bounds = "0.3,3.0",
+      margin_tolerance = 0.5,
+      allow_unmatched = "N",
+      grossing = "N"
     )
   )
 

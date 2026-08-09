@@ -136,7 +136,15 @@ diagnose_weights <- function(weights,
       n_trimmed = trimming_result$n_trimmed,
       pct_trimmed = trimming_result$pct_trimmed,
       original_max = trimming_result$original_max,
-      new_max = trimming_result$new_max
+      new_max = trimming_result$new_max,
+      # Post-hoc trimming is corrected by rescaling to the original sum. That
+      # keeps the weighted base honest but moves individual weights, including
+      # the capped ones, so the report must be able to say it happened.
+      rescaled = isTRUE(trimming_result$rescaled),
+      rescale_factor = trimming_result$rescale_factor,
+      sum_before = trimming_result$sum_before,
+      sum_after = trimming_result$sum_after,
+      max_after_rescale = trimming_result$max_after_rescale
     )
   } else {
     results$trimming <- list(applied = FALSE)
