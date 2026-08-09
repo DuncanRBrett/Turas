@@ -42,17 +42,88 @@ test_that("trim_weights with no weights exceeding cap changes nothing", {
   expect_equal(result$weights, weights)
 })
 
-test_that("apply_trimming_from_config applies trimming when enabled", {
+test_that("apply_trimming_from_config trims, then restores the original sum", {
+  # Hand-checkable: sum 18.5. Capping at 5 gives c(0.5, 1, 2, 5, 5), sum 13.5.
+  # The rescale factor is therefore 18.5 / 13.5 = 1.370370..., which puts the
+  # two capped weights at 6.851852 — above the cap, and that is the point: the
+  # weighted base is restored and the cap becomes nominal.
   weights <- c(0.5, 1.0, 2.0, 5.0, 10.0)
   spec <- list(
+    method = "design",
     apply_trimming = "Y",
     trim_method = "cap",
     trim_value = 5.0
   )
 
   result <- apply_trimming_from_config(weights, spec, verbose = FALSE)
+
   expect_true(result$trimming_applied)
-  expect_true(all(result$weights <= 5.0))
+  expect_true(result$rescaled)
+  expect_equal(result$n_trimmed, 1)
+  expect_equal(result$sum_before, 18.5)
+  expect_equal(result$sum_trimmed, 13.5)
+  expect_equal(result$rescale_factor, 18.5 / 13.5)
+
+  # The invariant that matters: the weights still sum to what they summed to.
+  expect_equal(sum(result$weights), 18.5)
+  expect_equal(result$weights,
+               c(0.5, 1.0, 2.0, 5.0, 5.0) * (18.5 / 13.5))
+  expect_gt(result$max_after_rescale, 5.0)
+})
+
+test_that("apply_trimming_from_config refuses post-hoc trimming on rim weights", {
+  weights <- c(0.5, 1.0, 2.0, 5.0, 10.0)
+
+  for (m in c("rim", "rake", "RIM")) {
+    spec <- list(
+      weight_name = "wgt_rim",
+      method = m,
+      apply_trimming = "Y",
+      trim_method = "cap",
+      trim_value = 5.0
+    )
+
+    err <- tryCatch({
+      apply_trimming_from_config(weights, spec, verbose = FALSE)
+      NULL
+    }, error = function(e) e)
+
+    expect_false(is.null(err), info = paste("method:", m))
+    expect_true(grepl("CFG_TRIM_USE_CAP", conditionMessage(err)) ||
+                  identical(err$code, "CFG_TRIM_USE_CAP"),
+                info = paste("method:", m))
+    # It must name the setting that does this correctly, or the refusal is a
+    # dead end for whoever hits it.
+    expect_true(grepl("cap_weights", conditionMessage(err), fixed = TRUE),
+                info = paste("method:", m))
+  }
+})
+
+test_that("a rim spec with apply_trimming = N is untouched", {
+  weights <- c(0.5, 1.0, 2.0, 5.0, 10.0)
+  spec <- list(weight_name = "wgt_rim", method = "rim", apply_trimming = "N")
+
+  result <- apply_trimming_from_config(weights, spec, verbose = FALSE)
+  expect_false(result$trimming_applied)
+  expect_equal(result$weights, weights)
+})
+
+test_that("rescale_after_trimming is wired in, not dead code", {
+  # C1's original symptom was that rescale_after_trimming() had zero callers
+  # module-wide. This asserts the wiring, not just the arithmetic.
+  callers <- list.files(
+    file.path(dirname(dirname(getwd())), "lib"),
+    pattern = "[.]R$", full.names = TRUE, recursive = TRUE
+  )
+  if (length(callers) == 0) skip("module lib directory not found from test wd")
+
+  # "rescale_after_trimming(" only appears at call sites — the definition reads
+  # "rescale_after_trimming <- function(", which does not contain it.
+  call_sites <- sum(vapply(callers, function(f) {
+    sum(grepl("rescale_after_trimming(", readLines(f, warn = FALSE), fixed = TRUE))
+  }, numeric(1)))
+
+  expect_gte(call_sites, 1)
 })
 
 test_that("apply_trimming_from_config skips when disabled", {

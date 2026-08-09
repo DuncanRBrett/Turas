@@ -99,7 +99,7 @@ Paths are resolved in this order:
 | weight_name      | Yes         | Text   | Column name for weight (added to data) |
 | method           | Yes         | Text   | `design`, `rim`, `rake`, or `cell`     |
 | description      | No          | Text   | Documentation only                     |
-| apply_trimming   | No          | Y/N    | Apply weight trimming (default: N)     |
+| apply_trimming   | No          | Y/N    | Post-hoc trimming. Design/cell only — refused on rim (default: N) |
 | trim_method      | If trimming | Text   | `cap` or `percentile`                  |
 | trim_value       | If trimming | Number | Trim threshold                         |
 
@@ -124,20 +124,26 @@ Paths are resolved in this order:
 
 ### Trimming Configuration
 
-**When apply_trimming = Y:**
+`apply_trimming` caps weights **after** they were calculated. That is correct for `design` and `cell` weights and wrong for `rim`/`rake`, which calibrate the weights so the margins hit the targets — a post-hoc cap breaks that calibration and nothing re-rakes. A rim spec with `apply_trimming = Y` is refused with `CFG_TRIM_USE_CAP`.
 
-| trim_method | trim_value Meaning            | Example                         |
-|-------------|-------------------------------|---------------------------------|
-| cap         | Maximum weight value          | `5` = cap weights at 5          |
-| percentile  | Upper percentile threshold    | `95` = cap at 95th percentile   |
+**Rim weights:** set `cap_weights` (or `weight_bounds`) in Advanced_Settings. Those reach `survey::calibrate()` as bounds, so the cap applies during calibration and the margins survive it.
+
+**When apply_trimming = Y (design and cell only):**
+
+| trim_method | trim_value Meaning            | Example                            |
+|-------------|-------------------------------|------------------------------------|
+| cap         | Maximum weight value          | `5` = cap weights at 5             |
+| percentile  | Upper percentile, as a proportion strictly between 0 and 1 | `0.95` = cap at the 95th percentile (NOT `95`) |
+
+After capping, the weights are rescaled to restore their original sum so the weighted base does not shrink. Rescaling lifts the capped weights back above the nominal cap; the console reports `CALC_TRIM_RESCALED_ABOVE_CAP` and the diagnostics carry the rescale factor and both sums.
 
 ### Example
 
 ```
 | weight_name    | method | description              | apply_trimming | trim_method | trim_value |
 |----------------|--------|--------------------------|----------------|-------------|------------|
-| segment_weight | design | Stratified by segment    | N              |             |            |
-| pop_weight     | rim    | Census demographics      | Y              | cap         | 5          |
+| segment_weight | design | Stratified by segment    | Y              | cap         | 5          |
+| pop_weight     | rim    | Census demographics      | N              |             |            |
 | cell_weight    | cell   | Age x Gender interlocked | N              |             |            |
 ```
 
@@ -350,8 +356,8 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 ```
 | weight_name    | method | description                | apply_trimming | trim_method | trim_value |
 |----------------|--------|----------------------------|----------------|-------------|------------|
-| segment_weight | design | Account segment weights    | N              |             |            |
-| demo_weight    | rim    | Demographic adjustment     | Y              | cap         | 5          |
+| segment_weight | design | Account segment weights    | Y              | cap         | 5          |
+| demo_weight    | rim    | Demographic adjustment     | N              |             |            |
 | cell_weight    | cell   | Age x Gender interlocked   | N              |             |            |
 ```
 

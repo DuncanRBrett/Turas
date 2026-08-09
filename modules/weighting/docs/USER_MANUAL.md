@@ -200,15 +200,15 @@ One row per weight to calculate:
 
 | weight_name | method | apply_trimming | trim_method | trim_value |
 |-------------|--------|----------------|-------------|------------|
-| design_wt | design | N | | |
-| demo_wt | rim | Y | cap | 5 |
+| design_wt | design | Y | cap | 5 |
+| demo_wt | rim | N | | |
 | cell_wt | cell | N | | |
 
 - `weight_name` — Unique name for the weight column added to your data
 - `method` — `design`, `rim`, `rake`, or `cell`
-- `apply_trimming` — `Y` or `N`
+- `apply_trimming` — `Y` or `N`. Design and cell weights only; a rim weight with `Y` is refused (`CFG_TRIM_USE_CAP`) — use `cap_weights` in Advanced_Settings instead
 - `trim_method` — `cap` (absolute maximum) or `percentile` (percentile range)
-- `trim_value` — For cap: maximum weight (e.g., 5). For percentile: upper percentile (e.g., 95)
+- `trim_value` — For cap: maximum weight (e.g., 5). For percentile: a proportion strictly between 0 and 1 (e.g., `0.95`) — **not** 95
 
 ### Design_Targets Sheet (Required if method = "design")
 
@@ -363,15 +363,18 @@ Every weight run produces these diagnostic metrics:
 
 ### When to Apply Trimming
 
-Apply trimming (`apply_trimming = Y`) when:
-- Max weight exceeds 5
-- Design effect exceeds 2.0
-- A small number of respondents have disproportionate influence
+Trim when max weight exceeds 5, design effect exceeds 2.0, or a few respondents carry disproportionate influence. Which route you take depends on the method.
 
-**Cap method:** Sets a hard maximum (e.g., `trim_value = 5` means no weight exceeds 5).
-**Percentile method:** Trims to a percentile range (e.g., `trim_value = 95` caps at the 95th percentile).
+**Rim or rake — set `cap_weights` in Advanced_Settings, not `apply_trimming`.** Raking calibrates the weights so the weighted margins match your targets and the weights sum to n. A post-hoc cap breaks both and nothing re-rakes, so the run would report the raked margins as achieved while shipping weights that no longer meet them. `apply_trimming = Y` on a rim spec is refused with `CFG_TRIM_USE_CAP`. `cap_weights` reaches `survey::calibrate()` as the upper bound, so the cap holds during calibration and the margins survive it.
 
-**Trade-off:** Trimming introduces a small bias (weighted distribution won't perfectly match targets) but reduces variance. This is almost always a good trade-off.
+**Design or cell — `apply_trimming = Y` is correct.**
+
+- **Cap method:** hard maximum (`trim_value = 5` caps at 5).
+- **Percentile method:** caps at a percentile (`trim_value = 0.95` for the 95th — a proportion, not 95).
+
+After capping, the weights are rescaled to restore their original sum, so the weighted base does not shrink. That rescaling lifts the capped weights back above the nominal cap; the console says so (`CALC_TRIM_RESCALED_ABOVE_CAP`) and the diagnostics carry the rescale factor and the sums before and after.
+
+**Trade-off:** trimming buys lower variance with a little bias. For design and cell weights that is usually worth it. For rim weights you get the same variance reduction without the bias by bounding the calibration.
 
 ---
 
@@ -526,13 +529,15 @@ Output shows DEFF = 1.8, Max Weight = 4.2, Efficiency = 56%.
 
 **Interpretation:** DEFF of 1.8 is acceptable but not great. Effective sample = 500 / 1.8 = 278. Max weight of 4.2 means the most extreme respondent counts as 4.2 people.
 
-**Decision:** Apply cap trimming at 4.0 to reduce the max weight.
+**Decision:** cap the weights at 4.0 to reduce the max weight.
 
-### Step 6: Re-run with Trimming
+### Step 6: Re-run with the Cap Applied During Calibration
 
-Update Weight_Specifications: `apply_trimming = Y`, `trim_method = cap`, `trim_value = 4`.
+This is a rim weight, so the cap belongs in Advanced_Settings, not in Weight_Specifications. Set `cap_weights = 4`.
 
-Re-run. DEFF drops to 1.6, Max Weight = 4.0, Efficiency = 63%. This is acceptable.
+Do **not** set `apply_trimming = Y` here. That caps the weights after raking has finished, which breaks the margins you just calibrated to; the module refuses it with `CFG_TRIM_USE_CAP` and points you back to this setting.
+
+Re-run. `cap_weights` reaches `survey::calibrate()` as the upper bound, so no weight exceeds 4 by construction, the weighted margins still match your Stats SA targets, and DEFF falls because the tail has been pulled in. If the run now refuses with `MODEL_NO_CONVERGENCE`, the cap is too tight for these targets — either relax it or set `calibration_method = logit`, which the refusal message will suggest.
 
 ---
 

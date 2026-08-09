@@ -98,6 +98,26 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: post-hoc trimming no longer silently unpicks a rim calibration
+  (W1 / review C1).** `apply_trimming = Y` capped the weights after the engine
+  had finished and put nothing back: `rescale_after_trimming()` existed but had
+  zero callers module-wide, and nothing re-raked or re-checked the margins. On a
+  rim weight that meant the weights stopped summing to n, the raked margins
+  stopped holding, and the diagnostics still reported the raked margins as
+  achieved on a GOOD-quality run — every weighted base and percentage downstream
+  in tabs was wrong with nothing on the face of the report to show it. Now: a
+  rim or rake spec with `apply_trimming = Y` is refused with `CFG_TRIM_USE_CAP`,
+  which names `cap_weights` — the setting that reaches `survey::calibrate()` as
+  a bound and caps *during* calibration, leaving the margins intact. Design and
+  cell weights keep post-hoc trimming, but are now rescaled to their original
+  sum so the weighted base does not shrink, with the rescale factor and both
+  sums recorded in diagnostics; because rescaling lifts the capped weights back
+  above the nominal cap, the run says so on the console
+  (`CALC_TRIM_RESCALED_ABOVE_CAP`). The shipped template demonstrated the
+  refused combination on its own `wgt_demo` rim row — that example, and the
+  trimming guidance in README, USER_MANUAL, TEMPLATE_REFERENCE and
+  CONFIG_EXAMPLE, are corrected (including the percentile `trim_value`, which is
+  a proportion between 0 and 1, never 95).
 - **Weighting: the config template the module generates can now be loaded by the
   module.** `write_table_sheet()` puts a title in row 1, a subtitle in row 2, the
   real column headers in row 3 and per-column help text in row 4; the weighting
