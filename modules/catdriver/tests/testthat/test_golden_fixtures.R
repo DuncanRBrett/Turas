@@ -30,11 +30,35 @@ fixtures_dir <- file.path(test_dir, "fixtures")
 # HELPER: Load golden fixture data
 # ==============================================================================
 
-load_golden_binary <- function() {
-  path <- file.path(fixtures_dir, "golden_binary.csv")
+#' Insist on a golden fixture rather than skipping without one.
+#'
+#' These files used to be absent from the repository — .gitignore excluded
+#' *.csv — so on a fresh clone every one of the 16 tests in this file skipped
+#' and the suite still reported zero failures. A golden gate that skips is not
+#' a gate: it passes loudest exactly when it has checked nothing.
+#'
+#' The fixtures are committed now, so their absence means something is wrong
+#' with the checkout rather than something an operator has yet to do, and the
+#' suite has to say so. The generator is deterministic (fixed seeds per
+#' dataset) if they ever need rebuilding.
+require_golden_fixture <- function(filename) {
+  path <- file.path(fixtures_dir, filename)
   if (!file.exists(path)) {
-    skip("Golden binary fixture not found. Run: Rscript fixtures/golden_data_generator.R --generate")
+    stop(sprintf(
+      paste0("Golden fixture '%s' is missing from %s.\n",
+             "  It is committed to the repository, so this is a broken checkout, ",
+             "not a setup step you skipped.\n",
+             "  Restore it with: git checkout -- modules/catdriver/tests/fixtures/\n",
+             "  To rebuild the fixtures deliberately (they are deterministic): ",
+             "Rscript modules/catdriver/tests/fixtures/golden_data_generator.R --generate"),
+      filename, fixtures_dir
+    ), call. = FALSE)
   }
+  path
+}
+
+load_golden_binary <- function() {
+  path <- require_golden_fixture("golden_binary.csv")
 
   data <- read.csv(path, stringsAsFactors = FALSE)
 
@@ -48,10 +72,7 @@ load_golden_binary <- function() {
 }
 
 load_golden_ordinal <- function() {
-  path <- file.path(fixtures_dir, "golden_ordinal.csv")
-  if (!file.exists(path)) {
-    skip("Golden ordinal fixture not found. Run: Rscript fixtures/golden_data_generator.R --generate")
-  }
+  path <- require_golden_fixture("golden_ordinal.csv")
 
   data <- read.csv(path, stringsAsFactors = FALSE)
 
