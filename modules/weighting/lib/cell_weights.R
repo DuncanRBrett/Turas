@@ -31,6 +31,7 @@
 calculate_cell_weights <- function(data,
                                    cell_targets,
                                    cell_variables,
+                                   allow_unmatched = FALSE,
                                    verbose = FALSE) {
 
   # Validate inputs
@@ -115,11 +116,57 @@ calculate_cell_weights <- function(data,
     cell_targets[[var]] <- as.character(cell_targets[[var]])
   }
 
+  # Missing data has to be found BEFORE the key is built. paste() turns NA into
+  # the three characters "NA", so a respondent with a missing age used to be
+  # routed to an "undefined cell" and reported as an unmatched category — the
+  # one problem disguised as a different one. Find them first, and keep the rows
+  # out of key matching entirely.
+  na_in_variable <- vapply(cell_variables, function(v) sum(is.na(data[[v]])),
+                           numeric(1))
+  names(na_in_variable) <- cell_variables
+  has_na <- Reduce(`|`, lapply(cell_variables, function(v) is.na(data[[v]])))
+  n_na_rows <- sum(has_na)
+
+  # Cell keys are built by pasting the category values together, so the
+  # separator must be a character no survey category can contain. "|" can and
+  # does appear in category labels ("Yes|No", multi-select exports), and when it
+  # does two different cells collide into one key and their weights merge. The
+  # ASCII unit separator cannot appear in an Excel cell.
+  KEY_SEP <- "\x1F"
+
+  contains_sep <- function(df, vars) {
+    hits <- character(0)
+    for (v in vars) {
+      vals <- unique(df[[v]])
+      bad <- vals[!is.na(vals) & grepl(KEY_SEP, vals, fixed = TRUE)]
+      if (length(bad) > 0) hits <- c(hits, sprintf("%s: %s", v, paste(bad, collapse = ", ")))
+    }
+    hits
+  }
+
+  sep_hits <- c(contains_sep(data, cell_variables),
+                contains_sep(cell_targets, cell_variables))
+  if (length(sep_hits) > 0) {
+    weighting_refuse(
+      code = "DATA_KEY_SEPARATOR_IN_VALUE",
+      title = "A category value contains the cell key separator",
+      problem = sprintf("These values contain the ASCII unit separator used to build cell keys: %s",
+                        paste(sep_hits, collapse = "; ")),
+      why_it_matters = "Cell keys are built by joining the category values with that separator. A value containing it can collide with a different combination of categories, merging two cells and their weights.",
+      how_to_fix = "Remove the control character from those category values in the data and in Cell_Targets."
+    )
+  }
+
+  build_keys <- function(df) {
+    do.call(paste, c(df[, cell_variables, drop = FALSE], sep = KEY_SEP))
+  }
+
   # Create cell key for each row in data
-  data_keys <- apply(data[, cell_variables, drop = FALSE], 1, paste, collapse = "|")
+  data_keys <- build_keys(data)
+  data_keys[has_na] <- NA_character_
 
   # Create cell key for each target row
-  target_keys <- apply(cell_targets[, cell_variables, drop = FALSE], 1, paste, collapse = "|")
+  target_keys <- build_keys(cell_targets)
 
   # Initialize weight vector
   weights <- rep(NA_real_, n)
@@ -141,9 +188,10 @@ calculate_cell_weights <- function(data,
     key <- target_keys[i]
     target_pct <- cell_targets$target_percent[i]
 
-    # Find rows matching this cell
-    in_cell <- data_keys == key
-    cell_count <- sum(in_cell, na.rm = TRUE)
+    # Find rows matching this cell. Rows with missing data carry an NA key and
+    # match nothing, so they are counted as missing rather than as members.
+    in_cell <- !is.na(data_keys) & data_keys == key
+    cell_count <- sum(in_cell)
 
     if (cell_count == 0) {
       empty_cells <- c(empty_cells, key)
@@ -177,27 +225,69 @@ calculate_cell_weights <- function(data,
     }
   }
 
-  # Handle empty cells
-  if (length(empty_cells) > 0) {
-    warning(sprintf(
-      "%d cell(s) have targets but no observations: %s\nRows in these cells will have NA weights.",
-      length(empty_cells),
-      paste(empty_cells, collapse = "; ")
-    ), call. = FALSE)
-  }
-
-  # Handle unmatched rows (rows not belonging to any defined cell)
+  # Three ways a respondent ends up with no cell weight, each reported as itself
+  # rather than folded into "undefined cell". An NA weight removes that person
+  # from every weighted base downstream without appearing as a missing case, so
+  # by default this is a refusal — the same standard rim weighting already
+  # holds. An empty target cell is the mirror image: a share of the population
+  # that no respondent can carry, so the weighted total quietly loses it.
   unmatched <- is.na(weights) & !is.na(data_keys)
   n_unmatched <- sum(unmatched)
+  unmatched_keys <- if (n_unmatched > 0) unique(data_keys[unmatched]) else character(0)
 
-  if (n_unmatched > 0) {
-    unmatched_keys <- unique(data_keys[unmatched])
-    warning(sprintf(
-      "%d rows (%d%%) belong to undefined cells and will have NA weights.\nUndefined cells: %s",
-      n_unmatched,
-      round(100 * n_unmatched / n),
-      paste(head(unmatched_keys, 10), collapse = "; ")
-    ), call. = FALSE)
+  pretty_key <- function(k) gsub(KEY_SEP, " x ", k, fixed = TRUE)
+
+  n_unweighted <- n_unmatched + n_na_rows
+
+  if (n_unweighted > 0 || length(empty_cells) > 0) {
+
+    problems <- character(0)
+    if (n_na_rows > 0) {
+      per_var <- na_in_variable[na_in_variable > 0]
+      problems <- c(problems, sprintf(
+        "%d row%s (%.1f%%) have a missing value in a cell variable (%s)",
+        n_na_rows, if (n_na_rows == 1) "" else "s", 100 * n_na_rows / n,
+        paste(sprintf("%s: %d", names(per_var), per_var), collapse = ", ")
+      ))
+    }
+    if (n_unmatched > 0) {
+      problems <- c(problems, sprintf(
+        "%d row%s (%.1f%%) are in cells with no target: %s",
+        n_unmatched, if (n_unmatched == 1) "" else "s", 100 * n_unmatched / n,
+        paste(sprintf("'%s'", pretty_key(head(unmatched_keys, 10))), collapse = ", ")
+      ))
+    }
+    if (length(empty_cells) > 0) {
+      empty_share <- sum(cell_targets$target_percent[target_keys %in% empty_cells],
+                         na.rm = TRUE)
+      problems <- c(problems, sprintf(
+        "%d target cell%s have nobody in the sample, so %.1f%% of the population has no one to represent it: %s",
+        length(empty_cells), if (length(empty_cells) == 1) "" else "s", empty_share,
+        paste(sprintf("'%s'", pretty_key(head(empty_cells, 10))), collapse = ", ")
+      ))
+    }
+
+    if (!isTRUE(allow_unmatched)) {
+      weighting_refuse(
+        code = "DATA_UNWEIGHTED_ROWS",
+        title = "Some respondents would get no cell weight",
+        problem = paste(problems, collapse = "; "),
+        why_it_matters = "A respondent with an NA weight disappears from every weighted base, percentage and significance test downstream without being reported as a missing case — the base simply comes out smaller than the sample. A target cell with no respondents removes that share of the population from the weighted totals entirely.",
+        how_to_fix = "Either add the missing combinations to Cell_Targets, fix the category spellings so they match the data exactly (matching is case- and space-sensitive), collapse the sparse cells into larger ones, and check the cell variables for missing values — or set allow_unmatched = YES in Advanced_Settings if you have decided those respondents should be excluded. That opt-in leaves their weights NA and reports the count. If empty cells are unavoidable, rim weighting does not require every combination to be populated."
+      )
+    }
+
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: Weighting - cell weights\n")
+    cat("│ Code: DATA_UNWEIGHTED_ROWS_ALLOWED\n")
+    cat(sprintf("│ allow_unmatched = YES, so %d of %d respondents are being\n",
+                n_unweighted, n))
+    cat("│ left with no weight and will not appear in any weighted\n")
+    cat("│ base built on this weight:\n")
+    for (p in problems) cat(sprintf("│   - %s\n", p))
+    cat("│ How to fix: this is deliberate. Remove the opt-in to make it\n")
+    cat("│ a refusal again.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
   }
 
   if (verbose) {
@@ -217,7 +307,15 @@ calculate_cell_weights <- function(data,
     method = "cell",
     n_cells_defined = nrow(cell_targets),
     n_cells_empty = length(empty_cells),
-    n_unmatched = n_unmatched
+    n_unmatched = n_unmatched,
+    # Respondents left with no weight, split by cause. Zero unless
+    # allow_unmatched was set — otherwise the run would have refused.
+    n_unweighted = n_unweighted,
+    n_missing_cell_data = n_na_rows,
+    na_by_variable = na_in_variable,
+    unmatched_cells = pretty_key(unmatched_keys),
+    empty_cells = pretty_key(empty_cells),
+    allow_unmatched = isTRUE(allow_unmatched)
   ))
 }
 
@@ -279,11 +377,13 @@ calculate_cell_weights_from_config <- function(data, config, weight_name,
     }
   }
 
-  # Calculate cell weights
+  # Calculate cell weights. An NA weight silently deflates every weighted base
+  # downstream, so it is a refusal unless the config author has said otherwise.
   result <- calculate_cell_weights(
     data = data,
     cell_targets = cell_targets,
     cell_variables = cell_variables,
+    allow_unmatched = read_allow_unmatched_setting(config, weight_name),
     verbose = verbose
   )
 

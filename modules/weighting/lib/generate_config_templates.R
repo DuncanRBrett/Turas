@@ -593,6 +593,12 @@ generate_weight_config_template <- function(output_path) {
       width = 18,
       required = FALSE,
       description = "How far a weighted margin may sit from its target, in percentage points, before the run stops calling itself converged and reports PARTIAL naming the categories that missed. Default: 0.5. Raise it only if you accept the gap - it changes what the run reports, not what the weights are."
+    ),
+    list(
+      name = "allow_unmatched",
+      width = 18,
+      required = FALSE,
+      description = "Y or N. Default N. Design and cell weights refuse when any respondent would end up with no weight - an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. Set Y only if you have decided those respondents should be left out; their weights stay blank and the count is reported."
     )
   )
 
@@ -603,7 +609,8 @@ generate_weight_config_template <- function(output_path) {
       convergence_tolerance = 0.0000001,
       calibration_method = "raking",
       weight_bounds = "0.3,3.0",
-      margin_tolerance = 0.5
+      margin_tolerance = 0.5,
+      allow_unmatched = "N"
     )
   )
 

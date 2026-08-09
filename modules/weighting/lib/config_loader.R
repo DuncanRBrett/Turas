@@ -544,6 +544,42 @@ get_advanced_setting <- function(config, weight_name, setting_name, default = NU
   return(value)
 }
 
+#' Read the allow_unmatched Opt-In for a Weight
+#'
+#' Design and cell weighting refuse when any respondent would end up with an NA
+#' weight, because an NA weight removes that respondent from every weighted base
+#' downstream without being reported as a missing case. \code{allow_unmatched}
+#' is the deliberate opt-out: the run proceeds, those weights stay NA, and the
+#' count is disclosed on the console and in diagnostics.
+#'
+#' Anything unreadable is refused rather than treated as "no", because the
+#' difference between the two answers is whether a silent base deflation is
+#' possible at all.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return TRUE if the opt-in is set, FALSE otherwise
+#' @export
+read_allow_unmatched_setting <- function(config, weight_name) {
+  raw <- get_advanced_setting(config, weight_name, "allow_unmatched", "N")
+
+  if (is.logical(raw) && length(raw) == 1 && !is.na(raw)) return(isTRUE(raw))
+
+  value <- toupper(trimws(as.character(raw)[1]))
+
+  if (value %in% c("Y", "YES", "TRUE", "T", "1")) return(TRUE)
+  if (value %in% c("N", "NO", "FALSE", "F", "0", "")) return(FALSE)
+
+  weighting_refuse(
+    code = "CFG_INVALID_ALLOW_UNMATCHED",
+    title = "Invalid allow_unmatched setting",
+    problem = sprintf("allow_unmatched for weight '%s' is '%s'. Expected Y or N.",
+                      weight_name, as.character(raw)[1]),
+    why_it_matters = "allow_unmatched decides whether respondents with no weight stop the run or are silently left out of every weighted base. A value that cannot be read must not be guessed either way.",
+    how_to_fix = "Set allow_unmatched to Y or N in Advanced_Settings, or remove the row to keep the default (N — refuse)."
+  )
+}
+
 #' Get Weight Specification by Name
 #'
 #' Retrieves the specification for a specific weight.

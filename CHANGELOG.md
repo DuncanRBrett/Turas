@@ -98,6 +98,26 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **Weighting: a respondent who would get no design or cell weight stops the
+  run (W3 / review C2a, C2b, H2, M5).** Rim weighting has always refused rather
+  than emit an NA weight. Design and cell weighting warned and carried on, so
+  unmatched categories and missing values in weighting variables reached the
+  tabs lookup file as NA weights — and an NA weight removes that respondent from
+  every weighted base, percentage and significance test downstream without ever
+  appearing as a missing case. The base simply comes out smaller than the
+  sample. Both now refuse with `DATA_UNWEIGHTED_ROWS`, naming the cause, the
+  counts and the categories; `allow_unmatched = YES` (new Advanced_Settings key,
+  refused if unreadable) is the deliberate opt-out, which leaves the weights
+  blank, prints the count and carries it into diagnostics as `n_unweighted`. The
+  mirror-image case is covered too: a target cell or stratum with a population
+  share but nobody in the sample removes that share from the weighted totals
+  entirely, and now refuses with the share it would have cost. Two key bugs went
+  with it — a missing value in a cell variable became the literal string "NA" in
+  the paste-key and was reported as an undefined cell rather than as missing
+  data, and cell keys were joined with `|`, which survey categories can contain,
+  so two different cells could collide into one key and share a weight. Missing
+  values are now detected before the key is built, and the separator is the
+  ASCII unit separator, with a refusal if a category value somehow contains it.
 - **Weighting: a rim run stops claiming convergence it never checked (W2 /
   review H4).** `calculate_rim_weights()` returned `converged = TRUE` with the
   comment "TRUE if we got here". `survey::calibrate(force = FALSE)` does error

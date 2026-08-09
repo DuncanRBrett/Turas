@@ -145,15 +145,16 @@ One row per weight to calculate:
 
 Fine-tune rim weight calculation:
 
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance |
-|-------------|---------------|----------------------|--------------------|---------------|------------------|
-| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | 0.5 |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched |
+|-------------|---------------|----------------------|--------------------|---------------|------------------|-----------------|
+| demo_wt | 100 | 0.0000001 | logit | 0.1,10.0 | 0.5 | N |
 
 - `max_iterations` — Maximum calibration iterations (default: 50)
 - `convergence_tolerance` — Stopping threshold (default: 0.0000001, i.e. 1e-7)
 - `calibration_method` — `raking`, `linear`, or `logit` (default: `raking`)
 - `weight_bounds` — Weight range enforced during calibration, as `lower,upper` (default: `0.3,3.0`). A single number is read as the upper bound.
 - `margin_tolerance` — How far a weighted margin may sit from its target, in percentage points, before the run stops reporting itself as converged (default: `0.5`). The check is on the *achieved* margins, so a calibration that returned while a bound was binding is caught. Missing it makes the run PARTIAL and names the categories that missed; it does not change the weights.
+- `allow_unmatched` — `Y` or `N` (default `N`). Design and cell weighting refuse when any respondent would end up with no weight: an unmatched category, a missing value in a weighting variable, or a target cell nobody is in. An NA weight removes that respondent from every weighted base downstream without appearing as a missing case. Set `Y` only when you have decided those respondents should be left out — their weights stay blank and the count is disclosed.
 
 There is no way to accept non-converged weights. If calibration cannot reach the targets, the run refuses — weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. To accept a looser fit deliberately, raise `convergence_tolerance`: it states how loose in a number you can report, and the resulting gap stays visible in the achieved margins table. On the worked case below, a tolerance of 0.09 lets raking converge, and the achieved margins then show the worst category landing 3.2 percentage points off its target — which is the kind of thing you want on the page, not buried.
 

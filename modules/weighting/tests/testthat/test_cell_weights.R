@@ -119,14 +119,17 @@ test_that("cell weights refuse when targets don't sum to 100", {
   )
 })
 
-test_that("cell weights warn about empty cells", {
+test_that("cell weights refuse when a target cell has nobody in it", {
+  # Male-Young and Female-Old exist; Male-Old and Female-Young do not. Those two
+  # cells carry 50% of the target population between them, and no respondent can
+  # represent them — so every weighted total loses that half. This used to be a
+  # warning and the run carried on.
   data <- data.frame(
     Gender = c(rep("Male", 50), rep("Female", 50)),
     Age = c(rep("Young", 50), rep("Old", 50)),
     stringsAsFactors = FALSE
   )
 
-  # Target a cell that doesn't exist (Female-Young if data is structured)
   cell_targets <- data.frame(
     Gender = c("Male", "Male", "Female", "Female"),
     Age = c("Young", "Old", "Young", "Old"),
@@ -134,15 +137,141 @@ test_that("cell weights warn about empty cells", {
     stringsAsFactors = FALSE
   )
 
-  # This should produce a warning about empty cells (if any cells are empty)
-  # For this data pattern, Male-Young and Female-Old exist, but Male-Old and Female-Young don't
-  result <- suppressWarnings(
-    calculate_cell_weights(data, cell_targets, c("Gender", "Age"), verbose = FALSE)
+  refusal <- tryCatch(
+    suppressWarnings(
+      calculate_cell_weights(data, cell_targets, c("Gender", "Age"), verbose = FALSE)
+    ),
+    turas_refusal = function(e) e
   )
 
-  expect_true(is.list(result))
-  # Some weights may be NA for empty cells
-  expect_true(result$n_cells_empty >= 0)
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_UNWEIGHTED_ROWS")
+  # It must say which cells and how much of the population they carry.
+  expect_match(conditionMessage(refusal), "Male x Old")
+  expect_match(conditionMessage(refusal), "50.0%")
+})
+
+test_that("allow_unmatched turns the empty-cell refusal into a disclosed count", {
+  data <- data.frame(
+    Gender = c(rep("Male", 50), rep("Female", 50)),
+    Age = c(rep("Young", 50), rep("Old", 50)),
+    stringsAsFactors = FALSE
+  )
+
+  cell_targets <- data.frame(
+    Gender = c("Male", "Male", "Female", "Female"),
+    Age = c("Young", "Old", "Young", "Old"),
+    target_percent = c(25, 25, 25, 25),
+    stringsAsFactors = FALSE
+  )
+
+  result <- calculate_cell_weights(
+    data, cell_targets, c("Gender", "Age"),
+    allow_unmatched = TRUE, verbose = FALSE
+  )
+
+  expect_equal(result$n_cells_empty, 2)
+  expect_true(all(c("Male x Old", "Female x Young") %in% result$empty_cells))
+  # Everyone in the sample is in a populated cell here, so nobody loses a weight
+  # — the loss is on the population side.
+  expect_equal(result$n_unweighted, 0)
+  expect_false(any(is.na(result$weights)))
+})
+
+test_that("a missing value in a cell variable is reported as missing, not as an undefined cell", {
+  # paste() renders NA as the characters "NA", so a respondent with a missing
+  # Age used to be routed to a cell literally keyed "Male|NA" and then counted
+  # as belonging to an undefined cell. The cause was disguised as a different
+  # problem, and the fix the message suggested would never have worked.
+  data <- data.frame(
+    Gender = c(rep("Male", 50), rep("Female", 50)),
+    Age = c(rep("Young", 25), rep("Old", 24), NA, rep("Young", 25), rep("Old", 25)),
+    stringsAsFactors = FALSE
+  )
+
+  cell_targets <- data.frame(
+    Gender = c("Male", "Male", "Female", "Female"),
+    Age = c("Young", "Old", "Young", "Old"),
+    target_percent = c(25, 25, 25, 25),
+    stringsAsFactors = FALSE
+  )
+
+  refusal <- tryCatch(
+    suppressWarnings(
+      calculate_cell_weights(data, cell_targets, c("Gender", "Age"), verbose = FALSE)
+    ),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_match(conditionMessage(refusal), "missing value in a cell variable")
+  expect_match(conditionMessage(refusal), "Age: 1")
+  # And it must NOT be described as an undefined cell.
+  expect_false(grepl("Male x NA", conditionMessage(refusal), fixed = TRUE))
+
+  allowed <- calculate_cell_weights(
+    data, cell_targets, c("Gender", "Age"),
+    allow_unmatched = TRUE, verbose = FALSE
+  )
+  expect_equal(allowed$n_missing_cell_data, 1)
+  expect_equal(allowed$n_unweighted, 1)
+  expect_equal(unname(allowed$na_by_variable[["Age"]]), 1)
+  expect_equal(sum(is.na(allowed$weights)), 1)
+})
+
+test_that("a category value containing the key separator is refused, not silently merged", {
+  # Cell keys join category values with the ASCII unit separator. A value that
+  # contains it could collide with a different combination of categories and
+  # merge two cells into one weight.
+  sep <- "\x1F"
+  data <- data.frame(
+    Gender = c(rep(paste0("Male", sep, "X"), 50), rep("Female", 50)),
+    Age = c(rep("Young", 50), rep("Old", 50)),
+    stringsAsFactors = FALSE
+  )
+
+  cell_targets <- data.frame(
+    Gender = c("Male", "Female"),
+    Age = c("Young", "Old"),
+    target_percent = c(50, 50),
+    stringsAsFactors = FALSE
+  )
+
+  refusal <- tryCatch(
+    suppressWarnings(
+      calculate_cell_weights(data, cell_targets, c("Gender", "Age"), verbose = FALSE)
+    ),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_KEY_SEPARATOR_IN_VALUE")
+})
+
+test_that("a pipe in a category value no longer collides two cells", {
+  # The old separator was "|". "A|B" x "C" and "A" x "B|C" both keyed to
+  # "A|B|C", so the two cells merged and shared one weight. With the unit
+  # separator they stay distinct.
+  data <- data.frame(
+    V1 = c(rep("A|B", 40), rep("A", 60)),
+    V2 = c(rep("C", 40), rep("B|C", 60)),
+    stringsAsFactors = FALSE
+  )
+
+  cell_targets <- data.frame(
+    V1 = c("A|B", "A"),
+    V2 = c("C", "B|C"),
+    target_percent = c(50, 50),
+    stringsAsFactors = FALSE
+  )
+
+  result <- calculate_cell_weights(data, cell_targets, c("V1", "V2"), verbose = FALSE)
+
+  # Two distinct cells, each with its own count and its own weight.
+  expect_equal(nrow(result$cell_summary), 2)
+  expect_equal(sort(result$cell_summary$sample_count), c(40, 60))
+  # (0.5 * 100) / 40 = 1.25 and (0.5 * 100) / 60 = 0.8333
+  expect_equal(sort(round(result$cell_summary$weight, 4)), c(0.8333, 1.25))
 })
 
 test_that("cell weights return correct summary", {

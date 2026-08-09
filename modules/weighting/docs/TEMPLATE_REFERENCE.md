@@ -277,6 +277,7 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 | calibration_method | No | Text | raking | `raking`, `linear`, or `logit` |
 | weight_bounds | No | Text | 0.3,3.0 | Bounds during calibration, `lower,upper` |
 | margin_tolerance | No | Number | 0.5 | Max gap (pp) between achieved and target margin before the run reports PARTIAL |
+| allow_unmatched | No | Y/N | N | Let design/cell weighting leave respondents unweighted instead of refusing |
 
 ### Parameter Guidelines
 
@@ -302,14 +303,19 @@ The variable columns (e.g., Gender, Age) must match column names in your data ex
 - Exceeding it makes the run PARTIAL (`CALC_MARGINS_NOT_ACHIEVED`) and names the categories that missed, worst first. The weights are still written — they are usable, they are just not the weights the config asked for.
 - Raising it changes what the run reports, not what the weights are. Raise it only when you have decided the gap is acceptable and want it recorded.
 
+**allow_unmatched** (default: N)
+- Design and cell weighting refuse (`DATA_UNWEIGHTED_ROWS`) when any respondent would end up with an NA weight, and when a target cell or stratum has a population share but nobody in the sample. Rim weighting has always refused; the other two used to warn and carry on.
+- The refusal names the cause — unmatched category, missing value in a weighting variable, empty target cell — with counts and the categories involved.
+- `Y` is the deliberate opt-out. The run proceeds, those weights stay blank, and the count reaches the console and the diagnostics as `n_unweighted`. Use it when you have decided those respondents are out of scope, not to make an error message go away.
+
 **Accepting non-converged weights is not an option.** Calibration that cannot reach the targets refuses. Weights that do not match the targets are not rim weights, and shipping them silently would put unmarked numbers in a deliverable. Raise `convergence_tolerance` if you want a looser fit — that states how loose in a number you can report.
 
 ### Example
 
 ```
-| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance |
-|-------------|----------------|----------------------|--------------------|---------------|------------------|
-| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds | margin_tolerance | allow_unmatched |
+|-------------|----------------|----------------------|--------------------|---------------|------------------|-----------------|
+| pop_weight  | 200            | 0.0000001            | logit              | 0.1,10.0      | 0.5              | N               |
 ```
 
 ---

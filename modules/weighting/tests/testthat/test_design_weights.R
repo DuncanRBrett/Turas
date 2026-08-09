@@ -122,3 +122,93 @@ test_that("calculate_grossing_weights scales to population total", {
   expect_equal(sum(grossing), 10000, tolerance = 1e-6)
   expect_true(all(grossing > 0))
 })
+
+
+# ==============================================================================
+# W3: a respondent who would get no design weight stops the run
+# ==============================================================================
+
+test_that("design weights refuse a stratum category that has no population target", {
+  # 'West' is in the data but not in population_sizes. Those 20 respondents used
+  # to get an NA weight with a warning, then vanish from every weighted base in
+  # tabs without appearing as missing cases.
+  data <- data.frame(
+    Region = c(rep("North", 40), rep("South", 40), rep("West", 20)),
+    stringsAsFactors = FALSE
+  )
+  pop <- c(North = 1000, South = 1000)
+
+  refusal <- tryCatch(
+    suppressWarnings(calculate_design_weights(data, "Region", pop, verbose = FALSE)),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_UNWEIGHTED_ROWS")
+  expect_match(conditionMessage(refusal), "'West'")
+  expect_match(conditionMessage(refusal), "20 rows")
+  expect_match(conditionMessage(refusal), "allow_unmatched")
+})
+
+test_that("design weights refuse a missing value in the stratum variable", {
+  data <- data.frame(
+    Region = c(rep("North", 40), rep("South", 39), NA),
+    stringsAsFactors = FALSE
+  )
+  pop <- c(North = 1000, South = 1000)
+
+  refusal <- tryCatch(
+    suppressWarnings(calculate_design_weights(data, "Region", pop, verbose = FALSE)),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_UNWEIGHTED_ROWS")
+  expect_match(conditionMessage(refusal), "missing value in 'Region'")
+})
+
+test_that("design weights refuse a stratum with a population but no sample", {
+  data <- data.frame(Region = rep(c("North", "South"), each = 50),
+                     stringsAsFactors = FALSE)
+  pop <- c(North = 1000, South = 1000, East = 500)
+
+  refusal <- tryCatch(
+    suppressWarnings(calculate_design_weights(data, "Region", pop, verbose = FALSE)),
+    turas_refusal = function(e) e
+  )
+
+  expect_s3_class(refusal, "turas_refusal")
+  expect_equal(refusal$code, "DATA_UNWEIGHTED_ROWS")
+  expect_match(conditionMessage(refusal), "'East'")
+  expect_match(conditionMessage(refusal), "nobody in the sample")
+})
+
+test_that("allow_unmatched turns the design refusal into a disclosed count", {
+  data <- data.frame(
+    Region = c(rep("North", 40), rep("South", 40), rep("West", 20)),
+    stringsAsFactors = FALSE
+  )
+  pop <- c(North = 1000, South = 1000)
+
+  weights <- calculate_design_weights(data, "Region", pop,
+                                      allow_unmatched = TRUE, verbose = FALSE)
+
+  expect_equal(attr(weights, "n_unweighted"), 20)
+  expect_equal(attr(weights, "unmatched_categories"), "West")
+  expect_equal(sum(is.na(weights)), 20)
+  # The weights that were computed are still correct: 1000 / 40 = 25.
+  expect_equal(unique(weights[1:40]), 25)
+})
+
+test_that("a clean design run reports nothing unweighted", {
+  data <- data.frame(Region = rep(c("North", "South"), each = 50),
+                     stringsAsFactors = FALSE)
+  pop <- c(North = 1000, South = 500)
+
+  weights <- calculate_design_weights(data, "Region", pop, verbose = FALSE)
+
+  expect_equal(attr(weights, "n_unweighted"), 0)
+  expect_false(any(is.na(weights)))
+  expect_equal(unname(unique(weights[1:50])), 20)   # 1000 / 50
+  expect_equal(unname(unique(weights[51:100])), 10) # 500 / 50
+})
