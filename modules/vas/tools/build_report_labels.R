@@ -99,7 +99,51 @@ labels <- rbind(
   L("SDBusChannelMain", "Where do you buy short distance bus tickets most often?"),
   L("SDBusChannelOther", "Where else have you bought short distance bus tickets in the past 12 months?"),
   L("SDBusOwnFormat", "Ticket format usually bought (for self)", "no equivalent in the other categories"),
-  L("SDBusOthBuy", "Ticket format usually bought (for others)", "no equivalent in the other categories")
+  L("SDBusOthBuy", "Ticket format usually bought (for others)", "no equivalent in the other categories"),
+  # ---- bills ----------------------------------------------------------------
+  # One screener and one channel pair cover all fourteen bill categories; they
+  # are told apart only in the derived measures.
+  L("Bill", "Who have you paid bills for?", "ASKED - self / other / none; covers all 14 bill categories"),
+  L("BillChannelMain", "Where do you pay bills most often?"),
+  L("BillChannelOther", "Where else have you paid bills in the past 12 months?"),
+  L("BillTraffic_Purchased", "Pay traffic fines at all in last 12 months?", DERIVED),
+  L("BillClothing_Purchased", "Pay a clothing/fashion account at all in last 12 months?", DERIVED),
+  L("BillFurniture_Purchased", "Pay a furniture account at all in last 12 months?", DERIVED),
+  L("BillEducation_Purchased", "Pay education fees at all in last 12 months?", DERIVED),
+  L("BillHealth_Purchased", "Pay health bills at all in last 12 months?", DERIVED),
+  L("BillRetail_Purchased", "Pay a retail credit account at all in last 12 months?", DERIVED),
+  L("BillOther_Purchased", "Pay other bills at all in last 12 months?", DERIVED),
+  L("BillDSTV_Purchased", "Pay DSTV / Multichoice at all in last 12 months?", DERIVED),
+  L("BillMunicipal_Purchased", "Pay a municipal account at all in last 12 months?", DERIVED),
+  L("BillTelkom_Purchased", "Pay Telkom / cellphone at all in last 12 months?", DERIVED),
+  L("BillInsurance_Purchased", "Pay insurance / funeral at all in last 12 months?", DERIVED),
+  L("BillInternet_Purchased", "Pay an internet subscription at all in last 12 months?", DERIVED),
+  L("BillVehicle_Purchased", "Pay a vehicle licence at all in last 12 months?", DERIVED),
+  L("BillTVLicence_Purchased", "Pay a TV licence at all in last 12 months?", DERIVED),
+
+  # ---- events ---------------------------------------------------------------
+  # As with bills, one screener covers all six. Its options are Myself /
+  # Someone else / For a group - the group option exists nowhere else, so the
+  # for-others reading is not the same as it is in the other categories.
+  L("Event", "Who have you bought event tickets for?", "ASKED - self / someone else / for a group"),
+  L("EventType", "Types of event ticket bought", "no equivalent in the other categories"),
+  L("EventChannelMain", "Where do you buy event tickets most often?"),
+  L("EventChannelOther", "Where else have you bought event tickets in the past 12 months?"),
+  L("EventSportWatch_Purchased", "Buy tickets to watch sport at all in last 12 months?", DERIVED),
+  L("EventSportPlay_Purchased", "Buy entry to play sport at all in last 12 months?", DERIVED),
+  L("EventConcert_Purchased", "Buy concert tickets at all in last 12 months?", DERIVED),
+  L("EventCultural_Purchased", "Buy cultural event tickets at all in last 12 months?", DERIVED),
+  L("EventTheatre_Purchased", "Buy theatre tickets at all in last 12 months?", DERIVED),
+  L("EventOther_Purchased", "Buy other event tickets at all in last 12 months?", DERIVED),
+
+  # ---- wallet totals --------------------------------------------------------
+  # These carried developer notes as their question text - the definition of the
+  # measure, not a label a reader can use.
+  L("TotalBillSpend", "Total bill payments a month", "was an internal note about spend classes"),
+  L("TotalConsumptionSpend", "Total spend on services a month", "was an internal note"),
+  L("TotalTransferSent", "Total money sent a month", "was an internal note"),
+  L("TotalValueTransacted", "Total value transacted a month", "was an internal note"),
+  L("TotalTxnPerMonth", "Total transactions a month", "was an internal note")
 )
 
 wb <- openxlsx::createWorkbook()

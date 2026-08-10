@@ -173,6 +173,47 @@ describe_per_txn_missing_rule <- function(row) {
 #' @param config The VAS_CONFIG list.
 #'
 #' @return A three-row data frame.
+#' What a category assumes rather than asks
+#'
+#' Read from one map row. Both the per-side labels and the roll-up label go
+#' through here, so a category cannot end up marked on one and clean on the
+#' other — which is exactly what happened when they each tested it themselves.
+#'
+#' Note nzchar(NA) is TRUE, so the NA check is doing real work: without it every
+#' category with a blank assumed_cadence reads as having one.
+#'
+#' @param row One row of the category map.
+#'
+#' @return A list of three logicals: value, freq and spend.
+category_assumptions <- function(row) {
+  cadence <- row$assumed_cadence[1]
+  freq <- !is.na(cadence) && nzchar(cadence)
+  return(list(
+    value = identical(row$amount_basis[1], "imputed"),
+    freq  = freq,
+    # Monthly spend only inherits the frequency assumption when it was built
+    # with it. Where the amount is already asked monthly, the spend figure is
+    # the respondent's own number.
+    spend = freq && !identical(row$amount_basis[1], "monthly")
+  ))
+}
+
+#' Name the assumptions behind a money figure
+#'
+#' Returns a single phrase rather than two, so a label reads "at an assumed
+#' value and frequency" instead of stacking one qualifier on another.
+#'
+#' @param value Whether the amount is imputed rather than asked.
+#' @param freq Whether the frequency is assumed rather than asked.
+#'
+#' @return A phrase, or NULL when nothing is assumed.
+assumption_phrase <- function(value, freq) {
+  if (value && freq) return("at an assumed value and frequency")
+  if (value) return("at an assumed value")
+  if (freq) return("at an assumed frequency")
+  return(NULL)
+}
+
 #' Build a label's trailing parenthetical
 #'
 #' Joins whichever qualifiers apply into a single bracketed phrase, so a label
@@ -205,7 +246,12 @@ dictionary_for_map_row <- function(row, config) {
   # respondent's count multiplied by an assumed value from the config, so the
   # money labels have to say so — read as a plain average, a figure that is the
   # same assumption for everyone looks like a measured result.
-  assumed <- identical(row$amount_basis, "imputed")
+  # Where amount_basis is "imputed" the survey never asks a price, and where
+  # assumed_cadence is set it never asks a frequency — transactions per month is
+  # then a constant, 1 a month or 1/12 for the annual ones. A mean of 1.00 with
+  # a standard deviation of 0.00 reads as a finding unless the label says where
+  # it came from.
+  asm <- category_assumptions(row)
   sources <- paste(stats::na.omit(c(row$freq1, row$freq2, row$freq3, row$freq4,
                                     row$amount_alias, row$count_alias, row$legs_alias,
                                     row$presence_alias)), collapse = ", ")
@@ -213,18 +259,19 @@ dictionary_for_map_row <- function(row, config) {
   return(rbind(
     dictionary_row(paste0(stem, "TxnPerMonth"), "Category", row$category, row$base,
                    "TxnPerMonth", "transactions per month",
-                   sprintf("%s transactions per month%s", row$label, label_qualifier(view)),
+                   sprintf("%s transactions per month%s", row$label,
+                           label_qualifier(view, if (asm$freq) "at an assumed frequency")),
                    describe_txn_calculation(row, config), sources,
                    describe_txn_missing_rule(row)),
     dictionary_row(paste0(stem, "MonthlySpend"), "Category", row$category, row$base,
                    "MonthlySpend", "rand per month",
                    sprintf("%s spend per month%s", row$label,
-                           label_qualifier(view, if (assumed) "at an assumed value")),
+                           label_qualifier(view, assumption_phrase(asm$value, asm$spend))),
                    describe_spend_calculation(row, stem), sources,
                    describe_spend_missing_rule(row)),
     dictionary_row(paste0(stem, "SpendPerTxn"), "Category", row$category, row$base,
                    "SpendPerTxn", "rand per transaction",
-                   if (assumed) {
+                   if (asm$value) {
                      sprintf("%s assumed value per transaction%s", row$label,
                              label_qualifier(view))
                    } else {
@@ -240,28 +287,34 @@ dictionary_for_map_row <- function(row, config) {
 #'
 #' @param category The category name.
 #' @param label The category's display label.
-#' @param assumed Whether the category's price is imputed rather than asked.
+#' @param asm What the category assumes, from category_assumptions().
 #'
 #' @return A three-row data frame.
-dictionary_for_derived_total <- function(category, label, assumed = FALSE) {
+dictionary_for_derived_total <- function(category, label,
+                                        asm = category_assumptions(
+                                          data.frame(amount_basis = NA_character_,
+                                                     assumed_cadence = NA_character_))) {
   stem <- sprintf("%s_Total_", category)
   return(rbind(
     dictionary_row(paste0(stem, "TxnPerMonth"), "Category", category, "Total",
                    "TxnPerMonth", "transactions per month",
-                   sprintf("%s transactions per month (for everyone)", label),
+                   sprintf("%s transactions per month%s", label,
+                           label_qualifier("for everyone",
+                                           if (asm$freq) "at an assumed frequency")),
                    sprintf("%s_Own_TxnPerMonth + %s_Oth_TxnPerMonth", category, category),
                    sprintf("%s_Own_TxnPerMonth, %s_Oth_TxnPerMonth", category, category),
                    "Summed over whichever side is present. Missing only when both sides are missing."),
     dictionary_row(paste0(stem, "MonthlySpend"), "Category", category, "Total",
                    "MonthlySpend", "rand per month",
                    sprintf("%s spend per month%s", label,
-                           label_qualifier("for everyone", if (assumed) "at an assumed value")),
+                           label_qualifier("for everyone",
+                                           assumption_phrase(asm$value, asm$spend))),
                    sprintf("%s_Own_MonthlySpend + %s_Oth_MonthlySpend", category, category),
                    sprintf("%s_Own_MonthlySpend, %s_Oth_MonthlySpend", category, category),
                    "Summed over whichever side is present. Missing only when both sides are missing."),
     dictionary_row(paste0(stem, "SpendPerTxn"), "Category", category, "Total",
                    "SpendPerTxn", "rand per transaction",
-                   if (assumed) {
+                   if (asm$value) {
                      sprintf("%s assumed value per transaction (for everyone)", label)
                    } else {
                      sprintf("Average %s value per transaction (for everyone)", label)
