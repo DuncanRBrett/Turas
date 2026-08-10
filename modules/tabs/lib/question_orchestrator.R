@@ -145,6 +145,32 @@ prepare_question_data <- function(question_code, base_filter,
   }
 
   # ============================================================================
+  # STEP 2b: AN EMPTY SUBGROUP IS A FINDING, NOT A FAILURE
+  # ============================================================================
+  # A base filter can legitimately match nobody — a "bought for someone else"
+  # measure in a category nobody buys for others, a routed question no one
+  # reached. That is a fact about the study, not a broken config. It must not
+  # take the run down: create_banner_row_indices refuses on a zero-row frame
+  # (validate_data_frame, min_rows = 1), which abandoned every question after
+  # it. The question is skipped, named, and the run carries on to the rest.
+
+  if (nrow(filtered_data) == 0) {
+    cat("\n┌─── TURAS TABS: QUESTION SKIPPED ──────────────────────────┐\n")
+    cat("│ Question:", question_code, "\n")
+    cat("│ Reason:   its base filter matches no respondents\n")
+    cat("│ Filter:  ", base_filter, "\n")
+    cat("│ Effect:   this question is left out of the report; every other\n")
+    cat("│           question still runs. It returns on its own once the\n")
+    cat("│           subgroup has anyone in it.\n")
+    cat("└───────────────────────────────────────────────────────────┘\n\n")
+    return(list(
+      skip = TRUE,
+      question_code = question_code,
+      reason = sprintf("Base filter '%s' matches no respondents", base_filter)
+    ))
+  }
+
+  # ============================================================================
   # STEP 3: CREATE BANNER ROW INDICES
   # ============================================================================
 
@@ -682,9 +708,14 @@ process_all_questions <- function(questions_to_process, survey_data,
                                  is_weighted = FALSE,
                                  total_column = "Total",
                                  all_questions = NULL,
-                                 processed_so_far = character(0)) {
+                                 processed_so_far = character(0),
+                                 results_so_far = list()) {
 
-  all_results <- list()
+  # Seeded with the checkpoint's results. Without this a resumed run keeps only
+  # the questions it processed AFTER the crash: the earlier ones are counted as
+  # done (they are excluded from remaining_questions) but their results are
+  # gone, so the report silently ships short and still reports PASS.
+  all_results <- results_so_far
   processed_questions <- processed_so_far
   n_initial_processed <- length(processed_so_far)   # Captured once; does not grow with the loop
   skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
@@ -721,6 +752,19 @@ process_all_questions <- function(questions_to_process, survey_data,
       current_question_code, base_filter,
       survey_data, survey_structure, banner_info, master_weights
     )
+
+    # An empty subgroup is a deliberate, explained skip — it carries its own
+    # reason and is NOT the "unexpected failure" case below.
+    if (isTRUE(prepared_data$skip)) {
+      skipped_questions[[current_question_code]] <- list(
+        question_code = current_question_code,
+        reason = prepared_data$reason,
+        stage = "prepare_question_data"
+      )
+      message(sprintf("[TRS PARTIAL] Skipping %s: %s",
+                      current_question_code, prepared_data$reason))
+      next
+    }
 
     if (is.null(prepared_data)) {
       # TRS v1.0: Record skipped question for PARTIAL status disclosure

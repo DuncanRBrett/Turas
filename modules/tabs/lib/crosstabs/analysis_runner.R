@@ -230,13 +230,16 @@ get_progress_callback <- function() {
 #' @param total_column Character, total column name
 #' @param crosstab_questions Data frame, all questions
 #' @param processed_questions Character vector, already processed
+#' @param results_so_far List, results restored from a checkpoint (carried into
+#'   the run so a resume does not lose everything processed before the crash)
 #' @return List with results and status
 #' @export
 process_questions <- function(remaining_questions, survey_data, survey_structure,
                                banner_info, master_weights, config_obj,
                                checkpoint_file, checkpoint_frequency,
                                is_weighted, total_column,
-                               crosstab_questions, processed_questions) {
+                               crosstab_questions, processed_questions,
+                               results_so_far = list()) {
 
   log_message(sprintf("Processing %d questions...", nrow(remaining_questions)), "INFO")
   cat("\n")
@@ -257,7 +260,8 @@ process_questions <- function(remaining_questions, survey_data, survey_structure
     is_weighted = is_weighted,
     total_column = total_column,
     all_questions = crosstab_questions,
-    processed_so_far = processed_questions
+    processed_so_far = processed_questions,
+    results_so_far = results_so_far
   )
 
   cat("\n")
@@ -522,7 +526,8 @@ run_crosstabs_analysis <- function(config_result, data_result,
     data_result$is_weighted,
     total_column,
     data_result$crosstab_questions,
-    checkpoint_state$processed_questions
+    checkpoint_state$processed_questions,
+    checkpoint_state$all_results
   )
 
   all_results <- orchestration_result$all_results
