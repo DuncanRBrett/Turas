@@ -25,7 +25,7 @@ VAS_CATEGORY_MAP_FILE <- "vas_category_map.csv"
 # Reporting labels: the question text a reader should see, where the survey's
 # own wording or the dictionary's description is not it. Optional — a study
 # without the file simply has no overrides.
-VAS_REPORT_LABELS_FILE <- "vas_report_labels.csv"
+VAS_REPORT_LABELS_FILE <- "vas_report_labels.xlsx"
 
 #' Load the calculation library from a code directory
 #'

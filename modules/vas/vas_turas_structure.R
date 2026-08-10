@@ -212,17 +212,18 @@ write_turas_config <- function(questions, structure_file_name, path) {
 #' phrased for documentation ("Whether the respondent purchases Prepaid
 #' electricity at all."). Both are correct and neither belongs on a crosstab.
 #'
-#' \code{vas_report_labels.csv} is where a reporting label is written instead.
+#' \code{vas_report_labels.xlsx} is where a reporting label is written instead.
 #' Two columns, \code{question_code} and \code{question_text}; one row per
-#' question you want to reword. It survives every rebuild, which hand-editing
-#' the generated structure workbook does not.
+#' question you want to reword. Any other columns are ignored, so a notes column
+#' is free. It survives every rebuild, which hand-editing the generated
+#' structure workbook does not.
 #'
 #' A code that matches nothing is refused rather than ignored. A typo that
 #' silently does nothing is the worst outcome here: the run succeeds, the label
 #' does not change, and there is no reason on the screen to look at the file.
 #'
 #' @param questions The combined Questions data frame.
-#' @param code_dir The directory holding vas_report_labels.csv. A missing file
+#' @param code_dir The directory holding vas_report_labels.xlsx. A missing file
 #'   means no overrides, which is a valid state.
 #'
 #' @return The Questions data frame with QuestionText replaced where a code matched.
@@ -232,8 +233,10 @@ apply_report_labels <- function(questions, code_dir = ".") {
     return(questions)
   }
 
-  labels <- utils::read.csv(labels_path, stringsAsFactors = FALSE,
-                            colClasses = "character")
+  # openxlsx, like every other Excel read in this module — readxl is not part of
+  # the VAS module's dependency set.
+  labels <- openxlsx::read.xlsx(labels_path, sheet = 1)
+  labels[] <- lapply(labels, as.character)
 
   required <- c("question_code", "question_text")
   missing_cols <- setdiff(required, names(labels))

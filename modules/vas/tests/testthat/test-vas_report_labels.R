@@ -3,7 +3,7 @@
 # ==============================================================================
 # The text a reader sees comes from two places, neither written for them: an
 # asked question carries its Alchemer title, a derived column carries its
-# dictionary description. vas_report_labels.csv is where a reporting label goes
+# dictionary description. vas_report_labels.xlsx is where a reporting label goes
 # instead, and it has to survive a rebuild — which hand-editing the generated
 # structure workbook does not.
 # ==============================================================================
@@ -19,7 +19,11 @@ questions_fixture <- function() {
 }
 
 write_labels <- function(dir, df) {
-  utils::write.csv(df, file.path(dir, "vas_report_labels.csv"), row.names = FALSE)
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Labels")
+  openxlsx::writeData(wb, "Labels", df)
+  openxlsx::saveWorkbook(wb, file.path(dir, "vas_report_labels.xlsx"),
+                         overwrite = TRUE)
   dir
 }
 
@@ -105,12 +109,28 @@ test_that("surrounding whitespace in the file does not stop a match", {
 })
 
 test_that("the shipped label file matches its own contract", {
-  f <- file.path(dirname(dirname(getwd())), "vas_report_labels.csv")
+  f <- file.path(dirname(dirname(getwd())), "vas_report_labels.xlsx")
   skip_if_not(file.exists(f), "shipped label file not found from test wd")
 
-  labels <- utils::read.csv(f, stringsAsFactors = FALSE, colClasses = "character")
+  labels <- openxlsx::read.xlsx(f, sheet = 1)
   expect_true(all(c("question_code", "question_text") %in% names(labels)))
   expect_gt(nrow(labels), 0)
   expect_false(any(duplicated(trimws(labels$question_code))))
   expect_true(all(nzchar(trimws(labels$question_text))))
+})
+
+test_that("columns beyond the two required ones are ignored, not fatal", {
+  # The shipped file carries a note column so the reason for a wording is
+  # recorded beside it. That must not be mistaken for data.
+  d <- tempfile(); dir.create(d)
+  write_labels(d, data.frame(
+    question_code = "PPU",
+    question_text = "Who have you bought electricity for?",
+    note = "was the 12-month screener wording",
+    stringsAsFactors = FALSE))
+
+  out <- apply_report_labels(questions_fixture(), d)
+  expect_equal(out$QuestionText[out$QuestionCode == "PPU"],
+               "Who have you bought electricity for?")
+  expect_equal(names(out), names(questions_fixture()))
 })

@@ -40,6 +40,7 @@ examples/**/Output/
 # the contract that says what to read for every category; vas_turas_columns.csv
 # defines the published dataset. Without these the module cannot run.
 !modules/vas/*.csv
+!modules/vas/vas_report_labels.xlsx
 
 # EXCEPTION: Allow template files
 !templates/**/*.xlsx
