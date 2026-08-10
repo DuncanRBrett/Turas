@@ -179,8 +179,12 @@ dictionary_for_map_row <- function(row, config) {
                  "combined, as the survey asks a single question")
   # The reader label's view marker. The prose above reads as a sentence ending;
   # a crosstab row needs a tag that survives being read on its own.
-  view <- switch(row$base, Own = " (for self)", Oth = " (for others)",
-                 " (for everyone)")
+  #
+  # A map row with base "Total" belongs to a category the survey asks as a single
+  # question — there is no self / other split to roll up, so it takes no tag.
+  # "(for everyone)" is reserved for the genuine roll-up built by
+  # dictionary_for_derived_total(), where it means something.
+  view <- switch(row$base, Own = " (for self)", Oth = " (for others)", "")
   sources <- paste(stats::na.omit(c(row$freq1, row$freq2, row$freq3, row$freq4,
                                     row$amount_alias, row$count_alias, row$legs_alias,
                                     row$presence_alias)), collapse = ", ")
