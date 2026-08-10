@@ -622,11 +622,19 @@ Two Selection columns close that gap:
     out in plain words
 
 The report then badges each question **ASKED** or **DERIVED** beside its
-code. A derived question also carries its formula as a line under the
-base, on by default, and that line travels with the question into a
-pinned card and a PowerPoint slide. An asked question shows no line —
-the badge says everything, and its Source sits in the badge tooltip. The
-**Sources** toggle on the controls bar turns the lines off.
+code. A derived question always carries its formula as a line under the
+base, and that line travels with the question into a pinned card and a
+PowerPoint slide. An asked question shows no line — the badge says
+everything, and its Source sits in the badge tooltip.
+
+The **Sources** toggle on the controls bar governs only the source names
+beside the formula, not the formula itself. A DERIVED badge with nothing
+next to it would tell a reader the number was worked out and then
+withhold how, behind a control called "Sources" that they have no reason
+to click. So the Formula column is the one that earns its keep on a
+derived question; Source is optional there, naming what it was built
+from. On an asked question it is the other way round: without a Source
+the question carries no badge at all.
 
 A question with a formula reads as derived; a question with a source and
 no formula reads as asked. Nothing is inferred, so be careful which one

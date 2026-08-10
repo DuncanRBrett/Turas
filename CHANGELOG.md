@@ -10,14 +10,15 @@ All notable changes to TURAS are documented in this file.
   finished column, so a figure derived before the data reached it looks identical
   on the page to one someone was asked; these columns are what tells them apart.
   Each question card carries an **ASKED** or **DERIVED** badge beside its code.
-  A derived question also shows its formula as a line under the base, **on by
-  default** — the badge raises a question the reader should not have to find a
-  checkbox to answer — and that line travels into the card SVG and the PPTX
+  A derived question also shows its formula as a line under the base, **always**
+  — a DERIVED badge with no explanation beside it tells the reader the number
+  was worked out and then withholds how, and the control that would answer it is
+  named "Sources", which is not what they would go looking for — and that line travels into the card SVG and the PPTX
   slide kicker, which is where a derived figure is most likely to be misread with
   nobody there to explain it. An asked question shows no line; the badge is the
-  whole story and its Source sits in the tooltip. The **Sources** toggle turns
-  the lines off for a clean read or print (only the off state travels in the
-  report link). The rule is a declaration, never an inference: a Formula means
+  whole story and its Source sits in the tooltip. The **Sources** toggle governs only the source names
+  that follow the formula — the part a clean read or print can do without (only
+  the off state travels in the report link). The rule is a declaration, never an inference: a Formula means
   derived, a Source with no formula means asked, and a question declaring neither
   says nothing. Fully additive — a config without the columns produces a
   byte-identical report, and the toggle only appears when at least one question

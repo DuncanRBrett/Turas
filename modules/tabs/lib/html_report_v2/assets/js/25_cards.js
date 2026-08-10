@@ -168,8 +168,9 @@
       // Only offered when the study declares provenance — see hasProvenance().
       (hasProvenance()
         ? toggle("showSources", "Sources",
-            "Show where each question's numbers came from — the survey " +
-            "question behind it, or, for a derived figure, how it was worked out")
+            "Name the questions a derived figure was built from, beside the " +
+            "formula. How it was worked out always shows; this adds what it " +
+            "was worked out from")
         : "") +
       // Row scope is one explicit pick (not two checkboxes that can both go off
       // and empty the table). Global state, so it persists question to question.
@@ -551,24 +552,30 @@
   }
 
   /**
-   * The note under the title. DERIVED questions only, and on by default.
+   * The note under the title. DERIVED questions only.
    *
    * An asked question needs no line — the badge is the whole story, and 87 of
    * them saying "Source: survey question" is noise that would make the lines
    * that matter easier to skip. A derived one is the opposite case: the badge
    * announces that the number was worked out and then leaves the reader with
    * the obvious follow-up, so the answer sits on the card rather than behind a
-   * control nobody knows to click. The toggle stays as the way to turn the
-   * notes off for a clean read or print. An asked question's Source is still
-   * carried in the badge tooltip.
+   * control nobody knows to click. An asked question's Source is still carried
+   * in the badge tooltip.
+   *
+   * The formula is not the toggle's to hide. A DERIVED badge with no
+   * explanation beside it is worse than no badge at all — it tells the reader
+   * the number was worked out and then withholds how, and the control that
+   * would answer it is named "Sources", which is not what they are looking
+   * for. So the formula always shows; the toggle governs the source names
+   * that follow it, which are the part a clean read or print can do without.
    */
   function provNoteHtml(code) {
-    if (!TR.d2.state.showSources) return "";
     var p = provenance(code);
     if (!p || !p.derived) return "";
     var bits = [];
     if (p.formula) bits.push(fmt.escapeHtml(p.formula));
-    if (p.source) bits.push(fmt.escapeHtml(p.source));
+    if (p.source && TR.d2.state.showSources) bits.push(fmt.escapeHtml(p.source));
+    if (!bits.length) return "";
     return '<div class="provnote"><b>Derived:</b> ' + bits.join("  ·  ") + "</div>";
   }
   cards2._provNoteHtml = provNoteHtml;

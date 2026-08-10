@@ -115,11 +115,27 @@ run("P2: the note is for DERIVED questions only, formula first", () => {
   eq(TR.cards2._provNoteHtml("Gender"), "", "undeclared -> nothing rendered");
 });
 
-run("P3: the note is ON by default; the toggle turns it off", () => {
+run("P3: the formula is never hidden; the toggle governs the source names", () => {
   const src = readFileSync(path.join(JS_DIR, "20_data.js"), "utf8");
   at(src, "showSources: true", "default on — a reader should not have to find a checkbox");
+
+  // Toggle ON: how it was worked out, then what from.
+  const on = cardsSandbox([DERIVED], { showSources: true });
+  const noteOn = on.TR.cards2._provNoteHtml("Elec_Spend");
+  assert(noteOn.indexOf("mean monthly spend among buyers") !== -1, "formula shows");
+  assert(noteOn.indexOf("electricity amount question") !== -1, "source shows");
+
+  // Toggle OFF: the formula stays. A DERIVED badge with nothing beside it
+  // tells the reader the number was worked out and withholds how — and the
+  // control that would answer them is called "Sources", which is not what
+  // they would go looking for.
   const { TR } = cardsSandbox([DERIVED], { showSources: false });
-  eq(TR.cards2._provNoteHtml("Elec_Spend"), "", "toggle off -> no note");
+  const noteOff = TR.cards2._provNoteHtml("Elec_Spend");
+  assert(noteOff.indexOf("mean monthly spend among buyers") !== -1,
+    "toggle off -> the formula still shows");
+  assert(noteOff.indexOf("electricity amount question") === -1,
+    "toggle off -> the source name is gone");
+  assert(noteOff.indexOf("·") === -1, "toggle off -> no dangling separator");
   // The badge is not behind the toggle: whether a number was asked or worked
   // out is not something a reader should have to go looking for.
   const cards = readFileSync(path.join(JS_DIR, "25_cards.js"), "utf8");
