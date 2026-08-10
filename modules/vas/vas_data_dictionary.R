@@ -173,6 +173,21 @@ describe_per_txn_missing_rule <- function(row) {
 #' @param config The VAS_CONFIG list.
 #'
 #' @return A three-row data frame.
+#' Build a label's trailing parenthetical
+#'
+#' Joins whichever qualifiers apply into a single bracketed phrase, so a label
+#' reads "(for self, at an assumed value)" rather than "(for self) (at an
+#' assumed value)". Returns "" when there is nothing to qualify.
+#'
+#' @param ... Character qualifiers; NULL entries are dropped.
+#'
+#' @return A single string, empty or " (...)".
+label_qualifier <- function(...) {
+  parts <- unlist(list(...))
+  if (!length(parts)) return("")
+  return(sprintf(" (%s)", paste(parts, collapse = ", ")))
+}
+
 dictionary_for_map_row <- function(row, config) {
   stem <- sprintf("%s_%s_", row$category, row$base)
   side <- switch(row$base, Own = "for themselves", Oth = "for someone else",
@@ -184,7 +199,13 @@ dictionary_for_map_row <- function(row, config) {
   # question — there is no self / other split to roll up, so it takes no tag.
   # "(for everyone)" is reserved for the genuine roll-up built by
   # dictionary_for_derived_total(), where it means something.
-  view <- switch(row$base, Own = " (for self)", Oth = " (for others)", "")
+  view <- switch(row$base, Own = "for self", Oth = "for others", NULL)
+
+  # Where amount_basis is "imputed" the survey never asks a price. Spend is the
+  # respondent's count multiplied by an assumed value from the config, so the
+  # money labels have to say so — read as a plain average, a figure that is the
+  # same assumption for everyone looks like a measured result.
+  assumed <- identical(row$amount_basis, "imputed")
   sources <- paste(stats::na.omit(c(row$freq1, row$freq2, row$freq3, row$freq4,
                                     row$amount_alias, row$count_alias, row$legs_alias,
                                     row$presence_alias)), collapse = ", ")
@@ -192,17 +213,24 @@ dictionary_for_map_row <- function(row, config) {
   return(rbind(
     dictionary_row(paste0(stem, "TxnPerMonth"), "Category", row$category, row$base,
                    "TxnPerMonth", "transactions per month",
-                   sprintf("%s transactions per month%s", row$label, view),
+                   sprintf("%s transactions per month%s", row$label, label_qualifier(view)),
                    describe_txn_calculation(row, config), sources,
                    describe_txn_missing_rule(row)),
     dictionary_row(paste0(stem, "MonthlySpend"), "Category", row$category, row$base,
                    "MonthlySpend", "rand per month",
-                   sprintf("%s spend per month%s", row$label, view),
+                   sprintf("%s spend per month%s", row$label,
+                           label_qualifier(view, if (assumed) "at an assumed value")),
                    describe_spend_calculation(row, stem), sources,
                    describe_spend_missing_rule(row)),
     dictionary_row(paste0(stem, "SpendPerTxn"), "Category", row$category, row$base,
                    "SpendPerTxn", "rand per transaction",
-                   sprintf("Average %s value per transaction%s", row$label, view),
+                   if (assumed) {
+                     sprintf("%s assumed value per transaction%s", row$label,
+                             label_qualifier(view))
+                   } else {
+                     sprintf("Average %s value per transaction%s", row$label,
+                             label_qualifier(view))
+                   },
                    describe_per_txn_calculation(row, config, stem), sources,
                    describe_per_txn_missing_rule(row))
   ))
@@ -212,9 +240,10 @@ dictionary_for_map_row <- function(row, config) {
 #'
 #' @param category The category name.
 #' @param label The category's display label.
+#' @param assumed Whether the category's price is imputed rather than asked.
 #'
 #' @return A three-row data frame.
-dictionary_for_derived_total <- function(category, label) {
+dictionary_for_derived_total <- function(category, label, assumed = FALSE) {
   stem <- sprintf("%s_Total_", category)
   return(rbind(
     dictionary_row(paste0(stem, "TxnPerMonth"), "Category", category, "Total",
@@ -225,13 +254,18 @@ dictionary_for_derived_total <- function(category, label) {
                    "Summed over whichever side is present. Missing only when both sides are missing."),
     dictionary_row(paste0(stem, "MonthlySpend"), "Category", category, "Total",
                    "MonthlySpend", "rand per month",
-                   sprintf("%s spend per month (for everyone)", label),
+                   sprintf("%s spend per month%s", label,
+                           label_qualifier("for everyone", if (assumed) "at an assumed value")),
                    sprintf("%s_Own_MonthlySpend + %s_Oth_MonthlySpend", category, category),
                    sprintf("%s_Own_MonthlySpend, %s_Oth_MonthlySpend", category, category),
                    "Summed over whichever side is present. Missing only when both sides are missing."),
     dictionary_row(paste0(stem, "SpendPerTxn"), "Category", category, "Total",
                    "SpendPerTxn", "rand per transaction",
-                   sprintf("Average %s value per transaction (for everyone)", label),
+                   if (assumed) {
+                     sprintf("%s assumed value per transaction (for everyone)", label)
+                   } else {
+                     sprintf("Average %s value per transaction (for everyone)", label)
+                   },
                    sprintf("%sMonthlySpend / %sTxnPerMonth\nA true weighted figure, NOT the mean of the Own and Oth rates.", stem, stem),
                    sprintf("%sMonthlySpend, %sTxnPerMonth", stem, stem),
                    "Missing when total transactions are zero or missing.")

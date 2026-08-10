@@ -304,7 +304,9 @@ build_data_dictionary <- function(category_map, config) {
         rows[[length(rows) + 1L]] <- dictionary_for_map_row(map_row, config)
       } else if (identical(base, "Total") && nrow(category_rows) > 1L) {
         rows[[length(rows) + 1L]] <-
-          dictionary_for_derived_total(category, category_rows$label[1])
+          dictionary_for_derived_total(
+            category, category_rows$label[1],
+            assumed = identical(category_rows$amount_basis[1], "imputed"))
       }
     }
   }
