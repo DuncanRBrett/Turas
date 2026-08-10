@@ -177,6 +177,10 @@ dictionary_for_map_row <- function(row, config) {
   stem <- sprintf("%s_%s_", row$category, row$base)
   side <- switch(row$base, Own = "for themselves", Oth = "for someone else",
                  "combined, as the survey asks a single question")
+  # The reader label's view marker. The prose above reads as a sentence ending;
+  # a crosstab row needs a tag that survives being read on its own.
+  view <- switch(row$base, Own = " (for self)", Oth = " (for others)",
+                 " (for everyone)")
   sources <- paste(stats::na.omit(c(row$freq1, row$freq2, row$freq3, row$freq4,
                                     row$amount_alias, row$count_alias, row$legs_alias,
                                     row$presence_alias)), collapse = ", ")
@@ -184,17 +188,17 @@ dictionary_for_map_row <- function(row, config) {
   return(rbind(
     dictionary_row(paste0(stem, "TxnPerMonth"), "Category", row$category, row$base,
                    "TxnPerMonth", "transactions per month",
-                   sprintf("How often the respondent buys or pays %s, %s.", row$label, side),
+                   sprintf("%s transactions per month%s", row$label, view),
                    describe_txn_calculation(row, config), sources,
                    describe_txn_missing_rule(row)),
     dictionary_row(paste0(stem, "MonthlySpend"), "Category", row$category, row$base,
                    "MonthlySpend", "rand per month",
-                   sprintf("What the respondent spends on %s in a month, %s.", row$label, side),
+                   sprintf("%s spend per month%s", row$label, view),
                    describe_spend_calculation(row, stem), sources,
                    describe_spend_missing_rule(row)),
     dictionary_row(paste0(stem, "SpendPerTxn"), "Category", row$category, row$base,
                    "SpendPerTxn", "rand per transaction",
-                   sprintf("What one %s transaction costs, %s.", row$label, side),
+                   sprintf("Average %s value per transaction%s", row$label, view),
                    describe_per_txn_calculation(row, config, stem), sources,
                    describe_per_txn_missing_rule(row))
   ))
@@ -211,19 +215,19 @@ dictionary_for_derived_total <- function(category, label) {
   return(rbind(
     dictionary_row(paste0(stem, "TxnPerMonth"), "Category", category, "Total",
                    "TxnPerMonth", "transactions per month",
-                   sprintf("Total %s transactions a month", label),
+                   sprintf("%s transactions per month (for everyone)", label),
                    sprintf("%s_Own_TxnPerMonth + %s_Oth_TxnPerMonth", category, category),
                    sprintf("%s_Own_TxnPerMonth, %s_Oth_TxnPerMonth", category, category),
                    "Summed over whichever side is present. Missing only when both sides are missing."),
     dictionary_row(paste0(stem, "MonthlySpend"), "Category", category, "Total",
                    "MonthlySpend", "rand per month",
-                   sprintf("Total monthly spend on %s", label),
+                   sprintf("%s spend per month (for everyone)", label),
                    sprintf("%s_Own_MonthlySpend + %s_Oth_MonthlySpend", category, category),
                    sprintf("%s_Own_MonthlySpend, %s_Oth_MonthlySpend", category, category),
                    "Summed over whichever side is present. Missing only when both sides are missing."),
     dictionary_row(paste0(stem, "SpendPerTxn"), "Category", category, "Total",
                    "SpendPerTxn", "rand per transaction",
-                   sprintf("What one %s transaction costs across both sides.", label),
+                   sprintf("Average %s value per transaction (for everyone)", label),
                    sprintf("%sMonthlySpend / %sTxnPerMonth\nA true weighted figure, NOT the mean of the Own and Oth rates.", stem, stem),
                    sprintf("%sMonthlySpend, %sTxnPerMonth", stem, stem),
                    "Missing when total transactions are zero or missing.")
