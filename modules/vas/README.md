@@ -33,9 +33,32 @@ the project folder on OneDrive (`Electrum/VAS 2026/`), which set
 | `vas_derive_category.R` | one category, one base (Own / Oth) |
 | `vas_derive.R` | Own + Oth into Total, the wallet totals, the published columns |
 | `vas_category_map.csv` | one row per category and base — what to read and how |
+| `vas_report_labels.csv` | the question text a reader should see, where the survey's own wording or the dictionary's description is not it |
 | `vas_turas_*.R` + `vas_turas_columns.csv` | the Turas dataset, structure and config |
 | `docs/` | the calculation reference and the dataset plan |
 | `tests/testthat/` | 458 assertions — `testthat::test_dir("tests/testthat")` |
+
+## Rewording a question for the report
+
+Two different labels reach the crosstab, and neither was written for a reader.
+An asked question carries its Alchemer title, phrased for the respondent. A
+derived column carries its dictionary description, phrased for documentation.
+
+`vas_report_labels.csv` has the last word. Two columns — `question_code` and
+`question_text` — one row per question you want to reword. It is applied when
+the structure workbook is built, so it survives every rebuild; hand-editing the
+generated `VAS_Survey_Structure.xlsx` does not, because the next data build
+overwrites it.
+
+A code that matches nothing in the study **stops the build** and names the
+offending code. A typo that silently did nothing would be worse: the run would
+succeed, the label would not change, and there would be no reason to look at the
+file.
+
+For wording that should change for *every* category — the derived families like
+`_Total_TxnPerMonth` — edit the description templates in
+`vas_data_dictionary.R` / `vas_data_dictionary_headline.R` instead. One edit
+there covers all 33 categories; the labels file is for the exceptions.
 
 ## Things that will catch you
 

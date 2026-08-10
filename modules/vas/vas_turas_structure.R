@@ -200,3 +200,81 @@ write_turas_config <- function(questions, structure_file_name, path) {
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   return(invisible(path))
 }
+
+
+#' Apply the reporting label overrides
+#'
+#' The question text a reader sees comes from two places, neither of which was
+#' written for them: an asked question carries its Alchemer title, which is
+#' phrased for the respondent ("Have you bought prepaid electricity in the last
+#' 12 months, either for your own household or someone else's? (Select all that
+#' apply)"), and a derived column carries its dictionary description, which is
+#' phrased for documentation ("Whether the respondent purchases Prepaid
+#' electricity at all."). Both are correct and neither belongs on a crosstab.
+#'
+#' \code{vas_report_labels.csv} is where a reporting label is written instead.
+#' Two columns, \code{question_code} and \code{question_text}; one row per
+#' question you want to reword. It survives every rebuild, which hand-editing
+#' the generated structure workbook does not.
+#'
+#' A code that matches nothing is refused rather than ignored. A typo that
+#' silently does nothing is the worst outcome here: the run succeeds, the label
+#' does not change, and there is no reason on the screen to look at the file.
+#'
+#' @param questions The combined Questions data frame.
+#' @param code_dir The directory holding vas_report_labels.csv. A missing file
+#'   means no overrides, which is a valid state.
+#'
+#' @return The Questions data frame with QuestionText replaced where a code matched.
+apply_report_labels <- function(questions, code_dir = ".") {
+  labels_path <- file.path(path.expand(code_dir), VAS_REPORT_LABELS_FILE)
+  if (!file.exists(labels_path)) {
+    return(questions)
+  }
+
+  labels <- utils::read.csv(labels_path, stringsAsFactors = FALSE,
+                            colClasses = "character")
+
+  required <- c("question_code", "question_text")
+  missing_cols <- setdiff(required, names(labels))
+  if (length(missing_cols) > 0) {
+    stop(sprintf(
+      "%s must have columns %s. Missing: %s",
+      basename(labels_path), paste(required, collapse = " and "),
+      paste(missing_cols, collapse = ", ")), call. = FALSE)
+  }
+
+  labels$question_code <- trimws(labels$question_code)
+  labels$question_text <- trimws(labels$question_text)
+  labels <- labels[nzchar(labels$question_code) & nzchar(labels$question_text), ,
+                   drop = FALSE]
+  if (nrow(labels) == 0) {
+    return(questions)
+  }
+
+  dups <- unique(labels$question_code[duplicated(labels$question_code)])
+  if (length(dups) > 0) {
+    stop(sprintf("%s lists %s more than once. One label per question.",
+                 basename(labels_path), paste(dups, collapse = ", ")),
+         call. = FALSE)
+  }
+
+  unknown <- setdiff(labels$question_code, questions$QuestionCode)
+  if (length(unknown) > 0) {
+    stop(sprintf(
+      paste0("%s names %d question code(s) that do not exist in this study: %s\n",
+             "  Nothing was relabelled. Check the spelling against the ",
+             "QuestionCode column of the generated structure workbook."),
+      basename(labels_path), length(unknown),
+      paste(unknown, collapse = ", ")), call. = FALSE)
+  }
+
+  idx <- match(questions$QuestionCode, labels$question_code)
+  hit <- !is.na(idx)
+  questions$QuestionText[hit] <- labels$question_text[idx[hit]]
+
+  cat(sprintf("Reporting labels: %d question(s) relabelled from %s\n",
+              sum(hit), basename(labels_path)))
+
+  return(questions)
+}

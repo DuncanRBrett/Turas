@@ -249,7 +249,7 @@ dictionary_purchased_rows <- function(category_map) {
     label <- category_map$label[category_map$category == category][1]
     dictionary_row(paste0(category, "_Purchased"), "Purchased", category, "Total", NA,
                    "TRUE/FALSE",
-                   sprintf("Whether the respondent purchases %s at all.", label),
+                   sprintf("Buy %s at all in last 12 months?", label),
                    sprintf("%s_Total_TxnPerMonth > 0, OR the status says they buy but a figure is missing (freq_missing / amount_missing / partial).",
                            category),
                    sprintf("the %s frequency and amount questions", label),

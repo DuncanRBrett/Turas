@@ -285,6 +285,11 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   structure <- list(questions = rbind(content$questions, derived_rows$questions),
                     options = rbind(content$options, derived_rows$options))
 
+  # An asked question carries its Alchemer title and a derived column carries
+  # its dictionary description. Neither was written for a report reader, so
+  # vas_report_labels.csv gets the last word on the text.
+  structure$questions <- apply_report_labels(structure$questions, code_dir)
+
   cat(sprintf("\nTuras dataset: %d respondents x %d columns (%d excluded by the register)\n",
               nrow(data), ncol(data), length(filtered$excluded)))
   report_option_mismatches(data, structure)
