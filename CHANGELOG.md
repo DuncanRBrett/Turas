@@ -5,6 +5,35 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Tabs: question provenance** — two optional Selection columns, `Source` and
+  `Formula`, say where each question's numbers came from. Turas only ever meets a
+  finished column, so a figure derived before the data reached it looks identical
+  on the page to one someone was asked; these columns are what tells them apart.
+  Each question card carries an **ASKED** or **DERIVED** badge beside its code.
+  A derived question also shows its formula as a line under the base, **on by
+  default** — the badge raises a question the reader should not have to find a
+  checkbox to answer — and that line travels into the card SVG and the PPTX
+  slide kicker, which is where a derived figure is most likely to be misread with
+  nobody there to explain it. An asked question shows no line; the badge is the
+  whole story and its Source sits in the tooltip. The **Sources** toggle turns
+  the lines off for a clean read or print (only the off state travels in the
+  report link). The rule is a declaration, never an inference: a Formula means
+  derived, a Source with no formula means asked, and a question declaring neither
+  says nothing. Fully additive — a config without the columns produces a
+  byte-identical report, and the toggle only appears when at least one question
+  declares provenance. Both
+  columns are documented on the generated Selection template. **Composites fill
+  their own**: the engine builds them, so it already knows which questions feed
+  a composite and how they combine, and writes `Q01, Q02, Q03` /
+  `mean of the 3 source questions` from the Composite_Metrics sheet with nothing
+  to declare — otherwise a calculated index would be the one obviously derived
+  figure on the page with nothing said about it. An analyst's own Source or
+  Formula on the composite's Selection row wins per field, which is also the
+  first time a composite reads its Selection row at all. Tests:
+  `test_data_layer_writer.R` (present when set, absent when not),
+  `test_composite_processor.R` (generated wording, the override, and the
+  weights never being described unless they match the source questions), and
+  `html_report_v2/tests/provenance_tests.mjs` (8).
 - **Tabs: Qualitative tab** — a dedicated view for pre-coded open-end / verbatim
   comments in the v2 interactive report. Coded themes are treated as ordinary quant
   (a multi-mention variable, each mention carrying a 1/2/3 sentiment valence), so

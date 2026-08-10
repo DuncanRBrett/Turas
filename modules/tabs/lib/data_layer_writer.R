@@ -586,7 +586,14 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
 
   base_types <- c("Base (n=)", "Base", "Base (n)",
                   "Unweighted Base", "Weighted Base", "Effective Base")
-  mean_types <- c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare")
+  # Median and Mode belong here with the other summary statistics. Without them
+  # a numeric question's Median row was COMPUTED (numeric_processor honours
+  # show_numeric_median), written to the workbook, and then silently dropped on
+  # the way into the v2 report: the "mean" branch below does `next` when a row's
+  # RowType is absent from this list. The Excel and the interactive report
+  # disagreed, with no warning either way.
+  mean_types <- c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare",
+                  "Median", "Mode")
 
   # Rows are keyed by (RowLabel, RowSource) — NOT label alone — so a
   # BoxCategory NET sharing its label with a displayed option (e.g. box
@@ -780,6 +787,16 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   key_share_val <- if (is.null(key_share_val) || length(key_share_val) == 0 || is.na(key_share_val[1])) ""
                    else as.character(key_share_val[1])
 
+  # Source / Formula = the question's provenance (Selection sheet). Source names
+  # where the numbers came from, Formula how a derived one was worked out. Both
+  # "" when the analyst declared neither.
+  source_val <- q_result$source
+  source_val <- if (is.null(source_val) || length(source_val) == 0 || is.na(source_val[1])) ""
+                else trimws(as.character(source_val[1]))
+  formula_val <- q_result$formula
+  formula_val <- if (is.null(formula_val) || length(formula_val) == 0 || is.na(formula_val[1])) ""
+                 else trimws(as.character(formula_val[1]))
+
   # BaseFilter / FilterLabel = the question's own audience (Selection sheet).
   # A routed question ("asked only of shops that allow signwriting") reports a
   # smaller base than the survey total, and the base on its own never says WHY
@@ -876,6 +893,12 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # neither column produces byte-identical output.
   if (nzchar(filter_label_val)) out$filter_label <- filter_label_val
   if (nzchar(base_filter_val)) out$base_filter <- base_filter_val
+
+  # Provenance: same rule — a config without the columns produces byte-identical
+  # output, so only a study that declares where its numbers come from gets the
+  # source note on its cards.
+  if (nzchar(source_val)) out$source <- source_val
+  if (nzchar(formula_val)) out$formula <- formula_val
 
   # Reader-experience source fields (READER_EXPERIENCE_PLAN.md §E). All are
   # OPTIONAL columns on the structure workbook's Questions sheet; each key is

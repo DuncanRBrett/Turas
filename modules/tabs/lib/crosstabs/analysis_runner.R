@@ -381,6 +381,34 @@ process_composites <- function(composite_defs, survey_data, survey_structure,
 }
 
 
+#' Provenance an analyst declared for a question on the Selection sheet
+#'
+#' Composites do not go through prepare_question_data(), so this is how their
+#' Selection row is read. Returns "" for a field the sheet does not carry or
+#' leaves blank, which is what lets the caller fall back to the composite's own
+#' definition per field rather than all-or-nothing.
+#'
+#' @param selection_df Data frame, the Selection sheet (may be NULL)
+#' @param code Character, the question code to look up
+#' @return list(source = character, formula = character)
+#' @keywords internal
+selection_declared_provenance <- function(selection_df, code) {
+  blank <- list(source = "", formula = "")
+  if (is.null(selection_df) || !is.data.frame(selection_df) ||
+      !"QuestionCode" %in% names(selection_df)) {
+    return(blank)
+  }
+  idx <- which(as.character(selection_df$QuestionCode) == code)
+  if (length(idx) == 0) return(blank)
+  cell <- function(col) {
+    if (!col %in% names(selection_df)) return("")
+    v <- selection_df[[col]][idx[1]]
+    if (is.null(v) || length(v) == 0 || is.na(v)) return("")
+    trimws(as.character(v))
+  }
+  list(source = cell("Source"), formula = cell("Formula"))
+}
+
 #' Add Composites to Results
 #'
 #' Adds composite results to the main results list.
@@ -388,9 +416,15 @@ process_composites <- function(composite_defs, survey_data, survey_structure,
 #' @param all_results List, all question results
 #' @param composite_results List, composite results
 #' @param banner_info List, banner information
+#' @param composite_defs Data frame, the Composite_Metrics sheet. Optional —
+#'   supplied so each composite can state its own provenance (which questions
+#'   feed it and how they combine) without the analyst retyping it.
+#' @param selection_df Data frame, the Selection sheet. Optional — an analyst's
+#'   own Source / Formula wins over the generated wording, per field.
 #' @return List, updated all_results
 #' @export
-add_composites_to_results <- function(all_results, composite_results, banner_info) {
+add_composites_to_results <- function(all_results, composite_results, banner_info,
+                                      composite_defs = NULL, selection_df = NULL) {
   if (length(composite_results) == 0) {
     return(all_results)
   }
@@ -440,6 +474,22 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
       }
     }
 
+    # Provenance. A composite is the one derived question the engine builds
+    # itself, so it can say which questions feed it and how they combine
+    # without anyone declaring it — otherwise a calculated index would be the
+    # one obviously derived figure on the page with nothing said about it.
+    # The analyst's own words still win, per field.
+    comp_def <- NULL
+    if (!is.null(composite_defs) && is.data.frame(composite_defs) &&
+        nrow(composite_defs) > 0 && "CompositeCode" %in% names(composite_defs)) {
+      di <- which(as.character(composite_defs$CompositeCode) == comp_code)
+      if (length(di) > 0) comp_def <- composite_defs[di[1], , drop = FALSE]
+    }
+    auto <- composite_provenance(comp_def)
+    declared <- selection_declared_provenance(selection_df, comp_code)
+    comp_source <- if (nzchar(declared$source)) declared$source else auto$source
+    comp_formula <- if (nzchar(declared$formula)) declared$formula else auto$formula
+
     # Convert to standard result format
     all_results[[comp_code]] <- list(
       question_code = comp_code,
@@ -447,6 +497,8 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
       question_type = "Composite",
       base_filter = NA,
       filter_label = NA_character_,
+      source = if (nzchar(comp_source)) comp_source else NA_character_,
+      formula = if (nzchar(comp_formula)) comp_formula else NA_character_,
       table = comp_result$question_table,
       bases = comp_bases
     )
@@ -574,7 +626,9 @@ run_crosstabs_analysis <- function(config_result, data_result,
   }
 
   # Add composites to results
-  all_results <- add_composites_to_results(all_results, composite_results, banner_info)
+  all_results <- add_composites_to_results(all_results, composite_results, banner_info,
+                                           data_result$composite_defs,
+                                           data_result$selection_df)
 
   # Return all results
   list(

@@ -66,6 +66,9 @@ source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 source(file.path(turas_root, "modules/tabs/lib/crosstabs/data_setup.R"))  # normalise_flag_column
 source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
+# analysis_runner supplies selection_declared_provenance() + the composite path
+# that decides between an analyst's declaration and the generated wording.
+source(file.path(turas_root, "modules/tabs/lib/crosstabs/analysis_runner.R"))
 
 
 # ==============================================================================
@@ -855,4 +858,102 @@ test_that("a respondent with no scoreable source does not count toward the base"
     make_composite_config())
 
   expect_equal(result$bases[["TOTAL::Total"]]$unweighted, nrow(data) - 2L)
+})
+
+# ==============================================================================
+# PROVENANCE — a composite states its own, and the Selection sheet overrides it
+# ==============================================================================
+
+test_that("composite_provenance reads the definition Turas already has", {
+  defs <- make_composite_defs()
+
+  m <- composite_provenance(defs[1, , drop = FALSE])
+  expect_identical(m$source, "Q_Sat1, Q_Sat2, Q_Sat3")
+  expect_identical(m$formula, "mean of the 3 source questions")
+
+  # The weights join the sentence only when there is one per source question.
+  w <- composite_provenance(defs[2, , drop = FALSE])
+  expect_identical(w$source, "Q_Sat1, Q_Sat2, Q_Sat3")
+  expect_identical(w$formula,
+                   "weighted mean of the 3 source questions (weights 0.5, 0.3, 0.2)")
+
+  s <- defs[1, , drop = FALSE]
+  s$CalculationType <- "Sum"
+  expect_identical(composite_provenance(s)$formula, "sum of the 3 source questions")
+
+  one <- defs[1, , drop = FALSE]
+  one$SourceQuestions <- "Q_Sat1"
+  expect_identical(composite_provenance(one)$formula, "mean of the 1 source question")
+})
+
+test_that("composite_provenance never describes a calculation it cannot verify", {
+  defs <- make_composite_defs()
+
+  # A weight list that does not match the source questions is not reported —
+  # naming weights the engine did not use would be worse than naming none.
+  bad <- defs[2, , drop = FALSE]
+  bad$Weights <- "0.5,0.3"
+  expect_identical(composite_provenance(bad)$formula,
+                   "weighted mean of the 3 source questions")
+
+  # An unrecognised type is the analyst's own word, not a guess.
+  odd <- defs[1, , drop = FALSE]
+  odd$CalculationType <- "Median"
+  expect_identical(composite_provenance(odd)$formula, "Median of the 3 source questions")
+
+  # Nothing to go on -> nothing said.
+  expect_identical(composite_provenance(NULL), list(source = "", formula = ""))
+  none <- defs[1, , drop = FALSE]
+  none$SourceQuestions <- NA_character_
+  expect_identical(composite_provenance(none), list(source = "", formula = ""))
+})
+
+test_that("the Selection sheet overrides the generated provenance, per field", {
+  # Only Formula is declared: the analyst's wording wins there, and the
+  # generated Source still stands. All-or-nothing would make an analyst retype
+  # the source list just to reword the calculation.
+  sel <- data.frame(
+    QuestionCode = c("OVERALL_SAT", "Q_Sat1"),
+    Source = c("", "survey question"),
+    Formula = c("the satisfaction index, as agreed with the client", ""),
+    stringsAsFactors = FALSE
+  )
+  got <- selection_declared_provenance(sel, "OVERALL_SAT")
+  expect_identical(got$source, "")
+  expect_identical(got$formula, "the satisfaction index, as agreed with the client")
+
+  # A code the sheet does not carry, and a sheet without the columns at all.
+  expect_identical(selection_declared_provenance(sel, "NOT_THERE"),
+                   list(source = "", formula = ""))
+  expect_identical(selection_declared_provenance(data.frame(QuestionCode = "X"), "X"),
+                   list(source = "", formula = ""))
+  expect_identical(selection_declared_provenance(NULL, "OVERALL_SAT"),
+                   list(source = "", formula = ""))
+})
+
+test_that("a composite reaches the results list carrying its provenance", {
+  # The seam that matters: whatever add_composites_to_results() puts on the
+  # result is what build_dl_question() reads onto the report card.
+  defs <- make_composite_defs()
+  comp <- list(OVERALL_SAT = list(
+    question_table = data.frame(RowLabel = "Overall Satisfaction", Total = 4.2,
+                                stringsAsFactors = FALSE),
+    metadata = list(composite_code = "OVERALL_SAT")))
+
+  auto <- add_composites_to_results(list(), comp, NULL, defs, NULL)
+  expect_identical(auto$OVERALL_SAT$source, "Q_Sat1, Q_Sat2, Q_Sat3")
+  expect_identical(auto$OVERALL_SAT$formula, "mean of the 3 source questions")
+
+  sel <- data.frame(QuestionCode = "OVERALL_SAT", Source = "",
+                    Formula = "the client's agreed satisfaction index",
+                    stringsAsFactors = FALSE)
+  over <- add_composites_to_results(list(), comp, NULL, defs, sel)
+  expect_identical(over$OVERALL_SAT$source, "Q_Sat1, Q_Sat2, Q_Sat3")
+  expect_identical(over$OVERALL_SAT$formula, "the client's agreed satisfaction index")
+
+  # No definitions and no Selection sheet: NA, not "", so the data layer omits
+  # the keys and a report with nothing to say stays byte-identical.
+  bare <- add_composites_to_results(list(), comp, NULL, NULL, NULL)
+  expect_true(is.na(bare$OVERALL_SAT$source))
+  expect_true(is.na(bare$OVERALL_SAT$formula))
 })

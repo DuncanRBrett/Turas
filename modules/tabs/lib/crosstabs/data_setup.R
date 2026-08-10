@@ -326,7 +326,11 @@ load_question_selection <- function(config_file) {
   # are the V12 qualitative jump columns on the open-end rows (CommentSheet = the
   # comment-workbook sheet that codes this open-end; CommentLink = the closed
   # question/composite it explains) — see qual_build_links().
-  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "KeyShare", "AreaSummary", "CommentSheet", "CommentLink")) {
+  # Source/Formula are the provenance pair: where a question's numbers came from,
+  # and — when it is not simply asked — how it was worked out. A study whose data
+  # is built before the config ever sees it (derived columns, composites) has no
+  # other way to say so, because the engine only ever meets the finished column.
+  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "KeyShare", "AreaSummary", "Source", "Formula", "CommentSheet", "CommentLink")) {
     if (!col %in% names(selection_df)) {
       selection_df[[col]] <- NA_character_
     } else {

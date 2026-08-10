@@ -645,6 +645,28 @@ process_single_question <- function(question_code, prepared_data,
     !is.na(question_row$AreaSummary) &&
     identical(toupper(trimws(question_row$AreaSummary)), "Y")
 
+  # Extract Source/Formula (optional): the question's provenance. Source names
+  # where the numbers come from — the survey question, or the columns a derived
+  # one was built from; Formula states how it was worked out. Both are the
+  # analyst's own words, because a column derived upstream arrives at the engine
+  # as a finished column with nothing left to infer from. Carried to the v2 data
+  # layer as q.source / q.formula, and shown on the question card.
+  q_source <- if (!is.null(question_row$Source) &&
+                  !is.na(question_row$Source) &&
+                  nzchar(trimws(question_row$Source))) {
+    trimws(question_row$Source)
+  } else {
+    NA_character_
+  }
+
+  q_formula <- if (!is.null(question_row$Formula) &&
+                   !is.na(question_row$Formula) &&
+                   nzchar(trimws(question_row$Formula))) {
+    trimws(question_row$Formula)
+  } else {
+    NA_character_
+  }
+
   # Extract human-readable filter label (optional, overrides raw filter expression in display)
   q_filter_label <- if (!is.null(question_row$FilterLabel) &&
                         !is.na(question_row$FilterLabel) &&
@@ -667,6 +689,8 @@ process_single_question <- function(question_code, prepared_data,
     theme = q_theme,
     key_share = q_key_share,
     area_summary = q_area_summary,
+    source = q_source,
+    formula = q_formula,
     partial_sections = partial_sections  # TRS v1.0: Track section-level failures
   ))
 }

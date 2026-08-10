@@ -127,9 +127,14 @@ run("A2: the card states \"Base: <label>\", escaped", () => {
 
 run("A2: the card renders it between the title and the live-filter strip", () => {
   const src = readFileSync(path.join(JS_DIR, "25_cards.js"), "utf8");
-  const line = at(src, "titleHtml(model) + audienceHtml(model) + contextStrip",
-    "audience sits in the question head");
-  assert(line > 0, "wired into renderActive");
+  // Ordering, not the literal line: other notes (e.g. the provenance line) sit
+  // between the audience and the context strip, so pinning the exact
+  // concatenation just breaks every time a neighbour is added.
+  const title = at(src, "titleHtml(model)", "title in the question head");
+  const aud = at(src, "audienceHtml(model)", "audience in the question head");
+  const ctx = at(src, "contextStrip + bannerTabsHtml()", "live-filter strip after it");
+  assert(title < aud && aud < ctx,
+    "audience sits after the title and before the live-filter strip");
   assert(/\.qaudience\s*\{/.test(CSS), ".qaudience styled");
 });
 

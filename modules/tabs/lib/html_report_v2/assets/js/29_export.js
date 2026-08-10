@@ -102,6 +102,11 @@
       // the question's own audience travels with every export of it, so a
       // routed question's smaller base is never read as a shortfall
       model.audience ? "Base: " + model.audience : "",
+      // A derived figure carries its derivation out of the report. A slide
+      // showing a per-person average with nothing saying so is exactly the
+      // misreading the provenance exists to prevent, and it happens where
+      // nobody is there to explain it.
+      (TR.cards2 && TR.cards2._provNoteText) ? TR.cards2._provNoteText(model.code) : "",
       note || ""].filter(Boolean).join(" · ");
     var matrix = opts.includeTable !== false ? TR.render.matrix(model) : null;
     // D2: a pin's stored insight title leads the card when the caller has one
@@ -1173,6 +1178,8 @@
         // model.audience = who the QUESTION was asked of (routing);
         // model.filterNote = the cut the READER pinned. Both, never merged.
         model.audience ? "Base: " + model.audience : "",
+        // and the derivation, for the same reason it rides the card SVG
+        (TR.cards2 && TR.cards2._provNoteText) ? TR.cards2._provNoteText(model.code) : "",
         model.filterNote || ""].filter(Boolean).join(" · "),
       title: flags.title || model.short_label || model.title,
       subtitle: model.code + " · " + model.title });

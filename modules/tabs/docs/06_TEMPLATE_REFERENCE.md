@@ -1201,6 +1201,69 @@ overview tab's console + diagnostics echo says so rather than acting on
 it silently (see `patterns_echo.R`). Remove the column from older
 configs — there is nothing to migrate it to.
 
+### Column: Source
+
+**What it does:** Says where this question's numbers come from. The
+question card badges itself **ASKED** or **DERIVED** next to the question
+code, and the Source is carried in that badge's tooltip.
+
+**Required:** No
+
+**What to enter:** The survey question behind the figure, or the columns
+a derived one was built from. Leave blank and the report says nothing
+about where this question came from.
+
+**Examples:** - `survey question` - `Q12 in the questionnaire` -
+`the electricity amount question` - `all category amount questions`
+
+**When to use:** Whenever a reader could reasonably wonder whether a
+figure was asked or worked out. That is always true of a study whose
+data is built before Turas sees it — derived columns, composites,
+anything computed upstream arrives as a finished column and the engine
+has no way to tell the difference.
+
+### Column: Formula
+
+**What it does:** Says how a derived figure was worked out, in plain
+words. A question with a formula is badged **DERIVED** on its card; a
+question with a Source and no formula is badged **ASKED**.
+
+A derived question shows the formula as a line under its base, on by
+default — the badge raises the question and the answer should not be
+behind a control a reader has to find. The line also travels into a
+pinned card and a PowerPoint slide, which is where a derived figure is
+most likely to be misread. An asked question shows no line: the badge is
+the whole story. The **Sources** toggle on the crosstab controls bar
+turns the lines off for a clean read or print.
+
+**Required:** No
+
+**What to enter:** The calculation in a phrase a reader would
+understand, not code.
+
+**Examples:** - `monthly spend / monthly transactions, among buyers` -
+`consumption spend / income band midpoint` -
+`transactions a month across ALL respondents; non-buyer = 0`
+
+**When to use:** On every column computed before the data reached
+Turas. Two figures that look alike often are not — a per-person average
+of each buyer's own ratio is a different number from total spend over
+total transactions, and the formula is what stops a reader confusing
+them.
+
+**Note:** These two columns are the only thing that distinguishes an
+asked figure from a derived one, and neither is inferred. A config that
+leaves both blank produces exactly the report it always did — no
+badges, and no Sources toggle on the controls bar.
+
+**Composites are the exception.** A composite is built by Turas, so it
+already knows which questions feed it and how they combine, and it fills
+its own Source and Formula from the Composite_Metrics sheet — you get
+`Q01, Q02, Q03` and `mean of the 3 source questions` without typing
+anything. Give the composite a Source or Formula on the Selection sheet
+and yours wins, per field: write only a Formula and the generated source
+list still stands.
+
 ### Column: BaseFilter
 
 **What it does:** Restricts the analysis to a subset of respondents.

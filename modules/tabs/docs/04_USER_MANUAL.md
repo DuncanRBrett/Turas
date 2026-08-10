@@ -196,6 +196,8 @@ as banner columns.
 | BannerLabel  | Label for banner column (e.g., "Gender")        |
 | DisplayOrder | Order for banner columns (1, 2, 3...)           |
 | CreateIndex  | Y to calculate mean/index for this question     |
+| Source       | Where this question's numbers come from (the survey question, or the columns a derived one was built from) |
+| Formula      | Derived questions only: how the figure was worked out, in plain words |
 | BaseFilter   | Optional filter expression                      |
 | FilterLabel  | Human-readable label shown in reports instead of the filter expression |
 
@@ -604,6 +606,47 @@ Example: To analyze among females aged 18-34:
 ```         
 Q_Gender == "Female" & Q_Age %in% c("18-24", "25-34")
 ```
+
+### Saying Where a Question's Numbers Came From
+
+Turas only ever sees a finished column. If a figure was worked out
+before the data reached it — a derived column, a composite, anything
+computed upstream — nothing in the data says so, and on the page it
+looks exactly like a question someone was asked.
+
+Two Selection columns close that gap:
+
+1.  In the Source column, name where the numbers come from — the survey
+    question, or the columns a derived figure was built from
+2.  For a derived figure, in the Formula column, say how it was worked
+    out in plain words
+
+The report then badges each question **ASKED** or **DERIVED** beside its
+code. A derived question also carries its formula as a line under the
+base, on by default, and that line travels with the question into a
+pinned card and a PowerPoint slide. An asked question shows no line —
+the badge says everything, and its Source sits in the badge tooltip. The
+**Sources** toggle on the controls bar turns the lines off.
+
+A question with a formula reads as derived; a question with a source and
+no formula reads as asked. Nothing is inferred, so be careful which one
+you write: a figure the respondent answered directly should carry a
+Source and no Formula, even if the data was cleaned on the way in.
+
+Example:
+
+| QuestionCode        | Source                          | Formula                                        |
+|---------------------|---------------------------------|------------------------------------------------|
+| Q01                 | survey question                 |                                                |
+| Spend_PerTransaction| Q01 spend and Q02 transactions  | monthly spend / monthly transactions, among buyers |
+
+Leave both blank and nothing changes — no badges, and the Sources toggle
+does not appear. Only a study that declares its provenance gets it.
+
+Composites are the exception: Turas builds them, so it knows the answer
+already and fills both columns from the Composite_Metrics sheet. Write
+your own Source or Formula on a composite's Selection row and yours wins
+for that field.
 
 ### Creating a Composite Score
 

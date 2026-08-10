@@ -19,6 +19,13 @@
     filters: [],            // [{q: "Q006", rows: [9, 10]}]
     showCounts: false,
     showIntervals: false,   // 95% interval ranges under every value
+    // Provenance notes under the question title. ON by default, deliberately:
+    // the DERIVED badge raises a question ("derived how?") that a reader should
+    // not have to find a checkbox to answer, and the note has to be on screen
+    // to travel into a pinned card or a PPTX slide — which is where a derived
+    // figure is most likely to be misread, with nobody there to explain it.
+    // A report whose config declares no provenance shows nothing either way.
+    showSources: true,
     heatmap: "bars",        // cell magnitude: "bars" | "heat" | "off"
     showChart: false,
     showDeltas: true,
@@ -275,6 +282,7 @@
     if (s.banner) parts.push("banner=" + s.banner);
     if (s.showCounts) parts.push("count=1");
     if (s.showIntervals) parts.push("iv=1");
+    if (!s.showSources) parts.push("src=0");   // on by default, so only the OFF state travels
     if (s.showChart) parts.push("chart=1");
     if (s.heatmap !== "bars") parts.push("heat=" + s.heatmap);
     if (s.filters.length) {
@@ -303,6 +311,7 @@
       if (k === "banner") s.banner = v;
       if (k === "count") s.showCounts = v === "1";
       if (k === "iv") s.showIntervals = v === "1";
+      if (k === "src") s.showSources = v === "1";
       if (k === "chart") s.showChart = v === "1";
       if (k === "heat") s.heatmap = v === "0" ? "off" : v;
       if (k === "filter") {

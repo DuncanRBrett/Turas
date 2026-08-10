@@ -1036,4 +1036,81 @@ process_all_composites <- function(composite_defs, data, questions_df,
   return(composite_results)
 }
 
+#' Provenance for a Composite, From Its Own Definition
+#'
+#' A composite is the one derived question the engine builds itself, so unlike
+#' a column worked out before the data arrived it has nothing to declare: the
+#' Composite_Metrics sheet has already said which questions feed it and how
+#' they combine. This turns that definition into the two sentences the report
+#' shows on the question card, so a composite is never the one obviously
+#' calculated figure on the page with nothing said about it.
+#'
+#' The Selection sheet still wins per field — see add_composites_to_results().
+#'
+#' @param composite_def One-row data frame from the Composite_Metrics sheet.
+#'
+#' @return A list with structure:
+#'   \item{source}{The source question codes, comma separated; "" if unknown}
+#'   \item{formula}{How they combine, in plain words; "" if unknown}
+#'
+#' @examples
+#' \dontrun{
+#'   composite_provenance(defs[1, ])
+#'   # $source  "Q01, Q02, Q03"
+#'   # $formula "mean of the 3 source questions"
+#' }
+#'
+#' @export
+composite_provenance <- function(composite_def) {
+  blank <- list(source = "", formula = "")
+  if (is.null(composite_def) || !is.data.frame(composite_def) ||
+      nrow(composite_def) == 0 || !"SourceQuestions" %in% names(composite_def)) {
+    return(blank)
+  }
+
+  sq <- composite_def$SourceQuestions[1]
+  if (is.null(sq) || length(sq) == 0 || is.na(sq)) return(blank)
+  codes <- trimws(strsplit(as.character(sq), ",")[[1]])
+  codes <- codes[nzchar(codes)]
+  if (length(codes) == 0) return(blank)
+
+  n <- length(codes)
+  noun <- sprintf("%d source question%s", n, if (n == 1) "" else "s")
+
+  calc <- if ("CalculationType" %in% names(composite_def) &&
+              !is.na(composite_def$CalculationType[1])) {
+    trimws(as.character(composite_def$CalculationType[1]))
+  } else {
+    ""
+  }
+
+  # The weights only join the sentence when they parse and there is one per
+  # source question — a half-read weight list would describe a calculation the
+  # engine did not do.
+  weight_note <- ""
+  if (identical(tolower(calc), "weightedmean") && "Weights" %in% names(composite_def) &&
+      !is.na(composite_def$Weights[1])) {
+    w <- suppressWarnings(as.numeric(trimws(strsplit(as.character(composite_def$Weights[1]), ",")[[1]])))
+    if (length(w) == n && !any(is.na(w))) {
+      weight_note <- sprintf(" (weights %s)", paste(format(w, trim = TRUE), collapse = ", "))
+    }
+  }
+
+  formula <- if (identical(tolower(calc), "mean")) {
+    sprintf("mean of the %s", noun)
+  } else if (identical(tolower(calc), "sum")) {
+    sprintf("sum of the %s", noun)
+  } else if (identical(tolower(calc), "weightedmean")) {
+    sprintf("weighted mean of the %s%s", noun, weight_note)
+  } else if (nzchar(calc)) {
+    # An unrecognised type is the analyst's word, used verbatim rather than
+    # guessed at — the validator is what rejects a type the engine cannot run.
+    sprintf("%s of the %s", calc, noun)
+  } else {
+    sprintf("combined from the %s", noun)
+  }
+
+  list(source = paste(codes, collapse = ", "), formula = formula)
+}
+
 message("[OK] Turas>Tabs composite_processor module loaded")

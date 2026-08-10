@@ -344,6 +344,40 @@ test_that("filter_label / base_filter (the question's own audience) reach the da
   expect_null(wb$base_filter)
 })
 
+test_that("source / formula (the question's provenance) reach the data layer", {
+  # A column derived before the config ever sees it arrives at the engine as a
+  # finished column — the analyst's declaration is the only thing that can say
+  # it was worked out rather than asked, so it has to travel with the question.
+  q <- make_dl_q_single()
+  q$source <- "PrepaidElectricity amount question"
+  q$formula <- "mean monthly spend among priced buyers"
+  wq <- build_dl_question(q, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_identical(wq$source, "PrepaidElectricity amount question")
+  expect_identical(wq$formula, "mean monthly spend among priced buyers")
+
+  # A question that was simply asked: a source, no formula. The report reads the
+  # missing formula as "asked", so it must stay absent rather than become "".
+  qa <- make_dl_q_single()
+  qa$source <- "survey question"
+  qa$formula <- NA
+  wa <- build_dl_question(qa, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_identical(wa$source, "survey question")
+  expect_null(wa$formula)
+
+  # Declared neither (and blank/whitespace cells): neither key is emitted, so a
+  # config without the columns produces byte-identical output.
+  uq <- build_dl_question(make_dl_q_single(), make_dl_banner_info(),
+                          make_dl_config(), low_base = 30)
+  expect_null(uq$source)
+  expect_null(uq$formula)
+  qb <- make_dl_q_single()
+  qb$source <- "   "
+  qb$formula <- ""
+  wb <- build_dl_question(qb, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_null(wb$source)
+  expect_null(wb$formula)
+})
+
 test_that("area_summary (the area's overall-question marker) is TRUE-only, absent otherwise", {
   q <- make_dl_q_scale()
   q$area_summary <- TRUE
@@ -1133,4 +1167,59 @@ test_that("a Frequency-only row among column %s carries its own stat", {
   expect_false("stat" %in% names(q$rows[[1]]))       # "Yes" is a column %
   expect_equal(q$rows[[2]]$stat, "Frequency")        # "Other" is a headcount
   expect_equal(unlist(q$rows[[2]]$pct), c(37, 20, 17))
+})
+
+# ==============================================================================
+# MEDIAN AND MODE MUST REACH THE V2 REPORT
+# ==============================================================================
+# numeric_processor honours show_numeric_median / show_numeric_mode and writes
+# those rows to the workbook, but the data layer's mean_types whitelist omitted
+# them — so the "mean" branch hit `next` and the rows vanished on the way into
+# the interactive report. The Excel and the v2 report disagreed silently.
+
+make_dl_q_numeric_full <- function() {
+  list(
+    question_code = "Q3b", question_text = "Transactions a month",
+    question_type = "Numeric", category = "Service",
+    table = data.frame(
+      RowLabel  = c("Mean", "Median", "Mode", "Standard Deviation"),
+      RowType   = c("Average", "Median", "Mode", "StdDev"),
+      RowSource = c("summary", "summary", "summary", "summary"),
+      "TOTAL::Total"   = c("2.5", "1.6", "1.0", "3.0"),
+      "Gender::Male"   = c("2.2", "1.5", "1.0", "2.8"),
+      "Gender::Female" = c("2.8", "1.7", "1.0", "3.1"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 390, weighted = 390, effective = 390),
+      "Gender::Male"   = list(unweighted = 168, weighted = 168, effective = 168),
+      "Gender::Female" = list(unweighted = 222, weighted = 222, effective = 222))
+  )
+}
+
+test_that("Median and Mode rows survive into the data layer", {
+  q <- build_dl_question(make_dl_q_numeric_full(), make_dl_banner_info(),
+                         make_dl_config(), low_base = 30)
+  labels <- vapply(q$rows, function(r) r$label, character(1))
+  expect_true("Mean" %in% labels)
+  expect_true("Median" %in% labels)
+  expect_true("Mode" %in% labels)
+  expect_true("Standard Deviation" %in% labels)
+
+  med <- q$rows[[which(labels == "Median")]]
+  expect_equal(med$kind, "mean")
+  expect_equal(med$pct[[1]], 1.6)
+})
+
+test_that("adding Median/Mode does not change the headline metric type", {
+  # metric_type keys off Average/Mean/Index/Score only — a Median row must not
+  # claim it, or a plain numeric question would land on the index dashboard
+  # alongside genuine ratings. Compared against the Mean+StdDev fixture rather
+  # than a hard-coded value, so this asserts the INVARIANT: the extra rows
+  # change nothing about how the question is classified.
+  with_med <- build_dl_question(make_dl_q_numeric_full(), make_dl_banner_info(),
+                                make_dl_config(), low_base = 30)
+  baseline <- build_dl_question(make_dl_q_numeric(), make_dl_banner_info(),
+                                make_dl_config(), low_base = 30)
+  expect_identical(with_med$scale_max, baseline$scale_max)
+  expect_identical(with_med$type, baseline$type)
 })

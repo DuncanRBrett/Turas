@@ -165,6 +165,12 @@
         "Show the 95% " + TR.conf.labels().interval_term +
         " under every value — the range the number would likely land in " +
         "if the survey were repeated") +
+      // Only offered when the study declares provenance — see hasProvenance().
+      (hasProvenance()
+        ? toggle("showSources", "Sources",
+            "Show where each question's numbers came from — the survey " +
+            "question behind it, or, for a derived figure, how it was worked out")
+        : "") +
       // Row scope is one explicit pick (not two checkboxes that can both go off
       // and empty the table). Global state, so it persists question to question.
       '<label class="tg" title="Which rows show in the table — persists as you ' +
@@ -494,6 +500,88 @@
   }
   cards2._audienceHtml = audienceHtml;
 
+  /**
+   * Where this question's numbers came from. A study whose data is built before
+   * the config ever sees it — derived columns, composites, anything worked out
+   * upstream — hands the engine a finished column, so the only honest source of
+   * this is the analyst's own declaration on the Selection sheet.
+   *
+   * The rule, stated here because it is a convention and not an inference: a
+   * Formula means the number was WORKED OUT, so the question reads as derived;
+   * a Source with no formula means it was ASKED, and the source names the
+   * question behind it. A question declaring neither says nothing at all —
+   * which is why a config without the columns looks exactly as it did before.
+   */
+  function provenance(code) {
+    var q = TR.d2.questionByCode(code);
+    if (!q) return null;
+    var src = q.source || "";
+    var fml = q.formula || "";
+    if (!src && !fml) return null;
+    return { derived: !!fml, source: src, formula: fml };
+  }
+  cards2._provenance = provenance;
+
+  /** Does this report carry provenance at all? Decides whether the control bar
+   *  offers the Sources toggle — no study should grow a control for a column
+   *  it does not use. */
+  var _hasProv = null;
+  function hasProvenance() {
+    if (_hasProv === null) {
+      _hasProv = !!(TR.AGG && TR.AGG.questions && TR.AGG.questions.some(function (q) {
+        return q.source || q.formula;
+      }));
+    }
+    return _hasProv;
+  }
+  cards2._hasProvenance = hasProvenance;
+
+  /** The badge that sits with the question code — always on when the question
+   *  declares its provenance, because "is this asked or worked out?" is the
+   *  kind of thing a reader should not have to go looking for. */
+  function provBadgeHtml(code) {
+    var p = provenance(code);
+    if (!p) return "";
+    var tip = p.derived
+      ? "Worked out from the data, not asked" + (p.source ? " — built from " + p.source : "") +
+        (p.formula ? ". " + p.formula : "")
+      : "Asked in the survey" + (p.source ? " — " + p.source : "");
+    return '<span class="badge-prov' + (p.derived ? " derived" : "") + '" title="' +
+      fmt.escapeHtml(tip) + '">' + (p.derived ? "DERIVED" : "ASKED") + "</span>";
+  }
+
+  /**
+   * The note under the title. DERIVED questions only, and on by default.
+   *
+   * An asked question needs no line — the badge is the whole story, and 87 of
+   * them saying "Source: survey question" is noise that would make the lines
+   * that matter easier to skip. A derived one is the opposite case: the badge
+   * announces that the number was worked out and then leaves the reader with
+   * the obvious follow-up, so the answer sits on the card rather than behind a
+   * control nobody knows to click. The toggle stays as the way to turn the
+   * notes off for a clean read or print. An asked question's Source is still
+   * carried in the badge tooltip.
+   */
+  function provNoteHtml(code) {
+    if (!TR.d2.state.showSources) return "";
+    var p = provenance(code);
+    if (!p || !p.derived) return "";
+    var bits = [];
+    if (p.formula) bits.push(fmt.escapeHtml(p.formula));
+    if (p.source) bits.push(fmt.escapeHtml(p.source));
+    return '<div class="provnote"><b>Derived:</b> ' + bits.join("  ·  ") + "</div>";
+  }
+  cards2._provNoteHtml = provNoteHtml;
+
+  /** The same sentence as one line, for an export that has no room for a
+   *  styled block — the card SVG's meta line and the PPTX slide kicker. */
+  function provNoteText(code) {
+    var p = provenance(code);
+    if (!p || !p.derived) return "";
+    return "Derived: " + [p.formula, p.source].filter(Boolean).join(" · ");
+  }
+  cards2._provNoteText = provNoteText;
+
   cards2.renderActive = function () {
     var s = TR.d2.state;
     var holder = document.getElementById("qcard");
@@ -546,10 +634,11 @@
     var commentsBtn = (TR.qual && TR.qual.affordanceHtml) ? TR.qual.affordanceHtml(model.code) : "";
     var html = '<article class="card qc-card">' +
       '<div class="qhead"><div class="qmeta"><span class="qcode">' + model.code +
-      "</span>" + sourceBadge + prevBadge +
+      "</span>" + provBadgeHtml(model.code) + sourceBadge + prevBadge +
       '<span class="qnav"><button data-act="prevq" aria-label="Previous question">‹</button>' +
       '<button data-act="nextq" aria-label="Next question">›</button></span>' + commentsBtn + "</div>" +
-      titleHtml(model) + audienceHtml(model) + contextStrip + bannerTabsHtml() + "</div>";
+      titleHtml(model) + audienceHtml(model) + provNoteHtml(model.code) +
+      contextStrip + bannerTabsHtml() + "</div>";
 
     var chartModel = null;
     if (s.showChart) {
