@@ -213,6 +213,24 @@ test_that("build_config_object loads heatmap_colour and research_house through t
   expect_equal(config_obj$research_house, "White Label Partner Co")
 })
 
+test_that("html_report_v2_cover is whitelisted, logical, and defaults to FALSE", {
+  # The cover shipped with no operator control at all — it was gated purely in
+  # JavaScript, so a study could not decline it. The setting must survive all
+  # three registration points or it is a silent no-op: the known-settings
+  # whitelist (else an "unrecognised setting" warning), the logical list (else
+  # the TRUE/FALSE cell is not coerced), and build_config_object (else
+  # config_obj$html_report_v2_cover is NULL however the sheet is filled in).
+  skip_if_not(exists("TABS_KNOWN_SETTINGS"))
+  expect_true("html_report_v2_cover" %in% TABS_KNOWN_SETTINGS)
+
+  skip_if_not(exists("build_config_object", mode = "function"))
+  expect_false(build_config_object(list())$html_report_v2_cover)
+  expect_true(build_config_object(list(html_report_v2_cover = "TRUE"))$html_report_v2_cover)
+  expect_false(build_config_object(list(html_report_v2_cover = "FALSE"))$html_report_v2_cover)
+  # a blank cell is not an opt-in
+  expect_false(build_config_object(list(html_report_v2_cover = ""))$html_report_v2_cover)
+})
+
 test_that("build_config_object loads qual_tag_dimensions through to the config object", {
   # Regression guard (Feature 2 host tags): config_obj is an explicit whitelist, not the
   # raw settings — a qual_tag_dimensions row was read fine downstream but never assigned

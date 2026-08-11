@@ -300,12 +300,19 @@
   };
 
   /**
-   * The cover opens only on a saved/shared copy (user-state island present)
-   * that carries story content: story pins (incl. promoted hub insights)
-   * and/or an authored Report-tab executive summary / background section.
-   * Analyst-fresh reports keep today's landing exactly.
+   * The cover opens only when the STUDY asked for it (html_report_v2_cover in
+   * the config, carried as project.cover) AND this is a saved/shared copy
+   * (user-state island present) that carries story content: story pins (incl.
+   * promoted hub insights) and/or an authored Report-tab executive summary /
+   * background section. Analyst-fresh reports keep today's landing exactly.
+   *
+   * The config gate is first and absolute. A cover changes what a client sees
+   * when they open the file, so it is opted into per project — a report built
+   * from a config that never mentions the setting behaves as it did before the
+   * cover existed, on every copy, saved or not.
    */
   reader.coverAvailable = function () {
+    if (!(TR.AGG && TR.AGG.project && TR.AGG.project.cover)) return false;
     if (!TR.userState) return false;
     if (reader.coverFindings().length) return true;
     var rpt = TR.report;

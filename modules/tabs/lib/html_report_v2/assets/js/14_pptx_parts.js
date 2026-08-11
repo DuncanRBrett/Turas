@@ -85,6 +85,12 @@
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>' +
       '<Default Extension="png" ContentType="image/png"/>' +
+      // Config-authored study slides carry the original file, which may be a
+      // JPEG or a GIF. Declaring the extensions costs nothing when unused and
+      // keeps the package valid when they are — renaming a JPEG to .png and
+      // hoping PowerPoint sniffs it is not a contract worth relying on.
+      '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
+      '<Default Extension="gif" ContentType="image/gif"/>' +
       overrides.map(function (o) {
         return '<Override PartName="' + o[0] + '" ContentType="' + o[1] + '"/>';
       }).join("") + "</Types>";
@@ -227,9 +233,13 @@
       var imgBase = 2 + (slide.charts ? slide.charts.length : 0);
       (slide.images || []).forEach(function (img, k) {
         imageIndex++;
+        // ext defaults to png — every rasterised card is one, and an older
+        // caller that passes no ext behaves exactly as before.
+        var ext = img.ext === "jpeg" || img.ext === "gif" ? img.ext : "png";
         slideRels.push(["rId" + (imgBase + k), "image",
-          "../media/image" + imageIndex + ".png"]);
-        entries.push({ name: "ppt/media/image" + imageIndex + ".png", data: img.bytes });
+          "../media/image" + imageIndex + "." + ext]);
+        entries.push({ name: "ppt/media/image" + imageIndex + "." + ext,
+          data: img.bytes });
       });
       (slide.charts || []).forEach(function (chart, k) {
         chartIndex++;

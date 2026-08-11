@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /**
- * Exec-summary cover gate (READER_EXPERIENCE_PLAN bundle D) — two contracts:
+ * Exec-summary cover gate (READER_EXPERIENCE_PLAN bundle D) — three contracts:
+ *
+ * G  Opt-in: the cover exists only where the study asked for it. The config's
+ *    html_report_v2_cover rides the island as project.cover and gates every
+ *    cover behaviour ahead of the saved-copy and content checks, so a report
+ *    built from a config that never mentions it behaves exactly as reports did
+ *    before the cover was written.
  *
  * D1 Landing = exec summary: a saved/shared copy (user-state island present)
  *    that carries story content (pins incl. promoted hub insights, and/or an
@@ -62,8 +68,12 @@ function coverSandbox(opts) {
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
   const TR = sb.TR;
+  // Every contract below is "GIVEN the study asked for a cover" (config
+  // html_report_v2_cover -> project.cover), so the sandbox opts in by default
+  // and the gate itself is asserted on its own. opts.cover === false opts out.
   TR.AGG = {
-    project: opts.project || { name: "CCS 2026", client: "CCS", wave: "Wave 2" },
+    project: Object.assign({ cover: opts.cover !== false },
+      opts.project || { name: "CCS 2026", client: "CCS", wave: "Wave 2" }),
     questions: opts.questions || [],
     banner_groups: []
   };
@@ -98,6 +108,27 @@ const snap = (title) => ({ kind: "snapshot", source: "hub", title: title,
   context: "", html: "<div class='hx'>EVIDENCE</div>", lines: [], note: "" });
 
 console.log("Exec-summary cover (bundle D) — suite:");
+
+/* ---------------- the config gate (html_report_v2_cover) ---------------- */
+
+run("gate: without html_report_v2_cover there is no cover, whatever else is true", () => {
+  // The strongest form of the contract: the combination that WOULD open a cover
+  // (saved copy + story pins + authored sections) still does not, because the
+  // study never asked for one. A config that never mentions the setting emits no
+  // project.cover, so every report built before this existed behaves as it did.
+  const off = coverSandbox({ cover: false,
+    userState: { story: [snap("A finding")] },
+    project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
+  eq(off.TR.reader.coverAvailable(), false, "opted out -> never a cover");
+  // and the landing / header link follow the same gate
+  eq(shellSandbox(false).TR.shell.landingTab("", "takeout"), "takeout",
+    "opted out -> today's landing");
+  // the same sandbox with the study opted in DOES open a cover — so the test
+  // above is failing on the gate, not on missing content
+  const on = coverSandbox({ userState: { story: [snap("A finding")] },
+    project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
+  eq(on.TR.reader.coverAvailable(), true, "opted in + saved + content -> cover");
+});
 
 /* ---------------- D1: availability (all four combinations) ---------------- */
 

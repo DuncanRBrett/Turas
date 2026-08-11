@@ -292,6 +292,71 @@ test_that("heatmap_colour reaches the island only when the config sets it (I11)"
   }
 })
 
+test_that("study slides reach the island, or are absent entirely", {
+  # The AddedSlides sheet was loaded and then dropped — nothing read
+  # config_obj$qualitative_slides, so a filled-in sheet changed no report. It is
+  # carried now, but a config without the sheet must still emit no key at all.
+  slides <- list(
+    list(title = "Qual phase", content = "Six groups.",
+         image_data = "data:image/png;base64,AAAA", image_w = 640L, image_h = 360L),
+    list(title = "Method note", content = "Fieldwork in July.")
+  )
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(qualitative_slides = slides))
+  expect_length(dl$project$slides, 2)
+  expect_equal(dl$project$slides[[1]]$title, "Qual phase")
+  expect_equal(dl$project$slides[[1]]$image, "data:image/png;base64,AAAA")
+  expect_equal(dl$project$slides[[1]]$w, 640L)
+  expect_equal(dl$project$slides[[1]]$h, 360L)
+  # a text slide carries no image keys at all
+  expect_null(dl$project$slides[[2]]$image)
+  expect_null(dl$project$slides[[2]]$w)
+
+  dl0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_false("slides" %in% names(dl0$project))
+  # an empty sheet, or rows with nothing on them, is the same as no sheet
+  for (v in list(list(), NULL, list(list(title = "", content = "")))) {
+    dlb <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+      make_dl_config(qualitative_slides = v))
+    expect_false("slides" %in% names(dlb$project))
+  }
+})
+
+test_that("study slides survive the JSON round trip as an array of objects", {
+  # A single slide must not collapse to a bare object: the renderer indexes into
+  # project.slides, and a pinned slide stores that index.
+  slides <- list(list(title = "Only one", content = "Solo."))
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(qualitative_slides = slides))
+  json <- jsonlite::toJSON(dl$project$slides, auto_unbox = TRUE)
+  expect_true(grepl('^\\[\\{', as.character(json)))
+  back <- jsonlite::fromJSON(as.character(json), simplifyDataFrame = FALSE)
+  expect_length(back, 1)
+  expect_equal(back[[1]]$title, "Only one")
+})
+
+test_that("the exec-summary cover reaches the island only when the study opts in", {
+  # The cover changes what a client sees when they open a SAVED copy, so it is a
+  # per-project decision. A config that never mentions html_report_v2_cover must
+  # emit no cover key at all — every report built before the setting existed then
+  # keeps landing exactly where it always did, saved or not.
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(html_report_v2_cover = TRUE))
+  expect_true(dl$project$cover)
+
+  dl0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_null(dl0$project$cover)
+  expect_false("cover" %in% names(dl0$project))
+
+  # anything that is not a literal TRUE leaves the island untouched — a blank or
+  # unreadable cell must never switch a client-facing default on
+  for (v in list(FALSE, "", "   ", NA, NULL)) {
+    dlb <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+      make_dl_config(html_report_v2_cover = v))
+    expect_false("cover" %in% names(dlb$project), info = format(v))
+  }
+})
+
 test_that("sampling_note is carried trimmed, omitted when blank/NA", {
   dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(sampling_note = "  Substitution was allowed. "))

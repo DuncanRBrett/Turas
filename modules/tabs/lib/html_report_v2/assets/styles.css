@@ -635,6 +635,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .added-slide img { width: 100%; display: block; }
 .as-text { padding: 14px; font-size: 13px; min-height: 80px; white-space: pre-wrap; }
 .as-foot { display: flex; gap: 6px; padding: 7px 9px; border-top: 1px solid var(--line); background: var(--soft); }
+/* Config-authored study slides: the caption is static text, not an input — the
+   report author owns it, so the reader reads it. */
+.as-cap { flex: 1; font-size: 12px; color: var(--muted); align-self: center; overflow-wrap: anywhere; }
+.si-slide-img { width: 100%; display: block; border-radius: 8px; }
 .as-title { flex: 1; border: none; background: transparent; font: 12px var(--font); }
 .as-foot button { border: none; background: none; color: var(--muted); cursor: pointer; }
 .as-foot button:hover { color: var(--red); }

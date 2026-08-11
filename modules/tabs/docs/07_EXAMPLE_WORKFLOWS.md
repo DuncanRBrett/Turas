@@ -780,8 +780,21 @@ qualitative phase, or short text blocks):
 2. Under **Added slides**, click **+ Import image** or **+ Text block**
 3. Caption it — the slide is stored in the HTML file itself
 
-(The config's **AddedSlides** sheet pre-seeds slides for a retired
-report and is not wired into this one — use the in-browser method above.)
+### Study Slides — from the Config
+
+For exhibits that belong to the study rather than to one reader — and for
+anything you want in the PowerPoint:
+
+1. Add an **AddedSlides** sheet to the config: `slide_title`, `content`,
+   and `image_path` (relative to the config file's folder)
+2. Re-run. They render on the **Report** tab under *Study slides*,
+   read-only, identical in every copy
+3. Pin one (📌) and it joins the **Story** — and exports as a genuine
+   full-slide picture, the original file rather than a rendered card
+
+Keep images under 1.5 MB, and prefer PNG or JPG: an SVG or WebP slide shows
+in the report but exports as its text. Use the in-browser card above for
+scratch exhibits that only matter to your own copy.
 
 ### Building the Story
 

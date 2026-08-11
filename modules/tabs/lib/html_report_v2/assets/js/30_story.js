@@ -237,6 +237,29 @@
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
 
+  /** A config-authored study slide, pinned by INDEX into project.slides rather
+   *  than by copying it. The picture stays embedded exactly once no matter how
+   *  often it is pinned, and a rebuilt report's story keeps pointing at the
+   *  current slide. A pin whose slide no longer exists renders as a plain
+   *  missing-slide note rather than an empty card. */
+  story2.pinSlide = function (idx, title) {
+    if (!(idx >= 0)) return;
+    load().push({ kind: "slide", slide: idx, title: title || "", note: "" });
+    touch();
+    TR.shell.toast("Slide pinned to story (" + load().length + ") — see the Story tab");
+  };
+
+  /** The authored slide a "slide" item points at, or null when the config no
+   *  longer carries it (sheet row deleted, or an older report opened). */
+  function slideOf(item) {
+    if (!item || item.kind !== "slide") return null;
+    var list = (TR.report && TR.report.slides) ? TR.report.slides() : [];
+    return list[item.slide] || null;
+  }
+  story2._slideOf = slideOf;   // exposed for the node gate
+
+  var SLIDE_GONE_NOTE = "This slide is no longer in the project configuration.";
+
   story2.addDivider = function () {
     var title = prompt("Section title for the divider:");
     if (!title) return;
@@ -369,6 +392,10 @@
     if (item.kind === "exhibit") {
       return TR.exhibit.titleFor(item, TR.exhibit.models(item));
     }
+    if (item.kind === "slide") {
+      var sl = slideOf(item);
+      return (sl && sl.title) || "Study slide";
+    }
     if (item.kind === "heatmap") return "Index heatmap";
     if (item.kind === "composite") return "Composite — " + item.category;
     return item.kind === "divider" ? (item.title || "Section") : "Pinned card";
@@ -396,8 +423,25 @@
   var QUAL_STALE_NOTE = "This pinned collection references comments this copy " +
     "no longer publishes — re-pin it from the Qualitative tab.";
 
+  /** The picture (and/or words) of an authored slide, resolved from the island
+   *  at render time. Shared by the story card, the cover thumbnail and present
+   *  mode, so all three show the current slide rather than a frozen copy. */
+  function slideBodyHtml(item) {
+    var sl = slideOf(item);
+    if (!sl) {
+      return '<div class="snap-body"><p class="si-ctx">' +
+        fmt.escapeHtml(SLIDE_GONE_NOTE) + "</p></div>";
+    }
+    return '<div class="snap-body">' +
+      (sl.image ? '<img class="si-slide-img" src="' + fmt.escapeHtml(sl.image) +
+        '" alt="' + fmt.escapeHtml(sl.title || "Study slide") + '">' : "") +
+      (sl.text ? '<div class="as-text">' + fmt.escapeHtml(sl.text) + "</div>" : "") +
+      "</div>";
+  }
+
   story2.itemBodyHtml = function (item) {
     if (item.kind === "divider") return "";
+    if (item.kind === "slide") return slideBodyHtml(item);
     if (item.kind === "exhibit") return TR.exhibit.panelsHtml(item);
     if (item.kind === "snapshot") {
       if (qualPinStale(item)) {
@@ -537,6 +581,15 @@
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
             fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
+    }
+    if (item.kind === "slide") {
+      return '<div class="card story-item story-snapshot" data-i="' + i + '">' +
+        '<div class="si-head"><span class="qcode">' + (i + 1) + ". SLIDE</span>" +
+        "<strong>" + fmt.escapeHtml(TR.charts.clip(story2.pinTitle(item), 90)) +
+        "</strong>" + buttons + "</div>" +
+        slideBodyHtml(item) +
+        '<textarea class="si-note" placeholder="Commentary for this slide…">' +
+        fmt.escapeHtml(item.note || "") + "</textarea></div>";
     }
     if (item.kind === "snapshot") {
       // pinned "as it looks" — the card's own HTML, re-shown verbatim (unless a
@@ -733,6 +786,20 @@
         }
         return;
       }
+      if (item.kind === "slide") {
+        // The authored picture goes in as a real picture. A slide whose image
+        // cannot be decoded (or a text-only slide) still gets a slide, carrying
+        // its words — the deck never silently loses a pinned exhibit.
+        var sl = slideOf(item);
+        var pic = sl && TR.exporter.slidePicture ? TR.exporter.slidePicture(sl) : null;
+        if (pic) {
+          slides.push(TR.exporter.imageSlide(pic));
+        } else {
+          slides.push(TR.exporter.dividerSlide(story2.pinTitle(item),
+            (sl ? (sl.text || "") : SLIDE_GONE_NOTE) || item.note || ""));
+        }
+        return;
+      }
       if (item.kind === "heatmap") {
         slides.push(TR.exporter.matrixSlide("Index heatmap",
           contextLine(item) + (item.note ? " · " + item.note : ""),
@@ -808,6 +875,15 @@
    *  on-screen render of each item kind; null when the item has nothing to show
    *  (e.g. an exhibit with no resolvable questions). */
   function itemCardSvg(item) {
+    if (item.kind === "slide") {
+      // Not an SVG at all: the image deck takes this one through untouched, so
+      // the authored picture is never rasterised twice. imageCards labels it.
+      var sl = slideOf(item);
+      var pic = sl && TR.exporter.slidePicture ? TR.exporter.slidePicture(sl) : null;
+      if (pic) return { png: pic };
+      return TR.exporter.cardSvgRaw(story2.pinTitle(item),
+        (sl ? (sl.text || "") : SLIDE_GONE_NOTE) || "", null, null);
+    }
     if (item.kind === "divider") {
       return TR.exporter.cardSvgRaw(item.title || "Section", item.note || "", null, null);
     }
@@ -949,6 +1025,10 @@
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
         '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>" +
         quoteBlockHtml(item);
+    } else if (item.kind === "slide") {
+      body = "<h1>" + fmt.escapeHtml(story2.pinTitle(item)) + "</h1>" +
+        (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
+        '<div class="pr-table">' + slideBodyHtml(item) + "</div>";
     } else if (item.kind === "snapshot") {
       var presentBody = qualPinStale(item)
         ? '<p class="pr-ctx">' + fmt.escapeHtml(QUAL_STALE_NOTE) + "</p>"

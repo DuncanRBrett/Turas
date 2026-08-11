@@ -251,6 +251,12 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # resolves, the v2 report gains a Tracking tab built from anonymised per-wave
     # microdata. Independent of the standalone tracker module, which is untouched.
     html_report_v2_tracking = safe_logical(get_config_value(config, "html_report_v2_tracking", FALSE), default = FALSE),
+    # Exec-summary cover (OFF by default). When TRUE, a SAVED copy that carries
+    # story content opens on a cover page instead of the dashboard. It changes
+    # what a client sees on opening the file, so the study opts in per project
+    # rather than inheriting it: a config that never mentions the setting emits
+    # no cover flag at all and lands exactly where it always did.
+    html_report_v2_cover = safe_logical(get_config_value(config, "html_report_v2_cover", FALSE), default = FALSE),
     # Folder holding prior waves' *_wave.json tracking contributions (emitted by
     # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
     waves_source = get_config_value(config, "waves_source", ""),
@@ -765,6 +771,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "show_numeric_median", "show_numeric_mode", "show_numeric_outliers",
   "exclude_outliers_from_stats",
   "html_report_v2", "html_report_v2_microdata", "html_report_v2_tracking",
+  "html_report_v2_cover",
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
   "show_qualitative",
   "enable_ai_insights", "generate_reader_report", "reader_ai_prose",
@@ -1067,6 +1074,60 @@ load_population_sheet <- function(config_file) {
 #' @param config_file Character, path to config Excel file
 #' @return List of slide objects, or NULL
 #' @keywords internal
+#' Largest image an AddedSlides row may embed, in bytes
+#'
+#' Matches the in-browser import limit so the two routes refuse the same files.
+#' The config route embeds at BUILD time and had no limit at all: a 12 MB slide
+#' export went straight into the report and nobody found out until the file
+#' would not send.
+#' @keywords internal
+TABS_SLIDE_IMAGE_MAX_BYTES <- 1.5 * 1024 * 1024
+
+#' Intrinsic Pixel Size of an Image, From Its Header
+#'
+#' Reads width/height out of the file's own header for the formats whose header
+#' is fixed and trivially parsed. Pure base R — no image package is added for
+#' this. The dimensions travel to the report so a slide exported to PowerPoint
+#' keeps its aspect ratio; without them the deck writer stretches the picture to
+#' fill the slide.
+#'
+#' @param raw Raw vector, the whole file
+#' @param ext Character, lower-case file extension
+#' @return List with \code{w} and \code{h} (integers), or NULL when the format
+#'   carries no header this can read (SVG, WebP) or the file is truncated
+#' @keywords internal
+.slide_image_pixel_size <- function(raw, ext) {
+  n <- length(raw)
+  be <- function(i) sum(as.integer(raw[i:(i + 3)]) * c(16777216L, 65536L, 256L, 1L))
+  le2 <- function(i) as.integer(raw[i]) + 256L * as.integer(raw[i + 1])
+  be2 <- function(i) 256L * as.integer(raw[i]) + as.integer(raw[i + 1])
+  if (ext == "png" && n >= 24 &&
+      identical(as.integer(raw[1:4]), c(137L, 80L, 78L, 71L))) {
+    return(list(w = be(17), h = be(21)))
+  }
+  if (ext == "gif" && n >= 10 && identical(as.integer(raw[1:3]), c(71L, 73L, 70L))) {
+    return(list(w = le2(7), h = le2(9)))
+  }
+  if (ext %in% c("jpg", "jpeg") && n >= 4 &&
+      identical(as.integer(raw[1:2]), c(255L, 216L))) {
+    # Walk the marker segments to the first frame header (SOF0/1/2/…), whose
+    # payload carries the real dimensions. SOF4 (0xC4), SOF8 (0xC8) and SOFC
+    # (0xCC) are NOT frame headers — they are Huffman/JPEG-LS tables.
+    i <- 3L
+    sof <- c(0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+             0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF)
+    while (i + 8L <= n) {
+      if (as.integer(raw[i]) != 255L) return(NULL)   # not a marker -> give up
+      marker <- as.integer(raw[i + 1])
+      if (marker %in% sof) return(list(w = be2(i + 7), h = be2(i + 5)))
+      seg <- be2(i + 2)
+      if (seg < 2L) return(NULL)
+      i <- i + 2L + seg
+    }
+  }
+  NULL
+}
+
 load_qualitative_sheet <- function(config_file) {
   tryCatch({
     sheets <- openxlsx::getSheetNames(config_file)
@@ -1114,14 +1175,60 @@ load_qualitative_sheet <- function(config_file) {
 
       # Embed image as base64 if image_path is provided
       if (has_image_col && !is.na(df$image_path[i]) && nzchar(trimws(df$image_path[i]))) {
-        img_path <- trimws(df$image_path[i])
+        # Strip wrapping quotes before anything else. Every normal way of
+        # getting a path onto the clipboard on macOS or Windows can bring
+        # quotes with it (dragging a file into a terminal, "Copy as path"),
+        # and a cell reading '/Users/…/RatingsMap.png' resolves to nothing.
+        # The operator sees a correct-looking path and a missing picture.
+        img_path <- gsub("^['\"]+|['\"]+$", "", trimws(df$image_path[i]))
         # Resolve relative paths against config directory
         if (!file.exists(img_path)) {
           img_path <- file.path(config_dir, img_path)
         }
-        if (file.exists(img_path) && requireNamespace("base64enc", quietly = TRUE)) {
-          tryCatch({
-            raw <- readBin(img_path, "raw", file.info(img_path)$size)
+        if (!file.exists(img_path)) {
+          # Boxed, not a one-liner: Turas runs behind a Shiny app and this
+          # warning used to scroll past in a long console, leaving a slide that
+          # looked deliberately text-only.
+          cat("\n┌─── TURAS: SLIDE IMAGE NOT FOUND ──────────────────────┐\n")
+          cat(sprintf("│ Slide:  %s\n", slide$title))
+          cat(sprintf("│ Looked: %s\n", img_path))
+          cat("│ Fix:    Check the image_path cell in the AddedSlides sheet.\n")
+          cat("│         A relative path is resolved against the config file's\n")
+          cat("│         own folder. The slide's text still shows; only the\n")
+          cat("│         picture was left out.\n")
+          cat("└───────────────────────────────────────────────────────┘\n\n")
+          return(slide)
+        }
+        if (!requireNamespace("base64enc", quietly = TRUE)) {
+          # Its own message: this branch used to fall into "file not found",
+          # which sent the operator hunting a path that was perfectly correct.
+          cat("\n┌─── TURAS: SLIDE IMAGE NOT EMBEDDED ───────────────────┐\n")
+          cat(sprintf("│ Slide:  %s\n", slide$title))
+          cat("│ Cause:  The 'base64enc' package is not installed, so images\n")
+          cat("│         cannot be embedded in the report.\n")
+          cat("│ Fix:    install.packages(\"base64enc\"), then re-run.\n")
+          cat("└───────────────────────────────────────────────────────┘\n\n")
+          return(slide)
+        }
+        tryCatch({
+            img_size <- file.info(img_path)$size
+            # Refuse the image, keep the slide. The whole run must not fail over
+            # an oversized picture, but the operator has to be told plainly —
+            # a silently dropped exhibit is exactly the kind of thing nobody
+            # notices until the client asks where it went.
+            if (!is.na(img_size) && img_size > TABS_SLIDE_IMAGE_MAX_BYTES) {
+              cat("\n┌─── TURAS: SLIDE IMAGE TOO LARGE ──────────────────────┐\n")
+              cat(sprintf("│ Slide:  %s\n", slide$title))
+              cat(sprintf("│ File:   %s\n", basename(img_path)))
+              cat(sprintf("│ Size:   %.1f MB (limit %.1f MB)\n",
+                img_size / 1024 / 1024, TABS_SLIDE_IMAGE_MAX_BYTES / 1024 / 1024))
+              cat("│ Fix:    Export the slide at a smaller size, or save it as\n")
+              cat("│         a JPEG, then re-run. The slide's text still shows;\n")
+              cat("│         only the picture was left out.\n")
+              cat("└───────────────────────────────────────────────────────┘\n\n")
+              return(slide)
+            }
+            raw <- readBin(img_path, "raw", img_size)
             ext <- tolower(tools::file_ext(img_path))
             mime <- switch(ext,
               png = "image/png", jpg = "image/jpeg", jpeg = "image/jpeg",
@@ -1130,15 +1237,20 @@ load_qualitative_sheet <- function(config_file) {
             )
             slide$image_data <- sprintf("data:%s;base64,%s",
               mime, base64enc::base64encode(raw))
-            cat(sprintf("  [INFO] Embedded image for slide '%s' (%s, %dKB)\n",
-              slide$title, basename(img_path), round(length(raw) / 1024)))
+            # Intrinsic size, so the PowerPoint export keeps the aspect ratio.
+            # Absent for formats with no readable header — the report still
+            # shows the image; only the deck falls back to fitting the slide.
+            px <- .slide_image_pixel_size(raw, ext)
+            if (!is.null(px) && px$w > 0 && px$h > 0) {
+              slide$image_w <- px$w
+              slide$image_h <- px$h
+            }
+            cat(sprintf("  [INFO] Embedded image for slide '%s' (%s, %dKB%s)\n",
+              slide$title, basename(img_path), round(length(raw) / 1024),
+              if (is.null(px)) "" else sprintf(", %dx%d", px$w, px$h)))
           }, error = function(e) {
             cat(sprintf("  [WARNING] Could not embed image '%s': %s\n", img_path, e$message))
           })
-        } else {
-          cat(sprintf("  [WARNING] Image file not found for slide '%s': %s\n",
-            slide$title, img_path))
-        }
       }
 
       slide
@@ -1471,7 +1583,7 @@ TABS_KNOWN_SETTINGS <- c(
   "generate_stats_pack",
   # HTML report (html_report itself is retired — see TABS_RETIRED_SETTINGS)
   "html_report_v2", "html_report_v2_tracking",
-  "html_report_v2_microdata",
+  "html_report_v2_microdata", "html_report_v2_cover",
   "waves_source", "question_mapping", "wave_order", "sampling_method",
   "population_size", "wave",
   # Reader report (narrative summary, rides on html_report_v2)

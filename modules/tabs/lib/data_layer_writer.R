@@ -156,6 +156,13 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (!blank(config_obj$heatmap_colour)) {
     proj$heatmap_colour <- as.character(config_obj$heatmap_colour)
   }
+  # Exec-summary cover. Carried ONLY when the study opted in, so a config that
+  # never mentions it emits a byte-identical island and its saved copies open on
+  # the dashboard as they always have. The cover changes what a client sees when
+  # they open the file, which is a per-project decision, not a default.
+  if (isTRUE(config_obj$html_report_v2_cover)) {
+    proj$cover <- TRUE
+  }
   # Total universe size (finite population correction). Carried only when a
   # usable value is configured; the renderer derives the overall response /
   # coverage rate from it (TR.MICRO.n / population_size) and corrects the Total
@@ -305,6 +312,33 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     construction = cfg_chr("report_construction")
   )
   if (any(nzchar(unlist(meta)))) proj$report_meta <- meta
+
+  # Study slides — exhibits authored in the config's AddedSlides sheet (text
+  # blocks, or images resolved and embedded by load_qualitative_sheet). Carried
+  # only when the sheet holds usable rows, so a config without one emits a
+  # byte-identical island. These are the REPORT AUTHOR's, distinct from the
+  # reader's own Added slides, which live in browser state and never come from
+  # here — hence read-only in the app, like the narrative sections.
+  slides <- Filter(Negate(is.null), lapply(config_obj$qualitative_slides %||% list(),
+    function(s) {
+      title <- if (blank(s$title)) "" else trimws(as.character(s$title))
+      text  <- if (blank(s$content)) "" else trimws(as.character(s$content))
+      img   <- if (blank(s$image_data)) "" else as.character(s$image_data)
+      # a row with neither words nor a picture is nothing to show
+      if (!nzchar(title) && !nzchar(text) && !nzchar(img)) return(NULL)
+      out <- list(title = title, text = text)
+      if (nzchar(img)) {
+        out$image <- img
+        # intrinsic pixels, when the format let us read them — the deck export
+        # needs them to place the picture without stretching it
+        if (!is.null(s$image_w) && !is.null(s$image_h)) {
+          out$w <- as.integer(s$image_w)
+          out$h <- as.integer(s$image_h)
+        }
+      }
+      out
+    }))
+  if (length(slides) > 0) proj$slides <- unname(slides)
   proj
 }
 

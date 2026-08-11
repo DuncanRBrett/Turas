@@ -267,6 +267,16 @@
       var card = pin.closest("[data-snap-card]");
       if (!card) return;
       e.preventDefault();
+      // A config-authored study slide pins by REFERENCE, not as frozen HTML:
+      // its picture is already embedded once on the island, and snapshotting the
+      // card would copy that base64 into the story item, into localStorage and
+      // into every saved copy. One pinned slide would otherwise double it.
+      var slideIdx = pin.getAttribute("data-snap-slide");
+      if (slideIdx !== null && TR.story2.pinSlide) {
+        TR.story2.pinSlide(parseInt(slideIdx, 10),
+          pin.getAttribute("data-snap-title") || "");
+        return;
+      }
       TR.story2.pinSnapshot({
         source: pin.getAttribute("data-snap-source") || "card",
         title: pin.getAttribute("data-snap-title") || "Pinned card",

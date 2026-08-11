@@ -577,7 +577,36 @@
       '<p:spPr><a:xfrm><a:off x="' + inch(x) + '" y="' + inch(y) + '"/>' +
       '<a:ext cx="' + inch(w) + '" cy="' + inch(h) + '"/></a:xfrm>' +
       '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
-    return { xml: wrapSlide(pic), charts: [], images: [{ bytes: png.bytes }] };
+    return { xml: wrapSlide(pic), charts: [],
+      images: [{ bytes: png.bytes, ext: png.ext }] };
+  };
+
+  /**
+   * A config-authored study slide's picture, ready for imageSlide: the ORIGINAL
+   * file's bytes, not a re-render. Nothing is rasterised, so the picture reaches
+   * PowerPoint at its authored resolution — sharper than any card in the deck.
+   * The intrinsic size travels from the config (R reads it out of the file
+   * header); without it imageSlide falls back to filling the slide.
+   * @param {Object} slide - an entry of TR.AGG.project.slides
+   * @return {Object|null} {bytes, w, h, ext} or null when there is no picture
+   */
+  exporter.slidePicture = function (slide) {
+    if (!slide || !slide.image) return null;
+    var m = /^data:image\/([a-z+]+);base64,([\s\S]*)$/.exec(String(slide.image));
+    if (!m) return null;
+    var decode = (typeof atob === "function") ? atob
+      : (typeof global.atob === "function") ? global.atob : null;
+    if (!decode) return null;
+    var bin;
+    try { bin = decode(m[2]); } catch (e) { return null; }
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xFF;
+    // jpg/jpeg both land on the "jpeg" part extension; anything the package
+    // cannot declare (svg, webp) is refused rather than shipped mislabelled.
+    var ext = m[1] === "jpeg" || m[1] === "jpg" ? "jpeg"
+      : m[1] === "png" ? "png" : m[1] === "gif" ? "gif" : null;
+    if (!ext) return null;
+    return { bytes: bytes, w: slide.w || 0, h: slide.h || 0, ext: ext };
   };
 
   /* ---------- NATIVE PowerPoint chart objects ----------
@@ -1471,7 +1500,13 @@
     cards = (cards || []).filter(Boolean);
     if (!cards.length) { TR.shell.toast("Nothing to export"); return; }
     TR.shell.toast("Rendering " + cards.length + " image slide(s)…");
-    Promise.all(cards.map(function (svg) { return exporter.svgToPng(svg, 2); }))
+    // An entry may be an already-rendered picture ({png}) rather than an SVG
+    // card — a config-authored study slide IS an image, so it goes through at
+    // its own resolution instead of being rasterised down to a card.
+    Promise.all(cards.map(function (card) {
+      if (card && card.png) return Promise.resolve(card.png);
+      return exporter.svgToPng(card, 2);
+    }))
       .then(function (pngs) {
         var slides = [exporter.titleSlide(cards.length)].concat(
           pngs.map(function (png) { return exporter.imageSlide(png); }));
