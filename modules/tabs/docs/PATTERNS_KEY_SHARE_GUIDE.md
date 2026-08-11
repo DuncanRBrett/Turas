@@ -101,7 +101,7 @@ The third lever already existed: `show_patterns` = N hides the tab.
 
 ## The config echo (added 2026-07-18)
 
-Every Patterns lever is validated at generation time against what the data layer actually contains, and the outcome is printed to the console and added as a "Patterns configuration" section on the Report tab's statistical- diagnostics panel (it travels inside saved copies). A misspelt banner name, a KeyShare label that matches no option, an AreaSummary on an untagged question — each gets a ⚠ line saying what will be ignored and why, instead of silently doing nothing. The matching rules mirror the report engine exactly (NBSP/case forgiven, NETs before options, score-difference NETs never bind), so a ✓ in the echo is a promise about what the report will do. A config with no Patterns levers prints nothing.
+Every Patterns lever is validated at generation time against what the data layer actually contains, and the outcome is printed to the console and added as a "Group overview configuration" section on the Report tab's statistical- diagnostics panel (it travels inside saved copies). A misspelt banner name, a KeyShare label that matches no option, an AreaSummary on an untagged question — each gets a ⚠ line saying what will be ignored and why, instead of silently doing nothing. The matching rules mirror the report engine exactly (NBSP/case forgiven, NETs before options, score-difference NETs never bind), so a ✓ in the echo is a promise about what the report will do. A config with no Patterns levers prints nothing.
 
 ## Mechanics, for the record
 

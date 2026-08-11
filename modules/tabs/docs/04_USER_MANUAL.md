@@ -524,10 +524,26 @@ the browser — background & method, executive summary — use the
 see [Template Reference](06_TEMPLATE_REFERENCE.md). A third reserved row,
 `_REPORT_CONSTRUCTION`, states how the study's numbers were actually built when
 other stages sit around Turas — a derived engine ahead of it, a preparation
-layer, pages that compute in the browser. It replaces the standard sentence in
-the About card; leave it out and the report reads exactly as before. The config's
-**AddedSlides** sheet is a separate, older mechanism that is not
-currently wired into this report — filling it in has no effect here.
+layer, pages that compute in the browser. It replaces the whole *Report
+construction* section of the About card — the standard paragraphs on
+reproducibility, AI and author review go with it, so write whichever of those
+you want into the row. Leave the row out and the report reads exactly as before.
+
+### Study Slides — from the config
+
+For exhibits that belong to the study rather than to one reader, fill in the
+config's **AddedSlides** sheet: a title, some text, and optionally an
+`image_path`. They render on the **Report** tab under *Study slides*,
+read-only, identical in every copy, and they survive a rebuild — unlike the
+in-browser card above, which lives in whoever's browser made it.
+
+Each study slide carries a pin (📌). Pin one and it joins the **Story**; from
+there it exports to PowerPoint as a **genuine full-slide picture** — the
+original file rather than a screenshot of a card, so it is the sharpest thing
+in the deck. Images are limited to 1.5 MB each; a bigger file is refused with
+a console message and the slide keeps its text. See
+[Template Reference](06_TEMPLATE_REFERENCE.md) for the columns and the export
+format caveats.
 
 ### The Story Tab
 

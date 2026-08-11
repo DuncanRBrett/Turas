@@ -141,38 +141,35 @@
       bodyHtml(p, meta.cls) + "</article>";
   }
 
-  /** Provenance line — the glass-box audit trail. When the FDR family is present
-   *  it states the multiplicity correction: how many cells were scanned and how
-   *  many single-cell differences survive it (the rest being consistency, not
-   *  individual cells), or the confident null when nothing stands alone. */
+  /** Provenance line — how wide the scan was, and nothing else.
+   *
+   *  It used to carry the whole audit trail on the reader's face: no-AI, the
+   *  multiplicity method, and a sentence naming each never-cry-wolf check and
+   *  its outcome. That is the working, not the finding, and it crowded the one
+   *  fact a reader needs to size the scan. The checks and the correction are
+   *  unchanged — a confident-null card still shows its own working, and the FDR
+   *  correction still gates what appears here at all. Only the line is shorter.
+   *
+   *  A hit from the demoted checks (odd-one-out, hidden two-camp split) is still
+   *  stated inline, because those checks deliberately have no card of their own,
+   *  and a finding no reader is told about may as well not have been made. */
   function provHtml(t) {
-    var base = "Built from grouped questions and breakouts the report already computes · no AI · " +
-      t.segmentCount + " breakout groups and " + t.themeCount + " tagged areas considered";
+    var base;
     if (t.fdr) {
-      var f = t.fdr, scan = "scanned " + f.groupCount + " groups × " + f.questionCount +
-        " questions = " + f.K + " cells · corrected for multiplicity (" + f.method + ")";
-      base = "no AI · " + scan;
+      var f = t.fdr;
+      base = "Scanned " + f.groupCount + " groups × " + f.questionCount +
+        " questions = " + f.K + " cells";
+    } else {
+      base = t.segmentCount + " breakout groups and " + t.themeCount +
+        " tagged areas considered";
     }
-    // Rigor footer: the demoted never-cry-wolf checks (odd-one-out + hidden
-    // disagreement) report as one honest line instead of empty cards. A hit is
-    // stated HERE, inline — these checks deliberately have no card (the Phase-1
-    // card set is banked), so never point at cards that don't exist.
-    var rg = t.rigor || {}, checks = [], found = [];
-    if (rg.odd) {
-      checks.push("every group for a true exception");
-      if (rg.odd.found) found.push(rg.odd.note ||
-        "one group breaks its own pattern on a single question");
-    }
-    if (rg.bimodal) {
-      checks.push("every question for a hidden two-camp split");
-      if (rg.bimodal.found) found.push(rg.bimodal.note ||
-        "at least one question splits into two camps behind a calm average");
-    }
-    if (checks.length) {
-      base += " · also checked " + checks.join(" and ") +
-        (found.length ? " — found: " + found.join("; ") : " — nothing held up beyond chance");
-    }
-    return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + " · curated by the researcher.</div>";
+    var rg = t.rigor || {}, found = [];
+    if (rg.odd && rg.odd.found) found.push(rg.odd.note ||
+      "one group breaks its own pattern on a single question");
+    if (rg.bimodal && rg.bimodal.found) found.push(rg.bimodal.note ||
+      "at least one question splits into two camps behind a calm average");
+    if (found.length) base += " · also found: " + found.join("; ");
+    return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + "</div>";
   }
 
   /** The honest empty state. "Nothing stands out" is a FINDING — it may only be

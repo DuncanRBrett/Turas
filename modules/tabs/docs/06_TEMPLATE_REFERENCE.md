@@ -858,6 +858,7 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | `sampling_method` | Sample design — drives honest CI vocabulary. Probability designs (Random / Stratified / Cluster / Census) → CI/MOE; everything else → stability/PE | Not_Specified / Random / Stratified / Cluster / Census / Quota / Online_Panel / Convenience | Not_Specified |
 | `wave` | Wave label (v2 header + tracking trend label) | Text, e.g. `Wave 25 - May 2026` | (none) |
 | `html_report_v2_tracking` | Add a Tracking tab built from per-wave microdata. Needs `html_report_v2=TRUE` + a `waves_source` | TRUE / FALSE | FALSE |
+| `html_report_v2_cover` | Open **saved copies** on a cover page: report title, the Comments sheet's executive summary and background, and the first five Story pins as leading findings. Affects only copies made with *Save copy*, and only when there is story content to show. Your own generated report always lands on the dashboard | TRUE / FALSE | FALSE |
 | `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |
 | `wave_order` | Numeric x-axis order key (e.g. `2025.5` for twice-yearly) | Number | *(year parsed from `wave`)* |
 | `question_mapping` | Path to the classic tracker's `Question_Mapping.xlsx` — links waves by a canonical key (robust to renames) + curates tracked metrics | File path, or blank to auto-detect in `waves_source` | *(auto)* |
@@ -2059,30 +2060,42 @@ If one bin ends at 34, the next should start at 35.
 
 ## AddedSlides Sheet
 
-> **Not currently wired into the interactive (v2) report.** The loader
-> below reads this sheet into `config_obj$qualitative_slides`, but
-> nothing downstream consumes that value — it was built for the retired
-> classic HTML report and was never reconnected after that report was
-> deleted in August 2026. Filling in this sheet has no visible effect on
-> the report Turas ships today. For narrative that should come from the
-> config, use the **Comments** sheet's `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
-> rows below; for supplementary exhibits, use the v2 Report tab's
-> in-browser "Added slides" card (import an image or a text block —
-> see [User Manual](04_USER_MANUAL.md)).
+Exhibits from outside the crosstab data — a qual-phase slide exported as
+an image, a photo board, a method note — authored here rather than typed
+into the browser, so they are identical in every copy of the report and
+survive a rebuild.
 
-If this is fixed to feed the v2 report, the sheet's actual columns
-(`load_qualitative_sheet()` in `lib/crosstabs/crosstabs_config.R`) are:
+They appear on the v2 Report tab under **Study slides**, read-only (the
+report author owns them, like the `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
+sections). Each one carries a pin: pin it and it joins the **Story**, and
+exports to PowerPoint as a genuine full-slide picture — the original file,
+not a screenshot of a card, so it is the sharpest thing in the deck.
+
+This is separate from the Report tab's own **Added slides** card, which is
+the reader's scratch space in the browser. Both can be used at once.
 
 | Column         | Description                                    | Required |
 |----------------|-------------------------------------------------|----------|
-| `slide_title`  | Slide heading                                  | Yes      |
+| `slide_title`  | Slide heading — also the pin's title in the story | Yes    |
 | `content`      | Slide body text                                | Yes      |
 | `display_order`| Sort order (blank = sheet row order)           | No       |
 | `image_path`   | Path to an image file to embed in the slide    | No       |
 
-**Notes:** - Image paths can be relative (to the config file location)
-or absolute - Supported image formats: PNG, JPG, GIF, SVG, WEBP - Slides
-appear in `display_order`, or sheet order when blank
+**Notes:**
+
+- Image paths can be relative (to the config file's own folder) or absolute
+- Displayed formats: PNG, JPG, GIF, SVG, WEBP. **PowerPoint export covers
+  PNG, JPG and GIF** — an SVG or WebP slide shows in the report but exports
+  as its text, so use PNG or JPG for anything destined for a deck
+- **Images are limited to 1.5 MB each**, the same limit as the in-browser
+  import. A larger file is refused with a console message naming the slide
+  and the file; the slide still shows its text. Export the picture smaller,
+  or save it as a JPEG
+- A slide keeps its aspect ratio in PowerPoint when Turas can read the
+  size out of the file header (PNG, JPG, GIF). For other formats it is
+  fitted to the slide
+- Slides appear in `display_order`, or sheet order when blank
+- A row with neither a title, text nor a picture is skipped
 
 ------------------------------------------------------------------------
 
@@ -2110,7 +2123,7 @@ question card:
 |--------------|-------|
 | `_BACKGROUND` | The Report tab's *Background & method* card |
 | `_EXECUTIVE_SUMMARY` | The Report tab's *Executive summary* card |
-| `_REPORT_CONSTRUCTION` | The *Report construction* sentence in the About card |
+| `_REPORT_CONSTRUCTION` | The whole *Report construction* section of the About card |
 
 The first two are read-only in the report (edit the config to change them) and
 each is pinnable (📌) to the Story. See
@@ -2126,12 +2139,18 @@ the moment a study puts other stages around Turas — a derived-variable engine
 ahead of it, a preparation layer that builds composite columns, extra pages that
 compute their figures in the reader's browser from their own embedded data.
 Turas cannot see those stages, so it does not guess: the study declares them and
-the declaration stands in place of the standard sentence.
+the declaration stands in place of the standard text.
+
+**A declaration replaces the whole section**, not just the first sentence — the
+stock paragraphs on reproducibility, AI as a working tool and author review go
+with it. A study that says how its own numbers were built is the authority on
+that, and it owns the assurances too, including whether the report says anything
+about AI. If you want any of those paragraphs, write them into the row yourself.
 
 The producer line ("This report was produced by … using Turas Analytics") is
-kept either way, so a declaration cannot accidentally drop the attribution. The
-paragraphs after it — reproducibility, AI as a working tool, author review — are
-unchanged, because they stay true whatever the pipeline looks like.
+kept either way, so a declaration cannot accidentally drop the attribution. Your
+text is added *after* it — do not open the row by repeating it, or the sentence
+prints twice.
 
 **Leave the row out and nothing changes.** A config that says nothing renders
 exactly the report it rendered before this row existed.

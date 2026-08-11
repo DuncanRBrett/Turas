@@ -133,6 +133,9 @@
     // AI-assisted key findings (read-only, labelled) — shown only when present.
     html.push(TR.ai.execSummaryHtml());
 
+    // Authored exhibits from the config, above the reader's own scratch ones.
+    html.push(report.studySlidesHtml());
+
     html.push('<div class="card"><h3>Added slides</h3><p>Import exhibits from outside ' +
       "this study — e.g. qual-phase slides exported as images (in PowerPoint: " +
       "right-click a slide → Save as Picture), or plain text blocks.</p>" +
@@ -194,6 +197,40 @@
     }).join("");
   };
 
+  /** Study slides — exhibits the REPORT AUTHOR put in the config's AddedSlides
+   *  sheet, carried on the data island as project.slides. Distinct from the
+   *  reader's own Added slides above: these are authored, so they are read-only
+   *  here, exactly like the narrative sections. They are deliberately NOT merged
+   *  into the reader's slide store — that store takes ownership on first edit
+   *  and would then ignore anything a later run authored. */
+  report.slides = function () {
+    var s = (TR.AGG && TR.AGG.project && TR.AGG.project.slides) || [];
+    return Array.isArray(s) ? s : [];
+  };
+
+  /** One card per authored slide, each individually pinnable. A pure function of
+   *  the data island ("" when the config authored none) so it is unit-testable. */
+  report.studySlidesHtml = function () {
+    var list = report.slides();
+    if (!list.length) return "";
+    return '<div class="card"><h3>Study slides</h3>' +
+      '<p class="hint">Additional slides from outside Turas generation added ' +
+      "to this report can be found here.</p>" +
+      '<div class="added-slides">' + list.map(function (sl, i) {
+        var title = String(sl.title || "");
+        return '<div class="added-slide" data-snap-card>' +
+          (sl.image
+            ? '<img src="' + fmt.escapeHtml(sl.image) + '" alt="' +
+              fmt.escapeHtml(title || "Study slide") + '">' : "") +
+          (sl.text ? '<div class="as-text">' + fmt.escapeHtml(sl.text) + "</div>" : "") +
+          '<div class="as-foot"><span class="as-cap">' + fmt.escapeHtml(title) +
+          '</span><button class="snap-pin" data-snap-pin data-snap-source="slide" ' +
+          'data-snap-slide="' + i + '" data-snap-title="' + fmt.escapeHtml(title) +
+          '" title="Pin this slide to the story" ' +
+          'aria-label="Pin slide to story">📌</button></div></div>';
+      }).join("") + "</div></div>";
+  };
+
   /** The About card: analyst + contact (config-fed, shown when set), then the
    * standard report-construction note — how the report is produced and where
    * AI does and does not act. The note's "names the model" promise is kept by
@@ -213,47 +250,48 @@
    * Turas — a derived-variable engine ahead of it, a preparation layer that
    * builds composite columns, pages that compute in the browser from their own
    * embedded data. The engine cannot know about those, so the STUDY declares
-   * them, in the config's Comments sheet under _REPORT_CONSTRUCTION, and the
-   * declaration stands in place of the default sentence. Same convention as
-   * question provenance: Turas states what it knows and never guesses on a
-   * study's behalf.
+   * them, in the config's Comments sheet under _REPORT_CONSTRUCTION.
+   *
+   * A declaration replaces the WHOLE stock block — the default sentence and the
+   * reproducibility, AI and author-validation paragraphs with it. It used to
+   * replace only the first sentence, which meant a config that restated any of
+   * those paragraphs printed them twice, and a config that deliberately left one
+   * out had it silently reinstated underneath. Neither is a study saying how its
+   * own numbers were built. The study is the authority on that; the trade is
+   * that a study which declares a note owns every assurance in this section,
+   * including whether it says anything about AI.
    *
    * The producer line is kept either way, so a declaration cannot accidentally
-   * drop the attribution. A report that declares nothing renders exactly the
-   * bytes it rendered before this existed.
+   * drop the attribution — the declared text is written to FOLLOW it. Unless the
+   * study wrote its own: an author drafting this row naturally opens "This report
+   * was produced by …", and prepending a second copy printed the sentence twice
+   * on the client's page. So when the declaration already names the producer, it
+   * is left to say it in its own words. Attribution is still guaranteed — one of
+   * the two always renders.
    */
   function constructionHtml() {
     var company = fmt.escapeHtml(metaOf().company || DEFAULT_COMPANY);
     var produced = "This report was produced by " + company +
       " using Turas Analytics, our in-house analysis and reporting platform. ";
     var declared = String(metaOf().construction || "").trim();
-    if (!declared) {
-      return "<p>" + produced +
-        "The published figures are " +
-        "computed in R. The report itself is a self-contained HTML document " +
-        "generated by Turas, with no third-party reporting engine involved. When " +
-        "you change a view while reading, Turas recalculates it as you click: " +
-        "filters, custom banners and wave comparisons all recompute from the " +
-        "respondent-level data held inside the file, using the same formulas. " +
-        "Nothing is sent anywhere, and the report works with no internet " +
-        "connection.</p>";
+    if (declared) {
+      // Matched on the producer phrasing rather than the company name alone: a
+      // note may mention the company for other reasons ("… reviewed by The
+      // Research LampPost") without that being the attribution line.
+      var ownsAttribution = /produced by\s+\S/i.test(declared.slice(0, 400));
+      return declared.split(/\n+/).map(function (p, i) {
+        return "<p>" + (i || ownsAttribution ? "" : produced) + fmt.escapeHtml(p) + "</p>";
+      }).join("");
     }
-    return declared.split(/\n+/).map(function (p, i) {
-      return "<p>" + (i ? "" : produced) + fmt.escapeHtml(p) + "</p>";
-    }).join("");
-  }
-
-  report.aboutHtml = function () {
-    return '<div class="card"><h3>About this report</h3>' +
-      '<p class="hint">Analyst and contact are set from the project configuration.</p>' +
-      ABOUT_FIELDS.map(function (f) {
-        var aboutVal = aboutDefault(f[0]);
-        if (!aboutVal) return "";
-        return '<div class="rpt-field"><label>' + f[1] + "</label>" +
-          '<div class="rpt-about-static">' + fmt.escapeHtml(aboutVal) + "</div></div>";
-      }).join("") +
-      "<h3>Report construction</h3>" +
-      constructionHtml() +
+    return "<p>" + produced +
+      "The published figures are " +
+      "computed in R. The report itself is a self-contained HTML document " +
+      "generated by Turas, with no third-party reporting engine involved. When " +
+      "you change a view while reading, Turas recalculates it as you click: " +
+      "filters, custom banners and wave comparisons all recompute from the " +
+      "respondent-level data held inside the file, using the same formulas. " +
+      "Nothing is sent anywhere, and the report works with no internet " +
+      "connection.</p>" +
       // Scoped to what Turas computes: historical waves loaded from published
       // figures have no source data to reproduce them from, which is exactly
       // why no significance is claimed against them.
@@ -277,7 +315,20 @@
       "this report says. Where AI has generated report text directly, it is " +
       "labelled and the model named.</p>" +
       "<p>All output is reviewed and validated by the report author before " +
-      "release.</p>" +
+      "release.</p>";
+  }
+
+  report.aboutHtml = function () {
+    return '<div class="card"><h3>About this report</h3>' +
+      '<p class="hint">Analyst and contact are set from the project configuration.</p>' +
+      ABOUT_FIELDS.map(function (f) {
+        var aboutVal = aboutDefault(f[0]);
+        if (!aboutVal) return "";
+        return '<div class="rpt-field"><label>' + f[1] + "</label>" +
+          '<div class="rpt-about-static">' + fmt.escapeHtml(aboutVal) + "</div></div>";
+      }).join("") +
+      "<h3>Report construction</h3>" +
+      constructionHtml() +
       autoAboutHtml() + "</div>";
   };
 

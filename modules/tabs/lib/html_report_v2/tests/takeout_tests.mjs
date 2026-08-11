@@ -707,13 +707,33 @@ run("rigor footer states a hit inline, never points at nonexistent cards (audit 
   assert(html.indexOf("Pay") !== -1 && html.indexOf("4.2 vs 3.6") !== -1,
     "odd finding named inline with its real cells");
   assert(html.indexOf("Return to office") !== -1, "bimodal finding named inline");
-  // confident null unchanged: nothing found -> the honest null line, no 'found:'
+  // Nothing found -> the footer says nothing about the checks. The line is the
+  // scan's width, not its working (operator decision 2026-08-11): a check that
+  // came back clean is not news, whereas a hit has no card of its own and so
+  // must still be stated inline, above.
   const t0 = takeout.buildPatterns({ fdr: { cells: cells.slice(0, 19), K: 19, groupCount: 1, questionCount: 19,
     groups: [{ banner: "Campus", group: "Odd", base: 40, below: 19, above: 0, qn: 19, meanGap: -0.39 }] },
     bimodal: { questions: [{ code: "QB", title: "Calm", counts: [3, 3, 12, 19, 63], scaleMax: 5 }] } });
   const html0 = takeout.readView.html(t0);
-  assert(html0.indexOf("nothing held up beyond chance") !== -1 && html0.indexOf("found:") === -1,
-    "confident null still reads as nothing held up");
+  assert(html0.indexOf("found:") === -1, "a clean check adds nothing to the line");
+});
+
+run("the provenance line states the scan's width and nothing else", () => {
+  // Operator decision 2026-08-11: the line carried no-AI, the multiplicity
+  // method and a sentence per never-cry-wolf check. That is the working, not
+  // the finding. The correction and the checks are unchanged — only the line.
+  const cells = [];
+  for (let i = 0; i < 20; i++) {
+    cells.push({ banner: "Campus", group: "Odd", q: "Q" + i, qtitle: "Q" + i, nIn: 40,
+      gap: -0.39, value: 3.2, total: 3.59, scaleMax: 5, welchDiff: -0.4, welchP: 0.5, flooredG: false });
+  }
+  const t = takeout.buildPatterns({ fdr: { cells, K: cells.length, groupCount: 4, questionCount: 49,
+    groups: [{ banner: "Campus", group: "Odd", base: 40, below: 19, above: 1, qn: 20, meanGap: -0.339 }] } });
+  const prov = takeout.readView.html(t).split('<div class="tko-prov"')[1] || "";
+  assert(prov.indexOf("Scanned 4 groups × 49 questions = 20 cells") !== -1,
+    "the scan's width is stated");
+  ["no AI", "corrected for multiplicity", "also checked", "curated by the researcher"]
+    .forEach((gone) => assert(prov.indexOf(gone) === -1, "the line still carries: " + gone));
 });
 
 run("curation reset()/deletions survive reload — owning state beats the island seed (audit #5)", () => {

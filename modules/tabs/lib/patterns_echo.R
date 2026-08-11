@@ -196,7 +196,7 @@ attach_patterns_echo <- function(dl) {
   audit <- audit_patterns_config(dl)
   if (!isTRUE(audit$active)) return(dl)
 
-  cat("\n┌─── PATTERNS CONFIG ─────────────────────────────────────┐\n")
+  cat("\n┌─── GROUP OVERVIEW CONFIG ───────────────────────────────┐\n")
   for (r in audit$rows) cat("│ ", r[1], ": ", r[2], "\n", sep = "")
   if (audit$n_check > 0) {
     cat(sprintf("│ %d declaration%s to check — marked ⚠ above\n",
@@ -206,7 +206,10 @@ attach_patterns_echo <- function(dl) {
   }
   cat("└───────────────────────────────────────────────────────┘\n\n")
 
-  section <- list(title = "Patterns configuration", rows = audit$rows)
+  # "Patterns" is the internal name for these levers (patterns_banner and
+  # friends); the reader only ever sees the tab called Group overview, so the
+  # diagnostics panel names it the way the report does.
+  section <- list(title = "Group overview configuration", rows = audit$rows)
   if (is.null(dl$project$diagnostics)) {
     # No diagnostics panel this run (its build failed) — carry the echo alone so
     # the config record still travels inside the report and its saved copies.

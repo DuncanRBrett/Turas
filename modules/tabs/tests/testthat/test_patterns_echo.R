@@ -156,10 +156,10 @@ test_that("patterns_banner: a matching selection echoes ✓; a typo warns with t
 test_that("attach appends a diagnostics section (creating the panel when absent) and prints", {
   dl <- mk_dl(list(mk_rated("Q78")), project = list(takeout_headline = "Q78"))
   out <- capture.output(dl2 <- attach_patterns_echo(dl))
-  expect_true(any(grepl("PATTERNS CONFIG", out)))
+  expect_true(any(grepl("GROUP OVERVIEW CONFIG", out)))
   expect_true(any(grepl("all declarations resolved", out)))
   secs <- dl2$project$diagnostics$sections
-  expect_equal(secs[[length(secs)]]$title, "Patterns configuration")
+  expect_equal(secs[[length(secs)]]$title, "Group overview configuration")
 
   # existing diagnostics keep their sections; the echo appends after them
   dl$project$diagnostics <- list(sections = list(list(title = "Run", rows = list())),
@@ -167,7 +167,7 @@ test_that("attach appends a diagnostics section (creating the panel when absent)
   out <- capture.output(dl3 <- attach_patterns_echo(dl))
   secs <- dl3$project$diagnostics$sections
   expect_length(secs, 2)
-  expect_equal(secs[[2]]$title, "Patterns configuration")
+  expect_equal(secs[[2]]$title, "Group overview configuration")
   expect_equal(dl3$project$diagnostics$status, "PASS")
 
   # a ⚠ shows in the console tally

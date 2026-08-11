@@ -271,6 +271,16 @@ diagnostics_for_island <- function(payload) {
     row("Turas version", payload$turas_version),
     row("R version",     payload$r_version),
     row("Packages",      if (!is.null(payload$packages)) paste(payload$packages, collapse = ", ") else NULL),
+    # Naming R alone understated where the arithmetic happens. R computes the
+    # published figures; every COMPUTED view the reader makes — filters, custom
+    # banners, wave-on-wave comparisons and their significance — is recomputed
+    # by Turas's own engine inside this file, in the browser. Both are Turas and
+    # both are deterministic, but a reader told only "R" is told half of it.
+    row("Compute engines", paste0(
+      "R for the published figures; Turas's JavaScript engine, embedded in this ",
+      "HTML file, for every view the reader recomputes (filters, custom banners, ",
+      "wave-on-wave comparisons and their significance). No third-party ",
+      "statistical library and no server.")),
     row("Run timestamp", fmt_ts(payload$run_timestamp)),
     row("Duration",      dur_disp)
   )

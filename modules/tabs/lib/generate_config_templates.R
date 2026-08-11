@@ -496,6 +496,13 @@ generate_crosstab_config_template <- function(output_path,
                "contributions. The standalone tracker module is unaffected."),
              valid_values_text = "TRUE or FALSE",
              dropdown = c("TRUE", "FALSE")),
+        list(name = "html_report_v2_cover", default = "FALSE", required = FALSE,
+             description = paste0("Open SAVED copies of the v2 report on a cover page: report title, the ",
+               "Comments sheet's executive summary and background, and the first five Story pins as ",
+               "leading findings. Only affects copies made with Save copy, and only when there is story ",
+               "content to show. FALSE (the default) = saved copies open on the dashboard, as before."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
         list(name = "waves_source", default = "", required = FALSE,
              description = "Folder holding prior waves' *_wave.json tracking contributions (each wave's own tabs run writes one). Blank -> no history, Tracking tab stays hidden.",
              valid_values_text = "Folder path, or leave blank"),
@@ -890,7 +897,7 @@ generate_crosstab_config_template <- function(output_path,
     # Only fill this in when the study puts stages around Turas. Left blank, the
     # About card keeps its standard sentence, which is accurate for a report
     # built by Turas alone. Plain words only - no ampersand, no angle brackets.
-    list(QuestionCode = "_REPORT_CONSTRUCTION", Comment = "Optional: how this study's numbers were built, when other stages sit around Turas. Replaces the standard sentence in About. Blank leaves it unchanged.", Banner = "", Headline = ""),
+    list(QuestionCode = "_REPORT_CONSTRUCTION", Comment = "Optional: how this study's numbers were built, when other stages sit around Turas. Replaces the WHOLE Report construction section in About, including the standard reproducibility, AI and author-review paragraphs. Blank leaves it unchanged.", Banner = "", Headline = ""),
     list(QuestionCode = "Q_Satisfaction", Comment = "Note: Question wording changed from previous wave.", Banner = "",
          Headline = "Satisfaction is up 5 points, driven by service quality")
   )

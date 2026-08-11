@@ -187,8 +187,50 @@ run("a study can state how its own numbers were built, in place of the default",
     "the producer line is kept, so a declaration cannot drop the attribution");
   const declaredAt = h.indexOf("preparation layer");
   assert(h.indexOf("Report construction") < declaredAt &&
-    declaredAt < h.indexOf("Every number here is produced by code"),
-    "it sits under Report construction, before the reproducibility paragraph");
+    declaredAt < h.indexOf("Methodology (auto-generated)"),
+    "it sits under Report construction, above the auto-methodology block");
+});
+
+run("a declaration replaces the WHOLE stock block, not just its first sentence", () => {
+  // Operator decision 2026-08-11: each study owns its Report construction
+  // section. The stock reproducibility, AI and author-validation paragraphs used
+  // to render underneath a declaration regardless — so a config that restated
+  // them printed them twice (CCPB W2026 did exactly that), and a config that
+  // deliberately left one out had it reinstated. The study is the authority on
+  // how its own numbers were built, and it owns the assurances with it.
+  const h = boot(undefined, { construction: "Built by hand, checked twice." }).report.aboutHtml();
+  assert(h.indexOf("Built by hand, checked twice.") >= 0, "the study's own words render");
+  ["Every number here is produced by code", "We use AI as a working tool",
+    "reviewed and validated by the report author"].forEach((stock) => {
+    assert(h.indexOf(stock) < 0, "a declaration left the stock paragraph in place: " + stock);
+  });
+  // and nothing renders twice
+  const twice = boot(undefined, { company: "Acme Insights",
+    construction: "This report was produced by Acme Insights using Turas Analytics, our " +
+      "in-house analysis and reporting platform. We use AI as a working tool." }).report.aboutHtml();
+  assert(twice.split("We use AI as a working tool").length - 1 === 1,
+    "a config that restates a stock paragraph prints it once, not twice");
+});
+
+run("a note that writes its own producer line does not get a second one", () => {
+  // An author drafting this row opens the way the section reads — "This report
+  // was produced by …" — and the prepended copy printed the sentence twice on
+  // the client's page (CCPB W2026). Whoever says it, it is said exactly once.
+  const own = boot(undefined, { company: "Acme Insights",
+    construction: "This report was produced by Acme Insights using Turas Analytics, which " +
+      "includes R, Python and JavaScript." }).report.aboutHtml();
+  assert(own.split("This report was produced by").length - 1 === 1,
+    "the producer sentence renders exactly once when the note writes its own");
+  assert(own.indexOf("includes R, Python and JavaScript") >= 0, "in the study's own words");
+
+  // a note that does NOT claim attribution still gets it
+  const lent = boot(undefined, { company: "Acme Insights",
+    construction: "Figures come out of R, then a preparation layer adds composites." })
+    .report.aboutHtml();
+  assert(lent.split("This report was produced by").length - 1 === 1,
+    "and exactly once when Turas supplies it");
+  assert(lent.indexOf("produced by Acme Insights using Turas Analytics") >= 0,
+    "attribution is never dropped");
 });
 
 run("a declared note of several paragraphs renders as several paragraphs", () => {
