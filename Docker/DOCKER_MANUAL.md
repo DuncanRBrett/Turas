@@ -2,7 +2,18 @@
 
 Maintained by Duncan Brett, The Research LampPost (Pty) Ltd.
 
-Last updated: 9 April 2026
+Last updated: 11 August 2026
+
+> **MOTHBALLED — 11 August 2026.** Docker existed so Jess could run Turas on
+> Windows without an R setup. With Jess gone and TRL a one-person operation,
+> nothing runs in a container: Turas runs on Duncan's Mac through
+> `launch_turas()`. The image is no longer built or pushed, and the manual below
+> is kept as the record of how it worked, not as live instructions.
+>
+> Nothing has been deleted — `Dockerfile`, `.dockerignore`, `docker-compose.yml`
+> and the `TURAS_DOCKER` branches in the code are all still in place, so this is
+> reversible. Anything reading "the image needs X" is a note for whoever revives
+> it, not work to do now.
 
 ------------------------------------------------------------------------
 
@@ -71,6 +82,33 @@ cd /Users/duncan/Dev/Turas && docker build --platform linux/amd64 -t turas . && 
 | Dockerfile changes | Yes | May trigger full or partial rebuild |
 | Changes to `turas.bat` | No | That file lives on the user's machine, not in the image |
 | Data/project files | No | Mounted at runtime, not baked into image |
+
+### Python tools (Project Steps tile) — only if Docker is ever revived
+
+Moot while Docker is mothballed; recorded so a revival does not trip over it.
+
+The **Project Steps** tile runs the project's external tools, and today's three
+(the comment-appendix modes) are Python. The image installs R and Node.js but
+**not** python3, so those steps would refuse in a container with
+`PKG_RUNTIME_MISSING` naming what is absent. That refusal is correct behaviour,
+not a bug — the tile checks before it runs anything.
+
+To enable them, the image would need `python3` plus the packages pinned in
+`scripts/requirements.txt` (openpyxl, pandas):
+
+``` dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+COPY scripts/requirements.txt scripts/requirements.txt
+RUN python3 -m pip install --no-cache-dir -r scripts/requirements.txt
+```
+
+**Unverified:** the block above has not been built or run in a container, and
+will not be while Docker is mothballed. If Docker is revived and someone needs
+the Python steps, test the tile inside the container before relying on it. On the
+desktop the same steps work today
+(`/usr/bin/python3` 3.9.6, openpyxl 3.1.5, pandas 2.3.3 on Duncan's machine).
 
 ------------------------------------------------------------------------
 
