@@ -169,6 +169,49 @@ run("the construction note describes BOTH engines, not just R", () => {
     "the old R-only phrasing is gone");
 });
 
+run("a study can state how its own numbers were built, in place of the default", () => {
+  // Turas describes a stock Turas report accurately. It cannot see the stages a
+  // study puts around it - a derived engine ahead of it, a preparation layer
+  // building composite columns, pages that compute in the browser from their
+  // own embedded data - so the study declares them and the declaration stands
+  // in place of the default sentence. Turas never guesses on a study's behalf.
+  const h = boot(undefined, {
+    company: "Acme Insights",
+    construction: "Figures are computed in R, then a preparation layer adds composite columns."
+  }).report.aboutHtml();
+  assert(h.indexOf("preparation layer adds composite columns") >= 0,
+    "the study's own account of its build is shown");
+  assert(h.indexOf("published figures are computed in R.") < 0,
+    "the default sentence stands aside rather than contradicting the study");
+  assert(h.indexOf("produced by Acme Insights using Turas Analytics") >= 0,
+    "the producer line is kept, so a declaration cannot drop the attribution");
+  const declaredAt = h.indexOf("preparation layer");
+  assert(h.indexOf("Report construction") < declaredAt &&
+    declaredAt < h.indexOf("Every number here is produced by code"),
+    "it sits under Report construction, before the reproducibility paragraph");
+});
+
+run("a declared note of several paragraphs renders as several paragraphs", () => {
+  const h = boot(undefined, { construction: "First stage.\n\nSecond stage." })
+    .report.aboutHtml();
+  assert(h.indexOf("First stage.</p>") >= 0 && h.indexOf("<p>Second stage.</p>") >= 0,
+    "blank-line-separated paragraphs survive as paragraphs");
+});
+
+run("a report that declares nothing renders exactly as it did before", () => {
+  // The house rule the provenance feature set: a config without the new field
+  // must produce a byte-identical report. Blank, whitespace and absent all mean
+  // the same thing - say nothing, change nothing.
+  const base = boot(undefined, { company: "Acme Insights" }).report.aboutHtml();
+  ["", "   ", undefined].forEach((value) => {
+    const h = boot(undefined, { company: "Acme Insights", construction: value })
+      .report.aboutHtml();
+    assert(h === base, "an empty construction note changed the rendered About");
+  });
+  assert(base.indexOf("published figures are computed in R") >= 0,
+    "and the default sentence is what it falls back to");
+});
+
 run("the reproducibility claim is scoped to what the software computes", () => {
   // Waves loaded from published figures have no source data to reproduce them
   // from, which is precisely why no significance is claimed against them.

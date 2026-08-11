@@ -331,6 +331,75 @@ test_that("load_comments_sheet reads the optional Headline column", {
   expect_false("Q4" %in% names(hl))
 })
 
+test_that("load_comments_sheet lifts _REPORT_CONSTRUCTION off the sheet", {
+  # The link the unit tests below cannot reach: an actual Comments row in an
+  # actual workbook. A study declares how its numbers were really built, and it
+  # must arrive as an attribute rather than as a comment on a question called
+  # "_REPORT_CONSTRUCTION".
+  skip_if_not_installed("openxlsx")
+  skip_if_not_installed("readxl")
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Comments")
+  openxlsx::writeData(wb, "Comments", data.frame(
+    QuestionCode = c("_BACKGROUND", "_REPORT_CONSTRUCTION", "Q1"),
+    Comment      = c("Fieldwork ran in May.",
+                     "Figures are computed in R, then a preparation layer adds composite columns.",
+                     "A comment."),
+    stringsAsFactors = FALSE))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  cm <- NULL
+  capture.output(cm <- load_comments_sheet(tmp))
+  expect_false(is.null(cm))
+  expect_identical(attr(cm, "report_construction", exact = TRUE),
+                   "Figures are computed in R, then a preparation layer adds composite columns.")
+  expect_identical(attr(cm, "background_text", exact = TRUE), "Fieldwork ran in May.")
+  # the reserved row must not also surface as a question comment
+  expect_identical(names(cm), "Q1")
+})
+
+test_that("a Comments sheet with only a construction note still loads", {
+  # the "nothing usable" guard returns NULL when a sheet has no comments and no
+  # reserved rows; a sheet carrying only this one must not be thrown away
+  skip_if_not_installed("openxlsx")
+  skip_if_not_installed("readxl")
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Comments")
+  openxlsx::writeData(wb, "Comments", data.frame(
+    QuestionCode = "_REPORT_CONSTRUCTION",
+    Comment = "Built by three stages, not one.", stringsAsFactors = FALSE))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  cm <- NULL
+  capture.output(cm <- load_comments_sheet(tmp))
+  expect_false(is.null(cm))
+  expect_identical(attr(cm, "report_construction", exact = TRUE),
+                   "Built by three stages, not one.")
+})
+
+test_that("a Comments sheet with no construction note attaches none", {
+  skip_if_not_installed("openxlsx")
+  skip_if_not_installed("readxl")
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Comments")
+  openxlsx::writeData(wb, "Comments", data.frame(
+    QuestionCode = "Q1", Comment = "A comment.", stringsAsFactors = FALSE))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  cm <- NULL
+  capture.output(cm <- load_comments_sheet(tmp))
+  expect_null(attr(cm, "report_construction", exact = TRUE))
+})
+
 test_that("load_comments_sheet without a Headline column has no headlines attribute", {
   skip_if_not_installed("openxlsx")
   skip_if_not_installed("readxl")

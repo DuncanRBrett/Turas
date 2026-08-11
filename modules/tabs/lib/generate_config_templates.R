@@ -874,7 +874,7 @@ generate_crosstab_config_template <- function(output_path,
   # --- SHEET 4: Comments ---
   comments_cols <- list(
     list(name = "QuestionCode", width = 20, required = TRUE,
-         description = "Question code to attach comment to, or _BACKGROUND / _EXECUTIVE_SUMMARY for report sections."),
+         description = "Question code to attach comment to, or _BACKGROUND / _EXECUTIVE_SUMMARY / _REPORT_CONSTRUCTION for report sections."),
     list(name = "Comment", width = 60, required = TRUE,
          description = "Comment text. Supports markdown for HTML reports (bold, bullets, links)."),
     list(name = "Banner", width = 20, required = FALSE,
@@ -887,13 +887,17 @@ generate_crosstab_config_template <- function(output_path,
   comments_examples <- list(
     list(QuestionCode = "_BACKGROUND", Comment = "This survey was conducted among 500 adults nationally in Q1 2025.", Banner = "", Headline = ""),
     list(QuestionCode = "_EXECUTIVE_SUMMARY", Comment = "Key finding: Overall satisfaction increased by 5 points year-on-year.", Banner = "", Headline = ""),
+    # Only fill this in when the study puts stages around Turas. Left blank, the
+    # About card keeps its standard sentence, which is accurate for a report
+    # built by Turas alone. Plain words only - no ampersand, no angle brackets.
+    list(QuestionCode = "_REPORT_CONSTRUCTION", Comment = "Optional: how this study's numbers were built, when other stages sit around Turas. Replaces the standard sentence in About. Blank leaves it unchanged.", Banner = "", Headline = ""),
     list(QuestionCode = "Q_Satisfaction", Comment = "Note: Question wording changed from previous wave.", Banner = "",
          Headline = "Satisfaction is up 5 points, driven by service quality")
   )
 
   write_table_sheet(wb, "Comments", comments_cols,
                     title = "Question Comments & Report Text",
-                    subtitle = "Add question-specific comments and report narrative sections. Use _BACKGROUND and _EXECUTIVE_SUMMARY for report sections.",
+                    subtitle = "Add question-specific comments and report narrative sections. Use _BACKGROUND, _EXECUTIVE_SUMMARY and _REPORT_CONSTRUCTION for report sections.",
                     example_rows = comments_examples,
                     num_blank_rows = 30)
 

@@ -585,6 +585,34 @@ test_that("report_meta carries the config's analyst / contact / closing fields",
   expect_equal(p$report_meta$closing, "Confidential.")
 })
 
+test_that("a study's own report-construction note reaches report_meta", {
+  # Turas describes a stock Turas report accurately; a study with stages around
+  # it (a derived engine ahead, a preparation layer, pages that compute in the
+  # browser) says so itself, in Comments _REPORT_CONSTRUCTION.
+  cfg <- make_dl_config(
+    company_name = "The Research Lamppost",
+    report_construction = paste(
+      "Figures are computed in R, then a preparation layer adds composite",
+      "columns, and the section pages recompute in the browser."))
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_match(p$report_meta$construction, "preparation layer adds composite")
+})
+
+test_that("a config that declares no construction note carries an empty one", {
+  # the About card falls back to its standard sentence on an empty string, so a
+  # report that says nothing must render exactly as it did before this existed
+  cfg <- make_dl_config(company_name = "The Research Lamppost")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_equal(p$report_meta$construction, "")
+})
+
+test_that("a construction note of literal 'NA' is treated as blank", {
+  cfg <- make_dl_config(company_name = "The Research Lamppost",
+                        report_construction = "NA")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_equal(p$report_meta$construction, "")
+})
+
 test_that("report_meta is omitted entirely when no analyst metadata is configured", {
   # default config has no analyst / company / closing keys
   p <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$project

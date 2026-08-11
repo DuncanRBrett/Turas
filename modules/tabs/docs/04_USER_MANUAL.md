@@ -521,7 +521,11 @@ the browser and travel inside any saved copy of the report.
 For narrative that should come from the config instead of being typed in
 the browser — background & method, executive summary — use the
 **Comments** sheet's reserved `_BACKGROUND` / `_EXECUTIVE_SUMMARY` rows;
-see [Template Reference](06_TEMPLATE_REFERENCE.md). The config's
+see [Template Reference](06_TEMPLATE_REFERENCE.md). A third reserved row,
+`_REPORT_CONSTRUCTION`, states how the study's numbers were actually built when
+other stages sit around Turas — a derived engine ahead of it, a preparation
+layer, pages that compute in the browser. It replaces the standard sentence in
+the About card; leave it out and the report reads exactly as before. The config's
 **AddedSlides** sheet is a separate, older mechanism that is not
 currently wired into this report — filling it in has no effect here.
 

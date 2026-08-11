@@ -5,6 +5,25 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Tabs: a study can say how its numbers were actually built** — a third
+  reserved Comments row, `_REPORT_CONSTRUCTION`, stands in place of the
+  *Report construction* sentence in the About card. That sentence says the
+  published figures are computed in R, which is accurate for a report Turas
+  built on its own and stops being accurate the moment a study puts other
+  stages around it: a derived-variable engine ahead of it, a preparation layer
+  building composite columns, extra pages that compute their figures in the
+  reader's browser from their own embedded data. Turas cannot see those stages
+  and does not guess — the same rule as question provenance, where a blank
+  declares nothing rather than defaulting to "asked". The producer line is kept
+  either way, so a declaration cannot drop the attribution, and the paragraphs
+  that follow (reproducibility, AI as a working tool, author review) are
+  untouched because they stay true whatever the pipeline looks like. Blank lines
+  become paragraphs. Fully additive: a config that declares nothing renders a
+  byte-identical report, asserted in both directions. Documented on the
+  generated Comments template, in the Template Reference and the User Manual.
+  Tests: `test_data_layer_writer.R` (set, unset, and a literal "NA" cell) and
+  `html_report_v2/tests/report_tests.mjs` (declared text replaces the default,
+  multi-paragraph, and byte-identical when absent).
 - **Tabs: question provenance** — two optional Selection columns, `Source` and
   `Formula`, say where each question's numbers came from. Turas only ever meets a
   finished column, so a figure derived before the data reached it looks identical

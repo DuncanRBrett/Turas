@@ -2110,8 +2110,35 @@ question card:
 |--------------|-------|
 | `_BACKGROUND` | The Report tab's *Background & method* card |
 | `_EXECUTIVE_SUMMARY` | The Report tab's *Executive summary* card |
+| `_REPORT_CONSTRUCTION` | The *Report construction* sentence in the About card |
 
-Both are read-only in the report (edit the config to change them) and
+The first two are read-only in the report (edit the config to change them) and
 each is pinnable (📌) to the Story. See
 [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) ("Narrative
 pulled from the config" section).
+
+#### Saying how the numbers were actually built
+
+`_REPORT_CONSTRUCTION` exists because the About card's standard sentence
+describes a report that Turas built on its own, and says the published figures
+are computed in R. That is accurate for a stock report. It stops being accurate
+the moment a study puts other stages around Turas — a derived-variable engine
+ahead of it, a preparation layer that builds composite columns, extra pages that
+compute their figures in the reader's browser from their own embedded data.
+Turas cannot see those stages, so it does not guess: the study declares them and
+the declaration stands in place of the standard sentence.
+
+The producer line ("This report was produced by … using Turas Analytics") is
+kept either way, so a declaration cannot accidentally drop the attribution. The
+paragraphs after it — reproducibility, AI as a working tool, author review — are
+unchanged, because they stay true whatever the pipeline looks like.
+
+**Leave the row out and nothing changes.** A config that says nothing renders
+exactly the report it rendered before this row existed.
+
+Blank lines in the cell become separate paragraphs. Write it in plain words, and
+do not put `&`, `<` or `>` in the cell — `openxlsx` hands R the literal `&gt;`
+and the text arrives mangled. Write "and" rather than an ampersand.
+
+The row is the report author's own words. It is a statement about how the study
+was run and who stands behind it, so it should read as the author would say it.

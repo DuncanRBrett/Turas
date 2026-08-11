@@ -298,7 +298,11 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     closing     = cfg_chr("closing_notes"),
     verbatim    = cfg_chr("verbatim_filename"),
     background  = cfg_chr("background_text"),
-    exec_summary = cfg_chr("executive_summary")
+    exec_summary = cfg_chr("executive_summary"),
+    # How this study's numbers were actually built (Comments _REPORT_CONSTRUCTION).
+    # Stands in place of the About card's default construction sentence, which
+    # describes a stock Turas report and cannot know about stages around it.
+    construction = cfg_chr("report_construction")
   )
   if (any(nzchar(unlist(meta)))) proj$report_meta <- meta
   proj

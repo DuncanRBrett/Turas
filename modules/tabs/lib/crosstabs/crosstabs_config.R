@@ -844,8 +844,8 @@ get_output_path <- function(project_root, output_subfolder, output_filename) {
 #'
 #' @param config_file Character, path to config Excel file
 #' @return Named list of comments keyed by QuestionCode (with optional
-#'   \code{background_text} / \code{executive_summary} / \code{headlines}
-#'   attributes), or NULL
+#'   \code{background_text} / \code{executive_summary} /
+#'   \code{report_construction} / \code{headlines} attributes), or NULL
 #' @keywords internal
 load_comments_sheet <- function(config_file) {
   tryCatch({
@@ -879,9 +879,16 @@ load_comments_sheet <- function(config_file) {
 
     # Extract special dashboard text entries (V10.8.0)
     # Use _BACKGROUND and _EXECUTIVE_SUMMARY as reserved QuestionCode values
-    special_codes <- c("_BACKGROUND", "_EXECUTIVE_SUMMARY")
+    # _REPORT_CONSTRUCTION lets a study state how its numbers were actually
+    # built, in place of the About card's default sentence. Turas describes
+    # itself accurately, but it cannot see the stages around it - a derived
+    # engine ahead of it, a preparation layer, pages that compute in the
+    # browser - and a study that has them needs to say so where the reader
+    # looks. Left blank, the report reads exactly as it did before.
+    special_codes <- c("_BACKGROUND", "_EXECUTIVE_SUMMARY", "_REPORT_CONSTRUCTION")
     background_text <- NULL
     executive_summary <- NULL
+    report_construction <- NULL
 
     for (i in seq_len(nrow(df))) {
       if (!has_comment(df$Comment[i])) next
@@ -890,6 +897,8 @@ load_comments_sheet <- function(config_file) {
         background_text <- trimws(df$Comment[i])
       } else if (q_code == "_EXECUTIVE_SUMMARY") {
         executive_summary <- trimws(df$Comment[i])
+      } else if (q_code == "_REPORT_CONSTRUCTION") {
+        report_construction <- trimws(df$Comment[i])
       }
     }
 
@@ -932,7 +941,8 @@ load_comments_sheet <- function(config_file) {
     # Nothing usable at all -> NULL, exactly as a sheet with no valid rows
     # behaved before the Headline column existed
     if (length(comments) == 0 && length(headlines) == 0 &&
-        is.null(background_text) && is.null(executive_summary)) {
+        is.null(background_text) && is.null(executive_summary) &&
+        is.null(report_construction)) {
       return(NULL)
     }
 
@@ -942,6 +952,7 @@ load_comments_sheet <- function(config_file) {
 
     if (!is.null(background_text)) cat(sprintf("  [INFO] Background text loaded from Comments sheet\n"))
     if (!is.null(executive_summary)) cat(sprintf("  [INFO] Executive summary loaded from Comments sheet\n"))
+    if (!is.null(report_construction)) cat(sprintf("  [INFO] Report construction note loaded from Comments sheet\n"))
     if (length(headlines) > 0) {
       cat(sprintf("  [INFO] Loaded %d question headline(s) from Comments sheet\n",
                   length(headlines)))
@@ -950,6 +961,7 @@ load_comments_sheet <- function(config_file) {
     # Attach dashboard text (and headlines) as attributes
     attr(comments, "background_text") <- background_text
     attr(comments, "executive_summary") <- executive_summary
+    attr(comments, "report_construction") <- report_construction
     if (length(headlines) > 0) attr(comments, "headlines") <- headlines
 
     comments
@@ -1551,6 +1563,7 @@ load_crosstabs_config <- function(config_file) {
   if (!is.null(config_obj$comments)) {
     config_obj$background_text <- attr(config_obj$comments, "background_text")
     config_obj$executive_summary <- attr(config_obj$comments, "executive_summary")
+    config_obj$report_construction <- attr(config_obj$comments, "report_construction")
   }
 
   # Load optional AddedSlides sheet (V10.8.0, renamed from Qualitative)
