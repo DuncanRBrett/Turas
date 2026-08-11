@@ -23,6 +23,11 @@ python3 scripts/build_comment_appendix.py \
 Put the appendix in the project's data folder, next to the survey data. Full script
 reference (column-detection modes, flags): `scripts/README_comment_appendix.md`.
 
+**Or run it from Turas.** `launch_turas()` → **Project Steps** wraps the same script in a
+form — build/update, report changed comments, and apply approved changes — with the output
+shown on the page and failures reported as TRS refusals. Same script, same result; nothing to
+remember at the terminal. See `modules/steps/README.md`.
+
 It is **incremental and non-destructive** — re-run it whenever new interviews land and it
 appends only new respondents (matched by ResponseID), preserving all coding below. Each
 sheet looks like:

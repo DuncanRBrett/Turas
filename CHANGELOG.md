@@ -5,6 +5,54 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Project Steps: a per-project runbook** — one workbook per project recording
+  the ordered steps that produce the deliverable, including the ones no button
+  can run. `Steps` (Order / Step / Type / Tool / Notes / any `arg:<id>` columns),
+  a `Provenance` block saying which AI features were on and where the client's
+  approval lives, and a `Guide` sheet explaining both. The GUI opens one as a
+  checklist: **Open** on a tool row loads that step's arguments into the form —
+  you still press RUN STEP, so one click never starts something that writes
+  files — and **Mark done** records the human steps. Outcomes go to a sidecar
+  `.rds` beside the workbook; the analyst's workbook is never written to.
+  Last-used arguments beat the runbook's next time, so a corrected path sticks
+  without editing Excel. Refusals name the offending row as Excel numbers it: an
+  unknown tool id, an unknown step type, a step with no description, a missing
+  column. Deliberately not a pipeline engine — no sequencing, no run-all; the
+  work between steps is the point. Runbooks seeded for ASSA, Electrum VAS 2026
+  and SACAP SACS 2026 from each project's own documents. Tests:
+  `test_runbook.R` (parsing, every refusal path, provenance, state round-trip,
+  template) and `test_gui_server.R` (checklist rendering, prefill, mark-done,
+  and a real run recorded against its step).
+- **Project Steps: the steps outside the modules now run from Turas** — a new
+  tile (`modules/steps/`) that runs the tools a deliverable depends on but which
+  are not analytical modules. The first three are the comment-appendix builder's
+  modes: build/update, report changed comments, apply approved changes. Each tool
+  is described by a manifest (runtime, script, required packages, argument list);
+  the GUI renders a form from it, checks the runtime and its packages before
+  starting, streams the tool's output onto the page as it runs, and maps a
+  non-zero exit to an `IO_STEP_FAILED` refusal carrying the last lines of output —
+  boxed in the console and shown as a notification. The language does not matter,
+  the launch surface does: a step that exists only as a remembered terminal
+  command is a step that gets lost, and it is exactly the step that tempts an AI
+  session into running the pipeline itself. Two traps are encoded in the
+  manifests and asserted by tests: all three appendix modes carry the
+  column-resolution arguments (the script resolves columns *before* it dispatches
+  on mode, so a review mode without them would silently review a different set of
+  sheets), and `--dry-run` is offered on the build mode only (it is checked after
+  the dispatch, so it does nothing in the review modes). Argument validation
+  refuses before anything runs: blank required fields, missing files, mutually
+  exclusive arguments both set, choices out of range. Uses `processx` (already in
+  `renv.lock`) rather than console-inherited `system2`, because a module launched
+  from the hub writes to a temp log the launcher deletes — console-only streaming
+  would be invisible in the one case that matters. Python dependencies pinned in
+  `scripts/requirements.txt`. Policy lifted into `docs/REPORT_GENERATION_METHOD.md`:
+  AI builds Turas, Turas runs reports; deliverables carry no AI mark; AI-written
+  deliverable text needs the express tag, decided by the mechanism test (does a
+  model run at runtime, or could two runs on identical data differ?), not by
+  topic. Tests: `modules/steps/tests/testthat/` — manifest validation, command
+  construction, environment guard, exit-code mapping, and the appendix trio end to
+  end on a synthetic workbook in a temp folder. The GUI itself is verified by
+  Duncan through `launch_turas()`.
 - **Tabs: a study can say how its numbers were actually built** — a third
   reserved Comments row, `_REPORT_CONSTRUCTION`, stands in place of the
   *Report construction* sentence in the About card. That sentence says the
@@ -127,6 +175,14 @@ All notable changes to TURAS are documented in this file.
 - Root-level README.md for all modules
 
 ### Changed
+- **Docker mothballed** — it existed so a second operator could run Turas on
+  Windows without an R setup; TRL is a one-person operation now, so nothing runs
+  in a container and the image is no longer built or pushed. `Dockerfile`,
+  `docker-compose.yml`, `.dockerignore` and the `TURAS_DOCKER` branches all stay
+  in place, so it is reversible; `Docker/DOCKER_MANUAL.md` carries the banner and
+  remains the revival record, and `OPERATOR_GUIDE.md` no longer offers Docker as a
+  live path. `JESS_SETUP.md` (one-time setup for a Windows/Docker machine that no
+  longer exists) removed — git history keeps it.
 - Decomposed oversized functions across 7 modules to meet <100 line target:
   - CatDriver: `run_categorical_keydriver_impl()` 825 -> 212 lines
   - MaxDiff: `run_maxdiff_analysis_mode()` 531 -> 182 lines

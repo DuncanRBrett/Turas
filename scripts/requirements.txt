@@ -1,0 +1,16 @@
+# Python packages the Turas helper scripts need.
+#
+# Install:
+#   python3 -m pip install -r scripts/requirements.txt
+#
+# The Project Steps GUI (modules/steps) checks these before it runs a Python
+# tool and refuses with PKG_RUNTIME_MISSING naming whatever is absent.
+#
+# Verified working on Duncan's machine 2026-08-11 with /usr/bin/python3 3.9.6,
+# openpyxl 3.1.5, pandas 2.3.3. Floors below are the versions in use, not the
+# oldest that would work.
+#
+# Used by: scripts/build_comment_appendix.py (reads/writes .xlsx workbooks)
+
+openpyxl>=3.1
+pandas>=2.0

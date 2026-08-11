@@ -16,7 +16,9 @@ launch_turas()
 
 The Shiny launcher opens in your browser with a grid of all modules.
 
-### Docker
+### Docker — mothballed 11 August 2026
+
+Docker existed so a second operator could run Turas on Windows without an R setup. TRL is a one-person operation now, so nothing runs in a container and the image is no longer built or pushed. The files are all still in the repo, so this is reversible; `Docker/DOCKER_MANUAL.md` is the record. The commands below are kept for that revival, not for daily use.
 
 ```bash
 # Build the image (first time only)
@@ -48,8 +50,29 @@ Inside Docker, place config and data files under `/data` — that is the mount p
 | **Categorical Driver** | Logistic regression + SHAP drivers | Excel (Config sheet) |
 | **Confidence** | CIs for proportions, means, NPS | Excel (Config sheet) |
 | **Report Hub** | Combine HTML reports into a portal | Excel (Config + report list) |
+| **Project Steps** | Run the project's external tools (e.g. the comment-appendix builder) | None — a form per tool |
 
-Every module uses an **Excel configuration file** as its primary input. The Config sheet is always a two-column layout: `parameter | value`.
+Every analytical module uses an **Excel configuration file** as its primary input. The Config sheet is always a two-column layout: `parameter | value`.
+
+---
+
+## Project Steps (external tools)
+
+Not every step in producing a deliverable is an analytical module. The **Project Steps** tile
+runs the ones that aren't — today, the three comment-appendix modes (build/update, report
+changed comments, apply approved changes). Pick a step, fill the form, click **RUN STEP**: the
+tool's output streams into the page as it runs, and a failure comes back as a TRS refusal
+naming what went wrong rather than a silent stop.
+
+The tools can be written in any language. Python ones need their packages first:
+
+```bash
+python3 -m pip install -r scripts/requirements.txt
+```
+
+The tile checks that before it runs anything, and refuses with `PKG_RUNTIME_MISSING` if the
+runtime or a package is absent. Adding a tool: see `modules/steps/README.md`. Why the tile
+exists and what it may and may not do: `docs/REPORT_GENERATION_METHOD.md`.
 
 ---
 
