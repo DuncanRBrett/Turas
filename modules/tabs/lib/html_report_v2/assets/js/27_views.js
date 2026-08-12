@@ -142,7 +142,7 @@
       ", overall percentages are stable to about ±" +
       TR.conf.maxMoePct(overall).toFixed(1) + "pp";
     if (smallest) {
-      bits += "; smaller cuts swing more — " + fmt.escapeHtml(smallest.label) +
+      bits += "; smaller sample subsets are more volatile — " + fmt.escapeHtml(smallest.label) +
         " (n=" + fmt.base(smallest.n) + ") about ±" +
         TR.conf.maxMoePct(smallest.n).toFixed(1) + "pp";
     }

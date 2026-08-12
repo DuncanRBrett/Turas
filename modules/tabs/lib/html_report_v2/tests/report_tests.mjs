@@ -77,7 +77,7 @@ run("present -> a collapsible card with a status pill", () => {
   assert(h.indexOf("Statistical diagnostics") >= 0, "carries the panel heading");
   assert(h.indexOf("rpt-diag-status partial") >= 0 && h.indexOf(">PARTIAL<") >= 0,
     "the status pill reflects the run status (PARTIAL)");
-  assert(h.indexOf("twin of the Excel stats") >= 0, "explains it is the twin of the Excel pack");
+  assert(h.indexOf("This is the reports diagnostics record") >= 0, "carries the hint line");
 });
 
 run("present -> every curated section and its rows render", () => {
@@ -134,7 +134,7 @@ run("analyst + contact render from the config-fed island meta", () => {
 run("the standard report-construction note replaces the old disclaimer field", () => {
   const h = boot(undefined, { analyst: "D", closing: "OLD CLOSING TEXT" }).report.aboutHtml();
   assert(h.indexOf("Report construction") >= 0, "the note's heading renders");
-  assert(h.indexOf("Every number here is produced by code") >= 0,
+  assert(h.indexOf("produced by code and can be reproduced from the source data") >= 0,
     "the deterministic claim renders");
   assert(h.indexOf("It calculates nothing") >= 0,
     "AI is stated to calculate nothing");
@@ -186,9 +186,8 @@ run("a study can state how its own numbers were built, in place of the default",
   assert(h.indexOf("produced by Acme Insights using Turas Analytics") >= 0,
     "the producer line is kept, so a declaration cannot drop the attribution");
   const declaredAt = h.indexOf("preparation layer");
-  assert(h.indexOf("Report construction") < declaredAt &&
-    declaredAt < h.indexOf("Methodology (auto-generated)"),
-    "it sits under Report construction, above the auto-methodology block");
+  assert(h.indexOf("Report construction") < declaredAt,
+    "it sits under the Report construction heading");
 });
 
 run("a declaration replaces the WHOLE stock block, not just its first sentence", () => {
@@ -200,7 +199,8 @@ run("a declaration replaces the WHOLE stock block, not just its first sentence",
   // how its own numbers were built, and it owns the assurances with it.
   const h = boot(undefined, { construction: "Built by hand, checked twice." }).report.aboutHtml();
   assert(h.indexOf("Built by hand, checked twice.") >= 0, "the study's own words render");
-  ["Every number here is produced by code", "We use AI as a working tool",
+  ["produced by code and can be reproduced from the source data",
+    "We use AI as a working tool",
     "reviewed and validated by the report author"].forEach((stock) => {
     assert(h.indexOf(stock) < 0, "a declaration left the stock paragraph in place: " + stock);
   });
@@ -254,16 +254,73 @@ run("a report that declares nothing renders exactly as it did before", () => {
     "and the default sentence is what it falls back to");
 });
 
+// Wave fixtures. TR.PREV always carries the current wave, so one entry is not a
+// tracker. `scores` on a wave question means that wave holds respondent-level
+// data and IS recalculated (22w_waves.js), which changes what the note may claim.
+const PUBLISHED_WAVES = { waves: [
+  { wave: "2025", questions: { Q1: { code: "Q1", stats: { mean: 8.1 } } } },
+  { wave: "W2026", current: true, questions: { Q1: { code: "Q1", scores: [8, 9] } } }
+] };
+const MICRO_WAVES = { waves: [
+  { wave: "2025", questions: { Q1: { code: "Q1", scores: [7, 8] } } },
+  { wave: "W2026", current: true, questions: { Q1: { code: "Q1", scores: [8, 9] } } }
+] };
+
 run("the reproducibility claim is scoped to what the software computes", () => {
-  // Waves loaded from published figures have no source data to reproduce them
-  // from, which is precisely why no significance is claimed against them.
-  const h = boot(undefined, undefined).report.aboutHtml();
-  assert(h.indexOf("Every number here is produced by code") >= 0,
+  const h = boot(undefined, undefined, undefined, PUBLISHED_WAVES).report.aboutHtml();
+  assert(h.indexOf("produced by code and can be reproduced from the source data") >= 0,
     "the claim is scoped to code-produced figures");
-  assert(h.indexOf("carried forward from earlier waves") >= 0,
+  assert(h.indexOf("carried forward from earlier waves are the numbers published") >= 0,
     "historical figures are called out as not recalculated");
-  assert(h.indexOf("no significance is claimed against them") >= 0,
-    "and the consequence is stated");
+});
+
+run("the note never claims that earlier waves go untested", () => {
+  // It used to end "…which is why no significance is claimed against them",
+  // while the Tracking tab of the same report counted significant wave-on-wave
+  // movements and the auto-methodology block below described the test. The About
+  // card contradicted itself on one page (CCPB W2026: 8 up, 1 down).
+  const h = boot(undefined, undefined, undefined, PUBLISHED_WAVES).report.aboutHtml();
+  assert(h.indexOf("no significance is claimed against them") < 0,
+    "the false claim is gone");
+  assert(h.indexOf("the comparison is tested on the figures and bases each wave carries") >= 0,
+    "and what actually happens is stated instead");
+});
+
+run("a wave that carries respondent data is not described as published-only", () => {
+  // "Shown as published rather than recalculated" is a claim the note is only
+  // entitled to when no earlier wave carries per-respondent scores.
+  const h = boot(undefined, undefined, undefined, MICRO_WAVES).report.aboutHtml();
+  assert(h.indexOf("are the numbers published at the time") < 0,
+    "a recalculated wave is not called a published one");
+  assert(h.indexOf("the comparison is tested on the figures and bases each wave carries") >= 0,
+    "the comparison sentence still applies");
+});
+
+run("a report with no earlier waves says nothing about waves at all", () => {
+  const h = boot(undefined, undefined).report.aboutHtml();
+  ["wave comparison", "carried forward from earlier waves", "each wave carries"]
+    .forEach((s) => assert(h.indexOf(s) < 0, "a single-wave report mentions waves: " + s));
+  assert(h.indexOf("recompute from the respondent-level data held inside the file.") >= 0,
+    "and the recompute sentence closes cleanly without the wave clause");
+});
+
+run("the recompute sentence does not fold waves in with filters", () => {
+  // Filters and custom banners recompute from respondent-level data. A wave
+  // loaded from published tables has none in the file to recompute from, so
+  // listing all three together was untrue for the third.
+  const h = boot(undefined, undefined, undefined, PUBLISHED_WAVES).report.aboutHtml();
+  assert(h.indexOf("filters, custom banners and wave comparisons all recompute") < 0,
+    "the old conflated list is gone");
+  assert(h.indexOf("a wave comparison reads each earlier wave from the figures the file carries") >= 0,
+    "waves are named separately and accurately");
+});
+
+run("the report is not said to send anything while it is read", () => {
+  // Verified against the engine: no fetch, XHR, beacon or socket anywhere in it.
+  // AI insights, when used, run in R at BUILD time, so they do not qualify this.
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("Nothing is sent anywhere while you read it") >= 0,
+    "the claim is scoped to reading, which is the strong and true version");
 });
 
 run("AI is described as a working tool, covering every route it reaches the report by", () => {
@@ -291,48 +348,57 @@ run("the construction note contains no em dashes", () => {
   assert(note.indexOf("—") < 0, "an em dash crept into the report-construction note");
 });
 
-run("methodology names BOTH tests and the Bonferroni correction", () => {
-  const h = boot(undefined, undefined).report.aboutHtml();
-  assert(h.indexOf("two-proportion pooled z-test") >= 0, "the proportion test is named");
-  assert(h.indexOf("Welch t-test") >= 0,
-    "the Welch test is named — means/indexes/NPS use it and it was omitted before");
-  assert(h.indexOf("Bonferroni correction") >= 0,
-    "Bonferroni is disclosed; it materially raises the bar for a letter");
-});
-
-run("methodology drops Bonferroni from the text when the project disables it", () => {
-  const h = boot(undefined, undefined, { bonferroni: false }).report.aboutHtml();
-  assert(h.indexOf("Bonferroni") < 0, "no Bonferroni claim when it is switched off");
-  assert(h.indexOf("Welch t-test") >= 0, "the rest of the note is unaffected");
-});
-
-run("methodology reports the CONFIGURED level, not a hard-coded 95%", () => {
-  const dflt = boot(undefined, undefined).report.aboutHtml();
-  assert(dflt.indexOf("compared at the 95% level") >= 0, "0.05 default reads as 95%");
-  const ninety = boot(undefined, undefined, { alpha: 0.10 }).report.aboutHtml();
-  assert(ninety.indexOf("compared at the 90% level") >= 0,
-    "alpha 0.10 reads as 90% — a fixed 95% would describe letters the report never shows");
-  assert(ninety.indexOf("compared at the 95% level") < 0, "and 95% is not also claimed");
-});
-
-run("the wave-test caveat appears only when there IS wave history", () => {
-  const none = boot(undefined, undefined).report.aboutHtml();
-  assert(none.indexOf("Wave-on-wave change is tested") < 0,
-    "no tracking history -> no wave sentence");
-  const tracked = boot(undefined, undefined, undefined,
+run("the auto-generated methodology paragraph is gone from the Report tab", () => {
+  // Removed 2026-08-11 (Duncan): it restated in prose what the Statistical
+  // diagnostics panel and the How-to-read guide already carry, on the page whose
+  // job is the narrative. Nothing was lost — both other surfaces keep it.
+  const h = boot(undefined, undefined, undefined,
     { waves: [{ wave: "2025" }, { wave: "W2026", current: true }] }).report.aboutHtml();
-  assert(tracked.indexOf("Wave-on-wave change is tested") >= 0, "with history it renders");
-  assert(tracked.indexOf("single planned comparison") >= 0,
-    "and explains why wave tests take no Bonferroni divisor");
+  ["Methodology (auto-generated)", "two-proportion pooled z-test", "Welch t-test",
+    "Bonferroni correction", "compared at the 95% level", "Wave-on-wave change is tested",
+    "are excluded from testing and flagged"]
+    .forEach((gone) => assert(h.indexOf(gone) < 0, "still on the Report tab: " + gone));
 });
 
-run("no meta -> fields are omitted but the note and methodology still render", () => {
+run("a stock unweighted report ends at the construction note", () => {
+  const h = boot(undefined, undefined).report.aboutHtml();
+  assert(h.indexOf("Report construction") >= 0, "the note renders");
+  assert(h.indexOf("Notes on this report") < 0,
+    "and nothing follows it when no conditional disclosure applies");
+});
+
+run("weighting is still disclosed, because it changes how every base reads", () => {
+  const h = boot(undefined, undefined,
+    { weighted: true, weight_variable: "rim_wt" }).report.aboutHtml();
+  assert(h.indexOf("Notes on this report") >= 0, "the surviving notes get a heading");
+  assert(h.indexOf("Weighting.") >= 0 && h.indexOf("rim_wt") >= 0,
+    "the weight variable is named");
+  assert(h.indexOf("effective") >= 0, "and the three bases are explained");
+});
+
+run("synthetic respondent data is still disclosed", () => {
+  // A reader must never mistake a fitted prototype for real fieldwork.
+  const sandbox = boot(undefined, undefined);
+  sandbox.MICRO = { synthetic: true };
+  const h = sandbox.report.aboutHtml();
+  assert(h.indexOf("SYNTHETIC") >= 0, "the prototype warning survives");
+});
+
+run("the AI attribution is still rendered, keeping the construction note's promise", () => {
+  // The note promises AI-generated report text is labelled and its model named.
+  // TR.ai.methodologyHtml() is the only thing that keeps it, so it outlived the
+  // methodology block it used to sit inside.
+  const sandbox = boot(undefined, undefined);
+  sandbox.ai.methodologyHtml = () => "<p>Drafted with claude-opus-5.</p>";
+  const h = sandbox.report.aboutHtml();
+  assert(h.indexOf("claude-opus-5") >= 0, "the model is still named on the Report tab");
+});
+
+run("no meta -> fields are omitted but the note still renders", () => {
   const h = boot(undefined, undefined).report.aboutHtml();
   assert(h.indexOf("Analyst / author") < 0, "no empty analyst field is rendered");
   assert(h.indexOf("Contact details") < 0, "no empty contact field is rendered");
   assert(h.indexOf("Report construction") >= 0, "the note renders regardless");
-  assert(h.indexOf("Methodology (auto-generated)") >= 0,
-    "the auto-generated methodology block is kept below the note");
 });
 
 console.log("\nReport tab — read-only authored sections (config-sourced):");

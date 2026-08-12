@@ -730,11 +730,11 @@
       '<span class="callout-ico">i</span> Reading this table' +
       '<span class="callout-chev">▼</span></button><div class="callout-body"><ul>' +
       "<li><strong>Heatmap</strong> — cell shading scales with the value within each row.</li>" +
-      "<li><strong>PUBLISHED / COMPUTED</strong> — ‘Published’ figures are the " +
-      "official numbers of record, worked out when the report was built. The moment " +
-      "you apply a filter or build your own banner, Turas recalculates from the " +
-      "underlying responses and marks the result ‘Computed’ — so you always know " +
-      "whether you're seeing the signed-off figures or a live cut of the data.</li>" +
+      "<li><strong>PUBLISHED / COMPUTED.</strong> ‘Published’ figures are " +
+      "calculated when the report was built. The moment you apply a filter or " +
+      "build your own banner, Turas recalculates from the underlying responses " +
+      "and marks the result ‘Computed’, so you always know whether you're seeing " +
+      "the original figures or a filtered recalculation of the data.</li>" +
       "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots the full published history.</li>" +
       '<li>Significance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score ' +
       'bands are explained in <button class="linklike" data-legend-open>ⓘ How to ' +
@@ -747,16 +747,35 @@
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
-      "<p>Column percentages are compared pairwise within the banner using a " +
-      "<strong>two-proportion pooled z-test</strong> — at 95% confidence, plus an " +
-      "optional 80% level shown as lowercase letters (the tabs dual-significance " +
-      "convention). Letters are only awarded when the category being compared is " +
-      "common enough for the z-test to be reliable — in each column at least five " +
-      "respondents are expected to fall in the category and at least five outside " +
-      "it (at the two columns' pooled rate) — and both bases are at least " +
-      p.low_base_threshold + ". Index " +
-      "means use <strong>Welch's t-test</strong> on banded scores. Year-on-year " +
-      "chips test this wave's Total against the prior wave's Total.</p></div></div>" +
+      // Rewritten 2026-08-11 (Duncan): what the test answers and why sample size
+      // decides it, before any mechanics. The minimum base stays INTERPOLATED
+      // from the project — a literal 30 would misdescribe any study configured
+      // to a different threshold.
+      '<p>A significance test answers the question "How often would the ' +
+      'difference happen by chance?". If the answer is less than one in 20, ' +
+      "then we call it significant at the 95% level. At 80% it is less than one " +
+      "in 5. In a significance test, the size of your sample is critical " +
+      "because in a small sample one person has a bigger impact. A 5 point gap " +
+      "between two groups of 1,000 is significant; a 10 point gap between two " +
+      "groups of 30 is not.</p>" +
+      "<p>The maths works differently for percentages and averages and so we " +
+      "use a two-proportion z-test for percentages, a Welch t-test for " +
+      "averages, index scores and NPS. Same question, different test.</p>" +
+      "<p>Each column has a letter. A letter appearing in a cell means that " +
+      "column is significantly ahead of the column with that letter. Upper case " +
+      "denotes significant at 95%, lowercase at 80%. Letters require a sample " +
+      "of at least " + p.low_base_threshold + " to show.</p>" +
+      "<p>If you run enough comparisons, some will come up significant purely " +
+      'by chance. Test twenty things where nothing is happening and one will ' +
+      '"pass" on average. Turas corrects for that within each banner using a ' +
+      "Bonferroni correction, which raises the bar in proportion to how many " +
+      "comparisons the banner involves.</p>" +
+      "<p>Year-on-year comparisons don't take that correction, because each one " +
+      "is a single planned comparison.</p>" +
+      "<p>Also remember that significance is about whether a difference is " +
+      "real, not whether it's important. A tiny gap on a big sample can be " +
+      "significant and useless. A large gap on a small sample can be genuinely " +
+      "interesting and fail the test.</p></div></div>" +
       TR.conf.calloutHtml();
   }
 

@@ -413,10 +413,10 @@
     var lowBase = p.low_base_threshold;
     var sections = [];
     sections.push("<h3>Significance letters</h3><ul>" +
-      "<li><strong>▲ letters</strong> (e.g. <sup>B</sup>) — this value is significantly " +
+      "<li><strong>▲ letters</strong> (e.g. <sup>B</sup>) shows this value is significantly " +
       "higher than that lettered column. UPPERCASE letters = 95% confidence; with the " +
       "80% option on, <strong>lowercase letters = 80%</strong> (directional, weaker evidence).</li>" +
-      (lowBase ? "<li><strong>⚠ low base</strong> — fewer than " + lowBase +
+      (lowBase ? "<li><strong>⚠ low base</strong> has fewer than " + lowBase +
         " respondents; excluded from significance testing.</li>" : "") + "</ul>");
     sections.push("<h3>Arrows &amp; change chips</h3><ul>" +
       "<li><strong>▲ / ▼</strong> on a composite (profile) column — significantly above / " +
@@ -445,7 +445,7 @@
       fmt.escapeHtml(labels.moe_abbrev) + ")</h3><ul>" +
       "<li>Every number is an estimate, not an exact count" +
       (pub ? ": at n=" + fmt.base(pub) + ", overall percentages are stable to about ±" +
-        TR.conf.maxMoePct(pub).toFixed(1) + "pp; smaller cuts swing more" : "") +
+        TR.conf.maxMoePct(pub).toFixed(1) + "pp; smaller sample subsets are more volatile" : "") +
       ". The full working sits under “How sure can I be of these numbers?” on the " +
       "Crosstabs tab.</li></ul>");
     if (p.weighted) {
@@ -460,7 +460,7 @@
     sections.push("<h3>Explain significance</h3>" +
       '<label class="xpl-toggle"><input type="checkbox" data-explain-toggle' +
       (reader.explainOn() ? " checked" : "") + "> Explain significance in plain " +
-      "language — hover or focus any significance letter, arrow or Δ chip for a " +
+      "language: hover or focus any significance letter, arrow or Δ chip for a " +
       "sentence saying what it means.</label>");
     return sections.join("");
   };

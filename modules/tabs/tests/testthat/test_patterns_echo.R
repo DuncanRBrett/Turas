@@ -154,7 +154,8 @@ test_that("patterns_banner: a matching selection echoes ✓; a typo warns with t
 # ---- attach ------------------------------------------------------------------
 
 test_that("attach appends a diagnostics section (creating the panel when absent) and prints", {
-  dl <- mk_dl(list(mk_rated("Q78")), project = list(takeout_headline = "Q78"))
+  dl <- mk_dl(list(mk_rated("Q78")),
+              project = list(patterns_banner = "Centre", takeout_headline = "Q78"))
   out <- capture.output(dl2 <- attach_patterns_echo(dl))
   expect_true(any(grepl("GROUP OVERVIEW CONFIG", out)))
   expect_true(any(grepl("all declarations resolved", out)))
@@ -174,4 +175,49 @@ test_that("attach appends a diagnostics section (creating the panel when absent)
   dlw <- mk_dl(list(mk_rated("Q1")), project = list(takeout_headline = "Q99"))
   out <- capture.output(attach_patterns_echo(dlw))
   expect_true(any(grepl("1 declaration to check", out)))
+})
+
+# The console is the analyst's check and keeps every declaration. The panel that
+# travels inside the report names ONE thing: which banner the overview is of
+# (Duncan, 2026-08-11). CCPB W2026 shipped 30 rows of exclusions, KPIs and
+# KeyShare bindings to a client who has no use for any of them.
+test_that("the report panel names the selected banner and nothing else", {
+  dl <- mk_dl(
+    list(mk_rated("Q78"), mk_share("Q11", "Always")),
+    project = list(patterns_banner = "Centre",
+                   patterns_exclude_banners = c("Interviewer", "Nonesuch"),
+                   takeout_headline = "Q78"))
+  out <- capture.output(dl2 <- attach_patterns_echo(dl))
+
+  # console: the full audit, warning included
+  expect_true(any(grepl("Banner excluded", out, fixed = TRUE)))
+  expect_true(any(grepl("Headline KPI", out, fixed = TRUE)))
+  expect_true(any(grepl("KeyShare Q11", out, fixed = TRUE)))
+  expect_true(any(grepl("Nonesuch", out, fixed = TRUE)))
+
+  # panel: the selected banner only
+  rows <- dl2$project$diagnostics$sections[[1]]$rows
+  expect_length(rows, 1)
+  expect_equal(rows[[1]][1], "Banner selected")
+  expect_match(rows[[1]][2], "Centre", fixed = TRUE)
+})
+
+test_that("a selection that binds no banner still reaches the reader", {
+  # Not a config note: it says the overview fell back to every banner, which
+  # describes what the reader is actually looking at.
+  dl <- mk_dl(list(mk_rated("Q78")), project = list(patterns_banner = "Cntre"))
+  suppressWarnings(out <- capture.output(dl2 <- attach_patterns_echo(dl)))
+  rows <- dl2$project$diagnostics$sections[[1]]$rows
+  expect_length(rows, 1)
+  expect_match(rows[[1]][2], "falls back to ALL banners")
+})
+
+test_that("a config that only excludes banners attaches no panel section", {
+  dl <- mk_dl(list(mk_rated("Q78")),
+              project = list(patterns_exclude_banners = "Interviewer",
+                             takeout_headline = "Q78"))
+  out <- capture.output(dl2 <- attach_patterns_echo(dl))
+  expect_null(dl2$project$diagnostics)
+  # the console still audited it
+  expect_true(any(grepl("Banner excluded", out, fixed = TRUE)))
 })

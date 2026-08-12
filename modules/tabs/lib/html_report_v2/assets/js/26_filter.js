@@ -70,7 +70,8 @@
             ? ' · wave trends hidden while filtered (prior waves are full-sample totals)'
             : "") + "</span>"
         : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
-          ") · add a filter and every table and dashboard recomputes live</span>") +
+          ") · add a filter to recompute tables and dashboard with with your " +
+          "area of interest.</span>") +
       // The weighted-bases explainer (weightingNote) renders inside the shared
       // "How to read this" panel (A4) — no longer stacked under the filter bar.
       "</div>" + discWarn + "<div id='fpicker' hidden></div>";

@@ -383,18 +383,20 @@
     })[0];
     var html = ['<div class="page"><div class="card"><h2>Where groups differ · ' +
       fmt.escapeHtml(groupName ? groupName.name : banner) + "</h2>" +
-      "<p>Each card is one question; each line is one group that genuinely " +
-      "stands out — on a percentage, average, index or NPS — measured against " +
-      "the rest (the whole-sample figure is in brackets). Percentages name the " +
-      "groups they beat; averages show whether they sit above or below the rest " +
-      "(" + (dual ? "95%, plus nearly-significant differences at 80%" : "95% level") +
-      ", this wave; year-on-year changes live in Tracking). Classification questions " +
-      "(such as demographics or firmographics) describe the groups, not what they " +
-      "think and so are left out.</p>" +
+      // Rewritten 2026-08-11 (Duncan). The old paragraph explained the whole
+      // apparatus — bracketed whole-sample figures, how percentages differ from
+      // averages, the wave scope, why classification questions are excluded —
+      // on a tab the reader reaches after the Dashboard and the Group overview.
+      // What a reader needs here is what a card IS and what the control does.
+      "<p>Each card shows where one group stands out against the rest on a " +
+      "specific question, as identified by a significance test. Choose either " +
+      "95% or 95% + 80% significance. Note that this is a statistical test, " +
+      "not a judgement call. We have excluded classification questions such " +
+      "as demographics or corpographics from this page.</p>" +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' +
       '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +
-      ">Biggest standouts first</option>" +
+      ">Biggest differences first</option>" +
       '<option value="question"' + (diffSort === "question" ? " selected" : "") +
       ">Question order</option></select>" +
       '<select data-diffsig title="Significance level">' +

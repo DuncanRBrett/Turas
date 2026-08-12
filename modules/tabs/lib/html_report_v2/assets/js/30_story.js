@@ -536,8 +536,10 @@
       '<button data-sact="clear">Clear</button></div>' +
       '<div id="story-picker" hidden></div>' +
       (list.length ? "" : "<p>Pin questions from Crosstabs (📌), the dashboard heatmap, " +
-        "or add composites and dividers — then present full-screen or export a " +
-        "native editable PowerPoint.</p>") + "</div>"];
+        "or add composites and dividers. You can then present full-screen or export " +
+        "a native editable PowerPoint. The JSON downloads a small file containing " +
+        "insight notes and pins and you can export it and import it back in if " +
+        "needed.</p>") + "</div>"];
 
     list.forEach(function (item, i) {
       html.push(itemHtml(item, i));

@@ -370,18 +370,15 @@
       '<button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> How wave-on-wave changes are tested' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
-      // The spread a Welch test needs has THREE sources (waves.sdAtWave), and
-      // which one a wave uses is a property of that wave, not of the report — so
-      // this names all three rather than only the published-breakdown case, and
-      // says plainly that a wave carrying none of them is not tested.
-      "<p>Change between waves is tested with the right test for the number: a " +
-      "two-proportion z-test for percentages, and a Welch t-test for means, " +
-      "indexes and NPS. To be tested, a wave has to carry what the test needs: " +
-      "a base for a percentage, and for a mean its spread as well, taken from " +
-      "the wave's respondent-level data, a standard deviation recorded with it, " +
-      "or its published breakdown. Waves that carry neither are charted but not " +
-      "tested, which is usually the case for older waves loaded from published " +
-      "summaries.</p></div></div>");
+      // Shortened 2026-08-11 (Duncan). The long version enumerated all three
+      // sources of the spread a Welch test needs (waves.sdAtWave); the reader
+      // needs the shape of the rule, not the branch table.
+      "<p>Change between waves is tested as follows: a two-proportion z-test " +
+      "for percentages, and a Welch t-test for means, indexes and NPS. To run " +
+      "the test we need either respondent level data or if using published " +
+      "summaries sourced outside of Turas we need the percentage or mean, " +
+      "standard deviation or data on distribution. If that is not available " +
+      "the test cannot be run.</p></div></div>");
     host.innerHTML = html.join("");
 
     host.querySelectorAll("[data-callout]").forEach(function (el) {

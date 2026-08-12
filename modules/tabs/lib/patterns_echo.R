@@ -209,7 +209,23 @@ attach_patterns_echo <- function(dl) {
   # "Patterns" is the internal name for these levers (patterns_banner and
   # friends); the reader only ever sees the tab called Group overview, so the
   # diagnostics panel names it the way the report does.
-  section <- list(title = "Group overview configuration", rows = audit$rows)
+  #
+  # The console above gets the FULL audit — that is the analyst's check at
+  # generation time, and it is where a misspelt exclusion or an unbound KeyShare
+  # has to be caught. The panel that travels inside the report gets one fact
+  # (Duncan, 2026-08-11): which banner the Group overview is of. The exclusions,
+  # headline KPIs and KeyShare bindings are working notes about how the config
+  # was set up, and a reader of the report has no use for thirty rows of them.
+  #
+  # A ⚠ on the selection itself still shows: it says the overview fell back to
+  # every banner, which is a statement about what the reader is looking at, not
+  # about the config.
+  panel_rows <- Filter(function(r) identical(r[[1]], "Banner selected"), audit$rows)
+  # Nothing to say — a config that steers the overview only by exclusion has no
+  # selected banner to name, so no section is attached at all.
+  if (!length(panel_rows)) return(dl)
+
+  section <- list(title = "Group overview configuration", rows = panel_rows)
   if (is.null(dl$project$diagnostics)) {
     # No diagnostics panel this run (its build failed) — carry the echo alone so
     # the config record still travels inside the report and its saved copies.

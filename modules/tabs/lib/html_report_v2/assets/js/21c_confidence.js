@@ -430,7 +430,8 @@
       // table's corrected margin rather than the raw-base one).
       var sBase = (small.population > 1)
         ? conf.fpcBase(small.n, small.n, small.population) : small.n;
-      bullets.push("<li><strong>Small groups swing more.</strong> " +
+      bullets.push("<li><strong>Small samples are inherently more volatile and " +
+        "so have wider error ranges.</strong> " +
         fmt.escapeHtml(small.label) + " has only " + fmt.base(small.n) +
         " respondents, so its numbers can move by about ±" +
         conf.maxMoePct(sBase).toFixed(0) +
