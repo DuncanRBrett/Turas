@@ -199,11 +199,20 @@ check("the explainer does not name the withheld group's headcount",
 check("…it falls back to the smallest DISCLOSABLE column",
   () => supCallout.indexOf("Sales has only 196 respondents") !== -1);
 
+// 5b. the worked example's percentage is generated, so its indefinite article
+//     has to be chosen rather than written. CCPB W2026 read "a 88%" on the page.
+check("the worked example takes the right indefinite article",
+  () => [[1, "a"], [5, "a"], [8, "an"], [11, "an"], [12, "a"], [18, "an"], [19, "a"],
+     [42, "a"], [79, "a"], [80, "an"], [88, "an"], [89, "an"], [90, "a"], [100, "a"]]
+      .every(([n, want]) => RS.conf._article(n) === want));
+check("…and the rendered example never reads \"a 8\" or \"a 88\"",
+  () => !/\ba (8|11|18|8\d)%/.test(supCallout));
+
 // with no disclosable banner column at all, the bullet is dropped entirely
 const RS3 = renderSandbox();
 suppressionFixture(RS3, 250);            // k above every column
 check("no disclosable column -> no small-group bullet at all",
-  () => RS3.conf.calloutHtml().indexOf("Small groups swing more") === -1);
+  () => RS3.conf.calloutHtml().indexOf("Small samples are inherently more volatile") === -1);
 
 // 6. control off (k = 1): nothing is suppressed, rendering is unchanged.
 const RS2 = renderSandbox();

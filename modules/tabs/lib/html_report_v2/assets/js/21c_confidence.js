@@ -258,6 +258,15 @@
    * NET rows with a solid Total base, the one with the largest base
    * (ties: largest value) — deterministic for any project's data.
    */
+  /** "a" or "an" for a whole percentage read aloud: an EIGHT, an ELEVEN, an
+   *  EIGHTEEN, an EIGHTY-something. Everything else takes "a". The example is
+   *  generated from the report's own data, so the article has to be chosen, not
+   *  written — CCPB W2026 read "a 88%" on the client's page. */
+  function article(n) {
+    return (n === 8 || n === 11 || n === 18 || (n >= 80 && n <= 89)) ? "an" : "a";
+  }
+  conf._article = article;   // exposed for the node gate
+
   function workedExample() {
     var best = null;
     // When the Total universe is known, the table's Total intervals are
@@ -403,7 +412,7 @@
         ? "% for the group as a whole"
         : "% if we ran the survey again";
       bullets.push("<li><strong>Every number is an estimate, not an exact count.</strong> " +
-        "For example, a " + Math.round(ex.pct) + "% based on " +
+        "For example, " + article(Math.round(ex.pct)) + " " + Math.round(ex.pct) + "% based on " +
         fmt.base(ex.n) + " answers would sit between " + Math.round(ex.lo) +
         "% and " + Math.round(ex.hi) + tail + " — that band is the 95% " +
         fmt.escapeHtml(labels.interval_name) + " (" +

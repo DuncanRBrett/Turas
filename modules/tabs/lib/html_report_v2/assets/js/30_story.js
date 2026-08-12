@@ -956,9 +956,21 @@
     return cards;
   }
   story2._imageCards = imageCards;   // exposed for the node gate
+  story2._topAction = function (a) { return topAction(a); };  // node gate: Clear guard
 
   function topAction(action) {
     if (action === "clear") {
+      // Clear wipes an afternoon's pinning in one click, writes the empty state
+      // straight to storage, and sets the ownership marker — so a reload will
+      // NOT bring the pins back from the island seed. The only recovery is an
+      // earlier Export insights JSON or a saved copy. Ask first, and say what
+      // survives (the insight notes live in their own store and are untouched).
+      // Same guarded-confirm shape the qual hub delete uses.
+      var n = load().length;
+      if (n && typeof confirm !== "undefined" &&
+          !confirm("Clear the whole story? " + n + " pinned item" +
+                   (n === 1 ? "" : "s") + " will be removed and this cannot be " +
+                   "undone. Your Insight notes are not affected.")) return;
       items = [];
       touch();
       story2.renderTab(document.getElementById("tabhost"));

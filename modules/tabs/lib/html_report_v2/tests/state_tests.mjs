@@ -63,7 +63,9 @@ function boot(files, island, store) {
   for (const f of files) {
     vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), sandbox, { filename: f });
   }
-  return { TR: sandbox.TR, store };
+  // `sandbox` comes back too, so a test can stub page-level globals the engine
+  // reaches for (document, confirm) without them leaking between "reloads".
+  return { TR: sandbox.TR, store, sandbox };
 }
 const parse = (store, key) => JSON.parse(store.get(key + ":proj"));
 
@@ -113,6 +115,41 @@ run("story: a reader deletion survives reload; a cleared story stays cleared", (
   const cleared = new Map([["turas_v2_story:proj", JSON.stringify({ _owns: true, items: [] })]]);
   const c = boot(["30_story.js"], island, cleared);
   eq(c.TR.story2.items().length, 0, "a cleared story stays cleared (empty owned array wins)");
+});
+
+run("story: Clear asks first, and a declined confirm changes nothing", () => {
+  // Clear wipes the story, persists the empty state and sets the ownership
+  // marker, so a reload will not bring the pins back. There is no undo — the
+  // only recovery is an earlier Export insights JSON. So it must ask.
+  const island = { story: [{ kind: "divider", title: "A", note: "" },
+                           { kind: "divider", title: "B", note: "" }] };
+  const a = boot(["30_story.js"], island);
+  a.sandbox.document = { getElementById: () => null };
+  a.TR.story2.renderTab = () => {};      // the guard is under test, not the render
+  const asked = [];
+
+  a.sandbox.confirm = (msg) => { asked.push(msg); return false; };   // reader says no
+  a.TR.story2._topAction("clear");
+  eq(asked.length, 1, "Clear asked before wiping");
+  assert(/cannot be undone/.test(asked[0]), "the warning says it cannot be undone");
+  assert(/2 pinned items/.test(asked[0]), "and counts what will go");
+  assert(/Insight notes are not affected/.test(asked[0]), "and says what survives");
+  eq(a.TR.story2.items().length, 2, "declining leaves the story untouched");
+
+  a.sandbox.confirm = () => true;                             // reader says yes
+  a.TR.story2._topAction("clear");
+  eq(a.TR.story2.items().length, 0, "accepting clears it");
+});
+
+run("story: Clear on an empty story does not nag", () => {
+  const a = boot(["30_story.js"], { story: [] });
+  a.sandbox.document = { getElementById: () => null };
+  a.TR.story2.renderTab = () => {};
+  let asked = 0;
+  a.sandbox.confirm = () => { asked++; return true; };
+  a.TR.story2._topAction("clear");
+  eq(asked, 0, "nothing to lose, nothing to confirm");
+  eq(a.TR.story2.items().length, 0, "and it is still empty");
 });
 
 run("story: pinning marks ownership; a plain load never does", () => {

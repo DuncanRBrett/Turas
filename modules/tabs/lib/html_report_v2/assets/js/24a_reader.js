@@ -393,6 +393,18 @@
 
   /* ---------------- "How to read this" panel (A4) ---------------- */
 
+  /** The entities bandLegend emits, back to characters. &amp; is decoded LAST so
+   *  an already-escaped "&amp;ge;" survives as the literal text "&ge;" rather
+   *  than being decoded twice into "≥". */
+  function decodeEntities(s) {
+    return String(s)
+      .replace(/&ge;/g, "≥").replace(/&le;/g, "≤")
+      .replace(/&ndash;/g, "–").replace(/&mdash;/g, "—")
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&");
+  }
+
   /** The consolidated legend: sig letters (incl. lowercase 80%), ▲▵ arrows,
    *  strong/moderate/weak bands, the precision estimate, weighted bases. */
   reader.legendHtml = function () {
@@ -415,12 +427,17 @@
     // Read the bands off the questions, like the dashboard does — a study that
     // configures dashboard_green_mean is not banded on % of scale, and saying
     // so here would contradict the cards the reader is looking at.
+    //
+    // bandLegend returns HTML. Stripping its tags leaves the ENTITIES behind,
+    // and escapeHtml below then escapes their ampersands, so the reader saw a
+    // literal "strong &ge;8.6 moderate 8.0&ndash;8.5 weak &lt;8.0" \u2014 which is
+    // what CCPB W2026 shipped. Decode them back to characters first; escapeHtml
+    // still re-escapes the "<" that produces.
     var bandTxt = (TR.views && TR.views.bandLegend && TR.views.indexQuestions)
-      ? TR.views.bandLegend(TR.views.indexQuestions()).replace(/<[^>]+>/g, "")
+      ? decodeEntities(TR.views.bandLegend(TR.views.indexQuestions()).replace(/<[^>]+>/g, ""))
       : "strong \u226575%, moderate 50\u201374%, weak <50% of each scale's maximum";
     sections.push("<h3>Score bands</h3><ul>" +
-      "<li>Index cards and heatmap cells band as " + fmt.escapeHtml(bandTxt) +
-      " — the band is always written or bordered, never colour alone.</li>" +
+      "<li>Index cards and heatmap cells band as " + fmt.escapeHtml(bandTxt) + ".</li>" +
       "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> " +
       "(gold edge) are score-weighted means.</li></ul>");
     var pub = publishedTotalBase() || (TR.MICRO && TR.MICRO.n);

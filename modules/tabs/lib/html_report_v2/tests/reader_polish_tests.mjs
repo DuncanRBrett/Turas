@@ -366,6 +366,26 @@ run("A4: legend panel contains all five explains", () => {
     html.indexOf("Effective base") !== -1, "5: weighted/effective base note");
 });
 
+run("A4: the band legend renders symbols, not raw entities", () => {
+  // bandLegend returns HTML; stripping its tags left the entities behind and
+  // escapeHtml then escaped their ampersands, so CCPB W2026 shipped a legend
+  // reading "strong &ge;8.6 moderate 8.0&ndash;8.5 weak &lt;8.0" on the page.
+  const sb = readerSandbox({ questions: [{ code: "Q8", bases: [{ n: 400 }] }] });
+  sb.TR.views = {
+    indexQuestions: () => [{ code: "Q8" }],
+    bandLegend: () => "<span class='gl g'>strong &ge;8.6</span> " +
+      "<span class='gl a'>moderate 8.0&ndash;8.5</span> " +
+      "<span class='gl r'>weak &lt;8.0</span>"
+  };
+  const html = sb.TR.reader.legendHtml();
+  ["&amp;ge;", "&amp;ndash;", "&amp;lt;"].forEach((raw) =>
+    assert(html.indexOf(raw) === -1, "the reader is shown a raw entity: " + raw));
+  assert(html.indexOf("strong ≥8.6") !== -1 && html.indexOf("moderate 8.0–8.5") !== -1,
+    "the symbols render as characters");
+  assert(html.indexOf("weak &lt;8.0") !== -1,
+    "and the less-than is still escaped exactly once, so it renders as <");
+});
+
 run("A4: PE collapse persists per report — expanded all first session, ⓘ after", () => {
   const storage = {};
   const first = readerSandbox({ storage });
