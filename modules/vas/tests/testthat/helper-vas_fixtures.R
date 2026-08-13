@@ -106,6 +106,64 @@ fixture_totals_source <- function() {
   ))
 }
 
+#' A wallet-shaped source: split consumption, split obligation, unsplit
+#' gambling, a transfer and a receipt
+#'
+#' Respondent 1 buys everything once a month (Lotto twice); respondent 2 was
+#' routed past it all. Wallet arithmetic on respondent 1:
+#'   wallet spend 50 + 30 + 100 + 40 + 20 = 240, self 170, for others 70,
+#'   gambling 20; sent 500 and received 200 stay outside the wallet.
+#'
+#' @return A vas_source object.
+fixture_wallet_source <- function() {
+  return(fixture_source(
+    Income = c("R8,000 to R21,999", "Decline to answer"),
+    AirtimeOwnFreq1 = c("Once per month", NA), AirtimeOwnFreq2 = c(NA, NA),
+    AirtimeOwnFreq3 = c(NA, NA), AirtimeOwnFreq4 = c(NA, NA),
+    AirtimeOwnAmount = c("R50", NA),
+    AirtimeOthFreq1 = c("Once per month", NA), AirtimeOthFreq2 = c(NA, NA),
+    AirtimeOthFreq3 = c(NA, NA), AirtimeOthFreq4 = c(NA, NA),
+    AirtimeOthAmount = c("R30", NA),
+    BillMunOwnFreq1 = c("Once per month", NA), BillMunOwnFreq2 = c(NA, NA),
+    BillMunOwnFreq3 = c(NA, NA), BillMunOwnFreq4 = c(NA, NA),
+    BillMunOwnAmount = c("R100", NA),
+    BillMunOthFreq1 = c("Once per month", NA), BillMunOthFreq2 = c(NA, NA),
+    BillMunOthFreq3 = c(NA, NA), BillMunOthFreq4 = c(NA, NA),
+    BillMunOthAmount = c("R40", NA),
+    LottoFreq1 = c("A few times in a month", NA), LottoFreq2 = c(NA, NA),
+    LottoFreq3 = c("2", NA), LottoFreq4 = c(NA, NA),
+    LottoAmount = c("R10", NA),
+    DomSendFreq1 = c("Once per month", NA), DomSendFreq2 = c(NA, NA),
+    DomSendFreq3 = c(NA, NA), DomSendFreq4 = c(NA, NA),
+    DomSendAmount = c("R500", NA),
+    DomRcvFreq1 = c("Once per month", NA), DomRcvFreq2 = c(NA, NA),
+    DomRcvFreq3 = c(NA, NA), DomRcvFreq4 = c(NA, NA),
+    DomRcvAmount = c("R200", NA)
+  ))
+}
+
+#' The seven-row category map matching \code{fixture_wallet_source()}
+#'
+#' @return A category map data frame.
+fixture_wallet_map <- function() {
+  cascade <- function(category, base, stem, amount, spend_class) {
+    fixture_map_row(
+      category = category, base = base, freq1 = paste0(stem, "1"),
+      freq2 = paste0(stem, "2"), freq3 = paste0(stem, "3"), freq4 = paste0(stem, "4"),
+      amount_alias = amount, amount_basis = "per_txn", spend_class = spend_class
+    )
+  }
+  return(rbind(
+    cascade("Airtime", "Own", "AirtimeOwnFreq", "AirtimeOwnAmount", "consumption"),
+    cascade("Airtime", "Oth", "AirtimeOthFreq", "AirtimeOthAmount", "consumption"),
+    cascade("BillMunicipal", "Own", "BillMunOwnFreq", "BillMunOwnAmount", "obligation"),
+    cascade("BillMunicipal", "Oth", "BillMunOthFreq", "BillMunOthAmount", "obligation"),
+    cascade("Lotto", "Total", "LottoFreq", "LottoAmount", "consumption"),
+    cascade("DomSend", "Total", "DomSendFreq", "DomSendAmount", "transfer"),
+    cascade("DomRcv", "Total", "DomRcvFreq", "DomRcvAmount", "received")
+  ))
+}
+
 #' The four-row category map matching \code{fixture_totals_source()}
 #'
 #' @return A category map data frame.

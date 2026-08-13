@@ -84,6 +84,16 @@ VAS_CONFIG <- list(
   total_transfer_sent      = c("transfer"),
   reported_separately      = c("received"),
 
+  # The wallet: what the respondent SPENDS through these rails each month.
+  # Money sent is an outflow but not spend, and money received is income, so
+  # both transfer classes stay out (Duncan, 13 Aug 2026). The 2024 WALLET_OUT
+  # included money sent - re-derive 2024 on this formula before any trend row.
+  total_wallet_spend       = c("consumption", "obligation"),
+
+  # "Of which gambling" under the wallet line. Named by CATEGORY rather than
+  # spend class, because Lotto and Betting sit inside consumption.
+  gambling_categories      = c("Lotto", "Betting"),
+
   # ---- amount parsing --------------------------------------------------------
   # The amount questions are free-text, so expect "R150", "150,00", "about 200".
   # Strip currency symbols, spaces and thousands separators, then coerce.

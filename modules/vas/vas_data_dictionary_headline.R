@@ -128,7 +128,75 @@ dictionary_total_rows <- function(category_map, config) {
                    "Money coming IN. Reported on its own and never added to a spend total.",
                    categories_in_classes(category_map, config$reported_separately),
                    "all category Total spend columns in the received class",
-                   "0 when the respondent receives nothing. The transactions still count in TotalTxnPerMonth.")
+                   "0 when the respondent receives nothing. The transactions still count in TotalTxnPerMonth."),
+    dictionary_wallet_rows(category_map, config)
+  ))
+}
+
+#' Document the wallet columns and the gambling break-out
+#'
+#' The wallet is what the respondent SPENDS through these rails each month:
+#' the consumption and obligation classes, with money sent and received both
+#' excluded (Duncan, 13 Aug 2026). The 2024 WALLET_OUT included money sent,
+#' so 2024 must be re-derived on this formula before any trend is shown.
+#'
+#' @param category_map The category map data frame.
+#' @param config The VAS_CONFIG list.
+#'
+#' @return A data frame of dictionary rows.
+dictionary_wallet_rows <- function(category_map, config) {
+  wallet_categories <- unique(
+    category_map$category[category_map$spend_class %in% config$total_wallet_spend])
+  split_categories <- intersect(
+    wallet_categories, unique(category_map$category[category_map$base == "Own"]))
+  unsplit <- setdiff(wallet_categories, split_categories)
+  self_terms <- join_summed_terms(c(sprintf("%s_Own_MonthlySpend", split_categories),
+                                    sprintf("%s_Total_MonthlySpend", unsplit)))
+  self_txn_terms <- join_summed_terms(c(sprintf("%s_Own_TxnPerMonth", split_categories),
+                                        sprintf("%s_Total_TxnPerMonth", unsplit)))
+  self_rule <- sprintf(paste0(
+    "A split category contributes its self side; the %d single-question ",
+    "categories cannot be attributed to anyone else, so their Total counts ",
+    "as self. TotalWalletSpend - TotalWalletSpendSelf = TotalSpendForOthers."),
+    length(unsplit))
+  return(rbind(
+    dictionary_row("TotalWalletSpend", "Headline", NA, "Total", "MonthlySpend",
+                   "rand per month",
+                   sprintf("The VAS wallet: monthly spend through these rails. Spend classes %s - money sent and money received are both excluded by design.",
+                           paste(config$total_wallet_spend, collapse = " + ")),
+                   categories_in_classes(category_map, config$total_wallet_spend),
+                   "all category Total spend columns in the wallet classes",
+                   "Built from what is present, like every total. TotalValueTransacted = TotalWalletSpend + TotalTransferSent."),
+    dictionary_row("TotalWalletTxn", "Headline", NA, "Total", "TxnPerMonth",
+                   "transactions per month",
+                   "Wallet transactions per month, over the same classes as TotalWalletSpend.",
+                   join_summed_terms(sprintf("%s_Total_TxnPerMonth", wallet_categories)),
+                   "all category Total transaction columns in the wallet classes",
+                   "Excludes transfers both ways: sending and receiving count only in TotalTxnPerMonth."),
+    dictionary_row("TotalWalletSpendSelf", "Headline", NA, "Own", "MonthlySpend",
+                   "rand per month",
+                   "The wallet's for-self side: what the respondent spends on their own household.",
+                   self_terms, "the wallet categories' Own (or unsplit Total) spend columns",
+                   paste("Built from what is present.", self_rule)),
+    dictionary_row("TotalWalletTxnSelf", "Headline", NA, "Own", "TxnPerMonth",
+                   "transactions per month",
+                   "The wallet's for-self transactions per month.",
+                   self_txn_terms, "the wallet categories' Own (or unsplit Total) transaction columns",
+                   paste("Built from what is present.", self_rule)),
+    dictionary_row("TotalGamblingSpend", "Headline", NA, "Total", "MonthlySpend",
+                   "rand per month",
+                   "The wallet's gambling line: stakes at face value, winnings never netted off.",
+                   join_summed_terms(sprintf("%s_Total_MonthlySpend",
+                                             config$gambling_categories)),
+                   "the gambling categories' Total spend columns",
+                   "Built from what is present. A subset of TotalWalletSpend, for the of-which-gambling line."),
+    dictionary_row("TotalGamblingTxn", "Headline", NA, "Total", "TxnPerMonth",
+                   "transactions per month",
+                   "Gambling transactions per month: tickets bought and bets placed.",
+                   join_summed_terms(sprintf("%s_Total_TxnPerMonth",
+                                             config$gambling_categories)),
+                   "the gambling categories' Total transaction columns",
+                   "Built from what is present. A subset of TotalWalletTxn.")
   ))
 }
 
@@ -164,7 +232,7 @@ dictionary_composite_rows <- function(category_map, config) {
                    "rand per month",
                    paste("Monthly spend on behalf of someone else.", split_note),
                    oth_terms, "all category Oth spend columns",
-                   "0 when the respondent buys nothing for others; missing when every Oth cell is missing."),
+                   "0 when the respondent buys nothing for others; missing when every Oth cell is missing. Every split category sits inside the wallet classes, so this is also the wallet's for-others side."),
     dictionary_row("TotalTxnForOthers", "Composite", NA, "Oth", "TxnPerMonth",
                    "transactions per month",
                    paste("Transactions per month on behalf of someone else.", split_note),

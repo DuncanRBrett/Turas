@@ -199,3 +199,65 @@ test_that("the category map makes the screener authoritative for the four multis
   air <- map[map$category == "Airtime" & map$base == "Own", ]
   expect_equal(air$presence_option, "Myself")
 })
+
+test_that("the wallet excludes money sent and received, in rand and in transactions", {
+  result <- derive_vas(fixture_wallet_source(), fixture_wallet_map(), VAS_CONFIG)$wide
+  # airtime 50 + 30, municipal bill 100 + 40, lotto 2 x R10; sent 500 and
+  # received 200 stay out
+  expect_equal(result$TotalWalletSpend[1], 240)
+  expect_equal(result$TotalValueTransacted[1], 740)
+  # transactions: airtime 2 + bill 2 + lotto 2; send and receive count only in
+  # the all-category TotalTxnPerMonth
+  expect_equal(result$TotalWalletTxn[1], 6)
+  expect_equal(result$TotalTxnPerMonth[1], 8)
+})
+
+test_that("the wallet's self side plus the for-others side equals the wallet", {
+  result <- derive_vas(fixture_wallet_source(), fixture_wallet_map(), VAS_CONFIG)$wide
+  # self = airtime own 50 + bill own 100 + lotto 20 (unsplit counts as self)
+  expect_equal(result$TotalWalletSpendSelf[1], 170)
+  expect_equal(result$TotalSpendForOthers[1], 70)
+  expect_equal(result$TotalWalletSpendSelf[1] + result$TotalSpendForOthers[1],
+               result$TotalWalletSpend[1])
+  expect_equal(result$TotalWalletTxnSelf[1], 4)
+})
+
+test_that("the gambling line is a subset of the wallet, at face value", {
+  result <- derive_vas(fixture_wallet_source(), fixture_wallet_map(), VAS_CONFIG)$wide
+  expect_equal(result$TotalGamblingSpend[1], 20)
+  expect_equal(result$TotalGamblingTxn[1], 2)
+  expect_true(result$TotalGamblingSpend[1] <= result$TotalWalletSpend[1])
+})
+
+test_that("a respondent routed past everything gets a zero wallet, not missing", {
+  result <- derive_vas(fixture_wallet_source(), fixture_wallet_map(), VAS_CONFIG)$wide
+  expect_equal(result$TotalWalletSpend[2], 0)
+  expect_equal(result$TotalWalletSpendSelf[2], 0)
+  expect_equal(result$TotalGamblingSpend[2], 0)
+})
+
+test_that("a don't-know amount leaves the wallet built from what is present", {
+  source <- fixture_wallet_source()
+  source$data$AirtimeOwnAmount[1] <- "dont know"
+  result <- derive_vas(source, fixture_wallet_map(), VAS_CONFIG)$wide
+  expect_equal(result$TotalWalletSpend[1], 190)
+  expect_true(result$Incomplete[1])
+})
+
+test_that("every split category sits inside the wallet classes", {
+  # TotalSpendForOthers doubles as the wallet's for-others side. That is only
+  # true while every category with an Own/Oth split is in a wallet spend class,
+  # so a reclassification that breaks the identity must fail here.
+  map <- fixture_real_map()
+  split_classes <- unique(map$spend_class[map$base %in% c("Own", "Oth")])
+  expect_true(all(split_classes %in% VAS_CONFIG$total_wallet_spend))
+})
+
+test_that("the gambling categories exist in the real map, inside the wallet", {
+  map <- fixture_real_map()
+  for (category in VAS_CONFIG$gambling_categories) {
+    expect_true(category %in% map$category, info = category)
+    expect_true(all(map$spend_class[map$category == category] %in%
+                      VAS_CONFIG$total_wallet_spend), info = category)
+  }
+})
