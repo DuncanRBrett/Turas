@@ -79,14 +79,31 @@ STEPS_DEFAULT_GROUP <- "Built-in tools"
            "The coded-comment workbook to create or update."
          }),
 
+    list(id = "config", label = "Crosstab config (.xlsx) - names the open-ends AND their sheets",
+         type = "file", required = FALSE, must_exist = TRUE,
+         cli = "--config", exclusive = "columns",
+         help = paste("Best option on an existing project: every Selection row with a CommentSheet",
+                      "is an open-end, and that cell is the appendix sheet its comments belong in.",
+                      "It is the same declaration the report reads, so the two cannot drift apart.")),
+
     list(id = "columns_file", label = "Comment-columns file (one column per line)",
          type = "file", required = FALSE, must_exist = TRUE,
          cli = "--columns-file", exclusive = "columns",
-         help = "Most reliable way to name the comment columns. Leave blank to use a pattern instead."),
+         help = "Names the comment columns when there is no config to read. Leave blank to use a pattern instead."),
 
     list(id = "pattern", label = "Column pattern (regex)",
          type = "text", required = FALSE, cli = "--pattern", exclusive = "columns",
-         help = "Alternative to the columns file, e.g. comment|verbatim|feedback.")
+         help = "Alternative to the columns file, e.g. comment|verbatim|feedback."),
+
+    # Without this, a topic-named appendix (sheets called Engagement / Values rather
+    # than Q17 / Q24) gets a SECOND set of column-named sheets and the coded ones are
+    # left empty — a run that reports success and produces an appendix the report
+    # cannot read. The config supplies it; this is the manual override.
+    list(id = "sheet_map", label = "Sheet map (COLUMN=SHEET, comma-separated)",
+         type = "text", required = FALSE, cli = "--sheet-map",
+         help = paste("Only needed when the appendix names its sheets for the topic and there is no",
+                      "config to read, e.g. 'Q17=Engagement, Q24=Values'. Overrides the config for",
+                      "the columns it names. Leave blank when the sheets are named after the columns."))
   )
 }
 
