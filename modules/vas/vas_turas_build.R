@@ -179,6 +179,52 @@ report_option_mismatches <- function(data, structure) {
   return(invisible(mismatches))
 }
 
+#' Read a sheet whose header row may sit under a template title block
+#'
+#' The kept workbooks can carry the modern template format: a title row, a
+#' notes row, the column headers, and a "[REQUIRED]/[Optional]" help row above
+#' the data. openxlsx takes row 1 as the header, so this mirrors the tabs
+#' engine's own convention (data_loader.R): scan the first ten rows for the
+#' required column names, read from there, then drop the help row and any
+#' blank spacer rows. A plain row-1 workbook reads exactly as before.
+#'
+#' @param path The workbook path.
+#' @param sheet The sheet name.
+#' @param required_cols Column names that identify the header row.
+#'
+#' @return The sheet as a data frame, data rows only.
+#'
+#' @throws Stops with class "vas_sheet_headerless" when no row carries the
+#'   required columns.
+read_template_sheet <- function(path, sheet, required_cols) {
+  probe <- openxlsx::read.xlsx(path, sheet = sheet, colNames = FALSE,
+                               skipEmptyRows = FALSE, rows = 1:10)
+  header_row <- NA_integer_
+  for (r in seq_len(nrow(probe))) {
+    vals <- as.character(unlist(probe[r, ]))
+    if (all(required_cols %in% vals)) {
+      header_row <- r
+      break
+    }
+  }
+  if (is.na(header_row)) {
+    stop(structure(class = c("vas_sheet_headerless", "error", "condition"), list(
+      message = sprintf(paste0(
+        "Sheet '%s' of %s carries no row with the columns %s in its first ",
+        "ten rows - the workbook is not a structure this build recognises."),
+        sheet, basename(path), paste(required_cols, collapse = ", ")),
+      call = NULL)))
+  }
+  out <- openxlsx::read.xlsx(path, sheet = sheet, startRow = header_row,
+                             skipEmptyRows = FALSE)
+  help_rows <- grepl("^\\[(REQUIRED|Optional)\\]", as.character(out[[1]]),
+                     ignore.case = TRUE)
+  blank_rows <- rowSums(!is.na(out)) == 0
+  out <- out[!help_rows & !blank_rows, , drop = FALSE]
+  rownames(out) <- NULL
+  return(out)
+}
+
 #' Check that an existing structure workbook still fits the data
 #'
 #' Once generated, the Survey_Structure and Crosstab_Config belong to Duncan
@@ -193,10 +239,14 @@ report_option_mismatches <- function(data, structure) {
 #'
 #' @throws Stops with class "vas_structure_stale" naming the drift.
 verify_structure_alignment <- function(structure_path, data) {
-  questions <- openxlsx::read.xlsx(structure_path, sheet = "Questions")
+  questions <- read_template_sheet(structure_path, "Questions",
+                                   c("QuestionCode", "Variable_Type", "Columns"))
   declared <- unlist(lapply(seq_len(nrow(questions)), function(i) {
     if (identical(questions$Variable_Type[i], "Multi_Mention")) {
-      sprintf("%s_%d", questions$QuestionCode[i], seq_len(questions$Columns[i]))
+      # as.integer: a template help row above the data makes openxlsx read the
+      # whole Columns column as character, and dropping the row does not
+      # change the column's class back
+      sprintf("%s_%d", questions$QuestionCode[i], seq_len(as.integer(questions$Columns[i])))
     } else {
       questions$QuestionCode[i]
     }

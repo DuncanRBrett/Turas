@@ -163,3 +163,48 @@ test_that("the assembled data matches the generated structure", {
   expect_equal(awareness_options$OptionText, "Bank ATM")
   expect_equal(awareness_options$DisplayText, "Bank: ATM")
 })
+
+test_that("a kept structure in the modern template format is read past its title block", {
+  # title row, notes row, headers, a [REQUIRED] help row, then the data -
+  # the format generate_config_templates.R produces and the tabs engine
+  # already reads by scanning for the header row
+  path <- file.path(tempdir(), "template_structure.xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Questions")
+  openxlsx::writeData(wb, "Questions", data.frame(x = "TURAS Survey Structure"),
+                      startRow = 1, colNames = FALSE)
+  openxlsx::writeData(wb, "Questions", data.frame(x = "Define every question below."),
+                      startRow = 2, colNames = FALSE)
+  questions <- data.frame(
+    QuestionCode = c("[REQUIRED] Question code", "Gender", "Channels"),
+    QuestionText = c("[Optional] text", "Gender", "Channels used"),
+    Variable_Type = c("help", "Single_Response", "Multi_Mention"),
+    Columns = c("help", "1", "2"),
+    stringsAsFactors = FALSE)
+  openxlsx::writeData(wb, "Questions", questions, startRow = 3)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+
+  got <- read_template_sheet(path, "Questions",
+                             c("QuestionCode", "Variable_Type", "Columns"))
+  expect_equal(got$QuestionCode, c("Gender", "Channels"))
+
+  data <- data.frame(ResponseID = "1", Gender = "F",
+                     Channels_1 = "a", Channels_2 = "b",
+                     stringsAsFactors = FALSE, check.names = FALSE)
+  expect_true(verify_structure_alignment(path, data))
+
+  data$Extra <- "x"
+  expect_error(verify_structure_alignment(path, data),
+               class = "vas_structure_stale")
+})
+
+test_that("a workbook with no recognisable header refuses by name", {
+  path <- file.path(tempdir(), "headerless.xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Questions")
+  openxlsx::writeData(wb, "Questions", data.frame(a = 1:3, b = 4:6))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  expect_error(read_template_sheet(path, "Questions",
+                                   c("QuestionCode", "Variable_Type", "Columns")),
+               class = "vas_sheet_headerless")
+})
