@@ -646,3 +646,87 @@ test_that("banner DisplayOrder starts at 2, leaving column 1 for Total", {
   expect_true(length(orders) > 0)
   expect_true(min(orders) >= 2)
 })
+
+# ==============================================================================
+# TRACKING QUESTION_MAPPING TEMPLATE
+# ==============================================================================
+# A tracker's mapping is the one file a study cannot build retrospectively: get
+# it wrong at wave one and wave two has no history to join to. Until 2026-08-13
+# the only shipped mapping template was the AGGREGATE one (a different contract
+# — live codes, one wave column), so a study on the raw-data path had no way to
+# discover that composites need SourceQuestions or that segment trends need a
+# Banners sheet, short of reading examples/sacs_segment_backfill.R.
+
+test_that("the tracking Question_Mapping template carries both sheets", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp)
+  sheets <- openxlsx::getSheetNames(tmp)
+  expect_true("QuestionMap" %in% sheets)
+  expect_true("Banners" %in% sheets)
+})
+
+test_that("the template offers every QuestionMap column the tracker and backfill read", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp, waves = c("2024", "2025", "2026"))
+  raw <- openxlsx::read.xlsx(tmp, sheet = "QuestionMap", colNames = FALSE)
+  hrow <- which(raw[[1]] == "QuestionCode")[1]
+  expect_false(is.na(hrow))
+  cols <- trimws(as.character(unlist(raw[hrow, ])))
+
+  # tracking_metrics() reads QuestionCode / QuestionText / TrackingSpecs and the
+  # wave column; sacs_segment_backfill.R additionally reads SourceQuestions to
+  # rebuild a composite for prior waves.
+  for (k in c("QuestionCode", "QuestionText", "TrackingSpecs", "SourceQuestions",
+              "Wave2024", "Wave2025", "Wave2026")) {
+    expect_true(k %in% cols, info = paste(k, "should be a QuestionMap column"))
+  }
+})
+
+test_that("the generated mapping loads through the real reader with a composite row", {
+  skip_if_not(exists("load_question_mapping", mode = "function"),
+              "tracking_island.R not sourced in this run")
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp)
+  qm <- load_question_mapping(tmp)
+  expect_false(is.null(qm))
+  # help rows are dropped, examples survive
+  expect_true(all(c("ENG01", "Engagement") %in% trimws(as.character(qm$QuestionCode))))
+  comp <- qm[trimws(as.character(qm$QuestionCode)) == "Engagement", , drop = FALSE]
+  expect_true(nzchar(trimws(as.character(comp$SourceQuestions[1]))),
+    info = "the composite example must show SourceQuestions filled — that is the whole point of the column")
+})
+
+test_that("the Banners sheet reads with its header in row 1 and no stray dimensions", {
+  # The backfill reads this sheet plainly, so row 1 must be the header — and
+  # anything in column A becomes a banner dimension. A help note written into
+  # column A would silently become a breakout named after its own instructions.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp)
+  b <- openxlsx::read.xlsx(tmp, sheet = "Banners")
+  expect_equal(names(b)[1], "BreakLabel")
+
+  labels <- trimws(as.character(b$BreakLabel))
+  labels <- labels[!is.na(labels) & nzchar(labels)]
+  expect_true("Total" %in% labels)
+  # every dimension is a short name, not prose
+  expect_true(all(nchar(labels) <= 40),
+    info = paste("stray text in column A becomes a banner dimension:",
+                 paste(labels[nchar(labels) > 40], collapse = " | ")))
+})
+
+test_that("generate_all_templates ships the mapping alongside config and structure", {
+  tmp_dir <- file.path(tempdir(), paste0("tabs_tpl_", as.integer(runif(1, 1, 1e6))))
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  res <- generate_all_templates(tmp_dir)
+  expect_true(file.exists(res$mapping))
+  expect_true("Banners" %in% openxlsx::getSheetNames(res$mapping))
+})

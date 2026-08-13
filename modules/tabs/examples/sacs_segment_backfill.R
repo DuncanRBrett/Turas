@@ -48,7 +48,36 @@ source(file.path(TURAS, "modules/tabs/lib/tracking_segment_bridge.R"))
 
 qm <- load_question_mapping(QMAP)
 if (is.null(qm)) stop("Could not read QuestionMap sheet from: ", QMAP)
-banners <- tryCatch(read.xlsx(QMAP, sheet = "Banners"), error = function(e) NULL)
+
+# The Banners sheet drives the per-group trend lines. It used to be read with a
+# bare read.xlsx(), which takes ROW 1 as the header — so a sheet carrying a title
+# block produced a frame with no BreakLabel column, no segment dimensions, and a
+# run that finished "successfully" with Total-only sidecars and not one word about
+# it. Scan for the header row, and say so loudly when the sheet is there but
+# unusable: a silent no-segments backfill is indistinguishable from a correct one
+# until someone opens the report and finds a flat trend.
+read_banners <- function(path) {
+  raw <- tryCatch(read.xlsx(path, sheet = "Banners", colNames = FALSE),
+                  error = function(e) NULL)
+  if (is.null(raw) || nrow(raw) == 0) return(NULL)
+  hrow <- which(vapply(seq_len(min(10, nrow(raw))), function(r)
+    any(trimws(as.character(unlist(raw[r, ]))) == "BreakLabel", na.rm = TRUE), logical(1)))[1]
+  if (is.na(hrow)) {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ The mapping has a Banners sheet but no 'BreakLabel' header\n")
+    cat("│ in its first 10 rows, so NO segment dimensions were read.\n")
+    cat("│ The sidecars will carry Total only — every per-group trend\n")
+    cat("│ line will be empty for these waves.\n")
+    cat("│ How to fix: put BreakLabel in column A of the header row.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    return(NULL)
+  }
+  df <- raw[seq(hrow + 1, nrow(raw)), , drop = FALSE]
+  names(df) <- trimws(as.character(unlist(raw[hrow, ])))
+  df <- df[!is.na(df$BreakLabel) & nzchar(trimws(as.character(df$BreakLabel))), , drop = FALSE]
+  if (nrow(df) == 0) NULL else df
+}
+banners <- read_banners(QMAP)
 
 wave_cols <- sort(grep("^Wave", names(qm), value = TRUE))   # Wave2023, Wave2024, Wave2025
 prior_cols <- utils::head(wave_cols, -1)                    # all but the latest (= live wave)
@@ -100,6 +129,9 @@ metrics <- lapply(seq_len(nrow(qm)), function(i) {
 seg_rows <- if (is.null(banners)) integer(0) else which(tolower(trimws(banners$BreakLabel)) != "total")
 segment_dims <- lapply(seg_rows, function(i) list(
   label = as.character(banners$BreakLabel[i]), cols = per_wave(banners[i, ])))
+cat("Segment dimensions:", if (length(segment_dims))
+  paste(vapply(segment_dims, function(d) d$label, character(1)), collapse = ", ")
+  else "NONE — the sidecars will carry Total only", "\n")
 
 paths <- write_segment_wave_sidecars(
   waves, metrics, segment_dims, OUT_DIR,
