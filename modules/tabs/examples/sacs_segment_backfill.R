@@ -72,12 +72,18 @@ src_of <- function(i) if ("SourceQuestions" %in% names(qm)) blankna(qm$SourceQue
 metrics <- lapply(seq_len(nrow(qm)), function(i) {
   src <- src_of(i)
   if (!is.na(src)) {
-    # composite / index: the metric value is the mean of its source items. The
-    # live wave does NOT emit a composite (no per-respondent micro score), so it
-    # links by the data-layer TITLE -> key = NULL keeps the bridge on the title
-    # path (tracking_norm(QuestionText)), which is the renderer's aggKeys fallback.
+    # composite / index: the metric value is the mean of its source items.
+    #
+    # This used to pass key = NULL, which puts the bridge on the TITLE path
+    # (tracking_norm(QuestionText)) — correct back when the live wave emitted no
+    # composite at all, so the renderer's aggKeys fell back to the title too.
+    # A composite now DOES carry per-respondent micro scores and so appears in
+    # the live contribution keyed by its canonical QuestionCode; aggKeys then
+    # PREFERS that code -> match_key map, and a title-keyed prior would pair with
+    # nothing. Key it canonically, exactly like an item row.
     codes <- trimws(strsplit(src, "[,;]")[[1]]); codes <- codes[nzchar(codes)]
-    list(code = as.character(qm$QuestionCode[i]), key = NULL,
+    list(code = as.character(qm$QuestionCode[i]),
+         key = as.character(qm$QuestionCode[i]),
          title = as.character(qm$QuestionText[i]), type = "mean",
          sources = setNames(lapply(prior_cols, function(c)
            unname(vapply(codes, function(cd) (code_col[[cd]] %||% list())[[c]] %||% NA_character_,
