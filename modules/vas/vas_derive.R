@@ -7,6 +7,8 @@
 #   Total          -> taken as collected, for the 14 categories where the survey
 #                     asks a single combined question
 #   spend classes  -> TotalValueTransacted, TotalConsumptionSpend, ValueReceived
+#   wallet         -> TotalWalletSpend (consumption + obligation; transfers out),
+#                     its self side, and the gambling break-out
 #   income band    -> midpoint and upper boundary, and share of wallet on each
 #
 # Money received is never added to a spend total. It is reported on its own.
@@ -130,6 +132,51 @@ total_measure_for_classes <- function(derived, category_map, classes, measure) {
   categories <- unique(category_map$category[category_map$spend_class %in% classes])
   keys <- paste0(categories, "|Total")
   keys <- keys[keys %in% names(derived)]
+  if (!length(keys)) {
+    return(rep(NA_real_, nrow(derived[[1]])))
+  }
+  return(sum_available(do.call(cbind, lapply(keys, function(k) derived[[k]][[measure]]))))
+}
+
+#' Total one measure's Total-base column across a set of named categories
+#'
+#' The class helpers slice by spend class; this slices by category name, for
+#' the lines (gambling) that cut across a class rather than covering it.
+#'
+#' @param derived The list from \code{derive_all_categories()}.
+#' @param categories A character vector of category names.
+#' @param measure "monthly_spend" or "txn_per_month".
+#'
+#' @return A numeric vector, one element per respondent.
+total_measure_for_categories <- function(derived, categories, measure) {
+  keys <- paste0(categories, "|Total")
+  keys <- keys[keys %in% names(derived)]
+  if (!length(keys)) {
+    return(rep(NA_real_, nrow(derived[[1]])))
+  }
+  return(sum_available(do.call(cbind, lapply(keys, function(k) derived[[k]][[measure]]))))
+}
+
+#' Total one measure over the self side of a set of spend classes
+#'
+#' A split category contributes its Own side. A category collected as a single
+#' combined question has no split, so its Total counts as self - the survey
+#' cannot attribute it to anyone else, and the dictionary states the rule.
+#'
+#' @param derived The list from \code{derive_all_categories()}.
+#' @param category_map The category map data frame.
+#' @param classes A character vector of spend classes to include.
+#' @param measure "monthly_spend" or "txn_per_month".
+#'
+#' @return A numeric vector, one element per respondent.
+total_measure_for_self <- function(derived, category_map, classes, measure) {
+  categories <- unique(category_map$category[category_map$spend_class %in% classes])
+  own_keys <- paste0(categories, "|Own")
+  own_keys <- own_keys[own_keys %in% names(derived)]
+  split_categories <- sub("\\|Own$", "", own_keys)
+  total_keys <- paste0(setdiff(categories, split_categories), "|Total")
+  total_keys <- total_keys[total_keys %in% names(derived)]
+  keys <- c(own_keys, total_keys)
   if (!length(keys)) {
     return(rep(NA_real_, nrow(derived[[1]])))
   }
@@ -282,6 +329,13 @@ build_headline_columns <- function(derived, category_map, income, config) {
   oth_txn <- total_measure_for_base(derived, "Oth", "txn_per_month")
   split_spend <- sum_available(cbind(total_measure_for_base(derived, "Own", "monthly_spend"),
                                      oth_spend))
+  # The wallet excludes both transfer classes, so TotalSpendForOthers (whose
+  # split categories all sit inside the wallet classes) is also the wallet's
+  # for-others side; self is built directly rather than by subtraction so the
+  # missing-data semantics stay sum_available's.
+  wallet_spend <- total_spend_for_classes(derived, category_map, config$total_wallet_spend)
+  wallet_txn <- total_measure_for_classes(derived, category_map,
+                                          config$total_wallet_spend, "txn_per_month")
   return(data.frame(
     TotalTxnPerMonth = if (length(total_keys)) {
       sum_available(do.call(cbind, lapply(total_keys, function(k) derived[[k]]$txn_per_month)))
@@ -293,6 +347,16 @@ build_headline_columns <- function(derived, category_map, income, config) {
     TotalBillSpend = total_spend_for_classes(derived, category_map, config$total_bill_spend),
     TotalTransferSent = total_spend_for_classes(derived, category_map, config$total_transfer_sent),
     ValueReceived = total_spend_for_classes(derived, category_map, config$reported_separately),
+    TotalWalletSpend = wallet_spend,
+    TotalWalletTxn = wallet_txn,
+    TotalWalletSpendSelf = total_measure_for_self(derived, category_map,
+                                                  config$total_wallet_spend, "monthly_spend"),
+    TotalWalletTxnSelf = total_measure_for_self(derived, category_map,
+                                                config$total_wallet_spend, "txn_per_month"),
+    TotalGamblingSpend = total_measure_for_categories(derived, config$gambling_categories,
+                                                      "monthly_spend"),
+    TotalGamblingTxn = total_measure_for_categories(derived, config$gambling_categories,
+                                                    "txn_per_month"),
     TotalTxnTransacted = txn_transacted,
     AvgSpendPerTxn = ifelse(is.na(txn_transacted) | txn_transacted == 0,
                             NA_real_, transacted / txn_transacted),
