@@ -30,7 +30,7 @@ can't, the point is drawn but left untested — never a fabricated arrow.
 |---|---|---|
 | **Engine** | `modules/tabs/lib/tracking_aggregate_bridge.R` | Turns a values table into the wave-island sidecar shapes. Already tested (`tests/testthat/test_tracking_aggregate_bridge.R`). You don't edit this. |
 | **Generator** | `modules/tabs/examples/aggregate_wave_backfill.R` | The script you run. Values table + QuestionMap → sidecars, with a verification summary. |
-| **Templates** | `modules/tabs/templates/Aggregate_History_Values_Template.xlsx` and `Aggregate_QuestionMap_Template.xlsx` | Copy these to start a new project. |
+| **Templates** | `modules/tabs/templates/Aggregate_History_Values_Template.xlsx` and `Aggregate_QuestionMap_Template.xlsx` | Copy these to start a new project. **Not** `Tracking_QuestionMap_Template.xlsx` — that is the other tracking path (raw data per wave, canonical codes, one column per wave). Same sheet name, different contract; see 06_TEMPLATE_REFERENCE.md Chapter 3. |
 | **Two inputs you prepare** | your project folder | A **values table** and a **QuestionMap** (sections 3–4). |
 
 The current (live) wave needs nothing extra — its own tabs run produces its

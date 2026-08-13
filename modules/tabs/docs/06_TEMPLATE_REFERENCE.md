@@ -17,7 +17,12 @@ section.
 
 The templates are in the `templates/` subfolder: -
 `Crosstab_Config_Template.xlsx` - Analysis configuration -
-`Survey_Structure_Template.xlsx` - Survey definition
+`Survey_Structure_Template.xlsx` - Survey definition -
+`Tracking_QuestionMap_Template.xlsx` - Links a tracking study's waves
+(Chapter 3) - `Aggregate_QuestionMap_Template.xlsx` and
+`Aggregate_History_Values_Template.xlsx` - a *different* tracking path, for
+history that survives only as published figures (see
+[AGGREGATE_TRACKING_GUIDE.md](AGGREGATE_TRACKING_GUIDE.md))
 
 ------------------------------------------------------------------------
 
@@ -703,6 +708,21 @@ Currently only IQR (Interquartile Range) method is supported.
 
 ------------------------------------------------------------------------
 
+#### decimal_places
+
+**What it does:** General fallback — the workbook builder uses this for
+cells that have no type-specific setting of their own (the four
+`decimal_places_*` settings above take precedence wherever they apply).
+
+**Required:** No.
+
+**What to enter:** A number from 0 to 4, or leave blank.
+
+**Default:** blank — each consumer keeps its own default, which is how
+every report behaved before this row existed.
+
+------------------------------------------------------------------------
+
 ### Summary Sheet Settings
 
 #### create_index_summary
@@ -862,6 +882,22 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |
 | `wave_order` | Numeric x-axis order key (e.g. `2025.5` for twice-yearly) | Number | *(year parsed from `wave`)* |
 | `question_mapping` | Path to the classic tracker's `Question_Mapping.xlsx` — links waves by a canonical key (robust to renames) + curates tracked metrics | File path, or blank to auto-detect in `waves_source` | *(auto)* |
+
+### Tab Visibility (v2 report)
+
+Which tabs the interactive report carries. Crosstabs is always on; every
+other tab is includable per report, so a study can withhold one without
+changing anything else. A tab also self-hides when its data island is
+absent, so these only ever take a tab away — never add one that has
+nothing behind it.
+
+| Setting | Description | Values | Default |
+|----|----|----|----|
+| `show_dashboard` | Show the Dashboard tab | TRUE / FALSE | TRUE |
+| `show_patterns` | Show the Group overview (Patterns) tab | TRUE / FALSE | TRUE |
+| `show_differences` | Show the Differences tab | TRUE / FALSE | TRUE |
+| `show_tracking` | Show the Tracking tab. Also needs `html_report_v2_tracking = TRUE` and at least one prior wave in `waves_source` | TRUE / FALSE | TRUE |
+| `show_qualitative` | Show the Qualitative (comment) tab. Also needs a `qual_workbook` that joins to the survey | TRUE / FALSE | TRUE |
 
 ### Dashboard Settings
 
@@ -1023,11 +1059,6 @@ above. Descriptions below are the template's own help text.
 |---------|---------|--------------|
 | `generate_reader_report` | `FALSE` | Also build the narrative Reader report (a `*_Reader.html` file) — a plain-language summary beside the crosstab that deep-links into its tables. Requires `html_report_v2 = TRUE`. Deterministic and on-device by default: no data leaves this machine. |
 | `reader_ai_prose` | `FALSE` | Draft the Reader narrative with an AI model instead of the built-in template (only used when `generate_reader_report = TRUE`). Requires an Anthropic API key in the `ANTHROPIC_API_KEY` environment variable. Only aggregate figures are sent — never microdata or verbatims — and every number the model writes is checked against the data. Falls back to the on-device narrative (and says so) if the model is unavailable. |
-
-### Row descriptors (HTML report)
-
-| Setting | Default | Description |
-|---------|---------|--------------|
 
 ### Analyst & closing section / study identification
 
@@ -2161,3 +2192,124 @@ and the text arrives mangled. Write "and" rather than an ampersand.
 
 The row is the report author's own words. It is a statement about how the study
 was run and who stands behind it, so it should read as the author would say it.
+
+
+------------------------------------------------------------------------
+
+# Chapter 3: Tracking Question_Mapping Template
+
+`Tracking_QuestionMap_Template.xlsx` links a study's waves together so the
+v2 report can draw a trend. You need it only for a tracking study — but you
+need it from **wave one**, because a mapping written at wave two has already
+lost wave one.
+
+> **Two files share the name `QuestionMap`, and they are not the same
+> thing.** This one is for studies where each wave's raw respondent data
+> still exists: its `QuestionCode` is a canonical key you invent, deliberately
+> independent of any wave's question numbering, and it carries one
+> `Wave<YEAR>` column per wave. The *other* one —
+> `Aggregate_QuestionMap_Template.xlsx` — is for history that survives only
+> as published figures in a values table; there `QuestionCode` **is** the live
+> survey code and there is a single wave column. Using the wrong one produces
+> a mapping that reads without error and tracks nothing. If you hold the raw
+> data, you want this chapter.
+
+## QuestionMap Sheet
+
+One row per tracked metric.
+
+### Column: QuestionCode
+
+**What it does:** The canonical key that joins this metric across every
+wave. It is the single most important cell in the file.
+
+**Required:** Yes.
+
+**What to enter:** A code you invent and then never change — `ENG01`,
+`SAT_OVERALL`, `NPS`. It must **not** be a survey question code: the survey
+renumbers between waves (SACS asked engagement item 1 as `Q01` in 2023 and
+`Q05` from 2024), and the join key must not move when it does.
+
+**The trap:** the key is normalised before matching — lower-cased with
+punctuation stripped — so `Q_Engage` becomes `qengage`. A composite named
+`Q_Engage` here will not join history keyed `engagement`. Name the row for
+the metric (`Engagement`), and put the code the data uses (`Q_Engage`) in
+the wave column.
+
+### Column: QuestionText
+
+**What it does:** The display title for the metric in the report.
+
+**Required:** No — falls back to QuestionCode.
+
+### Column: TrackingSpecs
+
+**What it does:** What kind of metric this is.
+
+**What to enter:** `mean` for a rating or scale average (the default), or
+`nps` for an NPS net.
+
+### Column: SourceQuestions
+
+**What it does:** Marks the row as a **composite** and names the canonical
+codes it averages (e.g. `ENG01,ENG02,...,ENG12`).
+
+**Required:** No — leave blank on an ordinary question.
+
+**Who reads it:** the tabs tracker does **not**. It reads a composite
+straight from the Survey_Structure's Composite_Metrics sheet, so a live wave
+tracks a composite with this cell empty. The **segment backfill**
+(`examples/sacs_segment_backfill.R`) does read it, because it rebuilds prior
+waves from their raw data and has no Composite_Metrics for those years. Fill
+it in if you might ever backfill; it costs nothing if you don't.
+
+### Column: Wave\<YEAR\>
+
+**What it does:** This metric's question code in that wave's **data** — one
+column per wave, e.g. `Wave2024`, `Wave2025`, `Wave2026`.
+
+**What to enter:** The data column for that year (`Q05`), or blank if the
+metric wasn't asked that wave.
+
+**Which column is "live":** the report works it out by matching your data
+against each wave column and taking the best fit. If two columns list
+identical codes it says so and takes the leftmost — harmless when the codes
+really are identical, but fill only the current wave's column on a new row
+and the ambiguity never arises.
+
+## Banners Sheet
+
+Optional. It exists so per-group trend lines (by campus, region, tenure)
+can be rebuilt for prior waves. Leave the sheet out if you only want
+whole-sample trends.
+
+| Column | Meaning |
+|---|---|
+| `BreakLabel` | The dimension's name — `Total`, `Campus`, `Department`. |
+| `Wave<YEAR>` | The banner question's code in that wave's data. `Total` leaves these blank: it means all respondents. |
+
+**Two rules this sheet enforces quietly, so know them:**
+
+1. **Row 1 must be the header row.** This sheet is read plainly, unlike
+   QuestionMap. The backfill scans the first ten rows for `BreakLabel` and
+   warns loudly if it can't find one, but a template that needs the fallback
+   is a template inviting a silent Total-only run.
+2. **Anything in column A becomes a dimension.** Don't write notes there —
+   a help sentence in column A becomes a breakout named after itself.
+
+## When the trend lines have gaps
+
+A per-group line that shows some waves and not others is almost always one
+of two things:
+
+- **A wave contributed no segments.** A normal tabs run records the whole
+  sample only; per-group figures for a prior wave come from the segment
+  backfill. Re-running that wave does not change this — only the backfill
+  does.
+- **A label changed.** Prior waves join to the current report by the
+  normalised group LABEL, and the banner it came from is ignored. So
+  `Registrar` renamed to `Registrars Office` silently ends that group's
+  history, and a department that becomes a sub-department of the same name
+  keeps its line across the two levels. Decide which of those you want;
+  neither is an error the engine can spot.
+

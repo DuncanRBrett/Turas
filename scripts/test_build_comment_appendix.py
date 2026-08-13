@@ -198,5 +198,123 @@ check(ws5.cell(hr5 + 2, 3).value == "cleaned two", "unapproved row kept the hand
 check(ws5.cell(hr5 + 1, 2).value == "p", "coding on the updated row is untouched")
 
 
+
+# ---- column -> sheet mapping (topic-named appendices) ------------------------
+# A hand-built appendix names its sheets for the topic ("Engagement"), not the
+# data column ("Q17"). Without a mapping the builder created a SECOND set of
+# sheets named after the columns and left the coded ones empty — which looks like
+# a successful run and loses nothing, but produces an appendix the report can't
+# use and an analyst can't see is wrong.
+
+def config_with_selection(path, rows, header=("QuestionCode", "Include", "CommentSheet")):
+    """A minimal crosstab config: title/subtitle block, then the Selection table."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Selection"
+    ws.cell(1, 1).value = "Question Selection"
+    ws.cell(2, 1).value = "Define which questions appear as stubs and banners."
+    for j, h in enumerate(header, start=1):
+        ws.cell(3, j).value = h
+    ws.cell(4, 1).value = "[REQUIRED] Question code from Survey_Structure."
+    for i, row in enumerate(rows, start=5):
+        for j, v in enumerate(row, start=1):
+            ws.cell(i, j).value = v
+    wb.save(path)
+    return path
+
+
+cfg = config_with_selection(tmp / "config.xlsx", [
+    ("ResponseID", "N", ""),
+    ("Q1Comment", "N", "Delivery talk"),
+    ("Q5", "Y", ""),                       # closed question: no CommentSheet, skipped
+    ("xtraNotes", "N", "Loose ends"),
+])
+cols_cfg, map_cfg = bca.load_selection_sheet_map(cfg)
+check(cols_cfg == ["Q1Comment", "xtraNotes"],
+      "config supplies only the rows carrying a CommentSheet, in order")
+check(map_cfg == {"Q1Comment": "Delivery talk", "xtraNotes": "Loose ends"},
+      "config supplies the column -> sheet mapping")
+
+# a band-split declaration must REFUSE, not guess a band per comment
+cfg_split = config_with_selection(tmp / "config_split.xlsx", [
+    ("Q_Rec", "Y", "DetractorComment:Detractor; PromoterComment:Promoter"),
+])
+try:
+    bca.load_selection_sheet_map(cfg_split)
+    check(False, "a band-split CommentSheet must refuse")
+except bca.SheetMapError as e:
+    check("band-split" in str(e) and "Q_Rec" in str(e),
+          "the band-split refusal names the offending question")
+
+# a config with no CommentSheet column refuses rather than silently mapping nothing
+cfg_nocol = config_with_selection(tmp / "config_nocol.xlsx",
+                                  [("Q1Comment", "N")], header=("QuestionCode", "Include"))
+try:
+    bca.load_selection_sheet_map(cfg_nocol)
+    check(False, "a Selection sheet with no CommentSheet column must refuse")
+except bca.SheetMapError as e:
+    check("CommentSheet" in str(e), "the refusal names the missing column")
+
+check(bca.parse_sheet_map("Q17=Engagement, Q24=Values") == {"Q17": "Engagement", "Q24": "Values"},
+      "--sheet-map parses COLUMN=SHEET pairs")
+try:
+    bca.parse_sheet_map("Q17")
+    check(False, "a malformed --sheet-map entry must refuse")
+except bca.SheetMapError:
+    check(True, "a malformed --sheet-map entry refuses")
+
+check(bca.sheet_name_for("Q17", {"Q17": "Engagement"}) == "Engagement", "mapped column -> its sheet")
+check(bca.sheet_name_for("Q99", {"Q17": "Engagement"}) == "Q99", "unmapped column -> its own name")
+check(bca.sheet_name_for("Q99", None) == "Q99", "no mapping at all -> unchanged behaviour")
+
+
+# ---- the mapping preserves coding across a re-run (the whole point) ----------
+
+apx4 = tmp / "topic_named.xlsx"
+smap = {"Q1Comment": "Delivery talk", "xtraNotes": "Loose ends"}
+cols4 = ["Q1Comment", "xtraNotes"]
+
+bca.build_appendix(df, idc, apx4, cols4, "ID", smap)["wb"].save(apx4)
+wb4 = openpyxl.load_workbook(apx4)
+check(set(wb4.sheetnames) == {"Delivery talk", "Loose ends"},
+      "sheets are created under their MAPPED names")
+ws4 = wb4["Delivery talk"]
+hr4 = bca.find_header_row(ws4)
+check(ws4.cell(hr4, 3).value == "Q1Comment",
+      "the verbatim header still records which data column the sheet was built from")
+
+# analyst codes a theme, a tier and a redaction marker
+ws4.cell(hr4, 5).value = "Service"
+ws4.cell(hr4 + 1, 2).value = "m"        # must-read
+ws4.cell(hr4 + 1, 4).value = "3"        # negative
+ws4.cell(hr4 + 1, 5).value = "1"
+ws4.cell(hr4 + 2, 2).value = "hide"     # redaction: text withheld, still counted
+wb4.save(apx4)
+
+# fieldwork grows; re-run must append only, and only into the mapped sheets
+df4 = pd.concat([df, pd.DataFrame({"Response ID": [777], "Q1Comment": ["late arrival again"],
+                 "xtraNotes": [""], "Q9Comment": [""]})], ignore_index=True)
+s4 = bca.build_appendix(df4, idc, apx4, cols4, "ID", smap)
+check(s4["added"] == 1, "only the new respondent is appended")
+check(s4["created"] == 0 and set(s4["wb"].sheetnames) == {"Delivery talk", "Loose ends"},
+      "no duplicate column-named sheets are created on the second run")
+
+ws5 = s4["wb"]["Delivery talk"]
+hr5 = bca.find_header_row(ws5)
+check(ws5.cell(hr5, 5).value == "Service", "theme COLUMN survives the re-run")
+check(ws5.cell(hr5 + 1, 2).value == "m" and ws5.cell(hr5 + 1, 4).value == "3"
+      and ws5.cell(hr5 + 1, 5).value == "1", "tier, sentiment and theme coding survive")
+check(ws5.cell(hr5 + 2, 2).value == "hide", "a 'hide' redaction marker survives")
+check(any(str(r[0]) == "777" and r[2] == "late arrival again" for r in sheet_rows(ws5)),
+      "the new comment lands in the mapped sheet")
+
+# the change-review path follows the mapping too
+d5 = df4.copy()
+d5.loc[d5["Response ID"] == 777, "Q1Comment"] = "late arrival again (corrected)"
+s4["wb"].save(apx4)
+chg5 = bca.find_text_changes(d5, idc, cols4, openpyxl.load_workbook(apx4), smap)
+check(len(chg5) == 1 and chg5[0]["sheet"] == "Delivery talk",
+      "find_text_changes reports the MAPPED sheet name")
+
 print("\n" + ("FAILED" if _failed else "OK"), "— %d passed, %d failed" % (_passed, _failed))
 raise SystemExit(1 if _failed else 0)

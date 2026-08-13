@@ -161,6 +161,64 @@ test_that("crosstab config Settings sheet offers the Qualitative (comment) tab s
   expect_true(any(grepl("S01:Centre", cells, fixed = TRUE)))        # qual_tag_dimensions example
 })
 
+test_that("every setting build_config_object reads is offered by the template", {
+  # Regression guard (review 2026-08-13): the five tab-visibility flags and the
+  # general decimal_places fallback were read by build_config_object and listed
+  # in TABS_KNOWN_SETTINGS, but appeared in NO template and in no documentation —
+  # the only way to discover them was to read the source. A setting the engine
+  # honours must be discoverable from a freshly generated config.
+  #
+  # The weight_* and ranking_* keys are deliberate omissions, documented as such
+  # in 06_TEMPLATE_REFERENCE.md; data_file lives on the Survey_Structure Project
+  # sheet. Those are named here so the exemption is explicit rather than implied.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  settings <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  cells <- unlist(settings, use.names = FALSE)
+
+  deliberately_absent <- c(
+    "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
+    "ranking_tie_threshold_pct", "ranking_gap_threshold_pct",
+    "ranking_completeness_threshold_pct", "ranking_min_base",
+    "data_file"
+  )
+  expected <- setdiff(TABS_KNOWN_SETTINGS, deliberately_absent)
+  missing <- setdiff(expected, cells)
+
+  expect_equal(missing, character(0),
+    info = paste("settings the engine reads but no template offers:",
+                 paste(missing, collapse = ", ")))
+})
+
+test_that("the generated Settings sheet carries no section header without fields", {
+  # The retired ROW DESCRIPTORS section left its heading behind with nothing
+  # under it, so every generated template shipped an empty section (2026-08-13).
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  raw <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  hrow <- which(raw[[1]] == "Setting")[1]
+  body <- raw[(hrow + 1):nrow(raw), , drop = FALSE]
+
+  # A section header is a row with a name but no Required? marker.
+  is_section <- !is.na(body[[1]]) & is.na(body[[3]])
+  names_col <- as.character(body[[1]])
+
+  empty_sections <- character(0)
+  section_rows <- which(is_section)
+  for (i in seq_along(section_rows)) {
+    r <- section_rows[i]
+    nxt <- if (i < length(section_rows)) section_rows[i + 1] else nrow(body) + 1L
+    if (nxt - r <= 1L) empty_sections <- c(empty_sections, names_col[r])
+  }
+  expect_equal(empty_sections, character(0),
+    info = paste("section headers with no settings under them:",
+                 paste(empty_sections, collapse = ", ")))
+})
+
 test_that("crosstab config Settings sheet writes research_house in lowercase snake_case", {
   # Regression guard: this field was previously written as "Research_House",
   # which get_config_value() (an exact-match lookup) can never find since
@@ -587,4 +645,88 @@ test_that("banner DisplayOrder starts at 2, leaving column 1 for Total", {
 
   expect_true(length(orders) > 0)
   expect_true(min(orders) >= 2)
+})
+
+# ==============================================================================
+# TRACKING QUESTION_MAPPING TEMPLATE
+# ==============================================================================
+# A tracker's mapping is the one file a study cannot build retrospectively: get
+# it wrong at wave one and wave two has no history to join to. Until 2026-08-13
+# the only shipped mapping template was the AGGREGATE one (a different contract
+# — live codes, one wave column), so a study on the raw-data path had no way to
+# discover that composites need SourceQuestions or that segment trends need a
+# Banners sheet, short of reading examples/sacs_segment_backfill.R.
+
+test_that("the tracking Question_Mapping template carries both sheets", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp)
+  sheets <- openxlsx::getSheetNames(tmp)
+  expect_true("QuestionMap" %in% sheets)
+  expect_true("Banners" %in% sheets)
+})
+
+test_that("the template offers every QuestionMap column the tracker and backfill read", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp, waves = c("2024", "2025", "2026"))
+  raw <- openxlsx::read.xlsx(tmp, sheet = "QuestionMap", colNames = FALSE)
+  hrow <- which(raw[[1]] == "QuestionCode")[1]
+  expect_false(is.na(hrow))
+  cols <- trimws(as.character(unlist(raw[hrow, ])))
+
+  # tracking_metrics() reads QuestionCode / QuestionText / TrackingSpecs and the
+  # wave column; sacs_segment_backfill.R additionally reads SourceQuestions to
+  # rebuild a composite for prior waves.
+  for (k in c("QuestionCode", "QuestionText", "TrackingSpecs", "SourceQuestions",
+              "Wave2024", "Wave2025", "Wave2026")) {
+    expect_true(k %in% cols, info = paste(k, "should be a QuestionMap column"))
+  }
+})
+
+test_that("the generated mapping loads through the real reader with a composite row", {
+  skip_if_not(exists("load_question_mapping", mode = "function"),
+              "tracking_island.R not sourced in this run")
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp)
+  qm <- load_question_mapping(tmp)
+  expect_false(is.null(qm))
+  # help rows are dropped, examples survive
+  expect_true(all(c("ENG01", "Engagement") %in% trimws(as.character(qm$QuestionCode))))
+  comp <- qm[trimws(as.character(qm$QuestionCode)) == "Engagement", , drop = FALSE]
+  expect_true(nzchar(trimws(as.character(comp$SourceQuestions[1]))),
+    info = "the composite example must show SourceQuestions filled — that is the whole point of the column")
+})
+
+test_that("the Banners sheet reads with its header in row 1 and no stray dimensions", {
+  # The backfill reads this sheet plainly, so row 1 must be the header — and
+  # anything in column A becomes a banner dimension. A help note written into
+  # column A would silently become a breakout named after its own instructions.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_tracking_questionmap_template(tmp)
+  b <- openxlsx::read.xlsx(tmp, sheet = "Banners")
+  expect_equal(names(b)[1], "BreakLabel")
+
+  labels <- trimws(as.character(b$BreakLabel))
+  labels <- labels[!is.na(labels) & nzchar(labels)]
+  expect_true("Total" %in% labels)
+  # every dimension is a short name, not prose
+  expect_true(all(nchar(labels) <= 40),
+    info = paste("stray text in column A becomes a banner dimension:",
+                 paste(labels[nchar(labels) > 40], collapse = " | ")))
+})
+
+test_that("generate_all_templates ships the mapping alongside config and structure", {
+  tmp_dir <- file.path(tempdir(), paste0("tabs_tpl_", as.integer(runif(1, 1, 1e6))))
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  res <- generate_all_templates(tmp_dir)
+  expect_true(file.exists(res$mapping))
+  expect_true("Banners" %in% openxlsx::getSheetNames(res$mapping))
 })

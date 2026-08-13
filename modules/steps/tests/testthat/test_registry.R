@@ -158,3 +158,30 @@ test_that("a manifest with no args is valid", {
   m$args <- NULL
   expect_equal(steps_validate_manifest(m)$status, "PASS")
 })
+
+test_that("the comment-appendix steps expose --config and --sheet-map", {
+  # A topic-named appendix (sheets called Engagement / Values, not Q17 / Q24) needs a
+  # column -> sheet mapping. Without one the builder creates a SECOND set of
+  # column-named sheets and leaves the coded ones empty — a run that reports success
+  # and produces an appendix the report cannot read. The GUI must offer the same way
+  # out the CLI has, or the GUI is the path that quietly gets it wrong.
+  manifests <- steps_builtin_manifests()
+  appendix_steps <- Filter(function(m) grepl("^comment_appendix", m$id), manifests)
+  expect_gt(length(appendix_steps), 0)
+
+  for (m in appendix_steps) {
+    clis <- vapply(m$args, function(a) as.character(a$cli %||% ""), character(1))
+    expect_true("--config" %in% clis,
+      info = paste(m$id, "should offer --config"))
+    expect_true("--sheet-map" %in% clis,
+      info = paste(m$id, "should offer --sheet-map"))
+
+    # --config picks the columns, so it cannot be combined with the other pickers
+    cfg <- m$args[[which(clis == "--config")[1]]]
+    expect_equal(cfg$exclusive, "columns",
+      info = paste(m$id, "--config must sit in the columns exclusive group"))
+    # --sheet-map is NOT a column picker: it must stay combinable with all of them
+    smap <- m$args[[which(clis == "--sheet-map")[1]]]
+    expect_null(smap$exclusive)
+  }
+})

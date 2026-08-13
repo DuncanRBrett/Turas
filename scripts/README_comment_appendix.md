@@ -65,7 +65,8 @@ so you can confirm before it writes:
 
 | Flag | Use when |
 |------|----------|
-| `--columns "a,b,c"` | you know the columns (**most reliable**) |
+| `--config FILE.xlsx` | the crosstab config already declares the open-ends (**best for an existing project**) |
+| `--columns "a,b,c"` | you know the columns (**most reliable** when there is no config) |
 | `--columns-file FILE` | same, one column per line (`#` and blanks ignored) |
 | `--pattern REGEX` | comment columns share a naming pattern (default `comment\|verbatim\|feedback`) |
 | `--structure FILE.xlsx` | the Survey_Structure tags open-ends as `Variable_Type = Open_End` |
@@ -77,9 +78,40 @@ comment columns** (e.g. CCPB, where it finds only a few). For those, use `--colu
 `--columns-file`. Because `--auto` prints its picks and needs `--yes`, an incomplete guess
 can't slip through silently.
 
+## Where each column's comments go
+
+By default a sheet is named after its data column — `Q17` writes to a sheet called
+`Q17`. Hand-built appendices are usually named for the **topic** instead
+(`Engagement`, `Values`, `Culture`), and without a mapping the builder would create a
+second set of column-named sheets and leave the coded ones empty. That run looks
+successful and loses nothing, but produces an appendix the report cannot use.
+
+| Flag | Mapping |
+|------|---------|
+| *(nothing)* | sheet name = column name |
+| `--config FILE.xlsx` | from the Selection sheet's `CommentSheet` column |
+| `--sheet-map "Q17=Engagement,Q24=Values"` | explicit; overrides `--config` for the columns it names |
+
+`--config` is the one to reach for. `CommentSheet` is the same declaration the report
+reads to find a question's comments, so the builder and the report cannot drift apart —
+and the config supplies the column list at the same time, so one flag answers both
+"which columns" and "which sheet".
+
+A **band-split** declaration (`DetractorComment:Detractor; PromoterComment:Promoter`,
+one open-end spread across sheets by score band) is **refused**, naming the question.
+Filing those correctly needs each respondent's band; guessing would put comments under
+the wrong band and silently corrupt a hand-coded workbook. Build those sheets by hand.
+
 ## Examples
 
 ```bash
+# An existing project: the config knows which columns are open-ends AND what each
+# one's sheet is called. Nothing else to type.
+python3 scripts/build_comment_appendix.py \
+  --data     "…/SACS-2026_Data.xlsx" \
+  --appendix "…/2026 SACS Comment Appendix.xlsx" \
+  --config   "…/SACS-2026_Crosstab_Config.xlsx" --dry-run
+
 # CCPB — 39 known columns (from a columns file next to the data)
 python3 scripts/build_comment_appendix.py \
   --data "…/CCPB_CSAT_2026.xlsx" \

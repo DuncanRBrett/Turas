@@ -927,6 +927,16 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # Emitted only when TRUE so untagged configs stay byte-identical.
   if (isTRUE(q_result$area_summary)) out$area_summary <- TRUE
 
+  # Composite index (e.g. Q_Engage = the mean of the twelve engagement items).
+  # A composite now carries per-respondent scores in the microdata island like
+  # any rated question, so it recomputes live and can be tracked across waves —
+  # but it is the AVERAGE of questions that are themselves in the report, so the
+  # Patterns families that scan every rated question must skip it or it competes
+  # with its own components. The renderer cannot tell a composite from an
+  # ordinary "single" by type alone, so it is flagged here. Emitted only when
+  # TRUE, so a study with no composites produces byte-identical output.
+  if (is_composite) out$composite <- TRUE
+
   # Audience note: emitted only when the analyst set one, so a config with
   # neither column produces byte-identical output.
   if (nzchar(filter_label_val)) out$filter_label <- filter_label_val

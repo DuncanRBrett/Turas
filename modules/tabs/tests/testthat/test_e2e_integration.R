@@ -425,5 +425,120 @@ test_that("output Crosstabs sheet contains data rows", {
 
 
 # ==============================================================================
+# 6. COMPOSITE INDICES REACH THE MICRODATA ISLAND
+# ==============================================================================
+# A composite (COMP_SAT = the mean of Q002..Q005) has no column in the data and
+# no row in the Questions sheet, so it used to be absent from TR.MICRO.scores.
+# It therefore could not recompute under a live filter, and the wave tracker
+# SILENTLY dropped any Question_Mapping row naming one — the fault that cost
+# SACS its Overall Engagement trend. Gated end to end on the demo project,
+# because the unit test cannot prove the real pipeline wires composite_defs
+# through.
+
+context("E2E: composite indices in the microdata island")
+
+source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
+source(file.path(turas_root, "modules/tabs/lib/data_layer_writer.R"))
+source(file.path(turas_root, "modules/tabs/lib/microdata_writer.R"))
+
+e2e_micro_build <- function() {
+  config_result <- load_crosstabs_config(demo_config_file)
+  data_result <- load_crosstabs_data(config_result)
+  analysis_result <- run_crosstabs_analysis(
+    config_result, data_result,
+    checkpoint_frequency = CHECKPOINT_FREQUENCY, total_column = TOTAL_COLUMN)
+  dl <- build_data_layer(analysis_result$all_results, analysis_result$banner_info,
+                         config_result$config_obj, data_result$survey_structure)
+  micro <- build_microdata(dl, data_result$survey_data, data_result$survey_structure,
+                           analysis_result$banner_info, config_result$config_obj,
+                           composite_defs = data_result$composite_defs)
+  list(dl = dl, micro = micro, defs = data_result$composite_defs)
+}
+
+e2e_dl_question <- function(dl, code) {
+  for (q in dl$questions) if (identical(q$code, code)) return(q)
+  NULL
+}
+
+test_that("the demo project's composites are flagged and carry per-respondent scores", {
+  skip_if_not(file.exists(demo_config_file), "Demo config file not found")
+  built <- e2e_micro_build()
+
+  codes <- as.character(built$defs$CompositeCode)
+  expect_true(length(codes) > 0)
+
+  for (code in codes) {
+    q <- e2e_dl_question(built$dl, code)
+    expect_false(is.null(q), info = paste(code, "should be a data-layer question"))
+    expect_true(isTRUE(q$composite),
+      info = paste(code, "should be flagged composite so the Patterns scans skip it"))
+    sc <- built$micro$scores[[code]]
+    expect_false(is.null(sc),
+      info = paste(code, "should carry per-respondent scores in the island"))
+    expect_equal(length(sc), built$micro$n,
+      info = paste(code, "score vector should be one value per respondent"))
+    expect_true(any(!is.na(sc)), info = paste(code, "should have at least one real score"))
+  }
+})
+
+test_that("an ordinary question carries no composite flag", {
+  skip_if_not(file.exists(demo_config_file), "Demo config file not found")
+  built <- e2e_micro_build()
+  source_q <- e2e_dl_question(built$dl, "Q002")
+  if (!is.null(source_q)) expect_null(source_q$composite)
+})
+
+# The decimal places the composite's mean row is published at, so the
+# reconciliation tolerance tracks the config instead of hard-coding 1 dp.
+config_obj_dp <- function(built) {
+  dp <- suppressWarnings(as.numeric(
+    load_crosstabs_config(demo_config_file)$config_obj$decimal_places_index))
+  if (length(dp) != 1L || is.na(dp)) 1 else dp
+}
+
+test_that("the island's composite mean reconciles with every published composite", {
+  skip_if_not(file.exists(demo_config_file), "Demo config file not found")
+  built <- e2e_micro_build()
+
+  # The island holds per-respondent scores and per-respondent WEIGHTS; the
+  # published cell is the weighted mean of those scores. Recomputing unweighted
+  # here would pass on an unweighted project and quietly drift on a weighted one
+  # (the demo is weighted: it caught exactly that while this gate was written).
+  w <- as.numeric(built$micro$weights)
+  expect_equal(length(w), built$micro$n)
+
+  checked <- 0L
+  for (code in as.character(built$defs$CompositeCode)) {
+    q <- NULL
+    for (x in built$dl$questions) if (identical(x$code, code)) q <- x
+    mean_row <- NULL
+    for (r in q$rows) if (identical(r$kind, "mean")) { mean_row <- r; break }
+    expect_false(is.null(mean_row),
+      info = paste(code, "should publish a mean row"))
+
+    published <- suppressWarnings(as.numeric(mean_row$pct[[1]]))   # column 1 = Total
+    if (length(published) != 1L || is.na(published)) next
+
+    sc <- as.numeric(built$micro$scores[[code]])
+    keep <- !is.na(sc)
+    recomputed <- stats::weighted.mean(sc[keep], w = w[keep])
+
+    # The published cell is DISPLAY-ROUNDED (decimal_places_index), so the gate
+    # is that the island lands on the figure the reader sees — half of the last
+    # displayed place — not bit-identity with an unrounded intermediate.
+    dp <- suppressWarnings(as.numeric(config_obj_dp(built)))
+    tol <- 0.5 * 10^(-dp) + 1e-9
+    expect_lt(abs(recomputed - published), tol,
+      label = sprintf("%s: island weighted mean %.4f vs published %.4f (%d dp)",
+                      code, recomputed, published, dp))
+    checked <- checked + 1L
+  }
+  # A loop that reconciled nothing would pass in silence — the exact shape of
+  # useless test this gate exists to prevent.
+  expect_gt(checked, 0)
+})
+
+
+# ==============================================================================
 # END OF E2E INTEGRATION TESTS
 # ==============================================================================

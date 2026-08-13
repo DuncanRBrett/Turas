@@ -813,7 +813,8 @@ if (.html_report_v2_on) {
       .micro_wanted <- !isFALSE(config_result$config_obj$html_report_v2_microdata)
       micro <- if (!.micro_wanted) NULL else tryCatch(
         build_microdata(dl, data_result$survey_data, data_result$survey_structure,
-                        analysis_result$banner_info, config_result$config_obj),
+                        analysis_result$banner_info, config_result$config_obj,
+                        composite_defs = data_result$composite_defs),
         error = function(e) {
           cat("\n[WARNING] Microdata island generation failed:", conditionMessage(e), "\n")
           cat("  The v2 report still builds (published figures only).\n\n")

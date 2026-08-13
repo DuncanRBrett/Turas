@@ -8,7 +8,10 @@ grows without losing any coding you have done.
 
 WHAT IT PRODUCES
 ----------------
-One worksheet per comment column (sheet name = column name), in the Turas layout:
+One worksheet per comment column, in the Turas layout. The sheet is named after the
+column by default (Q17 -> sheet "Q17"); pass --config (or --sheet-map) when the appendix
+names its sheets for the TOPIC instead ("Engagement", "Values"), which hand-built
+appendices usually do:
 
     col A  <id header>         <- join key (matches the survey's respondent id)
     col B  Noteworthy          <- tier code: n=Noteworthy, m=Must-read, p=Priority.
@@ -35,13 +38,27 @@ backup before saving, and refuses (touching nothing) if it cannot find the colum
 
 CHOOSING THE COMMENT COLUMNS (in priority order)
 ------------------------------------------------
+  --config FILE.xlsx     the crosstab config: every Selection row with a CommentSheet.
+                         This also gives each column its SHEET NAME, so one flag covers
+                         both questions — and it reads the same declaration the report
+                         reads, so the builder and the report cannot disagree.
   --columns "a,b,c"      explicit list (most reliable — use when you know the columns)
   --columns-file FILE    same, one column per line (blank lines / #comments ignored)
   --pattern REGEX        headers matching this regex (default: comment|verbatim|feedback)
   --structure FILE.xlsx  the Survey_Structure's Open_End questions (if the survey tags them)
   --auto                 free-text heuristic (for question-wording headers, e.g. SACS);
                          prints its picks and requires --yes before writing
-The resolved columns are always printed with per-column counts, so you can confirm.
+The resolved columns are always printed with per-column counts and their target sheet,
+so you can confirm before anything is written.
+
+WHERE EACH COLUMN'S COMMENTS GO
+-------------------------------
+  (nothing)              sheet name = column name  (the historical behaviour)
+  --config FILE.xlsx     from the Selection sheet's CommentSheet column
+  --sheet-map "A=X,B=Y"  explicit; overrides --config for the columns it names
+A band-split declaration ('DetractorComment:Detractor; PromoterComment:Promoter') is
+REFUSED, not guessed: filing those needs each respondent's score band, and putting a
+comment under the wrong band would silently corrupt a hand-coded workbook.
 
 WHEN A COMMENT'S TEXT CHANGES (backcheck edits)
 -----------------------------------------------
@@ -54,6 +71,7 @@ Both are surgical: neither appends new respondents.
 
 USAGE
 -----
+    python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --config CONFIG.xlsx
     python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --columns "Q1Comment,Q2Comment"
     python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --pattern "comment|verbatim|xtra"
     python3 build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --auto           # preview
@@ -210,6 +228,104 @@ def existing_ids_and_last_row(ws, header_row):
     return ids, last
 
 
+# ---- column -> sheet mapping ------------------------------------------------
+# A sheet is normally named after its data column (Q17 -> sheet "Q17"). Hand-built
+# appendices are often named for the TOPIC instead ("Engagement", "Values"), and
+# that naming is already declared, per question, in the crosstab config's Selection
+# sheet CommentSheet column — which is what the report itself reads to find a
+# question's comments. Deriving the mapping from there means the builder and the
+# report can never disagree about which sheet belongs to which question.
+
+class SheetMapError(Exception):
+    """A mapping that cannot be honoured safely (refuse; never guess)."""
+
+
+def _selection_header_row(rows, anchor="QuestionCode", limit=10):
+    """Index of the Selection header row (it sits under a title/subtitle block)."""
+    for i, row in enumerate(rows[:limit]):
+        if any(norm(c) == anchor for c in row):
+            return i
+    return None
+
+
+def load_selection_sheet_map(config_path):
+    """{data column -> appendix sheet} from a crosstab config's Selection sheet.
+
+    Returns (columns_in_display_order, mapping). Only rows with a non-blank
+    CommentSheet are included, so the config alone resolves BOTH which columns are
+    open-ends and what their sheets are called.
+
+    Refuses on the band-split form ('Detractor:D; Passive:P'), where one question's
+    comments are meant to be split across several sheets by a score band. Appending
+    that correctly needs the band per respondent; guessing would file comments under
+    the wrong band and silently corrupt a hand-coded workbook.
+    """
+    wb = openpyxl.load_workbook(config_path, data_only=True, read_only=True)
+    if "Selection" not in wb.sheetnames:
+        raise SheetMapError("no 'Selection' sheet in %s" % Path(config_path).name)
+    rows = [list(r) for r in wb["Selection"].iter_rows(values_only=True)]
+    hr = _selection_header_row(rows)
+    if hr is None:
+        raise SheetMapError("no 'QuestionCode' header in the Selection sheet of %s"
+                            % Path(config_path).name)
+    header = [norm(c) for c in rows[hr]]
+    if "CommentSheet" not in header:
+        raise SheetMapError(
+            "the Selection sheet has no 'CommentSheet' column, so it cannot say which "
+            "appendix sheet each open-end belongs to. Add the column, or pass --sheet-map.")
+    i_code, i_sheet = header.index("QuestionCode"), header.index("CommentSheet")
+
+    columns, mapping, split = [], {}, []
+    for row in rows[hr + 1:]:
+        if len(row) <= max(i_code, i_sheet):
+            row = list(row) + [None] * (max(i_code, i_sheet) + 1 - len(row))
+        code, sheet = norm(row[i_code]), norm(row[i_sheet])
+        if not code or not sheet or code.startswith("["):
+            continue
+        if ";" in sheet or ":" in sheet:
+            split.append("%s -> %s" % (code, sheet))
+            continue
+        if code not in mapping:
+            columns.append(code)
+            mapping[code] = sheet
+    if split:
+        raise SheetMapError(
+            "band-split open-ends are not supported by this builder:\n    "
+            + "\n    ".join(split)
+            + "\n  Those questions spread one open-end across several sheets by score band, "
+              "which needs each respondent's band to file correctly. Build those sheets by "
+              "hand, or drop the band syntax and use one sheet per question.")
+    if not mapping:
+        raise SheetMapError("no Selection row has a CommentSheet value in %s"
+                            % Path(config_path).name)
+    return columns, mapping
+
+
+def parse_sheet_map(text):
+    """{col -> sheet} from 'Q17=Engagement,Q24=Values' (explicit alternative to --config)."""
+    mapping = {}
+    for part in str(text).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "=" not in part:
+            raise SheetMapError("--sheet-map entry %r is not COLUMN=SHEET" % part)
+        col, sheet = part.split("=", 1)
+        col, sheet = col.strip(), sheet.strip()
+        if not col or not sheet:
+            raise SheetMapError("--sheet-map entry %r is not COLUMN=SHEET" % part)
+        mapping[col] = sheet
+    if not mapping:
+        raise SheetMapError("--sheet-map is empty")
+    return mapping
+
+
+def sheet_name_for(col, sheet_map):
+    """The appendix sheet a data column writes to (itself when unmapped)."""
+    return (sheet_map or {}).get(col, col)
+
+
+
 # ---- workbook I/O -----------------------------------------------------------
 
 def load_data(path):
@@ -294,7 +410,7 @@ def sheet_rows_by_id(ws):
     return out
 
 
-def find_text_changes(df, id_col, columns, wb):
+def find_text_changes(df, id_col, columns, wb, sheet_map=None):
     """Rows whose comment text in the DATA differs from the text held in the appendix.
 
     Compares only ids present in BOTH, and only when the data's text is non-blank — the
@@ -302,18 +418,19 @@ def find_text_changes(df, id_col, columns, wb):
     {sheet, id, row, current, new}: the review list."""
     changes = []
     for col in dict.fromkeys(columns):
-        if col not in wb.sheetnames or col not in df.columns:
+        sheet = sheet_name_for(col, sheet_map)[:31]
+        if sheet not in wb.sheetnames or col not in df.columns:
             continue
         data_map = {}
         for rid, txt in zip(df[id_col], df[col]):
             if pd.isna(rid):
                 continue
             data_map[norm(fmt_id(rid))] = "" if pd.isna(txt) else str(txt).strip()
-        for rid, (row, current) in sheet_rows_by_id(wb[col]).items():
+        for rid, (row, current) in sheet_rows_by_id(wb[sheet]).items():
             new = data_map.get(rid)
             if new is None or new == "" or new == current:
                 continue
-            changes.append({"sheet": col, "id": rid, "row": row,
+            changes.append({"sheet": sheet, "id": rid, "row": row,
                             "current": current, "new": new})
     return changes
 
@@ -362,7 +479,7 @@ def apply_text_changes(wb, changes, decisions):
 
 # ---- orchestration ----------------------------------------------------------
 
-def build_appendix(df, id_col, appendix_path, columns, id_header):
+def build_appendix(df, id_col, appendix_path, columns, id_header, sheet_map=None):
     """Create/update the appendix in place. Returns a summary dict; caller saves the wb.
 
     Pure w.r.t. the data (df/columns already resolved); the only side effect is the
@@ -380,35 +497,43 @@ def build_appendix(df, id_col, appendix_path, columns, id_header):
             summary["missing"].append(col)
             continue
         records = comment_pairs(df, id_col, col)
-        if col in wb.sheetnames:
-            added, kept = update_sheet(wb[col], records)
+        sheet = sheet_name_for(col, sheet_map)[:31]
+        label = col if sheet == col else "%s -> %s" % (col, sheet)
+        if sheet in wb.sheetnames:
+            added, kept = update_sheet(wb[sheet], records)
             summary["added"] += added
             summary["updated"] += 1
-            print("  [update]  %-20s kept %3d, added %3d  (total %d)" % (col, kept, added, kept + added))
+            print("  [update]  %-32s kept %3d, added %3d  (total %d)" % (label, kept, added, kept + added))
         else:
-            n = create_sheet(wb, col, id_header, col, records)
+            # New sheet: named for the mapping, but the verbatim header stays the
+            # DATA column, so the sheet says which column it was built from.
+            n = create_sheet(wb, sheet, id_header, col, records)
             summary["added"] += n
             summary["created"] += 1
             if n == 0:
                 summary["empty"] += 1
-            print("  [create]  %-20s %s" % (col, "empty sheet" if n == 0 else "%d rows" % n))
+            print("  [create]  %-32s %s" % (label, "empty sheet" if n == 0 else "%d rows" % n))
     return summary
 
 
-def reorder_sheets(wb, columns):
+def reorder_sheets(wb, columns, sheet_map=None):
     """Order sheets to match `columns`; any extras keep their place at the end."""
-    wanted = [c[:31] for c in dict.fromkeys(columns) if c[:31] in wb.sheetnames]
+    wanted = []
+    for c in dict.fromkeys(columns):
+        name = sheet_name_for(c, sheet_map)[:31]
+        if name in wb.sheetnames and name not in wanted:
+            wanted.append(name)
     extras = [s for s in wb.sheetnames if s not in wanted]
     wb._sheets = [wb[name] for name in wanted + extras]
 
 
-def run_report_changes(df, id_col, columns, appendix_path, out_path):
+def run_report_changes(df, id_col, columns, appendix_path, out_path, sheet_map=None):
     """--report-changes: write the review list of differing comments; write nothing else."""
     appendix = Path(appendix_path)
     if not appendix.exists():
         print("ERROR: appendix not found: %s" % appendix)
         return 2
-    changes = find_text_changes(df, id_col, columns, openpyxl.load_workbook(appendix))
+    changes = find_text_changes(df, id_col, columns, openpyxl.load_workbook(appendix), sheet_map)
     if not changes:
         print("No comment text differs between the data and the appendix — nothing to review.")
         return 0
@@ -428,11 +553,11 @@ def run_report_changes(df, id_col, columns, appendix_path, out_path):
     return 0
 
 
-def run_apply_changes(df, id_col, columns, appendix_path, review_path, no_backup):
+def run_apply_changes(df, id_col, columns, appendix_path, review_path, no_backup, sheet_map=None):
     """--apply-changes: rewrite only the approved verbatims; all coding left untouched."""
     appendix = Path(appendix_path)
     wb = openpyxl.load_workbook(appendix)
-    changes = find_text_changes(df, id_col, columns, wb)
+    changes = find_text_changes(df, id_col, columns, wb, sheet_map)
     decisions = read_change_decisions(review_path)
     if not decisions:
         print("No rows marked in %s — nothing applied." % Path(review_path).name)
@@ -469,6 +594,11 @@ def parse_args(argv=None):
     src.add_argument("--pattern", help="regex; data headers matching it are comment columns")
     src.add_argument("--structure", help="Survey_Structure.xlsx; use its Open_End questions")
     src.add_argument("--auto", action="store_true", help="free-text heuristic (prints picks; needs --yes to write)")
+    src.add_argument("--config", help="crosstab config .xlsx; its Selection sheet supplies BOTH the "
+                                      "open-end columns and the appendix sheet each one writes to "
+                                      "(the CommentSheet column)")
+    ap.add_argument("--sheet-map", help="COLUMN=SHEET pairs, comma-separated (e.g. 'Q17=Engagement,Q24=Values') "
+                                        "for a topic-named appendix without a config to read")
     ap.add_argument("--id-header", default=DEFAULT_ID_HEADER, help="id header for NEW sheets (default: ResponseID)")
     ap.add_argument("--dry-run", action="store_true", help="report only; never write")
     ap.add_argument("--yes", action="store_true", help="confirm writing when columns came from --auto")
@@ -488,12 +618,33 @@ def main(argv=None):
     print("Appendix: %s" % args.appendix)
     print("ID column in data: '%s'\n" % id_col)
 
+    # The appendix sheet each column writes to. Default (no mapping) = the column
+    # name, which is the historical behaviour and what an unnamed appendix gets.
+    sheet_map = None
     explicit = None
+    if args.config:
+        try:
+            explicit, sheet_map = load_selection_sheet_map(args.config)
+        except SheetMapError as e:
+            print("ERROR: %s" % e)
+            return 2
+        print("Config:   %s" % args.config)
+    if args.sheet_map:
+        try:
+            override = parse_sheet_map(args.sheet_map)
+        except SheetMapError as e:
+            print("ERROR: %s" % e)
+            return 2
+        sheet_map = dict(sheet_map or {})
+        sheet_map.update(override)          # an explicit --sheet-map wins over the config
+        if explicit is None:
+            explicit = list(override.keys())
+
     if args.columns:
         explicit = [c for c in args.columns.split(",")]
     elif args.columns_file:
         explicit = read_columns_file(args.columns_file)
-    elif DEFAULT_COLUMNS:
+    elif explicit is None and DEFAULT_COLUMNS:
         explicit = list(DEFAULT_COLUMNS)
     structure_codes = open_end_codes_from_structure(args.structure) if args.structure else None
     pattern = args.pattern if args.pattern else None
@@ -508,7 +659,9 @@ def main(argv=None):
     print("Comment columns (%d, via %s):" % (len(columns), mode))
     for c in columns:
         n = len(comment_pairs(df, id_col, c)) if c in df.columns else "MISSING"
-        print("   %-24s %s" % (c, ("%s comments" % n) if c in df.columns else "NOT IN DATA"))
+        target = sheet_name_for(c, sheet_map)
+        arrow = "" if target == c else "  -> sheet '%s'" % target
+        print("   %-24s %s%s" % (c, ("%s comments" % n) if c in df.columns else "NOT IN DATA", arrow))
     print()
 
     # Safety: an --auto heuristic guess must be eyeballed before it writes.
@@ -519,11 +672,11 @@ def main(argv=None):
     # Changed-comment review modes — both are surgical and never append new respondents.
     if args.apply_changes:
         return run_apply_changes(df, id_col, columns, args.appendix,
-                                 args.apply_changes, args.no_backup)
+                                 args.apply_changes, args.no_backup, sheet_map)
     if args.report_changes is not None:
-        return run_report_changes(df, id_col, columns, args.appendix, args.report_changes)
+        return run_report_changes(df, id_col, columns, args.appendix, args.report_changes, sheet_map)
 
-    summary = build_appendix(df, id_col, args.appendix, columns, args.id_header)
+    summary = build_appendix(df, id_col, args.appendix, columns, args.id_header, sheet_map)
     for m in summary["missing"]:
         print("  [skip]    %-20s — NOT FOUND in the data file" % m)
     print("\nSummary: %d created (%d empty), %d updated, %d missing; %d comment rows added." % (
@@ -536,7 +689,7 @@ def main(argv=None):
         print("\nNo new sheets or rows — appendix left untouched (not re-saved).")
         return 0
 
-    reorder_sheets(summary["wb"], columns)
+    reorder_sheets(summary["wb"], columns, sheet_map)
     appendix = Path(args.appendix)
     if appendix.exists() and not args.no_backup:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")

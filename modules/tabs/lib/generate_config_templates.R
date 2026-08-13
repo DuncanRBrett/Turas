@@ -187,6 +187,12 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "decimal_places_numeric", default = 1, required = TRUE,
              description = "Number of decimal places for Numeric question statistics (mean, median).",
              valid_values_text = "0 to 4",
+             integer_range = c(0, 4)),
+        list(name = "decimal_places", default = "", required = FALSE,
+             description = paste0("General fallback: the workbook builder uses this for cells with no ",
+               "type-specific setting above. Blank = each consumer keeps its own default, which is ",
+               "what every report did before this row existed."),
+             valid_values_text = "0 to 4, or leave blank",
              integer_range = c(0, 4))
       )
     ),
@@ -517,6 +523,42 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
+    # ---- TAB VISIBILITY (v2 report) ------------------------------------------
+    # Crosstabs is always on; every other tab is includable per report. The flags
+    # ride into the data layer and tabList() filters against them (a tab also
+    # self-hides when its island is absent). They were readable by
+    # build_config_object from the start but appeared in NO template, so the only
+    # way to discover them was to read the source (review 2026-08-13).
+    list(
+      section_name = "TAB VISIBILITY (V2 REPORT)",
+      fields = list(
+        list(name = "show_dashboard", default = "TRUE", required = FALSE,
+             description = paste0("Show the Dashboard tab in the v2 report. FALSE withholds it from ",
+               "this build; the Crosstabs tab is always on."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_patterns", default = "TRUE", required = FALSE,
+             description = "Show the Group overview (Patterns) tab in the v2 report.",
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_differences", default = "TRUE", required = FALSE,
+             description = "Show the Differences tab in the v2 report.",
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_tracking", default = "TRUE", required = FALSE,
+             description = paste0("Show the Tracking tab in the v2 report. It also needs ",
+               "html_report_v2_tracking = TRUE and at least one prior wave in waves_source — ",
+               "without those the tab is absent whatever this is set to."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_qualitative", default = "TRUE", required = FALSE,
+             description = paste0("Show the Qualitative (comment) tab in the v2 report. It also needs ",
+               "a qual_workbook that joins to the survey."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE"))
+      )
+    ),
+
     # ---- GROUP OVERVIEW TAB (OPTIONAL; settings keep the patterns_ prefix) ----
     # The tab is a group-vs-peers overview of the selected banner: how many
     # questions each group sits ahead of / behind its peers on. Its surface is
@@ -571,12 +613,10 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
-    # ---- ROW DESCRIPTORS ----
-    list(
-      section_name = "ROW DESCRIPTORS (HTML Report)",
-      fields = list(
-      )
-    ),
+    # (ROW DESCRIPTORS was retired with the classic HTML report in 2026-08. Its
+    # three settings went to TABS_RETIRED_SETTINGS but the section header stayed
+    # behind with no fields under it, so every generated template carried an
+    # empty heading. Removed 2026-08-13.)
 
     # ---- ANALYST / CLOSING ----
     list(
@@ -1317,6 +1357,148 @@ generate_survey_structure_template <- function(output_path) {
 
 
 # ==============================================================================
+# TRACKING QUESTION_MAPPING TEMPLATE (multi-wave, canonical-key)
+# ==============================================================================
+
+#' Generate a Tracking Question_Mapping Template
+#'
+#' The workbook that links a study's waves together for the v2 Tracking tab: one
+#' row per tracked metric, keyed by a canonical QuestionCode that never changes,
+#' with each wave's own question code in that wave's column.
+#'
+#' NOT the same thing as \code{templates/Aggregate_QuestionMap_Template.xlsx}.
+#' That one serves the aggregate-history path (\code{aggregate_wave_backfill.R}),
+#' where the history arrives as published figures in a values table: its
+#' QuestionCode IS the live survey code and it carries a single wave column. This
+#' one serves the path where each wave's raw data still exists — the tabs tracker
+#' plus \code{sacs_segment_backfill.R} — where the whole point is that the
+#' canonical code is INDEPENDENT of any wave's numbering. Same sheet name, two
+#' different contracts; keep them apart.
+#'
+#' Two sheets:
+#'   QuestionMap — the metrics. Read through load_question_mapping(), which finds
+#'     the header by scanning for "QuestionCode" and drops help rows, so the
+#'     standard title block is safe here.
+#'   Banners     — the breakout dimensions for segment trends. Read with a plain
+#'     read.xlsx(), which takes ROW 1 as the header, so this sheet gets bare
+#'     headers and no title block. (The backfill also auto-detects the header row
+#'     now, but a template that needs the fallback is a template inviting a
+#'     silent no-segments run.)
+#'
+#' @param output_path Path for the output Excel file
+#' @param waves Character vector of wave column suffixes, oldest first
+#'   (default: three example years). The LAST one is the live wave.
+#' @return Invisible path to created file
+#' @export
+generate_tracking_questionmap_template <- function(output_path,
+                                                    waves = c("2024", "2025", "2026")) {
+  wave_cols <- paste0("Wave", waves)
+  live <- utils::tail(waves, 1)
+
+  wb <- createWorkbook()
+
+  # --- SHEET 1: QuestionMap ---
+  qm_cols <- c(
+    list(
+      list(name = "QuestionCode", width = 18, required = TRUE,
+           description = paste("[REQUIRED] The CANONICAL code for this metric - the cross-wave join key.",
+             "Invent it and never change it (e.g. ENG01, SAT_OVERALL). It must NOT be a survey question",
+             "code: the survey renumbers between waves and this must not. It is normalised",
+             "(lower-cased, punctuation stripped) before matching, so 'SAT_OVERALL' and 'sat overall'",
+             "are the same key.")),
+      list(name = "QuestionText", width = 46, required = FALSE,
+           description = "[Optional] Display title for this metric in the report. Falls back to QuestionCode."),
+      list(name = "TrackingSpecs", width = 15, required = FALSE,
+           description = "[Optional] 'mean' for a rating/scale average (the default), or 'nps' for an NPS net.",
+           dropdown = c("mean", "nps")),
+      list(name = "SourceQuestions", width = 40, required = FALSE,
+           description = paste("[Optional] COMPOSITE rows only: the comma-separated CANONICAL codes this index",
+             "averages (e.g. ENG01,ENG02,...,ENG12). Leave blank on an ordinary question. The tabs tracker",
+             "ignores this column - it reads the composite straight from the Survey_Structure - but the",
+             "segment backfill needs it to rebuild the composite for waves that ran before this one."))
+    ),
+    lapply(wave_cols, function(wc) {
+      yr <- sub("^Wave", "", wc)
+      list(name = wc, width = 12, required = FALSE,
+           description = sprintf(paste("[Optional] This metric's question code in the %s wave's DATA (e.g. Q05).",
+             "Blank = not asked that wave. %s"), yr,
+             if (identical(yr, live)) "This is the LIVE wave: the report keys the current run off this column."
+             else "A prior wave: the segment backfill reads this to find the column in that year's data."))
+    })
+  )
+
+  qm_examples <- list(
+    list(QuestionCode = "ENG01", QuestionText = "I know what is expected of me at work",
+         TrackingSpecs = "mean", SourceQuestions = ""),
+    list(QuestionCode = "SAT_OVERALL", QuestionText = "Overall satisfaction",
+         TrackingSpecs = "mean", SourceQuestions = ""),
+    list(QuestionCode = "NPS", QuestionText = "Likelihood to recommend",
+         TrackingSpecs = "nps", SourceQuestions = ""),
+    list(QuestionCode = "Engagement", QuestionText = "Overall Engagement (composite)",
+         TrackingSpecs = "mean", SourceQuestions = "ENG01,ENG02,ENG03")
+  )
+  # Example wave codes so the shape is obvious: the same metric renumbering.
+  ex_codes <- list(ENG01 = c("Q01", "Q05", "Q05"), SAT_OVERALL = c("Q21", "Q26", "Q28"),
+                   NPS = c("Q30", "Q34", "Q36"), Engagement = c("", "", "Q_Engage"))
+  qm_examples <- lapply(qm_examples, function(row) {
+    codes <- ex_codes[[row$QuestionCode]]
+    for (i in seq_along(wave_cols)) {
+      row[[wave_cols[i]]] <- if (i <= length(codes)) codes[i] else ""
+    }
+    row
+  })
+
+  write_table_sheet(wb, "QuestionMap", qm_cols,
+    title = "Tracking Question Mapping",
+    subtitle = paste("One row per tracked metric. QuestionCode is the canonical key that links the waves;",
+      "each Wave column holds that wave's own question code. Blue rows are examples - overwrite them."),
+    example_rows = qm_examples, num_blank_rows = 40)
+
+  # --- SHEET 2: Banners (bare header in row 1 — see the note above) ---
+  addWorksheet(wb, "Banners", gridLines = FALSE)
+  setColWidths(wb, "Banners", cols = seq_len(length(wave_cols) + 1),
+               widths = c(24, rep(12, length(wave_cols))))
+  headers <- c("BreakLabel", wave_cols)
+  writeData(wb, "Banners", x = data.frame(t(headers), stringsAsFactors = FALSE),
+            startRow = 1, startCol = 1, colNames = FALSE)
+  addStyle(wb, "Banners", make_header_style(), rows = 1,
+           cols = seq_along(headers), gridExpand = TRUE)
+
+  # Total carries blank wave columns = all respondents; each other row is a
+  # breakout dimension, with that wave's banner question code per column.
+  banner_examples <- list(
+    c("Total", rep("", length(wave_cols))),
+    c("Campus", if (length(wave_cols) >= 3) c("Q24", "Q02", "Q02") else rep("Q02", length(wave_cols))),
+    c("Department", if (length(wave_cols) >= 3) c("Q25", "Q03", "Q03") else rep("Q03", length(wave_cols)))
+  )
+  for (i in seq_along(banner_examples)) {
+    writeData(wb, "Banners",
+              x = data.frame(t(banner_examples[[i]]), stringsAsFactors = FALSE),
+              startRow = 1 + i, startCol = 1, colNames = FALSE)
+    addStyle(wb, "Banners", make_example_style(), rows = 1 + i,
+             cols = seq_along(headers), gridExpand = TRUE)
+  }
+  # The note sits to the RIGHT of the data, never in column A: anything in
+  # column A is a BreakLabel, so a note there becomes a banner dimension named
+  # after its own instructions.
+  writeData(wb, "Banners",
+    x = paste("HOW THIS SHEET WORKS:",
+              "Row 1 must stay the header row - this sheet is read with the header in row 1.",
+              "Column A is the dimension name; anything you put there is treated as a banner.",
+              "Total has blank wave columns (it means all respondents). Every other row is a",
+              "breakout dimension - give each wave the banner question's code in that wave's",
+              "data. Overwrite the example rows. Delete the whole sheet if you do not want",
+              "per-group trend lines."),
+    startRow = 1, startCol = length(headers) + 2)
+  setColWidths(wb, "Banners", cols = length(headers) + 2, widths = 70)
+
+  saveWorkbook(wb, output_path, overwrite = TRUE)
+  cat(sprintf("\n  [SUCCESS] Tracking Question_Mapping template created: %s\n", output_path))
+  invisible(output_path)
+}
+
+
+# ==============================================================================
 # CONVENIENCE: Generate All Templates
 # ==============================================================================
 
@@ -1327,11 +1509,15 @@ generate_survey_structure_template <- function(output_path) {
 #' @param output_dir Directory to create templates in
 #' @param config_filename Filename for config template (default: "Crosstab_Config.xlsx")
 #' @param structure_filename Filename for structure template (default: "Survey_Structure.xlsx")
+#' @param mapping_filename Filename for the tracking Question_Mapping template
+#'   (default: "Question_Mapping.xlsx"). Only a tracking study needs it, but it
+#'   ships with the set: a mapping built at wave 2 has already lost wave 1.
 #' @return Invisible list of created file paths
 #' @export
 generate_all_templates <- function(output_dir,
                                     config_filename = "Crosstab_Config.xlsx",
-                                    structure_filename = "Survey_Structure.xlsx") {
+                                    structure_filename = "Survey_Structure.xlsx",
+                                    mapping_filename = "Question_Mapping.xlsx") {
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
     cat(sprintf("  Created directory: %s\n", output_dir))
@@ -1339,19 +1525,28 @@ generate_all_templates <- function(output_dir,
 
   config_path <- file.path(output_dir, config_filename)
   structure_path <- file.path(output_dir, structure_filename)
+  mapping_path <- file.path(output_dir, mapping_filename)
 
   generate_survey_structure_template(structure_path)
   generate_crosstab_config_template(config_path, structure_file = structure_filename)
+  generate_tracking_questionmap_template(mapping_path)
 
   cat("\n  ========================================\n")
   cat("  All templates generated successfully!\n")
   cat("  ========================================\n")
   cat(sprintf("  Config:    %s\n", config_path))
   cat(sprintf("  Structure: %s\n", structure_path))
+  cat(sprintf("  Mapping:   %s  (tracking studies only)\n", mapping_path))
   cat("\n  Next steps:\n")
   cat("  1. Open Survey_Structure.xlsx and fill in your project details & questions\n")
   cat("  2. Open Crosstab_Config.xlsx and adjust analysis settings\n")
-  cat("  3. Run your analysis!\n\n")
+  cat("  3. Run your analysis!\n")
+  cat("\n  Tracking study? Fill in Question_Mapping.xlsx at WAVE ONE, not wave two,\n")
+  cat("  and set wave / wave_order / html_report_v2_tracking in the config from the\n")
+  cat("  first wave. The Tracking tab stays hidden until there are two waves, but\n")
+  cat("  wave one's run is what writes the history wave two reads. Delete the\n")
+  cat("  mapping if the study is a one-off.\n\n")
 
-  invisible(list(config = config_path, structure = structure_path))
+  invisible(list(config = config_path, structure = structure_path,
+                 mapping = mapping_path))
 }
