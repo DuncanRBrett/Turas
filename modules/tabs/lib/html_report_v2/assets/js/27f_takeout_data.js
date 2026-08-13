@@ -376,6 +376,40 @@
   }
 
   /**
+   * Is this question eligible for the per-respondent score families (the
+   * odd-one-out cell family and the two-camps scan)? Shared so the two can
+   * never drift apart. Four conditions, each with a reason:
+   *
+   *  - it carries per-respondent scores (nothing to test otherwise);
+   *  - it is not NPS — those are bucketed −100/0/+100 (score_utils.R), which
+   *    swamps gap floors tuned for 1–5 scale points and makes the camp binning
+   *    meaningless (production review 2026-08, C4);
+   *  - its scale tops out at 10 — a ±100 metric would clear a small-scale floor
+   *    on a trivial wobble, a fabricated "odd one out";
+   *  - it is NOT A COMPOSITE. A composite index is the mean of rated questions
+   *    that are themselves in the family, so including it would let it compete
+   *    with its own components (the same movement counted twice, and an "odd
+   *    one out" that is only the average of its neighbours). Its distribution is
+   *    an average of averages too, so its spread is narrower than any item's by
+   *    construction and a "two camps" reading of it would be an artefact of the
+   *    averaging rather than a real split. Composites began carrying scores when
+   *    they were made live-recomputable and trackable across waves; this keeps
+   *    them out of the scans that assume one row per measured thing.
+   *
+   * @param q A data-layer question
+   * @param micro The TR.MICRO payload
+   * @return {boolean}
+   */
+  function familyEligible(q, micro) {
+    if (!micro || !micro.scores) return false;
+    var sc = micro.scores[q.code];
+    if (!sc || !sc.length) return false;
+    if (q.type === "nps" || q.composite) return false;
+    return touchpointMax(q) <= 10;
+  }
+  takeout._familyEligible = familyEligible;   // exposed for the node gate
+
+  /**
    * The shared CELL FAMILY for the multiple-comparison trust-gate AND the
    * odd-one-out pattern: ONE weighted variance-floored Welch test of each breakout
    * group vs the rest, on every rated question, from per-respondent scores. No new
@@ -403,10 +437,7 @@
     // — a fabricated "odd one out" — and its ±100 gaps would swamp the mean-gap
     // baseline. Strain/thrive keep NPS: they normalise each gap by scaleMax; this
     // family does not.
-    var qs = views.indexQuestions().filter(function (q) {
-      return micro.scores && micro.scores[q.code] && micro.scores[q.code].length &&
-        q.type !== "nps" && touchpointMax(q) <= 10;
-    });
+    var qs = views.indexQuestions().filter(function (q) { return familyEligible(q, micro); });
     var shareList = takeout._shares ? takeout._shares.list(views) : [];
     var nResp = micro.n || (qs.length ? micro.scores[qs[0].code].length : 0);
     if (!nResp) return null;
@@ -499,10 +530,7 @@
     // below dropped the −100 camp and the remaining two lumps read as a
     // fabricated "two camps" split; a 0–100 composite's 101-bin histogram makes
     // the camp gate meaningless. Both stay out (production review 2026-08, C4).
-    var qs = views.indexQuestions().filter(function (q) {
-      return micro.scores[q.code] && micro.scores[q.code].length &&
-        q.type !== "nps" && touchpointMax(q) <= 10;
-    });
+    var qs = views.indexQuestions().filter(function (q) { return familyEligible(q, micro); });
     if (!qs.length) return null;
     var nResp = micro.n || micro.scores[qs[0].code].length;
     var out = qs.map(function (q) {

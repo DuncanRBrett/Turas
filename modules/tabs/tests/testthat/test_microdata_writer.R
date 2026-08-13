@@ -487,3 +487,138 @@ test_that("Numeric scores stay unfiltered when no Min/Max is configured", {
   sd <- data.frame(HRS = c("5", "999"), stringsAsFactors = FALSE)
   expect_equal(micro_scores_for_question(dl_q, sd, struct, 2), c(5, 999))
 })
+
+# ==============================================================================
+# COMPOSITE INDEX SCORES (Q_Engage / Q_Value and friends)
+# ==============================================================================
+# A composite has no column in the survey data and no row in the Questions
+# sheet, so micro_scores_for_question() cannot see it — which left it out of the
+# island entirely. It then could not recompute under a live filter, and the wave
+# tracker SILENTLY dropped any Question_Mapping row pointing at one
+# (wave_contribution() skips a metric with no scores). These gate the fix.
+
+source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
+
+context("microdata_writer: composite index scores")
+
+mwc_structure <- function() {
+  list(
+    questions = data.frame(
+      QuestionCode  = c("Q2", "Q4", "G"),
+      QuestionText  = c("Rate A", "Rate B", "Gender"),
+      Variable_Type = c("Rating", "Rating", "Single_Choice"),
+      Columns       = c(1, 1, 1),
+      stringsAsFactors = FALSE),
+    options = data.frame(
+      QuestionCode = c("Q2", "Q2", "Q2", "Q4", "Q4", "Q4", "G", "G"),
+      OptionText   = c("1", "2", "3", "1", "2", "3", "M", "F"),
+      DisplayText  = c("1", "2", "3", "1", "2", "3", "Male", "Female"),
+      OptionValue  = c(1, 2, 3, 1, 2, 3, NA, NA),
+      stringsAsFactors = FALSE))
+}
+
+# Respondent 4 answered only one source (partial); respondent 5 answered neither.
+mwc_data <- function() data.frame(
+  Q2 = c("3", "1", "2", "3", NA),
+  Q4 = c("1", "3", "2", NA,  NA),
+  G  = c("M", "M", "F", "F", "M"),
+  stringsAsFactors = FALSE)
+
+mwc_defs <- function(calc = "Mean", weights = NA_character_) data.frame(
+  CompositeCode    = "Q_IDX",
+  CompositeLabel   = "Overall Index",
+  CalculationType  = calc,
+  SourceQuestions  = "Q2,Q4",
+  Weights          = weights,
+  SectionLabel     = "Overall",
+  stringsAsFactors = FALSE)
+
+mwc_build <- function(defs = mwc_defs()) {
+  results <- list(
+    Q2    = mw_q("Q2", "Rate A", "Rating", c("1", "2", "3"), mean_label = "Mean"),
+    Q4    = mw_q("Q4", "Rate B", "Rating", c("1", "2", "3"), mean_label = "Mean"),
+    Q_IDX = mw_q("Q_IDX", "Overall Index", "Composite", character(0),
+                 mean_label = "Index"))
+  cfg <- mw_config()
+  dl <- build_data_layer(results, mw_banner_info(), cfg, mwc_structure())
+  micro <- build_microdata(dl, mwc_data(), mwc_structure(), mw_banner_info(), cfg,
+                           composite_defs = defs)
+  list(dl = dl, micro = micro)
+}
+
+dl_q_by_code <- function(dl, code) {
+  for (q in dl$questions) if (identical(q$code, code)) return(q)
+  NULL
+}
+
+test_that("a composite question is flagged in the data layer", {
+  built <- mwc_build()
+  expect_true(isTRUE(dl_q_by_code(built$dl, "Q_IDX")$composite))
+  # ordinary questions carry no flag at all (byte-identical output for a study
+  # with no composites)
+  expect_null(dl_q_by_code(built$dl, "Q2")$composite)
+})
+
+test_that("a Mean composite carries the per-respondent mean of its sources", {
+  micro <- mwc_build()$micro
+  # (3+1)/2, (1+3)/2, (2+2)/2, 3 alone (partial answer), neither -> NA
+  expect_equal(as.numeric(micro$scores$Q_IDX), c(2, 2, 2, 3, NA))
+})
+
+test_that("the composite score reproduces the published composite maths", {
+  # The island must never drift from the published cell: same function, same
+  # inputs. A wave point and a live recompute both read this vector.
+  published <- calculate_composite_values(
+    data_subset = mwc_data(), source_questions = c("Q2", "Q4"),
+    calculation_type = "Mean", questions_df = mwc_structure()$questions,
+    options_df = mwc_structure()$options)
+  expect_equal(as.numeric(mwc_build()$micro$scores$Q_IDX), as.numeric(published))
+})
+
+test_that("a WeightedMean composite honours its declared weights", {
+  micro <- mwc_build(mwc_defs("WeightedMean", "3,1"))$micro
+  # (3*3 + 1*1)/4 = 2.5 · (1*3 + 3*1)/4 = 1.5 · 2 · 3 alone · NA
+  expect_equal(as.numeric(micro$scores$Q_IDX), c(2.5, 1.5, 2, 3, NA))
+})
+
+test_that("a WeightedMean composite with unusable weights scores nothing rather than guessing", {
+  # Count mismatch and blank both return NULL — the composite is simply absent
+  # from the island. Silently averaging unweighted here would publish a number
+  # that disagrees with the report.
+  expect_null(mwc_build(mwc_defs("WeightedMean", "3"))$micro$scores$Q_IDX)
+  expect_null(mwc_build(mwc_defs("WeightedMean", ""))$micro$scores$Q_IDX)
+})
+
+test_that("without composite_defs the island is exactly what it was before", {
+  expect_null(mwc_build(NULL)$micro$scores$Q_IDX)
+  # the source questions still score, so nothing else changed
+  expect_equal(as.numeric(mwc_build(NULL)$micro$scores$Q2), c(3, 1, 2, 3, NA))
+})
+
+test_that("an unknown or malformed composite definition yields no scores", {
+  expect_null(micro_scores_for_composite("NOPE", mwc_data(), mwc_structure(), mwc_defs()))
+  bad <- mwc_defs(); bad$SourceQuestions <- ""
+  expect_null(micro_scores_for_composite("Q_IDX", mwc_data(), mwc_structure(), bad))
+})
+
+test_that("a composite metric reaches the wave contribution", {
+  # The end of the chain this fix exists for: with scores present, a
+  # Question_Mapping row pointing at a composite now produces a tracked metric.
+  source(file.path(turas_root, "modules/tabs/lib/tracking_island.R"))
+  built <- mwc_build()
+  mapping <- data.frame(
+    QuestionCode  = c("IDX"),
+    QuestionText  = c("Overall Index"),
+    TrackingSpecs = c("mean"),
+    Wave2026      = c("Q_IDX"),
+    stringsAsFactors = FALSE)
+  contrib <- wave_contribution(built$dl, built$micro,
+                               list(wave = "W 2026", wave_order = 2026), mapping)
+  expect_false(is.null(contrib))
+  keys <- vapply(contrib$questions, function(q) q$match_key, character(1))
+  expect_true("idx" %in% keys)
+  hit <- contrib$questions[[which(keys == "idx")]]
+  expect_equal(hit$code, "Q_IDX")
+  expect_equal(hit$base, 4)                     # respondent 5 has no score
+  expect_equal(as.numeric(unlist(hit$scores)), c(2, 2, 2, 3))
+})

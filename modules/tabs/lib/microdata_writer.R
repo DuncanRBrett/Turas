@@ -469,6 +469,84 @@ micro_scores_for_question <- function(dl_q, survey_data, survey_structure, n) {
 }
 
 
+#' Per-respondent numeric scores for a COMPOSITE index
+#'
+#' A composite (e.g. Q_Engage = the mean of the twelve engagement items) has no
+#' column in the survey data and no row in the Questions sheet, so
+#' micro_scores_for_question() cannot see it — which left composites out of the
+#' island entirely. They then could not recompute under a live filter, and the
+#' wave tracker skipped any Question_Mapping row pointing at one, silently
+#' (\code{wave_contribution()} drops a metric with no scores). This computes the
+#' same per-respondent vector the published composite is built from, by calling
+#' the composite processor's own maths — so a live recompute and a wave point
+#' can never drift from the published figure.
+#'
+#' @param code The composite's code (e.g. "Q_Engage")
+#' @param survey_data Respondent data (the FULL frame — one score per row)
+#' @param survey_structure Loaded structure (needs $questions, $options)
+#' @param composite_defs The Composite_Metrics sheet, or NULL
+#' @return Numeric vector, one per respondent (NA where unscoreable), or NULL
+#'   when the code is not a defined composite / the definition is unusable
+#' @keywords internal
+micro_scores_for_composite <- function(code, survey_data, survey_structure,
+                                       composite_defs) {
+  if (is.null(composite_defs) || !is.data.frame(composite_defs) ||
+      nrow(composite_defs) == 0 ||
+      !all(c("CompositeCode", "SourceQuestions") %in% names(composite_defs))) {
+    return(NULL)
+  }
+  if (!exists("calculate_composite_values", mode = "function")) return(NULL)
+
+  hit <- composite_defs[!is.na(composite_defs$CompositeCode) &
+                          trimws(as.character(composite_defs$CompositeCode)) == code, ,
+                        drop = FALSE]
+  if (nrow(hit) == 0) return(NULL)
+  def <- hit[1, , drop = FALSE]
+
+  # Parsed exactly as process_composite_question() parses it, so the score a
+  # respondent contributes here is the score behind the published cell.
+  sources <- trimws(strsplit(as.character(def$SourceQuestions), ",")[[1]])
+  sources <- sources[nzchar(sources)]
+  if (length(sources) == 0) return(NULL)
+
+  calc_type <- if (!is.null(def$CalculationType) && length(def$CalculationType) > 0 &&
+                   !is.na(def$CalculationType) && nzchar(trimws(as.character(def$CalculationType)))) {
+    trimws(as.character(def$CalculationType))
+  } else {
+    "Mean"
+  }
+  calc_weights <- NULL
+  if (identical(calc_type, "WeightedMean")) {
+    if (is.null(def$Weights) || is.na(def$Weights) ||
+        !nzchar(trimws(as.character(def$Weights)))) {
+      return(NULL)   # validated (and refused) upstream; never guess a weighting here
+    }
+    calc_weights <- suppressWarnings(as.numeric(trimws(strsplit(as.character(def$Weights), ",")[[1]])))
+    if (length(calc_weights) != length(sources) || any(is.na(calc_weights))) return(NULL)
+  }
+
+  sc <- tryCatch(
+    calculate_composite_values(
+      data_subset       = survey_data,
+      source_questions  = sources,
+      calculation_type  = calc_type,
+      weights           = calc_weights,
+      weight_vector     = NULL,          # NULL -> the per-respondent vector
+      questions_df      = survey_structure$questions,
+      options_df        = survey_structure$options
+    ),
+    error = function(e) NULL)
+
+  if (is.null(sc) || length(sc) != nrow(survey_data)) return(NULL)
+  sc <- as.numeric(sc)
+  # rowMeans/rowSums over an all-NA row yields NaN / 0; the processor already
+  # NAs those rows, but coerce defensively — a NaN would serialise as null and a
+  # spurious 0 would drag a tracked mean down.
+  sc[!is.finite(sc)] <- NA_real_
+  sc
+}
+
+
 #' Per-respondent box-category membership for one question
 #'
 #' Maps each respondent to the data-layer row index of their box-category NET
@@ -520,12 +598,16 @@ micro_box_membership <- function(dl_q, survey_data, survey_structure, n) {
 #' @param survey_structure Loaded survey structure (needs $options)
 #' @param banner_info Banner structure
 #' @param config_obj Tabs config
+#' @param composite_defs The Composite_Metrics sheet (optional). Supplied, each
+#'   composite index carries per-respondent scores like any rated question, so it
+#'   recomputes under a live filter and can be tracked across waves. Omitted, the
+#'   island is exactly what it was before composites were scored.
 #' @return A list {n, answers, banner_vars, weights}, or NULL when microdata
 #'   cannot be built (no respondents or no structure) — the report then degrades
 #'   to published-only (no live filter / custom banner), exactly as before.
 #' @export
 build_microdata <- function(data_layer, survey_data, survey_structure,
-                            banner_info, config_obj) {
+                            banner_info, config_obj, composite_defs = NULL) {
   if (is.null(survey_data) || !is.data.frame(survey_data) || nrow(survey_data) == 0) {
     return(NULL)
   }
@@ -539,6 +621,12 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
   for (q in data_layer$questions) {
     answers[[q$code]] <- micro_answers_for_question(q, survey_data, survey_structure, n)
     sc <- micro_scores_for_question(q, survey_data, survey_structure, n)
+    # A composite has no data column and no Questions row, so the standard path
+    # returns NULL for it. Score it from its own definition instead.
+    if (is.null(sc) && isTRUE(q$composite)) {
+      sc <- micro_scores_for_composite(q$code, survey_data, survey_structure,
+                                       composite_defs)
+    }
     if (!is.null(sc) && any(!is.na(sc))) scores[[q$code]] <- I(sc)
     bx <- micro_box_membership(q, survey_data, survey_structure, n)
     if (!is.null(bx)) boxes[[q$code]] <- I(bx)
