@@ -17,8 +17,15 @@ with the reusable script instead of by hand:
 python3 scripts/build_comment_appendix.py \
   --data   "…/<project> data.xlsx" \
   --appendix "…/<project> Comment Appendix.xlsx" \
-  --columns "Q1Comment,Q2Comment,…"     # or --columns-file / --pattern / --auto
+  --config "…/<project>_Crosstab_Config.xlsx"   # or --columns / --columns-file / --pattern / --auto
 ```
+
+`--config` reads the Selection sheet: every row with a `CommentSheet` is an open-end,
+and that cell is the sheet its comments go to. Use it on an existing project — it is
+the same declaration the report reads, so the two cannot drift. Reach for `--columns`
+only when there is no config yet. If your appendix names its sheets for the topic
+(`Engagement`, `Values`) rather than the question code, the mapping is what stops the
+builder creating a second, empty set of sheets.
 
 Put the appendix in the project's data folder, next to the survey data. Full script
 reference (column-detection modes, flags): `scripts/README_comment_appendix.md`.
