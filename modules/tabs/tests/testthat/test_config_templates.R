@@ -161,6 +161,64 @@ test_that("crosstab config Settings sheet offers the Qualitative (comment) tab s
   expect_true(any(grepl("S01:Centre", cells, fixed = TRUE)))        # qual_tag_dimensions example
 })
 
+test_that("every setting build_config_object reads is offered by the template", {
+  # Regression guard (review 2026-08-13): the five tab-visibility flags and the
+  # general decimal_places fallback were read by build_config_object and listed
+  # in TABS_KNOWN_SETTINGS, but appeared in NO template and in no documentation —
+  # the only way to discover them was to read the source. A setting the engine
+  # honours must be discoverable from a freshly generated config.
+  #
+  # The weight_* and ranking_* keys are deliberate omissions, documented as such
+  # in 06_TEMPLATE_REFERENCE.md; data_file lives on the Survey_Structure Project
+  # sheet. Those are named here so the exemption is explicit rather than implied.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  settings <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  cells <- unlist(settings, use.names = FALSE)
+
+  deliberately_absent <- c(
+    "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
+    "ranking_tie_threshold_pct", "ranking_gap_threshold_pct",
+    "ranking_completeness_threshold_pct", "ranking_min_base",
+    "data_file"
+  )
+  expected <- setdiff(TABS_KNOWN_SETTINGS, deliberately_absent)
+  missing <- setdiff(expected, cells)
+
+  expect_equal(missing, character(0),
+    info = paste("settings the engine reads but no template offers:",
+                 paste(missing, collapse = ", ")))
+})
+
+test_that("the generated Settings sheet carries no section header without fields", {
+  # The retired ROW DESCRIPTORS section left its heading behind with nothing
+  # under it, so every generated template shipped an empty section (2026-08-13).
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  raw <- openxlsx::read.xlsx(tmp, sheet = "Settings", colNames = FALSE)
+  hrow <- which(raw[[1]] == "Setting")[1]
+  body <- raw[(hrow + 1):nrow(raw), , drop = FALSE]
+
+  # A section header is a row with a name but no Required? marker.
+  is_section <- !is.na(body[[1]]) & is.na(body[[3]])
+  names_col <- as.character(body[[1]])
+
+  empty_sections <- character(0)
+  section_rows <- which(is_section)
+  for (i in seq_along(section_rows)) {
+    r <- section_rows[i]
+    nxt <- if (i < length(section_rows)) section_rows[i + 1] else nrow(body) + 1L
+    if (nxt - r <= 1L) empty_sections <- c(empty_sections, names_col[r])
+  }
+  expect_equal(empty_sections, character(0),
+    info = paste("section headers with no settings under them:",
+                 paste(empty_sections, collapse = ", ")))
+})
+
 test_that("crosstab config Settings sheet writes research_house in lowercase snake_case", {
   # Regression guard: this field was previously written as "Research_House",
   # which get_config_value() (an exact-match lookup) can never find since

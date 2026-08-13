@@ -187,6 +187,12 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "decimal_places_numeric", default = 1, required = TRUE,
              description = "Number of decimal places for Numeric question statistics (mean, median).",
              valid_values_text = "0 to 4",
+             integer_range = c(0, 4)),
+        list(name = "decimal_places", default = "", required = FALSE,
+             description = paste0("General fallback: the workbook builder uses this for cells with no ",
+               "type-specific setting above. Blank = each consumer keeps its own default, which is ",
+               "what every report did before this row existed."),
+             valid_values_text = "0 to 4, or leave blank",
              integer_range = c(0, 4))
       )
     ),
@@ -517,6 +523,42 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
+    # ---- TAB VISIBILITY (v2 report) ------------------------------------------
+    # Crosstabs is always on; every other tab is includable per report. The flags
+    # ride into the data layer and tabList() filters against them (a tab also
+    # self-hides when its island is absent). They were readable by
+    # build_config_object from the start but appeared in NO template, so the only
+    # way to discover them was to read the source (review 2026-08-13).
+    list(
+      section_name = "TAB VISIBILITY (V2 REPORT)",
+      fields = list(
+        list(name = "show_dashboard", default = "TRUE", required = FALSE,
+             description = paste0("Show the Dashboard tab in the v2 report. FALSE withholds it from ",
+               "this build; the Crosstabs tab is always on."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_patterns", default = "TRUE", required = FALSE,
+             description = "Show the Group overview (Patterns) tab in the v2 report.",
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_differences", default = "TRUE", required = FALSE,
+             description = "Show the Differences tab in the v2 report.",
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_tracking", default = "TRUE", required = FALSE,
+             description = paste0("Show the Tracking tab in the v2 report. It also needs ",
+               "html_report_v2_tracking = TRUE and at least one prior wave in waves_source — ",
+               "without those the tab is absent whatever this is set to."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "show_qualitative", default = "TRUE", required = FALSE,
+             description = paste0("Show the Qualitative (comment) tab in the v2 report. It also needs ",
+               "a qual_workbook that joins to the survey."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE"))
+      )
+    ),
+
     # ---- GROUP OVERVIEW TAB (OPTIONAL; settings keep the patterns_ prefix) ----
     # The tab is a group-vs-peers overview of the selected banner: how many
     # questions each group sits ahead of / behind its peers on. Its surface is
@@ -571,12 +613,10 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
-    # ---- ROW DESCRIPTORS ----
-    list(
-      section_name = "ROW DESCRIPTORS (HTML Report)",
-      fields = list(
-      )
-    ),
+    # (ROW DESCRIPTORS was retired with the classic HTML report in 2026-08. Its
+    # three settings went to TABS_RETIRED_SETTINGS but the section header stayed
+    # behind with no fields under it, so every generated template carried an
+    # empty heading. Removed 2026-08-13.)
 
     # ---- ANALYST / CLOSING ----
     list(

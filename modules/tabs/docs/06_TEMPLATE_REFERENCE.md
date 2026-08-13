@@ -703,6 +703,21 @@ Currently only IQR (Interquartile Range) method is supported.
 
 ------------------------------------------------------------------------
 
+#### decimal_places
+
+**What it does:** General fallback — the workbook builder uses this for
+cells that have no type-specific setting of their own (the four
+`decimal_places_*` settings above take precedence wherever they apply).
+
+**Required:** No.
+
+**What to enter:** A number from 0 to 4, or leave blank.
+
+**Default:** blank — each consumer keeps its own default, which is how
+every report behaved before this row existed.
+
+------------------------------------------------------------------------
+
 ### Summary Sheet Settings
 
 #### create_index_summary
@@ -862,6 +877,22 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |
 | `wave_order` | Numeric x-axis order key (e.g. `2025.5` for twice-yearly) | Number | *(year parsed from `wave`)* |
 | `question_mapping` | Path to the classic tracker's `Question_Mapping.xlsx` — links waves by a canonical key (robust to renames) + curates tracked metrics | File path, or blank to auto-detect in `waves_source` | *(auto)* |
+
+### Tab Visibility (v2 report)
+
+Which tabs the interactive report carries. Crosstabs is always on; every
+other tab is includable per report, so a study can withhold one without
+changing anything else. A tab also self-hides when its data island is
+absent, so these only ever take a tab away — never add one that has
+nothing behind it.
+
+| Setting | Description | Values | Default |
+|----|----|----|----|
+| `show_dashboard` | Show the Dashboard tab | TRUE / FALSE | TRUE |
+| `show_patterns` | Show the Group overview (Patterns) tab | TRUE / FALSE | TRUE |
+| `show_differences` | Show the Differences tab | TRUE / FALSE | TRUE |
+| `show_tracking` | Show the Tracking tab. Also needs `html_report_v2_tracking = TRUE` and at least one prior wave in `waves_source` | TRUE / FALSE | TRUE |
+| `show_qualitative` | Show the Qualitative (comment) tab. Also needs a `qual_workbook` that joins to the survey | TRUE / FALSE | TRUE |
 
 ### Dashboard Settings
 
@@ -1023,11 +1054,6 @@ above. Descriptions below are the template's own help text.
 |---------|---------|--------------|
 | `generate_reader_report` | `FALSE` | Also build the narrative Reader report (a `*_Reader.html` file) — a plain-language summary beside the crosstab that deep-links into its tables. Requires `html_report_v2 = TRUE`. Deterministic and on-device by default: no data leaves this machine. |
 | `reader_ai_prose` | `FALSE` | Draft the Reader narrative with an AI model instead of the built-in template (only used when `generate_reader_report = TRUE`). Requires an Anthropic API key in the `ANTHROPIC_API_KEY` environment variable. Only aggregate figures are sent — never microdata or verbatims — and every number the model writes is checked against the data. Falls back to the on-device narrative (and says so) if the model is unavailable. |
-
-### Row descriptors (HTML report)
-
-| Setting | Default | Description |
-|---------|---------|--------------|
 
 ### Analyst & closing section / study identification
 
