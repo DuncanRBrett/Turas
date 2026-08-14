@@ -413,9 +413,12 @@
       parts.push("±" + Number(rel.moePct).toFixed(1) + "pp worst-case");
     }
     parts.push("95% " + (rel.sigNote || "confidence"));
+    // The "How sure are these numbers?" entry point was removed here on
+    // 2026-08-12: it did not work for the reader on this tab. The same explainer
+    // is reached from Crosstabs (25_cards) and Tracking (27t_tracking), where it
+    // does work, so nothing is lost - only the broken route.
     return '<div class="tko-reliability" role="note"><span>' +
-      fmt.escapeHtml(parts.join(" · ")) + "</span>" +
-      '<button class="tko-howsure" data-howsure>How sure are these numbers? ›</button></div>';
+      fmt.escapeHtml(parts.join(" · ")) + "</span></div>";
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

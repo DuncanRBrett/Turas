@@ -1,7 +1,7 @@
 /**
  * Pattern recognition — controller / tab. Orchestrates the deterministic engine
- * and the single Read layout, and owns all interaction wiring (inline editing,
- * the "how sure" explainer, and reset-to-engine). Thin by design:
+ * and the single Read layout, and owns all interaction wiring (inline editing
+ * and reset-to-engine). Thin by design:
  * gather -> build -> render -> wire. Registered as a top-level tab in 24_shell.js
  * (id stays "takeout"; the visible label is "Patterns").
  */
@@ -34,7 +34,6 @@
     var t = takeout.compute();
     host.innerHTML = '<div class="page tko-page">' + headHtml() +
       '<div class="tko-body tko-view-read">' + takeout.readView.html(t) + "</div>" +
-      '<div class="tko-howsure-panel" hidden></div>' +
       '<div class="tko-live" aria-live="polite"></div></div>';
     wire(host);
   };
@@ -70,34 +69,12 @@
       }
     });
     host.addEventListener("click", function (e) {
-      // toggle the "how sure are these numbers?" explainer panel
-      if (e.target.closest("[data-howsure]")) { toggleHowSure(host); return; }
       if (e.target.closest("[data-tko-reset]")) {
         takeout.state.reset();
         announce(host, "Edits discarded — back to the engine's selection");
         takeout.render(host);
       }
     });
-  }
-
-  /** Show/hide the shared confidence explainer (reused from TR.conf) inline. */
-  function toggleHowSure(host) {
-    var panel = host.querySelector(".tko-howsure-panel");
-    if (!panel) return;
-    if (panel.hidden) {
-      panel.innerHTML = (TR.conf && TR.conf.calloutHtml) ? TR.conf.calloutHtml() : "";
-      panel.hidden = false;
-      var cl = panel.querySelector(".callout");
-      if (cl) cl.classList.remove("collapsed");   // open it straight away
-      var head = panel.querySelector("[data-callout]");
-      if (head) head.addEventListener("click", function () {
-        head.closest(".callout").classList.toggle("collapsed");
-      });
-      panel.scrollIntoView({ block: "nearest" });
-    } else {
-      panel.hidden = true;
-      panel.innerHTML = "";
-    }
   }
 
 })(typeof window !== "undefined" ? window : globalThis);

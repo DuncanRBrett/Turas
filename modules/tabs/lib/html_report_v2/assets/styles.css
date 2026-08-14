@@ -808,16 +808,13 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 @media print {
-  .tko-head, .tko-veto, .tko-edithint, .tko-reset, .tko-howsure { display: none !important; }
+  .tko-head, .tko-veto, .tko-edithint, .tko-reset { display: none !important; }
   .tko-card, .tko-apex, .tko-pcard { box-shadow: none; }
   .tko-ed:hover, .tko-ed:focus { background: none; outline: none; }
 }
 
 /* ---------- Pattern recognition cards (group / split / area / moved) ---------- */
-.tko-howsure { border: none; background: none; color: var(--brand); font: 600 11.5px var(--font); cursor: pointer; padding: 0; margin-left: auto; }
-.tko-howsure:hover { text-decoration: underline; }
 .tko-reliability { justify-content: flex-start; }
-.tko-howsure-panel { margin-top: -6px; }
 .tko-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tko-pcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 15px 18px; }
 .tko-edge-strain { border-left-color: var(--red); } .tko-edge-weak { border-left-color: var(--tko-act); } .tko-edge-strong { border-left-color: var(--tko-protect); } .tko-edge-moved { border-left-color: var(--tko-watch); } .tko-edge-split { border-left-color: var(--tko-decide); } .tko-edge-comove { border-left-color: var(--tko-comove); } .tko-edge-odd { border-left-color: var(--tko-odd); } .tko-edge-bimodal { border-left-color: var(--tko-bimodal); }

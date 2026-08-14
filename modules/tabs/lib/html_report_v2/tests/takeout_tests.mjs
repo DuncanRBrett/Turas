@@ -363,7 +363,10 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, read view"
   // it must render after the pattern grid (above the provenance line), never in the apex.
   assert(read.indexOf("tko-reliability") > read.indexOf("tko-pgrid"),
     "reliability ribbon sits in the footer, not the apex");
-  assert(read.indexOf("data-howsure") !== -1, "the how-sure explainer entry point renders");
+  // The "How sure are these numbers?" entry point was removed from this tab on
+  // 2026-08-12 — it did not work for the reader here. The explainer is still
+  // reached from Crosstabs and Tracking, so only the broken route is gone.
+  assert(read.indexOf("data-howsure") === -1, "no how-sure entry point on the Group overview");
   assert(read.indexOf('data-edit="') !== -1, "editable hooks present");
 });
 
