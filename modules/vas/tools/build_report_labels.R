@@ -15,16 +15,17 @@ CROSSTAB <- "Crosstab planning, 14 Aug 2026"
 # relabel_category.R. Kept in step with that script by hand — a structure
 # generated from scratch must say what the kept one says.
 #
-# Every measure row carries its audience. The total row says "(all buyers)"
-# rather than "(for everyone)": its base IS the buyers, which is what the base
-# line under it says, and dropping the marker made it read as a heading over
-# the two beneath it.
+# Every measure row says WHO THE PURCHASE WAS FOR. The total row is
+# "(all purchases)": all three rows sit on buyers - 765, 727 and 87 of them on
+# electricity - so the base is not what tells them apart. "(for everyone)"
+# would overstate it (the base is the buyers, not every adult), and "(Total)"
+# would collide with the banner's own Total column.
 # `views` because 14 of the 33 categories are TOTAL ONLY — the questionnaire
 # never split their money by who it was for. Naming an Own or Oth code that
 # does not exist would not fail quietly: apply_report_labels() REFUSES the
 # whole build on an unknown code. Pass views = "Total" for those.
 BLOCK <- function(category, subject, subject_title, views = c("Total", "Own", "Oth")) {
-  marks <- c(Total = "all buyers", Own = "for self", Oth = "for others")
+  marks <- c(Total = "all purchases", Own = "for self", Oth = "for others")
   views <- marks[views]
   out <- L(paste0(category, "_Purchased"),
            sprintf("Did you purchase %s in the past 12 months?", subject), CROSSTAB)
