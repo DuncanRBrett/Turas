@@ -57,7 +57,7 @@ CHAN <- function(stem, asked, where) {
   subject <- sub("\\s*most often\\s*\\?\\s*$", "", asked)
   rbind(
     L(paste0(stem, "ChannelEver"),
-      paste0(subject, " - all channels used, most often or also?"), CHANNELS),
+      paste0(subject, " - all purchases"), CHANNELS),
     L(paste0(stem, "ChannelMain"), asked),
     L(paste0(stem, "ChannelAlso"),
       paste0(sub("^Where ", "Where else ", subject),
@@ -79,10 +79,10 @@ labels <- rbind(
 
   # ---- prepaid electricity --------------------------------------------------
   BLOCK("PrepaidElectricity", "prepaid electricity", "Prepaid Electricity"),
-  # "more than one may apply" belongs in the wording, not in a note: a note in
+  # "multi-mentions possible" belongs in the wording, not in a note: a note in
   # the Formula column is what makes the report read a row as DERIVED, and this
   # one was genuinely asked.
-  L("PPU", "Who have you bought electricity for? (more than one may apply)", SELFOTH),
+  L("PPU", "Who have you bought electricity for? (multi-mentions possible)", SELFOTH),
   CHAN("PPU", "Where do you buy prepaid electricity most often?",
        "Where else have you bought prepaid electricity in the past 12 months?"),
 
