@@ -23,7 +23,7 @@ CROSSTAB <- "Crosstab planning, 14 Aug 2026"
 # never split their money by who it was for. Naming an Own or Oth code that
 # does not exist would not fail quietly: apply_report_labels() REFUSES the
 # whole build on an unknown code. Pass views = "Total" for those.
-BLOCK <- function(category, subject, views = c("Total", "Own", "Oth")) {
+BLOCK <- function(category, subject, subject_title, views = c("Total", "Own", "Oth")) {
   marks <- c(Total = "all buyers", Own = "for self", Oth = "for others")
   views <- marks[views]
   out <- L(paste0(category, "_Purchased"),
@@ -31,8 +31,11 @@ BLOCK <- function(category, subject, views = c("Total", "Own", "Oth")) {
   for (v in names(views)) {
     mark <- sprintf(" (%s)", views[[v]])
     out <- rbind(out,
+      # A statement, not a question: nobody was asked a monthly count, and the
+      # row reports a RATE per month - which a "past 12 months" wording invited
+      # a reader to take as a yearly total (Duncan, 14 Aug).
       L(sprintf("%s_%s_TxnPerMonth", category, v),
-        sprintf("How often do you buy %s?%s", subject, mark), CROSSTAB),
+        sprintf("Number of %s transactions per month%s", subject_title, mark), CROSSTAB),
       L(sprintf("%s_%s_MonthlySpend", category, v),
         sprintf("How much do you spend per month on %s?%s", subject, mark), CROSSTAB),
       L(sprintf("%s_%s_SpendPerTxn", category, v),
@@ -74,7 +77,7 @@ labels <- rbind(
   L("BillPayer", "Role in paying household bills", "matches the reporting build"),
 
   # ---- prepaid electricity --------------------------------------------------
-  BLOCK("PrepaidElectricity", "prepaid electricity"),
+  BLOCK("PrepaidElectricity", "prepaid electricity", "Prepaid Electricity"),
   # "more than one may apply" belongs in the wording, not in a note: a note in
   # the Formula column is what makes the report read a row as DERIVED, and this
   # one was genuinely asked.
