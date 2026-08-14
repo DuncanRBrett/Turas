@@ -19,10 +19,13 @@ CROSSTAB <- "Crosstab planning, 14 Aug 2026"
 # rather than "(for everyone)": its base IS the buyers, which is what the base
 # line under it says, and dropping the marker made it read as a heading over
 # the two beneath it.
-BLOCK <- function(category, subject) {
-  views <- c(Total = "all buyers", Own = "for self", Oth = "for others")
-  side <- c(Total = "", Own = "; counting only what they buy for themselves",
-            Oth = "; counting only what they buy for someone else")
+# `views` because 14 of the 33 categories are TOTAL ONLY — the questionnaire
+# never split their money by who it was for. Naming an Own or Oth code that
+# does not exist would not fail quietly: apply_report_labels() REFUSES the
+# whole build on an unknown code. Pass views = "Total" for those.
+BLOCK <- function(category, subject, views = c("Total", "Own", "Oth")) {
+  marks <- c(Total = "all buyers", Own = "for self", Oth = "for others")
+  views <- marks[views]
   out <- L(paste0(category, "_Purchased"),
            sprintf("Did you purchase %s in the past 12 months?", subject), CROSSTAB)
   for (v in names(views)) {
