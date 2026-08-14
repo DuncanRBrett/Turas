@@ -125,6 +125,32 @@
     return (row && row.stat) || (model && model.stat) || fmt.COL_PCT;
   };
 
+  /**
+   * WHICH statistic a mean-kind row reports: "mean" (the headline Average /
+   * Index / Score), "median", "mode", "sd", "ratio" or "chi".
+   *
+   * Same reasoning as the stat vocabulary above, and it lives beside it for the
+   * same reason: the model, the waves engine and Differences each need it, and
+   * each of them used to carry its OWN copy — a regex on the row's LABEL that
+   * recognised nothing but "Standard Deviation". Everything else, a Median
+   * included, then read as the question's mean: displayed as one under a
+   * filter, trended as one across waves, and tested as one in Differences.
+   *
+   * `mstat` travels on the row from the RowType in R. The label test is the
+   * fallback for reports built before it existed.
+   */
+  fmt.SPREAD_LABEL = /^(std\.?\s*dev|standard deviation)/i;
+
+  fmt.meanStat = function (row) {
+    if (!row) return "mean";
+    return row.mstat || (fmt.SPREAD_LABEL.test(String(row.label || "")) ? "sd" : "mean");
+  };
+
+  /** Is this the row a trend, a test or a finding should be built on? */
+  fmt.isHeadlineMean = function (row) {
+    return fmt.meanStat(row) === "mean";
+  };
+
   /** True when the value is a percentage of SOME denominator — it gets a "%". */
   fmt.isPctStat = function (stat) {
     return stat === undefined || stat === null ||

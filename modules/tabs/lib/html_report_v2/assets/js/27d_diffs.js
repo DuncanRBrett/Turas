@@ -94,11 +94,11 @@
     return (totalCell.n - groupCell.n) / rb * 100;
   }
 
-  /** A mean-kind row that reports spread (Std Dev), not a centre — never a
-   *  "difference" finding (mirrors the model's isStdDevRow). */
-  function isSpreadRow(label) {
-    return /^(std\.?\s*dev|standard deviation)/i.test(String(label || ""));
-  }
+  /* A finding is built on the question's HEADLINE mean. A median, a mode, a
+     spread or a ratio of totals is a different statistic, and the weighted
+     means this file recomputes are the wrong input for testing any of them —
+     so a "difference" on one would be a finding about a number nobody
+     computed. This asked the LABEL until 2026-08, which caught only the SD. */
 
   /**
    * Mean / Index / NPS findings for one question. The published tables carry NO
@@ -115,7 +115,7 @@
   function meanFindings(q, spec, mask, threshold, dual) {
     var out = [], row = null;
     q.rows.forEach(function (r) {
-      if (!row && r.kind === "mean" && !isSpreadRow(r.label)) row = r;
+      if (!row && r.kind === "mean" && TR.fmt.isHeadlineMean(r)) row = r;
     });
     if (!row) return out;
     var means = TR.stats.indexMeans(q, spec.columns, mask);

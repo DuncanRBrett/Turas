@@ -241,5 +241,41 @@ run("the distribution rows recompute now that the island bins respondents", () =
   near(got.row.cells[0].pct, 75, "three men of four in the first bin");
 });
 
+/* --------------------------------------------------------------------------
+ * The same question, asked by every other surface that treats a mean-kind row
+ * as "the question's number". Each of these tested the LABEL, so each caught
+ * the SD and let a Median through as if it were the mean.
+ * ----------------------------------------------------------------------- */
+
+run("fmt.meanStat reads the row's own statistic, with a label fallback", () => {
+  assert(TR.fmt.meanStat({ mstat: "median", label: "Median" }) === "median", "mstat wins");
+  assert(TR.fmt.meanStat({ label: "Standard Deviation" }) === "sd", "label fallback for old reports");
+  assert(TR.fmt.meanStat({ label: "Mean" }) === "mean", "anything else is the headline mean");
+  assert(TR.fmt.isHeadlineMean({ mstat: "ratio" }) === false, "a ratio is not the headline");
+});
+
+run("only the headline mean is trended across waves", () => {
+  setup(question(MEAN_ROWS));
+  const q = TR.d2.questionByCode("VALUE");
+  q.rows.forEach((r) => {
+    if (r.kind !== "mean" || TR.fmt.isHeadlineMean(r)) return;
+    // a mean-kind row's wave history resolves to each wave's MEAN, so a
+    // median trended that way would be a line of means under a median's label
+    assert(TR.waves.series(q, r, q.rows.indexOf(r), null).length === 0,
+      r.label + " must not carry a wave series");
+  });
+});
+
+run("the Differences tab builds its finding on the mean, not the median", () => {
+  setup(question(MEAN_ROWS));
+  const q = TR.d2.questionByCode("VALUE");
+  let chosen = null;
+  q.rows.forEach((r) => {
+    if (!chosen && r.kind === "mean" && TR.fmt.isHeadlineMean(r)) chosen = r;
+  });
+  assert(chosen && chosen.label === "Mean per buyer",
+    "expected the mean row, got " + (chosen && chosen.label));
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed\n");
 process.exit(failed ? 1 : 0);

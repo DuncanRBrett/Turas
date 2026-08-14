@@ -438,10 +438,12 @@
    */
   waves.series = function (q, row, ri, seg) {
     var isMean = row.kind === "mean";
-    // An SD row's "history" would be each wave's MEAN (valueAt resolves
-    // mean-kind rows through stats.mean/index) — no published SD series
-    // exists, so the row is untracked rather than trended against the mean.
-    if (isMean && TR.model.isStdDevRow(row.label)) return [];
+    // A median's, a mode's or an SD's "history" would be each wave's MEAN
+    // (valueAt resolves mean-kind rows through stats.mean/index), so any row
+    // that is not the headline mean is untracked rather than trended against
+    // a number it does not hold. This tested the LABEL until 2026-08, which
+    // caught the SD and let every Median row trend as the mean.
+    if (isMean && !TR.fmt.isHeadlineMean(row)) return [];
     var series = [];
     waves.history(q).forEach(function (h) {
       var value = waves.valueAt(q, row, ri, h.q, seg || null);
@@ -548,7 +550,7 @@
 
     viewModel.rows.forEach(function (row, ri) {
       var isMean = row.kind === "mean";
-      if (isMean && TR.model.isStdDevRow(row.label)) return;   // untracked (no SD history)
+      if (isMean && !TR.fmt.isHeadlineMean(row)) return;   // only the headline mean has a history
       // A tracked proportion is a share of its column: the delta chip, the wave
       // table and the trendline all frame it as one, and a prior wave built
       // under a different config may not even be in the same unit. A row that

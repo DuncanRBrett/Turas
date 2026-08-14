@@ -19,13 +19,14 @@
   }
 
   /** A standard-deviation summary row (reports spread, not the mean).
-   *  Exported: the waves engine must NOT track these — a mean-kind row's wave
-   *  history resolves to each wave's MEAN, so pairing it with a current SD
-   *  fabricates a huge sig-flagged "decline". */
+   *  Kept for callers that only have a label; the vocabulary itself lives in
+   *  TR.fmt, because the waves engine and Differences need it too. */
   function isStdDevRow(label) {
-    return /^(std\.?\s*dev|standard deviation)/i.test(String(label || ""));
+    return TR.fmt.SPREAD_LABEL.test(String(label || ""));
   }
   model.isStdDevRow = isStdDevRow;
+  model.meanStat = function (row) { return TR.fmt.meanStat(row); };
+  model.isHeadlineMean = function (row) { return TR.fmt.isHeadlineMean(row); };
 
   /**
    * One value per column for a mean-kind row, by which statistic it reports.
@@ -223,7 +224,7 @@
         // under a Male filter in a row whose real value is R300. mstat comes
         // from the row TYPE in R; the label test stays as the fallback for
         // reports built before mstat existed.
-        var stat = r.mstat || (isStdDevRow(r.label) ? "sd" : "mean");
+        var stat = model.meanStat(r);
         var vals = statValues(stat, q, r, means, spec.columns, mask);
         // Only the headline mean is tested. A spread, a median and a ratio of
         // totals each need a test nobody has specified, and inventing one is
@@ -511,7 +512,10 @@
 
     viewModel.rows.forEach(function (row, ri) {
       var isMean = row.kind === "mean";
-      var skip = row.diff || (isMean && isStdDevRow(row.label));
+      // Only the headline mean is tested. A median, a mode, a spread or a
+      // ratio of totals each need a test nobody has specified, and the means
+      // this path recomputes are the wrong input for all four.
+      var skip = row.diff || (isMean && !model.isHeadlineMean(row));
       row.cells.forEach(function (cell, ci) {
         cell.sig = "";                       // clears any (empty) pairwise letters
         if (ci === 0 || skip) return;
