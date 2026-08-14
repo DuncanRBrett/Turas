@@ -282,6 +282,10 @@ generate_crosstab_config_template <- function(output_path,
              description = "Show mode (most frequent value) for Numeric-type questions (unweighted only).",
              valid_values_text = "TRUE or FALSE",
              dropdown = c("TRUE", "FALSE")),
+        list(name = "show_numeric_sd", default = "TRUE", required = FALSE,
+             description = "Show the Standard Deviation row on Numeric-type questions. Turn off for skewed measures (spend, counts) where the SD exceeds the mean and says less than the bins above it.",
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
         list(name = "show_numeric_outliers", default = "TRUE", required = TRUE,
              description = "Report outlier counts for Numeric-type questions.",
              valid_values_text = "TRUE or FALSE",
@@ -1109,6 +1113,17 @@ generate_survey_structure_template <- function(output_path) {
          description = "For Numeric questions: minimum expected value. Used for validation and binning."),
     list(name = "Max_Value", width = 12, required = FALSE,
          description = "For Numeric questions: maximum expected value. Used for validation and binning."),
+    # Two averages on one numeric table: the mean averages PEOPLE, the ratio row
+    # averages the units underneath (total spend / total transactions). They are
+    # different numbers and reporting one as "the" average misleads.
+    list(name = "MeanLabel", width = 22, required = FALSE,
+         description = "For Numeric questions: rename the Mean row (e.g. 'Mean per buyer'). Use when the table also carries a ratio row and 'Mean' alone is ambiguous. Blank = 'Mean'."),
+    list(name = "RatioNumerator", width = 22, required = FALSE,
+         description = "For Numeric questions: data column to total on top of an extra 'ratio of totals' row (e.g. monthly spend). Needs RatioDenominator too."),
+    list(name = "RatioDenominator", width = 22, required = FALSE,
+         description = "For Numeric questions: data column to total underneath (e.g. monthly transactions). The row reads total numerator / total denominator among everyone with both."),
+    list(name = "RatioLabel", width = 22, required = FALSE,
+         description = "Label for the ratio row (e.g. 'Mean per transaction'). Blank = 'Mean per unit'."),
     # Reader-experience columns (all optional; READER_EXPERIENCE_PLAN.md §E)
     list(name = "ShortLabel", width = 25, required = FALSE,
          description = "Optional short label used where space is tight (dashboard cards, chart/PPTX titles). Leave blank to auto-trim QuestionText."),

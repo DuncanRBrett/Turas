@@ -285,3 +285,48 @@ test_that("the raw where-else question starts unselected in a generated config",
   expect_equal(include("PPUChannelMain"), "Y")
   expect_equal(include("PPUChannelAlso"), "Y")
 })
+
+# ==============================================================================
+# The value-per-transaction tables carry both averages
+# ==============================================================================
+
+test_that("every _SpendPerTxn question names its numerator and denominator", {
+  dictionary <- data.frame(
+    column = c("PrepaidElectricity_Total_SpendPerTxn",
+               "PrepaidElectricity_Total_MonthlySpend", "Airtime_Own_SpendPerTxn"),
+    description = c("value per transaction", "spend a month", "value per transaction"),
+    unit = c("rand", "rand", "rand"), stringsAsFactors = FALSE)
+
+  rows <- derived_structure_rows(dictionary, VAS_CONFIG)$questions
+  at <- match("PrepaidElectricity_Total_SpendPerTxn", rows$QuestionCode)
+
+  expect_equal(rows$MeanLabel[at], "Mean per buyer")
+  expect_equal(rows$RatioNumerator[at], "PrepaidElectricity_Total_MonthlySpend")
+  expect_equal(rows$RatioDenominator[at], "PrepaidElectricity_Total_TxnPerMonth")
+  expect_equal(rows$RatioLabel[at], "Mean per transaction")
+
+  # ... and a measure that is not a ratio names nothing, so it keeps one average
+  spend <- match("PrepaidElectricity_Total_MonthlySpend", rows$QuestionCode)
+  expect_true(is.na(rows$RatioNumerator[spend]))
+  expect_true(is.na(rows$MeanLabel[spend]))
+})
+
+test_that("asked and derived questions stack even with different columns", {
+  asked <- data.frame(QuestionCode = "PPUChannelMain", QuestionText = "Where?",
+                      Variable_Type = "Single_Response", Columns = 1L,
+                      stringsAsFactors = FALSE)
+  derived <- data.frame(QuestionCode = "X_SpendPerTxn", QuestionText = "Value",
+                        Variable_Type = "Numeric", Columns = 1L,
+                        RatioNumerator = "X_MonthlySpend",
+                        RatioDenominator = "X_TxnPerMonth",
+                        stringsAsFactors = FALSE)
+
+  both <- rbind_widened(asked, derived)
+  expect_equal(nrow(both), 2L)
+  expect_equal(both$QuestionCode, c("PPUChannelMain", "X_SpendPerTxn"))
+  expect_true(is.na(both$RatioNumerator[1]))
+  expect_equal(both$RatioNumerator[2], "X_MonthlySpend")
+  # the asked frame's columns lead, so a reader opening the sheet sees them first
+  expect_equal(names(both)[1:4],
+               c("QuestionCode", "QuestionText", "Variable_Type", "Columns"))
+})

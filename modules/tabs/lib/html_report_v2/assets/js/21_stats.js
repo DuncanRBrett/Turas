@@ -92,6 +92,25 @@
     return w ? w[r] : 1;
   }
 
+  /**
+   * Is this a weighted report? The island carries a weight per respondent and
+   * an unweighted project's are all 1 (microdata_writer.R), so "weighted" is
+   * "some weight is not 1" — not merely "weights exist". Cached: the vector
+   * does not change within a page.
+   */
+  var weightedFlag = null;
+  stats.isWeighted = function () {
+    if (weightedFlag !== null) return weightedFlag;
+    var w = TR.MICRO && TR.MICRO.weights;
+    weightedFlag = false;
+    if (w) {
+      for (var r = 0; r < w.length; r++) {
+        if (w[r] !== 1) { weightedFlag = true; break; }
+      }
+    }
+    return weightedFlag;
+  };
+
   /** Kish effective base from running Σw and Σw². 0 when no weight mass. */
   function effectiveBase(sumW, sumW2) {
     return sumW2 > 0 ? (sumW * sumW) / sumW2 : 0;
@@ -425,6 +444,67 @@
         var s = scoreByRow[a];
         return s === undefined ? null : s;
       }, mask, col);
+    });
+  };
+
+  /**
+   * Median per column, from the carried per-respondent scores. Its own
+   * recompute, because a median is not a mean: before this, a filtered view
+   * showed the recomputed MEAN in the Median row (VAS electricity: R563.68 in
+   * a row whose true value for that audience was R300).
+   *
+   * Weighted runs return null — the R engine prints "N/A (weighted)" in this
+   * row for the same reason, and a weighted median needs a definition nobody
+   * has chosen here. null renders as no value, never as a wrong one.
+   */
+  stats.medians = function (q, columns, mask) {
+    var scores = TR.MICRO.scores && TR.MICRO.scores[q.code];
+    if (!scores) return null;
+    if (stats.isWeighted && stats.isWeighted()) {
+      return columns.map(function () { return { mean: null, sd: 0, k: 0 }; });
+    }
+    return columns.map(function (col) {
+      var vals = [];
+      for (var r = 0; r < mask.length; r++) {
+        if (!mask[r]) continue;
+        if (col.member && !col.member[r]) continue;
+        var s = scores[r];
+        if (s === null || s === undefined) continue;
+        vals.push(s);
+      }
+      if (!vals.length) return { mean: null, sd: 0, k: 0 };
+      vals.sort(function (a, b) { return a - b; });
+      var mid = vals.length >> 1;
+      var med = vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+      return { mean: med, sd: 0, k: vals.length };
+    });
+  };
+
+  /**
+   * Ratio of totals per column: Σw·numerator / Σw·denominator, over everyone in
+   * the audience holding both, with a denominator above zero. This is the
+   * average of the UNITS (the average transaction), not of the people (the
+   * average person's transaction) — different numbers off the same respondents,
+   * and the row exists precisely to show both.
+   *
+   * Mirrors calculate_ratio_of_totals() in numeric_processor.R exactly, so the
+   * unfiltered recompute reproduces the published figure.
+   */
+  stats.ratioOfTotals = function (ratio, columns, mask) {
+    var scores = TR.MICRO.scores || {};
+    var num = ratio && scores[ratio.num], den = ratio && scores[ratio.den];
+    if (!num || !den) return null;
+    return columns.map(function (col) {
+      var top = 0, bottom = 0, k = 0;
+      for (var r = 0; r < mask.length; r++) {
+        if (!mask[r]) continue;
+        if (col.member && !col.member[r]) continue;
+        var a = num[r], b = den[r];
+        if (a === null || a === undefined || b === null || b === undefined || !(b > 0)) continue;
+        var w = weightAt(r);
+        top += w * a; bottom += w * b; k++;
+      }
+      return { mean: bottom > 0 ? top / bottom : null, sd: 0, k: k };
     });
   };
 

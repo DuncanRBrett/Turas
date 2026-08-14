@@ -27,6 +27,32 @@
   }
   model.isStdDevRow = isStdDevRow;
 
+  /**
+   * One value per column for a mean-kind row, by which statistic it reports.
+   *
+   * `means` is the recomputed mean/sd/effective-base per column, so "mean" and
+   * "sd" read straight off it. A median and a ratio of totals are separate
+   * recomputes; when either cannot be computed for this audience the row goes
+   * BLANK rather than falling back to the mean, because a plausible wrong
+   * number in a labelled row is the failure this whole path is fixing.
+   * A mode is not recomputed at all — no recompute exists for it.
+   */
+  function statValues(stat, q, row, means, columns, mask) {
+    var blank = columns.map(function () { return null; });
+    if (stat === "sd") return means.map(function (m) { return m.sd; });
+    if (stat === "median") {
+      var med = TR.stats.medians(q, columns, mask);
+      return med ? med.map(function (m) { return m.mean; }) : blank;
+    }
+    if (stat === "ratio") {
+      var rat = q.ratio ? TR.stats.ratioOfTotals(q.ratio, columns, mask) : null;
+      return rat ? rat.map(function (m) { return m.mean; }) : blank;
+    }
+    if (stat === "mode" || stat === "chi") return blank;
+    return means.map(function (m) { return m.mean; });
+  }
+  model._statValues = statValues;
+
   // What a question's (or one row's) `pct` values ACTUALLY are — the vocabulary
   // lives in TR.fmt (review 2026-08, C1) because every display and scan layer
   // needs it, not just the model.
@@ -190,14 +216,22 @@
             return { mean: null, n: null, pct: null, sig: "" };
           }));
         }
-        // A "Standard Deviation" row is a mean-kind row but reports the spread,
-        // not the centre — show the recomputed SD (untested) so a filtered view
-        // never displays the mean in the SD row.
-        var sd = isStdDevRow(r.label);
-        var sig = sd ? null : TR.stats.sigLetters(means, letters, threshold, true, dual);
-        return rowModel(r, means.map(function (m, i) {
-          return { mean: sd ? m.sd : m.mean, n: null, pct: null,
-            sig: sd ? "" : sig[i] };
+        // WHICH statistic this row reports decides what gets recomputed. This
+        // used to recognise "Standard Deviation" by its label and treat every
+        // other mean-kind row as the mean itself, so a filtered view printed
+        // the recomputed MEAN in the Median row — on VAS electricity, R563.68
+        // under a Male filter in a row whose real value is R300. mstat comes
+        // from the row TYPE in R; the label test stays as the fallback for
+        // reports built before mstat existed.
+        var stat = r.mstat || (isStdDevRow(r.label) ? "sd" : "mean");
+        var vals = statValues(stat, q, r, means, spec.columns, mask);
+        // Only the headline mean is tested. A spread, a median and a ratio of
+        // totals each need a test nobody has specified, and inventing one is
+        // worse than showing none.
+        var sig = stat === "mean"
+          ? TR.stats.sigLetters(means, letters, threshold, true, dual) : null;
+        return rowModel(r, vals.map(function (v, i) {
+          return { mean: v, n: null, pct: null, sig: sig ? sig[i] : "" };
         }));
       }
       if (r.kind === "net") {

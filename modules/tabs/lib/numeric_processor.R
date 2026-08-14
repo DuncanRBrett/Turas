@@ -25,7 +25,129 @@
 FREQUENCY_ROW_TYPE <- "Frequency"
 COLUMN_PCT_ROW_TYPE <- "Column %"
 AVERAGE_ROW_TYPE <- "Average"
+RATIO_ROW_TYPE <- "RatioMean"
 TOTAL_COLUMN <- "Total"
+
+# The Questions-sheet columns that describe a ratio-of-totals row.
+NUMERIC_RATIO_COLS <- c(numerator = "RatioNumerator",
+                        denominator = "RatioDenominator")
+
+#' One optional Questions-sheet cell, or a fallback
+#'
+#' A structure workbook written before a column existed simply has no such
+#' column, and an empty cell means "not set" - both must read the same.
+#'
+#' @param question_info One row of the Questions sheet.
+#' @param column The column name to read.
+#' @param fallback What to return when it is absent or blank.
+#'
+#' @return A single string.
+#' @keywords internal
+question_text_or <- function(question_info, column, fallback) {
+  if (!column %in% names(question_info)) {
+    return(fallback)
+  }
+  value <- trimws(as.character(question_info[[column]][1]))
+  if (is.na(value) || !nzchar(value)) {
+    return(fallback)
+  }
+  return(value)
+}
+
+#' The ratio-of-totals specification for a numeric question, or NULL
+#'
+#' A question declares one by naming the two columns to total. Naming one
+#' without the other, or naming a column that is not in the data, REFUSES -
+#' a ratio row that silently did not appear would leave the reader with the
+#' per-person mean and no sign that the other number was meant to be there.
+#'
+#' @param question_info One row of the Questions sheet.
+#' @param data The (filtered) survey data.
+#'
+#' @return A list of \code{numerator}, \code{denominator} and \code{label}, or
+#'   NULL when the question declares no ratio.
+#' @keywords internal
+numeric_ratio_spec <- function(question_info, data) {
+  named <- vapply(NUMERIC_RATIO_COLS, function(col) {
+    question_text_or(question_info, col, "")
+  }, character(1))
+  if (!any(nzchar(named))) {
+    return(NULL)
+  }
+
+  question_col <- question_info$QuestionCode
+  if (!all(nzchar(named))) {
+    tabs_refuse(
+      code = "CFG_RATIO_INCOMPLETE",
+      title = paste0("Half a Ratio Row: ", question_col),
+      problem = sprintf(
+        "Question '%s' names %s but not %s.", question_col,
+        paste(NUMERIC_RATIO_COLS[nzchar(named)], collapse = " and "),
+        paste(NUMERIC_RATIO_COLS[!nzchar(named)], collapse = " and ")),
+      why_it_matters = "A ratio of totals needs both halves. With one named, the row cannot be built and the table would show only the per-respondent mean, with nothing saying the other figure is missing.",
+      how_to_fix = c(
+        sprintf("Fill both %s and %s on this question's Questions row",
+                NUMERIC_RATIO_COLS[["numerator"]], NUMERIC_RATIO_COLS[["denominator"]]),
+        "Or clear both, to publish the mean alone"
+      )
+    )
+  }
+
+  missing <- named[!named %in% names(data)]
+  if (length(missing)) {
+    tabs_refuse(
+      code = "DATA_RATIO_COLUMN_NOT_FOUND",
+      title = paste0("Ratio Column Missing: ", question_col),
+      problem = sprintf("Question '%s' names column(s) not in the data: %s",
+                        question_col, paste(missing, collapse = ", ")),
+      why_it_matters = "The ratio row totals these columns. Without them it cannot be computed.",
+      how_to_fix = c(
+        "Check the spelling against the data file's column names (case-sensitive)",
+        sprintf("Columns named: %s", paste(named, collapse = ", "))
+      ),
+      missing = unname(missing)
+    )
+  }
+
+  return(list(
+    numerator = unname(named[["numerator"]]),
+    denominator = unname(named[["denominator"]]),
+    label = question_text_or(question_info, "RatioLabel", "Mean per unit")
+  ))
+}
+
+#' Total the numerator over the total denominator, for one banner column
+#'
+#' Weighted throughout: Sum(w * numerator) / Sum(w * denominator), which
+#' collapses to the plain ratio on an unweighted run. A respondent counts only
+#' when BOTH values are present and their denominator is above zero, so the two
+#' totals always describe the same people.
+#'
+#' @param data The (filtered) survey data.
+#' @param spec From \code{numeric_ratio_spec()}.
+#' @param row_idx The banner column's row indices.
+#' @param weights The full weight vector.
+#'
+#' @return The ratio, or NA when nothing qualifies.
+#' @keywords internal
+calculate_ratio_of_totals <- function(data, spec, row_idx, weights) {
+  if (length(row_idx) == 0) {
+    return(NA_real_)
+  }
+  numerator <- suppressWarnings(as.numeric(data[[spec$numerator]][row_idx]))
+  denominator <- suppressWarnings(as.numeric(data[[spec$denominator]][row_idx]))
+  w <- weights[row_idx]
+
+  usable <- !is.na(numerator) & !is.na(denominator) & denominator > 0 & !is.na(w)
+  if (!any(usable)) {
+    return(NA_real_)
+  }
+  bottom <- sum(w[usable] * denominator[usable])
+  if (!is.finite(bottom) || bottom <= 0) {
+    return(NA_real_)
+  }
+  return(sum(w[usable] * numerator[usable]) / bottom)
+}
 
 # ==============================================================================
 # MAIN NUMERIC QUESTION PROCESSOR
@@ -192,13 +314,16 @@ process_numeric_question <- function(data, question_info, question_options,
     }
   }
   
-  # Mean row
+  # Mean row. MeanLabel renames it where "Mean" alone would be ambiguous - a
+  # question that also carries a ratio row needs the two told apart ("Mean per
+  # buyer" against "Mean per transaction"). The RowType is untouched, so
+  # significance, styling and the v2 recompute all still find it.
   mean_row <- data.frame(
-    RowLabel = "Mean",
+    RowLabel = question_text_or(question_info, "MeanLabel", "Mean"),
     RowType = AVERAGE_ROW_TYPE,
     stringsAsFactors = FALSE
   )
-  
+
   for (key in internal_keys) {
     mean_row[[key]] <- format_output_value(
       stat_results[[key]]$mean,
@@ -206,9 +331,41 @@ process_numeric_question <- function(data, question_info, question_options,
       decimal_places_numeric = config$decimal_places_numeric
     )
   }
-  
+
   results_list[[length(results_list) + 1]] <- mean_row
-  
+
+  # Ratio-of-totals row, when the question names a numerator and a denominator.
+  #
+  # The mean above averages PEOPLE: each respondent's own value counts once,
+  # whatever their size. This one averages the UNITS underneath - total spend
+  # over total transactions - so somebody who transacts eight times a month
+  # counts eight times. On prepaid electricity the two read R534.63 and R295.61
+  # off the same 764 people, and reporting either as "the" average without the
+  # other has already caused a wave comparison to look like a collapse that
+  # never happened (Electrum VAS, 10 Aug 2026).
+  #
+  # Deliberately NOT subject to exclude_outliers_from_stats: dropping a person
+  # from one total and not the other would produce a ratio of two different
+  # populations. The base is everyone with both values present and a
+  # denominator above zero.
+  ratio_spec <- numeric_ratio_spec(question_info, data)
+  if (!is.null(ratio_spec)) {
+    ratio_row <- data.frame(
+      RowLabel = ratio_spec$label,
+      RowType = RATIO_ROW_TYPE,
+      stringsAsFactors = FALSE
+    )
+    for (key in internal_keys) {
+      row_idx <- banner_row_indices[[key]]
+      ratio_row[[key]] <- format_output_value(
+        calculate_ratio_of_totals(data, ratio_spec, row_idx, master_weights),
+        "numeric",
+        decimal_places_numeric = config$decimal_places_numeric
+      )
+    }
+    results_list[[length(results_list) + 1]] <- ratio_row
+  }
+
   # Median row (if enabled and unweighted)
   if (config$show_numeric_median) {
     median_row <- data.frame(
@@ -262,23 +419,28 @@ process_numeric_question <- function(data, question_info, question_options,
     results_list[[length(results_list) + 1]] <- mode_row
   }
   
-  # Standard deviation row
-  sd_row <- data.frame(
-    RowLabel = "Standard Deviation",
-    RowType = "StdDev",
-    stringsAsFactors = FALSE
-  )
-  
-  for (key in internal_keys) {
-    sd_row[[key]] <- format_output_value(
-      stat_results[[key]]$sd,
-      "numeric",
-      decimal_places_numeric = config$decimal_places_numeric
+  # Standard deviation row. Switchable since 2026-08: on a skewed measure like
+  # monthly spend the SD routinely exceeds the mean, which tells a reader
+  # nothing they can use - the bins above say far more about the spread. It
+  # defaults ON, so a report that has not asked for the change is unaffected.
+  if (config$show_numeric_sd) {
+    sd_row <- data.frame(
+      RowLabel = "Standard Deviation",
+      RowType = "StdDev",
+      stringsAsFactors = FALSE
     )
+
+    for (key in internal_keys) {
+      sd_row[[key]] <- format_output_value(
+        stat_results[[key]]$sd,
+        "numeric",
+        decimal_places_numeric = config$decimal_places_numeric
+      )
+    }
+
+    results_list[[length(results_list) + 1]] <- sd_row
   }
-  
-  results_list[[length(results_list) + 1]] <- sd_row
-  
+
   # Outliers row (if enabled)
   if (config$show_numeric_outliers) {
     outlier_label <- if (config$exclude_outliers_from_stats) {

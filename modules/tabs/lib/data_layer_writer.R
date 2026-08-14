@@ -631,7 +631,18 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # RowType is absent from this list. The Excel and the interactive report
   # disagreed, with no warning either way.
   mean_types <- c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare",
-                  "Median", "Mode")
+                  "Median", "Mode", "RatioMean")
+
+  # RowType -> what the reader must recompute for this row under a filter.
+  # "mean" is the headline statistic (Average / Index / Score); the rest each
+  # need their own recompute and must never fall back to the mean.
+  mean_stat_of <- function(row_type) {
+    switch(row_type,
+      "Median" = "median", "Mode" = "mode",
+      "Std Dev" = "sd", "StdDev" = "sd",
+      "RatioMean" = "ratio", "ChiSquare" = "chi",
+      "mean")
+  }
 
   # Rows are keyed by (RowLabel, RowSource) — NOT label alone — so a
   # BoxCategory NET sharing its label with a displayed option (e.g. box
@@ -738,8 +749,13 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       # carried none, so the published view showed a bare Average while the
       # workbook lettered it — and the 80% set-difference below would have read
       # a 95% result as an 80%-only one.
+      # WHICH statistic this mean-kind row is. Without it the reader had only
+      # the label to go on, and recognised nothing but "Standard Deviation" —
+      # so under a filter every Median row silently redisplayed the recomputed
+      # MEAN (electricity: median R310 published, R563.68 shown to anyone who
+      # filtered to men, whose real median is R300). Row TYPE decides now.
       mrow <- list(
-        kind = "mean", label = lbl,
+        kind = "mean", label = lbl, mstat = mean_stat_of(mrt[1]),
         pct = as.list(vals_for(lbl, src, mrt[1])), n = null_vec(),
         sig = if (stats$has_sig) as.list(mean_sig_for(lbl, src, mrt[1])) else empty_sig())
       if (stats$has_sig2) {
@@ -923,6 +939,10 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   if (!identical(primary_stat, "Column %")) out$stat <- primary_stat
   if (!is.null(index_scores)) out$index_scores <- index_scores
   if (!is.null(net_diffs)) out$net_diffs <- net_diffs
+  # The two data columns behind a ratio-of-totals row, so the reader can
+  # re-total them over whoever is in the audience. Both are questions in their
+  # own right, so their per-respondent scores are already in the island.
+  if (!is.null(q_result$ratio)) out$ratio <- q_result$ratio
   # AreaSummary: the question that summarises its area/theme (Patterns tab).
   # Emitted only when TRUE so untagged configs stay byte-identical.
   if (isTRUE(q_result$area_summary)) out$area_summary <- TRUE

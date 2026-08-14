@@ -53,7 +53,8 @@
       "closing": "",
       "verbatim": "",
       "background": "",
-      "exec_summary": ""
+      "exec_summary": "",
+      "construction": ""
     }
   },
   "columns": [
@@ -449,6 +450,7 @@
         {
           "kind": "mean",
           "label": "Mean",
+          "mstat": "mean",
           "pct": [
             3.5,
             3.7,
@@ -481,6 +483,7 @@
         {
           "kind": "mean",
           "label": "Standard Deviation",
+          "mstat": "sd",
           "pct": [
             1.2,
             1.1,
@@ -1086,6 +1089,7 @@
         {
           "kind": "mean",
           "label": "NPS Score",
+          "mstat": "mean",
           "pct": [
             -1,
             40,
@@ -1118,6 +1122,7 @@
         {
           "kind": "mean",
           "label": "Standard Deviation",
+          "mstat": "sd",
           "pct": [
             89.9,
             81.2,

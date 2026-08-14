@@ -593,6 +593,9 @@ get_row_style <- function(row_type, styles) {
     "Index" = styles$index_style,
     "Score" = styles$score_style,
     "StdDev" = styles$stddev_style,
+    # A ratio of totals is an average and reads beside the mean, so it wears
+    # the mean's face rather than the plain numeric one.
+    "RatioMean" = styles$rating_style,
     "Median" = styles$numeric_style,
     "Mode" = styles$numeric_style,
     "Outliers" = styles$base,

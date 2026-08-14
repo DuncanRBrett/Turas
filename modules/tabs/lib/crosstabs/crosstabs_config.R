@@ -212,6 +212,9 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # V10.0.0 numeric question settings
     show_numeric_median = safe_logical(get_config_value(config, "show_numeric_median", FALSE), default = FALSE),
     show_numeric_mode = safe_logical(get_config_value(config, "show_numeric_mode", FALSE), default = FALSE),
+    # Defaults ON, unlike its siblings: the SD row has always been published on
+    # numeric questions, so a report that says nothing about it must not change.
+    show_numeric_sd = safe_logical(get_config_value(config, "show_numeric_sd", TRUE), default = TRUE),
     show_numeric_outliers = safe_logical(get_config_value(config, "show_numeric_outliers", TRUE), default = TRUE),
     exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE), default = FALSE),
     outlier_method = get_config_value(config, "outlier_method", "IQR"),
@@ -768,7 +771,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "enable_significance_testing", "bonferroni_correction", "enable_checkpointing",
   "zero_division_as_blank", "show_standard_deviation", "test_net_differences",
   "create_sample_composition", "enable_chi_square", "show_net_positive",
-  "show_numeric_median", "show_numeric_mode", "show_numeric_outliers",
+  "show_numeric_median", "show_numeric_mode", "show_numeric_sd", "show_numeric_outliers",
   "exclude_outliers_from_stats",
   "html_report_v2", "html_report_v2_microdata", "html_report_v2_tracking",
   "html_report_v2_cover",
@@ -1557,7 +1560,8 @@ TABS_KNOWN_SETTINGS <- c(
   "decimal_places_index", "decimal_places_numeric",
   # Statistics
   "show_standard_deviation", "show_net_positive", "show_numeric_median",
-  "show_numeric_mode", "show_numeric_outliers", "exclude_outliers_from_stats", "outlier_method",
+  "show_numeric_mode", "show_numeric_sd", "show_numeric_outliers",
+  "exclude_outliers_from_stats", "outlier_method",
   "test_net_differences", "zero_division_as_blank",
   # Significance testing
   "enable_significance_testing", "alpha",

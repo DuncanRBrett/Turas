@@ -676,12 +676,28 @@ process_single_question <- function(question_code, prepared_data,
     NA_character_
   }
 
+  # The ratio-of-totals pairing (RatioNumerator / RatioDenominator). Carried to
+  # the v2 data layer so the report can recompute the row under an audience
+  # filter from the two sibling columns' microdata scores. Without it the row
+  # would freeze at its published value while every other row moved — the same
+  # class of silent disagreement as a stale median.
+  q_ratio <- NULL
+  ratio_named <- vapply(NUMERIC_RATIO_COLS, function(col) {
+    question_text_or(question_info, col, "")
+  }, character(1))
+  if (all(nzchar(ratio_named))) {
+    q_ratio <- list(num = unname(ratio_named[["numerator"]]),
+                    den = unname(ratio_named[["denominator"]]),
+                    label = question_text_or(question_info, "RatioLabel", "Mean per unit"))
+  }
+
   return(list(
     question_code = question_code,
     question_text = question_info$QuestionText,
     question_type = question_info$Variable_Type,
     base_filter = base_filter,
     filter_label = q_filter_label,
+    ratio = q_ratio,
     bases = banner_bases,
     table = question_table,
     category = q_category,

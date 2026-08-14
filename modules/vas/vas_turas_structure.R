@@ -127,6 +127,21 @@ derived_structure_rows <- function(dictionary, config) {
                                   "Single_Response", "Numeric")),
     Columns = 1L, stringsAsFactors = FALSE)
 
+  # Two averages on the value-per-transaction tables. The Mean averages BUYERS
+  # - each person counts once, whatever their size; the ratio row averages the
+  # TRANSACTIONS, by totalling the same category's spend over its transactions.
+  # On electricity they read R534.63 and R295.61 off the same 764 buyers, and
+  # publishing either alone as "the" average made a 2024 comparison look like a
+  # collapse that never happened.
+  stem <- sub("_SpendPerTxn$", "", questions$QuestionCode)
+  is_ratio <- stem != questions$QuestionCode
+  questions$MeanLabel <- ifelse(is_ratio, "Mean per buyer", NA_character_)
+  questions$RatioNumerator <- ifelse(is_ratio, paste0(stem, "_MonthlySpend"),
+                                     NA_character_)
+  questions$RatioDenominator <- ifelse(is_ratio, paste0(stem, "_TxnPerMonth"),
+                                       NA_character_)
+  questions$RatioLabel <- ifelse(is_ratio, "Mean per transaction", NA_character_)
+
   option_rows <- list()
   for (code in yes_no) {
     option_rows[[length(option_rows) + 1L]] <- data.frame(
@@ -140,6 +155,26 @@ derived_structure_rows <- function(dictionary, config) {
 
   return(list(questions = questions, options = do.call(rbind, option_rows)))
 }
+
+#' Stack two data frames that do not carry the same columns
+#'
+#' Each gains the other's missing columns as NA, and BOTH are put in the same
+#' order (the first frame's, then whatever only the second has) - widening them
+#' separately would leave two different column orders and rbind would pair the
+#' wrong ones.
+#'
+#' @param first,second The frames to stack, in that order.
+#'
+#' @return The stacked frame.
+rbind_widened <- function(first, second) {
+  columns <- union(names(first), names(second))
+  fill <- function(df) {
+    for (column in setdiff(columns, names(df))) df[[column]] <- NA
+    df[, columns, drop = FALSE]
+  }
+  return(rbind(fill(first), fill(second)))
+}
+
 
 #' Write the Survey_Structure workbook
 #'

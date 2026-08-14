@@ -340,8 +340,12 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   content <- list(questions = channels$questions, options = channels$options)
 
   derived_rows <- derived_structure_rows(dictionary, VAS_CONFIG)
-  structure <- list(questions = rbind(content$questions, derived_rows$questions),
-                    options = rbind(content$options, derived_rows$options))
+  # The derived rows carry columns the asked ones do not (the ratio pairing on
+  # every value-per-transaction question), so both frames are widened to the
+  # union before they meet - rbind would refuse otherwise.
+  structure <- list(
+    questions = rbind_widened(content$questions, derived_rows$questions),
+    options = rbind(content$options, derived_rows$options))
 
   # An asked question carries its Alchemer title and a derived column carries
   # its dictionary description. Neither was written for a report reader, so

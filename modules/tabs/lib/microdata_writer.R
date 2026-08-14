@@ -218,10 +218,29 @@ micro_answers_multi <- function(survey_data, code, maps, n) {
 #'   question carries no categorical answer (allocation / derived / no options)
 #' @keywords internal
 micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
-  maps <- micro_value_index_map(dl_q, survey_structure)
   has_cols <- dl_q$code %in% names(survey_data) ||
     length(grep(paste0("^\\Q", dl_q$code, "\\E_\\d+$"), names(survey_data),
                 perl = TRUE)) > 0
+
+  # A BINNED numeric question's rows are ranges ("R100 - R249") and its stored
+  # values are numbers, so no value ever matched a row label: every respondent
+  # landed on NA and the whole distribution vanished the moment anyone filtered
+  # — five rows of 0% on a base of 0, with the mean above them still moving.
+  # Bin first, using the engine's own binner, then map the bin's label.
+  binned <- micro_numeric_bins(dl_q, survey_data, survey_structure)
+  if (!is.null(binned) && has_cols) {
+    return(I(binned))
+  }
+
+  # An UNBINNED numeric question has no category rows to land on, but it still
+  # has respondents who answered it — and the base row is read off this island.
+  # Without them a filtered view reported a mean above a base of zero.
+  if (identical(dl_q$type, "numeric") && dl_q$code %in% names(survey_data)) {
+    answered <- !is.na(suppressWarnings(as.numeric(survey_data[[dl_q$code]])))
+    return(I(ifelse(answered, MICRO_ANSWERED_UNSHOWN, NA_integer_)))
+  }
+
+  maps <- micro_value_index_map(dl_q, survey_structure)
   if (is.null(maps) || !has_cols) {
     return(I(rep(NA_integer_, n)))   # serialises to [null,…] — still length n
   }
@@ -229,6 +248,60 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
     return(micro_answers_multi(survey_data, dl_q$code, maps, n))
   }
   I(micro_answers_single(survey_data[[dl_q$code]], maps))
+}
+
+
+#' Per-respondent bin row indices for a binned numeric question
+#'
+#' Uses \code{categorize_numeric_bins()} — the same function the numeric
+#' processor bins with — so the recomputed distribution is the published one
+#' when the audience is everyone. Bin labels are matched to the question's own
+#' category rows, so a bin the processor did not publish maps to nothing rather
+#' than to the wrong row.
+#'
+#' @param dl_q One built data-layer question.
+#' @param survey_data Respondent data.
+#' @param survey_structure Loaded structure.
+#'
+#' @return Integer vector length n, or NULL when the question is not a binned
+#'   numeric (every other type keeps the label-matching path).
+#' @keywords internal
+micro_numeric_bins <- function(dl_q, survey_data, survey_structure) {
+  if (!identical(dl_q$type, "numeric") || is.null(survey_structure)) {
+    return(NULL)
+  }
+  if (!dl_q$code %in% names(survey_data)) {
+    return(NULL)
+  }
+  options <- survey_structure$options
+  if (is.null(options) || !all(c("Min", "Max") %in% names(options))) {
+    return(NULL)
+  }
+  bins <- options[!is.na(options$QuestionCode) & options$QuestionCode == dl_q$code, ,
+                  drop = FALSE]
+  bins <- bins[!is.na(bins$Min) | !is.na(bins$Max), , drop = FALSE]
+  if (!nrow(bins)) {
+    return(NULL)
+  }
+
+  label_to_index <- list()
+  for (i in seq_along(dl_q$rows)) {
+    r <- dl_q$rows[[i]]
+    if (identical(r$kind, "category")) {
+      label_to_index[[trimws(as.character(r$label))]] <- i - 1L
+    }
+  }
+  if (!length(label_to_index)) {
+    return(NULL)
+  }
+
+  labels <- categorize_numeric_bins(
+    suppressWarnings(as.numeric(survey_data[[dl_q$code]])), bins)
+  idx <- vapply(trimws(as.character(labels)), function(lbl) {
+    hit <- label_to_index[[lbl]]
+    if (is.null(hit)) NA_integer_ else as.integer(hit)
+  }, integer(1), USE.NAMES = FALSE)
+  return(idx)
 }
 
 
