@@ -171,9 +171,14 @@ write_turas_structure <- function(questions, options, data_file_name, path) {
 #' @param questions The combined Questions data frame, for the Selection sheet.
 #' @param structure_file_name The structure workbook's file name (same folder).
 #' @param path Where to write.
+#' @param hide_codes Questions that start unselected even though they are
+#'   perfectly good closed questions - the raw "where else" channel questions,
+#'   whose total-used and also-used replacements say the same thing without
+#'   double-counting the channel used most often.
 #'
 #' @return The path, invisibly.
-write_turas_config <- function(questions, structure_file_name, path) {
+write_turas_config <- function(questions, structure_file_name, path,
+                               hide_codes = character(0)) {
   settings <- data.frame(
     Setting = c("structure_file", "output_filename", "html_report_v2",
                 "show_numeric_median", "enable_significance_testing",
@@ -185,7 +190,8 @@ write_turas_config <- function(questions, structure_file_name, path) {
   selection <- data.frame(
     QuestionCode = questions$QuestionCode,
     # open text produces empty crosstab tables, so it starts unselected
-    Include = ifelse(questions$Variable_Type == "Open_End", "N", "Y"),
+    Include = ifelse(questions$Variable_Type == "Open_End" |
+                       questions$QuestionCode %in% hide_codes, "N", "Y"),
     UseBanner = ifelse(questions$QuestionCode %in% VAS_TURAS_BANNERS, "Y", "N"),
     BannerLabel = ifelse(questions$QuestionCode %in% VAS_TURAS_BANNERS,
                          questions$QuestionCode, ""),

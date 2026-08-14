@@ -9,7 +9,7 @@ for (script in c("vas_derived_config.R", "vas_amount_parser.R", "vas_frequency.R
                  "vas_sense_check.R", "vas_pipeline.R", "vas_data_dictionary.R",
                  "vas_data_dictionary_headline.R", "vas_write_excel.R",
                  "vas_register.R", "vas_turas_plan.R", "vas_turas_structure.R",
-                 "vas_turas_build.R")) {
+                 "vas_channel_use.R", "vas_turas_build.R")) {
   source(file.path(VAS_PROJECT_ROOT, script))
 }
 

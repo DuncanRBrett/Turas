@@ -331,6 +331,14 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   town_values <- town_values[nzchar(town_values)]
 
   content <- content_structure_rows(plan, index, options, town_values)
+
+  # Total used and also used, built from the two asked channel questions. The
+  # "where else" question does not exclude the channel used most often, so the
+  # two asked tables overlap and cannot be added up; these two can.
+  channels <- add_channel_use(data, content)
+  data <- channels$data
+  content <- list(questions = channels$questions, options = channels$options)
+
   derived_rows <- derived_structure_rows(dictionary, VAS_CONFIG)
   structure <- list(questions = rbind(content$questions, derived_rows$questions),
                     options = rbind(content$options, derived_rows$options))
@@ -368,7 +376,8 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   if (file.exists(config_path)) {
     cat(sprintf("  %s kept (hand-curated)\n", VAS_TURAS_CONFIG_FILE))
   } else {
-    write_turas_config(structure$questions, VAS_TURAS_STRUCTURE_FILE, config_path)
+    write_turas_config(structure$questions, VAS_TURAS_STRUCTURE_FILE, config_path,
+                       hide_codes = channels$pairs$other)
   }
   return(list(data = data_path, structure = structure_path, config = config_path,
               respondents = nrow(data), columns = ncol(data),
