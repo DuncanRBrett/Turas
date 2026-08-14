@@ -9,6 +9,35 @@ ASKED   <- "ASKED"
 DERIVED <- "DERIVED from transactions above zero"
 SELFOTH <- "ASKED - self / other / none"
 CHANNELS <- "DERIVED from the most-often and where-else questions"
+CROSSTAB <- "Crosstab planning, 14 Aug 2026"
+# One category's crosstab block, worded the way Duncan set it out in
+# "Crosstab planning.docx" (14 Aug 2026) and applied by the OneDrive script
+# relabel_category.R. Kept in step with that script by hand — a structure
+# generated from scratch must say what the kept one says.
+#
+# Every measure row carries its audience. The total row says "(all buyers)"
+# rather than "(for everyone)": its base IS the buyers, which is what the base
+# line under it says, and dropping the marker made it read as a heading over
+# the two beneath it.
+BLOCK <- function(category, subject) {
+  views <- c(Total = "all buyers", Own = "for self", Oth = "for others")
+  side <- c(Total = "", Own = "; counting only what they buy for themselves",
+            Oth = "; counting only what they buy for someone else")
+  out <- L(paste0(category, "_Purchased"),
+           sprintf("Did you purchase %s in the past 12 months?", subject), CROSSTAB)
+  for (v in names(views)) {
+    mark <- sprintf(" (%s)", views[[v]])
+    out <- rbind(out,
+      L(sprintf("%s_%s_TxnPerMonth", category, v),
+        sprintf("How often do you buy %s?%s", subject, mark), CROSSTAB),
+      L(sprintf("%s_%s_MonthlySpend", category, v),
+        sprintf("How much do you spend per month on %s?%s", subject, mark), CROSSTAB),
+      L(sprintf("%s_%s_SpendPerTxn", category, v),
+        sprintf("Average %s value per transaction%s", subject, mark), CROSSTAB))
+  }
+  out
+}
+
 
 # The three channel tables of one occasion, worded as a set. CHAN() takes the
 # "most often" question's wording and builds the other two from it, so a reader
@@ -42,8 +71,11 @@ labels <- rbind(
   L("BillPayer", "Role in paying household bills", "matches the reporting build"),
 
   # ---- prepaid electricity --------------------------------------------------
-  L("PrepaidElectricity_Purchased", "Buy electricity at all in last 12 months?", DERIVED),
-  L("PPU", "Who have you bought electricity for?", SELFOTH),
+  BLOCK("PrepaidElectricity", "prepaid electricity"),
+  # "more than one may apply" belongs in the wording, not in a note: a note in
+  # the Formula column is what makes the report read a row as DERIVED, and this
+  # one was genuinely asked.
+  L("PPU", "Who have you bought electricity for? (more than one may apply)", SELFOTH),
   CHAN("PPU", "Where do you buy prepaid electricity most often?",
        "Where else have you bought prepaid electricity in the past 12 months?"),
 
