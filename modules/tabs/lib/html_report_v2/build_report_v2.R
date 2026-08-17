@@ -201,7 +201,9 @@ build_report_v2_html <- function(data_json, config_obj,
   # the shared callout registry and checked against the renderer's manifest —
   # see report_text.R for why a mismatch refuses the build instead of falling
   # back to wording the author never wrote.
-  text_result <- build_report_text_json(assets_dir, js_bundle = js_bundle)
+  text_result <- build_report_text_json(
+    assets_dir, js_bundle = js_bundle,
+    overrides = config_obj$report_text_overrides)
   for (w in text_result$warnings) cat("  [NOTE] Report text:", w, "\n")
 
   html <- render_template(read_text(template_path), list(

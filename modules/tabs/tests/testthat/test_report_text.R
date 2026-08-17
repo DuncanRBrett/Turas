@@ -36,6 +36,15 @@ assign(".tabs_lib_dir", file.path(turas_root, "modules/tabs/lib"), envir = globa
 source(file.path(turas_root, "modules/tabs/lib/html_report_v2/build_report_v2.R"))
 source(file.path(turas_root, "modules/tabs/lib/html_report_v2/report_text.R"))
 source(file.path(turas_root, "modules/shared/lib/callouts/callout_registry.R"))
+# The override path spans the config side too: the template that ships the
+# ReportText sheet, and the loader that reads it back. The template generator
+# finds its shared styles relative to the working directory, so source it from
+# the project root.
+local({
+  owd <- setwd(turas_root); on.exit(setwd(owd), add = TRUE)
+  source(file.path(turas_root, "modules/tabs/lib/generate_config_templates.R"))
+  source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))
+})
 
 assets_dir <- file.path(turas_root, "modules/tabs/lib/html_report_v2/assets")
 
@@ -192,4 +201,60 @@ test_that("a missing key in the real build stops the report, loudly", {
   expect_error(
     build_report_text_json(assets_dir, js_bundle = js, entries = gutted),
     "CFG_REPORT_TEXT_INVALID")
+})
+
+
+# ==============================================================================
+# 5. Per-project overrides (the config's ReportText sheet)
+# ==============================================================================
+
+context("report_text: per-project overrides")
+
+test_that("an override replaces the platform wording for this build only", {
+  js <- bundle_report_v2_js(assets_dir)
+  base <- turas_callout_module("tabs")
+  res <- build_report_text_json(assets_dir, js_bundle = js, entries = base,
+    overrides = list("report.construction.computed" = "Figures come out of R."))
+  payload <- jsonlite::fromJSON(res$json, simplifyVector = FALSE)
+  expect_equal(payload[["report.construction.computed"]], "Figures come out of R.")
+  # the registry itself is untouched — the override lives for this build only
+  expect_false(identical(base[["report.construction.computed"]]$text,
+                         "Figures come out of R."))
+})
+
+test_that("an override naming nothing refuses, rather than being ignored", {
+  js <- bundle_report_v2_js(assets_dir)
+  expect_error(
+    build_report_text_json(assets_dir, js_bundle = js,
+                           overrides = list("cards.sig.lettres" = "typo'd key")),
+    "CFG_REPORT_TEXT_OVERRIDE")
+})
+
+test_that("an override is validated like any other authored text", {
+  js <- bundle_report_v2_js(assets_dir)
+  expect_error(
+    build_report_text_json(assets_dir, js_bundle = js,
+      overrides = list("report.construction.computed" = "A <strong>broken claim.")),
+    "CFG_REPORT_TEXT_INVALID")
+  expect_error(
+    build_report_text_json(assets_dir, js_bundle = js,
+      overrides = list("report.construction.produced" = "Produced by {compny}.")),
+    "CFG_REPORT_TEXT_INVALID")
+})
+
+test_that("no overrides leaves the platform text exactly as authored", {
+  js <- bundle_report_v2_js(assets_dir)
+  plain <- build_report_text_json(assets_dir, js_bundle = js)
+  empty <- build_report_text_json(assets_dir, js_bundle = js, overrides = list())
+  expect_equal(as.character(plain$json), as.character(empty$json))
+})
+
+test_that("the generated config template ships a ReportText sheet, and it is empty", {
+  tmp <- file.path(tempdir(), "reporttext_tpl.xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+  generate_crosstab_config_template(tmp)
+  expect_true("ReportText" %in% openxlsx::getSheetNames(tmp))
+  # Empty means empty: the loader must find nothing to override, so a fresh
+  # config can never quietly carry a stale copy of the platform wording.
+  expect_null(load_report_text_sheet(tmp))
 })

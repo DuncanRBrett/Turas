@@ -989,7 +989,39 @@ generate_crosstab_config_template <- function(output_path,
                     example_rows = comments_examples,
                     num_blank_rows = 30)
 
-  # --- SHEET 5: AddedSlides ---
+  # --- SHEET 5: ReportText (per-project text overrides) ---
+  # Ships EMPTY on purpose. The v2 report's explanatory text is authored once,
+  # platform-wide, in the Callout Editor (module "tabs"); this sheet is only for
+  # a study that needs to say something different. A blank sheet, a missing key
+  # or a blank Text cell all mean "use the platform wording", so a config can
+  # never quietly hold a stale copy of text that has since been improved.
+  # A key that matches nothing REFUSES the report build rather than being
+  # ignored — a typo here looks exactly like an override that is working.
+  report_text_cols <- list(
+    list(name = "Key", width = 40, required = FALSE,
+         description = paste0(
+           "Text key to override for THIS study only, e.g. cards.sig.letters. ",
+           "Find the key by opening a report and pressing ctrl+alt+K, or in the ",
+           "Callout Editor under module 'tabs'. An unknown key stops the report ",
+           "build rather than being ignored.")),
+    list(name = "Text", width = 90, required = FALSE,
+         description = paste0(
+           "Replacement wording for this study. Leave blank to use the platform ",
+           "text. Same rules as the editor: inline markup only (strong, em, li, ",
+           "sup...), balanced, no attributes; keep any {placeholders} the key ",
+           "declares."))
+  )
+
+  write_table_sheet(wb, "ReportText", report_text_cols,
+                    title = "Report Text Overrides (optional)",
+                    subtitle = paste0(
+                      "Leave empty unless this study must word something differently ",
+                      "from every other study. Platform wording is edited once, in the ",
+                      "Callout Editor."),
+                    example_rows = NULL,
+                    num_blank_rows = 20)
+
+  # --- SHEET 6: AddedSlides ---
   slides_cols <- list(
     list(name = "slide_title", width = 30, required = TRUE,
          description = "Title for this additional report section/slide."),

@@ -1131,6 +1131,54 @@ TABS_SLIDE_IMAGE_MAX_BYTES <- 1.5 * 1024 * 1024
   NULL
 }
 
+#' Load Optional ReportText Sheet from Config Excel
+#'
+#' Per-project overrides for the v2 report's authored text. The platform wording
+#' lives in the shared callout registry (module "tabs") and is edited in the
+#' Callout Editor; this sheet lets ONE study say something different without
+#' changing what every other study says.
+#'
+#' The sheet ships empty on purpose. A key with no row, or a row with a blank
+#' Text cell, uses the platform wording — so an override only exists where an
+#' analyst deliberately typed one, and a stale copy of the platform text can
+#' never sit in an old config quietly overriding an improvement made since.
+#'
+#' Unknown keys are NOT silently ignored: they are returned and the report build
+#' refuses, naming them, because a typed key that matches nothing looks exactly
+#' like an override that is working.
+#'
+#' @param config_file Path to the config workbook
+#' @return Named list of key -> text, or NULL when the sheet is absent or empty
+load_report_text_sheet <- function(config_file) {
+  tryCatch({
+    sheets <- openxlsx::getSheetNames(config_file)
+    if (!"ReportText" %in% sheets) return(NULL)
+
+    df <- tryCatch(.read_table_sheet(config_file, "ReportText", c("Key", "Text")),
+                   error = function(e) NULL)
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    if (!all(c("Key", "Text") %in% names(df))) {
+      cat("  [INFO] ReportText sheet found but missing Key/Text columns - skipped\n")
+      return(NULL)
+    }
+
+    keys <- trimws(as.character(df$Key))
+    txt  <- ifelse(is.na(df$Text), "", as.character(df$Text))
+    keep <- !is.na(keys) & nzchar(keys) & nzchar(trimws(txt))
+    if (!any(keep)) return(NULL)
+
+    out <- as.list(txt[keep])
+    names(out) <- keys[keep]
+    cat(sprintf("  Report text: %d per-project override(s) from the ReportText sheet.\n",
+                length(out)))
+    out
+  }, error = function(e) {
+    cat(sprintf("  [WARNING] Could not read ReportText sheet: %s\n", e$message))
+    NULL
+  })
+}
+
+
 load_qualitative_sheet <- function(config_file) {
   tryCatch({
     sheets <- openxlsx::getSheetNames(config_file)
@@ -1684,6 +1732,10 @@ load_crosstabs_config <- function(config_file) {
 
   # Load optional AddedSlides sheet (V10.8.0, renamed from Qualitative)
   config_obj$qualitative_slides <- load_qualitative_sheet(config_file)
+
+  # Load optional ReportText sheet — per-project overrides for the v2 report's
+  # authored text (the platform wording lives in the callout registry).
+  config_obj$report_text_overrides <- load_report_text_sheet(config_file)
 
   # Load optional Population sheet (finite population correction) — per-subgroup
   # universe sizes; the study total lives in the population_size setting.

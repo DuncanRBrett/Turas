@@ -40,8 +40,9 @@ The template has six sheets:
 2.  **Selection** - Which questions to analyze and use as banners
 3.  **Base Filters Reference** - Example filter syntax (reference only)
 4.  **Comments** - Per-question commentary, background and executive summary
-5.  **AddedSlides** - Narrative slides carried into the report
-6.  **Population** - Per-subgroup universe sizes (finite population correction)
+5.  **ReportText** - Optional per-study overrides for the report's explanatory text
+6.  **AddedSlides** - Narrative slides carried into the report
+7.  **Population** - Per-subgroup universe sizes (finite population correction)
 
 ------------------------------------------------------------------------
 
@@ -2086,6 +2087,48 @@ Questions sheet with exactly matching codes.
 
 **Fix:** Ensure your Min and Max values create non-overlapping ranges.
 If one bin ends at 34, the next should start at 35.
+
+------------------------------------------------------------------------
+
+## ReportText Sheet
+
+The v2 report's explanatory text — the "How to read this report" panel, the
+significance explainers, the precision footer, the weighting note, the About
+card's construction note — is authored once, platform-wide, in the **Callout
+Editor** (launched from `launch_turas()`, module `tabs`). Change it there and
+every study picks it up at its next generation.
+
+This sheet is the exception: one study saying something differently, without
+changing what every other study says.
+
+**It ships empty, and should usually stay that way.** A key with no row, or a
+row with a blank `Text` cell, uses the platform wording. That is deliberate: if
+the template pre-filled the platform text, an old config would quietly hold a
+stale copy and keep overriding improvements made since.
+
+| Column | Description                                             | Required |
+|--------|---------------------------------------------------------|----------|
+| `Key`  | The text key to override for this study                 | No       |
+| `Text` | Replacement wording. Blank = use the platform text      | No       |
+
+**Finding a key:** open a generated report and press **ctrl+alt+K**. Every
+authored block wears its key; click one to copy it. The same keys are listed in
+the Callout Editor under module `tabs`.
+
+**Notes:**
+
+-   A `Key` that matches nothing **stops the report build** and names it. A
+    typo that was silently ignored would look exactly like an override that is
+    working, and you would only find out by reading the client's copy.
+-   Overrides are validated like any other authored text: inline markup only
+    (`strong em b i br p ul ol li h3 h4 span code sup sub`), balanced, no
+    attributes, and any `{placeholders}` the key declares must survive.
+-   Overriding is per-build. The registry is untouched, so the platform wording
+    is still there for every other study.
+-   For a study's *narrative* — background, executive summary, how its numbers
+    were built — use the **Comments** sheet's `_BACKGROUND`,
+    `_EXECUTIVE_SUMMARY` and `_REPORT_CONSTRUCTION` rows instead. This sheet is
+    for the report's standing explanatory furniture.
 
 ------------------------------------------------------------------------
 

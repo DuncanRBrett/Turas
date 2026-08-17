@@ -244,11 +244,15 @@ validate_report_text <- function(manifest, entries, keys_used = character(0)) {
 #'   scan, which is only appropriate in unit tests of this function itself.
 #' @param entries Optional pre-loaded registry entries (tests inject here);
 #'   defaults to the "tabs" block of the shared registry.
+#' @param overrides Optional named list of key -> text from the config's
+#'   ReportText sheet. Applied on top of the platform wording for this build
+#'   only, and validated exactly like it.
 #' @return list(status = "PASS"|"REFUSED", json = character, warnings = character)
 #' @export
 build_report_text_json <- function(assets_dir = report_v2_assets_dir(),
                                    js_bundle = NULL,
-                                   entries = NULL) {
+                                   entries = NULL,
+                                   overrides = NULL) {
   manifest <- load_report_text_manifest(report_text_manifest_path(assets_dir))
 
   if (is.null(entries)) {
@@ -256,6 +260,24 @@ build_report_text_json <- function(assets_dir = report_v2_assets_dir(),
       stop("[IO_REPORT_TEXT_REGISTRY] callout_registry.R is not loaded — the v2 report cannot read its authored text.")
     }
     entries <- turas_callout_module("tabs")
+  }
+
+  # Per-project overrides (config ReportText sheet). A key that names nothing is
+  # an error, not a no-op: a typo there looks exactly like an override that is
+  # working, and the analyst would only find out by reading the client's copy.
+  if (length(overrides)) {
+    unknown <- setdiff(names(overrides), names(manifest))
+    if (length(unknown)) {
+      stop(sprintf(paste0("[CFG_REPORT_TEXT_OVERRIDE] the config's ReportText sheet ",
+                          "names text this report does not have: %s.\n  Check the key ",
+                          "against the Callout Editor (module 'tabs'), or delete the row."),
+                   paste(unknown, collapse = ", ")))
+    }
+    for (key in names(overrides)) {
+      entry <- entries[[key]] %||% list()
+      entry$text <- as.character(overrides[[key]])
+      entries[[key]] <- entry
+    }
   }
 
   keys_used <- if (is.null(js_bundle)) character(0) else report_text_keys_used(js_bundle)

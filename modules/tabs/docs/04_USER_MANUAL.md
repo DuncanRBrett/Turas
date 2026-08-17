@@ -529,6 +529,32 @@ construction* section of the About card — the standard paragraphs on
 reproducibility, AI and author review go with it, so write whichever of those
 you want into the row. Leave the row out and the report reads exactly as before.
 
+### The report's explanatory text — where it lives
+
+Everything the report says *about itself* — the "How to read this report"
+panel, the significance explainers, the precision footer, the weighting note,
+the About card's construction note — is written by you, not by the code and not
+by a model. It lives in the **Callout Editor** (a tile on the `launch_turas()`
+home screen, module `tabs`). Edit a sentence there and every study picks it up
+at its next generation.
+
+To find the entry behind a paragraph, open a generated report and press
+**ctrl+alt+K**. Every authored block wears its key; click one to copy it, then
+paste it into the editor's filter. Gold badges are platform text from the
+editor; navy `config:` badges are text this study wrote in its own config.
+Press the same keys again to hide them — the badges are author-only and never
+appear in a pin, an export or a saved copy.
+
+Two things worth knowing. Text applies at the **next report generation** — an
+editor save changes nothing in an HTML file that already exists. And clearing a
+sentence to blank is a legitimate way to switch a block off; deleting the entry
+outright will stop the next build instead.
+
+When one study alone must word something differently, use the config's
+**ReportText** sheet rather than changing the platform text: put the key in
+`Key` and your wording in `Text`. The sheet ships empty and should usually stay
+that way.
+
 ### Study Slides — from the config
 
 For exhibits that belong to the study rather than to one reader, fill in the

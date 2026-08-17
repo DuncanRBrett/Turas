@@ -347,6 +347,24 @@ node modules/tabs/lib/html_report_v2/tests/mutate_text_check.mjs
 It must pass. A failure there is a test pinned to words the report author is
 entitled to change.
 
+### Overriding the wording for one study
+
+Platform text is edited once, in the Callout Editor, and every study picks it up
+at its next generation. When ONE study has to say something differently, put the
+key and its replacement in the config's **ReportText** sheet.
+
+The sheet ships empty and should usually stay that way. A missing row or a blank
+`Text` cell means "use the platform wording" — so a config can never quietly
+carry a stale copy of text that has been improved since. A `Key` that matches
+nothing refuses the build and names it, because a typo there looks exactly like
+an override that is working. Overrides are validated like any other authored
+text, and apply to that build only; the registry is untouched.
+
+A study's own *narrative* (background, executive summary, how its numbers were
+built) still belongs in the Comments sheet's `_BACKGROUND`,
+`_EXECUTIVE_SUMMARY` and `_REPORT_CONSTRUCTION` rows. ReportText is for the
+report's standing explanatory furniture.
+
 ### Editing operationally
 
 Text applies at the **next report generation** — an editor save changes nothing
@@ -365,8 +383,16 @@ like code. The editor writes it atomically and keeps its last ten saves under
 | Bundler (inlines renderer + islands → one HTML) | `modules/tabs/lib/html_report_v2/build_report_v2.R` |
 | Vendored renderer (engine + v2 modules) | `modules/tabs/lib/html_report_v2/assets/` |
 | Authored text: validation + island | `modules/tabs/lib/html_report_v2/report_text.R`, `assets/text_manifest.json` |
+| Authored text: the words | `modules/shared/lib/callouts/callouts.json` (module `tabs`), edited in the Callout Editor |
+| Per-study text overrides | `ReportText` sheet -> `load_report_text_sheet()` in `crosstabs/crosstabs_config.R` |
 | Wiring (Step 4d) | `modules/tabs/lib/run_crosstabs.R` |
 | Tests | `tests/testthat/test_{data_layer_writer,microdata_writer,tracking_island,report_v2_bundler,report_text}.R` + prototype `tests/run_tests_v2.mjs` |
 
-The renderer is vendored from `prototypes/report-redesign/fable/v2/` (the
-source-of-truth for the JS); the two must stay in sync.
+The renderer under `modules/tabs/lib/html_report_v2/assets/` **is** the
+source of truth. It began as a vendored copy of
+`prototypes/report-redesign/fable/v2/`, and that line used to say the two must
+stay in sync — but the prototype has carried no `assets/js` for some time, so
+there is nothing there to sync with. What remains under `prototypes/` is design
+history: read it for how the v2 report came to be shaped this way, not for code.
+(Retired 2026-08-17, with the authored-text work, which changed the vendored
+renderer and could otherwise have been erased by a future "re-vendor" sweep.)
