@@ -1556,7 +1556,7 @@ merge_segment_to_data <- function(data_path,
         wb <- openxlsx::createWorkbook()
         openxlsx::addWorksheet(wb, "Data")
         openxlsx::writeData(wb, "Data", seg_escape_df(merged))
-        openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+        turas_saveWorkbook(wb, output_path, overwrite = TRUE)
       } else {
         write.csv(merged, output_path, row.names = FALSE, fileEncoding = "UTF-8")
       }
@@ -1941,7 +1941,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       warning(sprintf("Failed to save config template: %s", save_result$error))
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("Config template saved: %s\n", output_path))

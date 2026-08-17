@@ -172,7 +172,7 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(paste0("\u2713 Output written to: ", output_path, "\n"))

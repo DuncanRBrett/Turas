@@ -233,7 +233,7 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result 
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   if (verbose) {
@@ -1330,7 +1330,7 @@ generate_design_output <- function(design_result, config, verbose = TRUE) {
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   if (verbose) {

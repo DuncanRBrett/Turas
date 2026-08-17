@@ -139,7 +139,7 @@ turas_write_stats_pack <- function(payload, output_path, protect_sheets = TRUE) 
         return(invisible(NULL))
       }
     } else {
-      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+      turas_saveWorkbook(wb, output_path, overwrite = TRUE)
     }
 
     message(sprintf("[TRS INFO] STATS_PACK: Written to %s", basename(output_path)))

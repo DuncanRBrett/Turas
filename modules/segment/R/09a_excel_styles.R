@@ -396,7 +396,7 @@ seg_write_xlsx <- function(sheets, file_path, module = "SEGMENT") {
       warning(sprintf("[%s] Failed to save: %s", module, save_result$error))
     }
   } else {
-    openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, file_path, overwrite = TRUE)
   }
 
   invisible(file_path)

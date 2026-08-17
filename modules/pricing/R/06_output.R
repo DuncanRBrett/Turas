@@ -974,7 +974,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_file, overwrite = TRUE)
   }
 
   # Save plots to same directory

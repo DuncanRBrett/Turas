@@ -504,7 +504,7 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     }
   } else {
     tryCatch(
-      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE),
+      turas_saveWorkbook(wb, output_file, overwrite = TRUE),
       error = function(e) {
         keydriver_refuse(
           code = "IO_OUTPUT_ERROR",

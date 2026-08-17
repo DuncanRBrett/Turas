@@ -72,7 +72,7 @@ write_tracking_crosstab_output <- function(crosstab_data, config, output_path,
   write_crosstab_data_sheet(wb, crosstab_data, config, styles)
 
   # Save workbook
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   cat(paste0("  Tracking Crosstab saved to: ", output_path, "\n"))
 
   return(output_path)

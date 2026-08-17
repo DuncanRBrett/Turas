@@ -49,6 +49,31 @@ load_vas_library <- function(code_dir = ".") {
   for (file in VAS_LIBRARY_FILES) {
     source(file.path(code_dir, file))
   }
+
+  # The shared workbook saver lives outside the VAS code directory, at
+  # <turas>/modules/shared/lib. Resolve it from code_dir rather than the working
+  # directory, because the launcher runs from the project folder, not the repo.
+  # Without it openxlsx leaves every sheet pointing at a drawing part it never
+  # writes, and Excel offers to repair the register and QC packs -- a repair that
+  # strips their dropdowns.
+  saver <- file.path(code_dir, "..", "shared", "lib", "turas_save_workbook_atomic.R")
+  if (file.exists(saver)) {
+    source(saver)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: VAS - load calculation library\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found next to the VAS code,\n")
+    cat("│          so workbooks are written without part reconciliation and Excel\n")
+    cat("│          may offer to repair them, losing their dropdowns.\n")
+    cat("│ How to fix: point the code directory at modules/vas inside a full Turas\n")
+    cat("│          checkout, so modules/shared/lib sits alongside it\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)
+    }
+  }
+
   return(invisible(code_dir))
 }
 

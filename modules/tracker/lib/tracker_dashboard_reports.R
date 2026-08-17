@@ -1225,7 +1225,7 @@ write_dashboard_output <- function(trend_results, config, wave_data,
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(paste0("\u2713 Dashboard output written to: ", output_path, "\n"))
@@ -1315,7 +1315,7 @@ write_sig_matrix_output <- function(trend_results, config, wave_data, output_pat
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(paste0("\u2713 Significance Matrix output written to: ", output_path, "\n"))

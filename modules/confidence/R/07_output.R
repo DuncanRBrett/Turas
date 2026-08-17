@@ -220,7 +220,7 @@ save_confidence_workbook <- function(wb, output_path, run_result = NULL) {
     }
   } else {
     tryCatch({
-      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+      turas_saveWorkbook(wb, output_path, overwrite = TRUE)
     }, error = function(e) {
       confidence_refuse(
         code = "IO_EXCEL_SAVE_FAILED",

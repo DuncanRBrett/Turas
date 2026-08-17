@@ -152,7 +152,7 @@ export_quadrant_to_excel <- function(quadrant_results, wb = NULL, output_file = 
 
   # Save if new workbook
   if (create_new && !is.null(output_file)) {
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_file, overwrite = TRUE)
   }
 
   invisible(wb)

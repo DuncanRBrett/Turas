@@ -501,7 +501,7 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(paste0("\u2713 Wave History output written to: ", output_path, "\n"))

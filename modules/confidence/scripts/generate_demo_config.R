@@ -12,6 +12,43 @@
 
 library(openxlsx)
 
+# ------------------------------------------------------------------------------
+# Shared workbook saver
+# ------------------------------------------------------------------------------
+# turas_saveWorkbook() reconciles worksheet relationships before saving. Without
+# it openxlsx leaves every sheet pointing at a drawing part it never writes, and
+# Excel reports a problem with the file and offers to repair it -- a repair that
+# strips every data-validation dropdown in the template.
+#
+# This file is designed to be sourced on its own, so it locates the shared
+# helper itself rather than assuming the caller has already loaded it.
+if (!exists("turas_saveWorkbook", mode = "function")) {
+  .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  .turas_saver_dir <- getwd()
+  while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+         .turas_saver_dir != dirname(.turas_saver_dir)) {
+    .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
+  if (file.exists(.turas_saver_path)) {
+    source(.turas_saver_path)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found, so templates are\n")
+    cat("│          written without part reconciliation and Excel may offer to\n")
+    cat("│          repair them, losing their dropdowns.\n")
+    cat("│ How to fix: run from the Turas project root, or set the working\n")
+    cat("│          directory so that modules/shared/lib is reachable\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)
+    }
+  }
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+}
+
+
 # Set demo_dir before sourcing, or override with TURAS_DEMO_DIR env var
 demo_dir   <- Sys.getenv("TURAS_DEMO_DIR", "examples/confidence/demo")
 output_dir <- file.path(demo_dir, "output")
@@ -247,5 +284,5 @@ setColWidths(wb, "Population_Margins", cols = 1:5, widths = c(18, 20, 16, 14, 10
 dataValidation(wb, "Population_Margins", cols = 4, rows = 4:34, type = "decimal", operator = "between", value = c(0, 1), showInputMsg = TRUE, showErrorMsg = TRUE)
 dataValidation(wb, "Population_Margins", cols = 5, rows = 4:34, type = "list", value = '"Y,N"', allowBlank = TRUE, showInputMsg = TRUE, showErrorMsg = TRUE)
 
-saveWorkbook(wb, config_path, overwrite = TRUE)
+turas_saveWorkbook(wb, config_path, overwrite = TRUE)
 cat("Demo config saved to:", config_path, "\n")

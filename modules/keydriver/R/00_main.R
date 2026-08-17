@@ -1401,7 +1401,7 @@ write_keydriver_output_enhanced <- function(results, output_file,
       })
     }
 
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_file, overwrite = TRUE)
   }
 }
 

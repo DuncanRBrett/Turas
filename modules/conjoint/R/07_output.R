@@ -183,7 +183,7 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
   } else {
     # Fallback to direct save
     tryCatch({
-      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+      turas_saveWorkbook(wb, output_file, overwrite = TRUE)
     }, error = function(e) {
       conjoint_refuse(
         code = "IO_OUTPUT_SAVE_FAILED_DIRECT",

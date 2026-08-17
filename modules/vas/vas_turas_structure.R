@@ -197,7 +197,7 @@ write_turas_structure <- function(questions, options, data_file_name, path) {
   openxlsx::writeData(wb, "Project", project, headerStyle = excel_header_style())
   openxlsx::writeData(wb, "Questions", questions, headerStyle = excel_header_style())
   openxlsx::writeData(wb, "Options", options, headerStyle = excel_header_style())
-  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  turas_saveWorkbook(wb, path, overwrite = TRUE)
   return(invisible(path))
 }
 
@@ -238,7 +238,7 @@ write_turas_config <- function(questions, structure_file_name, path,
   openxlsx::addWorksheet(wb, "Selection")
   openxlsx::writeData(wb, "Settings", settings, headerStyle = excel_header_style())
   openxlsx::writeData(wb, "Selection", selection, headerStyle = excel_header_style())
-  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  turas_saveWorkbook(wb, path, overwrite = TRUE)
   return(invisible(path))
 }
 

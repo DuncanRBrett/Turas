@@ -13,6 +13,11 @@ for (script in c("vas_derived_config.R", "vas_amount_parser.R", "vas_frequency.R
   source(file.path(VAS_PROJECT_ROOT, script))
 }
 
+# The tests source the VAS files directly rather than through
+# load_vas_library(), so they have to pick up the shared workbook saver
+# themselves. Same relative position: <turas>/modules/shared/lib.
+source(file.path(VAS_PROJECT_ROOT, "..", "shared", "lib", "turas_save_workbook_atomic.R"))
+
 #' Build a vas_source from literal columns, for tests
 #'
 #' @param ... Named character vectors, one per column, all the same length.

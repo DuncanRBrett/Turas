@@ -136,7 +136,7 @@ export_shap_to_excel <- function(shap_results, wb = NULL, output_file = NULL) {
 
   # Save if new workbook
   if (create_new && !is.null(output_file)) {
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_file, overwrite = TRUE)
   }
 
   invisible(wb)

@@ -892,7 +892,7 @@ save_config_to_excel <- function(config, output_file) {
   openxlsx::setColWidths(wb, "Settings", cols = 1:2, widths = "auto")
   openxlsx::setColWidths(wb, "Attributes", cols = 1:3, widths = "auto")
 
-  openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  turas_saveWorkbook(wb, output_file, overwrite = TRUE)
 
   message(sprintf("Configuration saved to: %s", output_file))
 }

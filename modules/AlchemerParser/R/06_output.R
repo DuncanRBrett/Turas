@@ -5,6 +5,43 @@
 # Creates: Crosstab_Config.xlsx, Survey_Structure.xlsx, Data_Headers.xlsx
 # ==============================================================================
 
+# ------------------------------------------------------------------------------
+# Shared workbook saver
+# ------------------------------------------------------------------------------
+# turas_saveWorkbook() reconciles worksheet relationships before saving. Without
+# it openxlsx leaves every sheet pointing at a drawing part it never writes, and
+# Excel reports a problem with the file and offers to repair it -- a repair that
+# strips every data-validation dropdown in the template.
+#
+# This file is designed to be sourced on its own, so it locates the shared
+# helper itself rather than assuming the caller has already loaded it.
+if (!exists("turas_saveWorkbook", mode = "function")) {
+  .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  .turas_saver_dir <- getwd()
+  while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+         .turas_saver_dir != dirname(.turas_saver_dir)) {
+    .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
+  if (file.exists(.turas_saver_path)) {
+    source(.turas_saver_path)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found, so templates are\n")
+    cat("│          written without part reconciliation and Excel may offer to\n")
+    cat("│          repair them, losing their dropdowns.\n")
+    cat("│ How to fix: run from the Turas project root, or set the working\n")
+    cat("│          directory so that modules/shared/lib is reachable\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)
+    }
+  }
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+}
+
+
 #' Generate Output Files
 #'
 #' @description
@@ -95,7 +132,7 @@ generate_output_files <- function(questions, project_name, output_dir,
                     style = openxlsx::createStyle(textDecoration = "bold"),
                     rows = 1, cols = 1:ncol(crosstab_data), gridExpand = TRUE)
 
-  openxlsx::saveWorkbook(wb_crosstab, crosstab_file, overwrite = TRUE)
+  turas_saveWorkbook(wb_crosstab, crosstab_file, overwrite = TRUE)
 
   # ===========================================================================
   # Generate Survey_Structure (Questions and Options sheets)
@@ -144,7 +181,7 @@ generate_output_files <- function(questions, project_name, output_dir,
     }
   }
 
-  openxlsx::saveWorkbook(wb_survey, survey_file, overwrite = TRUE)
+  turas_saveWorkbook(wb_survey, survey_file, overwrite = TRUE)
 
   # ===========================================================================
   # Generate Data_Headers
@@ -161,7 +198,7 @@ generate_output_files <- function(questions, project_name, output_dir,
   openxlsx::writeData(wb_headers, "Headers", headers_data,
                      startRow = 1, startCol = 1, colNames = FALSE)
 
-  openxlsx::saveWorkbook(wb_headers, headers_file, overwrite = TRUE)
+  turas_saveWorkbook(wb_headers, headers_file, overwrite = TRUE)
 
   return(list(
     crosstab_config = crosstab_file,

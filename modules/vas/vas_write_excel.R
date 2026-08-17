@@ -123,7 +123,7 @@ write_vas_workbook <- function(result, dictionary, config, source_origin, path) 
                 wrap_columns = 7:10)
   add_vas_sheet(wb, "Settings", settings, widths = c(28, 74), wrap_columns = 2L)
   add_vas_sheet(wb, "Audit", result$audit, widths = "auto")
-  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  turas_saveWorkbook(wb, path, overwrite = TRUE)
   return(invisible(path))
 }
 

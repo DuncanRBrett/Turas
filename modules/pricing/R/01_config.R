@@ -1094,7 +1094,7 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
     )
     openxlsx::writeData(wb, "Settings", settings_data, headerStyle = header_style)
     openxlsx::setColWidths(wb, "Settings", cols = 1:2, widths = c(30, 30))
-    openxlsx::saveWorkbook(wb, output_file, overwrite = overwrite)
+    turas_saveWorkbook(wb, output_file, overwrite = overwrite)
   }
 
   cat(sprintf("Configuration template created: %s\n", output_file))

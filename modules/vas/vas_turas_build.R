@@ -363,7 +363,7 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Data")
   openxlsx::writeData(wb, "Data", data, headerStyle = excel_header_style())
-  openxlsx::saveWorkbook(wb, data_path, overwrite = TRUE)
+  turas_saveWorkbook(wb, data_path, overwrite = TRUE)
 
   # the data regenerates every build; the structure and config are generated
   # ONCE and then belong to Duncan - report curation must survive rebuilds

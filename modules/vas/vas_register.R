@@ -305,7 +305,7 @@ write_report_register <- function(register, path) {
   openxlsx::freezePane(wb, VAS_REGISTER_SHEET, firstActiveRow = 5L)
   openxlsx::setColWidths(wb, VAS_REGISTER_SHEET,
                          cols = seq_len(ncol(register)), widths = "auto")
-  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  turas_saveWorkbook(wb, path, overwrite = TRUE)
   return(invisible(path))
 }
 

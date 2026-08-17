@@ -174,7 +174,7 @@ write_catdriver_output <- function(results, config, output_file) {
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    turas_saveWorkbook(wb, output_file, overwrite = TRUE)
   }
 
   invisible(output_file)

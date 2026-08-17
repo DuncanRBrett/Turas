@@ -2,6 +2,43 @@
 # Only the asked questions live here; the nine derived measures per category come
 # from the dictionary templates in vas_data_dictionary.R.
 
+
+# ------------------------------------------------------------------------------
+# Shared workbook saver
+# ------------------------------------------------------------------------------
+# turas_saveWorkbook() reconciles worksheet relationships before saving. Without
+# it openxlsx leaves every sheet pointing at a drawing part it never writes, and
+# Excel reports a problem with the file and offers to repair it -- a repair that
+# strips every data-validation dropdown in the template.
+#
+# This file is designed to be sourced on its own, so it locates the shared
+# helper itself rather than assuming the caller has already loaded it.
+if (!exists("turas_saveWorkbook", mode = "function")) {
+  .turas_saver_rel <- file.path("modules", "shared", "lib", "turas_save_workbook_atomic.R")
+  .turas_saver_dir <- getwd()
+  while (!file.exists(file.path(.turas_saver_dir, .turas_saver_rel)) &&
+         .turas_saver_dir != dirname(.turas_saver_dir)) {
+    .turas_saver_dir <- dirname(.turas_saver_dir)
+  }
+  .turas_saver_path <- file.path(.turas_saver_dir, .turas_saver_rel)
+  if (file.exists(.turas_saver_path)) {
+    source(.turas_saver_path)
+  } else {
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Code: IO_SAVER_NOT_FOUND\n")
+    cat("│ Message: turas_save_workbook_atomic.R was not found, so templates are\n")
+    cat("│          written without part reconciliation and Excel may offer to\n")
+    cat("│          repair them, losing their dropdowns.\n")
+    cat("│ How to fix: run from the Turas project root, or set the working\n")
+    cat("│          directory so that modules/shared/lib is reachable\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    turas_saveWorkbook <- function(wb, file, overwrite = TRUE, ...) {
+      openxlsx::saveWorkbook(wb, file, overwrite = overwrite, ...)
+    }
+  }
+  rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
+}
+
 L <- function(code, text, note = "") data.frame(question_code = code, question_text = text,
                                                 note = note, stringsAsFactors = FALSE)
 
@@ -248,5 +285,5 @@ openxlsx::addStyle(wb, "Labels", openxlsx::createStyle(textDecoration = "bold"),
                    rows = 1, cols = 1:3, gridExpand = TRUE)
 openxlsx::setColWidths(wb, "Labels", cols = 1:3, widths = c(32, 72, 58))
 openxlsx::freezePane(wb, "Labels", firstRow = TRUE)
-openxlsx::saveWorkbook(wb, "modules/vas/vas_report_labels.xlsx", overwrite = TRUE)
+turas_saveWorkbook(wb, "modules/vas/vas_report_labels.xlsx", overwrite = TRUE)
 cat("labels:", nrow(labels), "rows,", length(unique(labels$question_code)), "unique codes\n")
