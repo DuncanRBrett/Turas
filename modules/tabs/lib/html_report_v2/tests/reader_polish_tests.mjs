@@ -22,7 +22,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
-import { TXT, installText } from "./_text.mjs";
+import { TXT, installText, blockOf } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -369,7 +369,8 @@ run("A4: legend panel contains all five explains", () => {
     html.indexOf('data-txt-key="reader.legend.moe_with_base"') !== -1,
     "4: precision sentence");
   assert(html.indexOf("Weighted data") !== -1 &&
-    html.indexOf("Effective base") !== -1, "5: weighted/effective base note");
+    html.indexOf('data-txt-key="filter.weighting.base_effective"') !== -1,
+    "5: weighted/effective base note");
 });
 
 run("A4: the band legend renders symbols, not raw entities", () => {

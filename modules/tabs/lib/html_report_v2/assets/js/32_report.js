@@ -122,9 +122,8 @@
   report.renderTab = function (host) {
     var s = store();
     var html = ['<div class="page">'];
-    html.push('<div class="card"><h2>Report</h2><p>This page contains the ' +
-      "background, method, executive summary, any imported slides and an " +
-      "explanation of how the Turas report is constructed.</p></div>");
+    html.push('<div class="card"><h2>Report</h2>' +
+      TR.txt.block("report.intro") + "</div>");
     html.push(report.sectionsHtml());
 
     // AI-assisted key findings (read-only, labelled) — shown only when present.
@@ -133,9 +132,8 @@
     // Authored exhibits from the config, above the reader's own scratch ones.
     html.push(report.studySlidesHtml());
 
-    html.push('<div class="card"><h3>Added slides</h3><p>Import exhibits from outside ' +
-      "this study — e.g. qual-phase slides exported as images (in PowerPoint: " +
-      "right-click a slide → Save as Picture), or plain text blocks.</p>" +
+    html.push('<div class="card"><h3>Added slides</h3>' +
+      TR.txt.block("report.added_slides.intro") +
       '<div class="sa-btns"><label class="t-btnish">+ Import image' +
       '<input id="slide-image" type="file" accept="image/png,image/jpeg" hidden></label>' +
       '<button data-act="add-text">+ Text block</button></div>' +
@@ -181,8 +179,7 @@
         ? text.split(/\n+/).map(function (p) {
             return "<p>" + fmt.escapeHtml(p) + "</p>";
           }).join("")
-        : '<p class="hint">Not set — the report author writes this in the ' +
-          "config file (Comments sheet, " + sec[2] + " row).</p>";
+        : TR.txt.block("report.section_unset", { row: sec[2] }, { cls: "hint" });
       return '<div class="card rpt-sec-card"' + (text ? " data-snap-card" : "") +
         "><h3>" + sec[1] + "</h3>" +
         (text

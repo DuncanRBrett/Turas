@@ -20,7 +20,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
-import { TXT, installText } from "./_text.mjs";
+import { TXT, installText, blockOf } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -202,11 +202,13 @@ run("intervals bracket the shown % on a banner past the first (own-base fix)", (
 run("weighting callout appears only when weighted and explains the three bases", () => {
   TR.AGG = { project: { weighted: true, weight_variable: "weight" } };
   const note = TR.filterBar.weightingNote();
-  assert(note.indexOf("Weighted data") !== -1, "callout headline present");
-  assert(note.indexOf("weight") !== -1, "names the weight variable");
-  assert(note.indexOf("Base (unweighted)") !== -1 &&
-         note.indexOf("Base (weighted)") !== -1 &&
-         note.indexOf("Effective base") !== -1, "explains all three bases");
+  assert(note.indexOf(TXT("filter.weighting.summary")) !== -1, "callout headline present");
+  assert(blockOf(note, "filter.weighting.what").indexOf("weight") !== -1,
+    "names the weight variable");
+  ["base_unweighted", "base_weighted", "base_effective"].forEach((k) => {
+    assert(note.indexOf('data-txt-key="filter.weighting.' + k + '"') !== -1,
+      "explains all three bases: " + k);
+  });
 
   // unweighted -> no callout at all
   TR.AGG = { project: { weighted: false } };

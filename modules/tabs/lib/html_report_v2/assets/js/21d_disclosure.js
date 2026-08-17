@@ -57,11 +57,8 @@
   disc.note = function () {
     var base = disc.audienceBase();
     if (base === null) {
-      return "Confidentiality threshold (k=" + disc.minBase() + ") is on but the audience size " +
-        "can't be verified in this view — demographic detail is hidden to protect individual identities.";
+      return TR.txt("disclosure.note_unverified", { k: disc.minBase() });
     }
-    return "Audience too small (n=" + base + ", below the confidentiality threshold of " +
-      disc.minBase() + ") — demographic detail is hidden to protect individual identities. " +
-      "Broaden the filter to see it.";
+    return TR.txt("disclosure.note_too_small", { n: base, k: disc.minBase() });
   };
 })(typeof window !== "undefined" ? window : globalThis);

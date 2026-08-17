@@ -4,11 +4,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TXT, installText, blockOf } from "./_text.mjs";
+import { TXT, CATALOGUE, installText, blockOf } from "./_text.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsDir = path.join(here, "..", "assets", "js");
 globalThis.TR = {};
+// disc.note() reads its wording from the catalogue (02_text.js), like the rest
+// of the renderer.
+new Function(fs.readFileSync(path.join(jsDir, "02_text.js"), "utf8"))();
+globalThis.TR.txt.load(CATALOGUE);
 new Function(fs.readFileSync(path.join(jsDir, "21d_disclosure.js"), "utf8"))();
 const disc = globalThis.TR.disclosure;
 
@@ -61,7 +65,8 @@ TR.AGG.project.min_reporting_base = 10;
 TR.MICRO = null;
 assert(disc.audienceBase() === null, "no microdata -> audience base is unknown (null), not Infinity");
 assert(disc.audienceTooSmall() === true, "disclosure on + no microdata -> fail closed (too small)");
-assert(disc.note().indexOf("can't be verified") !== -1, "note explains the base is unverifiable");
+assert(disc.note() === TXT("disclosure.note_unverified", { k: 10 }),
+  "note explains the base is unverifiable");
 // ...but with the control off, missing microdata gates nothing (existing reports unaffected).
 TR.AGG.project.min_reporting_base = 1;
 assert(disc.audienceTooSmall() === false, "control off + no microdata -> nothing gated");

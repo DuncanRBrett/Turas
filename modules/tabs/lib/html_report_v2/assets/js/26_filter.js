@@ -19,24 +19,17 @@
   filterBar.weightingNote = function () {
     var p = (TR.AGG && TR.AGG.project) || {};
     if (!p.weighted) return "";
-    var by = p.weight_variable
-      ? " using ‘" + fmt.escapeHtml(p.weight_variable) + "’" : "";
-    return '<details class="fb-wnote"><summary>⚖ Weighted data — figures ' +
-      "represent the population, not the raw sample. How the three bases work ▸" +
-      "</summary><div><p>These results are <strong>weighted</strong>" + by +
-      " so the sample matches the known profile of the population. Every " +
-      "percentage, mean and significance test is calculated on the weights, so " +
-      "the figures describe the population rather than the unadjusted sample.</p>" +
-      "<p>Each table shows three base sizes:</p><ul>" +
-      "<li><strong>Base (unweighted)</strong> — the actual number of people who " +
-      "answered. Judge how robust a result is on this: a small unweighted base " +
-      "is fragile however large the weighted figure looks.</li>" +
-      "<li><strong>Base (weighted)</strong> — the weighted total the percentages " +
-      "are calculated on.</li>" +
-      "<li><strong>Effective base</strong> — the sample's effective size once " +
-      "weighting is accounted for (always ≤ the unweighted count). Significance " +
-      "tests and confidence intervals are sized on this, because weighting " +
-      "reduces precision.</li></ul></div></details>";
+    // The weight variable is data, so it arrives escaped as a token; the clause
+    // around it is authored, and disappears cleanly when no variable is named.
+    var by = p.weight_variable ? " using ‘" + p.weight_variable + "’" : "";
+    var li = function (key) { return TR.txt.block(key, null, { tag: "li" }); };
+    return '<details class="fb-wnote"><summary>' +
+      fmt.escapeHtml(TR.txt("filter.weighting.summary")) + "</summary><div>" +
+      TR.txt.block("filter.weighting.what", { by: by }) +
+      TR.txt.block("filter.weighting.bases_lead") + "<ul>" +
+      li("filter.weighting.base_unweighted") +
+      li("filter.weighting.base_weighted") +
+      li("filter.weighting.base_effective") + "</ul></div></details>";
   };
 
   filterBar.render = function () {

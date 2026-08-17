@@ -844,6 +844,102 @@
       "text": "mixed",
       "context": "Qualitative, sentiment word (coloured by the renderer)",
       "page": "Qualitative"
+    },
+    "report.intro": {
+      "title": "Report tab — what this page is",
+      "text": "This page contains the background, method, executive summary, any imported slides and an explanation of how the Turas report is constructed.",
+      "context": "Report tab, opening card",
+      "page": "Report"
+    },
+    "report.section_unset": {
+      "title": "Report tab — an unfilled section",
+      "text": "Not set — the report author writes this in the config file (Comments sheet, {row} row).",
+      "context": "Report tab, in place of an empty narrative section",
+      "page": "Report"
+    },
+    "report.added_slides.intro": {
+      "title": "Report tab — Added slides",
+      "text": "Import exhibits from outside this study — e.g. qual-phase slides exported as images (in PowerPoint: right-click a slide → Save as Picture), or plain text blocks.",
+      "context": "Report tab, Added slides card",
+      "page": "Report"
+    },
+    "filter.weighting.summary": {
+      "title": "Weighted data — summary line",
+      "text": "⚖ Weighted data — figures represent the population, not the raw sample. How the three bases work ▸",
+      "context": "Filter bar, the collapsed weighting note",
+      "page": "Crosstabs"
+    },
+    "filter.weighting.what": {
+      "title": "Weighted data — what weighting does",
+      "text": "These results are <strong>weighted<\/strong>{by} so the sample matches the known profile of the population. Every percentage, mean and significance test is calculated on the weights, so the figures describe the population rather than the unadjusted sample.",
+      "context": "Filter bar, weighting note",
+      "page": "Crosstabs"
+    },
+    "filter.weighting.bases_lead": {
+      "title": "Weighted data — the three bases",
+      "text": "Each table shows three base sizes:",
+      "context": "Filter bar, weighting note",
+      "page": "Crosstabs"
+    },
+    "filter.weighting.base_unweighted": {
+      "title": "Weighted data — unweighted base",
+      "text": "<strong>Base (unweighted)<\/strong> — the actual number of people who answered. Judge how robust a result is on this: a small unweighted base is fragile however large the weighted figure looks.",
+      "context": "Filter bar, weighting note",
+      "page": "Crosstabs"
+    },
+    "filter.weighting.base_weighted": {
+      "title": "Weighted data — weighted base",
+      "text": "<strong>Base (weighted)<\/strong> — the weighted total the percentages are calculated on.",
+      "context": "Filter bar, weighting note",
+      "page": "Crosstabs"
+    },
+    "filter.weighting.base_effective": {
+      "title": "Weighted data — effective base",
+      "text": "<strong>Effective base<\/strong> — the sample's effective size once weighting is accounted for (always ≤ the unweighted count). Significance tests and confidence intervals are sized on this, because weighting reduces precision.",
+      "context": "Filter bar, weighting note",
+      "page": "Crosstabs"
+    },
+    "disclosure.note_unverified": {
+      "title": "Disclosure — size unverifiable",
+      "text": "Confidentiality threshold (k={k}) is on but the audience size can't be verified in this view — demographic detail is hidden to protect individual identities.",
+      "context": "Shown wherever the disclosure control speaks",
+      "page": "Crosstabs"
+    },
+    "disclosure.note_too_small": {
+      "title": "Disclosure — audience too small",
+      "text": "Audience too small (n={n}, below the confidentiality threshold of {k}) — demographic detail is hidden to protect individual identities. Broaden the filter to see it.",
+      "context": "Shown wherever the disclosure control speaks",
+      "page": "Crosstabs"
+    },
+    "render.base.withheld_tip": {
+      "title": "Base cell — withheld tooltip",
+      "text": "Withheld: this column's base is below the confidentiality threshold, so its exact size is not disclosed",
+      "context": "Crosstab base row",
+      "page": "Crosstabs"
+    },
+    "render.base.low_tip": {
+      "title": "Base cell — low base tooltip",
+      "text": "Base below {threshold} — interpret with caution",
+      "context": "Crosstab base row",
+      "page": "Crosstabs"
+    },
+    "render.base.low_fpc_tip": {
+      "title": "Base cell — low base after correction",
+      "text": "Even after the finite population correction the effective base is below {threshold} — interpret with caution",
+      "context": "Crosstab base row",
+      "page": "Crosstabs"
+    },
+    "render.base.coverage_tip": {
+      "title": "Base cell — coverage tooltip",
+      "text": "{base} of {population} in this group responded — its numbers carry a finite population correction",
+      "context": "Crosstab base row, census reports only",
+      "page": "Crosstabs"
+    },
+    "render.base.effective_tip": {
+      "title": "Base row — effective base tooltip",
+      "text": "Kish effective sample size — significance and confidence intervals are sized on this, not the raw count",
+      "context": "Crosstab base row label",
+      "page": "Crosstabs"
     }
   },
   "brand": {

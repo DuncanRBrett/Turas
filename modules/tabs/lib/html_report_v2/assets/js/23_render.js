@@ -24,8 +24,7 @@
    * unprotected report (k <= 1 — nothing is ever flagged) renders byte-identically.
    * TR.disclosure is guarded: the flag only ever arrives from a model built with
    * it loaded, and "n<k" mirrors disclosure_marker()'s own unknown-k branch. */
-  var WITHHELD_TITLE = "Withheld: this column's base is below the confidentiality " +
-    "threshold, so its exact size is not disclosed";
+  var WITHHELD_TITLE = function () { return TR.txt("render.base.withheld_tip"); };
   render.baseMarker = function (col) {
     if (!col || !col.suppressed) return null;
     var k = (TR.disclosure && TR.disclosure.minBase) ? TR.disclosure.minBase() : null;
@@ -239,7 +238,7 @@
     var baseCell = function (col, value) {
       var mark = render.baseMarker(col);
       return mark
-        ? '<span class="supb" title="' + fmt.escapeHtml(WITHHELD_TITLE) + '">' +
+        ? '<span class="supb" title="' + fmt.escapeHtml(WITHHELD_TITLE()) + '">' +
           fmt.escapeHtml(mark) + "</span>"
         : value;
     };
@@ -269,10 +268,8 @@
       // The FPC only frames a column when it MATERIALLY applies (known universe +
       // coverage above the floor); a thin sample reads as a plain low base.
       var colFpc = col.population != null && TR.conf.fpcApplies(col.base, col.population);
-      var lowTitle = colFpc
-        ? "Even after the finite population correction the effective base is below "
-          + model.lowBaseThreshold + " — interpret with caution"
-        : "Base below " + model.lowBaseThreshold + " — interpret with caution";
+      var lowTitle = TR.txt(colFpc ? "render.base.low_fpc_tip" : "render.base.low_tip",
+                            { threshold: model.lowBaseThreshold });
       out.push("<td>" + (col.low
         ? '<span class="lowb" title="' + lowTitle + '">' +
           fmt.base(col.base) + " ⚠</span>"
@@ -284,9 +281,9 @@
         // 14 563" under every base on a stratified sample reads as noise.
         (colFpc && col.coverage != null &&
          TR.conf.labels().sampling_method_normalised === "census"
-          ? '<div class="civ" title="' + fmt.escapeHtml(fmt.base(col.base) +
-            " of " + fmt.base(col.population) + " in this group responded — its " +
-            "numbers carry a finite population correction") + '">' +
+          ? '<div class="civ" title="' +
+            fmt.escapeHtml(TR.txt("render.base.coverage_tip",
+              { base: fmt.base(col.base), population: fmt.base(col.population) })) + '">' +
             Math.round(col.coverage * 100) + "% of " + fmt.base(col.population) +
             "</div>"
           : "") +
@@ -316,9 +313,8 @@
         out.push("</tr>");
       }
       if (wproj.show_effective_n !== false) {
-        out.push('<tr class="rb"><td class="lab" title="Kish effective sample ' +
-          'size — significance and confidence intervals are sized on this, not ' +
-          'the raw count">Effective base</td>');
+        out.push('<tr class="rb"><td class="lab" title="' +
+          fmt.escapeHtml(TR.txt("render.base.effective_tip")) + '">Effective base</td>');
         model.columns.forEach(function (col) {
           out.push("<td>" + baseCell(col,
             col.baseEff != null ? fmt.base(col.baseEff) : "–") + "</td>");

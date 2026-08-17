@@ -559,5 +559,101 @@
     "page": "Qualitative",
     "context": "Themes board — the word for the middle of a sentiment bar, coloured to match it",
     "tokens": []
+  },
+  "report.intro": {
+    "page": "Report",
+    "context": "Report tab — what this page holds.",
+    "tokens": []
+  },
+  "report.section_unset": {
+    "page": "Report",
+    "context": "Report tab — shown in place of a narrative section the config has not filled in. {row} names the Comments-sheet row that fills it.",
+    "tokens": [
+      "row"
+    ]
+  },
+  "report.added_slides.intro": {
+    "page": "Report",
+    "context": "Report tab — what the reader's own Added slides are for and how to make one.",
+    "tokens": []
+  },
+  "filter.weighting.summary": {
+    "page": "Crosstabs",
+    "context": "Filter bar — the collapsed weighted-data summary line.",
+    "tokens": []
+  },
+  "filter.weighting.what": {
+    "page": "Crosstabs",
+    "context": "Filter bar, weighted-data note — what weighting does to every figure. {by} names the weight variable when the study declares one.",
+    "tokens": [
+      "by"
+    ]
+  },
+  "filter.weighting.bases_lead": {
+    "page": "Crosstabs",
+    "context": "Filter bar, weighted-data note — introduces the three base sizes.",
+    "tokens": []
+  },
+  "filter.weighting.base_unweighted": {
+    "page": "Crosstabs",
+    "context": "Filter bar, weighted-data note — the unweighted base and why robustness is judged on it.",
+    "tokens": []
+  },
+  "filter.weighting.base_weighted": {
+    "page": "Crosstabs",
+    "context": "Filter bar, weighted-data note — the weighted base.",
+    "tokens": []
+  },
+  "filter.weighting.base_effective": {
+    "page": "Crosstabs",
+    "context": "Filter bar, weighted-data note — the effective base and why tests are sized on it.",
+    "tokens": []
+  },
+  "disclosure.note_unverified": {
+    "page": "Crosstabs",
+    "context": "Disclosure — the audience size cannot be verified in this view.",
+    "tokens": [
+      "k"
+    ]
+  },
+  "disclosure.note_too_small": {
+    "page": "Crosstabs",
+    "context": "Disclosure — the audience is below the confidentiality threshold.",
+    "tokens": [
+      "n",
+      "k"
+    ]
+  },
+  "render.base.withheld_tip": {
+    "page": "Crosstabs",
+    "context": "Crosstab base row — tooltip on a base withheld under the confidentiality threshold.",
+    "tokens": []
+  },
+  "render.base.low_tip": {
+    "page": "Crosstabs",
+    "context": "Crosstab base row — tooltip on a base below the low-base threshold.",
+    "tokens": [
+      "threshold"
+    ]
+  },
+  "render.base.low_fpc_tip": {
+    "page": "Crosstabs",
+    "context": "Crosstab base row — the same warning where a finite population correction has already been applied.",
+    "tokens": [
+      "threshold"
+    ]
+  },
+  "render.base.coverage_tip": {
+    "page": "Crosstabs",
+    "context": "Crosstab base row — tooltip on the coverage line under a census base.",
+    "tokens": [
+      "base",
+      "population"
+    ]
+  },
+  "render.base.effective_tip": {
+    "page": "Crosstabs",
+    "context": "Crosstab base row — tooltip on the Effective base label.",
+    "tokens": []
   }
 }

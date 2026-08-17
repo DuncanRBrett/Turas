@@ -27,6 +27,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { TXT, installText, blockOf } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -35,6 +36,7 @@ const sandbox = { console };
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
+installText(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "20_data.js",
   "21_stats.js", "21c_confidence.js", "21d_disclosure.js", "22w_waves.js", "22_model.js",
   "23_render.js", "26_filter.js"]) {
