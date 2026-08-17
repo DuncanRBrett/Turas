@@ -542,7 +542,7 @@
     "tracking.heatmap.soft_clause": {
       "title": "Heatmap — the 80% clause",
       "text": "hollow △▽ = significant at 80% (not 95%), ",
-      "context": "Tracking summary heatmap note, only when the 80% level is on",
+      "context": "Tracking summary heatmap note, spliced mid-sentence — keep the trailing comma and space",
       "page": "Tracking"
     },
     "tracking.scorecard.bands": {
@@ -620,7 +620,7 @@
     "visualise.ci_note_softened": {
       "title": "Visualise — non-probability caveat",
       "text": " Quoted as stability intervals: this survey did not use formal random sampling.",
-      "context": "Tracking visualise, appended to the interval note for non-probability designs",
+      "context": "Tracking visualise, appended to the interval note — keep the leading space",
       "page": "Tracking"
     },
     "visualise.note_tags": {

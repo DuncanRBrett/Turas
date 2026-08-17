@@ -386,7 +386,7 @@ like code. The editor writes it atomically and keeps its last ten saves under
 | Authored text: the words | `modules/shared/lib/callouts/callouts.json` (module `tabs`), edited in the Callout Editor |
 | Per-study text overrides | `ReportText` sheet -> `load_report_text_sheet()` in `crosstabs/crosstabs_config.R` |
 | Wiring (Step 4d) | `modules/tabs/lib/run_crosstabs.R` |
-| Tests | `tests/testthat/test_{data_layer_writer,microdata_writer,tracking_island,report_v2_bundler,report_text}.R` + prototype `tests/run_tests_v2.mjs` |
+| Tests | `tests/testthat/test_{data_layer_writer,microdata_writer,tracking_island,report_v2_bundler,report_text}.R` + the node suite in `html_report_v2/tests/` (`*_tests.mjs`, plus `mutate_text_check.mjs`) |
 
 The renderer under `modules/tabs/lib/html_report_v2/assets/` **is** the
 source of truth. It began as a vendored copy of

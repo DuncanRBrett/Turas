@@ -276,7 +276,7 @@
   },
   "tracking.heatmap.soft_clause": {
     "page": "Tracking",
-    "context": "Tracking summary — the hollow-arrow clause spliced into the heatmap note when the 80% level is on.",
+    "context": "Tracking summary — the hollow-arrow clause spliced into the heatmap note when the 80% level is on. Ends with a comma and a space because it sits mid-sentence; keep them.",
     "tokens": []
   },
   "tracking.scorecard.bands": {
@@ -344,7 +344,7 @@
   },
   "visualise.ci_note_softened": {
     "page": "Tracking",
-    "context": "Tracking visualise — the clause added to the interval note when the design is not a formal random sample.",
+    "context": "Tracking visualise — the clause appended to the interval note for non-probability designs. Starts with a space because it follows the previous sentence; keep it.",
     "tokens": []
   },
   "visualise.note_tags": {
