@@ -443,9 +443,12 @@
   },
   "qual.board.salience_hint": {
     "page": "Qualitative",
-    "context": "Themes board — how to read the diverging bars: what salience means, what the mix shows, which side is which.",
+    "context": "Themes board — how to read the diverging bars. The three sentiment words arrive as {neg} {pos} {mixed}; the renderer colours them to match the bars, so their wording stays editable below.",
     "tokens": [
-      "audience_n"
+      "audience_n",
+      "neg",
+      "pos",
+      "mixed"
     ]
   },
   "qual.board.champ_rule": {
@@ -540,6 +543,21 @@
   "qual.collection.empty_cut": {
     "page": "Qualitative",
     "context": "Your collection — no marks fall in the current cut.",
+    "tokens": []
+  },
+  "qual.board.word_negative": {
+    "page": "Qualitative",
+    "context": "Themes board — the word for the negative end of a sentiment bar, coloured to match it",
+    "tokens": []
+  },
+  "qual.board.word_positive": {
+    "page": "Qualitative",
+    "context": "Themes board — the word for the positive end of a sentiment bar, coloured to match it",
+    "tokens": []
+  },
+  "qual.board.word_mixed": {
+    "page": "Qualitative",
+    "context": "Themes board — the word for the middle of a sentiment bar, coloured to match it",
     "tokens": []
   }
 }
