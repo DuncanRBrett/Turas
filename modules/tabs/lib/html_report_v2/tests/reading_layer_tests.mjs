@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { TXT, installText } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -63,6 +64,7 @@ function shellSandbox(opts) {
     }
   };
   vm.createContext(sb);
+  installText(sb);
   load(sb, "24_shell.js");
   return sb;
 }
@@ -124,6 +126,7 @@ run("B1: hash deep links keep working — ids unchanged, decode round-trips", ()
   ds.globalThis = ds; ds.window = ds;
   ds.TR = { fmt: { slug: (s) => s } };
   vm.createContext(ds);
+  installText(ds);
   load(ds, "00_namespace.js");
   load(ds, "20_data.js");
   ds.TR.AGG = { questions: [], columns: [] };
@@ -149,6 +152,7 @@ function readerSandbox(opts) {
     };
   }
   vm.createContext(sb);
+  installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
   load(sb, "21_stats.js");                       // real alphaPrimary/Secondary
@@ -303,7 +307,7 @@ run("B2: toggle lives in the legend dialog AND by the sig-mode control; tooltip 
   const sb = readerSandbox({});
   const legend = sb.TR.reader.legendHtml();
   assert(legend.indexOf("data-explain-toggle") !== -1, "legend checkbox present");
-  assert(legend.indexOf("Explain significance in plain language") !== -1, "legend copy");
+  assert(legend.indexOf(TXT("reader.legend.explain_toggle")) !== -1, "legend copy");
   const cardsSrc = readFileSync(path.join(JS_DIR, "25_cards.js"), "utf8");
   const sig = at(cardsSrc, "data-sigmode>", "sig-mode select");
   const tgl = at(cardsSrc, "data-explain-sig", "compact Explain toggle");

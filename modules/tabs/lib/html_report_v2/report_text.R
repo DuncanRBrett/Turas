@@ -44,7 +44,7 @@ if (!exists("%||%", mode = "function")) {
 # write a list, not enough to lay anything out. Layout is the renderer's job,
 # and an unbalanced <div> typed into the editor would distort a client report.
 .REPORT_TEXT_TAGS <- c("strong", "em", "b", "i", "br", "p", "ul", "ol", "li",
-                       "h3", "h4", "span", "code")
+                       "h3", "h4", "span", "code", "sup", "sub")
 
 # Tags with no closing partner — excluded from the balance check.
 .REPORT_TEXT_VOID_TAGS <- c("br")

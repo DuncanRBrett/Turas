@@ -348,49 +348,37 @@
     if (!conf.fpcActiveReport()) return "";
     var rr = conf.responseRate();
     var census = conf.labels().sampling_method_normalised === "census";
-    // "Responded" (and the non-response caveat) presume everyone was invited —
-    // true only for a declared census. On a sample the same number is coverage
-    // of the universe, and most of the universe was never asked, so the honest
-    // note is that the correction exists and is modest.
-    if (census) {
-      var lead = rr
-        ? " About " + Math.round(rr.rate * 100) +
-          "% of the " + TR.fmt.base(rr.N) + "-strong universe responded, so "
-        : " Known group sizes were supplied, so ";
-      return lead + "ranges include a <strong>finite population correction</strong> " +
-        "— they narrow as coverage of a group rises, reaching zero for a full " +
-        "census. The remaining uncertainty is mainly <strong>non-response</strong>: " +
-        "the people who did not answer may differ from those who did, and no " +
-        "interval can correct for that.";
-    }
-    var slead = rr
-      ? " The sample covers about " + Math.round(rr.rate * 100) +
-        "% of the " + TR.fmt.base(rr.N) + "-strong universe, so "
-      : " Known group sizes were supplied, so ";
-    return slead + "ranges include a <strong>finite population correction</strong> — " +
-      "they narrow as coverage of a group rises, and at low coverage the " +
-      "effect is slight. Sampling uncertainty itself is unchanged: most of " +
-      "the universe was not interviewed.";
+    // A lead clause and a body, joined here. "Responded" (and the non-response
+    // caveat) presume everyone was invited — true only for a declared census. On
+    // a sample the same number is coverage of the universe, and most of the
+    // universe was never asked, so the honest note is that the correction exists
+    // and is modest. Which pair a report gets is code's decision; the words in
+    // each are the author's (conf.fpc.* in the Callout Editor).
+    var vars = rr ? { rate: Math.round(rr.rate * 100), universe: TR.fmt.base(rr.N) } : null;
+    var span = function (key, v) { return TR.txt.block(key, v, { tag: "span" }); };
+    var lead = rr
+      ? span(census ? "conf.fpc.lead_census_rate" : "conf.fpc.lead_sample_rate", vars)
+      : span("conf.fpc.lead_known_sizes");
+    var body = span(census ? "conf.fpc.body_census" : "conf.fpc.body_sample");
+    if (!lead && !body) return "";
+    return " " + [lead, body].filter(Boolean).join(" ");
   }
 
-  /** One honest sentence about the sampling design (labels port). */
+  /** One honest sentence about the sampling design, then the population-
+   *  correction note when one applies. Authored under conf.design.*. */
   function designSentence(labels) {
+    var span = function (key, v) { return TR.txt.block(key, v, { tag: "span" }); };
     if (!labels.is_probability) {
-      return "Responses were not drawn by formal random sampling, so ranges " +
-        "are <strong>stability intervals (" + labels.interval_abbrev +
-        ")</strong> — how much a number would wobble — not formal " +
-        "confidence intervals." + fpcNote();
+      return span("conf.design.non_probability",
+        { interval_abbrev: labels.interval_abbrev }) + fpcNote();
     }
     if (labels.sampling_method_normalised === "cluster") {
       // CLUSTER_WARNING_HTML pattern: clustering is not adjusted for
-      return "Probability (cluster) sample: ranges are 95% confidence " +
-        "intervals, but respondents cluster, so true uncertainty can be " +
-        "larger — treat near-" + labels.precision_term +
-        " differences with caution." + fpcNote();
+      return span("conf.design.cluster",
+        { precision_term: labels.precision_term }) + fpcNote();
     }
-    return "This survey used probability sampling, so ranges are formal " +
-      "95% <strong>confidence intervals (" + labels.interval_abbrev +
-      ")</strong>." + fpcNote();
+    return span("conf.design.probability",
+      { interval_abbrev: labels.interval_abbrev }) + fpcNote();
   }
 
   /**
@@ -404,44 +392,41 @@
     var small = smallColumnExample();
     var fmt = TR.fmt;
     var bullets = [];
+    var li = function (key, vars) { return TR.txt.block(key, vars, { tag: "li" }); };
     if (ex) {
       // worked example with real numbers, and it NAMES the concept (so the
-      // CI/SI/MOE jargon elsewhere has an anchor). Tail matches the inference:
-      // FPC ranges describe the whole group; uncorrected ranges describe a re-run.
-      var tail = ex.fpc
-        ? "% for the group as a whole"
-        : "% if we ran the survey again";
-      bullets.push("<li><strong>Every number is an estimate, not an exact count.</strong> " +
-        "For example, " + article(Math.round(ex.pct)) + " " + Math.round(ex.pct) + "% based on " +
-        fmt.base(ex.n) + " answers would sit between " + Math.round(ex.lo) +
-        "% and " + Math.round(ex.hi) + tail + " — that band is the 95% " +
-        fmt.escapeHtml(labels.interval_name) + " (" +
-        fmt.escapeHtml(labels.interval_abbrev) + ").</li>");
+      // CI/SI/MOE jargon elsewhere has an anchor). The tail matches the
+      // inference: corrected ranges describe the whole group, uncorrected ones
+      // describe a re-run — two short authored phrases rather than a branch
+      // inside one long sentence.
+      bullets.push(li("conf.footer.example", {
+        article: article(Math.round(ex.pct)),
+        pct: Math.round(ex.pct),
+        n: fmt.base(ex.n),
+        lo: Math.round(ex.lo),
+        hi: Math.round(ex.hi),
+        range_meaning: { html: TR.txt(ex.fpc ? "conf.footer.range_meaning_group"
+                                             : "conf.footer.range_meaning_rerun") },
+        interval_name: labels.interval_name,
+        interval_abbrev: labels.interval_abbrev
+      }));
     }
     // what the "95%" actually means — kept honest for non-probability designs,
     // where a wobble band is not a formal coverage guarantee
-    bullets.push(labels.is_probability
-      ? "<li><strong>What “95%” means:</strong> if we repeated the survey, the true " +
-        "figure would fall inside the range about 19 times out of 20.</li>"
-      : "<li><strong>Reading the ranges:</strong> they show how far a number would " +
-        "likely wobble if you measured again — a wider range means less certainty.</li>");
+    bullets.push(li(labels.is_probability ? "conf.footer.what_95_means"
+                                          : "conf.footer.reading_ranges"));
     if (small) {
       // FPC-consistent ±pp when the group's universe is known (matches the
       // table's corrected margin rather than the raw-base one).
       var sBase = (small.population > 1)
         ? conf.fpcBase(small.n, small.n, small.population) : small.n;
-      bullets.push("<li><strong>Small samples are inherently more volatile and " +
-        "so have wider error ranges.</strong> " +
-        fmt.escapeHtml(small.label) + " has only " + fmt.base(small.n) +
-        " respondents, so its numbers can move by about ±" +
-        conf.maxMoePct(sBase).toFixed(0) +
-        "pp — treat them as indicative.</li>");
+      bullets.push(li("conf.footer.small_samples", {
+        label: small.label, n: fmt.base(small.n),
+        moe_pp: conf.maxMoePct(sBase).toFixed(0)
+      }));
     }
-    bullets.push("<li><strong>Comparing two numbers:</strong> if two groups’ ranges " +
-      "overlap, treat the difference as noise rather than a real gap.</li>");
-    bullets.push("<li><strong>“Significant”</strong> means a difference too " +
-      "large to be explained by sampling wobble alone — not necessarily " +
-      "an important one.</li>");
+    bullets.push(li("conf.footer.comparing"));
+    bullets.push(li("conf.footer.significant_means"));
     // Analyst's fieldwork caveat (config sampling_note) — the honest asterisk
     // where fieldwork deviated from the textbook design (substitution rules,
     // replaced clusters, low response). Free text: escaped, sentence-terminated.

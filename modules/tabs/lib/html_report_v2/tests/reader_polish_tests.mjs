@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { TXT, installText } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -53,6 +54,7 @@ function viewsSandbox() {
   sb.globalThis = sb;
   sb.window = sb;
   vm.createContext(sb);
+  installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
   load(sb, "20_data.js");                     // real d2.shortLabel
@@ -278,6 +280,7 @@ function readerSandbox(opts) {
     };
   }
   vm.createContext(sb);
+  installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
   const TR = sb.TR;
@@ -356,12 +359,15 @@ run("A4: legend panel contains all five explains", () => {
   const sb = readerSandbox({ project: { weighted: true, weight_variable: "wt" },
     questions: [{ code: "Q8", bases: [{ n: 400 }] }] });
   const html = sb.TR.reader.legendHtml();
-  assert(html.indexOf("lowercase letters = 80%") !== -1, "1: sig letters incl. 80%");
-  assert(html.indexOf("▵ / ▿") !== -1 && html.indexOf("▲ / ▼") !== -1, "2: ▲▵ arrows");
+  assert(html.indexOf('data-txt-key="reader.legend.sig_letters"') !== -1,
+    "1: sig letters incl. 80%");
+  assert(html.indexOf('data-txt-key="reader.legend.arrows_profile"') !== -1 &&
+    html.indexOf('data-txt-key="reader.legend.arrows_chips"') !== -1, "2: ▲▵ arrows");
   assert(html.indexOf("strong ≥75%") !== -1 && html.indexOf("moderate 50–74%") !== -1 &&
     html.indexOf("weak") !== -1, "3: bands");
   assert(html.indexOf("Precision Estimate") !== -1 &&
-    html.indexOf("stable to about ±") !== -1, "4: precision sentence");
+    html.indexOf('data-txt-key="reader.legend.moe_with_base"') !== -1,
+    "4: precision sentence");
   assert(html.indexOf("Weighted data") !== -1 &&
     html.indexOf("Effective base") !== -1, "5: weighted/effective base note");
 });

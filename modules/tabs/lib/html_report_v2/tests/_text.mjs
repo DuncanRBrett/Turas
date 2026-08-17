@@ -65,3 +65,16 @@ export function installText(sandbox) {
   sandbox.TR.txt.load(CATALOGUE);
   return sandbox.TR;
 }
+
+/**
+ * The rendered contents of one authored block, tags stripped — for asserting on
+ * the VALUES a sentence carries (a base, a percentage, a column name) without
+ * asserting on the words around them.
+ */
+export function blockOf(html, key) {
+  // Closes on the block's OWN tag: an authored sentence may contain <strong>,
+  // and a lazy </[a-z]+> would stop at the first of those instead.
+  const m = new RegExp('<([a-z]+) data-txt-key="' +
+    key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '"[^>]*>([\\s\\S]*?)</\\1>').exec(html);
+  return m ? m[2].replace(/<[^>]+>/g, "") : "";
+}

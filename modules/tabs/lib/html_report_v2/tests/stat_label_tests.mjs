@@ -29,6 +29,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { TXT, installText, blockOf } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -37,6 +38,7 @@ const sandbox = { console };
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
+installText(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "20_data.js",
   "21_stats.js", "21c_confidence.js", "21d_disclosure.js", "22w_waves.js",
   "22_model.js", "23_render.js", "26_filter.js"]) {
@@ -266,14 +268,14 @@ run("the confidence explainer never quotes a headcount as its worked example", (
     pct: [142, 80, 62], n: [142, 80, 62], sig: ["", "", ""] });
   TR.d2._qIndex = null;
   const html = TR.conf.calloutHtml();
-  assert(!/a 142% based on/.test(html),
+  assert(blockOf(html, "conf.footer.example").indexOf("142") === -1,
     "the counts-only question must not supply the worked example");
   // control: as column percentages, that same NET IS the worked example
   loadFixture(null);
   TR.AGG.questions[0].rows.push({ kind: "net", label: "Top 2 Box",
     pct: [71, 80, 62], n: [142, 80, 62], sig: ["", "", ""] });
   TR.d2._qIndex = null;
-  assert(/a 71% based on/.test(TR.conf.calloutHtml()),
+  assert(blockOf(TR.conf.calloutHtml(), "conf.footer.example").indexOf("71") !== -1,
     "a real column percentage still supplies it");
 });
 
@@ -284,6 +286,7 @@ function diffsSandbox() {
   box.globalThis = box;
   box.window = box;
   vm.createContext(box);
+  installText(box);
   for (const file of ["00_namespace.js", "01_format.js", "27_views.js", "27d_diffs.js"]) {
     vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), box, { filename: file });
   }

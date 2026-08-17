@@ -722,60 +722,42 @@
     } catch (e) { return null; }
   };
 
+  /**
+   * The two collapsible explainers under every crosstab card, plus the shared
+   * precision footer. All three are authored in the Callout Editor —
+   * cards.reading.* and cards.sig.* here, conf.* in 21c_confidence.js.
+   *
+   * The minimum base stays INTERPOLATED from the project: a literal 30 in the
+   * text would misdescribe any study configured to a different threshold, which
+   * is why {min_base} is a declared token rather than something an author types.
+   */
   function explainersHtml() {
     var p = TR.AGG.project;
+    var li = function (key, vars) { return TR.txt.block(key, vars, { tag: "li" }); };
     // Table-specific mechanics only — significance letters, arrows, Δ chips
     // and bands live in the ONE shared "How to read this" panel (A4).
     return '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">i</span> Reading this table' +
       '<span class="callout-chev">▼</span></button><div class="callout-body"><ul>' +
-      "<li><strong>Heatmap</strong> — cell shading scales with the value within each row.</li>" +
-      "<li><strong>PUBLISHED / COMPUTED.</strong> ‘Published’ figures are " +
-      "calculated when the report was built. The moment you apply a filter or " +
-      "build your own banner, Turas recalculates from the underlying responses " +
-      "and marks the result ‘Computed’, so you always know whether you're seeing " +
-      "the original figures or a filtered recalculation of the data.</li>" +
-      "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots the full published history.</li>" +
-      '<li>Significance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score ' +
-      'bands are explained in <button class="linklike" data-legend-open>ⓘ How to ' +
-      "read this report</button>.</li>" +
-      "<li><strong>Insight</strong> — jot your own note on the question in the " +
-      "Insight box at the foot of the card. It's kept for the banner you're viewing " +
-      "(each banner has its own; a blank one falls back to the question's general " +
-      "note), saved in this browser, and carried into any saved copy.</li>" +
+      li("cards.reading.heatmap") +
+      li("cards.reading.published_computed") +
+      li("cards.reading.row_kinds") +
+      // The control is markup the renderer owns, passed in as {html:} so the
+      // author keeps one whole sentence instead of two fragments round a button.
+      li("cards.reading.see_legend", { legend_link: { html:
+        '<button class="linklike" data-legend-open>ⓘ How to read this report</button>' } }) +
+      li("cards.reading.insight_box") +
       "</ul></div></div>" +
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
-      // Rewritten 2026-08-11 (Duncan): what the test answers and why sample size
-      // decides it, before any mechanics. The minimum base stays INTERPOLATED
-      // from the project — a literal 30 would misdescribe any study configured
-      // to a different threshold.
-      '<p>A significance test answers the question "How often would the ' +
-      'difference happen by chance?". If the answer is less than one in 20, ' +
-      "then we call it significant at the 95% level. At 80% it is less than one " +
-      "in 5. In a significance test, the size of your sample is critical " +
-      "because in a small sample one person has a bigger impact. A 5 point gap " +
-      "between two groups of 1,000 is significant; a 10 point gap between two " +
-      "groups of 30 is not.</p>" +
-      "<p>The maths works differently for percentages and averages and so we " +
-      "use a two-proportion z-test for percentages, a Welch t-test for " +
-      "averages, index scores and NPS. Same question, different test.</p>" +
-      "<p>Each column has a letter. A letter appearing in a cell means that " +
-      "column is significantly ahead of the column with that letter. Upper case " +
-      "denotes significant at 95%, lowercase at 80%. Letters require a sample " +
-      "of at least " + p.low_base_threshold + " to show.</p>" +
-      "<p>If you run enough comparisons, some will come up significant purely " +
-      'by chance. Test twenty things where nothing is happening and one will ' +
-      '"pass" on average. Turas corrects for that within each banner using a ' +
-      "Bonferroni correction, which raises the bar in proportion to how many " +
-      "comparisons the banner involves.</p>" +
-      "<p>Year-on-year comparisons don't take that correction, because each one " +
-      "is a single planned comparison.</p>" +
-      "<p>Also remember that significance is about whether a difference is " +
-      "real, not whether it's important. A tiny gap on a big sample can be " +
-      "significant and useless. A large gap on a small sample can be genuinely " +
-      "interesting and fail the test.</p></div></div>" +
+      TR.txt.block("cards.sig.what_it_answers") +
+      TR.txt.block("cards.sig.which_test") +
+      TR.txt.block("cards.sig.letters", { min_base: p.low_base_threshold }) +
+      TR.txt.block("cards.sig.multiplicity") +
+      TR.txt.block("cards.sig.wave_exception") +
+      TR.txt.block("cards.sig.real_vs_important") +
+      "</div></div>" +
       TR.conf.calloutHtml();
   }
 

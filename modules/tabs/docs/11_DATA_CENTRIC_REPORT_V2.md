@@ -312,8 +312,8 @@ Three pieces, and the loop between them closes itself:
 Miss step 2 or 3 and the next build **refuses and names the key** — the renderer
 is scanned for its own `TR.txt(...)` calls, so nothing can silently render blank.
 A build also refuses on a `{placeholder}` the key does not declare, on markup
-outside the inline whitelist (`strong em b i br p ul ol li h3 h4 span code`, all
-balanced, no attributes), and on a key deleted from the registry.
+outside the inline whitelist (`strong em b i br p ul ol li h3 h4 span code sup sub`,
+all balanced, no attributes), and on a key deleted from the registry.
 
 **Blank text is legitimate** and means "do not show this block on any report" —
 that is how an author switches a paragraph off without a code change. Deleting

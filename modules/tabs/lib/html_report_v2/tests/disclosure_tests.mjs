@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { TXT, installText, blockOf } from "./_text.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsDir = path.join(here, "..", "assets", "js");
@@ -94,6 +95,7 @@ function renderSandbox() {
   box.globalThis = box;
   box.window = box;
   vm.createContext(box);
+  installText(box);
   for (const f of jsFiles) {
     vm.runInContext(fs.readFileSync(path.join(jsDir, f), "utf8"), box, { filename: f });
   }
@@ -194,10 +196,11 @@ check("the wave strip masks a suppressed current base too",
 //    name and headcount ("Legal has only 4 respondents") in prose.
 const supCallout = RS.conf.calloutHtml();
 check("the explainer does not name the withheld group's headcount",
-  () => supCallout.indexOf("Legal has only") === -1 &&
-    supCallout.indexOf("4 respondents") === -1);
+  () => supCallout.indexOf("Legal") === -1 &&
+    supCallout.indexOf(">4 respondents") === -1);
 check("…it falls back to the smallest DISCLOSABLE column",
-  () => supCallout.indexOf("Sales has only 196 respondents") !== -1);
+  () => supCallout.indexOf('data-txt-key="conf.footer.small_samples"') !== -1 &&
+    supCallout.indexOf("Sales") !== -1 && supCallout.indexOf("196") !== -1);
 
 // 5b. the worked example's percentage is generated, so its indefinite article
 //     has to be chosen rather than written. CCPB W2026 read "a 88%" on the page.
@@ -224,7 +227,10 @@ check("an unprotected report still prints the small base and its margin",
 check("…and carries no marker", () => openHtml.indexOf("n&lt;") === -1);
 check("…and exports it unchanged", () => /\t4 ⚠/.test(RS2.render.tsv(openModel)));
 check("…and its explainer still uses the genuinely smallest column",
-  () => RS2.conf.calloutHtml().indexOf("Legal has only 4 respondents") !== -1);
+  () => {
+    const b = blockOf(RS2.conf.calloutHtml(), "conf.footer.small_samples");
+    return b.indexOf("Legal") !== -1 && b.indexOf("4") !== -1;
+  });
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 if (failed) process.exit(1);

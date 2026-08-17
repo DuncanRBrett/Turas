@@ -406,24 +406,25 @@
   }
 
   /** The consolidated legend: sig letters (incl. lowercase 80%), ▲▵ arrows,
-   *  strong/moderate/weak bands, the precision estimate, weighted bases. */
+   *  strong/moderate/weak bands, the precision estimate, weighted bases.
+   *
+   *  Every sentence here is authored in the Callout Editor under reader.legend.*
+   *  — what stays in code is which sections a given report is entitled to show
+   *  (a low-base threshold, a banding, a weighted design). The <li> wrappers
+   *  carry the data-txt-key, so an author can find any line of it on the page.
+   */
   reader.legendHtml = function () {
     var p = (TR.AGG && TR.AGG.project) || {};
     var labels = TR.conf.labels();
     var lowBase = p.low_base_threshold;
+    var li = function (key, vars) { return TR.txt.block(key, vars, { tag: "li" }); };
     var sections = [];
     sections.push("<h3>Significance letters</h3><ul>" +
-      "<li><strong>▲ letters</strong> (e.g. <sup>B</sup>) shows this value is significantly " +
-      "higher than that lettered column. UPPERCASE letters = 95% confidence; with the " +
-      "80% option on, <strong>lowercase letters = 80%</strong> (directional, weaker evidence).</li>" +
-      (lowBase ? "<li><strong>⚠ low base</strong> has fewer than " + lowBase +
-        " respondents; excluded from significance testing.</li>" : "") + "</ul>");
+      li("reader.legend.sig_letters") +
+      (lowBase ? li("reader.legend.low_base", { low_base: lowBase }) : "") + "</ul>");
     sections.push("<h3>Arrows &amp; change chips</h3><ul>" +
-      "<li><strong>▲ / ▼</strong> on a composite (profile) column — significantly above / " +
-      "below <em>the rest of the sample</em> at 95%; hollow <strong>▵ / ▿</strong> mark the " +
-      "80% level. Composite columns may overlap, so they are never compared with one another.</li>" +
-      "<li><strong>▲ / ▼ chips</strong> on a Total column or card — change vs the most recent " +
-      "prior wave carrying that question; an outlined chip is a significant change.</li></ul>");
+      li("reader.legend.arrows_profile") +
+      li("reader.legend.arrows_chips") + "</ul>");
     // Read the bands off the questions, like the dashboard does — a study that
     // configures dashboard_green_mean is not banded on % of scale, and saying
     // so here would contradict the cards the reader is looking at.
@@ -437,31 +438,31 @@
       ? decodeEntities(TR.views.bandLegend(TR.views.indexQuestions()).replace(/<[^>]+>/g, ""))
       : "strong \u226575%, moderate 50\u201374%, weak <50% of each scale's maximum";
     sections.push("<h3>Score bands</h3><ul>" +
-      "<li>Index cards and heatmap cells band as " + fmt.escapeHtml(bandTxt) + ".</li>" +
-      "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> " +
-      "(gold edge) are score-weighted means.</li></ul>");
+      li("reader.legend.bands", { bands: bandTxt }) +
+      li("reader.legend.row_kinds") + "</ul>");
+    // Two whole sentences rather than one spliced around a conditional: the
+    // author edits the version their report actually shows, and neither reads
+    // as a fragment in the editor.
     var pub = publishedTotalBase() || (TR.MICRO && TR.MICRO.n);
     sections.push("<h3>" + fmt.escapeHtml(labels.moe_name) + " (" +
       fmt.escapeHtml(labels.moe_abbrev) + ")</h3><ul>" +
-      "<li>Every number is an estimate, not an exact count" +
-      (pub ? ": at n=" + fmt.base(pub) + ", overall percentages are stable to about ±" +
-        TR.conf.maxMoePct(pub).toFixed(1) + "pp; smaller sample subsets are more volatile" : "") +
-      ". The full working sits under “How sure can I be of these numbers?” on the " +
-      "Crosstabs tab.</li></ul>");
+      (pub
+        ? li("reader.legend.moe_with_base",
+             { base: fmt.base(pub), moe_pp: TR.conf.maxMoePct(pub).toFixed(1) })
+        : li("reader.legend.moe_no_base")) + "</ul>");
     if (p.weighted) {
       // single source of truth for the weighted-bases explainer
       var wnote = (TR.filterBar && TR.filterBar.weightingNote)
         ? TR.filterBar.weightingNote() : "";
       sections.push("<h3>Weighted data</h3>" +
-        (wnote || "<ul><li>Figures are weighted; significance uses the effective base.</li></ul>"));
+        (wnote || "<ul>" + li("reader.legend.weighted_fallback") + "</ul>"));
     }
     // B2 toggle: the same preference as the compact "Explain" control on the
     // crosstabs sig-mode bar (one persisted store behind both).
     sections.push("<h3>Explain significance</h3>" +
       '<label class="xpl-toggle"><input type="checkbox" data-explain-toggle' +
-      (reader.explainOn() ? " checked" : "") + "> Explain significance in plain " +
-      "language: hover or focus any significance letter, arrow or Δ chip for a " +
-      "sentence saying what it means.</label>");
+      (reader.explainOn() ? " checked" : "") + "> " +
+      TR.txt("reader.legend.explain_toggle") + "</label>");
     return sections.join("");
   };
 

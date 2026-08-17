@@ -67,8 +67,14 @@
       // A brace group with no supplied value is left as written rather than
       // blanked, so a mismatch is visible in review instead of silently
       // swallowing a sentence's subject.
-      return Object.prototype.hasOwnProperty.call(vars, name)
-        ? escapeHtml(vars[name]) : whole;
+      if (!Object.prototype.hasOwnProperty.call(vars, name)) return whole;
+      var v = vars[name];
+      // {html: "..."} is the renderer explicitly passing markup it built
+      // itself — an in-sentence control, a formatted figure. Everything else
+      // is data and is escaped. The distinction is deliberate: it keeps a
+      // sentence whole for the author instead of splitting it around a button.
+      return (v && typeof v === "object" && typeof v.html === "string")
+        ? v.html : escapeHtml(v);
     });
   }
 

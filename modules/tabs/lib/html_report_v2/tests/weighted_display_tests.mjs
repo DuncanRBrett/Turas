@@ -20,6 +20,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { TXT, installText } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -28,6 +29,7 @@ const sandbox = { console };
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
+installText(sandbox);
 for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "20_data.js",
   "21_stats.js", "21c_confidence.js", "22w_waves.js", "22_model.js", "23_render.js",
   "26_filter.js"]) {
@@ -314,16 +316,24 @@ run("FPC callout wording: 'responded' + non-response caveat only on a DECLARED c
     sampling_method: "Stratified" }, columns: [{ label: "Total" }], questions: [], banner_groups: [] };
   TR.MICRO = { n: 753 };
   let html = TR.conf.calloutHtml();
-  assert(html.indexOf("finite population correction") !== -1, "5.2% coverage: FPC sentence present");
-  assert(html.indexOf("responded") === -1, "sample: never says 'responded'");
-  assert(html.indexOf("covers about 5%") !== -1, "sample: speaks coverage of the universe");
-  assert(html.indexOf("non-response") === -1, "sample: no non-response caveat (nobody was 'invited')");
+  // Asserted on which authored block the code chose, not on its words: the
+  // decision (census framing vs coverage framing) is the code's and must not
+  // drift; the sentences themselves are the report author's to rewrite.
+  assert(html.indexOf('data-txt-key="conf.fpc.body_sample"') !== -1,
+    "5.2% coverage: FPC sentence present, in its sample form");
+  assert(html.indexOf('data-txt-key="conf.fpc.lead_sample_rate"') !== -1,
+    "sample: speaks coverage of the universe");
+  assert(html.indexOf('data-txt-key="conf.fpc.lead_census_rate"') === -1 &&
+    html.indexOf('data-txt-key="conf.fpc.body_census"') === -1,
+    "sample: never takes the census framing (nobody was 'invited')");
   // A declared census keeps the response framing and the non-response caveat.
   TR.AGG.project.sampling_method = "Census";
   TR.MICRO = { n: 10000 };
   html = TR.conf.calloutHtml();
-  assert(html.indexOf("universe responded") !== -1, "census: response framing kept");
-  assert(html.indexOf("non-response") !== -1, "census: non-response caveat kept");
+  assert(html.indexOf('data-txt-key="conf.fpc.lead_census_rate"') !== -1,
+    "census: response framing kept");
+  assert(html.indexOf('data-txt-key="conf.fpc.body_census"') !== -1,
+    "census: non-response caveat kept");
 });
 
 run("sampling_note rides into the how-sure callout, escaped and sentence-terminated", () => {
@@ -372,13 +382,14 @@ run("FPC callout: no census/FPC framing for a thin sample; present for a near-ce
     columns: [{ label: "Total" }], questions: [], banner_groups: [] };
   TR.MICRO = { n: 396 };                                  // 2.7% — a sample
   let html = TR.conf.calloutHtml();
-  assert(html.indexOf("finite population correction") === -1, "thin sample: no FPC sentence");
-  assert(html.indexOf("near-census") === -1, "the 'near-census' claim is gone entirely");
-  assert(html.indexOf("probability sampling, so ranges are formal") !== -1,
+  assert(html.indexOf('data-txt-key="conf.fpc.') === -1,
+    "thin sample: no population-correction sentence of any kind");
+  assert(html.indexOf('data-txt-key="conf.design.probability"') !== -1,
     "thin sample reads as a plain probability sample");
   TR.MICRO = { n: 10000 };                                 // 68.7% — genuinely finite-population
   html = TR.conf.calloutHtml();
-  assert(html.indexOf("finite population correction") !== -1, "near-census: FPC sentence present");
+  assert(html.indexOf('data-txt-key="conf.fpc.body_sample"') !== -1,
+    "near-census: FPC sentence present");
   assert(html.indexOf("near-census") === -1, "and still never uses the 'near-census' wording");
 });
 
