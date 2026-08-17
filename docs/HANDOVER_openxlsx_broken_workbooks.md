@@ -158,3 +158,96 @@ is a VAS-specific artefact of a config pour and is **not** needed in the engine.
   in the console because Turas runs under Shiny; test before claiming.
 - Fieldwork on VAS 2026 is live (1,100 responses as of 16 Aug) and Duncan
   regenerates reports himself via `launch_turas()`. Do not run his pipeline.
+
+---
+
+# RESOLVED — branch `fix/openxlsx-dangling-parts`
+
+**Written 2026-08-17 by the session that did the work.** The sections above are
+left as they were written, because the diagnosis in them is correct and worth
+keeping. This section records what was actually done, where it differs, and what
+is still open.
+
+## What the fix is, and why it is not the zip repair suggested above
+
+`turas_reconcile_workbook_parts()` in
+`modules/shared/lib/turas_save_workbook_atomic.R` fixes the **workbook object
+before the save** instead of repairing the file after it.
+
+The defect is fully visible in the openxlsx workbook object:
+`wb$worksheets_rels[[i]]` always carries a drawing and a vmlDrawing
+relationship, and `wb$Content_Types` always carries the drawing override, while
+`wb$drawings[[i]]`, `wb$vml[[i]]` and `wb$comments[[i]]` say whether those parts
+will actually be written. Making the two agree before calling `saveWorkbook()`
+is strictly better than rewriting the zip afterwards:
+
+- no XML string surgery, so both traps in section 5 above simply do not arise;
+- cell values, styles and validations cannot be touched, by construction;
+- it preserves the atomic write-then-rename guarantee. Repairing the final file
+  in place, as section 5 suggested, would have broken the thing
+  `turas_save_workbook_atomic()` exists to provide.
+
+It reconciles rather than only dropping — it re-adds a relationship when a sheet
+gains a drawing later — so it is idempotent and safe before every save,
+including a second save on the same workbook object.
+
+## A second instance of the same defect, not in the diagnosis above
+
+`xl/sharedStrings.xml` is only written when the workbook holds shared strings,
+but the relationship to it and its content-type override are seeded
+unconditionally. **A workbook whose cells are entirely numeric, or which has
+only an empty sheet, was broken even with every worksheet sound.** The
+reconciler handles it on the same rule.
+
+## What was routed
+
+58 production call sites across 17 modules now call `turas_saveWorkbook()`,
+which reconciles and then saves.
+
+- Files designed to be sourced on their own — every
+  `generate_config_templates.R`, and the standalone tools — locate the shared
+  helper themselves rather than assuming the caller loaded it.
+- VAS resolves it from its own code directory in `load_vas_library()`, not from
+  the working directory, because the fieldwork launcher runs from the project
+  folder rather than the repo.
+- Tests, examples and fixtures were deliberately left alone.
+
+**A trap worth knowing about.** Many writers already guarded with
+`exists("turas_save_workbook_atomic", mode = "function")` and fell back to a
+direct save. That branch runs precisely when the shared file is *not* loaded, so
+`turas_saveWorkbook()` does not exist there either — it lives in the same file.
+Routing those branches turned a working fallback into an error that the
+surrounding `tryCatch` swallowed, so the workbook was silently never written.
+`test_stats_pack_writer.R` caught it with 11 failures. Those 18 fallbacks were
+put back to `openxlsx::saveWorkbook()` and now print a console warning that the
+file is being written without reconciliation.
+
+## Verification
+
+- `turas_check_workbook_parts(path)` asserts the invariant at the **zip level** —
+  every relationship Target and every `[Content_Types].xml` override resolves to
+  a part present in the archive. It is independent of how the file was written,
+  so it keeps its meaning if openxlsx changes.
+- Regression tests: `modules/shared/tests/testthat/test_workbook_parts.R` and
+  three tests through the real tabs writer in
+  `modules/tabs/tests/testthat/test_workbook_builder.R`.
+- Real templates generated through the real generators:
+  `Crosstab_Config.xlsx` keeps all **75** `dataValidation` elements and
+  `Survey_Structure.xlsx` all **12**; both now open in
+  `openpyxl.load_workbook()` (not read-only) and convert under
+  `soffice --headless`.
+
+## Still open
+
+- **The dimension.** Deliberately untouched. It is not free once you are fixing
+  the workbook object rather than the zip, and it is not what Excel objects to.
+  See section 7 above.
+- **Cell comments.** `openpyxl.load_workbook()` still fails on a workbook that
+  carries an openxlsx cell comment, for an unrelated reason in openxlsx's
+  comment font XML. No production Turas writer writes cell comments, so no
+  deliverable is affected. Not investigated further.
+- **The live VAS launcher path was not exercised.** The VAS suite passes and the
+  path resolution is derived from `code_dir` the way VAS resolves everything
+  else, but nobody has run Duncan's OneDrive launcher against it. Worth one run
+  before the next fieldwork day.
+- **Retro-fixing existing deliverables** remains out of scope, as section 7 says.
