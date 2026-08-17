@@ -85,10 +85,30 @@ load_report_text_manifest <- function(path = report_text_manifest_path()) {
 }
 
 
-#' Every text key the renderer actually asks for
+# A direct call: TR.txt("x.y") / TR.txt.block("x.y").
+.REPORT_TEXT_CALL_RE <- "TR\\.txt(?:\\.block)?\\(\\s*[\"']([^\"']+)[\"']"
+
+# Any quoted dotted lower-case key ANYWHERE in the bundle. The renderer reaches
+# its text three ways — directly, through a local one-line wrapper
+# (li("cards.reading.heatmap")), and through a ternary inside the call
+# (TR.txt(cond ? "a.b" : "c.d")) — and only the first is a call-position match.
+# Since this is intersected with the manifest before use, a key named in a
+# comment counts as referenced, which is the right answer for a check whose only
+# job is to notice text nobody renders.
+.REPORT_TEXT_ALIAS_RE <- "[\"']([a-z][a-z0-9_]*(?:\\.[a-z0-9_]+)+)[\"']"
+
+.report_text_matches <- function(txt, pattern) {
+  m <- gregexpr(pattern, txt, perl = TRUE)
+  hits <- regmatches(txt, m)[[1]]
+  if (length(hits) == 0) return(character(0))
+  unique(sub(pattern, "\\1", hits, perl = TRUE))
+}
+
+
+#' Every text key the renderer directly asks for
 #'
-#' Scans the bundled JS for TR.txt("key") / TR.txt.block("key") calls. This is
-#' what makes the manifest impossible to forget: a call with no manifest entry
+#' Scans the bundled JS for TR.txt("key") / TR.txt.block("key"). This is what
+#' makes the manifest impossible to forget: a direct call with no manifest entry
 #' is a build refusal, not a blank space in a client's report.
 #'
 #' Note it scans the bundle as text, so a call inside a comment counts. That is
@@ -99,12 +119,30 @@ load_report_text_manifest <- function(path = report_text_manifest_path()) {
 #' @return Character vector of unique keys, sorted
 #' @export
 report_text_keys_used <- function(js_bundle) {
-  pattern <- "TR\\.txt(?:\\.block)?\\(\\s*[\"']([^\"']+)[\"']"
-  m <- gregexpr(pattern, js_bundle, perl = TRUE)
-  hits <- regmatches(js_bundle, m)[[1]]
-  if (length(hits) == 0) return(character(0))
-  keys <- sub(pattern, "\\1", hits, perl = TRUE)
-  sort(unique(keys))
+  sort(.report_text_matches(js_bundle, .REPORT_TEXT_CALL_RE))
+}
+
+
+#' Manifest keys the renderer references at all, including through a wrapper
+#'
+#' Several renderers alias TR.txt.block behind a one-line local helper so a
+#' block of markup reads cleanly — li("cards.reading.heatmap") rather than the
+#' full call with its options object. Those are real uses, and counting only
+#' direct calls reported two thirds of the catalogue as unused.
+#'
+#' This deliberately only ever CONFIRMS keys the manifest already declares, so a
+#' coincidental dotted string can never invent a refusal. The one gap it leaves —
+#' a wrapper call to a key nobody declared — renders empty and is reported by the
+#' in-browser selftest (TR.txt.misses, 31_selftest.js) during development.
+#'
+#' @param js_bundle The concatenated renderer JS
+#' @param manifest The loaded manifest
+#' @return Character vector of unique keys, sorted
+#' @export
+report_text_keys_referenced <- function(js_bundle, manifest) {
+  candidates <- .report_text_matches(js_bundle, .REPORT_TEXT_ALIAS_RE)
+  sort(unique(c(report_text_keys_used(js_bundle),
+                intersect(candidates, names(manifest)))))
 }
 
 
@@ -164,10 +202,15 @@ report_text_keys_used <- function(js_bundle) {
 #'
 #' @param manifest Named list from load_report_text_manifest()
 #' @param entries Named list of registry entries for the "tabs" module
-#' @param keys_used Character vector from report_text_keys_used()
+#' @param keys_used Character vector from report_text_keys_used() — DIRECT calls,
+#'   checked against the manifest
+#' @param referenced Character vector from report_text_keys_referenced() — every
+#'   key the renderer touches, used only for the "authored but never rendered"
+#'   note. Defaults to keys_used.
 #' @return list(errors = character, warnings = character)
 #' @export
-validate_report_text <- function(manifest, entries, keys_used = character(0)) {
+validate_report_text <- function(manifest, entries, keys_used = character(0),
+                                 referenced = keys_used) {
   errors <- character(0)
   warnings <- character(0)
 
@@ -220,9 +263,11 @@ validate_report_text <- function(manifest, entries, keys_used = character(0)) {
   }
 
   # 5. Text nobody renders. Not fatal — a key may be declared ahead of the code
-  #    that uses it — but it is how the registry silted up before.
-  if (length(keys_used)) {
-    unused_keys <- setdiff(names(manifest), keys_used)
+  #    that uses it — but it is how the registry silted up before. `referenced`
+  #    is the wider list (wrapper calls included) so this stays quiet about text
+  #    that IS rendered; leave it NULL to skip the check entirely.
+  if (length(referenced)) {
+    unused_keys <- setdiff(names(manifest), referenced)
     if (length(unused_keys)) {
       warnings <- c(warnings, sprintf(
         "\"%s\" is authored but the renderer never asks for it", unused_keys))
@@ -281,7 +326,9 @@ build_report_text_json <- function(assets_dir = report_v2_assets_dir(),
   }
 
   keys_used <- if (is.null(js_bundle)) character(0) else report_text_keys_used(js_bundle)
-  check <- validate_report_text(manifest, entries, keys_used)
+  referenced <- if (is.null(js_bundle)) character(0)
+                else report_text_keys_referenced(js_bundle, manifest)
+  check <- validate_report_text(manifest, entries, keys_used, referenced)
 
   if (length(check$errors)) {
     stop(sprintf(

@@ -269,12 +269,6 @@
     }
   },
   "tabs": {
-    "significance_testing": {
-      "title": "Understanding Significance Tests",
-      "text": "Significance letters (a, b, c…) indicate which column's value is statistically significantly higher than another at the chosen confidence level. A cell showing <strong>'a'<\/strong> means that column's value is significantly higher than column a's value. No letter means no significant difference was detected. Significance depends on sample size — small sub-groups may show no differences even when values appear different.",
-      "context": "Crosstab tables",
-      "page": "Crosstabs"
-    },
     "report.construction.produced": {
       "title": "Report construction — attribution",
       "text": "This report was produced by {company} using Turas Analytics, our in-house analysis and reporting platform which includes R, Python and Javascript.",
