@@ -1,6 +1,11 @@
 # Authored report text for Tabs v2 — feasibility and plan
 
-Status: proposal, nothing built. Written 2026-08-17.
+Status: **BUILT — all stages complete.** Written 2026-08-17, delivered the same
+day on `feature/tabs-v2-text-registry`. 111 authored keys; the report's words
+are byte-identical to before across every tab. Kept as the record of what was
+decided and why; the working documentation is `11_DATA_CENTRIC_REPORT_V2.md`
+("Where the report's words come from"), `06_TEMPLATE_REFERENCE.md` (the
+ReportText sheet) and `04_USER_MANUAL.md`.
 
 The ask: the explanatory text in the v2 report should come from a file Duncan
 edits in a GUI, the way callouts already do for brand/confidence/conjoint —
