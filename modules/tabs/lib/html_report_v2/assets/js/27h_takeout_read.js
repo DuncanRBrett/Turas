@@ -70,35 +70,39 @@
     if (p.kind === "group") {
       var rows = (p.evidence || []).map(function (e) { return ui.groupRow(e, cls); }).join("");
       var note = p.secondary
-        ? '<div class="tko-note">Most positive group: ' + fmt.escapeHtml(p.secondary) + ".</div>" : "";
+        ? TR.txt.block("patterns.group.most_positive", { subject: p.secondary },
+                       { tag: "div", cls: "tko-note" }) : "";
       return rows + note;
     }
     if (p.kind === "split") {
       // Navigation pointer only — no synthetic average-index rows (the "4.4 / 3.7
       // that's nowhere else" fix). Names the cut; the portraits carry the detail.
-      return '<div class="tko-note">The widest, most consistent differences run by ' +
-        fmt.escapeHtml(p.subject) +
-        (p.sigGaps ? " — " + p.sigGaps + " group" + (p.sigGaps === 1 ? "" : "s") +
-          " stand clearly apart" : "") + ". Start here, then read the rest through it.</div>";
+      return TR.txt.block("patterns.split.note", {
+        subject: p.subject,
+        gaps_clause: { html: p.sigGaps
+          ? TR.txt("patterns.split.gaps_clause",
+                   { n: p.sigGaps, groups_word: p.sigGaps === 1 ? "group" : "groups" })
+          : "" }
+      }, { tag: "div", cls: "tko-note" });
     }
     if (p.kind === "comove") {
       var bundles = (p.bundles || []).map(function (b, i) { return ui.comoveBundle(b, p.floor, i); }).join("");
-      return bundles +
-        '<div class="tko-note">Scanned ' + p.pairCount + " question pairs · controlled for the " +
-        "survey-wide tendency to agree · only sets that cohere beyond that baseline survive.</div>";
+      return bundles + TR.txt.block("patterns.comove.note", { pairs: p.pairCount },
+                                    { tag: "div", cls: "tko-note" });
     }
     if (p.kind === "odd") {
       var rows = ui.oddRow(p.flip) + (p.secondary || []).map(function (s) { return ui.oddRow(s); }).join("");
-      return rows + '<div class="tko-cap">Out of ' + p.familyCells + " group × question cells, this one " +
-        "opposes the group’s own direction and survives multiplicity correction.</div>";
+      return rows + TR.txt.block("patterns.odd.caption", { cells: p.familyCells },
+                                 { tag: "div", cls: "tko-cap" });
     }
     if (p.kind === "bimodal") {
       var qrows = (p.questions || []).map(function (q) { return ui.bimodalRow(q); }).join("");
-      return qrows + '<div class="tko-note">The average sits mid-scale, but the answers pile up at both ' +
-        "ends — read the split, not the mean.</div>";
+      return qrows + TR.txt.block("patterns.bimodal.note", null,
+                                  { tag: "div", cls: "tko-note" });
     }
     // movement
-    if (p.stable) return '<div class="tko-note">No metric shifted materially since the last wave.</div>';
+    if (p.stable) return TR.txt.block("patterns.movement.stable", null,
+                                      { tag: "div", cls: "tko-note" });
     var rows = (p.down ? ui.moverRow(p.down, "down") : "") + (p.up ? ui.moverRow(p.up, "up") : "");
     var spark = ui.movementSpark(p.waves);
     return rows + (spark ? '<div class="tko-mspark">' + spark + "</div>" : "");
@@ -108,11 +112,11 @@
    *  test, not a pattern that simply wasn't computed. */
   function nullCaption(p) {
     if (p.id === "odd") {
-      return '<div class="tko-cap">Scanned ' + p.familyCells + " group × question cells · an exception " +
-        "must oppose the group’s own direction, clear a real gap, and survive multiplicity correction · 0 survive.</div>";
+      return TR.txt.block("patterns.null.odd", { cells: p.familyCells },
+                          { tag: "div", cls: "tko-cap" });
     }
-    return '<div class="tko-cap">Scanned ' + p.scanned + " questions for a two-camp split (peaks at both " +
-      "ends, a calm average, real mass in each camp) · none found — not mere spread or skew.</div>";
+    return TR.txt.block("patterns.null.bimodal", { scanned: p.scanned },
+                        { tag: "div", cls: "tko-cap" });
   }
 
   /** One pattern as an editable card. The takeaway is keyed by id + subject so a
@@ -178,19 +182,12 @@
    *  but no comparable groups is told that. */
   function emptyHtml(t) {
     var s = t.scope;
-    if (s && (s.rated + s.shares) === 0) {
-      return '<div class="tko-empty">Patterns has nothing it can score on this study. ' +
-        "The scan reads rated questions (an index) and closed questions with a declared " +
-        "key share — the KeyShare column on the config’s Selection sheet, naming the " +
-        "answer where a higher share is better. Tag a few and regenerate.</div>";
-    }
-    if (!t.segmentCount) {
-      return '<div class="tko-empty">Nothing to compare: this study has no breakout ' +
-        "groups above the reporting floor — questions to score, but no groups to test " +
-        "them across.</div>";
-    }
-    return '<div class="tko-empty">No clear cross-question pattern stands out on this study — ' +
-      "and that, honestly, is the headline.</div>";
+    var empty = function (key) {
+      return TR.txt.block(key, null, { tag: "div", cls: "tko-empty" });
+    };
+    if (s && (s.rated + s.shares) === 0) return empty("patterns.empty.nothing_scorable");
+    if (!t.segmentCount) return empty("patterns.empty.no_groups");
+    return empty("patterns.empty.no_pattern");
   }
 
   /** The groups a portrayed banner scanned that produced NO portrait — stated
@@ -205,10 +202,9 @@
     // Neutral wording: this list now also carries groups whose gaps did not
     // hold up as a consistent story (incl. polarized ones the steady card
     // refuses to claim) — "close to the overall" would overclaim for them.
-    return '<div class="tko-cap tko-nostory">Also scanned: ' + fmt.escapeHtml(names) +
-      " — no consistent story held up beyond chance for " +
-      (list.length === 1 ? "it" : "them") +
-      ". No portrait is honest reporting, not a gap.</div>";
+    return TR.txt.block("patterns.no_story",
+      { names: names, it_them: list.length === 1 ? "it" : "them" },
+      { tag: "div", cls: "tko-cap tko-nostory" });
   }
 
   read.html = function (t) {

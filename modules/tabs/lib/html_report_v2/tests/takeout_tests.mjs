@@ -15,6 +15,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { TXT, installText, blockOf } from "./_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -32,6 +33,7 @@ const MAX_ACTIVE_LINES = 410;
 const sandbox = { console };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
+installText(sandbox);
 const takeoutFiles = readdirSync(JS_DIR).filter((f) => /takeout.*\.js$/.test(f)).sort();
 for (const file of ["00_namespace.js", "01_format.js"].concat(takeoutFiles)) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
@@ -562,7 +564,8 @@ run("a scanned group with no lean becomes the STEADY card; overflow goes to the 
   TR.d2 = { storeKey: (k) => k };
   const page = takeout.readView.html(t);
   assert(page.indexOf("The steady one") !== -1, "steady card renders with its tag");
-  assert(page.indexOf("Also scanned: FlatSmall (n = 60)") !== -1, "note names only the overflow");
+  assert(blockOf(page, "patterns.no_story").indexOf("FlatSmall (n = 60)") !== -1,
+    "note names only the overflow");
   assert(page.indexOf("Also scanned: Flat (") === -1, "the carded group is not in the note");
   // a banner with NO portraits at all keeps the empty state — no steady card either
   const t2 = takeout.buildPatterns({ columns: [columns[2]], scope: { rated: 3, shares: 0 } });
@@ -1024,18 +1027,21 @@ run("patterns_headline pins the apex KPIs; a scalar value never substring-matche
 });
 
 run("empty state is scope-honest: 'nothing found' only when something was scanned", () => {
+  // Which empty state the code chose is the thing under test; the three
+  // messages are the author's words and are asserted by key.
   const none = takeout.readView.html(takeout.buildPatterns({ scope: { rated: 0, shares: 0 } }));
-  assert(none.indexOf("nothing it can score") !== -1, "unscannable study says so");
-  assert(none.indexOf("KeyShare") !== -1, "and points at the fix");
-  assert(none.indexOf("No clear cross-question pattern") === -1,
+  assert(none.indexOf('data-txt-key="patterns.empty.nothing_scorable"') !== -1,
+    "unscannable study says so");
+  assert(none.indexOf('data-txt-key="patterns.empty.no_pattern"') === -1,
     "an unscannable study never claims a null finding");
   const noGroups = takeout.readView.html(takeout.buildPatterns({ scope: { rated: 3, shares: 0 } }));
-  assert(noGroups.indexOf("Nothing to compare") !== -1, "questions but no groups says so");
+  assert(noGroups.indexOf('data-txt-key="patterns.empty.no_groups"') !== -1,
+    "questions but no groups says so");
   const genuine = takeout.readView.html(takeout.buildPatterns({
     scope: { rated: 1, shares: 0 },
     columns: [{ column: "A", group: "G", base: 40,
       gaps: [{ title: "Q", value: 3.99, total: 4.0, scaleMax: 5 }] }] }));
-  assert(genuine.indexOf("No clear cross-question pattern stands out") !== -1,
+  assert(genuine.indexOf('data-txt-key="patterns.empty.no_pattern"') !== -1,
     "a scanned-but-flat study keeps the honest null headline");
 });
 

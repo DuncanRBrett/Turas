@@ -388,11 +388,7 @@
       // averages, the wave scope, why classification questions are excluded —
       // on a tab the reader reaches after the Dashboard and the Group overview.
       // What a reader needs here is what a card IS and what the control does.
-      "<p>Each card shows where one group stands out against the rest on a " +
-      "specific question, as identified by a significance test. Choose either " +
-      "95% or 95% + 80% significance. Note that this is a statistical test, " +
-      "not a judgement call. We have excluded classification questions such " +
-      "as demographics or corpographics from this page.</p>" +
+      TR.txt.block("diffs.intro") +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' +
       '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +

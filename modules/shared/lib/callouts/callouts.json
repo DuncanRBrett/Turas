@@ -634,6 +634,90 @@
       "text": "💬 Click any data point to tag it with a note (e.g. “Campaign launched”) — tags travel with pins and saved copies.",
       "context": "Tracking visualise, note under the chart",
       "page": "Tracking"
+    },
+    "patterns.split.note": {
+      "title": "Patterns — the main split",
+      "text": "The widest, most consistent differences run by {subject}{gaps_clause}. Start here, then read the rest through it.",
+      "context": "Group overview, split card",
+      "page": "Group overview"
+    },
+    "patterns.split.gaps_clause": {
+      "title": "Patterns — groups standing apart",
+      "text": " — {n} {groups_word} stand clearly apart",
+      "context": "Group overview, spliced into the split card's sentence",
+      "page": "Group overview"
+    },
+    "patterns.group.most_positive": {
+      "title": "Patterns — most positive group",
+      "text": "Most positive group: {subject}.",
+      "context": "Group overview, group card",
+      "page": "Group overview"
+    },
+    "patterns.comove.note": {
+      "title": "Patterns — co-movement working",
+      "text": "Scanned {pairs} question pairs · controlled for the survey-wide tendency to agree · only sets that cohere beyond that baseline survive.",
+      "context": "Group overview, co-movement card",
+      "page": "Group overview"
+    },
+    "patterns.odd.caption": {
+      "title": "Patterns — exception working",
+      "text": "Out of {cells} group × question cells, this one opposes the group’s own direction and survives multiplicity correction.",
+      "context": "Group overview, exception card",
+      "page": "Group overview"
+    },
+    "patterns.bimodal.note": {
+      "title": "Patterns — two-camp split working",
+      "text": "The average sits mid-scale, but the answers pile up at both ends — read the split, not the mean.",
+      "context": "Group overview, two-camp card",
+      "page": "Group overview"
+    },
+    "patterns.movement.stable": {
+      "title": "Patterns — nothing moved",
+      "text": "No metric shifted materially since the last wave.",
+      "context": "Group overview, movement card",
+      "page": "Group overview"
+    },
+    "patterns.null.odd": {
+      "title": "Patterns — no exception survived",
+      "text": "Scanned {cells} group × question cells · an exception must oppose the group’s own direction, clear a real gap, and survive multiplicity correction · 0 survive.",
+      "context": "Group overview, confident-null card",
+      "page": "Group overview"
+    },
+    "patterns.null.bimodal": {
+      "title": "Patterns — no two-camp split",
+      "text": "Scanned {scanned} questions for a two-camp split (peaks at both ends, a calm average, real mass in each camp) · none found — not mere spread or skew.",
+      "context": "Group overview, confident-null card",
+      "page": "Group overview"
+    },
+    "patterns.empty.nothing_scorable": {
+      "title": "Patterns — nothing to score",
+      "text": "Patterns has nothing it can score on this study. The scan reads rated questions (an index) and closed questions with a declared key share — the KeyShare column on the config’s Selection sheet, naming the answer where a higher share is better. Tag a few and regenerate.",
+      "context": "Group overview, empty state",
+      "page": "Group overview"
+    },
+    "patterns.empty.no_groups": {
+      "title": "Patterns — nothing to compare",
+      "text": "Nothing to compare: this study has no breakout groups above the reporting floor — questions to score, but no groups to test them across.",
+      "context": "Group overview, empty state",
+      "page": "Group overview"
+    },
+    "patterns.empty.no_pattern": {
+      "title": "Patterns — nothing stood out",
+      "text": "No clear cross-question pattern stands out on this study — and that, honestly, is the headline.",
+      "context": "Group overview, empty state",
+      "page": "Group overview"
+    },
+    "patterns.no_story": {
+      "title": "Patterns — groups with no portrait",
+      "text": "Also scanned: {names} — no consistent story held up beyond chance for {it_them}. No portrait is honest reporting, not a gap.",
+      "context": "Group overview, under the portraits",
+      "page": "Group overview"
+    },
+    "diffs.intro": {
+      "title": "Differences — how to read this tab",
+      "text": "Each card shows where one group stands out against the rest on a specific question, as identified by a significance test. Choose either 95% or 95% + 80% significance. Note that this is a statistical test, not a judgement call. We have excluded classification questions such as demographics or corpographics from this page.",
+      "context": "Differences tab, intro card",
+      "page": "Differences"
     }
   },
   "brand": {

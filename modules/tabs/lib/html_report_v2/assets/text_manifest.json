@@ -351,5 +351,94 @@
     "page": "Tracking",
     "context": "Tracking visualise — how to tag a data point with a note.",
     "tokens": []
+  },
+  "patterns.split.note": {
+    "page": "Group overview",
+    "context": "Patterns — the 'widest differences run by X' navigation pointer. {gaps_clause} appears only when groups stand apart.",
+    "tokens": [
+      "subject",
+      "gaps_clause"
+    ]
+  },
+  "patterns.split.gaps_clause": {
+    "page": "Group overview",
+    "context": "Patterns — the clause naming how many groups stand clearly apart.",
+    "tokens": [
+      "n",
+      "groups_word"
+    ]
+  },
+  "patterns.group.most_positive": {
+    "page": "Group overview",
+    "context": "Patterns — names the most positive group under a group card.",
+    "tokens": [
+      "subject"
+    ]
+  },
+  "patterns.comove.note": {
+    "page": "Group overview",
+    "context": "Patterns — the working under a co-movement card.",
+    "tokens": [
+      "pairs"
+    ]
+  },
+  "patterns.odd.caption": {
+    "page": "Group overview",
+    "context": "Patterns — the working under an exception card.",
+    "tokens": [
+      "cells"
+    ]
+  },
+  "patterns.bimodal.note": {
+    "page": "Group overview",
+    "context": "Patterns — the working under a two-camp split card.",
+    "tokens": []
+  },
+  "patterns.movement.stable": {
+    "page": "Group overview",
+    "context": "Patterns — shown when no metric shifted materially since the last wave.",
+    "tokens": []
+  },
+  "patterns.null.odd": {
+    "page": "Group overview",
+    "context": "Patterns — the confident-null caption when exceptions were scanned and none survived.",
+    "tokens": [
+      "cells"
+    ]
+  },
+  "patterns.null.bimodal": {
+    "page": "Group overview",
+    "context": "Patterns — the confident-null caption when no two-camp split was found.",
+    "tokens": [
+      "scanned"
+    ]
+  },
+  "patterns.empty.nothing_scorable": {
+    "page": "Group overview",
+    "context": "Patterns — empty state: the study has nothing the scan can score, and what it would need.",
+    "tokens": []
+  },
+  "patterns.empty.no_groups": {
+    "page": "Group overview",
+    "context": "Patterns — empty state: questions to score but no breakout groups above the reporting floor.",
+    "tokens": []
+  },
+  "patterns.empty.no_pattern": {
+    "page": "Group overview",
+    "context": "Patterns — empty state: the scan ran and found nothing, which is itself the finding.",
+    "tokens": []
+  },
+  "patterns.no_story": {
+    "page": "Group overview",
+    "context": "Patterns — the groups that were scanned but produced no portrait, stated so their absence is not read as an omission.",
+    "tokens": [
+      "names",
+      "it_them"
+    ]
+  },
+  "diffs.intro": {
+    "page": "Differences",
+    "context": "Differences tab — what a card is and what the significance control does.",
+    "tokens": []
   }
 }
