@@ -339,9 +339,7 @@
   views.whatMoved = function (host) {
     if (!TR.d2.tracking().enabled) {
       host.innerHTML = '<div class="page"><div class="card"><h2>Tracking</h2>' +
-        "<p>No wave history is configured, so there is nothing to track. With " +
-        "history supplied (one wave or many), this workspace provides the " +
-        "summary, explorer and visualise tracking views.</p></div></div>";
+        TR.txt.block("tracking.empty") + "</div></div>";
       return;
     }
     // migrate pre-round-6 state

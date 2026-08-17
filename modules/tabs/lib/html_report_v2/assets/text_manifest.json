@@ -252,5 +252,104 @@
     "page": "Crosstabs",
     "context": "Precision footer, finite population correction — the sample case, where sampling uncertainty is unchanged because most of the universe was never asked.",
     "tokens": []
+  },
+  "tracking.unmatched.lead": {
+    "page": "Tracking",
+    "context": "Tracking summary — shown when prior waves loaded but nothing matched. {priors} is the count, {span} the wave range.",
+    "tokens": [
+      "priors",
+      "waves_word",
+      "span"
+    ]
+  },
+  "tracking.unmatched.cause": {
+    "page": "Tracking",
+    "context": "Tracking summary — the usual cause, and the config setting that fixes it.",
+    "tokens": []
+  },
+  "tracking.heatmap.legend": {
+    "page": "Tracking",
+    "context": "Tracking summary — the heatmap's reading note. {soft_clause} appears only when the 80% level is switched on.",
+    "tokens": [
+      "soft_clause"
+    ]
+  },
+  "tracking.heatmap.soft_clause": {
+    "page": "Tracking",
+    "context": "Tracking summary — the hollow-arrow clause spliced into the heatmap note when the 80% level is on.",
+    "tokens": []
+  },
+  "tracking.scorecard.bands": {
+    "page": "Tracking",
+    "context": "Tracking summary — how the key-metric cards are coloured.",
+    "tokens": []
+  },
+  "tracking.pulse.not_testable_tip": {
+    "page": "Tracking",
+    "context": "Tracking summary — tooltip on the 'not testable' pulse chip.",
+    "tokens": []
+  },
+  "tracking.pulse.sigmode_tip": {
+    "page": "Tracking",
+    "context": "Tracking summary — tooltip on the significance-level selector.",
+    "tokens": []
+  },
+  "tracking.changes.none": {
+    "page": "Tracking",
+    "context": "Tracking summary — no significant wave-on-wave changes, and the history could support a test.",
+    "tokens": []
+  },
+  "tracking.changes.untestable": {
+    "page": "Tracking",
+    "context": "Tracking summary — no test could run at all because the historical bases were not loaded.",
+    "tokens": []
+  },
+  "tracking.soft.intro": {
+    "page": "Tracking",
+    "context": "Tracking summary — the 'nearly significant' card block.",
+    "tokens": []
+  },
+  "tracking.method.how_tested": {
+    "page": "Tracking",
+    "context": "Tracking summary — the collapsed 'How wave-on-wave changes are tested' note.",
+    "tokens": []
+  },
+  "tracking.empty": {
+    "page": "Tracking",
+    "context": "Tracking tab — shown when no wave history is configured at all.",
+    "tokens": []
+  },
+  "visualise.legend.significance": {
+    "page": "Tracking",
+    "context": "Tracking visualise — what a coloured arrow means and which test produced it.",
+    "tokens": []
+  },
+  "visualise.ci_tip": {
+    "page": "Tracking",
+    "context": "Tracking visualise — tooltip on the interval-bands toggle.",
+    "tokens": []
+  },
+  "visualise.trendline_tip": {
+    "page": "Tracking",
+    "context": "Tracking visualise — tooltip on the trendline toggle.",
+    "tokens": []
+  },
+  "visualise.ci_note": {
+    "page": "Tracking",
+    "context": "Tracking visualise — the note under the chart when interval bands are on. {softened} is added for non-probability designs.",
+    "tokens": [
+      "interval_term",
+      "softened"
+    ]
+  },
+  "visualise.ci_note_softened": {
+    "page": "Tracking",
+    "context": "Tracking visualise — the clause added to the interval note when the design is not a formal random sample.",
+    "tokens": []
+  },
+  "visualise.note_tags": {
+    "page": "Tracking",
+    "context": "Tracking visualise — how to tag a data point with a note.",
+    "tokens": []
   }
 }

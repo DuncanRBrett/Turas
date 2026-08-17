@@ -57,16 +57,12 @@
       ? info.waveLabels[0] + "–" + info.waveLabels[info.waveLabels.length - 1]
       : info.waveLabels[0];
     return '<div class="card"><h3>Tracking could not be compared</h3>' +
-      "<p class='trknote'>" + info.priors + " prior wave" +
-      (info.priors === 1 ? "" : "s") + " loaded (" + fmt.escapeHtml(span) +
-      "), but no metric in this wave matched any of them, so there is no " +
-      "wave-on-wave comparison to show. This is a configuration problem, not " +
-      "a finding — it does not mean the numbers held steady.</p>" +
-      "<p class='trknote'>The usual cause is that this wave was built without " +
-      "a question mapping, so its metrics are keyed by question title while " +
-      "the history is keyed by question code. Setting " +
-      "<code>question_mapping</code> in the crosstab config to the tracker's " +
-      "Question_Mapping workbook keys both sides the same way.</p></div>";
+      TR.txt.block("tracking.unmatched.lead", {
+        priors: info.priors,
+        waves_word: info.priors === 1 ? "wave" : "waves",
+        span: span
+      }, { cls: "trknote" }) +
+      TR.txt.block("tracking.unmatched.cause", null, { cls: "trknote" }) + "</div>";
   }
 
   /** Visualise selection produced by clicking a scorecard / sig card: the
@@ -206,13 +202,12 @@
         return '<option value="' + g.id + '"' + (group === g.id ? " selected" : "") +
           ">" + fmt.escapeHtml(g.name) + "</option>";
       }).join("") + "</select></div>" +
-      "<p class='trknote'>One top-box NET per question. Cells show the " +
-      "percentage-point change vs the previous wave with this segment; " +
-      "<strong>filled ▲▼ = significant at 95%</strong>, " +
-      (TR.d2.state.sigMode === "dual"
-        ? "hollow △▽ = significant at 80% (not 95%), " : "") +
-      "grey = direction only, – = no history. Hover for the underlying " +
-      "values; click a metric to explore it across segments.</p>" +
+      // The 80% clause is spliced in only when that level is on, so it is its
+      // own authored phrase rather than a branch inside the sentence.
+      TR.txt.block("tracking.heatmap.legend", {
+        soft_clause: { html: TR.d2.state.sigMode === "dual"
+          ? TR.txt("tracking.heatmap.soft_clause") : "" }
+      }, { cls: "trknote" }) +
       '<div class="trkwrap"><table class="moved trk hm"><thead><tr><th>Metric</th>' +
       "<th class='wv'>Total</th>" + segs.map(function (s) {
         return "<th class='wv'>" + fmt.escapeHtml(TR.charts.clip(s.label, 16)) + "</th>";
@@ -303,9 +298,7 @@
 
     var html = ['<div class="card"><h3>Key metric scorecard · ' +
       fmt.escapeHtml(TR.AGG.project.wave) + "</h3>" +
-      "<p class='trknote'>Card colour shows the latest value against the " +
-      "tracker thresholds — green strong, amber moderate, red weak, by " +
-      "metric type.</p>" +
+      TR.txt.block("tracking.scorecard.bands", null, { cls: "trknote" }) +
       '<div class="kpis">' + cards.map(kpiCardHtml).join("") + "</div></div>"];
 
     var sm = TR.d2.state.sigMode;
@@ -317,12 +310,11 @@
       '<span class="pulse-chip">→ ' +
       Math.max(tested - totalUp - totalDown - totalSoft, 0) +
       " stable</span>" +
-      (notTestable ? '<span class="pulse-chip" title="These metrics have a ' +
-        'previous value but the history carries no base or spread, so no ' +
-        'wave-on-wave test could run">· ' + notTestable +
+      (notTestable ? '<span class="pulse-chip" title="' +
+        fmt.escapeHtml(TR.txt("tracking.pulse.not_testable_tip")) + '">· ' + notTestable +
         " not testable this wave</span>" : "") +
-      '<label class="trk-sigctl" title="Significance level shown across the ' +
-      'Tracking tab (shared with the Crosstabs tab)">Significance ' +
+      '<label class="trk-sigctl" title="' +
+      fmt.escapeHtml(TR.txt("tracking.pulse.sigmode_tip")) + '">Significance ' +
       '<select data-trk-sigmode>' +
       '<option value="off"' + (sm === "off" ? " selected" : "") + ">off</option>" +
       '<option value="95"' + (sm === "95" ? " selected" : "") + ">95%</option>" +
@@ -339,10 +331,9 @@
           fmt.escapeHtml(label) + "</option>";
       }).join("") + "</select></div>" +
       (changes.length ? "" :
-        "<p class='trknote'>" + (anyTestablePrev()
-          ? "No significant wave-on-wave changes."
-          : "Significance could not be tested because the historical wave bases were " +
-            "not loaded — the wave-on-wave changes are directional only.") + "</p>") +
+        TR.txt.block(anyTestablePrev() ? "tracking.changes.none"
+                                       : "tracking.changes.untestable",
+                     null, { cls: "trknote" })) +
       '<div class="sigcards">' + shown.map(function (c) { return sigCardHtml(c); }).join("") +
       "</div>" +
       (changes.length > 24 && !showAllSig
@@ -355,8 +346,7 @@
     if (softCards.length) {
       html.push('<div class="card"><div class="heathead"><h3>Nearly significant ' +
         "· 80% level · latest wave</h3></div>" +
-        "<p class='trknote'>Moved enough to clear the 80% threshold but not 95% " +
-        "— watch items, not confirmed shifts. Click one to visualise it.</p>" +
+        TR.txt.block("tracking.soft.intro", null, { cls: "trknote" }) +
         '<div class="sigcards">' +
         softCards.map(function (c) { return sigCardHtml(c, true); }).join("") +
         "</div></div>");
@@ -370,15 +360,7 @@
       '<button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> How wave-on-wave changes are tested' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
-      // Shortened 2026-08-11 (Duncan). The long version enumerated all three
-      // sources of the spread a Welch test needs (waves.sdAtWave); the reader
-      // needs the shape of the rule, not the branch table.
-      "<p>Change between waves is tested as follows: a two-proportion z-test " +
-      "for percentages, and a Welch t-test for means, indexes and NPS. To run " +
-      "the test we need either respondent level data or if using published " +
-      "summaries sourced outside of Turas we need the percentage or mean, " +
-      "standard deviation or data on distribution. If that is not available " +
-      "the test cannot be run.</p></div></div>");
+      TR.txt.block("tracking.method.how_tested") + "</div></div>");
     host.innerHTML = html.join("");
 
     host.querySelectorAll("[data-callout]").forEach(function (el) {

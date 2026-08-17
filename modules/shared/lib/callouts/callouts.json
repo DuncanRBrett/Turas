@@ -526,6 +526,114 @@
       "text": "ranges include a <strong>finite population correction<\/strong> — they narrow as coverage of a group rises, and at low coverage the effect is slight. Sampling uncertainty itself is unchanged: most of the universe was not interviewed.",
       "context": "'How sure can I be of these numbers?' footer, follows the lead clause",
       "page": "Crosstabs"
+    },
+    "tracking.unmatched.lead": {
+      "title": "Tracking not comparable — what happened",
+      "text": "{priors} prior {waves_word} loaded ({span}), but no metric in this wave matched any of them, so there is no wave-on-wave comparison to show. This is a configuration problem, not a finding — it does not mean the numbers held steady.",
+      "context": "Tracking summary, 'Tracking could not be compared' card",
+      "page": "Tracking"
+    },
+    "tracking.unmatched.cause": {
+      "title": "Tracking not comparable — the usual cause",
+      "text": "The usual cause is that this wave was built without a question mapping, so its metrics are keyed by question title while the history is keyed by question code. Setting <code>question_mapping<\/code> in the crosstab config to the tracker's Question_Mapping workbook keys both sides the same way.",
+      "context": "Tracking summary, 'Tracking could not be compared' card",
+      "page": "Tracking"
+    },
+    "tracking.heatmap.legend": {
+      "title": "Heatmap — how to read it",
+      "text": "One top-box NET per question. Cells show the percentage-point change vs the previous wave with this segment; <strong>filled ▲▼ = significant at 95%<\/strong>, {soft_clause}grey = direction only, – = no history. Hover for the underlying values; click a metric to explore it across segments.",
+      "context": "Tracking summary, the key metric × segment heatmap",
+      "page": "Tracking"
+    },
+    "tracking.heatmap.soft_clause": {
+      "title": "Heatmap — the 80% clause",
+      "text": "hollow △▽ = significant at 80% (not 95%), ",
+      "context": "Tracking summary heatmap note, only when the 80% level is on",
+      "page": "Tracking"
+    },
+    "tracking.scorecard.bands": {
+      "title": "Scorecard — card colour",
+      "text": "Card colour shows the latest value against the tracker thresholds — green strong, amber moderate, red weak, by metric type.",
+      "context": "Tracking summary, key metric scorecard",
+      "page": "Tracking"
+    },
+    "tracking.pulse.not_testable_tip": {
+      "title": "Pulse — not testable tooltip",
+      "text": "These metrics have a previous value but the history carries no base or spread, so no wave-on-wave test could run",
+      "context": "Tracking summary, pulse chip tooltip",
+      "page": "Tracking"
+    },
+    "tracking.pulse.sigmode_tip": {
+      "title": "Pulse — significance selector tooltip",
+      "text": "Significance level shown across the Tracking tab (shared with the Crosstabs tab)",
+      "context": "Tracking summary, pulse bar",
+      "page": "Tracking"
+    },
+    "tracking.changes.none": {
+      "title": "Changes — none significant",
+      "text": "No significant wave-on-wave changes.",
+      "context": "Tracking summary, significant-changes block",
+      "page": "Tracking"
+    },
+    "tracking.changes.untestable": {
+      "title": "Changes — could not be tested",
+      "text": "Significance could not be tested because the historical wave bases were not loaded — the wave-on-wave changes are directional only.",
+      "context": "Tracking summary, significant-changes block",
+      "page": "Tracking"
+    },
+    "tracking.soft.intro": {
+      "title": "Nearly significant — what these are",
+      "text": "Moved enough to clear the 80% threshold but not 95% — watch items, not confirmed shifts. Click one to visualise it.",
+      "context": "Tracking summary, 'Nearly significant' card block",
+      "page": "Tracking"
+    },
+    "tracking.method.how_tested": {
+      "title": "How wave-on-wave changes are tested",
+      "text": "Change between waves is tested as follows: a two-proportion z-test for percentages, and a Welch t-test for means, indexes and NPS. To run the test we need either respondent level data or if using published summaries sourced outside of Turas we need the percentage or mean, standard deviation or data on distribution. If that is not available the test cannot be run.",
+      "context": "Tracking summary, collapsed method note at the foot",
+      "page": "Tracking"
+    },
+    "tracking.empty": {
+      "title": "Tracking — no history configured",
+      "text": "No wave history is configured, so there is nothing to track. With history supplied (one wave or many), this workspace provides the summary, explorer and visualise tracking views.",
+      "context": "Tracking tab, empty state",
+      "page": "Tracking"
+    },
+    "visualise.legend.significance": {
+      "title": "Visualise legend — significance",
+      "text": "▲▼ coloured = significant at 95% vs the comparison wave — two-proportion z-test on percentages, Welch t-test on means/indexes/NPS (spread from each wave's published breakdown)",
+      "context": "Tracking visualise, chart legend",
+      "page": "Tracking"
+    },
+    "visualise.ci_tip": {
+      "title": "Visualise — interval bands tooltip",
+      "text": "Percentages: Wilson score interval on the published base. Means, indexes and NPS: spread taken from each wave's published breakdown.",
+      "context": "Tracking visualise, toggle tooltip",
+      "page": "Tracking"
+    },
+    "visualise.trendline_tip": {
+      "title": "Visualise — trendline tooltip",
+      "text": "Dashed least-squares linear fit over the plotted waves — one per series.",
+      "context": "Tracking visualise, toggle tooltip",
+      "page": "Tracking"
+    },
+    "visualise.ci_note": {
+      "title": "Visualise — interval bands note",
+      "text": "95% {interval_term} bands — percentages: Wilson score interval on the published base; means, indexes and NPS: spread taken from each wave's published breakdown.{softened}",
+      "context": "Tracking visualise, note under the chart",
+      "page": "Tracking"
+    },
+    "visualise.ci_note_softened": {
+      "title": "Visualise — non-probability caveat",
+      "text": " Quoted as stability intervals: this survey did not use formal random sampling.",
+      "context": "Tracking visualise, appended to the interval note for non-probability designs",
+      "page": "Tracking"
+    },
+    "visualise.note_tags": {
+      "title": "Visualise — tagging a data point",
+      "text": "💬 Click any data point to tag it with a note (e.g. “Campaign launched”) — tags travel with pins and saved copies.",
+      "context": "Tracking visualise, note under the chart",
+      "page": "Tracking"
     }
   },
   "brand": {

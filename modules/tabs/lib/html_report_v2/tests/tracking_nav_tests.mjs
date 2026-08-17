@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CATALOGUE } from "./_text.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsDir = path.join(here, "..", "assets", "js");
@@ -20,6 +21,10 @@ globalThis.TR = { fmt: { escapeHtml: (s) => String(s == null ? "" : s) } };
 function load(file) {
   new Function(fs.readFileSync(path.join(jsDir, file), "utf8"))();
 }
+// The renderer reads its prose from TR.txt; this file loads modules into
+// globalThis rather than a vm sandbox, so install the catalogue the same way.
+load("02_text.js");
+globalThis.TR.txt.load(CATALOGUE);
 load("27u_summary.js");
 load("27v_visualise.js");
 const summary = globalThis.TR.trkSummary;

@@ -131,9 +131,8 @@
     return '<div class="trklegend"><span class="lg cb-g">strong · ≥70% / 7+ ' +
       "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
       "<span class='lg cb-r'>weak</span>" +
-      "<span class='lg'>▲▼ coloured = significant at 95% vs the comparison " +
-      "wave — two-proportion z-test on percentages, Welch t-test on " +
-      "means/indexes/NPS (spread from each wave's published breakdown)</span>" +
+      TR.txt.block("visualise.legend.significance", null,
+                   { tag: "span", cls: "lg" }) +
       "<span class='lg'>⚠ base under " +
       (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
   }
@@ -596,13 +595,12 @@
           "Explorer</button>") + "</div>" +
       '<div class="scopebar">' + modeBtn("absolute", "Absolute") +
       modeBtn("prev", "vs Previous") + modeBtn("base", "vs Baseline") +
-      '<label class="tg" title="Percentages: Wilson score interval on the ' +
-      "published base. Means, indexes and NPS: spread taken from each wave's " +
-      'published breakdown."><input type="checkbox" data-visci' +
+      '<label class="tg" title="' + fmt.escapeHtml(TR.txt("visualise.ci_tip")) +
+      '"><input type="checkbox" data-visci' +
       (s.visCI ? " checked" : "") + (mode !== "absolute" ? " disabled" : "") +
       "> 95% " + TR.conf.labels().interval_abbrev + " bands</label>" +
-      '<label class="tg" title="Dashed least-squares linear fit over the ' +
-      'plotted waves — one per series."><input type="checkbox" data-vistrendline' +
+      '<label class="tg" title="' + fmt.escapeHtml(TR.txt("visualise.trendline_tip")) +
+      '"><input type="checkbox" data-vistrendline' +
       (s.visTrendline ? " checked" : "") +
       (mode !== "absolute" ? " disabled" : "") + "> Trendline</label>" +
       '<label class="tg">Labels <select data-vislabels>' +
@@ -627,16 +625,13 @@
       '<div class="chart" data-vischart>' + (chart ||
         '<div class="chart-error">No data for this selection.</div>') + "</div>" +
       (s.visCI && mode === "absolute"
-        ? '<p class="trknote">95% ' + TR.conf.labels().interval_term +
-          " bands — percentages: Wilson score interval on the published " +
-          "base; means, indexes and NPS: spread taken from each wave's " +
-          "published breakdown." +
-          (TR.conf.labels().is_probability ? "" :
-            " Quoted as stability intervals: this survey did not use " +
-            "formal random sampling.") + "</p>"
+        ? TR.txt.block("visualise.ci_note", {
+            interval_term: TR.conf.labels().interval_term,
+            softened: { html: TR.conf.labels().is_probability ? ""
+              : TR.txt("visualise.ci_note_softened") }
+          }, { cls: "trknote" })
         : "") +
-      '<p class="trknote">💬 Click any data point to tag it with a note ' +
-      "(e.g. “Campaign launched”) — tags travel with pins and saved copies.</p>"];
+      TR.txt.block("visualise.note_tags", null, { cls: "trknote" })];
 
     if (notes.length) {
       html.push('<div class="notechips">' + notes.map(function (n) {
