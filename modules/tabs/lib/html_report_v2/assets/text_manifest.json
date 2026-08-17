@@ -440,5 +440,106 @@
     "page": "Differences",
     "context": "Differences tab — what a card is and what the significance control does.",
     "tokens": []
+  },
+  "qual.board.salience_hint": {
+    "page": "Qualitative",
+    "context": "Themes board — how to read the diverging bars: what salience means, what the mix shows, which side is which.",
+    "tokens": [
+      "audience_n"
+    ]
+  },
+  "qual.board.champ_rule": {
+    "page": "Qualitative",
+    "context": "Themes board — which example comments are shown, when examples are switched on.",
+    "tokens": []
+  },
+  "qual.xtab.mode_skew": {
+    "page": "Qualitative",
+    "context": "Themes × banner — what a cell means in sentiment-skew mode.",
+    "tokens": []
+  },
+  "qual.xtab.mode_salience": {
+    "page": "Qualitative",
+    "context": "Themes × banner — what a cell means in salience mode.",
+    "tokens": []
+  },
+  "qual.xtab.caption": {
+    "page": "Qualitative",
+    "context": "Themes × banner — the caption under the table. {counts_clause} appears only when counts are shown.",
+    "tokens": [
+      "banner",
+      "mode",
+      "counts_clause"
+    ]
+  },
+  "qual.xtab.counts_clause": {
+    "page": "Qualitative",
+    "context": "Themes × banner — the clause added to the caption when cells show counts.",
+    "tokens": []
+  },
+  "qual.footer.themes_salience": {
+    "page": "Qualitative",
+    "context": "Comment footer — that themes are unprompted salience, not prompted incidence.",
+    "tokens": []
+  },
+  "qual.footer.demos_blocked": {
+    "page": "Qualitative",
+    "context": "Comment footer — demographic cuts are switched off for this report.",
+    "tokens": []
+  },
+  "qual.footer.demos_safe": {
+    "page": "Qualitative",
+    "context": "Comment footer — demographic tags appear only where the group is large enough.",
+    "tokens": []
+  },
+  "qual.footer.verbatim_full": {
+    "page": "Qualitative",
+    "context": "Comment footer — the verbatims are as given and unedited.",
+    "tokens": []
+  },
+  "qual.footer.verbatim_redacted": {
+    "page": "Qualitative",
+    "context": "Comment footer — the verbatims are as given with identifying details removed, never rewritten.",
+    "tokens": []
+  },
+  "qual.footer.dropped_codes": {
+    "page": "Qualitative",
+    "context": "Comment footer — stray codes quarantined out of the run.",
+    "tokens": [
+      "n",
+      "codes_word"
+    ]
+  },
+  "qual.collection.empty": {
+    "page": "Qualitative",
+    "context": "Your collection — nothing marked yet, and how to mark something.",
+    "tokens": []
+  },
+  "qual.collection.hub_not_narrowed": {
+    "page": "Qualitative",
+    "context": "Your collection — why a named hub ignores the audience filter.",
+    "tokens": []
+  },
+  "qual.collection.orphans_tip": {
+    "page": "Qualitative",
+    "context": "Your collection — tooltip on marks that no longer match the data.",
+    "tokens": []
+  },
+  "qual.collection.withheld_tip": {
+    "page": "Qualitative",
+    "context": "Your collection — tooltip on marked comments whose text this copy does not publish.",
+    "tokens": []
+  },
+  "qual.collection.empty_hub": {
+    "page": "Qualitative",
+    "context": "Your collection — the selected hub is empty, and how to add to it.",
+    "tokens": [
+      "hub"
+    ]
+  },
+  "qual.collection.empty_cut": {
+    "page": "Qualitative",
+    "context": "Your collection — no marks fall in the current cut.",
+    "tokens": []
   }
 }

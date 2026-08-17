@@ -1763,18 +1763,14 @@
     var tools = '<label class="ql-inlinetoggle" title="Show a couple of example comments beneath each theme bar">' +
       '<input type="checkbox" data-champtoggle' + champChecked + "> Show example comments</label>";
     var champRule = st.showChampions
-      ? '<span class="ql-hint ql-champrule">Examples show one positive + one negative comment per theme; ' +
-        "your ★ shortlisted picks always lead.</span>"
+      ? TR.txt.block("qual.board.champ_rule", null,
+                     { tag: "span", cls: "ql-hint ql-champrule" })
       : "";
     return '<div class="ql-board"><div class="ql-boardhd">' +
       '<div class="ql-boardhdrow"><span class="ql-boardttl">What people raised</span>' +
       '<div class="ql-boardtools">' + tools + "</div></div>" +
-      '<span class="ql-hint">Ranked by salience (% of the ' + audience.length +
-      ' who raised each theme <b>unprompted</b>, right). Each bar is the sentiment <i>mix</i> ' +
-      'of that theme’s comments, so every theme is equal width and the lean shows the balance: ' +
-      '<b class="qc-neg">negative</b> left, <b class="qc-pos">positive</b> right, ' +
-      '<b class="qc-neu">mixed</b> centre; net = net sentiment %. ' +
-      "Click a theme to read its comments.</span>" + champRule +
+      TR.txt.block("qual.board.salience_hint", { audience_n: audience.length },
+                   { tag: "span", cls: "ql-hint" }) + champRule +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
   }
 
@@ -1870,9 +1866,8 @@
     var insKey = q.code + ":xtab";
     var insTxt = (TR.insights && TR.insights.get) ? TR.insights.get(insKey, bannerId) : "";
     var pinCtx = "Themes by " + bannerName + " · " + (mode === "skew" ? "sentiment skew" : "salience");
-    var modeLabel = mode === "skew"
-      ? "net sentiment of those who raised each theme (of mentioners)"
-      : "% of each column who raised each theme";
+    var modeLabel = TR.txt(mode === "skew" ? "qual.xtab.mode_skew"
+                                            : "qual.xtab.mode_salience");
     var countsBox = '<label class="ql-xcounts"><input type="checkbox" data-xcounts' +
       (counts ? " checked" : "") + "> Counts</label>";
     return '<section class="ql-xtab card" data-snap-card>' +
@@ -1880,9 +1875,10 @@
         '<span class="ql-xspacer"></span><button class="ql-xpin" data-snap-pin ' +
         'data-snap-source="qualitative" data-snap-title="' + esc(q.title + " — themes by " + bannerName) +
         '" data-snap-context="' + esc(pinCtx) + '">📌 Pin to story</button></div>' +
-      '<div class="ql-xcap">Themes × ' + esc(bannerName) + " — " + esc(modeLabel) +
-        ". Each cell is a % of its column (commenters)" + (counts ? ", shown as counts" : "") +
-        "; click a theme for its split + comments.</div>" +
+      TR.txt.block("qual.xtab.caption", {
+        banner: bannerName, mode: { html: modeLabel },
+        counts_clause: { html: counts ? TR.txt("qual.xtab.counts_clause") : "" }
+      }, { tag: "div", cls: "ql-xcap" }) +
       '<div class="ql-xscroll"><table class="ql-xtable">' + head + body + "</table></div>" +
       '<div class="insight"><div class="insight-head">Analyst insight</div>' +
       '<textarea class="ql-xinsight" data-xinsight="' + esc(insKey) +
@@ -1992,14 +1988,15 @@
     // never rewrites; "hidden" shows no text at all, so the note is dropped.
     var verbatimNote =
       island.textMode === "hidden"   ? null :
-      island.textMode === "redacted" ? "comments shown as given, identifying details removed" :
-                                       "comments shown as given, not edited post-survey";
+      island.textMode === "redacted" ? TR.txt("qual.footer.verbatim_redacted") :
+                                       TR.txt("qual.footer.verbatim_full");
     var bits = [(q.base ? q.base.answered : 0) + " comments",
                 island.textMode !== "hidden" ? "✎ select text in a comment to highlight a passage" : null,
-                q.type === "themed" ? "themes are salience (raised unprompted), not prompted incidence" : null,
-                island.demographicCuts === "block" ? "demographic cuts blocked" :
-                island.demographicCuts === "safe" ? "demographic tags shown only where the group is large enough" : null,
-                dropped ? (dropped + " stray code(s) quarantined") : null,
+                q.type === "themed" ? TR.txt("qual.footer.themes_salience") : null,
+                island.demographicCuts === "block" ? TR.txt("qual.footer.demos_blocked") :
+                island.demographicCuts === "safe" ? TR.txt("qual.footer.demos_safe") : null,
+                dropped ? TR.txt("qual.footer.dropped_codes",
+                  { n: dropped, codes_word: dropped === 1 ? "code" : "codes" }) : null,
                 verbatimNote];
     return '<footer class="ql-foot">' + bits.filter(Boolean).join(" · ") + '</footer>';
   }
@@ -2138,8 +2135,8 @@
 
     if (!total) {
       qual._colview = { island: island, items: [] };
-      return head + hubBar + '<div class="ql-drawer"><p class="ql-empty">Nothing collected yet. As you read, ' +
-        "★ shortlist a comment or ✎ highlight a passage — they gather here, across every question.</p></div>";
+      return head + hubBar + '<div class="ql-drawer">' +
+        TR.txt.block("qual.collection.empty", null, { cls: "ql-empty" }) + "</div>";
     }
     // A named hub is a hand-picked set — INDEPENDENT of the audience filter (show all its
     // members). "All marks" is the exploratory view: it honours the live cut, and a below-k
@@ -2184,7 +2181,8 @@
     var cover, coverPlain;
     if (activeHub) {
       cover = "Showing all " + shown.length + noun + " in " + esc(activeHub.name);
-      if (cutDesc) cover += ' · <span class="ql-cut">a hub shows all its comments — the filter doesn’t narrow it</span>';
+      if (cutDesc) cover += " · " + TR.txt.block("qual.collection.hub_not_narrowed", null,
+                                                 { tag: "span", cls: "ql-cut" });
       coverPlain = "Illustrating " + shown.length + noun + " in " + activeHub.name;
     } else {
       cover = shown.length === scopeTotal
@@ -2193,15 +2191,14 @@
       if (cutDesc) cover += ' · <span class="ql-cut">' + esc(cutDesc) + "</span>";
       coverPlain = "Illustrating " + shown.length + " of " + scopeTotal + noun + (cutDesc ? " · " + cutDesc : "");
     }
-    if (pool.orphans) cover += ' · <span class="ql-orphan" title="These marks point at comments not present ' +
-      'in this data run — re-mark to refresh them">' + pool.orphans +
+    if (pool.orphans) cover += ' · <span class="ql-orphan" title="' +
+      esc(TR.txt("qual.collection.orphans_tip")) + '">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
     // The cover states the withholding — a marked comment whose verbatim this
     // copy does not publish must not simply vanish from the collection
     // ("reads like the control did nothing"; review 2026-08, I21).
-    if (pool.withheld) cover += ' · <span class="ql-orphan" title="These marked comments are counted in ' +
-      'every distribution, but this copy of the report does not publish their text ' +
-      '(confidentiality scope)">' + pool.withheld +
+    if (pool.withheld) cover += ' · <span class="ql-orphan" title="' +
+      esc(TR.txt("qual.collection.withheld_tip")) + '">' + pool.withheld +
       " marked comment" + (pool.withheld === 1 ? "" : "s") + " withheld in this copy</span>";
     qual._colview = { island: island, items: shown, hub: activeHub, coverPlain: coverPlain,
                       safeDemos: safeDemos, dropTags: hubBelowK };
@@ -2226,8 +2223,8 @@
 
     var ctx = { dropTags: hubBelowK };
     var emptyMsg = activeHub
-      ? ("“" + esc(activeHub.name) + "” is empty — switch to All marks and use ＋ Hub on a comment to add it.")
-      : "No marks fall in this cut — broaden the filter to see them.";
+      ? TR.txt("qual.collection.empty_hub", { hub: activeHub.name })
+      : TR.txt("qual.collection.empty_cut");
     var cards = groups.length
       ? groups.map(function (g) {
           return '<div class="ql-colhd">' + esc(g.label) +

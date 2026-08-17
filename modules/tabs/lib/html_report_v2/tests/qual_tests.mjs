@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { TXT, CATALOGUE, blockOf } from "./_text.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsDir = path.join(here, "..", "assets", "js");
@@ -13,6 +14,10 @@ globalThis.TR = { fmt: {
   score: (v) => Number(v).toFixed(1),          // one-decimal score rule (01_format.js)
   base: (n) => String(n)
 } };
+// The renderer reads its prose from TR.txt (02_text.js); install the real
+// catalogue so the qual views render the words a real report would.
+new Function(fs.readFileSync(path.join(jsDir, "02_text.js"), "utf8"))();
+globalThis.TR.txt.load(CATALOGUE);
 new Function(fs.readFileSync(path.join(jsDir, "21_stats.js"), "utf8"))();   // TR.stats.propZ for crosstab sig
 new Function(fs.readFileSync(path.join(jsDir, "27q_qualitative.js"), "utf8"))();
 const qual = globalThis.TR.qual;
@@ -686,7 +691,8 @@ assert(ch.indexOf('id="ql-comments-anchor"') >= 0 && ch.indexOf("ql-secdivider")
 qual._state.showChampions = true;
 qual.render(host);
 ch = host.innerHTML;
-assert(ch.indexOf("ql-champtext") >= 0 && ch.indexOf("Examples show one positive + one negative") >= 0,
+assert(ch.indexOf("ql-champtext") >= 0 &&
+  ch.indexOf('data-txt-key="qual.board.champ_rule"') >= 0,
   "fix #1/#2: with examples on, champions render (clamped .ql-champtext) under the stated selection rule");
 assert(ch.indexOf("“great value”") >= 0,
   "theme cards carry a championed quote inline once examples are shown (Price)");
@@ -814,15 +820,16 @@ function footNote(textMode) {
   qual.render(h);
   return h.innerHTML;
 }
-assert(footNote("full").indexOf("comments shown as given, not edited post-survey") >= 0,
+// Which provenance claim the footer makes is the code's decision and must not
+// drift; the sentences themselves are the report author's.
+assert(footNote("full").indexOf(TXT("qual.footer.verbatim_full")) >= 0,
   "footer: full mode says comments are shown as given, not edited post-survey");
-assert(footNote("redacted").indexOf("comments shown as given, identifying details removed") >= 0,
+assert(footNote("redacted").indexOf(TXT("qual.footer.verbatim_redacted")) >= 0,
   "footer: redacted mode says identifying details are removed (never claims 'not edited')");
 const hiddenFoot = footNote("hidden");
-assert(hiddenFoot.indexOf("shown as given") < 0 && hiddenFoot.indexOf("not edited") < 0,
-  "footer: hidden mode (no verbatims shown) carries no 'as given' note");
-assert(footNote("full").indexOf("model-authored") < 0,
-  "footer: the old 'model-authored' jargon is gone");
+assert(hiddenFoot.indexOf(TXT("qual.footer.verbatim_full")) < 0 &&
+  hiddenFoot.indexOf(TXT("qual.footer.verbatim_redacted")) < 0,
+  "footer: hidden mode (no verbatims shown) carries no provenance note at all");
 
 // ---- Split band (NPS Detractor/Passive/Promoter) view-by ----------------------
 const qsplit = {

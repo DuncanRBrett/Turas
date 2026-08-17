@@ -718,6 +718,114 @@
       "text": "Each card shows where one group stands out against the rest on a specific question, as identified by a significance test. Choose either 95% or 95% + 80% significance. Note that this is a statistical test, not a judgement call. We have excluded classification questions such as demographics or corpographics from this page.",
       "context": "Differences tab, intro card",
       "page": "Differences"
+    },
+    "qual.board.salience_hint": {
+      "title": "Themes board — how to read it",
+      "text": "Ranked by salience (% of the {audience_n} who raised each theme <b>unprompted<\/b>, right). Each bar is the sentiment <i>mix<\/i> of that theme’s comments, so every theme is equal width and the lean shows the balance: <b class=\"qc-neg\">negative<\/b> left, <b class=\"qc-pos\">positive<\/b> right, <b class=\"qc-neu\">mixed<\/b> centre; net = net sentiment %. Click a theme to read its comments.",
+      "context": "Qualitative, themes board header",
+      "page": "Qualitative"
+    },
+    "qual.board.champ_rule": {
+      "title": "Themes board — example comments rule",
+      "text": "Examples show one positive + one negative comment per theme; your ★ shortlisted picks always lead.",
+      "context": "Qualitative, shown when example comments are switched on",
+      "page": "Qualitative"
+    },
+    "qual.xtab.mode_skew": {
+      "title": "Themes × banner — skew mode",
+      "text": "net sentiment of those who raised each theme (of mentioners)",
+      "context": "Qualitative, crosstab caption",
+      "page": "Qualitative"
+    },
+    "qual.xtab.mode_salience": {
+      "title": "Themes × banner — salience mode",
+      "text": "% of each column who raised each theme",
+      "context": "Qualitative, crosstab caption",
+      "page": "Qualitative"
+    },
+    "qual.xtab.caption": {
+      "title": "Themes × banner — caption",
+      "text": "Themes × {banner} — {mode}. Each cell is a % of its column (commenters){counts_clause}; click a theme for its split + comments.",
+      "context": "Qualitative, crosstab caption",
+      "page": "Qualitative"
+    },
+    "qual.xtab.counts_clause": {
+      "title": "Themes × banner — counts clause",
+      "text": ", shown as counts",
+      "context": "Qualitative, spliced into the crosstab caption when counts are on",
+      "page": "Qualitative"
+    },
+    "qual.footer.themes_salience": {
+      "title": "Comment footer — salience",
+      "text": "themes are salience (raised unprompted), not prompted incidence",
+      "context": "Qualitative, footer under a themed question",
+      "page": "Qualitative"
+    },
+    "qual.footer.demos_blocked": {
+      "title": "Comment footer — demographic cuts blocked",
+      "text": "demographic cuts blocked",
+      "context": "Qualitative, footer",
+      "page": "Qualitative"
+    },
+    "qual.footer.demos_safe": {
+      "title": "Comment footer — demographic tags gated",
+      "text": "demographic tags shown only where the group is large enough",
+      "context": "Qualitative, footer",
+      "page": "Qualitative"
+    },
+    "qual.footer.verbatim_full": {
+      "title": "Comment footer — verbatims as given",
+      "text": "comments shown as given, not edited post-survey",
+      "context": "Qualitative, footer",
+      "page": "Qualitative"
+    },
+    "qual.footer.verbatim_redacted": {
+      "title": "Comment footer — verbatims redacted",
+      "text": "comments shown as given, identifying details removed",
+      "context": "Qualitative, footer",
+      "page": "Qualitative"
+    },
+    "qual.footer.dropped_codes": {
+      "title": "Comment footer — quarantined codes",
+      "text": "{n} stray {codes_word} quarantined",
+      "context": "Qualitative, footer",
+      "page": "Qualitative"
+    },
+    "qual.collection.empty": {
+      "title": "Collection — nothing collected yet",
+      "text": "Nothing collected yet. As you read, ★ shortlist a comment or ✎ highlight a passage — they gather here, across every question.",
+      "context": "Qualitative, Your collection",
+      "page": "Qualitative"
+    },
+    "qual.collection.hub_not_narrowed": {
+      "title": "Collection — a hub ignores the filter",
+      "text": "a hub shows all its comments — the filter doesn’t narrow it",
+      "context": "Qualitative, Your collection cover line",
+      "page": "Qualitative"
+    },
+    "qual.collection.orphans_tip": {
+      "title": "Collection — stale marks tooltip",
+      "text": "These marks point at comments not present in this data run — re-mark to refresh them",
+      "context": "Qualitative, Your collection cover line",
+      "page": "Qualitative"
+    },
+    "qual.collection.withheld_tip": {
+      "title": "Collection — withheld text tooltip",
+      "text": "These marked comments are counted in every distribution, but this copy of the report does not publish their text (confidentiality scope)",
+      "context": "Qualitative, Your collection cover line",
+      "page": "Qualitative"
+    },
+    "qual.collection.empty_hub": {
+      "title": "Collection — empty hub",
+      "text": "“{hub}” is empty — switch to All marks and use ＋ Hub on a comment to add it.",
+      "context": "Qualitative, Your collection",
+      "page": "Qualitative"
+    },
+    "qual.collection.empty_cut": {
+      "title": "Collection — nothing in this cut",
+      "text": "No marks fall in this cut — broaden the filter to see them.",
+      "context": "Qualitative, Your collection",
+      "page": "Qualitative"
     }
   },
   "brand": {
