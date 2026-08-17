@@ -237,6 +237,18 @@ file is being written without reconciliation.
   `openpyxl.load_workbook()` (not read-only) and convert under
   `soffice --headless`.
 
+- Suites, 17 May–Aug modules, all on this branch: **18,223 assertions passing,
+  0 failing**. tabs 4804, brand 2155, tracker 1969, confidence 1063, segment
+  1026, keydriver 940, pricing 845, shared 801, maxdiff 797, weighting 743,
+  catdriver 673, conjoint 588, vas 564, report_hub 360, steps 318,
+  AlchemerParser 299, hub_app 278. The tabs v2 JS suite is 33/33.
+- Two tabs **errors are pre-existing**, unrelated to workbooks, and reproduce
+  identically on `main`: `test_allocation_processor.R:658` and
+  `test_sig_row_dispatch.R:217`.
+- `modules/weighting/lib/output.R` needed no change: its no-helper branches TRS-
+  refuse (`IO_ATOMIC_SAVE_UNAVAILABLE`) rather than falling back to a direct
+  save, so it never wrote an unreconciled workbook. That is the better pattern.
+
 ## Still open
 
 - **The dimension.** Deliberately untouched. It is not free once you are fixing
