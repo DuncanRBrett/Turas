@@ -131,3 +131,7 @@ prototypes/report-redesign/fable/v2/ccs_backfill/
 prototypes/report-redesign/fable/v2/data/ccs_*.json
 # Tabs-tracker per-wave contribution sidecars (may carry client microdata)
 *_wave.json
+
+# Callout Editor keeps timestamped copies of the registry beside it; these are
+# local safety copies, not repo content (the registry itself IS tracked).
+modules/shared/lib/callouts/backups/

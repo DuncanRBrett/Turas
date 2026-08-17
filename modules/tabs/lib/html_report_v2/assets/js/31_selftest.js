@@ -271,6 +271,14 @@
           '<img src=x onerror=alert(1)>', "tko-take", "label");
         eq(hostile.indexOf("<img src=x") === -1, true, "raw tag never emitted");
         eq(hostile.indexOf("&lt;img") !== -1, true, "shown escaped instead");
+      } },
+      { name: "every authored text key the renderer asked for was present", fn: function () {
+        // The build refuses on a key that is declared but unauthored, so a miss
+        // here means the renderer asked for a key it never declared in
+        // text_manifest.json — caught in development rather than shipping as a
+        // silently empty paragraph. Reports the keys, not a bare count, so the
+        // fix is obvious.
+        eq(TR.txt.misses(), [], "text keys asked for but not in the catalogue");
       } }
     ];
   };

@@ -37,7 +37,9 @@
   var CATALOGUE = {};
 
   /** Keys asked for that the catalogue does not hold. Empty in a report that
-   *  built cleanly; the selftest surfaces it during development. */
+   *  built cleanly — the build refuses on an unauthored key — so this can only
+   *  fill if the renderer asks for a key it never declared in the manifest.
+   *  Surfaced by the #selftest case in 31_selftest.js. */
   var MISSES = [];
 
   function escapeHtml(s) {
