@@ -55,6 +55,9 @@ REQUIRED_FUNCTIONS <- c(
   "turas_run_state_new",          # trs_run_state.R
   "turas_print_start_banner",     # trs_banner.R
   "turas_save_workbook_atomic",   # turas_save_workbook_atomic.R
+  "turas_saveWorkbook",           # turas_save_workbook_atomic.R
+  "turas_reconcile_workbook_parts", # turas_save_workbook_atomic.R
+  "turas_check_workbook_parts",   # turas_save_workbook_atomic.R
   "turas_excel_escape",           # turas_excel_escape.R
   "turas_write_stats_pack"        # stats_pack_writer.R
 )

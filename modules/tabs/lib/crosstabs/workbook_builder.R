@@ -607,6 +607,19 @@ save_workbook_safe <- function(wb, output_path, run_result = NULL) {
       log_message(sprintf("Saved: %s", output_path), "INFO")
     }
   } else {
+    # Fallback: the shared helper was not loaded, so the workbook cannot be
+    # reconciled before saving and openxlsx will leave relationships pointing at
+    # drawing parts it never writes. Excel will offer to repair the result and
+    # strip its dropdowns. Say so on the console rather than shipping quietly.
+    cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
+    cat("│ Context: TABS - save crosstab workbook\n")
+    cat("│ Code: IO_SAVE_UNRECONCILED\n")
+    cat("│ Message: modules/shared/lib/turas_save_workbook_atomic.R is not loaded,\n")
+    cat("│          so this workbook is saved without part reconciliation and\n")
+    cat("│          Excel may report a problem and offer to repair it.\n")
+    cat("│ How to fix: source modules/shared/lib/import_all.R before running tabs\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+
     tryCatch({
       openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
       log_message(sprintf("Saved: %s", output_path), "INFO")

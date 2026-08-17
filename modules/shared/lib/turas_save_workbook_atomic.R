@@ -48,8 +48,8 @@
 #
 # IMPLEMENTATION NOTE: this reaches into openxlsx internals (worksheets_rels,
 # Content_Types, drawings, vml, comments) as of openxlsx 4.2.8, pinned by renv.
-# The regression tests in modules/tabs/tests/testthat/test_excel_output.R and
-# modules/shared/tests/testthat/test_workbook_parts.R are the guard if that ever
+# The regression tests in modules/shared/tests/testthat/test_workbook_parts.R and
+# modules/tabs/tests/testthat/test_workbook_builder.R are the guard if that ever
 # changes: they assert the zip-level invariant, not the mechanism.
 # ==============================================================================
 
@@ -215,10 +215,15 @@ turas_reconcile_workbook_parts <- function(wb, module = "TURAS", verbose = FALSE
     ct <- ct[!grepl(ss_part_tag, ct, fixed = TRUE)]
   } else {
     if (!any(is_ss_rel)) {
+      # A fixed, unmistakable Id rather than a computed rIdN: nothing refers to
+      # the sharedStrings relationship by Id (readers find it by Type), and a
+      # computed one could collide with a sheet or styles relationship on the
+      # re-add path (all-numeric save -> writeData adds strings -> save again).
+      # openxlsx uses the same trick with "rIdvml".
       wb$workbook.xml.rels <- c(
         wb_rels,
-        sprintf("<Relationship Id=\"rId%d\" Type=\"%s\" Target=\"sharedStrings.xml\"/>",
-                length(wb_rels) + 1L, .TURAS_REL_TYPE_SHARED_STRINGS)
+        sprintf("<Relationship Id=\"rIdTurasSharedStrings\" Type=\"%s\" Target=\"sharedStrings.xml\"/>",
+                .TURAS_REL_TYPE_SHARED_STRINGS)
       )
       n_added <- n_added + 1L
     }

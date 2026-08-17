@@ -802,3 +802,83 @@ test_that("k = 10 withholds the sub-k column on EVERY sheet, not just Crosstabs 
 
   unlink(tmp)
 })
+
+
+# ==============================================================================
+# 4. Saved workbooks must not reference parts that were never written
+# ==============================================================================
+#
+# openxlsx seeds every worksheet with a relationship to a drawing part and a
+# vmlDrawing part, but only writes those parts when the sheet actually holds a
+# drawing or a comment. The leftover relationship makes Excel report a problem
+# with the content and offer to repair the file -- and its repair strips every
+# data-validation dropdown, which is worse than the bug.
+#
+# These tests go through the real tabs save path (save_workbook_safe) and assert
+# the zip-level invariant, so they hold regardless of how openxlsx changes.
+# ==============================================================================
+
+context("workbook part soundness")
+
+source(file.path(turas_root, "modules/shared/lib/turas_save_workbook_atomic.R"))
+
+test_that("save_workbook_safe writes a workbook with no dangling part references", {
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Crosstabs")
+  openxlsx::writeData(wb, "Crosstabs", data.frame(a = 1:5, b = letters[1:5]))
+  openxlsx::addWorksheet(wb, "Guide")
+  openxlsx::writeData(wb, "Guide", data.frame(note = "how to read this"))
+
+  save_workbook_safe(wb, tmp)
+
+  chk <- turas_check_workbook_parts(tmp)
+  expect_equal(chk$status, "PASS")
+  expect_equal(chk$dangling, character(0))
+  expect_equal(chk$phantom_overrides, character(0))
+})
+
+test_that("dropdowns survive the tabs save path", {
+  # This is the thing Excel's own repair destroys, so a fix that loses the
+  # validations would be worse than the defect it fixes.
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Config")
+  openxlsx::writeData(wb, "Config", data.frame(Setting = c("A", "B"), Value = c("Y", "N")))
+  openxlsx::dataValidation(wb, "Config", col = 2, rows = 2:3, type = "list", value = '"Y,N"')
+
+  save_workbook_safe(wb, tmp)
+
+  expect_equal(turas_check_workbook_parts(tmp)$status, "PASS")
+
+  con <- unz(tmp, "xl/worksheets/sheet1.xml")
+  sheet <- paste(readLines(con, warn = FALSE), collapse = "")
+  close(con)
+  expect_true(grepl("dataValidation", sheet, fixed = TRUE))
+
+  expect_equal(nrow(openxlsx::read.xlsx(tmp, sheet = "Config")), 2)
+})
+
+test_that("a workbook re-saved through the tabs path stays sound", {
+  # loadWorkbook() re-seeds the relationships, so every save has to reconcile,
+  # not just the first one.
+  first <- tempfile(fileext = ".xlsx")
+  second <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(c(first, second)), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Data")
+  openxlsx::writeData(wb, "Data", data.frame(a = 1:3, b = c("x", "y", "z")))
+  save_workbook_safe(wb, first)
+
+  reloaded <- openxlsx::loadWorkbook(first)
+  save_workbook_safe(reloaded, second)
+
+  expect_equal(turas_check_workbook_parts(second)$status, "PASS")
+  expect_equal(openxlsx::read.xlsx(second, sheet = "Data"),
+               openxlsx::read.xlsx(first, sheet = "Data"))
+})
