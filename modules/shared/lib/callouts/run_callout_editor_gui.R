@@ -33,6 +33,23 @@ run_callout_editor_gui <- function() {
     json_path <- file.path(dirname(sys.frame(1)$ofile %||% "."), "callouts.json")
   }
 
+  # --- The shared registry writer (atomic + backups) ---------------------
+  # Every module's report build reads callouts.json, and from Tabs v2 onwards a
+  # build REFUSES when the file will not parse. A save that died half way would
+  # therefore break report generation platform-wide, so writes go through
+  # turas_callouts_write() in callout_registry.R rather than straight to disk.
+  # Sourced here (not assumed loaded) because the editor is launched as its own
+  # script from launch_turas.R.
+  if (!exists("turas_callouts_write", mode = "function")) {
+    reg_file <- file.path(dirname(json_path), "callout_registry.R")
+    if (file.exists(reg_file)) source(reg_file)
+  }
+  if (!exists("turas_callouts_write", mode = "function")) {
+    stop(sprintf(
+      "\n[REFUSE] IO_CALLOUT_REGISTRY_MISSING: callout_registry.R was not found beside %s.\nThe editor will not write the registry without its safe writer.\n",
+      json_path), call. = FALSE)
+  }
+
   # --- Read registry ---
   read_registry <- function() {
     if (!file.exists(json_path)) return(list())
@@ -41,7 +58,7 @@ run_callout_editor_gui <- function() {
 
   # --- Write registry ---
   write_registry <- function(data) {
-    jsonlite::write_json(data, json_path, pretty = TRUE, auto_unbox = TRUE)
+    turas_callouts_write(data, json_path)
   }
 
   # --- Build flat table from nested JSON ---

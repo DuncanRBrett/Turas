@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "What authored text the v2 renderer needs. The words themselves live in the shared callout registry under module 'tabs' and are edited in the Callout Editor; this file is the renderer's contract with them. Validated at build time by report_text.R — a key here with no entry in the registry, or a placeholder in the registry that is not declared here, refuses the build.",
+    "format": "key -> { page, context, tokens }. page groups the entry in the Callout Editor and should match a v2 tab. context says where on that tab it renders, so an author knows what they are changing. tokens lists the {placeholders} the renderer supplies for that key; any other {lower_snake_case} in the authored text is a typo and refuses the build.",
+    "authoring": "Text is the CONTENT of its block — the renderer supplies the surrounding <p>/<div> and the data-txt-key tag. Inline markup is limited to strong em b i br p ul ol li h3 h4 span code, balanced, with no attributes. Blank text renders nothing at all, which is how an author switches a block off without touching code."
+  },
+
+  "report.construction.produced": {
+    "page": "Report",
+    "context": "About card, Report construction — the attribution sentence. Always rendered, and prepended to a study's own _REPORT_CONSTRUCTION note unless that note names the producer itself.",
+    "tokens": ["company"]
+  },
+  "report.construction.computed": {
+    "page": "Report",
+    "context": "About card, Report construction — completes the attribution paragraph. Stock note only; a study's own _REPORT_CONSTRUCTION replaces it.",
+    "tokens": []
+  },
+  "report.construction.self_contained": {
+    "page": "Report",
+    "context": "About card, Report construction — what the file is and what recalculates as the reader clicks. Stock note only.",
+    "tokens": []
+  },
+  "report.construction.prior_waves_published": {
+    "page": "Report",
+    "context": "About card, Report construction — rendered ONLY when the report carries earlier waves and none of them holds respondent-level scores, i.e. when the figures really are carried forward rather than recalculated. Stock note only.",
+    "tokens": []
+  },
+  "report.construction.ai_and_review": {
+    "page": "Report",
+    "context": "About card, Report construction — where AI does and does not act, and who is accountable. Stock note only; a study's own _REPORT_CONSTRUCTION replaces this too, and then owns the disclosure.",
+    "tokens": []
+  }
+}

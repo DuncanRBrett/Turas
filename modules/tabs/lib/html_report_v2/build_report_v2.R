@@ -17,8 +17,12 @@
 
 # Shared v1 engine modules load first (00_namespace defines the TR namespace);
 # the v2 modules (20+) follow. Mirrors build.R's explicit ordering.
+# 02_text.js is listed explicitly rather than left to the sorted v2 group: it
+# installs TR.txt, which the renderer's prose depends on, so its position ahead
+# of everything that renders is a fact of the bundle, not a sorting accident.
 .REPORT_V2_ENGINE_MODULES <- c(
-  "00_namespace.js", "01_format.js", "03_svg.js", "13_zip.js", "14_pptx_parts.js"
+  "00_namespace.js", "01_format.js", "02_text.js", "03_svg.js",
+  "13_zip.js", "14_pptx_parts.js"
 )
 
 if (!exists("%||%", mode = "function")) {
@@ -67,6 +71,49 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
     stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '<!--' — cannot inline safely.")
   }
   bundle
+}
+
+
+#' Ensure the authored-text layer is loaded
+#'
+#' The v2 report reads its prose from the shared callout registry, so a build
+#' needs two files that are not part of the tabs module: report_text.R (beside
+#' this one) and the registry reader in modules/shared. Both are loaded here
+#' rather than assumed, because write_html_report_v2() is called from
+#' run_crosstabs.R, from qual_report.R and from tests, each with a different
+#' idea of what has already been sourced.
+#'
+#' @param assets_dir The vendored v2 assets directory
+#' @return Invisibly TRUE; stops with an IO_ code when a file cannot be found
+#' @keywords internal
+.report_v2_load_text_layer <- function(assets_dir = report_v2_assets_dir()) {
+  v2_dir <- dirname(assets_dir)
+
+  if (!exists("build_report_text_json", mode = "function")) {
+    f <- file.path(v2_dir, "report_text.R")
+    if (!file.exists(f)) {
+      stop(sprintf("[IO_REPORT_TEXT_MISSING] report_text.R not found at %s", f))
+    }
+    source(f)
+  }
+
+  if (!exists("turas_callout_module", mode = "function")) {
+    tr <- Sys.getenv("TURAS_ROOT", "")
+    candidates <- c(
+      file.path(v2_dir, "..", "..", "..", "shared", "lib", "callouts", "callout_registry.R"),
+      if (nzchar(tr)) file.path(tr, "modules", "shared", "lib", "callouts", "callout_registry.R") else NULL,
+      file.path("modules", "shared", "lib", "callouts", "callout_registry.R")
+    )
+    hit <- Filter(file.exists, candidates)
+    if (!length(hit)) {
+      stop(paste0("[IO_CALLOUT_REGISTRY_MISSING] the shared callout registry was not found; ",
+                  "the v2 report cannot read its authored text. Looked in: ",
+                  paste(candidates, collapse = ", ")))
+    }
+    source(hit[[1]])
+  }
+
+  invisible(TRUE)
 }
 
 
@@ -147,6 +194,16 @@ build_report_v2_html <- function(data_json, config_obj,
     escape_island(qual_json)
   } else "null"
 
+  .report_v2_load_text_layer(assets_dir)
+  js_bundle <- bundle_report_v2_js(assets_dir)
+
+  # The report's authored prose (explainers, legends, method notes). Read from
+  # the shared callout registry and checked against the renderer's manifest —
+  # see report_text.R for why a mismatch refuses the build instead of falling
+  # back to wording the author never wrote.
+  text_result <- build_report_text_json(assets_dir, js_bundle = js_bundle)
+  for (w in text_result$warnings) cat("  [NOTE] Report text:", w, "\n")
+
   html <- render_template(read_text(template_path), list(
     "{{TITLE}}"       = escape_html(as.character(title)),
     "{{GENERATED}}"   = generated,
@@ -156,7 +213,8 @@ build_report_v2_html <- function(data_json, config_obj,
     "{{DATA_PREV}}"   = prev_inlined,
     "{{DATA_VERIFY}}" = "null",
     "{{DATA_QUAL}}"   = qual_inlined,
-    "{{JS}}"          = bundle_report_v2_js(assets_dir)
+    "{{DATA_TEXT}}"   = escape_island(as.character(text_result$json)),
+    "{{JS}}"          = js_bundle
   ))
 
   if (grepl('(src|href)="https?://', html)) {

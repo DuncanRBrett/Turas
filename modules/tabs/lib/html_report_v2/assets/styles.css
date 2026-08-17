@@ -1276,3 +1276,32 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .cover-thumb .si-table { max-height: none; border: none; }
 .cover-thumb::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: linear-gradient(rgba(255,255,255,0), var(--card)); pointer-events: none; }
 .cover-foot { text-align: center; padding: 22px; }
+
+/* ---------------------------------------------------------------------------
+   Author-only text-key badges (shell.textKeys, ctrl+alt+K or #keys=1).
+   Every block whose words come from the Callout Editor carries data-txt-key.
+   The attribute is always in the DOM — it costs nothing and gives the node
+   tests a stable hook — but it only becomes visible when the author asks.
+   Purely presentational, so nothing about the report changes when it is off.
+--------------------------------------------------------------------------- */
+body.txt-keys [data-txt-key],
+body.txt-keys [data-txt-config] { position: relative; outline: 1px dashed var(--accent); outline-offset: 3px; }
+body.txt-keys [data-txt-key] { cursor: copy; }
+/* The badge sits above its block, so give it room rather than let it cover the
+   line before. Author-only, so shifting the layout here costs a client nothing. */
+body.txt-keys [data-txt-key],
+body.txt-keys [data-txt-config] { margin-top: 16px; }
+body.txt-keys [data-txt-key]::after,
+body.txt-keys [data-txt-config]::after {
+  content: attr(data-txt-key);
+  position: absolute; top: -9px; right: 0;
+  font: 700 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .3px; text-transform: none;
+  background: var(--accent); color: #fff;
+  padding: 1px 6px; border-radius: 3px;
+  pointer-events: none; white-space: nowrap; z-index: 5;
+}
+/* Text this STUDY wrote in its own config, not platform text — a different
+   colour, because the Callout Editor is the wrong place to go looking for it. */
+body.txt-keys [data-txt-config] { outline-color: var(--brand); }
+body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-config); background: var(--brand); }

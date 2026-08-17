@@ -6,40 +6,72 @@
 # edited there without touching any module code.
 #
 # FUNCTIONS:
-# - turas_callout()      - Get a single callout as styled HTML
-# - turas_callout_text() - Get raw callout data (title + text)
-# - turas_callout_html() - Build callout HTML with standard styling
+# - turas_callout()        - Get a single callout as styled HTML
+# - turas_callout_text()   - Get raw callout data (title + text)
+# - turas_callout_html()   - Build callout HTML with standard styling
+# - turas_callout_module() - Get every entry for one module
+# - turas_callouts_path()  - Resolve the on-disk registry path
+# - turas_callouts_write() - Write the registry back, atomically, with backups
 #
-# VERSION: 1.0.0
+# VERSION: 1.1.0
 # ==============================================================================
 
 
 # --- Internal: load and cache the callout registry ---
 .callout_cache <- new.env(parent = emptyenv())
 
+# Where this file was sourced from, captured AT SOURCE TIME.
+#
+# source() records the file it is reading as `ofile` on its own evaluation
+# frame, and that frame only exists while the file is being read — so this has
+# to be resolved here, at the top level, not inside a function called later.
+# Reading sys.frame(1)$ofile from inside a function is what the registry used
+# to do, and it silently returned nothing: the lookup then fell through to
+# working-directory-relative paths, which happen to work when a report is built
+# from the project root and fail everywhere else (testthat runs from
+# modules/tabs/tests/testthat, and found no callouts at all).
+.CALLOUTS_SOURCE_DIR <- local({
+  ofile <- NULL
+  for (i in seq_len(sys.nframe())) {
+    f <- sys.frame(i)
+    if (!is.null(f$ofile)) ofile <- f$ofile
+  }
+  if (is.null(ofile)) "" else dirname(normalizePath(ofile, mustWork = FALSE))
+})
+
+
+#' Resolve the Callout Registry Path
+#'
+#' Single place that knows where callouts.json lives, so the reader, the
+#' editor and the Tabs v2 text loader can never disagree about it. Tries, in
+#' order: the directory this file was sourced from, TURAS_ROOT, then two
+#' working-directory-relative paths (Shiny and test environments run from
+#' different places).
+#'
+#' @return Character path. The best candidate even when nothing exists yet,
+#'   so callers can report a useful "not found" against a real path.
+#' @export
+turas_callouts_path <- function() {
+  here <- .CALLOUTS_SOURCE_DIR
+  candidates <- c(
+    if (nzchar(here)) file.path(here, "callouts.json") else NULL,
+    local({
+      tr <- Sys.getenv("TURAS_ROOT", "")
+      if (nzchar(tr)) file.path(tr, "modules", "shared", "lib", "callouts", "callouts.json") else NULL
+    }),
+    file.path("modules", "shared", "lib", "callouts", "callouts.json"),
+    file.path("..", "modules", "shared", "lib", "callouts", "callouts.json")
+  )
+  candidates <- candidates[!is.na(candidates)]
+  for (cand in candidates) if (file.exists(cand)) return(cand)
+  candidates[length(candidates)]
+}
+
+
 .load_callouts <- function() {
   if (!is.null(.callout_cache$data)) return(.callout_cache$data)
 
-  json_path <- file.path(
-    dirname(sys.frame(1)$ofile %||% ""),
-    "callouts.json"
-  )
-
-  # Fallback paths (TURAS_ROOT-aware for Shiny / test environments)
-  if (!file.exists(json_path)) {
-    tr <- Sys.getenv("TURAS_ROOT", "")
-    candidates <- c(
-      if (nzchar(tr)) file.path(tr, "modules", "shared", "lib", "callouts", "callouts.json") else NULL,
-      file.path("modules", "shared", "lib", "callouts", "callouts.json"),
-      file.path("..", "modules", "shared", "lib", "callouts", "callouts.json")
-    )
-    for (cand in candidates) {
-      if (file.exists(cand)) {
-        json_path <- cand
-        break
-      }
-    }
-  }
+  json_path <- turas_callouts_path()
 
   if (!file.exists(json_path)) {
     warning("Callout registry not found at: ", json_path)
@@ -173,6 +205,82 @@ turas_callout_list <- function() {
     stringsAsFactors = FALSE
   ))
   do.call(rbind, rows)
+}
+
+
+#' Get Every Callout for One Module
+#'
+#' Returns the whole `module` block as a named list of entries. Used by
+#' consumers that need the entries themselves rather than rendered HTML —
+#' notably the Tabs v2 report, which ships the text into the browser and
+#' renders it with its own markup.
+#'
+#' @param module Character. Module name (e.g. "tabs")
+#' @return Named list of entries (each with title/text/context/page).
+#'   Empty list when the module has no entries.
+#' @export
+turas_callout_module <- function(module) {
+  data <- .load_callouts()
+  mod <- data[[module]]
+  if (is.null(mod)) list() else mod
+}
+
+
+#' Write the Callout Registry Back to Disk
+#'
+#' Atomic, with backups. The editor rewrites the WHOLE file on every save, and
+#' every Turas module that renders callouts — and, from v2, every Tabs report
+#' build — depends on that file parsing. A plain write that dies half way
+#' through would leave a truncated registry and break all of them, so the new
+#' contents are written to a temporary file in the same directory, parsed back
+#' to prove they are valid JSON, and only then moved into place. The move is
+#' atomic on the same filesystem, which is why the temp file is a sibling and
+#' not in tempdir().
+#'
+#' @param data List. The complete registry (including `_meta`)
+#' @param path Character. Destination; defaults to the resolved registry path
+#' @param backups Integer. How many timestamped copies to keep (0 = none)
+#' @return Invisibly, the path written
+#' @export
+turas_callouts_write <- function(data, path = turas_callouts_path(), backups = 10L) {
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("[REFUSE] PKG_MISSING_DEPENDENCY: jsonlite is required to write the callout registry.",
+         call. = FALSE)
+  }
+
+  dir <- dirname(path)
+  tmp <- file.path(dir, paste0(".", basename(path), ".tmp-", Sys.getpid()))
+  on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
+
+  jsonlite::write_json(data, tmp, pretty = TRUE, auto_unbox = TRUE)
+
+  # Parse the file we are about to install, not the object we serialised — this
+  # is what catches a truncated or partially-flushed write.
+  check <- tryCatch(jsonlite::fromJSON(tmp, simplifyVector = FALSE),
+                    error = function(e) e)
+  if (inherits(check, "error")) {
+    stop(sprintf("[REFUSE] IO_CALLOUTS_WRITE: the new registry did not parse back (%s). The existing %s is untouched.",
+                 conditionMessage(check), basename(path)), call. = FALSE)
+  }
+
+  if (backups > 0 && file.exists(path)) {
+    bdir <- file.path(dir, "backups")
+    if (!dir.exists(bdir)) dir.create(bdir, showWarnings = FALSE)
+    file.copy(path, file.path(bdir, sprintf("callouts-%s.json",
+                                            format(Sys.time(), "%Y%m%d-%H%M%S"))),
+              overwrite = TRUE)
+    kept <- sort(list.files(bdir, pattern = "^callouts-.*\\.json$", full.names = TRUE),
+                 decreasing = TRUE)
+    if (length(kept) > backups) unlink(kept[(backups + 1L):length(kept)])
+  }
+
+  if (!file.rename(tmp, path)) {
+    stop(sprintf("[REFUSE] IO_CALLOUTS_WRITE: could not move the new registry into place at %s.", path),
+         call. = FALSE)
+  }
+
+  .callout_cache$data <- NULL   # next read picks up what was just written
+  invisible(path)
 }
 
 

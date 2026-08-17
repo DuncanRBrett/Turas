@@ -284,6 +284,76 @@ means / NPS — recomputes correctly and matches the published figures.
 
 ---
 
+## Where the report's words come from
+
+The interpretive prose in a v2 report — the explainers, legends, method notes
+and the About card's construction note — is **authored, not coded**. It lives in
+the shared callout registry (`modules/shared/lib/callouts/callouts.json`, module
+`tabs`) and is edited in the **Callout Editor**, launched from `launch_turas()`.
+The renderer holds no fallback wording: if a sentence is not in the registry, it
+does not exist.
+
+Three pieces, and the loop between them closes itself:
+
+| Piece | File | Holds |
+|---|---|---|
+| The words | `modules/shared/lib/callouts/callouts.json` (module `tabs`) | what the report says |
+| The contract | `modules/tabs/lib/html_report_v2/assets/text_manifest.json` | which keys exist, what `{placeholders}` each may use, and where it renders |
+| The check | `modules/tabs/lib/html_report_v2/report_text.R` | validates one against the other at build time and emits the `#data-text` island |
+| The lookup | `assets/js/02_text.js` (`TR.txt`) | serves a key to the renderer |
+
+### Adding a new authored block
+
+1. Call it where it renders: `TR.txt.block("cards.my_note")`, or
+   `TR.txt("cards.my_note", { level: 95 })` for a fragment inside other markup.
+2. Declare it in `text_manifest.json` with its `page`, `context` and `tokens`.
+3. Write the text in the Callout Editor, under module `tabs`.
+
+Miss step 2 or 3 and the next build **refuses and names the key** — the renderer
+is scanned for its own `TR.txt(...)` calls, so nothing can silently render blank.
+A build also refuses on a `{placeholder}` the key does not declare, on markup
+outside the inline whitelist (`strong em b i br p ul ol li h3 h4 span code`, all
+balanced, no attributes), and on a key deleted from the registry.
+
+**Blank text is legitimate** and means "do not show this block on any report" —
+that is how an author switches a paragraph off without a code change. Deleting
+the entry is a different act, and refuses.
+
+### Finding a block's key on the page
+
+Open a report and press **ctrl+alt+K** (or open it with `#keys=1`). Every
+authored block wears its key; click one to copy it, then paste it into the
+Callout Editor's filter. Gold badges are platform text from the editor; navy
+`config:` badges are text this study wrote in its own config (the Comments
+sheet's `_BACKGROUND`, `_EXECUTIVE_SUMMARY`, `_REPORT_CONSTRUCTION`), which the
+editor does not own.
+
+The flag is author-only by construction: it is not in `d2.encodeHash()`, so it
+cannot travel in a shared link; not in `report.saveCopy()`'s state whitelist, so
+it cannot be baked into an annotated copy; and PNG/PPTX exports render from the
+data model rather than the DOM, so badges cannot reach a deck.
+
+### The rule for tests
+
+**No test may assert on authored wording.** Assert on the catalogue value
+(`TXT(key)` from `tests/_text.mjs`) or on the `data-txt-key` attribute. Enforced
+by the mutation check, which reruns the whole node suite against a catalogue
+whose every value has been replaced:
+
+```
+node modules/tabs/lib/html_report_v2/tests/mutate_text_check.mjs
+```
+
+It must pass. A failure there is a test pinned to words the report author is
+entitled to change.
+
+### Editing operationally
+
+Text applies at the **next report generation** — an editor save changes nothing
+in an HTML file that already exists. `callouts.json` is repo content: commit it
+like code. The editor writes it atomically and keeps its last ten saves under
+`modules/shared/lib/callouts/backups/`.
+
 ## Where the code lives
 
 | Concern | File |
@@ -294,8 +364,9 @@ means / NPS — recomputes correctly and matches the published figures.
 | Tracking island assembler (`TR.PREV`) | `modules/tabs/lib/tracking_island.R` |
 | Bundler (inlines renderer + islands → one HTML) | `modules/tabs/lib/html_report_v2/build_report_v2.R` |
 | Vendored renderer (engine + v2 modules) | `modules/tabs/lib/html_report_v2/assets/` |
+| Authored text: validation + island | `modules/tabs/lib/html_report_v2/report_text.R`, `assets/text_manifest.json` |
 | Wiring (Step 4d) | `modules/tabs/lib/run_crosstabs.R` |
-| Tests | `tests/testthat/test_{data_layer_writer,microdata_writer,tracking_island,report_v2_bundler}.R` + prototype `tests/run_tests_v2.mjs` |
+| Tests | `tests/testthat/test_{data_layer_writer,microdata_writer,tracking_island,report_v2_bundler,report_text}.R` + prototype `tests/run_tests_v2.mjs` |
 
 The renderer is vendored from `prototypes/report-redesign/fable/v2/` (the
 source-of-truth for the JS); the two must stay in sync.

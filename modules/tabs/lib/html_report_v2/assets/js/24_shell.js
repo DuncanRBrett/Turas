@@ -51,12 +51,19 @@
   shell._tabsNavHtml = tabsNavHtml;   // exposed for the node gate
 
   shell.boot = function () {
+    // Read before anything renders: d2.render() replaces the address bar with
+    // d2.encodeHash() (20_data.js), which is a curated whitelist and drops any
+    // flag not in it — including keys=1.
+    var bootHash = typeof location !== "undefined" ? location.hash : "";
     var agg = parseIsland("data-agg"), micro = parseIsland("data-micro"),
         prev = parseIsland("data-prev"), verify = parseIsland("data-verify");
     if (!agg) { fatal([{ code: "IO_DATA_PARSE", message: "aggregate data island failed to parse" }]); return; }
     TR.AGG = agg; TR.MICRO = micro; TR.PREV = prev; TR.VERIFY = verify;
     TR.QUAL = parseIsland("data-qual");          // qualitative verbatims (null when absent)
     TR.userState = parseIsland("user-state");   // saved-copy annotations
+    // The report's authored prose, keyed. Installed before anything renders,
+    // because every explainer on every tab reads from it (see 02_text.js).
+    TR.txt.load(parseIsland("data-text"));
     var check = TR.d2.validate(agg, micro, prev);
     if (!check.ok) { fatal(check.errors); return; }
 
@@ -77,7 +84,56 @@
     TR.filterBar.render();
     shell.route();
     wireTopLevel();
+    shell.textKeys.init(bootHash);
     if (wantSelftest && TR.selftest2) TR.selftest2.run();
+  };
+
+  /**
+   * Author-only text-key badges.
+   *
+   * Every authored block carries data-txt-key (see 02_text.js). With this on,
+   * the stylesheet paints that key onto the block so the report author can see
+   * which entry in the Callout Editor writes which paragraph, and click it to
+   * copy the key. Off by default and invisible to a client.
+   *
+   * Deliberately NOT part of d2.encodeHash(), which is a curated whitelist of
+   * shareable state: the flag therefore cannot travel in a link, and is not in
+   * report.saveCopy()'s state whitelist either, so it cannot be baked into an
+   * annotated copy. Exports (PNG, PPTX) render from the data model rather than
+   * the DOM, so the badges cannot reach a deck by any route.
+   *
+   * Switched on by ctrl+alt+K, or by #keys=1 for a report that should open with
+   * them already showing.
+   */
+  shell.textKeys = {
+    on: false,
+
+    init: function (bootHash) {
+      if (/(^#|[&#])keys=1/.test(bootHash || "")) shell.textKeys.set(true);
+      document.addEventListener("keydown", function (e) {
+        if (e.ctrlKey && e.altKey && (e.key === "k" || e.key === "K")) {
+          e.preventDefault();
+          shell.textKeys.set(!shell.textKeys.on);
+        }
+      });
+      // Clicking a badge copies its key, ready to paste into the editor's filter.
+      document.addEventListener("click", function (e) {
+        if (!shell.textKeys.on) return;
+        var el = e.target.closest("[data-txt-key]");
+        if (!el) return;
+        var key = el.getAttribute("data-txt-key");
+        if (navigator.clipboard) navigator.clipboard.writeText(key);
+        shell.toast("Text key copied: " + key);
+      });
+    },
+
+    set: function (on) {
+      shell.textKeys.on = !!on;
+      document.body.classList.toggle("txt-keys", shell.textKeys.on);
+      shell.toast(on
+        ? "Text keys shown — click one to copy it for the Callout Editor"
+        : "Text keys hidden");
+    }
   };
 
   /**
