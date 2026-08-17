@@ -139,7 +139,13 @@ turas_write_stats_pack <- function(payload, output_path, protect_sheets = TRUE) 
         return(invisible(NULL))
       }
     } else {
-      turas_saveWorkbook(wb, output_path, overwrite = TRUE)
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
+      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
     }
 
     message(sprintf("[TRS INFO] STATS_PACK: Written to %s", basename(output_path)))

@@ -396,7 +396,13 @@ seg_write_xlsx <- function(sheets, file_path, module = "SEGMENT") {
       warning(sprintf("[%s] Failed to save: %s", module, save_result$error))
     }
   } else {
-    turas_saveWorkbook(wb, file_path, overwrite = TRUE)
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
+    openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
   }
 
   invisible(file_path)

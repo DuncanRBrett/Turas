@@ -63,6 +63,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   escape_text <- if (exists("turas_excel_escape", mode = "function")) {
     turas_excel_escape
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Minimal inline fallback: prefix dangerous characters with single quote
     # Covers OWASP CSV injection vectors: =, +, -, @, tab, CR, LF
     # Must match .EXCEL_FORMULA_PREFIXES in shared/lib/turas_excel_escape.R
@@ -109,6 +115,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     names(summary_data) <- c("Driver", "Label", "Shapley (%)", "Rel. Weight (%)",
                              "Beta Weight (%)", "Beta Coef", "Correlation (r)", "Avg Rank")
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Fallback if column names differ
     summary_data <- importance
   }
@@ -132,6 +144,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     names(ranking_data) <- c("Driver", "Label", "Shapley Rank", "Rel. Weight Rank",
                              "Beta Rank", "Corr Rank", "Average Rank")
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     ranking_data <- importance
   }
 
@@ -181,6 +199,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                          "N/A — VIF requires at least 2 predictors.",
                          startRow = vif_start_row + 1, startCol = 1)
     } else {
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
       vif_df <- data.frame(
         Driver = names(vif_vals),
         VIF = as.numeric(vif_vals),
@@ -215,6 +239,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                        cols = 1:ncol(cor_df), gridExpand = TRUE)
     openxlsx::setColWidths(wb, "Correlations", cols = 1:ncol(cor_df), widths = "auto")
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Correlations",
                        "Correlation matrix not available (insufficient numeric drivers).",
                        startRow = 1, startCol = 1)
@@ -275,6 +305,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     # Note: Don't delete plot_file yet - it needs to exist until saveWorkbook() is called
     # The temp file will be cleaned up by the OS eventually
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Charts",
                        "Shapley_Value column not found; chart not generated.",
                        startRow = 1, startCol = 1)
@@ -344,6 +380,12 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       nrow(status_table) + length(status_details$degraded_reasons) +
         length(status_details$affected_outputs) + 8
     } else {
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
       nrow(status_table) + 4
     }
 
@@ -503,8 +545,14 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       )
     }
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     tryCatch(
-      turas_saveWorkbook(wb, output_file, overwrite = TRUE),
+      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE),
       error = function(e) {
         keydriver_refuse(
           code = "IO_OUTPUT_ERROR",

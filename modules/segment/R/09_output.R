@@ -130,7 +130,13 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
       warning(sprintf("[SEGMENT] Failed to save assignments: %s", save_result$error))
     }
   } else {
-    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("  Exported %d segment assignments (with Segment_Names sheet)\n", nrow(assignments)))
@@ -445,7 +451,13 @@ export_exploration_report <- function(exploration_result, metrics_result,
       warning(sprintf("[SEGMENT] Failed to save exploration report: %s", save_result$error))
     }
   } else {
-    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("✓ Exported exploration report with %d sheets\n", length(profile_sheets)))
@@ -796,7 +808,13 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       warning(sprintf("[SEGMENT] Failed to save final report: %s", save_result$error))
     }
   } else {
-    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("  Exported report with %d sheets\n", length(sheets)))
@@ -958,7 +976,13 @@ save_workbook_safe <- function(wb, file_path) {
       warning(sprintf("[SEGMENT] save_workbook_safe failed: %s", result$error))
     }
   } else {
-    turas_saveWorkbook(wb, file_path, overwrite = TRUE)
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
+    openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
   }
   invisible(NULL)
 }

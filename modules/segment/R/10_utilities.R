@@ -1941,7 +1941,13 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       warning(sprintf("Failed to save config template: %s", save_result$error))
     }
   } else {
-    turas_saveWorkbook(wb, output_path, overwrite = TRUE)
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("Config template saved: %s\n", output_path))

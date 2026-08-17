@@ -31,6 +31,12 @@
 conjoint_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
   turas_excel_escape
 } else {
+  # The shared saver is not loaded, so this workbook cannot have its
+  # worksheet relationships reconciled and Excel may offer to repair it,
+  # stripping any dropdowns it carries.
+  cat("[TRS WARNING] Saving without part reconciliation: ",
+      "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+      "report a problem with this file and offer to repair it.\n", sep = "")
   function(x) {
     if (!is.character(x)) return(x)
     vapply(x, function(val) {
@@ -39,6 +45,12 @@ conjoint_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
       if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
         paste0("'", val)
       } else {
+        # The shared saver is not loaded, so this workbook cannot have its
+        # worksheet relationships reconciled and Excel may offer to repair it,
+        # stripping any dropdowns it carries.
+        cat("[TRS WARNING] Saving without part reconciliation: ",
+            "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+            "report a problem with this file and offer to repair it.\n", sep = "")
         val
       }
     }, character(1), USE.NAMES = FALSE)
@@ -181,9 +193,15 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
       )
     }
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Fallback to direct save
     tryCatch({
-      turas_saveWorkbook(wb, output_file, overwrite = TRUE)
+      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
     }, error = function(e) {
       conjoint_refuse(
         code = "IO_OUTPUT_SAVE_FAILED_DIRECT",
@@ -416,6 +434,12 @@ create_raw_coefficients_sheet <- function(wb, model_result, header_style) {
 
     row <- row + nrow(coef_df) + 2
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Raw Coefficients", "No coefficients available",
                        startRow = row, startCol = 1)
     row <- row + 2
@@ -651,6 +675,12 @@ create_individual_utilities_sheet <- function(wb, model_result, config, header_s
     if (!is.null(attribute_map[[cn]])) {
       readable_cols[k] <- paste0(attribute_map[[cn]]$attribute, ": ", attribute_map[[cn]]$level)
     } else {
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
       readable_cols[k] <- cn
     }
   }
@@ -831,6 +861,12 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     if (param_df$Geweke_Status[r] == "FAIL") {
       openxlsx::addStyle(wb, "HB Diagnostics", fail_style, rows = data_row, cols = 3)
     } else {
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
       openxlsx::addStyle(wb, "HB Diagnostics", ok_style, rows = data_row, cols = 3)
     }
     if (param_df$ESS_Status[r] == "LOW") {
@@ -840,6 +876,12 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
                         openxlsx::createStyle(fontColour = "#B7950B", textDecoration = "bold"),
                         rows = data_row, cols = 5)
     } else {
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
       openxlsx::addStyle(wb, "HB Diagnostics", ok_style, rows = data_row, cols = 5)
     }
   }
@@ -967,6 +1009,12 @@ create_respondent_quality_sheet <- function(wb, model_result, header_style) {
                         openxlsx::createStyle(numFmt = "0.000", fontColour = "#CC0000"),
                         rows = data_row, cols = 2)
     } else {
+      # The shared saver is not loaded, so this workbook cannot have its
+      # worksheet relationships reconciled and Excel may offer to repair it,
+      # stripping any dropdowns it carries.
+      cat("[TRS WARNING] Saving without part reconciliation: ",
+          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+          "report a problem with this file and offer to repair it.\n", sep = "")
       openxlsx::addStyle(wb, "Respondent Quality", ok_style, rows = data_row, cols = 3)
     }
   }

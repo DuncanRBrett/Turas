@@ -178,6 +178,12 @@ resolve_sampling_labels <- function(output_path, config) {
   if (exists("get_sampling_labels", mode = "function")) {
     get_sampling_labels(config$sampling_method %||% "Not_Specified")
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     NULL
   }
 }
@@ -219,8 +225,14 @@ save_confidence_workbook <- function(wb, output_path, run_result = NULL) {
       )
     }
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     tryCatch({
-      turas_saveWorkbook(wb, output_path, overwrite = TRUE)
+      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
     }, error = function(e) {
       confidence_refuse(
         code = "IO_EXCEL_SAVE_FAILED",
@@ -313,6 +325,12 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
   title_text <- if (labels$is_probability) {
     "TURAS CONFIDENCE ANALYSIS - SUMMARY"
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     "TURAS PRECISION ANALYSIS - SUMMARY"
   }
   openxlsx::writeData(wb, "Summary", title_text,
@@ -404,6 +422,12 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
                                 length(warnings)),
                         startCol = 1, startRow = row)
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Summary", "No Warnings",
                         startCol = 1, startRow = row)
     openxlsx::addStyle(wb, "Summary",
@@ -449,6 +473,12 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
       "  See the Methodology sheet for details on each statistical method used."
     )
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     callout_lines <- c(
       "HOW TO READ THIS REPORT",
       "",
@@ -808,6 +838,12 @@ add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep, labels =
       "snowball sampling, the intervals may understate the true uncertainty."
     )
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     c(
       sprintf("IMPORTANT: These %ss measure precision within the achieved sample.", tolower(labels$interval_name)),
       "Because respondents were not randomly selected from the population,",
@@ -906,6 +942,12 @@ build_proportions_dataframe <- function(prop_results) {
   if (requireNamespace("dplyr", quietly = TRUE)) {
     df <- dplyr::bind_rows(rows_list)
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Fallback: find all unique column names and fill missing ones with NA
     all_cols <- unique(unlist(lapply(rows_list, names)))
     rows_list_filled <- lapply(rows_list, function(row) {
@@ -977,6 +1019,12 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep, labels = NULL)
       "variability only and does not capture selection bias."
     )
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     c(
       sprintf("IMPORTANT: These %ss measure precision within the achieved sample.", tolower(labels$interval_name)),
       "Because respondents were not randomly selected from the population,",
@@ -1070,6 +1118,12 @@ build_means_dataframe <- function(mean_results) {
   if (requireNamespace("dplyr", quietly = TRUE)) {
     df <- dplyr::bind_rows(rows_list)
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Fallback: find all unique column names and fill missing ones with NA
     all_cols <- unique(unlist(lapply(rows_list, names)))
     rows_list_filled <- lapply(rows_list, function(row) {
@@ -1141,6 +1195,12 @@ add_nps_detail_sheet <- function(wb, nps_results, decimal_sep, labels = NULL) {
       "for the bias introduced by sample selection."
     )
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     c(
       sprintf("IMPORTANT: These %ss measure precision within the achieved sample.", tolower(labels$interval_name)),
       "Because respondents were not randomly selected, the intervals describe",
@@ -1222,6 +1282,12 @@ build_nps_dataframe <- function(nps_results) {
   if (requireNamespace("dplyr", quietly = TRUE)) {
     df <- dplyr::bind_rows(rows_list)
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Fallback: find all unique column names and fill missing ones with NA
     all_cols <- unique(unlist(lapply(rows_list, names)))
     rows_list_filled <- lapply(rows_list, function(row) {
@@ -1422,6 +1488,12 @@ add_warnings_sheet <- function(wb, warnings) {
                        style = openxlsx::createStyle(fontSize = 12, fontColour = "#008000"),
                        rows = row, cols = 1)
   } else {
+    # The shared saver is not loaded, so this workbook cannot have its
+    # worksheet relationships reconciled and Excel may offer to repair it,
+    # stripping any dropdowns it carries.
+    cat("[TRS WARNING] Saving without part reconciliation: ",
+        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
+        "report a problem with this file and offer to repair it.\n", sep = "")
     # Build warnings with guidance
     guidance <- vapply(warnings, classify_warning_guidance, character(1))
 
