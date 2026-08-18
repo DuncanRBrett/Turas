@@ -229,6 +229,34 @@ label_qualifier <- function(...) {
   return(sprintf(" (%s)", paste(parts, collapse = ", ")))
 }
 
+#' Document the legs-a-year column, where the category has one
+#'
+#' Only the count-based travel categories carry it. Everything else returns
+#' NULL, which rbind drops.
+#'
+#' @param row One row of the category map.
+#' @param config The VAS_CONFIG list.
+#' @param stem The output column stem, e.g. "FlightDomestic_Total_".
+#' @param view The reader label's view marker, or NULL.
+#'
+#' @return A one-row data frame, or NULL.
+dictionary_for_trips_per_year <- function(row, config, stem, view) {
+  if (is.na(row$count_alias)) {
+    return(NULL)
+  }
+  return(dictionary_row(
+    paste0(stem, "TripsPerYear"), "Category", row$category, row$base,
+    "TripsPerYear", "trips per year",
+    sprintf("%s: trips a year, counting a return as two%s", row$label,
+            label_qualifier(view)),
+    sprintf('%s x legs, where legs = %s if %s = "Return" and %s if "One way".\nBlank %s is treated as %s leg.\nThe count question asks how many were bought in the past 12 months, so this is already an annual figure.',
+            row$count_alias, config$legs_per_trip$Return, row$legs_alias,
+            config$legs_per_trip$`One way`, row$legs_alias, config$legs_default),
+    paste(stats::na.omit(c(row$count_alias, row$legs_alias)), collapse = ", "),
+    sprintf("Missing when %s could not be read as a number; a count of 0 is a real zero.",
+            row$count_alias)))
+}
+
 dictionary_for_map_row <- function(row, config) {
   stem <- sprintf("%s_%s_", row$category, row$base)
   side <- switch(row$base, Own = "for themselves", Oth = "for someone else",
@@ -279,7 +307,8 @@ dictionary_for_map_row <- function(row, config) {
                              label_qualifier(view))
                    },
                    describe_per_txn_calculation(row, config, stem), sources,
-                   describe_per_txn_missing_rule(row))
+                   describe_per_txn_missing_rule(row)),
+    dictionary_for_trips_per_year(row, config, stem, view)
   ))
 }
 

@@ -89,10 +89,12 @@ test_that("an implausible frequency is flagged and the numbers are unchanged", {
 
 test_that("a derived Total inherits its sides' outlier flags", {
   own <- data.frame(txn_per_month = c(30, 1), monthly_spend = c(15000, 100),
-                    spend_per_txn = c(500, 100), status = c("ok", "ok"),
+                    spend_per_txn = c(500, 100), trips_per_year = c(NA_real_, NA_real_),
+                    status = c("ok", "ok"),
                     outlier = c(TRUE, FALSE), stringsAsFactors = FALSE)
   oth <- data.frame(txn_per_month = c(0, 1), monthly_spend = c(0, 100),
-                    spend_per_txn = c(NA, 100), status = c("not_asked", "ok"),
+                    spend_per_txn = c(NA, 100), trips_per_year = c(NA_real_, NA_real_),
+                    status = c("not_asked", "ok"),
                     outlier = c(FALSE, FALSE), stringsAsFactors = FALSE)
   total <- combine_bases_to_total(own, oth)
   expect_equal(total$outlier, c(TRUE, FALSE))

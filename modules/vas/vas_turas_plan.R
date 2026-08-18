@@ -67,6 +67,21 @@ engine_aliases <- function(category_map) {
   return(unique(stats::na.omit(unlist(category_map[, alias_columns]))))
 }
 
+#' The engine aliases that ride into the dataset as questions anyway
+#'
+#' Most engine inputs are replaced by the derived columns they feed, so
+#' publishing them too would be the same number twice. The one-way/return
+#' question is different: it is a finding in its own right - how people travel,
+#' not just what the trip is priced at - and no derived column carries it, so it
+#' rides in as an ordinary Single_Response question.
+#'
+#' @param category_map The category map data frame.
+#'
+#' @return A character vector of aliases.
+reported_engine_aliases <- function(category_map) {
+  return(unique(stats::na.omit(category_map$legs_alias)))
+}
+
 #' Decide the action for one export column
 #'
 #' @param header The export header.
@@ -125,7 +140,8 @@ classify_export_column <- function(header, parts, consumed, index, duplicate,
 #' @return The plan data frame, one row per export column.
 build_turas_column_plan <- function(headers, category_map, index) {
   parts <- split_export_header(headers)
-  consumed <- engine_aliases(category_map)
+  consumed <- setdiff(engine_aliases(category_map),
+                      reported_engine_aliases(category_map))
   duplicate <- duplicated(headers)
   scalar_aliases <- headers[!grepl(":", headers, fixed = TRUE)]
   action <- vapply(seq_along(headers), function(i) {

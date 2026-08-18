@@ -9,9 +9,9 @@ test_that("sum_available treats an all-missing row as missing, not zero", {
 
 test_that("Own and Oth combine into a weighted Total", {
   own <- data.frame(txn_per_month = 4, monthly_spend = 200, spend_per_txn = 50,
-                    status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
+                    trips_per_year = NA_real_, status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
   oth <- data.frame(txn_per_month = 2, monthly_spend = 100, spend_per_txn = 50,
-                    status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
+                    trips_per_year = NA_real_, status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
   result <- combine_bases_to_total(own, oth)
   expect_equal(result$txn_per_month, 6)
   expect_equal(result$monthly_spend, 300)
@@ -23,16 +23,16 @@ test_that("the Total spend per transaction is weighted, not averaged", {
   # R300 over 3 own purchases and R100 over 1 other purchase is R100 a purchase,
   # not the mean of R100 and R100... so use unequal rates to prove the point
   own <- data.frame(txn_per_month = 3, monthly_spend = 300, spend_per_txn = 100,
-                    status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
+                    trips_per_year = NA_real_, status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
   oth <- data.frame(txn_per_month = 1, monthly_spend = 20, spend_per_txn = 20,
-                    status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
+                    trips_per_year = NA_real_, status = "ok", outlier = FALSE, stringsAsFactors = FALSE)
   result <- combine_bases_to_total(own, oth)
   expect_equal(result$spend_per_txn, 320 / 4)  # 80, not (100 + 20) / 2 = 60
 })
 
 test_that("a Total with no transactions has no per-transaction figure", {
   zero <- data.frame(txn_per_month = 0, monthly_spend = 0, spend_per_txn = NA_real_,
-                     status = "not_asked", outlier = FALSE, stringsAsFactors = FALSE)
+                     trips_per_year = NA_real_, status = "not_asked", outlier = FALSE, stringsAsFactors = FALSE)
   result <- combine_bases_to_total(zero, zero)
   expect_equal(result$txn_per_month, 0)
   expect_true(is.na(result$spend_per_txn))
@@ -144,10 +144,12 @@ test_that("the real category map is well formed", {
 
 test_that("a don't-know amount leaves the published Total spend blank", {
   own <- data.frame(txn_per_month = 2, monthly_spend = NA_real_,
-                    spend_per_txn = NA_real_, status = "amount_missing",
+                    spend_per_txn = NA_real_, trips_per_year = NA_real_,
+                    status = "amount_missing",
                     outlier = FALSE, stringsAsFactors = FALSE)
   oth <- data.frame(txn_per_month = 0, monthly_spend = 0,
-                    spend_per_txn = NA_real_, status = "not_asked",
+                    spend_per_txn = NA_real_, trips_per_year = NA_real_,
+                    status = "not_asked",
                     outlier = FALSE, stringsAsFactors = FALSE)
   total <- combine_bases_to_total(own, oth)
   # the internal frame still carries what is present - the wallet totals are
@@ -168,10 +170,12 @@ test_that("a don't-know amount leaves the published Total spend blank", {
 
 test_that("a missing FREQUENCY does not blank a known amount", {
   own <- data.frame(txn_per_month = NA_real_, monthly_spend = 300,
-                    spend_per_txn = NA_real_, status = "freq_missing",
+                    spend_per_txn = NA_real_, trips_per_year = NA_real_,
+                    status = "freq_missing",
                     outlier = FALSE, stringsAsFactors = FALSE)
   oth <- data.frame(txn_per_month = 0, monthly_spend = 0,
-                    spend_per_txn = NA_real_, status = "not_asked",
+                    spend_per_txn = NA_real_, trips_per_year = NA_real_,
+                    status = "not_asked",
                     outlier = FALSE, stringsAsFactors = FALSE)
   total <- combine_bases_to_total(own, oth)
   expect_false(total$amount_unknown)

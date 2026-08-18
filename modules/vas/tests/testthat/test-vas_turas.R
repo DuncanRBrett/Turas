@@ -15,7 +15,7 @@ turas_fixture_index <- function() {
 turas_fixture_headers <- function() {
   c("Response ID", "Status", "Longitude", "gps_maps",
     "Supervisor", "Other (Specify):Supervisor",
-    "PPUOwnFreq1", "AirtimeOwnAmount",
+    "PPUOwnFreq1", "AirtimeOwnAmount", "FlightDomCount", "FlightDomReturn",
     "BankMain", "Other (Specify):BankMain", "Province",
     "Bank: ATM:Awareness", "Bank: on their website:Awareness",
     "Other (Please Specify):Awareness", "Other (Please Specify):Awareness",
@@ -44,6 +44,12 @@ test_that("the plan classifies every column the documented way", {
   expect_equal(action_of("Supervisor"), "drop")       # QC field
   expect_equal(action_of("PPUOwnFreq1"), "engine")    # consumed by the derivation
   expect_equal(action_of("AirtimeOwnAmount"), "engine")
+  expect_equal(action_of("FlightDomCount"), "engine")   # replaced by TripsPerYear
+  # the one-way/return question is consumed by the derivation AND rides in: no
+  # derived column carries the answer, and how people travel is a finding
+  expect_equal(action_of("FlightDomReturn"), "keep")
+  expect_equal(plan$question_code[plan$export_header == "FlightDomReturn"],
+               "FlightDomReturn")
   expect_equal(action_of("BankMain"), "keep")
   # a single-choice question's write-in column must NOT become a checkbox
   # member - that declared 21 questions twice (found by the pilot check)
@@ -109,15 +115,19 @@ test_that("the register gate refuses undecided rows unless smoke testing", {
 test_that("the assembled data matches the generated structure", {
   headers <- turas_fixture_headers()
   plan <- turas_fixture_plan()
-  index <- turas_fixture_index()
+  index <- rbind(turas_fixture_index(), data.frame(
+    alias = "FlightDomReturn", type = "RADIO",
+    q_title = "Is that number of flights for one way or return trips?",
+    stringsAsFactors = FALSE
+  ))
   options <- data.frame(
     alias = c("BankMain", "BankMain", "Awareness", "Awareness", "Awareness",
-              "Province", "WC_Town"),
-    position = c(1, 2, 1, 2, 3, 1, 1),
+              "Province", "WC_Town", "FlightDomReturn", "FlightDomReturn"),
+    position = c(1, 2, 1, 2, 3, 1, 1, 1, 2),
     value = c("Capitec", "FNB", "Bank ATM", "Bank Website", "Other", "Western Cape",
-              "Paarl"),
+              "Paarl", "One way", "Return"),
     title = c("Capitec", "FNB", "Bank: ATM", "Bank: on their website",
-              "Other (Please Specify)", "Western Cape", "Paarl"),
+              "Other (Please Specify)", "Western Cape", "Paarl", "One way", "Return"),
     stringsAsFactors = FALSE
   )
   source_data <- new_vas_source(
@@ -126,6 +136,7 @@ test_that("the assembled data matches the generated structure", {
       list(c("1", "2"), c("Complete", "Partial"), c(NA, NA), c(NA, NA),
            c("Megan", "Jacky"), c(NA, NA),
            c(NA, NA), c(NA, NA),
+           c("2", NA), c("Return", NA),
            c("Capitec", "FNB"), c(NA, NA), c("Western Cape", NA),
            c("Bank ATM", NA), c(NA, "Bank Website"),
            c(NA, NA), c(NA, NA),
@@ -145,6 +156,9 @@ test_that("the assembled data matches the generated structure", {
   expect_equal(data$Awareness_1, c("Bank ATM", NA))
   expect_equal(data$Awareness_2, c(NA, "Bank Website"))
   expect_equal(data$Town, c("Paarl", NA))
+  # the one-way/return question rides in even though the engine also reads it
+  expect_equal(data$FlightDomReturn, c("Return", NA))
+  expect_false("FlightDomCount" %in% names(data))    # replaced by TripsPerYear
   expect_equal(data$TotalValueTransacted, c(100, NA))
   expect_equal(data$BuysForOthers, c("Yes", NA))     # logical -> Yes/No text
 

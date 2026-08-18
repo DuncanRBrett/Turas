@@ -13,7 +13,8 @@ test_that("the dictionary documents every real output column and no others", {
 test_that("the dictionary has one row per column, in output order", {
   map <- fixture_real_map()
   dictionary <- build_data_dictionary(map, VAS_CONFIG)
-  expect_equal(nrow(dictionary), 279L)
+  # 282 = 279 plus the three travel legs-a-year columns (Aug 2026)
+  expect_equal(nrow(dictionary), 282L)
   expect_equal(anyDuplicated(dictionary$column), 0L)
   expect_equal(names(dictionary), VAS_DICTIONARY_COLUMNS)
 })

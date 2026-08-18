@@ -110,6 +110,7 @@ test_that("a return flight counts two legs and is priced per leg", {
   expect_equal(result$txn_per_month, 4 / 12)
   expect_equal(result$spend_per_txn, 3000)
   expect_equal(result$monthly_spend, 1000)
+  expect_equal(result$trips_per_year, 8)
 })
 
 test_that("a one-way trip counts a single leg", {
@@ -123,6 +124,7 @@ test_that("a one-way trip counts a single leg", {
   expect_equal(result$txn_per_month, 0.5)
   expect_equal(result$spend_per_txn, 750)
   expect_equal(result$monthly_spend, 375)
+  expect_equal(result$trips_per_year, 6)
 })
 
 test_that("a blank one-way/return answer falls back to the configured default", {
@@ -135,6 +137,46 @@ test_that("a blank one-way/return answer falls back to the configured default", 
   result <- derive_category_base(source, row, VAS_CONFIG)
   expect_equal(result$spend_per_txn, 7500)
   expect_equal(result$monthly_spend, 7500)
+  expect_equal(result$trips_per_year, 12)
+})
+
+test_that("legs a year and monthly spend describe the same journeys", {
+  # the point of publishing legs rather than transactions a month: the two
+  # columns have to be the same journeys priced once, or the travel table and
+  # the wallet would disagree
+  source <- fixture_source(FlightDomCount = c("1", "3", "0"),
+                           FlightDomReturn = c("Return", "One way", "Return"))
+  row <- fixture_map_row(
+    category = "FlightDomestic", base = "Total", amount_basis = "imputed",
+    count_alias = "FlightDomCount", legs_alias = "FlightDomReturn"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_equal(result$trips_per_year, c(2, 3, 0))
+  rate <- VAS_CONFIG$imputed_spend_per_leg$FlightDomestic
+  expect_equal(result$monthly_spend, result$trips_per_year * rate / 12)
+})
+
+test_that("a count that is not a number leaves legs a year missing", {
+  # one real respondent answered "12+" and typed a reason, not a number, into
+  # the specify box - there is no count to multiply
+  source <- fixture_source(FlightDomCount = "12+", FlightDomReturn = "Return")
+  row <- fixture_map_row(
+    category = "FlightDomestic", base = "Total", amount_basis = "imputed",
+    count_alias = "FlightDomCount", legs_alias = "FlightDomReturn"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_true(is.na(result$trips_per_year))
+  expect_equal(result$status, "freq_missing")
+})
+
+test_that("a category that asks no count has no legs a year", {
+  source <- fixture_source(PPUOwnFreq1 = "Once per month", PPUOwnAmount = "300")
+  row <- fixture_map_row(
+    category = "PrepaidElectricity", freq1 = "PPUOwnFreq1",
+    amount_alias = "PPUOwnAmount", amount_basis = "monthly"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_true(is.na(result$trips_per_year))
 })
 
 test_that("a zero count spends nothing and has no per-transaction figure", {
@@ -147,6 +189,7 @@ test_that("a zero count spends nothing and has no per-transaction figure", {
   expect_equal(result$txn_per_month, 0)
   expect_equal(result$monthly_spend, 0)
   expect_true(is.na(result$spend_per_txn))
+  expect_equal(result$trips_per_year, 0)
 })
 
 test_that("a respondent routed past a category is a real zero", {

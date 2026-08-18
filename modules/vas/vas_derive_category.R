@@ -118,6 +118,27 @@ category_txn_per_month <- function(source, row, present, config) {
   return(derived)
 }
 
+#' Read how many legs each of a respondent's trips is worth
+#'
+#' The count questions ask how many flights or bus tickets were bought, and a
+#' companion question asks whether that number is of one-way or return trips.
+#' A return trip is therefore two legs. A blank answer falls back to
+#' \code{config$legs_default}.
+#'
+#' @param source A vas_source object.
+#' @param row One row of the category map.
+#' @param config The VAS_CONFIG list.
+#'
+#' @return A numeric vector of legs per trip, one element per respondent.
+travel_legs_per_trip <- function(source, row, config) {
+  legs_answer <- source_scalar(source, row$legs_alias)
+  return(vapply(legs_answer, function(answer) {
+    if (is.na(answer)) return(as.numeric(config$legs_default))
+    matched <- config$legs_per_trip[[answer]]
+    if (is.null(matched)) as.numeric(config$legs_default) else as.numeric(matched)
+  }, numeric(1), USE.NAMES = FALSE))
+}
+
 #' Read the imputed spend per transaction for a count-based travel category
 #'
 #' The survey asks whether the respondent's count refers to one-way or return
@@ -137,13 +158,31 @@ imputed_travel_spend_per_txn <- function(source, row, config) {
       message = sprintf("Category '%s' has an imputed amount basis but no entry in config$imputed_spend_per_leg.",
                         row$category), call = NULL)))
   }
-  legs_answer <- source_scalar(source, row$legs_alias)
-  legs <- vapply(legs_answer, function(answer) {
-    if (is.na(answer)) return(as.numeric(config$legs_default))
-    matched <- config$legs_per_trip[[answer]]
-    if (is.null(matched)) as.numeric(config$legs_default) else as.numeric(matched)
-  }, numeric(1), USE.NAMES = FALSE)
-  return(legs * rate)
+  return(travel_legs_per_trip(source, row, config) * rate)
+}
+
+#' Derive legs a year for a count-based travel category
+#'
+#' The reportable travel figure is legs a year, not transactions a month: every
+#' respondent in these categories buys less than monthly, so a monthly rate puts
+#' the whole base in one band and says nothing. A return trip counts twice,
+#' which is also what the imputed price is charged on, so this column and
+#' MonthlySpend describe the same journeys.
+#'
+#' Categories that are not count-based get NA - they have no leg to count.
+#'
+#' @param source A vas_source object.
+#' @param row One row of the category map.
+#' @param txn A data frame from \code{category_txn_per_month()}.
+#' @param config The VAS_CONFIG list.
+#'
+#' @return A numeric vector, one element per respondent.
+category_trips_per_year <- function(source, row, txn, config) {
+  if (is.na(row$count_alias)) {
+    return(rep(NA_real_, nrow(txn)))
+  }
+  legs <- travel_legs_per_trip(source, row, config)
+  return(txn$txn_per_month * config$months_per_year * legs)
 }
 
 #' Derive monthly spend and spend per transaction for one category and base
@@ -210,19 +249,20 @@ category_outlier_flags <- function(txn_per_month, monthly_spend, spend_class, co
            over(monthly_spend, config$outlier_monthly_spend))
 }
 
-#' Derive all three measures for one category and base
+#' Derive every measure for one category and base
 #'
 #' @param source A vas_source object.
 #' @param row One row of the category map.
 #' @param config The VAS_CONFIG list.
 #'
 #' @return A data frame with one row per respondent: \code{txn_per_month},
-#'   \code{monthly_spend}, \code{spend_per_txn}, \code{status},
-#'   \code{outlier}.
+#'   \code{monthly_spend}, \code{spend_per_txn}, \code{trips_per_year},
+#'   \code{status}, \code{outlier}.
 derive_category_base <- function(source, row, config) {
   present <- category_presence(source, row)
   txn <- category_txn_per_month(source, row, present, config)
   spend <- category_spend(source, row, txn, config)
+  trips_per_year <- category_trips_per_year(source, row, txn, config)
 
   status <- txn$status
   status[status == "ok" & !spend$amount_ok] <- "amount_missing"
@@ -236,10 +276,13 @@ derive_category_base <- function(source, row, config) {
   spend_per_txn[!present] <- NA_real_
   spend_per_txn[!is.na(txn$txn_per_month) & txn$txn_per_month == 0] <- NA_real_
   monthly_spend[status == "amount_missing"] <- NA_real_
+  # legs a year needs no zeroing of its own: transactions per month is already
+  # 0 for a respondent routed past, and NA where the count could not be read
 
   return(data.frame(
     txn_per_month = txn$txn_per_month, monthly_spend = monthly_spend,
-    spend_per_txn = spend_per_txn, status = status,
+    spend_per_txn = spend_per_txn, trips_per_year = trips_per_year,
+    status = status,
     # the amount specifically is unusable - distinct from a missing FREQUENCY,
     # which also lands in the combined "partial" status but leaves a known
     # amount perfectly reportable

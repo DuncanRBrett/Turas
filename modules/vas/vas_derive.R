@@ -57,7 +57,12 @@ combine_bases_to_total <- function(own, oth) {
                    ifelse(own$status == "not_asked" & oth$status == "not_asked",
                           "not_asked", "ok"))
   return(data.frame(txn_per_month = txn, monthly_spend = spend,
-                    spend_per_txn = per_txn, status = status,
+                    spend_per_txn = per_txn,
+                    # NA throughout for a split category: only the count-based
+                    # travel ones carry legs, and those are collected as a Total
+                    trips_per_year = sum_available(cbind(own$trips_per_year,
+                                                         oth$trips_per_year)),
+                    status = status,
                     amount_unknown = own$status %in% "amount_missing" |
                       oth$status %in% "amount_missing",
                     # a total built on a flagged side is itself suspect
@@ -272,6 +277,25 @@ count_outlier_cells <- function(derived, category_map) {
   return(rowSums(matrix(flags, nrow = nrow(derived[[keys[1]]]))))
 }
 
+#' Does this category and base count travel legs?
+#'
+#' Only the count-based travel categories do: the survey asks them how many
+#' flights or tickets they bought in the past 12 months and whether that number
+#' is one-way or return.
+#'
+#' @param category_map The category map data frame.
+#' @param category The category name.
+#' @param base "Own", "Oth" or "Total".
+#'
+#' @return TRUE when the map row for this category and base has a count alias.
+category_counts_legs <- function(category_map, category, base) {
+  if (!"count_alias" %in% names(category_map)) {
+    return(FALSE)
+  }
+  row <- category_map[category_map$category == category & category_map$base == base, ]
+  return(nrow(row) == 1L && !is.na(row$count_alias))
+}
+
 #' Lay the per-category results out as one wide row per respondent
 #'
 #' @param derived The list from \code{derive_all_categories()}.
@@ -305,6 +329,12 @@ build_category_columns <- function(derived, category_map) {
       columns[[paste0(stem, "TxnPerMonth")]] <- frame$txn_per_month
       columns[[paste0(stem, "MonthlySpend")]] <- spend
       columns[[paste0(stem, "SpendPerTxn")]] <- per_txn
+      # Legs a year exists only where the survey asked a 12-month count and a
+      # one-way/return question - the travel categories. Emitting it everywhere
+      # would publish a column of NA for every other category.
+      if (category_counts_legs(category_map, category, base)) {
+        columns[[paste0(stem, "TripsPerYear")]] <- frame$trips_per_year
+      }
     }
   }
   return(as.data.frame(columns, stringsAsFactors = FALSE, check.names = FALSE))
