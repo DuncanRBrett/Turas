@@ -47,6 +47,27 @@ category_presence <- function(source, row) {
   return(!is.na(source_scalar(source, probe_alias)))
 }
 
+#' Read a count question's top code at its lower bound
+#'
+#' The count questions cap at "12+" with a free-text specify box beside them,
+#' and that box collects a reason as often as a number. Reading "12+" as
+#' unusable left a real buyer with no trips and no spend, so the top code is
+#' taken as the number it names - a floor, and the honest one, because the
+#' alternative is discarding the answer entirely.
+#'
+#' @param answer A character vector of count answers.
+#' @param config The VAS_CONFIG list.
+#'
+#' @return The same vector with any "<n>+" replaced by "<n>".
+resolve_count_top_code <- function(answer, config) {
+  if (!isTRUE(config$count_top_code_at_lower_bound)) {
+    return(answer)
+  }
+  top <- !is.na(answer) & grepl("^\\s*[0-9]+\\s*\\+\\s*$", answer)
+  answer[top] <- sub("^\\s*([0-9]+)\\s*\\+\\s*$", "\\1", answer[top])
+  return(answer)
+}
+
 #' Read a travel count question and convert it to transactions per month
 #'
 #' The count questions ask how many tickets were bought in the past 12 months,
@@ -59,7 +80,9 @@ category_presence <- function(source, row) {
 #' @return A data frame of \code{txn_per_month} and \code{status}.
 count_to_txn_per_month <- function(source, row, config) {
   raw <- source_scalar(source, row$count_alias)
-  numeric_count <- suppressWarnings(as.numeric(raw))
+  # the zero test and the not-asked test stay on the RAW answer: only the
+  # numeric reading is relaxed
+  numeric_count <- suppressWarnings(as.numeric(resolve_count_top_code(raw, config)))
   numeric_count[!is.na(raw) & raw %in% config$count_zero_values] <- 0
   status <- ifelse(is.na(raw), "not_asked",
                    ifelse(is.na(numeric_count), "freq_missing", "ok"))

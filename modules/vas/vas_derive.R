@@ -328,12 +328,21 @@ build_category_columns <- function(derived, category_map) {
       per_txn[amount_unknown] <- NA_real_
       columns[[paste0(stem, "TxnPerMonth")]] <- frame$txn_per_month
       columns[[paste0(stem, "MonthlySpend")]] <- spend
-      columns[[paste0(stem, "SpendPerTxn")]] <- per_txn
       # Legs a year exists only where the survey asked a 12-month count and a
       # one-way/return question - the travel categories. Emitting it everywhere
       # would publish a column of NA for every other category.
+      #
+      # Those same categories publish NO per-transaction value. The survey asks
+      # them no price, so the figure is the imputed per-leg rate times one or
+      # two: the one-way/return answer restated in rand, taking exactly two
+      # values across a whole base. Duncan, 18 August 2026: "the average
+      # transaction is meaningless because we impute a fixed price". Legs a
+      # year and the published one-way/return question carry everything it
+      # held. It is still derived internally - monthly spend is built from it.
       if (category_counts_legs(category_map, category, base)) {
         columns[[paste0(stem, "TripsPerYear")]] <- frame$trips_per_year
+      } else {
+        columns[[paste0(stem, "SpendPerTxn")]] <- per_txn
       }
     }
   }

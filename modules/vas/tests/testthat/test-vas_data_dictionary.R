@@ -13,8 +13,9 @@ test_that("the dictionary documents every real output column and no others", {
 test_that("the dictionary has one row per column, in output order", {
   map <- fixture_real_map()
   dictionary <- build_data_dictionary(map, VAS_CONFIG)
-  # 282 = 279 plus the three travel legs-a-year columns (Aug 2026)
-  expect_equal(nrow(dictionary), 282L)
+  # 279: the three travel legs-a-year columns replace the three imputed
+  # value-per-transaction ones, one for one (Aug 2026)
+  expect_equal(nrow(dictionary), 279L)
   expect_equal(anyDuplicated(dictionary$column), 0L)
   expect_equal(names(dictionary), VAS_DICTIONARY_COLUMNS)
 })
@@ -45,8 +46,11 @@ test_that("the weeks-per-month factor is read from the config, not hard-coded", 
 test_that("imputed rates are read from the config", {
   map <- fixture_real_map()
   dictionary <- build_data_dictionary(map, VAS_CONFIG)
-  flight <- dictionary$calculation[dictionary$column == "FlightDomestic_Total_SpendPerTxn"]
+  # the travel three publish no per-transaction column, so the rate is named on
+  # monthly spend and on legs a year instead
+  flight <- dictionary$calculation[dictionary$column == "FlightDomestic_Total_MonthlySpend"]
   expect_true(grepl("R1,500 per leg", flight, fixed = TRUE))
+  expect_equal(sum(dictionary$column == "FlightDomestic_Total_SpendPerTxn"), 0L)
   licence <- dictionary$calculation[dictionary$column == "BillTVLicence_Own_SpendPerTxn"]
   expect_true(grepl("R265", licence, fixed = TRUE))
 })

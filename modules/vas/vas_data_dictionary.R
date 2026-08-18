@@ -105,14 +105,24 @@ describe_per_txn_calculation <- function(row, config, stem) {
 #'
 #' @param row One row of the category map.
 #' @param stem The output column stem.
+#' @param config The VAS_CONFIG list.
 #'
 #' @return A single character value.
-describe_spend_calculation <- function(row, stem) {
+describe_spend_calculation <- function(row, stem, config) {
   if (identical(row$amount_basis, "monthly")) {
     return(sprintf("parse(%s)\nThe amount question already asks for a monthly figure, so it is taken as it stands.",
                    row$amount_alias))
   }
   if (identical(row$amount_basis, "imputed")) {
+    # A count-based travel category publishes no per-transaction column, so the
+    # rate has to be named here or the calculation points at something the
+    # dataset has not got.
+    if (!is.na(row$count_alias)) {
+      return(sprintf(
+        "%sTripsPerYear x R%s per leg / %s\nIMPUTED: the survey collects no amount for this category.",
+        stem, format(config$imputed_spend_per_leg[[row$category]], big.mark = ","),
+        config$months_per_year))
+    }
     return(sprintf("%sTxnPerMonth x %sSpendPerTxn", stem, stem))
   }
   return(sprintf("%sTxnPerMonth x parse(%s)", stem, row$amount_alias))
@@ -295,19 +305,24 @@ dictionary_for_map_row <- function(row, config) {
                    "MonthlySpend", "rand per month",
                    sprintf("%s spend per month%s", row$label,
                            label_qualifier(view, assumption_phrase(asm$value, asm$spend))),
-                   describe_spend_calculation(row, stem), sources,
+                   describe_spend_calculation(row, stem, config), sources,
                    describe_spend_missing_rule(row)),
-    dictionary_row(paste0(stem, "SpendPerTxn"), "Category", row$category, row$base,
-                   "SpendPerTxn", "rand per transaction",
-                   if (asm$value) {
-                     sprintf("%s assumed value per transaction%s", row$label,
-                             label_qualifier(view))
-                   } else {
-                     sprintf("Average %s value per transaction%s", row$label,
-                             label_qualifier(view))
-                   },
-                   describe_per_txn_calculation(row, config, stem), sources,
-                   describe_per_txn_missing_rule(row)),
+    # A count-based travel category publishes legs a year INSTEAD of a value per
+    # transaction - see build_category_columns() for why the imputed one is not
+    # worth a column.
+    if (is.na(row$count_alias)) {
+      dictionary_row(paste0(stem, "SpendPerTxn"), "Category", row$category, row$base,
+                     "SpendPerTxn", "rand per transaction",
+                     if (asm$value) {
+                       sprintf("%s assumed value per transaction%s", row$label,
+                               label_qualifier(view))
+                     } else {
+                       sprintf("Average %s value per transaction%s", row$label,
+                               label_qualifier(view))
+                     },
+                     describe_per_txn_calculation(row, config, stem), sources,
+                     describe_per_txn_missing_rule(row))
+    },
     dictionary_for_trips_per_year(row, config, stem, view)
   ))
 }

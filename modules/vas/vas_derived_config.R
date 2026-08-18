@@ -23,6 +23,14 @@ VAS_CONFIG <- list(
   # What to do when Freq4 = "Don't know": "missing" or "impute_median"
   dont_know_rule = "missing",
 
+  # A count question's top code ("12+") is read at its LOWER BOUND, so "12+"
+  # counts as 12. Duncan, 18 August 2026: "lets assume 12 for the 12+ domestic
+  # leg". The specify box beside it collects free text, so it cannot be relied
+  # on for a number - the one respondent who used it typed "For work purposes".
+  # Reading the top code as unusable dropped a real buyer out of every travel
+  # figure while still counting them as a buyer.
+  count_top_code_at_lower_bound = TRUE,
+
   # ---- imputed spend for the count-only categories ---------------------------
   # Duncan's values, 22 July 2026. NORMALISED TO PER LEG, because the survey
   # asks whether the respondent's count is of one-way or return trips

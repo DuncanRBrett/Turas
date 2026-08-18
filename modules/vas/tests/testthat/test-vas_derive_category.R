@@ -156,10 +156,25 @@ test_that("legs a year and monthly spend describe the same journeys", {
   expect_equal(result$monthly_spend, result$trips_per_year * rate / 12)
 })
 
-test_that("a count that is not a number leaves legs a year missing", {
-  # one real respondent answered "12+" and typed a reason, not a number, into
-  # the specify box - there is no count to multiply
+test_that("a top-coded count is read at its lower bound", {
+  # one real respondent answered "12+" and typed "For work purposes", not a
+  # number, into the specify box. Reading the top code as unusable left them a
+  # buyer with no trips and no spend; 12+ counts as 12 (Duncan, 18 Aug 2026)
+  expect_true(VAS_CONFIG$count_top_code_at_lower_bound)
   source <- fixture_source(FlightDomCount = "12+", FlightDomReturn = "Return")
+  row <- fixture_map_row(
+    category = "FlightDomestic", base = "Total", amount_basis = "imputed",
+    count_alias = "FlightDomCount", legs_alias = "FlightDomReturn"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_equal(result$trips_per_year, 24)          # 12 return trips = 24 legs
+  expect_equal(result$txn_per_month, 1)
+  expect_equal(result$monthly_spend, 24 * 1500 / 12)
+  expect_equal(result$status, "ok")
+})
+
+test_that("a count that is not a number at all is still missing", {
+  source <- fixture_source(FlightDomCount = "lots", FlightDomReturn = "Return")
   row <- fixture_map_row(
     category = "FlightDomestic", base = "Total", amount_basis = "imputed",
     count_alias = "FlightDomCount", legs_alias = "FlightDomReturn"
@@ -167,6 +182,31 @@ test_that("a count that is not a number leaves legs a year missing", {
   result <- derive_category_base(source, row, VAS_CONFIG)
   expect_true(is.na(result$trips_per_year))
   expect_equal(result$status, "freq_missing")
+})
+
+test_that("the top-code rule can be switched off", {
+  config <- VAS_CONFIG
+  config$count_top_code_at_lower_bound <- FALSE
+  source <- fixture_source(FlightDomCount = "12+", FlightDomReturn = "Return")
+  row <- fixture_map_row(
+    category = "FlightDomestic", base = "Total", amount_basis = "imputed",
+    count_alias = "FlightDomCount", legs_alias = "FlightDomReturn"
+  )
+  expect_true(is.na(derive_category_base(source, row, config)$trips_per_year))
+})
+
+test_that("a count-based travel category publishes no value per transaction", {
+  # the survey asks these no price, so the column could only ever restate the
+  # one-way/return answer in rand
+  map <- fixture_real_map()
+  columns <- names(derive_vas(fixture_blank_source(map), map, VAS_CONFIG)$wide)
+  for (cat in c("FlightDomestic", "FlightInternational", "LongDistanceBus")) {
+    expect_false(sprintf("%s_Total_SpendPerTxn", cat) %in% columns, info = cat)
+    expect_true(sprintf("%s_Total_TripsPerYear", cat) %in% columns, info = cat)
+    expect_true(sprintf("%s_Total_TxnPerMonth", cat) %in% columns, info = cat)
+  }
+  # every other category keeps its measured one
+  expect_true("PrepaidElectricity_Total_SpendPerTxn" %in% columns)
 })
 
 test_that("a category that asks no count has no legs a year", {
@@ -321,4 +361,28 @@ test_that("a respondent routed past a category is still a genuine zero", {
   expect_equal(result$monthly_spend, 0)
   expect_equal(result$status, "not_asked")
   expect_false(result$status %in% VAS_INCOMPLETE_STATUSES)
+})
+
+# ==============================================================================
+# THE "12+" TOP CODE AND ITS SPECIFY BOX
+# ==============================================================================
+# The export writes the write-in as its own column and puts "12+" in the parent.
+# The box is free text, so it collects a reason as readily as a count.
+
+test_that("a numeric write-in replaces the top code", {
+  frame <- data.frame(FlightDomCount = c("12+", "4"),
+                      `12+ (Specify):FlightDomCount` = c("20", ""),
+                      stringsAsFactors = FALSE, check.names = FALSE)
+  expect_equal(merge_specify_writeins(frame)$FlightDomCount, c("20", "4"))
+})
+
+test_that("a write-in that is not a number leaves the top code standing", {
+  # the real 2026 answer: "For work purposes". Folding it in replaced a usable
+  # "12+" with text, and the derivation then read no count at all
+  frame <- data.frame(FlightDomCount = "12+",
+                      `12+ (Specify):FlightDomCount` = "For work purposes",
+                      stringsAsFactors = FALSE, check.names = FALSE)
+  merged <- merge_specify_writeins(frame)
+  expect_equal(merged$FlightDomCount, "12+")
+  expect_equal(resolve_count_top_code(merged$FlightDomCount, VAS_CONFIG), "12")
 })

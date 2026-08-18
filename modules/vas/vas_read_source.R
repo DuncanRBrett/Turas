@@ -272,6 +272,14 @@ clean_export_headers <- function(header) {
 
 #' Fold each "12+ (Specify)" write-in column into its parent count column
 #'
+#' ONLY A WRITE-IN THAT READS AS A NUMBER IS TAKEN. The box is free text and
+#' collects a reason as readily as a count - the one respondent who used it in
+#' the 2026 field typed "For work purposes" - and folding that in destroyed the
+#' answer twice over: it replaced a usable "12+" with text, and the derivation
+#' then read the text as no count at all, leaving a real buyer with no trips and
+#' no spend. Where the write-in is not a number the sentinel stays, and
+#' \code{resolve_count_top_code()} reads it at its lower bound.
+#'
 #' @param frame The export data frame, character columns, original names.
 #'
 #' @return The frame with parent count columns carrying the write-in values.
@@ -284,6 +292,7 @@ merge_specify_writeins <- function(frame) {
     }
     write_in <- trimws(as.character(frame[[column]]))
     uses_write_in <- !is.na(write_in) & nzchar(write_in) &
+      !is.na(suppressWarnings(as.numeric(write_in))) &
       trimws(as.character(frame[[parent]])) %in% VAS_SPECIFY_SENTINEL
     frame[[parent]][uses_write_in] <- write_in[uses_write_in]
   }
