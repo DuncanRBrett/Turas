@@ -548,10 +548,13 @@ appear in a pin, an export or a saved copy.
 Each entry is a whole block, not a sentence: blank lines between paragraphs,
 one line per bullet, exactly as you would type it. The "Understanding the
 significance testing" panel is one entry, and so is the Report construction
-note. Where a sentence only appears on some reports — the earlier-waves line,
-which is only true when a report carries them — it sits in the text as a
-placeholder like `{waves_note}`; move it to say it somewhere else, or delete it
-to never say it at all.
+note. Some entries carry **placeholders** in curly brackets, like `{producer}` or
+`{waves_note}`. The report fills each one in when it builds. The editor lists
+them under the text you are editing and says in plain words what each becomes,
+which of them your text is currently using, and — as you type — flags any that
+are not real. Move a placeholder to say that thing somewhere else, or delete it
+to never say it at all; invent one and the next build stops and names it rather
+than printing the brackets into a client's report.
 
 Two more things worth knowing. Text applies at the **next report generation** —
 an editor save changes nothing in an HTML file that already exists. And clearing

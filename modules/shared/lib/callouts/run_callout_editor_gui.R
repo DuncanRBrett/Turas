@@ -50,6 +50,37 @@ run_callout_editor_gui <- function() {
       json_path), call. = FALSE)
   }
 
+  # --- Renderer manifests (optional, per module) --------------------------
+  # A module whose report reads its text by key ships a manifest declaring what
+  # each key is for and what {placeholders} it may carry. The editor shows that
+  # beside the text being edited, because an author looking at "{producer}" has
+  # no other way to know what it becomes. Modules without a manifest are
+  # unaffected — the panel simply does not appear.
+  .TEXT_MANIFESTS <- list(
+    tabs = file.path("modules", "tabs", "lib", "html_report_v2", "assets",
+                     "text_manifest.json")
+  )
+
+  manifest_for <- function(module) {
+    rel <- .TEXT_MANIFESTS[[module]]
+    if (is.null(rel)) return(NULL)
+    # json_path is <root>/modules/shared/lib/callouts/callouts.json
+    root <- normalizePath(file.path(dirname(json_path), "..", "..", "..", ".."),
+                          mustWork = FALSE)
+    path <- file.path(root, rel)
+    if (!file.exists(path)) return(NULL)
+    tryCatch(jsonlite::fromJSON(path, simplifyVector = FALSE),
+             error = function(e) NULL)
+  }
+
+  # Placeholders actually written in a piece of text: {lower_snake_case}.
+  tokens_in <- function(txt) {
+    if (is.null(txt)) return(character(0))
+    hits <- regmatches(txt, gregexpr("\\{[a-z][a-z0-9_]*\\}", txt, perl = TRUE))[[1]]
+    if (length(hits) == 0) return(character(0))
+    unique(gsub("[{}]", "", hits))
+  }
+
   # --- Read registry ---
   read_registry <- function() {
     if (!file.exists(json_path)) return(list())
@@ -390,6 +421,10 @@ run_callout_editor_gui <- function() {
                         placeholder = "Where on the page? (e.g. 'Results overview card')")
             )
           ),
+          # What this entry is, and what its {placeholders} become — read from
+          # the module's renderer manifest, so it cannot drift from the code.
+          uiOutput("placeholder_help"),
+
           div(class = "ce-field ce-field-text",
             tags$label("Text (supports basic HTML: <strong>, <ul>, <li>, <p>)", class = "ce-label"),
             textAreaInput("edit_text", NULL,
@@ -414,6 +449,51 @@ run_callout_editor_gui <- function() {
             )
           )
         )
+      )
+    })
+
+    # --- What this entry is, and what its placeholders become ---------------
+    # An author looking at "{producer}" has no way to know what it becomes, so
+    # the renderer's own manifest says — which cannot drift from the code the
+    # way a hand-written note would. Depends on input$edit_text as well as the
+    # selection, so a mistyped placeholder is caught while typing rather than
+    # in a refused build an hour later.
+    output$placeholder_help <- renderUI({
+      sel <- selected()
+      if (is.null(sel)) return(NULL)
+      man <- manifest_for(sel$module)
+      spec <- if (is.null(man)) NULL else man[[sel$key]]
+      if (is.null(spec)) return(NULL)
+
+      declared <- unlist(spec$tokens %||% list())
+      help_for <- spec$token_help %||% list()
+      used <- tokens_in(input$edit_text)
+
+      rows <- lapply(declared, function(tok) {
+        present <- tok %in% used
+        div(class = paste("ce-ph-row", if (present) "on" else "off"),
+          span(class = "ce-ph-name", paste0("{", tok, "}")),
+          span(class = "ce-ph-desc", help_for[[tok]] %||% ""),
+          span(class = "ce-ph-state", if (present) "in your text" else "not used")
+        )
+      })
+
+      unknown <- setdiff(used, declared)
+      warn <- if (length(unknown)) {
+        div(class = "ce-ph-warn",
+          paste0("Not a placeholder this text can supply: ",
+                 paste0("{", unknown, "}", collapse = ", "),
+                 ". The report will refuse to build until it is corrected or removed."))
+      } else NULL
+
+      div(class = "ce-ph",
+        div(class = "ce-ph-where", spec$context %||% ""),
+        if (length(declared)) {
+          div(class = "ce-ph-list",
+            div(class = "ce-ph-head", "Placeholders - the report fills these in"),
+            rows)
+        } else NULL,
+        warn
       )
     })
 
@@ -839,5 +919,24 @@ callout_editor_css <- function() {
   .modal-content { border-radius: 12px; }
   .modal-header { border-bottom: 1px solid #f1f5f9; }
   .modal-title { font-size: 16px; font-weight: 600; }
+
+  /* --- Placeholder help: what the {tokens} in a text become ------------- */
+  .ce-ph { margin: 4px 0 14px; padding: 12px 14px; border: 1px solid #e2e8f0;
+           border-left: 3px solid #94a3b8; border-radius: 6px; background: #f8fafc; }
+  .ce-ph-where { font-size: 12.5px; color: #475569; line-height: 1.5; }
+  .ce-ph-list { margin-top: 10px; }
+  .ce-ph-head { font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+                text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+  .ce-ph-row { display: flex; gap: 10px; align-items: baseline; padding: 3px 0;
+               font-size: 12.5px; line-height: 1.45; }
+  .ce-ph-row.off { opacity: 0.62; }
+  .ce-ph-name { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px;
+                font-weight: 700; color: #b45309; background: #fef3c7;
+                padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+  .ce-ph-desc { flex: 1; color: #334155; }
+  .ce-ph-state { font-size: 10.5px; color: #94a3b8; white-space: nowrap; }
+  .ce-ph-warn { margin-top: 10px; padding: 8px 10px; border-radius: 4px;
+                background: #fef2f2; color: #991b1b; font-size: 12.5px;
+                border: 1px solid #fecaca; }
   '
 }

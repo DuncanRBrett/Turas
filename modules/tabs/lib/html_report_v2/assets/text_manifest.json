@@ -2,7 +2,7 @@
   "_meta": {
     "version": "1.0.0",
     "description": "What authored text the v2 renderer needs. The words themselves live in the shared callout registry under module 'tabs' and are edited in the Callout Editor; this file is the renderer's contract with them. Validated at build time by report_text.R — a key here with no entry in the registry, or a placeholder in the registry that is not declared here, refuses the build.",
-    "format": "key -> { page, context, tokens }. page groups the entry in the Callout Editor and should match a v2 tab. context says where on that tab it renders, so an author knows what they are changing. tokens lists the {placeholders} the renderer supplies for that key; any other {lower_snake_case} in the authored text is a typo and refuses the build.",
+    "format": "key -> { page, context, tokens }. page groups the entry in the Callout Editor and should match a v2 tab. context says where on that tab it renders, so an author knows what they are changing. tokens lists the {placeholders} the renderer supplies for that key, and token_help says in plain English what each one becomes — the Callout Editor shows that beside the text being edited; any other {lower_snake_case} in the authored text is a typo and refuses the build.",
     "authoring": "Text is the CONTENT of its block — the renderer supplies the surrounding <p>/<div> and the data-txt-key tag. Inline markup is limited to strong em b i br p ul ol li h3 h4 span code sup sub, balanced, with no attributes. Blank text renders nothing at all, which is how an author switches a block off without touching code."
   },
   "report.construction.produced": {
@@ -10,7 +10,10 @@
     "context": "The attribution sentence. Used two ways: on its own in front of a study's own _REPORT_CONSTRUCTION note, and as {producer} inside the stock note below — so it is worded once and correct in both.",
     "tokens": [
       "company"
-    ]
+    ],
+    "token_help": {
+      "company": "the producing company, from company_name in the config's Settings sheet"
+    }
   },
   "report.construction.prior_waves_published": {
     "page": "Report",
@@ -27,7 +30,10 @@
     "context": "Legend panel, Significance letters — only when the project sets a low-base threshold.",
     "tokens": [
       "low_base"
-    ]
+    ],
+    "token_help": {
+      "low_base": "the project's low-base threshold, e.g. 30"
+    }
   },
   "reader.legend.moe_with_base": {
     "page": "How to read",
@@ -35,7 +41,11 @@
     "tokens": [
       "base",
       "moe_pp"
-    ]
+    ],
+    "token_help": {
+      "base": "the published total base, e.g. 753",
+      "moe_pp": "the worst-case margin at that base in points, e.g. 3.6"
+    }
   },
   "reader.legend.moe_no_base": {
     "page": "How to read",
@@ -64,7 +74,17 @@
       "range_meaning",
       "interval_name",
       "interval_abbrev"
-    ]
+    ],
+    "token_help": {
+      "article": "'a' or 'an', chosen to fit the number that follows",
+      "pct": "the example percentage",
+      "n": "the base it is calculated on",
+      "lo": "the bottom of its range",
+      "hi": "the top of its range",
+      "range_meaning": "what the range describes — one of the two 'Precision — range means' entries",
+      "interval_name": "'Confidence Interval' or 'Stability Interval', per the sampling design",
+      "interval_abbrev": "'CI' or 'SI', per the sampling design"
+    }
   },
   "conf.footer.range_meaning_group": {
     "page": "Crosstabs",
@@ -93,7 +113,12 @@
       "label",
       "n",
       "moe_pp"
-    ]
+    ],
+    "token_help": {
+      "label": "the smallest disclosable column's name",
+      "n": "its base",
+      "moe_pp": "how far its numbers can move, in points"
+    }
   },
   "conf.footer.comparing": {
     "page": "Crosstabs",
@@ -110,21 +135,30 @@
     "context": "Precision footer, About this survey — a probability design.",
     "tokens": [
       "interval_abbrev"
-    ]
+    ],
+    "token_help": {
+      "interval_abbrev": "'CI' or 'SI', per the sampling design"
+    }
   },
   "conf.design.non_probability": {
     "page": "Crosstabs",
     "context": "Precision footer, About this survey — a non-probability design; the ranges are stability intervals, not confidence intervals.",
     "tokens": [
       "interval_abbrev"
-    ]
+    ],
+    "token_help": {
+      "interval_abbrev": "'CI' or 'SI', per the sampling design"
+    }
   },
   "conf.design.cluster": {
     "page": "Crosstabs",
     "context": "Precision footer, About this survey — a cluster sample, whose clustering Turas does not adjust for.",
     "tokens": [
       "precision_term"
-    ]
+    ],
+    "token_help": {
+      "precision_term": "'margin of error' or 'precision range', per the sampling design"
+    }
   },
   "conf.fpc.lead_census_rate": {
     "page": "Crosstabs",
@@ -132,7 +166,11 @@
     "tokens": [
       "rate",
       "universe"
-    ]
+    ],
+    "token_help": {
+      "rate": "response rate as a whole number, e.g. 69",
+      "universe": "the size of the universe, e.g. 14,563"
+    }
   },
   "conf.fpc.lead_sample_rate": {
     "page": "Crosstabs",
@@ -140,7 +178,11 @@
     "tokens": [
       "rate",
       "universe"
-    ]
+    ],
+    "token_help": {
+      "rate": "coverage of the universe as a whole number, e.g. 5",
+      "universe": "the size of the universe, e.g. 14,563"
+    }
   },
   "conf.fpc.lead_known_sizes": {
     "page": "Crosstabs",
@@ -164,7 +206,12 @@
       "priors",
       "waves_word",
       "span"
-    ]
+    ],
+    "token_help": {
+      "priors": "how many prior waves loaded",
+      "waves_word": "'wave' or 'waves', to match the count",
+      "span": "the range of waves, e.g. 2012–2025"
+    }
   },
   "tracking.unmatched.cause": {
     "page": "Tracking",
@@ -176,7 +223,10 @@
     "context": "Tracking summary — the heatmap's reading note. {soft_clause} appears only when the 80% level is switched on.",
     "tokens": [
       "soft_clause"
-    ]
+    ],
+    "token_help": {
+      "soft_clause": "the hollow-arrow clause, added only when the 80% level is switched on"
+    }
   },
   "tracking.heatmap.soft_clause": {
     "page": "Tracking",
@@ -244,7 +294,11 @@
     "tokens": [
       "interval_term",
       "softened"
-    ]
+    ],
+    "token_help": {
+      "interval_term": "'confidence interval' or 'stability interval', per the sampling design",
+      "softened": "the non-probability caveat, added only when the design is not a formal random sample"
+    }
   },
   "visualise.ci_note_softened": {
     "page": "Tracking",
@@ -262,7 +316,11 @@
     "tokens": [
       "subject",
       "gaps_clause"
-    ]
+    ],
+    "token_help": {
+      "subject": "the banner the differences run by",
+      "gaps_clause": "the 'N groups stand clearly apart' clause, when any do"
+    }
   },
   "patterns.split.gaps_clause": {
     "page": "Group overview",
@@ -270,28 +328,41 @@
     "tokens": [
       "n",
       "groups_word"
-    ]
+    ],
+    "token_help": {
+      "n": "how many groups stand apart",
+      "groups_word": "'group' or 'groups', to match the count"
+    }
   },
   "patterns.group.most_positive": {
     "page": "Group overview",
     "context": "Patterns — names the most positive group under a group card.",
     "tokens": [
       "subject"
-    ]
+    ],
+    "token_help": {
+      "subject": "the most positive group's name"
+    }
   },
   "patterns.comove.note": {
     "page": "Group overview",
     "context": "Patterns — the working under a co-movement card.",
     "tokens": [
       "pairs"
-    ]
+    ],
+    "token_help": {
+      "pairs": "how many question pairs were scanned"
+    }
   },
   "patterns.odd.caption": {
     "page": "Group overview",
     "context": "Patterns — the working under an exception card.",
     "tokens": [
       "cells"
-    ]
+    ],
+    "token_help": {
+      "cells": "how many group × question cells were scanned"
+    }
   },
   "patterns.bimodal.note": {
     "page": "Group overview",
@@ -308,14 +379,20 @@
     "context": "Patterns — the confident-null caption when exceptions were scanned and none survived.",
     "tokens": [
       "cells"
-    ]
+    ],
+    "token_help": {
+      "cells": "how many group × question cells were scanned"
+    }
   },
   "patterns.null.bimodal": {
     "page": "Group overview",
     "context": "Patterns — the confident-null caption when no two-camp split was found.",
     "tokens": [
       "scanned"
-    ]
+    ],
+    "token_help": {
+      "scanned": "how many questions were scanned"
+    }
   },
   "patterns.empty.nothing_scorable": {
     "page": "Group overview",
@@ -338,7 +415,11 @@
     "tokens": [
       "names",
       "it_them"
-    ]
+    ],
+    "token_help": {
+      "names": "the groups scanned that produced no portrait, with their bases",
+      "it_them": "'it' or 'them', to match the count"
+    }
   },
   "diffs.intro": {
     "page": "Differences",
@@ -353,7 +434,13 @@
       "neg",
       "pos",
       "mixed"
-    ]
+    ],
+    "token_help": {
+      "audience_n": "how many people are in the current audience",
+      "neg": "the word for the negative end, coloured to match the bar",
+      "pos": "the word for the positive end, coloured to match the bar",
+      "mixed": "the word for the middle, coloured to match the bar"
+    }
   },
   "qual.board.champ_rule": {
     "page": "Qualitative",
@@ -377,7 +464,12 @@
       "banner",
       "mode",
       "counts_clause"
-    ]
+    ],
+    "token_help": {
+      "banner": "the banner the themes are crossed by",
+      "mode": "what a cell means — one of the two 'Themes × banner' mode entries",
+      "counts_clause": "the 'shown as counts' clause, added only when counts are switched on"
+    }
   },
   "qual.xtab.counts_clause": {
     "page": "Qualitative",
@@ -415,7 +507,11 @@
     "tokens": [
       "n",
       "codes_word"
-    ]
+    ],
+    "token_help": {
+      "n": "how many stray codes were quarantined",
+      "codes_word": "'code' or 'codes', to match the count"
+    }
   },
   "qual.collection.empty": {
     "page": "Qualitative",
@@ -442,7 +538,10 @@
     "context": "Your collection — the selected hub is empty, and how to add to it.",
     "tokens": [
       "hub"
-    ]
+    ],
+    "token_help": {
+      "hub": "the name of the selected hub"
+    }
   },
   "qual.collection.empty_cut": {
     "page": "Qualitative",
@@ -474,7 +573,10 @@
     "context": "Report tab — shown in place of a narrative section the config has not filled in. {row} names the Comments-sheet row that fills it.",
     "tokens": [
       "row"
-    ]
+    ],
+    "token_help": {
+      "row": "the Comments-sheet row that fills this section (_BACKGROUND or _EXECUTIVE_SUMMARY)"
+    }
   },
   "report.added_slides.intro": {
     "page": "Report",
@@ -491,7 +593,10 @@
     "context": "Filter bar, weighted-data note — what weighting does to every figure. {by} names the weight variable when the study declares one.",
     "tokens": [
       "by"
-    ]
+    ],
+    "token_help": {
+      "by": "the weight variable clause, e.g. “ using ‘wt’” — empty when the study does not name one"
+    }
   },
   "filter.weighting.bases_lead": {
     "page": "Crosstabs",
@@ -503,7 +608,10 @@
     "context": "Disclosure — the audience size cannot be verified in this view.",
     "tokens": [
       "k"
-    ]
+    ],
+    "token_help": {
+      "k": "the confidentiality threshold"
+    }
   },
   "disclosure.note_too_small": {
     "page": "Crosstabs",
@@ -511,7 +619,11 @@
     "tokens": [
       "n",
       "k"
-    ]
+    ],
+    "token_help": {
+      "n": "the audience size",
+      "k": "the confidentiality threshold"
+    }
   },
   "render.base.withheld_tip": {
     "page": "Crosstabs",
@@ -523,14 +635,20 @@
     "context": "Crosstab base row — tooltip on a base below the low-base threshold.",
     "tokens": [
       "threshold"
-    ]
+    ],
+    "token_help": {
+      "threshold": "the low-base threshold"
+    }
   },
   "render.base.low_fpc_tip": {
     "page": "Crosstabs",
     "context": "Crosstab base row — the same warning where a finite population correction has already been applied.",
     "tokens": [
       "threshold"
-    ]
+    ],
+    "token_help": {
+      "threshold": "the low-base threshold"
+    }
   },
   "render.base.coverage_tip": {
     "page": "Crosstabs",
@@ -538,7 +656,11 @@
     "tokens": [
       "base",
       "population"
-    ]
+    ],
+    "token_help": {
+      "base": "the column's base",
+      "population": "the size of that group's universe"
+    }
   },
   "render.base.effective_tip": {
     "page": "Crosstabs",
@@ -551,21 +673,31 @@
     "tokens": [
       "producer",
       "waves_note"
-    ]
+    ],
+    "token_help": {
+      "producer": "the attribution sentence — 'This report was produced by … using Turas Analytics …'. Edited under 'Report construction — attribution'.",
+      "waves_note": "the earlier-waves sentence — 'Figures carried forward from earlier waves are shown as previously published rather than recalculated.' Appears only when the report carries earlier waves and none of them holds respondent-level data. Renders as nothing otherwise, leaving no empty paragraph."
+    }
   },
   "cards.sig.explainer": {
     "page": "Crosstabs",
     "context": "The whole 'Understanding the significance testing' panel under every crosstab card, as one entry. Blank lines separate paragraphs. {min_base} is the project's own low-base threshold, so a study configured to something other than 30 is described correctly — keep it rather than typing a number.",
     "tokens": [
       "min_base"
-    ]
+    ],
+    "token_help": {
+      "min_base": "this project's low-base threshold — the sample a column needs before letters show, e.g. 30"
+    }
   },
   "cards.reading.list": {
     "page": "Crosstabs",
     "context": "The whole 'Reading this table' panel under every crosstab card, as one entry — ONE BULLET PER LINE. {legend_link} is the 'How to read this report' button the renderer supplies; keep it where you want the cross-reference to sit.",
     "tokens": [
       "legend_link"
-    ]
+    ],
+    "token_help": {
+      "legend_link": "the 'ⓘ How to read this report' button, which opens the legend panel"
+    }
   },
   "filter.weighting.bases": {
     "page": "Crosstabs",
@@ -582,6 +714,9 @@
     "context": "Legend panel, Score bands — both bullets as one entry, ONE BULLET PER LINE. {bands} is the study's own banding, read off its questions, so it describes what the cards actually show.",
     "tokens": [
       "bands"
-    ]
+    ],
+    "token_help": {
+      "bands": "the study's own banding, read off its questions, e.g. 'strong ≥8.6, moderate 8.0–8.5, weak <8.0'"
+    }
   }
 }

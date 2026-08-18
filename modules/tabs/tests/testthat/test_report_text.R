@@ -291,3 +291,28 @@ test_that("an edit made after the first read is picked up without restarting R",
   expect_equal(length(after), before + 1)
   expect_false(is.null(after[["zz.freshness_probe"]]))
 })
+
+
+# ==============================================================================
+# 7. Every placeholder explains itself
+# ==============================================================================
+
+context("report_text: placeholder descriptions")
+
+test_that("every declared token is described, and every description names a real token", {
+  # The Callout Editor shows token_help beside the text being edited — it is the
+  # only way an author looking at "{producer}" learns what it becomes. A token
+  # added to the manifest without a description would leave a blank line there,
+  # which is worse than useless: it looks explained.
+  man <- load_report_text_manifest(report_text_manifest_path(assets_dir))
+  for (key in names(man)) {
+    # as.character() so a key with no tokens compares as two empty character
+    # vectors rather than NULL, which expect_setequal refuses
+    toks <- as.character(unlist(man[[key]]$tokens %||% list()))
+    help <- as.character(names(man[[key]]$token_help %||% list()))
+    expect_setequal(toks, help)
+    for (h in unlist(man[[key]]$token_help %||% list())) {
+      expect_true(nzchar(trimws(h)))
+    }
+  }
+})
