@@ -418,13 +418,23 @@
     var labels = TR.conf.labels();
     var lowBase = p.low_base_threshold;
     var li = function (key, vars) { return TR.txt.block(key, vars, { tag: "li" }); };
+    // A legend section whose bullets always appear together is ONE entry, one
+    // bullet per line. Sections with a condition between their bullets (the
+    // low-base line, the two margin-of-error forms) stay separate, because only
+    // the build knows which one a given report may show.
+    var lines = function (key, vars) {
+      return TR.txt(key, vars).split(/\n+/)
+        .map(function (x) { return x.trim(); })
+        .filter(Boolean)
+        .map(function (x) { return '<li data-txt-key="' + key + '">' + x + "</li>"; })
+        .join("");
+    };
     var sections = [];
     sections.push("<h3>Significance letters</h3><ul>" +
       li("reader.legend.sig_letters") +
       (lowBase ? li("reader.legend.low_base", { low_base: lowBase }) : "") + "</ul>");
     sections.push("<h3>Arrows &amp; change chips</h3><ul>" +
-      li("reader.legend.arrows_profile") +
-      li("reader.legend.arrows_chips") + "</ul>");
+      lines("reader.legend.arrows") + "</ul>");
     // Read the bands off the questions, like the dashboard does — a study that
     // configures dashboard_green_mean is not banded on % of scale, and saying
     // so here would contradict the cards the reader is looking at.
@@ -438,8 +448,7 @@
       ? decodeEntities(TR.views.bandLegend(TR.views.indexQuestions()).replace(/<[^>]+>/g, ""))
       : "strong \u226575%, moderate 50\u201374%, weak <50% of each scale's maximum";
     sections.push("<h3>Score bands</h3><ul>" +
-      li("reader.legend.bands", { bands: bandTxt }) +
-      li("reader.legend.row_kinds") + "</ul>");
+      lines("reader.legend.bands", { bands: bandTxt }) + "</ul>");
     // Two whole sentences rather than one spliced around a conditional: the
     // author edits the version their report actually shows, and neither reads
     // as a fragment in the editor.

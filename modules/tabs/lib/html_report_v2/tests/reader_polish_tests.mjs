@@ -361,15 +361,15 @@ run("A4: legend panel contains all five explains", () => {
   const html = sb.TR.reader.legendHtml();
   assert(html.indexOf('data-txt-key="reader.legend.sig_letters"') !== -1,
     "1: sig letters incl. 80%");
-  assert(html.indexOf('data-txt-key="reader.legend.arrows_profile"') !== -1 &&
-    html.indexOf('data-txt-key="reader.legend.arrows_chips"') !== -1, "2: ▲▵ arrows");
+  assert(html.split('data-txt-key="reader.legend.arrows"').length - 1 === 2,
+    "2: ▲▵ arrows — both bullets of the one authored entry");
   assert(html.indexOf("strong ≥75%") !== -1 && html.indexOf("moderate 50–74%") !== -1 &&
     html.indexOf("weak") !== -1, "3: bands");
   assert(html.indexOf("Precision Estimate") !== -1 &&
     html.indexOf('data-txt-key="reader.legend.moe_with_base"') !== -1,
     "4: precision sentence");
   assert(html.indexOf("Weighted data") !== -1 &&
-    html.indexOf('data-txt-key="filter.weighting.base_effective"') !== -1,
+    html.indexOf('data-txt-key="filter.weighting.bases"') !== -1,
     "5: weighted/effective base note");
 });
 

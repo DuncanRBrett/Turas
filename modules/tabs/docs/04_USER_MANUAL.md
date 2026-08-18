@@ -545,9 +545,17 @@ editor; navy `config:` badges are text this study wrote in its own config.
 Press the same keys again to hide them — the badges are author-only and never
 appear in a pin, an export or a saved copy.
 
-Two things worth knowing. Text applies at the **next report generation** — an
-editor save changes nothing in an HTML file that already exists. And clearing a
-sentence to blank is a legitimate way to switch a block off; deleting the entry
+Each entry is a whole block, not a sentence: blank lines between paragraphs,
+one line per bullet, exactly as you would type it. The "Understanding the
+significance testing" panel is one entry, and so is the Report construction
+note. Where a sentence only appears on some reports — the earlier-waves line,
+which is only true when a report carries them — it sits in the text as a
+placeholder like `{waves_note}`; move it to say it somewhere else, or delete it
+to never say it at all.
+
+Two more things worth knowing. Text applies at the **next report generation** —
+an editor save changes nothing in an HTML file that already exists. And clearing
+an entry to blank is a legitimate way to switch a block off; deleting the entry
 outright will stop the next build instead.
 
 When one study alone must word something differently, use the config's

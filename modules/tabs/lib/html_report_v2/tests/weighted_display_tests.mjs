@@ -205,10 +205,8 @@ run("weighting callout appears only when weighted and explains the three bases",
   assert(note.indexOf(TXT("filter.weighting.summary")) !== -1, "callout headline present");
   assert(blockOf(note, "filter.weighting.what").indexOf("weight") !== -1,
     "names the weight variable");
-  ["base_unweighted", "base_weighted", "base_effective"].forEach((k) => {
-    assert(note.indexOf('data-txt-key="filter.weighting.' + k + '"') !== -1,
-      "explains all three bases: " + k);
-  });
+  assert(note.split('data-txt-key="filter.weighting.bases"').length - 1 === 3,
+    "explains all three bases, one bullet each");
 
   // unweighted -> no callout at all
   TR.AGG = { project: { weighted: false } };

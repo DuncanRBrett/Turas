@@ -22,14 +22,19 @@
     // The weight variable is data, so it arrives escaped as a token; the clause
     // around it is authored, and disappears cleanly when no variable is named.
     var by = p.weight_variable ? " using ‘" + p.weight_variable + "’" : "";
-    var li = function (key) { return TR.txt.block(key, null, { tag: "li" }); };
+    // The three base definitions are one authored entry, one bullet per line —
+    // they are read together and there is no condition between them.
+    var bases = TR.txt("filter.weighting.bases").split(/\n+/)
+      .map(function (line) { return line.trim(); })
+      .filter(Boolean)
+      .map(function (line) {
+        return '<li data-txt-key="filter.weighting.bases">' + line + "</li>";
+      }).join("");
     return '<details class="fb-wnote"><summary>' +
       fmt.escapeHtml(TR.txt("filter.weighting.summary")) + "</summary><div>" +
       TR.txt.block("filter.weighting.what", { by: by }) +
-      TR.txt.block("filter.weighting.bases_lead") + "<ul>" +
-      li("filter.weighting.base_unweighted") +
-      li("filter.weighting.base_weighted") +
-      li("filter.weighting.base_effective") + "</ul></div></details>";
+      TR.txt.block("filter.weighting.bases_lead") + "<ul>" + bases +
+      "</ul></div></details>";
   };
 
   filterBar.render = function () {

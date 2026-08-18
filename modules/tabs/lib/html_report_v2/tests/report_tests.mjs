@@ -140,8 +140,8 @@ run("the standard report-construction note replaces the old disclaimer field", (
   assert(h.indexOf("Report construction") >= 0, "the note's heading renders");
   assert(h.indexOf(TXT("report.construction.produced",
     { company: "The Research LampPost" })) >= 0, "the attribution renders");
-  assert(h.indexOf(TXT("report.construction.ai_and_review")) >= 0,
-    "the AI and author-review paragraph renders");
+  assert(h.indexOf('data-txt-key="report.construction.stock"') >= 0,
+    "the stock note renders, tagged with its key");
   assert(h.indexOf("Disclaimers / confidentiality") < 0, "the old disclaimer field is gone");
   assert(h.indexOf("OLD CLOSING TEXT") < 0, "closing_notes no longer renders in About");
 });
@@ -156,15 +156,15 @@ run("the producing company interpolates into the note, with a TRL fallback", () 
 });
 
 run("the stock note renders every paragraph the report is entitled to", () => {
-  // Asserts the authored blocks are SERVED, not what they say — the wording is
-  // the author's and changes in the Callout Editor without touching this file.
+  // The note is ONE authored entry whose blank lines become paragraphs. Asserts
+  // the paragraphs are SERVED, not what they say — the wording is the author's.
   const h = boot(undefined, undefined).report.aboutHtml();
-  ["report.construction.computed", "report.construction.self_contained",
-   "report.construction.ai_and_review"].forEach((key) => {
-    assert(h.indexOf(TXT(key)) >= 0, key + " renders");
-  });
-  assert(h.indexOf('data-txt-key="report.construction.self_contained"') >= 0,
-    "each authored block is tagged with its key, so the author can find it");
+  const paras = TXT("report.construction.stock", { producer: "", waves_note: "" })
+    .split(/\n\s*\n+/).map((x) => x.trim()).filter(Boolean);
+  assert(paras.length >= 3, "the stock note is multi-paragraph");
+  paras.forEach((para) => assert(h.indexOf(para) >= 0, "renders: " + para.slice(0, 40)));
+  assert(h.split('data-txt-key="report.construction.stock"').length - 1 === paras.length,
+    "one tagged <p> per authored paragraph, so any of them can be found");
 });
 
 run("a study can state how its own numbers were built, in place of the default", () => {
@@ -179,8 +179,8 @@ run("a study can state how its own numbers were built, in place of the default",
   }).report.aboutHtml();
   assert(h.indexOf("preparation layer adds composite columns") >= 0,
     "the study's own account of its build is shown");
-  assert(h.indexOf(TXT("report.construction.computed")) < 0,
-    "the stock sentence stands aside rather than contradicting the study");
+  assert(h.indexOf('data-txt-key="report.construction.stock"') < 0,
+    "the stock note stands aside rather than contradicting the study");
   assert(h.indexOf(TXT("report.construction.produced", { company: "Acme Insights" })) >= 0,
     "the producer line is kept, so a declaration cannot drop the attribution");
   const declaredAt = h.indexOf("preparation layer");
@@ -197,11 +197,8 @@ run("a declaration replaces the WHOLE stock block, not just its first sentence",
   // how its own numbers were built, and it owns the assurances with it.
   const h = boot(undefined, { construction: "Built by hand, checked twice." }).report.aboutHtml();
   assert(h.indexOf("Built by hand, checked twice.") >= 0, "the study's own words render");
-  ["report.construction.computed", "report.construction.self_contained",
-    "report.construction.ai_and_review"].forEach((key) => {
-    assert(h.indexOf(TXT(key)) < 0, "a declaration left the stock paragraph in place: " + key);
-    assert(h.indexOf('data-txt-key="' + key + '"') < 0, "and left its block behind: " + key);
-  });
+  assert(h.indexOf('data-txt-key="report.construction.stock"') < 0,
+    "a declaration left the stock note in place");
   // and nothing renders twice
   const twice = boot(undefined, { company: "Acme Insights",
     construction: "This report was produced by Acme Insights using Turas Analytics, our " +
@@ -252,7 +249,7 @@ run("a report that declares nothing renders exactly as it did before", () => {
       .report.aboutHtml();
     assert(h === base, "an empty construction note changed the rendered About");
   });
-  assert(base.indexOf(TXT("report.construction.computed")) >= 0,
+  assert(base.indexOf('data-txt-key="report.construction.stock"') >= 0,
     "and the stock note is what it falls back to");
 });
 
@@ -288,27 +285,27 @@ run("a wave that carries respondent data is not described as published-only", ()
   // note is only entitled to when no earlier wave carries per-respondent
   // scores — a wave with scores IS recalculated (22w_waves.js).
   const h = boot(undefined, undefined, undefined, MICRO_WAVES).report.aboutHtml();
-  assert(h.indexOf('data-txt-key="report.construction.prior_waves_published"') < 0,
+  assert(h.indexOf(TXT("report.construction.prior_waves_published")) < 0,
     "a recalculated wave is not called a published one");
 });
 
 run("a report with no earlier waves says nothing about waves at all", () => {
   const h = boot(undefined, undefined).report.aboutHtml();
-  assert(h.indexOf('data-txt-key="report.construction.prior_waves_published"') < 0,
+  assert(h.indexOf(TXT("report.construction.prior_waves_published")) < 0,
     "a single-wave report says nothing about earlier waves");
-  assert(h.indexOf(TXT("report.construction.self_contained")) >= 0,
-    "and the recompute paragraph still closes the stock note");
+  // ...and dropping that sentence leaves no empty paragraph behind: the note is
+  // one authored entry with a {waves_note} placeholder in the middle of it.
+  assert(h.indexOf("<p data-txt-key=\"report.construction.stock\"></p>") < 0,
+    "the empty placeholder paragraph is filtered out");
 });
 
-run("AI is described as a working tool, and the author owns the report", () => {
-  // Author accountability carries the assurance — it stays true as AI use
-  // grows — rather than an absolute no-AI claim, which ages badly.
-  const h = boot(undefined, undefined).report.aboutHtml();
-  assert(h.indexOf(TXT("report.construction.ai_and_review")) >= 0,
-    "the AI and accountability paragraph renders in full");
-  assert(h.indexOf('data-txt-key="report.construction.ai_and_review"') >= 0,
-    "and is tagged, so the author can find it in the Callout Editor");
-});
+// The test that asserted the AI/accountability paragraph by its own key went
+// when the construction note became ONE authored entry (2026-08-18, Duncan:
+// "why not put them all in one? It is all one paragraph"). What it checked —
+// that the paragraph reaches the page — is covered by "the stock note renders
+// every paragraph the report is entitled to", which asserts every authored
+// paragraph renders and that the count matches. What it also checked — that the
+// wording says what it says — is the report author's, not the suite's.
 
 run("the construction note contains no em dashes", () => {
   // Duncan's house style. Also the tell readers most associate with AI-written

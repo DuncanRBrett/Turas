@@ -302,6 +302,22 @@ Three pieces, and the loop between them closes itself:
 | The check | `modules/tabs/lib/html_report_v2/report_text.R` | validates one against the other at build time and emits the `#data-text` island |
 | The lookup | `assets/js/02_text.js` (`TR.txt`) | serves a key to the renderer |
 
+### One block, one entry
+
+A thing the reader sees as one thing is **one entry**, however many paragraphs
+or bullets it renders as. The whitespace carries the structure: a **blank line**
+starts a new paragraph, a **single newline** starts a new bullet. So the whole
+"Understanding the significance testing" panel is one entry of six paragraphs,
+and "Reading this table" is one entry of five bullets.
+
+Text is only split across entries when the code has to choose between the
+pieces — a sentence that renders only on a weighted report, a clause that
+appears only at the 80% level, two forms of the same sentence for reports with
+and without a base. Where a conditional sentence sits *inside* an otherwise
+continuous block, it arrives as a placeholder instead (`{waves_note}` in the
+Report construction note), so the author still edits one entry and decides where
+that sentence goes — or deletes the placeholder to never say it.
+
 ### Adding a new authored block
 
 1. Call it where it renders: `TR.txt.block("cards.my_note")`, or

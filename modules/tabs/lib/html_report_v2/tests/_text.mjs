@@ -40,9 +40,19 @@ export const CATALOGUE = (() => {
   Object.keys(tabs).forEach((k) => {
     const real = tabs[k].text || "";
     if (!MUTATED || !real) { out[k] = real; return; }
-    const tokens = (real.match(/\{[a-z][a-z0-9_]*\}/g) || []).join(" ");
-    out[k] = ("MUTATED_TEXT_" + k.replace(/[^a-z0-9]+/gi, "_") +
-              (tokens ? " " + tokens : "")).trim();
+    // Mutate LINE by line, keeping every newline exactly where it was. The
+    // renderers read structure out of the whitespace — blank lines become
+    // paragraphs, single lines become bullets — so flattening it here would
+    // fail tests that assert the SHAPE of a block for a reason that has
+    // nothing to do with wording.
+    const slug = "MUTATED_TEXT_" + k.replace(/[^a-z0-9]+/gi, "_");
+    let n = 0;
+    out[k] = real.split("\n").map((line) => {
+      if (!line.trim()) return line;                    // blank lines stay blank
+      n += 1;
+      const tokens = (line.match(/\{[a-z][a-z0-9_]*\}/g) || []).join(" ");
+      return (slug + (n > 1 ? "_" + n : "") + (tokens ? " " + tokens : "")).trim();
+    }).join("\n");
   });
   return out;
 })();

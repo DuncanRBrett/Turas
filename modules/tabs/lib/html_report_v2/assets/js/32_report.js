@@ -314,20 +314,29 @@
       }).join("");
     }
 
-    // The attribution and the "computed in R" sentence share one paragraph, so
-    // they are joined here rather than relying on trailing spaces surviving a
-    // trip through the editor's textarea.
-    var opener = [produced, TR.txt("report.construction.computed")]
-      .filter(Boolean).join(" ");
+    // The stock note is ONE authored entry, written as it reads — blank lines
+    // between paragraphs, exactly like the config row a study would write. Two
+    // things inside it cannot be plain text and so arrive as placeholders:
+    //   {producer}   the attribution sentence, because the declared-note path
+    //                above uses the same sentence on its own;
+    //   {waves_note} the earlier-waves sentence, because only the code knows
+    //                when the report is entitled to make that claim — it needs
+    //                earlier waves, none of them carrying respondent-level
+    //                scores (a wave with scores IS recalculated, 22w_waves.js).
+    // An author moves {waves_note} to say it somewhere else, or deletes it to
+    // never say it at all.
+    var stock = TR.txt("report.construction.stock", {
+      producer: { html: produced },
+      waves_note: { html: priorWavesArePublished()
+        ? TR.txt("report.construction.prior_waves_published") : "" }
+    });
 
-    return (opener ? '<p data-txt-key="report.construction.produced">' + opener + "</p>" : "") +
-      TR.txt.block("report.construction.self_contained") +
-      // Only when it is true: the report must carry earlier waves, and none of
-      // them may hold respondent-level scores (a wave with scores IS
-      // recalculated, by 22w_waves.js).
-      (priorWavesArePublished()
-        ? TR.txt.block("report.construction.prior_waves_published") : "") +
-      TR.txt.block("report.construction.ai_and_review");
+    return stock.split(/\n\s*\n+/)
+      .map(function (para) { return para.trim(); })
+      .filter(Boolean)          // a dropped {waves_note} leaves no empty <p>
+      .map(function (para) {
+        return '<p data-txt-key="report.construction.stock">' + para + "</p>";
+      }).join("");
   }
 
   report.aboutHtml = function () {

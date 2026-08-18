@@ -731,32 +731,48 @@
    * text would misdescribe any study configured to a different threshold, which
    * is why {min_base} is a declared token rather than something an author types.
    */
+  /** A list authored as one entry: each LINE becomes a bullet, so the author
+   *  edits one block rather than hunting five. */
+  function listItems(key, vars) {
+    return TR.txt(key, vars).split(/\n+/)
+      .map(function (line) { return line.trim(); })
+      .filter(Boolean)
+      .map(function (line) {
+        return '<li data-txt-key="' + key + '">' + line + "</li>";
+      }).join("");
+  }
+
+  /** A multi-paragraph authored entry: blank lines in the editor become
+   *  paragraphs on the page, each tagged with the same key. */
+  function paragraphs(key, vars) {
+    return TR.txt(key, vars).split(/\n\s*\n+/)
+      .map(function (para) { return para.trim(); })
+      .filter(Boolean)
+      .map(function (para) {
+        return '<p data-txt-key="' + key + '">' + para + "</p>";
+      }).join("");
+  }
+
   function explainersHtml() {
     var p = TR.AGG.project;
-    var li = function (key, vars) { return TR.txt.block(key, vars, { tag: "li" }); };
     // Table-specific mechanics only — significance letters, arrows, Δ chips
     // and bands live in the ONE shared "How to read this" panel (A4).
     return '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">i</span> Reading this table' +
       '<span class="callout-chev">▼</span></button><div class="callout-body"><ul>' +
-      li("cards.reading.heatmap") +
-      li("cards.reading.published_computed") +
-      li("cards.reading.row_kinds") +
-      // The control is markup the renderer owns, passed in as {html:} so the
-      // author keeps one whole sentence instead of two fragments round a button.
-      li("cards.reading.see_legend", { legend_link: { html:
+      // One entry, one bullet per line. {legend_link} is markup the renderer
+      // owns, passed in raw so the author keeps a whole sentence rather than
+      // two fragments either side of a button.
+      listItems("cards.reading.list", { legend_link: { html:
         '<button class="linklike" data-legend-open>ⓘ How to read this report</button>' } }) +
-      li("cards.reading.insight_box") +
       "</ul></div></div>" +
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
-      TR.txt.block("cards.sig.what_it_answers") +
-      TR.txt.block("cards.sig.which_test") +
-      TR.txt.block("cards.sig.letters", { min_base: p.low_base_threshold }) +
-      TR.txt.block("cards.sig.multiplicity") +
-      TR.txt.block("cards.sig.wave_exception") +
-      TR.txt.block("cards.sig.real_vs_important") +
+      // One authored entry for the whole panel — blank lines separate the
+      // paragraphs. Nothing here is conditional, so splitting it into six
+      // entries only made the author hunt for the one they wanted to change.
+      paragraphs("cards.sig.explainer", { min_base: p.low_base_threshold }) +
       "</div></div>" +
       TR.conf.calloutHtml();
   }

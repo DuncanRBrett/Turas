@@ -214,11 +214,11 @@ test_that("an override replaces the platform wording for this build only", {
   js <- bundle_report_v2_js(assets_dir)
   base <- turas_callout_module("tabs")
   res <- build_report_text_json(assets_dir, js_bundle = js, entries = base,
-    overrides = list("report.construction.computed" = "Figures come out of R."))
+    overrides = list("report.construction.stock" = "Figures come out of R."))
   payload <- jsonlite::fromJSON(res$json, simplifyVector = FALSE)
-  expect_equal(payload[["report.construction.computed"]], "Figures come out of R.")
+  expect_equal(payload[["report.construction.stock"]], "Figures come out of R.")
   # the registry itself is untouched — the override lives for this build only
-  expect_false(identical(base[["report.construction.computed"]]$text,
+  expect_false(identical(base[["report.construction.stock"]]$text,
                          "Figures come out of R."))
 })
 
@@ -234,7 +234,7 @@ test_that("an override is validated like any other authored text", {
   js <- bundle_report_v2_js(assets_dir)
   expect_error(
     build_report_text_json(assets_dir, js_bundle = js,
-      overrides = list("report.construction.computed" = "A <strong>broken claim.")),
+      overrides = list("report.construction.stock" = "A <strong>broken claim.")),
     "CFG_REPORT_TEXT_INVALID")
   expect_error(
     build_report_text_json(assets_dir, js_bundle = js,
