@@ -50,7 +50,15 @@ source(file.path(script_dir, "00_guard.R"))
     file.path(getwd(), "..", "shared", "lib")
   )
 
+  # Order matters: turas_save_workbook_atomic and turas_excel_escape must load
+  # BEFORE stats_pack_writer, which uses both (import_all.R keeps the same
+  # order). The atomic saver reconciles a workbook's parts before writing it —
+  # without it openxlsx leaves relationships pointing at drawing parts it never
+  # writes, Excel offers to repair the file, and repairing strips the dropdowns.
+  # It was missing from this list, so every tabs run fell through to the plain
+  # openxlsx save and said so on the console (IO_SAVE_UNRECONCILED).
   trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                  "turas_save_workbook_atomic.R", "turas_excel_escape.R",
                   "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
