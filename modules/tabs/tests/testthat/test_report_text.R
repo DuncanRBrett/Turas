@@ -258,3 +258,36 @@ test_that("the generated config template ships a ReportText sheet, and it is emp
   # config can never quietly carry a stale copy of the platform wording.
   expect_null(load_report_text_sheet(tmp))
 })
+
+
+# ==============================================================================
+# 6. The registry cache must not outlive the file
+# ==============================================================================
+
+context("report_text: registry freshness")
+
+test_that("an edit made after the first read is picked up without restarting R", {
+  # launch_turas() is a long-running session: the Callout Editor writes the
+  # registry from inside it and the analyst then regenerates a report from the
+  # same session. A session-lifetime cache meant the edit could not reach the
+  # report — and a build could refuse against a registry that had been correct
+  # on disk for hours. That is exactly how CCPB failed on 2026-08-18.
+  path <- turas_callouts_path()
+  original <- readLines(path, warn = FALSE)
+  on.exit({
+    writeLines(original, path, useBytes = TRUE)
+    turas_callout_clear_cache()
+  }, add = TRUE)
+
+  before <- length(turas_callout_module("tabs"))     # populates the cache
+
+  reg <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+  reg$tabs[["zz.freshness_probe"]] <- list(title = "probe", text = "probe",
+                                           context = "probe", page = "Report")
+  jsonlite::write_json(reg, path, pretty = TRUE, auto_unbox = TRUE)
+  Sys.setFileTime(path, Sys.time() + 2)              # a later save, another process
+
+  after <- turas_callout_module("tabs")
+  expect_equal(length(after), before + 1)
+  expect_false(is.null(after[["zz.freshness_probe"]]))
+})

@@ -68,10 +68,25 @@ turas_callouts_path <- function() {
 }
 
 
+# Cached per (path, modification time). The cache used to live for the whole R
+# session, which is wrong for the way this file is actually used: launch_turas()
+# is a long-running session, the Callout Editor writes callouts.json from inside
+# it, and the analyst then regenerates a report from the same session. With a
+# session-lifetime cache their edit could not reach the report until they
+# restarted R — and, worse, a report build could refuse against a registry that
+# had been correct on disk for hours. Re-reading a 100 KB JSON when its mtime
+# moves costs nothing next to a report build.
 .load_callouts <- function() {
-  if (!is.null(.callout_cache$data)) return(.callout_cache$data)
-
   json_path <- turas_callouts_path()
+  stamp <- if (file.exists(json_path)) {
+    as.numeric(file.info(json_path)$mtime)
+  } else NA_real_
+
+  if (!is.null(.callout_cache$data) &&
+      identical(.callout_cache$path, json_path) &&
+      identical(.callout_cache$stamp, stamp)) {
+    return(.callout_cache$data)
+  }
 
   if (!file.exists(json_path)) {
     warning("Callout registry not found at: ", json_path)
@@ -90,6 +105,8 @@ turas_callouts_path <- function() {
   data[["_meta"]] <- NULL
 
   .callout_cache$data <- data
+  .callout_cache$path <- json_path
+  .callout_cache$stamp <- stamp
   data
 }
 
@@ -279,7 +296,7 @@ turas_callouts_write <- function(data, path = turas_callouts_path(), backups = 1
          call. = FALSE)
   }
 
-  .callout_cache$data <- NULL   # next read picks up what was just written
+  turas_callout_clear_cache()   # next read picks up what was just written
   invisible(path)
 }
 
@@ -292,6 +309,8 @@ turas_callouts_write <- function(data, path = turas_callouts_path(), backups = 1
 #' @export
 turas_callout_clear_cache <- function() {
   .callout_cache$data <- NULL
+  .callout_cache$path <- NULL
+  .callout_cache$stamp <- NULL
   invisible(TRUE)
 }
 
