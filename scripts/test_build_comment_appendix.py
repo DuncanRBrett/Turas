@@ -316,5 +316,37 @@ chg5 = bca.find_text_changes(d5, idc, cols4, openpyxl.load_workbook(apx4), smap)
 check(len(chg5) == 1 and chg5[0]["sheet"] == "Delivery talk",
       "find_text_changes reports the MAPPED sheet name")
 
+# ---- "None" is a verbatim, not a missing value ------------------------------
+# pandas' DEFAULT null list holds "None", "NA", "N/A", "NULL", "nan" - every one
+# of which a respondent may genuinely type in an open end to mean "nothing".
+# Read with the default list on and those verbatims vanish: the respondent is
+# recorded as having said nothing and never reaches the appendix. Found live on
+# ASSA 2026, where four respondents answered "None" to "what would you do
+# differently?" and were silently absent from the coded workbook.
+
+none_dir = Path(tempfile.mkdtemp())
+none_data = none_dir / "data.xlsx"
+pd.DataFrame({
+    "ResponseID": [1, 2, 3, 4, 5],
+    "Q1Comment": ["None", "NA", "a proper answer here", "", "N/A"],
+}).to_excel(none_data, index=False)
+
+ndf, nidc = bca.load_data(none_data)
+check(nidc == "ResponseID", "None-test: id column found")
+check(str(ndf["Q1Comment"].iloc[0]) == "None", "'None' survives the read as a verbatim")
+check(str(ndf["Q1Comment"].iloc[1]) == "NA", "'NA' survives the read as a verbatim")
+check(str(ndf["Q1Comment"].iloc[4]) == "N/A", "'N/A' survives the read as a verbatim")
+check(bool(pd.isna(ndf["Q1Comment"].iloc[3])) or str(ndf["Q1Comment"].iloc[3]) == "",
+      "a genuinely empty cell is still empty")
+
+none_apx = none_dir / "apx.xlsx"
+ns = bca.build_appendix(ndf, nidc, none_apx, ["Q1Comment"], "ResponseID")
+ns["wb"].save(none_apx)
+nrows = sheet_rows(openpyxl.load_workbook(none_apx)["Q1Comment"])
+check(len(nrows) == 4, "all four real answers reach the appendix, the blank does not")
+check({str(r[0]) for r in nrows} == {"1", "2", "3", "5"},
+      "the 'None' / 'NA' / 'N/A' respondents are present, not dropped")
+
+
 print("\n" + ("FAILED" if _failed else "OK"), "— %d passed, %d failed" % (_passed, _failed))
 raise SystemExit(1 if _failed else 0)

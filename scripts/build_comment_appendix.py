@@ -330,7 +330,13 @@ def sheet_name_for(col, sheet_map):
 
 def load_data(path):
     """(df with BOM-stripped headers, id column name)."""
-    df = pd.read_excel(path)
+    # pandas' DEFAULT null list contains the strings "None", "NA", "N/A",
+    # "NULL" and "nan" - all of which are things a respondent genuinely types
+    # in an open end to mean "nothing". Reading with the default list on drops
+    # those verbatims silently: the respondent is counted as having said
+    # nothing, and their row never reaches the appendix. Only a truly empty
+    # cell is missing.
+    df = pd.read_excel(path, keep_default_na=False, na_values=[""])
     df.columns = [strip_bom(c) for c in df.columns]
     return df, resolve_id_column(list(df.columns))
 
