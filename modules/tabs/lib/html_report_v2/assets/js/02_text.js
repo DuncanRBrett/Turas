@@ -42,10 +42,17 @@
    *  Surfaced by the #selftest case in 31_selftest.js. */
   var MISSES = [];
 
+  // Character-for-character fmt.escapeHtml (01_format.js), including the
+  // apostrophe. This module loads before 01_format, so it cannot call it — but
+  // token values are the SAME values the renderer used to escape itself, and a
+  // milder escaper here would change the emitted HTML for any value carrying an
+  // apostrophe ("each scale's maximum"). Displayed text would be identical and
+  // nothing would be unsafe, but "the report is byte-identical" would stop being
+  // true, and that claim is worth more than one saved replace.
   function escapeHtml(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   /**
