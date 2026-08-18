@@ -339,6 +339,13 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   data <- channels$data
   content <- list(questions = channels$questions, options = channels$options)
 
+  # Who each bill type was paid for. The survey asks this once for bills as a
+  # whole and never per bill type, but the per-type answer is already in the
+  # derived Own and Oth sides, so the table is built from them.
+  who_for <- add_bill_who_for(data, content, category_map)
+  data <- who_for$data
+  content <- list(questions = who_for$questions, options = who_for$options)
+
   derived_rows <- derived_structure_rows(dictionary, VAS_CONFIG)
   # The derived rows carry columns the asked ones do not (the ratio pairing on
   # every value-per-transaction question), so both frames are widened to the
