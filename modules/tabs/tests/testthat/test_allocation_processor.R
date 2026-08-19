@@ -284,7 +284,10 @@ test_that("row has correct RowLabel and RowType", {
 
   expect_equal(row$RowLabel, "Brand A")
   expect_equal(row$RowType,  "Average")
-  expect_equal(row$RowSource, "individual")
+  # "summary", like a numeric question's Mean row - every allocation row IS a
+  # mean. Tagged "individual" the v2 data layer read them as category rows and
+  # the report would not open; see build_allocation_mean_row().
+  expect_equal(row$RowSource, "summary")
 })
 
 test_that("Total mean is 40.0 for Brand A — known answer", {
@@ -618,6 +621,10 @@ context("allocation routing via question_orchestrator")
 source(file.path(.tabs_lib_dir, "weighting.R"))
 source(file.path(.tabs_lib_dir, "banner.R"))
 source(file.path(.tabs_lib_dir, "banner_indices.R"))
+# numeric_processor.R first: the orchestrator reads its NUMERIC_RATIO_COLS
+# when it routes a question, so sourcing the orchestrator alone leaves the
+# routing test failing on a missing object rather than on its own subject.
+source(file.path(.tabs_lib_dir, "numeric_processor.R"))
 source(file.path(.tabs_lib_dir, "question_orchestrator.R"))
 
 alloc_orch_data <- function() data.frame(
@@ -733,3 +740,52 @@ test_that("misaligned value/weight sets refuse instead of silently truncating", 
 # ==============================================================================
 # END OF TEST FILE
 # ==============================================================================
+
+# ==============================================================================
+# COLUMN VALIDATION: a wholly missing column set must REFUSE, not report zeros
+# ==============================================================================
+# The allocation processor treats an absent member column as "no answers", so a
+# question whose columns are all missing does not fail - it publishes a table of
+# zeros, which a reader takes for a real finding. VAS 2026 hit exactly that: the
+# config was regenerated ahead of the data and every wallet location read R0.
+
+source(file.path(turas_root, "modules/tabs/lib/validation/data_validators.R"))
+
+alloc_col_question <- function(code = "BUDGET", columns = 3) {
+  data.frame(QuestionCode = code, Columns = columns, stringsAsFactors = FALSE)
+}
+
+alloc_empty_log <- function() {
+  # the shape add_log_entry() builds
+  data.frame(Timestamp = character(0), Component = character(0),
+             Issue_Type = character(0), Description = character(0),
+             QuestionCode = character(0), Severity = character(0),
+             stringsAsFactors = FALSE)
+}
+
+test_that("all allocation columns present logs nothing", {
+  data <- data.frame(BUDGET_1 = c(50, 30), BUDGET_2 = c(30, 40), BUDGET_3 = c(20, 30))
+  log <- check_allocation_columns(alloc_col_question(), data, c("numeric", "integer"),
+                                  alloc_empty_log())
+  expect_equal(nrow(log), 0L)
+})
+
+test_that("NO allocation columns in the data is an Error, not a Warning", {
+  data <- data.frame(Gender = c("Male", "Female"))
+  log <- check_allocation_columns(alloc_col_question(), data, c("numeric", "integer"),
+                                  alloc_empty_log())
+
+  expect_equal(nrow(log), 1L)
+  expect_equal(log$Severity[1], "Error")
+  expect_true(grepl("does not carry this question at all", log$Description[1]))
+})
+
+test_that("SOME allocation columns missing stays a Warning", {
+  data <- data.frame(BUDGET_1 = c(50, 30), BUDGET_2 = c(30, 40))
+  log <- check_allocation_columns(alloc_col_question(), data, c("numeric", "integer"),
+                                  alloc_empty_log())
+
+  expect_equal(nrow(log), 1L)
+  expect_equal(log$Severity[1], "Warning")
+  expect_true(grepl("BUDGET_3", log$Description[1]))
+})

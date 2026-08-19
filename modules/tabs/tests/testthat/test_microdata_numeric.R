@@ -172,3 +172,65 @@ test_that("non-numeric questions keep the label-matching path", {
 
   expect_equal(as.integer(answers), c(0L, 0L, 1L, 1L, 0L, 1L))
 })
+
+# ==============================================================================
+# ALLOCATION QUESTIONS
+# ==============================================================================
+# An Allocation (constant-sum) question is {code}_1..{code}_N of numbers with no
+# bare column and no category rows. There is nowhere in this island to put N
+# numbers per respondent, so it carries none - and the entry must still be a
+# full-length column of NA. VAS 2026: without it the single-response path
+# indexed a column that does not exist, returned a zero-length vector, and the
+# whole report refused to open with "DATA_MICRO_Q microdata missing/short".
+
+alloc_structure <- function() {
+  list(
+    questions = data.frame(
+      QuestionCode = c("WALLETLOC", "SPEND"),
+      Variable_Type = c("Allocation", "Numeric"),
+      Columns = c(3, 1), stringsAsFactors = FALSE),
+    options = data.frame(
+      QuestionCode = rep("WALLETLOC", 3),
+      OptionText = c("Bank", "Retailer", "Other"),
+      DisplayText = c("Bank", "Retailer", "Other"),
+      DisplayOrder = 1:3, Min = NA_real_, Max = NA_real_,
+      stringsAsFactors = FALSE))
+}
+
+alloc_data <- function() {
+  data.frame(WALLETLOC_1 = c(50, 30, 0, 10),
+             WALLETLOC_2 = c(30, 40, 0, 20),
+             WALLETLOC_3 = c(20, 30, 0, 70),
+             SPEND = c(1, 2, 3, 4), stringsAsFactors = FALSE)
+}
+
+# Two shapes, because the row CLASS is what decides which path the island
+# takes. "mean" is what the data layer builds now that the processor tags its
+# rows RowSource = "summary". "category" is what it built before that - and it
+# is the shape that broke: a value-index map exists, so the single-response
+# path indexes the question's bare column, which an allocation question has
+# not got. The guard has to hold for both.
+alloc_dl_q <- function(kind = "mean") {
+  list(code = "WALLETLOC", type = "single",
+       rows = lapply(c("Bank", "Retailer", "Other"), function(l) {
+         if (identical(kind, "mean")) list(kind = "mean", label = l, mstat = "mean")
+         else list(kind = "category", label = l)
+       }))
+}
+
+test_that("an allocation question carries a full-length column of NA", {
+  for (kind in c("mean", "category")) {
+    answers <- micro_answers_for_question(alloc_dl_q(kind), alloc_data(),
+                                          alloc_structure(), 4)
+    expect_equal(length(answers), 4L, info = kind)
+    expect_true(all(is.na(as.integer(answers))), info = kind)
+  }
+})
+
+test_that("the island entry is never zero-length, whatever the row count", {
+  for (n in c(1L, 4L, 25L)) {
+    answers <- micro_answers_for_question(alloc_dl_q(), alloc_data(),
+                                          alloc_structure(), n)
+    expect_equal(length(answers), n, info = paste("n =", n))
+  }
+})

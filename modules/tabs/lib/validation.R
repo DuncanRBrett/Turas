@@ -423,22 +423,13 @@ validate_data_structure <- function(survey_data, survey_structure, error_log, ve
   # ===========================================================================
 
   # ===========================================================================
-  # ALLOCATION QUESTION VALIDATION
+  # ALLOCATION QUESTION VALIDATION - already done, deliberately not repeated
   # ===========================================================================
-  # Validate Allocation questions — column existence and numeric compatibility
-  allocation_questions <- questions_df[questions_df$Variable_Type == "Allocation", ]
-
-  if (nrow(allocation_questions) > 0) {
-    for (i in seq_len(nrow(allocation_questions))) {
-      error_log <- validate_allocation_question(
-        allocation_questions[i, ],
-        survey_data,
-        error_log
-      )
-    }
-  }
-  # ===========================================================================
-  # END OF ALLOCATION VALIDATION
+  # The dispatch loop above walks EVERY question and routes Allocation to
+  # check_allocation_columns(), so a second pass here logged every allocation
+  # issue twice - VAS 2026's two wallet questions produced four identical
+  # errors. validate_allocation_question() is kept as an exported wrapper for
+  # callers outside this function.
   # ===========================================================================
 
   if (verbose) cat("✓ Data structure validation complete\n")

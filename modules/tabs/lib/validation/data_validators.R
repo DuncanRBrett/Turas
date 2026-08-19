@@ -240,17 +240,38 @@ check_allocation_columns <- function(question, survey_data, numeric_types, error
   missing_cols  <- expected_cols[!expected_cols %in% names(survey_data)]
 
   if (length(missing_cols) > 0) {
+    # NONE of them present is an ERROR, not a warning. The allocation processor
+    # reads each member column and treats an absent one as no answers at all,
+    # so a question whose columns are all missing does not fail - it publishes
+    # a table of zeros, which reads as a real finding. (VAS 2026: the config
+    # was regenerated ahead of the data and every location showed R0.) Some
+    # present and some absent stays a warning: the table is still built from
+    # the ones that are there. This mirrors check_preflight_multi_mention().
+    severity <- if (length(missing_cols) == length(expected_cols)) "Error" else "Warning"
     error_log <- log_issue(
       error_log,
       "Validation",
       "Missing Allocation Columns",
       sprintf(
-        "Allocation question '%s': expected data columns not found: %s. Verify the data file and Columns count.",
+        "Allocation question '%s': expected data columns not found: %s. %s",
         question_code,
-        paste(missing_cols, collapse = ", ")
+        paste(missing_cols, collapse = ", "),
+        if (identical(severity, "Error")) {
+          # Say which of the two things is wrong, rather than offering a menu.
+          # NONE present almost always means the config was updated and the
+          # data was not rebuilt after it - correcting the Columns count would
+          # be the wrong fix and it is what a reader reaches for first.
+          paste("NONE of its columns are in the data. The data file does not",
+                "carry this question at all, so every option would report",
+                "zero. Rebuild the survey data so it includes this question -",
+                "the config is ahead of it. If the question is not meant to be",
+                "in this study, take it out of the Questions sheet.")
+        } else {
+          "Verify the data file and Columns count."
+        }
       ),
       question_code,
-      "Warning"
+      severity
     )
     return(error_log)
   }

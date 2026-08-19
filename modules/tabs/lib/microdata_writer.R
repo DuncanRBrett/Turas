@@ -222,6 +222,19 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
     length(grep(paste0("^\\Q", dl_q$code, "\\E_\\d+$"), names(survey_data),
                 perl = TRUE)) > 0
 
+  # An ALLOCATION question has no bare data column and no category rows: it is
+  # {code}_1..{code}_N of numbers, published as one mean row per option. There
+  # is nowhere in this island to put N numbers per respondent, so it carries
+  # none - the same place Ranking is in. Without this it fell through to the
+  # single-response path, which indexed a column that does not exist and
+  # returned a zero-length vector: the report then refused to open at all
+  # ("DATA_MICRO_Q microdata missing/short"). A full-length column of NA is
+  # honest and well-formed - recomputable() reads it as "no microdata" and a
+  # filtered view says so rather than inventing figures.
+  if (identical(micro_variable_type(dl_q$code, survey_structure), "Allocation")) {
+    return(I(rep(NA_integer_, n)))
+  }
+
   # A BINNED numeric question's rows are ranges ("R100 - R249") and its stored
   # values are numbers, so no value ever matched a row label: every respondent
   # landed on NA and the whole distribution vanished the moment anyone filtered

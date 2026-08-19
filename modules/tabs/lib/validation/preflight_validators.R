@@ -738,6 +738,15 @@ check_data_column_coverage <- function(selection_df, questions_df, survey_data,
       next
     }
 
+    if (var_type == "Allocation") {
+      # Allocation (constant-sum) spreads across {code}_1..{code}_N with NO
+      # bare column, exactly like Multi_Mention — check_allocation_columns()
+      # verifies those members. Looking for a bare column here raised a hard
+      # ERROR on every allocation question and blocked the run (VAS 2026, the
+      # first study to use the type).
+      next
+    }
+
     # Single column questions: data column name = QuestionCode
     if (!q_code %in% data_cols) {
       error_log <- log_issue(

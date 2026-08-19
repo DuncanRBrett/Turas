@@ -226,10 +226,18 @@ compute_allocation_weighted_mean <- function(values, weights, is_weighted) {
 #' @export
 build_allocation_mean_row <- function(label, value_sets, weight_sets,
                                       internal_keys, config, is_weighted) {
+  # "summary", not "individual". Every row here is a MEAN - the same kind of
+  # thing as a numeric question's Mean row, which the numeric processor also
+  # tags "summary". Tagged "individual" the v2 data layer classified them as
+  # category rows, which are percentages of a base: it then looked for
+  # per-respondent answers under the question's own bare column, found none
+  # (an allocation question has only {code}_1..{code}_N) and wrote a
+  # zero-length island entry, so the report refused to open at all. VAS 2026
+  # is the first study to use the type.
   row <- data.frame(
     RowLabel  = label,
     RowType   = ALLOCATION_AVERAGE_ROW_TYPE,
-    RowSource = "individual",
+    RowSource = "summary",
     stringsAsFactors = FALSE
   )
 
