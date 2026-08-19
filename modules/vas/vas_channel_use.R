@@ -335,13 +335,25 @@ splice_after <- function(base, block, anchor) {
   block <- block[order(block$.position, block$.order), , drop = FALSE]
   keep <- setdiff(names(block), c("after", ".position", ".order"))
 
+  # The base and the block need not carry the same columns, and the slices of
+  # each are rbind()ed together below. A derived question can name a MeanLabel
+  # or a ratio pair that an asked one has not got, and a base that has been
+  # through rbind_widened() is wider than a freshly built block either way.
+  # Reconcile to the union HERE, once, so no caller has to remember: this
+  # refused with "numbers of columns of arguments do not match" the first time
+  # a splice ran after the derived rows had joined.
+  columns <- union(names(base), keep)
+  for (col in setdiff(columns, names(base))) base[[col]] <- NA
+  for (col in setdiff(columns, names(block))) block[[col]] <- NA
+  base <- base[, columns, drop = FALSE]
+
   out <- list()
   cursor <- 0L
   for (at in unique(block$.position)) {
     if (at > cursor) {
       out[[length(out) + 1L]] <- base[(cursor + 1L):at, , drop = FALSE]
     }
-    out[[length(out) + 1L]] <- block[block$.position == at, keep, drop = FALSE]
+    out[[length(out) + 1L]] <- block[block$.position == at, columns, drop = FALSE]
     cursor <- at
   }
   if (cursor < nrow(base)) {

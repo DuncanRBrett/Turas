@@ -241,8 +241,13 @@ read_template_sheet <- function(path, sheet, required_cols) {
 verify_structure_alignment <- function(structure_path, data) {
   questions <- read_template_sheet(structure_path, "Questions",
                                    c("QuestionCode", "Variable_Type", "Columns"))
+  # Multi_Mention AND Allocation both store their options across {code}_1 ...
+  # {code}_N with no bare column - see question_orchestrator.R, which routes
+  # them the same way. An Allocation question read as a single column declares
+  # something the build never produces and leaves six columns undeclared.
+  spread <- c("Multi_Mention", "Allocation")
   declared <- unlist(lapply(seq_len(nrow(questions)), function(i) {
-    if (identical(questions$Variable_Type[i], "Multi_Mention")) {
+    if (questions$Variable_Type[i] %in% spread) {
       # as.integer: a template help row above the data makes openxlsx read the
       # whole Columns column as character, and dropping the row does not
       # change the column's class back
@@ -339,6 +344,20 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   data <- channels$data
   content <- list(questions = channels$questions, options = channels$options)
 
+  # Where each occasion is bought - the channel tables folded onto the six
+  # locations, all-used and most-often. It reads the DERIVED total-used table,
+  # so it must run after add_channel_use().
+  places <- add_channel_location(data, content)
+  data <- places$data
+  content <- list(questions = places$questions, options = places$options)
+
+  # Total retailers used, and other retailers with the main one stripped out.
+  # The what-other question does not exclude the retailer used most often - 186
+  # people named Shoprite in both - so the same fix the channels needed.
+  retailers <- add_retailer_use(data, content)
+  data <- retailers$data
+  content <- list(questions = retailers$questions, options = retailers$options)
+
   # Who each bill type was paid for. The survey asks this once for bills as a
   # whole and never per bill type, but the per-type answer is already in the
   # derived Own and Oth sides, so the table is built from them.
@@ -353,6 +372,20 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   structure <- list(
     questions = rbind_widened(content$questions, derived_rows$questions),
     options = rbind(content$options, derived_rows$options))
+
+  # Where the wallet is spent - the month's total split six ways by the channel
+  # each occasion uses most often. It runs HERE, after the derived rows join,
+  # because TotalValueTransacted is a derived question and the location rows
+  # are spliced in behind it. The six columns must add up to that total and the
+  # build refuses if they do not.
+  located <- add_wallet_location(data, structure, category_map)
+  data <- located$data
+  structure <- list(questions = located$questions, options = located$options)
+
+  # And the same wallet split the other way: by section rather than by place.
+  sectioned <- add_wallet_section(data, structure, category_map)
+  data <- sectioned$data
+  structure <- list(questions = sectioned$questions, options = sectioned$options)
 
   # An asked question carries its Alchemer title and a derived column carries
   # its dictionary description. Neither was written for a report reader, so
