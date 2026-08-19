@@ -43,6 +43,12 @@
     hiddenChartRows: {},    // {qcode: [row labels]} — excluded from the chart
     sorts: {},              // {qcode: {col, dir}}
     activeQ: null,
+    // Question groups the reader has collapsed in the crosstabs sidebar, keyed
+    // by category title. Session state (not hashed, not saved): a collapse used
+    // to live only in the DOM, so it silently reset every time the tab was
+    // re-entered. Null-prototype for the same reason categories() is — a
+    // Selection Category named "constructor" is a name the analyst may type.
+    collapsedCats: Object.create(null),
     qualQ: null,            // focused open-end in the Qualitative tab (hash round-trips it)
     qualFrom: null,         // the closed/composite code we jumped FROM (breadcrumb + back)
     qualFromTab: null       // the tab to return to on "back" (crosstabs | dashboard)
