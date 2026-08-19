@@ -327,6 +327,54 @@ stop_unless_alchemer_export <- function(header, path) {
   ))
 }
 
+#' Drop a response that appears twice, and refuse when the copies differ
+#'
+#' The 19 Aug 2026 export repeated its first nine records as rows 10 to 18 -
+#' 1,114 rows carrying 1,105 people - and nothing anywhere noticed. Every
+#' figure in that build counted nine respondents twice.
+#'
+#' An IDENTICAL repeat carries no information, so the extra copy is dropped and
+#' said out loud. A repeat that DIFFERS is a real question about which answers
+#' stand, and nobody should guess at it: that refuses.
+#'
+#' @param frame The export as a data frame, one row per exported record.
+#' @param id_at The column index holding the response id.
+#' @param path The export path, for the message.
+#'
+#' @return The frame with identical repeats removed.
+#'
+#' @throws Stops with class "vas_export_duplicate_responses" when two rows
+#'   share an id and are not the same row.
+drop_repeated_responses <- function(frame, id_at, path) {
+  ids <- as.character(frame[[id_at]])
+  repeated <- unique(ids[duplicated(ids) & !is.na(ids)])
+  if (!length(repeated)) return(frame)
+
+  differing <- repeated[vapply(repeated, function(id) {
+    rows <- frame[!is.na(ids) & ids == id, , drop = FALSE]
+    nrow(unique(rows)) > 1L
+  }, logical(1))]
+  if (length(differing)) {
+    stop(structure(class = c("vas_export_duplicate_responses", "error", "condition"), list(
+      message = sprintf(paste0(
+        "%d response id(s) appear more than once in the export and the copies ",
+        "are NOT the same:\n  %s\n  export: %s\n\n",
+        "Which answers stand is a question about the fieldwork, not about the ",
+        "data, so this\nstops here. Take the export again, or delete the rows ",
+        "that should not be in it."),
+        length(differing), paste(utils::head(differing, 8), collapse = ", "),
+        basename(path)), call = NULL)))
+  }
+
+  keep <- !duplicated(ids) | is.na(ids)
+  cat(sprintf(paste0("Export: %d repeated record(s) dropped - %s. Every copy ",
+                     "was identical to the row it repeats.\n"),
+              sum(!keep), paste(utils::head(repeated, 10), collapse = ", ")))
+  out <- frame[keep, , drop = FALSE]
+  rownames(out) <- NULL
+  return(out)
+}
+
 #' Read VAS responses from an Alchemer Excel export
 #'
 #' The export's own headers are used unchanged: scalar questions are headed by
@@ -372,6 +420,9 @@ read_vas_export <- function(path, sheet = 1) {
 
   id_column <- if ("Response ID" %in% header) "Response ID" else header[1]
   status_column <- if ("Status" %in% header) "Status" else NA_character_
+
+  # A repeated record is dropped here, before anything counts rows.
+  frame <- drop_repeated_responses(frame, which(header == id_column)[1], path)
 
   duplicated_names <- unique(header[duplicated(header)])
   keep <- !duplicated(header) | !(header %in% duplicated_names)
