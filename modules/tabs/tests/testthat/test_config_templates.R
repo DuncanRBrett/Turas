@@ -289,6 +289,34 @@ test_that("html_report_v2_cover is whitelisted, logical, and defaults to FALSE",
   expect_false(build_config_object(list(html_report_v2_cover = ""))$html_report_v2_cover)
 })
 
+test_that("html_report_v2_cover_findings parses a number, ALL, or nothing", {
+  # Duncan pinned more than five findings and the cover silently showed five.
+  # The count is now his to set. Blank stays NULL so the island is unchanged and
+  # the renderer's own default of 5 stands; ALL is the no-limit sentinel 0.
+  skip_if_not(exists("TABS_KNOWN_SETTINGS"))
+  expect_true("html_report_v2_cover_findings" %in% TABS_KNOWN_SETTINGS)
+  # NOT a plain numeric setting: "ALL" is legal, so the generic must-be-a-number
+  # validation would refuse a valid cell.
+  skip_if_not(exists(".TABS_NUMERIC_SETTINGS"))
+  expect_false("html_report_v2_cover_findings" %in% .TABS_NUMERIC_SETTINGS)
+
+  skip_if_not(exists("build_config_object", mode = "function"))
+  f <- function(v) build_config_object(list(html_report_v2_cover_findings = v))$html_report_v2_cover_findings
+  expect_null(f(NULL))
+  expect_null(f(""))
+  expect_null(f("   "))
+  expect_equal(f("12"), 12)
+  expect_equal(f(12), 12)
+  expect_equal(f("8.6"), 8)          # floored, never a fractional pin count
+  expect_equal(f("ALL"), 0)
+  expect_equal(f("all"), 0)          # case-insensitive
+  expect_equal(f(" All "), 0)        # and trimmed
+  # junk falls back to the default rather than to zero findings
+  expect_null(f("lots"))
+  expect_null(f("0"))
+  expect_null(f("-4"))
+})
+
 test_that("build_config_object loads qual_tag_dimensions through to the config object", {
   # Regression guard (Feature 2 host tags): config_obj is an explicit whitelist, not the
   # raw settings — a qual_tag_dimensions row was read fine downstream but never assigned

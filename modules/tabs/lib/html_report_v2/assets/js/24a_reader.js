@@ -292,11 +292,25 @@
 
   /* ---------------- exec-summary cover (D1) ---------------- */
 
-  /** The cover's leading findings: the first 3–5 story items carrying
-   *  evidence (dividers are structure, not findings). */
-  reader.coverFindings = function () {
+  /** Every story item carrying evidence, in pin order (dividers are structure,
+   *  not findings). The cover's own limit is applied on top of this. */
+  reader.coverEvidence = function () {
     var items = (TR.story2 && TR.story2.items) ? TR.story2.items() : [];
-    return items.filter(function (it) { return it.kind !== "divider"; }).slice(0, 5);
+    return items.filter(function (it) { return it.kind !== "divider"; });
+  };
+
+  /** How many findings the cover lists: html_report_v2_cover_findings, carried
+   *  as project.cover_findings. 0 means ALL; absent means the default 5. */
+  reader.coverLimit = function () {
+    var n = (TR.AGG && TR.AGG.project) ? TR.AGG.project.cover_findings : undefined;
+    if (n === 0) return Infinity;
+    n = Number(n);
+    return (isFinite(n) && n >= 1) ? Math.floor(n) : 5;
+  };
+
+  /** The cover's leading findings — the evidence pins the limit admits. */
+  reader.coverFindings = function () {
+    return reader.coverEvidence().slice(0, reader.coverLimit());
   };
 
   /**
@@ -335,8 +349,8 @@
 
   /**
    * The cover page: report title/client/wave, the analyst headline sections
-   * (Report-tab executive summary / background when authored), then the
-   * leading findings — each story pin as its insight sentence (pin title)
+   * (Report-tab background then executive summary, when authored — the same
+   * order the Report tab itself lists them in), then the leading findings — each story pin as its insight sentence (pin title)
    * over a compact evidence thumbnail. Thumbnails re-use each pin's own
    * renderer (story2.itemBodyHtml), so disclosure gates travel with the pin
    * — never re-derived here.
@@ -354,7 +368,7 @@
       "<h1>" + fmt.escapeHtml(p.name || "") + "</h1>" +
       (sub ? '<div class="cover-sub">' + sub + "</div>" : "") + explore + "</div>");
     var rpt = TR.report;
-    [["exec", "Executive summary"], ["background", "Background & method"]]
+    [["background", "Background & method"], ["exec", "Executive summary"]]
       .forEach(function (sec) {
         var text = (rpt && rpt.sectionText)
           ? String(rpt.sectionText(sec[0]) || "").trim() : "";
@@ -366,16 +380,44 @@
     if (findings.length) {
       html.push('<h2 class="cover-h2">Leading findings</h2>');
       findings.forEach(function (item, i) {
+        // A slide pin is an imported picture: it gets the fit-whole thumbnail,
+        // never the cropped peek a data table gets. Cropping a ratings map in
+        // half is not a preview of it.
+        var cls = "cover-thumb" + (item.kind === "slide" ? " is-slide" : "");
         html.push('<div class="card cover-finding">' +
           '<h3 class="cf-title"><span class="cf-n">' + (i + 1) + "</span> " +
           fmt.escapeHtml(TR.story2.pinTitle(item)) + "</h3>" +
-          '<div class="cover-thumb">' + TR.story2.itemBodyHtml(item) +
+          '<div class="' + cls + '">' + TR.story2.itemBodyHtml(item) +
           "</div></div>");
       });
+      // Never truncate in silence: when the limit holds pins back, the cover
+      // says how many it is showing out of how many are pinned.
+      var total = reader.coverEvidence().length;
+      if (total > findings.length) {
+        // Client-facing text: the numbers only. The setting that lifts the limit
+        // is named in the config template and the docs, not on a client's cover.
+        html.push('<p class="cover-more">Showing ' + findings.length + " of " +
+          total + " pinned findings.</p>");
+      }
       html.push('<div class="card cover-foot">' + explore + "</div>");
     }
     html.push("</div>");
     return html.join("");
+  };
+
+  /** Back to the top of the page. Guarded: the node test sandbox has no window
+   *  scrolling, and an older browser may have neither the options form nor
+   *  scrollTo at all. */
+  reader.scrollToTop = function () {
+    var w = (typeof window !== "undefined") ? window : null;
+    if (w && typeof w.scrollTo === "function") {
+      try { w.scrollTo({ top: 0, behavior: "auto" }); }
+      catch (err) { w.scrollTo(0, 0); }
+    }
+    var el = (typeof document !== "undefined") ? document.documentElement : null;
+    if (el) el.scrollTop = 0;
+    var b = (typeof document !== "undefined") ? document.body : null;
+    if (b) b.scrollTop = 0;
   };
 
   /** Render the cover route into the tab host. */
@@ -387,6 +429,12 @@
     wrap.addEventListener("click", function (e) {
       if (e.target.closest("[data-cover-explore]")) {
         TR.shell.goTab(reader.exploreTarget());
+        // Land at the TOP of the dashboard. The explore button at the foot of
+        // the cover sits far down the page — and nothing in the tab switch
+        // resets scroll — so the reader arrived part-way down a tab they had
+        // never seen. The tab bar is not sticky, so every other route into a
+        // tab already starts from the top; this was the one that did not.
+        reader.scrollToTop();
       }
     });
   };

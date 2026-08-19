@@ -357,6 +357,52 @@ test_that("the exec-summary cover reaches the island only when the study opts in
   }
 })
 
+test_that("the cover's findings count rides the island only when the study set it", {
+  # An opted-in cover with no count emits the same island it did before the
+  # setting existed, so the renderer's default of 5 stands untouched.
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(html_report_v2_cover = TRUE))
+  expect_true(dl$project$cover)
+  expect_false("cover_findings" %in% names(dl$project))
+
+  # NB make_dl_config is a plain list, whereas in production config_obj is the
+  # OUTPUT of build_config_object — so the values here are the parsed ones (a
+  # number, or 0 for ALL), which is exactly what the writer receives live.
+  dl12 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(html_report_v2_cover = TRUE, html_report_v2_cover_findings = 12))
+  expect_equal(dl12$project$cover_findings, 12)
+
+  # 0 is the ALL sentinel and must survive to the island, since the renderer
+  # reads 0 as "no limit" — a dropped 0 would silently mean five again.
+  dla <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(html_report_v2_cover = TRUE, html_report_v2_cover_findings = 0))
+  expect_equal(dla$project$cover_findings, 0)
+
+  # a count without the cover opt-in carries nothing at all
+  dlx <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(html_report_v2_cover_findings = 12))
+  expect_false("cover" %in% names(dlx$project))
+  expect_false("cover_findings" %in% names(dlx$project))
+})
+
+test_that("a raw Settings cell reaches the island through the WHOLE chain", {
+  # The unit tests above each prove one hop. This one runs the operator's actual
+  # cell through build_config_object and then the writer, because a setting can
+  # be registered, parsed and emitted correctly at every step and still not join
+  # up — which is how the AddedSlides sheet stayed dead for a year.
+  skip_if_not(exists("build_config_object", mode = "function"))
+  chain <- function(cell) {
+    cfg <- build_config_object(list(html_report_v2 = "TRUE",
+      html_report_v2_cover = "TRUE", html_report_v2_cover_findings = cell))
+    build_data_layer(make_dl_results(), make_dl_banner_info(),
+      modifyList(make_dl_config(), cfg))$project
+  }
+  expect_equal(chain("12")$cover_findings, 12)
+  expect_equal(chain("ALL")$cover_findings, 0)
+  expect_true(chain("")$cover)
+  expect_false("cover_findings" %in% names(chain("")))
+})
+
 test_that("sampling_note is carried trimmed, omitted when blank/NA", {
   dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(sampling_note = "  Substitution was allowed. "))

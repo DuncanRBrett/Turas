@@ -611,7 +611,8 @@ on load and the setting does nothing.)
 | `html_report_v2` | Build the interactive report (TRUE/FALSE) | FALSE in config; the GUI turns it on |
 | `html_report_v2_microdata` | Embed the anonymised microdata island (needed for live filtering) | TRUE |
 | `html_report_v2_tracking` | Add the Tracking tab (needs a `waves_source`) | FALSE |
-| `html_report_v2_cover` | Open saved copies on a cover page (title, executive summary, first five Story pins) | FALSE |
+| `html_report_v2_cover` | Open saved copies on a cover page (title, background, executive summary, Story pins) | FALSE |
+| `html_report_v2_cover_findings` | How many Story pins the cover lists; `ALL` for every one | 5 |
 | `brand_colour` | Primary brand hex colour | #323367 |
 | `accent_colour` | Secondary accent hex colour | #CC9900 |
 | `chart_palette_preset` | Chart colour scheme | warm |

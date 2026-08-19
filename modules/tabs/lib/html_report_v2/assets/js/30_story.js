@@ -722,6 +722,10 @@
    *  to the plain title slide when the exporter has no cover (node stubs). */
   function coverSlideFor(list) {
     if (!TR.exporter.coverSlide) return TR.exporter.titleSlide(list.length);
+    // Deliberately 5, and NOT html_report_v2_cover_findings: the HTML cover
+    // scrolls, this is one fixed slide whose rows already shrink to fit, so a
+    // long list would compress into something unreadable. The config setting
+    // governs the HTML cover only, and says so in the template and the docs.
     var findings = list.filter(function (it) { return it.kind !== "divider"; })
       .slice(0, 5).map(function (it) { return story2.pinTitle(it); });
     var exec = (TR.report && TR.report.sectionText)

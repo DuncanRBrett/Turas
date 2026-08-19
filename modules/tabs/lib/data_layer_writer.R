@@ -162,6 +162,13 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # they open the file, which is a per-project decision, not a default.
   if (isTRUE(config_obj$html_report_v2_cover)) {
     proj$cover <- TRUE
+    # How many pins the cover lists. Carried only when the study set it, so a
+    # config that names no count emits the same island it always did and the
+    # renderer's default of 5 stands. 0 = ALL (no limit).
+    cf <- suppressWarnings(as.numeric(config_obj$html_report_v2_cover_findings))
+    if (length(cf) == 1L && !is.na(cf) && cf >= 0) {
+      proj$cover_findings <- cf
+    }
   }
   # Total universe size (finite population correction). Carried only when a
   # usable value is configured; the renderer derives the overall response /

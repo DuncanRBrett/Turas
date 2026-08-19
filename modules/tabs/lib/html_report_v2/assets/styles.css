@@ -1275,6 +1275,17 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .cover-thumb > * { transform: scale(.82); transform-origin: top left; width: 122%; }
 .cover-thumb .si-table { max-height: none; border: none; }
 .cover-thumb::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: linear-gradient(rgba(255,255,255,0), var(--card)); pointer-events: none; }
+/* An imported study slide is a picture, not a table to peek at: it fits whole.
+   The generic rules above crop at 280px behind a fade and scale the body to 82%
+   at 122% width — on a wide ratings map that cut the visual in half. Here the
+   crop, the scale and the fade all come off, and the image is bounded by height
+   so a tall slide still cannot run away with the page. */
+.cover-thumb.is-slide { max-height: none; overflow: visible; }
+.cover-thumb.is-slide > * { transform: none; width: 100%; }
+.cover-thumb.is-slide::after { content: none; }
+.cover-thumb.is-slide .si-slide-img { width: auto; max-width: 100%; max-height: 520px; margin: 0 auto; object-fit: contain; }
+.cover-thumb.is-slide .as-text { min-height: 0; padding: 10px 2px 2px; }
+.cover-more { font-size: 12px; color: var(--muted); text-align: center; margin: 2px 2px 6px; }
 .cover-foot { text-align: center; padding: 22px; }
 
 /* ---------------------------------------------------------------------------

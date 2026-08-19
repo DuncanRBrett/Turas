@@ -255,7 +255,9 @@ run("D1: cover = title/client/wave + authored sections + explore action", () => 
     "authored exec summary as paragraphs");
   assert(html.indexOf("STALE LOCAL EDIT") === -1,
     "a legacy locally-typed section never reaches the cover");
-  assert(html.indexOf("Background &amp; method") === -1,
+  // NB the section headings are inserted raw, so the literal is "&", not "&amp;".
+  // This assertion used to name the escaped form and so could never fail.
+  assert(html.indexOf("Background & method") === -1,
     "unauthored section omitted, never an empty card");
   assert(count(html, "data-cover-explore") >= 1, "Explore the dashboard action present");
 });
@@ -277,7 +279,7 @@ run("D1: findings = pins as insight sentences over their OWN evidence renderers"
   eq(count(html, '<div class="cover-thumb">'), 2, "one thumbnail per finding");
 });
 
-run("D1: findings cap at 5, in story order", () => {
+run("D1: findings default to the first 5, in story order", () => {
   const many = { userState: { story: [
     snap("F1"), snap("F2"), { kind: "divider", title: "D", note: "" },
     snap("F3"), snap("F4"), snap("F5"), snap("F6"), snap("F7")
@@ -479,6 +481,133 @@ run("I20: a copy with NO qual island treats qualitative pins as stale", () => {
     context: "", html: "<div>“secret”</div>", lines: [], note: "",
     quotes: [{ text: "secret", q: "Q1" }] };
   eq(TR.story2._qualPinStale(pin), true, "no island -> frozen quotes must not surface");
+});
+
+/* -------- 2026-08-19: order, the configurable pin count, slide thumbnails ---- */
+
+const manyPins = (n) => ({ userState: { story:
+  Array.from({ length: n }, (_, i) => snap("F" + (i + 1))) } });
+
+run("sections read background BEFORE executive summary (as the Report tab does)", () => {
+  // Duncan's order. The Report tab's own SECTIONS list has always been
+  // [background, exec]; the cover was the one surface disagreeing with it.
+  const sb = coverSandbox({ userState: { story: [] },
+    project: { name: "P", report_meta: {
+      background: "How it was done.", exec_summary: "What we found." } } });
+  const html = sb.TR.reader.coverHtml();
+  const bg = at(html, "Background & method", "background section");
+  const ex = at(html, "Executive summary", "exec section");
+  assert(bg < ex, "background must render above the executive summary");
+  at(READER_SRC, '[["background", "Background & method"], ["exec", "Executive summary"]]',
+    "the order is the literal in coverHtml, not an accident of the data");
+});
+
+run("limit: absent cover_findings keeps the default of 5", () => {
+  const sb = coverSandbox(manyPins(9));
+  eq(sb.TR.reader.coverLimit(), 5, "default when the study set no count");
+  eq(sb.TR.reader.coverFindings().length, 5, "five findings");
+  eq(sb.TR.reader.coverEvidence().length, 9, "all nine still visible to the count line");
+});
+
+run("limit: a configured number is honoured", () => {
+  const sb = coverSandbox(manyPins(9));
+  sb.TR.AGG.project.cover_findings = 8;
+  eq(sb.TR.reader.coverLimit(), 8, "eight");
+  eq(sb.TR.reader.coverFindings().map((f) => f.title).slice(-1), ["F8"], "up to the eighth pin");
+  eq(count(sb.TR.reader.coverHtml(), 'class="cf-title"'), 8, "eight findings rendered");
+});
+
+run("limit: 0 means ALL — every pin, however many", () => {
+  const sb = coverSandbox(manyPins(14));
+  sb.TR.AGG.project.cover_findings = 0;
+  assert(sb.TR.reader.coverLimit() === Infinity, "0 is the no-limit sentinel");
+  eq(sb.TR.reader.coverFindings().length, 14, "all fourteen pins");
+  const html = sb.TR.reader.coverHtml();
+  eq(count(html, 'class="cf-title"'), 14, "fourteen findings rendered");
+  assert(html.indexOf("pinned findings") === -1, "nothing held back -> no count line");
+});
+
+run("limit: junk on the island falls back to 5 rather than showing nothing", () => {
+  for (const bad of [undefined, null, "", "lots", -3, 0.4]) {
+    const sb = coverSandbox(manyPins(9));
+    sb.TR.AGG.project.cover_findings = bad;
+    eq(sb.TR.reader.coverLimit(), 5, "fallback for " + JSON.stringify(bad));
+  }
+});
+
+run("no silent truncation: the cover says how many of how many it shows", () => {
+  const sb = coverSandbox(manyPins(12));
+  const html = sb.TR.reader.coverHtml();
+  at(html, "Showing 5 of 12 pinned findings", "the count line states both numbers");
+  // client-facing surface: the numbers, never an operator's config key
+  assert(html.indexOf("html_report_v2_cover_findings") === -1,
+    "no config setting name on a page a client opens");
+  at(CSS, ".cover-more {", "and the line is styled rather than raw");
+  // and it disappears the moment nothing is held back
+  const all = coverSandbox(manyPins(3));
+  assert(all.TR.reader.coverHtml().indexOf("pinned findings") === -1,
+    "three pins under a limit of five -> no count line");
+});
+
+run("slide pins get the fit-whole thumbnail, tables keep the cropped peek", () => {
+  const sb = coverSandbox({ userState: {
+    story: [{ kind: "slide", slide: 0, title: "Ratings map" }, snap("A table")],
+    report: { sections: {}, about: {}, slides: [] } } });
+  sb.TR.AGG.project.slides = [{ title: "Ratings map",
+    image: "data:image/png;base64,AAAA", text: "" }];
+  const html = sb.TR.reader.coverHtml();
+  eq(count(html, '<div class="cover-thumb is-slide">'), 1, "the slide pin is marked");
+  eq(count(html, '<div class="cover-thumb">'), 1, "the table pin is not");
+  at(html, "si-slide-img", "the slide renders its image");
+});
+
+run("CSS: .is-slide undoes the crop, the scale and the fade", () => {
+  at(CSS, ".cover-thumb.is-slide { max-height: none; overflow: visible; }",
+    "no 280px crop on a slide");
+  at(CSS, ".cover-thumb.is-slide > * { transform: none; width: 100%; }",
+    "no scale(.82)/122% on a slide body");
+  at(CSS, ".cover-thumb.is-slide::after { content: none; }", "no fade-out over a picture");
+  assert(/\.cover-thumb\.is-slide \.si-slide-img \{[^}]*max-height: 520px/.test(CSS),
+    "the image is bounded by height so a tall slide cannot run away with the page");
+  // the generic rules the slide variant overrides must still exist, or the
+  // override is silently guarding nothing
+  at(CSS, ".cover-thumb { max-height: 280px; overflow: hidden;", "generic crop still there");
+});
+
+run("the PPTX cover slide stays at 5 by design, and says so", () => {
+  at(STORY_SRC, "Deliberately 5, and NOT html_report_v2_cover_findings",
+    "the deck's fixed limit is documented at the call site");
+  assert(STORY_SRC.indexOf("TR.AGG.project.cover_findings") === -1,
+    "the deck cover must not read the HTML cover's setting");
+});
+
+run("'Explore the dashboard' lands at the TOP of the tab, not part-way down", () => {
+  // The foot button sits far down a long cover and the tab switch does not
+  // reset scroll, so the reader used to arrive mid-page on a tab they had
+  // never seen.
+  const sb = coverSandbox({ userState: { story: [snap("A")] } });
+  const TR = sb.TR;
+  let scrolled = null, tab = null;
+  sb.window.scrollTo = (a, b) => { scrolled = (typeof a === "object") ? a : { top: a, left: b }; };
+  sb.document = { documentElement: { scrollTop: 900 }, body: { scrollTop: 900 },
+    createElement: () => ({ set innerHTML(v) { this._h = v; },
+      addEventListener: (_, fn) => { sb._click = fn; } }) };
+  TR.shell.goTab = (t) => { tab = t; };
+  TR.shell.tabGroups = () => [{ tabs: [["dashboard"]] }];
+  TR.reader.renderCover({ replaceChildren: () => {} });
+  sb._click({ target: { closest: (sel) => (sel === "[data-cover-explore]" ? {} : null) } });
+  eq(tab, TR.reader.exploreTarget(), "still routes to the first READ tab");
+  eq(scrolled, { top: 0, behavior: "auto" }, "and scrolls the window back to the top");
+  eq(sb.document.documentElement.scrollTop, 0, "documentElement reset too");
+  eq(sb.document.body.scrollTop, 0, "and body, for the browsers that scroll it");
+});
+
+run("scrollToTop is safe where there is no window scrolling at all", () => {
+  const sb = coverSandbox({});
+  delete sb.window.scrollTo;
+  sb.document = undefined;
+  sb.TR.reader.scrollToTop();   // must not throw
+  assert(true, "no throw without scrollTo or document");
 });
 
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");

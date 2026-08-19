@@ -260,6 +260,23 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # rather than inheriting it: a config that never mentions the setting emits
     # no cover flag at all and lands exactly where it always did.
     html_report_v2_cover = safe_logical(get_config_value(config, "html_report_v2_cover", FALSE), default = FALSE),
+    # How many story pins the cover lists as leading findings. Blank/absent ->
+    # NULL, and the renderer's own default of 5 stands (the island stays
+    # byte-identical to one built before this setting existed). "ALL" parses to
+    # 0, the no-limit sentinel: every pin is listed, however many there are.
+    # A cover that quietly stopped at five was the complaint this answers.
+    html_report_v2_cover_findings = {
+      raw <- get_config_value(config, "html_report_v2_cover_findings", NULL)
+      tok <- toupper(trimws(as.character(raw)[1]))
+      if (is.null(raw) || length(tok) != 1L || is.na(tok) || !nzchar(tok)) {
+        NULL
+      } else if (tok == "ALL") {
+        0
+      } else {
+        n <- suppressWarnings(as.numeric(tok))
+        if (is.na(n) || n < 1) NULL else floor(n)
+      }
+    },
     # Folder holding prior waves' *_wave.json tracking contributions (emitted by
     # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
     waves_source = get_config_value(config, "waves_source", ""),
@@ -650,6 +667,18 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
     pop <- suppressWarnings(as.numeric(raw_pop[[1]]))
     if (!is.na(pop) && pop <= 1) {
       bad("population_size", "must be a whole number greater than 1 (leave it blank for no finite population correction)")
+    }
+  }
+  # html_report_v2_cover_findings. Not in .TABS_NUMERIC_SETTINGS because "ALL"
+  # is a legal value, so the generic number test would refuse it. Junk here would
+  # silently mean "five" — the very cap the operator was trying to lift.
+  raw_cf <- if (!is.null(raw_settings)) raw_settings[["html_report_v2_cover_findings"]] else NULL
+  if (!is_blank_setting(raw_cf)) {
+    tok <- toupper(trimws(as.character(raw_cf[[1]])))
+    n <- suppressWarnings(as.numeric(tok))
+    if (tok != "ALL" && (is.na(n) || n < 1)) {
+      bad("html_report_v2_cover_findings",
+          "must be a whole number of 1 or more, or ALL (leave it blank for the default of 5)")
     }
   }
   # A scale maximum divides every gauge and heatmap cell; zero or negative makes
@@ -1636,6 +1665,7 @@ TABS_KNOWN_SETTINGS <- c(
   # HTML report (html_report itself is retired — see TABS_RETIRED_SETTINGS)
   "html_report_v2", "html_report_v2_tracking",
   "html_report_v2_microdata", "html_report_v2_cover",
+  "html_report_v2_cover_findings",
   "waves_source", "question_mapping", "wave_order", "sampling_method",
   "population_size", "wave",
   # Reader report (narrative summary, rides on html_report_v2)
