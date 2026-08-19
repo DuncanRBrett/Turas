@@ -726,8 +726,14 @@
     // scrolls, this is one fixed slide whose rows already shrink to fit, so a
     // long list would compress into something unreadable. The config setting
     // governs the HTML cover only, and says so in the template and the docs.
-    var findings = list.filter(function (it) { return it.kind !== "divider"; })
-      .slice(0, 5).map(function (it) { return story2.pinTitle(it); });
+    // Same two exclusions as the HTML cover: dividers, and pins of the Report
+    // tab's narrative sections — this slide already carries the exec summary as
+    // its own text, and a finding line reading "Background & method" is a
+    // heading, not a finding. Each such pin still gets its own slide below.
+    var findings = list.filter(function (it) {
+      return it.kind !== "divider" &&
+        !(TR.reader && TR.reader.isCoverSectionPin && TR.reader.isCoverSectionPin(it));
+    }).slice(0, 5).map(function (it) { return story2.pinTitle(it); });
     var exec = (TR.report && TR.report.sectionText)
       ? String(TR.report.sectionText("exec") || "").trim() : "";
     return TR.exporter.coverSlide({ exec: exec, findings: findings });

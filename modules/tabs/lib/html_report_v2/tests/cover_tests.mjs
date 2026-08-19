@@ -610,5 +610,74 @@ run("scrollToTop is safe where there is no window scrolling at all", () => {
   assert(true, "no throw without scrollTo or document");
 });
 
+/* -------- a pinned narrative section must not appear twice on the cover ----- */
+
+// what pinning the Report tab's "Executive summary" card actually stores:
+// snap-source="report", the heading as the title (32_report.js sectionsHtml)
+const sectionPin = (heading) => ({ kind: "snapshot", source: "report",
+  title: heading, context: "", html: "<div>the authored words</div>",
+  lines: [], note: "" });
+
+run("a pinned section is NOT repeated as a leading finding", () => {
+  // The cover renders background + exec from the authored text already. Duncan
+  // pinned them as well and got each one twice.
+  const sb = coverSandbox({
+    userState: { story: [sectionPin("Executive summary"),
+      sectionPin("Background & method"), snap("A real finding")] },
+    project: { name: "P", report_meta: {
+      background: "How it was done.", exec_summary: "What we found." } } });
+  eq(sb.TR.reader.coverEvidence().map((f) => f.title), ["A real finding"],
+    "the two section pins are not evidence for the cover");
+  const html = sb.TR.reader.coverHtml();
+  // each section's words appear exactly once — as the section, not again below
+  eq(count(html, "What we found."), 1, "exec summary rendered once");
+  eq(count(html, "How it was done."), 1, "background rendered once");
+  eq(count(html, 'class="cf-title"'), 1, "one finding, not three");
+  assert(html.indexOf("the authored words") === -1,
+    "the pin's captured html must not render as a finding thumbnail");
+});
+
+run("the count line counts findings, not the sections it drops", () => {
+  // 5 real pins + 2 section pins must read "5 of 5" and so print nothing,
+  // never "5 of 7" — the two it excludes are not findings being held back.
+  const sb = coverSandbox({ userState: { story: [
+    sectionPin("Executive summary"), snap("F1"), snap("F2"), snap("F3"),
+    snap("F4"), snap("F5"), sectionPin("Background & method")] } });
+  eq(sb.TR.reader.coverEvidence().length, 5, "five findings");
+  assert(sb.TR.reader.coverHtml().indexOf("pinned findings") === -1,
+    "nothing held back -> no count line");
+});
+
+run("only the narrative sections are dropped — every other pin source stays", () => {
+  const other = ["dashboard", "patterns", "differences", "qualitative", "slide", "card"];
+  const sb = coverSandbox({ userState: { story:
+    other.map((src) => Object.assign(snap("P-" + src), { source: src })) } });
+  eq(sb.TR.reader.coverEvidence().length, other.length,
+    "no other snapshot source is treated as a section");
+  eq(sb.TR.reader.isCoverSectionPin(sectionPin("Executive summary")), true, "report source");
+  eq(sb.TR.reader.isCoverSectionPin(snap("x")), false, "hub snapshot is a finding");
+  // a slide pin is kind "slide", not a snapshot at all
+  eq(sb.TR.reader.isCoverSectionPin({ kind: "slide", slide: 0 }), false, "slide pin kept");
+});
+
+run("the cover still opens when the ONLY pins are narrative sections", () => {
+  // findings are now empty, so coverAvailable has to fall through to the
+  // authored-section check or the cover would vanish for this analyst.
+  const sb = coverSandbox({
+    userState: { story: [sectionPin("Executive summary")] },
+    project: { name: "P", report_meta: { exec_summary: "What we found." } } });
+  eq(sb.TR.reader.coverFindings().length, 0, "no findings");
+  eq(sb.TR.reader.coverAvailable(), true, "but the authored section keeps the cover");
+});
+
+run("the PPTX cover drops section pins too, and keeps them as their own slides", () => {
+  at(STORY_SRC, "isCoverSectionPin", "the deck cover reuses the reader's test");
+  const sb = coverSandbox({});
+  const list = [sectionPin("Executive summary"), snap("F1")];
+  // the deck's own filter, exercised through the shared predicate
+  const kept = list.filter((it) => !sb.TR.reader.isCoverSectionPin(it));
+  eq(kept.map((f) => f.title), ["F1"], "only the real finding reaches the cover slide");
+});
+
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");
 process.exit(failed ? 1 : 0);

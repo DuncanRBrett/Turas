@@ -292,11 +292,26 @@
 
   /* ---------------- exec-summary cover (D1) ---------------- */
 
-  /** Every story item carrying evidence, in pin order (dividers are structure,
-   *  not findings). The cover's own limit is applied on top of this. */
+  /** Every story item carrying evidence, in pin order. The cover's own limit is
+   *  applied on top of this.
+   *
+   *  Two kinds are skipped. Dividers are structure, not findings. And a pin of a
+   *  Report-tab narrative section is skipped because the cover ALREADY renders
+   *  that section, above the findings, from the same authored text — an analyst
+   *  who pinned their background or executive summary was seeing it twice.
+   *  data-snap-source="report" is emitted only by those two section cards
+   *  (32_report.js), so this drops nothing else. The pin itself is untouched:
+   *  it still appears on the Story tab and gets its own slide in the deck. */
+  function isSectionPin(it) {
+    return it.kind === "snapshot" && it.source === "report";
+  }
+  reader.isCoverSectionPin = isSectionPin;   // exposed for the deck + tests
+
   reader.coverEvidence = function () {
     var items = (TR.story2 && TR.story2.items) ? TR.story2.items() : [];
-    return items.filter(function (it) { return it.kind !== "divider"; });
+    return items.filter(function (it) {
+      return it.kind !== "divider" && !isSectionPin(it);
+    });
   };
 
   /** How many findings the cover lists: html_report_v2_cover_findings, carried
