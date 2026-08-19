@@ -560,6 +560,11 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .catchev { font-size: 8px; transition: transform .15s; }
 .catgrp.collapsed .catitems { display: none; }
 .catgrp.collapsed .catchev { transform: rotate(-90deg); }
+.catsall { display: block; margin: 0 0 2px auto; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 8px; font: 700 10px var(--font); letter-spacing: .8px; text-transform: uppercase; color: var(--muted); cursor: pointer; }
+.catsall:hover { color: var(--brand); border-color: var(--brand); }
+/* a search match shows even inside a collapsed group — the collapse itself is kept */
+.side.searching .catgrp.collapsed .catitems { display: block; }
+.side.searching .catgrp.collapsed .catchev { transform: none; }
 
 /* column hide */
 .ct th { position: relative; }

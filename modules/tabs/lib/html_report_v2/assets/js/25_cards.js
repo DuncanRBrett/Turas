@@ -117,6 +117,7 @@
       '<nav class="side" aria-label="Questions">' +
       '<input id="qsearch" type="search" placeholder="Search ' +
       TR.AGG.questions.length + ' questions…" aria-label="Search questions">' +
+      catsAllHtml() +
       '<div class="qlist">' + sidebarHtml() + "</div></nav>" +
       '<div class="content">' +
       '<div id="controls" class="controls"></div>' +
@@ -128,10 +129,73 @@
     wire(wrap);
   };
 
+  /* ---------- sidebar group collapse ---------- */
+
+  /** The collapsed-group map, created on demand: a report opened from an older
+   *  saved copy (and the test sandboxes) can reach here before the key exists. */
+  function collapsedCats() {
+    var s = TR.d2.state;
+    if (!s.collapsedCats) s.collapsedCats = Object.create(null);
+    return s.collapsedCats;
+  }
+
+  /** Is this question group collapsed? */
+  cards2.catCollapsed = function (title) {
+    return collapsedCats()[title] === true;
+  };
+
+  /** Collapse (true) or expand (false) one group. */
+  cards2.setCat = function (title, collapsed) {
+    if (collapsed) collapsedCats()[title] = true;
+    else delete collapsedCats()[title];
+  };
+
+  /** Collapse or expand every group at once. */
+  cards2.setAllCats = function (collapsed) {
+    TR.d2.categories().forEach(function (cat) {
+      cards2.setCat(cat.title, collapsed);
+    });
+  };
+
+  /** True only when there is at least one group and every one is collapsed. */
+  cards2.allCatsCollapsed = function () {
+    var cats = TR.d2.categories();
+    return cats.length > 0 && cats.every(function (cat) {
+      return cards2.catCollapsed(cat.title);
+    });
+  };
+
+  /** The button's label says what the NEXT click does, so a part-collapsed
+   *  sidebar collapses the rest rather than guessing at the reader's intent. */
+  cards2.catsAllLabel = function () {
+    return cards2.allCatsCollapsed() ? "Expand all" : "Collapse all";
+  };
+
+  function catsAllHtml() {
+    if (!TR.d2.categories().length) return "";   // nothing to collapse
+    return '<button class="catsall" data-catsall type="button" ' +
+      'title="Collapse or expand every question group at once">' +
+      cards2.catsAllLabel() + "</button>";
+  }
+
+  /** Push the collapse state onto the rendered sidebar and refresh the button
+   *  label. Cheaper than re-rendering the tab, and it keeps the scroll position. */
+  function syncCats() {
+    document.querySelectorAll(".side .catgrp[data-cat]").forEach(function (grp) {
+      grp.classList.toggle("collapsed",
+        cards2.catCollapsed(grp.getAttribute("data-cat")));
+    });
+    var btn = document.querySelector(".side [data-catsall]");
+    if (btn) btn.textContent = cards2.catsAllLabel();
+  }
+
   function sidebarHtml() {
     var d2 = TR.d2;
     return d2.categories().map(function (cat) {
-      return '<div class="catgrp"><button class="cathdr" data-cattoggle>' +
+      return '<div class="catgrp' +
+        (cards2.catCollapsed(cat.title) ? " collapsed" : "") +
+        '" data-cat="' + fmt.escapeHtml(cat.title) +
+        '"><button class="cathdr" data-cattoggle>' +
         '<span class="catchev">▼</span>' + fmt.escapeHtml(cat.title) +
         ' <span class="catn">(' + cat.codes.length + ")</span></button>" +
         '<div class="catitems">' +
@@ -145,6 +209,12 @@
         }).join("") + "</div></div>";
     }).join("");
   }
+
+  // Test hooks (the suite has no DOM, so the sidebar HTML and the state->DOM
+  // sync are reachable directly — mirrors _publishedBadgeHtml above).
+  cards2._sidebarHtml = sidebarHtml;
+  cards2._catsAllHtml = catsAllHtml;
+  cards2._syncCats = syncCats;
 
   function renderControls() {
     var s = TR.d2.state;
@@ -697,7 +767,16 @@
     document.querySelectorAll(".qlink").forEach(function (a) {
       var active = a.getAttribute("data-code") === s.activeQ;
       a.classList.toggle("on", active);
-      if (active && a.scrollIntoView) a.scrollIntoView({ block: "nearest" });
+      if (!active) return;
+      // A collapsed group hides its links outright, so the marking and the
+      // scroll below did nothing — most visibly when prev/next stepped into a
+      // collapsed group and the sidebar stopped saying where you were.
+      var grp = a.closest && a.closest(".catgrp");
+      if (grp && grp.getAttribute("data-cat")) {
+        cards2.setCat(grp.getAttribute("data-cat"), false);
+        syncCats();
+      }
+      if (a.scrollIntoView) a.scrollIntoView({ block: "nearest" });
     });
     TR.d2.pushHash();
   };
@@ -993,8 +1072,16 @@
         return;
       }
       if (e.target.closest(".colmenu")) return;   // clicks inside the panel
+      if (e.target.closest("[data-catsall]")) {
+        cards2.setAllCats(!cards2.allCatsCollapsed());
+        syncCats();
+        return;
+      }
       if (e.target.closest("[data-cattoggle]")) {
-        e.target.closest(".catgrp").classList.toggle("collapsed");
+        var catGrp = e.target.closest(".catgrp");
+        cards2.setCat(catGrp.getAttribute("data-cat"),
+          !catGrp.classList.contains("collapsed"));
+        syncCats();
         return;
       }
       if (e.target.closest("[data-callout]")) {
@@ -1080,6 +1167,11 @@
     host.addEventListener("input", function (e) {
       if (e.target.id === "qsearch") {
         var term = e.target.value.trim().toLowerCase();
+        // While a term is typed, matches show even inside a collapsed group
+        // (CSS override — the reader's collapse state is left untouched and
+        // comes back the moment the box is cleared).
+        var side = e.target.closest && e.target.closest(".side");
+        if (side) side.classList.toggle("searching", !!term);
         document.querySelectorAll(".qlink").forEach(function (a) {
           a.classList.toggle("hidden",
             !!term && a.getAttribute("data-search").indexOf(term) === -1);
