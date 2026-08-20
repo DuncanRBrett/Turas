@@ -445,7 +445,7 @@
     },
     "tracking.scorecard.bands": {
       "title": "Scorecard — card colour",
-      "text": "Card colour shows the latest value against the tracker thresholds — green strong, amber moderate, red weak, by metric type.",
+      "text": "Card colour shows the latest value against the tracker thresholds: green strong, amber moderate, red weak, by metric type.",
       "context": "Tracking summary, key metric scorecard",
       "page": "Tracking"
     },

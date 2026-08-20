@@ -232,9 +232,7 @@
       toggle("showChart", "Chart") +
       toggle("showCounts", "Counts") +
       toggle("showIntervals", "Intervals",
-        "Show the 95% " + TR.conf.labels().interval_term +
-        " under every value — the range the number would likely land in " +
-        "if the survey were repeated") +
+        "Show the 95% interval as a range below each number") +
       // Only offered when the study declares provenance — see hasProvenance().
       (hasProvenance()
         ? toggle("showSources", "Sources",
@@ -260,8 +258,8 @@
       '<option value="dual"' + (s.sigMode === "dual" ? " selected" : "") + ">95% + 80%</option>" +
       "</select></label>" +
       // B2: compact twin of the "Explain significance" toggle in the ⓘ dialog
-      '<label class="tg" title="Plain-language significance — hover or focus any ' +
-      'letter, arrow or Δ chip for a sentence saying what it means">' +
+      '<label class="tg" title="Explain the confidence marker in plain ' +
+      'language">' +
       '<input type="checkbox" data-explain-sig' +
       (TR.reader && TR.reader.explainOn && TR.reader.explainOn() ? " checked" : "") +
       "> Explain</label>" +

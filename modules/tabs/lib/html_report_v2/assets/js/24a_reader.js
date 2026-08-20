@@ -65,7 +65,7 @@
       // full published sample (prior waves have no microdata to filter).
       bits.push('<span class="aud-cut">' +
         (tab === "takeout" ? "Group overview reads" : "Tracking shows") +
-        ' the <strong>full published sample</strong> — the audience filter does ' +
+        ' the <strong>full published sample</strong>, the audience filter does ' +
         "not apply on this tab</span>");
       var pub = TR.d2.hasMicrodata() ? TR.MICRO.n : publishedTotalBase();
       var pubPart = basePart(pub, true);

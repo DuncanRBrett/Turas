@@ -27,7 +27,7 @@
     }).join("");
     return '<div class="tko-apex"><div class="tko-kicker">Group overview · ' +
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +
-      '<div class="tko-eyebrow">The big picture</div>' +
+      '<div class="tko-eyebrow">Key finding</div>' +
       ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer — editable", seed) +
       "</div>" + (kpis ? '<div class="tko-apex-metrics">' + kpis + "</div>" : "") + "</div></div>";
   }

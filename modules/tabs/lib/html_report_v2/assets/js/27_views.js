@@ -254,8 +254,8 @@
       return !!(r && r.delta);
     });
     var html = ['<div class="page"><div class="dash-intro card">' +
-      "<h2>Experience dashboard</h2><p>Index scores for every rated touchpoint " +
-      "— " + bandLegend(qs) + ". " +
+      "<h2>Experience dashboard</h2><p>Index scores for every rated touchpoint" +
+      ": " + bandLegend(qs) + ". " +
       (TR.d2.filtersActive() ? "<strong>Filtered audience — recomputed live.</strong> " : "") +
       deltaIntro(hasDelta) + "Click any card or cell to open the full table.</p>" +
       moeChipHtml(qs, heatModels) + "</div>"];
