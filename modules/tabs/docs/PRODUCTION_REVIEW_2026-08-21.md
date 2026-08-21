@@ -56,7 +56,7 @@ Fixes landed on branch `fix/tabs-production-review-2026-08-21`, commit `6e3bceff
 | I-21 GUI error visibility | **FIXED** — both streams captured; toggle globals cleared |
 | I-22/I-23 weighting module dead preflight, unreachable opt-ins | **OPEN** — separate module, deliberately out of scope for this pass |
 | I-24 dead guard/validation layers | **OPEN** — deletion of ~1500 lines; wants its own reviewed change |
-| I-25 inert settings | **FIXED** — `alpha_default` wired end to end; weight thresholds documented as fixed |
+| I-25 inert settings | **PARTIALLY FIXED** — `alpha_default` wired end to end (and gated so it only applies when a secondary level is actually configured); the three weight thresholds documented as fixed rather than configurable. **Still open:** the `output_format` validator still reads `config_obj`, so both its warnings remain unreachable and a `csv` row is still ignored with no signal; the `significance_level` deprecation shim is still dead; and the contract test still gates only builder-reads ⊆ whitelist, not whitelist ⊆ actually-consumed |
 | I-26 filter `enclos` | **OPEN** — behaviour change; grep live configs first |
 | I-27 docs | **FIXED** — testing section, phantom files, deps, GUI snippet, 3 plan statuses, new INDEX.md |
 | I-28 ReportText silent degrade | **FIXED** — refuses, with the refusal re-signalled past the outer handler |

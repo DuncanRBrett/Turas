@@ -149,8 +149,17 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     # warning and no effect (review 2026-08-21, I-25). Only meaningful when a
     # secondary level is configured; the renderer ignores it otherwise.
     alpha_default      = {
+      # Only honoured when the study actually CONFIGURED a secondary level.
+      # alpha_secondary above always carries a number (it falls back to 0.20),
+      # so the renderer cannot tell configured from defaulted — and
+      # validate_dual_significance_config() returns early when the setting is
+      # absent, so "alpha_default = secondary" on a single-alpha study is never
+      # refused either. Without this gate such a study would open in dual mode
+      # showing an 80% level it never asked for.
       ad <- tolower(trimws(as.character(config_obj$alpha_default %||% "primary")))
-      if (identical(ad, "secondary")) "secondary" else "primary"
+      has_secondary <- !is.null(config_obj[["alpha_secondary"]]) &&
+        !is.na(suppressWarnings(as.numeric(config_obj[["alpha_secondary"]])))
+      if (identical(ad, "secondary") && has_secondary) "secondary" else "primary"
     },
     bonferroni         = bonferroni,
     sampling_method    = sm,
