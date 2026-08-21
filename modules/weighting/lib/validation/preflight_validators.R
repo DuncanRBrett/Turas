@@ -372,6 +372,27 @@ check_cell_targets_sum <- function(cell_df, error_log) {
 # CHECK 6: Cell Combinations vs Data
 # ==============================================================================
 
+#' Does this weight opt in to redistributing empty cells?
+#'
+#' Reads the same Advanced_Settings value the cell engine reads, so preflight's
+#' severity for a zero-respondent cell matches what the engine will actually do.
+#' Deliberately forgiving: preflight is advisory, so anything unreadable (no
+#' config, reader not loaded, malformed value) falls back to "not allowed",
+#' which produces the stricter message rather than silently excusing the cell.
+#'
+#' @param config List, full configuration object (may be NULL)
+#' @param weight_name Character, name of the weight
+#' @return TRUE when allow_empty_targets is set for this weight
+#' @keywords internal
+.preflight_allows_empty_targets <- function(config, weight_name) {
+  if (is.null(config)) return(FALSE)
+  if (!exists("read_allow_empty_targets_setting", mode = "function")) return(FALSE)
+  isTRUE(tryCatch(
+    read_allow_empty_targets_setting(config, weight_name),
+    error = function(e) FALSE
+  ))
+}
+
 #' Check Cell Combinations Against Data
 #'
 #' Verifies that cell variable columns exist in data and that cell value
@@ -380,9 +401,12 @@ check_cell_targets_sum <- function(cell_df, error_log) {
 #' @param cell_df Data frame, Cell_Targets sheet
 #' @param data Data frame, survey data
 #' @param error_log Data frame, error log
+#' @param config List, full configuration object. Used only to read each
+#'   weight's allow_empty_targets opt-in, so a zero-respondent cell is reported
+#'   at the severity the ENGINE will actually apply to it.
 #' @return Updated error_log
 #' @keywords internal
-check_cell_combinations_vs_data <- function(cell_df, data, error_log) {
+check_cell_combinations_vs_data <- function(cell_df, data, error_log, config = NULL) {
   if (is.null(cell_df) || nrow(cell_df) == 0) return(error_log)
 
   data_cols <- names(data)
@@ -429,14 +453,25 @@ check_cell_combinations_vs_data <- function(cell_df, data, error_log) {
     combo_label <- paste(combo_parts, collapse = " + ")
 
     if (!any(match_mask)) {
-      # An Error, not a Warning: the cell engine refuses on this and preflight
-      # exists to say so before the engine runs. Matching ignores surrounding
-      # spaces but is case-sensitive, which is the usual cause.
+      # Severity follows the ENGINE's actual behaviour for this weight. With
+      # allow_empty_targets = YES the cell engine does not refuse: it
+      # redistributes the orphaned population share across the cells that do
+      # have respondents and discloses that it did (cell_weights.R:289, :301).
+      # Logging an unconditional Error here would have had preflight refuse a
+      # config the engine handles correctly — dead-ending the opt-in the
+      # message itself recommends (review 2026-08-21, I-22).
+      allowed <- .preflight_allows_empty_targets(config, wname)
       error_log <- log_preflight_issue(
         error_log, "Cell Combinations vs Data", "Cell Combination Not in Data",
-        sprintf("Weight '%s': combination %s has zero respondents in data. Matching ignores surrounding spaces but is case-sensitive. If the empty cell is real, set allow_empty_targets = YES in Advanced_Settings to redistribute its share.",
-                wname, combo_label),
-        paste(wname, combo_label, sep = " / "), "Error"
+        if (allowed) {
+          sprintf("Weight '%s': combination %s has zero respondents in data. allow_empty_targets = YES for this weight, so its population share will be redistributed across the cells that do have respondents.",
+                  wname, combo_label)
+        } else {
+          sprintf("Weight '%s': combination %s has zero respondents in data. Matching ignores surrounding spaces but is case-sensitive. If the empty cell is real, set allow_empty_targets = YES in Advanced_Settings to redistribute its share.",
+                  wname, combo_label)
+        },
+        paste(wname, combo_label, sep = " / "),
+        if (allowed) "Info" else "Error"
       )
     }
   }
@@ -906,7 +941,7 @@ validate_weighting_preflight <- function(config, data, error_log = NULL) {
 
   # --- Check 6: Cell combinations vs data ---
   if (!is.null(cell_df) && nrow(cell_df) > 0) {
-    error_log <- check_cell_combinations_vs_data(cell_df, data, error_log)
+    error_log <- check_cell_combinations_vs_data(cell_df, data, error_log, config)
   }
 
   # --- Check 7: Trim config consistency ---
@@ -972,4 +1007,54 @@ validate_weighting_preflight <- function(config, data, error_log = NULL) {
   }
 
   return(error_log)
+}
+
+
+#' Report Pre-flight Findings to the Console
+#'
+#' Prints the pre-flight log in the module's boxed house style, grouped by
+#' severity, worst first. Advisory: it never refuses. Errors are shown as
+#' "would block once enforced" so an operator can tell the difference between a
+#' finding this layer acted on (none) and one the engines will act on later.
+#'
+#' Kept deliberately quiet when there is nothing to say: a run with a clean
+#' config prints one line, not a box.
+#'
+#' @param error_log Data frame from validate_weighting_preflight()
+#' @param max_per_severity Integer, findings listed per severity before the rest
+#'   are summarised as a count (a broken column can produce hundreds)
+#' @return Invisible NULL
+#' @export
+report_preflight_findings <- function(error_log, max_per_severity = 10) {
+  if (is.null(error_log) || !is.data.frame(error_log) || nrow(error_log) == 0) {
+    return(invisible(NULL))
+  }
+
+  severities <- c("Error", "Warning", "Info")
+  labels <- c(
+    Error = "WOULD BLOCK once these checks are enforced",
+    Warning = "Worth a look before you trust the weights",
+    Info = "For information"
+  )
+
+  cat("\n┌─── TURAS WEIGHTING PRE-FLIGHT ─────────────────────────────┐\n")
+  cat("│ Checks run before any weight was calculated. ADVISORY: this\n")
+  cat("│ does not stop the run. Each engine still validates its own\n")
+  cat("│ config and refuses there if something is genuinely wrong.\n")
+
+  for (sev in severities) {
+    rows <- error_log[error_log$Severity == sev, , drop = FALSE]
+    if (nrow(rows) == 0) next
+    cat(sprintf("│\n│ %s (%d) — %s\n", toupper(sev), nrow(rows), labels[[sev]]))
+    shown <- min(nrow(rows), max_per_severity)
+    for (i in seq_len(shown)) {
+      cat(sprintf("│  • [%s] %s\n", rows$Check[i], rows$Detail[i]))
+    }
+    if (nrow(rows) > shown) {
+      cat(sprintf("│  … and %d more %s finding(s)\n", nrow(rows) - shown, tolower(sev)))
+    }
+  }
+
+  cat("└────────────────────────────────────────────────────────────┘\n\n")
+  invisible(NULL)
 }
