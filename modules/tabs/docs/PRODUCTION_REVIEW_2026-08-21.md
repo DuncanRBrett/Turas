@@ -26,6 +26,50 @@ maintainer to ignore red.
 
 ---
 
+## Fix status (updated 2026-08-21, after the fix pass)
+
+Fixes landed on branch `fix/tabs-production-review-2026-08-21`, commit `6e3bceff`.
+**Suite after fixes: 5077 passing, 0 failures, 0 warnings, 1 skip; 36 node suites green.**
+(Before: 5041 passing, 1 error, 150 warnings.)
+
+| Finding | Status |
+|---------|--------|
+| C-1 checkpoint resume | **FIXED** — fingerprint + discard-with-reason; cleanup moved after the save; 21 new behavioural tests |
+| I-1 misleading refusal messages | **FIXED (messages)** — fail-fast kept deliberately; dead branches marked |
+| I-2 version stamp | **FIXED** — `TABS_ENGINE_VERSION` captured before sourcing |
+| I-3 dangling sig letters | **FIXED** — + `hidden_columns_tests.mjs`, confirmed failing pre-fix |
+| I-4 saveCopy escaping | **FIXED** — one-line escape parity with the build side |
+| I-5 allocation letters in v2 | **FIXED** — + 4 tests, probe-confirmed pre/post |
+| I-6 red gate test | **FIXED** — fixture given both flags; suite green |
+| I-7 tracking mapping whitespace | **FIXED** — trim + name unmatched codes |
+| I-8 null-year wave | **FIXED** — priors dropped with a warning; current wave never dropped |
+| I-9 discarded Kish eff_n | **OPEN** — needs the sidecar rebuild (see growth path step 3) |
+| I-10 silently unweighted wave | **FIXED** — one warning per wave |
+| I-11 missing union member | **FIXED** |
+| I-12 "safe" cuts with k=1 | **FIXED** — declares "allow" and says why |
+| I-13 NO_ID_COLUMN silent fallback | **FIXED** — + a catch-all for any non-PASS status |
+| I-14 duplicate host ResponseID | **FIXED** |
+| I-15/I-16 allocation sums, blank policy | **OPEN** — needs Duncan's policy decision (blank = zero?) |
+| I-17/I-18 ranking sentinels, significance | **OPEN** — changes published numbers; needs a decision |
+| I-19 large-file BOM bypass | **FIXED** — routed through the standard loader |
+| I-20 unknown Variable_Type | **WITHDRAWN — false finding** (see below); message improved |
+| I-21 GUI error visibility | **FIXED** — both streams captured; toggle globals cleared |
+| I-22/I-23 weighting module dead preflight, unreachable opt-ins | **OPEN** — separate module, deliberately out of scope for this pass |
+| I-24 dead guard/validation layers | **OPEN** — deletion of ~1500 lines; wants its own reviewed change |
+| I-25 inert settings | **FIXED** — `alpha_default` wired end to end; weight thresholds documented as fixed |
+| I-26 filter `enclos` | **OPEN** — behaviour change; grep live configs first |
+| I-27 docs | **FIXED** — testing section, phantom files, deps, GUI snippet, 3 plan statuses, new INDEX.md |
+| I-28 ReportText silent degrade | **FIXED** — refuses, with the refusal re-signalled past the outer handler |
+| M-11 checkpoint cleanup order | **FIXED** (with C-1) |
+| M-18 dead writer / duplicate formatter | **DOCUMENTED in place** — both have test callers, so deletion was not the safe move |
+| M-19 150 tibble warnings | **FIXED** — `[[ ]]` access; suite warnings now 0 |
+
+Everything still marked OPEN is either a decision only Duncan can make (I-15 to
+I-18), a behaviour change needing a survey of live configs (I-26), or a
+deliberately-scoped-out module (I-22/I-23) or large deletion (I-24).
+
+---
+
 ## Verdict up front
 
 **DEPLOY WITH CONDITIONS.** The statistical core is in genuinely strong shape: the two-proportion
