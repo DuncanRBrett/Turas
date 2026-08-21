@@ -143,6 +143,15 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     low_base_threshold = as.numeric(config_obj$significance_min_base %||% 30),
     alpha              = alpha,
     alpha_secondary    = alpha2,
+    # Which level the report OPENS on. The setting has been registered,
+    # validated and offered by the config template for a long time, but nothing
+    # ever consumed it — so an operator who set alpha_default = secondary got no
+    # warning and no effect (review 2026-08-21, I-25). Only meaningful when a
+    # secondary level is configured; the renderer ignores it otherwise.
+    alpha_default      = {
+      ad <- tolower(trimws(as.character(config_obj$alpha_default %||% "primary")))
+      if (identical(ad, "secondary")) "secondary" else "primary"
+    },
     bonferroni         = bonferroni,
     sampling_method    = sm,
     sig_note           = build_sig_note(alpha, sm),
@@ -706,10 +715,19 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       if (!rtype %in% c("Average", "Index", "Score")) return(rep("", length(keys)))
       sel <- table[!is.na(table$RowType) & row_src == "summary" &
                    table$RowType == sig_type, , drop = FALSE]
-      # Exactly one sig row per summary block. Anything else is a shape we do
-      # not recognise — carry nothing rather than guess which row it tests.
-      if (nrow(sel) != 1) return(rep("", length(keys)))
-      return(sig_cells(sel))
+      # One sig row per summary block: it tests the headline statistic, so it
+      # goes to the mean regardless of which descriptive row the forward-fill
+      # labelled it with.
+      if (nrow(sel) == 1) return(sig_cells(sel))
+      # SEVERAL sig rows means several mean blocks in one table — an Allocation
+      # question emits one Average row per option, each with its own Sig. row.
+      # This used to return nothing, so a multi-option allocation showed letters
+      # in the Excel workbook and none in the report: the same Excel/report
+      # disagreement the D1 work removed for numeric questions (review
+      # 2026-08-21, I-5). Here the forward-filled label IS the discriminator —
+      # each Sig. row inherits its own Average row's label — so match on it.
+      if (nrow(sel) > 1) return(sig_for(lbl, src, sig_type))
+      return(rep("", length(keys)))
     }
     sig_for(lbl, src, sig_type)
   }
@@ -979,18 +997,24 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # OPTIONAL columns on the structure workbook's Questions sheet; each key is
   # emitted only when its cell is usable, so a config without the columns
   # produces byte-identical output.
+  #
+  # [[ ]] not $: srow is a tibble, and $ on a tibble column that does not exist
+  # warns ("Unknown or uninitialised column"). Harmless — .dl_chr_cell() treats
+  # NULL as absent — but it fired once per optional column per question, which
+  # was 150 of the tabs suite's warnings and exactly the noise that buries a
+  # real one (review 2026-08-21, M-19).
   srow <- .dl_structure_question_row(out$code, survey_structure)
   if (!is.null(srow)) {
     # E/A2: analyst-authored short label for tight surfaces (cards, chart and
     # PPTX titles) — replaces mid-word auto-truncation of the question text.
-    sl <- .dl_chr_cell(srow$ShortLabel)
+    sl <- .dl_chr_cell(srow[["ShortLabel"]])
     if (nzchar(sl)) out$short_label <- sl
 
     # E: explicit scale bounds — remove scale inference; feed bands, index
     # maths and chart axes. Only honoured when BOTH parse as numbers and
     # min < max; a half-filled or inverted pair is ignored (inference stands).
-    smin <- suppressWarnings(as.numeric(.dl_chr_cell(srow$Scale_Min)))
-    smax <- suppressWarnings(as.numeric(.dl_chr_cell(srow$Scale_Max)))
+    smin <- suppressWarnings(as.numeric(.dl_chr_cell(srow[["Scale_Min"]])))
+    smax <- suppressWarnings(as.numeric(.dl_chr_cell(srow[["Scale_Max"]])))
     if (length(smin) == 1L && length(smax) == 1L &&
         !is.na(smin) && !is.na(smax) && smin < smax) {
       out$scale_min <- smin
@@ -1000,7 +1024,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     # E/C2: declared closed->open question link (the open-end that explains
     # this closed question). Emitted here; build_data_layer() validates the
     # target against the run and drops it — with a console NOTE — when broken.
-    lo <- .dl_chr_cell(srow$LinkedOpenQuestion)
+    lo <- .dl_chr_cell(srow[["LinkedOpenQuestion"]])
     if (nzchar(lo)) out$linked_open <- lo
   }
 

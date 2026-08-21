@@ -114,18 +114,30 @@ check_variable_types <- function(questions_df, error_log) {
     "Ranking", "Numeric", "Allocation", "Open_End", "Grid_Single", "Grid_Multi"
   )
 
-  invalid_types <- questions_df$Variable_Type[!questions_df$Variable_Type %in% valid_types]
+  bad <- !questions_df$Variable_Type %in% valid_types
+  invalid_types <- questions_df$Variable_Type[bad]
   if (length(invalid_types) > 0) {
+    # Name the offending QuestionCodes, not just the bad values. On a structure
+    # with 200 questions, "Invalid Variable_Type values found: numeric" left the
+    # operator hunting for the row; the codes make it a one-line fix. (The check
+    # itself already refused the run — review 2026-08-21 wrongly reported this
+    # vocabulary gate as absent.)
+    codes <- if ("QuestionCode" %in% names(questions_df)) {
+      as.character(questions_df$QuestionCode[bad])
+    } else character(0)
+    offenders <- if (length(codes)) {
+      paste(sprintf("%s (%s)", codes, invalid_types), collapse = ", ")
+    } else paste(unique(invalid_types), collapse = ", ")
     error_log <- log_issue(
       error_log,
       "Validation",
       "Invalid Variable_Type",
       sprintf(
-        "Invalid Variable_Type values found: %s. Valid types: %s",
-        paste(unique(invalid_types), collapse = ", "),
+        "Invalid Variable_Type on %d question(s): %s. Valid types: %s. Note these are case-sensitive.",
+        sum(bad), offenders,
         paste(valid_types, collapse = ", ")
       ),
-      "",
+      if (length(codes)) codes[1] else "",
       "Error"
     )
   }

@@ -196,10 +196,20 @@ qual_apply_sheet_unions <- function(questions, unions, module = "TABS") {
   built <- list()
   for (u in unions) {
     recs <- list(); dropped <- 0L; found_any <- FALSE
+    missing_members <- character(0)
     themes_union <- list()                       # union of member themes, keyed by label
     for (m in u$members) {
       mq <- by_code[[m$code]]
-      if (is.null(mq)) next                       # a named sheet that is not in the workbook
+      if (is.null(mq)) {
+        # A named sheet that is not in the workbook. This used to be a silent
+        # `next`: the union still built and still DECLARED the missing member's
+        # band, so every verbatim in that band vanished from the deliverable
+        # with nothing on the console. A duplicate across members refuses
+        # loudly; a missing member must not be quieter (review 2026-08-21,
+        # I-11).
+        missing_members <- c(missing_members, m$sheet)
+        next
+      }
       found_any <- TRUE
       consumed <- c(consumed, m$code)
       for (rec in mq$records) {
@@ -209,6 +219,17 @@ qual_apply_sheet_unions <- function(questions, unions, module = "TABS") {
       md <- mq$meta$dropped_codes
       dropped <- dropped + (if (is.null(md) || is.na(md)) 0L else md)
       for (th in mq$roles$themes) themes_union[[th$label]] <- th
+    }
+    if (length(missing_members) > 0) {
+      cat("\n┌─── TURAS QUAL WARNING ─────────────────────────────────────┐\n")
+      cat("│ Union '", as.character(u$code %||% u$sheet %||% "(unnamed)"),
+          "' names ", length(missing_members), " member sheet(s) that are\n", sep = "")
+      cat("│ not in the coding workbook, so their comments are MISSING:\n")
+      cat("│  ", paste(missing_members, collapse = ", "), "\n", sep = "")
+      cat("│ The union still declares those bands, so the band will appear\n")
+      cat("│ with no verbatims behind it. Check the sheet names on the\n")
+      cat("│ CommentSheet cell against the workbook's actual tabs.\n")
+      cat("└────────────────────────────────────────────────────────────┘\n\n")
     }
     if (!found_any) next
     theme_list <- unname(themes_union)

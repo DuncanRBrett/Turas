@@ -280,11 +280,18 @@ check_weight_distribution <- function(valid_weights, weight_values, weight_varia
 #' - Weight distribution is reasonable (CV, design effect)
 #' - Weights are not all equal (V9.9.2)
 #'
-#' V9.9.5 ENHANCEMENTS:
-#' - All thresholds now configurable:
-#'   * weight_na_threshold (default: 10)
-#'   * weight_zero_threshold (default: 5)
-#'   * weight_deff_warning (default: 3)
+#' THRESHOLDS ARE FIXED, NOT CONFIGURABLE. weight_na_threshold (10),
+#' weight_zero_threshold (5) and weight_deff_warning (3) are read here through
+#' get_config_value(config_obj, ...), but config_obj is built from an explicit
+#' whitelist in build_config_object() and these three are deliberately NOT on it
+#' (test_config_contract.R pins their absence, from the I9 dead-settings sweep).
+#' So the defaults below always apply. A V9.9.5 note claiming they were
+#' configurable stood here for years and was wrong: a Settings row naming one
+#' had no effect AND was reported to the operator as a probable typo
+#' (review 2026-08-21, I-25). If they should become configurable, register them
+#' in build_config_object, add them to TABS_KNOWN_SETTINGS and
+#' .TABS_NUMERIC_SETTINGS, and update that contract test — all four, or the
+#' setting is inert again.
 #'
 #' V9.9.2 ENHANCEMENTS:
 #' - Reports Kish design effect (deff ≈ 1 + CV²)

@@ -68,9 +68,9 @@ This documentation pack contains everything you need:
 
 ## Dependencies
 
-**Required:** - openxlsx (Excel file I/O) - readxl (Excel reading)
+**Required:** - openxlsx (Excel file I/O) - readxl (Excel reading) - jsonlite (the interactive HTML report, which is ON by default: without it the run refuses with PKG_JSONLITE_MISSING)
 
-**Optional:** - haven (SPSS file support) - data.table (faster CSV processing)
+**Optional:** - base64enc (embeds logos in the report) - haven (SPSS file support) - data.table (faster CSV processing)
 
 Install with:
 
@@ -78,6 +78,28 @@ Install with:
 install.packages(c("openxlsx", "readxl"))
 install.packages(c("haven", "data.table"))  # optional
 ```
+
+## Running the Tests
+
+Run both suites from the **repository root** (not from inside the test
+directory — `testthat` there does not activate renv, and packages such as
+readxl go missing with a misleading error).
+
+```r
+# R suite: 67 files
+Rscript -e 'testthat::test_dir("modules/tabs/tests/testthat")'
+```
+
+```bash
+# Report v2 renderer (JS): 35 suites, no single runner — loop over them
+for f in modules/tabs/lib/html_report_v2/tests/*_tests.mjs; do node "$f"; done
+```
+
+Both must be green before a change ships. The cross-engine parity fixture
+(`test_cross_engine_stats.R` on the R side, `parity_stats_tests.mjs` on the JS
+side) is a permanent gate: it pins the R engine and the in-browser engine to the
+same numbers, so regenerate it deliberately whenever a formula changes on either
+side.
 
 ## Module Structure
 

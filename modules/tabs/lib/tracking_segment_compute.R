@@ -26,6 +26,33 @@ if (!exists("%||%", mode = "function")) {
 }
 
 # Case-insensitive, whitespace-trimmed equality against a banner value.
+# Waves already reported as unweighted this run. The weight lookup happens once
+# per metric x segment x wave, so without this the console would carry hundreds
+# of copies of the same warning and bury it (I-10).
+.tsc_unweighted_reported <- new.env(parent = emptyenv())
+
+.tsc_note_unweighted_wave <- function(wid, weight_col) {
+  key <- as.character(wid)
+  if (!is.null(.tsc_unweighted_reported[[key]])) return(invisible(NULL))
+  assign(key, TRUE, envir = .tsc_unweighted_reported)
+  cat("\n┌─── TURAS WEIGHTING WARNING ────────────────────────────────┐\n")
+  cat("│ Wave '", key, "' has no column named '", weight_col, "', so its\n", sep = "")
+  cat("│ segment trends are computed UNWEIGHTED while other waves are\n")
+  cat("│ weighted. Movement against this wave may be an artefact of the\n")
+  cat("│ mismatch rather than a real change.\n")
+  cat("│ Fix: check that wave's export for a renamed weight column.\n")
+  cat("└────────────────────────────────────────────────────────────┘\n\n")
+  invisible(NULL)
+}
+
+#' Reset the unweighted-wave warning log (test support)
+#' @return Invisible NULL
+#' @export
+tracking_reset_unweighted_notices <- function() {
+  rm(list = ls(envir = .tsc_unweighted_reported), envir = .tsc_unweighted_reported)
+  invisible(NULL)
+}
+
 .tsc_eq <- function(x, value) {
   trimws(toupper(as.character(x))) == trimws(toupper(as.character(value)))
 }
@@ -86,8 +113,10 @@ if (!exists("%||%", mode = "function")) {
 #'   per-respondent mean of those columns) and no `cols`.
 #' @param segment_dims List of banner dimensions, each
 #'   `list(label = <e.g. "Campus">, cols = list(<wave id> = <column>))`.
-#' @param weight_col Optional weight column name (used when present in a wave;
-#'   absent -> unweighted).
+#' @param weight_col Optional weight column name. When supplied but absent from
+#'   a given wave, that wave is computed UNWEIGHTED and a console warning names
+#'   it — mixing weighted and unweighted waves in one trend is almost always an
+#'   export fault, not an intention (I-10).
 #'
 #' @return `list(trend_results = <question -> segment -> {metric_type,
 #'   question_text, wave_results}>, segments_meta = <segment_name -> {value,
@@ -135,9 +164,19 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
           rows <- !is.na(d[[scol]]) & .tsc_eq(d[[scol]], seg$value)
         }
         if (!any(rows)) next
+        # A weighted study whose export renamed the weight column in ONE wave
+        # used to compute that wave unweighted, land it in the sidecars under an
+        # implicit PASS, and plot it as genuine movement against its weighted
+        # neighbours — with nothing on the console. The sibling loader refuses
+        # outright in this situation (wave_values_from_microdata ->
+        # DATA_WEIGHT_MISSING); this path is an offline backfill tool, so it
+        # names the wave and continues (review 2026-08-21, I-10).
         w <- if (!is.null(weight_col) && weight_col %in% names(d)) {
           as.numeric(d[[weight_col]][rows])
-        } else rep(1, sum(rows))
+        } else {
+          if (!is.null(weight_col)) .tsc_note_unweighted_wave(wid, weight_col)
+          rep(1, sum(rows))
+        }
         res <- .tsc_wave_result(mtype, metric_vec[rows], w)
         if (!is.null(res)) wr[[wid]] <- res
       }

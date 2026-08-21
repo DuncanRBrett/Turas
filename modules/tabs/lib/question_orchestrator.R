@@ -78,7 +78,7 @@ prepare_question_data <- function(question_code, base_filter,
       code = "CFG_QUESTION_NOT_FOUND",
       title = paste0("Question Not Found: ", question_code),
       problem = paste0("Question '", question_code, "' is referenced in config but not found in Survey_Structure."),
-      why_it_matters = "This question will be missing from output, producing incomplete results.",
+      why_it_matters = "The run STOPS here: this refusal ends the analysis, so no workbook is written until it is resolved.",
       how_to_fix = c(
         "Check that the QuestionCode in Selection sheet matches Questions sheet exactly",
         "Verify the question exists in Survey_Structure.xlsx Questions sheet",
@@ -123,7 +123,7 @@ prepare_question_data <- function(question_code, base_filter,
         code = "DATA_FILTER_FAILED",
         title = paste0("Base Filter Failed: ", question_code),
         problem = paste0("Could not apply base filter '", base_filter, "' for question ", question_code),
-        why_it_matters = "This question cannot be processed without a valid filter. It will be missing from output.",
+        why_it_matters = "The run STOPS here: this refusal ends the analysis until the filter is fixed.",
         how_to_fix = c(
           "Check that the filter expression in Survey_Structure is valid R syntax",
           "Verify the filter column exists in your data",
@@ -334,7 +334,7 @@ process_single_question <- function(question_code, prepared_data,
         code = "DATA_RANKING_EXTRACTION_FAILED",
         title = paste0("Ranking Data Extraction Failed: ", question_code),
         problem = paste0("Could not extract ranking data for question ", question_code),
-        why_it_matters = "This ranking question cannot be processed. It will be missing from output.",
+        why_it_matters = "The run STOPS here: this refusal ends the analysis until the ranking question is fixed.",
         how_to_fix = c(
           "Check that ranking columns follow the expected naming pattern",
           "Verify Ranking_Format in Survey_Structure is correct",
@@ -407,7 +407,7 @@ process_single_question <- function(question_code, prepared_data,
         code = "DATA_NUMERIC_QUESTION_FAILED",
         title = paste0("Failed to Process Numeric Question: ", question_code),
         problem = paste0("Numeric question processing failed: ", conditionMessage(e)),
-        why_it_matters = "This question will be missing from output, producing incomplete results.",
+        why_it_matters = "The run STOPS here: this refusal ends the analysis, so no workbook is written until it is resolved.",
         how_to_fix = c(
           "Check that the question data is in the expected numeric format",
           "Verify the question configuration in Survey_Structure",
@@ -440,7 +440,7 @@ process_single_question <- function(question_code, prepared_data,
         code = "DATA_ALLOCATION_QUESTION_FAILED",
         title = paste0("Failed to Process Allocation Question: ", question_code),
         problem = paste0("Allocation question processing failed: ", conditionMessage(e)),
-        why_it_matters = "This question will be missing from output, producing incomplete results.",
+        why_it_matters = "The run STOPS here: this refusal ends the analysis, so no workbook is written until it is resolved.",
         how_to_fix = c(
           "Check that the allocation columns ({code}_1..{code}_N) exist and are numeric",
           "Verify Columns in Survey_Structure matches the number of allocation options",
@@ -470,7 +470,7 @@ process_single_question <- function(question_code, prepared_data,
         code = "DATA_QUESTION_PROCESSING_FAILED",
         title = paste0("Failed to Process Question: ", question_code),
         problem = paste0("Question processing failed: ", conditionMessage(e)),
-        why_it_matters = "This question will be missing from output, producing incomplete results.",
+        why_it_matters = "The run STOPS here: this refusal ends the analysis, so no workbook is written until it is resolved.",
         how_to_fix = c(
           "Check the question data and configuration",
           "Verify response options match the data",
@@ -806,6 +806,16 @@ process_all_questions <- function(questions_to_process, survey_data,
       next
     }
 
+    # UNREACHABLE TODAY, kept as a safety net. prepare_question_data() never
+    # returns NULL: every failure path inside it calls tabs_refuse(), which
+    # signals a condition (stop) and takes the whole run down rather than
+    # returning. This branch only becomes live if a future change wraps the call
+    # in tryCatch to convert refusals into per-question skips. The engine is
+    # deliberately fail-fast — a research workbook silently missing a question is
+    # worse than a run that stops — so the refusal messages say the run stops
+    # (review 2026-08-21, I-1). Do not read this branch as evidence that
+    # per-question skipping is in force; the live skip is the empty-subgroup one
+    # above, which returns skip=TRUE rather than NULL.
     if (is.null(prepared_data)) {
       # TRS v1.0: Record skipped question for PARTIAL status disclosure
       skipped_questions[[current_question_code]] <- list(
@@ -825,6 +835,8 @@ process_all_questions <- function(questions_to_process, survey_data,
       total_column
     )
 
+    # UNREACHABLE TODAY for the same reason as the prepare branch above:
+    # process_single_question()'s failure paths refuse rather than return NULL.
     if (is.null(question_result)) {
       # TRS v1.0: Record skipped question for PARTIAL status disclosure
       skipped_questions[[current_question_code]] <- list(
@@ -852,7 +864,8 @@ process_all_questions <- function(questions_to_process, survey_data,
     checkpoint_counter <- checkpoint_counter + 1
     if (checkpoint_config$enabled &&
         checkpoint_counter >= checkpoint_config$frequency) {
-      save_checkpoint(checkpoint_config$file, all_results, processed_questions)
+      save_checkpoint(checkpoint_config$file, all_results, processed_questions,
+                      checkpoint_config$fingerprint)
       checkpoint_counter <- 0
     }
   }

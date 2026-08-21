@@ -1,6 +1,6 @@
 # Plan — Per-segment prior-wave trends in the v2 report (Total + published dimensions)
 
-**Status:** PLANNING (no code yet). Branch: `feature/tabs-v2-segment-wave-trends` (stacked on
+**Status:** DELIVERED (verified 2026-08-21) — `lib/tracking_segment_compute.R` and its bridges exist with passing tests. This document is the design record, not an open plan. Branch: `feature/tabs-v2-segment-wave-trends` (stacked on
 `fix/tabs-v2-banner-composite-fixes`, which adds the filter-suppression this feature refines).
 **Date:** 2026-06-18.
 

@@ -319,7 +319,24 @@ qual_build_data_qual <- function(questions, master, config = list(), rid_map = N
   demo_map <- NULL
   if (identical(cuts, "safe") && length(demo_labels)) {
     k <- suppressWarnings(as.numeric(qual_cfg(config, "min_reporting_base", 1)))
-    if (length(k) == 1L && !is.na(k) && k > 1) {
+    if (!(length(k) == 1L && !is.na(k) && k > 1)) {
+      # "safe" tagging IS the k-anonymity pass, so with k unset (default 1) there
+      # is nothing to anonymise against: raw tags used to ship while the island
+      # still declared demographicCuts:"safe". A label that overstates the
+      # protection actually applied is worse than no label, so the declaration is
+      # downgraded to match reality and the operator is told why
+      # (review 2026-08-21, I-12).
+      cuts <- "allow"
+      cat("\n┌─── TURAS DISCLOSURE WARNING ───────────────────────────────┐\n")
+      cat("│ qual_demographic_cuts = 'safe' needs min_reporting_base > 1 to\n")
+      cat("│ have anything to anonymise against; it is currently ",
+          if (length(k) == 1L && !is.na(k)) k else "unset", ".\n", sep = "")
+      cat("│ Demographic tags would ship RAW while the report claimed 'safe',\n")
+      cat("│ so the report now declares 'allow' — which is what it is doing.\n")
+      cat("│ Fix: set min_reporting_base (e.g. 10) to get k-anonymised tags,\n")
+      cat("│ or set qual_demographic_cuts = block to ship no tags at all.\n")
+      cat("└────────────────────────────────────────────────────────────┘\n\n")
+    } else {
       # Collect each unique respondent's demos + their split band (the real, non-empty band
       # wins if they appear in both a split and a non-split question) so tags are k-anonymised
       # within the band — the band being a visible quasi-identifier once the segment exists.

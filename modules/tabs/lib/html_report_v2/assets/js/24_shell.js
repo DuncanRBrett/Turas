@@ -73,6 +73,16 @@
     // banner; "" matches no column group, so views show the Total column.
     d2.state.banner = (agg.banner_groups && agg.banner_groups.length)
       ? agg.banner_groups[0].id : "";
+    // alpha_default: which significance level the report OPENS on. Only
+    // meaningful when the study configured a secondary level — with one alpha
+    // there is nothing to open "on". Set BEFORE decodeHash so a shared or
+    // saved URL still wins over the config default. The setting was registered,
+    // validated and documented for a long time while nothing read it, so
+    // "alpha_default = secondary" silently did nothing (review 2026-08-21, I-25).
+    if (agg.project && agg.project.alpha_default === "secondary" &&
+        agg.project.alpha_secondary) {
+      d2.state.sigMode = "dual";
+    }
     d2.decodeHash(location.hash);
     if (!d2.questionByCode(d2.state.activeQ)) {
       d2.state.activeQ = agg.questions[0].code;

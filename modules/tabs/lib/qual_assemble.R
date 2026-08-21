@@ -210,6 +210,26 @@ qual_host_id_to_idx <- function(survey_data, id_col) {
   idx <- (seq_along(ids) - 1L)[keep]
   ids <- ids[keep]
   dup <- duplicated(ids)
+  # First occurrence wins, but say so. A duplicated ResponseID in the HOST survey
+  # is a merge artefact that does happen in real exports, and every comment from
+  # that respondent then silently takes the FIRST row's banner values, filter
+  # masks and NPS band — a verbatim read against the wrong demographics. The
+  # workbook side and the union side both refuse loudly on duplicates; this side
+  # was the quiet one (review 2026-08-21, I-14).
+  if (any(dup)) {
+    dup_ids <- unique(ids[dup])
+    shown <- utils::head(dup_ids, 10)
+    cat("\n┌─── TURAS QUAL WARNING ─────────────────────────────────────┐\n")
+    cat("│ The survey data carries ", length(dup_ids),
+        " duplicated ResponseID(s) in '", id_col, "'.\n", sep = "")
+    cat("│ Comments join to the FIRST matching row, so any comment from these\n")
+    cat("│ respondents is tagged with that row's demographics and NPS band:\n")
+    cat("│  ", paste(shown, collapse = ", "),
+        if (length(dup_ids) > length(shown)) sprintf(" (+%d more)", length(dup_ids) - length(shown)) else "",
+        "\n", sep = "")
+    cat("│ Fix: de-duplicate the survey export before running.\n")
+    cat("└────────────────────────────────────────────────────────────┘\n\n")
+  }
   stats::setNames(idx[!dup], ids[!dup])
 }
 

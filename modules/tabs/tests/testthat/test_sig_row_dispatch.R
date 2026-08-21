@@ -136,7 +136,15 @@ make_config <- function() {
     show_numeric_outliers = FALSE,
     exclude_outliers_from_stats = FALSE,
     outlier_method = "IQR",
-    decimal_places_numeric = 1
+    decimal_places_numeric = 1,
+    # Both flags are read with a bare `if (config$...)` in the processors, so a
+    # fixture that predates a setting crashes with "argument is of length zero"
+    # rather than failing an assertion. build_config_object() always supplies
+    # them in production; a hand-built config here must too (review 2026-08-21,
+    # I-6). show_numeric_sd defaults ON in the real builder — keep it TRUE so
+    # this fixture exercises the same shape a real run produces.
+    show_numeric_sd = TRUE,
+    show_percent_column = FALSE
   )
 }
 

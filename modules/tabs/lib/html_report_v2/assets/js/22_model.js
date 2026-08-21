@@ -564,10 +564,30 @@
       return i === 0 || hiddenLabels.indexOf(col.label) === -1;
     });
     viewModel.hiddenCount = keep.filter(function (k) { return !k; }).length;
+    // Collect the letters leaving with the columns BEFORE the filter: a cell
+    // that still says "▲C" once column C is gone claims significance against a
+    // column the reader cannot see, and that dangling letter travels into the
+    // clipboard, the XLSX export and the PPTX matrix as well as the screen.
+    // applyDisclosureSuppression does this same strip for suppressed columns;
+    // hiding was the path that forgot (review 2026-08-21, I-3).
+    var gone = [];
+    viewModel.columns.forEach(function (col, i) {
+      if (!keep[i] && col.letter) gone.push(col.letter);
+    });
     viewModel.columns = viewModel.columns.filter(function (_, i) { return keep[i]; });
     viewModel.rows.forEach(function (row) {
       row.cells = row.cells.filter(function (_, i) { return keep[i]; });
     });
+    if (gone.length) {
+      var re = new RegExp("[" + gone.join("") + "]", "gi");   // strip both 95% + 80% forms
+      viewModel.rows.forEach(function (row) {
+        row.cells.forEach(function (cell) {
+          // The 80% (lowercase) letters are already folded into cell.sig by the
+          // dual-alpha merge above, so the case-insensitive strip covers both.
+          if (cell && cell.sig) cell.sig = cell.sig.replace(re, "");
+        });
+      });
+    }
     return viewModel;
   }
 

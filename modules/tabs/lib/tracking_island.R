@@ -109,7 +109,10 @@ detect_wave_column <- function(mapping, data_layer) {
   if (length(wave_cols) == 0) return(NULL)
   dl_codes <- vapply(data_layer$questions, function(q) as.character(q$code), character(1))
   hits <- vapply(wave_cols, function(wc) {
-    sum(as.character(mapping[[wc]]) %in% dl_codes, na.rm = TRUE)
+    # trimws to match tracking_metrics(): detection and use must agree on what
+    # a cell says, or a whitespace-padded column detects as the current wave
+    # and then contributes nothing (I-7).
+    sum(trimws(as.character(mapping[[wc]])) %in% dl_codes, na.rm = TRUE)
   }, integer(1))
   if (max(hits) == 0) return(NULL)
   # which.max() silently takes the FIRST column on a tie, so two waves whose
@@ -149,15 +152,35 @@ tracking_metrics <- function(data_layer, mapping = NULL) {
     wc <- detect_wave_column(mapping, data_layer)
     if (!is.null(wc)) {
       out <- list()
+      unmatched <- character(0)
       for (i in seq_len(nrow(mapping))) {
-        code <- as.character(mapping[[wc]][i])
-        if (is.na(code) || !(code %in% dl_codes)) next
+        # trimws: an Excel-authored cell holding "Q1 " matched nothing and the
+        # row was skipped in silence, so the metric simply stopped appearing in
+        # the Tracking tab — which reads as "not tracked", not "broken mapping".
+        # The pairing report cannot catch it either, because it counts only the
+        # metrics this wave contributes (review 2026-08-21, I-7).
+        code <- trimws(as.character(mapping[[wc]][i]))
+        if (is.na(code) || !nzchar(code)) next
+        if (!(code %in% dl_codes)) {
+          unmatched <- c(unmatched, code)
+          next
+        }
         spec <- tolower(as.character(mapping$TrackingSpecs[i] %||% ""))
         out[[length(out) + 1]] <- list(
           code = code,
           key = tracking_norm(mapping$QuestionCode[i]),
           title = as.character(mapping$QuestionText[i] %||% mapping$QuestionCode[i]),
           score_type = if (grepl("nps", spec)) "nps" else "mean")
+      }
+      if (length(unmatched) > 0) {
+        cat("\n┌─── TURAS TRACKING WARNING ─────────────────────────────────┐\n")
+        cat("│ Question_Mapping column '", wc, "' names ", length(unmatched),
+            " question code(s)\n", sep = "")
+        cat("│ that are not in this run's data layer, so they are NOT tracked:\n")
+        cat("│  ", paste(unmatched, collapse = ", "), "\n", sep = "")
+        cat("│ Check the spelling against Survey_Structure (a composite uses its\n")
+        cat("│ CompositeCode). These metrics will be missing from the Tracking tab.\n")
+        cat("└────────────────────────────────────────────────────────────┘\n\n")
       }
       if (length(out) > 0) return(out)
     }
@@ -494,6 +517,41 @@ build_tracking_island <- function(current_contribution, prior_contributions = li
     y <- suppressWarnings(as.numeric(w$year))
     if (length(y) != 1 || is.na(y)) Inf else y
   }, numeric(1))
+
+  # A wave with no derivable year (a label like "Baseline" carrying no 4-digit
+  # year) sorts to Inf — i.e. AFTER the current wave — so the renderer treats it
+  # as "the previous wave" for every delta chip, anchors vs-first on it, and
+  # draws its point off the chart canvas because `year - y0` coerces null to 0.
+  # It is never a usable comparison point, so drop it and say which one went
+  # (review 2026-08-21, I-8).
+  # The current wave is always kept (it is this run's own output); only priors
+  # can be dropped, and a yearless CURRENT wave gets its own warning because the
+  # whole trend then has no anchor.
+  is_current <- seq_along(waves) == length(waves)
+  drop_prior <- is.infinite(keys) & !is_current
+
+  if (any(drop_prior)) {
+    dropped <- vapply(waves[drop_prior],
+                      function(w) as.character(w$wave %||% "(unlabelled)"), character(1))
+    cat("\n┌─── TURAS TRACKING WARNING ─────────────────────────────────┐\n")
+    cat("│ ", length(dropped), " prior wave(s) carry no year and cannot be placed on\n", sep = "")
+    cat("│ a trend line, so they are EXCLUDED from tracking:\n")
+    cat("│  ", paste(dropped, collapse = ", "), "\n", sep = "")
+    cat("│ Left in, they sort after the current wave: every 'vs previous' delta\n")
+    cat("│ would compare against them and their point would fall off the chart.\n")
+    cat("│ Fix: label the wave with a 4-digit year (e.g. 'Baseline 2023'), or\n")
+    cat("│ give it an explicit year via waves_meta / wave_order.\n")
+    cat("└────────────────────────────────────────────────────────────┘\n\n")
+    waves <- waves[!drop_prior]
+    keys <- keys[!drop_prior]
+  }
+  if (any(is.infinite(keys))) {
+    cat("\n  [WARNING] Tracking: the current wave ('",
+        as.character(waves[[length(waves)]]$wave %||% "(unlabelled)"),
+        "') carries no 4-digit year.\n", sep = "")
+    cat("  Trend positions are derived from the year, so the chart may place it oddly.\n")
+    cat("  Fix: include the year in the wave label, or set it via waves_meta.\n\n")
+  }
   waves <- waves[order(keys)]
 
   list(schema_version = 1L, kind = "tracking_microdata", waves = waves)

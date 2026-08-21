@@ -68,21 +68,29 @@ if (exists("tabs_source", mode = "function")) {
 
 ### File Organization
 
+> **Line counts below are indicative, not maintained.** Several drifted badly
+> enough to mislead (this tree once listed `run_crosstabs_helpers.R`,
+> `question_dispatcher.R` and a 684-line `config_loader.R`, none of which exist
+> — routing lives in `question_orchestrator.R`, and `config_loader.R` is a
+> 14-line stub that says so in its own header). Treat the tree as a map of
+> which concerns live roughly where, and trust the files themselves for detail
+> (review 2026-08-21, I-27).
+
 ```
 modules/tabs/
 ├── run_tabs.R                    # Main entry point (~92 lines)
 ├── run_tabs_gui.R                # Shiny GUI interface (~651 lines)
 ├── lib/
 │   ├── 00_guard.R                # TRS guard layer & sourcing utilities (~786 lines)
-│   ├── run_crosstabs.R           # Core orchestration (~636 lines)
-│   ├── run_crosstabs_helpers.R   # Helper functions (~291 lines)
-│   ├── config_loader.R           # Configuration management (~684 lines)
+│   ├── run_crosstabs.R           # Core orchestration (~1,220 lines)
+│   ├── config_loader.R           # STUB (14 lines) — kept only as a source()
+│   │                             #   target; real config loading lives in
+│   │                             #   config_utils.R + crosstabs/crosstabs_config.R
 │   ├── config_utils.R            # Configuration utilities (~293 lines)
 │   ├── generate_config_templates.R # Professional config template generator (~1,354 lines)
 │   ├── validation.R              # Input validation core (~1,672 lines)
 │   ├── validation_utils.R        # Validation utility functions (~428 lines)
-│   ├── question_orchestrator.R   # Question preparation (~675 lines)
-│   ├── question_dispatcher.R     # Question type routing (~438 lines)
+│   ├── question_orchestrator.R   # Question preparation AND type routing (~940 lines)
 │   ├── standard_processor.R      # Single/Multi processing (~1,338 lines)
 │   ├── numeric_processor.R       # Numeric/Rating/NPS processing (~592 lines)
 │   ├── allocation_processor.R    # Allocation (constant-sum) processing (~310 lines)
@@ -145,7 +153,8 @@ code deleted; git history holds it.
 ### Dependencies
 
 **Required R Packages:** - openxlsx: Excel file I/O (no Java
-dependency) - htmltools: HTML generation for reports - jsonlite: JSON
+dependency) - readxl: Excel reading (the loaders read config and data through
+it) - jsonlite: JSON
 serialization
 
 **Optional R Packages:** - data.table: High-performance data operations
@@ -229,7 +238,21 @@ execution with a clear message.
 **Global Variables:**
 - `.tabs_lib_dir`: Cached library directory path
 
-### Configuration Loader (config_loader.R)
+### Configuration loading (config_utils.R + crosstabs/crosstabs_config.R)
+
+> **`config_loader.R` is a 14-line stub** retained only so the existing
+> `source()` chain does not break; it contains no functions and says so in its
+> own header. The functions named in this section
+> (`load_crosstab_configuration()`, `load_config_settings()`) do not exist. The
+> real entry points are `load_config_sheet()` / `get_config_value()` in
+> `config_utils.R` and `load_crosstabs_config()` / `build_config_object()` in
+> `crosstabs/crosstabs_config.R` (review 2026-08-21, I-27).
+>
+> Note `build_config_object()` is a WHITELIST: a Settings key it does not read
+> is silently absent from `config_obj`. Adding a setting means editing it, plus
+> `TABS_KNOWN_SETTINGS`, plus the numeric/logical coercion lists, plus the
+> template — and adding a consumer. `test_config_contract.R` gates most of those
+> pairs.
 
 Loads and parses Excel configuration files into R data structures.
 
@@ -402,9 +425,15 @@ question options 3. Apply base filter (if specified) 4. Create row
 indices for each banner column 5. Calculate base sizes (unweighted,
 weighted, effective)
 
-### Question Dispatcher (question_dispatcher.R)
+### Question dispatch (question_orchestrator.R)
 
-Routes questions to the appropriate processor based on type.
+> **There is no `question_dispatcher.R`.** Routing lives in
+> `question_orchestrator.R` alongside question preparation; the signatures below
+> are illustrative of the pattern, not literal (review 2026-08-21, I-27).
+
+Routes questions to the appropriate processor based on `Variable_Type`. Unknown
+types are refused before they reach dispatch, by `check_variable_types()` in
+`validation/structure_validators.R` — the vocabulary is case-sensitive.
 
 ``` r
 process_question(question_code, base_filter, survey_data,
@@ -935,7 +964,10 @@ process_custom_question <- function(prepared_data, config, error_log) {
 }
 ```
 
-3.  **Update dispatcher** in `question_dispatcher.R`:
+3.  **Update dispatch** in `question_orchestrator.R` (there is no
+    `question_dispatcher.R`), and add the new type to the vocabulary in
+    `validation/structure_validators.R`'s `check_variable_types()` — otherwise
+    every config naming it is refused as an invalid Variable_Type:
 
 ``` r
 if (question_type == "Custom_Type") {
@@ -951,7 +983,11 @@ source(file.path(script_dir, "custom_processor.R"))
 
 ### Adding a New Statistical Test
 
-1.  **Add test function** in `lib/statistical_tests.R`:
+1.  **Add the test function** in `lib/weighting.R` (there is no
+    `lib/statistical_tests.R`; the significance machinery lives in weighting.R,
+    with the row-level wiring in run_crosstabs.R). Whatever you add must be
+    mirrored in the JS twin `html_report_v2/assets/js/21_stats.js` and pinned by
+    the cross-engine parity fixture, or the workbook and the report will drift:
 
 ``` r
 calculate_custom_test <- function(count1, base1, count2, base2, alpha = 0.05) {
@@ -1014,11 +1050,32 @@ Tested on MacBook Pro M1:
 
 ## Testing
 
-### Current Coverage
+### Current coverage
 
-Estimated coverage is under 10% (mostly manual testing).
+The module has a substantial automated suite. As of 2026-08-21:
 
-### Recommended Test Structure
+| Suite | Location | Command (run from the REPO ROOT) | Size |
+|-------|----------|----------------------------------|------|
+| R unit/integration | `modules/tabs/tests/testthat/` | `Rscript -e 'testthat::test_dir("modules/tabs/tests/testthat")'` | 67 files, 5077 passing assertions |
+| Report v2 renderer (JS) | `modules/tabs/lib/html_report_v2/tests/` | `node modules/tabs/lib/html_report_v2/tests/<name>_tests.mjs` | 35 suites (plus mutate_text_check.mjs) |
+
+Run the R suite from the repository root, never from inside the test
+directory: `testthat::test_file()` invoked from `tests/testthat/` does not
+activate renv, so packages such as readxl go missing and the guarded
+dependency-sourcing in the test headers reports a misleading failure instead of
+the real cause.
+
+There is no single runner for the node suites; run them individually, or loop
+over `*_tests.mjs`. `mutate_text_check.mjs` is a mutation check on the authored
+text catalogue rather than a test suite.
+
+A prior version of this section claimed "estimated coverage is under 10%
+(mostly manual testing)" and sketched a hypothetical test layout. Both were
+years out of date and actively harmful: they told a new maintainer there was no
+safety net, when the module's entire change discipline depends on these suites
+(review 2026-08-21, I-27).
+
+### Historical: the originally recommended test structure
 
 ```         
 modules/tabs/tests/
