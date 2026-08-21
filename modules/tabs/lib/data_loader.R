@@ -473,11 +473,23 @@ load_survey_data_smart <- function(data_file_path, project_root = NULL,
           cat("  Re-reading the Excel source.\n")
           NULL
         })
-        if (!is.null(cached)) return(cached)
+        if (!is.null(cached)) {
+          # Caches written before the BOM strip moved onto this path (review
+          # 2026-08-21, I-19) can hold BOM'd names; stripping on read costs
+          # nothing and is a no-op for a clean cache.
+          names(cached) <- strip_leading_bom(names(cached))
+          return(cached)
+        }
       }
 
       cat(sprintf("Large Excel file (%.1f MB) detected. Creating RDS cache...\n", file_size_mb))
-      data <- as.data.frame(readxl::read_excel(data_file_path))
+      # Read through the standard loader, NOT readxl directly. Reading directly
+      # skipped strip_leading_bom() plus the empty-file, zero-column and
+      # not-a-data-frame refusals — so a >50MB Alchemer export re-broke the
+      # qualitative ResponseID join exactly the way the BOM fix was written to
+      # prevent, and then froze the corrupted names into the RDS cache so every
+      # later run inherited them (review 2026-08-21, I-19).
+      data <- load_survey_data(data_file_path, project_root, convert_labelled)
       tryCatch({
         saveRDS(data, rds_cache_path)
         cat("  RDS cache created:", basename(rds_cache_path), "\n")

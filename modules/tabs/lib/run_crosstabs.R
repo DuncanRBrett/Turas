@@ -24,6 +24,16 @@
 
 SCRIPT_VERSION <- "10.8.1"
 
+# The engine's version, immune to the sourcing that follows. shared_functions.R,
+# validation.R, weighting.R and ranking.R each assign their OWN SCRIPT_VERSION
+# at the top level, and they are sourced into this same environment below — so
+# by the time anything stamps a deliverable, SCRIPT_VERSION has been overwritten
+# with whichever file was sourced last ("10.1"). Every workbook, stats pack,
+# diagnostics payload and start banner carried that stale number, which is a
+# provenance bug: a client asking which engine produced a file got the wrong
+# answer (review 2026-08-21, I-2). Captured here, before the first source().
+TABS_ENGINE_VERSION <- SCRIPT_VERSION
+
 # ==============================================================================
 # TRS GUARD LAYER - Must be loaded FIRST
 # ==============================================================================
@@ -573,6 +583,23 @@ write_question_table_fast <- function(wb, sheet, data_table, banner_info,
 #' @param decimal_places_numeric Integer
 #' @return Formatted numeric or NA_real_
 #' @export
+# DUPLICATE DEFINITION — this copy is the one that runs.
+#
+# excel_utils.R defines format_output_value() too (sourced via
+# shared_functions.R, above), and this later definition overwrites it. The two
+# have drifted: that one handles a length-0 or multi-element value (warns, takes
+# the first) and rounds an UNKNOWN type to 0 decimals; this one errors on a
+# multi-element value (is.na() on a vector) and rounds an unknown type to 2.
+# Nothing ships wrong today — every call site in the module passes a scalar and
+# one of the five known types, so the divergent branches are unreachable — but
+# tests that source only excel_utils.R exercise the OTHER function, so a change
+# made in one place can pass its tests and never reach production
+# (review 2026-08-21, M-18).
+#
+# Not merged yet because test_e2e_integration.R text-extracts this definition
+# out of this file by regex (`^format_output_value <- function`), so deleting it
+# breaks that harness. Collapse the two when the harness stops parsing source
+# text — see the engine-as-function refactor in the growth path.
 format_output_value <- function(value, type = "frequency",
                                 decimal_places_percent = 0,
                                 decimal_places_ratings = 1,
@@ -599,7 +626,7 @@ format_output_value <- function(value, type = "frequency",
 
 # Print TRS start banner
 if (exists("turas_print_start_banner", mode = "function")) {
-  turas_print_start_banner("TABS", SCRIPT_VERSION)
+  turas_print_start_banner("TABS", TABS_ENGINE_VERSION)
 } else {
   print_toolkit_header("Crosstab Analysis - Turas v10.8.1")
 }
@@ -687,10 +714,19 @@ workbook_result <- create_crosstabs_workbook(
   effective_n = data_result$effective_n,
   master_weights = data_result$master_weights,
   output_path = config_result$output_path,
-  script_version = SCRIPT_VERSION,
+  script_version = TABS_ENGINE_VERSION,
   total_column = TOTAL_COLUMN,
   very_small_base = VERY_SMALL_BASE_SIZE
 )
+
+# The checkpoint is only safe to discard once the workbook it was protecting is
+# on disk. Cleaning up earlier meant a failure in composites, sheet building or
+# the save itself lost the entire analysis (review 2026-08-21, M-11).
+if (isTRUE(analysis_result$checkpoint_enabled) &&
+    !is.null(analysis_result$checkpoint_file) &&
+    file.exists(config_result$output_path)) {
+  cleanup_checkpoint(analysis_result$checkpoint_file)
+}
 
 # ==============================================================================
 # STEP 4d: THE INTERACTIVE REPORT (default output)
@@ -793,7 +829,7 @@ if (.html_report_v2_on) {
           analysis_result = analysis_result,
           workbook_result = workbook_result,
           start_time      = start_time,
-          script_version  = SCRIPT_VERSION)),
+          script_version  = TABS_ENGINE_VERSION)),
         error = function(e) {
           cat("\n[WARNING] Report diagnostics panel could not be built:",
               conditionMessage(e), "\n  The v2 report still builds without it.\n\n")
@@ -973,6 +1009,20 @@ if (.html_report_v2_on) {
                              "0 of %d commenters — check the ResponseID alignment (or set ",
                              "qual_join_id_column). Falling back to a standalone comment report.\n\n"),
                       qj$id_column, qj$total))
+        } else if (!is.null(qj) && identical(qj$status, "NO_ID_COLUMN")) {
+          # Previously silent: the operator configured a comment workbook
+          # expecting the integrated Qualitative tab and got a separate
+          # standalone report, with the only signals being an absent "joined X
+          # of Y" line and an extra file on disk (review 2026-08-21, I-13).
+          cat(paste0("\n[WARNING] Qualitative join found NO response-id column in the survey ",
+                     "data, so comments cannot be tied to respondents: there will be no ",
+                     "integrated Qualitative tab, only a standalone comment report.\n",
+                     "  Fix: name the column explicitly with qual_join_id_column, or check ",
+                     "the export's id header (the auto-match looks for 'id' / 'Response ID').\n\n"))
+        } else if (!is.null(qj) && !identical(qj$status, "PASS")) {
+          cat(sprintf(paste0("\n[WARNING] Qualitative join did not complete (status: %s). ",
+                             "Falling back to a standalone comment report.\n\n"),
+                      as.character(qj$status)))
         }
       }
 
@@ -1131,7 +1181,7 @@ if (generate_stats_pack_flag) {
       analysis_result = analysis_result,
       workbook_result = workbook_result,
       start_time     = start_time,
-      script_version = SCRIPT_VERSION
+      script_version = TABS_ENGINE_VERSION
     )
   }, error = function(e) {
     cat(sprintf("\n[WARNING] Stats pack generation failed: %s\n", conditionMessage(e)))

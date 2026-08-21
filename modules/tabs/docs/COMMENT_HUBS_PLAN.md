@@ -1,6 +1,6 @@
 # Comment Hubs — feature plan
 
-**Status:** design locked; not built. Planning session Duncan + Claude, 2026-07-01.
+**Status:** DELIVERED (verified 2026-08-21) — hubs are live in the v2 renderer (see `qual.hubs` in `html_report_v2/assets/js/27q_qualitative.js`). This document is the design record, not an open plan. Original planning session Duncan + Claude, 2026-07-01.
 **Type:** software feature — tabs v2 Qualitative tab.
 **Regen/verify:** Duncan via `launch_turas` (never `preview_start`).
 

@@ -348,6 +348,20 @@ write_column_letters <- function(wb, sheet, banner_info, styles, current_row) {
 #' @param start_row Integer, starting row
 #' @param config List, configuration
 #' @return Integer, next row number
+#'
+#' @section NOT THE PRODUCTION WRITER — DO NOT WIRE THIS UP:
+#' The live path is `write_question_table_fast()` (defined in run_crosstabs.R,
+#' called from crosstabs/workbook_builder.R). This slow-path twin has no callers
+#' outside tests/testthat/test_excel_output.R, and it carries a latent
+#' data-integrity bug that the fast writer does not: its value loop advances
+#' `col_offset` only when a banner key is present in the row, so a row missing
+#' one key shifts every later value one column LEFT — printing real numbers
+#' under the wrong banner heading, with nothing to signal it. (It also calls
+#' `grepl()` on a possibly-NA value, which yields NA into `if()` and errors.)
+#' The fast writer is index-aligned into a fixed-width matrix and cannot shift.
+#' Retained only because the tests above exercise it; fix the shift before any
+#' production use (review 2026-08-21, M-18).
+#'
 #' @export
 write_question_table <- function(wb, sheet, result, banner_info, styles,
                                 start_row, config) {

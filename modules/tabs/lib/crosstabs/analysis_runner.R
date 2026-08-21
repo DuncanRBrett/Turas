@@ -239,7 +239,8 @@ process_questions <- function(remaining_questions, survey_data, survey_structure
                                checkpoint_file, checkpoint_frequency,
                                is_weighted, total_column,
                                crosstab_questions, processed_questions,
-                               results_so_far = list()) {
+                               results_so_far = list(),
+                               checkpoint_fingerprint = NULL) {
 
   log_message(sprintf("Processing %d questions...", nrow(remaining_questions)), "INFO")
   cat("\n")
@@ -254,7 +255,8 @@ process_questions <- function(remaining_questions, survey_data, survey_structure
     checkpoint_config = list(
       enabled = config_obj$enable_checkpointing,
       file = checkpoint_file,
-      frequency = checkpoint_frequency
+      frequency = checkpoint_frequency,
+      fingerprint = checkpoint_fingerprint
     ),
     progress_callback = active_progress_callback,
     is_weighted = is_weighted,
@@ -559,10 +561,21 @@ run_crosstabs_analysis <- function(config_result, data_result,
     config_result$output_subfolder
   )
 
+  # A checkpoint may only be resumed into the run that created it (C-1).
+  checkpoint_fingerprint <- build_checkpoint_fingerprint(
+    config_file = config_result$config_file,
+    structure_file = config_result$structure_file_path,
+    data_file = data_result$data_file_path,
+    question_codes = data_result$crosstab_questions$QuestionCode,
+    banner_labels = as.character(banner_info$internal_keys),
+    config_obj = config_result$config_obj
+  )
+
   checkpoint_state <- setup_checkpointing(
     config_result$config_obj$enable_checkpointing,
     checkpoint_file,
-    data_result$crosstab_questions
+    data_result$crosstab_questions,
+    checkpoint_fingerprint
   )
 
   # Process questions
@@ -579,7 +592,8 @@ run_crosstabs_analysis <- function(config_result, data_result,
     total_column,
     data_result$crosstab_questions,
     checkpoint_state$processed_questions,
-    checkpoint_state$all_results
+    checkpoint_state$all_results,
+    checkpoint_fingerprint
   )
 
   all_results <- orchestration_result$all_results
@@ -593,10 +607,10 @@ run_crosstabs_analysis <- function(config_result, data_result,
 
   log_message(sprintf("Processed %d questions", length(all_results)), "INFO")
 
-  # Cleanup checkpoint
-  if (config_result$config_obj$enable_checkpointing) {
-    cleanup_checkpoint(checkpoint_file)
-  }
+  # NOTE: the checkpoint is NOT cleaned up here. It used to be, which threw away
+  # the whole analysis if composites, sheet building or the save then failed —
+  # the re-run started from zero (review 2026-08-21, M-11). run_crosstabs.R now
+  # removes it only after the workbook is safely on disk.
 
   # Process composites
   composite_results <- process_composites(
@@ -635,6 +649,8 @@ run_crosstabs_analysis <- function(config_result, data_result,
     all_results = all_results,
     composite_results = composite_results,
     banner_info = banner_info,
+    checkpoint_file = checkpoint_file,
+    checkpoint_enabled = isTRUE(config_result$config_obj$enable_checkpointing),
     error_log = error_log,
     run_status = run_status,
     skipped_questions = skipped_questions,

@@ -1183,12 +1183,48 @@ load_report_text_sheet <- function(config_file) {
     sheets <- openxlsx::getSheetNames(config_file)
     if (!"ReportText" %in% sheets) return(NULL)
 
+    # A sheet that EXISTS but cannot be read is an authoring fault, not an
+    # absence: the study's own wording silently reverts to platform wording and
+    # the client report ships in the wrong voice. The authored-text system
+    # refuses the build for an unknown KEY, so an unreadable SHEET must not be
+    # quieter than that (review 2026-08-21, I-28). A missing sheet is still a
+    # clean no-op — that is the normal case for most projects.
+    read_err <- NULL
     df <- tryCatch(.read_table_sheet(config_file, "ReportText", c("Key", "Text")),
-                   error = function(e) NULL)
+                   error = function(e) { read_err <<- conditionMessage(e); NULL })
+    if (!is.null(read_err)) {
+      tabs_refuse(
+        code = "CFG_REPORT_TEXT_UNREADABLE",
+        title = "ReportText Sheet Could Not Be Read",
+        problem = paste0("The config has a ReportText sheet, but reading it failed: ", read_err),
+        why_it_matters = paste0(
+          "The sheet exists, so this study intends to override some report wording. ",
+          "Continuing would silently publish the platform's default wording instead ",
+          "of the study's own — a difference nobody would notice until a client did."),
+        how_to_fix = c(
+          "Open the config's ReportText sheet and check it has 'Key' and 'Text' header columns",
+          "Check the sheet is not corrupt (re-save the workbook from Excel)",
+          "Delete the ReportText sheet entirely if this study does not override any wording"
+        )
+      )
+    }
     if (is.null(df) || nrow(df) == 0) return(NULL)
     if (!all(c("Key", "Text") %in% names(df))) {
-      cat("  [INFO] ReportText sheet found but missing Key/Text columns - skipped\n")
-      return(NULL)
+      tabs_refuse(
+        code = "CFG_REPORT_TEXT_INVALID_COLUMNS",
+        title = "ReportText Sheet Is Missing Key/Text Columns",
+        problem = paste0(
+          "The ReportText sheet has columns [", paste(names(df), collapse = ", "),
+          "] but needs 'Key' and 'Text'."),
+        why_it_matters = paste0(
+          "Every override on the sheet is ignored without them, so the report would ",
+          "ship with platform wording while the config says otherwise."),
+        how_to_fix = c(
+          "Name the first two header cells 'Key' and 'Text'",
+          "Regenerate the config template to get the sheet in its expected shape",
+          "Delete the ReportText sheet if this study does not override any wording"
+        )
+      )
     }
 
     keys <- trimws(as.character(df$Key))
@@ -1202,6 +1238,9 @@ load_report_text_sheet <- function(config_file) {
                 length(out)))
     out
   }, error = function(e) {
+    # A TRS refusal raised above must travel, not be downgraded to a warning by
+    # the very handler this fix exists to bypass (I-28).
+    if (inherits(e, "turas_refusal")) stop(e)
     cat(sprintf("  [WARNING] Could not read ReportText sheet: %s\n", e$message))
     NULL
   })

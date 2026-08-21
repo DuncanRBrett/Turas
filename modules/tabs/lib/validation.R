@@ -1576,10 +1576,12 @@ run_all_validations <- function(survey_structure, survey_data, config,
 #
 # V9.9.5 ENHANCEMENTS (EXTERNAL REVIEW FIXES):
 # 1. Type coverage: Added integer64 (data.table, DB extracts) and labelled (haven)
-# 2. Configurable thresholds: All weight validation thresholds now configurable
-#    - weight_na_threshold (default: 10)
-#    - weight_zero_threshold (default: 5)
-#    - weight_deff_warning (default: 3)
+# 2. Weight validation thresholds — weight_na_threshold (10),
+#    weight_zero_threshold (5), weight_deff_warning (3). NOTE: these were
+#    described here as "configurable" but never were: they are not registered in
+#    build_config_object, so config_obj never carries them and the defaults
+#    always apply. See the contract note in validation/weight_validators.R
+#    (review 2026-08-21, I-25).
 #
 # V9.9.4 ENHANCEMENTS:
 # 1. Likert character data: Accept character/factor for Likert questions

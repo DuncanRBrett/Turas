@@ -1,6 +1,6 @@
 # Qualitative Tab — Implementation Spec (tabs v2 report)
 
-**Status:** Planned (ready to build) · **Date:** 2026-06-29 · **Owner:** Duncan Brett
+**Status:** DELIVERED (verified 2026-08-21) — the qualitative layer is in production (`lib/qual_*.R`, sourced by run_crosstabs.R; 589 passing assertions across `test_qual_*.R`). This document is the design record, not an open plan. · **Date:** 2026-06-29 · **Owner:** Duncan Brett
 **Module:** `tabs` (v2 HTML report) · **Type:** New report tab + new data island
 **Companion:** `OPEN_END_CODING_PLAN.md` (the in-Turas AI coding engine) — **decoupled**;
 this tab consumes a file contract, the coder later becomes one upstream producer of it.

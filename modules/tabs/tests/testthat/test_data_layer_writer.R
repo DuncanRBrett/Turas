@@ -1362,3 +1362,81 @@ test_that("adding Median/Mode does not change the headline metric type", {
   expect_identical(with_med$scale_max, baseline$scale_max)
   expect_identical(with_med$type, baseline$type)
 })
+
+# ==============================================================================
+# ALLOCATION: ONE MEAN BLOCK PER OPTION (review 2026-08-21, I-5)
+# ==============================================================================
+# An Allocation question emits one "Average" row per option, each tagged
+# RowSource="summary" and each followed by its own Sig. row. mean_sig_for's
+# "exactly one sig row per summary block" guard then saw N sig rows and carried
+# NONE, so a multi-option allocation showed significance letters in the Excel
+# workbook and none in the v2 report — the Excel/report disagreement the D1 work
+# removed for numeric questions. VAS 2026's wallet questions are 6-option
+# allocations, so this is the shape that matters.
+
+make_allocation_table <- function(option_labels) {
+  keys <- c("TOTAL::Total", "Gender::Male", "Gender::Female")
+  rows <- list()
+  for (i in seq_along(option_labels)) {
+    mean_row <- data.frame(RowLabel = option_labels[i], RowType = "Average",
+                           RowSource = "summary", stringsAsFactors = FALSE)
+    # Distinct means and letters per option, so a test cannot pass by accident
+    # on a table where every block looks alike.
+    mean_row[[keys[1]]] <- 30 + i
+    mean_row[[keys[2]]] <- 32 + i
+    mean_row[[keys[3]]] <- 28 + i
+    sig_row <- data.frame(RowLabel = NA_character_, RowType = "Sig.",
+                          RowSource = NA_character_, stringsAsFactors = FALSE)
+    sig_row[[keys[1]]] <- "-"
+    sig_row[[keys[2]]] <- if (i %% 2 == 1) "B" else ""     # odd options: Male > Female
+    sig_row[[keys[3]]] <- if (i %% 2 == 0) "A" else ""     # even options: Female > Male
+    rows[[length(rows) + 1L]] <- mean_row
+    rows[[length(rows) + 1L]] <- sig_row
+  }
+  normalize_question_table(do.call(rbind, rows))
+}
+
+allocation_dl <- function(option_labels) {
+  build_dl_question(
+    list(code = "QWALLET", title = "Wallet share", table = make_allocation_table(option_labels)),
+    make_dl_banner_info(), list(), 30
+  )
+}
+
+test_that("a single-option allocation carries its significance letters", {
+  q <- allocation_dl("Groceries")
+  expect_equal(length(q$rows), 1)
+  expect_equal(unlist(q$rows[[1]]$sig), c("", "B", ""))
+})
+
+test_that("a multi-option allocation carries EVERY option's letters, not none", {
+  q <- allocation_dl(c("Groceries", "Transport", "Airtime"))
+  expect_equal(length(q$rows), 3)
+
+  # The regression: all three used to come back empty.
+  expect_equal(unlist(q$rows[[1]]$sig), c("", "B", ""))
+  expect_equal(unlist(q$rows[[2]]$sig), c("", "", "A"))
+  expect_equal(unlist(q$rows[[3]]$sig), c("", "B", ""))
+
+  # Each option keeps its OWN letters — the whole point is that the blocks are
+  # told apart rather than one block's letters being copied to all of them.
+  expect_false(identical(unlist(q$rows[[1]]$sig), unlist(q$rows[[2]]$sig)))
+})
+
+test_that("each allocation option keeps its own values alongside its own letters", {
+  # A mean-kind row carries its values in pct[] (the shared numeric channel),
+  # with mstat naming the statistic — so the values and the letters must line up
+  # per option, not just the letters.
+  q <- allocation_dl(c("Groceries", "Transport"))
+  expect_equal(unlist(q$rows[[1]]$pct), c(31, 33, 29))
+  expect_equal(unlist(q$rows[[2]]$pct), c(32, 34, 30))
+})
+
+test_that("a six-option allocation (the VAS 2026 wallet shape) loses nothing", {
+  labels <- c("Groceries", "Transport", "Airtime", "Electricity", "School fees", "Savings")
+  q <- allocation_dl(labels)
+  expect_equal(length(q$rows), 6)
+  expect_equal(vapply(q$rows, function(r) r$label, character(1)), labels)
+  carried <- vapply(q$rows, function(r) any(nzchar(unlist(r$sig))), logical(1))
+  expect_true(all(carried))
+})

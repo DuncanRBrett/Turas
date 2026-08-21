@@ -247,6 +247,10 @@ load_and_validate_data <- function(survey_structure, project_root) {
 
   log_message(sprintf("Loaded %d responses", nrow(survey_data)), "INFO")
 
+  # The resolved path rides along so the checkpoint fingerprint can stamp the
+  # data file's identity and mtime (review 2026-08-21, C-1). Read immediately by
+  # load_crosstabs_data(); nothing downstream depends on the attribute surviving.
+  attr(survey_data, "turas_data_file") <- data_file_path
   survey_data
 }
 
@@ -411,6 +415,10 @@ load_crosstabs_data <- function(config_result) {
   list(
     survey_structure = survey_structure,
     survey_data = survey_data,
+    data_file_path = {
+      .dfp <- attr(survey_data, "turas_data_file", exact = TRUE)
+      if (is.null(.dfp)) NA_character_ else .dfp
+    },
     composite_defs = composite_defs,
     master_weights = weight_result$master_weights,
     effective_n = weight_result$effective_n,

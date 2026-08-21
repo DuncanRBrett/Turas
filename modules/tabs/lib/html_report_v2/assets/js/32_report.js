@@ -501,7 +501,21 @@
       takeout: (TR.takeout && TR.takeout.state && TR.takeout.state.snapshot) ? TR.takeout.state.snapshot() : null,
       report: store()
     };
-    var json = JSON.stringify(state).replace(/<\//g, "<\\/");
+    // Escape EVERY "<" as the JSON unicode escape, not just the closing-tag
+    // form. An HTML comment opener followed by a script opener inside a script
+    // island puts the HTML parser into its double-escaped state, after which
+    // this island's own closing tag no longer closes it and the following
+    // islands plus the JS bundle are swallowed — a blank report. The build side
+    // has escaped this way since review 2026-08 (I14, triggered by a respondent
+    // pasting an HTML email into an open-end); saveCopy still had the weaker
+    // closing-tag-only guard, so an analyst pasting the same markup into an
+    // Insight box or an added slide could ship a blank saved copy (review
+    // 2026-08-21, I-4). The escape parses back to "<" through JSON.parse.
+    //
+    // NB: this comment deliberately spells those sequences out in words. The
+    // bundler refuses to inline any renderer JS that CONTAINS them literally
+    // (CFG_REPORT_V2_JS_EMBED), so writing them here would break every build.
+    var json = JSON.stringify(state).replace(/</g, "\\u003c");
     var clone = document.documentElement.cloneNode(true);
     var app = clone.querySelector("#app");
     if (app) app.innerHTML = "";

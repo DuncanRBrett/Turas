@@ -483,8 +483,22 @@ run_tabs_gui <- function() {
         withProgress(message = progress_msg, value = 0, {
 
           # Run analysis and capture ALL console output (including validation errors)
+          #
+          # BOTH streams, not just stdout. sink(type = "output") captures cat()
+          # — the TRS refusal boxes and TURAS WARNING boxes — but NOT anything
+          # emitted through message(), which goes to stderr: the
+          # "[TRS PARTIAL] Skipping ..." notices, the run-status line and the
+          # checkpoint notes. Those reached only the terminal that launched
+          # Shiny, while the boxes reached only this in-app panel, so neither
+          # place showed the whole story of a run (review 2026-08-21, I-21).
+          # Two files, merged on read: sinking both streams to ONE path would
+          # have the stdout sink truncate the file the message connection is
+          # holding open.
           output_file <- tempfile()
+          message_file <- tempfile()
+          msg_con <- file(message_file, open = "wt")
           sink(output_file, type = "output")
+          sink(msg_con, type = "message")
 
           analysis_result <- tryCatch({
             source("run_crosstabs.R", local = FALSE)
@@ -494,13 +508,31 @@ run_tabs_gui <- function() {
             list(success = FALSE, error = e)
 
           }, finally = {
-            sink(type = "output")
+            # Unwind in reverse order, and defensively: an unbalanced sink here
+            # would leave the whole Shiny session with no visible console.
+            try(sink(type = "message"), silent = TRUE)
+            try(sink(type = "output"), silent = TRUE)
+            try(close(msg_con), silent = TRUE)
           })
         })
 
-        # Read captured output
+        # Read captured output. The message stream is appended under its own
+        # heading rather than interleaved — the two sinks buffer independently,
+        # so their true ordering is not recoverable and a fabricated interleave
+        # would read as a sequence that never happened.
         captured_output <- readLines(output_file, warn = FALSE)
-        unlink(output_file)
+        captured_messages <- if (file.exists(message_file)) {
+          readLines(message_file, warn = FALSE)
+        } else character(0)
+        captured_messages <- captured_messages[nzchar(trimws(captured_messages))]
+        if (length(captured_messages) > 0) {
+          captured_output <- c(
+            captured_output, "",
+            "─── Messages and warnings (stderr) ───",
+            captured_messages
+          )
+        }
+        unlink(c(output_file, message_file))
 
         if (length(captured_output) > 0) {
           console_output(paste0(
@@ -548,15 +580,19 @@ run_tabs_gui <- function() {
           )
         }
 
-        # Clean up global variables between runs
-        if (exists("config_file", envir = .GlobalEnv)) {
-          rm("config_file", envir = .GlobalEnv)
-        }
-        if (exists("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv)) {
-          rm("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv)
-        }
-        if (exists("TURAS_CLIENT_NAME", envir = .GlobalEnv)) {
-          rm("TURAS_CLIENT_NAME", envir = .GlobalEnv)
+        # Clean up global variables between runs.
+        #
+        # Every global this GUI SETS must be removed here. The three report
+        # toggles below were set on each run but never cleared, so a later
+        # scripted run_tabs_analysis() in the same R session silently inherited
+        # the last GUI run's choices — AI prose still on, for instance, because
+        # a previous run ticked it (review 2026-08-21, I-21/M-9).
+        for (gvar in c("config_file", "TURAS_PREPARE_DELIVERABLE", "TURAS_CLIENT_NAME",
+                       "TURAS_HTML_REPORT_V2", "TURAS_GENERATE_READER_REPORT",
+                       "TURAS_READER_AI_PROSE")) {
+          if (exists(gvar, envir = .GlobalEnv)) {
+            rm(list = gvar, envir = .GlobalEnv)
+          }
         }
 
         # Restore working directory between runs

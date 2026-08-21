@@ -29,7 +29,7 @@ your survey data.
 Open R and run:
 
 ``` r
-install.packages(c("openxlsx", "readxl"))
+install.packages(c("openxlsx", "readxl", "jsonlite"))
 ```
 
 If you're working with SPSS files or large CSV files, also install:
@@ -261,8 +261,9 @@ The graphical interface is the easiest way to run Tabs:
 # Set your working directory to the Turas folder
 setwd("path/to/Turas")
 
-# Launch the GUI
+# Launch the GUI: sourcing only DEFINES the function - you must call it
 source("modules/tabs/run_tabs_gui.R")
+run_tabs_gui()
 ```
 
 In the GUI: 1. Click Browse to select your Tabs_Config.xlsx 2. Click Run
