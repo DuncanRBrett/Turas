@@ -8,6 +8,34 @@
 # survey by build_category_map.R; safe to hand-edit afterwards.
 # ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# Written-in town spellings that are the SAME place
+#
+# When a respondent picks "Other" for their town they type it in themselves, so
+# the same town arrives spelled several ways. Left alone each spelling becomes
+# its own crosstab row and one real town fragments into four or five small
+# ones - worse than the "Other" it replaced.
+#
+# The rule for adding a line here is strict: ONLY where the variant is
+# unambiguously the same name. A place that might be somewhere else stays
+# exactly as it was typed, because guessing would put a respondent in a town
+# they did not name. Matching is case-insensitive and ignores extra spaces, so
+# only genuine spelling differences need a line.
+#
+# Deliberately NOT folded on VAS 2026, and why:
+#   "Brits Bethani" / "Brits Bettarny"  Bethanie is its own settlement near
+#                                       Brits, not a spelling of it
+#   "Blood river"                       a different place entirely
+#   "Extinction 76" / "Dairing extinction"  almost certainly "extension", but
+#                                       of which township is not recoverable
+#   "Seshego zone 2", "Kwena moloto 3"  a zone within a named town; folding
+#                                       them loses the detail the person gave
+# ------------------------------------------------------------------------------
+VAS_TOWN_ALIASES <- c(
+  "Britz"     = "Brits",
+  "Brits cbd" = "Brits"
+)
+
 VAS_CONFIG <- list(
 
   # ---- frequency conversion --------------------------------------------------

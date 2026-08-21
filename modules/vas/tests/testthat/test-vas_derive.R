@@ -98,6 +98,63 @@ test_that("the wide table carries three measures per category and base", {
   expect_equal(result$Airtime_Total_MonthlySpend[1], 80)
 })
 
+test_that("a respondent routed past a category gets NA, not a zero", {
+  # Respondent 2 in this fixture answered nothing. Published as 0 their spend
+  # is arithmetically true but drags every naive average down by 1/incidence,
+  # so the flow columns are blanked and _Purchased carries the fact instead.
+  result <- derive_vas(fixture_totals_source(), fixture_totals_map(), VAS_CONFIG)$wide
+  for (column in c("Airtime_Own_TxnPerMonth", "Airtime_Own_MonthlySpend",
+                   "Airtime_Oth_TxnPerMonth", "Airtime_Oth_MonthlySpend",
+                   "Airtime_Total_TxnPerMonth", "Airtime_Total_MonthlySpend",
+                   "DomSend_Total_MonthlySpend", "DomSend_Total_TxnPerMonth")) {
+    expect_true(is.na(result[[column]][2]), info = column)
+  }
+  # the buyer is untouched
+  expect_equal(result$Airtime_Total_MonthlySpend[1], 80)
+  expect_equal(result$Airtime_Total_TxnPerMonth[1], 2)
+})
+
+test_that("blanking the routed-past does not disturb who counts as a buyer", {
+  result <- derive_vas(fixture_totals_source(), fixture_totals_map(), VAS_CONFIG)$wide
+  expect_true(result$Airtime_Purchased[1])
+  expect_false(result$Airtime_Purchased[2])
+  # nothing bought, so nothing counted - the flag is the record, not the zero
+  expect_equal(result$CategoriesPurchased[2], 0)
+})
+
+test_that("Total still equals Own plus Oth once the routed-past are blank", {
+  # The blanking is decided per CATEGORY, never per base: blanking one side of
+  # a buyer would break this identity, which the sense check enforces.
+  result <- derive_vas(fixture_totals_source(), fixture_totals_map(), VAS_CONFIG)$wide
+  expect_equal(result$Airtime_Total_MonthlySpend[1],
+               result$Airtime_Own_MonthlySpend[1] + result$Airtime_Oth_MonthlySpend[1])
+  expect_equal(result$Airtime_Total_TxnPerMonth[1],
+               result$Airtime_Own_TxnPerMonth[1] + result$Airtime_Oth_TxnPerMonth[1])
+  # and on the non-buyer all three are missing together, so the check has
+  # nothing to compare rather than a false failure
+  expect_true(all(is.na(c(result$Airtime_Total_MonthlySpend[2],
+                          result$Airtime_Own_MonthlySpend[2],
+                          result$Airtime_Oth_MonthlySpend[2]))))
+})
+
+test_that("a genuine zero inside a buyer survives the blanking", {
+  # Freq1 has no "never" option: a blank Freq1 IS the routed-past signal, and
+  # for a single base it means a genuine zero rather than a missing value. So
+  # someone who buys for themselves but was routed past the for-others cascade
+  # must keep a numeric 0 on the Oth side - blanking it would make a category
+  # they WERE asked about look unasked, and would break Total = Own + Oth.
+  source <- fixture_totals_source()
+  source$data$AirtimeOthFreq1[1] <- NA
+  source$data$AirtimeOthAmount[1] <- NA
+  result <- derive_vas(source, fixture_totals_map(), VAS_CONFIG)$wide
+  expect_true(result$Airtime_Purchased[1])
+  expect_equal(result$Airtime_Oth_TxnPerMonth[1], 0)
+  expect_equal(result$Airtime_Total_MonthlySpend[1],
+               result$Airtime_Own_MonthlySpend[1])
+  # and the respondent who was routed past the WHOLE category is still blank
+  expect_true(is.na(result$Airtime_Total_MonthlySpend[2]))
+})
+
 test_that("incomplete respondents are counted and flagged", {
   source <- fixture_totals_source()
   source$data$AirtimeOwnAmount[1] <- "dont know"

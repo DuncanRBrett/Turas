@@ -223,6 +223,26 @@ category_purchased <- function(frame) {
   return(transacts | buys_but_unmeasured)
 }
 
+#' Whether each respondent bought in a category at all
+#'
+#' The same rule as \code{category_purchased()}, resolved for one category
+#' against whichever base that category actually collected. Kept separate so
+#' the published \code{_Purchased} column and the routed-past blanking in
+#' \code{build_category_columns()} can never disagree about who bought.
+#'
+#' @param derived The list from \code{derive_all_categories()}.
+#' @param category_map The category map data frame.
+#' @param category The category name.
+#'
+#' @return A logical vector, one element per respondent, never NA.
+category_bought <- function(derived, category_map, category) {
+  key <- paste0(category, "|Total")
+  if (!key %in% names(derived)) {
+    key <- paste0(category, "|", category_map$base[category_map$category == category][1])
+  }
+  return(category_purchased(derived[[key]]))
+}
+
 #' Lay the per-category purchased flags out as one column per category
 #'
 #' @param derived The list from \code{derive_all_categories()}.
@@ -232,12 +252,8 @@ category_purchased <- function(frame) {
 build_purchased_columns <- function(derived, category_map) {
   columns <- list()
   for (category in unique(category_map$category)) {
-    key <- paste0(category, "|Total")
-    if (!key %in% names(derived)) {
-      # a category collected on one side only has no Total; use what was collected
-      key <- paste0(category, "|", category_map$base[category_map$category == category][1])
-    }
-    columns[[paste0(category, "_Purchased")]] <- category_purchased(derived[[key]])
+    columns[[paste0(category, "_Purchased")]] <-
+      category_bought(derived, category_map, category)
   }
   return(as.data.frame(columns, stringsAsFactors = FALSE, check.names = FALSE))
 }
@@ -305,6 +321,20 @@ category_counts_legs <- function(category_map, category, base) {
 build_category_columns <- function(derived, category_map) {
   columns <- list()
   for (category in unique(category_map$category)) {
+    # A respondent routed past the category never answered its questions, so a
+    # zero there is an artefact of the routing rather than something they told
+    # us. Published as 0 it is arithmetically true - they do spend nothing -
+    # but in a flat file with no base filter it drags every naive average down
+    # by roughly 1/incidence: education bills read R63 instead of R1,531.
+    # Blanked, a plain AVERAGE() returns the buyer figure, which is the one
+    # worth having, and nothing is lost because <Category>_Purchased still
+    # carries who bought.
+    #
+    # Decided at the CATEGORY level, never per base: blanking Own without
+    # Total would break Total = Own + Oth. A category buyer keeps numbers on
+    # all three bases even where one side is a genuine zero (bought for self,
+    # not for others) - that zero IS an answer.
+    bought <- category_bought(derived, category_map, category)
     for (base in c("Own", "Oth", "Total")) {
       key <- paste0(category, "|", base)
       if (!key %in% names(derived)) {
@@ -326,7 +356,16 @@ build_category_columns <- function(derived, category_map) {
       per_txn <- frame$spend_per_txn
       spend[amount_unknown] <- NA_real_
       per_txn[amount_unknown] <- NA_real_
-      columns[[paste0(stem, "TxnPerMonth")]] <- frame$txn_per_month
+      txn <- frame$txn_per_month
+      trips <- frame$trips_per_year
+      # the routed-past blanking described above
+      txn[!bought] <- NA_real_
+      spend[!bought] <- NA_real_
+      per_txn[!bought] <- NA_real_
+      if (!is.null(trips)) {
+        trips[!bought] <- NA_real_
+      }
+      columns[[paste0(stem, "TxnPerMonth")]] <- txn
       columns[[paste0(stem, "MonthlySpend")]] <- spend
       # Legs a year exists only where the survey asked a 12-month count and a
       # one-way/return question - the travel categories. Emitting it everywhere
@@ -340,7 +379,7 @@ build_category_columns <- function(derived, category_map) {
       # year and the published one-way/return question carry everything it
       # held. It is still derived internally - monthly spend is built from it.
       if (category_counts_legs(category_map, category, base)) {
-        columns[[paste0(stem, "TripsPerYear")]] <- frame$trips_per_year
+        columns[[paste0(stem, "TripsPerYear")]] <- trips
       } else {
         columns[[paste0(stem, "SpendPerTxn")]] <- per_txn
       }
