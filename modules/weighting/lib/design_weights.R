@@ -242,8 +242,23 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     )
   }
 
+  # Read the opt-ins BEFORE validating. They used to be read after the
+  # validation refusal below, which made both flags unreachable through the
+  # config path: the refusal's own how_to_fix told the operator to set
+  # allow_unmatched / allow_empty_targets in Advanced_Settings, and setting
+  # them changed nothing because validation had already refused
+  # (review 2026-08-21, I-23).
+  #
+  # An NA weight silently deflates every weighted base downstream, so these
+  # conditions still refuse by default — the flags are how the config author
+  # says "yes, I know, proceed", exactly as they already do on the cell path.
+  allow_unmatched <- read_allow_unmatched_setting(config, weight_name)
+  allow_empty_targets <- read_allow_empty_targets_setting(config, weight_name)
+
   # Validate configuration against data
-  validation <- validate_design_config(data, targets, weight_name)
+  validation <- validate_design_config(data, targets, weight_name,
+                                       allow_unmatched = allow_unmatched,
+                                       allow_empty_targets = allow_empty_targets)
 
   if (!validation$valid) {
     weighting_refuse(
@@ -269,11 +284,6 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
     as.numeric(targets$population_size),
     as.character(targets$stratum_category)
   )
-
-  # An NA weight silently deflates every weighted base downstream, so it is a
-  # refusal unless the config author has said otherwise in Advanced_Settings.
-  allow_unmatched <- read_allow_unmatched_setting(config, weight_name)
-  allow_empty_targets <- read_allow_empty_targets_setting(config, weight_name)
 
   # Calculate weights
   weights <- calculate_design_weights(

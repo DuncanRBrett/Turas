@@ -93,14 +93,31 @@ source_module_libs <- function(module_dir) {
     "cell_weights.R",
     "trimming.R",
     "diagnostics.R",
-    "output.R"
+    "output.R",
+    # Pre-flight cross-reference checks. Absent from this list until
+    # 2026-08-21, which meant validate_weighting_preflight() and its 14 checks
+    # never ran in a real weighting run while a 482-line test suite went on
+    # passing against them — a whole validation layer testifying to being alive.
+    file.path("validation", "preflight_validators.R")
   )
 
   for (lib_file in lib_files) {
     lib_path <- file.path(lib_dir, lib_file)
-    if (file.exists(lib_path)) {
-      source(lib_path, local = FALSE)
+    if (!file.exists(lib_path)) {
+      # REFUSE, do not skip. Silently skipping a missing file is how the
+      # preflight layer stayed dead and unnoticed for so long; it is the same
+      # trap the brand module hit with its own source whitelist. A file named
+      # here is required, so its absence is a broken installation, not an
+      # option (review 2026-08-21, I-22).
+      cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+      cat(sprintf("│ Required module file not found: %s\n", lib_file))
+      cat(sprintf("│ Looked in: %s\n", lib_dir))
+      cat("│ Fix: Ensure the Turas installation is complete (re-clone or\n")
+      cat("│      restore the missing file from git).\n")
+      cat("└───────────────────────────────────────────────────────┘\n\n")
+      stop(paste0("Required module file not found: ", lib_path), call. = FALSE)
     }
+    source(lib_path, local = FALSE)
   }
 }
 
@@ -376,6 +393,39 @@ run_weighting <- function(config_file,
   # data[[weight_name]] <- weights replaces an existing column without a word,
   # and if the name matches the ID column it destroys the merge key.
   validate_weight_names(data, weight_names, config$general$id_column)
+
+  # ---------------------------------------------------------------------------
+  # PRE-FLIGHT CROSS-REFERENCE CHECKS (advisory)
+  # ---------------------------------------------------------------------------
+  # Runs before any weight is computed, so an operator with a five-weight config
+  # sees every config problem at once instead of fixing one, re-running, and
+  # meeting the next. This layer existed with a full test suite but was never
+  # sourced or called, so none of its 14 checks had ever run in a real weighting
+  # run (review 2026-08-21, I-22).
+  #
+  # ADVISORY ON PURPOSE — it reports and does not refuse. The checks that must
+  # stop a run already do: each engine calls its own validate_*_config() and
+  # refuses there, and every weight is validated after calculation
+  # (CALC_WEIGHT_INVALID). Turning fourteen never-executed checks into blocking
+  # gates in one step, on a module whose design and cell paths have never run
+  # against real project data, risks refusing a config that works today — the
+  # worst version of which happens mid-fieldwork. Promote individual checks to
+  # blocking once they have proven themselves on real projects.
+  if (exists("validate_weighting_preflight", mode = "function")) {
+    preflight_log <- tryCatch(
+      validate_weighting_preflight(config, data),
+      error = function(e) {
+        # A fault in an advisory layer must never take down a run that would
+        # otherwise succeed.
+        cat(sprintf("\n  [WARNING] Pre-flight checks could not complete: %s\n",
+                    conditionMessage(e)))
+        NULL
+      }
+    )
+    if (!is.null(preflight_log) && nrow(preflight_log) > 0) {
+      report_preflight_findings(preflight_log)
+    }
+  }
 
   weight_results <- list()
   # Weights that failed in PARTIAL mode. Their columns are never written, so the

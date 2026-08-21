@@ -14,9 +14,25 @@
 #' @param weight_name Character, name of the weight being validated
 #' @return List with $valid (logical), $errors (character vector)
 #' @export
-validate_design_config <- function(data, design_targets, weight_name) {
+validate_design_config <- function(data, design_targets, weight_name,
+                                   allow_unmatched = FALSE,
+                                   allow_empty_targets = FALSE) {
   errors <- character(0)
   warnings <- character(0)
+
+  # The two opt-ins exist so an operator can say "yes, I know, proceed" to
+  # conditions the engine can genuinely handle: allow_unmatched leaves
+  # unmatched respondents' weights blank and reports the count;
+  # allow_empty_targets redistributes a population share nobody can carry.
+  # Until 2026-08-21 this validator raised those conditions as unconditional
+  # errors and ran BEFORE the engine read either flag, so the refusal told the
+  # operator to set a setting that then changed nothing — they set it, re-ran,
+  # and were refused again with the same message (review 2026-08-21, I-23).
+  # Downgrading to a warning when the flag is set is what makes the documented
+  # escape hatch reachable. The cell path has always worked this way.
+  note <- function(errs, warns, msg, allowed) {
+    if (isTRUE(allowed)) list(errs, c(warns, msg)) else list(c(errs, msg), warns)
+  }
 
   # Filter targets for this weight
   targets <- design_targets[design_targets$weight_name == weight_name, , drop = FALSE]
@@ -50,10 +66,12 @@ validate_design_config <- function(data, design_targets, weight_name) {
   # Check no missing values in stratum variable
   n_missing <- sum(is.na(data[[stratum_var]]))
   if (n_missing > 0) {
-    errors <- c(errors, sprintf(
-      "Stratum variable '%s' has %d missing values (%.1f%%). Cannot calculate design weights with missing stratification data.",
-      stratum_var, n_missing, 100 * n_missing / nrow(data)
-    ))
+    .r <- note(errors, warnings, sprintf(
+      "Stratum variable '%s' has %d missing values (%.1f%%). Those respondents cannot be stratified.%s",
+      stratum_var, n_missing, 100 * n_missing / nrow(data),
+      if (isTRUE(allow_unmatched)) " allow_unmatched = YES, so their weights are left blank and the count is reported." else " Cannot calculate design weights with missing stratification data."
+    ), allow_unmatched)
+    errors <- .r[[1]]; warnings <- .r[[2]]
   }
 
   # Check all categories exist in data
@@ -61,21 +79,29 @@ validate_design_config <- function(data, design_targets, weight_name) {
   data_categories <- data_categories[!is.na(data_categories)]
   target_categories <- as.character(targets$stratum_category)
 
+  # A target category with nobody in it is the SAME condition as the
+  # zero-observation stratum checked further down, just detected from the other
+  # side; allow_empty_targets has to govern both or the opt-in cannot clear a
+  # config, because the two checks fire together on the same category.
   missing_in_data <- setdiff(target_categories, data_categories)
   if (length(missing_in_data) > 0) {
-    errors <- c(errors, sprintf(
-      "Categories specified in Design_Targets not found in data: %s\nCategories in data: %s",
+    .r <- note(errors, warnings, sprintf(
+      "Categories specified in Design_Targets not found in data: %s\nCategories in data: %s%s",
       paste(missing_in_data, collapse = ", "),
-      paste(data_categories, collapse = ", ")
-    ))
+      paste(data_categories, collapse = ", "),
+      if (isTRUE(allow_empty_targets)) "\nallow_empty_targets = YES, so their population share is redistributed across the strata that do have respondents." else ""
+    ), allow_empty_targets)
+    errors <- .r[[1]]; warnings <- .r[[2]]
   }
 
   missing_in_targets <- setdiff(data_categories, target_categories)
   if (length(missing_in_targets) > 0) {
-    errors <- c(errors, sprintf(
-      "Categories in data not specified in Design_Targets: %s\nThese cases will have no weight assigned.",
-      paste(missing_in_targets, collapse = ", ")
-    ))
+    .r <- note(errors, warnings, sprintf(
+      "Categories in data not specified in Design_Targets: %s\nThese cases will have no weight assigned.%s",
+      paste(missing_in_targets, collapse = ", "),
+      if (isTRUE(allow_unmatched)) " allow_unmatched = YES, so this is accepted and the count is reported." else ""
+    ), allow_unmatched)
+    errors <- .r[[1]]; warnings <- .r[[2]]
   }
 
   # Check population sizes are positive
@@ -101,10 +127,12 @@ validate_design_config <- function(data, design_targets, weight_name) {
     cat_val <- targets$stratum_category[i]
     sample_n <- sum(data[[stratum_var]] == cat_val, na.rm = TRUE)
     if (sample_n == 0) {
-      errors <- c(errors, sprintf(
-        "Stratum '%s' has 0 observations in data. Cannot calculate weight.",
-        cat_val
-      ))
+      .r <- note(errors, warnings, sprintf(
+        "Stratum '%s' has 0 observations in data.%s",
+        cat_val,
+        if (isTRUE(allow_empty_targets)) " allow_empty_targets = YES, so its population share is redistributed across the strata that do have respondents." else " Cannot calculate weight."
+      ), allow_empty_targets)
+      errors <- .r[[1]]; warnings <- .r[[2]]
     }
   }
 
