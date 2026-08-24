@@ -56,7 +56,9 @@ test_that("the plan classifies every column the documented way", {
   expect_equal(action_of("Other (Specify):BankMain"), "drop")
   expect_equal(action_of("Bank: ATM:Awareness"), "multi")
   expect_equal(action_of("WC_Town"), "merge_town")
-  expect_equal(action_of("Other (Specify):WC_Town"), "drop")   # write-in twin
+  # The write-in twin is kept and folded into Town: a respondent who picked
+  # "Other" typed their real town into it, and 11% of VAS 2026 did.
+  expect_equal(action_of("Other (Specify):WC_Town"), "merge_town_other")
 
   # the DUPLICATED "Other (Please Specify)" header: option column kept,
   # write-in twin dropped
@@ -221,4 +223,37 @@ test_that("a workbook with no recognisable header refuses by name", {
   expect_error(read_template_sheet(path, "Questions",
                                    c("QuestionCode", "Variable_Type", "Columns")),
                class = "vas_sheet_headerless")
+})
+
+test_that("a written-in town replaces the literal 'Other'", {
+  source <- list(response_id = c("1", "2", "3"),
+                 data = data.frame(
+                   WC_Town = c("Cape Town", "Other", "Other"),
+                   `Other (Please Specify):WC_Town` = c(NA, "Britz", NA),
+                   check.names = FALSE, stringsAsFactors = FALSE))
+  town <- assemble_town_column(source, "WC_Town",
+                               "Other (Please Specify):WC_Town")
+  expect_equal(town[1], "Cape Town")     # a picked town is untouched
+  expect_equal(town[2], "Brits")         # written in, and folded to the canonical spelling
+  expect_equal(town[3], "Other")         # nothing typed, so "Other" stands honestly
+})
+
+test_that("town folding only touches unambiguous spellings of one name", {
+  expect_equal(canonical_town("Britz"), "Brits")
+  expect_equal(canonical_town("BRITS CBD"), "Brits")      # case-insensitive
+  expect_equal(canonical_town("Brits   cbd"), "Brits")    # extra spaces ignored
+  # a settlement near Brits is NOT Brits, and stays as typed
+  expect_equal(canonical_town("Brits Bethani"), "Brits Bethani")
+  expect_equal(canonical_town("Blood river"), "Blood river")
+  # an unknown town passes through, tidied but never guessed at
+  expect_equal(canonical_town("  Standerton "), "Standerton")
+  expect_true(is.na(canonical_town(NA_character_)))
+})
+
+test_that("Town's option list drops 'Other' once no one is filed under it", {
+  # The survey offers "Other" but the data never carries it any more, so
+  # declaring it would leave a permanently empty row on the Town table.
+  declared <- c("Cape Town", "Other", "Stellenbosch")
+  kept <- declared[tolower(trimws(declared)) != "other"]
+  expect_equal(kept, c("Cape Town", "Stellenbosch"))
 })

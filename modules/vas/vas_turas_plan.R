@@ -8,7 +8,9 @@
 #   id          the Response ID column
 #   keep        rides into the Turas dataset (scalar question)
 #   multi       rides in as one member column of a Multi_Mention question
-#   merge_town  coalesced into the single Town column
+#   merge_town        coalesced into the single Town column
+#   merge_town_other  the "Other (Please Specify)" twin of a town question,
+#                     folded into Town in place of the literal "Other"
 #   engine      consumed by the derived-variable engine; replaced by the
 #               derived columns, so it does not ride in itself
 #   drop        left out (GPS machinery, QC fields, PII, write-in duplicates)
@@ -116,7 +118,11 @@ classify_export_column <- function(header, parts, consumed, index, duplicate,
     return("engine")
   }
   if (grepl(VAS_PLAN_TOWN_PATTERN, parts$alias)) {
-    return(if (is.na(parts$option_title)) "merge_town" else "drop")
+    # The write-in twin is KEPT, not dropped: a respondent who picked "Other"
+    # typed their town into it, and publishing them as "Other" throws that away
+    # for the 11% of the sample who did. It is folded into Town rather than
+    # published as a column of its own - see assemble_town_column().
+    return(if (is.na(parts$option_title)) "merge_town" else "merge_town_other")
   }
   if (!is.na(parts$option_title) && parts$alias %in% scalar_aliases) {
     return("drop")            # a single-choice question's write-in column
@@ -150,7 +156,7 @@ build_turas_column_plan <- function(headers, category_map, index) {
   }, character(1))
 
   question_code <- ifelse(action %in% c("keep", "multi"), parts$alias,
-                          ifelse(action == "merge_town", "Town",
+                          ifelse(action %in% c("merge_town", "merge_town_other"), "Town",
                                  ifelse(action == "id", "ResponseID", NA_character_)))
   question_code[headers == "Status"] <- "ResponseStatus"
 

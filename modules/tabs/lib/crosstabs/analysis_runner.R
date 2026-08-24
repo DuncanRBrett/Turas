@@ -288,14 +288,30 @@ print_partial_status <- function(run_status, skipped_questions, partial_question
   cat("[TRS PARTIAL] ANALYSIS COMPLETED WITH PARTIAL RESULTS\n")
   cat(paste(rep("!", 80), collapse=""), "\n")
 
-  # Report skipped questions
-  if (length(skipped_questions) > 0) {
-    cat(sprintf("\n  SKIPPED QUESTIONS: %d\n", length(skipped_questions)))
+  # Report skipped questions. The two kinds are listed apart: an empty subgroup
+  # is not something to go and fix, so it must not appear under ACTION REQUIRED
+  # alongside skips that are genuinely wrong.
+  is_empty_base <- vapply(skipped_questions,
+                          function(s) identical(s$kind, "empty_base"), logical(1))
+  degrading_skips <- skipped_questions[!is_empty_base]
+  empty_base_skips <- skipped_questions[is_empty_base]
+
+  if (length(degrading_skips) > 0) {
+    cat(sprintf("\n  SKIPPED QUESTIONS: %d\n", length(degrading_skips)))
     cat("  The following questions are MISSING from your output:\n\n")
-    for (skip_code in names(skipped_questions)) {
-      skip_info <- skipped_questions[[skip_code]]
+    for (skip_code in names(degrading_skips)) {
+      skip_info <- degrading_skips[[skip_code]]
       cat(sprintf("    - %s: %s (stage: %s)\n",
                   skip_code, skip_info$reason, skip_info$stage))
+    }
+  }
+
+  if (length(empty_base_skips) > 0) {
+    cat(sprintf("\n  NO RESPONDENTS TO TABULATE: %d (not a fault)\n",
+                length(empty_base_skips)))
+    cat("  Nobody falls into these subgroups, so there is nothing to tabulate:\n\n")
+    for (skip_code in names(empty_base_skips)) {
+      cat(sprintf("    - %s: %s\n", skip_code, empty_base_skips[[skip_code]]$reason))
     }
   }
 

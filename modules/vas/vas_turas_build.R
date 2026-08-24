@@ -97,14 +97,47 @@ assemble_multi_columns <- function(source, alias, alias_options) {
 #' @param town_headers The scalar town headers, from the plan.
 #'
 #' @return A character vector, one element per respondent.
-assemble_town_column <- function(source, town_headers) {
+assemble_town_column <- function(source, town_headers, other_headers = character(0)) {
   town <- rep(NA_character_, length(source$response_id))
   for (header in town_headers) {
     values <- as.character(source$data[[header]])
     town <- ifelse(is.na(town) & !is.na(values) & nzchar(trimws(values)),
                    values, town)
   }
-  return(town)
+
+  # "Other" is not a town. Where the respondent picked it they typed the real
+  # one into the write-in twin, so use that instead - on VAS 2026 that is 11%
+  # of the sample, every one of whom typed something. A blank write-in leaves
+  # "Other" standing, because that at least says the picked option honestly.
+  written <- rep(NA_character_, length(town))
+  for (header in other_headers) {
+    values <- as.character(source$data[[header]])
+    written <- ifelse(is.na(written) & !is.na(values) & nzchar(trimws(values)),
+                      values, written)
+  }
+  is_other <- !is.na(town) & tolower(trimws(town)) == "other"
+  town <- ifelse(is_other & !is.na(written), written, town)
+
+  return(canonical_town(town))
+}
+
+#' Fold the spelling variants of a written-in town together
+#'
+#' Free text arrives as people type it: Brits, Britz, "Brits cbd". Left alone
+#' each becomes its own crosstab row, which fragments a real town into several
+#' small ones and is worse than the "Other" it replaced. The folding is a
+#' TABLE, not code, so changing it is a one-line edit rather than a rewrite -
+#' and only unambiguous variants of the same name belong in it. A town that
+#' might be somewhere else stays as it was typed.
+#'
+#' @param town A character vector of town values.
+#'
+#' @return The vector with whitespace tidied and known aliases folded.
+canonical_town <- function(town) {
+  tidy <- trimws(gsub("[[:space:]]+", " ", town))
+  key <- tolower(tidy)
+  hit <- match(key, tolower(names(VAS_TOWN_ALIASES)))
+  return(ifelse(!is.na(hit), unname(VAS_TOWN_ALIASES)[hit], tidy))
 }
 
 #' Assemble the full Turas data frame
@@ -132,8 +165,9 @@ assemble_turas_data <- function(source, plan, options, wide) {
     }
   }
   town_headers <- plan$export_header[plan$action == "merge_town"]
+  other_headers <- plan$export_header[plan$action == "merge_town_other"]
   if (length(town_headers)) {
-    data$Town <- assemble_town_column(source, town_headers)
+    data$Town <- assemble_town_column(source, town_headers, other_headers)
   }
 
   derived <- wide[match(as.character(source$response_id), as.character(wide$ResponseID)),
@@ -331,7 +365,9 @@ build_turas_dataset <- function(export_path, register_path, output_dir,
   # undeclared option is a respondent quietly dropped from that table. The
   # observed values are unioned in as well, so a hand-added town still counts.
   town_declared <- options$value[grepl(VAS_PLAN_TOWN_PATTERN, options$alias)]
-  town_values <- sort(unique(c(trimws(town_declared),
+  # "Other" no longer reaches the data, so it no longer belongs on the list.
+  town_declared <- town_declared[tolower(trimws(town_declared)) != "other"]
+  town_values <- sort(unique(c(canonical_town(town_declared),
                                trimws(stats::na.omit(data$Town)))))
   town_values <- town_values[nzchar(town_values)]
 
