@@ -4,7 +4,9 @@
  * Findings are grouped by QUESTION into ranked cards; each line is one group
  * that genuinely stands out, told as a sentence with a two-bar comparison
  * (group vs THE REST — everyone except it) and a plain-English verdict.
- * Percentages surface when a group beats 2+ siblings (the published letters);
+ * Percentages surface when a group beats 2+ siblings (the published letters) —
+ * except on a two-level banner, where the single sibling IS all the siblings,
+ * so beating it alone is a finding (DIFFERENCES_RANKING_DESIGN.md, decision E);
  * mean / index / NPS are recomputed from microdata and surface when a group
  * differs from the rest, in either direction — on a two-level banner the rest
  * of one level IS the other, so that pair is one finding told twice and the
@@ -102,6 +104,60 @@
      so a "difference" on one would be a finding about a number nobody
      computed. This asked the LABEL until 2026-08, which caught only the SD. */
 
+  /* ------------------------------------------------------------------------
+     The BALANCED score (DIFFERENCES_RANKING_DESIGN.md). Every finding carries
+     a second score, scoreBalanced = strength × effect × 100, both on 0..1:
+     strength is bounded evidence (a capped |z| ratio for a mean, the share of
+     siblings beaten for a proportion) and effect is size on the measure's own
+     scale (|gap|/robust range for a mean, Cohen's h for a proportion). It
+     drives the "balanced" sort only; the legacy `score` and the default sort
+     are byte-identical to before. */
+
+  /** Bound on the mean strength ratio |z|/zHi: beyond three times the
+   *  critical value, more certainty says nothing more about size. */
+  var MEAN_Z_CAP = 3;
+
+  /** Cohen's h for two proportions — the same effect currency as the
+   *  Executive Takeout (takeout.effectSize, 27e). Duplicated, not imported:
+   *  this module and its test sandbox stay self-contained (SIZE-EXCEPTION). */
+  var COHEN_H_REFERENCE = 0.8;   // Cohen's "large" effect -> full weight
+  function cohenH(p1, p2) {
+    var clamp = function (p) { return Math.min(1, Math.max(0, p)); };
+    var phi = function (p) { return 2 * Math.asin(Math.sqrt(clamp(p))); };
+    return phi(p1) - phi(p2);
+  }
+
+  /**
+   * Robust scoring range for a question's per-respondent scores. On an
+   * unbounded observed scale (rand, counts — more than 12 distinct values,
+   * since the widest designed scale is 0–10 and NPS index scores are three
+   * values) one big spender stretches the min–max and deflates every
+   * finding's effect, so the bounds become the nearest-rank p5/p95 of the
+   * non-null values — computed over the same full unfiltered vector as the
+   * min–max, unweighted, deterministic on rebuild. A designed scale (≤ 12
+   * distinct values, where outliers are impossible) keeps the full range.
+   * Anchored at 0 exactly as the display range is. Fallback chain: robust
+   * range → full range (e.g. ≥95% zeros makes p5 = p95 = 0) → 1. Returns the
+   * range WIDTH only — f.scaleMin/scaleMax are untouched: they drive the
+   * comparison bars and the Takeout's effectSize, and must not move.
+   */
+  function robustRange(values, fullRange) {
+    var seen = {}, distinct = 0, i;
+    for (i = 0; i < values.length && distinct <= 12; i++) {
+      if (!seen[values[i]]) { seen[values[i]] = true; distinct++; }
+    }
+    if (distinct <= 12) return fullRange || 1;
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var rank = function (p) {
+      return sorted[Math.min(sorted.length - 1,
+        Math.max(0, Math.ceil(p * sorted.length) - 1))];
+    };
+    var lo = rank(0.05), hi = rank(0.95);
+    var range = Math.max(0, hi) - Math.min(0, lo);
+    return range || fullRange || 1;
+  }
+  views._robustRange = robustRange;   // exposed for the differences gate test
+
   /**
    * Mean / Index / NPS findings for one question. The published tables carry NO
    * significance for these rows, so recompute the per-column weighted means from
@@ -123,10 +179,11 @@
     var means = TR.stats.indexMeans(q, spec.columns, mask);
     if (!means) return out;                       // ranking / no-score question
     var scores = TR.MICRO.scores && TR.MICRO.scores[q.code];
-    var lo = 0, hi = 0, any = false;              // response-scale range
+    var lo = 0, hi = 0, any = false, vals = [];   // response-scale range
     if (scores) {
       scores.forEach(function (v) {
         if (v === null || v === undefined) return;
+        vals.push(v);
         if (!any) { lo = hi = v; any = true; } else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
       });
     } else if (q.index_scores) {
@@ -141,6 +198,10 @@
     }
     var scaleMin = Math.min(0, lo), scaleMax = Math.max(0, hi);
     var range = (scaleMax - scaleMin) || 1;
+    // Balanced-score denominator only. The q.index_scores fallback path is a
+    // designed scale by definition (declared label scores), so it keeps the
+    // full range without the distinct-value scan.
+    var scoreRange = scores ? robustRange(vals, range) : range;
     var decimals = /nps/i.test(row.label) ? 0 : 1;
     var n = TR.MICRO.n;
     // The disclosure k-gate blanks below-k columns in the crosstab; a recomputed
@@ -169,7 +230,12 @@
         value: means[i].mean, rest: rm.mean, overall: means[0].mean,
         gap: gap, decimals: decimals, scaleMin: scaleMin, scaleMax: scaleMax,
         beaten: [], base: means[i].k,   // column base — carried for the Executive Takeout
-        score: (az / TR.stats.Z95) * Math.abs(gap) / range * 100 });
+        score: (az / TR.stats.Z95) * Math.abs(gap) / range * 100,
+        // Balanced: capped evidence (the same configured critical value that
+        // gated the finding, not the fixed Z95 the legacy score keeps) times
+        // size on the robust range. A just-significant mean scores 1/3.
+        scoreBalanced: Math.min(az / zHi, MEAN_Z_CAP) / MEAN_Z_CAP *
+          Math.min(1, Math.abs(gap) / scoreRange) * 100 });
     });
     return out;
   }
@@ -206,6 +272,15 @@
       model.columns.forEach(function (col) {
         if (col.letter) labelByLetter[col.letter] = col.label;
       });
+      // Decision E (DIFFERENCES_RANKING_DESIGN.md): a proportion finding
+      // normally needs the group ahead of 2+ siblings — one letter is a
+      // pairwise result, not a standout. On a TWO-level banner the single
+      // sibling IS all the siblings, so beating it is the strongest breadth
+      // statement the banner allows, and it matches the mean path's single
+      // planned test (the letters' Bonferroni divisor is 1 there). Structural
+      // (Total + two columns), so the rule holds without microdata; banners
+      // with 3+ levels are unchanged.
+      var required = model.columns.length === 3 ? 1 : 2;
       // model.rows is 1:1 with q.rows in this view (no row scope / hide / sort),
       // so the loop index is the question row index used to recompute the rest.
       model.rows.forEach(function (row, ri) {
@@ -227,8 +302,8 @@
           var sig = cell.sig || "";
           var solid = sig.replace(/[a-z]/g, "");              // beaten at 95%
           var soft80 = dual ? sig.replace(/[A-Z]/g, "") : ""; // beaten only at 80%
-          var is95 = solid.length >= 2;
-          var is80 = !is95 && (solid.length + soft80.length) >= 2;
+          var is95 = solid.length >= required;
+          var is80 = !is95 && (solid.length + soft80.length) >= required;
           if (!is95 && !is80) return;
           var overall = row.cells[0].pct;
           if (cell.pct === null || overall === null) return;
@@ -250,7 +325,15 @@
               return labelByLetter[l.toUpperCase()] || l;
             }),
             base: model.columns[i].base,   // column base — carried for the Executive Takeout
-            score: letters.length * Math.abs(cell.pct - baseline) });
+            score: letters.length * Math.abs(cell.pct - baseline),
+            // Balanced: share of siblings beaten (structural denominator, as
+            // the gate — low-base siblings understate it, conservatively)
+            // times Cohen's h against the same baseline the gap uses, in the
+            // Takeout's effect currency (h / 0.8, Cohen's "large").
+            scoreBalanced:
+              Math.min(1, letters.length / Math.max(1, model.columns.length - 2)) *
+              Math.min(1, Math.abs(cohenH(cell.pct / 100, baseline / 100)) /
+                COHEN_H_REFERENCE) * 100 });
         });
       });
       // Mean / index / NPS standouts — recomputed from microdata (the published
@@ -315,9 +398,19 @@
   }
 
   /** The ranked findings a banner renders: collected, then reciprocal
-   *  mean pairs collapsed. */
-  function rankedFindings(banner) {
-    return collapseReciprocal(collectFindings(banner), bannerLevels(banner));
+   *  mean pairs collapsed. sortKey "balanced" re-ranks by scoreBalanced under
+   *  the same tier rule (solid before soft) — the findings SET is identical
+   *  under every sort, so the "top N of M" note stays honest when the reader
+   *  switches. Any other key keeps collectFindings' default order. */
+  function rankedFindings(banner, sortKey) {
+    var out = collapseReciprocal(collectFindings(banner), bannerLevels(banner));
+    if (sortKey === "balanced") {
+      out = out.slice().sort(function (a, b) {
+        return (a.soft ? 1 : 0) - (b.soft ? 1 : 0) ||
+          b.scoreBalanced - a.scoreBalanced;
+      });
+    }
+    return out;
   }
 
   /** Group the ranked findings by question, preserving rank order. */
@@ -406,6 +499,21 @@
       '<div class="df-beats">' + verdict + "</div></div>";
   }
 
+  /** The sort control's options. "balanced" ranks by scoreBalanced
+   *  (DIFFERENCES_RANKING_DESIGN.md) — a page-local control like the other
+   *  two, deliberately with no config plumbing (decision C: watch it on real
+   *  studies before considering the default). */
+  function sortOptionsHtml(current) {
+    return [["standout", "Biggest differences first"],
+            ["balanced", "Biggest differences first (balanced)"],
+            ["question", "Question order"]]
+      .map(function (o) {
+        return '<option value="' + o[0] + '"' +
+          (current === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
+      }).join("");
+  }
+  views._diffSortOptions = sortOptionsHtml;   // exposed for the gate test
+
   /* exposed for the differences gate test */
   views._collectFindings = collectFindings;
   views._collapseReciprocal = collapseReciprocal;
@@ -444,7 +552,7 @@
       banner = TR.d2.firstBanner();
     }
     var dual = TR.d2.state.sigMode === "dual";
-    var all = rankedFindings(banner);
+    var all = rankedFindings(banner, diffSort);
     // 95% findings get the full budget; nearly-significant (80%) ones get their
     // own, so turning on dual mode ADDS soft findings without ever crowding out
     // a solid one — even on dense banners that already have 80+ solid findings.
@@ -466,11 +574,7 @@
       // What a reader needs here is what a card IS and what the control does.
       TR.txt.block("diffs.intro") +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
-      '<select data-diffsort>' +
-      '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +
-      ">Biggest differences first</option>" +
-      '<option value="question"' + (diffSort === "question" ? " selected" : "") +
-      ">Question order</option></select>" +
+      '<select data-diffsort>' + sortOptionsHtml(diffSort) + "</select>" +
       '<select data-diffsig title="Significance level">' +
       '<option value="95"' + (!dual ? " selected" : "") + ">95%</option>" +
       '<option value="dual"' + (dual ? " selected" : "") + ">95% + 80%</option>" +
@@ -481,8 +585,8 @@
         ? '<span class="trknote">top ' + shown.length + " of " + all.length +
           " differences shown</span>" : "") + "</div></div>"];
     if (!groups.length) {
-      html.push('<div class="card"><p>No group is significantly ahead of two ' +
-        "or more others on this banner.</p></div>");
+      html.push('<div class="card"><p>No group stands significantly apart ' +
+        "on this banner.</p></div>");
     }
     groups.forEach(function (group) { html.push(cardHtml(group)); });
     html.push(TR.conf.calloutHtml());
