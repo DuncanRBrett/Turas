@@ -11,8 +11,10 @@
 # alpha_default / insight_exclude_categories class of defect: registered and
 # consumed, never carried). Each link has a gate:
 #
-#   1. Selection-column carry-through  (crosstabs/data_setup.R)
+#   1. Selection-column carry-through + Y/N canonicalisation, so "Yes" acts and
+#      junk refuses rather than quietly meaning "no"  (crosstabs/data_setup.R)
 #        -> test_selection_flags.R, "ExcludeFromInsights is carried through..."
+#           and "...refuses instead of meaning 'no'"
 #   2. Orchestrator extraction, Y -> TRUE  (question_orchestrator.R)
 #        -> THIS FILE (nothing else exercises the extraction)
 #   3. Data-layer emission, TRUE-only      (data_layer_writer.R)
@@ -111,9 +113,10 @@ test_that("a 'Y' becomes TRUE on the question result", {
 })
 
 test_that("case and surrounding whitespace do not defeat it", {
-  # The loader does NOT canonicalise this column (AreaSummary is the precedent),
-  # so the orchestrator's own toupper(trimws()) is the only thing standing
-  # between an operator typing " y " and a silently ignored declaration.
+  # A config read from a workbook arrives already canonicalised to "Y"/"N" by
+  # the loader's gate loop, but process_single_question is also called with
+  # hand-built question rows, so its own toupper(trimws()) is a second line —
+  # tested here because that is the path a caller bypassing the loader takes.
   expect_true(isTRUE(efi_run(ExcludeFromInsights = " y ")$exclude_from_insights))
   expect_true(isTRUE(efi_run(ExcludeFromInsights = "Y ")$exclude_from_insights))
 })

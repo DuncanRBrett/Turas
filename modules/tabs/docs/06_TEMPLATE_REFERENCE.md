@@ -1237,7 +1237,10 @@ differ".
 **Required:** No. Blank means the question can raise findings, which is
 the default for every question.
 
-**What to enter:** `Y` to keep it out. `N` or blank to leave it in.
+**What to enter:** `Y` to keep it out. `N` or blank to leave it in. Read
+like the other Y/N gate columns — any case, `Yes`/`No` and `TRUE`/`FALSE`
+accepted — and a value Turas cannot read stops the run naming the row,
+rather than quietly meaning "no".
 
 **When to use Y:** When several near-duplicate views of one measure each
 raise their own card and crowd the ranking — a study carrying

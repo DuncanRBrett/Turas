@@ -602,5 +602,18 @@ run("30. ExcludeFromInsights takes ONE question out of the findings, and nothing
      "ExcludeFromInsights = N is the same as not declaring it");
 });
 
+run("30b. …including MEAN findings, which are the case the column was built for", () => {
+  // The motivating study excludes imputed SPEND measures, and on a two-level
+  // banner those can only ever be mean findings (a proportion needs 2+ siblings
+  // — DIFFERENCES_TAB_SCOPE.md §3). The skip sits above meanFindings() in the
+  // same per-question loop; this pins that, rather than inferring it.
+  const D = meanFixture(sandbox(true));
+  eq(D.views._collectFindings("Gender").length, 2, "unflagged: both sides differ");
+  const F = meanFixture(sandbox(true));
+  F.AGG.questions[0].exclude_from_insights = true;
+  eq(F.views._collectFindings("Gender").length, 0,
+     "flagged: the recomputed mean finding is skipped too");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

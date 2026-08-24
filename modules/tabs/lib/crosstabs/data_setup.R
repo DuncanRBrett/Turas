@@ -346,7 +346,13 @@ load_question_selection <- function(config_file) {
   # reader — the engine's exact `== "Y"` tests and preflight's `toupper()` ones —
   # then sees the same value, so a lowercase "y" can no longer pass validation
   # and be dropped by the engine.
-  for (flag in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex")) {
+  # ExcludeFromInsights joins them: it is a Y/N gate like the others, and a
+  # "Yes" or a "TRUE" that quietly meant "no" would leave the analyst reading a
+  # Differences tab still full of the measures they asked to drop, with nothing
+  # said anywhere. The orchestrator keeps its own toupper(trimws()) == "Y" test
+  # for question rows built by hand rather than read from this sheet.
+  for (flag in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex",
+                 "ExcludeFromInsights")) {
     selection_df[[flag]] <- normalise_flag_column(
       selection_df[[flag]], flag, "Selection",
       default = "N", row_codes = selection_df$QuestionCode)

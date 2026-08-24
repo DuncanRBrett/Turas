@@ -370,27 +370,36 @@ test_that("logical and numeric columns normalise without a detour through text",
 
 context("optional Selection columns survive the loader")
 
-test_that("ExcludeFromInsights is carried through as text, and invented when absent", {
+test_that("ExcludeFromInsights is carried through and canonicalised like its siblings", {
   # DIFFERENCES_TAB_SCOPE.md item 4: the per-question Differences opt-out. The
-  # loader's optional-column loop is the first of the five touch points — a
+  # loader's optional-column loop is the first of its five touch points — a
   # column missing from that vector is silently dropped before the orchestrator
-  # ever sees it. Deliberately NOT a normalise_flag_column gate (AreaSummary is
-  # the precedent): the orchestrator reads it with toupper(trimws()) == "Y".
+  # ever sees it — and it joins the Y/N gate loop, so "Yes" acts and junk
+  # refuses instead of quietly meaning "no" (C3).
   res <- load_selection(data.frame(
-    QuestionCode = c("Q1", "Q2", "Q3"),
-    Include = c("Y", "Y", "Y"),
-    ExcludeFromInsights = c("Y", "", "y"),
+    QuestionCode = c("Q1", "Q2", "Q3", "Q4"),
+    Include = c("Y", "Y", "Y", "Y"),
+    ExcludeFromInsights = c("Y", "", " y ", "Yes"),
     stringsAsFactors = FALSE
   ))
   expect_true("ExcludeFromInsights" %in% names(res$selection_df))
-  expect_type(res$selection_df$ExcludeFromInsights, "character")
-  expect_equal(res$selection_df$ExcludeFromInsights[1], "Y")
-  expect_equal(res$selection_df$ExcludeFromInsights[3], "y")   # orchestrator upper-cases
+  expect_equal(res$selection_df$ExcludeFromInsights, c("Y", "N", "Y", "Y"))
 
-  # A config written before the column existed still loads, with the column
-  # present and empty — nothing downstream has to test for its absence.
+  # A config written before the column existed still loads, with every question
+  # free to raise findings — nothing downstream has to test for its absence.
   bare <- load_selection(data.frame(
     QuestionCode = "Q1", Include = "Y", stringsAsFactors = FALSE))
   expect_true("ExcludeFromInsights" %in% names(bare$selection_df))
-  expect_true(all(is.na(bare$selection_df$ExcludeFromInsights)))
+  expect_equal(bare$selection_df$ExcludeFromInsights, "N")
+})
+
+test_that("an unreadable ExcludeFromInsights value refuses instead of meaning 'no'", {
+  # Silently reading it as "no" would leave the analyst looking at a Differences
+  # tab still full of the measures they asked to drop, with nothing said.
+  expect_error(
+    load_selection(data.frame(
+      QuestionCode = c("Q1", "Q2"), Include = c("Y", "Y"),
+      ExcludeFromInsights = c("Y", "maybe"), stringsAsFactors = FALSE)),
+    "ExcludeFromInsights"
+  )
 })
