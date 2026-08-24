@@ -7,6 +7,14 @@ through."*
 *Everything below was checked by reading the code or driving the built report in
 a browser. Nothing has been changed.*
 
+*Second review, 24 August 2026 (independent session): every code claim re-read
+against the source. The observed report behaviour stands unchallenged. Several
+corrections landed, marked "**Second review**" below — the biggest two: item
+0's plumbing is four files, not two (the plan as written would have re-created
+the `alpha_default` defect a third time), and the absence of incidence findings
+on Gender is caused by a structural gate, not by the ranking, so item 3 as
+scoped would not have fixed the symptom that motivated it.*
+
 ---
 
 ## First, a correction
@@ -71,15 +79,43 @@ client-facing deliverable.
 
 ### 3. The ranking surfaces the weakest findings first
 
-Sorted by absolute difference, so a rand gap always outranks a percentage-point
-gap. On VAS the top card on Gender is **long-distance bus monthly spend — a
-number no respondent was asked.** It is trips × an assumed R750 a leg, on 36
-male buyers. The label does say "(imputed)", which is to the config's credit,
-but a modelled value should not be the first thing a reader meets.
+On VAS the top card on Gender is **long-distance bus monthly spend — a number
+no respondent was asked.** It is trips × an assumed R750 a leg, on 36 male
+buyers. The label does say "(imputed)", which is to the config's credit, but a
+modelled value should not be the first thing a reader meets.
 
 The knock-on: almost no incidence findings surface at all. On Gender, 9 of 9
 cards are derived numeric measures. "Who buys what" — the difference a lay
 reader most wants — never reaches the top of the list.
+
+**Second review — the mechanism above was misdiagnosed; the observation
+stands.** The first write-up said the sort was "by absolute difference, so a
+rand gap always outranks a percentage-point gap". The code does not do that.
+Two things are actually going on:
+
+1. **On a two-level banner, proportion findings are structurally impossible.**
+   A percentage finding requires the group to beat **two or more** sibling
+   columns (`27d_diffs.js:217-218` — `solid.length >= 2` at 95%, and the 80%
+   path needs two letters combined, so one sibling can never satisfy either).
+   Gender has one sibling.
+   So on Gender — and any yes/no or two-level cut — the tab can only ever show
+   mean / index / NPS findings. That, not the ranking, is why 9 of 9 Gender
+   cards are numeric and no "who buys what" finding appears there. It also
+   explains the doc's own numbers exactly: 9 cards × 2 mirrored mean lines =
+   18. **Re-ranking alone changes nothing on Gender.**
+
+2. **The scoring already attempts standardisation, and the two formulas are
+   not comparable.** A proportion scores `letters_beaten × pp_gap`
+   (`27d_diffs.js:240`); a mean scores `(|z|/z95) × |gap|/scale_range × 100`
+   (`27d_diffs.js:170`) — deliberately range-normalised so rand and pp rank
+   together. The comparability failures are subtler: the mean score's
+   significance multiplier `|z|/z95` is unbounded, while a proportion's letter
+   count caps at columns − 1 (on two levels: at 1, below the gate); and for an
+   unbounded rand scale the range is the *observed* min–max, so one big
+   spender in the data enlarges the range and deflates every spend finding's
+   score.
+
+Item 3's scope changes accordingly — see the revised table below.
 
 ### 4. Near-duplicate measures stack
 
@@ -114,7 +150,8 @@ fraction of what a 9-level cut produces, and nothing on the page explains that.
 | Renderer | `lib/html_report_v2/assets/js/27d_diffs.js` — 451 lines, one cohesive module, carries a SIZE-EXCEPTION note against splitting it |
 | Tests | `lib/html_report_v2/tests/diffs_tests.mjs` — 485 lines, ~25 named cases pinning the finding contract |
 | Sibling consumer | `lib/patterns_echo.R` — the Patterns tab mirrors the same classification rule; a change to what counts as excluded must move both or they disagree |
-| Config plumbing | `lib/data_layer_writer.R` (builds `proj`), `lib/generate_config_templates.R` (registers settings) |
+| Config plumbing | `lib/crosstabs/crosstabs_config.R` (`build_config_object` — the whitelist a Settings key must enter first, plus the known-settings list at ~line 1691), `lib/data_layer_writer.R` (builds `proj`), `lib/generate_config_templates.R` (registers settings). For per-question Selection columns (item 4): also `lib/crosstabs/data_setup.R:337` (column carry-through whitelist) and `lib/question_orchestrator.R` |
+| Takeout sibling | `lib/html_report_v2/assets/js/27fa_takeout_shares.js` — uses `views._isClassification` at line 68, so the exclusion lever reaches the Patterns/Group-overview KeyShare scan too |
 
 ### Blast radius
 
@@ -130,17 +167,29 @@ the default behaviour, with one exception noted below.
 
 | # | Change | Size | Risk | Default |
 |---|---|---|---|---|
-| **0** | **Wire `insight_exclude_categories` through** — add it to `proj` in `data_layer_writer.R`, register it in the config template, keep `patterns_echo.R` reading the same key | ~10 lines + 1 test | Very low — additive, the consumer and its test already exist | Empty, so nothing changes until a project sets it |
+| **0** | **Wire `insight_exclude_categories` through** — **four files** (second review; the two-file plan below repeated the defect it fixes): (1) `lib/crosstabs/crosstabs_config.R` — a `get_config_value` entry in `build_config_object` **and** the known-settings list at ~line 1691, or the setting is silently NULL and a fresh template warns on it; (2) `proj` in `data_layer_writer.R`; (3) `generate_config_templates.R`; (4) `patterns_echo.R` already reads the key — no change | ~15 lines + 1 test | Very low — additive, the consumer and its test already exist | Empty, so nothing changes until a project sets it |
 | **1** | **Collapse reciprocal pairs** — one card per finding, with both sides shown inside it | ~30 lines + tests | Low, but it changes what every existing report displays | Behaviour change (see below) |
 | **2** | **Drop the code prefix** — show the question label, keep the code in a title attribute or a "show codes" toggle | ~5 lines | Very low | Behaviour change, cosmetic |
-| **3** | **Rank by standardised effect** rather than raw difference, so a percentage-point gap and a rand gap are comparable | ~20 lines + tests | **Medium** — changes which findings reach the top, and the 80-cut-off then admits a different set | Best offered as a sort option first |
-| **4** | **Per-question exclusion** — a `ExcludeFromInsights` column on the config's Selection sheet, so a study can drop a duplicate measure from Differences without dropping it from the crosstabs | ~20 lines across R and JS + tests | Low — additive | Off |
+| **3** | **Fix score comparability + decide the two-level gate** (rescoped by the second review — the scoring is already standardised in intent). Three sub-decisions: bound or rescale the mean score's `|z|/z95` multiplier so it ranks fairly against letter counts; make the range normalisation robust to outliers on unbounded scales (rand); and decide whether a two-level banner should admit proportion findings on its single sibling (today it structurally cannot — see §3) | Bigger than first scoped — design work, then modest code | **Medium-high** — changes which findings reach the top *and* (if the gate opens) admits a class of finding that has never appeared | Best offered as a sort option first; the gate decision is separate |
+| **4** | **Per-question exclusion** — an `ExcludeFromInsights` column on the config's Selection sheet, so a study can drop a duplicate measure from Differences without dropping it from the crosstabs. **Five touch points** (modelled on `KeyShare`): the Selection-column carry-through whitelist in `lib/crosstabs/data_setup.R:337`, `question_orchestrator.R`, `data_layer_writer.R`, the Selection-column registration in `generate_config_templates.R`, and the skip in `27d_diffs.js`. Decide explicitly whether the Patterns/takeout scan (`27fa`) honours it or ignores it — silence would be a divergence nobody chose | ~25 lines across R and JS + tests | Low — additive | Off |
 
 **Item 0 is the enabler and should go first regardless.** It costs almost
 nothing, it makes an already-tested feature reachable, and on its own it lets
 VAS exclude the imputed categories (flights, long-distance bus, TV licence) from
 the findings — which removes the worst symptom of item 3 without touching the
 ranking at all.
+
+**Second review — two caveats on item 0's reach.** First, the lever is shared:
+`views._isClassification` also gates the Patterns/Group-overview KeyShare scan
+(`27fa_takeout_shares.js:68`), so a category excluded here leaves **two** tabs,
+not one. Second, exclusion is by *category*, so it takes the incidence
+questions ("who buys flights") down with the imputed spend measures. On Gender
+that costs nothing (incidence findings cannot appear there — see §3), but on
+multi-level banners it removes real findings. Whether that trade is acceptable
+for VAS depends on how the VAS config's Category column groups those questions
+— unverified from the repo (the config lives on OneDrive). If the imputed
+measures do not sit in categories of their own, item 0 alone cannot isolate
+them, and item 4 becomes the VAS fix rather than the general nicety.
 
 **Item 1 is the one worth arguing about.** It is the biggest readability win and
 it is also the one that visibly changes every existing report. Two ways to take
@@ -154,6 +203,19 @@ it:
 I would take it as a straight change, with the tests updated in the same commit
 to pin the new contract — but that is a judgement about how much churn existing
 reports can absorb, which is Duncan's call, not mine.
+
+**Second review — implementation notes on item 1.** The duplication is
+specific: only **mean / index / NPS findings on a two-level banner** mirror
+exactly (each side tested against "the rest", which *is* the other side).
+Proportion findings cannot duplicate — a significance letter is directional,
+so if Male beats Female, Female does not also beat Male. On three-plus-level
+banners "A vs the rest" and "B vs the rest" are different comparisons, not a
+pair. So the collapse rule is narrow: same question, same row, exactly two
+banner levels → one line. Prefer collapsing at the grouping/render layer and
+leaving `collectFindings` alone: its finding objects are the contract ~25
+`diffs_tests.mjs` cases pin, and though `27f_takeout_data.js` names
+`_collectFindings` only in a comment today (nothing else live consumes it),
+the render layer is the cheaper place to absorb the change either way.
 
 **Item 4 replaces the VAS-config fix I wrongly promised.** It is the general
 version of it, and it is what any study with Own/Oth/Total variants of the same
@@ -193,4 +255,5 @@ different banner shapes, not just VAS, before they land.
 | A | Do items 1–3 at all, given they change every project's report | Yes, but staged in the order above rather than as one change |
 | B | Item 1 as a straight behaviour change, or behind a setting | Straight change — one finding printed twice was never the intent |
 | C | Item 3's ranking: replace the default sort, or add a sort option | Add the option first, watch it on two studies, then consider the default |
-| D | Whether item 0 alone is enough for VAS for now | It is — it removes the imputed categories from the findings, which is the worst of what he saw |
+| D | Whether item 0 alone is enough for VAS for now | *(revised by the second review)* Conditional. It removes the imputed categories from the findings — **if** the VAS config's Category column isolates them, and accepting that (a) their incidence questions leave with them and (b) the same categories leave the Patterns KeyShare scan. Check the VAS config's Category values before relying on it; if they don't isolate, item 4 is the VAS fix |
+| E | *(new, second review)* Should a two-level banner admit proportion findings on its single sibling? Today the ≥2-letters gate makes them impossible, so Gender can never show "who buys what" no matter how the ranking is fixed | Decide inside item 3's design, not as a quick patch — opening the gate admits a class of finding no delivered report has ever shown, which is a bigger behaviour change than the re-ranking itself |
