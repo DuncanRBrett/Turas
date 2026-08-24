@@ -11,7 +11,8 @@
  * questions are excluded as tautological cuts, what "the rest" is and when it is
  * unavailable, which rows are suppressed on a scale, the tautological 0%/100%
  * drop, the 95% vs 95%+80% split, the bidirectional mean test and its two base
- * gates, and the wording of every sentence a client reads.
+ * gates, the two-level collapse of reciprocal mean pairs, and the wording of
+ * every sentence a client reads.
  *
  * The mean-finding half runs on the REAL statistics module (21_stats.js) over
  * real per-respondent microdata, so it tests the arithmetic the report performs
@@ -382,6 +383,83 @@ run("22. an NPS row prints whole numbers, a mean prints one decimal", () => {
   const found = D.views._collectFindings("Gender");
   assert(found.length > 0, "the NPS row is a finding");
   eq(found[0].decimals, 0, "an NPS of 41.7 reads as 42");
+});
+
+/* ==========================================================================
+   4b. Reciprocal mean pairs on a two-level banner (SCOPE item 1)
+   ========================================================================== */
+
+console.log("\nDifferences — reciprocal pairs on a two-level banner:");
+
+/** The level count production derives, from the same stub the view reads. */
+function levels(D, banner) { return D.d2.groupCols(banner).length; }
+
+run("22b. a two-level banner tells one mean finding twice — the mirror is collapsed", () => {
+  const D = meanFixture(sandbox(true));
+  const both = D.views._collectFindings("Gender");
+  eq(both.length, 2, "collectFindings still emits both ends — its contract is unchanged");
+  eq(levels(D, "Gender"), 2, "Gender is a two-level cut");
+  const shown = D.views._collapseReciprocal(both, levels(D, "Gender"));
+  eq(shown.length, 1, "the reader sees one line, not the same finding from both ends");
+  eq(shown[0].column, "Female", "the higher side leads");
+  eq(shown[0].direction, "ahead", "…so the kept line names the group that is ahead");
+  near(shown[0].value, 7.5, 1e-9, "its own mean");
+  near(shown[0].rest, 3.5, 1e-9, "and the rest — which on a two-level cut is the other level");
+});
+
+run("22c. the view renders the collapsed list, not the raw one", () => {
+  // The collapse is worthless if nothing calls it: pin the composition the
+  // render path actually uses.
+  const D = meanFixture(sandbox(true));
+  eq(D.views._rankedFindings("Gender").length, 1, "collect + collapse, as views.findings does");
+  eq(D.views._rankedFindings("Gender")[0].column, "Female", "and it is the collapsed pair");
+});
+
+run("22d. on three or more levels 'A vs the rest' and 'B vs the rest' are different comparisons", () => {
+  const D = meanFixture(sandbox(true));
+  const both = D.views._collectFindings("Gender");
+  eq(D.views._collapseReciprocal(both, 3).length, 2,
+     "a three-level banner keeps every finding — nothing there is a mirror");
+  eq(D.views._collapseReciprocal(both, 1).length, 2, "and a single-level cut has no pair either");
+});
+
+run("22e. a proportion finding is never collapsed — a significance letter is directional", () => {
+  const D = catFixture(sandbox());
+  const found = D.views._collectFindings("Gender");
+  eq(found.length, 1, "the fixture's one percentage finding");
+  eq(D.views._collapseReciprocal(found, 2).length, 1, "and it survives a two-level collapse");
+});
+
+run("22f. two findings pointing the SAME way are not a pair, and both stand", () => {
+  // Where a banner leaves respondents unbannered, the rest of one level is not
+  // the other level, and both groups can sit above their own rest. That is two
+  // findings, not one told twice.
+  const D = meanFixture(sandbox(true));
+  const both = D.views._collectFindings("Gender").map((f) =>
+    Object.assign({}, f, { direction: "ahead" }));
+  eq(D.views._collapseReciprocal(both, 2).length, 2, "nothing is discarded");
+});
+
+run("22g. …nor are two whose tests disagree on significance", () => {
+  const D = meanFixture(sandbox(true));
+  const both = D.views._collectFindings("Gender");
+  const mixed = [both[0], Object.assign({}, both[1], { soft: true })];
+  eq(D.views._collapseReciprocal(mixed, 2).length, 2,
+     "one solid and one nearly-significant are two different tests");
+});
+
+run("22h. a finding with no counterpart is left alone", () => {
+  const D = meanFixture(sandbox(true));
+  const one = [D.views._collectFindings("Gender")[0]];
+  eq(D.views._collapseReciprocal(one, 2).length, 1, "only one side stood out");
+});
+
+run("22i. a report with no microdata has no mean findings, so no level count is sought", () => {
+  // catFixture's d2 stub carries no groupCols at all — bannerLevels must never
+  // reach for it when hasMicrodata() is false.
+  const D = catFixture(sandbox());
+  assert(!D.d2.groupCols, "the fixture has no groupCols to call");
+  eq(D.views._rankedFindings("Gender").length, 1, "and the view still renders its findings");
 });
 
 /* ==========================================================================

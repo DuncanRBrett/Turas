@@ -6,9 +6,11 @@
  * (group vs THE REST — everyone except it) and a plain-English verdict.
  * Percentages surface when a group beats 2+ siblings (the published letters);
  * mean / index / NPS are recomputed from microdata and surface when a group
- * differs from the rest, in either direction. Honours the report's 95% /
- * 95%+80% significance toggle: in dual mode nearly-significant (80%) findings
- * also show, flagged soft and ranked below the solid 95% ones. The shared
+ * differs from the rest, in either direction — on a two-level banner the rest
+ * of one level IS the other, so that pair is one finding told twice and the
+ * mirror line is collapsed away. Honours the report's 95% / 95%+80%
+ * significance toggle: in dual mode nearly-significant (80%) findings also
+ * show, flagged soft and ranked below the solid 95% ones. The shared
  * confidence explainer renders at the foot.
  *
  * SIZE-EXCEPTION: one cohesive lay-reader view (rest recompute + categorical
@@ -252,6 +254,61 @@
     return findings;
   }
 
+  /**
+   * Banner LEVELS — columns excluding Total. 0 without microdata, where no mean
+   * findings are recomputed and so nothing can be a reciprocal pair.
+   */
+  function bannerLevels(banner) {
+    if (!TR.d2.hasMicrodata()) return 0;
+    var cols = TR.d2.groupCols(banner);
+    return cols ? cols.length : 0;
+  }
+
+  /**
+   * Collapse reciprocal mean / index / NPS pairs on a TWO-LEVEL banner
+   * (DIFFERENCES_TAB_SCOPE.md, item 1). Each mean finding is tested against THE
+   * REST, and on a two-level cut the rest of one level IS the other level — so
+   * Male-vs-rest and Female-vs-rest are one comparison told from both ends, and
+   * every card printed exactly double. The kept line already carries both sides
+   * (both values, both bars), so dropping the mirror removes nothing.
+   *
+   * Deliberately narrow. Proportion findings never mirror — a significance
+   * letter is directional, so if Male beats Female, Female does not also beat
+   * Male. On three-plus levels "A vs the rest" and "B vs the rest" are genuinely
+   * different comparisons, not a pair. And where a banner leaves respondents
+   * unbannered the rest is NOT the other level, so the two tests really do
+   * differ: the direction and significance guards below then leave both lines
+   * standing rather than silently discarding a finding.
+   *
+   * The higher side leads: the kept line names the group that is ahead. Runs
+   * before the MAX_FINDINGS cut so the cap counts real findings and the "top N
+   * of M" note is honest.
+   */
+  function collapseReciprocal(findings, levels) {
+    if (levels !== 2) return findings;
+    var byRow = {}, drop = [];
+    findings.forEach(function (f) {
+      if (!f.isMean) return;                       // proportions cannot mirror
+      var key = f.code + "\u0000" + f.label;       // one headline mean row per question
+      (byRow[key] || (byRow[key] = [])).push(f);
+    });
+    Object.keys(byRow).forEach(function (key) {
+      var pair = byRow[key];
+      if (pair.length !== 2) return;               // only one side stood out
+      if (pair[0].soft !== pair[1].soft) return;   // the two tests disagree — not one finding
+      if (pair[0].direction === pair[1].direction) return;  // both above their own rest
+      drop.push(pair[0].direction === "ahead" ? pair[1] : pair[0]);
+    });
+    if (!drop.length) return findings;
+    return findings.filter(function (f) { return drop.indexOf(f) === -1; });
+  }
+
+  /** The ranked findings a banner renders: collected, then reciprocal
+   *  mean pairs collapsed. */
+  function rankedFindings(banner) {
+    return collapseReciprocal(collectFindings(banner), bannerLevels(banner));
+  }
+
   /** Group the ranked findings by question, preserving rank order. */
   function groupByQuestion(findings) {
     var byCode = {}, groups = [];
@@ -340,6 +397,8 @@
 
   /* exposed for the differences gate test */
   views._collectFindings = collectFindings;
+  views._collapseReciprocal = collapseReciprocal;
+  views._rankedFindings = rankedFindings;
   views._diffLineHtml = lineHtml;
 
   function cardHtml(group) {
@@ -374,7 +433,7 @@
       banner = TR.d2.firstBanner();
     }
     var dual = TR.d2.state.sigMode === "dual";
-    var all = collectFindings(banner);
+    var all = rankedFindings(banner);
     // 95% findings get the full budget; nearly-significant (80%) ones get their
     // own, so turning on dual mode ADDS soft findings without ever crowding out
     // a solid one — even on dense banners that already have 80+ solid findings.
