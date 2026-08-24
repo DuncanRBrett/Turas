@@ -1212,8 +1212,13 @@ if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function"
 
   if (analysis_result$run_status == "PARTIAL") {
     cat("  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
-    if (length(analysis_result$skipped_questions) > 0) {
-      cat(sprintf("  Questions skipped: %d\n", length(analysis_result$skipped_questions)))
+    # Empty subgroups are counted apart: they are reported, but they are not
+    # what made the run PARTIAL.
+    n_skipped_faulty <- sum(vapply(
+      analysis_result$skipped_questions,
+      function(s) !identical(s$kind, "empty_base"), logical(1)))
+    if (n_skipped_faulty > 0) {
+      cat(sprintf("  Questions skipped: %d\n", n_skipped_faulty))
     }
     if (length(analysis_result$partial_questions) > 0) {
       cat(sprintf("  Questions with missing sections: %d\n", length(analysis_result$partial_questions)))

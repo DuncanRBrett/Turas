@@ -205,3 +205,62 @@ test_that("the runner hands the restored results down the chain", {
   # and the top-level call must pass what setup_checkpointing restored
   expect_match(txt, "checkpoint_state$all_results", fixed = TRUE)
 })
+
+# ------------------------------------------------------------------------------
+# AN EMPTY SUBGROUP IS NOT A PARTIAL RESULT
+# ------------------------------------------------------------------------------
+# Duncan, 23 Aug 2026, on three BillVehicle_Oth_* questions in the VAS run:
+# "we should not get a partial - these options had no responses and so is not a
+# mistake". Nobody pays a vehicle licence on someone else's behalf, so the
+# subgroup is empty and there is nothing to tabulate. That is a finding, and it
+# is still listed in the diagnostics - but at INFO, and the run stays PASS.
+#
+# The skip is tagged with a KIND at source. Everything downstream branches on
+# that tag, never on the wording of the reason, so rewording cannot silently
+# turn the status back into PARTIAL.
+
+test_that("an empty subgroup skip is tagged empty_base", {
+  data <- make_data()
+  result <- prepare_question_data(
+    "SpendForOther", 'BoughtForOther == "Yes"',
+    data, make_structure(), make_banner(), rep(1, nrow(data))
+  )
+
+  expect_true(isTRUE(result$skip))
+  expect_identical(result$kind, "empty_base")
+})
+
+test_that("the run status ignores empty-base skips but still counts real ones", {
+  orch <- file.path(turas_root, "modules/tabs/lib/question_orchestrator.R")
+  txt <- paste(readLines(orch, warn = FALSE), collapse = "\n")
+
+  # the status is computed from the skips that are NOT empty_base
+  expect_match(txt, 'identical(s$kind, "empty_base")', fixed = TRUE)
+  expect_match(txt, "has_skipped <- length(degrading_skips) > 0", fixed = TRUE)
+  # and the old unconditional form is gone
+  expect_false(grepl("has_skipped <- length(skipped_questions) > 0",
+                     txt, fixed = TRUE))
+
+  # the skip entry carries the kind down to the logger
+  expect_match(txt, "kind = skip_kind", fixed = TRUE)
+})
+
+test_that("an empty-base skip logs at INFO, every other skip stays PARTIAL", {
+  wb <- file.path(turas_root, "modules/tabs/lib/crosstabs/workbook_builder.R")
+  txt <- paste(readLines(wb, warn = FALSE), collapse = "\n")
+
+  expect_match(txt, "turas_run_state_info", fixed = TRUE)
+  expect_match(txt, "TABS_EMPTY_BASE_%s", fixed = TRUE)
+  # the PARTIAL path survives for the other kinds
+  expect_match(txt, "TABS_SKIP_%s", fixed = TRUE)
+  expect_match(txt, 'identical(skip_info$kind, "empty_base")', fixed = TRUE)
+})
+
+test_that("the console disclosure lists empty subgroups apart from faults", {
+  runner <- file.path(turas_root, "modules/tabs/lib/crosstabs/analysis_runner.R")
+  txt <- paste(readLines(runner, warn = FALSE), collapse = "\n")
+
+  # they must not be printed under ACTION REQUIRED as things to go and fix
+  expect_match(txt, "NO RESPONDENTS TO TABULATE", fixed = TRUE)
+  expect_match(txt, "degrading_skips", fixed = TRUE)
+})

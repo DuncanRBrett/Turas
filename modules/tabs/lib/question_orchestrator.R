@@ -165,6 +165,12 @@ prepare_question_data <- function(question_code, base_filter,
     cat("└───────────────────────────────────────────────────────────┘\n\n")
     return(list(
       skip = TRUE,
+      # The kind is what the run status and the TRS log branch on. An empty
+      # subgroup is a fact about the study, so it is reported and does NOT
+      # downgrade the run; every other skip still does. Tagged here rather
+      # than matched on the reason text downstream, which would break the
+      # moment the wording changed.
+      kind = "empty_base",
       question_code = question_code,
       reason = sprintf("Base filter '%s' matches no respondents", base_filter)
     ))
@@ -796,12 +802,17 @@ process_all_questions <- function(questions_to_process, survey_data,
     # An empty subgroup is a deliberate, explained skip — it carries its own
     # reason and is NOT the "unexpected failure" case below.
     if (isTRUE(prepared_data$skip)) {
+      skip_kind <- if (is.null(prepared_data$kind)) "unexpected" else prepared_data$kind
       skipped_questions[[current_question_code]] <- list(
         question_code = current_question_code,
         reason = prepared_data$reason,
+        kind = skip_kind,
         stage = "prepare_question_data"
       )
-      message(sprintf("[TRS PARTIAL] Skipping %s: %s",
+      # An empty subgroup is not a partial result, so the console must not
+      # announce one - it is the first thing anyone reads when a run finishes.
+      message(sprintf("[TRS %s] Skipping %s: %s",
+                      if (identical(skip_kind, "empty_base")) "INFO" else "PARTIAL",
                       current_question_code, prepared_data$reason))
       next
     }
@@ -821,6 +832,7 @@ process_all_questions <- function(questions_to_process, survey_data,
       skipped_questions[[current_question_code]] <- list(
         question_code = current_question_code,
         reason = "Preparation failed (unexpected - check data and config)",
+        kind = "unexpected",
         stage = "prepare_question_data"
       )
       message(sprintf("[TRS PARTIAL] Skipping %s: preparation failed unexpectedly", current_question_code))
@@ -842,6 +854,7 @@ process_all_questions <- function(questions_to_process, survey_data,
       skipped_questions[[current_question_code]] <- list(
         question_code = current_question_code,
         reason = "Processing failed (unexpected - check question configuration)",
+        kind = "unexpected",
         stage = "process_single_question"
       )
       message(sprintf("[TRS PARTIAL] Skipping %s: processing failed unexpectedly", current_question_code))
@@ -870,15 +883,31 @@ process_all_questions <- function(questions_to_process, survey_data,
     }
   }
 
-  # TRS v1.0: Determine run status based on skipped questions AND partial sections
-  has_skipped <- length(skipped_questions) > 0
+  # TRS v1.0: Determine run status based on skipped questions AND partial sections.
+  #
+  # An empty subgroup does NOT downgrade the run. A "bought for someone else"
+  # measure in a category nobody buys for others has no respondents to tabulate,
+  # and saying so is a finding about the study, not a degraded result. Reporting
+  # it as PARTIAL trained the reader to ignore the status, which is worse than
+  # not having one. It is still listed in the diagnostics, at INFO.
+  empty_base_skips <- Filter(
+    function(s) identical(s$kind, "empty_base"), skipped_questions)
+  degrading_skips <- skipped_questions[
+    setdiff(names(skipped_questions), names(empty_base_skips))]
+  has_skipped <- length(degrading_skips) > 0
   has_partial <- length(partial_questions) > 0
   run_status <- if (has_skipped || has_partial) "PARTIAL" else "PASS"
+
+  if (length(empty_base_skips) > 0) {
+    message(sprintf(
+      "[TRS INFO] %d question(s) left out because their base filter matches nobody",
+      length(empty_base_skips)))
+  }
 
   if (run_status == "PARTIAL") {
     if (has_skipped) {
       message(sprintf("[TRS] Run completed with PARTIAL status: %d questions skipped",
-                      length(skipped_questions)))
+                      length(degrading_skips)))
     }
     if (has_partial) {
       message(sprintf("[TRS] Run completed with PARTIAL status: %d questions have missing sections",

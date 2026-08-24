@@ -131,11 +131,25 @@ build_project_info <- function(survey_structure, survey_data, banner_info, effec
 log_partial_to_trs <- function(trs_state, skipped_questions, partial_questions) {
   if (is.null(trs_state)) return(invisible(NULL))
 
-  # Log skipped questions as PARTIAL events
+  # Log skipped questions. A question whose base filter matches nobody is
+  # reported at INFO: it is a fact about the study, not a degraded result, so
+  # it stays visible in the diagnostics without downgrading the run. Every
+  # other skip is still a PARTIAL. The branch reads the kind the orchestrator
+  # tagged, never the wording of the reason.
   if (length(skipped_questions) > 0) {
     for (skip_code in names(skipped_questions)) {
       skip_info <- skipped_questions[[skip_code]]
-      if (exists("turas_run_state_partial", mode = "function")) {
+      if (identical(skip_info$kind, "empty_base")) {
+        if (exists("turas_run_state_info", mode = "function")) {
+          turas_run_state_info(
+            trs_state,
+            sprintf("TABS_EMPTY_BASE_%s", skip_code),
+            sprintf("No respondents to tabulate: %s", skip_code),
+            detail = skip_info$reason,
+            stage = skip_info$stage
+          )
+        }
+      } else if (exists("turas_run_state_partial", mode = "function")) {
         turas_run_state_partial(
           trs_state,
           sprintf("TABS_SKIP_%s", skip_code),
