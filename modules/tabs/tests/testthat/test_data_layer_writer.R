@@ -517,6 +517,23 @@ test_that("area_summary (the area's overall-question marker) is TRUE-only, absen
   expect_null(uq$area_summary)
 })
 
+test_that("exclude_from_insights (the Differences opt-out) is TRUE-only, absent otherwise", {
+  # DIFFERENCES_TAB_SCOPE.md item 4. The question stays in the crosstabs — only
+  # the island flag changes — and an unflagged config must produce a byte-
+  # identical island, so the key is absent rather than FALSE.
+  q <- make_dl_q_scale()
+  q$exclude_from_insights <- TRUE
+  wq <- build_dl_question(q, make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_true(isTRUE(wq$exclude_from_insights))
+  expect_true(length(wq$rows) > 0)          # still fully tabulated for the crosstab
+  uq <- build_dl_question(make_dl_q_scale(), make_dl_banner_info(), make_dl_config(), low_base = 30)
+  expect_null(uq$exclude_from_insights)
+  fq <- make_dl_q_scale()
+  fq$exclude_from_insights <- FALSE
+  expect_null(build_dl_question(fq, make_dl_banner_info(), make_dl_config(),
+                                low_base = 30)$exclude_from_insights)
+})
+
 # ------------------------------------------------------------------------------
 # Finite population correction: per-column population emission
 # ------------------------------------------------------------------------------

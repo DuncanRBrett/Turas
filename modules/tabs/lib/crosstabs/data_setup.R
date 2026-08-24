@@ -334,7 +334,7 @@ load_question_selection <- function(config_file) {
   # and — when it is not simply asked — how it was worked out. A study whose data
   # is built before the config ever sees it (derived columns, composites) has no
   # other way to say so, because the engine only ever meets the finished column.
-  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "KeyShare", "AreaSummary", "Source", "Formula", "CommentSheet", "CommentLink")) {
+  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "KeyShare", "AreaSummary", "ExcludeFromInsights", "Source", "Formula", "CommentSheet", "CommentLink")) {
     if (!col %in% names(selection_df)) {
       selection_df[[col]] <- NA_character_
     } else {

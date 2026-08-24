@@ -372,7 +372,8 @@ test_that("crosstab config Selection sheet has expected columns", {
   selection <- openxlsx::read.xlsx(tmp, sheet = "Selection", startRow = 3)
 
   # AreaSummary/Theme retired with the area cards (2026-08-05); Category stays
-  expected_cols <- c("QuestionCode", "Include", "UseBanner", "KeyShare", "Category")
+  expected_cols <- c("QuestionCode", "Include", "UseBanner", "KeyShare", "Category",
+                     "ExcludeFromInsights")
   retired_cols <- c("AreaSummary", "Theme")
   for (col in retired_cols) {
     expect_false(col %in% names(selection),

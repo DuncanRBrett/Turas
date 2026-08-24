@@ -986,6 +986,12 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # Emitted only when TRUE so untagged configs stay byte-identical.
   if (isTRUE(q_result$area_summary)) out$area_summary <- TRUE
 
+  # ExcludeFromInsights: the analyst has taken this question out of the
+  # Differences tab's findings (Selection sheet column) while leaving it in the
+  # crosstabs — the per-question version of insight_exclude_categories. Emitted
+  # only when TRUE so an unflagged config produces a byte-identical island.
+  if (isTRUE(q_result$exclude_from_insights)) out$exclude_from_insights <- TRUE
+
   # Composite index (e.g. Q_Engage = the mean of the twelve engagement items).
   # A composite now carries per-respondent scores in the microdata island like
   # any rated question, so it recomputes live and can be tracked across waves —

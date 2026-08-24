@@ -362,3 +362,35 @@ test_that("logical and numeric columns normalise without a detour through text",
     c("Y", "N")
   )
 })
+
+
+# ==============================================================================
+# Optional Selection columns — carry-through
+# ==============================================================================
+
+context("optional Selection columns survive the loader")
+
+test_that("ExcludeFromInsights is carried through as text, and invented when absent", {
+  # DIFFERENCES_TAB_SCOPE.md item 4: the per-question Differences opt-out. The
+  # loader's optional-column loop is the first of the five touch points — a
+  # column missing from that vector is silently dropped before the orchestrator
+  # ever sees it. Deliberately NOT a normalise_flag_column gate (AreaSummary is
+  # the precedent): the orchestrator reads it with toupper(trimws()) == "Y".
+  res <- load_selection(data.frame(
+    QuestionCode = c("Q1", "Q2", "Q3"),
+    Include = c("Y", "Y", "Y"),
+    ExcludeFromInsights = c("Y", "", "y"),
+    stringsAsFactors = FALSE
+  ))
+  expect_true("ExcludeFromInsights" %in% names(res$selection_df))
+  expect_type(res$selection_df$ExcludeFromInsights, "character")
+  expect_equal(res$selection_df$ExcludeFromInsights[1], "Y")
+  expect_equal(res$selection_df$ExcludeFromInsights[3], "y")   # orchestrator upper-cases
+
+  # A config written before the column existed still loads, with the column
+  # present and empty — nothing downstream has to test for its absence.
+  bare <- load_selection(data.frame(
+    QuestionCode = "Q1", Include = "Y", stringsAsFactors = FALSE))
+  expect_true("ExcludeFromInsights" %in% names(bare$selection_df))
+  expect_true(all(is.na(bare$selection_df$ExcludeFromInsights)))
+})

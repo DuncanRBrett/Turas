@@ -577,5 +577,30 @@ run("29. the card header leads with the question text; the code stays reachable,
     "the pin keeps code — title for traceability");
 });
 
+run("30. ExcludeFromInsights takes ONE question out of the findings, and nothing else", () => {
+  // DIFFERENCES_TAB_SCOPE.md item 4: the per-question opt-out. The flagged
+  // question keeps its crosstab (untouched here) but raises no finding; an
+  // otherwise identical twin still does, so the flag — not the fixture — is
+  // what silenced it.
+  const cells = [{ pct: 60, n: 120, sig: "" }, { pct: 85, n: 85, sig: "BC" },
+                 { pct: 40, n: 20, sig: "" }, { pct: 30, n: 15, sig: "" }];
+  const rows = [{ kind: "category", label: "Yes", stat: "Column %", cells: cells }];
+  const twins = [
+    { code: "Q1", title: "Are you aware?", category: "Awareness", type: "single",
+      exclude_from_insights: true, rows: [{ kind: "category", label: "Yes" }] },
+    { code: "Q2", title: "Are you aware?", category: "Awareness", type: "single",
+      rows: [{ kind: "category", label: "Yes" }] }
+  ];
+  const D = catFixture(sandbox(), { rows: rows, questions: twins });
+  const found = D.views._collectFindings("Gender");
+  eq(found.length, 1, "only the unflagged twin raises a finding");
+  eq(found[0].code, "Q2", "and it is the unflagged one");
+  // absent / falsy flag must behave exactly as before (no config = no change)
+  const D2 = catFixture(sandbox(), { rows: rows, questions: [
+    Object.assign({}, twins[0], { exclude_from_insights: false })] });
+  eq(D2.views._collectFindings("Gender").length, 1,
+     "ExcludeFromInsights = N is the same as not declaring it");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

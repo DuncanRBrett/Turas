@@ -1226,6 +1226,38 @@ order) — and rated questions, where CreateIndex already summarises them
 **See:** `PATTERNS_KEY_SHARE_GUIDE.md` for worked examples from live
 studies.
 
+### Column: ExcludeFromInsights
+
+**What it does:** Keeps this question out of the **Differences tab's
+findings** while it stays in the crosstabs, the dashboard and every
+other tab exactly as before. Nothing is dropped from the deliverable —
+the question simply stops competing for a place in "where groups
+differ".
+
+**Required:** No. Blank means the question can raise findings, which is
+the default for every question.
+
+**What to enter:** `Y` to keep it out. `N` or blank to leave it in.
+
+**When to use Y:** When several near-duplicate views of one measure each
+raise their own card and crowd the ranking — a study carrying
+`Own_SpendPerTxn`, `Total_SpendPerTxn` and `Total_MonthlySpend` for the
+same category tells one story three times, so mark two of them and keep
+the one you want read. Also for a modelled or imputed figure that should
+not be the first thing a lay reader meets.
+
+**Category-level alternative:** the `insight_exclude_categories` setting
+takes a whole Category out at once. Use it when a run of questions
+belongs together; use this column when the exclusion is question by
+question.
+
+**What it does NOT do:** the Group overview (Patterns) tab **ignores
+this column by design**. A `KeyShare` is the analyst's single declared
+summary of its own question, so it cannot duplicate another question in
+that scan, and dropping it would silently remove a group portrait's
+input for a reason belonging to a different tab. If you want a question
+out of **both** tabs, use `insight_exclude_categories`, which gates both.
+
 ### Column: AreaSummary — RETIRED
 
 **This column is absent from the generated Selection template and has no

@@ -651,6 +651,19 @@ process_single_question <- function(question_code, prepared_data,
     !is.na(question_row$AreaSummary) &&
     identical(toupper(trimws(question_row$AreaSummary)), "Y")
 
+  # Extract ExcludeFromInsights (optional, Y/blank): drops this question from the
+  # Differences tab's findings WITHOUT dropping it from the crosstabs. The lever a
+  # study needs when several near-duplicate views of one measure (Own / Other /
+  # Total spend per transaction) each raise their own card and crowd the ranking,
+  # or when a modelled figure should not lead a lay reader's page. Category-level
+  # exclusion (Settings insight_exclude_categories) is the blunt version; this is
+  # per question. Carried to the v2 data layer as q.exclude_from_insights (TRUE
+  # only). Differences-only by design — the Patterns/Group-overview KeyShare scan
+  # ignores it (see 27d_diffs.js / 27fa_takeout_shares.js).
+  q_exclude_from_insights <- !is.null(question_row$ExcludeFromInsights) &&
+    !is.na(question_row$ExcludeFromInsights) &&
+    identical(toupper(trimws(question_row$ExcludeFromInsights)), "Y")
+
   # Extract Source/Formula (optional): the question's provenance. Source names
   # where the numbers come from — the survey question, or the columns a derived
   # one was built from; Formula states how it was worked out. Both are the
@@ -711,6 +724,7 @@ process_single_question <- function(question_code, prepared_data,
     theme = q_theme,
     key_share = q_key_share,
     area_summary = q_area_summary,
+    exclude_from_insights = q_exclude_from_insights,
     source = q_source,
     formula = q_formula,
     partial_sections = partial_sections  # TRS v1.0: Track section-level failures

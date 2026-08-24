@@ -815,6 +815,23 @@ run("KeyShare eligibility: rated and classification questions stay out", () => {
     "only the declared, non-rated, non-classification share scans");
 });
 
+run("KeyShare ignores ExcludeFromInsights — it is a Differences-tab lever, by design", () => {
+  // DIFFERENCES_TAB_SCOPE.md item 4 asked for this divergence to be chosen, not
+  // silent. A question dropped from the Differences findings (near-duplicate
+  // card, modelled figure) still carries the analyst's declared share, so it
+  // stays in the Group overview scan. The category-level lever
+  // (insight_exclude_categories, reaching here via _isClassification) is the
+  // one that gates both tabs.
+  TR.views = { indexQuestions: () => ([]), _isClassification: () => false };
+  TR.AGG = { questions: [
+    { code: "Q12", key_share: "Always", exclude_from_insights: true,
+      rows: [{ kind: "category", label: "Always" }] }
+  ] };
+  const list = takeout._shares.list(TR.views);
+  assert(list.length === 1 && list[0].q.code === "Q12",
+    "the flagged share still scans");
+});
+
 run("KeyShare score vector: 0/100/null with the published denominator", () => {
   const shares = takeout._shares;
   // single: answered-unshown (-2) counts in the base, never the numerator

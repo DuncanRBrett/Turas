@@ -189,6 +189,17 @@
     TR.AGG.questions.forEach(function (q) {
       if (q.code === bannerSource) return;   // a banner never "beats" itself
       if (isClassification(q)) return;       // demographics / corpographics: tautological cuts, not outcomes
+      // Per-question opt-out (Selection sheet ExcludeFromInsights = Y): the
+      // analyst has taken this question out of the FINDINGS while leaving it in
+      // the crosstabs — near-duplicate views of one measure, or a modelled
+      // figure that should not lead the page. BY DESIGN this flag is honoured
+      // here ONLY: the Patterns / Group-overview KeyShare scan
+      // (27fa_takeout_shares.js) deliberately ignores it, because a question
+      // can be a duplicate among Differences cards and still be the single
+      // declared share that summarises its own question in the group portraits.
+      // A study that wants BOTH tabs to skip a question uses the category-level
+      // lever (project.insight_exclude_categories), which gates both.
+      if (q.exclude_from_insights) return;
       var model = TR.model.forQuestion(q.code, banner, TR.d2.state.filters,
         { hiddenCols: [], dual: dual });
       var labelByLetter = {};

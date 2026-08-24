@@ -70,6 +70,14 @@
     var out = [];
     (((TR.AGG || {}).questions) || []).forEach(function (q) {
       if (!q.key_share || rated[q.code] || isClass(q)) return;
+      // NOT gated on q.exclude_from_insights, by design. That Selection-sheet
+      // column is a DIFFERENCES-tab lever (27d_diffs.js): it thins near-
+      // duplicate finding cards. A KeyShare is the analyst's single declared
+      // summary of its own question, so it cannot duplicate another question
+      // here — dropping it would silently remove a group portrait's input for a
+      // reason belonging to a different tab. The category-level lever
+      // (project.insight_exclude_categories, via isClass above) is the one that
+      // gates BOTH tabs.
       // A KeyShare is a SHARE of the column. A question reporting counts or row
       // percentages (show_percent_column = N) carries no such share, so it is
       // not eligible — rather than joining the scan with a headcount read as a
