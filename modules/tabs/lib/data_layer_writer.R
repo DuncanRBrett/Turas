@@ -252,6 +252,11 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # the named banner group(s) (label or id; comma-separated for more than one).
   pb <- .dl_split_csv(config_obj$patterns_banner)
   if (length(pb) > 0) proj$patterns_banner <- I(pb)
+  # insight_exclude_categories: category names (matched case-insensitively in
+  # JS) the Differences tab and the Patterns KeyShare scan treat as cuts, not
+  # outcomes — beyond the built-in demographics/corpographics detection.
+  iec <- .dl_split_csv(config_obj$insight_exclude_categories)
+  if (length(iec) > 0) proj$insight_exclude_categories <- I(iec)
   # Fieldwork caveat for the "how sure" panel (substitution etc.) — plain text,
   # escaped at render; carried only when non-empty so old islands are unchanged.
   sn <- config_obj$sampling_note

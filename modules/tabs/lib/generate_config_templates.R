@@ -634,7 +634,14 @@ generate_crosstab_config_template <- function(output_path,
              description = paste0("Pin the Group overview apex KPI tiles to these question codes, in order ",
                "(e.g. Q78, Q79). Blank = auto-detect from question titles, which on a study with many ",
                "section ratings can pick the wrong ones and crowd out the true headline."),
-             valid_values_text = "Comma-separated question codes, or leave blank")
+             valid_values_text = "Comma-separated question codes, or leave blank"),
+        list(name = "insight_exclude_categories", default = "", required = FALSE,
+             description = paste0("Category names (from the Selection sheet's Category column) whose ",
+               "questions the Differences tab and the Group overview KeyShare scan treat as cuts, ",
+               "not outcomes - e.g. imputed or modelled measures a study does not want leading its ",
+               "findings. Case-insensitive; adds to the built-in demographics/corpographics ",
+               "detection. The questions stay in the crosstabs. Blank = built-in detection only."),
+             valid_values_text = "Comma-separated category names, or leave blank")
       )
     ),
 

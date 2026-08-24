@@ -350,15 +350,21 @@
       'data-snap-title="' + fmt.escapeHtml(group.code + " — " + group.title) + '" ' +
       'data-snap-context="' + fmt.escapeHtml("Where groups differ · " + (group.category || "")) +
       '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>';
+    // The header leads with the question TEXT, not the variable name — the
+    // code is engineering vocabulary in a lay deliverable (DIFFERENCES_TAB_
+    // SCOPE.md, item 2). It stays reachable: hover (title attribute) and the
+    // search index both carry it, and the pin keeps "code — title" so a
+    // pinned card stays traceable to its crosstab.
     return '<div class="card df-card" data-snap-card data-search="' +
       fmt.escapeHtml(search) + '">' +
       '<div class="df-qhead"><button class="linklike" data-goq="' +
-      group.code + '">' + group.code + " · " +
+      group.code + '" title="' + fmt.escapeHtml(group.code) + '">' +
       fmt.escapeHtml(group.title) + "</button>" +
       '<span class="kindtag">' + fmt.escapeHtml(group.category) +
       "</span>" + pin + "</div>" +
       group.items.map(lineHtml).join("") + "</div>";
   }
+  views._diffCardHtml = cardHtml;   // exposed for the differences gate test
 
   views.findings = function (host) {
     var banner = diffBanner || TR.d2.state.banner;

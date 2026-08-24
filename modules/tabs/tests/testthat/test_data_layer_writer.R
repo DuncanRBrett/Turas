@@ -272,6 +272,25 @@ test_that("Patterns levers: headline + banner exclusion emitted as arrays, omitt
   expect_null(dl0$project$patterns_exclude_banners)
 })
 
+test_that("insight_exclude_categories reaches the island as an array, omitted when unset", {
+  # The JS consumer (27d isClassification) and its test predate this: the key
+  # was consumed but nothing ever wrote it (DIFFERENCES_TAB_SCOPE.md, item 0).
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(insight_exclude_categories = "Flights, Long distance bus"))
+  expect_equal(as.character(dl$project$insight_exclude_categories),
+               c("Flights", "Long distance bus"))
+  # one-element value must SERIALISE as a JSON array under auto_unbox — the JS
+  # calls .some() on it, so a bare string would silently match nothing
+  dl1 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+    make_dl_config(insight_exclude_categories = "Flights"))
+  expect_identical(
+    as.character(jsonlite::toJSON(dl1$project$insight_exclude_categories, auto_unbox = TRUE)),
+    '["Flights"]')
+  # unset -> key absent entirely (byte-identical island for existing reports)
+  dl0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_null(dl0$project$insight_exclude_categories)
+})
+
 test_that("heatmap_colour reaches the island only when the config sets it (I11)", {
   # The setting was whitelisted, templated and documented — and read by nothing,
   # so it was a silent no-op. It is now carried to the report, but ONLY when set:

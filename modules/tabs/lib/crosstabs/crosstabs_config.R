@@ -376,6 +376,13 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # group(s) to portray (e.g. "Centre"; comma-separated for a second banner).
     # Unset -> every banner group, as before.
     patterns_banner = get_config_value(config, "patterns_banner", NULL),
+    # Category names (beyond the built-in demographics/corpographics detection)
+    # whose questions the Differences tab and the Patterns KeyShare scan treat
+    # as cuts, not outcomes — e.g. imputed spend families a study does not want
+    # leading its findings. Comma/semicolon-separated; parsed in the data layer.
+    # The JS consumer and its test predate this line; the setting was consumed
+    # but never written until 2026-08 (DIFFERENCES_TAB_SCOPE.md, item 0).
+    insight_exclude_categories = get_config_value(config, "insight_exclude_categories", NULL),
 
     # Free-text fieldwork caveat appended to the "how sure" design sentence in
     # the v2 report (e.g. substitution rules, replaced clusters, low response).
@@ -1689,7 +1696,7 @@ TABS_KNOWN_SETTINGS <- c(
   # blind to them)
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
   "show_qualitative", "patterns_headline", "patterns_exclude_banners",
-  "patterns_banner", "sampling_note",
+  "patterns_banner", "sampling_note", "insight_exclude_categories",
   # Checkpointing
   "enable_checkpointing",
   # Qualitative confidentiality & disclosure control

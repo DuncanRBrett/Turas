@@ -481,5 +481,23 @@ run("28c. a hostile group NAME in the beaten list is escaped too", () => {
   assert(/&lt;b&gt;Female/.test(html), "and survives as text");
 });
 
+run("29. the card header leads with the question text; the code stays reachable, not shown", () => {
+  // DIFFERENCES_TAB_SCOPE.md item 2: the code prefix is engineering vocabulary
+  // in a lay deliverable. It must still be reachable — hover and search — and
+  // the pin keeps "code — title" so a pinned card traces to its crosstab.
+  const D = catFixture(sandbox());
+  const f = D.views._collectFindings("Gender")[0];
+  const html = D.views._diffCardHtml({ code: f.code, title: f.title,
+    category: f.category, top: f.score, items: [f] });
+  const head = html.match(/<div class="df-qhead">.*?<\/button>/)[0];
+  assert(!/Q1 ·/.test(head), "no 'Q1 ·' prefix in the header: " + head);
+  assert(/>Are you aware\?</.test(head), "the question text leads");
+  assert(/title="Q1"/.test(head), "the code survives as a hover title");
+  assert(/data-goq="Q1"/.test(head), "and the jump-to-question link still keys on it");
+  assert(/data-search="[^"]*q1/.test(html), "search still finds the code");
+  assert(/data-snap-title="Q1 — Are you aware\?"/.test(html),
+    "the pin keeps code — title for traceability");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
