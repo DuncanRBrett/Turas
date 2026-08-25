@@ -175,6 +175,14 @@ All notable changes to TURAS are documented in this file.
 - Root-level README.md for all modules
 
 ### Changed
+- **The audience line says whether the figures are weighted** (v2 report). Every
+  number in a report is either weighted or it is not, and the answer was only in
+  the "How to read this" panel — a reader who never opened it could quote a
+  weighted percentage as a headcount. The filter bar's audience line now carries
+  "unweighted data", or "weighted data (<the study's own weight label>)" when the
+  config declares one, in both the unfiltered and the filtered state. Also fixes
+  the doubled "with with" in the unfiltered invitation. Gate:
+  `modules/tabs/tests/js/test_filter_audience_weighting.mjs`.
 - **Docker mothballed** — it existed so a second operator could run Turas on
   Windows without an R setup; TRL is a one-person operation now, so nothing runs
   in a container and the image is no longer built or pushed. `Dockerfile`,
