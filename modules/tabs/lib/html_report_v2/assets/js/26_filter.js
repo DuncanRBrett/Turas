@@ -37,6 +37,20 @@
       "</ul></div></details>";
   };
 
+  /**
+   * Weighted or unweighted, said on the audience line itself. A reader who
+   * never opens the "How to read this" panel still has to know which kind of
+   * figure they are quoting, and the answer is the same for every table in the
+   * report. Names the study's own weight label when it declares one. Pure
+   * (reads TR.AGG.project only), so it unit-tests without a DOM.
+   */
+  filterBar.weightingTag = function () {
+    var p = (TR.AGG && TR.AGG.project) || {};
+    if (!p.weighted) return "unweighted data";
+    var named = p.weight_label || p.weight_variable;
+    return "weighted data" + (named ? " (" + fmt.escapeHtml(named) + ")" : "");
+  };
+
   filterBar.render = function () {
     var holder = document.getElementById("filterbar");
     if (!holder) return;
@@ -63,12 +77,13 @@
       (s.filters.length
         ? '<button class="fb-clear" data-fact="clear">Clear</button>' +
           '<span class="fb-n">n=' + fmt.base(n) + " of " + fmt.base(TR.MICRO.n) +
-          ' · live recompute' +
+          ' · live recompute · ' + filterBar.weightingTag() +
           (TR.d2.tracking().enabled
             ? ' · wave trends hidden while filtered (prior waves are full-sample totals)'
             : "") + "</span>"
-        : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
-          ") · add a filter to recompute tables and dashboard with with your " +
+        : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) + ") · " +
+          filterBar.weightingTag() +
+          " · add a filter to recompute tables and dashboard with your " +
           "area of interest.</span>") +
       // The weighted-bases explainer (weightingNote) renders inside the shared
       // "How to read this" panel (A4) — no longer stacked under the filter bar.
