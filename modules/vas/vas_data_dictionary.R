@@ -90,7 +90,7 @@ describe_per_txn_calculation <- function(row, config, stem) {
                    format(fee, big.mark = ",")))
   }
   if (identical(row$amount_basis, "monthly")) {
-    return(sprintf("%sMonthlySpend / %sTxnPerMonth\nDERIVED, not reported: the respondent gave a monthly figure and was never asked a per-transaction one.",
+    return(sprintf("%sMonthlySpend / %sTxnPerMonth\nDERIVED, not reported: the respondent gave a monthly figure and was never asked a per-transaction one. A buyer on a sub-monthly rhythm is the exception: their amount is read as what one purchase costs, so it IS their per-transaction figure.",
                    stem, stem))
   }
   wording <- if (identical(row$amount_basis, "last_occasion")) {
@@ -110,7 +110,7 @@ describe_per_txn_calculation <- function(row, config, stem) {
 #' @return A single character value.
 describe_spend_calculation <- function(row, stem, config) {
   if (identical(row$amount_basis, "monthly")) {
-    return(sprintf("parse(%s)\nThe amount question already asks for a monthly figure, so it is taken as it stands.",
+    return(sprintf("parse(%s)\nThe amount question already asks for a monthly figure, so it is taken as it stands - except for a buyer on a sub-monthly rhythm, whose answer is read as the cost of one purchase and spread over their year (amount x frequency).",
                    row$amount_alias))
   }
   if (identical(row$amount_basis, "imputed")) {
