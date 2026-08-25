@@ -64,6 +64,35 @@ For wording that should change for *every* category — the derived families lik
 `vas_data_dictionary.R` / `vas_data_dictionary_headline.R` instead. One edit
 there covers all 33 categories; the labels file is for the exceptions.
 
+## The three money constructions — every reporting surface picks one
+
+Settled 25 Aug 2026 after the same fault shipped three times (the wallet
+page, its spend column, then the dashboard): different surfaces averaging
+the same data on different bases, R290 on one page against R294 on the
+next. Any page, table or column that shows a money figure uses exactly one
+of these, and says which:
+
+1. **Per buyer** — the monthly spend of every buyer with a COMPLETE amount,
+   summed, divided by the number of those buyers. A don't-know is left out,
+   never counted as a zero.
+2. **Per adult** — every KNOWN rand (a known side counts past a don't-know
+   on the other side), divided by everyone in the study. The summing
+   construction: category rows on this base add up to the wallet.
+3. **Per transaction** — total rand ÷ total transactions, paired over
+   buyers with both known. The average TRANSACTION, and the construction
+   the restated earlier waves use. The average buyer's own `_SpendPerTxn`
+   is a different number: it belongs in a crosstab row under its own label,
+   never as a page's headline.
+
+Related engine rule: `submonthly_amount_is_per_occasion` (default TRUE) —
+a buyer on a sub-monthly rhythm is read as reporting the cost of ONE
+purchase, so per-transaction is the amount itself and monthly spend is the
+amount spread over their year, which is also how the 2024 wave derived it.
+
+The project-side statement of the same rule, with the worked example, is
+"The three money constructions" in the study's
+`Reporting/HOW TO UPDATE THE REPORTING.md`.
+
 ## Things that will catch you
 
 - **The category map is the contract.** `presence_alias` / `presence_option`
