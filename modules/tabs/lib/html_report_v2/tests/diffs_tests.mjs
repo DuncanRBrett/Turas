@@ -603,16 +603,224 @@ run("30. ExcludeFromInsights takes ONE question out of the findings, and nothing
 });
 
 run("30b. …including MEAN findings, which are the case the column was built for", () => {
-  // The motivating study excludes imputed SPEND measures, and on a two-level
-  // banner those can only ever be mean findings (a proportion needs 2+ siblings
-  // — DIFFERENCES_TAB_SCOPE.md §3). The skip sits above meanFindings() in the
-  // same per-question loop; this pins that, rather than inferring it.
+  // The motivating study excludes imputed SPEND measures, which on a two-level
+  // banner raise mean findings (and, since decision E, could raise proportion
+  // findings too — the flag must silence both). The skip sits above
+  // meanFindings() in the same per-question loop; this pins that, rather than
+  // inferring it.
   const D = meanFixture(sandbox(true));
   eq(D.views._collectFindings("Gender").length, 2, "unflagged: both sides differ");
   const F = meanFixture(sandbox(true));
   F.AGG.questions[0].exclude_from_insights = true;
   eq(F.views._collectFindings("Gender").length, 0,
      "flagged: the recomputed mean finding is skipped too");
+});
+
+/* ==========================================================================
+   6. Decision E and the balanced score (DIFFERENCES_RANKING_DESIGN.md)
+   ========================================================================== */
+
+console.log("\nDifferences — the two-level gate and the balanced score:");
+
+/**
+ * A TWO-level banner (Total + Male/Female), no microdata. Male 75% vs
+ * Female 45% on "Yes" — the letters carry whatever significance the fixture
+ * declares. The rest for Male is the exact count identity:
+ * (120 − 75) / (200 − 100) = 45%.
+ */
+function catFixture2(D, opts) {
+  opts = opts || {};
+  const rows = opts.rows || [{ kind: "category", label: "Yes", stat: "Column %",
+    cells: [{ pct: 60, n: 120, sig: "" }, { pct: 75, n: 75, sig: opts.sig || "B" },
+            { pct: 45, n: 45, sig: "" }] }];
+  const columns = [{ label: "Total", letter: "", base: 200 },
+                   { label: "Male", letter: "A", base: 100 },
+                   { label: "Female", letter: "B", base: 100 }];
+  D.d2 = { state: { sigMode: opts.sigMode || "95", filters: [] },
+           hasMicrodata: () => false, firstBanner: () => "Gender" };
+  D.AGG = { project: { low_base_threshold: 30 },
+            columns: columns,
+            banner_groups: [{ id: "Gender", name: "Gender" }],
+            questions: [{ code: "Q1", title: "Do you buy it?",
+              category: "Behaviour", type: "single",
+              rows: rows.map((r) => ({ kind: r.kind, label: r.label })) }] };
+  D.model = { forQuestion: () => ({ columns: columns, rows: rows }) };
+  return D;
+}
+
+run("31. on a TWO-level banner, beating the single sibling IS a finding (decision E)", () => {
+  // Test 5 pins the other half: on three levels one letter stays a pairwise
+  // result, not a standout. On two levels the single sibling is ALL the
+  // siblings, so one letter is the strongest breadth statement the banner
+  // allows — and "who buys what" can finally surface on Gender.
+  const D = catFixture2(sandbox());
+  const found = D.views._collectFindings("Gender");
+  eq(found.length, 1, "one letter carries the finding on a two-level cut");
+  const f = found[0];
+  eq(f.column, "Male", "the standout group");
+  eq(f.beaten.join(","), "Female", "it beat its single sibling by name");
+  eq(f.rest, 45, "the rest is the other level, by the count identity");
+  eq(f.soft, false, "a 95% letter is a solid finding");
+});
+
+run("31b. a lowercase-only letter on two levels is a SOFT finding, dual mode only", () => {
+  eq(catFixture2(sandbox(), { sig: "b" }).views._collectFindings("Gender").length, 0,
+     "at 95% a lone 80% letter is silent");
+  const dual = catFixture2(sandbox(), { sig: "b", sigMode: "dual" })
+    .views._collectFindings("Gender");
+  eq(dual.length, 1, "in dual mode it appears");
+  eq(dual[0].soft, true, "flagged soft so the sentence hedges");
+});
+
+run("32. the balanced proportion score is Cohen's h times the share of siblings beaten", () => {
+  const D = catFixture2(sandbox());
+  const f = D.views._collectFindings("Gender")[0];
+  // Independent restatement: h = 2·asin(√.75) − 2·asin(√.45), against Cohen's
+  // "large" 0.8 (the Takeout's effect currency); one of one siblings beaten.
+  const h = 2 * Math.asin(Math.sqrt(0.75)) - 2 * Math.asin(Math.sqrt(0.45));
+  near(f.scoreBalanced, Math.min(1, h / 0.8) * 100, 1e-9,
+       "strength 1 (beat them all) × h/0.8");
+  // And on the THREE-level fixture: two of two beatable siblings, h capped.
+  const T = catFixture(sandbox());
+  near(T.views._collectFindings("Gender")[0].scoreBalanced, 100, 1e-9,
+       "85% vs 35% is past Cohen's large — effect caps at 1, strength is 2/2");
+});
+
+run("33. the balanced mean score is CAPPED where the legacy score runs away", () => {
+  // meanFixture: 3.5 vs 7.5 with sd ≈ 0.5 over 20-a-side — |z| is many times
+  // the critical value. The legacy score multiplies by |z|/1.96 unbounded; the
+  // balanced score caps evidence at 3× the critical value, so here it is
+  // exactly the effect term: |gap| / range × 100 = 4/8 × 100 = 50.
+  const D = meanFixture(sandbox(true));
+  const f = D.views._collectFindings("Gender")[0];
+  assert(f.score > 100, "the legacy score is unbounded (kept for the default sort): " + f.score);
+  near(f.scoreBalanced, 50, 1e-9, "capped strength 1 × effect 4/8");
+  assert(f.scoreBalanced <= 100, "the balanced score never exceeds 100");
+});
+
+run("34. the robust range ignores an outlier on an OBSERVED scale, keeps a DESIGNED one whole", () => {
+  const D = sandbox();
+  // Designed: ≤ 12 distinct values (a 0–10 scale) — outliers are impossible,
+  // the full range stands.
+  const designed = [];
+  for (let i = 0; i < 100; i++) designed.push(i % 11);
+  eq(D.views._robustRange(designed, 10), 10, "a rating scale keeps min–max");
+  // Observed: 20 distinct values 0..19, five of each — nearest-rank p5/p95
+  // are 0 and 18. One 10,000 spender must not set the denominator.
+  const spend = [];
+  for (let i = 0; i < 100; i++) spend.push(i % 20);
+  eq(D.views._robustRange(spend, 19), 18, "p5..p95 of the clean vector");
+  spend.push(10000);
+  eq(D.views._robustRange(spend, 10000), 19,
+     "one big spender no longer stretches the scoring range");
+});
+
+run("34b. …and falls back to the full range when the percentiles collapse", () => {
+  // ≥ 95% zeros: p5 = p95 = 0, a zero robust range. The chain falls back to
+  // the full min–max rather than dividing by zero.
+  const D = sandbox();
+  const vals = [];
+  for (let i = 0; i < 290; i++) vals.push(0);
+  for (let i = 1; i <= 13; i++) vals.push(i * 100);   // 13 distinct positives
+  eq(D.views._robustRange(vals, 1300), 1300, "degenerate percentiles → full range");
+  eq(D.views._robustRange([], 0), 1, "and an empty/flat vector ends at the 1 guard");
+});
+
+run("35. an outlier-carrying spend measure scores on the robust range END TO END", () => {
+  // 20 Male around 14.5, 20 Female around 49, one UNBANNERED respondent at
+  // 500 (21 distinct values → an observed scale). The outlier sits in "the
+  // rest" of every group and in the full range (0–500), but the balanced
+  // score must divide by the robust p5–p95 range instead — so it comes out
+  // LARGER than the same gap measured against the outlier-stretched range.
+  const D = sandbox(true);
+  const n = 41, bannerVars = [], scores = [];
+  for (let r = 0; r < 40; r++) {
+    const male = r < 20;
+    bannerVars.push(male ? 0 : 1);
+    scores.push(male ? 10 + (r % 10) : 40 + (r % 10) * 2);
+  }
+  bannerVars.push(2); scores.push(500);
+  const q = { code: "Q9", title: "Monthly spend", category: "Spend",
+    type: "scale", rows: [{ kind: "mean", label: "Mean" }] };
+  D.MICRO = { n: n, answers: {}, scores: { Q9: scores },
+              banner_vars: { Gender: bannerVars }, boxes: {}, weights: null };
+  D.AGG = { project: { low_base_threshold: 10 },
+            columns: [{ label: "Male", letter: "A" }, { label: "Female", letter: "B" }],
+            banner_groups: [{ id: "Gender", name: "Gender" }],
+            questions: [q] };
+  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => true,
+           firstBanner: () => "Gender", groupCols: () => [0, 1],
+           questionByCode: (c) => (c === "Q9" ? q : null) };
+  D.model = { forQuestion: () => ({
+    columns: [{ label: "Total", letter: "", base: n }],
+    rows: [{ kind: "mean", label: "Mean", stat: "Column %", cells: [] }] }) };
+  const found = D.views._collectFindings("Gender");
+  assert(found.length >= 1, "the outlier-dragged rest still leaves a finding");
+  const f = found[0];
+  eq(f.scaleMax, 500, "the DISPLAY range still holds the outlier — bars and Takeout untouched");
+  assert(f.scoreBalanced > Math.abs(f.gap) / (f.scaleMax - f.scaleMin) * 100,
+    "the balanced score beats the full-range effect, so the robust range is in the denominator");
+  assert(f.scoreBalanced <= 100, "and stays on the 0–100 scale");
+});
+
+run("36. the balanced sort reorders where the legacy sort over-ranks certainty", () => {
+  // QA: a tiny gap measured with extreme precision — huge |z|, small effect.
+  // QB: a broad gap at ordinary precision. The legacy sort leads with QA
+  // (unbounded |z| multiplier); the balanced sort leads with QB (evidence
+  // capped, size on its own scale decides).
+  const D = sandbox(true);
+  const n = 40, bannerVars = [], A = [], B = [];
+  for (let r = 0; r < n; r++) {
+    const male = r < 20;
+    bannerVars.push(male ? 0 : 1);
+    A.push((male ? 5.0 : 5.5) + (r % 2 ? 0.01 : 0));
+    B.push(male ? (r % 2 ? 1 : 2) : (r % 2 ? 5 : 9));
+  }
+  const qs = [
+    { code: "QA", title: "Tight tiny gap", category: "S", type: "scale",
+      rows: [{ kind: "mean", label: "Mean" }] },
+    { code: "QB", title: "Broad big gap", category: "S", type: "scale",
+      rows: [{ kind: "mean", label: "Mean" }] }];
+  D.MICRO = { n: n, answers: {}, scores: { QA: A, QB: B },
+              banner_vars: { Gender: bannerVars }, boxes: {}, weights: null };
+  D.AGG = { project: { low_base_threshold: 10 },
+            columns: [{ label: "Male", letter: "A" }, { label: "Female", letter: "B" }],
+            banner_groups: [{ id: "Gender", name: "Gender" }],
+            questions: qs };
+  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => true,
+           firstBanner: () => "Gender", groupCols: () => [0, 1],
+           questionByCode: (c) => qs.filter((q) => q.code === c)[0] || null };
+  D.model = { forQuestion: () => ({
+    columns: [{ label: "Total", letter: "", base: n }],
+    rows: [{ kind: "mean", label: "Mean", stat: "Column %", cells: [] }] }) };
+  const legacy = D.views._rankedFindings("Gender");
+  const balanced = D.views._rankedFindings("Gender", "balanced");
+  eq(legacy.length, 2, "one collapsed finding per question");
+  eq(legacy[0].code, "QA", "the legacy sort leads with the huge-z sliver");
+  eq(balanced[0].code, "QB", "the balanced sort leads with the big difference");
+  eq(balanced.length, legacy.length,
+     "the findings SET is identical — only the order moves, so 'top N of M' stays honest");
+});
+
+run("36b. a soft finding still never outranks a solid one under the balanced sort", () => {
+  const D = catFixture(sandbox(), { sigMode: "dual", rows: [{ kind: "category",
+    label: "Yes", stat: "Column %",
+    cells: [{ pct: 50, n: 100, sig: "" }, { pct: 52, n: 52, sig: "BC" },
+            { pct: 95, n: 48, sig: "ac" }, { pct: 20, n: 10, sig: "" }] }] });
+  const found = D.views._rankedFindings("Gender", "balanced");
+  eq(found.length, 2, "both appear");
+  eq(found[0].soft, false, "solid first…");
+  assert(found[1].scoreBalanced > found[0].scoreBalanced,
+    "…even though the soft one's balanced score is higher");
+});
+
+run("37. the sort control offers exactly three orders, balanced in the middle", () => {
+  const D = catFixture(sandbox());
+  const html = D.views._diffSortOptions("balanced");
+  const values = [...html.matchAll(/value="([a-z]+)"/g)].map((m) => m[1]);
+  eq(values.join(","), "standout,balanced,question", "the three sort keys, in order");
+  assert(/value="balanced" selected/.test(html), "the current key is marked selected");
+  assert(/\(balanced\)/.test(html), "and the balanced option says so on its face");
 });
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
