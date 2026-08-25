@@ -238,6 +238,19 @@ category_spend <- function(source, row, txn, config) {
     monthly_spend <- amount$value
     spend_per_txn <- ifelse(is.na(txn$txn_per_month) | txn$txn_per_month == 0,
                             NA_real_, monthly_spend / txn$txn_per_month)
+    # A buyer on a sub-monthly rhythm has no "typical month" to answer for -
+    # they answer for the month they buy, so the amount is what one purchase
+    # costs. Read it that way: per-transaction is the amount itself and
+    # monthly spend is the amount spread over their year. Dividing the raw
+    # answer by a fractional frequency would instead multiply it (R1,200 once
+    # a year -> R14,400 "per transaction"). See
+    # submonthly_amount_is_per_occasion in vas_derived_config.R.
+    if (isTRUE(config$submonthly_amount_is_per_occasion)) {
+      sub <- !is.na(txn$txn_per_month) &
+        txn$txn_per_month > 0 & txn$txn_per_month < 1
+      spend_per_txn[sub] <- amount$value[sub]
+      monthly_spend[sub] <- amount$value[sub] * txn$txn_per_month[sub]
+    }
   } else {
     # per_txn and last_occasion both give a per-transaction figure
     monthly_spend <- txn$txn_per_month * amount$value

@@ -40,6 +40,81 @@ test_that("monthly basis divides the amount by the monthly count", {
   expect_equal(result$spend_per_txn, 400 / (2 * 52 / 12))
 })
 
+test_that("a sub-monthly buyer's monthly amount is read as the cost of one purchase", {
+  # buys once a year and says R1,200: that is what the trip costs, not a
+  # month's spending. Per transaction = R1,200; monthly = R1,200/12 = R100.
+  source <- fixture_source(
+    SDBusOwnFreq1 = "Less than once per month", SDBusOwnFreq2 = NA_character_,
+    SDBusOwnFreq3 = NA_character_, SDBusOwnFreq4 = "1",
+    SDBusOwnAmount = "1200"
+  )
+  row <- fixture_map_row(
+    category = "ShortDistanceBus", freq1 = "SDBusOwnFreq1", freq2 = "SDBusOwnFreq2",
+    freq3 = "SDBusOwnFreq3", freq4 = "SDBusOwnFreq4",
+    amount_alias = "SDBusOwnAmount", amount_basis = "monthly"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_equal(result$txn_per_month, 1 / 12)
+  expect_equal(result$spend_per_txn, 1200)
+  expect_equal(result$monthly_spend, 100)
+  # the identity every consistency check relies on still holds
+  expect_equal(result$monthly_spend, result$txn_per_month * result$spend_per_txn)
+})
+
+test_that("the sub-monthly reading can be switched off", {
+  source <- fixture_source(
+    SDBusOwnFreq1 = "Less than once per month", SDBusOwnFreq2 = NA_character_,
+    SDBusOwnFreq3 = NA_character_, SDBusOwnFreq4 = "1",
+    SDBusOwnAmount = "1200"
+  )
+  row <- fixture_map_row(
+    category = "ShortDistanceBus", freq1 = "SDBusOwnFreq1", freq2 = "SDBusOwnFreq2",
+    freq3 = "SDBusOwnFreq3", freq4 = "SDBusOwnFreq4",
+    amount_alias = "SDBusOwnAmount", amount_basis = "monthly"
+  )
+  config <- utils::modifyList(VAS_CONFIG,
+                              list(submonthly_amount_is_per_occasion = FALSE))
+  result <- derive_category_base(source, row, config)
+  expect_equal(result$monthly_spend, 1200)
+  expect_equal(result$spend_per_txn, 14400)
+})
+
+test_that("a monthly-or-better buyer is untouched by the sub-monthly rule", {
+  # the existing construction: R400 a month at 2 a week stays R400 a month
+  source <- fixture_source(
+    PPUOwnFreq1 = "Once a week or more often", PPUOwnFreq2 = "2",
+    PPUOwnFreq3 = NA_character_, PPUOwnFreq4 = NA_character_,
+    PPUOwnAmount = "400"
+  )
+  row <- fixture_map_row(
+    category = "PrepaidElectricity", freq1 = "PPUOwnFreq1", freq2 = "PPUOwnFreq2",
+    freq3 = "PPUOwnFreq3", freq4 = "PPUOwnFreq4",
+    amount_alias = "PPUOwnAmount", amount_basis = "monthly"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_equal(result$monthly_spend, 400)
+  expect_equal(result$spend_per_txn, 400 / (2 * 52 / 12))
+})
+
+test_that("a sub-monthly buyer with a don't-know amount is missing, not invented", {
+  # a typed 0 is a don't-know on this study; the rule must not turn it into R0
+  source <- fixture_source(
+    SDBusOwnFreq1 = "Less than once per month", SDBusOwnFreq2 = NA_character_,
+    SDBusOwnFreq3 = NA_character_, SDBusOwnFreq4 = "2",
+    SDBusOwnAmount = "0"
+  )
+  row <- fixture_map_row(
+    category = "ShortDistanceBus", freq1 = "SDBusOwnFreq1", freq2 = "SDBusOwnFreq2",
+    freq3 = "SDBusOwnFreq3", freq4 = "SDBusOwnFreq4",
+    amount_alias = "SDBusOwnAmount", amount_basis = "monthly"
+  )
+  result <- derive_category_base(source, row, VAS_CONFIG)
+  expect_equal(result$txn_per_month, 2 / 12)
+  expect_true(is.na(result$monthly_spend))
+  expect_true(is.na(result$spend_per_txn))
+  expect_equal(result$status, "amount_missing")
+})
+
 test_that("last-occasion basis is treated as a per-transaction amount", {
   # a fine paid 3 times a year at R750 = 0.25 a month, R187.50 a month
   source <- fixture_source(

@@ -179,6 +179,18 @@ VAS_CONFIG <- list(
   # decided by zero_words / unknown_words below.
   zero_amount_is_dont_know = TRUE,
 
+  # ADDED 25 Aug - the monthly-amount questions (electricity, short-distance
+  # bus, the bills) ask for spend "in a typical month", but a respondent who
+  # buys less than once a month has no typical month, so they answer for the
+  # month they actually buy - the amount is what one purchase costs them.
+  # TRUE reads a sub-monthly buyer's amount as per-occasion: the
+  # per-transaction figure IS the amount, and monthly spend becomes
+  # amount x frequency. This is also the 2024 wave's construction
+  # (amount x frequency), so trends stay comparable. Without it, a
+  # once-a-year R1,200 answer publishes as R1,200 a month and R14,400 a
+  # transaction. Set FALSE to read every monthly amount at face value.
+  submonthly_amount_is_per_occasion = TRUE,
+
   # ADDED AT BUILD (22 July) - the parser needs a vocabulary, and it belongs
   # here rather than inside the code. A word answer is only classified when the
   # response contains no digits at all, so "about 200" still parses as 200.
