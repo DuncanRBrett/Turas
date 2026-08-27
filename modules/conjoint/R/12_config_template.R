@@ -247,6 +247,10 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   # --- BEST-WORST ---
   add("BEST-WORST", "bw_method", "sequential", "Best-worst estimation approach. Only sequential is implemented; simultaneous refuses.", FALSE, "sequential", "sequential")
 
+  # --- TABS EXPORT ---
+  add("TABS EXPORT", "generate_tabs_export", "N", "Write per-respondent attribute importance in the shape the tabs module reads as an Allocation question, so conjoint results can be crosstabbed. Requires estimation_method = hb or latent_class.", FALSE, "Y,N", "Y or N")
+  add("TABS EXPORT", "tabs_question_code", "CJIMP", "QuestionCode for the exported importance question", FALSE, "", "Letters, digits and underscores, starting with a letter")
+
   # --- DATA QUALITY ---
   add("DATA QUALITY", "min_responses_per_level", "10", "Minimum observations required per attribute level before a warning is raised", FALSE, "", "Positive integer")
   add("WILLINGNESS TO PAY", "wtp_method", "marginal", "WTP calculation method", FALSE, "marginal,simulation", "marginal or simulation")

@@ -17,6 +17,7 @@ Runs end-to-end conjoint analysis: loads a config-driven study definition, estim
 | **Auto** | `auto` | Tries mlogit first, falls back to clogit on convergence failure. Recommended default. | mlogit, survival |
 | **Hierarchical Bayes** | `hb` | Individual-level utilities per respondent via MCMC (bayesm). Produces convergence diagnostics, respondent quality scores (RLH), and preference heterogeneity analysis. | bayesm, coda (optional) |
 | **Latent Class** | `latent_class` | Discovers preference-based segments directly from choice data. Fits K=min..max classes, selects optimal K by BIC/AIC. Each class gets its own utility profile. | bayesm |
+| **Crosstab export** | `generate_tabs_export` | Per-respondent attribute importance written in the tabs Allocation shape, so conjoint results can be broken by any banner. Requires HB or latent class. | openxlsx |
 | **Best-Worst Scaling** | `best_worst` | Exploded logit for best-worst choice tasks (sequential estimation; simultaneous is not implemented and refuses). | mlogit |
 | **Rating-Based** | `rating` | OLS regression for rating-scale conjoint designs (not CBC). | base R |
 

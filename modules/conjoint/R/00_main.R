@@ -234,6 +234,10 @@ if (file.exists(file.path(.conjoint_module_dir, "15_product_optimizer.R"))) {
   source(file.path(.conjoint_module_dir, "15_product_optimizer.R"))
 }
 
+if (file.exists(file.path(.conjoint_module_dir, "16_tabs_export.R"))) {
+  source(file.path(.conjoint_module_dir, "16_tabs_export.R"))
+}
+
 # HTML report and simulator orchestrators (lazy-loaded)
 .conjoint_lib_dir <- file.path(dirname(.conjoint_module_dir), "lib")
 assign(".conjoint_lib_dir", .conjoint_lib_dir, envir = globalenv())
@@ -672,6 +676,32 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
 
   if (verbose) cat(sprintf("   \u2713 Results written to: %s\n", basename(config$output_file)))
 
+  # Step 7b: tabs export (opt-in). Written before the report so a refusal here
+  # is visible next to the Excel deliverable it accompanies.
+  tabs_export_result <- NULL
+  if (isTRUE(config$generate_tabs_export)) {
+    if (verbose) cat("\n7b. Exporting attribute importance for tabs...\n")
+
+    tabs_export_result <- tryCatch(
+      export_conjoint_importance_for_tabs(
+        results = list(
+          respondent_importance = attr(importance, "respondent_importance"),
+          model_result = model_result,
+          config = config
+        ),
+        verbose = verbose
+      ),
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+          turas_run_state_partial(trs_state, e$code, "Tabs export not produced",
+                                  problem = e$problem)
+        }
+        NULL
+      }
+    )
+  }
+
   # Step 8: HTML report
   if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
     if (verbose) {
@@ -826,6 +856,7 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     run_result = run_result,
     warnings = if (length(all_warnings) > 0) all_warnings else NULL,
     stats_pack = stats_pack_result,
+    tabs_export = tabs_export_result,
 
     # Per-respondent attribute importance, one row per respondent, columns
     # summing to 100 except for respondents with flat part-worths. NULL unless
