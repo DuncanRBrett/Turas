@@ -1344,3 +1344,33 @@ body.txt-keys [data-txt-config]::after {
    colour, because the Callout Editor is the wrong place to go looking for it. */
 body.txt-keys [data-txt-config] { outline-color: var(--brand); }
 body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-config); background: var(--brand); }
+
+/* ---------------------------------------------------------------------------
+   Conjoint view (27x_conjoint.js). Frozen results contributed by the conjoint
+   module; see that file's header for why this is an island and not row kinds.
+   --------------------------------------------------------------------------- */
+.cj-view { max-width: 1100px; }
+.cj-view h2 { margin: 0 0 4px; }
+.cj-panel { margin: 22px 0; }
+.cj-panel h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.cj-panel h4 { margin: 14px 0 4px; font-size: .95rem; }
+.cj-note { margin: 0 0 10px; font-size: .85rem; color: #555; line-height: 1.45; }
+.cj-provenance p { margin: 2px 0; font-size: .9rem; }
+.cj-warn { color: #b3372f; }
+.cj-table { border-collapse: collapse; width: 100%; margin-bottom: 6px; }
+.cj-table th, .cj-table td {
+  padding: 5px 9px; border-bottom: 1px solid #e6e6e6; text-align: left;
+  font-size: .88rem;
+}
+.cj-table th { font-weight: 600; border-bottom: 2px solid #ccc; }
+.cj-table .cj-num { text-align: right; font-variant-numeric: tabular-nums; }
+.cj-baseline { color: #777; font-size: .8rem; }
+.cj-barcell { width: 40%; padding-right: 0; }
+.cj-bar {
+  display: inline-block; height: 11px; border-radius: 2px;
+  background: var(--brand, #323367); min-width: 1px;
+}
+.cj-attrs { display: grid; gap: 4px; }
+@media (min-width: 900px) {
+  .cj-attrs { grid-template-columns: 1fr 1fr; gap: 8px 26px; }
+}

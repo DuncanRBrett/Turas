@@ -238,6 +238,10 @@ if (file.exists(file.path(.conjoint_module_dir, "16_tabs_export.R"))) {
   source(file.path(.conjoint_module_dir, "16_tabs_export.R"))
 }
 
+if (file.exists(file.path(.conjoint_module_dir, "17_v2_island.R"))) {
+  source(file.path(.conjoint_module_dir, "17_v2_island.R"))
+}
+
 # HTML report and simulator orchestrators (lazy-loaded)
 .conjoint_lib_dir <- file.path(dirname(.conjoint_module_dir), "lib")
 assign(".conjoint_lib_dir", .conjoint_lib_dir, envir = globalenv())
@@ -702,6 +706,31 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     )
   }
 
+  # Step 7c: contribution to the interactive report. Always written when the
+  # analysis produced utilities — it is a small JSON file, and a tabs run for
+  # the same project picks it up. Nothing consumes it until one does.
+  island_result <- NULL
+  if (exists("write_conjoint_island", mode = "function")) {
+    island_result <- tryCatch(
+      write_conjoint_island(
+        results = list(
+          utilities = utilities,
+          importance = importance,
+          diagnostics = diagnostics,
+          model_result = model_result,
+          config = config,
+          wtp = wtp_result
+        ),
+        verbose = verbose
+      ),
+      turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+      error = function(e) {
+        message(sprintf("[TRS INFO] CONJ_ISLAND_FAILED: %s", conditionMessage(e)))
+        NULL
+      }
+    )
+  }
+
   # Step 8: HTML report
   if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
     if (verbose) {
@@ -857,6 +886,7 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     warnings = if (length(all_warnings) > 0) all_warnings else NULL,
     stats_pack = stats_pack_result,
     tabs_export = tabs_export_result,
+    v2_island = island_result,
 
     # Per-respondent attribute importance, one row per respondent, columns
     # summing to 100 except for respondents with flat part-worths. NULL unless

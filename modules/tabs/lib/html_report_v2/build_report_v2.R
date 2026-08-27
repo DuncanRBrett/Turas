@@ -128,7 +128,8 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
 build_report_v2_html <- function(data_json, config_obj,
                                   assets_dir = report_v2_assets_dir(),
                                   generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z"),
-                                  prev_json = NULL, micro_json = NULL, qual_json = NULL) {
+                                  prev_json = NULL, micro_json = NULL, qual_json = NULL,
+                                  cj_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
   template_path <- file.path(assets_dir, "template.html")
@@ -193,6 +194,12 @@ build_report_v2_html <- function(data_json, config_obj,
   qual_inlined <- if (!is.null(qual_json) && nzchar(qual_json) && qual_json != "null") {
     escape_island(qual_json)
   } else "null"
+  # A conjoint contribution, when the project has one. Absent by default, so a
+  # tabs run without conjoint renders exactly as it did before this island
+  # existed — the Conjoint tab only appears when TR.CJ has content.
+  cj_inlined <- if (!is.null(cj_json) && nzchar(cj_json) && cj_json != "null") {
+    escape_island(cj_json)
+  } else "null"
 
   .report_v2_load_text_layer(assets_dir)
   js_bundle <- bundle_report_v2_js(assets_dir)
@@ -216,6 +223,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "{{DATA_VERIFY}}" = "null",
     "{{DATA_QUAL}}"   = qual_inlined,
     "{{DATA_TEXT}}"   = escape_island(as.character(text_result$json)),
+    "{{DATA_CJ}}"     = cj_inlined,
     "{{JS}}"          = js_bundle
   ))
 
@@ -246,7 +254,8 @@ build_report_v2_html <- function(data_json, config_obj,
 #' @export
 write_html_report_v2 <- function(data_json, config_obj, output_path,
                                  assets_dir = report_v2_assets_dir(),
-                                 prev_json = NULL, micro_json = NULL, qual_json = NULL) {
+                                 prev_json = NULL, micro_json = NULL, qual_json = NULL,
+                                 cj_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code:", code, "\n")
@@ -264,7 +273,8 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
 
   html <- tryCatch(
     build_report_v2_html(data_json, config_obj, assets_dir,
-                         prev_json = prev_json, micro_json = micro_json, qual_json = qual_json),
+                         prev_json = prev_json, micro_json = micro_json,
+                         qual_json = qual_json, cj_json = cj_json),
     error = function(e) e)
   if (inherits(html, "error")) {
     return(refuse("REPORT_V2_BUILD_FAILED", conditionMessage(html),

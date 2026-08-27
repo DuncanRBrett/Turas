@@ -26,6 +26,9 @@
     if (on("patterns")) read.push(["takeout", "Group overview"]);
     if (TR.d2.tracking().enabled && on("tracking")) read.push(["moved", "Tracking"]);
     if (TR.d2.qualitative && TR.d2.qualitative().enabled) read.push(["qualitative", "Qualitative"]);
+    // Conjoint appears only when the project contributed one. A tabs run
+    // without a conjoint study renders exactly as it did before.
+    if (TR.conjoint && TR.conjoint.available()) read.push(["conjoint", "Conjoint"]);
     read.push(["story", "Story"]);
     var analyse = [["crosstabs", "Crosstabs"]];
     if (on("differences")) analyse.push(["findings", "Differences"]);
@@ -60,6 +63,7 @@
     if (!agg) { fatal([{ code: "IO_DATA_PARSE", message: "aggregate data island failed to parse" }]); return; }
     TR.AGG = agg; TR.MICRO = micro; TR.PREV = prev; TR.VERIFY = verify;
     TR.QUAL = parseIsland("data-qual");          // qualitative verbatims (null when absent)
+    TR.CJ = parseIsland("data-cj");              // conjoint contribution (null when absent)
     TR.userState = parseIsland("user-state");   // saved-copy annotations
     // The report's authored prose, keyed. Installed before anything renders,
     // because every explainer on every tab reads from it (see 02_text.js).
@@ -253,6 +257,7 @@
     else if (d2.state.tab === "moved") TR.views.whatMoved(host);
     else if (d2.state.tab === "findings") TR.views.findings(host);
     else if (d2.state.tab === "qualitative") TR.qual.render(host);
+    else if (d2.state.tab === "conjoint") TR.conjoint.render(host);
     else if (d2.state.tab === "story") TR.story2.renderTab(host);
     else TR.report.renderTab(host);
     // The audience filter recomputes from this wave's microdata; prior waves
@@ -261,7 +266,7 @@
     // cover is a landing page, not an analysis surface — no filter bar.
     var fb = document.getElementById("filterbar");
     if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout" ||
-      d2.state.tab === "cover";
+      d2.state.tab === "cover" || d2.state.tab === "conjoint";
     if (TR.reader) TR.reader.renderStrip();
     shell.autoGrowNotes(host);   // every tab render lands here
     d2.pushHash();
