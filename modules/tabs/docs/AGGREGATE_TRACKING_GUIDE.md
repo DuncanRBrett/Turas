@@ -264,6 +264,41 @@ available.
 
 ---
 
+## 10a. Tracking in a confidential (no-microdata) build
+
+A sensitive study — a staff climate survey read by the employer, say — ships
+with `html_report_v2_microdata = N` so the file holds no per-respondent records
+at all. That used to take the Tracking tab with it, because the current wave was
+built from those records. It no longer does.
+
+With the island off, the current wave is built from the published figures
+(`published_wave_contribution()` in `lib/tracking_island.R`). It carries each
+tracked metric's code, cross-wave key, title and published base — and nothing
+per-respondent. The renderer covers the rest: `waves.currentPoint()` returns
+null without scores, so both callers read the current point off the published
+cell, and the Welch test takes the current wave's spread from its published
+category distribution. The metric set is deliberately the same one the microdata
+build of that wave would produce, so the confidential copy and the analyst's own
+copy show the same trend. One honest degrade: a question that publishes only its
+mean (every category hidden) has no distribution to take a spread from, so it
+plots untested where the microdata build would have tested it.
+
+Two things to know:
+
+- **That build writes no `*_wave.json`.** An aggregate-only contribution carries
+  no stats a future wave could plot, and writing one would overwrite the real
+  sidecar from your microdata run. Run your own copy first, keep its wave file,
+  and treat it as this wave's contribution to next year's history.
+- **The history is unaffected.** Prior waves are read from `waves_source`
+  exactly as always, and the aggregate sidecars this guide describes carry no
+  records either — which is why a long back-history and a confidential ship go
+  together naturally.
+
+The console says which path ran: `Tracking: current wave built from published
+figures (N metric(s), no per-respondent records)`.
+
+---
+
 ## 11. Files at a glance
 
 ```

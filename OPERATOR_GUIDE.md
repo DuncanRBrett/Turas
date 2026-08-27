@@ -166,6 +166,16 @@ page source (View Source), whatever the screen shows. The build prints a
 boxed DISCLOSURE WARNING whenever `min_reporting_base > 1` and the island
 still ships, so you cannot send the wrong copy unwarned.
 
+The confidential copy keeps its Tracking tab. It has no per-respondent scores
+to recompute from, so the current wave is built from the published figures
+instead, and the wave-on-wave significance test takes the current wave's spread
+from its published category distribution. The trend and the history are the
+same as the analyst's own copy; only the live filter and the computed views are
+gone. A question that publishes only its mean, with every category hidden, is
+the exception: it has no distribution to take a spread from, so it plots
+untested. That build writes no `*_wave.json`, so keep the one your microdata run
+produced — it is this wave's contribution to next year's history.
+
 Typical setup: your own working config keeps microdata TRUE (full
 interactivity); a second config for the client copy sets it FALSE. The Excel
 workbook applies the same k-gate on every sheet (Crosstabs, Index_Summary,

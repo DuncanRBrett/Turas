@@ -571,3 +571,107 @@ test_that("build_tracking_island forwards the data layer to the option check", {
   expect_equal(length(island$waves), 2)          # island still builds
   expect_true(any(grepl("renamed option", out)))
 })
+
+# ==============================================================================
+# 8. PUBLISHED (no-microdata) current wave — the confidentiality ship
+# ==============================================================================
+#
+# html_report_v2_microdata = FALSE ships no per-respondent records. The Tracking
+# tab used to disappear with them, which put anonymity and a trend line in
+# competition. published_wave_contribution() builds the current wave from the
+# published figures instead: same metric set, same cross-wave keys, no scores.
+
+context("tracking_island: published (no-microdata) current wave")
+
+pw_dl <- function() list(questions = list(
+  list(code = "Q1", title = "Overall rating", type = "scale",
+       rows = list(list(kind = "category", label = "Good"),
+                   list(kind = "mean", label = "Mean")),
+       bases = list(list(n = 120), list(n = 60))),
+  list(code = "Q2", title = "Recommend (NPS)", type = "nps",
+       rows = list(list(kind = "mean", label = "NPS")),
+       bases = list(list(n = 118))),
+  list(code = "Q3", title = "No mean here", type = "single",
+       rows = list(list(kind = "category", label = "Yes")),
+       bases = list(list(n = 120)))))
+
+pw_micro <- function() list(
+  n = 3,
+  scores = list(Q1 = I(c(6, 8, 7)), Q2 = I(c(100, 100, -100))),
+  weights = I(c(1, 1, 1)))
+
+pw_cfg <- function() list(wave = "SACS 2026", wave_order = 2026)
+
+test_that("the published contribution carries NO per-respondent fields", {
+  contrib <- published_wave_contribution(pw_dl(), pw_cfg())
+  expect_equal(contrib$wave, "SACS 2026")
+  expect_equal(contrib$year, 2026)
+  for (q in contrib$questions) {
+    expect_null(q$scores)
+    expect_null(q$weights)
+  }
+  # And nothing per-respondent survives serialisation either.
+  json <- serialize_tracking_island(build_tracking_island(contrib, list()))
+  expect_false(grepl("scores", json, fixed = TRUE))
+  expect_false(grepl("weights", json, fixed = TRUE))
+})
+
+test_that("it tracks the SAME metrics, with the same keys, as the microdata build", {
+  # The whole point: the confidential copy and the analyst's working copy of the
+  # same wave must show the same trend, or the two files disagree.
+  dl <- pw_dl()
+  micro_contrib <- wave_contribution(dl, pw_micro(), pw_cfg())
+  pub_contrib   <- published_wave_contribution(dl, pw_cfg())
+
+  field <- function(contrib, nm) vapply(contrib$questions, function(q) as.character(q[[nm]]), character(1))
+  expect_equal(field(pub_contrib, "code"), field(micro_contrib, "code"))
+  expect_equal(field(pub_contrib, "match_key"), field(micro_contrib, "match_key"))
+  expect_equal(field(pub_contrib, "score_type"), field(micro_contrib, "score_type"))
+})
+
+test_that("a question that publishes no mean is not tracked", {
+  contrib <- published_wave_contribution(pw_dl(), pw_cfg())
+  expect_false("Q3" %in% vapply(contrib$questions, function(q) q$code, character(1)))
+  expect_equal(length(contrib$questions), 2)
+})
+
+test_that("the published base is the Total column's, not a banner column's", {
+  contrib <- published_wave_contribution(pw_dl(), pw_cfg())
+  q1 <- contrib$questions[[1]]
+  expect_equal(q1$code, "Q1")
+  expect_equal(q1$base, 120)          # bases[[1]], not the 60 in bases[[2]]
+})
+
+test_that("no question publishes a mean -> NULL (no Tracking tab, as before)", {
+  dl <- list(questions = list(
+    list(code = "Q3", title = "No mean here", type = "single",
+         rows = list(list(kind = "category", label = "Yes")),
+         bases = list(list(n = 120)))))
+  expect_null(published_wave_contribution(dl, pw_cfg()))
+  # A data layer whose questions carry no rows at all (older shape) is also NULL
+  # rather than a contribution of metrics that publish nothing.
+  expect_null(published_wave_contribution(ti_data_layer(), pw_cfg()))
+})
+
+test_that("a question mapping still curates the metric set and the keys", {
+  mapping <- data.frame(
+    QuestionCode = c("Track_01", "Track_02"),
+    QuestionText = c("Overall rating", "Recommend"),
+    TrackingSpecs = c("mean", "nps_score"),
+    Wave2026 = c("Q1", "Q2"),
+    stringsAsFactors = FALSE)
+  contrib <- published_wave_contribution(pw_dl(), pw_cfg(), mapping)
+  expect_equal(vapply(contrib$questions, function(q) q$match_key, character(1)),
+               c("track01", "track02"))
+  expect_equal(vapply(contrib$questions, function(q) q$score_type, character(1)),
+               c("mean", "nps"))
+})
+
+test_that("a published current wave assembles and is flagged current", {
+  priors <- list(ti_contrib("SACS 2025", 2025, c("overall rating")))
+  island <- build_tracking_island(published_wave_contribution(pw_dl(), pw_cfg()),
+                                  priors)
+  expect_equal(length(island$waves), 2)
+  expect_false(isTRUE(island$waves[[1]]$current))   # 2025 first
+  expect_true(isTRUE(island$waves[[2]]$current))    # 2026 current
+})

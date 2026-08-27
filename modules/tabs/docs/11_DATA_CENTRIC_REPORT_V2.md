@@ -201,7 +201,7 @@ GUI tick-box for option 2):
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
-| `html_report_v2_microdata` | `Y` | Embed the anonymised per-respondent microdata island. `N` = the **confidentiality ship**: an aggregates-only file for insider populations (see Anonymisation & governance) — the live filter, custom banners, COMPUTED views and the Tracking tab switch off for that build. Only an explicit `N`/`FALSE` disables; blank keeps the island. |
+| `html_report_v2_microdata` | `Y` | Embed the anonymised per-respondent microdata island. `N` = the **confidentiality ship**: an aggregates-only file for insider populations (see Anonymisation & governance) — the live filter, custom banners and COMPUTED views switch off for that build. **The Tracking tab survives**: the current wave is built from the published figures instead of from records (`published_wave_contribution()`), and that build writes no `*_wave.json`. Only an explicit `N`/`FALSE` disables; blank keeps the island. |
 | `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. Weighted studies are supported (the wave trend is weighted to match the crosstab). |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
 | `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…) — robust to renames — and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
@@ -245,8 +245,16 @@ onward; a back-catalogue can be produced by running each historical wave once.)
   what ships in the page source. For those ships set
   `html_report_v2_microdata = N`: the file then carries published aggregates
   only — the same confidentiality as a printed report. Costs: no live filter,
-  custom banners or COMPUTED views; the Tracking tab is skipped for that build
-  and no `_wave.json` is written (keep the wave file from your full build).
+  custom banners or COMPUTED views. The **Tracking tab is not a cost**: with no
+  scores to draw on, the current wave is built from the published figures
+  (`published_wave_contribution()`, same metrics and same cross-wave keys as the
+  microdata build of that wave), the renderer reads its point off the published
+  cell, and the Welch test takes its spread from the published category
+  distribution. The one honest degrade: a question that publishes only its mean
+  (every category hidden) has no distribution to take a spread from, so it plots
+  untested where the microdata build would have tested it. That build writes no
+  `_wave.json` — keep the one from your full build, it is this wave's
+  contribution to the history.
   Recommended workflow: **two configs** — your own working copy with microdata
   ON, the client copy with it OFF — and pair the client copy with the qual
   dials (`qual_confidentiality_mode` hidden, `qual_demographic_cuts = block`)

@@ -270,6 +270,94 @@ wave_contribution <- function(data_layer, micro, config_obj, mapping = NULL) {
 }
 
 
+#' Does a data-layer question publish a mean?
+#'
+#' The gate the microdata path applies implicitly: only a question carrying a
+#' mean row gets per-respondent scores (micro_scores_for_question), so only such
+#' a question can contribute a mean-kind metric to a wave.
+#'
+#' @param dl_q One built data-layer question
+#' @return TRUE when the question has a row of kind "mean"
+#' @keywords internal
+tracking_has_mean_row <- function(dl_q) {
+  rows <- dl_q$rows %||% list()
+  if (!length(rows)) return(FALSE)
+  any(vapply(rows, function(r) identical(r$kind, "mean"), logical(1)))
+}
+
+
+#' A data-layer question's published Total base
+#'
+#' @param dl_q One built data-layer question
+#' @return The first column's unweighted base, or NA_real_
+#' @keywords internal
+tracking_total_base <- function(dl_q) {
+  b <- tryCatch(dl_q$bases[[1]]$n, error = function(e) NULL)
+  if (is.null(b) || length(b) != 1) return(NA_real_)
+  suppressWarnings(as.numeric(b))
+}
+
+
+#' Build this wave's tracking contribution from PUBLISHED figures only
+#'
+#' The confidentiality build (`html_report_v2_microdata = FALSE`) ships no
+#' per-respondent records, so `wave_contribution()` has no scores to work from —
+#' and the Tracking tab used to be lost along with them, which put anonymity and
+#' a trend line in competition. They are not in competition: the renderer needs
+#' the current wave only to know WHICH metrics track and what their cross-wave
+#' keys are, and it already reads the current point off the published figures
+#' when no scores are present (`waves.currentPoint()` returns null and both its
+#' callers fall back to the published cell, 22w_waves.js / 27t_tracking.js). The
+#' current wave's SD for the Welch test comes from `sdFromModel()`, derived from
+#' the published category distribution — so wave-on-wave significance still runs.
+#' The one honest degrade: a question that publishes only its mean (every category
+#' hidden) has no distribution to take a spread from, so it plots untested where
+#' the microdata build would have tested it off the scores.
+#'
+#' This therefore emits the same contribution shape as `wave_contribution()`
+#' minus `scores`/`weights`: nothing in it describes an individual.
+#'
+#' The metric set is deliberately the same one the microdata build of this same
+#' wave would produce — mean-kind metrics only — so the confidential copy and the
+#' analyst's own copy show the same trend. (The mirror is the mean-row gate;
+#' `micro_scores_for_question()` also requires a Rating/Likert/NPS/Numeric
+#' variable type, so a categorical question that publishes a mean would appear
+#' here and not there. It would simply pair with no history and be reported as
+#' unmatched.)
+#'
+#' @param data_layer The built data layer (for codes, titles, rows, bases)
+#' @param config_obj The tabs config (for wave label + order key)
+#' @param mapping Optional Question_Mapping body (the curated cross-wave link)
+#' @return A wave contribution list, or NULL when no metric publishes a mean
+#' @export
+published_wave_contribution <- function(data_layer, config_obj, mapping = NULL) {
+  metrics <- tracking_metrics(data_layer, mapping)
+  if (!length(metrics)) return(NULL)
+
+  by_code <- list()
+  for (q in data_layer$questions) by_code[[as.character(q$code)]] <- q
+
+  questions <- list()
+  for (mt in metrics) {
+    q <- by_code[[as.character(mt$code)]]
+    if (is.null(q) || !tracking_has_mean_row(q)) next
+    questions[[length(questions) + 1]] <- list(
+      code       = mt$code,
+      match_key  = mt$key,
+      title      = mt$title,
+      base       = tracking_total_base(q),
+      score_type = mt$score_type)
+  }
+  if (length(questions) == 0) return(NULL)
+  list(
+    wave     = as.character(config_obj$wave %||% ""),
+    year     = wave_order_key(config_obj),
+    segments = list(),
+    questions = questions
+  )
+}
+
+
 #' Assemble the tracking island from the current + prior wave contributions
 #'
 #' The current contribution is flagged `current` (its scores drive the live

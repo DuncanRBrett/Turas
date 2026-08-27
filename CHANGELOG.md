@@ -5,6 +5,31 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **The confidential build keeps its Tracking tab** — `html_report_v2_microdata
+  = FALSE` ships no per-respondent records, and until now the Tracking tab went
+  with them, so an anonymity-sensitive study had to choose between protecting
+  respondents and showing a trend. It no longer has to. When the island is off,
+  the current wave is built from the published figures instead
+  (`published_wave_contribution()` in `lib/tracking_island.R`): each tracked
+  metric's code, cross-wave key, title and published base, and nothing that
+  describes a person. The renderer already covered the rest — `currentPoint()`
+  returns null without scores, both callers fall back to the published cell, and
+  the Welch test takes the current wave's spread from its published category
+  distribution — so the trend and its wave-on-wave significance survive intact,
+  with one honest degrade: a question publishing only its mean (every category
+  hidden) has no distribution to take a spread from and plots untested.
+  The metric set is deliberately the one the microdata build of that wave would
+  produce (mean-kind only, composites included), so the confidential copy and the
+  analyst's own copy show the same trend. That build writes no `*_wave.json`: an
+  aggregate-only contribution carries no stats a future wave could plot, and
+  writing one would overwrite the real sidecar from the microdata run. Tests:
+  `test_tracking_island.R` (+8: no per-respondent fields survive serialisation,
+  metric-set parity with `wave_contribution()`, the mean-row gate, Total base,
+  mapping-curated keys, assembly), `test_data_layer_writer.R` (+1: a composite
+  index is tracked, off a really-built data layer) and a new JS suite
+  `published_wave_tests.mjs` (8: a scores-free current wave pairs with history,
+  a real movement still tests significant, a small one does not, and a mean-only
+  question plots untested).
 - **Project Steps: a per-project runbook** — one workbook per project recording
   the ordered steps that produce the deliverable, including the ones no button
   can run. `Steps` (Order / Step / Type / Tool / Notes / any `arg:<id>` columns),
