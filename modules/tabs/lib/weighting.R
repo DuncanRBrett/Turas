@@ -54,6 +54,28 @@ source_if_exists("shared_functions.R")
 source_if_exists("Scripts/shared_functions.R")
 
 # One Kish n_eff for the platform (modules/shared/lib/effective_n.R).
+# One minimum-base predicate for the platform
+# (modules/shared/lib/disclosure_gate.R).
+if (!exists("meets_min_base", mode = "function")) {
+  .gate_file <- local({
+    rel <- file.path("modules", "shared", "lib", "disclosure_gate.R")
+    roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+    roots <- roots[nzchar(roots)]
+    d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+    for (i in 1:10) {
+      roots <- c(roots, d)
+      parent <- dirname(d)
+      if (identical(parent, d)) break
+      d <- parent
+    }
+    hits <- file.path(roots, rel)
+    hits <- hits[file.exists(hits)]
+    if (length(hits) > 0) hits[[1L]] else NA_character_
+  })
+  if (!is.na(.gate_file)) source(.gate_file)
+  rm(.gate_file)
+}
+
 if (!exists("calculate_effective_n", mode = "function")) {
   .eff_n_file <- local({
     rel <- file.path("modules", "shared", "lib", "effective_n.R")
@@ -880,7 +902,7 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
 
   # Check minimum base size — on the CORRECTED base, so the gate agrees with the
   # instability flag, which is also raised against the corrected base.
-  if (n1 < min_base || n2 < min_base) {
+  if (!all(meets_min_base(c(n1, n2), min_base))) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
   
@@ -1133,7 +1155,7 @@ weighted_t_test_means <- function(values1, values2,
   }
 
   # Check minimum base size — on the CORRECTED base (see the z-test).
-  if (eff_n1 < min_base || eff_n2 < min_base) {
+  if (!all(meets_min_base(c(eff_n1, eff_n2), min_base))) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
 
