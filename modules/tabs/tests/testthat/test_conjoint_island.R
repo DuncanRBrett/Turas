@@ -205,3 +205,51 @@ test_that("an empty island renders a message rather than throwing", {
     system2(node, shQuote(script), stdout = TRUE, stderr = TRUE)), collapse = " ")
   expect_equal(out, "OK")
 })
+
+test_that("degenerate blocks — fit {}, no heterogeneity, no sd — render clean", {
+  # jsonlite used to serialise an absent block as {} (truthy in JS): an HB
+  # island showed a Model fit panel of seven em-dashes, and an MNL island
+  # (no Heterogeneity_SD column) crashed utilitiesHtml on ({}).some. The
+  # writer now drops NULLs, and the view guards with Array.isArray so
+  # islands written before the fix still render.
+  node <- unname(Sys.which("node"))
+  skip_if(!nzchar(node), "node not on PATH")
+
+  script <- tempfile(fileext = ".js")
+  on.exit(unlink(script), add = TRUE)
+
+  writeLines(c(
+    'global.window = global;',
+    'global.TR = {};',
+    'require(', shQuote(file.path(v2_dir, "assets", "js", "27x_conjoint.js")), ');',
+    'global.TR.CJ = {',
+    '  meta: { methodLabel: "Multinomial logit", method: "mlogit",',
+    '          nRespondents: 200, zeroCentred: true, frozen: true },',
+    '  utilities: [{ attribute: "Brand", levels: ["Alpha", "Beta"],',
+    '                utility: [0.5, -0.5], se: [null, 0.1],',
+    '                ciLower: [null, -0.7], ciUpper: [null, -0.3],',
+    '                heterogeneity: {}, pValue: {},',   # the pre-fix {} shape
+    '                isBaseline: [true, false] }],',
+    '  importance: { method: "aggregate", attribute: ["Brand"],',
+    '                importance: [100], sd: {} },',
+    '  fit: {},',
+    '  wtp: {}',
+    '};',
+    'var host = { innerHTML: "" };',
+    'var threw = false;',
+    'try { global.TR.conjoint.render(host); } catch (e) { threw = true; }',
+    'var h = host.innerHTML;',
+    'var checks = [',
+    '  !threw,',
+    '  h.indexOf("Part-worth utilities") !== -1,',
+    '  h.indexOf("Model fit") === -1,',                 # empty fit: no panel
+    '  h.indexOf("Heterogeneity (SD)") === -1,',        # {} is not an array
+    '  h.indexOf("SD across respondents") === -1',      # {} sd: no column
+    '];',
+    'console.log(checks.every(Boolean) ? "OK" : "FAIL " + checks.join(","));'
+  ), script)
+
+  out <- paste(suppressWarnings(
+    system2(node, shQuote(script), stdout = TRUE, stderr = TRUE)), collapse = " ")
+  expect_equal(out, "OK")
+})

@@ -77,18 +77,22 @@
     var max = 0;
     imp.importance.forEach(function (v) { if (v > max) max = v; });
 
+    // An island whose writer had no SD column may carry sd as {} (a NULL
+    // serialised by jsonlite) — only a real array counts.
+    var sdArr = Array.isArray(imp.sd) ? imp.sd : null;
+
     // Descending: the attribute that drives choice most is read first.
     var rows = imp.attribute.map(function (a, i) {
       var v = imp.importance[i];
       var w = max > 0 ? (v / max * 100) : 0;
-      var sd = imp.sd && imp.sd[i] != null
-        ? '<td class="cj-num">' + num(imp.sd[i]) + "</td>" : "";
+      var sd = sdArr && sdArr[i] != null
+        ? '<td class="cj-num">' + num(sdArr[i]) + "</td>" : "";
       return "<tr><td>" + esc(a) + "</td>" +
         '<td class="cj-barcell"><span class="cj-bar" style="width:' + w.toFixed(1) + '%"></span></td>' +
         '<td class="cj-num">' + num(v) + "%</td>" + sd + "</tr>";
     }).join("");
 
-    var sdHead = imp.sd ? '<th class="cj-num">SD across respondents</th>' : "";
+    var sdHead = sdArr ? '<th class="cj-num">SD across respondents</th>' : "";
     var method = imp.method === "individual"
       ? "Each respondent's own importance was computed first, then averaged."
       : "Computed from the averaged utilities. Where respondents disagree about an attribute, that disagreement cancels before the range is taken, so its importance is understated.";
@@ -102,7 +106,9 @@
 
   function utilitiesHtml(blocks, meta) {
     var anyHet = blocks.some(function (b) {
-      return (b.heterogeneity || []).some(function (h) { return h != null && h > 0; });
+      // Array.isArray, not truthiness: an older island can carry {} here.
+      var het = Array.isArray(b.heterogeneity) ? b.heterogeneity : [];
+      return het.some(function (h) { return h != null && h > 0; });
     });
 
     var tables = blocks.map(function (b) {
@@ -120,7 +126,7 @@
               ? num(b.ciLower[i], 2) + " to " + num(b.ciUpper[i], 2) : "—");
         var het = anyHet
           ? '<td class="cj-num">' +
-            (base ? "—" : (b.heterogeneity ? num(b.heterogeneity[i], 2) : "—")) + "</td>"
+            (base ? "—" : (Array.isArray(b.heterogeneity) ? num(b.heterogeneity[i], 2) : "—")) + "</td>"
           : "";
 
         return "<tr>" +
@@ -153,6 +159,14 @@
 
   function fitHtml(fit) {
     if (!fit) return "";
+    // An island written before the writer dropped NULL blocks carries
+    // "fit": {} — truthy, but with nothing to say. No panel for those either.
+    var any = [fit.mcFaddenR2, fit.hitRate, fit.chanceRate,
+               fit.logLikelihoodFitted, fit.logLikelihoodNull,
+               fit.nObservations, fit.nParameters].some(function (v) {
+      return v !== null && v !== undefined;
+    });
+    if (!any) return "";
 
     var beatsChance = (fit.hitRate != null && fit.chanceRate != null)
       ? " The model picks the chosen alternative " + num(fit.hitRate * 100) +

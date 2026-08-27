@@ -68,6 +68,12 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
     x
   }
 
+  # jsonlite writes a NULL list element as {} — truthy in JavaScript, and
+  # worse than absent: an MNL island (which has no Heterogeneity_SD column)
+  # would hand the view "heterogeneity": {} where it expects an array. A
+  # field the run did not produce is dropped, at every level.
+  drop_null <- function(x) Filter(Negate(is.null), x)
+
   # --- Utilities, by attribute ---------------------------------------------
   # Zero-centred level utilities with the post-A4 honest intervals: se is the
   # posterior SE of the population mean, NOT the between-respondent spread,
@@ -76,7 +82,7 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
   attrs <- unique(utilities$Attribute)
   utility_blocks <- lapply(attrs, function(a) {
     rows <- utilities[utilities$Attribute == a, , drop = FALSE]
-    list(
+    drop_null(list(
       attribute = a,
       levels = as.character(rows$Level),
       utility = num(rows$Utility),
@@ -86,7 +92,7 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
       heterogeneity = num(rows$Heterogeneity_SD),
       pValue = num(rows$p_value),
       isBaseline = as.logical(rows$is_baseline)
-    )
+    ))
   })
 
   # --- Importance -----------------------------------------------------------
@@ -94,20 +100,20 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
   if (!is.null(importance) && is.data.frame(importance) && nrow(importance) > 0) {
     ord <- order(-num(importance$Importance))
     imp <- importance[ord, , drop = FALSE]
-    importance_block <- list(
+    importance_block <- drop_null(list(
       # Named so the reader knows what they are looking at: "individual" means
       # each respondent's own importance was computed before averaging.
       method = attr(importance, "importance_method") %||% "aggregate",
       attribute = as.character(imp$Attribute),
       importance = num(imp$Importance),
       sd = if ("SD" %in% names(imp)) num(imp$SD) else NULL
-    )
+    ))
   }
 
   # --- Model fit ------------------------------------------------------------
   fit <- results$diagnostics$fit_statistics %||% NULL
   fit_block <- if (!is.null(fit)) {
-    list(
+    drop_null(list(
       mcFaddenR2 = num(fit$mcfadden_r2),
       adjMcFaddenR2 = num(fit$adj_mcfadden_r2),
       hitRate = num(fit$hit_rate),
@@ -116,7 +122,7 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
       logLikelihoodNull = num(fit$log_likelihood_null),
       nObservations = num(fit$n_obs),
       nParameters = num(fit$n_parameters)
-    )
+    ))
   } else NULL
 
   # --- Willingness to pay (optional) ----------------------------------------
@@ -124,7 +130,7 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
   wtp_block <- NULL
   if (!is.null(wtp) && !is.null(wtp$wtp_table) && nrow(wtp$wtp_table) > 0) {
     w <- wtp$wtp_table
-    wtp_block <- list(
+    wtp_block <- drop_null(list(
       priceAttribute = wtp$price_attribute %||% NA_character_,
       currency = config$currency_symbol %||% "$",
       attribute = as.character(w$Attribute),
@@ -140,7 +146,7 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
         "Approximate: the delta method applied to a price slope fitted ",
         "through the estimated price utilities, not a sampling interval."
       )
-    )
+    ))
   }
 
   # --- Provenance -----------------------------------------------------------
@@ -186,6 +192,12 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
     fit = fit_block,
     wtp = wtp_block
   )
+
+  # An absent block must be ABSENT in the JSON, not an empty object: jsonlite
+  # writes a NULL list element as {}, and {} is truthy in JavaScript — an HB
+  # run (which has no mlogit-style fit statistics) rendered a Model fit panel
+  # of seven em-dashes that way (C-delta review, finding 2).
+  out <- Filter(Negate(is.null), out)
 
   log_verbose(sprintf("  OK Conjoint island: %d attributes, %d levels",
                       length(attrs), nrow(utilities)), verbose)
