@@ -600,6 +600,54 @@ assert(themedHtml.indexOf('data-pinpart="board"') >= 0 && themedHtml.indexOf('da
 TR.QUAL = savedIsland;
 TR.d2.state.qualQ = null;
 
+// ---- the question list keeps its place across a re-render --------------------
+// The Qualitative tab re-renders whole, so the rail (its own scroll container)
+// was rebuilt at scrollTop 0 on every click and the list snapped back to the
+// top. The Crosstabs sidebar never moves because that tab re-renders only its
+// card; this carries the position across instead.
+console.log("\nRail scroll position:");
+{
+  // The stub models the REBUILD, which is the whole point: querySelector(".ql-rail")
+  // returns the old element before innerHTML is written and a brand-new one
+  // (scrollTop 0, as a freshly built element is) after. Without the carry-across
+  // the new rail stays at 0 and the list snaps to the top.
+  const makeRail = (top) => {
+    const cur = { nudged: false };
+    cur.scrollIntoView = () => { cur.nudged = true; };
+    return { scrollTop: top,
+             querySelector: (sel) => (sel === '[aria-current="true"]' ? cur : null),
+             _cur: cur };
+  };
+  const makeHost = (oldRail) => {
+    let html = "", rail = oldRail;
+    const host = {
+      querySelectorAll: () => [],
+      querySelector: (sel) => (sel === ".ql-rail" ? rail : null),
+      get rail() { return rail; }
+    };
+    Object.defineProperty(host, "innerHTML", {
+      get: () => html,
+      set: (v) => { html = v; rail = makeRail(0); }   // the rebuild
+    });
+    return host;
+  };
+
+  const scrolled = makeHost(makeRail(184));
+  qual._state = null;
+  qual.render(scrolled);
+  assert(scrolled.rail.scrollTop === 184,
+    "the rebuilt rail keeps the position the reader had scrolled to: " + scrolled.rail.scrollTop);
+  assert(scrolled.rail._cur.nudged === true,
+    "the selected item is nudged into view — 'nearest', so a no-op when already on screen");
+
+  // first render: no rail on screen yet, so nothing to carry and nothing to throw on
+  const fresh = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  let threw = false;
+  qual._state = null;
+  try { qual.render(fresh); } catch (e) { threw = true; }
+  assert(!threw, "a first render, with no rail to read from, does not throw");
+}
+
 // ---- priority comments reach the qual pin ------------------------------------
 // priorityQuotes() starts from the CLOSED question and resolves the link;
 // priorityQuotesFor() starts from the open-end itself, which is where the

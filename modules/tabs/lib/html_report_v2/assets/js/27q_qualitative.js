@@ -1516,12 +1516,28 @@
       qual._view = { island: island, q: q, audience: audience };   // for the export handler
       body = breadcrumbHtml(jump) + mainHtml(island, q, st, audience);
     }
+    // The rail is its own scroll container and this tab re-renders whole, so
+    // every click used to snap the question list back to the top. The Crosstabs
+    // sidebar never moves because that tab re-renders only its card; carry the
+    // scroll position across the rebuild so this one behaves the same way.
+    var priorRail = host.querySelector && host.querySelector(".ql-rail");
+    var railTop = priorRail ? priorRail.scrollTop : 0;
     host.innerHTML =
       '<div class="ql-wrap' + (st.railHidden ? " norail" : "") + '">' + railHtml(island, st, collected.items.length) +
         '<div class="ql-main">' +
           '<button class="ql-railtoggle" title="Show/hide the question list">⟨⟩ Questions</button>' +
           body +
         '</div></div>';
+    var rail = host.querySelector && host.querySelector(".ql-rail");
+    if (rail) {
+      rail.scrollTop = railTop;
+      // ...then nudge the selected item into view, exactly as the Crosstabs
+      // sidebar does. "nearest" is a no-op when it is already on screen, so a
+      // click never moves the list — only arriving from elsewhere (a jump from
+      // a closed question, a restored hash) scrolls, and only as far as needed.
+      var cur = rail.querySelector('[aria-current="true"]');
+      if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
+    }
     if (TR.shell && TR.shell.autoGrowNotes) TR.shell.autoGrowNotes(host);   // themes×banner insight box, full height
     wire(host, island);
   };
