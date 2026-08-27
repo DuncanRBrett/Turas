@@ -380,12 +380,25 @@
     if (!island) return [];
     var link = qual.linkFor(code);
     if (!link) return [];
-    var q = findQ(island, link.qcode);
-    if (!q || !q.records) return [];
+    return qual.priorityQuotesFor(findQ(island, link.qcode), link.title || link.qcode);
+  };
+
+  /**
+   * The same payload, asked for from the open-end itself rather than from the
+   * closed question in front of it — the Qualitative tab's own pin starts here.
+   * Every disclosure and band rule above applies unchanged; only the way the
+   * question is reached differs.
+   *
+   * @param q A qual island question.
+   * @param fallbackTitle Used for the quote attribution when q carries no title.
+   */
+  qual.priorityQuotesFor = function (q, fallbackTitle) {
+    var island = TR.QUAL;
+    if (!island || !q || !q.records) return [];
     var base = (q.base && q.base.answered) || q.records.length;
     var tagsOk = island.demographicCuts !== "block" &&
       !(TR.disclosure && TR.disclosure.cellOk && !TR.disclosure.cellOk(base));
-    var title = q.title || link.title || link.qcode;
+    var title = q.title || fallbackTitle || q.code;
     var bands = (q.split && q.split.bands) ? q.split.bands : [];
     var out = q.records.filter(function (r) {
       return (r.tier || 0) >= 3 && r.text != null;
@@ -1601,7 +1614,7 @@
     var key = qual.insightKey(q);
     var txt = (TR.insights && TR.insights.get) ? TR.insights.get(key) : "";
     return '<div class="insight ql-qinsight" data-pinpart="insight">' +
-      '<div class="insight-head">Analyst insight' +
+      '<div class="insight-head">Key themes' +
       '<span class="hint"> \u2014 the overall read on these comments</span></div>' +
       '<textarea data-qinsight="' + esc(key) + '" placeholder="Insight for ' +
       esc(key) + '\u2026">' + esc(txt) + "</textarea></div>";
@@ -1638,11 +1651,20 @@
       items.push({ key: "board", checked: true,
         label: st.themeView === "crosstab" ? "Themes by banner" : "Theme board" });
     }
-    items.push({ key: "insight", label: "Insight", checked: true });
+    items.push({ key: "insight", label: "Key themes", checked: true });
+    // The analyst's priority comments, offered only when there are some — an
+    // always-on tickbox would be dead on most questions. The count is
+    // filter-independent by design: priority is marked against the question,
+    // not against the cut on screen. Same offer the Crosstabs pin box makes.
+    var priority = qual.priorityQuotesFor(q);
+    if (priority.length) {
+      items.push({ key: "comments", checked: true,
+        label: "Priority comments (" + priority.length + ")" });
+    }
     TR.shell.pinMenu(menu, items, function (flags) {
       menu.hidden = true;
       btn.setAttribute("aria-expanded", "false");
-      if (!flags.board && !flags.insight) {
+      if (!flags.board && !flags.insight && !flags.comments) {
         TR.shell.toast("Pick at least one element to pin");
         return;
       }
@@ -1654,7 +1676,7 @@
   // carry buttons that do nothing when clicked. Kept in ONE list rather than
   // marked at each render site. Anything carrying data stays: the theme bars and
   // their numbers, the base, the coverage bar, the closed-question stat chip.
-  var PIN_DROP_SEL = "[data-jump-comments], .ql-boardtools, [data-theme-focus]";
+  var PIN_DROP_SEL = "[data-jump-comments], .ql-boardtools, [data-theme-focus], .ql-viewtog";
 
   /** Snapshot the question card with only the ticked elements in it. */
   function pinQuestion(host, q, st, flags) {
@@ -1669,18 +1691,41 @@
       if (!flags[el.getAttribute("data-pinpart")]) el.remove();
     });
     work.querySelectorAll(PIN_DROP_SEL).forEach(function (el) { el.remove(); });
+    // Priority comments are not in the card — they live in the filtered list
+    // below it — so the ticked block is built and appended before snapshotting.
+    // It arrives ALREADY disclosure-gated (hidden text absent, tags dropped
+    // below k); priorityQuotesFor applies every rule the crosstab pin gets.
+    var quotes = flags.comments ? qual.priorityQuotesFor(q) : [];
+    if (quotes.length) {
+      var holder = document.createElement("div");
+      holder.innerHTML = qual.priorityBlockHtml(quotes);
+      if (holder.firstChild) work.appendChild(holder.firstChild);
+    }
     var bits = [];
     if (flags.board && q.type === "themed") {
       bits.push(st.themeView === "crosstab" ? "themes by banner" : "what people raised");
     }
-    if (flags.insight) bits.push("analyst insight");
-    TR.story2.pinSnapshot({
+    if (flags.insight) bits.push("key themes");
+    if (quotes.length) bits.push(quotes.length + " priority comment" + (quotes.length === 1 ? "" : "s"));
+    // snapshotLines harvests by element selector and does not match a
+    // blockquote, so the quote lines are added beside it — same text, same
+    // gates, so the image deck and the editable deck cannot diverge.
+    var lines = TR.shell.snapshotLines(work);
+    quotes.forEach(function (qt) {
+      var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" \u00b7 ");
+      lines.push("\u201c" + qt.text + "\u201d" + (chip ? " \u2014 " + chip : ""));
+    });
+    var payload = {
       source: "qualitative",
       title: q.title,
       context: bits.join(" \u00b7 "),
       html: TR.shell.snapshotCard(work),
-      lines: TR.shell.snapshotLines(work)
-    });
+      lines: lines
+    };
+    // structured quotes drive the editable deck's quote-typography slide (WP4),
+    // exactly as a hub exhibit's do
+    if (quotes.length) payload.quotes = quotes;
+    TR.story2.pinSnapshot(payload);
   }
 
   function headerHtml(island, q, audience) {

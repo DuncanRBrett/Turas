@@ -552,6 +552,8 @@ assert(insHtml.indexOf("Service is the story.") >= 0,
   "the box is pre-filled from TR.insights (which falls back to the config Comments sheet)");
 assert(insHtml.indexOf('placeholder="Insight for QS') >= 0,
   "the placeholder prints the exact code to put in the Comments sheet");
+assert(insHtml.indexOf(">Key themes<") >= 0 || insHtml.indexOf(">Key themes<span") >= 0,
+  "the box is labelled Key themes — the client asked for a note on the key theme");
 assert(insightSeen.some((c) => c[0] === "QS" && c[1] === undefined),
   "the question insight is fetched banner-agnostically (no banner argument)");
 assert(insHtml.indexOf('id="insight-box"') < 0,
@@ -596,6 +598,50 @@ const themedHtml = host.innerHTML;
 assert(themedHtml.indexOf('data-pinpart="board"') >= 0 && themedHtml.indexOf('data-pinpart="insight"') >= 0,
   "board and insight are each tagged as a pin part, so the tickboxes can drop either");
 TR.QUAL = savedIsland;
+TR.d2.state.qualQ = null;
+
+// ---- priority comments reach the qual pin ------------------------------------
+// priorityQuotes() starts from the CLOSED question and resolves the link;
+// priorityQuotesFor() starts from the open-end itself, which is where the
+// Qualitative tab's own pin starts. Both must produce the same gated payload.
+console.log("\npriorityQuotesFor:");
+const pqIsland = {
+  textMode: "full", demographicCuts: "safe", noteworthyDefault: "all",
+  questions: [{ code: "QUAL_PQ", title: "Why do you say that?", type: "raw", themes: [],
+    base: { answered: 3 },
+    records: [
+      { idx: 0, tier: 3, sentiment: 3, themeVals: {}, demos: { Centre: "Metro South" }, text: "late again" },
+      { idx: 1, tier: 1, sentiment: 1, themeVals: {}, demos: { Centre: "Country North" }, text: "not marked priority" },
+      { idx: 2, tier: 3, sentiment: 1, themeVals: {}, demos: {}, text: "rep is excellent" }
+    ] }]
+};
+const pqSaved = TR.QUAL;
+TR.QUAL = pqIsland;
+const pqOwn = qual.priorityQuotesFor(pqIsland.questions[0]);
+assert(pqOwn.length === 2, "only tier-3 (priority) records come back: " + pqOwn.length);
+assert(pqOwn[0].text === "late again" && pqOwn[0].q === "Why do you say that?",
+  "each quote carries its text and the question title for the attribution");
+assert(pqOwn[0].tags.indexOf("Metro South") >= 0, "demographic tags travel when the dial allows");
+assert(pqOwn[0].sentiment === "neg" && pqOwn[1].sentiment === "pos", "sentiment classes travel");
+
+TR.QUAL = { textMode: "full", demographicCuts: "block", noteworthyDefault: "all",
+  questions: pqIsland.questions };
+assert(qual.priorityQuotesFor(pqIsland.questions[0])[0].tags.length === 0,
+  "a blocked demographic dial drops the tags, exactly as priorityQuotes does");
+
+TR.QUAL = pqIsland;
+assert(qual.priorityQuotesFor(null).length === 0 && qual.priorityQuotesFor({}).length === 0,
+  "no question, no quotes");
+const blockHtml = qual.priorityBlockHtml(pqOwn);
+assert(blockHtml.indexOf("late again") >= 0 && blockHtml.indexOf("In their words") >= 0,
+  "the pinned block is the same renderer the crosstab pin uses");
+
+// the tickbox appears only when the question actually has priority comments
+TR.d2.state.qualQ = "QUAL_PQ";
+qual._state = null;
+qual.render(host);
+assert(host.innerHTML.indexOf("data-qual-pin") >= 0, "the pin is offered on a verbatim-only question too");
+TR.QUAL = pqSaved;
 TR.d2.state.qualQ = null;
 
 TR.insights = realInsights;
@@ -1080,6 +1126,10 @@ qual._state = null;
 hostX.innerHTML = ""; qual.render(hostX);
 assert(hostX.innerHTML.indexOf('data-themeview="crosstab"') >= 0,
   "with microdata: the Crosstab by banner toggle renders");
+// the toggle is the fourth name in PIN_DROP_SEL — a live control that does
+// nothing once a card is frozen into the Story, so a pin must strip it
+assert(hostX.innerHTML.indexOf("ql-viewtog") >= 0,
+  "PIN_DROP_SEL still names the view toggle: ql-viewtog");
 
 // ---- priority comments behind a closed question (the crosstab pin) ----------
 // Tier 3 ("p" in the coding workbook) is AUTHORED, so it must read the same
