@@ -139,7 +139,9 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
 
   fit <- tryCatch({
     stan_model$sample(
-      data = stan_data,
+      # Only the declared data block: the full list carries character
+      # metadata (item_ids, resp_ids) that write_stan_json refuses (C1).
+      data = stan_declared_data(stan_data),
       seed = seed,
       chains = n_chains,
       parallel_chains = {
@@ -189,19 +191,24 @@ prepare_stan_data <- function(long_data, items) {
 
   # Get included items
   included_items <- items$Item_ID[items$Include == 1]
+  original_item_order <- included_items
   J <- length(included_items)
 
-  # Create item index mapping
-  item_to_idx <- setNames(seq_along(included_items), included_items)
-
-  # Get anchor item
+  # The Stan model hard-codes the LAST item as the anchor (beta[r,J] = 0,
+  # maxdiff_hb.stan). A designated Anchor_Item that sits anywhere else was
+  # silently ignored — the model anchored a different item than the logit
+  # engine did, so the two utility columns in one workbook disagreed (M1).
+  # Reorder so the designated anchor IS last; extraction maps the columns
+  # back to the original item order.
   anchor_idx <- which(items$Anchor_Item == 1 & items$Include == 1)
   if (length(anchor_idx) > 0) {
     anchor_item <- items$Item_ID[anchor_idx[1]]
-    anchor_item_idx <- item_to_idx[anchor_item]
-  } else {
-    anchor_item_idx <- J  # Use last item as anchor
+    included_items <- c(setdiff(included_items, anchor_item), anchor_item)
   }
+  anchor_item_idx <- J   # by construction: the model's anchor is item J
+
+  # Create item index mapping (anchor last)
+  item_to_idx <- setNames(seq_along(included_items), included_items)
 
   # Get unique respondents and create index
   respondents <- unique(long_data$resp_id)
@@ -291,8 +298,39 @@ prepare_stan_data <- function(long_data, items) {
     is_best = is_best_array,
     anchor_item = anchor_item_idx,
     item_ids = included_items,
-    resp_ids = respondents
+    resp_ids = respondents,
+    original_item_order = original_item_order
   )
+}
+
+
+#' The subset of prepared data the Stan model actually declares
+#'
+#' cmdstanr's write_stan_json serialises EVERYTHING it is handed and stops
+#' on character vectors — so passing the full prepared list (which carries
+#' item_ids and resp_ids for extraction) errored out inside $sample(), and
+#' the tryCatch silently downgraded every "HB" run to the empirical-Bayes
+#' fallback (C1). Only these eight members are in maxdiff_hb.stan's data
+#' block; everything else is extraction metadata and stays out.
+#'
+#' @param stan_data The list from prepare_stan_data().
+#' @return The declared members only, all numeric/integer.
+#' @keywords internal
+stan_declared_data <- function(stan_data) {
+  declared <- c("N", "R", "J", "K", "resp", "choice", "shown", "is_best")
+  out <- stan_data[declared]
+  bad <- names(out)[!vapply(out, is.numeric, logical(1))]
+  if (length(bad) > 0) {
+    maxdiff_refuse(
+      code = "CALC_STAN_DATA_INVALID",
+      title = "Stan Data Contains Non-Numeric Members",
+      problem = sprintf("Declared Stan data members are not numeric: %s",
+                        paste(bad, collapse = ", ")),
+      why_it_matters = "cmdstanr cannot serialise them; sampling would fail and silently fall back.",
+      how_to_fix = "This is a bug in prepare_stan_data() - report it with the console output."
+    )
+  }
+  out
 }
 
 
@@ -387,6 +425,15 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
     stan_data$item_ids, stan_data$resp_ids
   )
 
+  # prepare_stan_data reorders items so the designated anchor sits last
+  # (the model's beta[r,J] = 0 slot). Deliverables keep the configured
+  # item order, so map the columns back (M1).
+  orig <- stan_data$original_item_order %||% stan_data$item_ids
+  individual_utilities <- reorder_utility_columns(individual_utilities, orig)
+  population_utilities <- population_utilities[
+    order(match(population_utilities$Item_ID, orig)), , drop = FALSE]
+  rownames(population_utilities) <- NULL
+
   # Diagnostics
   diagnostics <- list(
     n_divergences = sum(fit$sampler_diagnostics()[, "divergent__"]),
@@ -418,6 +465,26 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
       n_chains = fit$num_chains()
     )
   )
+}
+
+
+#' Put an individual-utilities table's item columns in a given order
+#'
+#' The Stan path estimates with the designated anchor moved to the last
+#' column; deliverables keep the configured order (M1). resp_id (or any
+#' other non-item column) stays in front.
+#'
+#' @param individual_utilities Data frame: resp_id + one column per item.
+#' @param item_order Character vector, the wanted item-column order.
+#' @return The same data frame, item columns reordered.
+#' @keywords internal
+reorder_utility_columns <- function(individual_utilities, item_order) {
+  if (is.null(individual_utilities) || !is.data.frame(individual_utilities)) {
+    return(individual_utilities)
+  }
+  item_cols <- intersect(item_order, names(individual_utilities))
+  other_cols <- setdiff(names(individual_utilities), item_cols)
+  individual_utilities[, c(other_cols, item_cols), drop = FALSE]
 }
 
 

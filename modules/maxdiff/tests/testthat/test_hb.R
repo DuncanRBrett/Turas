@@ -608,3 +608,59 @@ test_that("get_recommended_hb_settings increases iterations for large studies", 
   expect_true(large$iterations >= small$iterations ||
               large$adapt_delta >= small$adapt_delta)
 })
+
+
+# ==============================================================================
+# A2 (C1 + M1): the Stan data block, and the anchor's seat
+# ==============================================================================
+
+test_that("C1: only the model's declared data block goes to the sampler", {
+  skip_if(!exists("stan_declared_data", mode = "function"))
+
+  items <- build_hb_items(4)
+  long_data <- build_hb_long_data(n_resp = 8, n_items = 4, n_tasks = 4)
+  stan_data <- prepare_stan_data(long_data, items)
+
+  # The full prepared list still carries the extraction metadata...
+  expect_true(all(c("item_ids", "resp_ids", "anchor_item",
+                    "original_item_order") %in% names(stan_data)))
+
+  # ...but what reaches $sample() is exactly the declared block, all
+  # numeric — a character member is what broke write_stan_json and
+  # silently downgraded every HB run to the EB fallback.
+  declared <- stan_declared_data(stan_data)
+  expect_setequal(names(declared),
+                  c("N", "R", "J", "K", "resp", "choice", "shown", "is_best"))
+  expect_true(all(vapply(declared, is.numeric, logical(1))))
+})
+
+test_that("M1: a designated anchor is moved to the model's last slot", {
+  items <- build_hb_items(4)
+  items$Anchor_Item[2] <- 1L   # I2, NOT last — was silently ignored
+  long_data <- build_hb_long_data(n_resp = 8, n_items = 4, n_tasks = 4)
+
+  stan_data <- prepare_stan_data(long_data, items)
+
+  expect_equal(stan_data$item_ids[stan_data$J], "I2")
+  expect_equal(unname(stan_data$anchor_item), stan_data$J)
+  # No item lost or invented by the reorder.
+  expect_setequal(stan_data$item_ids, paste0("I", 1:4))
+  # And the original order is remembered for extraction.
+  expect_equal(stan_data$original_item_order, paste0("I", 1:4))
+})
+
+test_that("M1: extraction maps utility columns back to the original order", {
+  skip_if(!exists("reorder_utility_columns", mode = "function"))
+
+  # Simulate the post-reorder extraction output: anchor I2 sits last.
+  iu <- data.frame(resp_id = c("r1", "r2"),
+                   I1 = c(0.1, 0.2), I3 = c(0.3, 0.4),
+                   I4 = c(0.5, 0.6), I2 = c(0, 0),
+                   stringsAsFactors = FALSE)
+
+  out <- reorder_utility_columns(iu, paste0("I", 1:4))
+  expect_equal(names(out), c("resp_id", "I1", "I2", "I3", "I4"))
+  # Values travel with their names.
+  expect_equal(out$I2, c(0, 0))
+  expect_equal(out$I3, c(0.3, 0.4))
+})
