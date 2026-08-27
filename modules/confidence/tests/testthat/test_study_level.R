@@ -2,7 +2,7 @@
 # TEST SUITE: Study-Level Calculations
 # ==============================================================================
 # Unit tests for:
-#   - calculate_effective_n() — Kish formula
+#   - calculate_effective_n_int() — Kish formula, rounded (this module's contract)
 #   - calculate_deff() — design effect
 #   - calculate_study_level_stats() — comprehensive stats
 #   - compute_weight_concentration() — weight diagnostics
@@ -13,7 +13,7 @@ library(testthat)
 context("Study-Level Calculations")
 
 # Re-source 03_study_level.R to ensure confidence module's versions of
-# calculate_effective_n and calculate_deff are loaded (other modules like
+# calculate_effective_n_int and calculate_deff are loaded (other modules like
 # maxdiff define functions with the same names but different behaviour)
 local({
   root <- tryCatch(get("TURAS_ROOT", envir = .GlobalEnv), error = function(e) NULL)
@@ -29,7 +29,7 @@ local({
 
 test_that("calculate_effective_n: equal weights return actual n", {
   weights <- rep(1, 100)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
   expect_equal(result, 100L)
 })
 
@@ -39,7 +39,7 @@ test_that("calculate_effective_n: Kish formula is correct", {
   # Scaled: w/mean = c(0.5, 1.0, 1.5), sum=3, sum_sq=3.5
   # n_eff = 9/3.5 = 2.571... -> rounds to 3
   weights <- c(1, 2, 3)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
   expected <- as.integer(round((sum(weights)^2) / sum(weights^2)))
   expect_equal(result, expected)
 })
@@ -47,14 +47,14 @@ test_that("calculate_effective_n: Kish formula is correct", {
 test_that("calculate_effective_n: uniform weights give n_eff = n", {
   # All weights the same (but not 1) should still give n_eff = n
   weights <- rep(2.5, 200)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
   expect_equal(result, 200L)
 })
 
 test_that("calculate_effective_n: extreme variation reduces n_eff", {
   # One very large weight dominates
   weights <- c(rep(1, 99), 100)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
 
   # n_eff should be much less than 100
 
@@ -64,34 +64,34 @@ test_that("calculate_effective_n: extreme variation reduces n_eff", {
 
 test_that("calculate_effective_n: removes NA weights", {
   weights <- c(1, 1, 1, NA, NA)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
   expect_equal(result, 3L)
 })
 
 test_that("calculate_effective_n: removes zero weights", {
   weights <- c(1, 1, 1, 0, 0)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
   expect_equal(result, 3L)
 })
 
 test_that("calculate_effective_n: removes infinite weights", {
   weights <- c(1, 1, 1, Inf)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
   expect_equal(result, 3L)
 })
 
 test_that("calculate_effective_n: all invalid returns 0", {
-  expect_equal(calculate_effective_n(c(NA, NA)), 0L)
-  expect_equal(calculate_effective_n(c(0, 0)), 0L)
-  expect_equal(calculate_effective_n(numeric(0)), 0L)
+  expect_equal(calculate_effective_n_int(c(NA, NA)), 0L)
+  expect_equal(calculate_effective_n_int(c(0, 0)), 0L)
+  expect_equal(calculate_effective_n_int(numeric(0)), 0L)
 })
 
 test_that("calculate_effective_n: scale invariant", {
   # Multiplying all weights by a constant shouldn't change n_eff
   weights <- c(1, 2, 3, 4, 5)
-  result1 <- calculate_effective_n(weights)
-  result2 <- calculate_effective_n(weights * 100)
-  result3 <- calculate_effective_n(weights * 0.001)
+  result1 <- calculate_effective_n_int(weights)
+  result2 <- calculate_effective_n_int(weights * 100)
+  result3 <- calculate_effective_n_int(weights * 0.001)
 
   expect_equal(result1, result2)
   expect_equal(result1, result3)
@@ -100,7 +100,7 @@ test_that("calculate_effective_n: scale invariant", {
 test_that("calculate_effective_n: large sample works", {
   set.seed(42)
   weights <- runif(10000, 0.5, 2.0)
-  result <- calculate_effective_n(weights)
+  result <- calculate_effective_n_int(weights)
 
   expect_true(result > 0)
   expect_true(result <= 10000)
@@ -269,7 +269,7 @@ test_that("DEFF and effective_n are consistent: n_eff ≈ n / DEFF", {
   weights <- runif(500, 0.3, 3.0)
 
   deff <- calculate_deff(weights)
-  n_eff <- calculate_effective_n(weights)
+  n_eff <- calculate_effective_n_int(weights)
   valid_n <- sum(!is.na(weights) & is.finite(weights) & weights > 0)
 
   # n_eff should be approximately n / DEFF (may differ due to rounding)

@@ -53,6 +53,49 @@ if (!exists("source_if_exists", mode = "function")) {
 source_if_exists("shared_functions.R")
 source_if_exists("Scripts/shared_functions.R")
 
+# One Kish n_eff for the platform (modules/shared/lib/effective_n.R).
+# One minimum-base predicate for the platform
+# (modules/shared/lib/disclosure_gate.R).
+if (!exists("meets_min_base", mode = "function")) {
+  .gate_file <- local({
+    rel <- file.path("modules", "shared", "lib", "disclosure_gate.R")
+    roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+    roots <- roots[nzchar(roots)]
+    d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+    for (i in 1:10) {
+      roots <- c(roots, d)
+      parent <- dirname(d)
+      if (identical(parent, d)) break
+      d <- parent
+    }
+    hits <- file.path(roots, rel)
+    hits <- hits[file.exists(hits)]
+    if (length(hits) > 0) hits[[1L]] else NA_character_
+  })
+  if (!is.na(.gate_file)) source(.gate_file)
+  rm(.gate_file)
+}
+
+if (!exists("calculate_effective_n", mode = "function")) {
+  .eff_n_file <- local({
+    rel <- file.path("modules", "shared", "lib", "effective_n.R")
+    roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+    roots <- roots[nzchar(roots)]
+    d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+    for (i in 1:10) {
+      roots <- c(roots, d)
+      parent <- dirname(d)
+      if (identical(parent, d)) break
+      d <- parent
+    }
+    hits <- file.path(roots, rel)
+    hits <- hits[file.exists(hits)]
+    if (length(hits) > 0) hits[[1L]] else NA_character_
+  })
+  if (!is.na(.eff_n_file)) source(.eff_n_file)
+  rm(.eff_n_file)
+}
+
 # ==============================================================================
 # WEIGHT EXTRACTION & VALIDATION (V9.9.2)
 # ==============================================================================
@@ -373,44 +416,10 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
 #' 
 #' # Check design effect
 #' design_effect <- length(weights) / calculate_effective_n(weights)
-calculate_effective_n <- function(weights) {
-  # Remove NA/infinite weights and keep only positive (zeros excluded)
-  weights <- weights[!is.na(weights) & is.finite(weights) & weights > 0]
-  
-  if (length(weights) == 0) {
-    return(0)
-  }
-
-  # If all weights are 1, effective n = actual n (no design effect)
-  if (all(weights == 1)) {
-    return(as.numeric(length(weights)))
-  }
-  
-  # V9.9.3: Scale-safe calculation for extreme weights
-  # Effective-n is scale-invariant, so we can normalize by mean
-  # This prevents numeric overflow with very large weights
-  mean_weight <- mean(weights)
-  
-  if (is.finite(mean_weight) && mean_weight > 0) {
-    # Scale by mean for numeric stability
-    w <- weights / mean_weight
-    n_effective <- (sum(w)^2) / sum(w^2)
-  } else {
-    # Fallback to direct calculation (shouldn't happen if weights validated)
-    sum_weights <- sum(weights)
-    sum_weights_squared <- sum(weights^2)
-    
-    if (sum_weights_squared == 0) {
-      return(0)
-    }
-
-    n_effective <- (sum_weights^2) / sum_weights_squared
-  }
-
-  # Fractional by design: this feeds SE, df and min_base gates. Display sites
-  # round (format_output_value / the base rows / summarize_weights).
-  return(n_effective)
-}
+# calculate_effective_n now lives in modules/shared/lib/effective_n.R, sourced
+# at the top of this file. It is the same implementation, moved: tabs was the
+# canonical copy and its numbers do not change. Three other modules carried
+# their own versions, two of which behaved differently.
 
 # ==============================================================================
 # WEIGHTED VARIANCE (V9.9.1)
@@ -893,7 +902,7 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
 
   # Check minimum base size — on the CORRECTED base, so the gate agrees with the
   # instability flag, which is also raised against the corrected base.
-  if (n1 < min_base || n2 < min_base) {
+  if (!all(meets_min_base(c(n1, n2), min_base))) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
   
@@ -1146,7 +1155,7 @@ weighted_t_test_means <- function(values1, values2,
   }
 
   # Check minimum base size — on the CORRECTED base (see the z-test).
-  if (eff_n1 < min_base || eff_n2 < min_base) {
+  if (!all(meets_min_base(c(eff_n1, eff_n2), min_base))) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
 

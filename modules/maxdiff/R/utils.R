@@ -582,19 +582,34 @@ parse_task_id <- function(task_id) {
 #'
 #' @return Numeric. Effective sample size
 #' @keywords internal
-calculate_effective_n <- function(weights) {
-  if (is.null(weights) || length(weights) == 0) return(0)
-
-  weights <- weights[!is.na(weights) & weights > 0]
-
-  if (length(weights) == 0) return(0)
-
-  sum_w <- sum(weights)
-  sum_w2 <- sum(weights^2)
-
-  if (sum_w2 == 0) return(0)
-
-  return((sum_w^2) / sum_w2)
+# calculate_effective_n now comes from modules/shared/lib/effective_n.R.
+#
+# This module's own copy differed from the platform's in two ways that matter:
+# it did not filter infinite weights, and it did not normalise by the mean
+# before squaring. Both produced NaN — the first on any infinite weight, the
+# second on weights large enough that their squares overflow. Verified against
+# the canonical implementation before re-pointing: on ordinary weights, on
+# all-equal weights, on extreme-but-finite weights and on weights containing
+# zeros, the two agree exactly. The only behaviour that changes is NaN becoming
+# a correct number.
+if (!exists("calculate_effective_n", mode = "function")) {
+  .eff_n_file <- local({
+    rel <- file.path("modules", "shared", "lib", "effective_n.R")
+    roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+    roots <- roots[nzchar(roots)]
+    d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+    for (i in 1:10) {
+      roots <- c(roots, d)
+      parent <- dirname(d)
+      if (identical(parent, d)) break
+      d <- parent
+    }
+    hits <- file.path(roots, rel)
+    hits <- hits[file.exists(hits)]
+    if (length(hits) > 0) hits[[1L]] else NA_character_
+  })
+  if (!is.na(.eff_n_file)) source(.eff_n_file)
+  rm(.eff_n_file)
 }
 
 

@@ -610,7 +610,7 @@ analyze_proportion <- function(data, categories, weights = NULL,
 
     p <- sum(valid_weights[valid_in_category]) / sum(valid_weights)
     n_actual <- length(valid_weights)
-    n_eff <- calculate_effective_n(valid_weights)
+    n_eff <- calculate_effective_n_int(valid_weights)
   } else {
     in_category <- data %in% categories
     valid_data <- in_category[!is.na(data)]
