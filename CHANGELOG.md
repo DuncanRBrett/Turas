@@ -20,7 +20,10 @@ All notable changes to TURAS are documented in this file.
   hidden) has no distribution to take a spread from and plots untested.
   The metric set is deliberately the one the microdata build of that wave would
   produce (mean-kind only, composites included), so the confidential copy and the
-  analyst's own copy show the same trend. That build writes no `*_wave.json`: an
+  analyst's own copy show the same trend. The substitution is gated on the config
+  flag, not on the island being absent: a normal project whose microdata failed to
+  build unexpectedly behaves exactly as before (no tab, and the warning that says
+  why), because published figures there would paper over a real failure. That build writes no `*_wave.json`: an
   aggregate-only contribution carries no stats a future wave could plot, and
   writing one would overwrite the real sidecar from the microdata run. Tests:
   `test_tracking_island.R` (+8: no per-respondent fields survive serialisation,

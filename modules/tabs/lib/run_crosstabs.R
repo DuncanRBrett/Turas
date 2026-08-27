@@ -918,7 +918,7 @@ if (.html_report_v2_on) {
           # by a canonical key — robust to renames + curates which metrics track.
           mapping <- load_question_mapping(config_result$config_obj$question_mapping)
           wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
-          if (is.null(micro)) {
+          if (!.micro_wanted) {
             # The confidentiality ship (html_report_v2_microdata = FALSE) has no
             # per-respondent records to build the live wave from. Anonymity and a
             # trend line are not in competition: the current wave is built from
@@ -927,6 +927,13 @@ if (.html_report_v2_on) {
             # NO sidecar is written from this path - it would carry no stats a
             # future wave could plot, and it would overwrite the real one from
             # this project's microdata build.
+            #
+            # Gated on the CONFIG FLAG, not on `micro` being NULL. A normal
+            # project whose microdata island failed to build unexpectedly keeps
+            # its old behaviour exactly - no contribution, no Tracking tab, and
+            # the [WARNING] above saying the island failed. Substituting
+            # published figures there would paper over a real failure with a
+            # tab that looks fine.
             contrib <- published_wave_contribution(dl, config_result$config_obj, mapping)
             if (!is.null(contrib)) {
               cat(sprintf(paste0("  Tracking: current wave built from published figures ",
