@@ -10,14 +10,20 @@ control, which is why it moved here.
 
 ## Running it
 
-Nothing in this module is run directly. The entry points are the launchers in
-the project folder on OneDrive (`Electrum/VAS 2026/`), which set
-`VAS_CODE_DIR` to this directory and call `load_vas_library()`:
+The live chain's entry points are the launchers in the project folder on
+OneDrive (`Electrum/VAS 2026/`), which set `VAS_CODE_DIR` to this directory
+and call `load_vas_library()`:
 
 - `Fieldwork/run_vas_fieldwork.R` — derived numbers + report register
 - `Reporting/run_vas_turas_reporting.R` — the Turas dataset
 - `Reporting/build_vas_reporting_layer.py`, `build_vas_reporting_config.py`
 - `Fieldwork/build_vas_field_report.py`
+
+One runner lives here (moved in from the project's `Survey/` folder,
+27 Aug 2026): `run_vas_derive.R` reads the Alchemer API — the only way to
+derive numbers without an export — or an export file, and writes timestamped
+outputs into `output/` under the current directory. It is the second runner
+`vas_pipeline.R`'s header describes, beside the fieldwork one.
 
 `vas_pipeline.R` defines `VAS_LIBRARY_FILES`, the load order, and
 `load_vas_library()`. Add a file to that vector or it will never be sourced.
@@ -35,6 +41,9 @@ the project folder on OneDrive (`Electrum/VAS 2026/`), which set
 | `vas_category_map.csv` | one row per category and base — what to read and how |
 | `vas_report_labels.xlsx` | the question text a reader should see, where the survey's own wording or the dictionary's description is not it |
 | `vas_turas_*.R` + `vas_turas_columns.csv` | the Turas dataset, structure and config |
+| `run_vas_derive.R` | the in-repo runner: API or export → timestamped derived outputs |
+| `check_vas_structure.R` | the structure gate (file/function size limits); also wired into the suite |
+| `tools/` | standalone tools: `build_report_labels.R`, `vas_channel_reporting_recode.R` (recode channel-option reporting values on any Alchemer survey) |
 | `docs/` | the calculation reference and the dataset plan |
 | `tests/testthat/` | 458 assertions — `testthat::test_dir("tests/testthat")` |
 
