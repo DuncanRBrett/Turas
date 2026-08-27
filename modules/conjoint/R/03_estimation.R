@@ -30,6 +30,79 @@
 #' @param verbose Logical, print progress
 #' @return List with model results
 #' @export
+#' Refuse If the Data Carries a None Alternative
+#'
+#' None rows carry the none label in every attribute column
+#' (`09_none_handling.R`), and the estimators factor attributes on the
+#' configured levels only, so a None row becomes NA on every attribute. There
+#' is no alternative-specific constant in the formula for it to land on. What
+#' followed was a raw R error ("argument is of length zero") from deep inside
+#' the estimation stack, with nothing to tell the user what had gone wrong.
+#'
+#' Estimating a None alternative properly needs a none dummy in the design, the
+#' product attributes held at their reference levels on those rows, and the
+#' estimated none utility carried through to the simulator — which currently
+#' assumes a none utility of zero. Until all three exist, refusing is the
+#' honest answer: a model fitted without the no-purchase option overstates
+#' every product's share.
+#'
+#' @param data Choice data.
+#' @param config Configuration.
+#' @return TRUE invisibly if no None alternative is present; refuses otherwise.
+#' @keywords internal
+.refuse_if_none_alternative <- function(data, config) {
+
+  none_label <- config$none_label
+  attrs <- intersect(config$attributes$AttributeName, names(data))
+
+  flagged <- if ("is_none_alternative" %in% names(data)) {
+    isTRUE(any(data$is_none_alternative %in% TRUE))
+  } else {
+    FALSE
+  }
+
+  labelled <- FALSE
+  if (!is.null(none_label) && nzchar(none_label) && length(attrs) > 0) {
+    labelled <- any(vapply(
+      attrs,
+      function(a) any(as.character(data[[a]]) == none_label, na.rm = TRUE),
+      logical(1)
+    ))
+  }
+
+  if (!flagged && !labelled) return(invisible(TRUE))
+
+  n_none_rows <- if (flagged) {
+    sum(data$is_none_alternative %in% TRUE)
+  } else {
+    sum(as.character(data[[attrs[1]]]) == none_label, na.rm = TRUE)
+  }
+
+  conjoint_refuse(
+    code = "FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE",
+    title = "None Alternative Cannot Be Estimated Yet",
+    problem = sprintf(
+      paste0("The data contains %d None (no-purchase) rows. This module has no ",
+             "alternative-specific constant for a None alternative, so those ",
+             "rows carry no level on any attribute and cannot enter the model."),
+      n_none_rows
+    ),
+    why_it_matters = paste0(
+      "Left to run, estimation fails with an uninformative internal error. ",
+      "Were it to succeed, the model would be fitted as though no respondent ",
+      "could ever decline, which overstates the share of every product in the ",
+      "study."
+    ),
+    how_to_fix = c(
+      sprintf("Remove the None rows from the data file (the rows where the attributes read '%s') and re-run. The remaining choices are then a valid conditional model: preference given that something is bought.",
+              none_label %||% "None"),
+      "Keep the None responses for reporting the no-purchase rate directly from the data, which is a defensible way to present them.",
+      "None-alternative estimation is a planned feature; it needs the design constant, the reference-level handling and the simulator's none utility together, not separately."
+    )
+  )
+}
+
+
 estimate_choice_model <- function(data_list, config, verbose = TRUE) {
 
   data <- data_list$data
@@ -41,6 +114,10 @@ estimate_choice_model <- function(data_list, config, verbose = TRUE) {
   if (config$analysis_type == "rating") {
     return(estimate_rating_based_conjoint(data_list, config, verbose))
   }
+
+  # A None alternative has no place in the model yet, and must not be handed
+  # to the estimators silently.
+  .refuse_if_none_alternative(data, config)
 
   # Choice-based conjoint
   if (method == "auto") {

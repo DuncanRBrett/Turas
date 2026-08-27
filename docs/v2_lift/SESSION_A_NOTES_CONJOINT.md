@@ -94,6 +94,21 @@ about |z| = 8.3, so the workbook has been printing `p = 0`. Changed to
 `2 * pnorm(-|z|)` at all three sites, which is accurate to ~1e-300. A p-value
 of exactly zero is not a number any survey result should carry.
 
+**A8 — refuse rather than implement the None ASC.** The work order allowed
+either. Refusing, because implementing only the engine half would leave an
+estimated none utility that nothing consumes: the simulator still defaults
+`noneUtility` to 0 (`simulator_engine.js:196-198`) and wiring it is explicitly
+Session B, B1. A none utility that is estimated and then ignored produces the
+same wrong shares as one that was never estimated, but now with the appearance
+of having been handled. The three pieces — design constant, reference-level
+handling on None rows, simulator export — belong in one change.
+
+*Correcting the review's "unverified" note on what mlogit does with all-NA
+rows:* it does not drop them silently. Verified this session on a 40-respondent
+explicit-None dataset — the run refused as `CFG_EST_MLOGIT_FAILED` with the
+problem text "missing value where TRUE/FALSE needed", which names neither the
+cause nor a fix. The new refusal names both.
+
 **A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd`
 sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`
 binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores
