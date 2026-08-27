@@ -321,10 +321,34 @@ estimate_d_efficiency <- function(design, item_cols, items) {
 #'
 #' @export
 validate_survey_data <- function(data, survey_mapping, design, items, verbose = TRUE,
-                                 choice_value_type = "ITEM_ID") {
+                                 choice_value_type = "ITEM_ID",
+                                 weight_variable = NULL,
+                                 respondent_id_variable = NULL) {
 
   issues <- character()
   warnings_list <- character()
+
+  # A configured column that is absent from the data must REFUSE, not
+  # degrade: a typo'd Weight_Variable silently became weight = 1 while
+  # every output still said "weighted" (H2); a wrong Respondent_ID_Variable
+  # breaks every downstream join.
+  if (!is.null(respondent_id_variable) && nzchar(respondent_id_variable) &&
+      !respondent_id_variable %in% names(data)) {
+    issues <- c(issues, sprintf(
+      "Respondent_ID_Variable '%s' is not a column of the survey data. Fix the PROJECT_SETTINGS value or the export.",
+      respondent_id_variable))
+  }
+  if (!is.null(weight_variable) && nzchar(weight_variable)) {
+    if (!weight_variable %in% names(data)) {
+      issues <- c(issues, sprintf(
+        "Weight_Variable '%s' is not a column of the survey data. The run would have silently used weight = 1 for everyone while reporting the results as weighted.",
+        weight_variable))
+    } else {
+      wv <- validate_maxdiff_weights(data[[weight_variable]], verbose = FALSE)
+      issues <- c(issues, wv$issues)
+      warnings_list <- c(warnings_list, wv$warnings)
+    }
+  }
 
   # ============================================================================
   # CHECK REQUIRED COLUMNS

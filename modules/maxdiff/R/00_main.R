@@ -633,7 +633,9 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     design = design,
     items = config$items,
     verbose = verbose,
-    choice_value_type = config$project_settings$Choice_Value_Type %||% "ITEM_ID"
+    choice_value_type = config$project_settings$Choice_Value_Type %||% "ITEM_ID",
+    weight_variable = config$project_settings$Weight_Variable,
+    respondent_id_variable = config$project_settings$Respondent_ID_Variable
   )
 
   if (!data_validation$valid) {
@@ -1023,7 +1025,8 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
                              segment_settings = config$segment_settings,
                              items = config$items,
                              output_settings = config$output_settings,
-                             verbose = verbose)
+                             verbose = verbose,
+                             resp_id_var = config$project_settings$Respondent_ID_Variable)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SEGMENT_FAILED: Segment analysis failed: %s", conditionMessage(e)))
       add_warning(sprintf("Segments: %s", conditionMessage(e)))

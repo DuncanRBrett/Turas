@@ -895,9 +895,17 @@ parse_survey_mapping <- function(df) {
   for (i in seq_len(nrow(df))) {
     if (df$Field_Type[i] %in% c("BEST_CHOICE", "WORST_CHOICE", "SHOWN_ITEMS")) {
       if (is.na(df$Task_Number[i])) {
-        # Try to extract from field name
-        task_match <- regmatches(df$Field_Name[i],
-                                 regexec("(\\d+)$", df$Field_Name[i]))[[1]]
+        # Extract from the field name: a T1 / Task1 / task_1 infix anywhere
+        # (the template's own MaxDiff_T1_Best naming ends in "Best", so the
+        # old trailing-digits match yielded NA and the rows paired
+        # positionally - M13). Trailing digits stay as the fallback.
+        fname <- df$Field_Name[i]
+        task_match <- regmatches(fname,
+                                 regexec("[Tt](?:ask)?[_ ]?(\\d+)", fname,
+                                         perl = TRUE))[[1]]
+        if (length(task_match) < 2) {
+          task_match <- regmatches(fname, regexec("(\\d+)$", fname))[[1]]
+        }
         if (length(task_match) > 1) {
           df$Task_Number[i] <- as.integer(task_match[2])
         }

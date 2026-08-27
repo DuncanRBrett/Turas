@@ -468,6 +468,8 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   # Initialize list to collect long format rows
   long_data_list <- vector("list", nrow(data) * n_tasks * items_per_task)
   idx <- 1
+  unmatched_tasks <- 0L
+  unmatched_examples <- character(0)
 
   # Process each respondent
   for (r in seq_len(nrow(data))) {
@@ -498,13 +500,15 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
       # Get items shown in this task
       design_row <- version_design[version_design$Task_Number == task_num, ]
 
+      # No positional fallback (H3): guessing design_row[t, ] when the
+      # Task_Number lookup fails can attribute a choice to items the
+      # respondent never saw, silently. Count it and refuse after the loop.
       if (nrow(design_row) == 0) {
-        # Try matching by row index if task numbers don't match
-        if (t <= nrow(version_design)) {
-          design_row <- version_design[t, ]
-        } else {
-          next
-        }
+        unmatched_tasks <- unmatched_tasks + 1L
+        unmatched_examples <- c(unmatched_examples,
+                                sprintf("resp %s / version %s / task %s",
+                                        resp_id, version, task_num))
+        next
       }
 
       items_shown <- as.character(unlist(design_row[1, item_cols]))
@@ -560,6 +564,22 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
     if (verbose && r %% 100 == 0) {
       log_progress(r, nrow(data), "Reshaping respondents", verbose)
     }
+  }
+
+  if (unmatched_tasks > 0) {
+    maxdiff_refuse(
+      code = "DATA_DESIGN_TASK_MISMATCH",
+      title = "Tasks Without A Matching Design Row",
+      problem = sprintf(
+        "%d task(s) had no design row for their (Version, Task_Number) - e.g. %s",
+        unmatched_tasks,
+        paste(utils::head(unique(unmatched_examples), 3), collapse = "; ")),
+      why_it_matters = "The engine used to guess the design row by position here, which can attribute choices to items the respondent never saw. There is no safe guess.",
+      how_to_fix = c(
+        "Check that the DESIGN sheet's Version and Task_Number values match the data's version column and the SURVEY_MAPPING Task_Numbers.",
+        "Check the Task_Number extraction from field names (a T1/T2 infix is recognised; other conventions need an explicit Task_Number column in SURVEY_MAPPING)."
+      )
+    )
   }
 
   # Combine all rows
