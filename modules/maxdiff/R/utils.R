@@ -691,6 +691,34 @@ rank_utilities <- function(utilities) {
 # PREFERENCE SHARE CALCULATION
 # ==============================================================================
 
+#' Strip the respondent-ID column from an individual-utilities table
+#'
+#' The individual_utilities data frame carries `resp_id` as its first column
+#' (07_hb.R, both the Stan and the empirical-Bayes path). Filtering on
+#' is.numeric alone is NOT enough to remove it: survey exports very commonly
+#' carry numeric respondent IDs (openxlsx reads them numeric), and a numeric
+#' ID like 10001 then dominates every per-respondent softmax — "resp_id"
+#' became a phantom item with ~100% preference share, and TURF's first pick
+#' (review C2). Drop it BY NAME first, then non-numeric leftovers.
+#'
+#' @param individual_utils Data frame or matrix, one row per respondent.
+#' @param id_names Column names that identify respondents, never items.
+#' @return The same table with only numeric item columns.
+#' @keywords internal
+strip_respondent_id_cols <- function(individual_utils,
+                                     id_names = c("resp_id", "respondent_id")) {
+  if (is.data.frame(individual_utils)) {
+    keep <- !(names(individual_utils) %in% id_names)
+    individual_utils <- individual_utils[, keep, drop = FALSE]
+    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
+    individual_utils <- individual_utils[, numeric_cols, drop = FALSE]
+  } else if (is.matrix(individual_utils) && !is.null(colnames(individual_utils))) {
+    keep <- !(colnames(individual_utils) %in% id_names)
+    individual_utils <- individual_utils[, keep, drop = FALSE]
+  }
+  individual_utils
+}
+
 #' Convert utilities to preference shares (MNL-based)
 #'
 #' Converts individual-level HB utilities to preference shares that sum
@@ -708,13 +736,9 @@ rank_utilities <- function(utilities) {
 compute_preference_shares <- function(individual_utils = NULL, aggregate_utils = NULL) {
 
   if (!is.null(individual_utils) && nrow(individual_utils) > 0) {
-    # Drop non-numeric columns (e.g., resp_id) before matrix conversion
-    if (is.data.frame(individual_utils)) {
-      numeric_cols <- sapply(individual_utils, is.numeric)
-      utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
-    } else {
-      utils_mat <- as.matrix(individual_utils)
-    }
+    # By name first, then non-numeric: a NUMERIC resp_id survives an
+    # is.numeric filter and becomes a phantom item (review C2).
+    utils_mat <- as.matrix(strip_respondent_id_cols(individual_utils))
     n_resp <- nrow(utils_mat)
     n_items <- ncol(utils_mat)
 
@@ -762,12 +786,9 @@ compute_head_to_head <- function(individual_utils, item_a, item_b) {
     return(list(prob_a = 50, prob_b = 50))
   }
 
-  # Strip non-numeric columns (e.g., resp_id) before matrix conversion
-  if (is.data.frame(individual_utils)) {
-    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
-    individual_utils <- individual_utils[, numeric_cols, drop = FALSE]
-  }
-  utils_mat <- as.matrix(individual_utils)
+  # By name first, then non-numeric — a numeric resp_id is not an item
+  # (review C2).
+  utils_mat <- as.matrix(strip_respondent_id_cols(individual_utils))
   col_names <- colnames(utils_mat)
 
   idx_a <- match(item_a, col_names)
@@ -818,13 +839,9 @@ classify_item_discrimination <- function(individual_utils, items = NULL) {
     ))
   }
 
-  # Drop non-numeric columns (e.g., resp_id) before matrix conversion
-  if (is.data.frame(individual_utils)) {
-    numeric_cols <- sapply(individual_utils, is.numeric)
-    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
-  } else {
-    utils_mat <- as.matrix(individual_utils)
-  }
+  # By name first, then non-numeric — a numeric resp_id is not an item
+  # (review C2).
+  utils_mat <- as.matrix(strip_respondent_id_cols(individual_utils))
   item_ids <- colnames(utils_mat)
 
   # Compute per-item statistics

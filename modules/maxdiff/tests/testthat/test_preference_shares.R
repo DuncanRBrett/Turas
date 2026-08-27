@@ -67,3 +67,64 @@ test_that("compute_head_to_head handles missing item IDs", {
   result <- compute_head_to_head(td$individual_utils, "MISSING", "I1")
   expect_equal(result$prob_a, 50)
 })
+
+# ------------------------------------------------------------------------------
+# C2: a NUMERIC resp_id column must never become an item. Survey exports
+# commonly carry numeric IDs (openxlsx reads them numeric); a value like
+# 10001 dominates every per-respondent softmax, so "resp_id" shipped with
+# ~100% share and every real item ~0%.
+# ------------------------------------------------------------------------------
+
+make_utils_with_numeric_id <- function(n = 20, seed = 7) {
+  set.seed(seed)
+  data.frame(
+    resp_id = 10000 + seq_len(n),          # numeric, large — the poison
+    A = rnorm(n, 1.0, 0.4),
+    B = rnorm(n, 0.2, 0.4),
+    C = rnorm(n, -1.2, 0.4),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("C2: preference shares ignore a numeric resp_id column", {
+  df <- make_utils_with_numeric_id()
+  shares <- compute_preference_shares(individual_utils = df)
+
+  expect_false("resp_id" %in% names(shares))
+  expect_equal(sort(names(shares)), c("A", "B", "C"))
+  expect_equal(round(sum(shares), 0), 100)
+  # The real items carry real shares, not the ~0% the phantom left them.
+  expect_true(shares["A"] > shares["C"])
+  expect_true(shares["A"] > 10)
+})
+
+test_that("C2: head-to-head ignores a numeric resp_id column", {
+  df <- make_utils_with_numeric_id()
+  h2h <- compute_head_to_head(df, "A", "C")
+
+  expect_equal(h2h$prob_a + h2h$prob_b, 100)
+  expect_true(h2h$prob_a > 50)   # A's utilities dominate C's
+})
+
+test_that("C2: discrimination classification ignores a numeric resp_id column", {
+  df <- make_utils_with_numeric_id()
+  cls <- classify_item_discrimination(df)
+
+  expect_false("resp_id" %in% cls$Item_ID)
+  expect_equal(sort(cls$Item_ID), c("A", "B", "C"))
+})
+
+test_that("C2: TURF's first pick is a real item, not the respondent ID", {
+  df <- make_utils_with_numeric_id()
+  items <- data.frame(Item_ID = c("A", "B", "C"),
+                      Item_Label = c("Item A", "Item B", "Item C"),
+                      stringsAsFactors = FALSE)
+  res <- run_turf_analysis(df, items, max_items = 2, verbose = FALSE)
+
+  expect_equal(res$status, "PASS")
+  picked <- as.character(res$incremental_table$Item_ID)
+  expect_true(length(picked) > 0)
+  expect_false(any(grepl("resp_id", picked)))
+  # The strongest item leads.
+  expect_equal(picked[1], "A")
+})

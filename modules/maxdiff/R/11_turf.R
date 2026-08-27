@@ -131,6 +131,17 @@ run_turf_analysis <- function(individual_utils, items,
     return(list(status = "REFUSED", message = "No individual utilities available"))
   }
 
+  # A numeric resp_id column survives the engine's is.numeric filter and
+  # becomes the "item" every respondent reaches first (review C2). Strip it
+  # by name HERE — the shared engine's semantics stay untouched for its
+  # brand-module caller.
+  if (exists("strip_respondent_id_cols", mode = "function")) {
+    individual_utils <- strip_respondent_id_cols(individual_utils)
+  } else if (is.data.frame(individual_utils)) {
+    keep <- !(names(individual_utils) %in% c("resp_id", "respondent_id"))
+    individual_utils <- individual_utils[, keep, drop = FALSE]
+  }
+
   # Delegate to shared engine
   .shared_run_turf(
     individual_scores = individual_utils,
