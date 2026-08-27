@@ -277,4 +277,5 @@ generate_conjoint_html_report <- function(conjoint_results, output_path, config 
 # MODULE INITIALIZATION
 # ==============================================================================
 
-message("TURAS>Conjoint HTML Report orchestrator loaded (v3.1.0)")
+message(sprintf("TURAS>Conjoint HTML Report orchestrator loaded (v%s)",
+                if (exists("CONJOINT_MODULE_VERSION")) CONJOINT_MODULE_VERSION else "?"))

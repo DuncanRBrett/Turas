@@ -4,7 +4,7 @@
 #
 # Module: Conjoint Analysis - Configuration Template
 # Purpose: Generate branded, formatted Excel config templates
-# Version: 3.1.0
+# Version: read from CONJOINT_MODULE_VERSION (R/99_helpers.R)
 # Date: 2026-03-19
 #
 # Generates a professional Excel configuration template with:
@@ -238,10 +238,17 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   # --- INTERACTIONS ---
   add("INTERACTIONS", "interaction_terms", "", "Comma-separated interaction pairs (e.g. Brand:Price, Size:Colour)", FALSE, "", "Format: Attr1:Attr2, Attr3:Attr4")
   add("INTERACTIONS", "auto_detect_interactions", "FALSE", "Automatically detect significant interactions", FALSE, "TRUE,FALSE", "TRUE or FALSE")
+  add("INTERACTIONS", "interaction_max", "3", "Maximum number of interaction terms to include", FALSE, "", "Integer 1-6")
 
   # --- WILLINGNESS TO PAY ---
   add("WILLINGNESS TO PAY", "wtp_price_attribute", "", "Name of the price attribute. Leave blank and an attribute named price/cost/fee is used automatically; set wtp_enabled = N to skip WTP entirely", FALSE, "", "Attribute name from Attributes sheet")
   add("WILLINGNESS TO PAY", "wtp_enabled", "Y", "Calculate willingness to pay (Y/N)", FALSE, "Y,N", "Y or N")
+
+  # --- BEST-WORST ---
+  add("BEST-WORST", "bw_method", "sequential", "Best-worst estimation approach. Only sequential is implemented; simultaneous refuses.", FALSE, "sequential", "sequential")
+
+  # --- DATA QUALITY ---
+  add("DATA QUALITY", "min_responses_per_level", "10", "Minimum observations required per attribute level before a warning is raised", FALSE, "", "Positive integer")
   add("WILLINGNESS TO PAY", "wtp_method", "marginal", "WTP calculation method", FALSE, "marginal,simulation", "marginal or simulation")
   add("WILLINGNESS TO PAY", "currency_symbol", "$", "Currency symbol for WTP display (e.g. $, R, EUR, GBP)", FALSE, "", "Any currency symbol or abbreviation")
 
@@ -271,7 +278,6 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
 
   # --- CUSTOM CONTENT ---
   add("CUSTOM CONTENT", "include_custom_slides", "FALSE", "Include custom slides in HTML report (see Custom_Slides sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
-  add("CUSTOM CONTENT", "include_custom_images", "FALSE", "Include custom images in HTML report (see Custom_Images sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
 
   # --- ANALYST & ABOUT ---
   add("ANALYST & ABOUT", "analyst_name", "", "Analyst name. Appears on the report About page and in the stats pack Declaration sheet.", FALSE, "", "Free text")
@@ -549,8 +555,15 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
   # Example data rows (light blue background)
   if (include_examples) {
+    # Marked, not bare. An example row the loader cannot tell from real input
+    # becomes the study when someone fills in Settings and forgets to replace
+    # the Attributes sheet — and the failure is a confusing "missing columns"
+    # refusal naming attributes the user never chose. The EXAMPLE prefix makes
+    # them visibly examples and lets the loader skip them (01_config.R).
     examples <- data.frame(
-      AttributeName = c("Brand", "Price", "Screen Size", "Battery Life", "Camera Quality"),
+      AttributeName = paste(CONJOINT_EXAMPLE_PREFIX,
+                            c("Brand", "Price", "Screen Size",
+                              "Battery Life", "Camera Quality")),
       NumLevels = c(4, 4, 3, 3, 3),
       LevelNames = c(
         "Apple, Samsung, Google, OnePlus",
@@ -622,55 +635,12 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
 
   # =========================================================================
-  # CUSTOM_IMAGES SHEET
+  # CUSTOM_IMAGES SHEET — removed 2026-08-27
   # =========================================================================
-
-  openxlsx::addWorksheet(wb, "Custom_Images", gridLines = FALSE)
-
-  openxlsx::writeData(wb, "Custom_Images", "Custom Images for HTML Report", startRow = 1, startCol = 1)
-  openxlsx::mergeCells(wb, "Custom_Images", cols = 1:4, rows = 1)
-  openxlsx::addStyle(wb, "Custom_Images", title_style, rows = 1, cols = 1)
-
-  openxlsx::writeData(wb, "Custom_Images",
-                       "Add images to embed in the HTML report. Images are base64-encoded for self-contained output.",
-                       startRow = 2, startCol = 1)
-  openxlsx::mergeCells(wb, "Custom_Images", cols = 1:4, rows = 2)
-  openxlsx::addStyle(wb, "Custom_Images", subtitle_style, rows = 2, cols = 1)
-
-  images_header <- data.frame(
-    a = "Image Path", b = "Caption", c = "Panel Placement", d = "Position"
-  )
-  openxlsx::writeData(wb, "Custom_Images", images_header, startRow = 4, colNames = FALSE)
-  openxlsx::addStyle(wb, "Custom_Images", header_style, rows = 4, cols = 1:4, gridExpand = TRUE)
-
-  # Help row
-  images_help <- data.frame(
-    a = "[REQUIRED] Path to image file (PNG, JPG)",
-    b = "[Optional] Caption below image",
-    c = "[Optional] overview, utilities, diagnostics, about",
-    d = "[Optional] Display order (1, 2, 3...)"
-  )
-  openxlsx::writeData(wb, "Custom_Images", images_help, startRow = 5, colNames = FALSE)
-  openxlsx::addStyle(wb, "Custom_Images", help_style, rows = 5, cols = 1:4, gridExpand = TRUE)
-
-  # Blank rows
-  for (r in 6:15) {
-    openxlsx::addStyle(wb, "Custom_Images", input_style, rows = r, cols = 1:4, gridExpand = TRUE)
-  }
-
-  # Panel placement dropdown
-  for (r in 6:15) {
-    openxlsx::dataValidation(wb, "Custom_Images", col = 3, rows = r,
-                              type = "list",
-                              value = '"overview,utilities,diagnostics,simulator,wtp,about"',
-                              allowBlank = TRUE, showInputMsg = TRUE, showErrorMsg = TRUE)
-  }
-
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 1, widths = 35)
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 2, widths = 35)
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 3, widths = 20)
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 4, widths = 10)
-
+  # The sheet and its include_custom_images setting were never read by the
+  # loader: custom images were only ever supported through the Image Path
+  # column on the Custom_Slides sheet. Shipping an empty promise in every
+  # template is worse than not offering it.
 
   # =========================================================================
   # DESIGN SHEET (optional placeholder)
@@ -745,7 +715,8 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
   if (verbose) {
     cat(sprintf("  ✓ Template saved to: %s\n", output_path))
-    cat("  Sheets: Settings, Attributes, Custom_Slides, Custom_Images, Design, Instructions\n")
+    cat(sprintf("  Sheets: %s\n",
+                paste(openxlsx::sheets(wb), collapse = ", ")))
   }
 
   invisible(output_path)

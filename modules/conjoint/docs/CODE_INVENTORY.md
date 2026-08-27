@@ -1,6 +1,6 @@
 # Conjoint Module - Code Inventory
 
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Generated:** 2026-03-20
 **Module:** `modules/conjoint/`
 
@@ -376,7 +376,7 @@ Shared utility functions: type conversion, statistics, formatting, logging.
 | `zero_center_utilities` | 542 | internal | Zero-center utilities within attribute |
 | `escape_attr_for_formula` | 559 | internal | Wrap special-character attribute names in backticks |
 | `escape_attr_for_regex` | 576 | internal | Escape regex special characters in attribute names |
-| `get_conjoint_version` | 587 | internal | Return current module version string ("3.1.0") |
+| `get_conjoint_version` | 587 | internal | Return CONJOINT_MODULE_VERSION, the single version definition |
 
 ---
 

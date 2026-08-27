@@ -15,10 +15,18 @@ test_that("M5: the known-settings list is derived from the code, not hand-writte
   expect_gt(length(known), 40)
   # Names that are genuinely read must all be present — a hand-list drifts and
   # then warns about settings that work.
-  for (s in c("estimation_method", "baseline_handling", "generate_market_simulator",
-              "include_diagnostics", "wtp_price_attribute", "hb_iterations",
+  for (s in c("estimation_method", "generate_market_simulator",
+              "wtp_price_attribute", "hb_iterations",
               "interaction_terms", "zero_center_utilities")) {
     expect_true(s %in% known, info = s)
+  }
+
+  # Retired settings must NOT be in the known list — they are announced by
+  # name with their replacement, not offered a spelling suggestion.
+  for (s in c("baseline_handling", "include_diagnostics", "bootstrap_iterations",
+              "optimizer_method", "include_custom_images")) {
+    expect_false(s %in% known, info = s)
+    expect_true(s %in% names(CONJOINT_RETIRED_SETTINGS), info = s)
   }
 })
 

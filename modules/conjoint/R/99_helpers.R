@@ -586,6 +586,26 @@ escape_attr_for_regex <- function(attr) {
 
 #' Get module version
 #' @keywords internal
+#' Prefix Marking a Row as Template Example Content
+#'
+#' Written onto the template's example Attributes rows, and recognised by the
+#' config loader so those rows are skipped rather than analysed. Anything the
+#' template ships that a user might forget to replace has to be identifiable.
+#'
+#' @keywords internal
+CONJOINT_EXAMPLE_PREFIX <- "EXAMPLE —"
+
+
+#' The Conjoint Module Version
+#'
+#' One definition. Everything that shows a version reads it from here — the
+#' banner, the stats pack, the report footer, the template subtitle — so a
+#' bump is one edit rather than five that drift apart.
+#'
+#' @keywords internal
+CONJOINT_MODULE_VERSION <- "3.2.0"
+
+
 get_conjoint_version <- function() {
-  "3.1.0"
+  CONJOINT_MODULE_VERSION
 }

@@ -82,8 +82,11 @@ find_config_header_row <- function(config_file, sheet_name, required_cols,
 
   # Remove section divider rows (ALL CAPS names with NA in Value column)
   if (nrow(df) > 0) {
+    # Hyphens count: a section called BEST-WORST is a divider, not a setting.
+    # Setting names are lower case, and the empty-Value guard below is what
+    # actually keeps this from swallowing one.
     section_dividers <- !is.na(df$Setting) &
-                        grepl("^[A-Z][A-Z &]+$", trimws(as.character(df$Setting))) &
+                        grepl("^[A-Z][A-Z &/-]+$", trimws(as.character(df$Setting))) &
                         (is.na(df$Value) | trimws(as.character(df$Value)) == "")
     df <- df[!section_dividers, , drop = FALSE]
   }
@@ -144,6 +147,102 @@ find_config_header_row <- function(config_file, sheet_name, required_cols,
 }
 
 
+#' Settings This Module Used to Read
+#'
+#' A setting that was removed is not a typo, and telling its owner "did you
+#' mean ...?" is wrong twice over: it implies they mis-spelled something, and
+#' it does not say what replaced it. Configs in the field still carry these
+#' rows. Follows the tabs pattern (`TABS_RETIRED_SETTINGS`,
+#' `modules/tabs/lib/crosstabs/crosstabs_config.R`).
+#'
+#' @keywords internal
+CONJOINT_RETIRED_SETTINGS <- c(
+  # --- the optimizer config surface, retired 2026-08-27 ----------------------
+  optimizer_method = paste(
+    "the optimizer was never driven from the config sheet — nothing read this",
+    "setting, and its dropdown offered a value the validator refused. The",
+    "optimizer functions remain available from R. Delete the row."
+  ),
+  optimizer_max_products = paste(
+    "nothing read this setting; the optimizer was never driven from the config",
+    "sheet. Delete the row."
+  ),
+
+  # --- dummy-coding knob that never existed, retired 2026-08-27 --------------
+  base_level_method = paste(
+    "nothing read this setting. The baseline is always the first level listed",
+    "for an attribute, and the effects coding it advertised is not implemented.",
+    "Delete the row."
+  ),
+
+  # --- duplicate identity block, retired 2026-08-27 --------------------------
+  # NOTE: Project_Name and Analyst_Name are deliberately NOT listed here.
+  # Lower-cased they would collide with the live project_name / analyst_name,
+  # and a config using those correctly would be told they were retired. A
+  # config carrying both spellings hits the duplicate refusal instead, which
+  # names the capitalised pair as the ones to delete.
+  research_house = paste(
+    "the stats pack Declaration reads company_name, not this setting, which",
+    "nothing read. Put your research house in company_name. Delete the row."
+  ),
+
+  # --- dead custom-image surface, retired 2026-08-27 -------------------------
+  include_custom_images = paste(
+    "custom images were never implemented — neither this setting nor the",
+    "Custom_Images sheet was read. Use the Image Path column on the",
+    "Custom_Slides sheet instead. Delete the row."
+  ),
+
+  # --- config keys with no consumer, retired 2026-08-27 ----------------------
+  bootstrap_iterations = paste(
+    "nothing read this setting. Bootstrapped intervals are not part of the",
+    "conjoint pipeline. Delete the row."
+  ),
+  include_diagnostics = paste(
+    "nothing read this setting; the diagnostics section is always built.",
+    "Delete the row."
+  ),
+  baseline_handling = paste(
+    "nothing read this setting. The baseline is always the first level listed",
+    "for an attribute. Delete the row."
+  )
+)
+
+# Lookups are done on a lower-cased name, so the vector's own names must be
+# lower case even where the sheet spells them differently.
+names(CONJOINT_RETIRED_SETTINGS) <- tolower(names(CONJOINT_RETIRED_SETTINGS))
+
+
+#' Announce Settings That Have Been Retired
+#'
+#' Prints one boxed notice naming every retired setting present in the config
+#' and what replaced it. The run continues — a retired setting had no effect
+#' before either.
+#'
+#' @param settings_list Named list of settings read from the sheet.
+#' @param retired Named character vector of retired setting names to messages.
+#' @return Invisibly, the retired names that were present.
+#' @keywords internal
+announce_retired_conjoint_settings <- function(settings_list,
+                                               retired = CONJOINT_RETIRED_SETTINGS) {
+  if (length(settings_list) == 0 || length(retired) == 0) {
+    return(invisible(character(0)))
+  }
+
+  present <- intersect(tolower(trimws(names(settings_list))), names(retired))
+  if (length(present) == 0) return(invisible(character(0)))
+
+  cat("\n┌─── SETTING RETIRED ───────────────────────────────────┐\n")
+  for (nm in present) {
+    cat(sprintf("│ %s: %s\n", nm, retired[[nm]]))
+  }
+  cat("│ The run continues; this setting had no effect.\n")
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+
+  invisible(present)
+}
+
+
 #' Warn About Setting Names the Loader Does Not Recognise
 #'
 #' Unknown keys are not fatal — a config may legitimately carry notes or
@@ -158,6 +257,10 @@ find_config_header_row <- function(config_file, sheet_name, required_cols,
 
   known <- .known_conjoint_settings()
   unknown <- setdiff(tolower(trimws(provided)), tolower(known))
+
+  # A retired setting is announced by name with its replacement; it must not
+  # also be offered a spelling suggestion.
+  unknown <- setdiff(unknown, names(CONJOINT_RETIRED_SETTINGS))
   unknown <- unknown[nzchar(unknown)]
 
   if (length(unknown) == 0) return(invisible(character(0)))
@@ -332,6 +435,31 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   dup_names <- unique(raw_names[usable][duplicated(tolower(trimws(raw_names[usable])))])
 
   if (length(dup_names) > 0) {
+
+    # A config written against a template older than 2026-08-27 carries
+    # Project_Name/Analyst_Name AND project_name/analyst_name. That is a
+    # case-only collision with a known answer: keep the lowercase row, which
+    # is the one the module reads.
+    case_only <- vapply(dup_names, function(nm) {
+      spellings <- unique(raw_names[usable][
+        tolower(trimws(raw_names[usable])) == tolower(trimws(nm))
+      ])
+      length(spellings) > 1
+    }, logical(1))
+
+    fixes <- c("Delete the duplicate rows so each setting appears exactly once.",
+               sprintf("Duplicated: %s", paste(dup_names, collapse = ", ")))
+
+    if (any(case_only)) {
+      fixes <- c(fixes, paste0(
+        "Some of these differ only in capitalisation. Templates before ",
+        "2026-08-27 shipped a STUDY IDENTIFICATION section (Project_Name, ",
+        "Analyst_Name, Research_House) that nothing read, alongside the ",
+        "lowercase project_name / analyst_name / company_name that the module ",
+        "and the stats pack actually use. Delete the capitalised rows."
+      ))
+    }
+
     conjoint_refuse(
       code = "CFG_DUPLICATE_SETTING",
       title = "Setting Appears More Than Once",
@@ -343,10 +471,7 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
         "Only one value can be in force. Picking the first one silently means ",
         "an edit made further down the sheet has no effect and nothing says so."
       ),
-      how_to_fix = c(
-        "Delete the duplicate rows so each setting appears exactly once.",
-        sprintf("Duplicated: %s", paste(dup_names, collapse = ", "))
-      )
+      how_to_fix = fixes
     )
   }
 
@@ -362,6 +487,7 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   # M5: a typo'd setting name used to be ignored without a word, so a user who
   # wrote "estimation_metod" got the default and no hint that their setting had
   # not taken. Warn, naming the closest known setting.
+  announce_retired_conjoint_settings(settings_list)
   .report_unknown_settings(names(settings_list), verbose)
 
   # =========================================================================
@@ -421,6 +547,49 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
         sprintf("Add these columns: %s", paste(missing_cols, collapse = ", ")),
         "Required columns: AttributeName, NumLevels, LevelNames",
         "Refer to the configuration template for the correct format"
+      )
+    )
+  }
+
+  # Drop the template's example rows. They are prefixed so they can be told
+  # from real input; without that, a user who fills in Settings and forgets the
+  # Attributes sheet gets their study run against a phone survey they never
+  # designed, and the failure reads as a data problem.
+  example_rows <- !is.na(attributes_df$AttributeName) &
+    startsWith(trimws(as.character(attributes_df$AttributeName)),
+               CONJOINT_EXAMPLE_PREFIX)
+
+  if (any(example_rows)) {
+    cat(sprintf(
+      "[TRS INFO] CONJ_TEMPLATE_ATTRIBUTES_SKIPPED: %d example attribute row(s) from the config template were ignored. Replace them with your own attributes.\n",
+      sum(example_rows)
+    ))
+    attributes_df <- attributes_df[!example_rows, , drop = FALSE]
+  }
+
+  # Blank rows are the template's input placeholders, not attributes.
+  blank_rows <- is.na(attributes_df$AttributeName) |
+    !nzchar(trimws(as.character(attributes_df$AttributeName)))
+  attributes_df <- attributes_df[!blank_rows, , drop = FALSE]
+  rownames(attributes_df) <- NULL
+
+  if (nrow(attributes_df) == 0) {
+    conjoint_refuse(
+      code = "CFG_NO_ATTRIBUTES_DEFINED",
+      title = "No Attributes Defined",
+      problem = paste0(
+        "The Attributes sheet has no attribute rows of your own — only the ",
+        "template's example rows and blank placeholders."
+      ),
+      why_it_matters = paste0(
+        "The attributes and their levels are the study. Without them there is ",
+        "nothing to estimate."
+      ),
+      how_to_fix = c(
+        "Fill in the Attributes sheet: one row per attribute, with NumLevels and a comma-separated LevelNames list.",
+        "The attribute and level names must match the column names and values in your data file exactly.",
+        sprintf("The example rows are prefixed '%s' and are ignored; replace or delete them.",
+                CONJOINT_EXAMPLE_PREFIX)
       )
     )
   }
@@ -619,7 +788,6 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     # attenuated estimates. Surfaced here so a user who sets it gets that
     # refusal instead of being silently defaulted.
     bw_method = settings_list$bw_method %||% "sequential",
-    baseline_handling = settings_list$baseline_handling %||% "first_level_zero",
     confidence_level = safe_numeric(settings_list$confidence_level, 0.95),
     choice_type = settings_list$choice_type %||% "single",
 
@@ -692,13 +860,7 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
       settings_list$generate_market_simulator,
       default = TRUE
     ),
-    include_diagnostics = safe_logical(
-      settings_list$include_diagnostics,
-      default = TRUE
-    ),
-
     # Advanced options
-    bootstrap_iterations = safe_numeric(settings_list$bootstrap_iterations, 1000),
     min_responses_per_level = safe_numeric(settings_list$min_responses_per_level, 10),
 
     # None option handling
@@ -950,15 +1112,6 @@ validate_config <- function(settings_list, attributes_df) {
       "simulation_method must be one of: %s (got: %s)",
       paste(valid_sim, collapse = ", "),
       sim_method
-    ))
-  }
-
-  # Validate baseline_handling
-  baseline_handling <- settings_list$baseline_handling %||% "first_level_zero"
-  if (!baseline_handling %in% c("first_level_zero", "all_levels_explicit")) {
-    errors <- c(errors, sprintf(
-      "baseline_handling must be 'first_level_zero' or 'all_levels_explicit', got: %s",
-      baseline_handling
     ))
   }
 

@@ -505,6 +505,9 @@ The Settings sheet uses a two-column layout: `Setting` and `Value`. Settings are
 | `estimation_method` | **Yes** | `auto` | Primary estimation algorithm | `auto`, `mlogit`, `clogit`, `hb`, `latent_class`, `best_worst` |
 | `confidence_level` | No | `0.95` | Confidence level for intervals | Decimal between `0.80` and `0.99` |
 | `zero_center_utilities` | No | `TRUE` | Zero-center utilities within each attribute (recommended) | `TRUE` or `FALSE` |
+| `bw_method` | No | `sequential` | Best-worst estimation approach. Only `sequential` is implemented; `simultaneous` refuses. | `sequential` |
+| `min_responses_per_level` | No | `10` | Minimum observations per attribute level before a data warning is raised | Positive integer |
+| `generate_stats_pack` | No | `Y` | Write the diagnostic stats pack workbook alongside the main output. A contractual audit trail of data received, methods used and assumptions. | `Y` or `N` |
 
 #### Hierarchical Bayes Settings
 
@@ -532,7 +535,8 @@ These settings apply only when `estimation_method = "latent_class"`.
 
 | Setting | Default | Description | Valid Values |
 |----|----|----|----|
-| `interaction_terms` | (none) | Comma-separated interaction pairs to include in the model | Format: `Brand:Price, Size:Colour` |
+| `interaction_terms` | (none) | Comma-separated interaction pairs to include in the model. **Note:** a model with interactions is reported without the market simulator — a part-worth table cannot carry interaction effects, so simulated shares would come from a main-effects model that was never estimated. | Format: `Brand:Price, Size:Colour` |
+| `interaction_max` | `3` | Maximum number of interaction terms to include | Integer 1--6 |
 | `auto_detect_interactions` | `FALSE` | Automatically detect statistically significant interactions | `TRUE` or `FALSE` |
 
 #### Willingness to Pay
@@ -541,6 +545,7 @@ These settings apply only when `estimation_method = "latent_class"`.
 |----|----|----|----|
 | `wtp_price_attribute` | (none) | Name of the price attribute. **Leave blank for auto-detection** -- the module looks for attribute names containing "price", "cost", or "fee". | An attribute name from the Attributes sheet, or blank |
 | `wtp_method` | `marginal` | WTP calculation method | `marginal` or `simulation` |
+| `wtp_enabled` | `Y` | Whether to calculate WTP at all. **Leaving `wtp_price_attribute` blank does NOT skip WTP** — a price/cost/fee attribute is auto-detected. This is the off switch. | `Y` or `N` |
 | `currency_symbol` | `$` | Currency symbol for WTP display | Any text (e.g., `$`, `R`, `EUR`) |
 
 #### Market Simulator
@@ -1202,6 +1207,44 @@ The pre-flight check runs in seconds and provides clear pass/fail output for eac
 ------------------------------------------------------------------------
 
 ## 14. Potential Issues and Troubleshooting
+
+### Refusal Codes
+
+Turas refuses rather than producing a number it cannot stand behind. Every
+refusal names what went wrong, why it matters, and how to fix it, on the
+console where you launched the app. This is the reference for the ones you are
+most likely to meet.
+
+| Code | What it means | What to do |
+|---|---|---|
+| `CFG_DUPLICATE_SETTING` | The Settings sheet lists the same setting twice. Only one value can be in force. | Delete the duplicate rows. If they differ only in capitalisation, keep the lowercase one — templates before 2026-08-27 shipped a duplicate identity block. |
+| `CFG_NO_ATTRIBUTES_DEFINED` | The Attributes sheet holds only the template's example rows and blanks. | Fill in your own attributes. The example rows are prefixed `EXAMPLE —` and are ignored. |
+| `CFG_INSUFFICIENT_LEVELS` | An attribute has fewer than two levels. | Add levels in the `LevelNames` column, comma-separated. |
+| `CALC_ALL_ZERO_UTILITIES` | Every non-baseline utility came back exactly zero, which means the model's coefficient names did not match your configured levels. | Check that attribute and level names match the data exactly, including case and spacing. |
+| `CALC_BW_SIMULTANEOUS_UNIMPLEMENTED` | `bw_method = "simultaneous"` was requested. That estimator fits best and worst against each other without reversing the design, so it biases every estimate toward zero. | Use `bw_method = "sequential"`, which is the default and a standard approximation. |
+| `CALC_INTERACTIONS_NOT_IN_SIMULATOR` | The model has interaction terms, which a part-worth table cannot carry, so the simulator would compute shares from a main-effects model that was never estimated. | The report is still produced without its simulator. Clear `interaction_terms` if you need the simulator. |
+| `CALC_WTP_POSITIVE_PRICE_SLOPE` | Utility rises with price, which reverses the sign of every willingness-to-pay figure. | Check that price levels are listed in ascending order and parse as numbers. A genuinely positive slope means price is acting as a quality cue and needs interpretation, not a WTP table. |
+| `CALC_LC_ASSIGNMENT_FAILED` | Respondents could not be assigned to latent classes at all. | Usually a failed HB run upstream, or too many classes for the data. Try fewer classes, or run `estimation_method = "hb"` first. |
+| `CALC_LC_NO_COMPARABLE_SOLUTION` | Latent class fitted, but no solution produced a usable BIC/AIC, so no class count could be chosen. | Latent class needs a substantial sample — 200+ is the usual guidance, and it is unreliable below about 100. |
+| `FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE` | The data contains None (no-purchase) rows. There is no alternative-specific constant for them yet. | Remove the None rows and analyse the remaining choices as a conditional model, reporting the no-purchase rate directly from the data. |
+| `DATA_NONCONTIGUOUS_CHOICE_SETS` | A respondent's choice sets do not form clean blocks of equal size. | Check for duplicated rows, or a choice set id reused for two different tasks. |
+| `DATA_ALCHEMER_SIGNED_SCORES` | The Alchemer Score column contains negative values, which is how a best-worst task is coded. | Import it through the best-worst path (`estimation_method = "best_worst"`), not the choice path. |
+
+### Warnings You Should Read
+
+These do not stop the run, but they change what the numbers mean.
+
+| Code | What it means |
+|---|---|
+| `CFG_UNKNOWN_SETTING` | A setting name is not recognised — usually a typo. It had no effect. The nearest known setting is suggested. |
+| `SETTING RETIRED` | A setting you have was removed from the module. The notice says what replaced it. Delete the row. |
+| `CONJ_INTERACTIONS_NOT_IN_UTILITIES` | Interaction coefficients were estimated but cannot appear in a part-worth table, so they are not in the utilities sheet, the importance table or the simulator. |
+| `CONJ_ALCH_SCORE_SCALE` | Names which score scale the Alchemer importer used — a 0/1 indicator, a 0-100 scale, or an unrecognised range where any positive value counts as chosen. |
+| `CONJ_ALCH_LEVELS_CLEANED` / `_COLLAPSED` | Level names were rewritten during import; the old-to-new mapping is listed. `_COLLAPSED` means two distinct levels now share a name and will be analysed as one. |
+| `CONJ_HB_SE_FALLBACK` | The posterior standard error could not be computed from the mixture draws, so an approximation was used. Intervals are indicative. |
+| `CONJ_ZERO_RANGE_RESPONDENTS` | Some respondents have completely flat part-worths and contribute no importance. |
+| `CONJ_TEMPLATE_ATTRIBUTES_SKIPPED` / `CONJ_TEMPLATE_SLIDES_SKIPPED` | The template's example rows were ignored. |
+| `CONJ_CUSTOM_SLIDES_OFF` | The Custom_Slides sheet has content but `include_custom_slides` is not Y, so none of it appears in the report. |
 
 ### Perfect Separation
 

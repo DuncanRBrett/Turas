@@ -1,6 +1,6 @@
 # TURAS Conjoint Analysis Module
 
-**Version 3.1.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, Revenue Simulator, and interactive HTML reporting
+**Version 3.2.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, Revenue Simulator, and interactive HTML reporting
 
 ---
 
