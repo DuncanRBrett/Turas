@@ -255,9 +255,9 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("HTML REPORT", "generate_html_simulator", "FALSE", "Generate standalone HTML market simulator", FALSE, "TRUE,FALSE", "TRUE or FALSE")
   add("HTML REPORT", "brand_colour", "#323367", "Primary brand hex colour for HTML output", FALSE, "", "Hex colour (e.g. #323367)")
   add("HTML REPORT", "accent_colour", "#CC9900", "Accent hex colour for HTML output", FALSE, "", "Hex colour (e.g. #CC9900)")
-  add("HTML REPORT", "project_name", "Conjoint Analysis", "Project name displayed in report header", FALSE, "", "Free text")
+  add("HTML REPORT", "project_name", "Conjoint Analysis", "Project name. Appears in the report header and in the stats pack Declaration sheet.", FALSE, "", "Free text")
   add("HTML REPORT", "client_name", "", "Client name displayed in header and About page", FALSE, "", "Free text")
-  add("HTML REPORT", "company_name", "The Research LampPost", "Company name for report header", FALSE, "", "Free text")
+  add("HTML REPORT", "company_name", "The Research LampPost", "Company or white-label partner name. Appears in the report header and as the research house in the stats pack Declaration sheet.", FALSE, "", "Free text")
 
   # --- HTML REPORT INSIGHTS ---
   add("HTML REPORT INSIGHTS", "insight_overview", "", "Pre-populated insight text for Overview tab", FALSE, "", "Free text or markdown")
@@ -274,7 +274,7 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("CUSTOM CONTENT", "include_custom_images", "FALSE", "Include custom images in HTML report (see Custom_Images sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
 
   # --- ANALYST & ABOUT ---
-  add("ANALYST & ABOUT", "analyst_name", "", "Analyst name for About page", FALSE, "", "Free text")
+  add("ANALYST & ABOUT", "analyst_name", "", "Analyst name. Appears on the report About page and in the stats pack Declaration sheet.", FALSE, "", "Free text")
   add("ANALYST & ABOUT", "analyst_email", "", "Analyst email for About page", FALSE, "", "Email address")
   add("ANALYST & ABOUT", "analyst_phone", "", "Analyst phone for About page", FALSE, "", "Phone number")
   add("ANALYST & ABOUT", "closing_notes", "", "Closing notes (editable in HTML report)", FALSE, "", "Free text")
@@ -304,9 +304,12 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("STATS PACK", "generate_stats_pack", "Y", "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility. This is a contractual deliverable. Output file is named {output}_stats_pack.xlsx.", FALSE, "Y,N", "Y or N")
 
   # --- STUDY IDENTIFICATION ---
-  add("STUDY IDENTIFICATION", "Project_Name", "", "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.", FALSE, "", "Free text")
-  add("STUDY IDENTIFICATION", "Analyst_Name", "", "Analyst name — appears in the stats pack Declaration sheet.", FALSE, "", "Free text")
-  add("STUDY IDENTIFICATION", "Research_House", "", "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.", FALSE, "", "Free text")
+  # STUDY IDENTIFICATION removed 2026-08-27. It offered Project_Name,
+  # Analyst_Name and Research_House, described as feeding the stats pack
+  # Declaration sheet — which is false: the Declaration reads the lowercase
+  # project_name, analyst_name and company_name below. The capitalised trio was
+  # read by nothing, and shipping both spellings made every freshly generated
+  # template a config with duplicated settings.
 
   settings
 }
