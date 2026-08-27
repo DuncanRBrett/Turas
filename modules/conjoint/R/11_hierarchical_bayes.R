@@ -339,6 +339,104 @@ estimate_hierarchical_bayes <- function(data_list, config, verbose = TRUE) {
 # RESULT EXTRACTION
 # ==============================================================================
 
+#' Posterior Draws of the Population Mean Part-Worths
+#'
+#' The population mean at MCMC draw d is the mixture mean
+#' \eqn{\sum_k p_{dk} \mu_{dk}}, taken from bayesm's `nmix` output
+#' (`probdraw` and `compdraw`). Its standard deviation across retained draws is
+#' the posterior standard error of the population mean — which is what a
+#' confidence interval, a z-statistic and a significance star are about.
+#'
+#' This is emphatically NOT the same quantity as
+#' `apply(individual_betas, 2, sd)`, which is the spread of preferences ACROSS
+#' respondents (heterogeneity). Using the latter as a standard error, as this
+#' module did until 2026-08, inflates every HB interval by roughly
+#' \eqn{\sqrt{n_{respondents}}} and makes every significance claim wrong.
+#'
+#' Note on label switching: individual components are not identified across
+#' draws, but the mixture mean is, so this quantity is safe for ncomp > 1.
+#'
+#' @param hb_output Output from `bayesm::rhierMnlRwMixture`.
+#' @param n_burnin_draws Number of retained draws to discard as burn-in — the
+#'   same count applied to `betadraw`, so the two summaries agree.
+#' @param n_parameters Number of design columns.
+#' @return A [n_draws x n_parameters] matrix of population-mean draws, or NULL
+#'   if the output carries no usable mixture draws.
+#' @keywords internal
+extract_hb_population_mean_draws <- function(hb_output, n_burnin_draws, n_parameters) {
+
+  nmix <- hb_output$nmix
+  if (is.null(nmix) || is.null(nmix$probdraw) || is.null(nmix$compdraw)) return(NULL)
+
+  prob <- nmix$probdraw
+  comp <- nmix$compdraw
+  if (!is.matrix(prob)) prob <- matrix(prob, ncol = 1)
+
+  n_total <- min(nrow(prob), length(comp))
+  if (n_total < 2) return(NULL)
+
+  keep_idx <- seq_len(n_total)
+  if (n_burnin_draws > 0 && n_burnin_draws < n_total) {
+    keep_idx <- (n_burnin_draws + 1):n_total
+  }
+  if (length(keep_idx) < 2) return(NULL)
+
+  draws <- matrix(NA_real_, nrow = length(keep_idx), ncol = n_parameters)
+
+  for (row in seq_along(keep_idx)) {
+    d <- keep_idx[row]
+    weights <- as.numeric(prob[d, ])
+    mus <- vapply(
+      comp[[d]],
+      function(cc) as.numeric(cc$mu),
+      numeric(n_parameters)
+    )
+    if (is.null(dim(mus))) mus <- matrix(mus, nrow = n_parameters)
+    draws[row, ] <- as.numeric(mus %*% weights)
+  }
+
+  if (anyNA(draws)) return(NULL)
+
+  draws
+}
+
+
+#' Population-Mean Standard Errors for an HB Fit
+#'
+#' Prefers the posterior standard deviation of the mixture-mean draws. Falls
+#' back to `heterogeneity_sd / sqrt(n)` only when bayesm returned no usable
+#' mixture draws, and says so on the console either way.
+#'
+#' @return List with `std_errors`, `se_method` ("posterior_draws" or
+#'   "heterogeneity_over_sqrt_n") and `n_se_draws`.
+#' @keywords internal
+compute_hb_population_se <- function(hb_output, n_burnin_draws, n_parameters,
+                                     heterogeneity_sd, n_respondents,
+                                     verbose = TRUE) {
+
+  draws <- extract_hb_population_mean_draws(hb_output, n_burnin_draws, n_parameters)
+
+  if (!is.null(draws)) {
+    return(list(
+      std_errors = apply(draws, 2, stats::sd),
+      se_method = "posterior_draws",
+      n_se_draws = nrow(draws)
+    ))
+  }
+
+  cat("\n[TRS INFO] CONJ_HB_SE_FALLBACK: bayesm returned no usable mixture-mean\n")
+  cat("  draws, so the posterior standard error of the population mean could not\n")
+  cat("  be computed directly. Falling back to heterogeneity SD / sqrt(n). The\n")
+  cat("  reported standard errors are an approximation.\n\n")
+
+  list(
+    std_errors = heterogeneity_sd / sqrt(max(n_respondents, 1)),
+    se_method = "heterogeneity_over_sqrt_n",
+    n_se_draws = NA_integer_
+  )
+}
+
+
 #' Extract HB Results from bayesm Output
 #'
 #' Processes the raw bayesm output into a standardized turas_conjoint_model
@@ -403,7 +501,23 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
 
   # Aggregate utilities (population mean of individual means)
   aggregate_betas <- colMeans(individual_betas)
-  aggregate_sds <- apply(individual_betas, 2, sd)
+
+  # Between-respondent spread. This is heterogeneity, NOT a standard error —
+  # it is reported in its own right and must never drive a CI or a p-value.
+  heterogeneity_sd <- apply(individual_betas, 2, sd)
+  names(heterogeneity_sd) <- col_names
+
+  # Posterior SE of the population mean, from the mixture-mean draws.
+  se_info <- compute_hb_population_se(
+    hb_output = hb_output,
+    n_burnin_draws = n_burnin_draws,
+    n_parameters = n_parameters,
+    heterogeneity_sd = heterogeneity_sd,
+    n_respondents = n_respondents,
+    verbose = verbose
+  )
+  aggregate_ses <- se_info$std_errors
+  names(aggregate_ses) <- col_names
 
   log_verbose(sprintf("  ✓ Extracted utilities for %d respondents (%d parameters)",
                        n_respondents, n_parameters), verbose)
@@ -421,8 +535,11 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
     method = "hierarchical_bayes",
     model = hb_output,
     coefficients = aggregate_betas,
-    vcov = NULL,  # Not directly available from HB; use posterior SDs
-    std_errors = aggregate_sds,
+    vcov = NULL,  # Not directly available from HB
+    std_errors = aggregate_ses,
+    heterogeneity_sd = heterogeneity_sd,
+    se_method = se_info$se_method,
+    n_se_draws = se_info$n_se_draws,
     loglik = c(null = NA_real_, fitted = NA_real_),
     n_obs = sum(sapply(bayesm_data$lgtdata, function(x) length(x$y) * bayesm_data$p)),
     n_respondents = n_respondents,
@@ -673,19 +790,40 @@ calculate_respondent_rlh <- function(individual_betas, bayesm_data, config, verb
 #' @param hb_result HB model result (turas_conjoint_model with method="hierarchical_bayes")
 #' @param config Configuration object
 #' @param verbose Logical
-#' @return Data frame with Attribute, Level, Utility, SE, CI_Lower, CI_Upper,
-#'         p_value, is_baseline columns (same as aggregate method output)
+#' @return Data frame with Attribute, Level, Utility, Std_Error, SE (an alias of
+#'         Std_Error kept for the report table builder), Heterogeneity_SD,
+#'         CI_Lower, CI_Upper, p_value, Significance, is_baseline.
+#'         `Std_Error` is the posterior SE of the population mean;
+#'         `Heterogeneity_SD` is the spread across respondents. They answer
+#'         different questions and only the first belongs in a CI.
 #' @keywords internal
 extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
 
   log_verbose("  → Extracting HB utilities into standard format...", verbose)
 
   aggregate_betas <- hb_result$coefficients
-  aggregate_sds <- hb_result$std_errors
+  aggregate_ses <- hb_result$std_errors
+  heterogeneity_sd <- hb_result$heterogeneity_sd
   attribute_map <- hb_result$attribute_map
   col_names <- hb_result$col_names
   confidence_level <- config$confidence_level
+  if (is.null(confidence_level)) confidence_level <- 0.95
   z <- qnorm(1 - (1 - confidence_level) / 2)
+
+  # An SE of 0 (or a missing one) means "no uncertainty was estimated", not
+  # "estimated with perfect precision". The class-utility caller in
+  # 13_latent_class.R passes exactly that, and the old code turned it into
+  # p = 0 and three significance stars on every row.
+  .se_at <- function(idx) {
+    if (is.null(aggregate_ses) || length(aggregate_ses) < idx) return(NA_real_)
+    val <- unname(aggregate_ses[idx])
+    if (!is.finite(val) || val <= 0) return(NA_real_)
+    val
+  }
+  .het_at <- function(idx) {
+    if (is.null(heterogeneity_sd) || length(heterogeneity_sd) < idx) return(NA_real_)
+    unname(heterogeneity_sd[idx])
+  }
 
   utilities_list <- list()
 
@@ -702,7 +840,8 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
           Attribute = attr,
           Level = level,
           Utility = 0,
-          SE = 0,
+          Std_Error = 0,
+          Heterogeneity_SD = 0,
           CI_Lower = 0,
           CI_Upper = 0,
           p_value = NA_real_,
@@ -715,17 +854,19 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
         idx <- which(col_names == col_name)
 
         if (length(idx) == 1) {
-          beta_val <- aggregate_betas[idx]
-          sd_val <- aggregate_sds[idx]
+          beta_val <- unname(aggregate_betas[idx])
+          se_val <- .se_at(idx)
+          het_val <- .het_at(idx)
 
           utilities_list[[length(utilities_list) + 1]] <- data.frame(
             Attribute = attr,
             Level = level,
             Utility = beta_val,
-            SE = sd_val,
-            CI_Lower = beta_val - z * sd_val,
-            CI_Upper = beta_val + z * sd_val,
-            p_value = 2 * (1 - pnorm(abs(beta_val / max(sd_val, 1e-10)))),
+            Std_Error = se_val,
+            Heterogeneity_SD = het_val,
+            CI_Lower = if (is.na(se_val)) NA_real_ else beta_val - z * se_val,
+            CI_Upper = if (is.na(se_val)) NA_real_ else beta_val + z * se_val,
+            p_value = if (is.na(se_val)) NA_real_ else 2 * pnorm(-abs(beta_val / se_val)),
             is_baseline = FALSE,
             stringsAsFactors = FALSE
           )
@@ -736,9 +877,10 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
             Attribute = attr,
             Level = level,
             Utility = 0,
-            SE = 0,
-            CI_Lower = 0,
-            CI_Upper = 0,
+            Std_Error = NA_real_,
+            Heterogeneity_SD = NA_real_,
+            CI_Lower = NA_real_,
+            CI_Upper = NA_real_,
             p_value = NA_real_,
             is_baseline = FALSE,
             stringsAsFactors = FALSE
@@ -752,7 +894,7 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
   rownames(utilities) <- NULL
 
   # Zero-center within each attribute if configured
-  if (config$zero_center_utilities) {
+  if (isTRUE(config$zero_center_utilities)) {
     for (attr in unique(utilities$Attribute)) {
       mask <- utilities$Attribute == attr
       attr_mean <- mean(utilities$Utility[mask])
@@ -761,6 +903,13 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
       utilities$CI_Upper[mask] <- utilities$CI_Upper[mask] - attr_mean
     }
   }
+
+  utilities$Significance <- vapply(utilities$p_value, get_significance_stars,
+                                   character(1))
+
+  # `SE` is an alias of `Std_Error`, kept because the report table builder and
+  # the WTP module look for it by that name.
+  utilities$SE <- utilities$Std_Error
 
   utilities
 }

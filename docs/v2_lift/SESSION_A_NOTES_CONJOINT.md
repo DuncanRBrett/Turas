@@ -26,8 +26,45 @@ HTML report for as long as this code has existed. p-values and stars are unaffec
 (`calculate_p_value` takes scalars and returns an unnamed value).
 Fixed under A4 (the CI/SE honesty item), since that item already rewrites this plumbing.
 
+### A-NEW-2 — six console warnings fire on the *success* branch
+`R/07_output.R` carried the "Saving without part reconciliation" warning pasted
+into six unrelated `else` blocks: every non-formula string cell escaped
+(`:51`), "no coefficients available" (`:440`), an unmapped column name
+(`:681`), a Geweke check that PASSED (`:867`), an ESS check that PASSED
+(`:882`), and an RLH check that PASSED (`:1015`). On an HB run that is one
+false alarm per diagnostics row. Because the same text is also the *genuine*
+warning that a workbook was written without `turas_saveWorkbook` — the one that
+means Excel may offer to repair the file — the false copies drown the real
+signal. The six mis-pasted copies are removed; the two legitimate sites
+(`:37`, the shared-library-absent notice at load time, and `:199`, the actual
+fallback save) stay.
+
+### A-NEW-3 — TRS `CALC_` refusals came out blaming the config
+`conjoint_refuse()` (`R/00_guard.R`) prefix-checked against a list that omitted
+`CALC_`, although the project CLAUDE.md names it and the shared
+`.trs_valid_prefixes` (`modules/shared/lib/trs_refusal.R:38-48`) allows it. Any
+`CALC_*` code was silently rewritten to `CFG_CALC_*`, which tells the user their
+configuration is wrong when the failure was a calculation. `CALC_` added.
+
 ---
 
 ## Deviations from the work order
 
-(appended as they happen)
+**A4 — the SE column contract.** The two extractors disagreed on the column
+name: the aggregate path emitted `Std_Error`, the HB path emitted `SE`, and
+`lib/html_report/02_table_builder.R:56` tests for `"SE"` — so the HTML report
+has been showing a Std. Error column on HB runs and never on MNL runs. Rather
+than rename one and chase the consumers, both paths now emit `Std_Error` as the
+canonical column *and* `SE` as an alias with the same values, plus
+`Heterogeneity_SD`. No consumer breaks and the report gains the column on the
+MNL path. `R/14_willingness_to_pay.R:281-283` already handled both names.
+
+**A4 — p-values in the tail.** `2 * (1 - pnorm(|z|))` returns exactly 0 from
+about |z| = 8.3, so the workbook has been printing `p = 0`. Changed to
+`2 * pnorm(-|z|)` at all three sites, which is accurate to ~1e-300. A p-value
+of exactly zero is not a number any survey result should carry.
+
+**A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd`
+sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`
+binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores
+the directory at exactly the right moment with no frame ambiguity. Same intent.

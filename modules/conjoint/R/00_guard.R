@@ -102,7 +102,10 @@ conjoint_refuse <- function(code,
                             missing = NULL,
                             details = NULL) {
 
-  if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
+  # Keep this list in step with .trs_valid_prefixes in
+  # modules/shared/lib/trs_refusal.R. CALC_ was missing here, so every
+  # calculation refusal came out as CFG_CALC_..., blaming the config.
+  if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|CALC_|PKG_|FEATURE_|BUG_)", code)) {
     code <- paste0("CFG_", code)
   }
 

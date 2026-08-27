@@ -55,6 +55,13 @@ build_utilities_table <- function(utilities) {
 
   has_se <- "SE" %in% names(utilities)
 
+  # Heterogeneity is the spread of preferences across respondents. It only
+  # exists for HB and latent class, and it is shown in its own column so that
+  # nobody mistakes it for the standard error of the mean — which is exactly
+  # what happened while the two were the same number.
+  has_het <- "Heterogeneity_SD" %in% names(utilities) &&
+    any(is.finite(utilities$Heterogeneity_SD) & utilities$Heterogeneity_SD > 0)
+
   rows <- vapply(seq_len(nrow(utilities)), function(i) {
     u <- utilities$Utility[i]
     class <- if (u > 0) "cj-positive" else if (u < 0) "cj-negative" else ""
@@ -71,20 +78,34 @@ build_utilities_table <- function(utilities) {
       )
     } else ""
 
+    het_cell <- if (has_het) {
+      het_val <- if (!is.null(utilities$Heterogeneity_SD[i]) &&
+                     !is.na(utilities$Heterogeneity_SD[i])) {
+        utilities$Heterogeneity_SD[i]
+      } else NA
+      sprintf(
+        '<td class="cj-num" data-col-key="heterogeneity" data-export-value="%s">%s</td>',
+        if (is.na(het_val)) "" else sprintf("%.3f", het_val),
+        if (is.na(het_val)) "\u2014" else sprintf("%.3f", het_val)
+      )
+    } else ""
+
     sprintf(
-      '<tr><td class="cj-label-col" data-col-key="level" data-export-value="%s">%s%s</td><td class="cj-num %s" data-col-key="utility" data-export-value="%.4f">%.3f</td>%s</tr>',
+      '<tr><td class="cj-label-col" data-col-key="level" data-export-value="%s">%s%s</td><td class="cj-num %s" data-col-key="utility" data-export-value="%.4f">%.3f</td>%s%s</tr>',
       .html_escape(utilities$Level[i]),
-      .html_escape(utilities$Level[i]), baseline, class, u, u, se_cell
+      .html_escape(utilities$Level[i]), baseline, class, u, u, se_cell, het_cell
     )
   }, character(1))
 
   se_header <- if (has_se) '<th class="cj-num-header" data-col-key="se">Std. Error</th>' else ""
+  het_header <- if (has_het) '<th class="cj-num-header" data-col-key="heterogeneity">Heterogeneity (SD)</th>' else ""
 
   paste0(
     '<table class="cj-table" data-table-id="utilities"><thead><tr>',
     '<th data-col-key="level">Level</th>',
     '<th class="cj-num-header" data-col-key="utility">Utility</th>',
     se_header,
+    het_header,
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'

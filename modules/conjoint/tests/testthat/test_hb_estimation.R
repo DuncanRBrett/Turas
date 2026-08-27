@@ -339,4 +339,80 @@ if (is.null(turas_root)) {
     }
   })
 
+  # ============================================================================
+  # TEST 7: posterior SE of the population mean (review finding C3)
+  # ============================================================================
+  test_that("HB: std_errors is the posterior SE of the mean, not the heterogeneity SD", {
+    skip_if_not_installed("bayesm")
+
+    synth <- generate_synthetic_cbc(
+      n_respondents = 40, n_tasks = 8, n_alts = 3, seed = 202
+    )
+
+    config <- synth$config
+    config$estimation_method <- "hb"
+    config$hb_iterations <- 600
+    config$hb_burnin <- 200
+    config$hb_thin <- 2
+    config$hb_ncomp <- 1
+    config$zero_center_utilities <- FALSE
+
+    data_list <- list(
+      data = synth$data,
+      n_respondents = synth$n_respondents,
+      n_choice_sets = synth$n_respondents * synth$n_tasks,
+      has_none = FALSE,
+      none_info = NULL,
+      validation = list(warnings = character(0), info = character(0))
+    )
+
+    result <- suppressWarnings(
+      capture.output(
+        model <- estimate_choice_model(data_list, config, verbose = FALSE),
+        type = "output"
+      )
+    )
+
+    # The SE must come from the mixture-mean draws, not the sqrt(n) stopgap.
+    expect_equal(model$se_method, "posterior_draws")
+    expect_true(is.numeric(model$n_se_draws) && model$n_se_draws > 1)
+
+    expect_true(!is.null(model$heterogeneity_sd))
+    expect_length(model$std_errors, length(model$coefficients))
+    expect_length(model$heterogeneity_sd, length(model$coefficients))
+
+    # The point of C3: these are different quantities, and the standard error
+    # of a mean over 40 respondents is far smaller than the spread across them.
+    expect_true(all(model$std_errors < model$heterogeneity_sd))
+    expect_lt(mean(model$std_errors), mean(model$heterogeneity_sd) / 2)
+
+    # And the utilities table carries both, honestly labelled.
+    u <- extract_hb_utilities(model, config, verbose = FALSE)
+    nb <- u[!u$is_baseline, ]
+    expect_true(all(nb$Std_Error < nb$Heterogeneity_SD))
+  })
+
+  # ============================================================================
+  # TEST 8: the SE fallback is honest when bayesm returns no mixture draws
+  # ============================================================================
+  test_that("HB: a fit with no mixture draws falls back and says so", {
+    het <- c(a = 0.9, b = 1.2, c = 0.6)
+
+    out <- capture.output(
+      se_info <- compute_hb_population_se(
+        hb_output = list(betadraw = array(0, c(2, 3, 4))),  # no nmix
+        n_burnin_draws = 0,
+        n_parameters = 3,
+        heterogeneity_sd = het,
+        n_respondents = 100,
+        verbose = FALSE
+      ),
+      type = "output"
+    )
+
+    expect_equal(se_info$se_method, "heterogeneity_over_sqrt_n")
+    expect_equal(unname(se_info$std_errors), unname(het / 10), tolerance = 1e-9)
+    expect_true(any(grepl("CONJ_HB_SE_FALLBACK", out)))
+  })
+
 } # end turas_root guard

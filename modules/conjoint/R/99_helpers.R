@@ -199,9 +199,11 @@ calculate_ci <- function(estimate, std_error, confidence_level = 0.95) {
 #' Calculate p-value from z-statistic
 #' @keywords internal
 calculate_p_value <- function(estimate, std_error) {
-  if (std_error == 0) return(NA_real_)
+  if (is.na(std_error) || std_error == 0) return(NA_real_)
   z_stat <- estimate / std_error
-  2 * (1 - pnorm(abs(z_stat)))
+  # 2 * pnorm(-|z|) rather than 2 * (1 - pnorm(|z|)): the latter loses all
+  # precision in the tail and reports p = 0 exactly from about |z| = 8.3.
+  2 * pnorm(-abs(z_stat))
 }
 
 

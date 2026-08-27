@@ -693,9 +693,13 @@ extract_lc_utilities <- function(lc_result, config, verbose = TRUE) {
 
   for (c in seq_len(k)) {
     # Build a pseudo-model with this class's betas as the aggregate
+    # No posterior SE is computed per class, so the SEs are NA rather than 0.
+    # Passing zeros made extract_hb_utilities divide by 1e-10, which returned
+    # p = 0 and three significance stars on every single class-level row.
     class_model <- list(
       coefficients = lc$class_betas[c, ],
-      std_errors = rep(0, length(lc$class_betas[c, ])),
+      std_errors = rep(NA_real_, length(lc$class_betas[c, ])),
+      heterogeneity_sd = rep(NA_real_, length(lc$class_betas[c, ])),
       attribute_map = lc_result$attribute_map,
       col_names = lc_result$col_names
     )

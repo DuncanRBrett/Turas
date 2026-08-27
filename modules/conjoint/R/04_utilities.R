@@ -26,9 +26,45 @@ calculate_utilities <- function(model_result, config, verbose = TRUE) {
 
   log_verbose("Calculating part-worth utilities...", verbose)
 
-  # HB dispatch: use HB-specific extraction for individual-level utilities
-  if (!is.null(model_result$method) && model_result$method == "hierarchical_bayes") {
+  # Respondent-level dispatch. Both HB and latent class store their
+  # coefficients as `Attribute_Level`, which the aggregate extractor below
+  # cannot parse — it strips the attribute prefix and is left with "_Level",
+  # which matches no level, so every utility stays at its initialised zero.
+  # Latent class used to fall through to that branch and shipped an all-zero
+  # utilities table, an all-zero importance table and an all-zero simulator,
+  # all labelled PASS.
+  respondent_level_methods <- c("hierarchical_bayes", "latent_class")
+
+  if (!is.null(model_result$method) && model_result$method %in% respondent_level_methods) {
     utilities <- extract_hb_utilities(model_result, config, verbose)
+
+    # Safety net: if every non-baseline utility is exactly zero, the extraction
+    # did not find its coefficients. Refuse rather than ship a zero table.
+    non_baseline <- utilities[!utilities$is_baseline, , drop = FALSE]
+    if (nrow(non_baseline) > 0 && all(non_baseline$Utility == 0)) {
+      return(conjoint_refuse(
+        code = "CALC_ALL_ZERO_UTILITIES",
+        title = "All Part-Worth Utilities Are Zero",
+        problem = sprintf(
+          paste0("Every non-baseline utility extracted from the %s model is ",
+                 "exactly zero (%d levels across %d attributes)."),
+          model_result$method, nrow(non_baseline),
+          length(unique(non_baseline$Attribute))
+        ),
+        why_it_matters = paste0(
+          "An all-zero utilities table produces zero importance for every ",
+          "attribute and a simulator that gives every product the same share. ",
+          "Reporting it as a result would be reporting nothing as something."
+        ),
+        how_to_fix = c(
+          "This means the model's coefficient names did not match the attribute levels in the config.",
+          "Check that the attribute and level names in the Attributes sheet match the data exactly (case and spacing included).",
+          "Check the console above for CONJ_HB_MISSING_COL notices naming the columns that were not found.",
+          sprintf("Model coefficient names: %s",
+                  paste(utils::head(model_result$col_names, 8), collapse = ", "))
+        )
+      ))
+    }
 
     # Add interpretation
     utilities$Interpretation <- mapply(
@@ -39,7 +75,8 @@ calculate_utilities <- function(model_result, config, verbose = TRUE) {
       SIMPLIFY = TRUE
     )
 
-    log_verbose(sprintf("  ✓ Calculated %d part-worth utilities (HB)", nrow(utilities)), verbose)
+    log_verbose(sprintf("  ✓ Calculated %d part-worth utilities (%s)",
+                        nrow(utilities), model_result$method), verbose)
     return(utilities)
   }
 
@@ -144,32 +181,46 @@ extract_attribute_utilities <- function(attr, coefs, std_errors, config, model_r
   ci_upper <- rep(NA_real_, n_levels)
   p_values <- rep(NA_real_, n_levels)
 
+  centre <- mean(utilities_raw)
+  conf_level <- config$confidence_level
+  if (is.null(conf_level)) conf_level <- 0.95
+
   for (i in seq_along(all_levels)) {
     if (!is_baseline[i]) {
-      # Calculate CI using raw (pre-centered) coefficient and SE
+      # Calculate CI using raw (pre-centered) coefficient and SE.
+      # unname() matters: utilities_raw[i] carries the level name, and a named
+      # estimate makes calculate_ci() return "lower.Alpha"/"upper.Alpha", so
+      # ci["lower"] was NA and every aggregate-path CI shipped blank.
       ci <- calculate_ci(
-        utilities_raw[i],
-        ses[i],
-        config$confidence_level
+        unname(utilities_raw[i]),
+        unname(ses[i]),
+        conf_level
       )
-      ci_lower[i] <- ci["lower"] - mean(utilities_raw)  # Adjust for centering
-      ci_upper[i] <- ci["upper"] - mean(utilities_raw)
+      ci_lower[i] <- ci["lower"] - centre  # Adjust for centering
+      ci_upper[i] <- ci["upper"] - centre
 
       # Calculate p-value
-      p_values[i] <- calculate_p_value(utilities_raw[i], ses[i])
+      p_values[i] <- calculate_p_value(unname(utilities_raw[i]), unname(ses[i]))
     }
   }
 
-  # Create data frame
+  # Create data frame.
+  # Heterogeneity_SD is NA on the aggregate path by construction: a single
+  # pooled model has no between-respondent spread to report. The column exists
+  # so that HB, LC and MNL results share one shape.
+  # SE duplicates Std_Error because the report table builder and the WTP module
+  # look for that name.
   data.frame(
     Attribute = attr,
     Level = all_levels,
     Utility = utilities,
     Std_Error = ses,
+    SE = ses,
+    Heterogeneity_SD = NA_real_,
     CI_Lower = ci_lower,
     CI_Upper = ci_upper,
     p_value = p_values,
-    Significance = sapply(p_values, get_significance_stars),
+    Significance = vapply(p_values, get_significance_stars, character(1)),
     is_baseline = is_baseline,
     stringsAsFactors = FALSE
   )
