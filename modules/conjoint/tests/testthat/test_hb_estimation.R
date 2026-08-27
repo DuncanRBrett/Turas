@@ -16,17 +16,24 @@
 
 # --- Locate project root and source module ----------------------------------
 .find_turas_root <- function() {
-  candidates <- c(
-    getwd(),
-    Sys.getenv("TURAS_ROOT", unset = ""),
-    tryCatch(file.path(dirname(dirname(testthat::test_path())), "..", ".."),
-             error = function(e) "")
-  )
-  for (cand in candidates) {
-    if (nzchar(cand) && file.exists(file.path(cand, "modules", "conjoint", "R", "00_main.R"))) {
-      return(normalizePath(cand))
-    }
+  marker <- file.path("modules", "conjoint", "R", "00_main.R")
+
+  # Strategy 1: walk up from the working directory. Under testthat, getwd() is
+  # the testthat/ directory, so the root is four levels up.
+  dir <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  for (i in 1:8) {
+    if (file.exists(file.path(dir, marker))) return(dir)
+    parent <- dirname(dir)
+    if (parent == dir) break
+    dir <- parent
   }
+
+  # Strategy 2: TURAS_ROOT, which helper-setup.R sets for the whole suite.
+  env_root <- Sys.getenv("TURAS_ROOT", unset = "")
+  if (nzchar(env_root) && file.exists(file.path(env_root, marker))) {
+    return(normalizePath(env_root))
+  }
+
   NULL
 }
 

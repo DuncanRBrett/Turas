@@ -652,8 +652,8 @@ test_that("all 7 JS files have valid syntax", {
   js_files <- list.files(js_dir, pattern = "\\.js$", full.names = TRUE)
   expect_gte(length(js_files), 7, label = "Expected at least 7 JS files")
 
-  node_path <- "/usr/local/bin/node"
-  if (!file.exists(node_path)) skip("node not found at /usr/local/bin/node")
+  node_path <- unname(Sys.which("node"))
+  if (!nzchar(node_path)) skip("node not on PATH")
 
   for (f in js_files) {
     result <- system2(node_path, args = c("--check", f), stdout = TRUE, stderr = TRUE)
