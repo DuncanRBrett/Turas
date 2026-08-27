@@ -53,13 +53,21 @@ detect_none_option <- function(data, config) {
   }
 
   # METHOD 2: Check for choice sets where all alternatives are unchosen
-  # This indicates implicit none option
+  # This indicates implicit none option.
+  # A choice set is a respondent AND a set id. Grouping by the set id alone
+  # breaks the moment set ids are numbered within respondent (1..8 for
+  # everyone) — which is the layout the estimator explicitly supports. Every
+  # "set" then pools the whole sample, no group ever sums to zero, and
+  # implicit-none detection silently never fires.
   chosen_per_set <- aggregate(
     data[[config$chosen_column]],
-    by = list(choice_set_id = data[[config$choice_set_column]]),
+    by = list(
+      resp_id = data[[config$respondent_id_column]],
+      choice_set_id = data[[config$choice_set_column]]
+    ),
     FUN = sum
   )
-  names(chosen_per_set)[2] <- "n_chosen"
+  names(chosen_per_set)[3] <- "n_chosen"
 
   all_unchosen_sets <- chosen_per_set$choice_set_id[chosen_per_set$n_chosen == 0]
   has_all_zeros <- length(all_unchosen_sets) > 0
@@ -181,15 +189,23 @@ handle_explicit_none <- function(data, config, none_info, verbose = TRUE) {
 #' @keywords internal
 handle_implicit_none <- function(data, config, none_info, verbose = TRUE) {
 
-  # Find choice sets where all alternatives are unchosen
+  # Find choice sets where all alternatives are unchosen.
+  # Grouped by respondent AND set: with per-respondent set numbering, grouping
+  # by set id alone pools every respondent into one "set" and the resp_id taken
+  # by first() belongs to whichever respondent happened to sort first.
   all_unchosen_sets <- data %>%
-    group_by(!!sym(config$choice_set_column)) %>%
+    group_by(
+      !!sym(config$respondent_id_column),
+      !!sym(config$choice_set_column)
+    ) %>%
     summarise(
-      resp_id = first(!!sym(config$respondent_id_column)),
       n_chosen = sum(!!sym(config$chosen_column)),
       .groups = "drop"
     ) %>%
     filter(n_chosen == 0)
+
+  # create_none_rows() reads the respondent from a column called resp_id.
+  all_unchosen_sets$resp_id <- all_unchosen_sets[[config$respondent_id_column]]
 
   if (nrow(all_unchosen_sets) == 0) {
     # No implicit none after all
@@ -278,9 +294,18 @@ create_none_rows <- function(all_unchosen_sets, config, original_data) {
     row_data[[config$chosen_column]] <- 1
     row_data[["is_none_alternative"]] <- TRUE
 
-    # Alternative ID
-    if (config$alternative_id_column %in% names(original_data)) {
-      row_data[[config$alternative_id_column]] <- "NONE"
+    # Alternative ID. It has to keep the column's own type: writing the string
+    # "NONE" into a numeric alternative_id makes the bind_rows in
+    # handle_implicit_none() fail outright. Numeric columns get one past the
+    # highest existing id; anything else gets "NONE".
+    alt_col <- config$alternative_id_column
+    if (!is.null(alt_col) && alt_col %in% names(original_data)) {
+      existing <- original_data[[alt_col]]
+      row_data[[alt_col]] <- if (is.numeric(existing)) {
+        max(existing, na.rm = TRUE) + 1
+      } else {
+        "NONE"
+      }
     }
 
     # Set all attributes to none label
@@ -303,13 +328,25 @@ create_none_rows <- function(all_unchosen_sets, config, original_data) {
 #' @keywords internal
 validate_none_choices <- function(data, config) {
 
-  # Check 1: Exactly one chosen per choice set
+  # Check 1: Exactly one chosen per choice set, per respondent.
+  # Grouping by set id alone made n_chosen equal the respondent count for
+  # every set, so this refused every explicit-None dataset whose set ids are
+  # numbered within respondent. (02_data.R groups correctly and is the model.)
   chosen_per_set <- data %>%
-    group_by(!!sym(config$choice_set_column)) %>%
+    group_by(
+      !!sym(config$respondent_id_column),
+      !!sym(config$choice_set_column)
+    ) %>%
     summarise(n_chosen = sum(!!sym(config$chosen_column)), .groups = "drop")
 
   if (any(chosen_per_set$n_chosen != 1)) {
-    bad_sets <- chosen_per_set[[config$choice_set_column]][chosen_per_set$n_chosen != 1]
+    bad <- chosen_per_set[chosen_per_set$n_chosen != 1, , drop = FALSE]
+    bad_sets <- sprintf(
+      "resp %s set %s (%d chosen)",
+      bad[[config$respondent_id_column]],
+      bad[[config$choice_set_column]],
+      bad$n_chosen
+    )
     conjoint_refuse(
       code = "DATA_INVALID_NONE_CHOICES",
       title = "Invalid Choice Counts With None Option",
@@ -325,16 +362,21 @@ validate_none_choices <- function(data, config) {
 
   # Check 2: If none is chosen, no other alternative should be chosen
   if ("is_none_alternative" %in% names(data)) {
-    none_chosen_sets <- data %>%
-      filter(is_none_alternative, !!sym(config$chosen_column) == 1) %>%
-      pull(!!sym(config$choice_set_column))
+    # Match on respondent AND set. Matching on set id alone flags a respondent
+    # whose set 3 has a product chosen because a DIFFERENT respondent's set 3
+    # was a none.
+    .key <- function(df) {
+      paste0(df[[config$respondent_id_column]], "\r", df[[config$choice_set_column]])
+    }
 
-    other_chosen_in_none_sets <- data %>%
-      filter(
-        !!sym(config$choice_set_column) %in% none_chosen_sets,
-        !is_none_alternative,
-        !!sym(config$chosen_column) == 1
-      )
+    none_chosen <- data %>%
+      filter(is_none_alternative, !!sym(config$chosen_column) == 1)
+    none_chosen_keys <- .key(none_chosen)
+
+    others <- data %>%
+      filter(!is_none_alternative, !!sym(config$chosen_column) == 1)
+
+    other_chosen_in_none_sets <- others[.key(others) %in% none_chosen_keys, , drop = FALSE]
 
     if (nrow(other_chosen_in_none_sets) > 0) {
       conjoint_refuse(

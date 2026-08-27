@@ -16,17 +16,24 @@
 
 # --- Locate project root and source module ----------------------------------
 .find_turas_root <- function() {
-  candidates <- c(
-    getwd(),
-    Sys.getenv("TURAS_ROOT", unset = ""),
-    tryCatch(file.path(dirname(dirname(testthat::test_path())), "..", ".."),
-             error = function(e) "")
-  )
-  for (cand in candidates) {
-    if (nzchar(cand) && file.exists(file.path(cand, "modules", "conjoint", "R", "00_main.R"))) {
-      return(normalizePath(cand))
-    }
+  marker <- file.path("modules", "conjoint", "R", "00_main.R")
+
+  # Strategy 1: walk up from the working directory. Under testthat, getwd() is
+  # the testthat/ directory, so the root is four levels up.
+  dir <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  for (i in 1:8) {
+    if (file.exists(file.path(dir, marker))) return(dir)
+    parent <- dirname(dir)
+    if (parent == dir) break
+    dir <- parent
   }
+
+  # Strategy 2: TURAS_ROOT, which helper-setup.R sets for the whole suite.
+  env_root <- Sys.getenv("TURAS_ROOT", unset = "")
+  if (nzchar(env_root) && file.exists(file.path(env_root, marker))) {
+    return(normalizePath(env_root))
+  }
+
   NULL
 }
 
@@ -330,6 +337,226 @@ if (is.null(turas_root)) {
       expect_true("level" %in% names(entry))
       expect_true(entry$attribute %in% synth$config$attributes$AttributeName)
     }
+  })
+
+  # ============================================================================
+  # TEST 7: posterior SE of the population mean (review finding C3)
+  # ============================================================================
+  test_that("HB: std_errors is the posterior SE of the mean, not the heterogeneity SD", {
+    skip_if_not_installed("bayesm")
+
+    synth <- generate_synthetic_cbc(
+      n_respondents = 40, n_tasks = 8, n_alts = 3, seed = 202
+    )
+
+    config <- synth$config
+    config$estimation_method <- "hb"
+    config$hb_iterations <- 600
+    config$hb_burnin <- 200
+    config$hb_thin <- 2
+    config$hb_ncomp <- 1
+    config$zero_center_utilities <- FALSE
+
+    data_list <- list(
+      data = synth$data,
+      n_respondents = synth$n_respondents,
+      n_choice_sets = synth$n_respondents * synth$n_tasks,
+      has_none = FALSE,
+      none_info = NULL,
+      validation = list(warnings = character(0), info = character(0))
+    )
+
+    result <- suppressWarnings(
+      capture.output(
+        model <- estimate_choice_model(data_list, config, verbose = FALSE),
+        type = "output"
+      )
+    )
+
+    # The SE must come from the mixture-mean draws, not the sqrt(n) stopgap.
+    expect_equal(model$se_method, "posterior_draws")
+    expect_true(is.numeric(model$n_se_draws) && model$n_se_draws > 1)
+
+    expect_true(!is.null(model$heterogeneity_sd))
+    expect_length(model$std_errors, length(model$coefficients))
+    expect_length(model$heterogeneity_sd, length(model$coefficients))
+
+    # The point of C3: these are different quantities, and the standard error
+    # of a mean over 40 respondents is far smaller than the spread across them.
+    expect_true(all(model$std_errors < model$heterogeneity_sd))
+    expect_lt(mean(model$std_errors), mean(model$heterogeneity_sd) / 2)
+
+    # And the utilities table carries both, honestly labelled.
+    u <- extract_hb_utilities(model, config, verbose = FALSE)
+    nb <- u[!u$is_baseline, ]
+    expect_true(all(nb$Std_Error < nb$Heterogeneity_SD))
+  })
+
+  # ============================================================================
+  # TEST 8: the SE fallback is honest when bayesm returns no mixture draws
+  # ============================================================================
+  test_that("HB: a fit with no mixture draws falls back and says so", {
+    het <- c(a = 0.9, b = 1.2, c = 0.6)
+
+    out <- capture.output(
+      se_info <- compute_hb_population_se(
+        hb_output = list(betadraw = array(0, c(2, 3, 4))),  # no nmix
+        n_burnin_draws = 0,
+        n_parameters = 3,
+        heterogeneity_sd = het,
+        n_respondents = 100,
+        verbose = FALSE
+      ),
+      type = "output"
+    )
+
+    expect_equal(se_info$se_method, "heterogeneity_over_sqrt_n")
+    expect_equal(unname(se_info$std_errors), unname(het / 10), tolerance = 1e-9)
+    expect_true(any(grepl("CONJ_HB_SE_FALLBACK", out)))
+  })
+
+  # ============================================================================
+  # TEST 9: row order does not change the answer (review finding H7)
+  # ============================================================================
+  test_that("HB: shuffled input rows recover the same utilities as ordered rows", {
+    skip_if_not_installed("bayesm")
+
+    synth <- generate_synthetic_cbc(
+      n_respondents = 25, n_tasks = 6, n_alts = 3, seed = 404
+    )
+
+    ordered <- synth$data
+    # Export order by alternative rather than by task: every alternative 1,
+    # then every alternative 2, then every alternative 3. This is a shape real
+    # exports take, and nothing in the module sorted it back.
+    shuffled <- ordered[order(ordered$alt_id, ordered$resp_id, ordered$task_id), ]
+    rownames(shuffled) <- NULL
+
+    prep <- function(d) {
+      prepare_bayesm_data(list(data = d), synth$config, verbose = FALSE)
+    }
+
+    a <- prep(ordered)
+    b <- prep(shuffled)
+
+    expect_equal(a$n_respondents, b$n_respondents)
+    expect_equal(a$col_names, b$col_names)
+
+    # Same respondent, same tasks, same design blocks, same choices.
+    for (i in seq_len(a$n_respondents)) {
+      expect_equal(a$lgtdata[[i]]$y, b$lgtdata[[i]]$y,
+                   info = sprintf("y differs for respondent %d", i))
+      expect_equal(unname(a$lgtdata[[i]]$X), unname(b$lgtdata[[i]]$X),
+                   info = sprintf("X differs for respondent %d", i))
+    }
+  })
+
+  # ============================================================================
+  # TEST 10: non-contiguous choice sets refuse rather than estimating nonsense
+  # ============================================================================
+  test_that("HB: a respondent whose sets cannot form clean blocks refuses", {
+    synth <- generate_synthetic_cbc(
+      n_respondents = 6, n_tasks = 4, n_alts = 3, seed = 11
+    )
+
+    # Give respondent 2's task a duplicate row: the set no longer holds
+    # exactly p alternatives once the per-set count check is bypassed.
+    d <- synth$data
+    dup <- d[d$resp_id == 2 & d$task_id == min(d$task_id[d$resp_id == 2]), ][1, ]
+    d <- rbind(d, dup)
+    d <- d[order(d$resp_id, d$task_id), ]
+
+    cond <- tryCatch(
+      {
+        prepare_bayesm_data(list(data = d), synth$config, verbose = FALSE)
+        NULL
+      },
+      turas_refusal = function(e) e
+    )
+
+    expect_false(is.null(cond))
+    expect_true(cond$code %in% c("DATA_INCONSISTENT_ALTERNATIVES",
+                                 "DATA_NONCONTIGUOUS_CHOICE_SETS"))
+  })
+
+  # ============================================================================
+  # TEST 11: latent class gets the same SE treatment as HB (review finding C3)
+  # ============================================================================
+  test_that("LC: std_errors is the posterior SE, and utilities are not all zero", {
+    skip_if_not_installed("bayesm")
+
+    synth <- generate_two_segment_data(n_respondents = 60, seed = 5)
+
+    config <- synth$config
+    config$estimation_method <- "latent_class"
+    config$hb_iterations <- 500
+    config$hb_burnin <- 150
+    config$hb_thin <- 2
+    config$hb_ncomp <- 1
+    config$latent_class_min <- 2
+    config$latent_class_max <- 2
+    config$zero_center_utilities <- TRUE
+    config$confidence_level <- 0.95
+
+    suppressWarnings(capture.output(
+      model <- estimate_choice_model(list(data = synth$data), config, verbose = FALSE),
+      type = "output"
+    ))
+
+    expect_equal(model$method, "latent_class")
+
+    # C3 on the LC path: build_latent_class_result stored the between-
+    # respondent SD as std_errors, exactly as extract_hb_results did.
+    expect_equal(model$se_method, "posterior_draws")
+    expect_false(is.null(model$heterogeneity_sd))
+    expect_true(all(model$std_errors < model$heterogeneity_sd))
+    expect_lt(mean(model$std_errors), mean(model$heterogeneity_sd) / 2)
+
+    # C1: the utilities table used to come back entirely zero for LC.
+    u <- calculate_utilities(model, config, verbose = FALSE)
+    non_baseline <- u[!u$is_baseline, ]
+    expect_false(all(non_baseline$Utility == 0))
+    expect_true(all(non_baseline$Std_Error < non_baseline$Heterogeneity_SD))
+
+    imp <- calculate_attribute_importance(u, config, verbose = FALSE)
+    expect_gt(sum(imp$Importance), 99)
+  })
+
+  # ============================================================================
+  # TEST 12: a latent class fit with nothing to compare refuses cleanly
+  # ============================================================================
+  test_that("LC: an uncomparable solution refuses instead of failing on an index", {
+    skip_if_not_installed("bayesm")
+
+    # 40 respondents is well below any usable sample for a 2-class solution;
+    # the information criteria come back NA. which.min() over all-NA returns
+    # integer(0), and the old code indexed the solution list with it, giving
+    # "attempt to select less than one element in get1index".
+    synth <- generate_two_segment_data(n_respondents = 40, seed = 5)
+
+    config <- synth$config
+    config$estimation_method <- "latent_class"
+    config$hb_iterations <- 500
+    config$hb_burnin <- 150
+    config$hb_thin <- 2
+    config$hb_ncomp <- 1
+    config$latent_class_min <- 2
+    config$latent_class_max <- 2
+
+    cond <- tryCatch(
+      {
+        suppressWarnings(capture.output(
+          estimate_choice_model(list(data = synth$data), config, verbose = FALSE),
+          type = "output"
+        ))
+        NULL
+      },
+      turas_refusal = function(e) e
+    )
+
+    expect_false(is.null(cond))
+    expect_equal(cond$code, "CALC_LC_NO_COMPARABLE_SOLUTION")
+    expect_true(any(grepl("200 or more respondents", cond$how_to_fix, fixed = TRUE)))
   })
 
 } # end turas_root guard

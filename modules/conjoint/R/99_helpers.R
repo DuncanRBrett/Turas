@@ -199,9 +199,11 @@ calculate_ci <- function(estimate, std_error, confidence_level = 0.95) {
 #' Calculate p-value from z-statistic
 #' @keywords internal
 calculate_p_value <- function(estimate, std_error) {
-  if (std_error == 0) return(NA_real_)
+  if (is.na(std_error) || std_error == 0) return(NA_real_)
   z_stat <- estimate / std_error
-  2 * (1 - pnorm(abs(z_stat)))
+  # 2 * pnorm(-|z|) rather than 2 * (1 - pnorm(|z|)): the latter loses all
+  # precision in the tail and reports p = 0 exactly from about |z| = 8.3.
+  2 * pnorm(-abs(z_stat))
 }
 
 
@@ -584,6 +586,26 @@ escape_attr_for_regex <- function(attr) {
 
 #' Get module version
 #' @keywords internal
+#' Prefix Marking a Row as Template Example Content
+#'
+#' Written onto the template's example Attributes rows, and recognised by the
+#' config loader so those rows are skipped rather than analysed. Anything the
+#' template ships that a user might forget to replace has to be identifiable.
+#'
+#' @keywords internal
+CONJOINT_EXAMPLE_PREFIX <- "EXAMPLE —"
+
+
+#' The Conjoint Module Version
+#'
+#' One definition. Everything that shows a version reads it from here — the
+#' banner, the stats pack, the report footer, the template subtitle — so a
+#' bump is one edit rather than five that drift apart.
+#'
+#' @keywords internal
+CONJOINT_MODULE_VERSION <- "3.2.0"
+
+
 get_conjoint_version <- function() {
-  "3.1.0"
+  CONJOINT_MODULE_VERSION
 }

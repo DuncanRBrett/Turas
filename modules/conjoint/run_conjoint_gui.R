@@ -2,6 +2,49 @@
 # TURAS CONJOINT MODULE - GUI LAUNCHER
 # ==============================================================================
 
+#' Detect a Refusal in a Conjoint Analysis Result
+#'
+#' `run_conjoint_analysis()` RETURNS refusals rather than throwing them, and it
+#' returns them in two shapes: the `list(status = "REFUSED", ...)` built by
+#' `run_conjoint_analysis_impl()`'s error handler, and the
+#' `turas_refusal_result` object produced by the shared refusal handler
+#' (`run_status = "REFUSE"`). Callers that only look at one shape — or at
+#' neither — report success on failure.
+#'
+#' @param results Whatever `run_conjoint_analysis()` returned.
+#' @return NULL when the run was not refused; otherwise a list with `code`,
+#'   `title`, `message` and `how_to_fix`, each always a character vector.
+#' @keywords internal
+.conjoint_gui_refusal <- function(results) {
+
+  if (is.null(results)) {
+    return(list(
+      code = "BUG_NO_RESULT",
+      title = "No Result Returned",
+      message = "run_conjoint_analysis() returned NULL. This is a bug.",
+      how_to_fix = "Report this to the Turas maintainer with the console output above."
+    ))
+  }
+
+  is_refusal <- inherits(results, "turas_refusal_result") ||
+    isTRUE(results$refused) ||
+    identical(results$run_status, "REFUSE") ||
+    identical(results$status, "REFUSED")
+
+  if (!is_refusal) return(NULL)
+
+  first_chr <- function(x, fallback) {
+    if (is.null(x) || length(x) == 0) fallback else as.character(x)
+  }
+
+  list(
+    code       = first_chr(results$code, "CONJ_REFUSED")[1],
+    title      = first_chr(results$title, "Analysis Refused")[1],
+    message    = first_chr(results$message, "No refusal message was supplied.")[1],
+    how_to_fix = first_chr(results$how_to_fix, character(0))
+  )
+}
+
 #' Run Conjoint Analysis GUI
 #'
 #' Launches a Shiny GUI for running conjoint analysis.
@@ -363,10 +406,10 @@ run_conjoint_gui <- function() {
           assign("TURAS_PREPARE_DELIVERABLE",
                  isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
           if (isTRUE(input$prepare_deliverable)) {
-            .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
-              input$client_name
-            } else NULL
-            assign("TURAS_CLIENT_NAME", .client, envir = .GlobalEnv)
+            # This UI has no client-name field, so the deliverable is prepared
+            # without one. (A previous version read a client-name input that
+            # the UI never defined, so it was always NULL anyway.)
+            assign("TURAS_CLIENT_NAME", NULL, envir = .GlobalEnv)
             .minify_dir <- file.path(turas_root, "modules", "shared", "lib")
             if (!exists("turas_prepare_deliverable", mode = "function")) {
               source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
@@ -375,15 +418,14 @@ run_conjoint_gui <- function() {
             }
           }
 
-          # Set working directory to Turas root for module loading
+          # Set working directory to Turas root for module loading, and put it
+          # back even if sourcing fails — otherwise every later relative path
+          # in the Shiny session resolves against the wrong directory.
           old_wd <- getwd()
-          setwd(turas_root)
-
-          # Source main module file
-          source(file.path(turas_root, "modules/conjoint/R/00_main.R"))
-
-          # Restore working directory
-          setwd(old_wd)
+          tryCatch({
+            setwd(turas_root)
+            source(file.path(turas_root, "modules/conjoint/R/00_main.R"))
+          }, finally = setwd(old_wd))
 
           # Verify config file exists
           if (!file.exists(files$config_file)) {
@@ -407,16 +449,56 @@ run_conjoint_gui <- function() {
           console_text(output_text)
 
           options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
-          capture <- capture.output({
-            results <- run_conjoint_analysis(
-              config_file = files$config_file
-            )
-          }, type = "output")
+
+          # Capture stdout AND messages. Much of the module's TRS reporting goes
+          # through message() (config warnings, Alchemer notices, HTML-report
+          # failure); capturing only stdout made all of it invisible in the GUI.
+          capture <- capture.output(
+            withCallingHandlers({
+              results <- run_conjoint_analysis(
+                config_file = files$config_file
+              )
+            }, message = function(m) {
+              cat(conditionMessage(m))
+              invokeRestart("muffleMessage")
+            }),
+            type = "output"
+          )
 
           incProgress(0.80, detail = "Finalising results...")
 
           output_text <- paste0(output_text, paste(capture, collapse = "\n"))
-          output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+
+          # A refusal is RETURNED, not thrown, so the tryCatch below never sees
+          # it. Without this check the GUI reported success on every refusal.
+          refusal <- .conjoint_gui_refusal(results)
+
+          if (!is.null(refusal)) {
+            cat("\n=== TURAS ERROR ===\n")
+            cat("Code:", refusal$code, "\n")
+            cat("Message:", refusal$message, "\n")
+            cat("==================\n\n")
+
+            output_text <- paste0(output_text, "\n\n✗ Analysis refused: ",
+                                  refusal$code, "\n\n", refusal$message)
+            if (length(refusal$how_to_fix) > 0) {
+              output_text <- paste0(output_text, "\n\nHow to fix:\n  ",
+                                    paste(refusal$how_to_fix, collapse = "\n  "))
+            }
+            showNotification(
+              paste0("Refused: ", refusal$code, " — ", refusal$title),
+              type = "error", duration = NULL
+            )
+          } else {
+            status <- if (is.null(results$status)) "PASS" else results$status
+            output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+            if (identical(status, "PARTIAL")) {
+              output_text <- paste0(output_text,
+                                    " (completed with warnings — see the Run_Status sheet)")
+              showNotification("Analysis completed with warnings (PARTIAL)",
+                               type = "warning", duration = 10)
+            }
+          }
 
           incProgress(0.05, detail = "Done!")
 

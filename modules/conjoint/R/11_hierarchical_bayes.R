@@ -181,9 +181,15 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
   if (length(bad_cs) > 0) {
     return(conjoint_refuse(
       code = "DATA_INCONSISTENT_ALTERNATIVES",
-      message = sprintf(
+      title = "Choice Sets Have Different Numbers of Alternatives",
+      problem = sprintf(
         "Not all choice sets have %d alternatives. bayesm requires a constant number of alternatives per choice set.",
         p
+      ),
+      why_it_matters = paste0(
+        "Hierarchical Bayes reads the design matrix as fixed-size blocks. A ",
+        "choice set of the wrong size shifts every block after it, so the ",
+        "utilities would be wrong with nothing to show for it."
       ),
       how_to_fix = c(
         "Ensure every choice set has exactly the same number of alternatives",
@@ -196,15 +202,61 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
   # Build lgtdata: one element per respondent
   lgtdata <- vector("list", n_respondents)
 
+  alt_col <- config$alternative_id_column
+
   for (i in seq_len(n_respondents)) {
     resp_id <- respondent_ids[i]
     resp_rows <- which(data[[resp_col]] == resp_id)
+
+    # bayesm reads X as consecutive blocks of p rows, one block per task, in
+    # the same order as y. Nothing upstream sorts the data, so a file exported
+    # by alternative (all alternative 1s, then all alternative 2s) produced an
+    # X whose blocks did not correspond to the tasks y described — silently
+    # wrong individual utilities, with no error anywhere. Order each
+    # respondent's rows by choice set, then by alternative within the set.
+    cs_vals <- data[[cs_col]][resp_rows]
+    cs_order <- match(cs_vals, unique(cs_vals))  # first appearance, stable
+    alt_vals <- if (!is.null(alt_col) && alt_col %in% names(data)) {
+      data[[alt_col]][resp_rows]
+    } else {
+      seq_along(resp_rows)
+    }
+    resp_rows <- resp_rows[order(cs_order, alt_vals, method = "radix")]
+
     resp_data <- data[resp_rows, ]
     resp_X <- X_full[resp_rows, , drop = FALSE]
 
     # Get choice sets for this respondent
     choice_sets <- unique(resp_data[[cs_col]])
     n_tasks <- length(choice_sets)
+
+    # After sorting, each task must occupy one contiguous block of exactly p
+    # rows. If it does not, the X/y correspondence bayesm assumes is broken
+    # and the utilities would be quietly wrong.
+    block_ids <- rep(choice_sets, each = p)
+    if (length(block_ids) != nrow(resp_data) ||
+        !identical(as.character(resp_data[[cs_col]]), as.character(block_ids))) {
+      return(conjoint_refuse(
+        code = "DATA_NONCONTIGUOUS_CHOICE_SETS",
+        title = "Choice Sets Do Not Form Clean Blocks",
+        problem = sprintf(
+          paste0("Respondent '%s' has %d rows across %d choice sets, which do ",
+                 "not sort into contiguous blocks of %d alternatives."),
+          resp_id, nrow(resp_data), n_tasks, p
+        ),
+        why_it_matters = paste0(
+          "Hierarchical Bayes estimation reads the design matrix as one block ",
+          "per task. If the blocks do not line up with the choices, the ",
+          "individual-level utilities are wrong and nothing downstream can ",
+          "detect it."
+        ),
+        how_to_fix = c(
+          "Check that every choice set for this respondent has the same number of alternatives.",
+          "Check for duplicated rows, or for a choice set id that is reused for two different tasks.",
+          sprintf("Respondent: %s. Alternatives expected per set: %d.", resp_id, p)
+        )
+      ))
+    }
 
     # Build y vector: which alternative was chosen in each task (1-indexed)
     y_vec <- integer(n_tasks)
@@ -218,13 +270,20 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
       if (is.na(y_val)) {
         return(conjoint_refuse(
           code = "DATA_NO_CHOICE",
-          message = sprintf(
+          title = "Choice Set With No Chosen Alternative",
+          problem = sprintf(
             "No chosen alternative found for respondent '%s' in choice set '%s'.",
             resp_id, cs_id
           ),
+          why_it_matters = paste0(
+            "Every choice task must record what the respondent picked. A task ",
+            "with nothing chosen carries no information and cannot be indexed ",
+            "into the design matrix."
+          ),
           how_to_fix = c(
             "Ensure every choice set has exactly one row with chosen=1",
-            "Check for missing or zero values in the chosen column"
+            "Check for missing or zero values in the chosen column",
+            "If respondents could decline to choose, configure the None option (see none_label) so those tasks are modelled rather than dropped"
           )
         ))
       }
@@ -277,11 +336,15 @@ estimate_hierarchical_bayes <- function(data_list, config, verbose = TRUE) {
   # Prepare data for bayesm
   bayesm_data <- prepare_bayesm_data(data_list, config, verbose)
 
-  # MCMC settings
-  R <- as.integer(config$hb_iterations)
-  burnin <- as.integer(config$hb_burnin)
-  thin <- as.integer(config$hb_thin)
-  ncomp <- as.integer(config$hb_ncomp)
+  # MCMC settings.
+  # load_conjoint_config always supplies these, but estimate_choice_model is
+  # also a direct API. as.integer(NULL) is integer(0), which reaches bayesm as
+  # an empty prior and fails inside the package with nothing useful to read,
+  # so the loader's defaults are repeated here.
+  R <- as.integer(config$hb_iterations %||% 10000)
+  burnin <- as.integer(config$hb_burnin %||% 5000)
+  thin <- as.integer(config$hb_thin %||% 1)
+  ncomp <- as.integer(config$hb_ncomp %||% 1)
 
   log_verbose(sprintf("  → MCMC: %d iterations, %d burn-in, thin=%d, ncomp=%d",
                        R, burnin, thin, ncomp), verbose)
@@ -338,6 +401,104 @@ estimate_hierarchical_bayes <- function(data_list, config, verbose = TRUE) {
 # ==============================================================================
 # RESULT EXTRACTION
 # ==============================================================================
+
+#' Posterior Draws of the Population Mean Part-Worths
+#'
+#' The population mean at MCMC draw d is the mixture mean
+#' \eqn{\sum_k p_{dk} \mu_{dk}}, taken from bayesm's `nmix` output
+#' (`probdraw` and `compdraw`). Its standard deviation across retained draws is
+#' the posterior standard error of the population mean — which is what a
+#' confidence interval, a z-statistic and a significance star are about.
+#'
+#' This is emphatically NOT the same quantity as
+#' `apply(individual_betas, 2, sd)`, which is the spread of preferences ACROSS
+#' respondents (heterogeneity). Using the latter as a standard error, as this
+#' module did until 2026-08, inflates every HB interval by roughly
+#' \eqn{\sqrt{n_{respondents}}} and makes every significance claim wrong.
+#'
+#' Note on label switching: individual components are not identified across
+#' draws, but the mixture mean is, so this quantity is safe for ncomp > 1.
+#'
+#' @param hb_output Output from `bayesm::rhierMnlRwMixture`.
+#' @param n_burnin_draws Number of retained draws to discard as burn-in — the
+#'   same count applied to `betadraw`, so the two summaries agree.
+#' @param n_parameters Number of design columns.
+#' @return A [n_draws x n_parameters] matrix of population-mean draws, or NULL
+#'   if the output carries no usable mixture draws.
+#' @keywords internal
+extract_hb_population_mean_draws <- function(hb_output, n_burnin_draws, n_parameters) {
+
+  nmix <- hb_output$nmix
+  if (is.null(nmix) || is.null(nmix$probdraw) || is.null(nmix$compdraw)) return(NULL)
+
+  prob <- nmix$probdraw
+  comp <- nmix$compdraw
+  if (!is.matrix(prob)) prob <- matrix(prob, ncol = 1)
+
+  n_total <- min(nrow(prob), length(comp))
+  if (n_total < 2) return(NULL)
+
+  keep_idx <- seq_len(n_total)
+  if (n_burnin_draws > 0 && n_burnin_draws < n_total) {
+    keep_idx <- (n_burnin_draws + 1):n_total
+  }
+  if (length(keep_idx) < 2) return(NULL)
+
+  draws <- matrix(NA_real_, nrow = length(keep_idx), ncol = n_parameters)
+
+  for (row in seq_along(keep_idx)) {
+    d <- keep_idx[row]
+    weights <- as.numeric(prob[d, ])
+    mus <- vapply(
+      comp[[d]],
+      function(cc) as.numeric(cc$mu),
+      numeric(n_parameters)
+    )
+    if (is.null(dim(mus))) mus <- matrix(mus, nrow = n_parameters)
+    draws[row, ] <- as.numeric(mus %*% weights)
+  }
+
+  if (anyNA(draws)) return(NULL)
+
+  draws
+}
+
+
+#' Population-Mean Standard Errors for an HB Fit
+#'
+#' Prefers the posterior standard deviation of the mixture-mean draws. Falls
+#' back to `heterogeneity_sd / sqrt(n)` only when bayesm returned no usable
+#' mixture draws, and says so on the console either way.
+#'
+#' @return List with `std_errors`, `se_method` ("posterior_draws" or
+#'   "heterogeneity_over_sqrt_n") and `n_se_draws`.
+#' @keywords internal
+compute_hb_population_se <- function(hb_output, n_burnin_draws, n_parameters,
+                                     heterogeneity_sd, n_respondents,
+                                     verbose = TRUE) {
+
+  draws <- extract_hb_population_mean_draws(hb_output, n_burnin_draws, n_parameters)
+
+  if (!is.null(draws)) {
+    return(list(
+      std_errors = apply(draws, 2, stats::sd),
+      se_method = "posterior_draws",
+      n_se_draws = nrow(draws)
+    ))
+  }
+
+  cat("\n[TRS INFO] CONJ_HB_SE_FALLBACK: bayesm returned no usable mixture-mean\n")
+  cat("  draws, so the posterior standard error of the population mean could not\n")
+  cat("  be computed directly. Falling back to heterogeneity SD / sqrt(n). The\n")
+  cat("  reported standard errors are an approximation.\n\n")
+
+  list(
+    std_errors = heterogeneity_sd / sqrt(max(n_respondents, 1)),
+    se_method = "heterogeneity_over_sqrt_n",
+    n_se_draws = NA_integer_
+  )
+}
+
 
 #' Extract HB Results from bayesm Output
 #'
@@ -403,7 +564,23 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
 
   # Aggregate utilities (population mean of individual means)
   aggregate_betas <- colMeans(individual_betas)
-  aggregate_sds <- apply(individual_betas, 2, sd)
+
+  # Between-respondent spread. This is heterogeneity, NOT a standard error —
+  # it is reported in its own right and must never drive a CI or a p-value.
+  heterogeneity_sd <- apply(individual_betas, 2, sd)
+  names(heterogeneity_sd) <- col_names
+
+  # Posterior SE of the population mean, from the mixture-mean draws.
+  se_info <- compute_hb_population_se(
+    hb_output = hb_output,
+    n_burnin_draws = n_burnin_draws,
+    n_parameters = n_parameters,
+    heterogeneity_sd = heterogeneity_sd,
+    n_respondents = n_respondents,
+    verbose = verbose
+  )
+  aggregate_ses <- se_info$std_errors
+  names(aggregate_ses) <- col_names
 
   log_verbose(sprintf("  ✓ Extracted utilities for %d respondents (%d parameters)",
                        n_respondents, n_parameters), verbose)
@@ -421,8 +598,11 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
     method = "hierarchical_bayes",
     model = hb_output,
     coefficients = aggregate_betas,
-    vcov = NULL,  # Not directly available from HB; use posterior SDs
-    std_errors = aggregate_sds,
+    vcov = NULL,  # Not directly available from HB
+    std_errors = aggregate_ses,
+    heterogeneity_sd = heterogeneity_sd,
+    se_method = se_info$se_method,
+    n_se_draws = se_info$n_se_draws,
     loglik = c(null = NA_real_, fitted = NA_real_),
     n_obs = sum(sapply(bayesm_data$lgtdata, function(x) length(x$y) * bayesm_data$p)),
     n_respondents = n_respondents,
@@ -673,19 +853,40 @@ calculate_respondent_rlh <- function(individual_betas, bayesm_data, config, verb
 #' @param hb_result HB model result (turas_conjoint_model with method="hierarchical_bayes")
 #' @param config Configuration object
 #' @param verbose Logical
-#' @return Data frame with Attribute, Level, Utility, SE, CI_Lower, CI_Upper,
-#'         p_value, is_baseline columns (same as aggregate method output)
+#' @return Data frame with Attribute, Level, Utility, Std_Error, SE (an alias of
+#'         Std_Error kept for the report table builder), Heterogeneity_SD,
+#'         CI_Lower, CI_Upper, p_value, Significance, is_baseline.
+#'         `Std_Error` is the posterior SE of the population mean;
+#'         `Heterogeneity_SD` is the spread across respondents. They answer
+#'         different questions and only the first belongs in a CI.
 #' @keywords internal
 extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
 
   log_verbose("  → Extracting HB utilities into standard format...", verbose)
 
   aggregate_betas <- hb_result$coefficients
-  aggregate_sds <- hb_result$std_errors
+  aggregate_ses <- hb_result$std_errors
+  heterogeneity_sd <- hb_result$heterogeneity_sd
   attribute_map <- hb_result$attribute_map
   col_names <- hb_result$col_names
   confidence_level <- config$confidence_level
+  if (is.null(confidence_level)) confidence_level <- 0.95
   z <- qnorm(1 - (1 - confidence_level) / 2)
+
+  # An SE of 0 (or a missing one) means "no uncertainty was estimated", not
+  # "estimated with perfect precision". The class-utility caller in
+  # 13_latent_class.R passes exactly that, and the old code turned it into
+  # p = 0 and three significance stars on every row.
+  .se_at <- function(idx) {
+    if (is.null(aggregate_ses) || length(aggregate_ses) < idx) return(NA_real_)
+    val <- unname(aggregate_ses[idx])
+    if (!is.finite(val) || val <= 0) return(NA_real_)
+    val
+  }
+  .het_at <- function(idx) {
+    if (is.null(heterogeneity_sd) || length(heterogeneity_sd) < idx) return(NA_real_)
+    unname(heterogeneity_sd[idx])
+  }
 
   utilities_list <- list()
 
@@ -702,7 +903,8 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
           Attribute = attr,
           Level = level,
           Utility = 0,
-          SE = 0,
+          Std_Error = 0,
+          Heterogeneity_SD = 0,
           CI_Lower = 0,
           CI_Upper = 0,
           p_value = NA_real_,
@@ -715,17 +917,19 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
         idx <- which(col_names == col_name)
 
         if (length(idx) == 1) {
-          beta_val <- aggregate_betas[idx]
-          sd_val <- aggregate_sds[idx]
+          beta_val <- unname(aggregate_betas[idx])
+          se_val <- .se_at(idx)
+          het_val <- .het_at(idx)
 
           utilities_list[[length(utilities_list) + 1]] <- data.frame(
             Attribute = attr,
             Level = level,
             Utility = beta_val,
-            SE = sd_val,
-            CI_Lower = beta_val - z * sd_val,
-            CI_Upper = beta_val + z * sd_val,
-            p_value = 2 * (1 - pnorm(abs(beta_val / max(sd_val, 1e-10)))),
+            Std_Error = se_val,
+            Heterogeneity_SD = het_val,
+            CI_Lower = if (is.na(se_val)) NA_real_ else beta_val - z * se_val,
+            CI_Upper = if (is.na(se_val)) NA_real_ else beta_val + z * se_val,
+            p_value = if (is.na(se_val)) NA_real_ else 2 * pnorm(-abs(beta_val / se_val)),
             is_baseline = FALSE,
             stringsAsFactors = FALSE
           )
@@ -736,9 +940,10 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
             Attribute = attr,
             Level = level,
             Utility = 0,
-            SE = 0,
-            CI_Lower = 0,
-            CI_Upper = 0,
+            Std_Error = NA_real_,
+            Heterogeneity_SD = NA_real_,
+            CI_Lower = NA_real_,
+            CI_Upper = NA_real_,
             p_value = NA_real_,
             is_baseline = FALSE,
             stringsAsFactors = FALSE
@@ -752,7 +957,7 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
   rownames(utilities) <- NULL
 
   # Zero-center within each attribute if configured
-  if (config$zero_center_utilities) {
+  if (isTRUE(config$zero_center_utilities)) {
     for (attr in unique(utilities$Attribute)) {
       mask <- utilities$Attribute == attr
       attr_mean <- mean(utilities$Utility[mask])
@@ -761,6 +966,13 @@ extract_hb_utilities <- function(hb_result, config, verbose = TRUE) {
       utilities$CI_Upper[mask] <- utilities$CI_Upper[mask] - attr_mean
     }
   }
+
+  utilities$Significance <- vapply(utilities$p_value, get_significance_stars,
+                                   character(1))
+
+  # `SE` is an alias of `Std_Error`, kept because the report table builder and
+  # the WTP module look for it by that name.
+  utilities$SE <- utilities$Std_Error
 
   utilities
 }
@@ -821,6 +1033,14 @@ calculate_attribute_importance_hb <- function(hb_result, config, verbose = TRUE)
     }
   }
 
+  # Respondents whose part-worths are entirely flat have a total range of zero
+  # and stay at zero importance, so their rows do not sum to 100. They are
+  # counted rather than quietly averaged in.
+  row_totals <- rowSums(resp_importance)
+  n_zero_range <- sum(row_totals == 0)
+
+  rownames(resp_importance) <- rownames(individual_betas)
+
   # Average across respondents
   avg_importance <- colMeans(resp_importance)
   sd_importance <- apply(resp_importance, 2, sd)
@@ -832,9 +1052,31 @@ calculate_attribute_importance_hb <- function(hb_result, config, verbose = TRUE)
     stringsAsFactors = FALSE
   )
 
+  # Rank and interpretation, to match the aggregate function's shape so that
+  # everything downstream can take either.
+  importance_df$Range <- NA_real_
+  importance_df$Rank <- rank(-importance_df$Importance, ties.method = "first")
+  if (exists("interpret_importance", mode = "function")) {
+    importance_df$Interpretation <- vapply(importance_df$Importance,
+                                           interpret_importance, character(1))
+  }
+
   # Sort by importance descending
   importance_df <- importance_df[order(-importance_df$Importance), ]
   rownames(importance_df) <- NULL
+
+  # The per-respondent matrix is what the tabs Allocation export needs. It used
+  # to be computed here and thrown away.
+  attr(importance_df, "respondent_importance") <- resp_importance
+  attr(importance_df, "n_zero_range_respondents") <- n_zero_range
+  attr(importance_df, "importance_method") <- "individual"
+
+  if (n_zero_range > 0) {
+    cat(sprintf(
+      "[TRS INFO] CONJ_ZERO_RANGE_RESPONDENTS: %d of %d respondents have flat part-worths and contribute zero importance.\n",
+      n_zero_range, n_respondents
+    ))
+  }
 
   if (verbose) {
     log_verbose("  ✓ Individual-level importance calculated (averaged across respondents)", verbose)

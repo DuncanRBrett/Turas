@@ -4,7 +4,7 @@
 #
 # Module: Conjoint Analysis - Configuration Template
 # Purpose: Generate branded, formatted Excel config templates
-# Version: 3.1.0
+# Version: read from CONJOINT_MODULE_VERSION (R/99_helpers.R)
 # Date: 2026-03-19
 #
 # Generates a professional Excel configuration template with:
@@ -219,7 +219,9 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("ESTIMATION METHOD", "estimation_method", "auto", "Primary estimation method", TRUE, "auto,mlogit,clogit,hb,latent_class,best_worst", "auto, mlogit, clogit, hb, latent_class, best_worst")
   add("ESTIMATION METHOD", "confidence_level", "0.95", "Confidence level for intervals", FALSE, "", "Decimal between 0.80 and 0.99")
   add("ESTIMATION METHOD", "zero_center_utilities", "TRUE", "Zero-center utilities within each attribute", FALSE, "TRUE,FALSE", "TRUE or FALSE")
-  add("ESTIMATION METHOD", "base_level_method", "first", "Which level serves as baseline (utility = 0)", FALSE, "first,last", "first or last")
+  # base_level_method removed 2026-08: nothing read it. The baseline is always
+  # the first level listed for an attribute (R's factor reference level), and
+  # effects coding does not exist in this module.
 
   # --- HIERARCHICAL BAYES SETTINGS ---
   add("HIERARCHICAL BAYES SETTINGS", "hb_iterations", "10000", "Total MCMC iterations (recommend 10000-50000)", FALSE, "", "Integer >= 1000")
@@ -236,9 +238,17 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   # --- INTERACTIONS ---
   add("INTERACTIONS", "interaction_terms", "", "Comma-separated interaction pairs (e.g. Brand:Price, Size:Colour)", FALSE, "", "Format: Attr1:Attr2, Attr3:Attr4")
   add("INTERACTIONS", "auto_detect_interactions", "FALSE", "Automatically detect significant interactions", FALSE, "TRUE,FALSE", "TRUE or FALSE")
+  add("INTERACTIONS", "interaction_max", "3", "Maximum number of interaction terms to include", FALSE, "", "Integer 1-6")
 
   # --- WILLINGNESS TO PAY ---
-  add("WILLINGNESS TO PAY", "wtp_price_attribute", "", "Name of the price attribute (leave blank to skip WTP)", FALSE, "", "Attribute name from Attributes sheet")
+  add("WILLINGNESS TO PAY", "wtp_price_attribute", "", "Name of the price attribute. Leave blank and an attribute named price/cost/fee is used automatically; set wtp_enabled = N to skip WTP entirely", FALSE, "", "Attribute name from Attributes sheet")
+  add("WILLINGNESS TO PAY", "wtp_enabled", "Y", "Calculate willingness to pay (Y/N)", FALSE, "Y,N", "Y or N")
+
+  # --- BEST-WORST ---
+  add("BEST-WORST", "bw_method", "sequential", "Best-worst estimation approach. Only sequential is implemented; simultaneous refuses.", FALSE, "sequential", "sequential")
+
+  # --- DATA QUALITY ---
+  add("DATA QUALITY", "min_responses_per_level", "10", "Minimum observations required per attribute level before a warning is raised", FALSE, "", "Positive integer")
   add("WILLINGNESS TO PAY", "wtp_method", "marginal", "WTP calculation method", FALSE, "marginal,simulation", "marginal or simulation")
   add("WILLINGNESS TO PAY", "currency_symbol", "$", "Currency symbol for WTP display (e.g. $, R, EUR, GBP)", FALSE, "", "Any currency symbol or abbreviation")
 
@@ -252,9 +262,9 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("HTML REPORT", "generate_html_simulator", "FALSE", "Generate standalone HTML market simulator", FALSE, "TRUE,FALSE", "TRUE or FALSE")
   add("HTML REPORT", "brand_colour", "#323367", "Primary brand hex colour for HTML output", FALSE, "", "Hex colour (e.g. #323367)")
   add("HTML REPORT", "accent_colour", "#CC9900", "Accent hex colour for HTML output", FALSE, "", "Hex colour (e.g. #CC9900)")
-  add("HTML REPORT", "project_name", "Conjoint Analysis", "Project name displayed in report header", FALSE, "", "Free text")
+  add("HTML REPORT", "project_name", "Conjoint Analysis", "Project name. Appears in the report header and in the stats pack Declaration sheet.", FALSE, "", "Free text")
   add("HTML REPORT", "client_name", "", "Client name displayed in header and About page", FALSE, "", "Free text")
-  add("HTML REPORT", "company_name", "The Research LampPost", "Company name for report header", FALSE, "", "Free text")
+  add("HTML REPORT", "company_name", "The Research LampPost", "Company or white-label partner name. Appears in the report header and as the research house in the stats pack Declaration sheet.", FALSE, "", "Free text")
 
   # --- HTML REPORT INSIGHTS ---
   add("HTML REPORT INSIGHTS", "insight_overview", "", "Pre-populated insight text for Overview tab", FALSE, "", "Free text or markdown")
@@ -268,10 +278,9 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
 
   # --- CUSTOM CONTENT ---
   add("CUSTOM CONTENT", "include_custom_slides", "FALSE", "Include custom slides in HTML report (see Custom_Slides sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
-  add("CUSTOM CONTENT", "include_custom_images", "FALSE", "Include custom images in HTML report (see Custom_Images sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
 
   # --- ANALYST & ABOUT ---
-  add("ANALYST & ABOUT", "analyst_name", "", "Analyst name for About page", FALSE, "", "Free text")
+  add("ANALYST & ABOUT", "analyst_name", "", "Analyst name. Appears on the report About page and in the stats pack Declaration sheet.", FALSE, "", "Free text")
   add("ANALYST & ABOUT", "analyst_email", "", "Analyst email for About page", FALSE, "", "Email address")
   add("ANALYST & ABOUT", "analyst_phone", "", "Analyst phone for About page", FALSE, "", "Phone number")
   add("ANALYST & ABOUT", "closing_notes", "", "Closing notes (editable in HTML report)", FALSE, "", "Free text")
@@ -282,8 +291,13 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("NONE OPTION", "none_label", "None", "Label for the None/no-choice option", FALSE, "", "Free text")
 
   # --- OPTIMIZER ---
-  add("OPTIMIZER", "optimizer_method", "exhaustive", "Product optimization search method", FALSE, "exhaustive,greedy", "exhaustive or greedy")
-  add("OPTIMIZER", "optimizer_max_products", "5", "Maximum products in optimizer scenarios", FALSE, "", "Integer 1-12")
+  # Removed 2026-08. Nothing in the pipeline read optimizer_method or
+  # optimizer_max_products, and the dropdown offered "greedy" while the
+  # validator accepted only "exhaustive" or "genetic" — so the template's own
+  # value refused the run. The optimizer functions themselves remain available
+  # as a direct API (optimize_product_exhaustive / optimize_product_greedy in
+  # R/15_product_optimizer.R, both covered by tests/testthat/test_optimizer.R);
+  # they are simply not driven from the config sheet.
 
   # --- ALCHEMER IMPORT ---
   add("ALCHEMER IMPORT", "clean_alchemer_levels", "TRUE", "Auto-clean Alchemer level names", FALSE, "TRUE,FALSE", "TRUE or FALSE")
@@ -296,9 +310,12 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("STATS PACK", "generate_stats_pack", "Y", "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility. This is a contractual deliverable. Output file is named {output}_stats_pack.xlsx.", FALSE, "Y,N", "Y or N")
 
   # --- STUDY IDENTIFICATION ---
-  add("STUDY IDENTIFICATION", "Project_Name", "", "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.", FALSE, "", "Free text")
-  add("STUDY IDENTIFICATION", "Analyst_Name", "", "Analyst name — appears in the stats pack Declaration sheet.", FALSE, "", "Free text")
-  add("STUDY IDENTIFICATION", "Research_House", "", "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.", FALSE, "", "Free text")
+  # STUDY IDENTIFICATION removed 2026-08-27. It offered Project_Name,
+  # Analyst_Name and Research_House, described as feeding the stats pack
+  # Declaration sheet — which is false: the Declaration reads the lowercase
+  # project_name, analyst_name and company_name below. The capitalised trio was
+  # read by nothing, and shipping both spellings made every freshly generated
+  # template a config with duplicated settings.
 
   settings
 }
@@ -538,8 +555,15 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
   # Example data rows (light blue background)
   if (include_examples) {
+    # Marked, not bare. An example row the loader cannot tell from real input
+    # becomes the study when someone fills in Settings and forgets to replace
+    # the Attributes sheet — and the failure is a confusing "missing columns"
+    # refusal naming attributes the user never chose. The EXAMPLE prefix makes
+    # them visibly examples and lets the loader skip them (01_config.R).
     examples <- data.frame(
-      AttributeName = c("Brand", "Price", "Screen Size", "Battery Life", "Camera Quality"),
+      AttributeName = paste(CONJOINT_EXAMPLE_PREFIX,
+                            c("Brand", "Price", "Screen Size",
+                              "Battery Life", "Camera Quality")),
       NumLevels = c(4, 4, 3, 3, 3),
       LevelNames = c(
         "Apple, Samsung, Google, OnePlus",
@@ -611,55 +635,12 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
 
   # =========================================================================
-  # CUSTOM_IMAGES SHEET
+  # CUSTOM_IMAGES SHEET — removed 2026-08-27
   # =========================================================================
-
-  openxlsx::addWorksheet(wb, "Custom_Images", gridLines = FALSE)
-
-  openxlsx::writeData(wb, "Custom_Images", "Custom Images for HTML Report", startRow = 1, startCol = 1)
-  openxlsx::mergeCells(wb, "Custom_Images", cols = 1:4, rows = 1)
-  openxlsx::addStyle(wb, "Custom_Images", title_style, rows = 1, cols = 1)
-
-  openxlsx::writeData(wb, "Custom_Images",
-                       "Add images to embed in the HTML report. Images are base64-encoded for self-contained output.",
-                       startRow = 2, startCol = 1)
-  openxlsx::mergeCells(wb, "Custom_Images", cols = 1:4, rows = 2)
-  openxlsx::addStyle(wb, "Custom_Images", subtitle_style, rows = 2, cols = 1)
-
-  images_header <- data.frame(
-    a = "Image Path", b = "Caption", c = "Panel Placement", d = "Position"
-  )
-  openxlsx::writeData(wb, "Custom_Images", images_header, startRow = 4, colNames = FALSE)
-  openxlsx::addStyle(wb, "Custom_Images", header_style, rows = 4, cols = 1:4, gridExpand = TRUE)
-
-  # Help row
-  images_help <- data.frame(
-    a = "[REQUIRED] Path to image file (PNG, JPG)",
-    b = "[Optional] Caption below image",
-    c = "[Optional] overview, utilities, diagnostics, about",
-    d = "[Optional] Display order (1, 2, 3...)"
-  )
-  openxlsx::writeData(wb, "Custom_Images", images_help, startRow = 5, colNames = FALSE)
-  openxlsx::addStyle(wb, "Custom_Images", help_style, rows = 5, cols = 1:4, gridExpand = TRUE)
-
-  # Blank rows
-  for (r in 6:15) {
-    openxlsx::addStyle(wb, "Custom_Images", input_style, rows = r, cols = 1:4, gridExpand = TRUE)
-  }
-
-  # Panel placement dropdown
-  for (r in 6:15) {
-    openxlsx::dataValidation(wb, "Custom_Images", col = 3, rows = r,
-                              type = "list",
-                              value = '"overview,utilities,diagnostics,simulator,wtp,about"',
-                              allowBlank = TRUE, showInputMsg = TRUE, showErrorMsg = TRUE)
-  }
-
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 1, widths = 35)
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 2, widths = 35)
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 3, widths = 20)
-  openxlsx::setColWidths(wb, "Custom_Images", cols = 4, widths = 10)
-
+  # The sheet and its include_custom_images setting were never read by the
+  # loader: custom images were only ever supported through the Image Path
+  # column on the Custom_Slides sheet. Shipping an empty promise in every
+  # template is worse than not offering it.
 
   # =========================================================================
   # DESIGN SHEET (optional placeholder)
@@ -734,7 +715,8 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
   if (verbose) {
     cat(sprintf("  ✓ Template saved to: %s\n", output_path))
-    cat("  Sheets: Settings, Attributes, Custom_Slides, Custom_Images, Design, Instructions\n")
+    cat(sprintf("  Sheets: %s\n",
+                paste(openxlsx::sheets(wb), collapse = ", ")))
   }
 
   invisible(output_path)

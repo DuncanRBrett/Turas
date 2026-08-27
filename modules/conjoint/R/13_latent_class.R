@@ -55,13 +55,15 @@ estimate_latent_class <- function(data_list, config, verbose = TRUE) {
   # Prepare data for bayesm (reuse HB data prep)
   bayesm_data <- prepare_bayesm_data(data_list, config, verbose)
 
-  k_min <- as.integer(config$latent_class_min)
-  k_max <- as.integer(config$latent_class_max)
-  criterion <- tolower(config$latent_class_criterion)
+  # Same reasoning as the HB settings: the loader always supplies these, but
+  # this is also reachable as a direct API, and as.integer(NULL) is integer(0).
+  k_min <- as.integer(config$latent_class_min %||% 2)
+  k_max <- as.integer(config$latent_class_max %||% 5)
+  criterion <- tolower(config$latent_class_criterion %||% "bic")
 
   # MCMC settings (use HB settings but can reduce for LC search)
-  R <- as.integer(config$hb_iterations)
-  thin <- as.integer(config$hb_thin)
+  R <- as.integer(config$hb_iterations %||% 10000)
+  thin <- as.integer(config$hb_thin %||% 1)
 
   # Fit models for each K
   solutions <- list()
@@ -118,15 +120,43 @@ estimate_latent_class <- function(data_list, config, verbose = TRUE) {
   }
 
   # Select optimal K
-  if (criterion == "aic") {
-    optimal_k <- comparison$K[which.min(comparison$AIC)]
-  } else {
-    optimal_k <- comparison$K[which.min(comparison$BIC)]
+  score <- if (criterion == "aic") comparison$AIC else comparison$BIC
+  best <- which.min(score)
+
+  # which.min() over all-NA scores returns integer(0), and the code that
+  # followed indexed a list with it — "attempt to select less than one element
+  # in get1index", which tells a user nothing. A criterion that cannot be
+  # computed means no comparable solution, which is a refusal.
+  optimal_solution <- NULL
+  if (length(best) == 1) {
+    optimal_k <- comparison$K[best]
+    optimal_solution <- solutions[[as.character(optimal_k)]]
+  }
+
+  if (is.null(optimal_solution)) {
+    conjoint_refuse(
+      code = "CALC_LC_NO_COMPARABLE_SOLUTION",
+      title = "No Latent Class Solution Could Be Compared",
+      problem = sprintf(
+        paste0("%d latent class solution(s) were fitted, but none produced a ",
+               "usable %s, so the optimal number of classes could not be chosen."),
+        nrow(comparison), toupper(criterion)
+      ),
+      why_it_matters = paste0(
+        "The class count is chosen by comparing information criteria across K. ",
+        "Without them there is no basis for preferring one solution over ",
+        "another, and picking one anyway would be arbitrary."
+      ),
+      how_to_fix = c(
+        "Latent class needs a substantial sample — 200 or more respondents is the usual guidance, and it is unreliable below about 100.",
+        "Reduce latent_class_max: fitting more classes than the data supports produces degenerate solutions.",
+        "Run estimation_method = 'hb' first and confirm it converges before asking for classes.",
+        sprintf("Solutions attempted: K = %s.", paste(comparison$K, collapse = ", "))
+      )
+    )
   }
 
   log_verbose(sprintf("  ★ Optimal: K=%d classes (by %s)", optimal_k, toupper(criterion)), verbose)
-
-  optimal_solution <- solutions[[as.character(optimal_k)]]
 
   # Build standardized result
   result <- build_latent_class_result(
@@ -301,11 +331,38 @@ extract_lc_solution <- function(hb_output, bayesm_data, k, R, thin, config) {
       }, error = function(e) NULL)
 
       if (!is.null(km)) {
+        cat("\n[TRS WARNING] CONJ_LC_KMEANS_ASSIGNMENT\n")
+        cat("  Posterior class probabilities could not be computed from the\n")
+        cat("  bayesm output, so respondents were assigned to classes by\n")
+        cat("  k-means on their individual part-worths instead. Class sizes,\n")
+        cat("  profiles and entropy below describe that clustering, not a\n")
+        cat("  posterior membership model. Treat them as indicative.\n\n")
         class_assignment <- km$cluster
         class_probs <- compute_class_probabilities(individual_betas, km$centers)
       } else {
-        class_assignment <- rep(seq_len(k), length.out = n_respondents)
-        class_probs <- matrix(1 / k, nrow = n_respondents, ncol = k)
+        # What used to happen here was rep(seq_len(k), length.out = n): every
+        # respondent dealt to a class in turn, with uniform probabilities and
+        # no message. Class profiles, sizes and entropy were then computed from
+        # an assignment carrying no information, and the run reported PASS.
+        conjoint_refuse(
+          code = "CALC_LC_ASSIGNMENT_FAILED",
+          title = "Respondents Could Not Be Assigned to Classes",
+          problem = sprintf(
+            paste0("Neither the posterior class probabilities nor the k-means ",
+                   "fallback could assign %d respondents to %d classes."),
+            n_respondents, k
+          ),
+          why_it_matters = paste0(
+            "Without an assignment there are no classes: the class sizes, ",
+            "profiles and entropy would all be arithmetic over an arbitrary ",
+            "deal of respondents into groups, presented as a segmentation."
+          ),
+          how_to_fix = c(
+            "Check that the individual part-worths contain no NA or infinite values (a failed HB run upstream is the usual cause).",
+            sprintf("Try a smaller number of classes than %d — there may not be enough separation in the data to support it.", k),
+            "Run estimation_method = 'hb' first and confirm it converges before asking for latent classes."
+          )
+        )
       }
     } else {
       # Modal assignment from posterior probabilities
@@ -348,6 +405,8 @@ extract_lc_solution <- function(hb_output, bayesm_data, k, R, thin, config) {
   list(
     k = k,
     hb_output = hb_output,
+    n_burnin_draws = n_burnin_draws,
+    n_parameters = n_parameters,
     individual_betas = individual_betas,
     class_assignment = class_assignment,
     class_probs = class_probs,
@@ -585,7 +644,25 @@ build_latent_class_result <- function(solution, bayesm_data, config,
 
   # Aggregate betas (population mean)
   aggregate_betas <- colMeans(solution$individual_betas)
-  aggregate_sds <- apply(solution$individual_betas, 2, sd)
+
+  # Between-respondent spread — heterogeneity, in its own field. Storing it as
+  # std_errors, which is what this did, inflated every latent-class interval by
+  # roughly sqrt(n) and made every significance star wrong (review C3). The
+  # standard error of the population mean comes from the mixture-mean draws,
+  # exactly as it does for HB.
+  heterogeneity_sd <- apply(solution$individual_betas, 2, sd)
+  names(heterogeneity_sd) <- col_names
+
+  se_info <- compute_hb_population_se(
+    hb_output        = solution$hb_output,
+    n_burnin_draws   = solution$n_burnin_draws %||% 0,
+    n_parameters     = solution$n_parameters %||% length(col_names),
+    heterogeneity_sd = heterogeneity_sd,
+    n_respondents    = bayesm_data$n_respondents,
+    verbose          = verbose
+  )
+  aggregate_ses <- se_info$std_errors
+  names(aggregate_ses) <- col_names
 
   # Respondent membership
   membership <- assign_respondents_to_classes(solution$class_probs, respondent_ids)
@@ -620,7 +697,10 @@ build_latent_class_result <- function(solution, bayesm_data, config,
     model = solution$hb_output,
     coefficients = aggregate_betas,
     vcov = NULL,
-    std_errors = aggregate_sds,
+    std_errors = aggregate_ses,
+    heterogeneity_sd = heterogeneity_sd,
+    se_method = se_info$se_method,
+    n_se_draws = se_info$n_se_draws,
     loglik = c(null = NA_real_, fitted = solution$log_likelihood),
     n_obs = sum(sapply(bayesm_data$lgtdata, function(x) length(x$y) * bayesm_data$p)),
     n_respondents = bayesm_data$n_respondents,
@@ -693,9 +773,13 @@ extract_lc_utilities <- function(lc_result, config, verbose = TRUE) {
 
   for (c in seq_len(k)) {
     # Build a pseudo-model with this class's betas as the aggregate
+    # No posterior SE is computed per class, so the SEs are NA rather than 0.
+    # Passing zeros made extract_hb_utilities divide by 1e-10, which returned
+    # p = 0 and three significance stars on every single class-level row.
     class_model <- list(
       coefficients = lc$class_betas[c, ],
-      std_errors = rep(0, length(lc$class_betas[c, ])),
+      std_errors = rep(NA_real_, length(lc$class_betas[c, ])),
+      heterogeneity_sd = rep(NA_real_, length(lc$class_betas[c, ])),
       attribute_map = lc_result$attribute_map,
       col_names = lc_result$col_names
     )

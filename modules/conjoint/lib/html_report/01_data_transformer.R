@@ -47,7 +47,16 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
   }
 
   # --- Simulator data (JSON-ready) ---
-  simulator_data <- .build_simulator_data(utilities, importance, model_result, module_config, config)
+  # The caller can suppress it: a model with interaction terms cannot be
+  # simulated from a part-worth table, so no simulator is honest and a
+  # main-effects one is not. The Simulator tab then carries the reason.
+  simulator_suppressed <- isTRUE(config$suppress_simulator)
+
+  simulator_data <- if (simulator_suppressed) {
+    NULL
+  } else {
+    .build_simulator_data(utilities, importance, model_result, module_config, config)
+  }
 
   # --- Insight seeds ---
   insights <- .extract_insights(config)
@@ -68,6 +77,8 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
     lc_data          = lc_data,
     wtp_data         = wtp_data,
     simulator_data   = simulator_data,
+    simulator_suppressed = simulator_suppressed,
+    simulator_suppressed_reason = config$suppress_simulator_reason %||% NULL,
     insights         = insights,
     about            = about,
     sidebar_nav      = sidebar_nav,

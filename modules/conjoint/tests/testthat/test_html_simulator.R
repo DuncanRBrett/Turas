@@ -123,8 +123,8 @@ test_that("simulator JS files have valid syntax", {
     fpath <- file.path(js_dir, fname)
     if (!file.exists(fpath)) skip(sprintf("%s not found", fname))
 
-    node_path <- "/usr/local/bin/node"
-    if (!file.exists(node_path)) skip("node not found")
+    node_path <- unname(Sys.which("node"))
+    if (!nzchar(node_path)) skip("node not on PATH")
 
     result <- system2(node_path, args = c("--check", fpath), stdout = TRUE, stderr = TRUE)
     exit_code <- attr(result, "status") %||% 0L

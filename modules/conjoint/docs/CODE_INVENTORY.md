@@ -1,6 +1,6 @@
 # Conjoint Module - Code Inventory
 
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Generated:** 2026-03-20
 **Module:** `modules/conjoint/`
 
@@ -12,15 +12,17 @@
 |---|---|
 | Core R files (`R/`) | 20 |
 | HTML Report R files (`lib/html_report/`) | 7 |
-| **Total R source files** | **27** |
+| **Total R source files** | **32** |
 | **Total functions** | **178** |
-| **Total lines of code** | **17,154** |
+| **Total lines of code** | **19,686** |
+
+> Line counts and totals in this document are regenerated from the source, not maintained by hand, and cover `R/`, `lib/` (including `lib/html_simulator/`, which earlier versions of this document omitted) and `run_conjoint_gui.R`. Last regenerated 2026-08-27.
 
 ---
 
 ## Core R Files (`modules/conjoint/R/`)
 
-### 00_guard.R (774 lines)
+### 00_guard.R (793 lines)
 
 TRS guard layer: refusal handling, guard state, validation gates for conjoint module.
 
@@ -47,7 +49,7 @@ TRS guard layer: refusal handling, guard state, validation gates for conjoint mo
 | `conjoint_status_refuse` | 673 | exported | Create TRS REFUSE status for user-fixable issues |
 | `conjoint_determine_status` | 700 | exported | Determine final TRS status from guard state and model fit |
 
-### 00_main.R (698 lines)
+### 00_main.R (1037 lines)
 
 Main entry point: sources all components, runs the full conjoint analysis pipeline.
 
@@ -69,7 +71,7 @@ Pre-flight validation: checks files, packages, JS syntax, TRS infrastructure bef
 | `.preflight_find_module_dir` | 326 | internal | Auto-detect conjoint module R/ directory from working directory |
 | `.preflight_print_summary` | 344 | internal | Print formatted pre-flight summary table to console |
 
-### 01_config.R (880 lines)
+### 01_config.R (1044 lines)
 
 Configuration loader: reads Excel config with autodetect heading, validates all settings.
 
@@ -93,7 +95,7 @@ Data loading and validation: loads CSV/XLSX/SAV/DTA, validates structure and qua
 | `get_required_columns` | 459 | internal | Get list of required column names from config |
 | `calculate_data_statistics` | 475 | internal | Calculate respondent/choice set/selection rate statistics |
 
-### 03_estimation.R (681 lines)
+### 03_estimation.R (758 lines)
 
 Model estimation: mlogit (primary), clogit (fallback), auto-selection, rating-based OLS.
 
@@ -109,7 +111,7 @@ Model estimation: mlogit (primary), clogit (fallback), auto-selection, rating-ba
 | `extract_clogit_results` | 566 | internal | Extract results from clogit model into standard format |
 | `estimate_rating_based_conjoint` | 616 | internal | OLS regression for rating-based conjoint designs |
 
-### 04_utilities.R (540 lines)
+### 04_utilities.R (615 lines)
 
 Utility calculation: part-worth utilities, confidence intervals, importance, diagnostics.
 
@@ -123,7 +125,7 @@ Utility calculation: part-worth utilities, confidence intervals, importance, dia
 | `calculate_hit_rate` | 354 | internal | Percentage of choices correctly predicted by model |
 | `calculate_attribute_diagnostics` | 515 | internal | Per-attribute significance counts and ranges |
 
-### 05_alchemer_import.R (937 lines)
+### 05_alchemer_import.R (1065 lines)
 
 Alchemer CBC data import: transforms Alchemer format to Turas internal format.
 
@@ -142,7 +144,7 @@ Alchemer CBC data import: transforms Alchemer format to Turas internal format.
 | `save_config_to_excel` | 840 | internal | Save configuration list to formatted Excel file |
 | `test_alchemer_import` | 890 | exported | Quick test of Alchemer import functionality |
 
-### 05_simulator.R (920 lines)
+### 05_simulator.R (963 lines)
 
 Market simulator: share prediction (logit, first-choice, RFC), sensitivity, source of volume.
 
@@ -168,7 +170,7 @@ Market simulator: share prediction (logit, first-choice, RFC), sensitivity, sour
 | `generate_demand_curve` | 765 | exported | Sweep price levels to generate demand curve |
 | `predict_shares_with_ci` | 824 | exported | Predict shares with bootstrap confidence intervals |
 
-### 06_interactions.R (650 lines)
+### 06_interactions.R (688 lines)
 
 Interaction effects: specification, estimation, analysis, config-driven pipeline.
 
@@ -191,7 +193,7 @@ Interaction effects: specification, estimation, analysis, config-driven pipeline
 | `get_interaction_terms` | 627 | helper | Get list of interaction terms from model |
 | `format_interaction` | 641 | helper | Format interaction term for display |
 
-### 07_output.R (1,231 lines)
+### 07_output.R (1307 lines)
 
 Excel output writer: creates formatted 8+ sheet workbook with results, simulator, diagnostics.
 
@@ -212,7 +214,7 @@ Excel output writer: creates formatted 8+ sheet workbook with results, simulator
 | `create_class_profiles_sheet` | 1077 | internal | Write class-level utility profiles sheet |
 | `create_class_membership_sheet` | 1191 | internal | Write respondent class membership assignments sheet |
 
-### 08_market_simulator.R (572 lines)
+### 08_market_simulator.R (609 lines)
 
 Excel market simulator: interactive sheet with dropdowns, formulas, sensitivity analysis.
 
@@ -227,7 +229,7 @@ Excel market simulator: interactive sheet with dropdowns, formulas, sensitivity 
 | `create_simulator_data_sheet` | 499 | internal | Create hidden lookup table sheet for simulator formulas |
 | `int2col` | 555 | helper | Convert column number to Excel column letter (A, AA, etc.) |
 
-### 09_none_handling.R (393 lines)
+### 09_none_handling.R (435 lines)
 
 None option detection and handling: auto-detect, explicit/implicit none, validation.
 
@@ -242,23 +244,23 @@ None option detection and handling: auto-detect, explicit/implicit none, validat
 | `validate_none_choices` | 304 | internal | Validate data integrity with none option present |
 | `calculate_none_diagnostics` | 367 | internal | Calculate none-specific diagnostics (selection rate, utility) |
 
-### 10_best_worst.R (496 lines)
+### 10_best_worst.R (543 lines)
 
-Best-worst scaling: BWS data validation, conversion, sequential/simultaneous estimation.
+Best-worst scaling: BWS data validation, conversion, sequential estimation (simultaneous refuses).
 
 | Function | Line | Type | Description |
 |---|---|---|---|
 | `validate_best_worst_data` | 40 | internal | Validate best-worst data format (best/worst columns, exclusivity) |
 | `convert_best_worst_to_choice` | 133 | internal | Convert best-worst data to standard choice format |
-| `estimate_best_worst_model` | 191 | exported | Estimate BWS model (sequential or simultaneous method) |
+| `estimate_best_worst_model` | 191 | exported | Estimate BWS model (sequential; simultaneous refuses) |
 | `estimate_best_worst_sequential` | 254 | internal | Estimate best and worst models separately, then combine |
-| `estimate_best_worst_simultaneous` | 324 | internal | Joint best-worst estimation with choice type indicator |
+| `estimate_best_worst_simultaneous` | 324 | internal | Unreachable: the joint estimator never applied the design negation, so callers refuse before reaching it |
 | `calculate_best_worst_utilities` | 364 | exported | Calculate utilities from best-worst model result |
 | `calculate_best_worst_diagnostics` | 401 | exported | Calculate BWS-specific diagnostics (LL, R-sq, best vs worst) |
 | `is_best_worst_model` | 443 | helper | Check if model is best-worst scaling |
 | `create_best_worst_template` | 456 | exported | Create empty BWS data template with attributes |
 
-### 11_hierarchical_bayes.R (896 lines)
+### 11_hierarchical_bayes.R (1143 lines)
 
 Hierarchical Bayes: individual-level utilities via bayesm MCMC, convergence diagnostics.
 
@@ -275,7 +277,7 @@ Hierarchical Bayes: individual-level utilities via bayesm MCMC, convergence diag
 | `calculate_attribute_importance_hb` | 771 | internal | Compute importance at individual level, then average |
 | `validate_hb_data` | 848 | internal | Validate data suitability for HB estimation |
 
-### 12_config_template.R (751 lines)
+### 12_config_template.R (804 lines)
 
 Configuration template generator: creates branded Excel config templates.
 
@@ -297,7 +299,7 @@ Configuration template generator: creates branded Excel config templates.
 | `generate_conjoint_config_template` | 285 | exported | Generate branded Excel configuration template |
 | `.get_method_template_overrides` | 703 | internal | Get preset overrides for standard_cbc, cbc_hb, etc. |
 
-### 13_latent_class.R (725 lines)
+### 13_latent_class.R (756 lines)
 
 Latent class analysis: discover preference segments, BIC/AIC model selection, membership.
 
@@ -314,7 +316,7 @@ Latent class analysis: discover preference segments, BIC/AIC model selection, me
 | `build_latent_class_result` | 579 | internal | Assemble standardized turas_conjoint_model for optimal LC |
 | `extract_lc_utilities` | 682 | internal | Extract aggregate and class-level utilities in standard format |
 
-### 14_willingness_to_pay.R (448 lines)
+### 14_willingness_to_pay.R (494 lines)
 
 WTP estimation: marginal rate of substitution, individual-level WTP, confidence intervals.
 
@@ -328,7 +330,7 @@ WTP estimation: marginal rate of substitution, individual-level WTP, confidence 
 | `calculate_individual_wtp` | 331 | internal | Calculate per-respondent WTP from HB betas |
 | `summarize_wtp_distribution` | 405 | internal | Summarize WTP distribution (mean, median, percentiles) |
 
-### 15_product_optimizer.R (343 lines)
+### 15_product_optimizer.R (353 lines)
 
 Product optimization: exhaustive search, greedy hill-climbing, revenue/profit objectives.
 
@@ -340,7 +342,7 @@ Product optimization: exhaustive search, greedy hill-climbing, revenue/profit ob
 | `get_product_price` | 306 | internal | Extract numeric price from product configuration |
 | `get_product_cost` | 320 | internal | Get total cost from cost data lookup |
 
-### 99_helpers.R (589 lines)
+### 99_helpers.R (591 lines)
 
 Shared utility functions: type conversion, statistics, formatting, logging.
 
@@ -374,7 +376,7 @@ Shared utility functions: type conversion, statistics, formatting, logging.
 | `zero_center_utilities` | 542 | internal | Zero-center utilities within attribute |
 | `escape_attr_for_formula` | 559 | internal | Wrap special-character attribute names in backticks |
 | `escape_attr_for_regex` | 576 | internal | Escape regex special characters in attribute names |
-| `get_conjoint_version` | 587 | internal | Return current module version string ("3.1.0") |
+| `get_conjoint_version` | 587 | internal | Return CONJOINT_MODULE_VERSION, the single version definition |
 
 ---
 
@@ -394,7 +396,7 @@ Input validation for HTML report generation.
 | `.validate_colours` | 119 | internal | Validate hex colour codes for brand/accent |
 | `.validate_insights` | 133 | internal | Validate insight text fields are character type |
 
-### 01_data_transformer.R (282 lines)
+### 01_data_transformer.R (283 lines)
 
 Transform conjoint results into HTML-ready data structures for all panels.
 
@@ -411,7 +413,7 @@ Transform conjoint results into HTML-ready data structures for all panels.
 | `.extract_about` | 251 | internal | Extract about page fields (analyst, company, closing notes) |
 | `.build_sidebar_nav` | 269 | internal | Build sidebar navigation items from attribute list |
 
-### 02_table_builder.R (401 lines)
+### 02_table_builder.R (439 lines)
 
 HTML table construction with export-ready data attributes.
 
@@ -428,7 +430,7 @@ HTML table construction with export-ready data attributes.
 | `build_class_importance_table` | 301 | internal | Build LC class importance table with class size labels |
 | `build_respondent_quality_table` | 365 | internal | Build HB respondent quality metrics table |
 
-### 03_page_builder.R (1,716 lines)
+### 03_page_builder.R (1822 lines)
 
 Full HTML page assembly: header, panels, CSS, JavaScript, navigation, overlays.
 
@@ -466,7 +468,7 @@ Write assembled HTML to disk as UTF-8 file.
 |---|---|---|---|
 | `write_conjoint_html_report` | 13 | internal | Write complete HTML string to file with size reporting |
 
-### 05_chart_builder.R (852 lines)
+### 05_chart_builder.R (883 lines)
 
 SVG chart construction following Turas visual standards (rounded bars, muted palette).
 

@@ -71,4 +71,5 @@ generate_conjoint_html_simulator <- function(utilities, importance,
 }
 
 
-message("TURAS>Conjoint HTML Simulator wrapper loaded (v3.1.0 - DEPRECATED)")
+message(sprintf("TURAS>Conjoint HTML Simulator wrapper loaded (v%s - DEPRECATED)",
+                if (exists("CONJOINT_MODULE_VERSION")) CONJOINT_MODULE_VERSION else "?"))

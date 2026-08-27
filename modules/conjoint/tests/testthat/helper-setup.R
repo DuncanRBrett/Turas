@@ -18,6 +18,10 @@ find_turas_root <- function() {
 turas_root <- find_turas_root()
 module_root <- file.path(turas_root, "modules", "conjoint")
 
+# Publish the root so test files that locate it themselves have a reliable
+# fallback (test_hb_estimation.R, test_guard_fixes.R, test_integration_mnl.R).
+Sys.setenv(TURAS_ROOT = turas_root)
+
 # Source shared utilities (TRS refusal etc.)
 shared_libs <- sort(list.files(file.path(turas_root, "modules", "shared", "lib"),
                                pattern = "[.]R$", full.names = TRUE))

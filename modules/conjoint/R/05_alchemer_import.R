@@ -164,14 +164,38 @@ import_alchemer_conjoint <- function(file_path,
   if (clean_levels && length(attribute_cols) > 0) {
     log_verbose("  Cleaning attribute level names...", verbose)
     for (col in attribute_cols) {
-      original_levels <- unique(df[[col]])
-      df[[col]] <- clean_alchemer_level(df[[col]], col)
-      cleaned_levels <- unique(df[[col]])
+      original_values <- as.character(df[[col]])
+      original_levels <- unique(original_values)
 
-      # Report changes if any
+      df[[col]] <- clean_alchemer_level(df[[col]], col)
+
+      cleaned_values <- as.character(df[[col]])
+      cleaned_levels <- unique(cleaned_values)
+
+      # Report the actual old -> new mapping, not just a count. Cleaning can
+      # rename a level (shared-prefix stripping turns New_York into York) or
+      # collapse two levels into one (Option_1 and Option_2 both become
+      # Option), and a count alone hides both.
       if (!identical(original_levels, cleaned_levels)) {
-        log_verbose(sprintf("    %s: %d unique levels (cleaned)",
-                           col, length(cleaned_levels)), verbose)
+        mapping <- unique(data.frame(
+          from = original_values,
+          to   = cleaned_values,
+          stringsAsFactors = FALSE
+        ))
+        mapping <- mapping[mapping$from != mapping$to, , drop = FALSE]
+
+        cat(sprintf("[TRS INFO] CONJ_ALCH_LEVELS_CLEANED: %s — %d level(s) renamed\n",
+                    col, nrow(mapping)))
+        for (i in seq_len(nrow(mapping))) {
+          cat(sprintf("    %s -> %s\n", mapping$from[i], mapping$to[i]))
+        }
+
+        if (length(cleaned_levels) < length(original_levels)) {
+          cat(sprintf(
+            "[TRS WARNING] CONJ_ALCH_LEVELS_COLLAPSED: %s had %d levels before cleaning and has %d after. Two or more distinct levels now share a name and will be analysed as one.\n",
+            col, length(original_levels), length(cleaned_levels)
+          ))
+        }
       }
     }
   }
@@ -345,18 +369,56 @@ normalize_score_column <- function(score_values) {
     score_values[is.na(score_values)] <- 0
   }
 
-  # Determine scale and normalize
+  # Determine scale and normalize.
+  # Which branch fires changes what the data means, so it is reported. It was
+  # chosen silently from the observed range before, and a reader of the console
+  # had no way to know whether "chosen" meant "score of 1", "score of 100" or
+  # "any positive score at all".
   max_score <- max(score_values, na.rm = TRUE)
   min_score <- min(score_values, na.rm = TRUE)
 
+  # Best/worst coding uses -1 for worst, 0 for not chosen, 1 for best. The
+  # "any positive value" branch below would read -1 as "not chosen", quietly
+  # discarding every worst response. Refuse: this needs the best-worst import,
+  # not the choice import.
+  if (min_score < 0) {
+    conjoint_refuse(
+      code = "DATA_ALCHEMER_SIGNED_SCORES",
+      title = "Score Column Contains Negative Values",
+      problem = sprintf(
+        paste0("The Score column runs from %s to %s. Negative scores are how ",
+               "Alchemer codes a best-worst task: -1 for worst, 0 for not ",
+               "chosen, 1 for best."),
+        format(min_score), format(max_score)
+      ),
+      why_it_matters = paste0(
+        "Read as a plain choice task, every -1 becomes 'not chosen' and the ",
+        "worst half of the study is discarded without a word. The remaining ",
+        "estimates would describe only the best choices while claiming to ",
+        "describe the whole task."
+      ),
+      how_to_fix = c(
+        "If this is a best-worst study, import it with the best-worst path (estimation_method = 'best_worst') and columns named best and worst.",
+        "If the negative values are a data error, correct them in the export before importing.",
+        sprintf("Observed score range: %s to %s.", format(min_score), format(max_score))
+      )
+    )
+  }
+
   if (max_score == 100 && min_score == 0) {
     # 0/100 scale - normalize to 0/1
+    cat("[TRS INFO] CONJ_ALCH_SCORE_SCALE: Score read as a 0-100 scale; values of 50 or more count as chosen.\n")
     chosen <- ifelse(score_values >= 50, 1L, 0L)
   } else if (max_score == 1 && min_score == 0) {
     # Already 0/1 scale
+    cat("[TRS INFO] CONJ_ALCH_SCORE_SCALE: Score read as a 0/1 indicator.\n")
     chosen <- as.integer(score_values)
   } else if (max_score > 0) {
     # Unknown scale - treat any positive value as chosen
+    cat(sprintf(
+      "[TRS WARNING] CONJ_ALCH_SCORE_SCALE: Score runs from %s to %s, which matches no known Alchemer scale. Any positive value is being counted as chosen. Check that this is what the column means.\n",
+      format(min_score), format(max_score)
+    ))
     chosen <- ifelse(score_values > 0, 1L, 0L)
   } else {
     # All zeros - this is a problem

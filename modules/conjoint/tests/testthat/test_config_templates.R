@@ -57,17 +57,20 @@ test_that("conjoint config template includes Custom_Images sheet", {
   generate_conjoint_config_template(tmp, verbose = FALSE)
   sheets <- openxlsx::getSheetNames(tmp)
 
-  expect_true("Custom_Images" %in% sheets)
+  # Custom_Images was removed 2026-08-27: neither the sheet nor its setting was
+  # ever read, so the template stopped promising it.
+  expect_false("Custom_Images" %in% sheets)
+  expect_true("Custom_Slides" %in% sheets)
 })
 
-test_that("conjoint config template has at least 6 sheets", {
+test_that("conjoint config template has at least 5 sheets", {
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
   generate_conjoint_config_template(tmp, verbose = FALSE)
   sheets <- openxlsx::getSheetNames(tmp)
 
-  expect_gte(length(sheets), 6)
+  expect_gte(length(sheets), 5)
 })
 
 test_that("conjoint config template works with include_examples = FALSE", {

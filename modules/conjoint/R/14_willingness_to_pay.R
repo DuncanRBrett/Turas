@@ -80,6 +80,32 @@ calculate_wtp <- function(utilities, config, model_result = NULL, verbose = TRUE
     )
   }
 
+  # A price slope that rises with price means the data says people prefer
+  # paying more. Every WTP figure derived from it has the wrong sign, and
+  # nothing downstream would show it. Refuse rather than publish the table.
+  if (price_coef > 0) {
+    conjoint_refuse(
+      code = "CALC_WTP_POSITIVE_PRICE_SLOPE",
+      title = "Price Utility Rises With Price",
+      problem = sprintf(
+        paste0("The estimated price coefficient is %+.4f. Utility increases as ",
+               "price increases, which reverses the sign of every willingness-",
+               "to-pay figure."),
+        price_coef
+      ),
+      why_it_matters = paste0(
+        "WTP is -(attribute utility / price slope). With a positive slope the ",
+        "table would report that respondents will pay to have less of what ",
+        "they prefer. The numbers would look ordinary and be backwards."
+      ),
+      how_to_fix = c(
+        sprintf("Check that the levels of '%s' are listed in the config in ascending price order.", price_attr),
+        "Check that the price levels parse as numbers (e.g. \"$299\", not \"Tier A\").",
+        "A genuinely positive slope usually means price is acting as a quality cue in this category, or that the design confounds price with something else. Either way it needs interpretation, not a WTP table."
+      )
+    )
+  }
+
   # Estimate price coefficient SE for full delta method
   price_coef_se <- estimate_price_coefficient_se(utilities, price_attr)
 
@@ -264,13 +290,30 @@ extract_numeric_prices <- function(levels) {
 #' @keywords internal
 calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coef_se, config, verbose) {
 
-  # WTP for each non-price attribute level relative to baseline
-  non_price <- utilities[utilities$Attribute != price_attr, ]
+  # WTP for each non-price attribute level relative to baseline.
+  #
+  # The utilities handed in are zero-centred within attribute, but WTP is
+  # defined against the baseline level (see the methodology note at the top of
+  # this file, and calculate_individual_wtp, which uses raw dummy-coded betas
+  # where the baseline is 0). Dividing centred utilities by the price slope
+  # produced a table anchored on the attribute mean: every baseline row carried
+  # a spurious non-zero WTP, and the aggregate and individual tables in the
+  # same workbook answered different questions.
+  #
+  # Re-anchoring here rather than asking for raw coefficients keeps this
+  # correct whether or not zero-centring was applied upstream.
+  non_price <- utilities[utilities$Attribute != price_attr, , drop = FALSE]
+
+  baseline_utility <- vapply(non_price$Attribute, function(a) {
+    rows <- non_price[non_price$Attribute == a, , drop = FALSE]
+    base <- rows$Utility[isTRUE(rows$is_baseline) | rows$is_baseline %in% TRUE]
+    if (length(base) == 1) base else 0
+  }, numeric(1))
 
   wtp_rows <- list()
   for (i in seq_len(nrow(non_price))) {
     row <- non_price[i, ]
-    beta <- row$Utility
+    beta <- row$Utility - baseline_utility[i]
     wtp_value <- -(beta / price_coef)
 
     # Full delta method for WTP SE:
@@ -294,15 +337,18 @@ calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coe
 
     z <- qnorm(1 - (1 - (config$confidence_level %||% 0.95)) / 2)
 
+    is_base <- isTRUE(row$is_baseline) || row$is_baseline %in% TRUE
+
     wtp_rows[[i]] <- data.frame(
       Attribute = row$Attribute,
       Level = row$Level,
       Utility = row$Utility,
-      WTP = wtp_value,
-      WTP_SE = se_wtp,
-      WTP_Lower = if (!is.na(se_wtp)) wtp_value - z * se_wtp else NA_real_,
-      WTP_Upper = if (!is.na(se_wtp)) wtp_value + z * se_wtp else NA_real_,
-      is_baseline = row$is_baseline %||% FALSE,
+      Utility_vs_Baseline = beta,
+      WTP = if (is_base) 0 else wtp_value,
+      WTP_SE = if (is_base) NA_real_ else se_wtp,
+      WTP_Lower = if (!is_base && !is.na(se_wtp)) wtp_value - z * se_wtp else NA_real_,
+      WTP_Upper = if (!is_base && !is.na(se_wtp)) wtp_value + z * se_wtp else NA_real_,
+      is_baseline = is_base,
       stringsAsFactors = FALSE
     )
   }

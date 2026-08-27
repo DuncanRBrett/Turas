@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # Tests the full conjoint analysis pipeline from config+data to output files.
-# Uses the v3 demo config and data that ship with the module.
+# Uses the example config and sample data committed under modules/conjoint/examples/.
 #
 # Coverage:
 #   - run_conjoint_analysis() end-to-end
@@ -66,16 +66,21 @@ if (is.null(turas_root)) {
   # Source module (loads all functions into global env)
   source(file.path(turas_root, "modules", "conjoint", "R", "00_main.R"))
 
-  # Paths to demo fixtures
-  demo_config <- file.path(turas_root, "examples", "conjoint", "v3_demo", "demo_config.xlsx")
-  demo_data   <- file.path(turas_root, "examples", "conjoint", "v3_demo", "demo_data.csv")
+  # Paths to the committed example fixture (50 respondents, 8 tasks, 3 alts,
+  # 5 attributes). These files are in the repo, so a missing one is a broken
+  # checkout, not an environmental skip.
+  demo_config <- file.path(turas_root, "modules", "conjoint", "examples", "example_config.xlsx")
+  demo_data   <- file.path(turas_root, "modules", "conjoint", "examples", "sample_cbc_data.csv")
+
+  test_that("MNL end-to-end: the committed example fixture is present", {
+    expect_true(file.exists(demo_config), info = demo_config)
+    expect_true(file.exists(demo_data), info = demo_data)
+  })
 
   # ============================================================================
   # TEST 1: Full pipeline produces PASS / PARTIAL status
   # ============================================================================
   test_that("MNL end-to-end: run_conjoint_analysis returns PASS or PARTIAL", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -101,8 +106,6 @@ if (is.null(turas_root)) {
   # TEST 2: Utilities data frame structure
   # ============================================================================
   test_that("MNL end-to-end: utilities have Attribute, Level, Utility, SE columns", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -143,8 +146,6 @@ if (is.null(turas_root)) {
   # TEST 3: Importance sums to ~100%
   # ============================================================================
   test_that("MNL end-to-end: importance sums to approximately 100", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -177,8 +178,6 @@ if (is.null(turas_root)) {
   # TEST 4: Diagnostics has fit_statistics
   # ============================================================================
   test_that("MNL end-to-end: diagnostics contain fit_statistics", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -218,8 +217,6 @@ if (is.null(turas_root)) {
   # TEST 5: Excel output file is created
   # ============================================================================
   test_that("MNL end-to-end: Excel output file is created", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -249,8 +246,6 @@ if (is.null(turas_root)) {
   # TEST 6: HTML report is created when configured
   # ============================================================================
   test_that("MNL end-to-end: HTML report is created", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -266,13 +261,21 @@ if (is.null(turas_root)) {
     # HTML report path is derived from output file
     html_path <- sub("\\.xlsx$", "_report.html", output_file)
 
-    # If the config enables HTML report generation, verify it was created
-    if (isTRUE(result$config$generate_html_report)) {
+    # The flag must be readable either way, and the file must match it: written
+    # and non-trivial when enabled, absent when not. (The committed example
+    # config has it off, so the else arm is the one that normally runs — but
+    # the test must assert something in both arms, not silently pass empty.)
+    html_enabled <- isTRUE(result$config$generate_html_report)
+    expect_type(result$config$generate_html_report, "logical")
+
+    if (html_enabled) {
       expect_true(file.exists(html_path),
                   info = "HTML report should be created when generate_html_report is TRUE")
 
       # File should have non-trivial size (> 1 KB)
       expect_gt(file.info(html_path)$size, 1000)
+    } else {
+      expect_false(file.exists(html_path))
     }
 
     unlink(output_file)
@@ -283,8 +286,6 @@ if (is.null(turas_root)) {
   # TEST 7: Model result structure
   # ============================================================================
   test_that("MNL end-to-end: model_result has expected structure", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -322,8 +323,6 @@ if (is.null(turas_root)) {
   # TEST 8: Repeated runs are deterministic
   # ============================================================================
   test_that("MNL end-to-end: repeated runs produce identical utilities", {
-    skip_if(!file.exists(demo_config), "Demo config not found")
-    skip_if(!file.exists(demo_data), "Demo data not found")
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 

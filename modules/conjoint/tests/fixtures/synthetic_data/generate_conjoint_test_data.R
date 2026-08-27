@@ -126,6 +126,10 @@ generate_synthetic_cbc <- function(n_respondents = 100,
     LevelNames = sapply(attributes, paste, collapse = ","),
     stringsAsFactors = FALSE
   )
+  # The module reads levels through config$attributes$levels_list (see
+  # get_attribute_levels() in R/99_helpers.R), so the fixture config must carry
+  # that list-column exactly as load_conjoint_config() builds it.
+  attr_df$levels_list <- unname(attributes)
 
   config <- list(
     respondent_id_column = "resp_id",
@@ -224,6 +228,10 @@ generate_two_segment_data <- function(n_respondents = 200, seed = 42) {
     LevelNames = sapply(attributes, paste, collapse = ","),
     stringsAsFactors = FALSE
   )
+  # The module reads levels through config$attributes$levels_list (see
+  # get_attribute_levels() in R/99_helpers.R), so the fixture config must carry
+  # that list-column exactly as load_conjoint_config() builds it.
+  attr_df$levels_list <- unname(attributes)
 
   config <- list(
     respondent_id_column  = "resp_id",
@@ -312,6 +320,14 @@ generate_bws_data <- function(n_respondents = 50, n_tasks = 8, seed = 42) {
 
   data <- do.call(rbind, all_rows)
 
+  bws_attr_df <- data.frame(
+    AttributeName = names(attributes),
+    NumLevels = sapply(attributes, length),
+    LevelNames = sapply(attributes, paste, collapse = ","),
+    stringsAsFactors = FALSE
+  )
+  bws_attr_df$levels_list <- unname(attributes)
+
   config <- list(
     respondent_id_column  = "resp_id",
     choice_set_column     = "choice_set_id",
@@ -320,12 +336,7 @@ generate_bws_data <- function(n_respondents = 50, n_tasks = 8, seed = 42) {
     estimation_method     = "best_worst",
     analysis_type         = "choice",
     bw_method             = "sequential",
-    attributes            = data.frame(
-      AttributeName = names(attributes),
-      NumLevels = sapply(attributes, length),
-      LevelNames = sapply(attributes, paste, collapse = ","),
-      stringsAsFactors = FALSE
-    ),
+    attributes            = bws_attr_df,
     attribute_levels      = attributes,
     confidence_level      = 0.95,
     n_alternatives        = n_alts

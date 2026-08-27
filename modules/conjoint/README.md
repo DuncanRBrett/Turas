@@ -1,6 +1,6 @@
 # TURAS Conjoint Analysis Module
 
-**Version 3.1.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, Revenue Simulator, and interactive HTML reporting
+**Version 3.2.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, Revenue Simulator, and interactive HTML reporting
 
 ---
 
@@ -17,7 +17,7 @@ Runs end-to-end conjoint analysis: loads a config-driven study definition, estim
 | **Auto** | `auto` | Tries mlogit first, falls back to clogit on convergence failure. Recommended default. | mlogit, survival |
 | **Hierarchical Bayes** | `hb` | Individual-level utilities per respondent via MCMC (bayesm). Produces convergence diagnostics, respondent quality scores (RLH), and preference heterogeneity analysis. | bayesm, coda (optional) |
 | **Latent Class** | `latent_class` | Discovers preference-based segments directly from choice data. Fits K=min..max classes, selects optimal K by BIC/AIC. Each class gets its own utility profile. | bayesm |
-| **Best-Worst Scaling** | `best_worst` | Exploded logit for best-worst choice tasks (sequential or simultaneous estimation). | mlogit |
+| **Best-Worst Scaling** | `best_worst` | Exploded logit for best-worst choice tasks (sequential estimation; simultaneous is not implemented and refuses). | mlogit |
 | **Rating-Based** | `rating` | OLS regression for rating-scale conjoint designs (not CBC). | base R |
 
 ### Simulation Methods
@@ -149,7 +149,6 @@ Key-value format with columns: **Setting | Value | Required? | Description | Val
 | `estimation_method` | `auto` | `auto`, `mlogit`, `clogit`, `hb`, `latent_class`, `best_worst` |
 | `confidence_level` | `0.95` | Confidence level for intervals (0.80-0.99) |
 | `zero_center_utilities` | `TRUE` | Zero-center utilities within each attribute |
-| `base_level_method` | `first` | Baseline level: `first` or `last` |
 
 #### Hierarchical Bayes Settings
 
@@ -266,8 +265,6 @@ Pre-populated analyst commentary for each report panel:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `optimizer_method` | `exhaustive` | `exhaustive` or `greedy` |
-| `optimizer_max_products` | `5` | Maximum products in optimizer scenarios (1-12) |
 
 #### Alchemer Import
 

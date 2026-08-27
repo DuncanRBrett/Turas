@@ -45,12 +45,6 @@ conjoint_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
       if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
         paste0("'", val)
       } else {
-        # The shared saver is not loaded, so this workbook cannot have its
-        # worksheet relationships reconciled and Excel may offer to repair it,
-        # stripping any dropdowns it carries.
-        cat("[TRS WARNING] Saving without part reconciliation: ",
-            "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-            "report a problem with this file and offer to repair it.\n", sep = "")
         val
       }
     }, character(1), USE.NAMES = FALSE)
@@ -398,29 +392,45 @@ create_raw_coefficients_sheet <- function(wb, model_result, header_style) {
   openxlsx::addStyle(wb, "Raw Coefficients", header_style, rows = row, cols = 1:5)
   row <- row + 2
 
-  # Build coefficients table
+  # Build coefficients table.
+  # For HB and latent class, std_errors is the posterior SE of the population
+  # mean (from the mixture-mean draws), so the z-values, p-values and stars
+  # below are honest. Until 2026-08 this column held the between-respondent
+  # heterogeneity SD instead, which inflated every HB interval by roughly
+  # sqrt(n) and made every star wrong. Heterogeneity now has its own column.
   coefs <- model_result$coefficients
   std_errors <- model_result$std_errors
+  heterogeneity <- model_result$heterogeneity_sd
 
   if (!is.null(coefs) && length(coefs) > 0) {
-    # Calculate z-values and p-values
-    z_values <- coefs / std_errors
-    p_values <- 2 * (1 - pnorm(abs(z_values)))
+    # A zero or missing SE means no uncertainty was estimated. Dividing by it
+    # would manufacture p = 0 and three stars.
+    safe_se <- as.numeric(std_errors)
+    if (length(safe_se) != length(coefs)) safe_se <- rep(NA_real_, length(coefs))
+    safe_se[!is.finite(safe_se) | safe_se <= 0] <- NA_real_
+
+    z_values <- as.numeric(coefs) / safe_se
+    p_values <- 2 * pnorm(-abs(z_values))
 
     # Create data frame
     coef_df <- data.frame(
       Coefficient = names(coefs),
-      Estimate = coefs,
-      Std_Error = std_errors,
+      Estimate = as.numeric(coefs),
+      Std_Error = safe_se,
       z_value = z_values,
       p_value = p_values,
-      Significance = ifelse(p_values < 0.001, "***",
+      Significance = ifelse(is.na(p_values), "",
+                     ifelse(p_values < 0.001, "***",
                      ifelse(p_values < 0.01, "**",
                      ifelse(p_values < 0.05, "*",
-                     ifelse(p_values < 0.1, ".", "")))),
+                     ifelse(p_values < 0.1, ".", ""))))),
       stringsAsFactors = FALSE,
       row.names = NULL
     )
+
+    if (!is.null(heterogeneity) && length(heterogeneity) == length(coefs)) {
+      coef_df$Heterogeneity_SD <- as.numeric(heterogeneity)
+    }
 
     # Write data
     openxlsx::writeData(wb, "Raw Coefficients", conjoint_escape_df(coef_df), startRow = row, startCol = 1,
@@ -428,18 +438,14 @@ create_raw_coefficients_sheet <- function(wb, model_result, header_style) {
 
     # Apply number formatting
     num_style <- openxlsx::createStyle(numFmt = "0.0000")
+    num_cols <- setdiff(which(names(coef_df) != "Coefficient"),
+                        which(names(coef_df) == "Significance"))
     openxlsx::addStyle(wb, "Raw Coefficients", num_style,
                       rows = (row + 1):(row + nrow(coef_df)),
-                      cols = 2:5, gridExpand = TRUE)
+                      cols = num_cols, gridExpand = TRUE)
 
     row <- row + nrow(coef_df) + 2
   } else {
-    # The shared saver is not loaded, so this workbook cannot have its
-    # worksheet relationships reconciled and Excel may offer to repair it,
-    # stripping any dropdowns it carries.
-    cat("[TRS WARNING] Saving without part reconciliation: ",
-        "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-        "report a problem with this file and offer to repair it.\n", sep = "")
     openxlsx::writeData(wb, "Raw Coefficients", "No coefficients available",
                        startRow = row, startCol = 1)
     row <- row + 2
@@ -451,6 +457,13 @@ create_raw_coefficients_sheet <- function(wb, model_result, header_style) {
   row <- row + 1
   openxlsx::writeData(wb, "Raw Coefficients",
                      "*** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1",
+                     startRow = row, startCol = 1)
+  row <- row + 2
+  openxlsx::writeData(wb, "Raw Coefficients",
+                     paste0("Std_Error is the standard error of the estimated mean. ",
+                            "Heterogeneity_SD, where present, is the spread of ",
+                            "part-worths across respondents; it describes how much ",
+                            "people differ, not how precisely the mean is known."),
                      startRow = row, startCol = 1)
 
   # Add note about zero-centering
@@ -675,12 +688,6 @@ create_individual_utilities_sheet <- function(wb, model_result, config, header_s
     if (!is.null(attribute_map[[cn]])) {
       readable_cols[k] <- paste0(attribute_map[[cn]]$attribute, ": ", attribute_map[[cn]]$level)
     } else {
-      # The shared saver is not loaded, so this workbook cannot have its
-      # worksheet relationships reconciled and Excel may offer to repair it,
-      # stripping any dropdowns it carries.
-      cat("[TRS WARNING] Saving without part reconciliation: ",
-          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-          "report a problem with this file and offer to repair it.\n", sep = "")
       readable_cols[k] <- cn
     }
   }
@@ -861,12 +868,6 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     if (param_df$Geweke_Status[r] == "FAIL") {
       openxlsx::addStyle(wb, "HB Diagnostics", fail_style, rows = data_row, cols = 3)
     } else {
-      # The shared saver is not loaded, so this workbook cannot have its
-      # worksheet relationships reconciled and Excel may offer to repair it,
-      # stripping any dropdowns it carries.
-      cat("[TRS WARNING] Saving without part reconciliation: ",
-          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-          "report a problem with this file and offer to repair it.\n", sep = "")
       openxlsx::addStyle(wb, "HB Diagnostics", ok_style, rows = data_row, cols = 3)
     }
     if (param_df$ESS_Status[r] == "LOW") {
@@ -876,12 +877,6 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
                         openxlsx::createStyle(fontColour = "#B7950B", textDecoration = "bold"),
                         rows = data_row, cols = 5)
     } else {
-      # The shared saver is not loaded, so this workbook cannot have its
-      # worksheet relationships reconciled and Excel may offer to repair it,
-      # stripping any dropdowns it carries.
-      cat("[TRS WARNING] Saving without part reconciliation: ",
-          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-          "report a problem with this file and offer to repair it.\n", sep = "")
       openxlsx::addStyle(wb, "HB Diagnostics", ok_style, rows = data_row, cols = 5)
     }
   }
@@ -1009,12 +1004,6 @@ create_respondent_quality_sheet <- function(wb, model_result, header_style) {
                         openxlsx::createStyle(numFmt = "0.000", fontColour = "#CC0000"),
                         rows = data_row, cols = 2)
     } else {
-      # The shared saver is not loaded, so this workbook cannot have its
-      # worksheet relationships reconciled and Excel may offer to repair it,
-      # stripping any dropdowns it carries.
-      cat("[TRS WARNING] Saving without part reconciliation: ",
-          "modules/shared/lib/import_all.R is not loaded, so Excel may ",
-          "report a problem with this file and offer to repair it.\n", sep = "")
       openxlsx::addStyle(wb, "Respondent Quality", ok_style, rows = data_row, cols = 3)
     }
   }

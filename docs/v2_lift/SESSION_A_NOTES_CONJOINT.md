@@ -1,0 +1,215 @@
+---
+
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Conjoint Session A — implementation notes
+
+Branch: `feature/conjoint-correctness`. Spec: `HANDOVER_CONJOINT_FOR_OPUS.md` §2 (A1-A14), findings in `CONJOINT_PRODUCTION_REVIEW_2026-07-11.md`.
+
+**Baseline reproduced this session** (`testthat::test_dir("modules/conjoint/tests/testthat")`): 0 fail / 12 skip / 2 warnings — matches the review's 2026-07-11 baseline exactly.
+
+Environment checks run this session: `bayesm` installed TRUE, `mlogit` TRUE, `survival` TRUE, `node` at `/opt/homebrew/bin/node` (not the hardcoded `/usr/local/bin/node`).
+
+------------------------------------------------------------------------
+
+## New findings (not in the review doc)
+
+### A-NEW-1 — every confidence interval on the aggregate (MNL/clogit) path is NA
+
+`calculate_ci()` (`R/99_helpers.R:190`) builds `c(lower = estimate - z*se, upper = ...)`. `estimate` arrives as a *named* element (`utilities_raw[i]`, named after the level), so R composes the names: the result is `lower.Samsung` / `upper.Samsung`, and the caller's `ci["lower"]` (`R/04_utilities.R:150-157`) is therefore `NA`. Verified twice this session — by executing the name-composition in R, and by running the full pipeline on `modules/conjoint/examples/example_config.xlsx`, whose utilities table comes back with `CI_Lower`/`CI_Upper` entirely `NA`. Consequence: the default estimation path has shipped blank CIs in the utilities sheet and the HTML report for as long as this code has existed. p-values and stars are unaffected (`calculate_p_value` takes scalars and returns an unnamed value). Fixed under A4 (the CI/SE honesty item), since that item already rewrites this plumbing.
+
+### A-NEW-2 — six console warnings fire on the *success* branch
+
+`R/07_output.R` carried the "Saving without part reconciliation" warning pasted into six unrelated `else` blocks: every non-formula string cell escaped (`:51`), "no coefficients available" (`:440`), an unmapped column name (`:681`), a Geweke check that PASSED (`:867`), an ESS check that PASSED (`:882`), and an RLH check that PASSED (`:1015`). On an HB run that is one false alarm per diagnostics row. Because the same text is also the *genuine* warning that a workbook was written without `turas_saveWorkbook` — the one that means Excel may offer to repair the file — the false copies drown the real signal. The six mis-pasted copies are removed; the two legitimate sites (`:37`, the shared-library-absent notice at load time, and `:199`, the actual fallback save) stay.
+
+### A-NEW-3 — TRS `CALC_` refusals came out blaming the config
+
+`conjoint_refuse()` (`R/00_guard.R`) prefix-checked against a list that omitted `CALC_`, although the project CLAUDE.md names it and the shared `.trs_valid_prefixes` (`modules/shared/lib/trs_refusal.R:38-48`) allows it. Any `CALC_*` code was silently rewritten to `CFG_CALC_*`, which tells the user their configuration is wrong when the failure was a calculation. `CALC_` added.
+
+### A-NEW-4 — sequential best-worst estimation recurses until the stack gives out
+
+`estimate_best_worst_sequential()` (`R/10_best_worst.R`) passed the study's own config to `estimate_choice_model()` for each of its two sub-models. That config carries `estimation_method = "best_worst"`, so `estimate_choice_model` dispatched straight back into `estimate_best_worst_model` and recursed. It was unreachable in production only because H2's validator refused `best_worst` before the run started — so fixing H2 (A5) exposes it. The sub-models now run under a config with `estimation_method = "auto"`. Found by the new sequential-recovery test, which is the first test in this module ever to estimate a best-worst model.
+
+### A-NEW-5 — the implicit-None path writes a string into a numeric column
+
+`create_none_rows()` (`R/09_none_handling.R`) set the synthesised None row's `alternative_id` to the literal `"NONE"`. When the data's alternative id is numeric — which it is in every generic Turas layout — the `bind_rows()` in `handle_implicit_none()` then fails outright with an incompatible-type error. The path was unreachable while H1 stopped implicit-None detection from ever firing, so fixing H1 (A6) exposes it. Numeric id columns now get one past the highest existing id; non-numeric ones still get `"NONE"`.
+
+### A-NEW-6 — two TRS refusals crashed instead of refusing
+
+`prepare_bayesm_data()` (`R/11_hierarchical_bayes.R`) called `conjoint_refuse()` with `message =`, an argument that function does not have, in both `DATA_INCONSISTENT_ALTERNATIVES` and `DATA_NO_CHOICE`. Instead of a refusal the user got a raw R "unused argument" error — on the data-validation path, which is precisely where the refusal text is the whole point. Both survived because the HB tests always skipped. Both now supply `title`/`problem`/`why_it_matters`. `test_refusal_call_shapes.R` walks the parse tree of all \~100 `conjoint_refuse` call sites in `R/` and `lib/` and fails on any unknown or missing argument, so this class of defect cannot come back quietly.
+
+### A-NEW-7 — C3 was live on the latent-class path too (found in the adversarial pass)
+
+`build_latent_class_result()` (`R/13_latent_class.R`) builds its own result object and set `std_errors <- apply(individual_betas, 2, sd)` — the same heterogeneity-as-standard-error defect as C3, in a second place the review named only in passing. Fixing `extract_hb_results` did not touch it. Caught by running a latent-class model end to end after A14: the LC intervals were about 3.3x wider than the HB intervals on the same data (mean SE 0.79 vs 0.21). `build_latent_class_result` now calls the same `compute_hb_population_se()`, using the burn-in count `extract_lc_solution` already computed, and reports heterogeneity in its own field. Re-measured after the fix: SE 0.24 against heterogeneity 0.79.
+
+### A-NEW-8 — a latent-class fit with no comparable criterion failed on a list index
+
+When every fitted K returns an NA information criterion — which happens on samples too small for the class count — `which.min()` returns `integer(0)` and the code indexed the solutions list with it, producing "attempt to select less than one element in get1index". Now refuses as `CALC_LC_NO_COMPARABLE_SOLUTION`, naming the sample-size guidance. Reproduced at 40 respondents, and covered by a test at that size.
+
+### A-NEW-9 — HB and LC crashed inside bayesm when their settings were absent
+
+`as.integer(NULL)` is `integer(0)`, and `if (NULL < 2)` is an error rather than `FALSE`. The MCMC and class-count settings are always supplied by `load_conjoint_config`, but `estimate_choice_model` is also a direct API, and through it an absent `hb_ncomp` reached bayesm as an empty prior and failed inside the package. `validate_hb_config`, `validate_latent_class_config`, `estimate_hierarchical_bayes` and `estimate_latent_class` now fall back to the loader's own defaults.
+
+### Known cosmetic issue, NOT fixed — negative numbers in the stats pack read `'-284.70`
+
+The shared formula-injection guard (`modules/shared/lib/turas_excel_escape.R:44-71`) prefixes an apostrophe to any string starting with `-`, which includes every negative number written as text. The M1 fix makes the model-fit block appear for the first time, so its two log-likelihoods are the first place this is visible in the conjoint stats pack — the escaping itself is long-standing and platform-wide. Not fixed here: exempting plain decimal numbers is safe in principle but is a change to shared code that every module's output depends on, and it does not belong in a conjoint correctness branch at the end of a session. Worth doing once, deliberately, with the other modules' suites in the room.
+
+------------------------------------------------------------------------
+
+## Deviations from the work order
+
+**A4 — the SE column contract.** The two extractors disagreed on the column name: the aggregate path emitted `Std_Error`, the HB path emitted `SE`, and `lib/html_report/02_table_builder.R:56` tests for `"SE"` — so the HTML report has been showing a Std. Error column on HB runs and never on MNL runs. Rather than rename one and chase the consumers, both paths now emit `Std_Error` as the canonical column *and* `SE` as an alias with the same values, plus `Heterogeneity_SD`. No consumer breaks and the report gains the column on the MNL path. `R/14_willingness_to_pay.R:281-283` already handled both names.
+
+**A4 — p-values in the tail.** `2 * (1 - pnorm(|z|))` returns exactly 0 from about \|z\| = 8.3, so the workbook has been printing `p = 0`. Changed to `2 * pnorm(-|z|)` at all three sites, which is accurate to \~1e-300. A p-value of exactly zero is not a number any survey result should carry.
+
+**A8 — refuse rather than implement the None ASC.** The work order allowed either. Refusing, because implementing only the engine half would leave an estimated none utility that nothing consumes: the simulator still defaults `noneUtility` to 0 (`simulator_engine.js:196-198`) and wiring it is explicitly Session B, B1. A none utility that is estimated and then ignored produces the same wrong shares as one that was never estimated, but now with the appearance of having been handled. The three pieces — design constant, reference-level handling on None rows, simulator export — belong in one change.
+
+*Correcting the review's "unverified" note on what mlogit does with all-NA rows:* it does not drop them silently. Verified this session on a 40-respondent explicit-None dataset — the run refused as `CFG_EST_MLOGIT_FAILED` with the problem text "missing value where TRUE/FALSE needed", which names neither the cause nor a fix. The new refusal names both.
+
+**A9 — the interaction honesty gate is a skip, not a run-killing refusal.** `predict_market_shares()` refuses outright (`CALC_INTERACTIONS_NOT_IN_SIMULATOR`) for direct API callers. In the pipeline, though, the Excel workbook — including the interaction analysis sheets that carry the real result — is already written by the time the HTML report is built, so `00_main.R` step 8 skips the report, prints the same code and reason in a console block and records a PARTIAL event, rather than refusing and discarding a complete deliverable. Interaction coefficients dropped from the utilities table are announced on the console (`CONJ_INTERACTIONS_NOT_IN_UTILITIES`) and tagged on the data frame, so the drop is never silent. Representing interactions as rows in the part-worth table was the alternative; it was not taken because an interaction "attribute" would then enter the importance calculation and change what that table means.
+
+**A11 / locked decision 7 — one premise does not hold; three functions kept.** Decision 7 says to delete the orphaned optimizer functions and `predict_shares_with_ci`, with the rationale "none has a caller or a test". Checked this session: all three *do* have tests. `optimize_product_exhaustive` and `optimize_product_greedy` are exercised by `tests/testthat/test_optimizer.R`, and `predict_shares_with_ci` by `tests/testthat/test_simulator_ci.R` (27 assertions). Deleting them would delete working coverage on a premise that is false, so the split taken is:
+
+- **Deleted:** the decorative *config surface* — the OPTIMIZER template section, its validator block, and the two config-object fields. Nothing read them, and the template's own "greedy" value was refused by a validator that accepted only "exhaustive" or "genetic". Also removed from the user manual and README.
+- **Kept:** the three functions, as a direct API. `predict_shares_with_ci` gains a roxygen note saying it is unwired and that its single-Gumbel-draw design injects Monte Carlo noise into the intervals, which must be fixed before anything calls it.
+
+**Duncan's ruling wanted** on whether the three tested-but-unwired functions should still be deleted. Nothing else in Session A depends on the answer.
+
+**A14 / H11 — three guards fixed rather than deleted, one deleted.** The work order said to wire the guards at their natural steps and delete what stays uncalled. Wiring them exposed that three had never been executed against a real config and did not work:
+
+- `validate_conjoint_attributes()` counted rows per attribute, which assumes a long-format Attributes sheet. The loader builds it wide (one row per attribute, comma-separated `LevelNames` plus a parsed `levels_list`), so it reported "Attribute 'Brand' has only 1 level" for a perfectly valid config and refused the run. It now reads levels the way the rest of the module does.
+- `validate_wtp_config()` did `!is.na(price_attr)` on a value that is NULL whenever `wtp_price_attribute` is blank — `is.na(NULL)` is `logical(0)` and `if (logical(0))` is an error — and `config$wtp_method %in% ...` had the same problem. Both cases are the normal one.
+- `validate_html_config()` had the same `is.na(NULL)` hazard on both colour settings.
+
+Deleted: `validate_conjoint_design()`, which validated a "Design sheet" this module has no concept of, with no caller and no test. `conjoint_guard_init()`, `conjoint_determine_status()` and `validate_conjoint_convergence()` are kept — they have tests in `test_guard_fixes.R`.
+
+**M11 — two clauses left alone, deliberately.** The code inventory's line counts are regenerated (A14). The other two clauses of M11 are logged, not fixed: the version string `3.1.0` is hardcoded in `R/99_helpers.R:590`, the README, the inventory and the template subtitle rather than read from one place; and the template's Attributes sheet ships live example rows the loader cannot distinguish from real input (the same class of defect as H12's example slide, but on a sheet where a wrong guess would silently drop a real attribute). Both are template-generation work, better done with a template regeneration than bolted onto an engine-correctness branch.
+
+**A9 revised after Duncan's first run (2026-08-27).** The first version skipped
+the entire HTML report for a with-interactions model. That was wrong twice
+over: the handover sanctions refusing *the simulator*, not the report, and the
+same main-effects utilities table was being shipped in the Excel workbook
+regardless — so refusing the HTML copy of it while shipping the Excel copy was
+incoherent. It also threw away a valid importance table, diagnostics and WTP
+panel over a limitation that touches only the simulator. And because the final
+status is warning-count arithmetic, the run announced a PARTIAL event and then
+printed PASS.
+
+Now: the report builds as usual, `transform_conjoint_for_html()` omits the
+simulator payload when the caller passes `suppress_simulator`, and the
+Simulator tab says "Not included for this study" with the reason. The
+limitation is added to the run's warnings, so the status is honestly PARTIAL.
+Verified by running a config with `interaction_terms = Brand:Price` end to end
+and rendering the result in headless Chrome.
+
+**A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd` sits inside a `withProgress()` expression in a Shiny observer, where `on.exit` binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores the directory at exactly the right moment with no frame ambiguity. Same intent.
+
+------------------------------------------------------------------------
+
+## Definition of done — item by item
+
+Every row was verified by running something this session, not by reading the diff. Suite command throughout: `Rscript -e 'testthat::test_dir("modules/conjoint/tests/testthat", reporter = "summary")'`.
+
+| Item | Fixed | Evidence |
+|------------------------|------------------------|------------------------|
+| A1 test harness (§5) | yes | Suite skips 12 → 0. Fixing the root finder made the six HB tests run and immediately error, which is the point. |
+| A2 GUI honesty (H4, H5, M10) | yes | `test_gui_refusal.R`, 12 cases, both refusal shapes |
+| A3 LC all-zero utilities (C1) | yes | `test_hb_uncertainty.R`; and an end-to-end LC run whose non-baseline utilities are non-zero and whose importance sums to 100 |
+| A4 SE/CI/p from heterogeneity (C3) | yes | `test_hb_uncertainty.R` + two bayesm integration tests; verified empirically before writing the code (see A-NEW notes) |
+| A5 BW simultaneous (C2), best_worst validator (H2) | refuse + fix | `test_bws_estimation.R`, incl. the first test in this module that estimates a BW model |
+| A6 set-only grouping (H1) | yes | `test_per_respondent_sets.R`, 6 cases on set ids that restart per respondent |
+| A7 bayesm row order (H7) | yes | `test_hb_estimation.R`: alternative-ordered input yields identical y and X |
+| A8 None in estimation (H8, engine side) | refuse, by decision | `test_none_estimation.R`; simulator side stays with Session B |
+| A9 interactions (H6) | yes | `test_interactions_config.R`, 8 cases |
+| A10 WTP (H9, M8) | yes | `test_wtp_anchoring.R`, 6 cases |
+| A11 LC round-robin (H10), slides (H12), optimizer (H3) | yes, with one deviation | `test_lc_slides_optimizer.R`, 8 cases; decision-7 split logged above |
+| A12 stats pack + config honesty (M1, M2, M3, M5) | yes | `test_config_and_stats_honesty.R`, 12 cases |
+| A13 HB importance (M4) | yes | `test_hb_importance.R`; a 50/50 split sample reports Brand at \<40% by the old method and \>80% by the new one |
+| A14 remaining M-tier + guard layer (H11, M6, M7, M9, M11) | yes | `test_guards_and_alchemer_honesty.R`, 12 cases |
+
+**Not done, and why:** the None-alternative ASC (A8) and the three tested-but-unwired functions of locked decision 7 (A11) — both logged above with the reasoning. Everything else in the work order landed.
+
+**Not verified by this session:** the HTML report and the Excel workbook were not opened and read as a human reader would read them. The report's table builder is covered by unit tests and the suite renders a \~1 MB report, but the Heterogeneity column, the WTP interval note and the interaction skip banner have not been eyeballed in a browser. That is Duncan's `launch_turas()` regeneration, per the standing rule that the pipeline is never headless-run against real projects from here.
+
+---
+
+## Template / documentation audit, 2026-08-27 (after A1-A14)
+
+Run by generating a fresh template and putting it through the loader and a real
+run, plus a two-way diff of template settings against
+`.known_conjoint_settings()`.
+
+**Found and fixed:** a freshly generated template **refused to load** — the
+duplicate-setting refusal (A12/M5) fired on the module's own template, which
+shipped `Project_Name`/`Analyst_Name` under STUDY IDENTIFICATION and
+`project_name`/`analyst_name` under HTML REPORT. No new project could start.
+The capitalised trio was the dead half (M7); it is gone, and
+`test_template_roundtrip.R` is now the gate.
+
+**Still open — template:**
+- `include_custom_images` and the entire `Custom_Images` sheet are dead (M7).
+  The round-trip test pins this as the one known exception, so removing it will
+  be noticed.
+- A fresh template ships **5 live example Attribute rows** (a phone study), one
+  example Custom_Slides row and one example Custom_Images row, none of which the
+  loader can tell from real input (M11). Leaving the Attributes rows in place
+  gives a clear refusal — verified: "Missing required columns: Screen Size,
+  Battery Life, Camera Quality" — so it fails safely, but it fails.
+- Four settings the module genuinely reads are **not offered in the template**:
+  `min_responses_per_level` (`02_data.R`), `interaction_max`
+  (`06_interactions.R`), and `wtp_enabled` and `bw_method`, both added this
+  session.
+- Three settings are read into the config object and consumed by **nothing**:
+  `bootstrap_iterations`, `include_diagnostics`, `baseline_handling` (the last
+  is also still validated).
+
+**Still open — documentation:**
+- `USER_MANUAL.md` does not mention `generate_stats_pack` or `wtp_enabled`.
+- **None** of the refusal codes added this session appear anywhere in the docs,
+  including §14 Troubleshooting: `CALC_ALL_ZERO_UTILITIES`,
+  `CALC_BW_SIMULTANEOUS_UNIMPLEMENTED`, `CALC_INTERACTIONS_NOT_IN_SIMULATOR`,
+  `FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE`, `CALC_WTP_POSITIVE_PRICE_SLOPE`,
+  `CALC_LC_ASSIGNMENT_FAILED`, `CALC_LC_NO_COMPARABLE_SOLUTION`,
+  `CFG_DUPLICATE_SETTING`, plus the `CFG_UNKNOWN_SETTING` warning.
+- Version `3.1.0` is hardcoded in five places and has not been bumped for this
+  work: `R/99_helpers.R:590`, the template header, `README.md`, and
+  `docs/CODE_INVENTORY.md` twice.
+
+**Still open — the report layer.** Session A did not touch it; P1-P8 are Session
+B. P1 is the one with commercial consequences: a saved report **actively
+reverts** insights the reader typed, because `syncInsight` writes `.value` on a
+hidden textarea and `outerHTML` does not serialise it.
+
+---
+
+## Pre-merge review outcome and Duncan's rulings, 2026-08-27
+
+An independent Fable pre-merge review verified C1, C2 and C3 by execution on
+both sides (defects reproduced at the merge-base, fixes reproduced at the tip;
+the HB and LC standard errors hand-recomputed from `nmix$probdraw`/`compdraw`
+and matching exactly), confirmed the A-NEW-1 aggregate-CI defect in both
+directions, ran the suite at 0 fail / 0 skip, and confirmed by execution that
+three new test files fail on the old engine for defect-semantic reasons.
+
+Duncan ruled on the open items:
+
+- **Locked decision 7 / A11:** the three tested-but-unwired functions
+  (`optimize_product_exhaustive`, `optimize_product_greedy`,
+  `predict_shares_with_ci`) are **kept**, as this session left them. The
+  decision's "no caller or test" premise was verified false for tests.
+- **A8 None ASC:** the deferral **stands**; refusal remains the behaviour until
+  the design constant, reference-level handling and simulator export land
+  together (Session B+).
+- **CFG_DUPLICATE_SETTING migration cost:** **accepted**. Configs that kept the
+  old template's `Project_Name`/`Analyst_Name` rows refuse to load until those
+  rows are deleted; the refusal names the rows and the reason.
+
+One review finding fixed in this commit: the `FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE`
+`how_to_fix` told the user to remove the None rows and re-run, but a set whose
+choice WAS None then has no chosen row and data validation refuses it
+("choice sets do not have exactly 1 chosen alternative") — verified by
+execution. The instruction now also says to remove the choice sets in which
+None was the chosen alternative.
