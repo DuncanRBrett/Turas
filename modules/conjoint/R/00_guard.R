@@ -300,52 +300,55 @@ validate_conjoint_attributes <- function(attributes) {
     )
   }
 
-  # Check each attribute has at least 2 levels
+  # Check each attribute has at least 2 levels.
+  #
+  # This counted rows per attribute, which assumes an Attributes sheet in long
+  # format — one row per level. The loader builds it wide: one row per
+  # attribute, with the levels in a comma-separated LevelNames string and a
+  # parsed levels_list column. Counting rows therefore reported "1 level" for
+  # every attribute in a perfectly valid config. Read the levels the way the
+  # rest of the module reads them.
+  .levels_for <- function(attr) {
+    idx <- which(attributes$AttributeName == attr)[1]
+
+    if ("levels_list" %in% names(attributes)) {
+      lv <- attributes$levels_list[[idx]]
+      if (!is.null(lv) && length(lv) > 0) return(unique(trimws(as.character(lv))))
+    }
+
+    if ("LevelNames" %in% names(attributes)) {
+      raw <- attributes$LevelNames[attributes$AttributeName == attr]
+      raw <- raw[!is.na(raw)]
+      if (length(raw) > 0) {
+        split_levels <- unlist(strsplit(as.character(raw), ","))
+        split_levels <- trimws(split_levels)
+        split_levels <- split_levels[nzchar(split_levels)]
+        if (length(split_levels) > 0) return(unique(split_levels))
+      }
+    }
+
+    if ("NumLevels" %in% names(attributes)) {
+      n <- suppressWarnings(as.integer(attributes$NumLevels[idx]))
+      if (!is.na(n) && n > 0) return(as.character(seq_len(n)))
+    }
+
+    character(0)
+  }
+
   for (attr in unique_attrs) {
-    levels <- attributes$LevelNames[attributes$AttributeName == attr]
-    if (length(unique(levels)) < 2) {
+    levels <- .levels_for(attr)
+    if (length(levels) < 2) {
       conjoint_refuse(
         code = "CFG_INSUFFICIENT_LEVELS",
         title = "Insufficient Levels for Attribute",
-        problem = paste0("Attribute '", attr, "' has only ", length(unique(levels)), " level(s). Need at least 2."),
+        problem = paste0("Attribute '", attr, "' has only ", length(levels), " level(s). Need at least 2."),
         why_it_matters = "Each attribute requires at least 2 levels to measure preference.",
-        how_to_fix = paste0("Add at least one more level to attribute '", attr, "'.")
+        how_to_fix = c(
+          paste0("Add at least one more level to attribute '", attr, "' in the Attributes sheet."),
+          "Levels go in the LevelNames column, separated by commas."
+        )
       )
     }
-  }
-
-  invisible(TRUE)
-}
-
-
-#' Validate Conjoint Design Matrix
-#'
-#' @param design Design matrix
-#' @param attributes Attributes data frame
-#' @keywords internal
-validate_conjoint_design <- function(design, attributes) {
-
-  if (is.null(design) || !is.data.frame(design)) {
-    conjoint_refuse(
-      code = "CFG_INVALID_DESIGN",
-      title = "Invalid Conjoint Design",
-      problem = "Design matrix is missing or invalid.",
-      why_it_matters = "Conjoint analysis requires a valid experimental design.",
-      how_to_fix = c(
-        "Check that the Design sheet exists",
-        "Generate a proper experimental design"
-      )
-    )
-  }
-
-  if (nrow(design) == 0) {
-    conjoint_refuse(
-      code = "CFG_EMPTY_DESIGN",
-      title = "Empty Conjoint Design",
-      problem = "Design matrix has no choice tasks.",
-      why_it_matters = "Cannot analyze conjoint without choice tasks.",
-      how_to_fix = "Add choice task definitions to your Design sheet."
-    )
   }
 
   invisible(TRUE)
@@ -550,10 +553,14 @@ validate_latent_class_config <- function(config) {
 #' @keywords internal
 validate_html_config <- function(config) {
 
-  # Validate brand colours if specified
+  # Validate brand colours if specified.
   colour_pattern <- "^#[0-9A-Fa-f]{6}$"
 
-  if (!is.na(config$brand_colour) && !grepl(colour_pattern, config$brand_colour)) {
+  .is_set <- function(x) {
+    !is.null(x) && length(x) == 1 && !is.na(x) && nzchar(trimws(x))
+  }
+
+  if (.is_set(config$brand_colour) && !grepl(colour_pattern, config$brand_colour)) {
     conjoint_refuse(
       code = "CFG_HTML_INVALID_COLOUR",
       title = "Invalid Brand Colour",
@@ -563,7 +570,7 @@ validate_html_config <- function(config) {
     )
   }
 
-  if (!is.na(config$accent_colour) && !grepl(colour_pattern, config$accent_colour)) {
+  if (.is_set(config$accent_colour) && !grepl(colour_pattern, config$accent_colour)) {
     conjoint_refuse(
       code = "CFG_HTML_INVALID_ACCENT",
       title = "Invalid Accent Colour",
@@ -588,9 +595,12 @@ validate_wtp_config <- function(config, attributes_df) {
 
   price_attr <- config$wtp_price_attribute
 
-  # If WTP price attribute is specified, validate it exists
-
-  if (!is.na(price_attr) && nchar(trimws(price_attr)) > 0) {
+  # If WTP price attribute is specified, validate it exists.
+  # is.na(NULL) is logical(0), and if (logical(0)) is an error, so the NULL
+  # case has to be handled before the test — an unset price attribute is the
+  # normal case, not a fault.
+  if (!is.null(price_attr) && length(price_attr) == 1 &&
+      !is.na(price_attr) && nchar(trimws(price_attr)) > 0) {
     if (!price_attr %in% attributes_df$AttributeName) {
       conjoint_refuse(
         code = "CFG_WTP_ATTRIBUTE_NOT_FOUND",
@@ -605,11 +615,18 @@ validate_wtp_config <- function(config, attributes_df) {
     }
 
     valid_wtp_methods <- c("marginal", "simulation", "sos")
-    if (!config$wtp_method %in% valid_wtp_methods) {
+    # An unset wtp_method is the documented default, not an error, and
+    # `if (NULL %in% x)` is an error rather than FALSE.
+    wtp_method <- config$wtp_method
+    if (is.null(wtp_method) || length(wtp_method) != 1 || is.na(wtp_method) ||
+        !nzchar(trimws(wtp_method))) {
+      wtp_method <- "marginal"
+    }
+    if (!wtp_method %in% valid_wtp_methods) {
       conjoint_refuse(
         code = "CFG_WTP_METHOD_INVALID",
         title = "Invalid WTP Method",
-        problem = sprintf("wtp_method '%s' is not supported.", config$wtp_method),
+        problem = sprintf("wtp_method '%s' is not supported.", wtp_method),
         why_it_matters = "The WTP method determines how willingness to pay is calculated.",
         how_to_fix = sprintf("Use one of: %s", paste(valid_wtp_methods, collapse = ", "))
       )

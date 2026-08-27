@@ -621,6 +621,11 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     # 00_main.R auto-detects a price/cost/fee attribute. This is the off switch.
     wtp_enabled = safe_logical(settings_list$wtp_enabled, default = TRUE),
 
+    # Read by the report's simulator transformer and by the revenue panel's
+    # JS. It was in the template but never surfaced, so the revenue simulator
+    # always opened at 1,000 customers whatever the config said.
+    default_customers = safe_numeric(settings_list$default_customers, 1000),
+
     # =========================================================================
     # INTERACTIONS
     # =========================================================================

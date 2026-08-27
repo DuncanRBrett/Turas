@@ -144,6 +144,28 @@ delete working coverage on a premise that is false, so the split taken is:
 **Duncan's ruling wanted** on whether the three tested-but-unwired functions
 should still be deleted. Nothing else in Session A depends on the answer.
 
+**A14 / H11 — three guards fixed rather than deleted, one deleted.** The work
+order said to wire the guards at their natural steps and delete what stays
+uncalled. Wiring them exposed that three had never been executed against a real
+config and did not work:
+
+- `validate_conjoint_attributes()` counted rows per attribute, which assumes a
+  long-format Attributes sheet. The loader builds it wide (one row per
+  attribute, comma-separated `LevelNames` plus a parsed `levels_list`), so it
+  reported "Attribute 'Brand' has only 1 level" for a perfectly valid config
+  and refused the run. It now reads levels the way the rest of the module does.
+- `validate_wtp_config()` did `!is.na(price_attr)` on a value that is NULL
+  whenever `wtp_price_attribute` is blank — `is.na(NULL)` is `logical(0)` and
+  `if (logical(0))` is an error — and `config$wtp_method %in% ...` had the same
+  problem. Both cases are the normal one.
+- `validate_html_config()` had the same `is.na(NULL)` hazard on both colour
+  settings.
+
+Deleted: `validate_conjoint_design()`, which validated a "Design sheet" this
+module has no concept of, with no caller and no test. `conjoint_guard_init()`,
+`conjoint_determine_status()` and `validate_conjoint_convergence()` are kept —
+they have tests in `test_guard_fixes.R`.
+
 **A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd`
 sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`
 binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores

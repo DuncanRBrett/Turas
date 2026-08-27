@@ -385,6 +385,21 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
     config <- load_conjoint_config(config_file, verbose = verbose)
 
+    # Guard layer (H11). These validators existed but had no production
+    # caller — only tests — so the checks they describe never actually ran.
+    if (exists("validate_conjoint_config", mode = "function")) {
+      validate_conjoint_config(config)
+    }
+    if (exists("validate_conjoint_attributes", mode = "function")) {
+      validate_conjoint_attributes(config$attributes)
+    }
+    if (exists("validate_wtp_config", mode = "function")) {
+      validate_wtp_config(config, config$attributes)
+    }
+    if (exists("validate_html_config", mode = "function")) {
+      validate_html_config(config)
+    }
+
     if (verbose) {
       cat(sprintf("   ✓ Loaded %d attributes with %d total levels\n",
                   nrow(config$attributes),
@@ -408,6 +423,10 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
     if (verbose) cat("\n2. Loading and validating data...\n")
 
     data_list <- load_conjoint_data(config$data_file, config, verbose = verbose)
+
+    if (exists("guard_check_data_exists", mode = "function")) {
+      guard_check_data_exists(data_list$data)
+    }
 
     if (verbose) {
       cat(sprintf("   ✓ Validated %d respondents with %d choice sets\n",

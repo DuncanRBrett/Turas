@@ -310,7 +310,17 @@ get_product_price <- function(product, price_attribute) {
   }
 
   price_str <- product[[price_attribute]]
-  price <- as.numeric(gsub("[^0-9.]", "", price_str))
+
+  # Use the WTP module's parser rather than a second, simpler one. Stripping
+  # every non-digit turns the European "1.500,00" into 1.50000, so the two
+  # parsers disagreed on the same price label depending on which module read
+  # it. extract_numeric_prices handles both separator conventions.
+  price <- if (exists("extract_numeric_prices", mode = "function")) {
+    extract_numeric_prices(as.character(price_str))[1]
+  } else {
+    suppressWarnings(as.numeric(gsub("[^0-9.]", "", price_str)))
+  }
+
   if (is.na(price)) 1 else price
 }
 
