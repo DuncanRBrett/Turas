@@ -63,11 +63,12 @@ B2 (the tabs exporter, which is not report work at all).
 | Conjoint island (R) | done — `modules/conjoint/R/17_v2_island.R` |
 | `data-cj` island + `cj_json` parameter | done — template, `build_report_v2.R`, `run_crosstabs.R`, config whitelist, tabs template |
 | `27x_conjoint.js` view + Conjoint tab | done — 19 + 11 tests, browser-verified |
-| Simulator extracted to standalone | **NOT DONE** |
-| Conjoint's classic report deleted | **NOT DONE** — blocked on the simulator extraction |
+| Simulator extracted to standalone | done — `lib/html_simulator/`, 90 KB self-contained, browser-verified |
+| Conjoint's classic report deleted | done — `lib/html_report/` removed entire, 7 R + 7 JS files |
 
-**Suites:** tabs 0 fail / 1 skip / 5144 pass; conjoint 0 / 0 / 1133;
-shared 0 / 1 / 903.
+**Suites:** tabs 0 fail / 1 skip / 5144 pass; conjoint 0 / 0 / 971
+(down from 1133 because `test_html_report.R` and `test_html_simulator.R` went
+with what they tested); shared 0 / 1 / 903.
 
 ---
 
@@ -103,15 +104,34 @@ same rows.
 
 ---
 
-## What remains for a complete module
+## The retirement
 
-1. **Extract the simulator to a standalone HTML tool.** It is currently
-   embedded in the classic report, so "delete the classic report" and "keep the
-   simulator" conflict until it is pulled out. The JS engine, UI and charts are
-   already self-contained; the island carries no per-respondent betas.
-2. **Delete `modules/conjoint/lib/html_report/`**, following the loud-retirement
-   pattern of `2fdcb38f`: retire `generate_html_report` and
-   `generate_html_simulator` through `CONJOINT_RETIRED_SETTINGS` so live configs
-   are answered rather than ignored. Expect it to take `test_html_report.R`,
-   `test_html_simulator.R` and parts of A2's GUI plumbing with it.
-3. Documentation for the island and the Conjoint tab in the user manual.
+`modules/conjoint/lib/html_report/` is gone — 7 R files, 7 JS files. The
+simulator was extracted first, whole, into `lib/html_simulator/`: the CSS
+builder, the panel markup, the data transformer and the JSON island, unchanged
+in behaviour, plus the same three JS files. What did not come across is the
+report around them — no pins, no insight editor, no tab shell. 90 KB,
+self-contained, verified in a browser computing shares.
+
+Retired loudly, following `2fdcb38f`: `generate_html_report` is in
+`CONJOINT_RETIRED_SETTINGS`, so a live config carrying it is answered by name
+rather than told it looks like a typo. `generate_html_simulator` stays live and
+now writes `{output}_simulator.html`; the island carries its filename so the
+Conjoint tab links to it.
+
+**One deliberate imprecision, logged:** the simulator ships the retired report's
+whole stylesheet, including rules for elements it never renders. Trimming it
+means deciding, rule by rule, what the simulator's runtime-generated markup
+needs, and getting that wrong shows up as a broken layout in a client's hands.
+90 KB total; the risk is not worth the kilobytes. Noted in
+`01_simulator_parts.R`.
+
+## What a complete module now produces
+
+| Deliverable | Setting |
+|---|---|
+| Excel workbook | always |
+| Stats pack | `generate_stats_pack` (default Y) |
+| Conjoint tab in the interactive report | always writes `{output}_cj_island.json`; the tabs config's `conjoint_island` points at it |
+| Crosstabbable attribute importance | `generate_tabs_export` |
+| Standalone market simulator | `generate_html_simulator` |

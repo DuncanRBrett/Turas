@@ -1,12 +1,12 @@
 # TURAS Conjoint Analysis Module
 
-**Version 3.2.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, Revenue Simulator, and interactive HTML reporting
+**Version 3.2.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, a standalone market simulator, and results that land in the interactive report
 
 ---
 
 ## What It Does
 
-Runs end-to-end conjoint analysis: loads a config-driven study definition, estimates part-worth utilities from choice data, calculates attribute importance and willingness to pay, and produces both Excel workbooks and self-contained HTML reports with an interactive market and revenue simulator.
+Runs end-to-end conjoint analysis: loads a config-driven study definition, estimates part-worth utilities from choice data, calculates attribute importance and willingness to pay, and produces Excel workbooks, a contribution that gives the interactive report a Conjoint tab, a crosstabbable importance export, and a self-contained market and revenue simulator.
 
 ### Estimation Methods
 
@@ -36,7 +36,7 @@ A configurable **scale factor** (exponent, 0.1–3.0) is available in the HTML s
 
 ### Revenue Simulator
 
-When a price attribute is detected, the HTML report includes a **Revenue Simulator** tab showing:
+When a price attribute is detected, the standalone simulator includes a **Revenue Simulator** mode showing:
 - Stacked horizontal bars: Market Share + Revenue per product
 - Revenue = Price × Share% × Customers (editable customer count)
 - Summary table with per-product breakdown and totals
@@ -90,7 +90,7 @@ results <- run_conjoint_analysis(
 ```r
 source("modules/conjoint/R/00_main.R")
 conjoint_preflight(verbose = TRUE)
-# Validates: 20 R files, 7 JS files, 7 HTML report files,
+# Validates: R files, the simulator's JS and R files,
 # required packages, optional packages, TRS infrastructure
 ```
 
@@ -202,7 +202,7 @@ Key-value format with columns: **Setting | Value | Required? | Description | Val
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `generate_html_report` | `FALSE` | Generate interactive HTML analysis report |
+| `generate_html_simulator` | `FALSE` | Generate the standalone market simulator |
 | `generate_html_simulator` | `FALSE` | Generate standalone HTML market simulator |
 | `brand_colour` | `#323367` | Primary brand hex colour |
 | `accent_colour` | `#CC9900` | Accent hex colour |
@@ -328,7 +328,7 @@ Auto-generated reference sheet with usage guidance.
 
 ### HTML Analysis Report
 
-A single self-contained HTML file with all analysis panels and an embedded market/revenue simulator. Generated when `generate_html_report = TRUE`.
+A single self-contained HTML file carrying the market and revenue simulator. Generated when `generate_html_simulator = TRUE`. The module's own analysis report was retired 2026-08-27 — results now appear in the interactive report's Conjoint tab, via the `{output}_cj_island.json` every run writes.
 
 **Report panels:**
 
@@ -518,7 +518,7 @@ Verify column mapping settings match your data file column names exactly (case-s
 
 ### HTML report not generated
 
-Set `generate_html_report = TRUE` in Settings sheet. Requires jsonlite:
+Set `generate_html_simulator = TRUE` in the Settings sheet. Requires jsonlite:
 ```r
 install.packages("jsonlite")
 ```
