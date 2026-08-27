@@ -129,7 +129,13 @@
   /** Save pinned data to the hidden JSON store. */
   ReportHub.savePinnedData = function() {
     var store = document.getElementById("hub-pinned-data");
-    if (store) store.textContent = JSON.stringify(ReportHub.pinnedItems);
+    if (!store) return;
+    // Same island hardening as modules/shared/js/turas_pins.js: escape every
+    // "<" as its JSON unicode escape, so a pinned title or note can never
+    // form "</", "<!--" or "<script" and break out of this script island when
+    // the hub is saved via outerHTML. JSON.parse restores it on read, so
+    // hydratePinnedViews needs no matching unescape.
+    store.textContent = JSON.stringify(ReportHub.pinnedItems).replace(/</g, "\\u003c");
   };
 
   /** Hydrate pinned views from the JSON store on page load. */

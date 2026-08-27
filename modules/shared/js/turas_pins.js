@@ -257,7 +257,17 @@
   function _save() {
     if (!_config) return;
     var store = document.getElementById(_config.storeId);
-    if (store) store.textContent = JSON.stringify(_pins);
+    if (!store) return;
+    // Harden the script island against markup-significant sequences in pin
+    // titles and insight text. Escaping only "</" is not enough: per the HTML
+    // parser, "<!--" followed by "<script" enters the script double-escaped
+    // state, after which this island's closing tag no longer closes it and the
+    // next island is swallowed. Escaping EVERY "<" as the JSON unicode escape
+    // makes "</", "<!--" and "<script" unformable. It is valid JSON and
+    // JSON.parse turns it straight back into "<", so _load needs no matching
+    // unescape. Mirrors the R-side island escaping in
+    // modules/tabs/lib/html_report_v2/build_report_v2.R.
+    store.textContent = JSON.stringify(_pins).replace(/</g, "\\u003c");
   }
 
   function _load() {
