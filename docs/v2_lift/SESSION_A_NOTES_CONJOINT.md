@@ -133,3 +133,52 @@ Every row was verified by running something this session, not by reading the dif
 **Not done, and why:** the None-alternative ASC (A8) and the three tested-but-unwired functions of locked decision 7 (A11) — both logged above with the reasoning. Everything else in the work order landed.
 
 **Not verified by this session:** the HTML report and the Excel workbook were not opened and read as a human reader would read them. The report's table builder is covered by unit tests and the suite renders a \~1 MB report, but the Heterogeneity column, the WTP interval note and the interaction skip banner have not been eyeballed in a browser. That is Duncan's `launch_turas()` regeneration, per the standing rule that the pipeline is never headless-run against real projects from here.
+
+---
+
+## Template / documentation audit, 2026-08-27 (after A1-A14)
+
+Run by generating a fresh template and putting it through the loader and a real
+run, plus a two-way diff of template settings against
+`.known_conjoint_settings()`.
+
+**Found and fixed:** a freshly generated template **refused to load** — the
+duplicate-setting refusal (A12/M5) fired on the module's own template, which
+shipped `Project_Name`/`Analyst_Name` under STUDY IDENTIFICATION and
+`project_name`/`analyst_name` under HTML REPORT. No new project could start.
+The capitalised trio was the dead half (M7); it is gone, and
+`test_template_roundtrip.R` is now the gate.
+
+**Still open — template:**
+- `include_custom_images` and the entire `Custom_Images` sheet are dead (M7).
+  The round-trip test pins this as the one known exception, so removing it will
+  be noticed.
+- A fresh template ships **5 live example Attribute rows** (a phone study), one
+  example Custom_Slides row and one example Custom_Images row, none of which the
+  loader can tell from real input (M11). Leaving the Attributes rows in place
+  gives a clear refusal — verified: "Missing required columns: Screen Size,
+  Battery Life, Camera Quality" — so it fails safely, but it fails.
+- Four settings the module genuinely reads are **not offered in the template**:
+  `min_responses_per_level` (`02_data.R`), `interaction_max`
+  (`06_interactions.R`), and `wtp_enabled` and `bw_method`, both added this
+  session.
+- Three settings are read into the config object and consumed by **nothing**:
+  `bootstrap_iterations`, `include_diagnostics`, `baseline_handling` (the last
+  is also still validated).
+
+**Still open — documentation:**
+- `USER_MANUAL.md` does not mention `generate_stats_pack` or `wtp_enabled`.
+- **None** of the refusal codes added this session appear anywhere in the docs,
+  including §14 Troubleshooting: `CALC_ALL_ZERO_UTILITIES`,
+  `CALC_BW_SIMULTANEOUS_UNIMPLEMENTED`, `CALC_INTERACTIONS_NOT_IN_SIMULATOR`,
+  `FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE`, `CALC_WTP_POSITIVE_PRICE_SLOPE`,
+  `CALC_LC_ASSIGNMENT_FAILED`, `CALC_LC_NO_COMPARABLE_SOLUTION`,
+  `CFG_DUPLICATE_SETTING`, plus the `CFG_UNKNOWN_SETTING` warning.
+- Version `3.1.0` is hardcoded in five places and has not been bumped for this
+  work: `R/99_helpers.R:590`, the template header, `README.md`, and
+  `docs/CODE_INVENTORY.md` twice.
+
+**Still open — the report layer.** Session A did not touch it; P1-P8 are Session
+B. P1 is the one with commercial consequences: a saved report **actively
+reverts** insights the reader typed, because `syncInsight` writes `.value` on a
+hidden textarea and `outerHTML` does not serialise it.
