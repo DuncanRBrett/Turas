@@ -451,7 +451,7 @@ run_conjoint_gui <- function() {
           options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
           # Capture stdout AND messages. Much of the module's TRS reporting goes
-          # through message() (config warnings, Alchemer notices, HTML-report
+          # through message() (config warnings, Alchemer notices, simulator
           # failure); capturing only stdout made all of it invisible in the GUI.
           capture <- capture.output(
             withCallingHandlers({
