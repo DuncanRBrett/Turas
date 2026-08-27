@@ -105,6 +105,17 @@ inside the package. `validate_hb_config`, `validate_latent_class_config`,
 `estimate_hierarchical_bayes` and `estimate_latent_class` now fall back to the
 loader's own defaults.
 
+### Known cosmetic issue, NOT fixed — negative numbers in the stats pack read `'-284.70`
+The shared formula-injection guard (`modules/shared/lib/turas_excel_escape.R:44-71`)
+prefixes an apostrophe to any string starting with `-`, which includes every
+negative number written as text. The M1 fix makes the model-fit block appear for
+the first time, so its two log-likelihoods are the first place this is visible in
+the conjoint stats pack — the escaping itself is long-standing and platform-wide.
+Not fixed here: exempting plain decimal numbers is safe in principle but is a
+change to shared code that every module's output depends on, and it does not
+belong in a conjoint correctness branch at the end of a session. Worth doing
+once, deliberately, with the other modules' suites in the room.
+
 ---
 
 ## Deviations from the work order
@@ -194,6 +205,16 @@ Deleted: `validate_conjoint_design()`, which validated a "Design sheet" this
 module has no concept of, with no caller and no test. `conjoint_guard_init()`,
 `conjoint_determine_status()` and `validate_conjoint_convergence()` are kept —
 they have tests in `test_guard_fixes.R`.
+
+**M11 — two clauses left alone, deliberately.** The code inventory's line
+counts are regenerated (A14). The other two clauses of M11 are logged, not
+fixed: the version string `3.1.0` is hardcoded in `R/99_helpers.R:590`, the
+README, the inventory and the template subtitle rather than read from one place;
+and the template's Attributes sheet ships live example rows the loader cannot
+distinguish from real input (the same class of defect as H12's example slide,
+but on a sheet where a wrong guess would silently drop a real attribute). Both
+are template-generation work, better done with a template regeneration than
+bolted onto an engine-correctness branch.
 
 **A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd`
 sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`

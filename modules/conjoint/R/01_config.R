@@ -488,6 +488,34 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   custom_slides <- NULL
   include_slides <- safe_logical(settings_list$include_custom_slides, default = FALSE)
 
+  # Say so when the sheet has real content but the gate is closed, rather than
+  # silently not reading it — that is the same silent-config failure this gate
+  # was added to fix, pointing the other way.
+  if (!isTRUE(include_slides) && "Custom_Slides" %in% sheet_names) {
+    tryCatch({
+      peek <- openxlsx::read.xlsx(config_file, sheet = "Custom_Slides", startRow = 4)
+      if (!is.null(peek) && nrow(peek) > 0) {
+        title_col <- grep("^Slide", names(peek), value = TRUE)[1]
+        content_col <- grep("^Content", names(peek), value = TRUE)[1]
+        real <- vapply(seq_len(nrow(peek)), function(r) {
+          tt <- if (!is.na(title_col)) as.character(peek[[title_col]][r]) else ""
+          cc <- if (!is.na(content_col)) as.character(peek[[content_col]][r]) else ""
+          tt <- if (is.na(tt)) "" else tt
+          cc <- if (is.na(cc)) "" else cc
+          (nzchar(trimws(tt)) || nzchar(trimws(cc))) &&
+            !.is_template_example_slide(tt, cc)
+        }, logical(1))
+
+        if (any(real)) {
+          cat(sprintf(
+            "[TRS INFO] CONJ_CUSTOM_SLIDES_OFF: the Custom_Slides sheet has %d slide(s) with content, but include_custom_slides is not Y, so none will appear in the report. Set include_custom_slides = Y to include them.\n",
+            sum(real)
+          ))
+        }
+      }
+    }, error = function(e) NULL)
+  }
+
   if (isTRUE(include_slides) && "Custom_Slides" %in% sheet_names) {
     tryCatch({
       slides_df <- openxlsx::read.xlsx(config_file, sheet = "Custom_Slides",
