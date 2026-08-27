@@ -116,3 +116,67 @@ test_that("M6: the stats pack no longer claims ChoiceModelR", {
   expect_true(grepl("Stan HB (cmdstanr)", src, fixed = TRUE))
   expect_true(grepl("Empirical Bayes shrinkage", src, fixed = TRUE))
 })
+
+# ------------------------------------------------------------------------------
+# A7: M4, M7, M8, M9
+# ------------------------------------------------------------------------------
+
+test_that("M4: an Include=0 item that is in the fielded design fails validation", {
+  design <- data.frame(Version = 1L, Task_Number = 1L,
+                       Item1_ID = "A", Item2_ID = "B", Item3_ID = "C",
+                       stringsAsFactors = FALSE)
+  mapping <- data.frame(Field_Type = c("VERSION", "BEST_CHOICE", "WORST_CHOICE"),
+                        Field_Name = c("Version", "T1_Best", "T1_Worst"),
+                        Task_Number = c(NA, 1L, 1L), stringsAsFactors = FALSE)
+  items <- data.frame(Item_ID = c("A", "B", "C"),
+                      Item_Label = c("a", "b", "c"),
+                      Include = c(1L, 1L, 0L),      # C excluded but fielded
+                      Anchor_Item = 0L, stringsAsFactors = FALSE)
+  data <- data.frame(RespID = "R1", Version = 1L,
+                     T1_Best = "A", T1_Worst = "B", stringsAsFactors = FALSE)
+
+  v <- validate_survey_data(data, mapping, design, items, verbose = FALSE)
+  expect_false(v$valid)
+  expect_true(any(grepl("Include = 0", v$issues)))
+})
+
+test_that("M7: the study summary discloses weighting engine by engine", {
+  long <- .a5_long()
+  cfg <- list(project_settings = list(Weight_Variable = "W"))
+  ss <- compute_study_summary(long, cfg, verbose = FALSE)
+
+  expect_true(!is.null(ss$weighting_by_engine))
+  expect_match(ss$weighting_by_engine$hb, "UNWEIGHTED")
+  expect_match(ss$weighting_by_engine$counts, "weighted")
+
+  ss_uw <- compute_study_summary(long,
+                                 list(project_settings = list(Weight_Variable = NULL)),
+                                 verbose = FALSE)
+  expect_equal(ss_uw$weighting_by_engine$hb, "unweighted")
+})
+
+test_that("M8: the anti-conservative count CI machinery is gone", {
+  expect_false(exists("add_count_confidence_intervals", mode = "function"))
+})
+
+test_that("M9: respondents with an NA design version are counted out loud", {
+  fxd <- data.frame(Version = c(1L, 1L), Task_Number = c(1L, 2L),
+                    Item1_ID = c("APPLE", "CHERRY"), Item2_ID = c("BANANA", "DATE"),
+                    Item3_ID = c("CHERRY", "APPLE"), stringsAsFactors = FALSE)
+  fxm <- data.frame(Field_Type = c("VERSION", "BEST_CHOICE", "WORST_CHOICE",
+                                   "BEST_CHOICE", "WORST_CHOICE"),
+                    Field_Name = c("Version", "T1_Best", "T1_Worst", "T2_Best", "T2_Worst"),
+                    Task_Number = c(NA, 1L, 1L, 2L, 2L), stringsAsFactors = FALSE)
+  data <- data.frame(RespID = c("R1", "R2"), Version = c(1L, NA),
+                     T1_Best = c("APPLE", "BANANA"), T1_Worst = c("CHERRY", "APPLE"),
+                     T2_Best = c("DATE", "CHERRY"), T2_Worst = c("APPLE", "DATE"),
+                     stringsAsFactors = FALSE)
+  cfg <- list(project_settings = list(Respondent_ID_Variable = "RespID",
+                                      Weight_Variable = NULL,
+                                      Choice_Value_Type = "ITEM_ID"))
+
+  out <- capture.output(long <- build_maxdiff_long(data, fxm, fxd, cfg, verbose = FALSE))
+  expect_true(any(grepl("MAXD_NA_VERSION", out)))
+  expect_true(any(grepl("1 respondent", out)))
+  expect_equal(sort(unique(long$resp_id)), "R1")
+})

@@ -410,6 +410,33 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
   }
 
   # ============================================================================
+  # DESIGN vs ITEMS ALIGNMENT (M4)
+  # ============================================================================
+  # An item that is in the fielded design but set Include = 0 gets an
+  # all-zero indicator in estimation - statistically a second anchor that
+  # biases every coefficient; on the Stan path it produced NAs and a silent
+  # EB fallback. Excluding an item after fielding requires refitting intent,
+  # so it refuses rather than degrades.
+  design_item_cols <- grep("^Item\\d+_ID$", names(design), value = TRUE)
+  if (length(design_item_cols) > 0) {
+    design_items <- unique(as.character(unlist(design[, design_item_cols])))
+    design_items <- design_items[!is.na(design_items) & nzchar(design_items)]
+    excluded_in_design <- intersect(design_items,
+                                    items$Item_ID[items$Include != 1])
+    if (length(excluded_in_design) > 0) {
+      issues <- c(issues, sprintf(
+        "Item(s) %s are set Include = 0 but appear in the fielded design. An excluded item that respondents actually saw biases every estimate; set Include = 1, or re-field without it.",
+        paste(excluded_in_design, collapse = ", ")))
+    }
+    unknown_in_design <- setdiff(design_items, items$Item_ID)
+    if (length(unknown_in_design) > 0) {
+      issues <- c(issues, sprintf(
+        "Design contains item IDs not in the ITEMS sheet: %s",
+        paste(unknown_in_design, collapse = ", ")))
+    }
+  }
+
+  # ============================================================================
   # CHOICE VALIDATION
   # ============================================================================
 

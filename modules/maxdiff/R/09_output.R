@@ -389,7 +389,11 @@ write_summary_sheet <- function(wb, results, config, styles) {
         "Number of Items",
         "Tasks per Respondent",
         "Items per Task",
-        "Weighted Analysis"
+        "Weighted Analysis",
+        "Weighting: counts",
+        "Weighting: logit",
+        "Weighting: HB",
+        "Weighting: TURF"
       ),
       Value = c(
         results$study_summary$n_respondents,
@@ -399,7 +403,13 @@ write_summary_sheet <- function(wb, results, config, styles) {
         results$study_summary$n_tasks,
         length(grep("^Item\\d+_ID$",
                     names(results$design))),
-        ifelse(results$study_summary$weighted, "Yes", "No")
+        ifelse(results$study_summary$weighted, "Yes", "No"),
+        # Per-engine disclosure (M7): a weighted study mixes weighted and
+        # unweighted engines; the summary says which is which.
+        results$study_summary$weighting_by_engine$counts %||% "unweighted",
+        results$study_summary$weighting_by_engine$logit %||% "unweighted",
+        results$study_summary$weighting_by_engine$hb %||% "unweighted",
+        results$study_summary$weighting_by_engine$turf %||% "unweighted"
       ),
       stringsAsFactors = FALSE
     )

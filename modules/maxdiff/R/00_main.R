@@ -1081,9 +1081,21 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
     turf_results <- tryCatch({
       turf_max <- safe_integer(config$output_settings$TURF_Max_Items %||% 10, default = 10L)
       turf_method <- config$output_settings$TURF_Threshold %||% "ABOVE_MEAN"
-      run_turf_analysis(individual_utils = hb_results$individual_utilities,
+      # Respondent weights, aligned to the utilities rows by resp_id (M7):
+      # the shared engine always supported them and the caller never passed
+      # them, so weighted studies got unweighted reach.
+      turf_weights <- NULL
+      iu <- hb_results$individual_utilities
+      if (!is.null(config$project_settings$Weight_Variable) &&
+          is.data.frame(iu) && "resp_id" %in% names(iu)) {
+        rw <- unique(long_data[, c("resp_id", "weight")])
+        turf_weights <- rw$weight[match(iu$resp_id, rw$resp_id)]
+        if (anyNA(turf_weights)) turf_weights <- NULL
+      }
+      run_turf_analysis(individual_utils = iu,
                         items = config$items, max_items = turf_max,
-                        threshold_method = turf_method, verbose = verbose)
+                        threshold_method = turf_method,
+                        weights = turf_weights, verbose = verbose)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_TURF_FAILED: TURF analysis failed: %s", conditionMessage(e)))
       add_warning(sprintf("TURF: %s", conditionMessage(e)))

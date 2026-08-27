@@ -27,7 +27,7 @@
 | `02_validation.R` | 617 | 5 | 11.1 | `validate_design()`, `compute_pair_frequencies()`, `estimate_d_efficiency()`, `validate_survey_data()`, `validate_maxdiff_weights()` | — |
 | `03_data.R` | 680 | 7 | 11.1 | `load_survey_data()`, `load_design_file()`, `build_maxdiff_long()`, `validate_filter_expression()`, `compute_study_summary()` | openxlsx::, tools:: |
 | `04_design.R` | 821 | 11 | 11.1 | `generate_maxdiff_design()`, `generate_balanced_design()`, `generate_optimal_design()`, `compute_design_diagnostics()` | AlgDesign:: (optional) |
-| `05_counts.R` | 334 | 4 | 11.1 | `compute_maxdiff_counts()`, `compute_respondent_counts()`, `compute_count_standard_errors()`, `add_count_confidence_intervals()` | — |
+| `05_counts.R` | 334 | 4 | 11.1 | `compute_maxdiff_counts()`, `compute_respondent_counts()`, `compute_count_standard_errors()` | — |
 | `06_logit.R` | 459 | 5 | 11.1 | `fit_aggregate_logit()`, `prepare_logit_data()`, `extract_logit_utilities()`, `fit_simple_logit()` | survival:: (clogit, strata, Surv, coxph) |
 | `07_hb.R` | 966 | 10 | 11.1 | `fit_hb_model()`, `prepare_stan_data()`, `fit_approximate_hb()`, `extract_hb_results()`, `check_cmdstanr_availability()` | cmdstanr:: (optional), parallel:: |
 | `08_segments.R` | 612 | 6 | 11.1 | `compute_segment_scores()`, `compute_single_segment()`, `compare_segment_utilities()`, `validate_safe_expression()` | — |

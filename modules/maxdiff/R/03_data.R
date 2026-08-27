@@ -470,6 +470,7 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   idx <- 1
   unmatched_tasks <- 0L
   unmatched_examples <- character(0)
+  n_na_version <- 0L
 
   # Process each respondent
   for (r in seq_len(nrow(data))) {
@@ -481,8 +482,12 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
       1
     }
 
-    # Skip if version is NA
-    if (is.na(version)) next
+    # Skip if version is NA - but count it (M9): these respondents used to
+    # vanish without a trace.
+    if (is.na(version)) {
+      n_na_version <- n_na_version + 1L
+      next
+    }
 
     # Get design rows for this version
     version_design <- design[design$Version == version, ]
@@ -564,6 +569,12 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
     if (verbose && r %% 100 == 0) {
       log_progress(r, nrow(data), "Reshaping respondents", verbose)
     }
+  }
+
+  if (n_na_version > 0) {
+    cat(sprintf(
+      "[TRS WARNING] MAXD_NA_VERSION: %d respondent(s) have no design version and were excluded from the analysis.\n",
+      n_na_version))
   }
 
   if (unmatched_tasks > 0) {
@@ -711,7 +722,19 @@ compute_study_summary <- function(long_data, config, verbose = TRUE) {
     effective_n = eff_n,
     design_effect = deff,
     weight_sum = weight_sum,
-    version_distribution = version_dist
+    version_distribution = version_dist,
+    # Per-engine weighting status (M7): one weighted study used to mix
+    # weighted (counts, logit) and unweighted (HB) numbers with a single
+    # global "weighted" flag and no disclosure.
+    weighting_by_engine = if (has_weights) list(
+      counts = "weighted",
+      logit = "weighted (frequency-weight approximation; see manual on SEs)",
+      hb = "UNWEIGHTED - neither the Stan model nor the EB fallback has a weight term",
+      turf = "weighted (respondent weights passed to the reach engine)"
+    ) else list(
+      counts = "unweighted", logit = "unweighted",
+      hb = "unweighted", turf = "unweighted"
+    )
   )
 
   if (verbose) {

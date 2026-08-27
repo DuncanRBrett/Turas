@@ -633,6 +633,13 @@ R-squared equivalent
 Logit utilities represent the average preference structure across all
 respondents.
 
+**Caveat on standard errors (read before quoting them):** the logit SEs
+treat sampling weights as frequency weights and ignore the correlation
+between a respondent's own choices (each respondent contributes many
+observations). Both effects overstate precision, more so under heavy
+weighting. Treat the SEs and p-values as approximate; the point estimates
+are unaffected.
+
 #### Hierarchical Bayes (HB)
 
 Estimates **individual-level** utilities for each respondent using

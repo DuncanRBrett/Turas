@@ -275,57 +275,15 @@ compute_count_standard_errors <- function(long_data, items, n_boot = 1000, verbo
 
 
 # ==============================================================================
-# CONFIDENCE INTERVALS FOR COUNT SCORES
+# CONFIDENCE INTERVALS - DELIBERATELY ABSENT FROM PRODUCTION
 # ==============================================================================
-#' Compute confidence intervals for count scores
-#'
-#' @param count_scores Data frame. Output from compute_maxdiff_counts
-#' @param n_respondents Integer. Number of respondents
-#' @param conf_level Numeric. Confidence level (default: 0.95)
-#'
-#' @return Data frame with CI columns added
-#' @export
-add_count_confidence_intervals <- function(count_scores, n_respondents, conf_level = 0.95) {
-
-  alpha <- 1 - conf_level
-  z <- qnorm(1 - alpha / 2)
-
-  # Calculate SEs using normal approximation
-  # Use Times_Shown (total item appearances) as denominator, not n_respondents,
-
-  # because Best%/Worst% are computed as proportions of times shown.
-  # Note: this is conservative — observations within respondent are correlated,
-  # so the effective sample size is smaller than Times_Shown. For design-corrected
-  # SEs, use compute_count_standard_errors() with bootstrap resampling.
-  effective_n <- count_scores$Times_Shown
-  effective_n[effective_n == 0] <- 1  # avoid division by zero
-
-  count_scores$Best_Pct_SE <- sqrt(
-    (count_scores$Best_Pct / 100) * (1 - count_scores$Best_Pct / 100) / effective_n
-  ) * 100
-
-  count_scores$Worst_Pct_SE <- sqrt(
-    (count_scores$Worst_Pct / 100) * (1 - count_scores$Worst_Pct / 100) / effective_n
-  ) * 100
-
-  # Net Score SE (assuming independence between Best and Worst within item)
-  count_scores$Net_Score_SE <- sqrt(
-    count_scores$Best_Pct_SE^2 + count_scores$Worst_Pct_SE^2
-  )
-
-  # Confidence intervals
-  count_scores$Best_Pct_Lower <- pmax(0, count_scores$Best_Pct - z * count_scores$Best_Pct_SE)
-  count_scores$Best_Pct_Upper <- pmin(100, count_scores$Best_Pct + z * count_scores$Best_Pct_SE)
-
-  count_scores$Worst_Pct_Lower <- pmax(0, count_scores$Worst_Pct - z * count_scores$Worst_Pct_SE)
-  count_scores$Worst_Pct_Upper <- pmin(100, count_scores$Worst_Pct + z * count_scores$Worst_Pct_SE)
-
-  count_scores$Net_Score_Lower <- count_scores$Net_Score - z * count_scores$Net_Score_SE
-  count_scores$Net_Score_Upper <- count_scores$Net_Score + z * count_scores$Net_Score_SE
-
-  return(count_scores)
-}
-
+# add_count_confidence_intervals() was deleted here (A7/M8): it used
+# Times_Shown as a binomial n, which treats correlated within-respondent
+# observations as independent - an ANTI-conservative interval that looked
+# like statistical rigour, and nothing called it. The honest alternative,
+# compute_count_standard_errors() above (respondent-level bootstrap), is
+# also not yet wired into production output; until it is, count tables
+# ship with no interval, which is more honest than a wrong one.
 
 # ==============================================================================
 # MODULE INITIALIZATION
