@@ -62,35 +62,48 @@ validate_best_worst_data <- function(data, config) {
 
   # Validate best-worst choices
   choice_set_col <- config$choice_set_column %||% "choice_set_id"
+  resp_col <- config$respondent_id_column %||% "resp_id"
+
+  # A choice set is a respondent AND a set id. Grouping by set id alone makes
+  # every count equal the number of respondents whenever set ids are numbered
+  # within respondent, so every such dataset failed validation.
+  group_key <- if (resp_col %in% names(data)) {
+    list(resp = data[[resp_col]], choice_set = data[[choice_set_col]])
+  } else {
+    list(choice_set = data[[choice_set_col]])
+  }
+
+  .describe_bad <- function(agg, count_col) {
+    bad <- agg[agg[[count_col]] != 1, , drop = FALSE]
+    if (!is.null(bad$resp)) {
+      sprintf("resp %s set %s", bad$resp, bad$choice_set)
+    } else {
+      sprintf("set %s", bad$choice_set)
+    }
+  }
 
   # Check: Exactly one best per choice set (base R — no dplyr)
-  best_per_set <- aggregate(
-    data[["best"]],
-    by = list(choice_set = data[[choice_set_col]]),
-    FUN = sum
-  )
-  names(best_per_set) <- c("choice_set", "n_best")
+  best_per_set <- aggregate(data[["best"]], by = group_key, FUN = sum)
+  names(best_per_set)[ncol(best_per_set)] <- "n_best"
 
   if (any(best_per_set$n_best != 1)) {
-    bad_sets <- best_per_set$choice_set[best_per_set$n_best != 1]
+    bad_sets <- .describe_bad(best_per_set, "n_best")
     validation$critical <- c(validation$critical,
-                              sprintf("Each choice set must have exactly 1 'best' selection (found %d violations)",
-                                      length(bad_sets)))
+                              sprintf("Each choice set must have exactly 1 'best' selection (found %d violations, e.g. %s)",
+                                      length(bad_sets),
+                                      paste(utils::head(bad_sets, 3), collapse = "; ")))
   }
 
   # Check: Exactly one worst per choice set (base R)
-  worst_per_set <- aggregate(
-    data[["worst"]],
-    by = list(choice_set = data[[choice_set_col]]),
-    FUN = sum
-  )
-  names(worst_per_set) <- c("choice_set", "n_worst")
+  worst_per_set <- aggregate(data[["worst"]], by = group_key, FUN = sum)
+  names(worst_per_set)[ncol(worst_per_set)] <- "n_worst"
 
   if (any(worst_per_set$n_worst != 1)) {
-    bad_sets <- worst_per_set$choice_set[worst_per_set$n_worst != 1]
+    bad_sets <- .describe_bad(worst_per_set, "n_worst")
     validation$critical <- c(validation$critical,
-                              sprintf("Each choice set must have exactly 1 'worst' selection (found %d violations)",
-                                      length(bad_sets)))
+                              sprintf("Each choice set must have exactly 1 'worst' selection (found %d violations, e.g. %s)",
+                                      length(bad_sets),
+                                      paste(utils::head(bad_sets, 3), collapse = "; ")))
   }
 
   # Check: Best and worst are different

@@ -56,6 +56,15 @@ started — so fixing H2 (A5) exposes it. The sub-models now run under a config
 with `estimation_method = "auto"`. Found by the new sequential-recovery test,
 which is the first test in this module ever to estimate a best-worst model.
 
+### A-NEW-5 — the implicit-None path writes a string into a numeric column
+`create_none_rows()` (`R/09_none_handling.R`) set the synthesised None row's
+`alternative_id` to the literal `"NONE"`. When the data's alternative id is
+numeric — which it is in every generic Turas layout — the `bind_rows()` in
+`handle_implicit_none()` then fails outright with an incompatible-type error.
+The path was unreachable while H1 stopped implicit-None detection from ever
+firing, so fixing H1 (A6) exposes it. Numeric id columns now get one past the
+highest existing id; non-numeric ones still get `"NONE"`.
+
 ---
 
 ## Deviations from the work order
