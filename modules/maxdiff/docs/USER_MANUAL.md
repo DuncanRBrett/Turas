@@ -419,27 +419,10 @@ best.
 Maps your survey column names to what the module expects. Two approaches
 are available.
 
-#### Approach A: Pattern-Based Mapping (Recommended)
-
-Use column name patterns with `{task}` as a placeholder for the task
-number:
-
-| Mapping_Type | Value | Description |
-|----------------------------|-----------------|--------------------------|
-| `Version_Variable` | `Version` | Column holding the design version number |
-| `Best_Column_Pattern` | `MaxDiff_T{task}_Best` | Pattern for best-choice columns |
-| `Worst_Column_Pattern` | `MaxDiff_T{task}_Worst` | Pattern for worst-choice columns |
-| `Best_Value_Type` | `ITEM_POSITION` | What the best-choice values represent |
-| `Worst_Value_Type` | `ITEM_POSITION` | What the worst-choice values represent |
-
-If your survey exports columns named `MD_T1_Best`, `MD_T1_Worst`,
-`MD_T2_Best`, `MD_T2_Worst`, etc., then set: -
-`Best_Column_Pattern = MD_T{task}_Best` -
-`Worst_Column_Pattern = MD_T{task}_Worst`
-
-#### Approach B: Explicit Field Mapping
-
-List each field individually in a table:
+SURVEY_MAPPING lists each data column explicitly, one row per field.
+(An older edition of this manual described a pattern-based schema with
+`Best_Column_Pattern` rows -- the engine has never supported it, and the
+template no longer shows it.)
 
 | Field_Type     | Field_Name   | Task_Number | Notes                   |
 |----------------|--------------|-------------|-------------------------|
@@ -449,10 +432,16 @@ List each field individually in a table:
 | `BEST_CHOICE`  | `Q2_Best`    | 2           | Best choice for task 2  |
 | `WORST_CHOICE` | `Q2_Worst`   | 2           | Worst choice for task 2 |
 
-**Value types:** - `ITEM_POSITION` -- Values are 1, 2, 3, 4, etc.
-(position of the chosen item within the task as defined by the design
-file). - `ITEM_ID` -- Values are the actual Item_ID strings (e.g.,
-`ITEM_01`).
+A `T1` / `Task1` infix anywhere in the field name is auto-detected when
+Task_Number is blank.
+
+**How the choice cells are coded** is set in PROJECT_SETTINGS with
+`Choice_Value_Type`: - `ITEM_ID` (default) -- values are the Item_ID
+strings (e.g., `ITEM_01`). - `ITEM_POSITION` -- values are 1, 2, 3...,
+the position of the chosen item within the task as defined by the design
+file (how Sawtooth and Alchemer typically export). The engine decodes
+positions through the design; an out-of-range position refuses with the
+respondent and task named.
 
 ### 4.7 Sheet: SEGMENT_SETTINGS (Optional)
 
@@ -695,7 +684,6 @@ After a successful analysis run, the output folder contains:
 | `{Project}_best_worst.png` | Diverging bar chart (Best% left, Worst% right) |
 | `{Project}_utility_distribution.png` | Violin plot of individual utilities (HB only) |
 | `{Project}_segment_*.png` | Segment comparison charts (one per segment variable) |
-| `{Project}_log.txt` | Run log with timestamps and diagnostics |
 
 ### 7.2 Excel Results Workbook
 
@@ -1229,7 +1217,7 @@ design version. Reduce the number of versions or increase total sample.
 
 ### 14.7 Getting Help
 
-1.  Check the run log: `{Output_Folder}/{Project_Name}_log.txt`
+1.  Read the console output of the run (errors and TRS notices print there)
 2.  Review error messages in the R console -- they include specific TRS
     error codes and remediation steps.
 3.  Check the Diagnostics tab in the HTML report for model-level issues.
@@ -1386,23 +1374,17 @@ simulator
 
 ## Appendix B: Example Configuration
 
-A complete working example with all features enabled is available in:
-
-```         
-examples/maxdiff/demo_showcase/
-```
-
-Run the full demo:
+Generate a fresh, loader-verified configuration template with:
 
 ``` r
-source("examples/maxdiff/demo_showcase/run_demo.R")
+source("modules/maxdiff/templates/create_maxdiff_template.R")
+create_maxdiff_template("my_maxdiff_config.xlsx")
 ```
 
-This generates: - `Demo_MaxDiff_Config.xlsx` -- complete configuration
-with all features enabled - `demo_design.xlsx` -- balanced 3-version
-design for 12 items - `demo_data.csv` -- simulated survey responses (n =
-200, with weights and anchor column) - `output/` -- HTML report (with
-embedded simulator) and Excel workbook
+The committed copy lives at
+`modules/maxdiff/templates/maxdiff_config_template.xlsx`. (An older
+edition of this manual referenced an `examples/maxdiff/demo_showcase/`
+folder that does not exist in the repository.)
 
 ------------------------------------------------------------------------
 

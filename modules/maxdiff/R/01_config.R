@@ -436,6 +436,38 @@ parse_project_settings <- function(df, project_root) {
   settings <- as.list(df$Value)
   names(settings) <- df$Setting_Name
 
+  # Section separators and blank rows are furniture, not settings.
+  keep <- !is.na(names(settings)) & nzchar(trimws(names(settings))) &
+    !grepl("^---", names(settings))
+  settings <- settings[keep]
+
+  # Duplicates refuse; unknown names warn (M10). A typo'd setting used to
+  # be carried along silently while the real one kept its default.
+  dup <- unique(names(settings)[duplicated(names(settings))])
+  if (length(dup) > 0) {
+    maxdiff_refuse(
+      code = "CFG_DUPLICATE_SETTING",
+      title = "Duplicate Setting Rows",
+      problem = sprintf("PROJECT_SETTINGS defines these settings more than once: %s",
+                        paste(dup, collapse = ", ")),
+      why_it_matters = "Which of the duplicate values wins is arbitrary; the run must not guess.",
+      how_to_fix = "Delete the duplicate rows so each setting appears once."
+    )
+  }
+  .known_project_settings <- c(
+    "Project_Name", "Mode", "Raw_Data_File", "Design_File", "Output_Folder",
+    "Output_File", "Data_File_Sheet", "Respondent_ID_Variable",
+    "Weight_Variable", "Filter_Expression", "Choice_Value_Type", "Seed",
+    "Brand_Colour", "Accent_Colour", "Module_Version", "Generate_Stats_Pack",
+    "Analyst_Name", "Research_House", "HB_Iterations", "HB_Warmup", "HB_Chains"
+  )
+  .unknown <- setdiff(names(settings), .known_project_settings)
+  if (length(.unknown) > 0) {
+    cat(sprintf(
+      "[TRS WARNING] MAXD_UNKNOWN_SETTINGS: PROJECT_SETTINGS rows not recognised and ignored: %s. Check for typos - a misspelled setting keeps its default silently.\n",
+      paste(.unknown, collapse = ", ")))
+  }
+
   # Required settings
   required <- c("Project_Name", "Mode")
   missing <- setdiff(required, names(settings))
@@ -517,11 +549,19 @@ parse_project_settings <- function(df, project_root) {
     settings$Seed <- safe_integer(settings$Seed[1], 12345)
   }
 
-  # Parse Data_File_Sheet
+  # Parse Data_File_Sheet. An all-digit string coerces to integer: the
+  # template default was the STRING "1", and openxlsx::read.xlsx errors on
+  # sheet = "1" while sheet = 1 works (H6, verified empirically) - the
+  # shipped template could not complete a run because of this cell.
   if (is_missing(settings$Data_File_Sheet)) {
     settings$Data_File_Sheet <- 1  # Default to first sheet
   } else {
-    settings$Data_File_Sheet <- settings$Data_File_Sheet[1]
+    v <- settings$Data_File_Sheet[1]
+    settings$Data_File_Sheet <- if (grepl("^\\s*\\d+\\s*$", as.character(v))) {
+      as.integer(trimws(as.character(v)))
+    } else {
+      v
+    }
   }
 
   # Parse optional settings
@@ -564,6 +604,17 @@ parse_project_settings <- function(df, project_root) {
 #' @return Data frame of validated items
 #' @keywords internal
 parse_items_sheet <- function(df) {
+
+  # The template writes an instruction block below the item table; those
+  # rows read back with a blank/NA Include and no real item. Only rows with
+  # a non-blank Item_ID AND a parseable Include count as items.
+  if ("Item_ID" %in% names(df)) {
+    df <- df[!is.na(df$Item_ID) & nzchar(trimws(as.character(df$Item_ID))), , drop = FALSE]
+  }
+  if ("Include" %in% names(df)) {
+    inc <- suppressWarnings(as.integer(df$Include))
+    df <- df[!is.na(inc), , drop = FALSE]
+  }
 
   # Required columns
   required_cols <- c("Item_ID", "Item_Label")
@@ -818,6 +869,12 @@ parse_design_settings <- function(df, n_items) {
 #' @keywords internal
 parse_survey_mapping <- function(df) {
 
+  # Rows with no Field_Type are sheet furniture, not mappings.
+  if ("Field_Type" %in% names(df)) {
+    df <- df[!is.na(df$Field_Type) & nzchar(trimws(as.character(df$Field_Type))), ,
+             drop = FALSE]
+  }
+
   # Required columns
   required_cols <- c("Field_Type", "Field_Name")
   missing_cols <- setdiff(required_cols, names(df))
@@ -938,6 +995,14 @@ parse_segment_settings <- function(df) {
     return(NULL)
   }
 
+  # Rows with no Segment_ID are sheet furniture (side notes, spacing), not
+  # segment definitions.
+  if ("Segment_ID" %in% names(df)) {
+    df <- df[!is.na(df$Segment_ID) & nzchar(trimws(as.character(df$Segment_ID))), ,
+             drop = FALSE]
+    if (nrow(df) == 0) return(NULL)
+  }
+
   # Required columns
   required_cols <- c("Segment_ID", "Segment_Label", "Variable_Name")
   missing_cols <- setdiff(required_cols, names(df))
@@ -1024,6 +1089,29 @@ parse_output_settings <- function(df) {
   # Convert to named list
   settings <- as.list(df[[value_col]])
   names(settings) <- df[[name_col]]
+
+  # Drop separators/blanks, refuse duplicates, warn on unknown names (M10).
+  keep <- !is.na(names(settings)) & nzchar(trimws(names(settings))) &
+    !grepl("^---", names(settings))
+  settings <- settings[keep]
+  dup <- unique(names(settings)[duplicated(names(settings))])
+  if (length(dup) > 0) {
+    maxdiff_refuse(
+      code = "CFG_DUPLICATE_SETTING",
+      title = "Duplicate Output Setting Rows",
+      problem = sprintf("OUTPUT_SETTINGS defines these settings more than once: %s",
+                        paste(dup, collapse = ", ")),
+      why_it_matters = "Which of the duplicate values wins is arbitrary; the run must not guess.",
+      how_to_fix = "Delete the duplicate rows so each setting appears once."
+    )
+  }
+  .unknown <- setdiff(names(settings), names(get_default_output_settings()))
+  if (length(.unknown) > 0) {
+    cat(sprintf(
+      "[TRS WARNING] MAXD_UNKNOWN_SETTINGS: OUTPUT_SETTINGS rows not recognised and ignored: %s. Check for typos - a misspelled setting keeps its default silently.\n",
+      paste(.unknown, collapse = ", ")))
+    settings <- settings[setdiff(names(settings), .unknown)]
+  }
 
   # Parse with defaults
   result <- get_default_output_settings()

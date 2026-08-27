@@ -117,8 +117,6 @@ create_maxdiff_template <- function(output_path = NULL) {
       "",
       "",
       "",
-      "",
-      "",
       "WORKFLOW: DESIGN MODE",
       "",
       "",
@@ -151,9 +149,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "SURVEY_MAPPING: Column mappings for survey data - Required for ANALYSIS mode",
       "SEGMENT_SETTINGS: Define segments for subgroup analysis - Optional",
       "OUTPUT_SETTINGS: Control what outputs are generated - Optional (has defaults)",
-      "REPORT_SETTINGS: Branding, logos, and report generation options - Optional",
       "SLIDES: Custom report pages inserted before/after diagnostics - Optional",
-      "IMAGES: Embedded images for specific report panels - Optional",
       "",
       "1. Set Mode = DESIGN in PROJECT_SETTINGS",
       "2. Define your items in the ITEMS sheet",
@@ -202,9 +198,12 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Respondent_ID_Variable",
       "Weight_Variable",
       "Filter_Expression",
+      "Choice_Value_Type",
       "Seed",
       "Brand_Colour",
       "Accent_Colour",
+      "Analyst_Name",
+      "Research_House",
       "Module_Version"
     ),
     Value = c(
@@ -217,9 +216,12 @@ create_maxdiff_template <- function(output_path = NULL) {
       "RespID",
       "",
       "",
+      "ITEM_ID",
       "12345",
       "#1e3a5f",
       "#2aa198",
+      "",
+      "",
       "v11.0"
     ),
     Required = c(
@@ -227,6 +229,9 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES",
       "ANALYSIS only",
       "ANALYSIS only",
+      "NO",
+      "NO",
+      "NO",
       "NO",
       "NO",
       "NO",
@@ -247,9 +252,12 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Column name containing respondent IDs (default: RespID)",
       "Column name for weighting variable (leave blank for unweighted)",
       "R expression to filter data, e.g., Q1 == 1 (leave blank for no filter)",
+      "How best/worst cells are coded: ITEM_ID (Item_ID strings) or ITEM_POSITION (1-based position within the task - how Sawtooth/Alchemer usually export)",
       "Random seed for reproducibility (any integer)",
       "Primary brand colour for HTML report and simulator (hex format)",
       "Secondary accent colour for HTML report (hex format)",
+      "Analyst name - appears in the stats pack Declaration sheet",
+      "Research organisation name - appears in the stats pack Declaration sheet",
       "Module version (for tracking)"
     ),
     Options_Examples = c(
@@ -262,9 +270,12 @@ create_maxdiff_template <- function(output_path = NULL) {
       "RespID, ResponseID, ID, Respondent_ID",
       "Weight, wgt, sample_weight (leave blank if unweighted)",
       "Region == 'North', Age >= 18 & Age <= 65, Complete == 1",
+      "ITEM_ID or ITEM_POSITION",
       "12345, 42, 98765",
       "#1e3a5f, #2c3e50, #003366",
       "#2aa198, #e67e22, #27ae60",
+      "Jane Smith",
+      "The Research LampPost, Acme Research Partners",
       "v11.0"
     ),
     stringsAsFactors = FALSE
@@ -493,91 +504,54 @@ create_maxdiff_template <- function(output_path = NULL) {
 
   addWorksheet(wb, "SURVEY_MAPPING", gridLines = FALSE)
 
+  # One row per data column the loader reads (01_config.R: Field_Type /
+  # Field_Name / Task_Number). The old template used a pattern schema
+  # (Mapping_Type / Best_Column_Pattern) the loader has never supported, so
+  # the shipped template could not complete an ANALYSIS run (H6).
+  n_example_tasks <- 6
   survey_mapping <- data.frame(
-    Mapping_Type = c(
-      "Version_Variable",
-      "Best_Column_Pattern",
-      "Worst_Column_Pattern",
-      "Task_Number_Pattern",
-      "Best_Value_Type",
-      "Worst_Value_Type",
-      "Anchor_Variable"
-    ),
-    Value = c(
-      "Version",
-      "MaxDiff_T{task}_Best",
-      "MaxDiff_T{task}_Worst",
-      "{task}",
-      "ITEM_POSITION",
-      "ITEM_POSITION",
-      ""
-    ),
-    Required = c(
-      "YES",
-      "YES",
-      "YES",
-      "NO",
-      "YES",
-      "YES",
-      "NO"
-    ),
+    Field_Type = c("VERSION",
+                   rep(c("BEST_CHOICE", "WORST_CHOICE"), n_example_tasks)),
+    Field_Name = c("Version",
+                   as.vector(rbind(sprintf("MaxDiff_T%d_Best", 1:n_example_tasks),
+                                   sprintf("MaxDiff_T%d_Worst", 1:n_example_tasks)))),
+    Task_Number = c(NA, rep(1:n_example_tasks, each = 2)),
     Description = c(
-      "Column name containing design version number (1, 2, 3...)",
-      "Pattern for Best choice columns. Use {task} as placeholder for task number",
-      "Pattern for Worst choice columns. Use {task} as placeholder for task number",
-      "How task number appears in column names (usually just {task})",
-      "What value is stored: ITEM_POSITION (1-5) or ITEM_ID (actual ID)",
-      "What value is stored: ITEM_POSITION (1-5) or ITEM_ID (actual ID)",
-      "Column containing anchor/must-have selections (comma-separated Item_IDs or blank)"
-    ),
-    Examples = c(
-      "Version, DesignVersion, Block, MD_Version",
-      "MaxDiff_T{task}_Best, MD{task}B, Best_{task}, Q5_{task}_Best",
-      "MaxDiff_T{task}_Worst, MD{task}W, Worst_{task}, Q5_{task}_Worst",
-      "{task}, T{task}, Task{task}",
-      "ITEM_POSITION (1,2,3,4,5) or ITEM_ID (ITEM_01, ITEM_02...)",
-      "ITEM_POSITION (1,2,3,4,5) or ITEM_ID (ITEM_01, ITEM_02...)",
-      "MustHave_Items, Anchor_Q (e.g. 'ITEM_01,ITEM_03,ITEM_05')"
+      "Column holding the design version number (1, 2, 3...)",
+      as.vector(rbind(sprintf("Best choice for task %d", 1:n_example_tasks),
+                      sprintf("Worst choice for task %d", 1:n_example_tasks)))
     ),
     stringsAsFactors = FALSE
   )
 
   writeData(wb, "SURVEY_MAPPING", survey_mapping, startRow = 1, startCol = 1)
-  addStyle(wb, "SURVEY_MAPPING", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
+  addStyle(wb, "SURVEY_MAPPING", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
+  addStyle(wb, "SURVEY_MAPPING", exampleStyle,
+           rows = 2:(nrow(survey_mapping) + 1), cols = 1:4, gridExpand = TRUE)
 
-  for (i in 2:(nrow(survey_mapping) + 1)) {
-    if (survey_mapping$Required[i-1] == "YES") {
-      addStyle(wb, "SURVEY_MAPPING", requiredStyle, rows = i, cols = 1:5, gridExpand = TRUE)
-    } else {
-      addStyle(wb, "SURVEY_MAPPING", optionalStyle, rows = i, cols = 1:5, gridExpand = TRUE)
-    }
-  }
-
-  setColWidths(wb, "SURVEY_MAPPING", cols = 1, widths = 25)
-  setColWidths(wb, "SURVEY_MAPPING", cols = 2, widths = 30)
-  setColWidths(wb, "SURVEY_MAPPING", cols = 3, widths = 12)
-  setColWidths(wb, "SURVEY_MAPPING", cols = 4, widths = 60)
-  setColWidths(wb, "SURVEY_MAPPING", cols = 5, widths = 50)
-  freezePane(wb, "SURVEY_MAPPING", firstRow = TRUE)
-
-  # Add explanation
-  mapping_notes <- data.frame(
+  survey_mapping_notes <- data.frame(
     Note = c(
-      "COLUMN PATTERN EXAMPLE:",
-      "If your survey has columns: MaxDiff_T1_Best, MaxDiff_T1_Worst, MaxDiff_T2_Best, MaxDiff_T2_Worst, ...",
-      "Set Best_Column_Pattern = MaxDiff_T{task}_Best",
-      "Set Worst_Column_Pattern = MaxDiff_T{task}_Worst",
-      "",
-      "VALUE TYPE EXPLANATION:",
-      "ITEM_POSITION: Values 1-5 indicate which position in the task was selected (matches design file)",
-      "ITEM_ID: Values are the actual Item_IDs (e.g., ITEM_01, ITEM_02) - used when survey stores IDs directly"
+      "One row per data column. Field_Type is VERSION, BEST_CHOICE or WORST_CHOICE.",
+      "Field_Name must match the column name in your data file exactly.",
+      "Task_Number links each best/worst pair to a DESIGN task; a T1/T2 infix in the name is auto-detected when the column is blank.",
+      "Adjust the example rows to your own task count and column names.",
+      "Whether the cells carry Item_IDs or task positions is set in PROJECT_SETTINGS (Choice_Value_Type)."
     ),
     stringsAsFactors = FALSE
   )
+  # Side column, NOT below the table: anything in the schema columns reads
+  # back as a mapping row and the loader (rightly) refuses it.
+  writeData(wb, "SURVEY_MAPPING", survey_mapping_notes,
+            startRow = 2, startCol = 6)
+  addStyle(wb, "SURVEY_MAPPING", instructionStyle,
+           rows = 3:7, cols = 6, gridExpand = TRUE)
+  setColWidths(wb, "SURVEY_MAPPING", cols = 6, widths = 110)
 
-  writeData(wb, "SURVEY_MAPPING", mapping_notes, startRow = 10, startCol = 1)
-  addStyle(wb, "SURVEY_MAPPING", instructionStyle, rows = 10:17, cols = 1, gridExpand = TRUE)
-  setColWidths(wb, "SURVEY_MAPPING", cols = 1, widths = 100)
+  setColWidths(wb, "SURVEY_MAPPING", cols = 1, widths = 16)
+  setColWidths(wb, "SURVEY_MAPPING", cols = 2, widths = 24)
+  setColWidths(wb, "SURVEY_MAPPING", cols = 3, widths = 13)
+  setColWidths(wb, "SURVEY_MAPPING", cols = 4, widths = 90)
+  freezePane(wb, "SURVEY_MAPPING", firstRow = TRUE)
 
   # ============================================================================
   # SHEET 6: SEGMENT_SETTINGS
@@ -585,46 +559,45 @@ create_maxdiff_template <- function(output_path = NULL) {
 
   addWorksheet(wb, "SEGMENT_SETTINGS", gridLines = FALSE)
 
+  # One row per segment GROUP (the loader refuses duplicate Segment_IDs and
+  # wants Segment_ID / Segment_Label / Variable_Name, 01_config.R). The old
+  # template's one-row-per-LEVEL schema with repeated IDs refused on load (H6).
   segment_settings <- data.frame(
-    Segment_ID = c("Gender", "Gender", "Age_Group", "Age_Group", "Age_Group", "Region", "Region", "Region", "Region"),
-    Segment_Name = c("Male", "Female", "18-34", "35-54", "55+", "North", "South", "East", "West"),
-    Variable_Name = c("Gender", "Gender", "Age_Group", "Age_Group", "Age_Group", "Region", "Region", "Region", "Region"),
-    Variable_Value = c("1", "2", "1", "2", "3", "North", "South", "East", "West"),
-    Include = c(1, 1, 1, 1, 1, 1, 1, 1, 1),
-    Display_Order = c(1, 2, 1, 2, 3, 1, 2, 3, 4),
+    Segment_ID = c("Gender", "Age_Group", "Region"),
+    Segment_Label = c("Gender", "Age group", "Region"),
+    Variable_Name = c("Gender", "Age_Group", "Region"),
+    Segment_Def = c("", "", ""),
+    Include_in_Output = c(1, 1, 1),
     stringsAsFactors = FALSE
   )
 
   writeData(wb, "SEGMENT_SETTINGS", segment_settings, startRow = 1, startCol = 1)
-  addStyle(wb, "SEGMENT_SETTINGS", headerStyle, rows = 1, cols = 1:6, gridExpand = TRUE)
-  addStyle(wb, "SEGMENT_SETTINGS", exampleStyle, rows = 2:10, cols = 1:6, gridExpand = TRUE)
+  addStyle(wb, "SEGMENT_SETTINGS", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
+  addStyle(wb, "SEGMENT_SETTINGS", exampleStyle, rows = 2:4, cols = 1:5, gridExpand = TRUE)
 
-  setColWidths(wb, "SEGMENT_SETTINGS", cols = 1, widths = 15)
-  setColWidths(wb, "SEGMENT_SETTINGS", cols = 2, widths = 20)
-  setColWidths(wb, "SEGMENT_SETTINGS", cols = 3, widths = 18)
-  setColWidths(wb, "SEGMENT_SETTINGS", cols = 4, widths = 15)
-  setColWidths(wb, "SEGMENT_SETTINGS", cols = 5, widths = 10)
-  setColWidths(wb, "SEGMENT_SETTINGS", cols = 6, widths = 14)
+  setColWidths(wb, "SEGMENT_SETTINGS", cols = 1:5, widths = c(15, 20, 18, 30, 16))
   freezePane(wb, "SEGMENT_SETTINGS", firstRow = TRUE)
 
-  # Add column descriptions
   segment_instructions <- data.frame(
-    Column = c("Segment_ID", "Segment_Name", "Variable_Name", "Variable_Value", "Include", "Display_Order"),
-    Required = c("YES", "YES", "YES", "YES", "NO", "NO"),
+    Column = c("Segment_ID", "Segment_Label", "Variable_Name",
+               "Segment_Def", "Include_in_Output"),
+    Required = c("YES", "YES", "YES", "NO", "NO"),
     Description = c(
-      "Grouping variable name (e.g., Gender, Age_Group) - segments with same ID are grouped",
-      "Display name for this segment level (e.g., Male, Female, 18-34)",
-      "Column name in your data file containing this variable",
-      "Value to match in the variable (can be numeric or text)",
-      "1 = Include in analysis, 0 = Skip",
-      "Order for display within the segment group"
+      "Unique identifier for the segment group (one ROW per group, not per level)",
+      "Display name in the output tables",
+      "Column in your data file whose LEVELS become the segments",
+      "Optional R expression to derive the grouping (e.g. Age >= 35); blank = use the variable's own values",
+      "1 = include in output (default), 0 = skip"
     ),
     stringsAsFactors = FALSE
   )
 
-  writeData(wb, "SEGMENT_SETTINGS", segment_instructions, startRow = 13, startCol = 1)
-  addStyle(wb, "SEGMENT_SETTINGS", sectionStyle, rows = 13, cols = 1:3, gridExpand = TRUE)
-  addStyle(wb, "SEGMENT_SETTINGS", instructionStyle, rows = 14:19, cols = 1:3, gridExpand = TRUE)
+  # Side columns for the same reason as SURVEY_MAPPING: below-the-table
+  # rows read back as segment definitions.
+  writeData(wb, "SEGMENT_SETTINGS", segment_instructions, startRow = 2, startCol = 7)
+  addStyle(wb, "SEGMENT_SETTINGS", sectionStyle, rows = 2, cols = 7:9, gridExpand = TRUE)
+  addStyle(wb, "SEGMENT_SETTINGS", instructionStyle, rows = 3:7, cols = 7:9, gridExpand = TRUE)
+  setColWidths(wb, "SEGMENT_SETTINGS", cols = 7:9, widths = c(22, 10, 80))
 
   # ============================================================================
   # SHEET 7: OUTPUT_SETTINGS
@@ -659,12 +632,10 @@ create_maxdiff_template <- function(output_path = NULL) {
       # --- Display & Formatting ---
       "--- DISPLAY & FORMATTING ---",
       "Score_Display",
-      "Utility_Scale",
-      "Include_Raw_Data",
-      "Include_Diagnostics",
-      "Chart_Format",
-      "Chart_Width",
-      "Chart_Height"
+      "Score_Rescale_Method",
+      "Export_Individual_Utils",
+      "Min_Respondents_Per_Segment",
+      "Output_Item_Sort_Order"
     ),
     Value = c(
       "",
@@ -689,11 +660,9 @@ create_maxdiff_template <- function(output_path = NULL) {
       "",
       "BOTH",
       "0_100",
-      "NO",
       "YES",
-      "PNG",
-      "800",
-      "600"
+      "50",
+      "UTILITY_DESC"
     ),
     Description = c(
       "",
@@ -717,12 +686,10 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Format of anchor variable data",
       "",
       "How to display preference scores in reports",
-      "Scale for utility scores: RAW, 0_100, or PROBABILITY",
-      "Include raw response data in output file",
-      "Include model diagnostics and fit statistics",
-      "Chart image format: PNG, PDF, or SVG",
-      "Chart width in pixels",
-      "Chart height in pixels"
+      "Scale for utility scores (the setting the engine reads - the old template's Utility_Scale row was silently ignored)",
+      "Write the per-respondent utilities sheet (needed for TURF and the tabs export)",
+      "Minimum respondents for a segment to be reported",
+      "Row order for item tables"
     ),
     Options = c(
       "",
@@ -748,10 +715,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "UTILITY | PREFERENCE_SHARE | BOTH",
       "RAW = logit scale | 0_100 = rescaled 0-100 | PROBABILITY = share of preference",
       "YES or NO",
-      "YES or NO",
-      "PNG, PDF, SVG",
-      "400-1600 (pixels)",
-      "300-1200 (pixels)"
+      "Positive integer (default 50)",
+      "UTILITY_DESC | UTILITY_ASC | ITEM_ID | DISPLAY_ORDER"
     ),
     stringsAsFactors = FALSE
   )
@@ -783,7 +748,7 @@ create_maxdiff_template <- function(output_path = NULL) {
                         "Generate_HTML_Report", "Generate_Simulator",
                         "Generate_Stats_Pack",
                         "Generate_TURF", "Has_Anchor_Question",
-                        "Include_Raw_Data", "Include_Diagnostics")
+                        "Export_Individual_Utils")
   for (sname in yn_setting_names) {
     row_idx <- which(output_settings$Setting_Name == sname) + 1
     if (length(row_idx) == 1) {
@@ -805,72 +770,6 @@ create_maxdiff_template <- function(output_path = NULL) {
     dataValidation(wb, "OUTPUT_SETTINGS", col = 2, rows = anchor_fmt_row,
                    type = "list", value = "'COMMA_SEPARATED,BINARY'")
   }
-
-  # ============================================================================
-  # SHEET 8: REPORT_SETTINGS
-  # ============================================================================
-
-  addWorksheet(wb, "REPORT_SETTINGS", gridLines = FALSE)
-
-  report_settings <- data.frame(
-    Setting_Name = c(
-      "Brand_Colour",
-      "Accent_Colour",
-      "Researcher_Logo_Path",
-      "Client_Logo_Path",
-      "Report_Title",
-      "Include_Methodology"
-    ),
-    Value = c(
-      "#323367",
-      "#CC9900",
-      "",
-      "",
-      "",
-      "YES"
-    ),
-    Required = c(
-      "NO",
-      "NO",
-      "NO",
-      "NO",
-      "NO",
-      "NO"
-    ),
-    Description = c(
-      "Primary brand colour for report theme (hex format)",
-      "Accent colour for highlights and secondary elements (hex format)",
-      "File path to researcher/agency logo image (PNG/JPG, leave blank for none)",
-      "File path to client logo image (PNG/JPG, leave blank for none)",
-      "Custom report title (leave blank to use Project_Name from PROJECT_SETTINGS)",
-      "Include a methodology section in the HTML report"
-    ),
-    Options_Examples = c(
-      "#323367, #1e3a5f, #2c3e50",
-      "#CC9900, #e67e22, #27ae60",
-      "logos/agency_logo.png, C:/Logos/company.png",
-      "logos/client_logo.png, C:/Logos/client_brand.png",
-      "Brand Preference MaxDiff Study Q1 2024",
-      "YES or NO"
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  writeData(wb, "REPORT_SETTINGS", report_settings, startRow = 1, startCol = 1)
-  addStyle(wb, "REPORT_SETTINGS", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
-  addStyle(wb, "REPORT_SETTINGS", optionalStyle,
-           rows = 2:(nrow(report_settings) + 1), cols = 1:5, gridExpand = TRUE)
-
-  setColWidths(wb, "REPORT_SETTINGS", cols = 1, widths = 25)
-  setColWidths(wb, "REPORT_SETTINGS", cols = 2, widths = 30)
-  setColWidths(wb, "REPORT_SETTINGS", cols = 3, widths = 12)
-  setColWidths(wb, "REPORT_SETTINGS", cols = 4, widths = 60)
-  setColWidths(wb, "REPORT_SETTINGS", cols = 5, widths = 50)
-  freezePane(wb, "REPORT_SETTINGS", firstRow = TRUE)
-
-  # Data validation for Include_Methodology
-  dataValidation(wb, "REPORT_SETTINGS", col = 2, rows = 7,
-                 type = "list", value = "'YES,NO'")
 
   # ============================================================================
   # SHEET 9: SLIDES
@@ -918,97 +817,6 @@ create_maxdiff_template <- function(output_path = NULL) {
                  type = "list", value = "'BEFORE_DIAGNOSTICS,AFTER_DIAGNOSTICS'")
 
   # ============================================================================
-  # SHEET 10: IMAGES
-  # ============================================================================
-
-  addWorksheet(wb, "IMAGES", gridLines = FALSE)
-
-  images <- data.frame(
-    Panel = c("summary"),
-    Image_Path = c("images/study_overview.png"),
-    Caption = c("Figure 1: Study overview and key findings"),
-    stringsAsFactors = FALSE
-  )
-
-  writeData(wb, "IMAGES", images, startRow = 1, startCol = 1)
-  addStyle(wb, "IMAGES", headerStyle, rows = 1, cols = 1:3, gridExpand = TRUE)
-  addStyle(wb, "IMAGES", exampleStyle, rows = 2, cols = 1:3, gridExpand = TRUE)
-
-  setColWidths(wb, "IMAGES", cols = 1, widths = 20)
-  setColWidths(wb, "IMAGES", cols = 2, widths = 50)
-  setColWidths(wb, "IMAGES", cols = 3, widths = 50)
-  freezePane(wb, "IMAGES", firstRow = TRUE)
-
-  # Add column descriptions below data
-  images_instructions <- data.frame(
-    Column = c("Panel", "Image_Path", "Caption"),
-    Required = c("YES", "YES", "NO"),
-    Description = c(
-      "Which report panel to embed the image in: summary, preferences, items, turf, segments, diagnostics",
-      "File path to the image file (PNG/JPG, relative to config or absolute)",
-      "Optional caption text displayed below the image"
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  writeData(wb, "IMAGES", images_instructions, startRow = 5, startCol = 1)
-  addStyle(wb, "IMAGES", sectionStyle, rows = 5, cols = 1:3, gridExpand = TRUE)
-  addStyle(wb, "IMAGES", instructionStyle, rows = 6:8, cols = 1:3, gridExpand = TRUE)
-
-  # Data validation for Panel
-  dataValidation(wb, "IMAGES", col = 1, rows = 2:20,
-                 type = "list", value = "'summary,preferences,items,turf,segments,diagnostics'")
-
-  # ============================================================================
-  # SHEET 11: STUDY_IDENTIFICATION
-  # ============================================================================
-
-  addWorksheet(wb, "STUDY_IDENTIFICATION", gridLines = FALSE)
-
-  study_id <- data.frame(
-    Setting_Name = c(
-      "Project_Name",
-      "Analyst_Name",
-      "Research_House"
-    ),
-    Value = c(
-      "",
-      "",
-      ""
-    ),
-    Required = c(
-      "NO",
-      "NO",
-      "NO"
-    ),
-    Description = c(
-      "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
-      "Analyst name — appears in the stats pack Declaration sheet.",
-      "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name."
-    ),
-    Options_Examples = c(
-      "Brand Preference Study Q1 2026, Product Features MaxDiff",
-      "Jane Smith, John Doe",
-      "The Research LampPost, Acme Research Partners"
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  writeData(wb, "STUDY_IDENTIFICATION", study_id, startRow = 1, startCol = 1)
-  addStyle(wb, "STUDY_IDENTIFICATION", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
-  addStyle(wb, "STUDY_IDENTIFICATION", optionalStyle,
-           rows = 2:(nrow(study_id) + 1), cols = 1:5, gridExpand = TRUE)
-
-  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 1, widths = 20)
-  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 2, widths = 35)
-  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 3, widths = 12)
-  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 4, widths = 75)
-  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 5, widths = 50)
-  freezePane(wb, "STUDY_IDENTIFICATION", firstRow = TRUE)
-
-  # ============================================================================
-  # SAVE WORKBOOK
-  # ============================================================================
 
   turas_saveWorkbook(wb, output_path, overwrite = TRUE)
 
@@ -1026,10 +834,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   cat("  5. SURVEY_MAPPING      - Survey column mappings\n")
   cat("  6. SEGMENT_SETTINGS    - Segment definitions\n")
   cat("  7. OUTPUT_SETTINGS     - Output options (TURF, Anchor, Display, Stats Pack)\n")
-  cat("  8. REPORT_SETTINGS     - Branding, logos, report options\n")
-  cat("  9. SLIDES              - Custom report pages\n")
-  cat(" 10. IMAGES              - Embedded panel images\n")
-  cat(" 11. STUDY_IDENTIFICATION - Project, analyst, and research house for stats pack\n")
+  cat("  8. SLIDES              - Custom report pages\n")
   cat("\n")
   cat("Color coding:\n")
   cat("  Yellow  = Required setting\n")

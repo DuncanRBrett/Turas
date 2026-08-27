@@ -86,7 +86,6 @@ This module includes comprehensive documentation:
 1. **[User Manual](USER_MANUAL.md)** - Complete setup, usage guide, study design, troubleshooting
 2. **[Technical Reference](TECHNICAL_REFERENCE.md)** - Statistical methods, API reference, architecture
 3. **[Configuration Template](../templates/maxdiff_config_template.xlsx)** - Excel configuration template
-4. **[Demo Showcase](../../examples/maxdiff/demo_showcase/)** - Full working example with all features
 
 ## Configuration
 
@@ -202,7 +201,6 @@ modules/maxdiff/
 │   └── maxdiff_config_template.xlsx # Excel config template
 ├── tests/
 │   ├── testthat/          # 13 test files
-│   ├── test_maxdiff.R     # Standalone test runner
 │   └── run_full_tests.R   # Integration test suite
 ├── examples/
 │   └── basic/             # Built-in example
@@ -214,7 +212,6 @@ modules/maxdiff/
 For detailed information:
 - **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
 - **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
-- **Demo**: See [Demo Showcase](../../examples/maxdiff/demo_showcase/) for a working example
 
 For issues or questions, consult the documentation or contact the development team.
 
