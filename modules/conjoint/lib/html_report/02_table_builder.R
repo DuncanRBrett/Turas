@@ -271,7 +271,18 @@ build_wtp_table <- function(wtp_data) {
     )
   }, character(1))
 
-  ci_header <- if (has_ci) '<th class="cj-num-header" data-col-key="ci">95% CI</th>' else ""
+  ci_header <- if (has_ci) '<th class="cj-num-header" data-col-key="ci">95% CI (approx.)</th>' else ""
+
+  # The interval is a delta-method approximation whose price-slope standard
+  # error comes from an ordinary regression through three to five estimated
+  # price utilities. It is indicative, not a sampling interval, and the table
+  # has to say so where the reader is looking.
+  ci_note <- if (has_ci) {
+    paste0('<p class="cj-table-note">Intervals are approximate: the delta ',
+           'method applied to a price slope fitted through the estimated ',
+           'price utilities, not a sampling interval. Read them as an ',
+           'indication of spread, not as significance.</p>')
+  } else ""
 
   paste0(
     '<table class="cj-table" data-table-id="wtp"><thead><tr>',
@@ -281,7 +292,8 @@ build_wtp_table <- function(wtp_data) {
     ci_header,
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
-    '</tbody></table>'
+    '</tbody></table>',
+    ci_note
   )
 }
 

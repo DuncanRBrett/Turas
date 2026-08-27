@@ -599,7 +599,7 @@ validate_wtp_config <- function(config, attributes_df) {
         why_it_matters = "WTP calculation requires a valid price attribute to compute willingness to pay.",
         how_to_fix = c(
           sprintf("Available attributes: %s", paste(attributes_df$AttributeName, collapse = ", ")),
-          "Set wtp_price_attribute to the attribute representing price, or leave blank to skip WTP"
+          "Set wtp_price_attribute to the attribute representing price. Leaving it blank does NOT skip WTP: an attribute named price, cost or fee is detected automatically. To skip WTP, set wtp_enabled = N."
         )
       )
     }

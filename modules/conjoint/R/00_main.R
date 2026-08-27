@@ -492,8 +492,11 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
     }
 
     # STEP 6b: Calculate WTP (if price attribute exists)
+    # Note: leaving wtp_price_attribute blank does not skip WTP — an attribute
+    # named price/cost/fee is auto-detected. wtp_enabled = N is the off switch,
+    # and the template and guard text now say so.
     wtp_result <- NULL
-    if (exists("calculate_wtp", mode = "function")) {
+    if (isTRUE(config$wtp_enabled) && exists("calculate_wtp", mode = "function")) {
       # Auto-detect price attribute from config
       price_attr <- config$price_attribute %||% NULL
       if (is.null(price_attr)) {

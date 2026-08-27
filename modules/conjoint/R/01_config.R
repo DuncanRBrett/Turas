@@ -458,6 +458,10 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
       default = TRUE
     ),
 
+    # Willingness to pay. Blank wtp_price_attribute does NOT disable WTP —
+    # 00_main.R auto-detects a price/cost/fee attribute. This is the off switch.
+    wtp_enabled = safe_logical(settings_list$wtp_enabled, default = TRUE),
+
     # =========================================================================
     # INTERACTIONS
     # =========================================================================
