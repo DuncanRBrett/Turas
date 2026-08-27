@@ -334,6 +334,12 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
       get_config_value(config, "qual_verbatim_scope", "all"),
       .TABS_QUAL_ENUMS$qual_verbatim_scope, "all"),
     qual_join_id_column = get_config_value(config, "qual_join_id_column", ""),
+
+    # Path to a conjoint contribution file ({output}_cj_island.json, written by
+    # the conjoint module). Names it and the report gains a Conjoint tab;
+    # leave it blank and nothing about the report changes. The two modules meet
+    # through this one file, the way the tracker meets its prior waves.
+    conjoint_island = get_config_value(config, "conjoint_island", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
     # Must be populated here — config_obj is an explicit whitelist, not the raw settings.
     qual_tag_dimensions = get_config_value(config, "qual_tag_dimensions", ""),
@@ -1673,6 +1679,9 @@ announce_retired_settings <- function(config, retired = TABS_RETIRED_SETTINGS) {
 # tell a mis-formatted setting row apart from a section header (see
 # warn_merged_setting_rows).
 TABS_KNOWN_SETTINGS <- c(
+  # Weighting
+  # Module contributions
+  "conjoint_island",
   # Weighting
   "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
   "show_weighted_base", "weight_label",

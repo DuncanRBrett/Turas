@@ -186,6 +186,15 @@ CONJOINT_RETIRED_SETTINGS <- c(
     "nothing read. Put your research house in company_name. Delete the row."
   ),
 
+  # --- the module's own HTML report, retired 2026-08-27 ----------------------
+  generate_html_report = paste(
+    "the conjoint module's own HTML report is retired. Conjoint results now",
+    "appear in the interactive report as a Conjoint tab - point the tabs",
+    "config's conjoint_island setting at the *_cj_island.json this run writes.",
+    "The market simulator is now a standalone file: set",
+    "generate_html_simulator = TRUE. Delete this row."
+  ),
+
   # --- dead custom-image surface, retired 2026-08-27 -------------------------
   include_custom_images = paste(
     "custom images were never implemented — neither this setting nor the",
@@ -817,6 +826,12 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     # 00_main.R auto-detects a price/cost/fee attribute. This is the off switch.
     wtp_enabled = safe_logical(settings_list$wtp_enabled, default = TRUE),
 
+    # Tabs export. Off by default: it only works for HB and latent class, and
+    # it is an extra deliverable, not part of every run.
+    generate_tabs_export = safe_logical(settings_list$generate_tabs_export,
+                                        default = FALSE),
+    tabs_question_code = settings_list$tabs_question_code %||% "CJIMP",
+
     # Read by the report's simulator transformer and by the revenue panel's
     # JS. It was in the template but never surfaced, so the revenue simulator
     # always opened at 1,000 customers whatever the config said.
@@ -904,7 +919,10 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     # HTML OUTPUT SETTINGS (Phase 3 Upgrade)
     # =========================================================================
 
-    generate_html_report = safe_logical(settings_list$generate_html_report, FALSE),
+    # generate_html_report is RETIRED (see CONJOINT_RETIRED_SETTINGS). The
+    # combined HTML report was this module's own second reporting stack; the
+    # interactive report is the deliverable and conjoint reaches it through
+    # conjoint_island. The simulator survives on its own.
     generate_html_simulator = safe_logical(settings_list$generate_html_simulator, FALSE),
     brand_colour = settings_list$brand_colour %||% "#323367",
     accent_colour = settings_list$accent_colour %||% "#CC9900",

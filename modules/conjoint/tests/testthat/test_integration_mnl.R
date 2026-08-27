@@ -245,7 +245,7 @@ if (is.null(turas_root)) {
   # ============================================================================
   # TEST 6: HTML report is created when configured
   # ============================================================================
-  test_that("MNL end-to-end: HTML report is created", {
+  test_that("MNL end-to-end: the standalone simulator matches its setting", {
     skip_if_not_installed("mlogit")
     skip_if_not_installed("dfidx")
 
@@ -258,28 +258,25 @@ if (is.null(turas_root)) {
       verbose     = FALSE
     )
 
-    # HTML report path is derived from output file
-    html_path <- sub("\\.xlsx$", "_report.html", output_file)
+    # The module's own combined HTML report was retired 2026-08-27. What a run
+    # can still produce on its own is the standalone market simulator, and it
+    # must match its setting: written when asked for, absent when not.
+    sim_path <- sub("\\.xlsx$", "_simulator.html", output_file)
+    sim_enabled <- isTRUE(result$config$generate_html_simulator)
+    expect_type(result$config$generate_html_simulator, "logical")
 
-    # The flag must be readable either way, and the file must match it: written
-    # and non-trivial when enabled, absent when not. (The committed example
-    # config has it off, so the else arm is the one that normally runs — but
-    # the test must assert something in both arms, not silently pass empty.)
-    html_enabled <- isTRUE(result$config$generate_html_report)
-    expect_type(result$config$generate_html_report, "logical")
-
-    if (html_enabled) {
-      expect_true(file.exists(html_path),
-                  info = "HTML report should be created when generate_html_report is TRUE")
-
-      # File should have non-trivial size (> 1 KB)
-      expect_gt(file.info(html_path)$size, 1000)
+    if (sim_enabled) {
+      expect_true(file.exists(sim_path))
+      expect_gt(file.info(sim_path)$size, 1000)
     } else {
-      expect_false(file.exists(html_path))
+      expect_false(file.exists(sim_path))
     }
 
+    # And the retired setting is gone from the config object entirely.
+    expect_null(result$config$generate_html_report)
+
     unlink(output_file)
-    unlink(html_path)
+    unlink(sim_path)
   })
 
   # ============================================================================

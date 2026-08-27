@@ -568,7 +568,13 @@ generate_crosstab_config_template <- function(output_path,
              description = paste0("Path to the classic tracker's Question_Mapping.xlsx. Links waves by a ",
                "canonical key (robust to question renames) + curates which metrics track. Blank -> ",
                "auto-detected in waves_source, else metrics match by question title."),
-             valid_values_text = "File path, or leave blank to auto-detect")
+             valid_values_text = "File path, or leave blank to auto-detect"),
+        list(name = "conjoint_island", default = "", required = FALSE,
+             description = paste0("Path to a conjoint study's contribution file for this project ",
+               "({output}_cj_island.json, written by the conjoint module). Names it and the report ",
+               "gains a Conjoint tab showing attribute importance, part-worth utilities, model fit ",
+               "and WTP. Blank -> no Conjoint tab, and nothing else about the report changes."),
+             valid_values_text = "File path, or leave blank")
       )
     ),
 

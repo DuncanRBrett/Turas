@@ -92,7 +92,7 @@ if (is.null(turas_root)) {
 
     # Expected check categories
     expected_categories <- c(
-      "r_files", "js_files", "html_report_files",
+      "r_files", "js_files", "simulator_files",
       "packages", "optional_packages", "trs_infrastructure"
     )
 

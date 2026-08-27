@@ -620,6 +620,52 @@ format_output_value <- function(value, type = "frequency",
 }
 
 
+#' Read a Conjoint Contribution For This Project
+#'
+#' The conjoint module writes `{output}_cj_island.json` when it runs. A tabs run
+#' embeds it when `conjoint_island` names it, so the two modules meet through
+#' one file and neither has to know how the other works — the same arrangement
+#' the tracker uses for wave contributions.
+#'
+#' Returns NULL for every ordinary tabs run, which is the point: nothing about
+#' a report without conjoint changes.
+#'
+#' @param config_obj The tabs config object.
+#' @return A single JSON string, or NULL.
+#' @keywords internal
+.read_conjoint_contribution <- function(config_obj) {
+  path <- config_obj$conjoint_island
+  if (is.null(path) || !nzchar(trimws(as.character(path)))) return(NULL)
+
+  path <- as.character(path)
+  if (!file.exists(path)) {
+    cat(sprintf(paste0("\n[WARNING] conjoint_island points at a file that is not there: %s\n",
+                       "  The report is built without the Conjoint tab.\n\n"), path))
+    return(NULL)
+  }
+
+  txt <- tryCatch(paste(readLines(path, warn = FALSE), collapse = ""),
+                  error = function(e) NULL)
+  if (is.null(txt) || !nzchar(trimws(txt))) return(NULL)
+
+  # Confirm it is what it claims to be before embedding it.
+  ok <- tryCatch({
+    parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+    identical(parsed$meta$kind, "conjoint")
+  }, error = function(e) FALSE)
+
+  if (!isTRUE(ok)) {
+    cat(sprintf(paste0("\n[WARNING] %s is not a conjoint contribution file.\n",
+                       "  The report is built without the Conjoint tab.\n\n"),
+                basename(path)))
+    return(NULL)
+  }
+
+  txt
+}
+
+
+
 # ==============================================================================
 # MAIN EXECUTION
 # ==============================================================================
@@ -1051,11 +1097,18 @@ if (.html_report_v2_on) {
         }
       }
 
+      # A conjoint study for this project contributes a small JSON file when it
+      # runs (write_conjoint_island, modules/conjoint/R/17_v2_island.R). Read it
+      # if the config points at one; the Conjoint tab appears only when it does.
+      # Absent or unreadable, this is NULL and the report is exactly as before.
+      cj_json_main <- .read_conjoint_contribution(config_result$config_obj)
+
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
                            sub("\\.xlsx$", "_report.html", v2_out),
                            prev_json = prev_json,
                            micro_json = serialize_microdata(micro),
-                           qual_json = qual_json_main)
+                           qual_json = qual_json_main,
+                           cj_json = cj_json_main)
     }, error = function(e) {
       cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
       cat("  The Excel and HTML outputs were not affected.\n\n")

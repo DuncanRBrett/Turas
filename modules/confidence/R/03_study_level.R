@@ -48,78 +48,33 @@ source_if_exists("utils.R")
 # ==============================================================================
 # EFFECTIVE SAMPLE SIZE
 # ==============================================================================
-
-#' Calculate effective sample size
-#'
-#' Calculates effective sample size using Kish (1965) formula.
-#' Effective-n represents the equivalent unweighted sample that would
-#' provide the same precision as the weighted sample.
-#'
-#' FORMULA: n_eff = (Σw)² / Σw²
-#'
-#' WEIGHT HANDLING:
-#' - NA weights: Excluded
-#' - Zero weights: Excluded
-#' - Negative weights: Should be caught by validation (causes error)
-#' - Infinite weights: Excluded
-#' - If all weights = 1: returns actual n (no design effect)
-#'
-#' NUMERIC STABILITY:
-#' Uses scale-safe calculation (normalizes by mean weight) to prevent
-#' overflow with very large weights. Effective-n is scale-invariant.
-#'
-#' @param weights Numeric vector. Survey weights (must be non-negative)
-#'
-#' @return Integer. Effective sample size (rounded)
-#'
-#' @references
-#' Kish, L. (1965). Survey Sampling. Wiley.
-#'
-#' @examples
-#' weights <- c(1.2, 0.8, 1.5, 1.0, 0.9)
-#' n_eff <- calculate_effective_n(weights)
-#' # Returns: 5 (very light weighting, minimal design effect)
-#'
-#' @author Adapted from Turas weighting.R V9.9.4
-#' @date 2025-11-12
-#' @export
-calculate_effective_n <- function(weights) {
-  # Remove NA/infinite weights and keep only positive (zeros excluded)
-  weights <- weights[!is.na(weights) & is.finite(weights) & weights > 0]
-
-  if (length(weights) == 0) {
-    return(0L)
-  }
-
-  # If all weights are 1, effective n = actual n (no design effect)
-  if (all(weights == 1)) {
-    return(as.integer(length(weights)))
-  }
-
-  # Scale-safe calculation for extreme weights
-  # Effective-n is scale-invariant, so we can normalize by mean
-  # This prevents numeric overflow with very large weights
-  mean_weight <- mean(weights)
-
-  if (is.finite(mean_weight) && mean_weight > 0) {
-    # Scale by mean for numeric stability
-    w <- weights / mean_weight
-    n_effective <- (sum(w)^2) / sum(w^2)
-  } else {
-    # Fallback to direct calculation (shouldn't happen if weights validated)
-    sum_weights <- sum(weights)
-    sum_weights_squared <- sum(weights^2)
-
-    if (sum_weights_squared == 0) {
-      return(0L)
+# calculate_effective_n now lives in modules/shared/lib/effective_n.R.
+#
+# The shared function is FRACTIONAL, which is what the statistic is. This
+# module has always worked from a rounded integer, so its call sites use
+# calculate_effective_n_int() — the same number this file used to return.
+# Naming the rounding at the call site is deliberate: the previous arrangement
+# had one function name meaning "float" in tabs and "integer" here.
+if (!exists("calculate_effective_n", mode = "function")) {
+  .eff_n_file <- local({
+    rel <- file.path("modules", "shared", "lib", "effective_n.R")
+    roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+    roots <- roots[nzchar(roots)]
+    d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+    for (i in 1:10) {
+      roots <- c(roots, d)
+      parent <- dirname(d)
+      if (identical(parent, d)) break
+      d <- parent
     }
-
-    n_effective <- (sum_weights^2) / sum_weights_squared
-  }
-
-  # Return as integer (downstream SE/df use this rounded value)
-  return(as.integer(round(n_effective)))
+    hits <- file.path(roots, rel)
+    hits <- hits[file.exists(hits)]
+    if (length(hits) > 0) hits[[1L]] else NA_character_
+  })
+  if (!is.na(.eff_n_file)) source(.eff_n_file)
+  rm(.eff_n_file)
 }
+
 
 
 # ==============================================================================
@@ -355,7 +310,7 @@ calculate_weight_stats_single <- function(group_name, weights, actual_n) {
   max_weight <- max(valid_weights)
   cv_weights <- sd(valid_weights) / mean_weight
   deff <- calculate_deff(weights)
-  n_eff <- calculate_effective_n(weights)
+  n_eff <- calculate_effective_n_int(weights)
 
   # Generate warnings
   warning_msgs <- character()

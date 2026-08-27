@@ -157,7 +157,7 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
     sd_val <- sqrt(calculate_weighted_variance(values, weights))
 
     # Effective sample size for degrees of freedom
-    n_eff <- calculate_effective_n(weights)
+    n_eff <- calculate_effective_n_int(weights)
   } else {
     mean_val <- mean(values)
     sd_val <- sd(values)
@@ -530,7 +530,7 @@ credible_interval_mean <- function(values, weights = NULL, conf_level = 0.95,
     sum_w <- sum(weights)
     mean_data <- sum(values * weights) / sum_w
     sd_data <- sqrt(calculate_weighted_variance(values, weights))
-    n_eff <- calculate_effective_n(weights)
+    n_eff <- calculate_effective_n_int(weights)
   } else {
     mean_data <- mean(values)
     sd_data <- sd(values)
@@ -689,7 +689,7 @@ analyze_mean <- function(values, weights = NULL, conf_level = 0.95,
     mean_val <- sum(values * weights) / sum_w
     sd_val <- sqrt(calculate_weighted_variance(values, weights))
     n_actual <- length(values)
-    n_eff <- calculate_effective_n(weights)
+    n_eff <- calculate_effective_n_int(weights)
   } else {
     mean_val <- mean(values)
     sd_val <- sd(values)

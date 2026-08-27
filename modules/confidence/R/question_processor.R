@@ -246,7 +246,7 @@ calculate_proportion_stats <- function(values, categories, weights = NULL) {
 
     success_w <- sum(weights[in_category])
     p <- success_w / total_w
-    n_eff <- calculate_effective_n(weights)
+    n_eff <- calculate_effective_n_int(weights)
     n_raw <- length(values)
   } else {
     p <- mean(in_category)
@@ -318,7 +318,7 @@ calculate_mean_stats <- function(values, weights = NULL) {
       weighted_var <- sum(weights * (values - mean_val)^2) / total_w
     }
     sd_val <- sqrt(weighted_var)
-    n_eff <- calculate_effective_n(weights)
+    n_eff <- calculate_effective_n_int(weights)
     n_raw <- length(values)
   } else {
     mean_val <- mean(values)
@@ -383,7 +383,7 @@ calculate_nps_stats <- function(values, promoter_codes, detractor_codes, weights
 
     pct_promoters <- 100 * sum(weights[is_promoter]) / total_w
     pct_detractors <- 100 * sum(weights[is_detractor]) / total_w
-    n_eff <- calculate_effective_n(weights)
+    n_eff <- calculate_effective_n_int(weights)
     n_raw <- length(values)
   } else {
     pct_promoters <- 100 * mean(is_promoter)

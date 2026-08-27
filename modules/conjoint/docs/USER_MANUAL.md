@@ -12,7 +12,7 @@
 4.  [Step-by-Step Guide](#4-step-by-step-guide)
 5.  [Configuration Reference](#5-configuration-reference)
 6.  [Interpreting Results](#6-interpreting-results)
-7.  [HTML Report Guide](#7-html-report-guide)
+7.  [Where Your Results Go](#7-where-your-results-go)
 8.  [Market Simulator Guide](#8-market-simulator-guide)
 9.  [Revenue Simulator](#9-revenue-simulator)
 10. [Product Optimizer](#10-product-optimizer)
@@ -448,14 +448,15 @@ results <- run_conjoint_analysis(
 The analysis produces:
 
 -   An **Excel workbook** with Utilities, Relative_Importance, Model_Summary, and Market Simulator sheets.
--   An **HTML report** (if `generate_html_report = TRUE`) with interactive charts, a built-in market and revenue simulator, and annotation tools.
+-   A **conjoint contribution file** (`{output}_cj_island.json`), which puts your results into the interactive report as a Conjoint tab. Point the tabs config's `conjoint_island` setting at it.
+-   A **standalone market simulator** (if `generate_html_simulator = TRUE`) — one self-contained HTML file with market shares, revenue modelling and sensitivity analysis, which the client can open and share.
 -   A **results object** in R with all computed outputs.
 
 See [Interpreting Results](#6-interpreting-results) for detailed guidance.
 
 ### Step 8: Use the Market Simulator
 
-The Market Simulator sheet in the output workbook lets you configure hypothetical products and see predicted market shares. The HTML report includes a richer interactive simulator with revenue modelling, sensitivity analysis, and scenario pinning. See [Market Simulator Guide](#8-market-simulator-guide) and [Revenue Simulator](#9-revenue-simulator) for full instructions.
+The Market Simulator sheet in the output workbook lets you configure hypothetical products and see predicted market shares. The standalone HTML simulator (`generate_html_simulator = TRUE`) is richer: revenue modelling, sensitivity analysis, several share methods. See [Market Simulator Guide](#8-market-simulator-guide) and [Revenue Simulator](#9-revenue-simulator).
 
 ------------------------------------------------------------------------
 
@@ -467,8 +468,7 @@ The configuration file is an Excel workbook with the following sheets:
 |----|----|----|
 | Settings | Yes | Analysis parameters, file paths, estimation options |
 | Attributes | Yes | Product attributes and their levels |
-| Custom_Slides | No | Custom content for the HTML report |
-| Custom_Images | No | Custom images for the HTML report |
+| Custom_Slides | No | Custom content for the report |
 | Design | No | Experimental design matrix (Turas infers from data if omitted) |
 | Instructions | No | Documentation (not read by code) |
 
@@ -507,6 +507,8 @@ The Settings sheet uses a two-column layout: `Setting` and `Value`. Settings are
 | `zero_center_utilities` | No | `TRUE` | Zero-center utilities within each attribute (recommended) | `TRUE` or `FALSE` |
 | `bw_method` | No | `sequential` | Best-worst estimation approach. Only `sequential` is implemented; `simultaneous` refuses. | `sequential` |
 | `min_responses_per_level` | No | `10` | Minimum observations per attribute level before a data warning is raised | Positive integer |
+| `generate_tabs_export` | No | `N` | Write per-respondent attribute importance for the tabs module (see above). Requires `hb` or `latent_class`. | `Y` or `N` |
+| `tabs_question_code` | No | `CJIMP` | QuestionCode stem for the exported importance question | Letters, digits and underscores, starting with a letter |
 | `generate_stats_pack` | No | `Y` | Write the diagnostic stats pack workbook alongside the main output. A contractual audit trail of data received, methods used and assumptions. | `Y` or `N` |
 
 #### Hierarchical Bayes Settings
@@ -560,7 +562,7 @@ These settings apply only when `estimation_method = "latent_class"`.
 
 | Setting | Default | Description | Valid Values |
 |----|----|----|----|
-| `default_customers` | `1000` | Default hypothetical customer count for the Revenue Simulator tab. Users can change this in the HTML report. | Positive integer |
+| `default_customers` | `1000` | Default hypothetical customer count for the Revenue Simulator tab. Users can change this in the simulator. | Positive integer |
 
 #### None Option
 
@@ -574,11 +576,11 @@ These settings apply only when `estimation_method = "latent_class"`.
 | Setting | Default | Description | Valid Values |
 |----|----|----|----|
 
-#### HTML Report
+#### Reporting
 
 | Setting | Default | Description | Valid Values |
 |----|----|----|----|
-| `generate_html_report` | `FALSE` | Generate an interactive HTML analysis report | `TRUE` or `FALSE` |
+| `generate_html_simulator` | `FALSE` | Generate the standalone market simulator, a self-contained HTML file | `TRUE` or `FALSE` |
 | `generate_html_simulator` | `FALSE` | Generate a standalone HTML market simulator | `TRUE` or `FALSE` |
 | `brand_colour` | `#323367` | Primary brand colour for HTML output | Hex colour code (e.g., `#323367`) |
 | `accent_colour` | `#CC9900` | Accent colour for highlights in HTML output | Hex colour code (e.g., `#CC9900`) |
@@ -796,7 +798,7 @@ WTP = -(Utility_level / Price_coefficient)
 
 ## 7. HTML Report Guide
 
-When `generate_html_report = TRUE`, Turas produces a single self-contained HTML file with all analysis panels and interactive tools. Open it in any modern browser -- no internet connection or server required.
+When `generate_html_simulator = TRUE`, Turas produces a single self-contained HTML file carrying the market and revenue simulator. Open it in any modern browser -- no internet connection or server required. The analysis itself is read in the interactive report's Conjoint tab (see above) and in the Excel workbook.
 
 ### Report Panels
 
@@ -1208,6 +1210,69 @@ The pre-flight check runs in seconds and provides clear pass/fail output for eac
 
 ## 14. Potential Issues and Troubleshooting
 
+
+> **Changed 2026-08-27.** The conjoint module no longer builds an HTML report of
+> its own. It was a second reporting stack, and the interactive report is the
+> deliverable — the same retirement the tabs module made on 2026-08-05.
+>
+> Your results reach the reader two ways now, and both are better than the old
+> report was:
+>
+> - **A Conjoint tab in the interactive report.** Every run writes
+>   `{output}_cj_island.json`. Point your tabs config's `conjoint_island`
+>   setting at it and the report gains a Conjoint tab: attribute importance,
+>   part-worth utilities with honest intervals, model fit, and WTP.
+> - **Crosstabbable importance.** `generate_tabs_export = Y` writes
+>   per-respondent attribute importance as a tabs Allocation question, so you
+>   can break importance by any banner in the study.
+>
+> The **market simulator** is unchanged in what it does, and is now its own
+> self-contained file (`generate_html_simulator = TRUE`) rather than a tab
+> inside the old report. The Conjoint tab links to it.
+>
+> If your config still says `generate_html_report`, the run will tell you so by
+> name and say what to use instead. Delete the row.
+
+### Exporting Attribute Importance to Crosstabs
+
+Conjoint results can be crosstabbed. Set `generate_tabs_export = Y` and the run
+writes `{output}_tabs_importance.xlsx` alongside the main workbook, containing
+each respondent's attribute importance in the shape the tabs module reads as an
+**Allocation** question.
+
+That means you can break attribute importance by any banner in the client's own
+report — importance by region, by segment, by purchase frequency — with tabs
+doing the weighting and the significance testing.
+
+**It requires `estimation_method = "hb"` or `"latent_class"`.** Under `auto`,
+`mlogit` or `clogit` there is one pooled model and no per-respondent estimates
+at all; the export refuses rather than repeating a single number for everyone,
+which would give banner differences of exactly zero and significance tests on a
+constant.
+
+The workbook has three sheets:
+
+| Sheet | What it holds |
+|---|---|
+| `DATA` | One row per respondent: your respondent ID column, then `CJIMP_1` … `CJIMP_k`, one per attribute, summing to 100. Paste or join this into your tabs data file. |
+| `QUESTIONMAP_SNIPPET` | The QuestionMap row and Options rows to paste into your tabs config. |
+| `METHOD` | The estimator and its settings, how many respondents were exported and excluded, the RLH quality flags, and the weighting disclosure. |
+
+Set `tabs_question_code` to change the `CJIMP` stem.
+
+**Two things to say when you present it.** The conjoint model is estimated
+unweighted, and tabs applies the study's weights when it reports these columns —
+so the crosstab is weighted and the estimation behind it is not. And these are
+model output, not answers a respondent gave. The METHOD sheet says both, in the
+workbook that carries the numbers.
+
+Respondents whose part-worths are completely flat have no importance profile —
+their shares do not sum to 100 — and are excluded and counted on the METHOD
+sheet rather than exported as zeros.
+
+Per-level part-worths as Numeric columns are a planned extension; only
+importance ships today.
+
 ### Refusal Codes
 
 Turas refuses rather than producing a number it cannot stand behind. Every
@@ -1224,6 +1289,8 @@ most likely to meet.
 | `CALC_BW_SIMULTANEOUS_UNIMPLEMENTED` | `bw_method = "simultaneous"` was requested. That estimator fits best and worst against each other without reversing the design, so it biases every estimate toward zero. | Use `bw_method = "sequential"`, which is the default and a standard approximation. |
 | `CALC_INTERACTIONS_NOT_IN_SIMULATOR` | The model has interaction terms, which a part-worth table cannot carry, so the simulator would compute shares from a main-effects model that was never estimated. | The report is still produced without its simulator. Clear `interaction_terms` if you need the simulator. |
 | `CALC_WTP_POSITIVE_PRICE_SLOPE` | Utility rises with price, which reverses the sign of every willingness-to-pay figure. | Check that price levels are listed in ascending order and parse as numbers. A genuinely positive slope means price is acting as a quality cue and needs interpretation, not a WTP table. |
+| `CALC_NO_RESPONDENT_UTILITIES` | The tabs export was requested but the model has no per-respondent estimates. | Set `estimation_method = "hb"` or `"latent_class"`. An aggregate model cannot be crosstabbed. |
+| `CALC_NO_EXPORTABLE_RESPONDENTS` | Every respondent has flat part-worths, so none has an importance profile. | Check convergence and the RLH quality figures — a sample that did not engage with the exercise produces exactly this. |
 | `CALC_LC_ASSIGNMENT_FAILED` | Respondents could not be assigned to latent classes at all. | Usually a failed HB run upstream, or too many classes for the data. Try fewer classes, or run `estimation_method = "hb"` first. |
 | `CALC_LC_NO_COMPARABLE_SOLUTION` | Latent class fitted, but no solution produced a usable BIC/AIC, so no class count could be chosen. | Latent class needs a substantial sample — 200+ is the usual guidance, and it is unreliable below about 100. |
 | `FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE` | The data contains None (no-purchase) rows. There is no alternative-specific constant for them yet. | Remove the None rows and analyse the remaining choices as a conditional model, reporting the no-purchase rate directly from the data. |
@@ -1393,7 +1460,7 @@ These do not stop the run, but they change what the numbers mean.
 
 **Solutions:**
 
-1.  Set `generate_html_report = TRUE` in the Settings sheet.
+1.  Set `generate_html_simulator = TRUE` in the Settings sheet.
 2.  Ensure jsonlite is installed: `install.packages("jsonlite")`.
 3.  Run `conjoint_preflight()` to check for missing files or packages.
 
@@ -1439,7 +1506,7 @@ The following R packages are required or optional for the Turas Conjoint Module.
 
 | Package | Purpose | When Needed |
 |----|----|----|
-| **jsonlite** | JSON encoding for HTML report data embedding | `generate_html_report = TRUE` |
+| **jsonlite** | JSON encoding for the simulator's data island and the report contribution | Always |
 | **base64enc** | Base64 encoding for config-driven slide images | `include_custom_images = TRUE` |
 
 ### Installing All Dependencies
@@ -1492,7 +1559,7 @@ Before running your analysis, verify the following:
 
 ### HTML Report (if enabled)
 
--   [ ] `generate_html_report` is set to `TRUE`.
+-   [ ] `generate_html_simulator` is set to `TRUE` if you want the simulator.
 -   [ ] jsonlite package is installed.
 -   [ ] If using custom slides with images: `include_custom_slides = TRUE` and `include_custom_images = TRUE`.
 -   [ ] If you want revenue simulation: verify a price attribute is present.

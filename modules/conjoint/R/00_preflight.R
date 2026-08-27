@@ -101,11 +101,12 @@ conjoint_preflight <- function(verbose = TRUE, module_dir = NULL) {
   # --------------------------------------------------------------------------
   # CHECK 2: Required JS files
   # --------------------------------------------------------------------------
-  js_dir <- file.path(base_dir, "lib", "html_report", "js")
+  # The report layer's JS went with the report (retired 2026-08-27). What
+  # remains is the simulator's, which is now a standalone tool.
+  js_dir <- file.path(base_dir, "lib", "html_simulator", "js")
   expected_js_files <- c(
-    "cj_pins.js", "conjoint_charts.js", "conjoint_export.js",
-    "conjoint_navigation.js", "simulator_charts.js", "simulator_engine.js",
-    "simulator_ui.js"
+    "simulator_charts.js", "simulator_engine.js", "simulator_ui.js",
+    "simulator_page.js"
   )
 
   js_present <- vapply(expected_js_files, function(f) {
@@ -127,14 +128,10 @@ conjoint_preflight <- function(verbose = TRUE, module_dir = NULL) {
   }
 
   # --------------------------------------------------------------------------
-  # CHECK 3: Required HTML report R files
+  # CHECK 3: Required simulator R files
   # --------------------------------------------------------------------------
-  html_dir <- file.path(base_dir, "lib", "html_report")
-  expected_html_files <- c(
-    "00_html_guard.R", "01_data_transformer.R", "02_table_builder.R",
-    "03_page_builder.R", "04_html_writer.R", "05_chart_builder.R",
-    "99_html_report_main.R"
-  )
+  html_dir <- file.path(base_dir, "lib", "html_simulator")
+  expected_html_files <- c("01_simulator_parts.R", "99_simulator_main.R")
 
   html_present <- vapply(expected_html_files, function(f) {
     file.exists(file.path(html_dir, f))
@@ -142,8 +139,8 @@ conjoint_preflight <- function(verbose = TRUE, module_dir = NULL) {
 
   html_missing <- expected_html_files[!html_present]
 
-  checks$html_report_files <- list(
-    name = "HTML report R files",
+  checks$simulator_files <- list(
+    name = "Simulator R files",
     pass = length(html_missing) == 0,
     expected = length(expected_html_files),
     found = sum(html_present),
@@ -289,10 +286,10 @@ conjoint_preflight <- function(verbose = TRUE, module_dir = NULL) {
       fix_steps <- c(fix_steps, "Restore missing R source files or re-install the module.")
     }
     if (length(checks$js_files$missing) > 0) {
-      fix_steps <- c(fix_steps, "Restore missing JS files in lib/html_report/js/.")
+      fix_steps <- c(fix_steps, "Restore missing JS files in lib/html_simulator/js/.")
     }
-    if (length(checks$html_report_files$missing) > 0) {
-      fix_steps <- c(fix_steps, "Restore missing HTML report R files in lib/html_report/.")
+    if (length(checks$simulator_files$missing) > 0) {
+      fix_steps <- c(fix_steps, "Restore missing simulator R files in lib/html_simulator/.")
     }
     if (length(checks$packages$missing) > 0) {
       fix_steps <- c(fix_steps, sprintf("Install missing packages: install.packages(c(%s))",

@@ -234,14 +234,18 @@ if (file.exists(file.path(.conjoint_module_dir, "15_product_optimizer.R"))) {
   source(file.path(.conjoint_module_dir, "15_product_optimizer.R"))
 }
 
-# HTML report and simulator orchestrators (lazy-loaded)
+if (file.exists(file.path(.conjoint_module_dir, "16_tabs_export.R"))) {
+  source(file.path(.conjoint_module_dir, "16_tabs_export.R"))
+}
+
+if (file.exists(file.path(.conjoint_module_dir, "17_v2_island.R"))) {
+  source(file.path(.conjoint_module_dir, "17_v2_island.R"))
+}
+
+# Standalone market simulator (lazy-loaded).
+# The combined HTML report that used to be loaded here was retired 2026-08-27.
 .conjoint_lib_dir <- file.path(dirname(.conjoint_module_dir), "lib")
 assign(".conjoint_lib_dir", .conjoint_lib_dir, envir = globalenv())
-
-.html_report_main <- file.path(.conjoint_lib_dir, "html_report", "99_html_report_main.R")
-if (file.exists(.html_report_main)) {
-  source(.html_report_main)
-}
 
 .html_simulator_main <- file.path(.conjoint_lib_dir, "html_simulator", "99_simulator_main.R")
 if (file.exists(.html_simulator_main)) {
@@ -672,84 +676,100 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
 
   if (verbose) cat(sprintf("   \u2713 Results written to: %s\n", basename(config$output_file)))
 
-  # Step 8: HTML report
-  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
-    if (verbose) {
-      cat(if (.model_has_interactions) {
-        "\n8. Generating HTML analysis report (without simulator - see below)...\n"
-      } else {
-        "\n8. Generating HTML analysis report (with simulator)...\n"
-      })
-    }
+  # Step 7b: tabs export (opt-in). Written before the report so a refusal here
+  # is visible next to the Excel deliverable it accompanies.
+  tabs_export_result <- NULL
+  if (isTRUE(config$generate_tabs_export)) {
+    if (verbose) cat("\n7b. Exporting attribute importance for tabs...\n")
 
-    if (.model_has_interactions) {
-      cat("\n┌─── TURAS: SIMULATOR OMITTED FROM REPORT ───────────────┐\n")
-      cat("│ Code: CALC_INTERACTIONS_NOT_IN_SIMULATOR\n")
-      cat("│ This model includes interaction terms. The market simulator is\n")
-      cat("│ built from the part-worth utilities table, which cannot carry\n")
-      cat("│ interaction coefficients, so its shares would come from a\n")
-      cat("│ main-effects model that was not estimated.\n")
-      cat("│ The rest of the report is built as usual, and the Simulator tab\n")
-      cat("│ explains why it is empty. The interaction effects themselves are\n")
-      cat("│ in the Excel workbook.\n")
-      cat("│ To get a simulator, clear interaction_terms in the Settings sheet.\n")
-      cat("└───────────────────────────────────────────────────────┘\n\n")
-    }
-
-    if (exists("generate_conjoint_html_report", mode = "function")) {
-      html_output_path <- sub("\\.xlsx$", "_report.html", config$output_file)
-
-      html_results <- list(
-        utilities = utilities, importance = importance,
-        model_result = model_result, diagnostics = diagnostics,
-        config = config, wtp = wtp_result
-      )
-
-      html_config <- list(
-        brand_colour = config$brand_colour, accent_colour = config$accent_colour,
-        project_name = config$project_name %||% "Conjoint Analysis",
-        company_name = config$company_name %||% "",
-        client_name = config$client_name %||% "",
-        analyst_name = config$analyst_name %||% "",
-        analyst_email = config$analyst_email %||% "",
-        analyst_phone = config$analyst_phone %||% "",
-        closing_notes = config$closing_notes %||% "",
-        researcher_logo_base64 = config$researcher_logo_base64 %||% "",
-        insight_overview = config$insight_overview %||% "",
-        insight_utilities = config$insight_utilities %||% "",
-        insight_diagnostics = config$insight_diagnostics %||% "",
-        insight_simulator = config$insight_simulator %||% "",
-        insight_wtp = config$insight_wtp %||% "",
-        custom_slides = config$custom_slides %||% NULL,
-        currency_symbol = config$currency_symbol %||% "$",
-
-        # The report builds normally, minus the simulator, when the model
-        # carries interaction terms the part-worth table cannot represent.
-        suppress_simulator = .model_has_interactions,
-        suppress_simulator_reason = if (.model_has_interactions) {
-          paste0("This model was estimated with interaction terms. The ",
-                 "simulator works from the part-worth utilities table, which ",
-                 "cannot carry interaction effects, so any share it showed ",
-                 "would come from a main-effects model that was not ",
-                 "estimated. The interaction effects are reported in the ",
-                 "Excel workbook. To use the simulator, re-run without ",
-                 "interaction terms.")
-        } else NULL
-      )
-
-      tryCatch({
-        generate_conjoint_html_report(html_results, html_output_path, html_config)
-        if (verbose) cat(sprintf("   \u2713 HTML report: %s\n", basename(html_output_path)))
-
-        # Minify for client delivery (if requested via Shiny checkbox)
-        if (exists("turas_prepare_deliverable", mode = "function")) {
-          turas_prepare_deliverable(html_output_path)
+    tabs_export_result <- tryCatch(
+      export_conjoint_importance_for_tabs(
+        results = list(
+          respondent_importance = attr(importance, "respondent_importance"),
+          model_result = model_result,
+          config = config
+        ),
+        verbose = verbose
+      ),
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+          turas_run_state_partial(trs_state, e$code, "Tabs export not produced",
+                                  problem = e$problem)
         }
-      }, error = function(e) {
-        message(sprintf("[TRS INFO] CONJ_HTML_REPORT_FAILED: %s", conditionMessage(e)))
-      })
+        NULL
+      }
+    )
+  }
+
+  # Step 7c: contribution to the interactive report. Always written when the
+  # analysis produced utilities — it is a small JSON file, and a tabs run for
+  # the same project picks it up. Nothing consumes it until one does.
+  island_result <- NULL
+  if (exists("write_conjoint_island", mode = "function")) {
+    island_result <- tryCatch(
+      write_conjoint_island(
+        results = list(
+          utilities = utilities,
+          importance = importance,
+          diagnostics = diagnostics,
+          model_result = model_result,
+          config = config,
+          wtp = wtp_result
+        ),
+        verbose = verbose
+      ),
+      turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+      error = function(e) {
+        message(sprintf("[TRS INFO] CONJ_ISLAND_FAILED: %s", conditionMessage(e)))
+        NULL
+      }
+    )
+  }
+
+  # Step 8: the standalone market simulator.
+  #
+  # This module's own combined HTML report was retired 2026-08-27, the same
+  # retirement tabs made on 2026-08-05: a second reporting stack nobody
+  # maintained. Conjoint results now appear in the interactive report as a
+  # Conjoint tab, fed by the *_cj_island.json written above. The simulator is
+  # a tool rather than report content, so it survives as its own file.
+  simulator_result <- NULL
+  if (isTRUE(config$generate_html_simulator)) {
+    if (verbose) cat("\n8. Generating the standalone market simulator...\n")
+
+    if (!exists("generate_conjoint_simulator", mode = "function")) {
+      cat("\n[TRS WARNING] CONJ_SIMULATOR_UNAVAILABLE: the simulator builder is not loaded; no simulator was written.\n\n")
     } else {
-      if (verbose) cat("   \u26a0 HTML report module not loaded\n")
+      sim_path <- sub("\\.xlsx$", "_simulator.html", config$output_file)
+      simulator_result <- tryCatch(
+        generate_conjoint_simulator(
+          results = list(utilities = utilities, importance = importance,
+                         model_result = model_result, config = config),
+          output_path = sim_path,
+          config = list(brand_colour = config$brand_colour,
+                        accent_colour = config$accent_colour,
+                        project_name = config$project_name),
+          verbose = verbose
+        ),
+        error = function(e) {
+          message(sprintf("[TRS INFO] CONJ_SIMULATOR_FAILED: %s", conditionMessage(e)))
+          NULL
+        }
+      )
+
+      if (!is.null(simulator_result) && identical(simulator_result$status, "REFUSED")) {
+        cat("\n\u250c\u2500\u2500\u2500 TURAS: SIMULATOR NOT PRODUCED \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
+        cat("\u2502 Code:", simulator_result$code, "\n")
+        cat("\u2502", simulator_result$message, "\n")
+        cat("\u2502 Fix:", simulator_result$how_to_fix, "\n")
+        cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
+        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+          turas_run_state_partial(trs_state, simulator_result$code,
+                                  "Simulator not produced",
+                                  problem = simulator_result$message)
+        }
+      }
     }
   }
 
@@ -826,6 +846,9 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     run_result = run_result,
     warnings = if (length(all_warnings) > 0) all_warnings else NULL,
     stats_pack = stats_pack_result,
+    tabs_export = tabs_export_result,
+    v2_island = island_result,
+    simulator = simulator_result,
 
     # Per-respondent attribute importance, one row per respondent, columns
     # summing to 100 except for respondents with flat part-worths. NULL unless
