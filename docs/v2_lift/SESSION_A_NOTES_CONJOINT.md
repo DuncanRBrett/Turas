@@ -182,3 +182,34 @@ The capitalised trio was the dead half (M7); it is gone, and
 B. P1 is the one with commercial consequences: a saved report **actively
 reverts** insights the reader typed, because `syncInsight` writes `.value` on a
 hidden textarea and `outerHTML` does not serialise it.
+
+---
+
+## Pre-merge review outcome and Duncan's rulings, 2026-08-27
+
+An independent Fable pre-merge review verified C1, C2 and C3 by execution on
+both sides (defects reproduced at the merge-base, fixes reproduced at the tip;
+the HB and LC standard errors hand-recomputed from `nmix$probdraw`/`compdraw`
+and matching exactly), confirmed the A-NEW-1 aggregate-CI defect in both
+directions, ran the suite at 0 fail / 0 skip, and confirmed by execution that
+three new test files fail on the old engine for defect-semantic reasons.
+
+Duncan ruled on the open items:
+
+- **Locked decision 7 / A11:** the three tested-but-unwired functions
+  (`optimize_product_exhaustive`, `optimize_product_greedy`,
+  `predict_shares_with_ci`) are **kept**, as this session left them. The
+  decision's "no caller or test" premise was verified false for tests.
+- **A8 None ASC:** the deferral **stands**; refusal remains the behaviour until
+  the design constant, reference-level handling and simulator export land
+  together (Session B+).
+- **CFG_DUPLICATE_SETTING migration cost:** **accepted**. Configs that kept the
+  old template's `Project_Name`/`Analyst_Name` rows refuse to load until those
+  rows are deleted; the refusal names the rows and the reason.
+
+One review finding fixed in this commit: the `FEATURE_NONE_ALTERNATIVE_NOT_ESTIMABLE`
+`how_to_fix` told the user to remove the None rows and re-run, but a set whose
+choice WAS None then has no chosen row and data validation refuses it
+("choice sets do not have exactly 1 chosen alternative") — verified by
+execution. The instruction now also says to remove the choice sets in which
+None was the chosen alternative.

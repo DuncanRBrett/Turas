@@ -94,7 +94,7 @@
       "study."
     ),
     how_to_fix = c(
-      sprintf("Remove the None rows from the data file (the rows where the attributes read '%s') and re-run. The remaining choices are then a valid conditional model: preference given that something is bought.",
+      sprintf("Remove the None rows from the data file (the rows where the attributes read '%s'), AND remove every choice set in which None was the chosen alternative — with its None row gone such a set has no chosen row left, and data validation will refuse it. Then re-run. The remaining choices are a valid conditional model: preference given that something is bought.",
               none_label %||% "None"),
       "Keep the None responses for reporting the no-purchase rate directly from the data, which is a defensible way to present them.",
       "None-alternative estimation is a planned feature; it needs the design constant, the reference-level handling and the simulator's none utility together, not separately."
