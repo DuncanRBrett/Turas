@@ -199,3 +199,39 @@ they have tests in `test_guard_fixes.R`.
 sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`
 binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores
 the directory at exactly the right moment with no frame ambiguity. Same intent.
+
+---
+
+## Definition of done — item by item
+
+Every row was verified by running something this session, not by reading the diff.
+Suite command throughout: `Rscript -e 'testthat::test_dir("modules/conjoint/tests/testthat", reporter = "summary")'`.
+
+| Item | Fixed | Evidence |
+|---|---|---|
+| A1 test harness (§5) | yes | Suite skips 12 → 0. Fixing the root finder made the six HB tests run and immediately error, which is the point. |
+| A2 GUI honesty (H4, H5, M10) | yes | `test_gui_refusal.R`, 12 cases, both refusal shapes |
+| A3 LC all-zero utilities (C1) | yes | `test_hb_uncertainty.R`; and an end-to-end LC run whose non-baseline utilities are non-zero and whose importance sums to 100 |
+| A4 SE/CI/p from heterogeneity (C3) | yes | `test_hb_uncertainty.R` + two bayesm integration tests; verified empirically before writing the code (see A-NEW notes) |
+| A5 BW simultaneous (C2), best_worst validator (H2) | refuse + fix | `test_bws_estimation.R`, incl. the first test in this module that estimates a BW model |
+| A6 set-only grouping (H1) | yes | `test_per_respondent_sets.R`, 6 cases on set ids that restart per respondent |
+| A7 bayesm row order (H7) | yes | `test_hb_estimation.R`: alternative-ordered input yields identical y and X |
+| A8 None in estimation (H8, engine side) | refuse, by decision | `test_none_estimation.R`; simulator side stays with Session B |
+| A9 interactions (H6) | yes | `test_interactions_config.R`, 8 cases |
+| A10 WTP (H9, M8) | yes | `test_wtp_anchoring.R`, 6 cases |
+| A11 LC round-robin (H10), slides (H12), optimizer (H3) | yes, with one deviation | `test_lc_slides_optimizer.R`, 8 cases; decision-7 split logged above |
+| A12 stats pack + config honesty (M1, M2, M3, M5) | yes | `test_config_and_stats_honesty.R`, 12 cases |
+| A13 HB importance (M4) | yes | `test_hb_importance.R`; a 50/50 split sample reports Brand at <40% by the old method and >80% by the new one |
+| A14 remaining M-tier + guard layer (H11, M6, M7, M9, M11) | yes | `test_guards_and_alchemer_honesty.R`, 12 cases |
+
+**Not done, and why:** the None-alternative ASC (A8) and the three
+tested-but-unwired functions of locked decision 7 (A11) — both logged above with
+the reasoning. Everything else in the work order landed.
+
+**Not verified by this session:** the HTML report and the Excel workbook were
+not opened and read as a human reader would read them. The report's table
+builder is covered by unit tests and the suite renders a ~1 MB report, but the
+Heterogeneity column, the WTP interval note and the interaction skip banner have
+not been eyeballed in a browser. That is Duncan's `launch_turas()` regeneration,
+per the standing rule that the pipeline is never headless-run against real
+projects from here.
