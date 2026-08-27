@@ -525,6 +525,82 @@ assert(gatedHtml.indexOf('data-tier="all" disabled') >= 0 &&
 assert(gatedHtml.indexOf("Withheld to protect confidentiality.") >= 0,
   "below k the controls row carries the standard disclosure note");
 
+// ---- per-question analyst insight + the question-level pin popover ----------
+// The insight box is config-seeded (TR.AGG.comments) and keyed on the QUAL_ code,
+// so it can never share a store key with the crosstab card's Insight box.
+console.log("\nQuestion insight + pin:");
+assert(qual.insightKey({ code: "QUAL_Q02COMMENT" }) === "QUAL_Q02COMMENT",
+  "insightKey is the question's own QUAL_ code");
+assert(qual.insightKey(null) === "" && qual.insightKey({}) === "",
+  "insightKey is empty when there is no code");
+
+const insightSeen = [];
+const realInsights = TR.insights;
+TR.insights = {
+  get: (k, b) => { insightSeen.push([k, b]); return k === "QS" ? "Service is the story." : ""; },
+  set: () => {}
+};
+const realStory = TR.story2, realShell = TR.shell;
+
+TR.disclosure = null;
+qual._state = null;
+qual.render(host);
+const insHtml = host.innerHTML;
+assert(insHtml.indexOf('data-qinsight="QS"') >= 0,
+  "the question page renders an insight textarea keyed on the question code");
+assert(insHtml.indexOf("Service is the story.") >= 0,
+  "the box is pre-filled from TR.insights (which falls back to the config Comments sheet)");
+assert(insHtml.indexOf('placeholder="Insight for QS') >= 0,
+  "the placeholder prints the exact code to put in the Comments sheet");
+assert(insightSeen.some((c) => c[0] === "QS" && c[1] === undefined),
+  "the question insight is fetched banner-agnostically (no banner argument)");
+assert(insHtml.indexOf('id="insight-box"') < 0,
+  "it never reuses the crosstab box's id — that handler writes to the crosstab active question");
+assert(insHtml.indexOf('<section class="ql-qcard" data-snap-card>') >= 0,
+  "header + insight + board form one pinnable snapshot card");
+assert(insHtml.indexOf('data-qinsight="QS"') < insHtml.indexOf("ql-controls"),
+  "the insight sits above the comments, not at the foot of a very long page");
+assert(insHtml.indexOf("data-qual-pin") >= 0 && insHtml.indexOf("ql-qpinmenu") >= 0,
+  "the header carries the shared Pin popover control");
+assert(insHtml.indexOf('class="pinwrap snap-pin ql-qpinwrap"') >= 0,
+  "the pin control is marked snap-pin, so a snapshot never captures the button");
+
+TR.disclosure = { active: () => true, minBase: () => 10,
+  audienceTooSmall: () => true, note: () => "Withheld to protect confidentiality." };
+qual._state = null;
+qual.render(host);
+assert(host.innerHTML.indexOf("data-qual-pin disabled") >= 0,
+  "below k the Pin button is disabled, exactly like Export");
+
+// A pin strips the controls that do nothing once frozen. pinQuestion names them
+// by selector in ONE list (PIN_DROP_SEL), so this locks the contract the other
+// way round: if a control is renamed, that list goes stale silently and a pinned
+// story card starts carrying dead buttons again.
+TR.disclosure = null;
+const savedIsland = TR.QUAL;
+TR.QUAL = {
+  textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
+  questions: [{ code: "QUAL_QT", title: "Why do you say that?", type: "themed",
+    themes: [{ id: 0, label: "Delivery" }], base: { answered: 2 },
+    records: [{ idx: 0, tier: 0, sentiment: 3, themeVals: { 0: 3 }, demos: {}, text: "late" },
+              { idx: 1, tier: 0, sentiment: 1, themeVals: { 0: 1 }, demos: {}, text: "fine" }] }]
+};
+TR.d2.state.qualQ = "QUAL_QT";
+qual._state = null;
+qual.render(host);
+const themedHtml = host.innerHTML;
+["data-jump-comments", "ql-boardtools", "data-theme-focus"].forEach((sel) => {
+  assert(themedHtml.indexOf(sel) >= 0,
+    "PIN_DROP_SEL still names a control the page renders: " + sel);
+});
+assert(themedHtml.indexOf('data-pinpart="board"') >= 0 && themedHtml.indexOf('data-pinpart="insight"') >= 0,
+  "board and insight are each tagged as a pin part, so the tickboxes can drop either");
+TR.QUAL = savedIsland;
+TR.d2.state.qualQ = null;
+
+TR.insights = realInsights;
+TR.story2 = realStory;
+TR.shell = realShell;
 TR.disclosure = null;   // leave no gate behind for anything after
 
 // ---- Reader bundle C1 — curated-first split ----------------------------------

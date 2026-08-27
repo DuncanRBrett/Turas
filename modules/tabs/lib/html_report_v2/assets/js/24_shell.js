@@ -430,6 +430,10 @@
   shell.snapshotCard = function (cardEl) {
     var clone = cardEl.cloneNode(true);
     clone.querySelectorAll(".snap-pin").forEach(function (el) { el.remove(); });
+    // A cloned textarea carries the analyst's TYPED value, not the markup
+    // default: the HTML spec has textarea's cloning steps propagate the API
+    // value and the dirty flag. So a note typed since the last render freezes
+    // correctly here even though these boxes persist without re-rendering.
     clone.querySelectorAll("textarea").forEach(function (ta) {
       var d = document.createElement("div");
       d.className = "snap-frozen-note";
@@ -459,6 +463,15 @@
     ).forEach(function (el) {
       if (el.closest(".snap-pin") || el.closest("table")) return;
       add(el.textContent);
+    });
+    // Analyst notes. The deck path harvests text from element selectors, which
+    // never matched a textarea (live card) or a .snap-frozen-note (a snapshot
+    // already frozen by snapshotCard) — so a pinned insight showed in the
+    // on-screen story and vanished from the PowerPoint. The note is usually
+    // the point of the pin, so it is harvested before the table figures.
+    cardEl.querySelectorAll("textarea, .snap-frozen-note").forEach(function (el) {
+      if (el.closest(".snap-pin")) return;
+      add(el.value != null ? el.value : el.textContent);
     });
     // Table rows: join each row's cells so a pinned crosstab carries its NUMBERS,
     // not just its title (I1 — the deck/PNG export had the caption but no figures).

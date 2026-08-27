@@ -941,6 +941,29 @@ table.ws td.sparkcell { padding: 1px 8px; }
   font: inherit; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 12px; cursor: pointer;
   white-space: nowrap; }
 .ql-jumpcomments:hover { border-color: var(--brand); background: var(--bg); }
+/* question-level Pin popover — same control as the Crosstabs tab, right-aligned
+   in the header meta row. It carries its own auto margin so a verbatim-only
+   question (no jump button) still pushes it right; where the jump button is
+   present that one already claimed the space, so this margin resets to 0 —
+   two auto margins would split the gap and strand the jump button mid-row. */
+.ql-qpinwrap { margin-left: auto; }
+.ql-jumpcomments + .ql-qpinwrap { margin-left: 0; }
+/* .snap-pin is BOTH the "strip me from a snapshot" marker and a styled
+   hover-reveal badge (absolute, 45% opacity). This pin is an ordinary inline
+   control in the header, so it resets the badge styling — exactly as the
+   themes x banner control bar does above. position stays relative: the
+   popover anchors to it. */
+.ql-qpinwrap.snap-pin { position: relative; top: auto; right: auto; z-index: auto;
+  opacity: 1; background: none; border: none; border-radius: 0; padding: 0;
+  font-size: inherit; line-height: inherit; }
+[data-snap-card]:hover .ql-qpinwrap.snap-pin { box-shadow: none; }
+.ql-qpin { border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
+  font: inherit; font-size: 12px; padding: 3px 11px; border-radius: 999px; white-space: nowrap; }
+.ql-qpin:hover:not(:disabled) { border-color: var(--brand); }
+.ql-qpin:disabled { opacity: .45; cursor: not-allowed; }
+/* the analyst insight sits directly under the header, ABOVE the board: on a page
+   this long a note at the foot would never be read. */
+.ql-qinsight { margin-top: 10px; margin-bottom: 16px; }
 /* controls row: noteworthy tier · sentiment filter (with counts) · shortlist + export */
 .ql-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 4px 0 12px;
   padding-top: 12px; border-top: 1px solid var(--line); }

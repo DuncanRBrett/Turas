@@ -284,6 +284,22 @@
     return (agg && typeof agg.headline === "string" && agg.headline.trim()) ? agg.headline.trim() : "";
   };
 
+  /** The analyst-insight key for a qual question — its own code.
+   *
+   *  A qual code is QUAL_<SHEET SLUG> (qual_sheet_code, R side), so it can
+   *  never collide with a crosstab QuestionCode: the two boxes stay separate
+   *  even where a closed question and its open-end sit side by side. Because
+   *  TR.insights falls back to TR.AGG.comments[key], a Comments-sheet row in
+   *  the config keyed on this code seeds this box — that is how a note ships
+   *  to the client rather than living in one browser.
+   *
+   *  Deliberately banner-agnostic: the question page has no banner context
+   *  (the themes x banner card carries its own, keyed <code>:xtab), so a
+   *  Banner-specific Comments row against a QUAL_ code is never read here. */
+  qual.insightKey = function (q) {
+    return (q && typeof q.code === "string") ? q.code : "";
+  };
+
   /** Whether this exact verbatim text is still PUBLISHED by the current island
    *  (a record with non-null text). The Story tab refuses to render a frozen
    *  qualitative pin whose quotes a rebuild has since withheld — hub pins used
@@ -1558,9 +1574,113 @@
     var divider = q.type === "themed"
       ? '<div class="ql-secdivider" id="ql-comments-anchor"><span class="ql-seclabel">💬 The comments</span></div>'
       : "";
-    return headerHtml(island, q, audience) + chart + divider +
+    // Header + board + insight form one pinnable card. The Pin popover in the
+    // header ticks which of those two parts travel to the Story (same shared
+    // popover as the Crosstabs tab). The comment list below is NOT part of the
+    // pin: priority quotes already reach a deck through the hubs and through
+    // the crosstab pin box.
+    return '<section class="ql-qcard" data-snap-card>' +
+        headerHtml(island, q, audience) + insightHtml(q) +
+        (chart ? '<div data-pinpart="board">' + chart + "</div>" : "") +
+      "</section>" + divider +
       controlsHtml(q, st, audience, island) +
       drawerHtml(island, q, st, audience) + footerHtml(island, q);
+  }
+
+  /**
+   * The per-question analyst insight — the overall read on this question's
+   * comments, in the same box the Crosstabs tab uses. It sits directly under
+   * the header, above the board: on a page this long a note at the foot would
+   * never be read, and the conclusion belongs ahead of the evidence.
+   *
+   * Seeded from the config's Comments sheet (keyed on qual.insightKey), then
+   * overridden by whatever the reader types. Clearing the box deletes the
+   * override and the config text returns.
+   */
+  function insightHtml(q) {
+    var key = qual.insightKey(q);
+    var txt = (TR.insights && TR.insights.get) ? TR.insights.get(key) : "";
+    return '<div class="insight ql-qinsight" data-pinpart="insight">' +
+      '<div class="insight-head">Analyst insight' +
+      '<span class="hint"> \u2014 the overall read on these comments</span></div>' +
+      '<textarea data-qinsight="' + esc(key) + '" placeholder="Insight for ' +
+      esc(key) + '\u2026">' + esc(txt) + "</textarea></div>";
+  }
+
+  /**
+   * Open the shared pin popover for the whole question card. Elements offered:
+   * the board (whichever view is showing) and the analyst insight — the two
+   * things inside the snap card.
+   */
+  function openQuestionPin(host, q, st) {
+    var btn = host.querySelector("[data-qual-pin]");
+    var menu = host.querySelector(".ql-qpinmenu");
+    if (!btn || !menu || !TR.shell || !TR.shell.pinMenu) return;
+    if (!menu.hidden) {                       // toggle closed on a second click
+      menu.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+      return;
+    }
+    menu.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    setTimeout(function () {
+      document.addEventListener("click", function closer(e) {
+        if (e.target && e.target.isConnected === false) return;   // re-rendered mid-click
+        if (!e.target.closest(".ql-qpinwrap")) {
+          menu.hidden = true;
+          btn.setAttribute("aria-expanded", "false");
+          document.removeEventListener("click", closer);
+        }
+      });
+    }, 0);
+    var items = [];
+    if (q.type === "themed") {
+      items.push({ key: "board", checked: true,
+        label: st.themeView === "crosstab" ? "Themes by banner" : "Theme board" });
+    }
+    items.push({ key: "insight", label: "Insight", checked: true });
+    TR.shell.pinMenu(menu, items, function (flags) {
+      menu.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+      if (!flags.board && !flags.insight) {
+        TR.shell.toast("Pick at least one element to pin");
+        return;
+      }
+      pinQuestion(host, q, st, flags);
+    });
+  }
+
+  // Controls that only make sense on the live page. A frozen story card must not
+  // carry buttons that do nothing when clicked. Kept in ONE list rather than
+  // marked at each render site. Anything carrying data stays: the theme bars and
+  // their numbers, the base, the coverage bar, the closed-question stat chip.
+  var PIN_DROP_SEL = "[data-jump-comments], .ql-boardtools, [data-theme-focus]";
+
+  /** Snapshot the question card with only the ticked elements in it. */
+  function pinQuestion(host, q, st, flags) {
+    var card = host.querySelector(".ql-qcard[data-snap-card]");
+    if (!card || !TR.story2 || !TR.story2.pinSnapshot) return;
+    // The clone carries each note's typed value (textarea cloning propagates it),
+    // so snapshotCard freezes what the analyst actually wrote — for this
+    // question's insight and, in the crosstab view, the nested themes x banner
+    // note inside the board.
+    var work = card.cloneNode(true);
+    work.querySelectorAll("[data-pinpart]").forEach(function (el) {
+      if (!flags[el.getAttribute("data-pinpart")]) el.remove();
+    });
+    work.querySelectorAll(PIN_DROP_SEL).forEach(function (el) { el.remove(); });
+    var bits = [];
+    if (flags.board && q.type === "themed") {
+      bits.push(st.themeView === "crosstab" ? "themes by banner" : "what people raised");
+    }
+    if (flags.insight) bits.push("analyst insight");
+    TR.story2.pinSnapshot({
+      source: "qualitative",
+      title: q.title,
+      context: bits.join(" \u00b7 "),
+      html: TR.shell.snapshotCard(work),
+      lines: TR.shell.snapshotLines(work)
+    });
   }
 
   function headerHtml(island, q, audience) {
@@ -1592,10 +1712,19 @@
       ? '<button class="ql-jumpcomments" data-jump-comments ' +
         'title="Skip the chart — jump to the comments and their filters">↓ Jump to comments</button>'
       : "";
+    // Pin to story — the same popover the Crosstabs tab opens, placed where the
+    // qual page previously had no pin at all (only the themes x banner card
+    // had one). Disabled below the disclosure threshold, exactly like Export:
+    // the board is withheld there, so there is nothing worth pinning.
+    var pin = '<span class="pinwrap snap-pin ql-qpinwrap">' +
+      '<button class="ql-qpin" data-qual-pin' + (gated ? " disabled" : "") +
+      ' aria-haspopup="true" aria-expanded="false"' +
+      ' title="Pin this question to the Story">\uD83D\uDCCC Pin\u2026</button>' +
+      '<span class="pinmenu ql-qpinmenu" hidden></span></span>';
     return '<header class="ql-head"><h2 class="ql-title">' + esc(q.title) + '</h2>' + headlineHtml +
       '<div class="ql-meta"><span class="ql-badge">' + badge + '</span>' +
       '<span class="ql-base">' + n + '</span>' + cov + qual.closedStatChip(q.code) + shield +
-      qual.scopeChip(island, q) + jump + '</div></header>';
+      qual.scopeChip(island, q) + jump + pin + '</div></header>';
   }
 
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
@@ -2403,6 +2532,21 @@
         st.xexpand = (st.xexpand === id) ? null : id;    // toggle its pos/mixed/neg split
         qual.render(host);
       });
+    });
+    // per-question analyst insight (persist on input, NO re-render so the
+    // cursor stays put) + the question-level pin popover
+    host.querySelectorAll("[data-qinsight]").forEach(function (ta) {
+      ta.addEventListener("input", function () {
+        if (TR.insights && TR.insights.set) {
+          TR.insights.set(ta.getAttribute("data-qinsight"), ta.value);
+        }
+      });
+    });
+    var qpin = host.querySelector("[data-qual-pin]");
+    if (qpin) qpin.addEventListener("click", function (e) {
+      e.stopPropagation();                       // never read as the outside click
+      var v = qual._view;
+      if (v && v.q) openQuestionPin(host, v.q, st);
     });
     host.querySelectorAll("[data-xinsight]").forEach(function (ta) {
       ta.addEventListener("input", function () {

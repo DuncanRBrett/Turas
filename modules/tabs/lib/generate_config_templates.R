@@ -982,7 +982,13 @@ generate_crosstab_config_template <- function(output_path,
   # --- SHEET 4: Comments ---
   comments_cols <- list(
     list(name = "QuestionCode", width = 20, required = TRUE,
-         description = "Question code to attach comment to, or _BACKGROUND / _EXECUTIVE_SUMMARY / _REPORT_CONSTRUCTION for report sections."),
+         description = paste0(
+           "Question code to attach comment to, or _BACKGROUND / _EXECUTIVE_SUMMARY / ",
+           "_REPORT_CONSTRUCTION for report sections. A QUAL_ code targets the ",
+           "Qualitative tab instead of the crosstab card: QUAL_ plus the coded-comment ",
+           "worksheet name, uppercased, non-alphanumerics as underscores (sheet ",
+           "'Q02Comment' -> QUAL_Q02COMMENT). The Qualitative page prints the exact ",
+           "code in its empty insight box. Banner is ignored on a QUAL_ row.")),
     list(name = "Comment", width = 60, required = TRUE,
          description = "Comment text. Supports markdown for HTML reports (bold, bullets, links)."),
     list(name = "Banner", width = 20, required = FALSE,
@@ -1000,7 +1006,12 @@ generate_crosstab_config_template <- function(output_path,
     # built by Turas alone. Plain words only - no ampersand, no angle brackets.
     list(QuestionCode = "_REPORT_CONSTRUCTION", Comment = "Optional: how this study's numbers were built, when other stages sit around Turas. Replaces the WHOLE Report construction section in About, including the standard reproducibility, AI and author-review paragraphs. Blank leaves it unchanged.", Banner = "", Headline = ""),
     list(QuestionCode = "Q_Satisfaction", Comment = "Note: Question wording changed from previous wave.", Banner = "",
-         Headline = "Satisfaction is up 5 points, driven by service quality")
+         Headline = "Satisfaction is up 5 points, driven by service quality"),
+    # A QUAL_ row lands on the Qualitative tab's per-question insight box, not on
+    # a crosstab card. QUAL_ codes come from the coded-comment WORKSHEET name, not
+    # from the question wording shown on screen.
+    list(QuestionCode = "QUAL_Q_COMMENTS", Comment = "Overall, the comments are dominated by delivery reliability.", Banner = "",
+         Headline = "")
   )
 
   write_table_sheet(wb, "Comments", comments_cols,
