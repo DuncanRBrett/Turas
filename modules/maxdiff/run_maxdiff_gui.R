@@ -384,15 +384,21 @@ run_maxdiff_gui <- function() {
 
         progress$set(value = 0.3, detail = "Running analysis...")
 
-        # Capture output
+        # Capture output AND messages (H5): all TRS PARTIAL notices —
+        # including the Stan-fallback notice — go through message(), and a
+        # stdout-only sink made every one of them invisible in the GUI.
         output_capture_file <- tempfile()
-        sink(output_capture_file, type = "output")
+        capture_con <- file(output_capture_file, open = "wt")
+        sink(capture_con, type = "output")
+        sink(capture_con, type = "message")
 
         options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
         result <- tryCatch({
           run_maxdiff(config_path = config_path, verbose = TRUE)
         }, finally = {
+          sink(type = "message")
           sink(type = "output")
+          close(capture_con)
         })
 
         progress$set(value = 0.9, detail = "Finalizing...")
@@ -411,16 +417,37 @@ run_maxdiff_gui <- function() {
         # Save to recent
         save_recent(config_path, rv$mode)
 
-        # Update console with completion message
-        out_path <- if (!is.null(result$output_path)) result$output_path else "output folder"
-        console_output(paste0(
-          console_output(),
-          sprintf("\n%s\n✓ MAXDIFF %s COMPLETE\n%s\n", strrep("=", 80), rv$mode, strrep("=", 80)),
-          sprintf("\nOutput saved to:\n%s\n", out_path)
-        ))
+        # Status-check before any success banner (H4): run_maxdiff returns a
+        # refusal OBJECT, not an error, so the old green toast fired on
+        # refusals too.
+        refused <- inherits(result, "turas_refusal_result") ||
+          (is.list(result) && identical(result$status, "REFUSED"))
 
-        progress$set(value = 1.0, detail = "Complete!")
-        showNotification("MaxDiff completed successfully!", type = "message", duration = 5)
+        if (refused) {
+          console_output(paste0(
+            console_output(),
+            sprintf("\n%s\n✗ MAXDIFF %s REFUSED\n%s\n", strrep("=", 80), rv$mode, strrep("=", 80)),
+            sprintf("\nCode: %s\n%s\n\nRead the refusal box above for how to fix it.\n",
+                    result$code %||% "(see console)",
+                    result$message %||% result$title %||% "")
+          ))
+          progress$set(value = 1.0, detail = "Refused")
+          showNotification(
+            paste0("MaxDiff refused: ", result$code %||% "see console"),
+            type = "error", duration = NULL
+          )
+        } else {
+          # Update console with completion message
+          out_path <- if (!is.null(result$output_path)) result$output_path else "output folder"
+          console_output(paste0(
+            console_output(),
+            sprintf("\n%s\n✓ MAXDIFF %s COMPLETE\n%s\n", strrep("=", 80), rv$mode, strrep("=", 80)),
+            sprintf("\nOutput saved to:\n%s\n", out_path)
+          ))
+
+          progress$set(value = 1.0, detail = "Complete!")
+          showNotification("MaxDiff completed successfully!", type = "message", duration = 5)
+        }
 
       }, error = function(e) {
         error_msg <- paste0(strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80))

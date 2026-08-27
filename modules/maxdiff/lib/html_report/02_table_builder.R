@@ -32,6 +32,9 @@ build_preference_scores_table <- function(scores, anchor_data = NULL, segment_da
 
   has_shares <- "Pref_Share" %in% names(scores)
   has_se <- "SE" %in% names(scores) && any(!is.na(scores$SE))
+  # The EB fallback ships Spread_SD instead of SE (M5): population spread of
+  # shrunken scores, so the header must not say SE.
+  has_spread <- "Spread_SD" %in% names(scores) && any(!is.na(scores$Spread_SD))
   has_anchor <- !is.null(anchor_data) && nrow(anchor_data) > 0
 
   # Header
@@ -41,6 +44,7 @@ build_preference_scores_table <- function(scores, anchor_data = NULL, segment_da
   if (has_shares) cols <- c(cols, '<th class="md-th md-num">Pref Share</th>')
   if (has_anchor) cols <- c(cols, '<th class="md-th md-num">Must-Have %</th>')
   if (has_se) cols <- c(cols, '<th class="md-th md-num">SE</th>')
+  if (has_spread) cols <- c(cols, '<th class="md-th md-num">Spread (SD)</th>')
 
   header <- sprintf('<thead><tr>%s</tr></thead>', paste(cols, collapse = "\n"))
 
@@ -82,6 +86,9 @@ build_preference_scores_table <- function(scores, anchor_data = NULL, segment_da
 
     if (has_se) {
       cells <- paste0(cells, sprintf('<td class="md-td md-num">%s</td>', fmt_num(s$SE, 3)))
+    }
+    if (has_spread) {
+      cells <- paste0(cells, sprintf('<td class="md-td md-num">%s</td>', fmt_num(s$Spread_SD, 3)))
     }
 
     sprintf('<tr>%s</tr>', cells)

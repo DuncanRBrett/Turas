@@ -412,9 +412,19 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
   # ==========================================================================
 
   if (config$mode == "ANALYSIS") {
-    generate_stats_pack_flag <- isTRUE(
-      toupper(config$project_settings$Generate_Stats_Pack %||% "Y") == "Y"
-    ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+    # The GUI sets this option every run (TRUE or FALSE), so when it is
+    # set it IS the toggle - the old '|| option' could only ever turn the
+    # pack on, never off (M11). Headless runs read the config: the
+    # OUTPUT_SETTINGS value (where the template puts it) wins over the
+    # legacy PROJECT_SETTINGS spelling.
+    .sp_opt <- getOption("turas.generate_stats_pack", NULL)
+    generate_stats_pack_flag <- if (!is.null(.sp_opt)) {
+      isTRUE(.sp_opt)
+    } else if (!is.null(config$output_settings$Generate_Stats_Pack)) {
+      isTRUE(config$output_settings$Generate_Stats_Pack)
+    } else {
+      isTRUE(toupper(config$project_settings$Generate_Stats_Pack %||% "Y") == "Y")
+    }
 
     if (generate_stats_pack_flag) {
       if (verbose) cat("\nGenerating stats pack...\n")
@@ -775,15 +785,24 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
 
   # Design info
   design_df      <- results$design %||% data.frame()
-  tasks_per_resp <- if (nrow(design_df) > 0 && "Task" %in% names(design_df)) {
-    max(design_df$Task, na.rm = TRUE)
+  # The design sheet's column is Task_Number ('Task' never existed - M6),
+  # so this always printed the em-dash before.
+  .task_col <- intersect(c("Task_Number", "Task"), names(design_df))[1]
+  tasks_per_resp <- if (nrow(design_df) > 0 && !is.na(.task_col)) {
+    max(design_df[[.task_col]], na.rm = TRUE)
   } else NA
 
-  # Model settings
+  # Model settings - the string reflects the estimator that actually ran
+  # (M6): the old text credited a choice-modelling package this module has
+  # never used, and said 'HB' even when the run had silently fallen back
+  # to empirical Bayes.
   has_hb      <- !is.null(results$hb_results)
   has_logit   <- !is.null(results$logit_results)
-  method_str  <- if (has_hb) {
-    "HB (ChoiceModelR package)"
+  hb_method   <- results$hb_results$model_fit$method %||% ""
+  method_str  <- if (has_hb && identical(hb_method, "cmdstanr")) {
+    "Stan HB (cmdstanr)"
+  } else if (has_hb) {
+    "Empirical Bayes shrinkage (count-based approximation - not Bayesian posterior utilities)"
   } else if (has_logit) {
     "Aggregate logit"
   } else {
@@ -874,7 +893,9 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
     data_used        = data_used,
     assumptions      = assumptions,
     run_result       = run_result,
-    packages         = c("openxlsx", "survival", "ChoiceModelR"),
+    packages         = c("openxlsx",
+                          if (has_logit) "survival",
+                          if (has_hb && identical(hb_method, "cmdstanr")) "cmdstanr"),
     config_echo      = list(
       project_settings = config$project_settings,
       output_settings  = config$output_settings

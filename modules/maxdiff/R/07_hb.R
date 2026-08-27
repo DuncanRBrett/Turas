@@ -221,6 +221,7 @@ prepare_stan_data <- function(long_data, items) {
   # Build observation data
   obs_list <- list()
   items_per_task <- NULL
+  n_tasks_dropped <- 0L
 
   for (i in seq_len(nrow(tasks))) {
     resp_id <- tasks$resp_id[i]
@@ -245,7 +246,10 @@ prepare_stan_data <- function(long_data, items) {
     best_item <- task_data$item_id[task_data$is_best == 1]
     worst_item <- task_data$item_id[task_data$is_worst == 1]
 
-    if (length(best_item) != 1 || length(worst_item) != 1) next
+    if (length(best_item) != 1 || length(worst_item) != 1) {
+      n_tasks_dropped <- n_tasks_dropped + 1L
+      next
+    }
 
     # Convert to indices
     resp_idx <- resp_to_idx[as.character(resp_id)]
@@ -268,6 +272,12 @@ prepare_stan_data <- function(long_data, items) {
       shown = shown_idx,
       is_best = 0L
     )
+  }
+
+  if (n_tasks_dropped > 0) {
+    cat(sprintf(
+      "[TRS INFO] MAXD_TASKS_DROPPED: %d of %d tasks lack exactly one best and one worst choice and were excluded from HB estimation (they remain in the counts denominators).\n",
+      n_tasks_dropped, nrow(tasks)))
   }
 
   N <- length(obs_list)
@@ -402,6 +412,7 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
     HB_Utility_Q95 = mu_summary$q95,
     HB_Rhat = mu_summary$rhat,
     HB_ESS = mu_summary$ess_bulk,
+    Estimation_Method = "Stan HB (cmdstanr posterior)",
     stringsAsFactors = FALSE
   )
 
@@ -600,6 +611,10 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
     HB_Utility_Q95 = safe_mean + 1.645 * sqrt(safe_var),
     HB_Rhat = NA_real_,
     HB_ESS = NA_real_,
+    # Honest stamp (M5): under EB these columns are the POPULATION SPREAD of
+    # shrunken count scores, not a posterior SE / credible interval. The
+    # stamp travels into the Excel output beside the numbers.
+    Estimation_Method = "Empirical Bayes (count-based; SD/Q5/Q95 are population spread, not posterior uncertainty)",
     stringsAsFactors = FALSE
   )
 

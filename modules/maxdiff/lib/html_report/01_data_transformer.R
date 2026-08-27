@@ -260,6 +260,10 @@ transform_preferences_section <- function(results, config) {
 
   if (has_hb) {
     pop <- results$hb_results$population_utilities
+    # Under the EB fallback HB_Utility_SD is the population spread of
+    # shrunken count scores, not a posterior SE - rendering it as "SE"
+    # overstated precision (M5). Name the column for what it is.
+    .is_eb <- !identical(results$hb_results$model_fit$method %||% "", "cmdstanr")
     scores <- data.frame(
       Item_ID = pop$Item_ID,
       Item_Label = pop$Item_Label %||% pop$Item_ID,
@@ -267,6 +271,7 @@ transform_preferences_section <- function(results, config) {
       SE = round(pop$HB_Utility_SD, 3),
       stringsAsFactors = FALSE
     )
+    if (.is_eb) names(scores)[names(scores) == "SE"] <- "Spread_SD"
 
     # Compute preference shares from individual utilities
     if (!is.null(results$hb_results$individual_utilities)) {
