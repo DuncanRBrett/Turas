@@ -874,7 +874,8 @@ if (.html_report_v2_on) {
         cat("    Confidentiality ship: the report file carries no per-respondent records.\n")
         cat("    Published figures only — live filter, custom banners and COMPUTED views are off.\n")
         if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
-          cat("    Tracking tab: skipped this build (the live wave needs microdata); no *_wave.json written.\n")
+          cat("    Tracking tab: built from PUBLISHED figures (the trend survives; the records do not).\n")
+          cat("    No *_wave.json is written by this build - keep the one from your microdata run.\n")
         }
         if (.mrb_set) {
           cat("    Disclosure detail panels: hidden (fail-closed without a microdata base).\n")
@@ -916,9 +917,33 @@ if (.html_report_v2_on) {
           # The classic tracker's Question_Mapping (when configured) links waves
           # by a canonical key — robust to renames + curates which metrics track.
           mapping <- load_question_mapping(config_result$config_obj$question_mapping)
-          contrib <- wave_contribution(dl, micro, config_result$config_obj, mapping)
           wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
-          write_wave_contribution(contrib, wave_path)
+          if (!.micro_wanted) {
+            # The confidentiality ship (html_report_v2_microdata = FALSE) has no
+            # per-respondent records to build the live wave from. Anonymity and a
+            # trend line are not in competition: the current wave is built from
+            # the PUBLISHED figures instead, and the renderer reads its point and
+            # its SD off the published distribution (published_wave_contribution).
+            # NO sidecar is written from this path - it would carry no stats a
+            # future wave could plot, and it would overwrite the real one from
+            # this project's microdata build.
+            #
+            # Gated on the CONFIG FLAG, not on `micro` being NULL. A normal
+            # project whose microdata island failed to build unexpectedly keeps
+            # its old behaviour exactly - no contribution, no Tracking tab, and
+            # the [WARNING] above saying the island failed. Substituting
+            # published figures there would paper over a real failure with a
+            # tab that looks fine.
+            contrib <- published_wave_contribution(dl, config_result$config_obj, mapping)
+            if (!is.null(contrib)) {
+              cat(sprintf(paste0("  Tracking: current wave built from published figures ",
+                                 "(%d metric(s), no per-respondent records).\n"),
+                          length(contrib$questions)))
+            }
+          } else {
+            contrib <- wave_contribution(dl, micro, config_result$config_obj, mapping)
+            write_wave_contribution(contrib, wave_path)
+          }
           priors <- read_wave_contributions(config_result$config_obj$waves_source, wave_path)
           island <- build_tracking_island(contrib, priors, dl, mapping)
           if (!is.null(island) && length(island$waves) > 1) {

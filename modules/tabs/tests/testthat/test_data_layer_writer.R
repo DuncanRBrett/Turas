@@ -1476,3 +1476,30 @@ test_that("a six-option allocation (the VAS 2026 wallet shape) loses nothing", {
   carried <- vapply(q$rows, function(r) any(nzchar(unlist(r$sig))), logical(1))
   expect_true(all(carried))
 })
+
+# ==============================================================================
+# The confidentiality ship's tracking metrics come off THIS data layer
+# ==============================================================================
+#
+# published_wave_contribution() (tracking_island.R) builds the current wave from
+# published figures when the microdata island is switched off. Its gate is "the
+# question publishes a mean", which has to hold for a COMPOSITE index too — the
+# composite is exactly the metric a staff climate tracker leads on, and the
+# microdata build tracks it (micro_scores_for_composite). If the gate missed it,
+# the confidential copy would silently drop the headline trend.
+
+source(file.path(turas_root, "modules/tabs/lib/tracking_island.R"))
+
+test_that("a composite index is tracked in a no-microdata build, with its Total base", {
+  dl <- build_data_layer(list(QE = make_dl_q_composite(), Q2 = make_dl_q_scale()),
+                         make_dl_banner_info(), make_dl_config())
+  contrib <- published_wave_contribution(dl, list(wave = "SACS 2026", wave_order = 2026))
+
+  codes <- vapply(contrib$questions, function(q) as.character(q$code), character(1))
+  expect_true("Q_Engage" %in% codes)
+
+  comp <- contrib$questions[[which(codes == "Q_Engage")]]
+  expect_equal(comp$base, 100)          # the TOTAL::Total base, not a banner column
+  expect_null(comp$scores)              # nothing per-respondent, ever
+  expect_null(comp$weights)
+})

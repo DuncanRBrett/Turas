@@ -20,6 +20,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { installText, TXT, blockOf }
+  from "../../lib/html_report_v2/tests/_text.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..", "..", "..");
@@ -50,6 +52,12 @@ function load(prev) {
   for (const f of readdirSync(JS).filter((x) => x.endsWith(".js")).sort()) {
     vm.runInContext(readFileSync(path.join(JS, f), "utf8"), sandbox, { filename: f });
   }
+  // The card's explanatory prose is AUTHORED text, inlined into a real report
+  // from the callout registry at build time. Booting the module JS alone leaves
+  // TR.txt with an empty catalogue, so every authored block renders as nothing —
+  // which is not what a reader sees, and made this suite assert against a card
+  // stripped of the two sentences that give it its point.
+  installText(sandbox);
   const TR = sandbox.TR;
   TR.AGG = JSON.parse(readFileSync(path.join(DATA, "sacap_2025.json"), "utf8"));
   TR.MICRO = JSON.parse(readFileSync(path.join(DATA, "sacap_microdata.json"), "utf8"));
@@ -99,8 +107,26 @@ ok(info && info.priors === broken.waves.filter((w) => !w.current).length,
 ok(/Tracking could not be compared/.test(hBad), "unmatched history: says it could not compare");
 ok(!/significant increases/.test(hBad), "unmatched history: the 0/0/0 pulse bar is NOT rendered");
 ok(!/Key metric scorecard/.test(hBad), "unmatched history: the empty scorecard is NOT rendered");
-ok(/question_mapping/.test(hBad), "unmatched history: names the config setting that fixes it");
-ok(/not a finding/.test(hBad), "unmatched history: says plainly this is not a result");
+// The two sentences that carry the card's point — one saying this is a
+// configuration problem rather than a finding, one naming the setting that
+// fixes it. The author owns those words (see _text.mjs), so the test compares
+// the rendered block against the catalogue rather than against a phrase: it
+// stays true when the sentence is rewritten, and fails the moment the block
+// goes missing, renders empty, or leaves a placeholder unsubstituted.
+const flat = (t) => t.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+const nPriors = broken.waves.filter((w) => !w.current).length;
+const labels = broken.waves.filter((w) => !w.current).map((w) => String(w.wave));
+const span = labels.length > 1 ? labels[0] + "\u2013" + labels[labels.length - 1] : labels[0];
+
+const lead = blockOf(hBad, "tracking.unmatched.lead");
+ok(lead !== "" && !/\{[a-z_]+\}/.test(lead) &&
+   flat(lead) === flat(TXT("tracking.unmatched.lead",
+     { priors: nPriors, waves_word: nPriors === 1 ? "wave" : "waves", span: span })),
+  "unmatched history: says plainly this is not a result");
+
+const cause = blockOf(hBad, "tracking.unmatched.cause");
+ok(cause !== "" && flat(cause) === flat(TXT("tracking.unmatched.cause")),
+  "unmatched history: names the config setting that fixes it");
 
 // ---- 3. a first wave (no history at all) is not this state ----
 const first = load({ schema_version: 1, waves: [] });
