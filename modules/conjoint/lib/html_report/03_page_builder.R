@@ -1361,6 +1361,22 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 build_simulator_panel <- function(html_data, brand) {
 
   if (is.null(html_data$simulator_data)) {
+
+    # A suppressed simulator is a decision with a reason, not an absence.
+    # Saying "no simulator data available" where the real answer is "this
+    # model cannot be simulated honestly" leaves the reader to guess.
+    if (isTRUE(html_data$simulator_suppressed)) {
+      reason <- html_data$simulator_suppressed_reason %||%
+        paste0("The simulator is not available for this model.")
+      return(paste0(
+        '<div class="cj-panel" role="tabpanel" id="panel-simulator"><div class="cj-card">',
+        '<h2 style="margin-top:0;">Market Simulator</h2>',
+        '<p><strong>Not included for this study.</strong></p>',
+        '<p>', .html_escape(reason), '</p>',
+        '</div></div>'
+      ))
+    }
+
     return('<div class="cj-panel" role="tabpanel" id="panel-simulator"><div class="cj-card"><p>No simulator data available.</p></div></div>')
   }
 

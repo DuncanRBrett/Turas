@@ -164,3 +164,65 @@ test_that("H6: dropped interaction coefficients are announced, not swallowed", {
   expect_true(isTRUE(attr(u, "has_interactions")))
   expect_equal(attr(u, "dropped_interaction_coefs"), "BrandBeta:Price$20")
 })
+
+# ---------------------------------------------------------------------------
+# The report keeps everything except the simulator
+# ---------------------------------------------------------------------------
+
+test_that("H6: the report is built without its simulator, not skipped entirely", {
+  root <- Sys.getenv("TURAS_ROOT")
+  main <- paste(readLines(file.path(root, "modules", "conjoint", "R", "00_main.R"),
+                          warn = FALSE), collapse = "\n")
+
+  # The whole report used to be skipped, which threw away a valid utilities
+  # table, importance, diagnostics and WTP over a limitation that affects only
+  # the simulator — and shipped the same utilities table in the Excel workbook
+  # regardless, which was incoherent.
+  expect_false(grepl("TURAS: HTML REPORT SKIPPED", main, fixed = TRUE))
+  expect_true(grepl("suppress_simulator = .model_has_interactions", main, fixed = TRUE))
+
+  # The limitation must reach the warning list, because the final status is
+  # computed from the warning count — otherwise the run announces a PARTIAL
+  # event and then reports PASS.
+  expect_true(grepl("interaction_warning", main, fixed = TRUE))
+})
+
+test_that("H6: the transformer drops the simulator payload when asked", {
+  root <- Sys.getenv("TURAS_ROOT")
+  tr <- file.path(root, "modules", "conjoint", "lib", "html_report",
+                  "01_data_transformer.R")
+  skip_if(!file.exists(tr), "transformer not found")
+  src <- paste(readLines(tr, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("simulator_suppressed <- isTRUE(config$suppress_simulator)",
+                    src, fixed = TRUE))
+  expect_true(grepl("simulator_suppressed_reason", src, fixed = TRUE))
+})
+
+test_that("H6: the Simulator tab states the reason rather than saying no data", {
+  root <- Sys.getenv("TURAS_ROOT")
+  pb <- file.path(root, "modules", "conjoint", "lib", "html_report",
+                  "03_page_builder.R")
+  skip_if(!file.exists(pb), "page builder not found")
+  source(file.path(root, "modules", "conjoint", "lib", "html_report",
+                   "02_table_builder.R"), local = TRUE)  # .html_escape
+  source(pb, local = TRUE)
+  skip_if(!exists("build_simulator_panel", mode = "function"))
+
+  html <- build_simulator_panel(
+    list(
+      simulator_data = NULL,
+      simulator_suppressed = TRUE,
+      simulator_suppressed_reason = "Because of the interaction terms."
+    ),
+    brand = "#323367"
+  )
+
+  expect_true(grepl("Not included for this study", html, fixed = TRUE))
+  expect_true(grepl("Because of the interaction terms.", html, fixed = TRUE))
+  expect_false(grepl("No simulator data available", html, fixed = TRUE))
+
+  # A genuinely absent simulator still gets the plain empty state.
+  plain <- build_simulator_panel(list(simulator_data = NULL), brand = "#323367")
+  expect_true(grepl("No simulator data available", plain, fixed = TRUE))
+})

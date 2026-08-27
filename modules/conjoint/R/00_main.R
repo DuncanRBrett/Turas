@@ -630,8 +630,25 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
 
   if (verbose) cat("\n7. Generating Excel output...\n")
 
+  # A with-interactions model cannot be simulated from a part-worth table, so
+  # the report ships without its simulator (see the html_config flag below).
+  # The final status is computed from the warning count, so the limitation has
+  # to be a warning or the run reports PASS while announcing a PARTIAL.
+  .model_has_interactions <- isTRUE(model_result$has_interactions) ||
+    isTRUE(attr(utilities, "has_interactions"))
+
+  interaction_warning <- if (.model_has_interactions) {
+    paste0("The model includes interaction terms. They are reported in the ",
+           "interaction analysis, but a part-worth utilities table cannot ",
+           "carry them, so the market simulator is not included in the HTML ",
+           "report (CALC_INTERACTIONS_NOT_IN_SIMULATOR).")
+  } else {
+    character(0)
+  }
+
   # TRS: Log warnings
-  all_warnings <- c(config$validation$warnings, data_list$validation$warnings)
+  all_warnings <- c(config$validation$warnings, data_list$validation$warnings,
+                    interaction_warning)
   if (!is.null(trs_state) && length(all_warnings) > 0) {
     for (warn in all_warnings) {
       if (exists("turas_run_state_partial", mode = "function")) {
@@ -656,35 +673,28 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
   if (verbose) cat(sprintf("   \u2713 Results written to: %s\n", basename(config$output_file)))
 
   # Step 8: HTML report
-  # The report embeds the market simulator, which is built from the part-worth
-  # utilities table. That table cannot carry interaction coefficients, so for a
-  # with-interactions model the report would present main-effects shares from a
-  # model that was never estimated. Skip it and say so; the Excel deliverable
-  # above is already written and its interaction sheets carry the real result.
-  .model_has_interactions <- isTRUE(model_result$has_interactions) ||
-    isTRUE(attr(utilities, "has_interactions"))
-
-  if (.model_has_interactions &&
-      (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator))) {
-    cat("\n┌─── TURAS: HTML REPORT SKIPPED ─────────────────────────┐\n")
-    cat("│ Code: CALC_INTERACTIONS_NOT_IN_SIMULATOR\n")
-    cat("│ This model includes interaction terms. The embedded market\n")
-    cat("│ simulator is built from the part-worth utilities table, which\n")
-    cat("│ cannot carry interaction coefficients, so its shares would come\n")
-    cat("│ from a main-effects model that was not estimated.\n")
-    cat("│ Fix: clear interaction_terms to produce a report with a simulator,\n")
-    cat("│ or read the interaction result from the Excel workbook.\n")
-    cat("└───────────────────────────────────────────────────────┘\n\n")
-
-    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
-      turas_run_state_partial(
-        trs_state, "CALC_INTERACTIONS_NOT_IN_SIMULATOR",
-        "HTML report skipped",
-        problem = "The model includes interaction terms, which the embedded simulator cannot represent."
-      )
+  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
+    if (verbose) {
+      cat(if (.model_has_interactions) {
+        "\n8. Generating HTML analysis report (without simulator - see below)...\n"
+      } else {
+        "\n8. Generating HTML analysis report (with simulator)...\n"
+      })
     }
-  } else if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
-    if (verbose) cat("\n8. Generating HTML analysis report (with simulator)...\n")
+
+    if (.model_has_interactions) {
+      cat("\n┌─── TURAS: SIMULATOR OMITTED FROM REPORT ───────────────┐\n")
+      cat("│ Code: CALC_INTERACTIONS_NOT_IN_SIMULATOR\n")
+      cat("│ This model includes interaction terms. The market simulator is\n")
+      cat("│ built from the part-worth utilities table, which cannot carry\n")
+      cat("│ interaction coefficients, so its shares would come from a\n")
+      cat("│ main-effects model that was not estimated.\n")
+      cat("│ The rest of the report is built as usual, and the Simulator tab\n")
+      cat("│ explains why it is empty. The interaction effects themselves are\n")
+      cat("│ in the Excel workbook.\n")
+      cat("│ To get a simulator, clear interaction_terms in the Settings sheet.\n")
+      cat("└───────────────────────────────────────────────────────┘\n\n")
+    }
 
     if (exists("generate_conjoint_html_report", mode = "function")) {
       html_output_path <- sub("\\.xlsx$", "_report.html", config$output_file)
@@ -711,7 +721,20 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
         insight_simulator = config$insight_simulator %||% "",
         insight_wtp = config$insight_wtp %||% "",
         custom_slides = config$custom_slides %||% NULL,
-        currency_symbol = config$currency_symbol %||% "$"
+        currency_symbol = config$currency_symbol %||% "$",
+
+        # The report builds normally, minus the simulator, when the model
+        # carries interaction terms the part-worth table cannot represent.
+        suppress_simulator = .model_has_interactions,
+        suppress_simulator_reason = if (.model_has_interactions) {
+          paste0("This model was estimated with interaction terms. The ",
+                 "simulator works from the part-worth utilities table, which ",
+                 "cannot carry interaction effects, so any share it showed ",
+                 "would come from a main-effects model that was not ",
+                 "estimated. The interaction effects are reported in the ",
+                 "Excel workbook. To use the simulator, re-run without ",
+                 "interaction terms.")
+        } else NULL
       )
 
       tryCatch({
