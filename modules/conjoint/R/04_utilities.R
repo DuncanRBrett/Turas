@@ -191,9 +191,14 @@ extract_attribute_utilities <- function(attr, coefs, std_errors, config, model_r
   baseline_level <- all_levels[1]
   is_baseline[names(utilities) == baseline_level] <- TRUE
 
-  # Zero-center utilities within attribute
+  # Zero-center utilities within attribute, if configured.
+  # The aggregate path used to centre unconditionally while the HB path
+  # honoured the flag, so a study with zero_center_utilities = N produced HB
+  # and MNL tables sitting on different anchors.
   utilities_raw <- utilities
-  utilities <- zero_center_utilities(utilities)
+  if (isTRUE(config$zero_center_utilities %||% TRUE)) {
+    utilities <- zero_center_utilities(utilities)
+  }
 
   # Calculate confidence intervals
   ci_lower <- rep(NA_real_, n_levels)

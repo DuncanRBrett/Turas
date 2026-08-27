@@ -144,6 +144,80 @@ find_config_header_row <- function(config_file, sheet_name, required_cols,
 }
 
 
+#' Warn About Setting Names the Loader Does Not Recognise
+#'
+#' Unknown keys are not fatal — a config may legitimately carry notes or
+#' settings for a later version — but they must not pass in silence, because
+#' the common cause is a typo and the symptom is a default quietly in force.
+#'
+#' @param provided Character vector of setting names found in the sheet.
+#' @param verbose Logical.
+#' @return Invisibly, the unknown names.
+#' @keywords internal
+.report_unknown_settings <- function(provided, verbose = TRUE) {
+
+  known <- .known_conjoint_settings()
+  unknown <- setdiff(tolower(trimws(provided)), tolower(known))
+  unknown <- unknown[nzchar(unknown)]
+
+  if (length(unknown) == 0) return(invisible(character(0)))
+
+  cat("\n[TRS WARNING] CFG_UNKNOWN_SETTING\n")
+  cat(sprintf("  %d setting name(s) in the Settings sheet are not recognised and\n",
+              length(unknown)))
+  cat("  have no effect. The usual cause is a typo.\n")
+
+  for (u in unknown) {
+    distances <- utils::adist(u, tolower(known))[1, ]
+    nearest <- known[which.min(distances)]
+    if (min(distances) <= max(3, nchar(u) %/% 3)) {
+      cat(sprintf("    %-32s did you mean '%s'?\n", u, nearest))
+    } else {
+      cat(sprintf("    %-32s (no close match)\n", u))
+    }
+  }
+  cat("\n")
+
+  invisible(unknown)
+}
+
+
+#' Setting Names the Conjoint Config Loader Reads
+#'
+#' Derived from the code rather than hand-listed: every `settings_list$name`
+#' and `settings_list[["name"]]` reference in the functions that consume the
+#' Settings sheet. A hand-maintained list would drift the moment someone added
+#' a setting, and then warn about a name that works perfectly well.
+#'
+#' @return Character vector of known setting names.
+#' @keywords internal
+.known_conjoint_settings <- function() {
+
+  readers <- list()
+  for (fn in c("load_conjoint_config", "validate_config")) {
+    if (exists(fn, mode = "function")) {
+      readers[[fn]] <- paste(deparse(body(get(fn, mode = "function"))),
+                             collapse = "\n")
+    }
+  }
+  if (length(readers) == 0) return(character(0))
+
+  src <- paste(unlist(readers), collapse = "\n")
+
+  dollar <- regmatches(src, gregexpr("settings_list\\$[A-Za-z0-9_.]+", src))[[1]]
+  dollar <- sub("^settings_list\\$", "", dollar)
+
+  bracket <- regmatches(src, gregexpr('settings_list\\[\\["[^"]+"\\]\\]', src))[[1]]
+  bracket <- gsub('^settings_list\\[\\["|"\\]\\]$', "", bracket)
+
+  # Settings consumed elsewhere in the pipeline, which never pass through
+  # settings_list in this file.
+  external <- c("generate_stats_pack")
+
+  sort(unique(c(dollar, bracket, external)))
+}
+
+
 load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRUE) {
 
   # Validate config file exists
@@ -249,6 +323,33 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   # Clean settings: remove help rows, section dividers, empty rows
   settings_df <- .clean_settings_df(settings_df)
 
+  # M5: a duplicated Setting row used to be resolved first-wins, in silence —
+  # so a config edited twice could ship with the losing value in force and
+  # nothing to show for it. Refuse: only the author knows which one is meant.
+  # (This mirrors the tabs module, config_utils.R.)
+  raw_names <- as.character(settings_df$Setting)
+  usable <- !is.na(raw_names) & nzchar(trimws(raw_names))
+  dup_names <- unique(raw_names[usable][duplicated(tolower(trimws(raw_names[usable])))])
+
+  if (length(dup_names) > 0) {
+    conjoint_refuse(
+      code = "CFG_DUPLICATE_SETTING",
+      title = "Setting Appears More Than Once",
+      problem = sprintf(
+        "The Settings sheet lists %d setting(s) more than once: %s",
+        length(dup_names), paste(dup_names, collapse = ", ")
+      ),
+      why_it_matters = paste0(
+        "Only one value can be in force. Picking the first one silently means ",
+        "an edit made further down the sheet has no effect and nothing says so."
+      ),
+      how_to_fix = c(
+        "Delete the duplicate rows so each setting appears exactly once.",
+        sprintf("Duplicated: %s", paste(dup_names, collapse = ", "))
+      )
+    )
+  }
+
   # Convert to named list
   settings_list <- setNames(as.list(settings_df$Value), settings_df$Setting)
 
@@ -257,6 +358,11 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     !is.na(names(settings_list)) &
     names(settings_list) != ""
   ]
+
+  # M5: a typo'd setting name used to be ignored without a word, so a user who
+  # wrote "estimation_metod" got the default and no hint that their setting had
+  # not taken. Warn, naming the closest known setting.
+  .report_unknown_settings(names(settings_list), verbose)
 
   # =========================================================================
   # LOAD ATTRIBUTES SHEET WITH AUTODETECT HEADING
@@ -528,12 +634,6 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
       default = FALSE
     ),
     interaction_max = safe_numeric(settings_list$interaction_max, 3),
-
-    # Base level method for dummy coding
-    # 'first' = first level is reference (default)
-    # 'last' = last level is reference
-    # 'effects' = effects coding (sum to zero)
-    base_level_method = settings_list$base_level_method %||% "first",
 
     # =========================================================================
     # COLUMN NAMES (with defaults)
@@ -868,14 +968,6 @@ validate_config <- function(settings_list, attributes_df) {
     ))
   }
 
-  # Validate base_level_method
-  base_level_method <- settings_list$base_level_method %||% "first"
-  if (!base_level_method %in% c("first", "last", "effects")) {
-    errors <- c(errors, sprintf(
-      "base_level_method must be 'first', 'last', or 'effects', got: %s",
-      base_level_method
-    ))
-  }
 
   # Info message for Alchemer source
 

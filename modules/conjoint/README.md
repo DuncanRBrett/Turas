@@ -149,7 +149,6 @@ Key-value format with columns: **Setting | Value | Required? | Description | Val
 | `estimation_method` | `auto` | `auto`, `mlogit`, `clogit`, `hb`, `latent_class`, `best_worst` |
 | `confidence_level` | `0.95` | Confidence level for intervals (0.80-0.99) |
 | `zero_center_utilities` | `TRUE` | Zero-center utilities within each attribute |
-| `base_level_method` | `first` | Baseline level: `first` or `last` |
 
 #### Hierarchical Bayes Settings
 

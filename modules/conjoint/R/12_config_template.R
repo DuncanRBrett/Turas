@@ -219,7 +219,9 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("ESTIMATION METHOD", "estimation_method", "auto", "Primary estimation method", TRUE, "auto,mlogit,clogit,hb,latent_class,best_worst", "auto, mlogit, clogit, hb, latent_class, best_worst")
   add("ESTIMATION METHOD", "confidence_level", "0.95", "Confidence level for intervals", FALSE, "", "Decimal between 0.80 and 0.99")
   add("ESTIMATION METHOD", "zero_center_utilities", "TRUE", "Zero-center utilities within each attribute", FALSE, "TRUE,FALSE", "TRUE or FALSE")
-  add("ESTIMATION METHOD", "base_level_method", "first", "Which level serves as baseline (utility = 0)", FALSE, "first,last", "first or last")
+  # base_level_method removed 2026-08: nothing read it. The baseline is always
+  # the first level listed for an attribute (R's factor reference level), and
+  # effects coding does not exist in this module.
 
   # --- HIERARCHICAL BAYES SETTINGS ---
   add("HIERARCHICAL BAYES SETTINGS", "hb_iterations", "10000", "Total MCMC iterations (recommend 10000-50000)", FALSE, "", "Integer >= 1000")

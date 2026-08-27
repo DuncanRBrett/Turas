@@ -696,9 +696,28 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
 
   # Step 8b: Stats Pack (Optional)
   stats_pack_result <- NULL
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
-  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+  # M2: the template writes lowercase generate_stats_pack; this read the
+  # capitalised name only, defaulted the miss to "Y", and OR'd in a GUI
+  # checkbox that can only turn the pack ON. A config saying "N" therefore
+  # produced a stats pack anyway. Read the setting case-tolerantly, let the
+  # config's "N" stand, and treat the checkbox as an override only when the
+  # user actually ticked it.
+  .settings_lookup <- function(settings, name) {
+    if (is.null(settings) || length(settings) == 0) return(NULL)
+    hit <- which(tolower(names(settings)) == tolower(name))
+    if (length(hit) == 0) return(NULL)
+    settings[[hit[1]]]
+  }
+
+  stats_pack_setting <- .settings_lookup(config$settings, "generate_stats_pack")
+  stats_pack_from_config <- if (is.null(stats_pack_setting)) {
+    TRUE  # not configured at all: the documented default is on
+  } else {
+    isTRUE(safe_logical(stats_pack_setting, default = TRUE))
+  }
+
+  generate_stats_pack_flag <- stats_pack_from_config ||
+    isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {
     if (verbose) cat("\n8b. Generating stats pack...\n")
@@ -708,10 +727,12 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
       model_result = model_result,
       run_result   = run_result,
       start_time   = start_time,
-      verbose      = verbose
+      verbose      = verbose,
+      diagnostics  = diagnostics,
+      wtp_result   = wtp_result
     )
   } else {
-    if (verbose) cat("\n8b. Stats pack skipped (set Generate_Stats_Pack = Y in config to enable)\n")
+    if (verbose) cat("\n8b. Stats pack skipped (set generate_stats_pack = Y in config to enable)\n")
   }
 
   # Finalization
@@ -757,7 +778,8 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
 #'
 #' @keywords internal
 generate_conjoint_stats_pack <- function(config, data_list, model_result,
-                                          run_result, start_time, verbose) {
+                                          run_result, start_time, verbose,
+                                          diagnostics = NULL, wtp_result = NULL) {
 
   # The config asked for a stats pack. If the writer is unavailable we cannot
   # produce one, and that must be visible regardless of the verbose setting.
@@ -807,9 +829,42 @@ generate_conjoint_stats_pack <- function(config, data_list, model_result,
   n_tasks     <- data_list$n_choice_sets %||% NA
   hb_iters    <- if (is_hb) as.character(config$hb_iterations %||% config$settings$HB_Iterations %||% "—") else "N/A"
   seed_val    <- as.character(config$seed %||% config$settings$Seed %||% "Not set")
-  wtp_flag    <- isTRUE(config$enable_wtp) || isTRUE(config$settings$Enable_WTP)
+  # M1: this read enable_wtp / Enable_WTP, settings that do not exist, so the
+  # pack said "WTP Estimation: Disabled" on every run that shipped a WTP table.
+  # Read the actual result instead.
+  wtp_flag    <- !is.null(wtp_result) && !is.null(wtp_result$wtp_table) &&
+                 nrow(wtp_result$wtp_table) > 0
   sim_flag    <- isTRUE(config$generate_html_simulator) || isTRUE(config$settings$Generate_Simulator)
-  impl_label  <- if (is_hb) "ChoiceModelR package (HB)" else "base R clogit() (MNL)"
+
+  # M1: the pack credited every HB run to a package that appears nowhere in
+  # this module and is not in renv.lock (the engine is bayesm) — and every
+  # other run "base R clogit() (MNL)" even when mlogit did the estimating.
+  # Derive it from what actually ran.
+  raw_method  <- model_result$method %||% ""
+  impl_label  <- switch(
+    raw_method,
+    "hierarchical_bayes"      = "bayesm::rhierMnlRwMixture (HB)",
+    "latent_class"            = "bayesm::rhierMnlRwMixture, mixture of normals (latent class)",
+    "mlogit"                  = "mlogit (MNL)",
+    "clogit"                  = "survival::clogit (MNL)",
+    "best_worst_sequential"   = "mlogit, best and worst estimated separately (BWS sequential)",
+    "ols_rating"              = "stats::lm (rating-based)",
+    if (nzchar(raw_method)) sprintf("%s", raw_method) else "unknown"
+  )
+
+  # M1: the packages list was hardcoded and omitted whatever actually ran.
+  packages_used <- c("openxlsx")
+  packages_used <- c(packages_used, switch(
+    raw_method,
+    "hierarchical_bayes"    = "bayesm",
+    "latent_class"          = "bayesm",
+    "mlogit"                = c("mlogit", "dfidx"),
+    "clogit"                = "survival",
+    "best_worst_sequential" = c("mlogit", "dfidx"),
+    "ols_rating"            = character(0),
+    character(0)
+  ))
+  packages_used <- unique(packages_used)
 
   # TRS summary
   n_events   <- length(run_result$events %||% list())
@@ -846,13 +901,31 @@ generate_conjoint_stats_pack <- function(config, data_list, model_result,
   }
 
   # Model fit statistics (when available)
-  fit_stats <- model_result$diagnostics$fit_statistics %||% NULL
+  # M1: this read model_result$diagnostics$fit_statistics, which is never
+  # attached — the fit statistics live on the diagnostics object the pipeline
+  # computes separately — so the model-fit block was silently always absent.
+  # The field name was wrong too: calculate_choice_fit_stats returns
+  # log_likelihood_fitted, not log_likelihood.
+  fit_stats <- diagnostics$fit_statistics %||%
+    model_result$diagnostics$fit_statistics %||% NULL
+
+  fmt_num <- function(x, fmt) {
+    if (is.null(x) || length(x) == 0 || !is.finite(x)) return("N/A")
+    sprintf(fmt, x)
+  }
+
   model_fit_items <- if (!is.null(fit_stats)) {
-    list(
-      "McFadden R-squared" = sprintf("%.4f", fit_stats$mcfadden_r2 %||% NA),
-      "Hit Rate" = sprintf("%.1f%%", (fit_stats$hit_rate %||% 0) * 100),
-      "Log-Likelihood" = sprintf("%.2f", fit_stats$log_likelihood %||% NA)
+    items <- list(
+      "McFadden R-squared" = fmt_num(fit_stats$mcfadden_r2, "%.4f"),
+      "Hit Rate" = if (is.null(fit_stats$hit_rate) || !is.finite(fit_stats$hit_rate)) {
+        "N/A"
+      } else {
+        sprintf("%.1f%%", fit_stats$hit_rate * 100)
+      },
+      "Log-Likelihood (fitted)" = fmt_num(fit_stats$log_likelihood_fitted, "%.2f"),
+      "Log-Likelihood (null)" = fmt_num(fit_stats$log_likelihood_null, "%.2f")
     )
+    items
   } else {
     list()
   }
@@ -865,7 +938,13 @@ generate_conjoint_stats_pack <- function(config, data_list, model_result,
     "HB Iterations"         = hb_iters,
     "HB Burn-in"            = if (is_hb) as.character(config$hb_burnin %||% config$settings$HB_Burnin %||% "—") else "N/A",
     "HB Thin"               = if (is_hb) as.character(config$hb_thin %||% config$settings$HB_Thin %||% "—") else "N/A",
-    "HB Chains"             = if (is_hb) "1 (bayesm)" else "N/A",
+    "HB Chains"             = if (is_hb) "1" else "N/A",
+    "HB Standard Errors"    = if (is_hb) {
+      switch(model_result$se_method %||% "unknown",
+             "posterior_draws" = "Posterior SD of the mixture-mean draws",
+             "heterogeneity_over_sqrt_n" = "Approximate: heterogeneity SD / sqrt(n)",
+             "unknown")
+    } else "N/A",
     "Seed"                  = seed_val,
     "WTP Estimation"        = if (wtp_flag) "Enabled" else "Disabled",
     "Market Simulation"     = if (sim_flag) "Enabled" else "Disabled",
@@ -897,7 +976,7 @@ generate_conjoint_stats_pack <- function(config, data_list, model_result,
     data_used        = data_used,
     assumptions      = assumptions,
     run_result       = run_result,
-    packages         = c("openxlsx", "mlogit", "survival", "dfidx"),
+    packages         = packages_used,
     config_echo      = list(settings = config$settings, attributes = config$attributes)
   )
 

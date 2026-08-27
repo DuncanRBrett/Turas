@@ -505,7 +505,6 @@ The Settings sheet uses a two-column layout: `Setting` and `Value`. Settings are
 | `estimation_method` | **Yes** | `auto` | Primary estimation algorithm | `auto`, `mlogit`, `clogit`, `hb`, `latent_class`, `best_worst` |
 | `confidence_level` | No | `0.95` | Confidence level for intervals | Decimal between `0.80` and `0.99` |
 | `zero_center_utilities` | No | `TRUE` | Zero-center utilities within each attribute (recommended) | `TRUE` or `FALSE` |
-| `base_level_method` | No | `first` | Which level serves as the baseline (utility = 0) | `first` or `last` |
 
 #### Hierarchical Bayes Settings
 
