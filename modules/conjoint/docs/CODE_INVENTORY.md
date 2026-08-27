@@ -244,15 +244,15 @@ None option detection and handling: auto-detect, explicit/implicit none, validat
 
 ### 10_best_worst.R (496 lines)
 
-Best-worst scaling: BWS data validation, conversion, sequential/simultaneous estimation.
+Best-worst scaling: BWS data validation, conversion, sequential estimation (simultaneous refuses).
 
 | Function | Line | Type | Description |
 |---|---|---|---|
 | `validate_best_worst_data` | 40 | internal | Validate best-worst data format (best/worst columns, exclusivity) |
 | `convert_best_worst_to_choice` | 133 | internal | Convert best-worst data to standard choice format |
-| `estimate_best_worst_model` | 191 | exported | Estimate BWS model (sequential or simultaneous method) |
+| `estimate_best_worst_model` | 191 | exported | Estimate BWS model (sequential; simultaneous refuses) |
 | `estimate_best_worst_sequential` | 254 | internal | Estimate best and worst models separately, then combine |
-| `estimate_best_worst_simultaneous` | 324 | internal | Joint best-worst estimation with choice type indicator |
+| `estimate_best_worst_simultaneous` | 324 | internal | Unreachable: the joint estimator never applied the design negation, so callers refuse before reaching it |
 | `calculate_best_worst_utilities` | 364 | exported | Calculate utilities from best-worst model result |
 | `calculate_best_worst_diagnostics` | 401 | exported | Calculate BWS-specific diagnostics (LL, R-sq, best vs worst) |
 | `is_best_worst_model` | 443 | helper | Check if model is best-worst scaling |

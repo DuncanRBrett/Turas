@@ -229,7 +229,34 @@ estimate_best_worst_model <- function(data_list,
   if (method == "sequential") {
     result <- estimate_best_worst_sequential(choice_data, config, verbose)
   } else if (method == "simultaneous") {
-    result <- estimate_best_worst_simultaneous(choice_data, config, verbose)
+    # The stacked best-and-worst data carries no sign reversal on the worst
+    # rows (convert_best_worst_to_choice defers that to the sequential path's
+    # (best - worst)/2), and estimate_best_worst_simultaneous fits a plain
+    # attributes-only MNL in which choice_type never enters the formula. The
+    # same beta therefore has to maximise both P(best) and P(worst), so the
+    # worst half drags every estimate toward zero. The output was labelled a
+    # successful model with no warning. Refuse until it is implemented
+    # properly (design negation on the worst rows).
+    conjoint_refuse(
+      code = "CALC_BW_SIMULTANEOUS_UNIMPLEMENTED",
+      title = "Simultaneous Best-Worst Estimation Is Not Implemented",
+      problem = paste0(
+        "bw_method = 'simultaneous' was requested, but the simultaneous ",
+        "estimator in this module fits best and worst choices against each ",
+        "other without reversing the design on the worst tasks."
+      ),
+      why_it_matters = paste0(
+        "Estimates from that model are biased toward zero: the worst half of ",
+        "the data pushes every coefficient in the opposite direction to the ",
+        "best half. The result would look like a successful model and would ",
+        "understate every difference in the study."
+      ),
+      how_to_fix = c(
+        "Set bw_method = 'sequential' in the Settings sheet. Sequential is the default.",
+        "Sequential estimates best and worst separately and combines them as (best - worst) / 2, which is a standard and defensible approximation.",
+        "If a joint estimator is genuinely needed, it must negate the design rows of the worst tasks first — that work is not in this module yet."
+      )
+    )
   } else {
     conjoint_refuse(
       code = "CFG_BEST_WORST_UNKNOWN_METHOD",
@@ -257,6 +284,13 @@ estimate_best_worst_sequential <- function(data, config, verbose = TRUE) {
   best_data <- data[data$choice_type == "best", ]
   worst_data <- data[data$choice_type == "worst", ]
 
+  # The two sub-models are ordinary choice models. They must NOT inherit
+  # estimation_method = "best_worst" from the study config, or
+  # estimate_choice_model dispatches straight back into
+  # estimate_best_worst_model and recurses until the stack gives out.
+  sub_config <- config
+  sub_config$estimation_method <- "auto"
+
   if (verbose) {
     cat("\n  Estimating 'best' choices...\n")
   }
@@ -267,7 +301,7 @@ estimate_best_worst_sequential <- function(data, config, verbose = TRUE) {
     n_obs = nrow(best_data)
   )
 
-  best_result <- estimate_choice_model(best_data_list, config, verbose = FALSE)
+  best_result <- estimate_choice_model(best_data_list, sub_config, verbose = FALSE)
 
   if (verbose) {
     cat(sprintf("    ✓ Best model: LL = %.2f\n", best_result$loglik[2]))
@@ -280,7 +314,7 @@ estimate_best_worst_sequential <- function(data, config, verbose = TRUE) {
     n_obs = nrow(worst_data)
   )
 
-  worst_result <- estimate_choice_model(worst_data_list, config, verbose = FALSE)
+  worst_result <- estimate_choice_model(worst_data_list, sub_config, verbose = FALSE)
 
   if (verbose) {
     cat(sprintf("    ✓ Worst model: LL = %.2f\n", worst_result$loglik[2]))

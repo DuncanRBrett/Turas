@@ -46,6 +46,16 @@ fallback save) stay.
 `CALC_*` code was silently rewritten to `CFG_CALC_*`, which tells the user their
 configuration is wrong when the failure was a calculation. `CALC_` added.
 
+### A-NEW-4 — sequential best-worst estimation recurses until the stack gives out
+`estimate_best_worst_sequential()` (`R/10_best_worst.R`) passed the study's own
+config to `estimate_choice_model()` for each of its two sub-models. That config
+carries `estimation_method = "best_worst"`, so `estimate_choice_model` dispatched
+straight back into `estimate_best_worst_model` and recursed. It was unreachable
+in production only because H2's validator refused `best_worst` before the run
+started — so fixing H2 (A5) exposes it. The sub-models now run under a config
+with `estimation_method = "auto"`. Found by the new sequential-recovery test,
+which is the first test in this module ever to estimate a best-worst model.
+
 ---
 
 ## Deviations from the work order

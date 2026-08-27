@@ -284,7 +284,7 @@ Discovers discrete preference-based segments (classes) directly from choice data
 
 For choice tasks where respondents select both the best and worst alternatives (not just the best). This provides more information per choice task and can improve estimation efficiency.
 
--   Supports sequential and simultaneous estimation approaches.
+-   Uses sequential estimation: best and worst choices are estimated separately and combined as (best - worst) / 2. Simultaneous (joint) estimation is not implemented and refuses if requested.
 -   Set `choice_type = "best_worst"` and `estimation_method = "best_worst"`.
 
 ------------------------------------------------------------------------

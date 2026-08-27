@@ -426,6 +426,12 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     # Analysis parameters (with defaults)
     analysis_type = settings_list$analysis_type %||% "choice",
     estimation_method = settings_list$estimation_method %||% "auto",
+
+    # Best-worst estimation approach. Only "sequential" is implemented;
+    # "simultaneous" refuses in 10_best_worst.R rather than returning
+    # attenuated estimates. Surfaced here so a user who sets it gets that
+    # refusal instead of being silently defaulted.
+    bw_method = settings_list$bw_method %||% "sequential",
     baseline_handling = settings_list$baseline_handling %||% "first_level_zero",
     confidence_level = safe_numeric(settings_list$confidence_level, 0.95),
     choice_type = settings_list$choice_type %||% "single",
@@ -687,7 +693,10 @@ validate_config <- function(settings_list, attributes_df) {
 
   # Validate estimation_method
   estimation_method <- settings_list$estimation_method %||% "auto"
-  valid_methods <- c("auto", "mlogit", "clogit", "hb", "latent_class")
+  # best_worst belongs here: the shipped template offers it (12_config_template.R),
+  # the engine implements it (03_estimation.R) and the manual instructs it. It was
+  # missing, so the template's own dropdown value refused the run.
+  valid_methods <- c("auto", "mlogit", "clogit", "hb", "latent_class", "best_worst")
   if (!estimation_method %in% valid_methods) {
     errors <- c(errors, sprintf(
       "estimation_method must be one of: %s (got: %s)",
