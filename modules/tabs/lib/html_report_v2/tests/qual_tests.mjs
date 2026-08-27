@@ -525,6 +525,176 @@ assert(gatedHtml.indexOf('data-tier="all" disabled') >= 0 &&
 assert(gatedHtml.indexOf("Withheld to protect confidentiality.") >= 0,
   "below k the controls row carries the standard disclosure note");
 
+// ---- per-question analyst insight + the question-level pin popover ----------
+// The insight box is config-seeded (TR.AGG.comments) and keyed on the QUAL_ code,
+// so it can never share a store key with the crosstab card's Insight box.
+console.log("\nQuestion insight + pin:");
+assert(qual.insightKey({ code: "QUAL_Q02COMMENT" }) === "QUAL_Q02COMMENT",
+  "insightKey is the question's own QUAL_ code");
+assert(qual.insightKey(null) === "" && qual.insightKey({}) === "",
+  "insightKey is empty when there is no code");
+
+const insightSeen = [];
+const realInsights = TR.insights;
+TR.insights = {
+  get: (k, b) => { insightSeen.push([k, b]); return k === "QS" ? "Service is the story." : ""; },
+  set: () => {}
+};
+const realStory = TR.story2, realShell = TR.shell;
+
+TR.disclosure = null;
+qual._state = null;
+qual.render(host);
+const insHtml = host.innerHTML;
+assert(insHtml.indexOf('data-qinsight="QS"') >= 0,
+  "the question page renders an insight textarea keyed on the question code");
+assert(insHtml.indexOf("Service is the story.") >= 0,
+  "the box is pre-filled from TR.insights (which falls back to the config Comments sheet)");
+assert(insHtml.indexOf('placeholder="Insight for QS') >= 0,
+  "the placeholder prints the exact code to put in the Comments sheet");
+assert(insHtml.indexOf(">Key themes<") >= 0 || insHtml.indexOf(">Key themes<span") >= 0,
+  "the box is labelled Key themes — the client asked for a note on the key theme");
+assert(insightSeen.some((c) => c[0] === "QS" && c[1] === undefined),
+  "the question insight is fetched banner-agnostically (no banner argument)");
+assert(insHtml.indexOf('id="insight-box"') < 0,
+  "it never reuses the crosstab box's id — that handler writes to the crosstab active question");
+assert(insHtml.indexOf('<section class="ql-qcard" data-snap-card>') >= 0,
+  "header + insight + board form one pinnable snapshot card");
+assert(insHtml.indexOf('data-qinsight="QS"') < insHtml.indexOf("ql-controls"),
+  "the insight sits above the comments, not at the foot of a very long page");
+assert(insHtml.indexOf("data-qual-pin") >= 0 && insHtml.indexOf("ql-qpinmenu") >= 0,
+  "the header carries the shared Pin popover control");
+assert(insHtml.indexOf('class="pinwrap snap-pin ql-qpinwrap"') >= 0,
+  "the pin control is marked snap-pin, so a snapshot never captures the button");
+
+TR.disclosure = { active: () => true, minBase: () => 10,
+  audienceTooSmall: () => true, note: () => "Withheld to protect confidentiality." };
+qual._state = null;
+qual.render(host);
+assert(host.innerHTML.indexOf("data-qual-pin disabled") >= 0,
+  "below k the Pin button is disabled, exactly like Export");
+
+// A pin strips the controls that do nothing once frozen. pinQuestion names them
+// by selector in ONE list (PIN_DROP_SEL), so this locks the contract the other
+// way round: if a control is renamed, that list goes stale silently and a pinned
+// story card starts carrying dead buttons again.
+TR.disclosure = null;
+const savedIsland = TR.QUAL;
+TR.QUAL = {
+  textMode: "full", noteworthyDefault: "all", demographicCuts: "safe", demographics: [],
+  questions: [{ code: "QUAL_QT", title: "Why do you say that?", type: "themed",
+    themes: [{ id: 0, label: "Delivery" }], base: { answered: 2 },
+    records: [{ idx: 0, tier: 0, sentiment: 3, themeVals: { 0: 3 }, demos: {}, text: "late" },
+              { idx: 1, tier: 0, sentiment: 1, themeVals: { 0: 1 }, demos: {}, text: "fine" }] }]
+};
+TR.d2.state.qualQ = "QUAL_QT";
+qual._state = null;
+qual.render(host);
+const themedHtml = host.innerHTML;
+["data-jump-comments", "ql-boardtools", "data-theme-focus"].forEach((sel) => {
+  assert(themedHtml.indexOf(sel) >= 0,
+    "PIN_DROP_SEL still names a control the page renders: " + sel);
+});
+assert(themedHtml.indexOf('data-pinpart="board"') >= 0 && themedHtml.indexOf('data-pinpart="insight"') >= 0,
+  "board and insight are each tagged as a pin part, so the tickboxes can drop either");
+TR.QUAL = savedIsland;
+TR.d2.state.qualQ = null;
+
+// ---- the question list keeps its place across a re-render --------------------
+// The Qualitative tab re-renders whole, so the rail (its own scroll container)
+// was rebuilt at scrollTop 0 on every click and the list snapped back to the
+// top. The Crosstabs sidebar never moves because that tab re-renders only its
+// card; this carries the position across instead.
+console.log("\nRail scroll position:");
+{
+  // The stub models the REBUILD, which is the whole point: querySelector(".ql-rail")
+  // returns the old element before innerHTML is written and a brand-new one
+  // (scrollTop 0, as a freshly built element is) after. Without the carry-across
+  // the new rail stays at 0 and the list snaps to the top.
+  const makeRail = (top) => {
+    const cur = { nudged: false };
+    cur.scrollIntoView = () => { cur.nudged = true; };
+    return { scrollTop: top,
+             querySelector: (sel) => (sel === '[aria-current="true"]' ? cur : null),
+             _cur: cur };
+  };
+  const makeHost = (oldRail) => {
+    let html = "", rail = oldRail;
+    const host = {
+      querySelectorAll: () => [],
+      querySelector: (sel) => (sel === ".ql-rail" ? rail : null),
+      get rail() { return rail; }
+    };
+    Object.defineProperty(host, "innerHTML", {
+      get: () => html,
+      set: (v) => { html = v; rail = makeRail(0); }   // the rebuild
+    });
+    return host;
+  };
+
+  const scrolled = makeHost(makeRail(184));
+  qual._state = null;
+  qual.render(scrolled);
+  assert(scrolled.rail.scrollTop === 184,
+    "the rebuilt rail keeps the position the reader had scrolled to: " + scrolled.rail.scrollTop);
+  assert(scrolled.rail._cur.nudged === true,
+    "the selected item is nudged into view — 'nearest', so a no-op when already on screen");
+
+  // first render: no rail on screen yet, so nothing to carry and nothing to throw on
+  const fresh = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  let threw = false;
+  qual._state = null;
+  try { qual.render(fresh); } catch (e) { threw = true; }
+  assert(!threw, "a first render, with no rail to read from, does not throw");
+}
+
+// ---- priority comments reach the qual pin ------------------------------------
+// priorityQuotes() starts from the CLOSED question and resolves the link;
+// priorityQuotesFor() starts from the open-end itself, which is where the
+// Qualitative tab's own pin starts. Both must produce the same gated payload.
+console.log("\npriorityQuotesFor:");
+const pqIsland = {
+  textMode: "full", demographicCuts: "safe", noteworthyDefault: "all",
+  questions: [{ code: "QUAL_PQ", title: "Why do you say that?", type: "raw", themes: [],
+    base: { answered: 3 },
+    records: [
+      { idx: 0, tier: 3, sentiment: 3, themeVals: {}, demos: { Centre: "Metro South" }, text: "late again" },
+      { idx: 1, tier: 1, sentiment: 1, themeVals: {}, demos: { Centre: "Country North" }, text: "not marked priority" },
+      { idx: 2, tier: 3, sentiment: 1, themeVals: {}, demos: {}, text: "rep is excellent" }
+    ] }]
+};
+const pqSaved = TR.QUAL;
+TR.QUAL = pqIsland;
+const pqOwn = qual.priorityQuotesFor(pqIsland.questions[0]);
+assert(pqOwn.length === 2, "only tier-3 (priority) records come back: " + pqOwn.length);
+assert(pqOwn[0].text === "late again" && pqOwn[0].q === "Why do you say that?",
+  "each quote carries its text and the question title for the attribution");
+assert(pqOwn[0].tags.indexOf("Metro South") >= 0, "demographic tags travel when the dial allows");
+assert(pqOwn[0].sentiment === "neg" && pqOwn[1].sentiment === "pos", "sentiment classes travel");
+
+TR.QUAL = { textMode: "full", demographicCuts: "block", noteworthyDefault: "all",
+  questions: pqIsland.questions };
+assert(qual.priorityQuotesFor(pqIsland.questions[0])[0].tags.length === 0,
+  "a blocked demographic dial drops the tags, exactly as priorityQuotes does");
+
+TR.QUAL = pqIsland;
+assert(qual.priorityQuotesFor(null).length === 0 && qual.priorityQuotesFor({}).length === 0,
+  "no question, no quotes");
+const blockHtml = qual.priorityBlockHtml(pqOwn);
+assert(blockHtml.indexOf("late again") >= 0 && blockHtml.indexOf("In their words") >= 0,
+  "the pinned block is the same renderer the crosstab pin uses");
+
+// the tickbox appears only when the question actually has priority comments
+TR.d2.state.qualQ = "QUAL_PQ";
+qual._state = null;
+qual.render(host);
+assert(host.innerHTML.indexOf("data-qual-pin") >= 0, "the pin is offered on a verbatim-only question too");
+TR.QUAL = pqSaved;
+TR.d2.state.qualQ = null;
+
+TR.insights = realInsights;
+TR.story2 = realStory;
+TR.shell = realShell;
 TR.disclosure = null;   // leave no gate behind for anything after
 
 // ---- Reader bundle C1 — curated-first split ----------------------------------
@@ -1004,6 +1174,10 @@ qual._state = null;
 hostX.innerHTML = ""; qual.render(hostX);
 assert(hostX.innerHTML.indexOf('data-themeview="crosstab"') >= 0,
   "with microdata: the Crosstab by banner toggle renders");
+// the toggle is the fourth name in PIN_DROP_SEL — a live control that does
+// nothing once a card is frozen into the Story, so a pin must strip it
+assert(hostX.innerHTML.indexOf("ql-viewtog") >= 0,
+  "PIN_DROP_SEL still names the view toggle: ql-viewtog");
 
 // ---- priority comments behind a closed question (the crosstab pin) ----------
 // Tier 3 ("p" in the coding workbook) is AUTHORED, so it must read the same
