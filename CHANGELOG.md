@@ -236,6 +236,16 @@ All notable changes to TURAS are documented in this file.
   significance, as before — a sub-population's universe is unknown.
 
 ### Fixed
+- **The tracking-unmatched gate was asserting against a card stripped of its
+  words** — `modules/tabs/tests/js/test_tracking_unmatched.mjs` booted the
+  shipped module JS but never installed the authored-text catalogue, so every
+  `TR.txt.block()` rendered as nothing and two of its eleven assertions had been
+  failing. The renderer was correct throughout. The suite now installs the
+  catalogue via `_text.mjs`, and the two assertions compare the rendered
+  `tracking.unmatched.lead` / `.cause` blocks against the catalogue rather than
+  grepping for a phrase — stronger than before (they catch an unsubstituted
+  placeholder too) and safe when the author rewrites the sentence. 11/11, and it
+  passes under `TURAS_TEXT_MUTATE=1`.
 - **Weighting: the design report and the lookup file no longer disagree about
   the weights (review F1).** W5 normalises design weights to sum to n, but the
   stratum summary was built from population ÷ sample *after* the vector had been
