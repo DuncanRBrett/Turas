@@ -283,8 +283,13 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("NONE OPTION", "none_label", "None", "Label for the None/no-choice option", FALSE, "", "Free text")
 
   # --- OPTIMIZER ---
-  add("OPTIMIZER", "optimizer_method", "exhaustive", "Product optimization search method", FALSE, "exhaustive,greedy", "exhaustive or greedy")
-  add("OPTIMIZER", "optimizer_max_products", "5", "Maximum products in optimizer scenarios", FALSE, "", "Integer 1-12")
+  # Removed 2026-08. Nothing in the pipeline read optimizer_method or
+  # optimizer_max_products, and the dropdown offered "greedy" while the
+  # validator accepted only "exhaustive" or "genetic" — so the template's own
+  # value refused the run. The optimizer functions themselves remain available
+  # as a direct API (optimize_product_exhaustive / optimize_product_greedy in
+  # R/15_product_optimizer.R, both covered by tests/testthat/test_optimizer.R);
+  # they are simply not driven from the config sheet.
 
   # --- ALCHEMER IMPORT ---
   add("ALCHEMER IMPORT", "clean_alchemer_levels", "TRUE", "Auto-clean Alchemer level names", FALSE, "TRUE,FALSE", "TRUE or FALSE")

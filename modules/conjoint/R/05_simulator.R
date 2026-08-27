@@ -856,6 +856,14 @@ generate_demand_curve <- function(base_product,
 #' @return Data frame with: Product, Share_Percent, Lower, Upper, SE
 #'
 #' @export
+#' @section Not wired into any pipeline:
+#' This function has no caller in the conjoint pipeline — nothing in
+#' `00_main.R`, the Excel output or the HTML report reaches it. It is covered
+#' by `tests/testthat/test_simulator_ci.R` and kept as a direct API, but before
+#' wiring it anywhere note that it takes a single Gumbel draw per bootstrap
+#' replicate, so its intervals carry Monte Carlo noise on top of the sampling
+#' variation they are meant to describe. That needs fixing first.
+#'
 predict_shares_with_ci <- function(products,
                                    utilities,
                                    individual_betas = NULL,

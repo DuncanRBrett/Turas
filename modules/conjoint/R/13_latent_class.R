@@ -301,11 +301,38 @@ extract_lc_solution <- function(hb_output, bayesm_data, k, R, thin, config) {
       }, error = function(e) NULL)
 
       if (!is.null(km)) {
+        cat("\n[TRS WARNING] CONJ_LC_KMEANS_ASSIGNMENT\n")
+        cat("  Posterior class probabilities could not be computed from the\n")
+        cat("  bayesm output, so respondents were assigned to classes by\n")
+        cat("  k-means on their individual part-worths instead. Class sizes,\n")
+        cat("  profiles and entropy below describe that clustering, not a\n")
+        cat("  posterior membership model. Treat them as indicative.\n\n")
         class_assignment <- km$cluster
         class_probs <- compute_class_probabilities(individual_betas, km$centers)
       } else {
-        class_assignment <- rep(seq_len(k), length.out = n_respondents)
-        class_probs <- matrix(1 / k, nrow = n_respondents, ncol = k)
+        # What used to happen here was rep(seq_len(k), length.out = n): every
+        # respondent dealt to a class in turn, with uniform probabilities and
+        # no message. Class profiles, sizes and entropy were then computed from
+        # an assignment carrying no information, and the run reported PASS.
+        conjoint_refuse(
+          code = "CALC_LC_ASSIGNMENT_FAILED",
+          title = "Respondents Could Not Be Assigned to Classes",
+          problem = sprintf(
+            paste0("Neither the posterior class probabilities nor the k-means ",
+                   "fallback could assign %d respondents to %d classes."),
+            n_respondents, k
+          ),
+          why_it_matters = paste0(
+            "Without an assignment there are no classes: the class sizes, ",
+            "profiles and entropy would all be arithmetic over an arbitrary ",
+            "deal of respondents into groups, presented as a segmentation."
+          ),
+          how_to_fix = c(
+            "Check that the individual part-worths contain no NA or infinite values (a failed HB run upstream is the usual cause).",
+            sprintf("Try a smaller number of classes than %d — there may not be enough separation in the data to support it.", k),
+            "Run estimation_method = 'hb' first and confirm it converges before asking for latent classes."
+          )
+        )
       }
     } else {
       # Modal assignment from posterior probabilities

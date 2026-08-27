@@ -266,8 +266,6 @@ Pre-populated analyst commentary for each report panel:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `optimizer_method` | `exhaustive` | `exhaustive` or `greedy` |
-| `optimizer_max_products` | `5` | Maximum products in optimizer scenarios (1-12) |
 
 #### Alchemer Import
 

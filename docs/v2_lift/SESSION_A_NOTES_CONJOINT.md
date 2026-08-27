@@ -122,6 +122,28 @@ is never silent. Representing interactions as rows in the part-worth table was
 the alternative; it was not taken because an interaction "attribute" would then
 enter the importance calculation and change what that table means.
 
+**A11 / locked decision 7 — one premise does not hold; three functions kept.**
+Decision 7 says to delete the orphaned optimizer functions and
+`predict_shares_with_ci`, with the rationale "none has a caller or a test".
+Checked this session: all three *do* have tests.
+`optimize_product_exhaustive` and `optimize_product_greedy` are exercised by
+`tests/testthat/test_optimizer.R`, and `predict_shares_with_ci` by
+`tests/testthat/test_simulator_ci.R` (27 assertions). Deleting them would
+delete working coverage on a premise that is false, so the split taken is:
+
+- **Deleted:** the decorative *config surface* — the OPTIMIZER template
+  section, its validator block, and the two config-object fields. Nothing read
+  them, and the template's own "greedy" value was refused by a validator that
+  accepted only "exhaustive" or "genetic". Also removed from the user manual
+  and README.
+- **Kept:** the three functions, as a direct API. `predict_shares_with_ci`
+  gains a roxygen note saying it is unwired and that its single-Gumbel-draw
+  design injects Monte Carlo noise into the intervals, which must be fixed
+  before anything calls it.
+
+**Duncan's ruling wanted** on whether the three tested-but-unwired functions
+should still be deleted. Nothing else in Session A depends on the answer.
+
 **A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd`
 sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`
 binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores

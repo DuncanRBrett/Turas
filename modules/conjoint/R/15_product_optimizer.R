@@ -74,7 +74,7 @@ optimize_product_exhaustive <- function(utilities,
       problem = sprintf("Exhaustive search requires %s combinations (max: 100,000).", format(n_combos, big.mark = ",")),
       why_it_matters = "Exhaustive enumeration becomes impractically slow with large design spaces.",
       how_to_fix = c(
-        "Use optimizer_method = 'greedy' for large design spaces",
+        "Use optimize_product_greedy() for large design spaces",
         "Reduce the number of attributes or levels"
       )
     )

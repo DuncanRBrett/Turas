@@ -116,6 +116,34 @@ find_config_header_row <- function(config_file, sheet_name, required_cols,
 #' @param verbose Logical, print detailed progress (default TRUE)
 #' @return List with validated configuration
 #' @export
+#' Is This the Config Template's Example Slide?
+#'
+#' The shipped Custom_Slides sheet carries a filled-in example row so that the
+#' format is obvious. The loader cannot otherwise tell it from real input, and
+#' it has been appearing in client reports.
+#'
+#' @param title Slide title from the sheet.
+#' @param content Slide content from the sheet.
+#' @return TRUE if the row looks like the shipped example.
+#' @keywords internal
+.is_template_example_slide <- function(title, content) {
+
+  norm <- function(x) tolower(trimws(gsub("[[:space:]\u2013\u2014-]+", " ", as.character(x %||% ""))))
+
+  known_titles <- c(
+    "executive summary key findings",
+    "executive summary",
+    "example slide"
+  )
+
+  if (norm(title) %in% known_titles) return(TRUE)
+
+  # Placeholder markers the template uses in the content column.
+  grepl("(example|placeholder|replace this|your text here|lorem ipsum)",
+        norm(content))
+}
+
+
 load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRUE) {
 
   # Validate config file exists
@@ -344,9 +372,17 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     log_verbose("  ✓ Loaded experimental design matrix", verbose)
   }
 
-  # Load custom slides (if exists and enabled)
+  # Load custom slides (if the sheet exists and the setting is on).
+  # The shipped template's Custom_Slides sheet carries an example row — an
+  # "Executive Summary — Key Findings" slide with placeholder text. The loader
+  # ingested any row it found and 00_main.R passed them on unconditionally, so
+  # that example has been reaching client reports. include_custom_slides has
+  # to be switched on deliberately, and rows whose title still matches the
+  # template's example are skipped.
   custom_slides <- NULL
-  if ("Custom_Slides" %in% sheet_names) {
+  include_slides <- safe_logical(settings_list$include_custom_slides, default = FALSE)
+
+  if (isTRUE(include_slides) && "Custom_Slides" %in% sheet_names) {
     tryCatch({
       slides_df <- openxlsx::read.xlsx(config_file, sheet = "Custom_Slides",
                                         startRow = 4)
@@ -396,7 +432,24 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
           if (!is.null(image_data)) result$images <- list(image_data)
           result
         })
-        log_verbose(sprintf("  \u2713 Loaded %d custom slides", length(custom_slides)), verbose)
+        # Drop the template's own example row and anything with no content.
+        n_before <- length(custom_slides)
+        custom_slides <- Filter(function(s) {
+          if (!nzchar(trimws(s$title)) && !nzchar(trimws(s$content))) return(FALSE)
+          !.is_template_example_slide(s$title, s$content)
+        }, custom_slides)
+
+        n_dropped <- n_before - length(custom_slides)
+        if (n_dropped > 0) {
+          cat(sprintf(
+            "[TRS INFO] CONJ_TEMPLATE_SLIDES_SKIPPED: %d example slide(s) from the config template were not included in the report.\n",
+            n_dropped
+          ))
+        }
+        if (length(custom_slides) == 0) custom_slides <- NULL
+
+        log_verbose(sprintf("  \u2713 Loaded %d custom slides",
+                            length(custom_slides %||% list())), verbose)
       }
     }, error = function(e) {
       message(sprintf("[TRS INFO] Could not read Custom_Slides sheet: %s", conditionMessage(e)))
@@ -585,14 +638,10 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     researcher_logo_base64 = settings_list$researcher_logo_base64 %||% "",
 
     # Custom slides for HTML report
-    include_custom_slides = as.logical(settings_list$include_custom_slides %||% FALSE),
-
-    # =========================================================================
-    # PRODUCT OPTIMIZER SETTINGS (Phase 3 Upgrade)
-    # =========================================================================
-
-    optimizer_method = settings_list$optimizer_method %||% "exhaustive",
-    optimizer_max_products = safe_numeric(settings_list$optimizer_max_products, 5),
+    # as.logical("Y") is NA, not TRUE — safe_logical is the one that knows the
+    # Y/N spellings the template writes.
+    include_custom_slides = safe_logical(settings_list$include_custom_slides,
+                                         default = FALSE),
 
     # Validation results
     validation = validation_result
@@ -768,15 +817,6 @@ validate_config <- function(settings_list, attributes_df) {
       "simulation_method must be one of: %s (got: %s)",
       paste(valid_sim, collapse = ", "),
       sim_method
-    ))
-  }
-
-  # Validate optimizer_method
-  opt_method <- settings_list$optimizer_method %||% "exhaustive"
-  if (!opt_method %in% c("exhaustive", "genetic")) {
-    errors <- c(errors, sprintf(
-      "optimizer_method must be 'exhaustive' or 'genetic' (got: %s)",
-      opt_method
     ))
   }
 

@@ -569,8 +569,6 @@ These settings apply only when `estimation_method = "latent_class"`.
 
 | Setting | Default | Description | Valid Values |
 |----|----|----|----|
-| `optimizer_method` | `exhaustive` | Search method for product optimization | `exhaustive` or `greedy` |
-| `optimizer_max_products` | `5` | Maximum number of products in optimization scenarios | Integer 1--12 |
 
 #### HTML Report
 
@@ -1081,8 +1079,6 @@ For large design spaces, the greedy optimizer starts with a random configuration
 
 | Setting | Default | Description |
 |----|----|----|
-| `optimizer_method` | `exhaustive` | `exhaustive` for small designs, `greedy` for large ones |
-| `optimizer_max_products` | `5` | Maximum products in multi-product portfolio optimization |
 
 ------------------------------------------------------------------------
 
