@@ -65,6 +65,17 @@ The path was unreachable while H1 stopped implicit-None detection from ever
 firing, so fixing H1 (A6) exposes it. Numeric id columns now get one past the
 highest existing id; non-numeric ones still get `"NONE"`.
 
+### A-NEW-6 — two TRS refusals crashed instead of refusing
+`prepare_bayesm_data()` (`R/11_hierarchical_bayes.R`) called `conjoint_refuse()`
+with `message =`, an argument that function does not have, in both
+`DATA_INCONSISTENT_ALTERNATIVES` and `DATA_NO_CHOICE`. Instead of a refusal the
+user got a raw R "unused argument" error — on the data-validation path, which is
+precisely where the refusal text is the whole point. Both survived because the
+HB tests always skipped. Both now supply `title`/`problem`/`why_it_matters`.
+`test_refusal_call_shapes.R` walks the parse tree of all ~100 `conjoint_refuse`
+call sites in `R/` and `lib/` and fails on any unknown or missing argument, so
+this class of defect cannot come back quietly.
+
 ---
 
 ## Deviations from the work order

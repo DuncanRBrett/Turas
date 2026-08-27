@@ -415,4 +415,68 @@ if (is.null(turas_root)) {
     expect_true(any(grepl("CONJ_HB_SE_FALLBACK", out)))
   })
 
+  # ============================================================================
+  # TEST 9: row order does not change the answer (review finding H7)
+  # ============================================================================
+  test_that("HB: shuffled input rows recover the same utilities as ordered rows", {
+    skip_if_not_installed("bayesm")
+
+    synth <- generate_synthetic_cbc(
+      n_respondents = 25, n_tasks = 6, n_alts = 3, seed = 404
+    )
+
+    ordered <- synth$data
+    # Export order by alternative rather than by task: every alternative 1,
+    # then every alternative 2, then every alternative 3. This is a shape real
+    # exports take, and nothing in the module sorted it back.
+    shuffled <- ordered[order(ordered$alt_id, ordered$resp_id, ordered$task_id), ]
+    rownames(shuffled) <- NULL
+
+    prep <- function(d) {
+      prepare_bayesm_data(list(data = d), synth$config, verbose = FALSE)
+    }
+
+    a <- prep(ordered)
+    b <- prep(shuffled)
+
+    expect_equal(a$n_respondents, b$n_respondents)
+    expect_equal(a$col_names, b$col_names)
+
+    # Same respondent, same tasks, same design blocks, same choices.
+    for (i in seq_len(a$n_respondents)) {
+      expect_equal(a$lgtdata[[i]]$y, b$lgtdata[[i]]$y,
+                   info = sprintf("y differs for respondent %d", i))
+      expect_equal(unname(a$lgtdata[[i]]$X), unname(b$lgtdata[[i]]$X),
+                   info = sprintf("X differs for respondent %d", i))
+    }
+  })
+
+  # ============================================================================
+  # TEST 10: non-contiguous choice sets refuse rather than estimating nonsense
+  # ============================================================================
+  test_that("HB: a respondent whose sets cannot form clean blocks refuses", {
+    synth <- generate_synthetic_cbc(
+      n_respondents = 6, n_tasks = 4, n_alts = 3, seed = 11
+    )
+
+    # Give respondent 2's task a duplicate row: the set no longer holds
+    # exactly p alternatives once the per-set count check is bypassed.
+    d <- synth$data
+    dup <- d[d$resp_id == 2 & d$task_id == min(d$task_id[d$resp_id == 2]), ][1, ]
+    d <- rbind(d, dup)
+    d <- d[order(d$resp_id, d$task_id), ]
+
+    cond <- tryCatch(
+      {
+        prepare_bayesm_data(list(data = d), synth$config, verbose = FALSE)
+        NULL
+      },
+      turas_refusal = function(e) e
+    )
+
+    expect_false(is.null(cond))
+    expect_true(cond$code %in% c("DATA_INCONSISTENT_ALTERNATIVES",
+                                 "DATA_NONCONTIGUOUS_CHOICE_SETS"))
+  })
+
 } # end turas_root guard

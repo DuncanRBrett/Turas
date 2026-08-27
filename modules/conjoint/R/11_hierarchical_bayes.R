@@ -181,9 +181,15 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
   if (length(bad_cs) > 0) {
     return(conjoint_refuse(
       code = "DATA_INCONSISTENT_ALTERNATIVES",
-      message = sprintf(
+      title = "Choice Sets Have Different Numbers of Alternatives",
+      problem = sprintf(
         "Not all choice sets have %d alternatives. bayesm requires a constant number of alternatives per choice set.",
         p
+      ),
+      why_it_matters = paste0(
+        "Hierarchical Bayes reads the design matrix as fixed-size blocks. A ",
+        "choice set of the wrong size shifts every block after it, so the ",
+        "utilities would be wrong with nothing to show for it."
       ),
       how_to_fix = c(
         "Ensure every choice set has exactly the same number of alternatives",
@@ -196,15 +202,61 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
   # Build lgtdata: one element per respondent
   lgtdata <- vector("list", n_respondents)
 
+  alt_col <- config$alternative_id_column
+
   for (i in seq_len(n_respondents)) {
     resp_id <- respondent_ids[i]
     resp_rows <- which(data[[resp_col]] == resp_id)
+
+    # bayesm reads X as consecutive blocks of p rows, one block per task, in
+    # the same order as y. Nothing upstream sorts the data, so a file exported
+    # by alternative (all alternative 1s, then all alternative 2s) produced an
+    # X whose blocks did not correspond to the tasks y described — silently
+    # wrong individual utilities, with no error anywhere. Order each
+    # respondent's rows by choice set, then by alternative within the set.
+    cs_vals <- data[[cs_col]][resp_rows]
+    cs_order <- match(cs_vals, unique(cs_vals))  # first appearance, stable
+    alt_vals <- if (!is.null(alt_col) && alt_col %in% names(data)) {
+      data[[alt_col]][resp_rows]
+    } else {
+      seq_along(resp_rows)
+    }
+    resp_rows <- resp_rows[order(cs_order, alt_vals, method = "radix")]
+
     resp_data <- data[resp_rows, ]
     resp_X <- X_full[resp_rows, , drop = FALSE]
 
     # Get choice sets for this respondent
     choice_sets <- unique(resp_data[[cs_col]])
     n_tasks <- length(choice_sets)
+
+    # After sorting, each task must occupy one contiguous block of exactly p
+    # rows. If it does not, the X/y correspondence bayesm assumes is broken
+    # and the utilities would be quietly wrong.
+    block_ids <- rep(choice_sets, each = p)
+    if (length(block_ids) != nrow(resp_data) ||
+        !identical(as.character(resp_data[[cs_col]]), as.character(block_ids))) {
+      return(conjoint_refuse(
+        code = "DATA_NONCONTIGUOUS_CHOICE_SETS",
+        title = "Choice Sets Do Not Form Clean Blocks",
+        problem = sprintf(
+          paste0("Respondent '%s' has %d rows across %d choice sets, which do ",
+                 "not sort into contiguous blocks of %d alternatives."),
+          resp_id, nrow(resp_data), n_tasks, p
+        ),
+        why_it_matters = paste0(
+          "Hierarchical Bayes estimation reads the design matrix as one block ",
+          "per task. If the blocks do not line up with the choices, the ",
+          "individual-level utilities are wrong and nothing downstream can ",
+          "detect it."
+        ),
+        how_to_fix = c(
+          "Check that every choice set for this respondent has the same number of alternatives.",
+          "Check for duplicated rows, or for a choice set id that is reused for two different tasks.",
+          sprintf("Respondent: %s. Alternatives expected per set: %d.", resp_id, p)
+        )
+      ))
+    }
 
     # Build y vector: which alternative was chosen in each task (1-indexed)
     y_vec <- integer(n_tasks)
@@ -218,13 +270,20 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
       if (is.na(y_val)) {
         return(conjoint_refuse(
           code = "DATA_NO_CHOICE",
-          message = sprintf(
+          title = "Choice Set With No Chosen Alternative",
+          problem = sprintf(
             "No chosen alternative found for respondent '%s' in choice set '%s'.",
             resp_id, cs_id
           ),
+          why_it_matters = paste0(
+            "Every choice task must record what the respondent picked. A task ",
+            "with nothing chosen carries no information and cannot be indexed ",
+            "into the design matrix."
+          ),
           how_to_fix = c(
             "Ensure every choice set has exactly one row with chosen=1",
-            "Check for missing or zero values in the chosen column"
+            "Check for missing or zero values in the chosen column",
+            "If respondents could decline to choose, configure the None option (see none_label) so those tasks are modelled rather than dropped"
           )
         ))
       }
