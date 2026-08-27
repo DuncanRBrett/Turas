@@ -105,7 +105,8 @@ conjoint_preflight <- function(verbose = TRUE, module_dir = NULL) {
   # remains is the simulator's, which is now a standalone tool.
   js_dir <- file.path(base_dir, "lib", "html_simulator", "js")
   expected_js_files <- c(
-    "simulator_charts.js", "simulator_engine.js", "simulator_ui.js"
+    "simulator_charts.js", "simulator_engine.js", "simulator_ui.js",
+    "simulator_page.js"
   )
 
   js_present <- vapply(expected_js_files, function(f) {

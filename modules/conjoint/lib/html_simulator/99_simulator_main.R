@@ -114,7 +114,7 @@ generate_conjoint_simulator <- function(results, output_path,
   sim_json <- gsub("<", "\\\\u003c", simulator_data_to_json(sim_data), fixed = TRUE)
 
   js <- .cj_sim_read_js(c("simulator_engine.js", "simulator_charts.js",
-                          "simulator_ui.js"))
+                          "simulator_ui.js", "simulator_page.js"))
   if (is.null(js)) {
     return(list(
       status = "REFUSED",

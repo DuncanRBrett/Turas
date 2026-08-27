@@ -179,3 +179,37 @@ test_that("the simulator's JavaScript parses", {
                  0L, info = basename(f))
   }
 })
+
+test_that("every inline handler in the page has a definition in the page", {
+  # The C-delta review found the extraction had left switchSimMode,
+  # exportSimulatorExcel and cjExportPNG behind in the deleted report JS:
+  # every mode button except the default and both export buttons threw a
+  # ReferenceError. This closes that class of defect: any onclick the panel
+  # markup emits must be defined somewhere in the same file.
+  skip_if(!file.exists(sim_main), "simulator module not present")
+  source(sim_main, local = TRUE)
+
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(out), add = TRUE)
+  res <- generate_conjoint_simulator(make_sim_results(), out, verbose = FALSE)
+  expect_equal(res$status, "PASS")
+
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  handlers <- unique(gsub(
+    '^onclick="([A-Za-z_$][A-Za-z0-9_$]*).*$', "\\1",
+    regmatches(html, gregexpr('onclick="[A-Za-z_$][A-Za-z0-9_$]*',
+                              html))[[1]]
+  ))
+  expect_true(length(handlers) > 0)
+
+  for (fn in handlers) {
+    # Object-method handlers (SimUI.addProduct()) resolve through the
+    # object; bare ones must be defined as a function or window assignment.
+    if (grepl("^(SimUI|SimEngine|SimCharts)$", fn)) next
+    defined <- grepl(paste0("function ", fn, "\\s*\\("), html) ||
+      grepl(paste0("window\\.", fn, "\\s*="), html) ||
+      grepl(paste0("\\b", fn, "\\s*=\\s*function"), html)
+    expect_true(defined, info = paste0("onclick handler '", fn,
+                                       "' has no definition in the page"))
+  }
+})
