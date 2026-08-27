@@ -8,13 +8,10 @@ test_that("generate_random_design creates correct structure", {
   item_ids <- paste0("I", 1:8)
 
   set.seed(42)
-  result <- tryCatch(
-    generate_random_design(item_ids, items_per_task = 4,
-                           tasks_per_respondent = 6, num_versions = 2),
-    error = function(e) NULL
-  )
-
-  skip_if(is.null(result), "generate_random_design call failed")
+  # No skip-on-failure: a design generator that errors is a failing test,
+  # not an environmental skip (review S5).
+  result <- generate_random_design(item_ids, items_per_task = 4,
+                                   tasks_per_respondent = 6, num_versions = 2)
 
   expect_true(is.data.frame(result))
   expect_true("Version" %in% names(result) || "version" %in% tolower(names(result)))
@@ -34,12 +31,7 @@ test_that("compute_pair_frequencies returns named pair counts", {
   )
 
   item_cols <- c("Item_1", "Item_2", "Item_3")
-  freq <- tryCatch(
-    compute_pair_frequencies(design, item_cols),
-    error = function(e) NULL
-  )
-
-  skip_if(is.null(freq), "compute_pair_frequencies call failed")
+  freq <- compute_pair_frequencies(design, item_cols)
 
   # Returns named numeric vector of pair counts
   expect_true(is.numeric(freq))
