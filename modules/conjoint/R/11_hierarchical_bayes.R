@@ -1029,6 +1029,14 @@ calculate_attribute_importance_hb <- function(hb_result, config, verbose = TRUE)
     }
   }
 
+  # Respondents whose part-worths are entirely flat have a total range of zero
+  # and stay at zero importance, so their rows do not sum to 100. They are
+  # counted rather than quietly averaged in.
+  row_totals <- rowSums(resp_importance)
+  n_zero_range <- sum(row_totals == 0)
+
+  rownames(resp_importance) <- rownames(individual_betas)
+
   # Average across respondents
   avg_importance <- colMeans(resp_importance)
   sd_importance <- apply(resp_importance, 2, sd)
@@ -1040,9 +1048,31 @@ calculate_attribute_importance_hb <- function(hb_result, config, verbose = TRUE)
     stringsAsFactors = FALSE
   )
 
+  # Rank and interpretation, to match the aggregate function's shape so that
+  # everything downstream can take either.
+  importance_df$Range <- NA_real_
+  importance_df$Rank <- rank(-importance_df$Importance, ties.method = "first")
+  if (exists("interpret_importance", mode = "function")) {
+    importance_df$Interpretation <- vapply(importance_df$Importance,
+                                           interpret_importance, character(1))
+  }
+
   # Sort by importance descending
   importance_df <- importance_df[order(-importance_df$Importance), ]
   rownames(importance_df) <- NULL
+
+  # The per-respondent matrix is what the tabs Allocation export needs. It used
+  # to be computed here and thrown away.
+  attr(importance_df, "respondent_importance") <- resp_importance
+  attr(importance_df, "n_zero_range_respondents") <- n_zero_range
+  attr(importance_df, "importance_method") <- "individual"
+
+  if (n_zero_range > 0) {
+    cat(sprintf(
+      "[TRS INFO] CONJ_ZERO_RANGE_RESPONDENTS: %d of %d respondents have flat part-worths and contribute zero importance.\n",
+      n_zero_range, n_respondents
+    ))
+  }
 
   if (verbose) {
     log_verbose("  ✓ Individual-level importance calculated (averaged across respondents)", verbose)

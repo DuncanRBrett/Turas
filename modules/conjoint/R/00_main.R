@@ -460,7 +460,24 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
     # STEP 5: Calculate Importance
     if (verbose) cat("\n5. Calculating attribute importance...\n")
 
-    importance <- calculate_attribute_importance(utilities, config, verbose = verbose)
+    # M4: importance from averaged utilities understates any attribute people
+    # disagree about, because the disagreement cancels before the range is
+    # taken. Where respondent-level part-worths exist, compute each
+    # respondent's importance first and average those — which is also the
+    # figure the tabs export will carry, so the report and the export agree.
+    use_individual_importance <-
+      !is.null(model_result$method) &&
+      model_result$method %in% c("hierarchical_bayes", "latent_class") &&
+      !is.null(model_result$individual_betas) &&
+      exists("calculate_attribute_importance_hb", mode = "function")
+
+    importance <- if (use_individual_importance) {
+      calculate_attribute_importance_hb(model_result, config, verbose = verbose)
+    } else {
+      imp <- calculate_attribute_importance(utilities, config, verbose = verbose)
+      attr(imp, "importance_method") <- "aggregate"
+      imp
+    }
 
     if (verbose) {
       cat("   ✓ Importance scores calculated:\n")
@@ -766,7 +783,14 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     version = get_conjoint_version(),
     run_result = run_result,
     warnings = if (length(all_warnings) > 0) all_warnings else NULL,
-    stats_pack = stats_pack_result
+    stats_pack = stats_pack_result,
+
+    # Per-respondent attribute importance, one row per respondent, columns
+    # summing to 100 except for respondents with flat part-worths. NULL unless
+    # the method produced respondent-level estimates. This is the payload the
+    # tabs Allocation export is built on.
+    respondent_importance = attr(importance, "respondent_importance"),
+    importance_method = attr(importance, "importance_method") %||% "aggregate"
   )
 }
 
