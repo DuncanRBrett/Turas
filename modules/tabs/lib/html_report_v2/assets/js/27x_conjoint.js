@@ -54,9 +54,20 @@
     if (meta.filterNote) notes.push(esc(meta.filterNote));
     if (meta.unweightedNote) notes.push(esc(meta.unweightedNote));
 
+    // The market simulator is a separate file — a tool rather than report
+    // content. Link to it when the study produced one; it sits beside this
+    // report, so a relative link is right.
+    var sim = "";
+    if (meta.simulatorFile) {
+      sim = '<p class="cj-note">Market simulator: <a href="' +
+        esc(meta.simulatorFile) + '">' + esc(meta.simulatorFile) +
+        "</a> — open it beside this report to test product configurations.</p>";
+    }
+
     return '<div class="cj-provenance">' +
       "<p>" + bits.join(" · ") + "</p>" +
       (notes.length ? '<p class="cj-note">' + notes.join(" ") + "</p>" : "") +
+      sim +
       "</div>";
   }
 

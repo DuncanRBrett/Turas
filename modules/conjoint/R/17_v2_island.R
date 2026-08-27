@@ -169,6 +169,13 @@ serialize_conjoint_layer <- function(results, verbose = TRUE) {
       "the crosstab export (generate_tabs_export)."
     ),
     unweightedNote = "The conjoint model is estimated unweighted.",
+    # The simulator is a separate file, by decision: it is a tool, not report
+    # content, and embedding it would put a second copy of the engine in every
+    # report. Named here so the view can link to it when it exists.
+    simulatorFile = if (isTRUE(config$generate_html_simulator)) {
+      basename(sub("[.]xlsx$", "_simulator.html",
+                   config$output_file %||% "conjoint_results.xlsx"))
+    } else NA_character_,
     generated = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
 

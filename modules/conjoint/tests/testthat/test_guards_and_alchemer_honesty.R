@@ -126,7 +126,9 @@ test_that("M7: default_customers reaches the config object", {
   expect_true(grepl("default_customers = safe_numeric(settings_list$default_customers",
                     cfg, fixed = TRUE))
 
-  # The report transformer and the revenue panel's JS already read it.
-  tr <- read_src("modules", "conjoint", "lib", "html_report", "01_data_transformer.R")
+  # The simulator's data builder and the revenue panel's JS read it. (It lived
+  # in the report layer until that was retired on 2026-08-27; the builder moved
+  # into the standalone simulator with the rest of what the simulator needs.)
+  tr <- read_src("modules", "conjoint", "lib", "html_simulator", "01_simulator_parts.R")
   expect_true(grepl("config$default_customers", tr, fixed = TRUE))
 })

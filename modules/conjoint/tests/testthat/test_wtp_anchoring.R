@@ -103,21 +103,24 @@ test_that("H9: a price slope that rises with price refuses", {
   expect_match(cond$problem, "increases as price increases")
 })
 
-test_that("H9: the report labels the WTP interval as approximate", {
-  tb <- file.path(Sys.getenv("TURAS_ROOT"), "modules", "conjoint", "lib",
-                  "html_report", "02_table_builder.R")
-  skip_if(!file.exists(tb), "table builder not found")
-  source(tb, local = TRUE)
+test_that("H9: the WTP interval is labelled approximate where the reader sees it", {
+  # This used to check the retired report's table builder. The note now travels
+  # in the island itself, so the view cannot forget to print it, and the view
+  # renders it as the column heading.
+  root <- Sys.getenv("TURAS_ROOT")
 
-  wtp_data <- list(
-    wtp_table = calculate_wtp(wtp_utilities(TRUE), wtp_config(), verbose = FALSE)$wtp_table,
-    currency_symbol = "$"
-  )
+  island_src <- paste(readLines(file.path(root, "modules", "conjoint", "R",
+                                          "17_v2_island.R"), warn = FALSE),
+                      collapse = "\n")
+  expect_true(grepl("intervalNote", island_src, fixed = TRUE))
+  expect_true(grepl("not a sampling interval", island_src, fixed = TRUE))
 
-  html <- build_wtp_table(wtp_data)
-
-  expect_true(grepl("approx", html, ignore.case = TRUE))
-  expect_true(grepl("not a sampling interval", html, fixed = TRUE))
+  view <- file.path(root, "modules", "tabs", "lib", "html_report_v2",
+                    "assets", "js", "27x_conjoint.js")
+  skip_if(!file.exists(view), "v2 conjoint view not present")
+  view_src <- paste(readLines(view, warn = FALSE), collapse = "\n")
+  expect_true(grepl("intervalNote", view_src, fixed = TRUE))
+  expect_true(grepl("Interval (approx.)", view_src, fixed = TRUE))
 })
 
 test_that("M8: wtp_enabled is the off switch and the template says so", {

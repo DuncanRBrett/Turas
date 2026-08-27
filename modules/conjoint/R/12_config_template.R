@@ -262,8 +262,7 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   add("MARKET SIMULATOR", "rfc_draws", "1000", "Number of random draws for RFC simulation", FALSE, "", "Integer >= 100")
 
   # --- HTML REPORT ---
-  add("HTML REPORT", "generate_html_report", "FALSE", "Generate interactive HTML analysis report", FALSE, "TRUE,FALSE", "TRUE or FALSE")
-  add("HTML REPORT", "generate_html_simulator", "FALSE", "Generate standalone HTML market simulator", FALSE, "TRUE,FALSE", "TRUE or FALSE")
+  add("HTML REPORT", "generate_html_simulator", "FALSE", "Generate the standalone HTML market simulator (a self-contained file the client can open and share)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
   add("HTML REPORT", "brand_colour", "#323367", "Primary brand hex colour for HTML output", FALSE, "", "Hex colour (e.g. #323367)")
   add("HTML REPORT", "accent_colour", "#CC9900", "Accent hex colour for HTML output", FALSE, "", "Hex colour (e.g. #CC9900)")
   add("HTML REPORT", "project_name", "Conjoint Analysis", "Project name. Appears in the report header and in the stats pack Declaration sheet.", FALSE, "", "Free text")
@@ -738,7 +737,6 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
       analysis_type = "choice",
       choice_type = "single",
       estimation_method = "auto",
-      generate_html_report = "TRUE",
       simulation_method = "logit"
     ),
     cbc_hb = list(
@@ -749,7 +747,6 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
       hb_burnin = "10000",
       hb_thin = "1",
       hb_ncomp = "1",
-      generate_html_report = "TRUE",
       simulation_method = "logit"
     ),
     cbc_latent_class = list(
@@ -759,14 +756,12 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
       latent_class_min = "2",
       latent_class_max = "6",
       latent_class_criterion = "bic",
-      generate_html_report = "TRUE",
       simulation_method = "logit"
     ),
     best_worst = list(
       analysis_type = "choice",
       choice_type = "best_worst",
       estimation_method = "auto",
-      generate_html_report = "TRUE",
       simulation_method = "logit"
     )
   )
