@@ -299,6 +299,33 @@ build_interaction_formula <- function(config) {
 #' @param config Configuration
 #'
 #' @return Data frame with interaction analysis
+#' Match mlogit Interaction Coefficient Names
+#'
+#' An interaction between attributes A and B produces coefficients named
+#' `A<levelA>:B<levelB>`. This returns a logical mask over `coef_names`
+#' selecting exactly those, in the order the formula declared the attributes.
+#'
+#' @param coef_names Character vector of model coefficient names.
+#' @param attrs Character vector of attribute names in the interaction.
+#' @return Logical vector the same length as `coef_names`.
+#' @keywords internal
+.match_interaction_coefficients <- function(coef_names, attrs) {
+
+  if (length(coef_names) == 0) return(logical(0))
+
+  strip_ticks <- function(x) gsub("^`|`$", "", x)
+
+  vapply(coef_names, function(cn) {
+    parts <- strsplit(cn, ":", fixed = TRUE)[[1]]
+    if (length(parts) != length(attrs)) return(FALSE)
+    all(mapply(
+      function(part, attr) startsWith(strip_ticks(part), attr),
+      parts, attrs
+    ))
+  }, logical(1), USE.NAMES = FALSE)
+}
+
+
 analyze_interaction <- function(model_result, interaction_term, config) {
 
   if (!model_result$has_interactions) {
@@ -313,8 +340,16 @@ analyze_interaction <- function(model_result, interaction_term, config) {
 
   int_name <- paste(interaction_term, collapse = "_x_")
 
-  # Extract coefficients for this interaction
-  int_coefs <- model_result$coefficients[grepl(int_name, names(model_result$coefficients))]
+  # Extract coefficients for this interaction.
+  # The formula is built with mlogit's ":" convention (build_formula_with_interactions),
+  # so the coefficients are named e.g. "BrandBeta:Price$20". Matching on the
+  # internal "Brand_x_Price" name — which mlogit never produces — found nothing,
+  # every analysis errored, the caller swallowed it, and interaction analyses
+  # came back empty with no sign that anything had gone wrong.
+  int_mask <- .match_interaction_coefficients(
+    names(model_result$coefficients), interaction_term
+  )
+  int_coefs <- model_result$coefficients[int_mask]
 
   if (length(int_coefs) == 0) {
     conjoint_refuse(
@@ -340,7 +375,10 @@ analyze_interaction <- function(model_result, interaction_term, config) {
 
   # Add standard errors if available
   if (!is.null(model_result$std_errors)) {
-    int_se <- model_result$std_errors[grepl(int_name, names(model_result$std_errors))]
+    se_mask <- .match_interaction_coefficients(
+      names(model_result$std_errors), interaction_term
+    )
+    int_se <- model_result$std_errors[se_mask]
     result$Std_Error <- unname(int_se)
 
     # Calculate significance

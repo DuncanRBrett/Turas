@@ -617,7 +617,34 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
   if (verbose) cat(sprintf("   \u2713 Results written to: %s\n", basename(config$output_file)))
 
   # Step 8: HTML report
-  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
+  # The report embeds the market simulator, which is built from the part-worth
+  # utilities table. That table cannot carry interaction coefficients, so for a
+  # with-interactions model the report would present main-effects shares from a
+  # model that was never estimated. Skip it and say so; the Excel deliverable
+  # above is already written and its interaction sheets carry the real result.
+  .model_has_interactions <- isTRUE(model_result$has_interactions) ||
+    isTRUE(attr(utilities, "has_interactions"))
+
+  if (.model_has_interactions &&
+      (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator))) {
+    cat("\n┌─── TURAS: HTML REPORT SKIPPED ─────────────────────────┐\n")
+    cat("│ Code: CALC_INTERACTIONS_NOT_IN_SIMULATOR\n")
+    cat("│ This model includes interaction terms. The embedded market\n")
+    cat("│ simulator is built from the part-worth utilities table, which\n")
+    cat("│ cannot carry interaction coefficients, so its shares would come\n")
+    cat("│ from a main-effects model that was not estimated.\n")
+    cat("│ Fix: clear interaction_terms to produce a report with a simulator,\n")
+    cat("│ or read the interaction result from the Excel workbook.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+
+    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+      turas_run_state_partial(
+        trs_state, "CALC_INTERACTIONS_NOT_IN_SIMULATOR",
+        "HTML report skipped",
+        problem = "The model includes interaction terms, which the embedded simulator cannot represent."
+      )
+    }
+  } else if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
     if (verbose) cat("\n8. Generating HTML analysis report (with simulator)...\n")
 
     if (exists("generate_conjoint_html_report", mode = "function")) {

@@ -46,6 +46,35 @@ predict_market_shares <- function(products,
     )
   }
 
+  # A with-interactions model cannot be simulated from a part-worth table: the
+  # interaction coefficients are not in it, so every share would come from a
+  # main-effects model the study did not estimate. Simulating anyway is worse
+  # than not simulating, because the numbers look ordinary.
+  if (isTRUE(attr(utilities, "has_interactions"))) {
+    dropped <- attr(utilities, "dropped_interaction_coefs")
+    conjoint_refuse(
+      code = "CALC_INTERACTIONS_NOT_IN_SIMULATOR",
+      title = "Simulator Cannot Represent an Interaction Model",
+      problem = sprintf(
+        paste0("The model was estimated with %d interaction coefficient(s), ",
+               "which a part-worth utilities table cannot carry, so the ",
+               "simulator would compute shares from main effects only."),
+        length(dropped)
+      ),
+      why_it_matters = paste0(
+        "Shares from a main-effects table are not the shares the estimated ",
+        "model implies. They would look like ordinary results and be wrong in ",
+        "a direction nobody could see."
+      ),
+      how_to_fix = c(
+        "Clear interaction_terms in the Settings sheet to run a main-effects study the simulator can represent.",
+        "Keep the interaction model for the interaction analysis sheets, which do report the interaction effects, and read shares from a separate main-effects run.",
+        sprintf("Interaction coefficients in this model: %s",
+                paste(utils::head(dropped, 6), collapse = ", "))
+      )
+    )
+  }
+
   if (!all(c("Attribute", "Level", "Utility") %in% names(utilities))) {
     conjoint_refuse(
       code = "DATA_SIMULATOR_INVALID_UTILITIES",

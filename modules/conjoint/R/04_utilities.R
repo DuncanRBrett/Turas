@@ -108,6 +108,25 @@ calculate_utilities <- function(model_result, config, verbose = TRUE) {
   utilities <- do.call(rbind, utilities_list)
   rownames(utilities) <- NULL
 
+  # Interaction coefficients (mlogit names them "A<level>:B<level>") have no
+  # row in a part-worth table, so they are dropped here. That must not happen
+  # in silence: everything downstream — importance, the simulator, the
+  # report — then describes a main-effects model that was never estimated.
+  interaction_coefs <- names(coefs)[grepl(":", names(coefs), fixed = TRUE)]
+  attr(utilities, "has_interactions") <- length(interaction_coefs) > 0
+  attr(utilities, "dropped_interaction_coefs") <- interaction_coefs
+
+  if (length(interaction_coefs) > 0) {
+    cat("\n[TRS WARNING] CONJ_INTERACTIONS_NOT_IN_UTILITIES\n")
+    cat(sprintf("  %d interaction coefficient(s) were estimated but cannot be shown\n",
+                length(interaction_coefs)))
+    cat("  in a part-worth utilities table, so they are not in the utilities\n")
+    cat("  sheet, the importance table or the simulator. The interaction\n")
+    cat("  analysis sheets carry them.\n")
+    cat(sprintf("  Dropped: %s\n\n",
+                paste(utils::head(interaction_coefs, 6), collapse = ", ")))
+  }
+
   # Add interpretation
   utilities$Interpretation <- mapply(
     interpret_utility,

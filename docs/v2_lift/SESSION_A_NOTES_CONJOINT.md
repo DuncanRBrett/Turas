@@ -109,6 +109,19 @@ explicit-None dataset — the run refused as `CFG_EST_MLOGIT_FAILED` with the
 problem text "missing value where TRUE/FALSE needed", which names neither the
 cause nor a fix. The new refusal names both.
 
+**A9 — the interaction honesty gate is a skip, not a run-killing refusal.**
+`predict_market_shares()` refuses outright (`CALC_INTERACTIONS_NOT_IN_SIMULATOR`)
+for direct API callers. In the pipeline, though, the Excel workbook — including
+the interaction analysis sheets that carry the real result — is already written
+by the time the HTML report is built, so `00_main.R` step 8 skips the report,
+prints the same code and reason in a console block and records a PARTIAL event,
+rather than refusing and discarding a complete deliverable. Interaction
+coefficients dropped from the utilities table are announced on the console
+(`CONJ_INTERACTIONS_NOT_IN_UTILITIES`) and tagged on the data frame, so the drop
+is never silent. Representing interactions as rows in the part-worth table was
+the alternative; it was not taken because an interaction "attribute" would then
+enter the importance calculation and change what that table means.
+
 **A2 — `setwd` unwinding.** The work order said to add `on.exit`. The `setwd`
 sits inside a `withProgress()` expression in a Shiny observer, where `on.exit`
 binds to an ambiguous frame; `tryCatch(..., finally = setwd(old_wd))` restores

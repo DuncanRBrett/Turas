@@ -458,6 +458,20 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
       default = TRUE
     ),
 
+    # =========================================================================
+    # INTERACTIONS
+    # =========================================================================
+    # These were read nowhere: config$interaction_terms was always NULL, so a
+    # user who configured Brand:Price got a main-effects analysis in silence.
+    # The template writes auto_detect_interactions; 06_interactions.R reads
+    # interaction_auto_detect. Both spellings are accepted, template first.
+    interaction_terms = settings_list$interaction_terms %||% "",
+    interaction_auto_detect = safe_logical(
+      settings_list$auto_detect_interactions %||% settings_list$interaction_auto_detect,
+      default = FALSE
+    ),
+    interaction_max = safe_numeric(settings_list$interaction_max, 3),
+
     # Base level method for dummy coding
     # 'first' = first level is reference (default)
     # 'last' = last level is reference
