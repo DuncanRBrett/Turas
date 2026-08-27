@@ -183,6 +183,17 @@ dictionary_wallet_rows <- function(category_map, config) {
                    "The wallet's for-self transactions per month.",
                    self_txn_terms, "the wallet categories' Own (or unsplit Total) transaction columns",
                    paste("Built from what is present.", self_rule)),
+    dictionary_gambling_rows(config)
+  ))
+}
+
+#' Document the gambling break-out of the wallet
+#'
+#' @param config The VAS_CONFIG list.
+#'
+#' @return A data frame of dictionary rows.
+dictionary_gambling_rows <- function(config) {
+  return(rbind(
     dictionary_row("TotalGamblingSpend", "Headline", NA, "Total", "MonthlySpend",
                    "rand per month",
                    "The wallet's gambling line: stakes at face value, winnings never netted off.",
