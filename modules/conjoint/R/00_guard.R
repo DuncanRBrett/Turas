@@ -436,6 +436,16 @@ guard_check_data_exists <- function(data, min_choices = 5) {
 #' @keywords internal
 validate_hb_config <- function(config) {
 
+  # Same NULL-safety as validate_latent_class_config: an absent MCMC setting
+  # is NULL, and comparing NULL in an if() is an error rather than FALSE.
+  .num_or <- function(x, default) {
+    if (is.null(x) || length(x) != 1 || is.na(x)) default else x
+  }
+  config$hb_iterations <- .num_or(config$hb_iterations, 10000)
+  config$hb_burnin     <- .num_or(config$hb_burnin, 5000)
+  config$hb_thin       <- .num_or(config$hb_thin, 1)
+  config$hb_ncomp      <- .num_or(config$hb_ncomp, 1)
+
   # Check bayesm package
   if (!requireNamespace("bayesm", quietly = TRUE)) {
     conjoint_refuse(
@@ -494,6 +504,22 @@ validate_hb_config <- function(config) {
 #' @param config Configuration list
 #' @keywords internal
 validate_latent_class_config <- function(config) {
+
+  # The loader always supplies these, but this validator is also reachable
+  # from the direct API, where an absent setting is NULL — and
+  # `if (NULL < 2)` and `if (!NULL %in% x)` are errors, not FALSE. Fall back
+  # to the loader's own defaults rather than failing with "argument is of
+  # length zero", which tells the user nothing.
+  .num_or <- function(x, default) {
+    if (is.null(x) || length(x) != 1 || is.na(x)) default else x
+  }
+  .chr_or <- function(x, default) {
+    if (is.null(x) || length(x) != 1 || is.na(x) || !nzchar(trimws(x))) default else x
+  }
+
+  config$latent_class_min <- .num_or(config$latent_class_min, 2)
+  config$latent_class_max <- .num_or(config$latent_class_max, 5)
+  config$latent_class_criterion <- .chr_or(config$latent_class_criterion, "bic")
 
   # bayesm is also required for LC (multi-component mixture)
   if (!requireNamespace("bayesm", quietly = TRUE)) {

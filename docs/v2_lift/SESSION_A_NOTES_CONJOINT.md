@@ -76,6 +76,35 @@ HB tests always skipped. Both now supply `title`/`problem`/`why_it_matters`.
 call sites in `R/` and `lib/` and fails on any unknown or missing argument, so
 this class of defect cannot come back quietly.
 
+### A-NEW-7 — C3 was live on the latent-class path too (found in the adversarial pass)
+`build_latent_class_result()` (`R/13_latent_class.R`) builds its own result
+object and set `std_errors <- apply(individual_betas, 2, sd)` — the same
+heterogeneity-as-standard-error defect as C3, in a second place the review
+named only in passing. Fixing `extract_hb_results` did not touch it. Caught by
+running a latent-class model end to end after A14: the LC intervals were about
+3.3x wider than the HB intervals on the same data (mean SE 0.79 vs 0.21).
+`build_latent_class_result` now calls the same `compute_hb_population_se()`,
+using the burn-in count `extract_lc_solution` already computed, and reports
+heterogeneity in its own field. Re-measured after the fix: SE 0.24 against
+heterogeneity 0.79.
+
+### A-NEW-8 — a latent-class fit with no comparable criterion failed on a list index
+When every fitted K returns an NA information criterion — which happens on
+samples too small for the class count — `which.min()` returns `integer(0)` and
+the code indexed the solutions list with it, producing "attempt to select less
+than one element in get1index". Now refuses as
+`CALC_LC_NO_COMPARABLE_SOLUTION`, naming the sample-size guidance. Reproduced
+at 40 respondents, and covered by a test at that size.
+
+### A-NEW-9 — HB and LC crashed inside bayesm when their settings were absent
+`as.integer(NULL)` is `integer(0)`, and `if (NULL < 2)` is an error rather than
+`FALSE`. The MCMC and class-count settings are always supplied by
+`load_conjoint_config`, but `estimate_choice_model` is also a direct API, and
+through it an absent `hb_ncomp` reached bayesm as an empty prior and failed
+inside the package. `validate_hb_config`, `validate_latent_class_config`,
+`estimate_hierarchical_bayes` and `estimate_latent_class` now fall back to the
+loader's own defaults.
+
 ---
 
 ## Deviations from the work order

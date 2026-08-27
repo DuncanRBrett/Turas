@@ -479,4 +479,84 @@ if (is.null(turas_root)) {
                                  "DATA_NONCONTIGUOUS_CHOICE_SETS"))
   })
 
+  # ============================================================================
+  # TEST 11: latent class gets the same SE treatment as HB (review finding C3)
+  # ============================================================================
+  test_that("LC: std_errors is the posterior SE, and utilities are not all zero", {
+    skip_if_not_installed("bayesm")
+
+    synth <- generate_two_segment_data(n_respondents = 60, seed = 5)
+
+    config <- synth$config
+    config$estimation_method <- "latent_class"
+    config$hb_iterations <- 500
+    config$hb_burnin <- 150
+    config$hb_thin <- 2
+    config$hb_ncomp <- 1
+    config$latent_class_min <- 2
+    config$latent_class_max <- 2
+    config$zero_center_utilities <- TRUE
+    config$confidence_level <- 0.95
+
+    suppressWarnings(capture.output(
+      model <- estimate_choice_model(list(data = synth$data), config, verbose = FALSE),
+      type = "output"
+    ))
+
+    expect_equal(model$method, "latent_class")
+
+    # C3 on the LC path: build_latent_class_result stored the between-
+    # respondent SD as std_errors, exactly as extract_hb_results did.
+    expect_equal(model$se_method, "posterior_draws")
+    expect_false(is.null(model$heterogeneity_sd))
+    expect_true(all(model$std_errors < model$heterogeneity_sd))
+    expect_lt(mean(model$std_errors), mean(model$heterogeneity_sd) / 2)
+
+    # C1: the utilities table used to come back entirely zero for LC.
+    u <- calculate_utilities(model, config, verbose = FALSE)
+    non_baseline <- u[!u$is_baseline, ]
+    expect_false(all(non_baseline$Utility == 0))
+    expect_true(all(non_baseline$Std_Error < non_baseline$Heterogeneity_SD))
+
+    imp <- calculate_attribute_importance(u, config, verbose = FALSE)
+    expect_gt(sum(imp$Importance), 99)
+  })
+
+  # ============================================================================
+  # TEST 12: a latent class fit with nothing to compare refuses cleanly
+  # ============================================================================
+  test_that("LC: an uncomparable solution refuses instead of failing on an index", {
+    skip_if_not_installed("bayesm")
+
+    # 40 respondents is well below any usable sample for a 2-class solution;
+    # the information criteria come back NA. which.min() over all-NA returns
+    # integer(0), and the old code indexed the solution list with it, giving
+    # "attempt to select less than one element in get1index".
+    synth <- generate_two_segment_data(n_respondents = 40, seed = 5)
+
+    config <- synth$config
+    config$estimation_method <- "latent_class"
+    config$hb_iterations <- 500
+    config$hb_burnin <- 150
+    config$hb_thin <- 2
+    config$hb_ncomp <- 1
+    config$latent_class_min <- 2
+    config$latent_class_max <- 2
+
+    cond <- tryCatch(
+      {
+        suppressWarnings(capture.output(
+          estimate_choice_model(list(data = synth$data), config, verbose = FALSE),
+          type = "output"
+        ))
+        NULL
+      },
+      turas_refusal = function(e) e
+    )
+
+    expect_false(is.null(cond))
+    expect_equal(cond$code, "CALC_LC_NO_COMPARABLE_SOLUTION")
+    expect_true(any(grepl("200 or more respondents", cond$how_to_fix, fixed = TRUE)))
+  })
+
 } # end turas_root guard

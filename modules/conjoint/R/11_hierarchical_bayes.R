@@ -336,11 +336,15 @@ estimate_hierarchical_bayes <- function(data_list, config, verbose = TRUE) {
   # Prepare data for bayesm
   bayesm_data <- prepare_bayesm_data(data_list, config, verbose)
 
-  # MCMC settings
-  R <- as.integer(config$hb_iterations)
-  burnin <- as.integer(config$hb_burnin)
-  thin <- as.integer(config$hb_thin)
-  ncomp <- as.integer(config$hb_ncomp)
+  # MCMC settings.
+  # load_conjoint_config always supplies these, but estimate_choice_model is
+  # also a direct API. as.integer(NULL) is integer(0), which reaches bayesm as
+  # an empty prior and fails inside the package with nothing useful to read,
+  # so the loader's defaults are repeated here.
+  R <- as.integer(config$hb_iterations %||% 10000)
+  burnin <- as.integer(config$hb_burnin %||% 5000)
+  thin <- as.integer(config$hb_thin %||% 1)
+  ncomp <- as.integer(config$hb_ncomp %||% 1)
 
   log_verbose(sprintf("  → MCMC: %d iterations, %d burn-in, thin=%d, ncomp=%d",
                        R, burnin, thin, ncomp), verbose)
