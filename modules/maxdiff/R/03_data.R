@@ -433,6 +433,10 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   weight_var <- config$project_settings$Weight_Variable
   version_col <- survey_mapping$Field_Name[survey_mapping$Field_Type == "VERSION"][1]
 
+  # How the choice cells are coded (C3): Item_ID strings, or the 1-based
+  # position of the chosen item within the task's design row.
+  choice_value_type <- toupper(config$project_settings$Choice_Value_Type %||% "ITEM_ID")
+
   # Get task columns
   best_mapping <- survey_mapping[survey_mapping$Field_Type == "BEST_CHOICE", ]
   worst_mapping <- survey_mapping[survey_mapping$Field_Type == "WORST_CHOICE", ]
@@ -504,6 +508,34 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
       }
 
       items_shown <- as.character(unlist(design_row[1, item_cols]))
+
+      # Position-coded data: translate the 1-based position into that
+      # task's item before matching (C3). Out-of-range or non-integer
+      # positions refuse with context — silently skipping them is how the
+      # all-zero scores shipped.
+      if (choice_value_type == "ITEM_POSITION") {
+        decode_position <- function(v, which_choice) {
+          if (is.na(v)) return(NA_character_)
+          p <- suppressWarnings(as.integer(v))
+          if (is.na(p) || p < 1 || p > length(items_shown)) {
+            maxdiff_refuse(
+              code = "DATA_CHOICE_POSITION_INVALID",
+              title = "Choice Position Out Of Range",
+              problem = sprintf(
+                "Respondent %s, task %s: %s choice '%s' is not a position between 1 and %d",
+                resp_id, task_num, which_choice, v, length(items_shown)),
+              why_it_matters = "Choice_Value_Type = ITEM_POSITION says these cells carry task positions; a value outside the task cannot be decoded, and guessing would credit the wrong item.",
+              how_to_fix = c(
+                "Check the export: positions must be 1-based within each task.",
+                "If the cells actually carry Item_IDs, set Choice_Value_Type = ITEM_ID."
+              )
+            )
+          }
+          items_shown[p]
+        }
+        best_choice <- decode_position(best_choice, "best")
+        worst_choice <- decode_position(worst_choice, "worst")
+      }
 
       # Create long format rows for each item shown
       for (pos in seq_along(items_shown)) {

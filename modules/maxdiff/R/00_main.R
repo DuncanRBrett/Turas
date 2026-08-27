@@ -632,7 +632,8 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     survey_mapping = config$survey_mapping,
     design = design,
     items = config$items,
-    verbose = verbose
+    verbose = verbose,
+    choice_value_type = config$project_settings$Choice_Value_Type %||% "ITEM_ID"
   )
 
   if (!data_validation$valid) {

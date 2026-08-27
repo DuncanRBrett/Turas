@@ -320,7 +320,8 @@ estimate_d_efficiency <- function(design, item_cols, items) {
 #' @return List with validation results
 #'
 #' @export
-validate_survey_data <- function(data, survey_mapping, design, items, verbose = TRUE) {
+validate_survey_data <- function(data, survey_mapping, design, items, verbose = TRUE,
+                                 choice_value_type = "ITEM_ID") {
 
   issues <- character()
   warnings_list <- character()
@@ -399,19 +400,41 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
   items_per_task <- length(grep("^Item\\d+_ID$", names(design)))
   valid_positions <- as.character(seq_len(max(items_per_task, 1)))
 
-  # Check each choice column - accept either Item_IDs or position numbers
+  # Check each choice column against the coding the config DECLARES (C3).
+  # Accepting either family here is what let position-coded data through
+  # under ITEM_ID — it then matched no Item_ID downstream and every score
+  # shipped as zero.
+  choice_value_type <- toupper(choice_value_type %||% "ITEM_ID")
+  valid_choice_values <- if (choice_value_type == "ITEM_POSITION") {
+    valid_positions
+  } else {
+    valid_item_ids
+  }
+
   for (col in c(best_cols, worst_cols)) {
     if (col %in% names(data)) {
       col_values <- data[[col]]
       col_values <- col_values[!is.na(col_values)]
 
       invalid_values <- setdiff(unique(as.character(col_values)),
-                                c(valid_item_ids, valid_positions))
+                                valid_choice_values)
       if (length(invalid_values) > 0) {
-        issues <- c(issues, sprintf(
-          "Column '%s' contains invalid values: %s (expected Item_IDs or positions 1-%d)",
-          col, paste(invalid_values, collapse = ", "), items_per_task
-        ))
+        looks_positional <- choice_value_type == "ITEM_ID" &&
+          all(invalid_values %in% valid_positions)
+        if (looks_positional) {
+          issues <- c(issues, sprintf(
+            "Column '%s' contains values that look like task positions (%s), but Choice_Value_Type is ITEM_ID. If the export codes choices by position, set Choice_Value_Type = ITEM_POSITION in PROJECT_SETTINGS.",
+            col, paste(invalid_values, collapse = ", ")
+          ))
+        } else {
+          issues <- c(issues, sprintf(
+            "Column '%s' contains invalid values: %s (Choice_Value_Type = %s expects %s)",
+            col, paste(invalid_values, collapse = ", "), choice_value_type,
+            if (choice_value_type == "ITEM_POSITION") {
+              sprintf("positions 1-%d", items_per_task)
+            } else "Item_IDs"
+          ))
+        }
       }
     }
   }

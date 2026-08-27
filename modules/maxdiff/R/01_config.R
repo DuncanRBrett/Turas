@@ -529,6 +529,26 @@ parse_project_settings <- function(df, project_root) {
   settings$Respondent_ID_Variable <- get_scalar(settings$Respondent_ID_Variable, "RespID")
   settings$Filter_Expression <- get_scalar(settings$Filter_Expression, NULL)
 
+  # How the BEST_CHOICE / WORST_CHOICE columns are coded (C3). ITEM_ID means
+  # the cells carry Item_ID strings; ITEM_POSITION means they carry the
+  # 1-based position of the chosen item within that task's design row —
+  # which is how Sawtooth and Alchemer typically export. Before this
+  # setting existed, position-coded data validated cleanly and scored as
+  # all zeros, because nothing translated positions to items.
+  settings$Choice_Value_Type <- toupper(get_scalar(settings$Choice_Value_Type, "ITEM_ID"))
+  if (!settings$Choice_Value_Type %in% c("ITEM_ID", "ITEM_POSITION")) {
+    maxdiff_refuse(
+      code = "CFG_INVALID_OPTION",
+      title = "Invalid Choice_Value_Type",
+      problem = sprintf("Choice_Value_Type = '%s' is not a recognised coding",
+                        settings$Choice_Value_Type),
+      why_it_matters = "The engine must know whether choice columns carry Item_IDs or task positions; guessing wrong scores everything as zero.",
+      how_to_fix = "Set Choice_Value_Type to ITEM_ID (cells carry Item_ID strings) or ITEM_POSITION (cells carry the 1-based position within the task).",
+      expected = "ITEM_ID or ITEM_POSITION",
+      observed = settings$Choice_Value_Type
+    )
+  }
+
   return(settings)
 }
 
