@@ -1631,7 +1631,7 @@
     var txt = (TR.insights && TR.insights.get) ? TR.insights.get(key) : "";
     return '<div class="insight ql-qinsight" data-pinpart="insight">' +
       '<div class="insight-head">Key themes' +
-      '<span class="hint"> \u2014 the overall read on these comments</span></div>' +
+      '<span class="hint"> from the analyst</span></div>' +
       '<textarea data-qinsight="' + esc(key) + '" placeholder="Insight for ' +
       esc(key) + '\u2026">' + esc(txt) + "</textarea></div>";
   }
