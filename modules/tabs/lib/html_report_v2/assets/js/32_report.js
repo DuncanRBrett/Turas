@@ -488,9 +488,20 @@
 
   /* ---------------- save a portable annotated copy ---------------- */
 
+  /** A private localStorage namespace for the copy about to be written.
+   *  EVERY save mints a fresh one, so pinning four different stories out of one
+   *  report gives four independent copies that can sit open in one browser
+   *  without overwriting each other (see d2.storeKey). Re-saving a copy starts a
+   *  new namespace too, and loses nothing: the new file seeds from the state
+   *  baked into it here. The original report mints nothing and is unaffected. */
+  function newCopyId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
   report.saveCopy = function () {
     var state = {
       saved: true,
+      copyId: newCopyId(),
       insights: TR.insights.all(),
       annotations: TR.notes.all(),
       story: TR.story2.items(),
