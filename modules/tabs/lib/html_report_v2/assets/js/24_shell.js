@@ -161,6 +161,44 @@
       ? "cover" : current;
   };
 
+  /* Tabs that are in the bar but are not FRONT DOORS. Each shows a slice
+   * rather than an overview: Qualitative is the comment tab, Story is the
+   * analyst's own pinned collection (empty in a fresh report), Conjoint is a
+   * sub-study. Dashboard, Group overview and Tracking ARE overviews and stay
+   * eligible. */
+  var NOT_A_LANDING_TAB = ["qualitative", "story", "conjoint"];
+
+  /**
+   * The tab the report should actually SHOW.
+   *
+   * A tab switched off in the config, or absent for want of data, is not in the
+   * bar — so if state.tab still names it the reader lands on a surface with no
+   * button and no way back to it. Fall back to the first tab that IS in the bar
+   * and is a front door. "cover" is exempt: it is a landing page rather than a
+   * tab in the bar, and route() checks its availability separately just above.
+   *
+   * Found 2026-08-28 on ASSA, in two steps. First: the study set
+   * show_patterns = FALSE, the Group overview button correctly disappeared from
+   * the bar, and the report still OPENED on that tab — because d2.state.tab
+   * defaults to "takeout" (20_data.js) and nothing reconciled the default
+   * against the flags. Then, once show_dashboard went FALSE as well, falling
+   * back to the plain first visible tab opened the report on Qualitative —
+   * hence the skip list above, which sends it to the Crosstabs instead.
+   */
+  shell.visibleTab = function (want) {
+    if (want === "cover") return want;
+    var ids = tabGroups().reduce(function (acc, g) {
+      return acc.concat(g.tabs.map(function (t) { return t[0]; }));
+    }, []);
+    if (ids.indexOf(want) >= 0) return want;
+    var landable = ids.filter(function (id) {
+      return NOT_A_LANDING_TAB.indexOf(id) === -1;
+    });
+    // Crosstabs is unconditional, so `landable` is never empty in practice;
+    // ids[0] is the last resort rather than an undefined tab id.
+    return landable.length ? landable[0] : ids[0];
+  };
+
   function parseIsland(id) {
     var el = document.getElementById(id);
     if (!el) return null;
@@ -246,6 +284,9 @@
         !(TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable())) {
       d2.state.tab = "dashboard";
     }
+    // ...and the same for any tab the config switched off or the data cannot
+    // support: never render a surface whose button is not in the bar.
+    d2.state.tab = shell.visibleTab(d2.state.tab);
     document.querySelectorAll(".tabbtn").forEach(function (btn) {
       btn.setAttribute("aria-selected",
         String(btn.getAttribute("data-tab") === d2.state.tab));

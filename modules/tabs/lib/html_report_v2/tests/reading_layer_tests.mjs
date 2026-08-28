@@ -94,6 +94,63 @@ run("B1: conditional tabs stay conditional (tracking/qual/flagged-off)", () => {
     "Differences flag-gated; Crosstabs/Report always present");
 });
 
+
+run("B1: a tab switched off is never the tab the report opens on", () => {
+  // ASSA, 28 Aug 2026: show_patterns = FALSE removed the Group overview button
+  // but the report still OPENED on it, because d2.state.tab defaults to
+  // "takeout". The button was gone and the panel was showing.
+  const off = shellSandbox({ tracking: true, qual: true,
+    project: { tabs: { patterns: false } } });
+  eq(off.TR.shell.visibleTab("takeout"), "dashboard",
+    "a flagged-off tab falls back to the first visible tab");
+  eq(off.TR.shell.visibleTab("crosstabs"), "crosstabs",
+    "a tab that IS in the bar is left alone");
+  eq(off.TR.shell.visibleTab("cover"), "cover",
+    "the cover is exempt - it is a landing page, not a tab in the bar");
+
+  const on = shellSandbox({ tracking: true, qual: true });
+  eq(on.TR.shell.visibleTab("takeout"), "takeout",
+    "with the tab on, the default landing tab is untouched");
+
+  // the guard is wired into route(), not just exported
+  const src = readFileSync(path.join(JS_DIR, "24_shell.js"), "utf8");
+  assert(src.indexOf("d2.state.tab = shell.visibleTab(d2.state.tab);") !== -1,
+    "route() reconciles state.tab against the visible tabs");
+
+  // a tab with no data behaves the same way as one switched off
+  const bare = shellSandbox({});
+  eq(bare.TR.shell.visibleTab("qualitative"), "dashboard",
+    "a tab absent for want of data also falls back");
+
+  // ASSA's actual shape, 28 Aug 2026: show_patterns AND show_dashboard both
+  // FALSE, comments on, no prior waves. Qualitative then leads the bar — and a
+  // comment tab is not a front door, so the fallback must skip it.
+  const assa = shellSandbox({ qual: true,
+    project: { tabs: { patterns: false, dashboard: false, tracking: false } } });
+  eq(assa.TR.shell.tabGroups()[0].tabs.map((t) => t[0]), ["qualitative", "story"],
+    "sanity: with both overviews off, Qualitative leads the READ group");
+  eq(assa.TR.shell.visibleTab("takeout"), "crosstabs",
+    "both overviews off -> the report opens on Crosstabs, never Qualitative");
+
+  // Story is not a front door either — a fresh report's Story tab is empty.
+  const storyOnly = shellSandbox({
+    project: { tabs: { patterns: false, dashboard: false } } });
+  eq(storyOnly.TR.shell.visibleTab("takeout"), "crosstabs",
+    "Story is skipped as a landing tab too");
+
+  // Tracking IS an overview, so it stays eligible ahead of the tables.
+  const tracked = shellSandbox({ tracking: true, qual: true,
+    project: { tabs: { patterns: false, dashboard: false } } });
+  eq(tracked.TR.shell.visibleTab("takeout"), "moved",
+    "Tracking is an overview and remains a valid landing tab");
+
+  // ...and an overview that IS in the bar still wins, exactly as before.
+  const dashOnly = shellSandbox({ tracking: true, qual: true,
+    project: { tabs: { patterns: false } } });
+  eq(dashOnly.TR.shell.visibleTab("takeout"), "dashboard",
+    "the Dashboard still leads when it is in the bar");
+});
+
 run("B1: nav HTML — one divider, aria-hidden group labels, tab semantics intact", () => {
   const sb = shellSandbox({ tracking: true, qual: true });
   const html = sb.TR.shell._tabsNavHtml();
