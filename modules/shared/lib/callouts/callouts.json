@@ -349,7 +349,7 @@
     },
     "conf.footer.reading_ranges": {
       "title": "Precision — reading the ranges",
-      "text": "<strong>Reading the ranges:<\/strong> they show how far a number would likely wobble if you measured again — a wider range means less certainty.",
+      "text": "<strong>Reading the ranges:<\/strong> they show how far a number would likely wobble if you measured again: a wider range means less certainty.",
       "context": "'How sure can I be of these numbers?' footer (non-probability designs)",
       "page": "Crosstabs"
     },
@@ -379,7 +379,7 @@
     },
     "conf.design.non_probability": {
       "title": "Sampling design — non-probability",
-      "text": "Responses were not drawn by formal random sampling, so ranges are <strong>stability intervals ({interval_abbrev})<\/strong> — how much a number would wobble — not formal confidence intervals.",
+      "text": "Responses were not drawn by formal random sampling, so ranges are <strong>stability intervals ({interval_abbrev})<\/strong>  , how much a number would wobble,  and are not formal confidence intervals.",
       "context": "'How sure can I be of these numbers?' footer, About this survey",
       "page": "Crosstabs"
     },
@@ -829,9 +829,9 @@
     },
     "cards.reading.list": {
       "title": "Reading this table",
-      "page": "Crosstabs",
+      "text": "<strong>Heatmap<\/strong> : cell shading scales with the value within each row.\n<strong>PUBLISHED / COMPUTED.<\/strong> ‘Published’ figures are calculated when the report was built. When you apply a filter or build your own banner, Turas recalculates from the underlying responses and marks the result ‘Computed’, so you always know whether you're seeing the original figures or a filtered recalculation of the data.\n<strong>NET rows<\/strong> (navy edge) combine categories; <strong>Index rows<\/strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots tracking history if available.\nSignificance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score bands are explained in {legend_link}.\n<strong>Insight<\/strong>: From the analyst or fill your own note on the question in the Insight box at the foot of the card. It's kept for the banner you're viewing (each banner has its own), and can be saved. ",
       "context": "The whole panel under every crosstab card — ONE BULLET PER LINE. Keep {legend_link} where the cross-reference should sit.",
-      "text": "<strong>Heatmap<\/strong> — cell shading scales with the value within each row.\n<strong>PUBLISHED / COMPUTED.<\/strong> ‘Published’ figures are calculated when the report was built. The moment you apply a filter or build your own banner, Turas recalculates from the underlying responses and marks the result ‘Computed’, so you always know whether you're seeing the original figures or a filtered recalculation of the data.\n<strong>NET rows<\/strong> (navy edge) combine categories; <strong>Index rows<\/strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots the full published history.\nSignificance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score bands are explained in {legend_link}.\n<strong>Insight<\/strong> — jot your own note on the question in the Insight box at the foot of the card. It's kept for the banner you're viewing (each banner has its own; a blank one falls back to the question's general note), saved in this browser, and carried into any saved copy."
+      "page": "Crosstabs"
     },
     "filter.weighting.bases": {
       "title": "Weighted data — the three bases",
