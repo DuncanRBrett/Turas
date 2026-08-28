@@ -1957,17 +1957,10 @@
                      { tag: "span", cls: "ql-hint ql-champrule" })
       : "";
     return '<div class="ql-board"><div class="ql-boardhd">' +
-      '<div class="ql-boardhdrow"><span class="ql-boardttl">What people raised</span>' +
+      '<div class="ql-boardhdrow"><span class="ql-boardttl">Theme</span>' +
       '<div class="ql-boardtools">' + tools + "</div></div>" +
-      // The three sentiment words are authored too; the renderer only supplies
-      // the colour, so the palette stays code's and the wording stays the
-      // author's (authored text may not carry class attributes).
-      TR.txt.block("qual.board.salience_hint", {
-        audience_n: audience.length,
-        neg: { html: '<b class="qc-neg">' + TR.txt("qual.board.word_negative") + "</b>" },
-        pos: { html: '<b class="qc-pos">' + TR.txt("qual.board.word_positive") + "</b>" },
-        mixed: { html: '<b class="qc-neu">' + TR.txt("qual.board.word_mixed") + "</b>" }
-      }, { tag: "span", cls: "ql-hint" }) + champRule +
+      TR.txt.block("qual.board.salience_hint", null,
+                   { tag: "span", cls: "ql-hint" }) + champRule +
       "</div>" + axis + '<div class="ql-boardgrid">' + body + "</div></div>";
   }
 

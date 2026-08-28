@@ -613,7 +613,7 @@
     },
     "qual.board.salience_hint": {
       "title": "Themes board — how to read it",
-      "text": "Ranked by salience (% of the {audience_n} who raised each theme <b>unprompted<\/b>, right). Each bar is the sentiment <i>mix<\/i> of that theme’s comments, so every theme is equal width and the lean shows the balance: {neg} left, {pos} right, {mixed} centre; net = net sentiment %. Click a theme to read its comments.",
+      "text": "Ranked by mentions. Each bar is the sentiment mix of that theme’s comments.<br>Click a theme to read its comments.",
       "context": "Qualitative, themes board header",
       "page": "Qualitative"
     },
@@ -717,24 +717,6 @@
       "title": "Collection — nothing in this cut",
       "text": "No marks fall in this cut — broaden the filter to see them.",
       "context": "Qualitative, Your collection",
-      "page": "Qualitative"
-    },
-    "qual.board.word_negative": {
-      "title": "Themes board — negative",
-      "text": "negative",
-      "context": "Qualitative, sentiment word (coloured by the renderer)",
-      "page": "Qualitative"
-    },
-    "qual.board.word_positive": {
-      "title": "Themes board — positive",
-      "text": "positive",
-      "context": "Qualitative, sentiment word (coloured by the renderer)",
-      "page": "Qualitative"
-    },
-    "qual.board.word_mixed": {
-      "title": "Themes board — mixed",
-      "text": "mixed",
-      "context": "Qualitative, sentiment word (coloured by the renderer)",
       "page": "Qualitative"
     },
     "report.intro": {

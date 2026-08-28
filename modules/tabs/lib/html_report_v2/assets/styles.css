@@ -477,6 +477,10 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .story-actions .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .t-btnish { display: inline-flex; align-items: center; cursor: pointer; }
 .si-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }
+/* Pin titles are full question wording, not clipped — flex-basis 0 (not auto) keeps the
+   title on the head row and wraps it in place, instead of its full hypothetical width
+   bumping it, the context line and the buttons onto separate lines. */
+.si-head > strong { flex: 1 1 0; min-width: 0; }
 .si-ctx { font-size: 11px; color: var(--faint); }
 .si-btns { margin-left: auto; display: flex; gap: 4px; }
 .si-table { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }

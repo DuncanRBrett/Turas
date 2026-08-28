@@ -284,10 +284,11 @@ exports as `[hidden]`, never the raw text.** Tests: `qual_tests.mjs` shortlist/e
 
 ### D3.4 — Phase-2 AS-BUILT (salience reframe; DONE)
 
-Since the comments are now client-facing, the prevalence board leads with **"What people raised"**
-and frames the % as **salience** — the share who raised each theme *unprompted* (what stood out),
-explicitly "not a prompted incidence rate." Row tooltips read "N of M raised this unprompted"; the
-themed footer carries the same caveat. There is no theme×cut significance to soften because the
+Since the comments are now client-facing, the prevalence board frames the % as **salience** — the
+share who raised each theme *unprompted* (what stood out), explicitly "not a prompted incidence
+rate." (The board header itself was later shortened to **"Theme"** with a two-line hint; the
+salience framing lives on in the tooltips and the themed footer.) Row tooltips read "N of M
+raised this unprompted"; the themed footer carries the same caveat. There is no theme×cut significance to soften because the
 integrated view does not render the sig crosstab (D3.1) — the verbatims lead, reached via the
 prevalence board and the closed→open jump, which is the methodologically right shape (open-end
 mentions are salience, not incidence — Duncan's own quant-analysis standard).

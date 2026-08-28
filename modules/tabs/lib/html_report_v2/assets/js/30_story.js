@@ -573,8 +573,7 @@
       var exFlags = item.flags || {};
       return '<div class="card story-item" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". TREND</span>" +
-        "<strong>" + fmt.escapeHtml(TR.charts.clip(
-          TR.exhibit.titleFor(item, exModels), 90)) + "</strong>" +
+        "<strong>" + fmt.escapeHtml(TR.exhibit.titleFor(item, exModels)) + "</strong>" +
         '<span class="si-ctx">' +
         fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</span>" +
         buttons + "</div>" +
@@ -587,7 +586,7 @@
     if (item.kind === "slide") {
       return '<div class="card story-item story-snapshot" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". SLIDE</span>" +
-        "<strong>" + fmt.escapeHtml(TR.charts.clip(story2.pinTitle(item), 90)) +
+        "<strong>" + fmt.escapeHtml(story2.pinTitle(item)) +
         "</strong>" + buttons + "</div>" +
         slideBodyHtml(item) +
         '<textarea class="si-note" placeholder="Commentary for this slide…">' +
@@ -603,7 +602,7 @@
       return '<div class="card story-item story-snapshot" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". " +
         fmt.escapeHtml((item.source || "PIN").toUpperCase()) + "</span><strong>" +
-        fmt.escapeHtml(TR.charts.clip(item.title || "Pinned card", 90)) + "</strong>" +
+        fmt.escapeHtml(item.title || "Pinned card") + "</strong>" +
         (item.context ? '<span class="si-ctx">' + fmt.escapeHtml(item.context) + "</span>" : "") +
         buttons + "</div>" +
         '<div class="snap-body">' + snapBody + "</div>" +
@@ -630,7 +629,7 @@
     // D2: a stored insight title leads; a title-less (older) pin is unchanged
     return '<div class="card story-item" data-i="' + i + '">' +
       '<div class="si-head"><span class="qcode">' + (i + 1) + ". " + model.code +
-      "</span> <strong>" + fmt.escapeHtml(TR.charts.clip(item.title || model.title, 90)) + "</strong>" +
+      "</span> <strong>" + fmt.escapeHtml(item.title || model.title) + "</strong>" +
       '<span class="si-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</span>" +
       buttons + "</div>" +
       (flags.chart ? '<div class="chart si-chart">' +

@@ -251,7 +251,16 @@
    */
   d2.storeKey = function (base) {
     var p = (TR.AGG && TR.AGG.project) || {};
-    return base + ":" + TR.fmt.slug((p.name || "report") + " " + (p.wave || ""));
+    var key = base + ":" + TR.fmt.slug((p.name || "report") + " " + (p.wave || ""));
+    // A saved copy carries its own id (report.saveCopy mints a fresh one on every
+    // save), which extends the namespace further. Project+wave alone is not enough
+    // when the reader wants SEVERAL copies of the SAME survey open side by side —
+    // four differently-pinned copies of one report would otherwise read and write
+    // one store, and merely opening the Story tab of the first writes its pins over
+    // the second's (30_story.js load()). Copies saved before this shipped carry no
+    // id and keep the project-level key, so nothing already annotated moves.
+    var copy = TR.userState && TR.userState.copyId;
+    return (typeof copy === "string" && copy) ? key + ":" + copy : key;
   };
 
   d2.filtersActive = function () {
