@@ -126,6 +126,27 @@ make_rsf_q_scale <- function() {
   )
 }
 
+# NPS question result. The answers are a 0-10 scale; the headline row is an NPS
+# Score, which is a net balance on -100..+100 (RowType "Score").
+make_rsf_q_nps <- function() {
+  list(
+    question_code = "Q_NPS", question_text = "How likely are you to recommend?",
+    question_type = "NPS", category = "Advocacy",
+    table = data.frame(
+      RowLabel  = c("Promoter", "Promoter", "Detractor", "Detractor", "NPS Score"),
+      RowType   = c("Frequency", "Column %", "Frequency", "Column %", "Score"),
+      RowSource = c(rep("individual", 4), "summary"),
+      "TOTAL::Total"   = c("58", "58.0", "10", "10.0", "48.0"),
+      "Gender::Male"   = c("30", "60.0", "5", "10.0", "50.0"),
+      "Gender::Female" = c("28", "56.0", "5", "10.0", "46.0"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 100),
+      "Gender::Male"   = list(unweighted = 50),
+      "Gender::Female" = list(unweighted = 50))
+  )
+}
+
 #' Survey structure with (or without) the optional §E Questions-sheet columns.
 #' All cells are supplied as character, exactly as .read_table_sheet delivers
 #' them (col_types = "text"); NA = blank cell, "NA" = stringified blank.
@@ -238,6 +259,50 @@ test_that("half-filled, inverted or non-numeric scale bounds are ignored", {
   ss <- make_rsf_structure(list(Scale_Min = c(NA, "NA", NA),
                                 Scale_Max = c(NA, "NA", NA)))
   expect_false("scale_min" %in% names(rsf_question("Q2", ss)))
+})
+
+test_that("a declared answer scale never becomes the denominator of an NPS", {
+  # ASSA, 28 Aug 2026. Q35_RECOMMEND is answered 0-10 and correctly declared
+  # Scale_Min 0 / Scale_Max 10 — but its headline row is an NPS Score, a net
+  # balance on -100..+100. The declaration used to override the metric's own
+  # 100, so the dashboard rendered an NPS of 48 as "48.0/10": a gauge bar 480%
+  # of full, clipped to a solid green bar, and a pinned NPS chart on a 0-10
+  # axis. The metric keeps its own scale; the declaration is ignored here.
+  # make_rsf_structure() carries a fixed three-question sheet, so the NPS row is
+  # added here rather than through its new_cols argument.
+  ss <- list(questions = data.frame(
+    QuestionCode  = c("Q1", "Q2", "Q_OPEN", "Q_NPS"),
+    QuestionText  = c("Are you aware of the brand?",
+                      "How satisfied are you overall?",
+                      "Why do you say that?",
+                      "How likely are you to recommend?"),
+    Variable_Type = c("Single_Choice", "Likert", "Open_End", "NPS"),
+    Columns       = c("1", "1", "1", "1"),
+    Scale_Min     = c(NA, NA, NA, "0"),
+    Scale_Max     = c(NA, NA, NA, "10"),
+    stringsAsFactors = FALSE), options = NULL)
+
+  dl <- NULL
+  results <- c(rsf_results(), list(Q_NPS = make_rsf_q_nps()))
+  capture.output(
+    dl <- build_data_layer(results, make_rsf_banner_info(), make_rsf_config(),
+                           survey_structure = ss)
+  )
+  q <- Filter(function(x) identical(x$code, "Q_NPS"), dl$questions)[[1]]
+
+  expect_equal(q$type, "nps")
+  expect_equal(q$scale_max, 100)             # the METRIC's scale, not 10
+  expect_false("scale_min" %in% names(q))    # both bounds are dropped together
+  # No raw thresholds for an NPS -> the renderer bands it on % of scale, so
+  # 48 reads as 48% (weak) rather than 480% (green).
+  expect_true(is.na(q$gauge_green))
+  expect_true(is.na(q$gauge_amber))
+
+  # ...and the Likert alongside it is untouched: its Index_Weight values ARE
+  # the scale values, so a declared 1-5 still wins there.
+  ss5 <- make_rsf_structure(list(Scale_Min = c(NA, "1", NA),
+                                 Scale_Max = c(NA, "5", NA)))
+  expect_identical(rsf_question("Q2", ss5)$scale_max, 5)
 })
 
 # ==============================================================================

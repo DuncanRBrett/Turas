@@ -1035,8 +1035,22 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     # min < max; a half-filled or inverted pair is ignored (inference stands).
     smin <- suppressWarnings(as.numeric(.dl_chr_cell(srow[["Scale_Min"]])))
     smax <- suppressWarnings(as.numeric(.dl_chr_cell(srow[["Scale_Max"]])))
+    # Scale_Min/Scale_Max describe the ANSWER scale. They may override the
+    # inferred max only where the headline summary statistic sits on that SAME
+    # scale. A Mean/Average does. An Index does too WHENEVER the study's
+    # Index_Weight values are the scale values (the 1-5 Likert case), so the
+    # declaration is honoured there and the index weights stay the authority.
+    #
+    # An NPS Score never does: it is a net promoter balance on -100..+100 no
+    # matter what the underlying question was answered on. Found on ASSA
+    # 28 Aug 2026 — Q35_RECOMMEND correctly declared Scale_Max = 10 for its 0-10
+    # answer scale, and that 10 overrode the NPS metric's own 100. The dashboard
+    # printed an NPS of 48 as "48.0/10", a gauge 480% of full and green with it,
+    # and a pinned NPS chart drew its bar on a 0-10 axis. The metric's
+    # denominator is not the question's.
+    nps_score <- identical(metric_type, "Score")
     if (length(smin) == 1L && length(smax) == 1L &&
-        !is.na(smin) && !is.na(smax) && smin < smax) {
+        !is.na(smin) && !is.na(smax) && smin < smax && !nps_score) {
       out$scale_min <- smin
       out$scale_max <- smax   # explicit declaration overrides the inferred max
     }
