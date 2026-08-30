@@ -95,7 +95,8 @@
       '<span class="kpi-chg ' + (change >= 0 ? "up" : "down") + '">' +
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? trk.yLabel(card.cells[card.cells.length - 2].year) : "") +
-      (last.sig_prev ? " · sig" : last.soft_prev ? " · sig 80%" : "") + "</span>";
+      (last.sig_prev ? " · sig"
+        : last.soft_prev ? " · sig " + TR.stats.levelSecondary() : "") + "</span>";
     // interval in the tooltip: same SD source as the sig test (trk.sdAt)
     var sd = trk.sdAt(m, null, TR.render.currentYear());
     var bounds = sd === null || !last.base ? null
@@ -176,7 +177,8 @@
       '<span class="sig-dir">' + arrow + " " +
       trk.changeText(c.change, c.metric.isMean) + " · " +
       fmt.escapeHtml(c.segment) +
-      (soft ? ' <span class="sig-badge">80%</span>' : "") + "</span>" +
+      (soft ? ' <span class="sig-badge">' + TR.stats.levelSecondary() +
+        "</span>" : "") + "</span>" +
       '<span class="sig-title">' +
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
@@ -202,12 +204,14 @@
         return '<option value="' + g.id + '"' + (group === g.id ? " selected" : "") +
           ">" + fmt.escapeHtml(g.name) + "</option>";
       }).join("") + "</select></div>" +
-      // The 80% clause is spliced in only when that level is on, so it is its
-      // own authored phrase rather than a branch inside the sentence.
-      TR.txt.block("tracking.heatmap.legend", {
-        soft_clause: { html: TR.d2.state.sigMode === "dual"
-          ? TR.txt("tracking.heatmap.soft_clause") : "" }
-      }, { cls: "trknote" }) +
+      // The secondary-level clause is spliced in only when that level is on, so
+      // it is its own authored phrase rather than a branch inside the sentence.
+      // Both entries name the levels, so both get the level vars.
+      TR.txt.block("tracking.heatmap.legend",
+        Object.assign(TR.stats.levelVars(), {
+          soft_clause: { html: TR.d2.state.sigMode === "dual"
+            ? TR.txt("tracking.heatmap.soft_clause", TR.stats.levelVars()) : "" }
+        }), { cls: "trknote" }) +
       '<div class="trkwrap"><table class="moved trk hm"><thead><tr><th>Metric</th>' +
       "<th class='wv'>Total</th>" + segs.map(function (s) {
         return "<th class='wv'>" + fmt.escapeHtml(TR.charts.clip(s.label, 16)) + "</th>";
@@ -219,16 +223,18 @@
         if (!last || last.change_prev === null) return '<td class="wv none">–</td>';
         var prev = cells[cells.length - 2];
         var dir = last.change_prev >= 0;
-        // strong (95%) = filled triangle + full colour; soft (80%, dual mode
-        // only) = hollow triangle + lighter "soft" tint; else direction-only.
+        // strong (primary level) = filled triangle + full colour; soft
+        // (secondary level, dual mode only) = hollow triangle + lighter "soft"
+        // tint; else direction-only.
         var cls = last.sig_prev ? (dir ? "hm-up" : "hm-down")
           : last.soft_prev ? (dir ? "hm-up soft" : "hm-down soft") : "hm-flat";
         var mark = last.sig_prev ? (dir ? "▲" : "▼")
           : last.soft_prev ? (dir ? "△" : "▽") : "";
         // "not significant" is a claim a TEST made — an untestable pair (no
         // base/spread on one side) must say so instead (review 2026-08, I23).
-        var lvlTip = last.sig_prev ? " · significant at 95%"
-          : last.soft_prev ? " · significant at 80% (not 95%)"
+        var lvlTip = last.sig_prev ? " · significant at " + TR.stats.levelPrimary()
+          : last.soft_prev ? " · significant at " + TR.stats.levelSecondary() +
+            " (not " + TR.stats.levelPrimary() + ")"
           : last.tested_prev ? " · not significant"
           : " · not testable (this wave pair lacks the base or spread a test needs)";
         return '<td class="wv ' + cls + '" title="' +
@@ -306,7 +312,7 @@
       '<span class="pulse-chip up">▲ ' + totalUp + " significant increases</span>" +
       '<span class="pulse-chip down">▼ ' + totalDown + " significant decreases</span>" +
       (totalSoft ? '<span class="pulse-chip soft">≈ ' + totalSoft +
-        " nearly significant (80%)</span>" : "") +
+        " nearly significant (" + TR.stats.levelSecondary() + ")</span>" : "") +
       '<span class="pulse-chip">→ ' +
       Math.max(tested - totalUp - totalDown - totalSoft, 0) +
       " stable</span>" +
@@ -317,9 +323,11 @@
       fmt.escapeHtml(TR.txt("tracking.pulse.sigmode_tip")) + '">Significance ' +
       '<select data-trk-sigmode>' +
       '<option value="off"' + (sm === "off" ? " selected" : "") + ">off</option>" +
-      '<option value="95"' + (sm === "95" ? " selected" : "") + ">95%</option>" +
-      '<option value="dual"' + (sm === "dual" ? " selected" : "") +
-      ">95% + 80%</option></select></label>" +
+      '<option value="95"' + (sm === "95" ? " selected" : "") + ">" +
+      TR.stats.levelPrimary() + "</option>" +
+      '<option value="dual"' + (sm === "dual" ? " selected" : "") + ">" +
+      TR.stats.levelPrimary() + " + " + TR.stats.levelSecondary() +
+      "</option></select></label>" +
       '<span class="trknote">Total only · all key metrics · latest wave vs ' +
       "previous</span></div></div>");
 
@@ -345,8 +353,8 @@
     var softCards = TR.d2.state.sigMode === "dual" ? softChanges() : [];
     if (softCards.length) {
       html.push('<div class="card"><div class="heathead"><h3>Nearly significant ' +
-        "· 80% level · latest wave</h3></div>" +
-        TR.txt.block("tracking.soft.intro", null, { cls: "trknote" }) +
+        "· " + TR.stats.levelSecondary() + " level · latest wave</h3></div>" +
+        TR.txt.block("tracking.soft.intro", TR.stats.levelVars(), { cls: "trknote" }) +
         '<div class="sigcards">' +
         softCards.map(function (c) { return sigCardHtml(c, true); }).join("") +
         "</div></div>");

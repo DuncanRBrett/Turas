@@ -283,7 +283,7 @@
     },
     "reader.legend.sig_letters": {
       "title": "Legend — significance letters",
-      "text": "<strong>▲ letters<\/strong> (e.g. <sup>B<\/sup>) shows this value is significantly higher than that lettered column. UPPERCASE letters = 95% confidence; with the 80% option on, <strong>lowercase letters = 80%<\/strong> (directional, weaker evidence).",
+      "text": "<strong>▲ letters<\/strong> (e.g. <sup>B<\/sup>) shows this value is significantly higher than that lettered column. UPPERCASE letters = {alpha_pct} confidence; with the {alpha2_pct} option on, <strong>lowercase letters = {alpha2_pct}<\/strong> (directional, weaker evidence).",
       "context": "How to read panel, Significance letters",
       "page": "How to read"
     },
@@ -433,13 +433,13 @@
     },
     "tracking.heatmap.legend": {
       "title": "Heatmap — how to read it",
-      "text": "One top-box NET per question. Cells show the percentage-point change vs the previous wave with this segment; <strong>filled ▲▼ = significant at 95%<\/strong>, {soft_clause}grey = direction only, – = no history. Hover for the underlying values; click a metric to explore it across segments.",
+      "text": "One top-box NET per question. Cells show the percentage-point change vs the previous wave with this segment; <strong>filled ▲▼ = significant at {alpha_pct}<\/strong>, {soft_clause}grey = direction only, – = no history. Hover for the underlying values; click a metric to explore it across segments.",
       "context": "Tracking summary, the key metric × segment heatmap",
       "page": "Tracking"
     },
     "tracking.heatmap.soft_clause": {
       "title": "Heatmap — the 80% clause",
-      "text": "hollow △▽ = significant at 80% (not 95%), ",
+      "text": "hollow △▽ = significant at {alpha2_pct} (not {alpha_pct}), ",
       "context": "Tracking summary heatmap note, spliced mid-sentence — keep the trailing comma and space",
       "page": "Tracking"
     },
@@ -475,7 +475,7 @@
     },
     "tracking.soft.intro": {
       "title": "Nearly significant — what these are",
-      "text": "Moved enough to clear the 80% threshold but not 95% — watch items, not confirmed shifts. Click one to visualise it.",
+      "text": "Moved enough to clear the {alpha2_pct} threshold but not {alpha_pct} — watch items, not confirmed shifts. Click one to visualise it.",
       "context": "Tracking summary, 'Nearly significant' card block",
       "page": "Tracking"
     },
@@ -493,7 +493,7 @@
     },
     "visualise.legend.significance": {
       "title": "Visualise legend — significance",
-      "text": "▲▼ coloured = significant at 95% vs the comparison wave — two-proportion z-test on percentages, Welch t-test on means/indexes/NPS (spread from each wave's published breakdown)",
+      "text": "▲▼ coloured = significant at {alpha_pct} vs the comparison wave — two-proportion z-test on percentages, Welch t-test on means/indexes/NPS (spread from each wave's published breakdown)",
       "context": "Tracking visualise, chart legend",
       "page": "Tracking"
     },
@@ -607,7 +607,7 @@
     },
     "diffs.intro": {
       "title": "Differences — how to read this tab",
-      "text": "Each card shows where one group stands out against the rest on a specific question, as identified by a significance test. Choose either 95% or 95% + 80% significance. Note that this is a statistical test, not a judgement call. We have excluded classification questions such as demographics or corpographics from this page.",
+      "text": "Each card shows where one group stands out against the rest on a specific question, as identified by a significance test. Choose either {alpha_pct} or {alpha_pct} + {alpha2_pct} significance. Note that this is a statistical test, not a judgement call. We have excluded classification questions such as demographics or corpographics from this page.",
       "context": "Differences tab, intro card",
       "page": "Differences"
     },
@@ -805,13 +805,13 @@
     },
     "cards.sig.explainer": {
       "title": "Understanding the significance testing",
-      "text": "A significance test answers the question \"How often would the difference happen by chance?\". If the answer is less than one in 20, then we call it significant at the 95% level. At 80% it is less than one in 5. In a significance test, the size of your sample is critical because in a small sample one person has a bigger impact. A 5 point gap between two groups of 1,000 is significant; a 10 point gap between two groups of 30 is not.\n\nThe maths works differently for percentages and averages and so we use a two-proportion z-test for percentages, a Welch t-test for averages, index scores and NPS. Same question, different test.\n\nEach column has a letter. A letter appearing in a cell means that column is significantly ahead of the column with that letter. Upper case denotes significant at 95%, lowercase at 80%. Letters require a sample of at least {min_base} to show.\n\nIf you run enough comparisons, some will come up significant purely by chance. Test twenty things where nothing is happening and one will \"pass\" on average. Turas corrects for that within each banner using a Bonferroni correction, which raises the bar in proportion to how many comparisons the banner involves.\n\nYear-on-year comparisons don't take that correction, because each one is a single planned comparison.\n\nAlso remember that significance is about whether a difference is real, not whether it's important. A tiny gap on a big sample can be significant and useless. A large gap on a small sample can be genuinely interesting and fail the test.",
+      "text": "A significance test answers the question \"How often would the difference happen by chance?\". If the answer is less than one in {alpha_odds}, then we call it significant at the {alpha_pct} level. At {alpha2_pct} it is less than one in {alpha2_odds}. In a significance test, the size of your sample is critical because in a small sample one person has a bigger impact. A 5 point gap between two groups of 1,000 is significant; a 10 point gap between two groups of 30 is not.\n\nThe maths works differently for percentages and averages and so we use a two-proportion z-test for percentages, a Welch t-test for averages, index scores and NPS. Same question, different test.\n\nEach column has a letter. A letter appearing in a cell means that column is significantly ahead of the column with that letter. Upper case denotes significant at {alpha_pct}, lowercase at {alpha2_pct}. Letters require a sample of at least {min_base} to show.\n\nIf you run enough comparisons, some will come up significant purely by chance. Test twenty things where nothing is happening and one will \"pass\" on average. Turas corrects for that within each banner using a Bonferroni correction, which raises the bar in proportion to how many comparisons the banner involves.\n\nYear-on-year comparisons don't take that correction, because each one is a single planned comparison.\n\nAlso remember that significance is about whether a difference is real, not whether it's important. A tiny gap on a big sample can be significant and useless. A large gap on a small sample can be genuinely interesting and fail the test.",
       "context": "The whole collapsible panel under every crosstab card, blank lines between paragraphs. {min_base} is this project's low-base threshold — keep it rather than typing a number, so a study on a different threshold is described correctly.",
       "page": "Crosstabs"
     },
     "cards.reading.list": {
       "title": "Reading this table",
-      "text": "<strong>Heatmap<\/strong> : cell shading scales with the value within each row.\n<strong>PUBLISHED / COMPUTED.<\/strong> ‘Published’ figures are calculated when the report was built. When you apply a filter or build your own banner, Turas recalculates from the underlying responses and marks the result ‘Computed’, so you always know whether you're seeing the original figures or a filtered recalculation of the data.\n<strong>NET rows<\/strong> (navy edge) combine categories; <strong>Index rows<\/strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots tracking history if available.\nSignificance letters (incl. lowercase 80%), ▲▵ arrows, Δ chips and score bands are explained in {legend_link}.\n<strong>Insight<\/strong>: From the analyst or fill your own note on the question in the Insight box at the foot of the card. It's kept for the banner you're viewing (each banner has its own), and can be saved. ",
+      "text": "<strong>Heatmap<\/strong> : cell shading scales with the value within each row.\n<strong>PUBLISHED / COMPUTED.<\/strong> ‘Published’ figures are calculated when the report was built. When you apply a filter or build your own banner, Turas recalculates from the underlying responses and marks the result ‘Computed’, so you always know whether you're seeing the original figures or a filtered recalculation of the data.\n<strong>NET rows<\/strong> (navy edge) combine categories; <strong>Index rows<\/strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots tracking history if available.\nSignificance letters (incl. lowercase {alpha2_pct}), ▲▵ arrows, Δ chips and score bands are explained in {legend_link}.\n<strong>Insight<\/strong>: From the analyst or fill your own note on the question in the Insight box at the foot of the card. It's kept for the banner you're viewing (each banner has its own), and can be saved. ",
       "context": "The whole panel under every crosstab card — ONE BULLET PER LINE. Keep {legend_link} where the cross-reference should sit.",
       "page": "Crosstabs"
     },
@@ -825,7 +825,7 @@
       "title": "Legend — arrows & change chips",
       "page": "How to read",
       "context": "Both bullets of the Arrows & change chips section — ONE BULLET PER LINE.",
-      "text": "<strong>▲ / ▼<\/strong> on a composite (profile) column — significantly above / below <em>the rest of the sample<\/em> at 95%; hollow <strong>▵ / ▿<\/strong> mark the 80% level. Composite columns may overlap, so they are never compared with one another.\n<strong>▲ / ▼ chips<\/strong> on a Total column or card — change vs the most recent prior wave carrying that question; an outlined chip is a significant change."
+      "text": "<strong>▲ / ▼<\/strong> on a composite (profile) column — significantly above / below <em>the rest of the sample<\/em> at {alpha_pct}; hollow <strong>▵ / ▿<\/strong> mark the {alpha2_pct} level. Composite columns may overlap, so they are never compared with one another.\n<strong>▲ / ▼ chips<\/strong> on a Total column or card — change vs the most recent prior wave carrying that question; an outlined chip is a significant change."
     }
   },
   "brand": {

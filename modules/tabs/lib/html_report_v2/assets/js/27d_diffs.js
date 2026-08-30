@@ -489,7 +489,7 @@
       ? (f.direction === "ahead" ? "ahead of" : "behind") + " the rest"
       : "ahead of " + fmt.escapeHtml(f.beaten.join(" · "));
     var verdict = f.soft
-      ? tail + " — nearly significant (80%)"
+      ? tail + " — nearly significant (" + TR.stats.levelSecondary() + ")"
       : "statistically " + tail;
     return '<div class="df-line' + (f.soft ? " soft" : "") + '">' +
       '<div class="df-sentence"><strong>' + fmt.escapeHtml(f.column) +
@@ -513,6 +513,20 @@
       }).join("");
   }
   views._diffSortOptions = sortOptionsHtml;   // exposed for the gate test
+
+  /**
+   * The Differences significance selector. Its WORDS are the project's own
+   * levels; its option VALUES ("95"/"dual") are persisted state and stay put.
+   */
+  function sigOptionsHtml(dual) {
+    return '<select data-diffsig title="Significance level">' +
+      '<option value="95"' + (!dual ? " selected" : "") + ">" +
+      TR.stats.levelPrimary() + "</option>" +
+      '<option value="dual"' + (dual ? " selected" : "") + ">" +
+      TR.stats.levelPrimary() + " + " + TR.stats.levelSecondary() + "</option>" +
+      "</select>";
+  }
+  views._diffSigOptions = sigOptionsHtml;   // exposed for the gate test
 
   /* exposed for the differences gate test */
   views._collectFindings = collectFindings;
@@ -572,13 +586,10 @@
       // averages, the wave scope, why classification questions are excluded —
       // on a tab the reader reaches after the Dashboard and the Group overview.
       // What a reader needs here is what a card IS and what the control does.
-      TR.txt.block("diffs.intro") +
+      TR.txt.block("diffs.intro", TR.stats.levelVars()) +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' + sortOptionsHtml(diffSort) + "</select>" +
-      '<select data-diffsig title="Significance level">' +
-      '<option value="95"' + (!dual ? " selected" : "") + ">95%</option>" +
-      '<option value="dual"' + (dual ? " selected" : "") + ">95% + 80%</option>" +
-      "</select>" +
+      sigOptionsHtml(dual) +
       '<input id="diff-search" type="search" placeholder="Search questions, ' +
       'answers or groups…">' +
       (all.length > shown.length

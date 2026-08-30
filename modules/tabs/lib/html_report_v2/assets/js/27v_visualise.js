@@ -131,7 +131,7 @@
     return '<div class="trklegend"><span class="lg cb-g">strong · ≥70% / 7+ ' +
       "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
       "<span class='lg cb-r'>weak</span>" +
-      TR.txt.block("visualise.legend.significance", null,
+      TR.txt.block("visualise.legend.significance", TR.stats.levelVars(),
                    { tag: "span", cls: "lg" }) +
       "<span class='lg'>⚠ base under " +
       (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
@@ -168,8 +168,9 @@
     var mark = sig ? (dir ? "▲" : "▼") : soft ? (dir ? "△" : "▽") : "";
     return '<td class="wv ' + cls +
       '" title="' + trk().fmtVal(c.value, metric.isMean, metric.q) + " in " + c.year +
-      (sig ? " · significant at 95%"
-        : soft ? " · significant at 80% (not 95%)" : "") + '">' +
+      (sig ? " · significant at " + TR.stats.levelPrimary()
+        : soft ? " · significant at " + TR.stats.levelSecondary() +
+          " (not " + TR.stats.levelPrimary() + ")" : "") + '">' +
       mark + trk().changeText(change, metric.isMean).replace("pp", "") + "</td>";
   }
 
@@ -178,8 +179,9 @@
     return '<td class="wv ' + (last.change_prev >= 0 ? "up" : "down") +
       (last.sig_prev ? " dsig" : last.soft_prev ? " dsig soft" : "") +
       '" title="latest vs previous wave' +
-      (last.sig_prev ? " · significant at 95%"
-        : last.soft_prev ? " · significant at 80% (not 95%)" : "") + '">' +
+      (last.sig_prev ? " · significant at " + TR.stats.levelPrimary()
+        : last.soft_prev ? " · significant at " + TR.stats.levelSecondary() +
+          " (not " + TR.stats.levelPrimary() + ")" : "") + '">' +
       (last.change_prev >= 0 ? "▲ +" : "▼ −") +
       Math.abs(last.change_prev).toFixed(isMean ? 1 : 0) +
       (isMean ? "" : "pp") + "</td>";

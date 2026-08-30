@@ -63,6 +63,37 @@
   // sentences from these ("the report's 95% level"), never a hard-coded 95/80.
   stats.alphaPrimary = projAlpha;
   stats.alphaSecondary = projAlpha2;
+  /**
+   * How a level is WORDED. Every user-visible "95%" / "80%" in the report — the
+   * legends, the mode selectors, the tooltips and the authored prose's
+   * {alpha_pct}/{alpha2_pct} tokens — comes from here, so a project on
+   * alpha_secondary = 0.1 reads "90%" everywhere instead of being told 80%
+   * while the engine tests at 90 (defect 2026-08-30).
+   *
+   * Confidence INTERVALS are a separate, deliberately fixed 95% convention
+   * (21c_confidence.js, Z95_EXACT) — those strings are not level wording and
+   * must not be routed through here.
+   */
+  stats.levelText = function (alpha) { return Math.round((1 - alpha) * 100) + "%"; };
+  /** The same level as odds ("one in 20" at 0.05, "one in 5" at 0.20). The
+   *  explainer says both, and interpolating only the percentage would leave it
+   *  claiming "at 90% it is less than one in 5". */
+  stats.levelOdds = function (alpha) { return String(Math.round(1 / alpha)); };
+  stats.levelPrimary = function () { return stats.levelText(projAlpha()); };
+  stats.levelSecondary = function () { return stats.levelText(projAlpha2()); };
+  stats.oddsPrimary = function () { return stats.levelOdds(projAlpha()); };
+  stats.oddsSecondary = function () { return stats.levelOdds(projAlpha2()); };
+  /** The four level tokens every authored sentence about significance takes.
+   *  One object so a call site cannot supply half of them and ship a literal
+   *  "{alpha2_pct}" to the reader. */
+  stats.levelVars = function () {
+    return {
+      alpha_pct: stats.levelPrimary(),
+      alpha2_pct: stats.levelSecondary(),
+      alpha_odds: stats.oddsPrimary(),
+      alpha2_odds: stats.oddsSecondary()
+    };
+  };
   /** Bonferroni is the R engine's default; only an explicit false disables it. */
   stats.bonferroni = function () {
     var p = TR.AGG && TR.AGG.project;

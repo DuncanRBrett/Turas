@@ -52,12 +52,22 @@
     return String(value);
   };
 
-  /** Render significance letters as superscript HTML ("" stays ""). */
+  /** Render significance letters as superscript HTML ("" stays "").
+   *  The level named in the tooltip is the project's own: UPPERCASE letters are
+   *  the primary level, lowercase the secondary, so a mixed string names both.
+   *  This module loads before 21_stats.js but only RUNS at render time, by
+   *  which point TR.stats is there; the guard covers the unit-test case. */
   fmt.sigSup = function (letters) {
     if (!letters) return "";
     var safe = fmt.escapeHtml(letters);
+    var S = TR.stats;
+    var hi = S && S.levelPrimary ? S.levelPrimary() : "95%";
+    var lo = S && S.levelSecondary ? S.levelSecondary() : "80%";
+    var level = /[a-z]/.test(letters)
+      ? (/[A-Z]/.test(letters) ? hi + " (uppercase) and " + lo + " (lowercase)" : lo)
+      : hi;
     return '<sup class="sig" title="Significantly higher than column(s) ' +
-      safe + ' at 95% confidence">' + safe + "</sup>";
+      safe + " at " + level + ' confidence">' + safe + "</sup>";
   };
 
   /** Display precision from the config's DECIMAL PLACES block. The crosstab

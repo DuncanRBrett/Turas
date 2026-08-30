@@ -216,6 +216,24 @@
   cards2._catsAllHtml = catsAllHtml;
   cards2._syncCats = syncCats;
 
+  /**
+   * The Sig mode selector. The words the reader sees are the project's own
+   * levels (TR.stats), so a study on alpha_secondary = 0.1 offers "95% + 90%"
+   * rather than being told 80% while the engine tests at 90. The option VALUES
+   * are persisted state (d2.state.sigMode) and must stay "off"/"95"/"dual".
+   */
+  function sigModeSelectHtml(sigMode) {
+    var lvl1 = TR.stats.levelPrimary(), lvl2 = TR.stats.levelSecondary();
+    return '<select data-sigmode>' +
+      '<option value="off"' + (sigMode === "off" ? " selected" : "") + ">Off</option>" +
+      '<option value="95"' + (sigMode === "95" ? " selected" : "") + ">" + lvl1 +
+      "</option>" +
+      '<option value="dual"' + (sigMode === "dual" ? " selected" : "") + ">" +
+      lvl1 + " + " + lvl2 + "</option>" +
+      "</select>";
+  }
+  cards2._sigModeSelectHtml = sigModeSelectHtml;   // exposed for the gate test
+
   function renderControls() {
     var s = TR.d2.state;
     var rowScope = TR.d2.rowScope();
@@ -252,11 +270,7 @@
       ">Detail only</option>" +
       "</select></label>" +
       '<label class="tg" title="Show/hide significance letters and choose the confidence level(s)">Sig ' +
-      '<select data-sigmode>' +
-      '<option value="off"' + (s.sigMode === "off" ? " selected" : "") + ">Off</option>" +
-      '<option value="95"' + (s.sigMode === "95" ? " selected" : "") + ">95%</option>" +
-      '<option value="dual"' + (s.sigMode === "dual" ? " selected" : "") + ">95% + 80%</option>" +
-      "</select></label>" +
+      sigModeSelectHtml(s.sigMode) + "</label>" +
       // B2: compact twin of the "Explain significance" toggle in the ⓘ dialog
       '<label class="tg" title="Explain the confidence marker in plain ' +
       'language">' +
@@ -840,8 +854,8 @@
       // One entry, one bullet per line. {legend_link} is markup the renderer
       // owns, passed in raw so the author keeps a whole sentence rather than
       // two fragments either side of a button.
-      listItems("cards.reading.list", { legend_link: { html:
-        '<button class="linklike" data-legend-open>ⓘ How to read this report</button>' } }) +
+      listItems("cards.reading.list", Object.assign(TR.stats.levelVars(), { legend_link: { html:
+        '<button class="linklike" data-legend-open>ⓘ How to read this report</button>' } })) +
       "</ul></div></div>" +
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +
@@ -849,10 +863,13 @@
       // One authored entry for the whole panel — blank lines separate the
       // paragraphs. Nothing here is conditional, so splitting it into six
       // entries only made the author hunt for the one they wanted to change.
-      paragraphs("cards.sig.explainer", { min_base: p.low_base_threshold }) +
+      paragraphs("cards.sig.explainer",
+        Object.assign(TR.stats.levelVars(), { min_base: p.low_base_threshold })) +
       "</div></div>" +
       TR.conf.calloutHtml();
   }
+
+  cards2._explainersHtml = explainersHtml;   // exposed for the gate test
 
   function openPinMenu() {
     var menu = document.getElementById("pinmenu");

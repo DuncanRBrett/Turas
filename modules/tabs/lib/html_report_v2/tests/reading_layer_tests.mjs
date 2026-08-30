@@ -366,7 +366,12 @@ run("B2: toggle lives in the legend dialog AND by the sig-mode control; tooltip 
   assert(legend.indexOf("data-explain-toggle") !== -1, "legend checkbox present");
   assert(legend.indexOf(TXT("reader.legend.explain_toggle")) !== -1, "legend copy");
   const cardsSrc = readFileSync(path.join(JS_DIR, "25_cards.js"), "utf8");
-  const sig = at(cardsSrc, "data-sigmode>", "sig-mode select");
+  // The Sig selector's markup moved into sigModeSelectHtml() when its option
+  // labels started reading the project's configured levels, so adjacency is
+  // measured at the CALL SITE in renderControls — which is what the reader
+  // actually sees side by side.
+  at(cardsSrc, "data-sigmode>", "sig-mode select");
+  const sig = at(cardsSrc, "sigModeSelectHtml(s.sigMode)", "sig-mode control");
   const tgl = at(cardsSrc, "data-explain-sig", "compact Explain toggle");
   assert(tgl > sig && tgl - sig < 700, "toggle sits by the sig-mode control");
   assert(cardsSrc.indexOf("TR.reader.setExplain(e.target.checked)") !== -1,

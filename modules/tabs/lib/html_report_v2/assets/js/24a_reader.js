@@ -133,13 +133,14 @@
   };
 
   // Level wording derives from the project's configured alphas (21_stats.js —
-  // the one source the tests use), NEVER a hard-coded "95%"/"80%" string.
-  function levelText(alpha) { return Math.round((1 - alpha) * 100) + "%"; }
+  // the one source the tests use), NEVER a hard-coded "95%"/"80%" string. The
+  // wording helpers themselves now live there too, so the legend, the mode
+  // selectors and these sentences cannot drift apart.
   function primaryLevel() {
-    return levelText(TR.stats && TR.stats.alphaPrimary ? TR.stats.alphaPrimary() : 0.05);
+    return TR.stats && TR.stats.levelPrimary ? TR.stats.levelPrimary() : "95%";
   }
   function secondaryLevel() {
-    return levelText(TR.stats && TR.stats.alphaSecondary ? TR.stats.alphaSecondary() : 0.20);
+    return TR.stats && TR.stats.levelSecondary ? TR.stats.levelSecondary() : "80%";
   }
   reader._levels = function () {
     return { primary: primaryLevel(), secondary: secondaryLevel() };
@@ -493,11 +494,14 @@
         .join("");
     };
     var sections = [];
+    // The authored sentences name the levels; the renderer supplies them, so a
+    // project on a non-default alpha_secondary is described correctly.
+    var lv = TR.stats.levelVars();
     sections.push("<h3>Significance letters</h3><ul>" +
-      li("reader.legend.sig_letters") +
+      li("reader.legend.sig_letters", lv) +
       (lowBase ? li("reader.legend.low_base", { low_base: lowBase }) : "") + "</ul>");
     sections.push("<h3>Arrows &amp; change chips</h3><ul>" +
-      lines("reader.legend.arrows") + "</ul>");
+      lines("reader.legend.arrows", lv) + "</ul>");
     // Read the bands off the questions, like the dashboard does — a study that
     // configures dashboard_green_mean is not banded on % of scale, and saying
     // so here would contradict the cards the reader is looking at.

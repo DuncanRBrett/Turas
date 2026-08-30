@@ -57,6 +57,7 @@ function viewsSandbox() {
   installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
+  load(sb, "21_stats.js");                    // real level wording (95%/80%)
   load(sb, "20_data.js");                     // real d2.shortLabel
   const TR = sb.TR;
   TR.charts = { clip: (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s)) };
@@ -283,6 +284,7 @@ function readerSandbox(opts) {
   installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
+  load(sb, "21_stats.js");                    // real level wording (95%/80%)
   const TR = sb.TR;
   TR.charts = { clip: (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s)) };
   TR.AGG = { project: opts.project || { wave: "Wave 2 - Jun 2026" },
@@ -295,10 +297,11 @@ function readerSandbox(opts) {
     hasMicrodata: () => !!(TR.MICRO && TR.MICRO.answers),
     storeKey: (base) => base + ":proj"
   };
-  TR.stats = {
-    mask: () => opts.mask || [1, 1, 0, 0],
-    maskCount: (m) => m.reduce((a, b) => a + b, 0)
-  };
+  // Stub the microdata helpers ONTO the real stats module — replacing it would
+  // take the level wording (levelPrimary/levelVars) with it, which the legend
+  // and the reader sentences now read from.
+  TR.stats.mask = () => opts.mask || [1, 1, 0, 0];
+  TR.stats.maskCount = (m) => m.reduce((a, b) => a + b, 0);
   TR.disclosure = { audienceBase: () => (TR.d2.state.filters.length
     ? TR.stats.maskCount(TR.stats.mask()) : (TR.MICRO ? TR.MICRO.n : null)) };
   TR.conf = { labels: () => ({ moe_name: "Precision Estimate", moe_abbrev: "PE" }),

@@ -45,14 +45,15 @@ function near(a, b, tol, msg) {
   }
 }
 
-/** A fresh sandbox with the view module loaded. `withStats` also loads the real
- *  statistics engine, for the microdata paths. */
-function sandbox(withStats) {
+/** A fresh sandbox with the view module loaded. 21_stats.js always loads: the
+ *  microdata paths need its tabulations, and every view now words its
+ *  significance levels through TR.stats.levelPrimary/Secondary rather than a
+ *  hard-coded "95%"/"80%". `withStats` is kept for call-site readability. */
+function sandbox(withStats) {   // eslint-disable-line no-unused-vars
   const box = { console };
   box.globalThis = box; box.window = box;
   vm.createContext(box);
-  const files = ["00_namespace.js", "01_format.js"];
-  if (withStats) files.push("21_stats.js");
+  const files = ["00_namespace.js", "01_format.js", "21_stats.js"];
   files.push("27_views.js", "27d_diffs.js");
   for (const f of files) {
     vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), box, { filename: f });

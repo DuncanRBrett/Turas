@@ -25,6 +25,9 @@ function load(file) {
 // globalThis rather than a vm sandbox, so install the catalogue the same way.
 load("02_text.js");
 globalThis.TR.txt.load(CATALOGUE);
+// The Summary view words its significance levels from the configured alphas
+// (TR.stats.levelPrimary / levelSecondary), so the real stats module loads too.
+load("21_stats.js");
 load("27u_summary.js");
 load("27v_visualise.js");
 const summary = globalThis.TR.trkSummary;
