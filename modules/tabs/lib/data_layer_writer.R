@@ -125,8 +125,19 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # The secondary (dual-sig) level and the Bonferroni flag travel with the report
   # so the in-browser recompute engine tests at the SAME levels as the published
   # letters (the config loader can hand us "NA" strings — treat those as absent).
-  alpha2 <- suppressWarnings(as.numeric(config_obj[["alpha_secondary"]]))
-  if (length(alpha2) != 1L || is.na(alpha2) || alpha2 <= alpha || alpha2 >= 1) alpha2 <- 0.20
+  alpha2_raw <- suppressWarnings(as.numeric(config_obj[["alpha_secondary"]]))
+  # Blank alpha_secondary DISABLES dual significance — that is the documented
+  # contract (00_guard.R: "Leave alpha_secondary blank to disable the dual
+  # significance feature") and run_crosstabs.R honours it, emitting no Sig.2 row
+  # and no sig2 letters. The number below still falls back to 0.20 so the
+  # recompute engine always has a level to work with, which meant the report
+  # could not tell "switched off" from "set to 0.2": it went on offering a
+  # "95% + 80%" option, and picking it made the browser RECOMPUTE 80% letters
+  # from the published counts (22_model.js) that the Excel crosstab does not
+  # have. So the fact travels separately.
+  has_secondary <- length(alpha2_raw) == 1L && !is.na(alpha2_raw)
+  alpha2 <- alpha2_raw
+  if (!has_secondary || alpha2 <= alpha || alpha2 >= 1) alpha2 <- 0.20
   bon_raw <- config_obj$bonferroni_correction
   bonferroni <- if (is.logical(bon_raw)) {
     isTRUE(bon_raw)
@@ -157,8 +168,6 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
       # refused either. Without this gate such a study would open in dual mode
       # showing an 80% level it never asked for.
       ad <- tolower(trimws(as.character(config_obj$alpha_default %||% "primary")))
-      has_secondary <- !is.null(config_obj[["alpha_secondary"]]) &&
-        !is.na(suppressWarnings(as.numeric(config_obj[["alpha_secondary"]])))
       if (identical(ad, "secondary") && has_secondary) "secondary" else "primary"
     },
     bonferroni         = bonferroni,
@@ -166,6 +175,11 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     sig_note           = build_sig_note(alpha, sm),
     tracking           = list(enabled = isTRUE(tracking_enabled), default_scope = "all")
   )
+  # Emitted ONLY when the study switched dual significance off, so every island
+  # from a study that uses it — and every fixture already committed — is
+  # byte-identical to before. The renderer reads `!== false`, so an older island
+  # with no flag behaves exactly as it does today.
+  if (!has_secondary) proj$dual_significance <- FALSE
   # The crosstab heat tint's base colour. Emitted ONLY when the operator set it,
   # so an island from a config that never mentions heatmap_colour is byte-identical
   # to the ones already committed and the tint stays on the brand colour

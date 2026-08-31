@@ -28,7 +28,7 @@
       hiddenRows: s.hiddenRows[s.activeQ] || [],
       rowScope: TR.d2.rowScope(),
       sort: s.sorts[s.activeQ] || null,
-      dual: s.sigMode === "dual",
+      dual: TR.stats.dualMode(),
       intervals: s.showIntervals
     };
   }
@@ -220,7 +220,8 @@
    * The Sig mode selector. The words the reader sees are the project's own
    * levels (TR.stats), so a study on alpha_secondary = 0.1 offers "95% + 90%"
    * rather than being told 80% while the engine tests at 90. The option VALUES
-   * are persisted state (d2.state.sigMode) and must stay "off"/"95"/"dual".
+   * ("off"/"95"/"dual") are the state contract and must not move with the
+   * wording. A study that switched the secondary level off is not offered it.
    */
   function sigModeSelectHtml(sigMode) {
     var lvl1 = TR.stats.levelPrimary(), lvl2 = TR.stats.levelSecondary();
@@ -228,8 +229,10 @@
       '<option value="off"' + (sigMode === "off" ? " selected" : "") + ">Off</option>" +
       '<option value="95"' + (sigMode === "95" ? " selected" : "") + ">" + lvl1 +
       "</option>" +
-      '<option value="dual"' + (sigMode === "dual" ? " selected" : "") + ">" +
-      lvl1 + " + " + lvl2 + "</option>" +
+      (TR.stats.hasSecondary()
+        ? '<option value="dual"' + (sigMode === "dual" ? " selected" : "") + ">" +
+          lvl1 + " + " + lvl2 + "</option>"
+        : "") +
       "</select>";
   }
   cards2._sigModeSelectHtml = sigModeSelectHtml;   // exposed for the gate test
@@ -844,6 +847,11 @@
       }).join("");
   }
 
+  /** A secondary-level clause, or "" on a study that switched the level off. */
+  function dualClause(key) {
+    return TR.stats.hasSecondary() ? TR.txt(key, TR.stats.levelVars()) : "";
+  }
+
   function explainersHtml() {
     var p = TR.AGG.project;
     // Table-specific mechanics only — significance letters, arrows, Δ chips
@@ -863,8 +871,15 @@
       // One authored entry for the whole panel — blank lines separate the
       // paragraphs. Nothing here is conditional, so splitting it into six
       // entries only made the author hunt for the one they wanted to change.
+      // The two secondary-level clauses are their own entries: a study with no
+      // secondary level shows no lowercase letters, so the panel must not
+      // explain them.
       paragraphs("cards.sig.explainer",
-        Object.assign(TR.stats.levelVars(), { min_base: p.low_base_threshold })) +
+        Object.assign(TR.stats.levelVars(), {
+          min_base: p.low_base_threshold,
+          dual_odds_clause: { html: dualClause("cards.sig.explainer_dual_odds") },
+          dual_case_clause: { html: dualClause("cards.sig.explainer_dual_case") }
+        })) +
       "</div></div>" +
       TR.conf.calloutHtml();
   }

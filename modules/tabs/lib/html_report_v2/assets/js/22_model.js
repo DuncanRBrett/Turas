@@ -88,6 +88,10 @@
    *  (sig2 minus sig) and appended to the published 95% letters; islands built
    *  before sig2 carriage fall back to recomputing them from published counts. */
   function publishedModel(q, bannerId, dual) {
+    // Belt and braces: a study that switched the secondary level off has no
+    // sig2 letters, and the fallback below would happily INVENT some from the
+    // published counts. Every caller gates already; this makes it impossible.
+    dual = dual && TR.stats.hasSecondary();
     var cols = [0].concat(TR.d2.groupCols(bannerId));
     var threshold = lowThreshold();
     var columns = cols.map(function (ci) {
@@ -189,6 +193,7 @@
 
   /** Computed view from microdata for any banner/filter combination. */
   function computedModel(q, bannerId, filters, dual) {
+    dual = dual && TR.stats.hasSecondary();   // see publishedModel
     var spec = TR.stats.columnsFor(bannerId);
     var mask = TR.stats.mask(filters);
     var tabs = TR.stats.tabulate(q, spec.columns, mask);

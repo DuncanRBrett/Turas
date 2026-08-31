@@ -495,13 +495,21 @@
     };
     var sections = [];
     // The authored sentences name the levels; the renderer supplies them, so a
-    // project on a non-default alpha_secondary is described correctly.
+    // project on a non-default alpha_secondary is described correctly. The
+    // secondary-level clauses are separate entries, spliced in only when the
+    // study HAS a secondary level — a study that switched it off has no
+    // lowercase letters and must not be promised any.
     var lv = TR.stats.levelVars();
+    var dualClause = function (key) {
+      return { dual_clause: { html: TR.stats.hasSecondary() ? TR.txt(key, lv) : "" } };
+    };
     sections.push("<h3>Significance letters</h3><ul>" +
-      li("reader.legend.sig_letters", lv) +
+      li("reader.legend.sig_letters",
+         Object.assign({}, lv, dualClause("reader.legend.sig_letters_dual"))) +
       (lowBase ? li("reader.legend.low_base", { low_base: lowBase }) : "") + "</ul>");
     sections.push("<h3>Arrows &amp; change chips</h3><ul>" +
-      lines("reader.legend.arrows", lv) + "</ul>");
+      lines("reader.legend.arrows",
+            Object.assign({}, lv, dualClause("reader.legend.arrows_dual"))) + "</ul>");
     // Read the bands off the questions, like the dashboard does — a study that
     // configures dashboard_green_mean is not banded on % of scale, and saying
     // so here would contradict the cards the reader is looking at.

@@ -83,8 +83,10 @@
     // saved URL still wins over the config default. The setting was registered,
     // validated and documented for a long time while nothing read it, so
     // "alpha_default = secondary" silently did nothing (review 2026-08-21, I-25).
+    // alpha_secondary always carries a number (it falls back to 0.20), so it
+    // cannot say whether the study HAS a secondary level — hasSecondary() can.
     if (agg.project && agg.project.alpha_default === "secondary" &&
-        agg.project.alpha_secondary) {
+        TR.stats.hasSecondary()) {
       d2.state.sigMode = "dual";
     }
     d2.decodeHash(location.hash);

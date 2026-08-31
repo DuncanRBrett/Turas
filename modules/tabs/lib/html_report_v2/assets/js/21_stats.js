@@ -94,6 +94,32 @@
       alpha2_odds: stats.oddsSecondary()
     };
   };
+  /**
+   * Does this study HAVE a secondary level at all?
+   *
+   * Blank alpha_secondary switches dual significance off: the R engine then
+   * emits no Sig.2 row and no sig2 letters. alpha_secondary in the island
+   * always carries a number (it falls back to 0.20), so it cannot answer this —
+   * the writer sends `dual_significance: false` instead, and only when the
+   * feature is off, which keeps every island from a dual study byte-identical.
+   * An older island has no flag and behaves exactly as it did before.
+   *
+   * Everything that offers, enters or computes the secondary level is gated on
+   * this. Without it the report offered a "95% + 80%" option on a study that
+   * switched the level off, and choosing it made 22_model.js recompute 80%
+   * letters from the published counts — letters the Excel crosstab does not
+   * have (2026-08-31).
+   */
+  stats.hasSecondary = function () {
+    var p = TR.AGG && TR.AGG.project;
+    return !(p && p.dual_significance === false);
+  };
+  /** The report's live dual-significance state: the reader asked for it AND the
+   *  study has a secondary level. The one place anything should ask. */
+  stats.dualMode = function () {
+    return stats.hasSecondary() && TR.d2 && TR.d2.state &&
+      TR.d2.state.sigMode === "dual";
+  };
   /** Bonferroni is the R engine's default; only an explicit false disables it. */
   stats.bonferroni = function () {
     var p = TR.AGG && TR.AGG.project;

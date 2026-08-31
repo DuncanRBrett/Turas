@@ -1,4 +1,20 @@
-# Handover — the HTML report hard-codes "80%" for the secondary significance level
+# Handover — three v2 report defects found on the ASSA project
+
+Three independent, small defects, each fixable on its own. All three are display
+or ordering issues: **no computed value in any report is wrong.**
+
+1. **The secondary significance level is labelled "80%" regardless of config** —
+   shared callouts + html_report_v2. ASSA is the only report currently affected.
+2. **Banner DisplayOrder is sorted as text**, so a tenth banner renders first —
+   `banner.R`. One-line fix, mirrors what `data_setup.R` already does.
+3. **An Index row never says what scale it is on** — html_report_v2 renderer.
+   The data it needs already ships.
+
+Items 2 and 3 start after the horizontal rules below.
+
+---
+
+# ITEM 1 — the HTML report hard-codes "80%" for the secondary significance level
 
 **Date:** 2026-08-30
 **Scope:** `modules/shared/lib/callouts/` + `modules/tabs/lib/html_report_v2/`
@@ -208,3 +224,146 @@ Then re-run for a CCPB or SACS report and confirm the visible strings are **unch
 - Reading `*.xlsx` written by openxlsx: `openpyxl` chokes on dangling drawings and
   collapsed dimensions. Parse the sheet XML directly, and handle **self-closing `<c/>`
   cells** — a regex that assumes `<c …>…</c>` will silently shift columns.
+
+---
+---
+
+# ITEM 2 — banner DisplayOrder is sorted as text
+
+**Found:** 2026-08-30, same session, while adding an eighth banner to the ASSA project.
+**Scope:** `modules/tabs/lib/banner.R`
+**Type:** ordering defect. Wrong banner order on screen; no computed value affected.
+
+This is a separate bug from the one above and can be fixed independently. It is
+recorded here only so one session can pick up both.
+
+## The defect
+
+`banner.R:64-68` sorts the banner questions by the Selection sheet's
+`DisplayOrder` with no type coercion:
+
+```r
+if ("DisplayOrder" %in% names(banner_questions) &&
+    !all(is.na(banner_questions$DisplayOrder))) {
+  banner_questions <- banner_questions[
+    order(banner_questions$DisplayOrder, na.last = TRUE),
+  ]
+}
+```
+
+The config template stores `DisplayOrder` as **text** (verified in the ASSA
+workbook: every cell in column F of Selection is a shared string), so `order()`
+does a lexical sort. With eight banners numbered 2..9 plus one at 10, the order
+becomes `"10","2","3","4","6","7","8","9"` — the tenth banner renders **first**.
+
+Observed live on ASSA: a banner at DisplayOrder 10 appeared as the leftmost tab,
+ahead of the one at 2.
+
+## Why it has never bitten before
+
+No project had more than nine banners, so `DisplayOrder` never reached two
+digits and lexical order happened to match numeric order.
+
+## The fix
+
+`modules/tabs/lib/crosstabs/data_setup.R:180-183` already does the right thing
+for the **Options** sheet and even carries the comment:
+
+```r
+# Convert DisplayOrder to numeric for proper sorting
+if ("DisplayOrder" %in% names(options)) {
+  options$DisplayOrder <- as.numeric(options$DisplayOrder)
+}
+```
+
+The Selection path needs the same treatment. Coerce with `suppressWarnings(as.numeric(...))`
+before `order()`, and keep `na.last = TRUE` so a blank or non-numeric entry
+still sorts to the end rather than becoming an error. Check whether
+`banner.R:216-219` (the per-question option ordering) needs it too — it may
+already be fed the coerced Options frame from data_setup.R, in which case leave
+it alone.
+
+## Test
+
+`order()` on a character vector is the whole bug, so the test is small:
+a Selection frame with banner DisplayOrders 2, 9 and 10 supplied **as
+character** must produce banner order 2, 9, 10 — not 10, 2, 9. Add it beside the
+existing banner tests.
+
+## Interim workaround now in place on ASSA
+
+The eight ASSA banners were renumbered 2..9 so lexical and numeric order agree.
+That config is correct either way and needs no change after the code fix — but
+it will break again the moment a ninth banner pushes DisplayOrder to 10, so the
+code fix is the real remedy.
+
+---
+---
+
+# ITEM 3 — an Index row never says what scale it is on
+
+**Found:** 2026-08-31, same session, reading a Likert index on the ASSA project.
+**Scope:** `modules/tabs/lib/html_report_v2/` (renderer only — the data already ships)
+**Type:** missing disclosure. No computed value is wrong.
+
+Independent of the two items above. Recorded here so one session can take all three.
+
+## The defect
+
+A scale question renders a summary row — `Index`, `Mean` or `NPS Score` — and the
+report never states how it was scored. A reader sees `31.0` on one question and
+`8.5` on the next and has no way to know they are on different scales.
+
+On ASSA, three different scoring schemes appear side by side:
+
+| `Variable_Type` | Row rendered | Actual scale |
+|---|---|---|
+| Likert | `Index` | weighted mean, −100…+100, 0 = the midpoint option |
+| Rating | `Mean` | plain average out of 10 |
+| NPS | `NPS Score` | promoters − detractors, −100…+100 |
+
+Two of them are labelled with the word "Mean"/"Index" and neither says which.
+The "Reading this table" panel says only that Index rows are "score-weighted
+means" — true, and not enough to interpret a number.
+
+## Why this is cheap to fix
+
+**The weights are already in the report.** Every scale question carries them in
+the data layer:
+
+```json
+"index_scores":{"Much worse than expected":-100,"Somewhat worse than expected":-50,
+                "About as expected":0,"Somewhat better than expected":50,
+                "Much better than expected":100}
+```
+
+`21_stats.js:467`, `22w_waves.js:170` and `27d_diffs.js:193` all read it for the
+in-browser recompute. Nothing renders it. So this is a display change over data
+that is already present and already correct — no config work, no new column, and
+it cannot drift out of step with the engine.
+
+## The fix
+
+Surface `q.index_scores` on the summary row. Either a tooltip on the row label
+(the gold-edged `Index` row already has a distinct style to hang it off), or a
+line in the "Reading this table" panel naming the scale for the question on
+screen. Derive the wording from `index_scores` plus the question's type — do not
+hard-code "−100 to +100", because Rating questions are 0–10 and NPS is its own
+thing. Note that an NPS question's Options-sheet `Index_Weight` values are the
+raw 0–10 scores and are IGNORED by the engine, so read `index_scores`, not the
+config, or NPS questions will be described wrongly.
+
+## Test
+
+A fixture with one Likert, one Rating and one NPS question must produce three
+different scale descriptions, and the NPS one must not describe itself as a mean
+out of 10.
+
+## Interim workaround now on ASSA
+
+All 22 scale questions have the scale written into the Selection sheet's
+`Source` column, generated from the config's own `Index_Weight` values rather
+than typed. `Source` rather than `Formula` deliberately: `25_cards.js:604` sets
+`derived: !!fml`, so any Formula value badges the question DERIVED, which would
+be wrong for a question that was simply asked. Once the renderer surfaces the
+scale itself, those 22 notes become redundant and can be cleared.

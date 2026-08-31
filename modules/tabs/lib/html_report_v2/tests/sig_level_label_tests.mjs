@@ -22,8 +22,16 @@
  *       sets it at all, every one of those surfaces still reads exactly "80%".
  *       CCPB, VAS and SACS are 0.2-or-unset projects: if this section goes red,
  *       the fix has changed what a live report displays.
- *   L5  Option VALUES ("95" / "dual") are persisted state and must NOT move
- *       with the wording, or saved copies lose their setting.
+ *   L5  Option VALUES ("95" / "dual") are the state contract and must NOT move
+ *       with the wording.
+ *   L6  No renderer types a level; only the fixed 95% interval convention may.
+ *   L7  A study that switched the secondary level OFF (blank alpha_secondary,
+ *       which the R engine honours by emitting no sig2 letters at all) is not
+ *       offered it, cannot enter it, cannot compute it, and is not told about
+ *       it. Before this, alpha_secondary defaulted to 0.20 in the island, so
+ *       such a report still offered "95% + 80%" — and choosing it made
+ *       22_model.js RECOMPUTE 80% letters from the published counts that the
+ *       Excel crosstab does not have (2026-08-31).
  *
  * Confidence INTERVALS are a separate, deliberately fixed 95% convention
  * (21c_confidence.js, Z95_EXACT) and are out of scope here — a "95% SI" string
@@ -63,7 +71,13 @@ const LEVEL_KEYS = [
   "visualise.legend.significance",
   "diffs.intro",
   "cards.sig.explainer",
-  "cards.reading.list"
+  "cards.reading.list",
+  // The secondary-level clauses, spliced in only on a study that has one.
+  "reader.legend.sig_letters_dual",
+  "reader.legend.arrows_dual",
+  "diffs.intro_dual",
+  "cards.sig.explainer_dual_odds",
+  "cards.sig.explainer_dual_case"
 ];
 
 /** A sandbox carrying the real 02_text + 21_stats over a given project. */
@@ -181,9 +195,11 @@ run("the explainer takes the odds form too, so 'one in 5' cannot outlive 80%", (
     path.join(HERE, "..", "..", "..", "..", "shared", "lib", "callouts",
               "callouts.json"), "utf8")).tabs;
   const t = reg["cards.sig.explainer"].text;
+  const dual = reg["cards.sig.explainer_dual_odds"].text;
   assert(t.indexOf("{alpha_odds}") !== -1, "primary odds tokenised");
-  assert(t.indexOf("{alpha2_odds}") !== -1, "secondary odds tokenised");
-  assert(!/one in \d/.test(t), "no typed odds left behind");
+  assert(dual.indexOf("{alpha2_odds}") !== -1,
+         "secondary odds tokenised, in the clause that only a dual study shows");
+  assert(!/one in \d/.test(t + dual), "no typed odds left behind");
 });
 
 run("substituting the ASSA levels puts 90% into every sentence that names one", () => {
@@ -251,23 +267,29 @@ function surfaces(project) {
   };
   const host = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
   TR.trkSummary.render(host);
+  const v = TR.stats.levelVars();
 
   return {
     // The crosstab footer panels are the only surface that also carries the
     // ODDS form ("one in 20"), so they are kept separate: a bare 5 or 10 cannot
     // be swapped safely in a byte-comparison.
     explainers: TR.cards2._explainersHtml(),
+    // The tracking summary as the renderer actually emits it.
+    tracking: host.innerHTML,
     rest: [
       TR.reader.legendHtml(),
       TR.cards2._sigModeSelectHtml("dual"),
       TR.views._diffSigOptions(true),
+      TR.views._diffsIntroHtml(),
       TR.views._diffLineHtml({
         soft: true, column: "Male", isMean: false, direction: "ahead",
         beaten: ["Female"], value: 60, rest: 40, overall: 50, gap: 20,
         row: "Yes", question: "Q1", title: "A question", code: "Q1", cells: []
       }),
       host.innerHTML,
-      TR.txt("tracking.heatmap.soft_clause", TR.stats.levelVars())
+      // 27u_summary splices this only in dual mode; mirror that here rather
+      // than rendering a clause the reader could never see.
+      TR.stats.dualMode() ? TR.txt("tracking.heatmap.soft_clause", v) : ""
     ].join("\n\n")
   };
 }
@@ -328,7 +350,7 @@ run("the explainer's odds move with the level, not just the percentage", () => {
   // is, so this asserts the substitution and not the sentence.
   // From the SAME catalogue the render uses, so this holds under the mutation
   // check too (mutate_text_check.mjs keeps every token in place).
-  const raw = CATALOGUE["cards.sig.explainer"];
+  const raw = CATALOGUE["cards.sig.explainer_dual_odds"];
   const at2 = raw.indexOf("{alpha2_odds}");
   assert(at2 !== -1, "{alpha2_odds} is in the authored text");
   // The author's own lead-in, back to the previous token so the anchor is
@@ -426,6 +448,164 @@ run("the sig-letter tooltip names the level the letters were tested at", () => {
   assert(/95% \(uppercase\)/.test(both) && /90% \(lowercase\)/.test(both),
          "a mixed string names both levels: " + both);
   eq(TR.fmt.sigSup(""), "", "nothing in, nothing out");
+});
+
+/* ==========================================================================
+   L7. A study with no secondary level is never offered one
+   ========================================================================== */
+console.log("\nL7 — dual significance switched off (blank alpha_secondary):");
+
+const OFF = { alpha: 0.05, alpha_secondary: 0.2, dual_significance: false,
+              low_base_threshold: 30, wave: "2026" };
+const ON = { alpha: 0.05, alpha_secondary: 0.2,
+             low_base_threshold: 30, wave: "2026" };
+
+run("hasSecondary reads the flag, and only an explicit false switches it off", () => {
+  eq(statsBox(OFF).stats.hasSecondary(), false, "explicit false");
+  eq(statsBox(ON).stats.hasSecondary(), true, "flag absent — a dual study");
+  eq(statsBox({}).stats.hasSecondary(), true,
+     "an older island carries no flag and must behave exactly as before");
+});
+
+run("no selector offers the dual option", () => {
+  const s = surfaces(OFF);
+  assert(s.rest.indexOf('value="dual"') === -1,
+         "the crosstab and tracking selectors drop it: " +
+         (s.rest.match(/.{0,80}value="dual".{0,40}/) || [""])[0]);
+  const TR = statsBox(OFF, ["20_data.js", "25_cards.js", "27_views.js", "27d_diffs.js"]);
+  TR.d2 = { state: { sigMode: "95" } };
+  assert(TR.cards2._sigModeSelectHtml("95").indexOf('value="dual"') === -1,
+         "crosstab Sig selector");
+  assert(/value="off"/.test(TR.cards2._sigModeSelectHtml("95")) &&
+         /value="95"/.test(TR.cards2._sigModeSelectHtml("95")),
+         "but Off and the primary level remain");
+  eq(TR.views._diffSigOptions(false), "",
+     "the Differences control is dropped entirely — one option is not a choice");
+});
+
+run("the dual option is still offered when the study HAS a secondary level", () => {
+  const TR = statsBox(ON, ["20_data.js", "25_cards.js", "27_views.js", "27d_diffs.js"]);
+  TR.d2 = { state: { sigMode: "dual" } };
+  assert(TR.cards2._sigModeSelectHtml("dual").indexOf('value="dual"') !== -1,
+         "crosstab selector unchanged");
+  assert(TR.views._diffSigOptions(true).indexOf('value="dual"') !== -1,
+         "Differences control unchanged");
+});
+
+run("dualMode stays false even when the state says dual", () => {
+  // Persisted or hand-set state must not reach the engine: 22_model's fallback
+  // would invent lowercase letters from the published counts.
+  const TR = statsBox(OFF, ["20_data.js"]);
+  TR.d2.state.sigMode = "dual";
+  eq(TR.stats.dualMode(), false, "switched off wins over the state");
+  const on = statsBox(ON, ["20_data.js"]);
+  on.d2.state.sigMode = "dual";
+  eq(on.stats.dualMode(), true, "and a dual study is unaffected");
+});
+
+/**
+ * A published question with NO sig2 — exactly what R emits with dual off, and
+ * also what a pre-sig2-carriage island looks like.
+ *
+ * Row 0 is a pair that clears the secondary level but NOT the primary one
+ * (54% vs 46% on n=200 each) — the only shape that can show whether the
+ * recompute fallback fired, since a pair that clears BOTH gets an uppercase
+ * letter either way. Row 1 carries a letter R itself assigned.
+ */
+function noSig2Model(project) {
+  const TR = statsBox(project, ["20_data.js", "22_model.js"]);
+  const q = { code: "Q1", title: "Q", type: "single",
+              bases: [{ n: 400 }, { n: 200 }, { n: 200 }],
+              rows: [{ kind: "category", label: "Marginal", pct: [50, 54, 46],
+                       n: [200, 108, 92], sig: ["", "", ""] },
+                     { kind: "category", label: "Clear", pct: [50, 70, 30],
+                       n: [200, 140, 60], sig: ["", "B", ""] }] };
+  TR.AGG.questions = [q];
+  // group is what d2.groupCols matches on; Total sits outside every group.
+  TR.AGG.columns = [{ label: "Total", letter: "" },
+                    { label: "Male", letter: "A", group: "g" },
+                    { label: "Female", letter: "B", group: "g" }];
+  TR.AGG.banner_groups = [{ id: "g", name: "Gender", columns: [1, 2] }];
+  TR.conf = { fpcActiveReport: () => false };
+  // Ask for dual explicitly — the point is that the engine refuses.
+  return TR.model._publishedModel(q, "g", true);
+}
+
+function modelLetters(m, ri) {
+  return m.rows[ri].cells.map(function (c) { return c.sig; }).join("");
+}
+
+run("the model refuses to compute secondary letters even if a caller asks", () => {
+  const m = noSig2Model(OFF);
+  assert(!/[a-z]/.test(modelLetters(m, 0)),
+         "nothing lowercase was invented from the published counts: " +
+         JSON.stringify(modelLetters(m, 0)));
+  assert(modelLetters(m, 1).indexOf("B") !== -1,
+         "while R's own uppercase letter still shows");
+});
+
+run("...but a dual study with a pre-sig2 island still gets the fallback", () => {
+  // The legacy recompute path must survive: an island built before sig2
+  // carriage has no sig2 either, and there dual is genuinely on. This is the
+  // guarantee that the flag, not the missing sig2, is what switches it off.
+  assert(/[a-z]/.test(modelLetters(noSig2Model(ON), 0)),
+         "the pre-carriage fallback still recomputes secondary letters: " +
+         JSON.stringify(modelLetters(noSig2Model(ON), 0)));
+});
+
+/** The five secondary-level clauses, as the reader would see them. Taken from
+ *  the catalogue rather than typed, so the author owns every word of them. */
+const DUAL_CLAUSES = [
+  "reader.legend.sig_letters_dual",
+  "reader.legend.arrows_dual",
+  "diffs.intro_dual",
+  "cards.sig.explainer_dual_odds",
+  "cards.sig.explainer_dual_case"
+];
+function clauseTexts() {
+  const TR = statsBox(ON);
+  return DUAL_CLAUSES.map(function (k) {
+    const t = TR.txt(k, TR.stats.levelVars()).trim();
+    assert(t, k + " has authored text to look for");
+    return { key: k, text: t };
+  });
+}
+
+run("no secondary-level clause is rendered anywhere", () => {
+  const off = surfaces(OFF);
+  const all = off.explainers + "\n" + off.rest;
+  clauseTexts().forEach(function (c) {
+    assert(all.indexOf(c.text) === -1,
+           c.key + " must not render on a study with no secondary level");
+  });
+  assert(all.indexOf("{alpha") === -1 && all.indexOf("{dual") === -1,
+         "and no token ships unsubstituted");
+  assert(all.indexOf("95%") !== -1, "the primary level is still named");
+});
+
+run("the tracking summary shows no secondary-level clause either", () => {
+  // These two are spliced by 27u_summary on TR.stats.dualMode(), so they should
+  // already self-suppress — asserted rather than assumed.
+  const TRon = statsBox(ON);
+  const v = TRon.stats.levelVars();
+  const off = surfaces(OFF).tracking;
+  const on = surfaces(ON).tracking;
+  ["tracking.heatmap.soft_clause", "tracking.soft.intro"].forEach(function (k) {
+    const t = TRon.txt(k, v).trim();
+    assert(t, k + " has authored text to look for");
+    assert(off.indexOf(t) === -1, k + " must not render with the level switched off");
+  });
+  assert(on.length > 0 && off.length > 0, "both summaries actually rendered");
+});
+
+run("a dual study still gets every clause — the no-op mirror", () => {
+  const on = surfaces(ON);
+  const all = on.explainers + "\n" + on.rest;
+  clauseTexts().forEach(function (c) {
+    assert(all.indexOf(c.text) !== -1, c.key + " still renders on a dual study");
+  });
+  assert(all.indexOf("{alpha") === -1 && all.indexOf("{dual") === -1,
+         "no token ships unsubstituted");
 });
 
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");

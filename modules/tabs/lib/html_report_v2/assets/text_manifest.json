@@ -25,6 +25,18 @@
     "context": "Legend panel, Significance letters — what a lettered cell means and what case signifies. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
+      "dual_clause"
+    ],
+    "token_help": {
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
+      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+    }
+  },
+  "reader.legend.sig_letters_dual": {
+    "page": "How to read",
+    "context": "Legend panel, Significance letters — the secondary-level clause spliced onto the sig-letters sentence. Rendered only on a study that configured a secondary level.",
+    "tokens": [
+      "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
@@ -454,6 +466,18 @@
     "context": "Differences tab — what a card is and what the significance control does. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
+      "dual_clause"
+    ],
+    "token_help": {
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
+      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+    }
+  },
+  "diffs.intro_dual": {
+    "page": "Differences",
+    "context": "Differences tab — the clause describing the significance control, spliced into the intro. Rendered only on a study that configured a secondary level.",
+    "tokens": [
+      "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
@@ -694,28 +718,50 @@
     "tokens": [
       "min_base",
       "alpha_pct",
-      "alpha2_pct",
       "alpha_odds",
-      "alpha2_odds"
+      "dual_odds_clause",
+      "dual_case_clause"
     ],
     "token_help": {
       "min_base": "this project's low-base threshold — the sample a column needs before letters show, e.g. 30",
       "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%",
       "alpha_odds": "the primary level as odds, e.g. \"20\" for \"one in 20\"",
+      "dual_odds_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them",
+      "dual_case_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+    }
+  },
+  "cards.sig.explainer_dual_odds": {
+    "page": "Crosstabs",
+    "context": "Crosstab significance panel — the secondary level stated as odds, spliced after the primary one. Rendered only on a study that configured a secondary level.",
+    "tokens": [
+      "alpha2_pct",
+      "alpha2_odds"
+    ],
+    "token_help": {
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%",
       "alpha2_odds": "the secondary level as odds, e.g. \"5\" for \"one in 5\""
+    }
+  },
+  "cards.sig.explainer_dual_case": {
+    "page": "Crosstabs",
+    "context": "Crosstab significance panel — what upper and lower case mean. Rendered only on a study that configured a secondary level.",
+    "tokens": [
+      "alpha_pct",
+      "alpha2_pct"
+    ],
+    "token_help": {
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "cards.reading.list": {
     "page": "Crosstabs",
     "context": "The whole 'Reading this table' panel under every crosstab card, as one entry — ONE BULLET PER LINE. {legend_link} is the 'How to read this report' button the renderer supplies; keep it where you want the cross-reference to sit. The level word ({alpha2_pct}) comes from the project's configured alpha_secondary — keep it rather than typing \"80%\", so a study testing at another level (some set 90%) is described correctly.",
     "tokens": [
-      "legend_link",
-      "alpha2_pct"
+      "legend_link"
     ],
     "token_help": {
-      "legend_link": "the 'ⓘ How to read this report' button, which opens the legend panel",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "legend_link": "the 'ⓘ How to read this report' button, which opens the legend panel"
     }
   },
   "filter.weighting.bases": {
@@ -728,10 +774,20 @@
     "context": "Legend panel, Arrows & change chips — both bullets as one entry, ONE BULLET PER LINE. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
-      "alpha2_pct"
+      "dual_clause"
     ],
     "token_help": {
       "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
+      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+    }
+  },
+  "reader.legend.arrows_dual": {
+    "page": "How to read",
+    "context": "Legend panel, Arrows & change chips — the hollow-arrow clause spliced into the composite bullet. Rendered only on a study that configured a secondary level.",
+    "tokens": [
+      "alpha2_pct"
+    ],
+    "token_help": {
       "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
     }
   },

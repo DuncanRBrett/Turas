@@ -295,7 +295,8 @@
     }
     // honour the report's significance setting (off / 95% / 95%+80%): "dual"
     // adds soft_prev/soft_base, "off" suppresses all sig flags.
-    return TR.waves.cellsFor(points, canSig, TR.d2.state.sigMode,
+    return TR.waves.cellsFor(points, canSig,
+      TR.stats.dualMode() ? "dual" : TR.d2.state.sigMode,
       fmt.decimalsForQ(metric.q, metric.isMean));
   };
 

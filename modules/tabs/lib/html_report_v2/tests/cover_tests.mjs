@@ -67,6 +67,7 @@ function coverSandbox(opts) {
   vm.createContext(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
+  load(sb, "21_stats.js");                    // level wording + dualMode()
   const TR = sb.TR;
   // Every contract below is "GIVEN the study asked for a cover" (config
   // html_report_v2_cover -> project.cover), so the sandbox opts in by default

@@ -281,9 +281,15 @@
       "context": "About card, Report construction — only when the report carries earlier waves with no respondent-level scores",
       "page": "Report"
     },
+    "reader.legend.sig_letters_dual": {
+      "title": "Legend — significance letters, the secondary-level clause",
+      "text": " UPPERCASE letters are {alpha_pct}; with the {alpha2_pct} option on, <strong>lowercase letters = {alpha2_pct}<\/strong> (directional, weaker evidence).",
+      "context": "How to read panel — spliced onto the end of the sig-letters sentence, and ONLY on a study that configured a secondary level (alpha_secondary). Starts with a space because it sits mid-paragraph; keep it.",
+      "page": "How to read"
+    },
     "reader.legend.sig_letters": {
       "title": "Legend — significance letters",
-      "text": "<strong>▲ letters<\/strong> (e.g. <sup>B<\/sup>) shows this value is significantly higher than that lettered column. UPPERCASE letters = {alpha_pct} confidence; with the {alpha2_pct} option on, <strong>lowercase letters = {alpha2_pct}<\/strong> (directional, weaker evidence).",
+      "text": "<strong>▲ letters<\/strong> (e.g. <sup>B<\/sup>) shows this value is significantly higher than that lettered column. Letters = {alpha_pct} confidence.{dual_clause}",
       "context": "How to read panel, Significance letters",
       "page": "How to read"
     },
@@ -605,9 +611,15 @@
       "context": "Group overview, under the portraits",
       "page": "Group overview"
     },
+    "diffs.intro_dual": {
+      "title": "Differences — the secondary-level clause",
+      "text": " Choose either {alpha_pct} or {alpha_pct} + {alpha2_pct} significance.",
+      "context": "Differences tab — spliced into the intro, and ONLY on a study that configured a secondary level; with none there is no control to describe. Starts with a space; keep it.",
+      "page": "Differences"
+    },
     "diffs.intro": {
       "title": "Differences — how to read this tab",
-      "text": "Each card shows where one group stands out against the rest on a specific question, as identified by a significance test. Choose either {alpha_pct} or {alpha_pct} + {alpha2_pct} significance. Note that this is a statistical test, not a judgement call. We have excluded classification questions such as demographics or corpographics from this page.",
+      "text": "Each card shows where one group stands out against the rest on a specific question, as identified by a significance test at {alpha_pct}.{dual_clause} Note that this is a statistical test, not a judgement call. We have excluded classification questions such as demographics or corpographics from this page.",
       "context": "Differences tab, intro card",
       "page": "Differences"
     },
@@ -803,15 +815,27 @@
       "context": "About card. The whole section, blank lines between paragraphs. {producer} is the attribution sentence (edited under 'Report construction — attribution'); {waves_note} is the earlier-waves sentence, which only appears when the report is entitled to it — move it, or delete it to never say it. A study's own _REPORT_CONSTRUCTION config row replaces this whole section.",
       "page": "Report"
     },
+    "cards.sig.explainer_dual_odds": {
+      "title": "Significance explainer — the secondary level in odds",
+      "text": " At {alpha2_pct} it is less than one in {alpha2_odds}.",
+      "context": "Crosstab significance panel — spliced after the 'one in {alpha_odds}' sentence, and ONLY on a study that configured a secondary level. Starts with a space; keep it.",
+      "page": "Crosstabs"
+    },
+    "cards.sig.explainer_dual_case": {
+      "title": "Significance explainer — what letter case means",
+      "text": " Upper case denotes {alpha_pct}, lowercase {alpha2_pct}.",
+      "context": "Crosstab significance panel — spliced after the 'a letter denotes' sentence, and ONLY on a study that configured a secondary level; with none there are no lowercase letters to explain. Starts with a space; keep it.",
+      "page": "Crosstabs"
+    },
     "cards.sig.explainer": {
       "title": "Understanding the significance testing",
-      "text": "A significance test answers the question \"How often would the difference happen by chance?\". If the answer is less than one in {alpha_odds}, then we call it significant at the {alpha_pct} level. At {alpha2_pct} it is less than one in {alpha2_odds}. In a significance test, the size of your sample is critical because in a small sample one person has a bigger impact. A 5 point gap between two groups of 1,000 is significant; a 10 point gap between two groups of 30 is not.\n\nThe maths works differently for percentages and averages and so we use a two-proportion z-test for percentages, a Welch t-test for averages, index scores and NPS. Same question, different test.\n\nEach column has a letter. A letter appearing in a cell means that column is significantly ahead of the column with that letter. Upper case denotes significant at {alpha_pct}, lowercase at {alpha2_pct}. Letters require a sample of at least {min_base} to show.\n\nIf you run enough comparisons, some will come up significant purely by chance. Test twenty things where nothing is happening and one will \"pass\" on average. Turas corrects for that within each banner using a Bonferroni correction, which raises the bar in proportion to how many comparisons the banner involves.\n\nYear-on-year comparisons don't take that correction, because each one is a single planned comparison.\n\nAlso remember that significance is about whether a difference is real, not whether it's important. A tiny gap on a big sample can be significant and useless. A large gap on a small sample can be genuinely interesting and fail the test.",
+      "text": "A significance test answers the question \"How often would the difference happen by chance?\". If the answer is less than one in {alpha_odds}, then we call it significant at the {alpha_pct} level.{dual_odds_clause} In a significance test, the size of your sample is critical because in a small sample one person has a bigger impact. A 5 point gap between two groups of 1,000 is significant; a 10 point gap between two groups of 30 is not.\n\nThe maths works differently for percentages and averages and so we use a two-proportion z-test for percentages, a Welch t-test for averages, index scores and NPS. Same question, different test.\n\nEach column has a letter. A letter appearing in a cell means that column is significantly ahead of the column with that letter. A letter denotes significant at {alpha_pct}.{dual_case_clause} Letters require a sample of at least {min_base} to show.\n\nIf you run enough comparisons, some will come up significant purely by chance. Test twenty things where nothing is happening and one will \"pass\" on average. Turas corrects for that within each banner using a Bonferroni correction, which raises the bar in proportion to how many comparisons the banner involves.\n\nYear-on-year comparisons don't take that correction, because each one is a single planned comparison.\n\nAlso remember that significance is about whether a difference is real, not whether it's important. A tiny gap on a big sample can be significant and useless. A large gap on a small sample can be genuinely interesting and fail the test.",
       "context": "The whole collapsible panel under every crosstab card, blank lines between paragraphs. {min_base} is this project's low-base threshold — keep it rather than typing a number, so a study on a different threshold is described correctly.",
       "page": "Crosstabs"
     },
     "cards.reading.list": {
       "title": "Reading this table",
-      "text": "<strong>Heatmap<\/strong> : cell shading scales with the value within each row.\n<strong>PUBLISHED / COMPUTED.<\/strong> ‘Published’ figures are calculated when the report was built. When you apply a filter or build your own banner, Turas recalculates from the underlying responses and marks the result ‘Computed’, so you always know whether you're seeing the original figures or a filtered recalculation of the data.\n<strong>NET rows<\/strong> (navy edge) combine categories; <strong>Index rows<\/strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots tracking history if available.\nSignificance letters (incl. lowercase {alpha2_pct}), ▲▵ arrows, Δ chips and score bands are explained in {legend_link}.\n<strong>Insight<\/strong>: From the analyst or fill your own note on the question in the Insight box at the foot of the card. It's kept for the banner you're viewing (each banner has its own), and can be saved. ",
+      "text": "<strong>Heatmap<\/strong> : cell shading scales with the value within each row.\n<strong>PUBLISHED / COMPUTED.<\/strong> ‘Published’ figures are calculated when the report was built. When you apply a filter or build your own banner, Turas recalculates from the underlying responses and marks the result ‘Computed’, so you always know whether you're seeing the original figures or a filtered recalculation of the data.\n<strong>NET rows<\/strong> (navy edge) combine categories; <strong>Index rows<\/strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕. The wave strip under tracked questions plots tracking history if available.\nSignificance letters, ▲▵ arrows, Δ chips and score bands are explained in {legend_link}.\n<strong>Insight<\/strong>: From the analyst or fill your own note on the question in the Insight box at the foot of the card. It's kept for the banner you're viewing (each banner has its own), and can be saved. ",
       "context": "The whole panel under every crosstab card — ONE BULLET PER LINE. Keep {legend_link} where the cross-reference should sit.",
       "page": "Crosstabs"
     },
@@ -821,11 +845,17 @@
       "context": "The three base sizes a weighted table shows — ONE BULLET PER LINE.",
       "text": "<strong>Base (unweighted)<\/strong> — the actual number of people who answered. Judge how robust a result is on this: a small unweighted base is fragile however large the weighted figure looks.\n<strong>Base (weighted)<\/strong> — the weighted total the percentages are calculated on.\n<strong>Effective base<\/strong> — the sample's effective size once weighting is accounted for (always ≤ the unweighted count). Significance tests and confidence intervals are sized on this, because weighting reduces precision."
     },
+    "reader.legend.arrows_dual": {
+      "title": "Legend — composite arrows, the secondary-level clause",
+      "text": " Hollow <strong>▵ / ▿<\/strong> mark the {alpha2_pct} level.",
+      "context": "How to read panel, Arrows & change chips — spliced into the composite-arrows bullet, and ONLY on a study that configured a secondary level. Starts with a space; keep it.",
+      "page": "How to read"
+    },
     "reader.legend.arrows": {
       "title": "Legend — arrows & change chips",
       "page": "How to read",
       "context": "Both bullets of the Arrows & change chips section — ONE BULLET PER LINE.",
-      "text": "<strong>▲ / ▼<\/strong> on a composite (profile) column — significantly above / below <em>the rest of the sample<\/em> at {alpha_pct}; hollow <strong>▵ / ▿<\/strong> mark the {alpha2_pct} level. Composite columns may overlap, so they are never compared with one another.\n<strong>▲ / ▼ chips<\/strong> on a Total column or card — change vs the most recent prior wave carrying that question; an outlined chip is a significant change."
+      "text": "<strong>▲ / ▼<\/strong> on a composite (profile) column — significantly above / below <em>the rest of the sample<\/em> at {alpha_pct}.{dual_clause} Composite columns may overlap, so they are never compared with one another.\n<strong>▲ / ▼ chips<\/strong> on a Total column or card — change vs the most recent prior wave carrying that question; an outlined chip is a significant change."
     }
   },
   "brand": {

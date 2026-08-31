@@ -250,7 +250,7 @@
     var spec = micro ? TR.stats.columnsFor(banner) : null;
     var mask = micro ? TR.stats.mask(TR.d2.state.filters) : null;
     var threshold = TR.AGG.project.low_base_threshold || 30;
-    var dual = TR.d2.state.sigMode === "dual";   // also surface nearly-significant (80%)
+    var dual = TR.stats.dualMode();   // also surface nearly-significant findings
     var findings = [];
     TR.AGG.questions.forEach(function (q) {
       if (q.code === bannerSource) return;   // a banner never "beats" itself
@@ -519,6 +519,8 @@
    * levels; its option VALUES ("95"/"dual") are persisted state and stay put.
    */
   function sigOptionsHtml(dual) {
+    // A study with no secondary level has one choice, which is not a choice.
+    if (!TR.stats.hasSecondary()) return "";
     return '<select data-diffsig title="Significance level">' +
       '<option value="95"' + (!dual ? " selected" : "") + ">" +
       TR.stats.levelPrimary() + "</option>" +
@@ -527,6 +529,16 @@
       "</select>";
   }
   views._diffSigOptions = sigOptionsHtml;   // exposed for the gate test
+
+  /** The tab's intro. The clause describing the significance control is its own
+   *  authored entry, spliced in only when there IS a control to describe. */
+  function introHtml() {
+    var lv = TR.stats.levelVars();
+    return TR.txt.block("diffs.intro", Object.assign({}, lv, {
+      dual_clause: { html: TR.stats.hasSecondary() ? TR.txt("diffs.intro_dual", lv) : "" }
+    }));
+  }
+  views._diffsIntroHtml = introHtml;   // exposed for the gate test
 
   /* exposed for the differences gate test */
   views._collectFindings = collectFindings;
@@ -565,7 +577,7 @@
     if (banner.indexOf("custom:") === 0 || banner.indexOf("composite:") === 0) {
       banner = TR.d2.firstBanner();
     }
-    var dual = TR.d2.state.sigMode === "dual";
+    var dual = TR.stats.dualMode();
     var all = rankedFindings(banner, diffSort);
     // 95% findings get the full budget; nearly-significant (80%) ones get their
     // own, so turning on dual mode ADDS soft findings without ever crowding out
@@ -586,7 +598,7 @@
       // averages, the wave scope, why classification questions are excluded —
       // on a tab the reader reaches after the Dashboard and the Group overview.
       // What a reader needs here is what a card IS and what the control does.
-      TR.txt.block("diffs.intro", TR.stats.levelVars()) +
+      introHtml() +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' + sortOptionsHtml(diffSort) + "</select>" +
       sigOptionsHtml(dual) +

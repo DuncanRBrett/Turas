@@ -120,7 +120,7 @@
         ? JSON.parse(JSON.stringify(s.sorts[s.activeQ])) : null,
       hiddenRows: (s.hiddenRows[s.activeQ] || []).slice(),
       hiddenCols: TR.d2.hiddenFor(s.banner).slice(),
-      dual: s.sigMode === "dual",
+      dual: TR.stats.dualMode(),
       intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       counts: !!s.showCounts,         // the "Counts" toggle travels with the pin
       note: ""
@@ -306,7 +306,7 @@
         hiddenRows: item.hiddenRows || [],
         rowScope: item.rowScope || "all",
         sort: item.sort || null,
-        dual: !!item.dual,
+        dual: !!item.dual && TR.stats.hasSecondary(),
         intervals: !!item.intervals });
     if (model) {
       model.filterNote = filterNote(item);

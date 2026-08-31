@@ -209,7 +209,7 @@
       // Both entries name the levels, so both get the level vars.
       TR.txt.block("tracking.heatmap.legend",
         Object.assign(TR.stats.levelVars(), {
-          soft_clause: { html: TR.d2.state.sigMode === "dual"
+          soft_clause: { html: TR.stats.dualMode()
             ? TR.txt("tracking.heatmap.soft_clause", TR.stats.levelVars()) : "" }
         }), { cls: "trknote" }) +
       '<div class="trkwrap"><table class="moved trk hm"><thead><tr><th>Metric</th>' +
@@ -292,7 +292,7 @@
     // surfaced as a separate "nearly significant" tally so they no longer hide
     // inside "stable" (soft_prev is false whenever sig_prev is true, so a
     // strong move is never also counted here).
-    var totalSoft = TR.d2.state.sigMode === "dual"
+    var totalSoft = TR.stats.dualMode()
       ? keyMetrics.filter(function (m) {
             var last = lastCell(trk.points(m, null));
             return last && last.soft_prev;
@@ -325,9 +325,11 @@
       '<option value="off"' + (sm === "off" ? " selected" : "") + ">off</option>" +
       '<option value="95"' + (sm === "95" ? " selected" : "") + ">" +
       TR.stats.levelPrimary() + "</option>" +
-      '<option value="dual"' + (sm === "dual" ? " selected" : "") + ">" +
-      TR.stats.levelPrimary() + " + " + TR.stats.levelSecondary() +
-      "</option></select></label>" +
+      (TR.stats.hasSecondary()
+        ? '<option value="dual"' + (sm === "dual" ? " selected" : "") + ">" +
+          TR.stats.levelPrimary() + " + " + TR.stats.levelSecondary() + "</option>"
+        : "") +
+      "</select></label>" +
       '<span class="trknote">Total only · all key metrics · latest wave vs ' +
       "previous</span></div></div>");
 
@@ -350,7 +352,7 @@
 
     // The 80% "nearly significant" moves as their own cards, so the pulse's
     // "≈ N nearly significant" count is something you can actually inspect.
-    var softCards = TR.d2.state.sigMode === "dual" ? softChanges() : [];
+    var softCards = TR.stats.dualMode() ? softChanges() : [];
     if (softCards.length) {
       html.push('<div class="card"><div class="heathead"><h3>Nearly significant ' +
         "· " + TR.stats.levelSecondary() + " level · latest wave</h3></div>" +

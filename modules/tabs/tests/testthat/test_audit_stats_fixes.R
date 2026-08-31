@@ -563,6 +563,49 @@ test_that("build_dl_project alpha_secondary: valid values kept, junk falls back 
 })
 
 
+test_that("build_dl_project flags dual significance OFF, and only when it is off", {
+  # Blank alpha_secondary disables the feature (00_guard.R says so, and
+  # run_crosstabs.R emits no Sig.2 row). alpha_secondary in the island still
+  # falls back to 0.20 so the recompute engine has a level, which meant the
+  # report could not tell "off" from "0.2": it offered a "95% + 80%" control,
+  # and choosing it made the browser recompute 80% letters the Excel crosstab
+  # does not have. dual_significance carries the fact instead.
+  off <- build_dl_project(list(project_title = "T", alpha = 0.05))
+  expect_false(is.null(off$dual_significance))
+  expect_false(off$dual_significance)
+  expect_equal(off$alpha_secondary, 0.20)   # the fallback level is unchanged
+
+  # "NA" is what the config loader hands back for an empty cell.
+  off_na <- build_dl_project(list(project_title = "T", alpha = 0.05,
+                                  alpha_secondary = "NA"))
+  expect_false(off_na$dual_significance)
+
+  # Emitted ONLY when off, so an island from a dual study — and every fixture
+  # already committed — is byte-identical to before.
+  on <- build_dl_project(list(project_title = "T", alpha = 0.05,
+                              alpha_secondary = 0.10))
+  expect_null(on$dual_significance)
+  expect_equal(on$alpha_secondary, 0.10)
+
+  on_str <- build_dl_project(list(project_title = "T", alpha = 0.05,
+                                  alpha_secondary = "0.15"))
+  expect_null(on_str$dual_significance)
+})
+
+test_that("alpha_default = secondary is still ignored on a single-alpha study", {
+  # Same root cause: alpha_secondary is always a number, so this gate must read
+  # whether the operator SET one, not whether the field carries a value.
+  single <- build_dl_project(list(project_title = "T", alpha = 0.05,
+                                  alpha_default = "secondary"))
+  expect_equal(single$alpha_default, "primary")
+
+  dual <- build_dl_project(list(project_title = "T", alpha = 0.05,
+                                alpha_secondary = 0.10,
+                                alpha_default = "secondary"))
+  expect_equal(dual$alpha_default, "secondary")
+})
+
+
 # ==============================================================================
 # 5b. .validate_column_populations — impossible populations dropped
 # ==============================================================================

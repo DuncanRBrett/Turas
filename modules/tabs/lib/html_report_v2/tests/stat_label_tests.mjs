@@ -287,7 +287,9 @@ function diffsSandbox() {
   box.window = box;
   vm.createContext(box);
   installText(box);
-  for (const file of ["00_namespace.js", "01_format.js", "27_views.js", "27d_diffs.js"]) {
+  // 21_stats supplies the level wording and dualMode() the views read.
+  for (const file of ["00_namespace.js", "01_format.js", "21_stats.js",
+                      "27_views.js", "27d_diffs.js"]) {
     vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), box, { filename: file });
   }
   return box.TR;
