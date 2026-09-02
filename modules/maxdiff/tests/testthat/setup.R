@@ -36,7 +36,7 @@ assign("script_dir_override", maxdiff_r_dir, envir = globalenv())
 maxdiff_files <- c(
   "00_guard.R", "utils.R", "01_config.R", "02_validation.R", "03_data.R",
   "04_design.R", "05_counts.R", "06_logit.R", "07_hb.R", "08_segments.R",
-  "09_output.R", "10_charts.R", "11_turf.R"
+  "09_output.R", "10_charts.R", "11_turf.R", "12_tabs_export.R", "13_v2_island.R"
 )
 
 for (f in maxdiff_files) {

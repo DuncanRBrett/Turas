@@ -196,7 +196,9 @@ source_module_files <- function(base_dir = NULL) {
     "08_segments.R",
     "09_output.R",
     "10_charts.R",
-    "11_turf.R"
+    "11_turf.R",
+    "12_tabs_export.R",
+    "13_v2_island.R"
   )
 
   for (file in module_files) {
@@ -1218,6 +1220,49 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
     NULL
   })
   results$output_path <- output_path
+
+  # Step 11b: tabs export (opt-in). Per-respondent preference shares in the
+  # shape tabs reads as an Allocation question. Written beside the Excel
+  # deliverable so a refusal here is visible next to it. The D5 gate lives in
+  # the exporter: EB utilities refuse unless Allow_Approx_Utilities_Export.
+  results$tabs_export <- NULL
+  if (isTRUE(config$output_settings$Generate_Tabs_Export) && !is.null(output_path)) {
+    if (verbose) cat("\nSTEP 11b: Exporting preference shares for tabs...\n")
+    results$tabs_export <- tryCatch(
+      export_maxdiff_shares_for_tabs(results, config, verbose = verbose),
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        add_warning(sprintf("Tabs export not produced: %s", e$code %||% "refused"))
+        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+          turas_run_state_partial(trs_state, e$code %||% "MODEL_TABS_EXPORT",
+                                  "Tabs export not produced",
+                                  problem = e$problem %||% conditionMessage(e))
+        }
+        NULL
+      },
+      error = function(e) {
+        cat(sprintf("\n[TRS PARTIAL] MAXD_TABS_EXPORT_FAILED: %s\n", conditionMessage(e)))
+        add_warning(sprintf("Tabs export: %s", conditionMessage(e)))
+        NULL
+      }
+    )
+  }
+
+  # Step 11c: contribution to the interactive report. Always written when the
+  # run scored anything: a small JSON file that a tabs run for the same
+  # project embeds as a MaxDiff tab (maxdiff_island in the tabs config).
+  results$v2_island <- NULL
+  if (!is.null(output_path) && exists("write_maxdiff_island", mode = "function")) {
+    results$v2_island <- tryCatch(
+      write_maxdiff_island(results, config, verbose = verbose),
+      turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+      error = function(e) {
+        cat(sprintf("\n[TRS PARTIAL] MAXD_ISLAND_FAILED: %s\n", conditionMessage(e)))
+        add_warning(sprintf("Interactive-report contribution: %s", conditionMessage(e)))
+        NULL
+      }
+    )
+  }
 
   # Step 12: Simulator
   generate_sim <- parse_yes_no(config$output_settings$Generate_Simulator %||% FALSE)

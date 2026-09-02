@@ -1127,7 +1127,8 @@ parse_output_settings <- function(df) {
                       "Generate_Segment_Tables", "Generate_Charts",
                       "Export_Individual_Utils", "Generate_HTML_Report",
                       "Generate_Simulator", "Generate_TURF",
-                      "Generate_Stats_Pack",
+                      "Generate_Stats_Pack", "Generate_Tabs_Export",
+                      "Allow_Approx_Utilities_Export",
                       "Has_Anchor_Question")) {
         result[[name]] <- parse_yes_no(val, result[[name]])
       }
@@ -1199,6 +1200,12 @@ get_default_output_settings <- function() {
     # Read from OUTPUT_SETTINGS, where the template puts it (M11) - it used
     # to be silently dropped here and read from PROJECT_SETTINGS instead.
     Generate_Stats_Pack = TRUE,
+    # Tabs export (12_tabs_export.R): per-respondent preference shares as an
+    # Allocation question. Off by default; the D5 gate refuses EB utilities
+    # unless Allow_Approx_Utilities_Export says otherwise, and stamps them.
+    Generate_Tabs_Export = FALSE,
+    Tabs_Question_Code = "MDSHARE",
+    Allow_Approx_Utilities_Export = FALSE,
     TURF_Max_Items = 10,
     TURF_Threshold = "ABOVE_MEAN",
     Has_Anchor_Question = FALSE,
