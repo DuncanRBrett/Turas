@@ -1,14 +1,14 @@
 /**
- * Differences view — significant banner gaps for LAY readers.
+ * Differences view. Significant banner gaps for LAY readers.
  *
  * Findings are grouped by QUESTION into ranked cards; each line is one group
  * that genuinely stands out, told as a sentence with a two-bar comparison
- * (group vs THE REST — everyone except it) and a plain-English verdict.
- * Percentages surface when a group beats 2+ siblings (the published letters) —
+ * (group vs THE REST, everyone except it) and a plain-English verdict.
+ * Percentages surface when a group beats 2+ siblings (the published letters),
  * except on a two-level banner, where the single sibling IS all the siblings,
  * so beating it alone is a finding (DIFFERENCES_RANKING_DESIGN.md, decision E);
  * mean / index / NPS are recomputed from microdata and surface when a group
- * differs from the rest, in either direction — on a two-level banner the rest
+ * differs from the rest, in either direction, on a two-level banner the rest
  * of one level IS the other, so that pair is one finding told twice and the
  * mirror line is collapsed away. Honours the report's 95% / 95%+80%
  * significance toggle: in dual mode nearly-significant (80%) findings also
@@ -28,8 +28,8 @@
   var diffBanner = null;        // banner override (default: report banner)
   var diffSort = "standout";    // "standout" (top score) | "question"
 
-  // CLASSIFICATION questions — demographics, and corpographics / firmographics
-  // (sales office, channel, region, etc.) — describe WHO or WHAT the groups are.
+  // CLASSIFICATION questions. Demographics, and corpographics / firmographics
+  // (sales office, channel, region, etc.): describe WHO or WHAT the groups are.
   // They are the cuts, not the outcomes, so a "difference" on them is tautological
   // (a campus is full of its own city; a sales region is full of its own offices).
   // Excluded as difference TARGETS, detected from the category tag the config
@@ -47,7 +47,7 @@
   views._isClassification = isClassification;   // exposed for the gate test
 
   /**
-   * "The rest" — everyone EXCEPT this group — for one question row, as a
+   * "The rest", everyone EXCEPT this group, for one question row, as a
    * percentage on the table's own base logic. Recomputed from microdata so it
    * is weighted-safe and reconciles exactly with the published group / overall
    * figures (group hits + rest hits = overall hits, over the matching bases).
@@ -63,7 +63,7 @@
       var col = [{ member: rest }];
       if (q.rows[ri].kind === "net") {
         // A NET that decomposes into shown categories recomputes from those
-        // members over the full answered base (netCounts) — correct.
+        // members over the full answered base (netCounts): correct.
         var members = q.net_members && q.net_members[String(ri)];
         if (members && members.length) {
           var nc = TR.stats.netCounts(q, members, col, mask)[0];
@@ -71,8 +71,8 @@
         }
         // A box-scored NET (no shown members) takes its NUMERATOR from box
         // membership but its DENOMINATOR from the full answered base (tabulate),
-        // NOT the box-only base. Otherwise respondents with no box — e.g. Neutral
-        // on a shown satisfaction scale — are dropped from the denominator and the
+        // NOT the box-only base. Otherwise respondents with no box, e.g. Neutral
+        // on a shown satisfaction scale. Are dropped from the denominator and the
         // rest inflates (verified on SACS: the rest read 90% instead of the true
         // 61%, flipping a group from ahead to behind). Hidden-scale box-only
         // questions are unaffected (there every answered respondent has a box, so
@@ -90,7 +90,7 @@
     }
     // No microdata: exact only when unweighted (published n are respondent
     // counts). On a weighted report the published n is the WEIGHTED frequency
-    // while the bases are unweighted — the identity breaks, so no rest value
+    // while the bases are unweighted. The identity breaks, so no rest value
     // (callers fall back to comparing against the overall figure).
     if (TR.AGG && TR.AGG.project && TR.AGG.project.weighted) return null;
     var rb = totalBase - groupBase;
@@ -100,7 +100,7 @@
 
   /* A finding is built on the question's HEADLINE mean. A median, a mode, a
      spread or a ratio of totals is a different statistic, and the weighted
-     means this file recomputes are the wrong input for testing any of them —
+     means this file recomputes are the wrong input for testing any of them,
      so a "difference" on one would be a finding about a number nobody
      computed. This asked the LABEL until 2026-08, which caught only the SD. */
 
@@ -117,7 +117,7 @@
    *  critical value, more certainty says nothing more about size. */
   var MEAN_Z_CAP = 3;
 
-  /** Cohen's h for two proportions — the same effect currency as the
+  /** Cohen's h for two proportions. The same effect currency as the
    *  Executive Takeout (takeout.effectSize, 27e). Duplicated, not imported:
    *  this module and its test sandbox stay self-contained (SIZE-EXCEPTION). */
   var COHEN_H_REFERENCE = 0.8;   // Cohen's "large" effect -> full weight
@@ -129,16 +129,16 @@
 
   /**
    * Robust scoring range for a question's per-respondent scores. On an
-   * unbounded observed scale (rand, counts — more than 12 distinct values,
+   * unbounded observed scale (rand, counts, more than 12 distinct values,
    * since the widest designed scale is 0–10 and NPS index scores are three
    * values) one big spender stretches the min–max and deflates every
    * finding's effect, so the bounds become the nearest-rank p5/p95 of the
-   * non-null values — computed over the same full unfiltered vector as the
+   * non-null values. Computed over the same full unfiltered vector as the
    * min–max, unweighted, deterministic on rebuild. A designed scale (≤ 12
    * distinct values, where outliers are impossible) keeps the full range.
    * Anchored at 0 exactly as the display range is. Fallback chain: robust
    * range → full range (e.g. ≥95% zeros makes p5 = p95 = 0) → 1. Returns the
-   * range WIDTH only — f.scaleMin/scaleMax are untouched: they drive the
+   * range WIDTH only. F.scaleMin/scaleMax are untouched: they drive the
    * comparison bars and the Takeout's effectSize, and must not move.
    */
   function robustRange(values, fullRange) {
@@ -162,7 +162,7 @@
    * Mean / Index / NPS findings for one question. The published tables carry NO
    * significance for these rows, so recompute the per-column weighted means from
    * microdata (the engine a filtered table uses) and test each group against THE
-   * REST with a weighted Welch t-test — the natural test for a single-value
+   * REST with a weighted Welch t-test. The natural test for a single-value
    * metric. It is bidirectional: a group significantly ABOVE or BELOW the rest
    * is a finding (a low-NPS segment is often the headline). The gap is in the
    * metric's own units (points, not pp); the score scales it by significance
@@ -187,7 +187,7 @@
         if (!any) { lo = hi = v; any = true; } else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
       });
     } else if (q.index_scores) {
-      // indexMeans fell back to q.index_scores, so the scale range must too —
+      // indexMeans fell back to q.index_scores, so the scale range must too,
       // a collapsed 0..0 range inflates the finding's score ~10x and breaks
       // the comparison bars (division by zero width).
       Object.keys(q.index_scores).forEach(function (label) {
@@ -221,7 +221,7 @@
       var az = Math.abs(z);
       var zHi = TR.stats.zPrimary(1), zLo = TR.stats.zSecondary(1);
       if (az <= zLo) return;                      // not different from the rest at all
-      var soft = az <= zHi;                       // secondary but not primary — "nearly significant"
+      var soft = az <= zHi;                       // secondary but not primary, "nearly significant"
       if (soft && !dual) return;                  // soft findings only when dual-sig is on
       var gap = means[i].mean - rm.mean;
       out.push({ code: q.code, title: q.title, category: q.category,
@@ -229,7 +229,7 @@
         direction: gap >= 0 ? "ahead" : "behind",
         value: means[i].mean, rest: rm.mean, overall: means[0].mean,
         gap: gap, decimals: decimals, scaleMin: scaleMin, scaleMax: scaleMax,
-        beaten: [], base: means[i].k,   // column base — carried for the Executive Takeout
+        beaten: [], base: means[i].k,   // column base. Carried for the Executive Takeout
         score: (az / TR.stats.Z95) * Math.abs(gap) / range * 100,
         // Balanced: capped evidence (the same configured critical value that
         // gated the finding, not the fixed Z95 the legacy score keeps) times
@@ -257,7 +257,7 @@
       if (isClassification(q)) return;       // demographics / corpographics: tautological cuts, not outcomes
       // Per-question opt-out (Selection sheet ExcludeFromInsights = Y): the
       // analyst has taken this question out of the FINDINGS while leaving it in
-      // the crosstabs — near-duplicate views of one measure, or a modelled
+      // the crosstabs. Near-duplicate views of one measure, or a modelled
       // figure that should not lead the page. BY DESIGN this flag is honoured
       // here ONLY: the Patterns / Group-overview KeyShare scan
       // (27fa_takeout_shares.js) deliberately ignores it, because a question
@@ -273,7 +273,7 @@
         if (col.letter) labelByLetter[col.letter] = col.label;
       });
       // Decision E (DIFFERENCES_RANKING_DESIGN.md): a proportion finding
-      // normally needs the group ahead of 2+ siblings — one letter is a
+      // normally needs the group ahead of 2+ siblings. One letter is a
       // pairwise result, not a standout. On a TWO-level banner the single
       // sibling IS all the siblings, so beating it is the strongest breadth
       // statement the banner allows, and it matches the mean path's single
@@ -289,13 +289,13 @@
         // column shares. On a counts-only / row-%-only question the same slot
         // holds a headcount or a row percentage, so the row stays out rather
         // than reporting "a 62pp gap" that is really 62 people (2026-08, C1).
-        // Mean/index standouts are unaffected — they recompute below.
+        // Mean/index standouts are unaffected. They recompute below.
         if (!TR.fmt.isColPctStat(row.stat)) return;
         // For rating scales the top-box NETs (+ the index) are the meaningful
         // standouts; individual scale points (Neutral, Very Satisfied…) read as
         // wrong sitting next to a top-box that already contains them, so suppress
         // raw category rows for scale / NPS questions. Other types (multi /
-        // single choice) keep their categories — there the categories ARE the story.
+        // single choice) keep their categories. There the categories ARE the story.
         if (row.kind === "category" && (q.type === "scale" || q.type === "nps")) return;
         row.cells.forEach(function (cell, i) {
           if (i === 0) return;
@@ -309,8 +309,8 @@
           if (cell.pct === null || overall === null) return;
           var rest = restPct(q, ri, spec ? spec.columns[i].member : null, mask,
             cell, row.cells[0], model.columns[i].base, model.columns[0].base);
-          // An answer no one outside the group gives (rest 0%) — or that
-          // everyone but this group gives (rest 100%) — is a defining trait of
+          // An answer no one outside the group gives (rest 0%), or that
+          // everyone but this group gives (rest 100%): is a defining trait of
           // the group, not a discovered difference (e.g. a plant that exists
           // only in its own region). Drop these tautological standouts.
           if (rest !== null && (Math.round(rest) === 0 || Math.round(rest) === 100)) return;
@@ -324,10 +324,10 @@
             beaten: letters.split("").map(function (l) {
               return labelByLetter[l.toUpperCase()] || l;
             }),
-            base: model.columns[i].base,   // column base — carried for the Executive Takeout
+            base: model.columns[i].base,   // column base. Carried for the Executive Takeout
             score: letters.length * Math.abs(cell.pct - baseline),
             // Balanced: share of siblings beaten (structural denominator, as
-            // the gate — low-base siblings understate it, conservatively)
+            // the gate. Low-base siblings understate it, conservatively)
             // times Cohen's h against the same baseline the gap uses, in the
             // Takeout's effect currency (h / 0.8, Cohen's "large").
             scoreBalanced:
@@ -336,7 +336,7 @@
                 COHEN_H_REFERENCE) * 100 });
         });
       });
-      // Mean / index / NPS standouts — recomputed from microdata (the published
+      // Mean / index / NPS standouts. Recomputed from microdata (the published
       // data has no significance for them), arguably the headline differences.
       if (spec) meanFindings(q, spec, mask, threshold, dual)
         .forEach(function (f) { findings.push(f); });
@@ -349,7 +349,7 @@
   }
 
   /**
-   * Banner LEVELS — columns excluding Total. 0 without microdata, where no mean
+   * Banner LEVELS. Columns excluding Total. 0 without microdata, where no mean
    * findings are recomputed and so nothing can be a reciprocal pair.
    */
   function bannerLevels(banner) {
@@ -361,12 +361,12 @@
   /**
    * Collapse reciprocal mean / index / NPS pairs on a TWO-LEVEL banner
    * (DIFFERENCES_TAB_SCOPE.md, item 1). Each mean finding is tested against THE
-   * REST, and on a two-level cut the rest of one level IS the other level — so
+   * REST, and on a two-level cut the rest of one level IS the other level, so
    * Male-vs-rest and Female-vs-rest are one comparison told from both ends, and
    * every card printed exactly double. The kept line already carries both sides
    * (both values, both bars), so dropping the mirror removes nothing.
    *
-   * Deliberately narrow. Proportion findings never mirror — a significance
+   * Deliberately narrow. Proportion findings never mirror. A significance
    * letter is directional, so if Male beats Female, Female does not also beat
    * Male. On three-plus levels "A vs the rest" and "B vs the rest" are genuinely
    * different comparisons, not a pair. And where a banner leaves respondents
@@ -389,7 +389,7 @@
     Object.keys(byRow).forEach(function (key) {
       var pair = byRow[key];
       if (pair.length !== 2) return;               // only one side stood out
-      if (pair[0].soft !== pair[1].soft) return;   // the two tests disagree — not one finding
+      if (pair[0].soft !== pair[1].soft) return;   // the two tests disagree, not one finding
       if (pair[0].direction === pair[1].direction) return;  // both above their own rest
       drop.push(pair[0].direction === "ahead" ? pair[1] : pair[0]);
     });
@@ -399,7 +399,7 @@
 
   /** The ranked findings a banner renders: collected, then reciprocal
    *  mean pairs collapsed. sortKey "balanced" re-ranks by scoreBalanced under
-   *  the same tier rule (solid before soft) — the findings SET is identical
+   *  the same tier rule (solid before soft): the findings SET is identical
    *  under every sort, so the "top N of M" note stays honest when the reader
    *  switches. Any other key keeps collectFindings' default order. */
   function rankedFindings(banner, sortKey) {
@@ -455,12 +455,12 @@
   }
 
   /** Small tag marking whether the standout row is a DEFINED CATEGORY (a NET
-   *  grouping such as a top-box) or an individual DETAIL option — so a label like
+   *  grouping such as a top-box) or an individual DETAIL option, so a label like
    *  "Agree" reads unambiguously as one or the other. Mean / index / NPS rows name
    *  their metric in the sentence already, so they carry no tag. */
   function rowKindTag(f) {
     if (f.kind === "net") {
-      return ' <span class="df-rowkind net" title="A defined category — a NET grouping of options (e.g. a top-box)">category</span>';
+      return ' <span class="df-rowkind net" title="A defined category. A NET grouping of options (e.g. a top-box)">category</span>';
     }
     if (f.kind === "category") {
       return ' <span class="df-rowkind" title="An individual response option (a detail row)">detail</span>';
@@ -489,18 +489,18 @@
       ? (f.direction === "ahead" ? "ahead of" : "behind") + " the rest"
       : "ahead of " + fmt.escapeHtml(f.beaten.join(" · "));
     var verdict = f.soft
-      ? tail + " — nearly significant (" + TR.stats.levelSecondary() + ")"
+      ? tail + ", nearly significant (" + TR.stats.levelSecondary() + ")"
       : "statistically " + tail;
     return '<div class="df-line' + (f.soft ? " soft" : "") + '">' +
       '<div class="df-sentence"><strong>' + fmt.escapeHtml(f.column) +
-      "</strong> — " + lead + rowKindTag(f) + " vs " + baseline + " · " +
+      "</strong>: " + lead + rowKindTag(f) + " vs " + baseline + " · " +
       direction + gapTxt +
       "</div>" + barsHtml(f) +
       '<div class="df-beats">' + verdict + "</div></div>";
   }
 
   /** The sort control's options. "balanced" ranks by scoreBalanced
-   *  (DIFFERENCES_RANKING_DESIGN.md) — a page-local control like the other
+   *  (DIFFERENCES_RANKING_DESIGN.md): a page-local control like the other
    *  two, deliberately with no config plumbing (decision C: watch it on real
    *  studies before considering the default). */
   function sortOptionsHtml(current) {
@@ -551,13 +551,13 @@
       group.items.map(function (f) { return f.label + " " + f.column; })
         .join(" ")).toLowerCase();
     var pin = '<button class="snap-pin" data-snap-pin data-snap-source="differences" ' +
-      'data-snap-title="' + fmt.escapeHtml(group.code + " — " + group.title) + '" ' +
+      'data-snap-title="' + fmt.escapeHtml(group.code + ": " + group.title) + '" ' +
       'data-snap-context="' + fmt.escapeHtml("Where groups differ · " + (group.category || "")) +
       '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>';
-    // The header leads with the question TEXT, not the variable name — the
+    // The header leads with the question TEXT, not the variable name. The
     // code is engineering vocabulary in a lay deliverable (DIFFERENCES_TAB_
     // SCOPE.md, item 2). It stays reachable: hover (title attribute) and the
-    // search index both carry it, and the pin keeps "code — title" so a
+    // search index both carry it, and the pin keeps "code. Title" so a
     // pinned card stays traceable to its crosstab.
     return '<div class="card df-card" data-snap-card data-search="' +
       fmt.escapeHtml(search) + '">' +
@@ -581,7 +581,7 @@
     var all = rankedFindings(banner, diffSort);
     // 95% findings get the full budget; nearly-significant (80%) ones get their
     // own, so turning on dual mode ADDS soft findings without ever crowding out
-    // a solid one — even on dense banners that already have 80+ solid findings.
+    // a solid one, even on dense banners that already have 80+ solid findings.
     var shown = all.filter(function (f) { return !f.soft; }).slice(0, MAX_FINDINGS)
       .concat(all.filter(function (f) { return f.soft; }).slice(0, MAX_FINDINGS));
     var groups = groupByQuestion(shown);
@@ -594,8 +594,8 @@
     var html = ['<div class="page"><div class="card"><h2>Where groups differ · ' +
       fmt.escapeHtml(groupName ? groupName.name : banner) + "</h2>" +
       // Rewritten 2026-08-11 (Duncan). The old paragraph explained the whole
-      // apparatus — bracketed whole-sample figures, how percentages differ from
-      // averages, the wave scope, why classification questions are excluded —
+      // apparatus. Bracketed whole-sample figures, how percentages differ from
+      // averages, the wave scope, why classification questions are excluded,
       // on a tab the reader reaches after the Dashboard and the Group overview.
       // What a reader needs here is what a card IS and what the control does.
       introHtml() +

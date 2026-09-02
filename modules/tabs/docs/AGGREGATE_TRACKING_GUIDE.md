@@ -1,8 +1,8 @@
-# Aggregate-Wave Tracking — setup & reuse guide
+# Aggregate-Wave Tracking. Setup & reuse guide
 
 How to show a tracker's **full history** in the v2 report's Tracking tab when the
-old waves survive only as published summary figures — a percentage, an average,
-an NPS net — with no respondent-level data. The recent wave stays live from its
+old waves survive only as published summary figures. A percentage, an average,
+an NPS net, with no respondent-level data. The recent wave stays live from its
 own microdata; the old years are stitched on behind it as one continuous trend,
 and the significance stays honest.
 
@@ -20,7 +20,7 @@ numbers into small per-wave files ("sidecars") that the v2 report already knows
 how to read, so the historical years drop straight onto the trend line next to
 your live data. The one rule it never breaks: it does not invent the pieces a
 significance test needs. Where a number can be tested honestly it is; where it
-can't, the point is drawn but left untested — never a fabricated arrow.
+can't, the point is drawn but left untested, never a fabricated arrow.
 
 ---
 
@@ -30,23 +30,23 @@ can't, the point is drawn but left untested — never a fabricated arrow.
 |---|---|---|
 | **Engine** | `modules/tabs/lib/tracking_aggregate_bridge.R` | Turns a values table into the wave-island sidecar shapes. Already tested (`tests/testthat/test_tracking_aggregate_bridge.R`). You don't edit this. |
 | **Generator** | `modules/tabs/examples/aggregate_wave_backfill.R` | The script you run. Values table + QuestionMap → sidecars, with a verification summary. |
-| **Templates** | `modules/tabs/templates/Aggregate_History_Values_Template.xlsx` and `Aggregate_QuestionMap_Template.xlsx` | Copy these to start a new project. **Not** `Tracking_QuestionMap_Template.xlsx` — that is the other tracking path (raw data per wave, canonical codes, one column per wave). Same sheet name, different contract; see 06_TEMPLATE_REFERENCE.md Chapter 3. |
+| **Templates** | `modules/tabs/templates/Aggregate_History_Values_Template.xlsx` and `Aggregate_QuestionMap_Template.xlsx` | Copy these to start a new project. **Not** `Tracking_QuestionMap_Template.xlsx`. That is the other tracking path (raw data per wave, canonical codes, one column per wave). Same sheet name, different contract; see 06_TEMPLATE_REFERENCE.md Chapter 3. |
 | **Two inputs you prepare** | your project folder | A **values table** and a **QuestionMap** (sections 3–4). |
 
-The current (live) wave needs nothing extra — its own tabs run produces its
+The current (live) wave needs nothing extra. Its own tabs run produces its
 microdata automatically. You are only backfilling the *prior* waves.
 
 ---
 
-## 3. What you prepare — the two inputs
+## 3. What you prepare. The two inputs
 
-### Input A — the values table (the history, one row per number)
+### Input A. The values table (the history, one row per number)
 
 A long table, `.csv` or `.xlsx`, one row per (metric, wave):
 
 | column | required | meaning |
 |---|---|---|
-| `metric_id` | yes | The **live survey QuestionCode** this figure belongs to (e.g. `Q02`). This is the link to the current wave — see the convention below. |
+| `metric_id` | yes | The **live survey QuestionCode** this figure belongs to (e.g. `Q02`). This is the link to the current wave. See the convention below. |
 | `wave` | yes | The wave identifier (e.g. `2019`). A 4-digit year in it becomes the x-axis position. |
 | `metric_type` | yes | `mean`, `proportion`, or `nps`. |
 | `value` | yes | The published figure, exactly as reported (an average like `9.0`, a percentage like `51`, an NPS net like `72`). |
@@ -54,33 +54,33 @@ A long table, `.csv` or `.xlsx`, one row per (metric, wave):
 | `sd` | optional | Standard deviation, for `mean` rows only. **Blank = not recorded** → the mean plots untested. |
 
 **The load-bearing convention:** `metric_id` must equal the **live** survey's
-QuestionCode for that question — the code in the current wave's data (e.g. `Q02`),
+QuestionCode for that question. The code in the current wave's data (e.g. `Q02`),
 not the old questionnaire's numbering. That is how a 2013 figure knows it belongs
 on the same line as the 2026 question. Getting this mapping right (old wording →
 live code) is the one genuinely manual step; do it by meaning and verify each one
 against the live survey structure.
 
-### Input B — the QuestionMap (which metrics track, and how)
+### Input B. The QuestionMap (which metrics track, and how)
 
 An `.xlsx` with a sheet named **QuestionMap**, one row per tracked metric:
 
 | column | meaning |
 |---|---|
-| `QuestionCode` | The canonical/live code — **the same value as `metric_id`**. |
+| `QuestionCode` | The canonical/live code, **the same value as `metric_id`**. |
 | `QuestionText` | The display title. |
 | `TrackingSpecs` | `mean`, `nps_score`, or `category:<label>` (see below). |
-| `Wave<YEAR>` | The current wave's data column for this metric — usually the same as `QuestionCode`. The report uses this to confirm the mapping matches the live data and to key the current wave by code. |
+| `Wave<YEAR>` | The current wave's data column for this metric. Usually the same as `QuestionCode`. The report uses this to confirm the mapping matches the live data and to key the current wave by code. |
 
 `TrackingSpecs` tells the report what kind of metric each row is:
-- **`mean`** — a rating / scale average.
-- **`nps_score`** — an NPS net.
-- **`category:<label>`** — a proportion. `<label>` is the crosstab row this % should
+- **`mean`**. A rating / scale average.
+- **`nps_score`**. An NPS net.
+- **`category:<label>`**. A proportion. `<label>` is the crosstab row this % should
   line up with. For a single option, use that option's **exact displayed label**
   (e.g. `category:Yes`, `category:Always`). For a **NET** of several options, use
   the exact **BoxCategory** label you give the NET in the Survey_Structure (section 4).
 
 Matching is forgiving about case and punctuation (both sides are normalised the
-same way — e.g. `Merchandised by CCPB/agency` → `merchandised by ccpbagency`), but
+same way, e.g. `Merchandised by CCPB/agency` → `merchandised by ccpbagency`), but
 the words must be the same on both sides.
 
 ---
@@ -88,17 +88,17 @@ the words must be the same on both sides.
 ## 4. NETs (a proportion that combines several options)
 
 Sometimes the historical metric is a **combination** of options, not a single one
-— "% quarterly or better" (Monthly + Quarterly), "% shop around" (Sometimes +
+, "% quarterly or better" (Monthly + Quarterly), "% shop around" (Sometimes +
 Always). To track one of these:
 
 1. In the **Survey_Structure Options sheet**, give the member options a shared
    label in the **`BoxCategory`** column. That renders a NET row in the report
-   showing their combined %. (Partial grouping is fine — you only box the options
+   showing their combined %. (Partial grouping is fine, you only box the options
    the NET needs; the rest stay as normal rows.)
 2. In the QuestionMap, set that metric's `TrackingSpecs` to `category:<that exact
    BoxCategory label>`.
 
-The BoxCategory label and the `category:` label must be identical — that's the
+The BoxCategory label and the `category:` label must be identical. That's the
 whole join. Only single-response questions support BoxCategory NETs; a
 Multi_Mention "any of these" NET is **not** covered this way and needs a separate
 approach (on CCPB, Q03 "out of stock on any day" was left as a known gap).
@@ -117,7 +117,7 @@ AGG_OUT=/path/to/waves_source_folder \
 Rscript modules/tabs/examples/aggregate_wave_backfill.R
 ```
 
-It writes one `<wave>_wave.json` per wave and prints a verification summary —
+It writes one `<wave>_wave.json` per wave and prints a verification summary,
 how many waves, how many metrics, and how many carry a base / an sd (i.e. how many
 can be significance-tested). Read that summary: if it says everything is untested,
 that's expected until you supply bases/sd (section 7).
@@ -140,7 +140,7 @@ In the crosstab config's **Settings** sheet:
 | `wave_order` | the current wave's numeric position (e.g. `2026`) |
 
 Then re-run the tabs report the normal way (launch_turas). The Tracking tab
-appears **only if the assembled island has more than one wave** — so if it stays
+appears **only if the assembled island has more than one wave**, so if it stays
 hidden, that's the first thing to check (section 8).
 
 > **Why `waves_source` must be absolute:** the report reads it raw, without
@@ -154,13 +154,13 @@ hidden, that's the first thing to check (section 8).
 This is the heart of the feature. A historical figure is only tested when the
 ingredients for an honest test are actually present:
 
-- **Mean** — tested only when the values table gives it an **sd** (and a base).
+- **Mean**. Tested only when the values table gives it an **sd** (and a base).
   Old summary sheets almost never recorded the sd, so historical means usually
   plot **untested**. The live microdata wave computes its own sd, so it is tested.
-- **Proportion** — tested (a real pooled z-test) wherever a **base** is present.
+- **Proportion**. Tested (a real pooled z-test) wherever a **base** is present.
   No base → untested. This is the cheapest significance to switch on: a base is
   often recoverable even when raw data isn't.
-- **NPS** — a net score on its own can't be tested (no promoter/detractor split),
+- **NPS**. A net score on its own can't be tested (no promoter/detractor split),
   so it is **always** untested as history.
 
 So a freshly-built aggregate history with blank bases and sds shows the full trend
@@ -172,23 +172,23 @@ section).
 
 ## 8. Moving from aggregate history to microdata
 
-"Aggregate" and "microdata" aren't a one-way door — significance switches on
+"Aggregate" and "microdata" aren't a one-way door. Significance switches on
 **incrementally** as you feed the trend more. There are three ways it happens, in
 rough order of how often you'll use them.
 
-### A. Going forward — new waves are microdata automatically (nothing to do)
+### A. Going forward. New waves are microdata automatically (nothing to do)
 
 Every new wave you field and run through Turas the normal way is **already**
 microdata: its own tabs run writes its own sidecar from per-respondent scores, so
 it is fully tested against the wave before it. The aggregate history just sits
 behind it as the untested backdrop. Over time the tested, microdata part of the
 line grows from the right; the old aggregate part stays as context. You do not
-touch the sidecars for this — it's automatic.
+touch the sidecars for this. It's automatic.
 
-### B. You get the old bases (but not the raw data) — the practical upgrade
+### B. You get the old bases (but not the raw data): the practical upgrade
 
-Often you can recover the historical **base sizes** — how many people each old
-figure was based on — even when the raw respondent data is long gone. When you do:
+Often you can recover the historical **base sizes**. How many people each old
+figure was based on, even when the raw respondent data is long gone. When you do:
 
 1. Fill the `base` column in the values table for those waves (and the `sd`
    column too, for any means where you have it).
@@ -197,16 +197,16 @@ figure was based on — even when the raw respondent data is long gone. When you
 
 Now every historical **proportion with a base gets a real z-test**, and any
 **mean with an sd gets tested**. This is the highest-value, lowest-effort way to
-bring significance to the back-history — no microdata required. NPS stays
+bring significance to the back-history. No microdata required. NPS stays
 untested (a net still has no split).
 
-### C. You get a specific old wave's raw respondent data — full conversion
+### C. You get a specific old wave's raw respondent data. Full conversion
 
 If the actual respondent-level data for an old wave turns up, you can convert
 that one wave to true microdata:
 
 1. Run that wave's data through Turas tabs as its own run. That produces a
-   microdata `<wave>_wave.json` — one carrying per-respondent **scores**, from
+   microdata `<wave>_wave.json`. One carrying per-respondent **scores**, from
    which the report recomputes the mean **and** the dispersion.
 2. Drop that file into the `waves_source` folder **in place of** the aggregate
    sidecar for that wave (same wave label).
@@ -215,7 +215,7 @@ The report then recomputes that wave's value and significance live from the
 scores, exactly like the current wave.
 
 **Two honest caveats for path C:**
-- A microdata sidecar carries the **mean-kind** metrics (ratings, NPS) only — it
+- A microdata sidecar carries the **mean-kind** metrics (ratings, NPS) only. It
   does **not** carry proportions. Proportions for a prior wave still come from the
   aggregate sidecar's stored rows. So if a wave has both, you usually want path B
   (keep the aggregate rows, just add bases) rather than replacing the file
@@ -229,12 +229,12 @@ scores, exactly like the current wave.
 Significance arrows appear for and against it, the value may shift a touch (path
 C), and the dashboard/summary treat it like any live wave. The design lets you
 flip **any single wave** between aggregate and microdata without disturbing the
-others — so you can upgrade the history one wave at a time as data becomes
+others, so you can upgrade the history one wave at a time as data becomes
 available.
 
 ---
 
-## 9. Worked example — CCPB CSAT
+## 9. Worked example. CCPB CSAT
 
 - Files live at `…/CCPB/CSAT/W2026/03 Tracker/v2 tabs tracking/`: `sidecars/`
   (14 files, 2012–2025), `CCPB_v2_question_mapping.xlsx`, `ccpb_v2_values.csv`.
@@ -244,9 +244,9 @@ available.
   behind the live 2026 microdata wave.
 - Four NETs via BoxCategory: `Shop around` (Q05), `Quarterly or better` (Q34),
   `Within 12 months` (Q35), `Merchandised by CCPB/agency` (Q16).
-- Known gap: Q03 (a Multi_Mention "any day" NET) — not yet trackable via
+- Known gap: Q03 (a Multi_Mention "any day" NET), not yet trackable via
   BoxCategory.
-- All history currently plots untested (no bases/sd supplied yet) — a textbook
+- All history currently plots untested (no bases/sd supplied yet): a textbook
   case for the section-8B upgrade when the historical bases are recovered.
 
 ---
@@ -255,10 +255,10 @@ available.
 
 | Symptom | Likely cause |
 |---|---|
-| Tracking tab doesn't appear | The island has ≤1 wave. Almost always `waves_source` isn't resolving — confirm it's the **absolute** path to the folder that actually contains the `*_wave.json` files. |
-| Tab appears but a question has no history | The current wave keyed by title instead of code — `question_mapping` isn't pointing at your QuestionMap, or its `Wave<YEAR>` codes don't match the live data. |
-| Tab appears and says "Tracking could not be compared" | *No* metric matched history — the whole wave keyed the other way. Same cause as the row above, and the run also prints a boxed `no metric matched history` warning naming both key shapes. Fix `question_mapping` and re-run. |
-| One proportion/NET has no history | Label mismatch — the `category:<label>` in the QuestionMap doesn't match the crosstab row / BoxCategory label. Compare them (case/punctuation are normalised; the words must match). |
+| Tracking tab doesn't appear | The island has ≤1 wave. Almost always `waves_source` isn't resolving. Confirm it's the **absolute** path to the folder that actually contains the `*_wave.json` files. |
+| Tab appears but a question has no history | The current wave keyed by title instead of code, `question_mapping` isn't pointing at your QuestionMap, or its `Wave<YEAR>` codes don't match the live data. |
+| Tab appears and says "Tracking could not be compared" | *No* metric matched history. The whole wave keyed the other way. Same cause as the row above, and the run also prints a boxed `no metric matched history` warning naming both key shapes. Fix `question_mapping` and re-run. |
+| One proportion/NET has no history | Label mismatch. The `category:<label>` in the QuestionMap doesn't match the crosstab row / BoxCategory label. Compare them (case/punctuation are normalised; the words must match). |
 | No significance anywhere | Expected if no bases/sd are supplied. See section 7–8. |
 | A Multi_Mention "any" NET won't track | Not supported via BoxCategory (the CCPB Q03 case). Needs a separate mechanism. |
 
@@ -266,14 +266,14 @@ available.
 
 ## 10a. Tracking in a confidential (no-microdata) build
 
-A sensitive study — a staff climate survey read by the employer, say — ships
+A sensitive study, a staff climate survey read by the employer, say, ships
 with `html_report_v2_microdata = N` so the file holds no per-respondent records
 at all. That used to take the Tracking tab with it, because the current wave was
 built from those records. It no longer does.
 
 With the island off, the current wave is built from the published figures
 (`published_wave_contribution()` in `lib/tracking_island.R`). It carries each
-tracked metric's code, cross-wave key, title and published base — and nothing
+tracked metric's code, cross-wave key, title and published base, and nothing
 per-respondent. The renderer covers the rest: `waves.currentPoint()` returns
 null without scores, so both callers read the current point off the published
 cell, and the Welch test takes the current wave's spread from its published
@@ -291,7 +291,7 @@ Two things to know:
   and treat it as this wave's contribution to next year's history.
 - **The history is unaffected.** Prior waves are read from `waves_source`
   exactly as always, and the aggregate sidecars this guide describes carry no
-  records either — which is why a long back-history and a confidential ship go
+  records either, which is why a long back-history and a confidential ship go
   together naturally.
 
 The console says which path ran: `Tracking: current wave built from published

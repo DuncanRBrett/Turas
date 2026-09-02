@@ -3,9 +3,9 @@
 # ==============================================================================
 # Validates the Patterns-tab levers against what the built data layer actually
 # contains, so a silent opt-in can never masquerade as "the feature doesn't
-# work". Every declaration is echoed with its outcome — a misspelt banner name,
+# work". Every declaration is echoed with its outcome. A misspelt banner name,
 # a KeyShare label that matches no option, an AreaSummary on an untagged
-# question — in the console (Shiny-visible) and as a section on the report's
+# question, in the console (Shiny-visible) and as a section on the report's
 # statistical-diagnostics panel (it rides inside saved copies).
 #
 # The matching rules here deliberately MIRROR the JS engine, so the echo tells
@@ -102,17 +102,17 @@ audit_patterns_config <- function(dl) {
   b_ids   <- vapply(banners, function(b) as.character(b$id %||% ""), character(1))
 
   # -- selected banner(s) (patterns_banner: the positive lever) -----------------
-  # A typo here means the Group overview silently falls back to EVERY banner —
+  # A typo here means the Group overview silently falls back to EVERY banner,
   # the exact everything-or-nothing this echo exists to catch.
   for (e in incl) {
     hit <- which(vapply(b_names, .pe_norm, character(1)) == .pe_norm(e) |
                  vapply(b_ids, .pe_norm, character(1)) == .pe_norm(e))
     if (length(hit) > 0) {
-      add("Banner selected", sprintf("✓ '%s' (%s) — the Group overview portrays this banner",
+      add("Banner selected", sprintf("✓ '%s' (%s): the Group overview portrays this banner",
                                      e, b_ids[hit[1]]))
     } else {
       add("Banner selected", sprintf(
-        "⚠ '%s' matches no banner — the overview falls back to ALL banners. Check spelling (banners: %s)",
+        "⚠ '%s' matches no banner. The overview falls back to ALL banners. Check spelling (banners: %s)",
         e, paste(b_names, collapse = ", ")))
     }
   }
@@ -122,11 +122,11 @@ audit_patterns_config <- function(dl) {
     hit <- which(vapply(b_names, .pe_norm, character(1)) == .pe_norm(e) |
                  vapply(b_ids, .pe_norm, character(1)) == .pe_norm(e))
     if (length(hit) > 0) {
-      add("Banner excluded", sprintf("✓ '%s' (%s) — out of the Group overview scan",
+      add("Banner excluded", sprintf("✓ '%s' (%s): out of the Group overview scan",
                                      e, b_ids[hit[1]]))
     } else {
       add("Banner excluded", sprintf(
-        "⚠ '%s' matches no banner — check spelling (banners: %s)",
+        "⚠ '%s' matches no banner. Check spelling (banners: %s)",
         e, paste(b_names, collapse = ", ")))
     }
   }
@@ -140,9 +140,9 @@ audit_patterns_config <- function(dl) {
       add("Headline KPI", sprintf("⚠ '%s' matches no question code", code))
     } else if (!.pe_is_rated(q)) {
       add("Headline KPI", sprintf(
-        "⚠ %s is not a rated question — the apex shows rated KPIs only", code))
+        "⚠ %s is not a rated question. The apex shows rated KPIs only", code))
     } else {
-      add("Headline KPI", sprintf("✓ %s — %s", code, .pe_clip(q$title)))
+      add("Headline KPI", sprintf("✓ %s: %s", code, .pe_clip(q$title)))
     }
   }
 
@@ -151,10 +151,10 @@ audit_patterns_config <- function(dl) {
     code <- as.character(q$code %||% "")
     if (.pe_is_rated(q)) {
       add(paste("KeyShare", code), sprintf(
-        "⚠ ignored — rated question; its index already scans"))
+        "⚠ ignored: rated question; its index already scans"))
     } else if (.pe_is_classification(q, extra_class)) {
       add(paste("KeyShare", code), sprintf(
-        "⚠ ignored — classification category '%s' (cuts, not outcomes)",
+        "⚠ ignored: classification category '%s' (cuts, not outcomes)",
         as.character(q$category %||% "")))
     } else {
       ri <- .pe_share_row(q)
@@ -163,19 +163,19 @@ audit_patterns_config <- function(dl) {
           as.character(q$rows[[ri]]$label %||% ""), as.character(q$rows[[ri]]$kind %||% "")))
       } else {
         add(paste("KeyShare", code), sprintf(
-          "⚠ '%s' matches no option, box or NET label on %s — check the exact text",
+          "⚠ '%s' matches no option, box or NET label on %s. Check the exact text",
           as.character(q$key_share), code))
       }
     }
   }
 
   # -- areas RETIRED (Duncan, 2026-08-05) ---------------------------------------
-  # The strongest/weakest area cards were dropped — the tab is a group-vs-peers
+  # The strongest/weakest area cards were dropped. The tab is a group-vs-peers
   # overview only. AreaSummary declarations are named as retired so a config
   # carrying them knows they no longer act (never silently ignored).
   if (length(summaries_declared) > 0) {
     add("AreaSummary", sprintf(
-      "· %d question(s) marked AreaSummary — the area cards are RETIRED; the mark no longer acts",
+      "· %d question(s) marked AreaSummary. The area cards are RETIRED; the mark no longer acts",
       length(summaries_declared)))
   }
 
@@ -199,7 +199,7 @@ attach_patterns_echo <- function(dl) {
   cat("\n┌─── GROUP OVERVIEW CONFIG ───────────────────────────────┐\n")
   for (r in audit$rows) cat("│ ", r[1], ": ", r[2], "\n", sep = "")
   if (audit$n_check > 0) {
-    cat(sprintf("│ %d declaration%s to check — marked ⚠ above\n",
+    cat(sprintf("│ %d declaration%s to check. Marked ⚠ above\n",
                 audit$n_check, if (audit$n_check == 1) "" else "s"))
   } else {
     cat("│ all declarations resolved ✓\n")
@@ -210,7 +210,7 @@ attach_patterns_echo <- function(dl) {
   # friends); the reader only ever sees the tab called Group overview, so the
   # diagnostics panel names it the way the report does.
   #
-  # The console above gets the FULL audit — that is the analyst's check at
+  # The console above gets the FULL audit. That is the analyst's check at
   # generation time, and it is where a misspelt exclusion or an unbound KeyShare
   # has to be caught. The panel that travels inside the report gets one fact
   # (Duncan, 2026-08-11): which banner the Group overview is of. The exclusions,
@@ -221,13 +221,13 @@ attach_patterns_echo <- function(dl) {
   # every banner, which is a statement about what the reader is looking at, not
   # about the config.
   panel_rows <- Filter(function(r) identical(r[[1]], "Banner selected"), audit$rows)
-  # Nothing to say — a config that steers the overview only by exclusion has no
+  # Nothing to say. A config that steers the overview only by exclusion has no
   # selected banner to name, so no section is attached at all.
   if (!length(panel_rows)) return(dl)
 
   section <- list(title = "Group overview configuration", rows = panel_rows)
   if (is.null(dl$project$diagnostics)) {
-    # No diagnostics panel this run (its build failed) — carry the echo alone so
+    # No diagnostics panel this run (its build failed): carry the echo alone so
     # the config record still travels inside the report and its saved copies.
     dl$project$diagnostics <- list(sections = list(section))
   } else {

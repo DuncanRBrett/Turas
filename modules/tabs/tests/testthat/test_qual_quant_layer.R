@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE QUANT LAYER TESTS (themes -> AGG/MICRO via the engine)
+# TABS MODULE. QUALITATIVE QUANT LAYER TESTS (themes -> AGG/MICRO via the engine)
 # ==============================================================================
 #
 # End-to-end known-answer tests: drive the REAL crosstab engine through
@@ -116,7 +116,7 @@ test_that("theme prevalence and significance ride the existing engine exactly", 
   expect_equal(cell_pct(q, ql$agg, "Price", "B"), 20)
 
   # Significance: A is significantly higher than B on Price (letter "B" on A's cell),
-  # and B significantly higher than A on Service — the same lettering a closed Q gets.
+  # and B significantly higher than A on Service. The same lettering a closed Q gets.
   expect_match(cell_sig(q, ql$agg, "Price", "A"), "B")
   expect_equal(cell_sig(q, ql$agg, "Price", "B"), "")
   expect_match(cell_sig(q, ql$agg, "Service", "B"), "A")
@@ -131,7 +131,7 @@ test_that("MICRO carries theme-index answers + the banner var for the cut", {
 })
 
 # ==============================================================================
-# CONFIDENTIALITY DIAL — demographic block yields a Total-only crosstab
+# CONFIDENTIALITY DIAL. Demographic block yields a Total-only crosstab
 # ==============================================================================
 
 test_that("demographic_cuts = block produces a Total-only banner (no cuts)", {
@@ -143,7 +143,7 @@ test_that("demographic_cuts = block produces a Total-only banner (no cuts)", {
 })
 
 # ==============================================================================
-# SMALL-BASE HONESTY — thin cells are not lettered
+# SMALL-BASE HONESTY. Thin cells are not lettered
 # ==============================================================================
 
 test_that("thin bases get no significance letter (no over-claiming)", {
@@ -155,7 +155,7 @@ test_that("thin bases get no significance letter (no over-claiming)", {
 })
 
 # ==============================================================================
-# NO THEMED QUESTIONS — raw-only workbook produces no quant layer
+# NO THEMED QUESTIONS. Raw-only workbook produces no quant layer
 # ==============================================================================
 
 test_that("a workbook with no themed questions yields a null quant layer", {
@@ -169,7 +169,7 @@ test_that("a workbook with no themed questions yields a null quant layer", {
 })
 
 # ==============================================================================
-# PREFIX-SHARING CODES — QUAL_CULTURE must not swallow QUAL_CULTURE_STAFF's
+# PREFIX-SHARING CODES. QUAL_CULTURE must not swallow QUAL_CULTURE_STAFF's
 # theme options (audit fix: the orchestrator's option match is now anchored)
 # ==============================================================================
 
@@ -197,7 +197,7 @@ test_that("prefix-sharing question codes cannot cross-contaminate theme options"
   cat_labels <- function(q) vapply(
     Filter(function(r) identical(r$kind, "category"), q$rows),
     function(r) r$label, character(1))
-  # No leak: each question shows ONLY its own themes, once each —
+  # No leak: each question shows ONLY its own themes, once each,
   # no phantom "Workload" row on Culture, no duplicated "Communication"
   expect_setequal(cat_labels(qc), c("Communication", "Trust"))
   expect_equal(anyDuplicated(cat_labels(qc)), 0L)

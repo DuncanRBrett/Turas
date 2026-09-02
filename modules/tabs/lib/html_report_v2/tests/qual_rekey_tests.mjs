@@ -2,7 +2,7 @@
 /**
  * Reader-mark re-keying gate (production review 2026-08, I20).
  *
- * A reader mark used to key on `qcode#idx`, and `idx` is POSITIONAL — re-export
+ * A reader mark used to key on `qcode#idx`, and `idx` is POSITIONAL. Re-export
  * the data and every shortlist star, highlighted passage and hub membership
  * silently re-attached to a DIFFERENT respondent's comment. Marks now key on the
  * respondent's opaque `rid` token (`qcode#@<rid>`) whenever the island carries
@@ -11,14 +11,14 @@
  * What is gated here (design §5, JS 1-9):
  *   1. a rid island keys new marks qcode#@<rid> in all three stores;
  *   2. a rid-less island keys them qcode#<idx> exactly as before (regression);
- *   3. a version-less idx store + a rid island migrates once — values intact,
+ *   3. a version-less idx store + a rid island migrates once. Values intact,
  *      _owns preserved (owned AND un-owning), _v: 2 stamped;
- *   4. hubs migrate their marks only — seq / order / name / insight untouched;
+ *   4. hubs migrate their marks only. Seq / order / name / insight untouched;
  *   5. highlight range arrays ride across verbatim;
  *   6. unresolved idx keys are dropped and the count is logged;
  *   7. migrating an already-migrated store is a byte-level no-op;
  *   8. a _v: 2 store read against a rid-less island is NEVER re-keyed back;
- *   9. savedAll()/highlightsAll() — what saveCopy embeds — emit rid keys.
+ *   9. savedAll()/highlightsAll(), what saveCopy embeds, emit rid keys.
  *
  * Each scenario runs in a fresh vm context ("a reload") over a shared in-memory
  * localStorage, exactly like a browser session (mirrors state_tests.mjs).
@@ -171,7 +171,7 @@ run("3b. an UN-OWNING legacy store migrates without claiming ownership", () => {
   const b = boot(island(true), store);
   eq(keysOf(b.qual.savedAll()), "Q1#@" + RID[2], "re-keyed on first read");
   const persisted = JSON.parse(b.store.get(SAVED));
-  assert(!("_owns" in persisted), "migration must not claim ownership — the island seed must keep merging");
+  assert(!("_owns" in persisted), "migration must not claim ownership. The island seed must keep merging");
   eq(persisted._v, 2, "still stamped _v: 2");
 });
 

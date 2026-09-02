@@ -3,8 +3,8 @@
 # ==============================================================================
 #
 # A numeric table's Mean averages PEOPLE: each respondent counts once, whatever
-# their size. Its ratio-of-totals row averages the UNITS underneath — total
-# spend over total transactions — so a heavy transactor counts many times. On
+# their size. Its ratio-of-totals row averages the UNITS underneath. Total
+# spend over total transactions, so a heavy transactor counts many times. On
 # Electrum VAS prepaid electricity the two read R534.63 and R295.61 off the
 # same 764 respondents, and reporting either alone as "the" average made a wave
 # comparison look like a 44% collapse that never happened.
@@ -45,7 +45,7 @@ for (f in c("modules/shared/lib/trs_refusal.R", "modules/tabs/lib/00_guard.R",
 }
 
 # batch_rbind lives in shared_functions.R, which sources its siblings by
-# relative path — so it is read from lib/ rather than sourced from here.
+# relative path, so it is read from lib/ rather than sourced from here.
 local({
   src <- readLines(file.path(turas_root, "modules/tabs/lib/shared_functions.R"))
   start <- grep("^batch_rbind <- function", src)
@@ -128,7 +128,7 @@ test_that("the ratio row totals both columns, and differs from the mean", {
 
   # people-average: (100 + 100 + 100 + 300) / 4
   expect_equal(row_value(result, "Mean"), "150")
-  # unit-average: 3300 / 13 — the heavy transactor counts ten times
+  # unit-average: 3300 / 13. The heavy transactor counts ten times
   expect_equal(row_value(result, "Mean per transaction"), "253.85")
 })
 
@@ -216,7 +216,7 @@ test_that("outlier exclusion does not touch the ratio row", {
 })
 
 # ==============================================================================
-# REFUSALS — a ratio that cannot be built must say so
+# REFUSALS. A ratio that cannot be built must say so
 # ==============================================================================
 
 test_that("naming one half of the ratio refuses rather than publishing the mean alone", {

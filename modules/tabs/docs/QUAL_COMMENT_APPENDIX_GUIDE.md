@@ -1,4 +1,4 @@
-# Qualitative Comment Appendix — setup & tabs integration
+# Qualitative Comment Appendix. Setup & tabs integration
 
 End-to-end guide for adding coded open-end comments to a Turas tabs report on a new
 project: build the appendix from the survey data, code it, wire it into the crosstab
@@ -21,7 +21,7 @@ python3 scripts/build_comment_appendix.py \
 ```
 
 `--config` reads the Selection sheet: every row with a `CommentSheet` is an open-end,
-and that cell is the sheet its comments go to. Use it on an existing project — it is
+and that cell is the sheet its comments go to. Use it on an existing project. It is
 the same declaration the report reads, so the two cannot drift. Reach for `--columns`
 only when there is no config yet. If your appendix names its sheets for the topic
 (`Engagement`, `Values`) rather than the question code, the mapping is what stops the
@@ -31,18 +31,18 @@ Put the appendix in the project's data folder, next to the survey data. Full scr
 reference (column-detection modes, flags): `scripts/README_comment_appendix.md`.
 
 **Or run it from Turas.** `launch_turas()` → **Project Steps** wraps the same script in a
-form — build/update, report changed comments, and apply approved changes — with the output
+form, build/update, report changed comments, and apply approved changes, with the output
 shown on the page and failures reported as TRS refusals. Same script, same result; nothing to
 remember at the terminal. See `modules/steps/README.md`.
 
-It is **incremental and non-destructive** — re-run it whenever new interviews land and it
+It is **incremental and non-destructive**. Re-run it whenever new interviews land and it
 appends only new respondents (matched by ResponseID), preserving all coding below. Each
 sheet looks like:
 
 | Col | Header | Filled by |
 |-----|--------|-----------|
 | A | `ResponseID` (or `ID`) | the script (join key) |
-| B | `Noteworthy` | you (tier code — see step 2) |
+| B | `Noteworthy` | you (tier code, see step 2) |
 | C | *the verbatim* | the script (comment text) |
 | D | `Overall Sentiment` | you (`1` pos / `2` mixed / `3` neg) |
 | E+ | *your theme columns* | you (`1`/`2`/`3` per theme) |
@@ -53,35 +53,35 @@ sheet looks like:
 
 Open each sheet and code by hand. Everything here survives every re-run of the builder.
 
-- **Noteworthy tier** — put one code in the `Noteworthy` column (case-insensitive):
+- **Noteworthy tier**. Put one code in the `Noteworthy` column (case-insensitive):
   `n` = Noteworthy · `m` = Must-read · `p` = Priority ("lead with in a presentation").
   Any other non-blank mark counts as Noteworthy.
-- **Blank is a valid, deliberate state — and it is the normal one.** A blank
+- **Blank is a valid, deliberate state, and it is the normal one.** A blank
   `Noteworthy` cell means "an ordinary comment": not flagged, but **its text still
   shows** in the report. Most comments should end up blank. An unremarkable but
   genuine answer ("We order weekly, so we seldom run short", "The service is good")
-  belongs here — *not* in `hide`.
-- **Hide a comment** — the one reserved word `hide` (or `hidden`) in the same
+  belongs here, *not* in `hide`.
+- **Hide a comment**. The one reserved word `hide` (or `hidden`) in the same
   `Noteworthy` column withholds *that comment's* text from the report while still
   counting it in the theme distribution. It is not noteworthy (it's the opposite),
   so it never counts as a tier mark. Reserve it for comments that are **not a real
-  answer** — non-answers ("No.", "Not sure", "Don't know"), gibberish, blank-ish
-  punctuation — or for text that would identify someone. See `qual_verbatim_scope`
+  answer**. Non-answers ("No.", "Not sure", "Don't know"), gibberish, blank-ish
+  punctuation, or for text that would identify someone. See `qual_verbatim_scope`
   in §3 for showing only the noteworthy comments across the whole report.
 
 > **The distinction that catches people:** blank and `hide` both mean "not
 > noteworthy", so it is tempting to treat them as the same thing. They are not.
 > Blank still publishes the verbatim; `hide` suppresses it. Coding every dull
 > comment as `hide` silently strips the ordinary voice out of the report and leaves
-> only the complaints and the raves. If in doubt, leave it blank — that is what
+> only the complaints and the raves. If in doubt, leave it blank. That is what
 > `qual_verbatim_scope = noteworthy` is for when you want a curated few.
-- **Overall Sentiment** — `1` positive / `2` mixed / `3` negative (legend sits above the header).
-- **Themes** — add a column per theme to the **right of the verbatim** (from col E), header =
+- **Overall Sentiment**, `1` positive / `2` mixed / `3` negative (legend sits above the header).
+- **Themes**. Add a column per theme to the **right of the verbatim** (from col E), header =
   the theme name, and code `1`/`2`/`3` per comment. The prevalence board and theme filters
   build from these.
 
 In the report the tiers give each comment a star, a `Noteworthy+ / Must-read+ / Priority`
-filter, and — highest tier first — the order comments are listed and exported.
+filter, and, highest tier first, the order comments are listed and exported.
 
 ---
 
@@ -93,11 +93,11 @@ Two sheets in the project's `*_Crosstab_Config.xlsx`.
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| `qual_workbook` | `02 Data/<project> Comment Appendix.xlsx` | Path **relative to the config file** — include the subfolder, or it won't be found. |
+| `qual_workbook` | `02 Data/<project> Comment Appendix.xlsx` | Path **relative to the config file**. Include the subfolder, or it won't be found. |
 | `qual_confidentiality_mode` | `redacted` | **Default is `hidden`, which shows NO verbatims.** Use `redacted` (auto-scrubs names/emails/numbers) or `full` to display the text. |
 | `qual_demographic_cuts` | `allow` | Disclosure of demographic tags: `allow` / `safe` (k-anonymised) / `block`. **Use `safe` for any client-facing report that carries tags** (see §5). |
 | `qual_noteworthy_default` | `all` | Which tier the filter opens on: `all` / `noteworthy` / `must_read` / `priority`. |
-| `qual_verbatim_scope` | `all` | Which comments ship readable text (build-time curation). `all` = every comment except those marked `hide`. `noteworthy` = only tier 1+ comments are readable; the rest are counted but not shown. **Theme all, show some** — use `noteworthy` to ship a curated handful of quotes from a large body of comments while the numbers reflect them all. |
+| `qual_verbatim_scope` | `all` | Which comments ship readable text (build-time curation). `all` = every comment except those marked `hide`. `noteworthy` = only tier 1+ comments are readable; the rest are counted but not shown. **Theme all, show some**. Use `noteworthy` to ship a curated handful of quotes from a large body of comments while the numbers reflect them all. |
 | `min_reporting_base` | `1` | Disclosure k (used by both the audience gate and the `safe` tag k-anonymisation). `1` = off. Set a real floor (e.g. `30`, matching `significance_min_base`) for a client-facing report with tags. |
 | `qual_tag_dimensions` | *(blank)* | Comment tags from the **host survey** (see §5): a comma list of `Column` or `Column:Label`, e.g. `S01:Centre, S09:Channel`. Values show as their Survey_Structure DisplayText; the Label is unchecked, so verify it against the Questions sheet. Blank = only the comment workbook's own demographic columns are tagged. |
 | `qual_join_id_column` | *(blank)* | Only set if the respondent-id column doesn't auto-detect. |
@@ -107,7 +107,7 @@ Two sheets in the project's `*_Crosstab_Config.xlsx`.
 | Column | Value | Notes |
 |--------|-------|-------|
 | `CommentSheet` | the appendix sheet name for this question (e.g. `Q06Comment`) | Links the question to its comments. For a band-split open-end, list several sheets as `Sheet:Band; …` (see §5). Leave blank for closed questions. |
-| `CommentLink` | the closed question/composite the open-end explains (e.g. `Q_Engage`) | Optional — enables the closed→comments jump. Blank for a standalone open-end. |
+| `CommentLink` | the closed question/composite the open-end explains (e.g. `Q_Engage`) | Optional. Enables the closed→comments jump. Blank for a standalone open-end. |
 | `SplitDimension` | the split axis label (e.g. `NPS band`) | Band-split open-ends only. Optional; defaults to `NPS band`. |
 | `NpsScoreQuestion` | the 0–10 recommend question (e.g. `Q79`) | Band-split open-ends only. Optional; the band is derived from this score. Defaults to the `CommentLink` target. |
 
@@ -126,7 +126,7 @@ sentiment controls. Re-run the builder + regenerate whenever fieldwork grows.
 ### If the Qualitative tab is empty or comments don't show
 
 The qual join's failure messages print to the **R console** (where launch_turas runs), not
-the Excel error log — so a clean-looking run can still have dropped the comments. Check, in
+the Excel error log, so a clean-looking run can still have dropped the comments. Check, in
 order:
 
 1. **`qual_confidentiality_mode`** isn't left at the `hidden` default (that hides all text).
@@ -135,7 +135,7 @@ order:
    prefix the first header with an invisible BOM (`Response ID`); the data loader strips a
    leading BOM on load, but if you built the appendix from a stale export, rebuild it.
 4. The data file is **fully synced** (OneDrive mid-sync can serve raw/unmapped headers; the
-   builder refuses safely in that state — re-run once synced).
+   builder refuses safely in that state. Re-run once synced).
 
 ---
 
@@ -150,16 +150,16 @@ Two different things change after the first build, and they are handled differen
 python3 scripts/build_comment_appendix.py --data DATA.xlsx --appendix APX.xlsx --columns "…"
 ```
 
-Close the appendix in Excel first, and let OneDrive finish syncing afterwards — if it's
+Close the appendix in Excel first, and let OneDrive finish syncing afterwards. If it's
 open, Excel's copy overwrites the update the next time it saves.
 
 **A comment's text changed** (a backcheck correction, say). The builder deliberately does
 *not* rewrite existing rows, so these never flow through on a normal run. Handle them in
-two steps — because a difference can run either way: the data may hold a correction, or
+two steps, because a difference can run either way: the data may hold a correction, or
 your appendix may hold text you cleaned by hand, and only you can tell which should win.
 
 ```bash
-# 1. see what differs — writes a review list, changes nothing
+# 1. see what differs. Writes a review list, changes nothing
 python3 scripts/build_comment_appendix.py … --report-changes
 
 # 2. open that list, mark 'y' under "Apply? (y)" on rows where the DATA should win
@@ -168,8 +168,8 @@ python3 scripts/build_comment_appendix.py … --apply-changes "… changes 20260
 ```
 
 The review list gives you Question, ResponseID, your current text and the new text side by
-side. Applying rewrites **only the verbatim cell** on rows you approved — Noteworthy,
-Overall Sentiment and every theme column are left exactly as they are — and it writes a
+side. Applying rewrites **only the verbatim cell** on rows you approved. Noteworthy,
+Overall Sentiment and every theme column are left exactly as they are, and it writes a
 backup first.
 
 One judgement it can't make for you: where a comment was *materially* reworded, your
@@ -185,8 +185,8 @@ the same disclosure gate as everything above. Design detail: `COMMENT_ATTRIBUTES
 
 ### 5a. One question from several band sheets (the NPS "why?" case)
 
-An NPS "how likely to recommend" follow-up is usually routed into **three** comment sheets —
-detractors, passives, promoters — so the builder emits three sheets that can't otherwise be
+An NPS "how likely to recommend" follow-up is usually routed into **three** comment sheets,
+detractors, passives, promoters, so the builder emits three sheets that can't otherwise be
 tied to the one question. List them in a single `CommentSheet` cell, each tagged with its band:
 
 ```
@@ -197,12 +197,12 @@ NpsScoreQuestion = Q79        # optional; defaults to the CommentLink target
 ```
 
 The three sheets reassemble into **one** reported question. Each comment's band is **derived
-from the 0–10 recommend score** (9–10 Promoter / 7–8 Passive / 0–6 Detractor) — the score
+from the 0–10 recommend score** (9–10 Promoter / 7–8 Passive / 0–6 Detractor): the score
 wins over which sheet the text happened to land in, and any disagreement is counted to the R
 console. In the report the question gets an **All / Detractors / Passives / Promoters**
 segmented control that re-slices the verbatims, the prevalence board and the export.
 
-*(`:` is the sheet→band separator — safe because Excel forbids `:` in a sheet name. A single
+*(`:` is the sheet→band separator, safe because Excel forbids `:` in a sheet name. A single
 sheet name in `CommentSheet` behaves exactly as before.)*
 
 ### 5b. Tag comments with host demographics (centre, channel …)
@@ -215,11 +215,11 @@ qual_tag_dimensions = S01:Centre, S09:Channel     # Column:Label, comma-separate
 ```
 
 Each comment then shows `Centre: Metro South · Channel: 11 - Spaza`. In the report a **🏷 Tags**
-control lets the reader hide all tags or toggle a single dimension (it can only *hide* — never
+control lets the reader hide all tags or toggle a single dimension (it can only *hide*, never
 reveal more than the analyst allowed).
 
 Values are shown as the column's **DisplayText** from Survey_Structure, matched on trimmed
-OptionText exactly as the crosstab processors match — so a column storing codes (`11`, `12`)
+OptionText exactly as the crosstab processors match, so a column storing codes (`11`, `12`)
 tags with the words the crosstab row uses, not the code. A value with no option in the
 structure is tagged raw and named in a console warning, which is usually the first sign of
 structure/data drift.
@@ -230,28 +230,28 @@ label back off the Questions sheet before you ship the report.
 
 ### 5c. Confidentiality with tags (important on small bases)
 
-Tags multiply re-identification risk — a detractor tagged with centre + channel on a base of
+Tags multiply re-identification risk. A detractor tagged with centre + channel on a base of
 8 could be one person. The controls, in increasing strictness:
 
-- `qual_demographic_cuts = block` — **no tags at all** (Total-only). The setting for a
+- `qual_demographic_cuts = block`, **no tags at all** (Total-only). The setting for a
   confidential low-sample survey.
-- `qual_demographic_cuts = safe` — **recommended for client-facing.** k-anonymises tag
+- `qual_demographic_cuts = safe`, **recommended for client-facing.** k-anonymises tag
   *combinations* against `min_reporting_base`, and does so **within each band**, so a tag that
   is common overall but unique among (say) the detractors is suppressed for them.
-- `qual_demographic_cuts = allow` — every tag; **internal use only.**
+- `qual_demographic_cuts = allow`. Every tag; **internal use only.**
 
 Plus the audience k-gate (`min_reporting_base`) withholds a whole comment list when a filtered
 cut falls below k. Rule-based scrubbing + k-anon handle direct identifiers and small cells, not
-*contextual* ones ("the only male teller at Newlands") — so default to `safe`, `block` for the
+*contextual* ones ("the only male teller at Newlands"), so default to `safe`, `block` for the
 most sensitive, and set `min_reporting_base` to a real floor (30 is a common choice).
 
 ---
 
-## Appendix — how surveys have organised this
+## Appendix. How surveys have organised this
 
-- **By question column** (CCPB) — one sheet per open-end field. This is what the builder
+- **By question column** (CCPB): one sheet per open-end field. This is what the builder
   produces automatically.
-- **By theme** (SACS) — one open-end's verbatims split across theme sheets (Culture,
+- **By theme** (SACS): one open-end's verbatims split across theme sheets (Culture,
   Satisfaction…). That split is an analyst coding decision, not derivable from the data;
   build the by-question appendix and add theme columns/sheets as your coding on top.
 

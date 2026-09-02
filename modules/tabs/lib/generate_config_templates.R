@@ -32,7 +32,7 @@ if (!requireNamespace("openxlsx", quietly = TRUE)) {
          call. = FALSE)
   }
 }
-# Attach openxlsx — template functions use createWorkbook(), addWorksheet(), etc.
+# Attach openxlsx. Template functions use createWorkbook(), addWorksheet(), etc.
 # without namespace prefix for readability
 library(openxlsx)
 
@@ -154,7 +154,7 @@ generate_crosstab_config_template <- function(output_path,
              valid_values_text = "TRUE or FALSE",
              dropdown = c("TRUE", "FALSE")),
         list(name = "show_weighted_base", default = "TRUE", required = FALSE,
-             description = "Show the weighted base row (the % denominator). Turn off for simpler client tables — the unweighted count and effective base still show.",
+             description = "Show the weighted base row (the % denominator). Turn off for simpler client tables. The unweighted count and effective base still show.",
              valid_values_text = "TRUE or FALSE",
              dropdown = c("TRUE", "FALSE")),
         list(name = "weight_label", default = "Weighted", required = TRUE,
@@ -162,7 +162,7 @@ generate_crosstab_config_template <- function(output_path,
              valid_values_text = "Any descriptive text")
         # weight_na_threshold / weight_zero_threshold / weight_deff_warning are
         # NOT in this generated template (removed as believed dead in an earlier
-        # review pass) — but weight_validators.R:178-180 DOES read all three,
+        # review pass), but weight_validators.R:178-180 DOES read all three,
         # with defaults 10/5/3 when the Settings row is absent. Reconciled in
         # docs (production review 2026-08, I10): documented as optional,
         # not-in-template settings rather than restored here, since restoring
@@ -449,7 +449,7 @@ generate_crosstab_config_template <- function(output_path,
              valid_values_text = "warm, cool, research, teal, red, or brand",
              dropdown = c("warm", "cool", "research", "teal", "red", "brand")),
         list(name = "chart_series_colour_1", default = "", required = FALSE,
-             description = "Custom colour for 1st banner series in bar charts (e.g., Total). Leave blank to auto-generate. You can define some colours and leave others blank — blanks are auto-filled with distinct hues.",
+             description = "Custom colour for 1st banner series in bar charts (e.g., Total). Leave blank to auto-generate. You can define some colours and leave others blank. Blanks are auto-filled with distinct hues.",
              valid_values_text = "Hex colour code (e.g. #1B365D)"),
         list(name = "chart_series_colour_2", default = "", required = FALSE,
              description = "Custom colour for 2nd banner series in bar charts. Leave blank to auto-generate.",
@@ -505,7 +505,7 @@ generate_crosstab_config_template <- function(output_path,
              dropdown = c("TRUE", "FALSE")),
         list(name = "html_report_v2_microdata", default = "TRUE", required = FALSE,
              description = paste0("Embed the anonymised per-respondent microdata island in the v2 report ",
-               "(coded answer indices + weights — no names, IDs or text). TRUE powers the live filter, ",
+               "(coded answer indices + weights, no names, IDs or text). TRUE powers the live filter, ",
                "custom banners and COMPUTED views. Set FALSE for a confidentiality ship to insider ",
                "populations (e.g. a small staff survey sent to the employer): the file then carries ",
                "published aggregates only, and the live features switch off for that build. The ",
@@ -518,12 +518,12 @@ generate_crosstab_config_template <- function(output_path,
              dropdown = c("TRUE", "FALSE")),
         list(name = "sampling_note", default = "", required = FALSE,
              description = paste0("Fieldwork caveat appended to the 'How sure can I be of these numbers?' ",
-               "design sentence in the v2 report — the honest asterisk where fieldwork deviated from ",
+               "design sentence in the v2 report. The honest asterisk where fieldwork deviated from ",
                "the textbook design (e.g. substitution when a selected store was unavailable, replaced ",
                "clusters, low response). Plain text, one or two sentences. Blank = no note."),
              valid_values_text = "Free text, or leave blank"),
         list(name = "sampling_method", default = "Not_Specified", required = FALSE,
-             description = paste0("Sample design — drives honest confidence vocabulary in the v2 report ",
+             description = paste0("Sample design. Drives honest confidence vocabulary in the v2 report ",
                "(probability designs speak confidence intervals / margin of error; otherwise stability ",
                "intervals / point estimates)."),
              valid_values_text = "Not_Specified, Random, Stratified, Cluster, Census, Quota, Online_Panel, Convenience",
@@ -640,7 +640,7 @@ generate_crosstab_config_template <- function(output_path,
              valid_values_text = "A banner label/id, or blank for all"),
         list(name = "patterns_exclude_banners", default = "", required = FALSE,
              description = paste0("Banners the Group overview tab must skip, comma-separated (label or code, ",
-               "e.g. Interviewer). Operational cuts are fieldwork QC, not client story — without this ",
+               "e.g. Interviewer). Operational cuts are fieldwork QC, not client story, without this ",
                "the tab's lead portrait can be an interviewer effect. The banner still works everywhere ",
                "else (crosstabs, Differences); it just never becomes a portrait. Blank = scan every banner."),
              valid_values_text = "Comma-separated banner labels/codes, or leave blank"),
@@ -664,7 +664,7 @@ generate_crosstab_config_template <- function(output_path,
       section_name = "READER REPORT (OPTIONAL)",
       fields = list(
         list(name = "generate_reader_report", default = "FALSE", required = FALSE,
-             description = paste0("Also build the narrative Reader report (a *_Reader.html file) — a ",
+             description = paste0("Also build the narrative Reader report (a *_Reader.html file): a ",
                "plain-language summary that sits beside the crosstab and deep-links into its tables. ",
                "Requires html_report_v2 = TRUE (it reuses that report's data layer, so no statistic is ",
                "recomputed). Deterministic and on-device by default: no data leaves this machine."),
@@ -673,8 +673,8 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "reader_ai_prose", default = "FALSE", required = FALSE,
              description = paste0("Draft the Reader narrative with an AI model instead of the built-in ",
                "template (only used when generate_reader_report = TRUE). Requires an Anthropic API key in ",
-               "the ANTHROPIC_API_KEY environment variable. Only aggregate figures are sent — never ",
-               "microdata or verbatims — and every number the model writes is checked against the data. ",
+               "the ANTHROPIC_API_KEY environment variable. Only aggregate figures are sent, never ",
+               "microdata or verbatims, and every number the model writes is checked against the data. ",
                "If the model is unavailable the report falls back to the on-device narrative and says so."),
              valid_values_text = "TRUE or FALSE",
              dropdown = c("FALSE", "TRUE"))
@@ -742,12 +742,12 @@ generate_crosstab_config_template <- function(output_path,
       section_name = "STUDY IDENTIFICATION",
       fields = list(
         list(name = "project_name", default = "", required = FALSE,
-             description = "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
+             description = "Project name. Appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
              valid_values_text = "Free text"),
-        # analyst_name is declared once, under ANALYST & CLOSING SECTION — it
+        # analyst_name is declared once, under ANALYST & CLOSING SECTION. It
         # feeds both the report closing section and the stats pack Declaration.
         list(name = "research_house", default = "", required = FALSE,
-             description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
+             description = "Research organisation name. Appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
              valid_values_text = "Free text")
       )
     ),
@@ -763,12 +763,12 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "qual_workbook", default = "", required = FALSE,
              description = paste0(
                "Path to the coded-comment workbook (the Comment Appendix), relative to THIS config ",
-               "file — include the subfolder or it will not be found. Set it to switch on the ",
+               "file. Include the subfolder or it will not be found. Set it to switch on the ",
                "Qualitative tab; leave blank for no comment tab."),
              valid_values_text = "e.g. 02 Data/<project> Comment Appendix.xlsx"),
         list(name = "qual_confidentiality_mode", default = "hidden", required = FALSE,
              description = paste0(
-               "How verbatim text is shown: 'hidden' = numbers only (the safe default — shows NO text); ",
+               "How verbatim text is shown: 'hidden' = numbers only (the safe default, shows NO text); ",
                "'redacted' = auto-scrub names / emails / phone numbers; 'full' = as typed. Use 'redacted' ",
                "or 'full' to display the comments."),
              valid_values_text = "hidden, redacted, or full",
@@ -784,7 +784,7 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "qual_noteworthy_default", default = "all", required = FALSE,
              description = paste0(
                "Which noteworthy tier the comment filter opens on: 'all', 'noteworthy' (tier 1+), ",
-               "'must_read' (tier 2+), or 'priority' (tier 3 — the lead-with comments)."),
+               "'must_read' (tier 2+), or 'priority' (tier 3, the lead-with comments)."),
              valid_values_text = "all, noteworthy, must_read, or priority",
              dropdown = c("all", "noteworthy", "must_read", "priority")),
         list(name = "qual_verbatim_scope", default = "all", required = FALSE,
@@ -793,16 +793,16 @@ generate_crosstab_config_template <- function(output_path,
                "filter): 'all' = every comment except those marked 'hide'/'hidden' in the ",
                "noteworthy column; 'noteworthy' = only tier 1+ comments (noteworthy / must-read / ",
                "priority). Withheld comments are still counted in the theme distribution and ",
-               "base sizes — only their verbatim text is withheld from the file, so a curated ",
+               "base sizes, only their verbatim text is withheld from the file, so a curated ",
                "handful of quotes ships while the numbers reflect every comment. Theme all, show some."),
              valid_values_text = "all or noteworthy",
              dropdown = c("all", "noteworthy")),
         list(name = "qual_tag_dimensions", default = "", required = FALSE,
              description = paste0(
-               "Host-survey columns shown as comment tags, reached via the ResponseID join — a comma ",
+               "Host-survey columns shown as comment tags, reached via the ResponseID join. A comma ",
                "list of 'Column' or 'Column:Label', e.g. 'S01:Centre, S09:Channel'. Values are shown ",
                "as their Survey_Structure DisplayText, so a coded column tags readably. The Label is ",
-               "only what the chip says — check it against the Questions sheet, or the chip will ",
+               "only what the chip says. Check it against the Questions sheet, or the chip will ",
                "confidently mis-name the column. Governed by qual_demographic_cuts + ",
                "min_reporting_base. Blank = only the workbook's own demographic columns are tagged."),
              valid_values_text = "e.g. S01:Centre, S09:Channel"),
@@ -876,7 +876,7 @@ generate_crosstab_config_template <- function(output_path,
          description = paste("Open-ends only: the comment-workbook sheet(s) holding this question's comments.",
            "One sheet for a normal open-end. For a 'why?' split across several sheets (e.g. an NPS",
            "follow-up), list them as 'Sheet:Band; Sheet:Band' to reassemble into ONE question with a",
-           "band you can view by — e.g. 'DetractorComment:Detractor; PassiveComment:Passive;",
+           "band you can view by, e.g. 'DetractorComment:Detractor; PassiveComment:Passive;",
            "PromoterComment:Promoter'. Leave blank for closed questions.")),
     list(name = "CommentLink", width = 16, required = FALSE,
          description = "Diagnostic open-ends only: the closed question or composite this open-end explains (e.g. Q_Engage), which enables jump-to-comments. Leave blank for a generic/standalone open-end."),
@@ -892,7 +892,7 @@ generate_crosstab_config_template <- function(output_path,
   # NO "Total" row: build_banner_structure() creates the Total column itself and
   # starts the banner questions at column 2. A Selection row saying
   # QuestionCode=Total, UseBanner=Y names a question that is not in the Questions
-  # sheet, which check_banner_variables() reports as a BLOCKING error — so the
+  # sheet, which check_banner_variables() reports as a BLOCKING error, so the
   # template used to ship a config that refused to run until the row was deleted.
   # DisplayOrder therefore starts at 2, the slot after Total.
   selection_examples <- list(
@@ -1041,7 +1041,7 @@ generate_crosstab_config_template <- function(output_path,
   # or a blank Text cell all mean "use the platform wording", so a config can
   # never quietly hold a stale copy of text that has since been improved.
   # A key that matches nothing REFUSES the report build rather than being
-  # ignored — a typo here looks exactly like an override that is working.
+  # ignored. A typo here looks exactly like an override that is working.
   report_text_cols <- list(
     list(name = "Key", width = 40, required = FALSE,
          description = paste0(
@@ -1088,7 +1088,7 @@ generate_crosstab_config_template <- function(output_path,
                     example_rows = slides_examples,
                     num_blank_rows = 20)
 
-  # --- SHEET 6: Population (optional — finite population correction) ---
+  # --- SHEET 6: Population (optional, finite population correction) ---
   population_cols <- list(
     list(name = "Group", width = 34, required = TRUE,
          description = "Banner column / subgroup label EXACTLY as it appears in the report (e.g. Masters, Honours, Cape Town)."),
@@ -1499,16 +1499,16 @@ generate_survey_structure_template <- function(output_path) {
 #' That one serves the aggregate-history path (\code{aggregate_wave_backfill.R}),
 #' where the history arrives as published figures in a values table: its
 #' QuestionCode IS the live survey code and it carries a single wave column. This
-#' one serves the path where each wave's raw data still exists — the tabs tracker
-#' plus \code{sacs_segment_backfill.R} — where the whole point is that the
+#' one serves the path where each wave's raw data still exists. The tabs tracker
+#' plus \code{sacs_segment_backfill.R}. Where the whole point is that the
 #' canonical code is INDEPENDENT of any wave's numbering. Same sheet name, two
 #' different contracts; keep them apart.
 #'
 #' Two sheets:
-#'   QuestionMap — the metrics. Read through load_question_mapping(), which finds
+#'   QuestionMap. The metrics. Read through load_question_mapping(), which finds
 #'     the header by scanning for "QuestionCode" and drops help rows, so the
 #'     standard title block is safe here.
-#'   Banners     — the breakout dimensions for segment trends. Read with a plain
+#'   Banners. The breakout dimensions for segment trends. Read with a plain
 #'     read.xlsx(), which takes ROW 1 as the header, so this sheet gets bare
 #'     headers and no title block. (The backfill also auto-detects the header row
 #'     now, but a template that needs the fallback is a template inviting a
@@ -1583,7 +1583,7 @@ generate_tracking_questionmap_template <- function(output_path,
       "each Wave column holds that wave's own question code. Blue rows are examples - overwrite them."),
     example_rows = qm_examples, num_blank_rows = 40)
 
-  # --- SHEET 2: Banners (bare header in row 1 — see the note above) ---
+  # --- SHEET 2: Banners (bare header in row 1, see the note above) ---
   addWorksheet(wb, "Banners", gridLines = FALSE)
   setColWidths(wb, "Banners", cols = seq_len(length(wave_cols) + 1),
                widths = c(24, rep(12, length(wave_cols))))

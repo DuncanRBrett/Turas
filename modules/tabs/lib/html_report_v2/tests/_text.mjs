@@ -1,7 +1,7 @@
 // Shared test access to the report's authored text.
 //
 // The prose in the v2 report is authored in the shared callout registry and
-// edited in the Callout Editor, so NO TEST MAY ASSERT ON ITS WORDING — the
+// edited in the Callout Editor, so NO TEST MAY ASSERT ON ITS WORDING. The
 // author is entitled to change any sentence without turning the suite red.
 // Tests assert either on the catalogue value (via TXT below) or on the
 // data-txt-key attribute the renderer tags each authored block with.
@@ -41,8 +41,8 @@ export const CATALOGUE = (() => {
     const real = tabs[k].text || "";
     if (!MUTATED || !real) { out[k] = real; return; }
     // Mutate LINE by line, keeping every newline exactly where it was. The
-    // renderers read structure out of the whitespace — blank lines become
-    // paragraphs, single lines become bullets — so flattening it here would
+    // renderers read structure out of the whitespace. Blank lines become
+    // paragraphs, single lines become bullets, so flattening it here would
     // fail tests that assert the SHAPE of a block for a reason that has
     // nothing to do with wording.
     const slug = "MUTATED_TEXT_" + k.replace(/[^a-z0-9]+/gi, "_");
@@ -58,7 +58,7 @@ export const CATALOGUE = (() => {
 })();
 
 /**
- * The authored text for a key, with placeholders filled — what the renderer
+ * The authored text for a key, with placeholders filled. What the renderer
  * should have produced. Throws on an unknown key so a renamed entry fails
  * loudly here rather than quietly matching "" against anything.
  */
@@ -77,7 +77,7 @@ export function installText(sandbox) {
 }
 
 /**
- * The rendered contents of one authored block, tags stripped — for asserting on
+ * The rendered contents of one authored block, tags stripped, for asserting on
  * the VALUES a sentence carries (a base, a percentage, a column name) without
  * asserting on the words around them.
  */

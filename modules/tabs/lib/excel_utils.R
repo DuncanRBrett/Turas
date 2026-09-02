@@ -173,7 +173,7 @@ disclosure_marker <- function(k) {
 #' \code{$columns}) of banner columns whose UNWEIGHTED reporting base falls in
 #' \code{[1, k-1]}, where \code{k = config$min_reporting_base}. Such a column
 #' describes a handful of identifiable people, so the distributed \code{.xlsx}
-#' must withhold its cells and base — the standalone workbook is a distinct code
+#' must withhold its cells and base. The standalone workbook is a distinct code
 #' path from the HTML report and does not inherit the JS render-time gate.
 #'
 #' A base of 0 is already empty (nothing to hide) and is never flagged;

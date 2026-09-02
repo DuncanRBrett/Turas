@@ -61,7 +61,7 @@ builder_read_keys <- function() {
   unique(gsub('get_config_value\\(config, "([a-z_0-9]+)".*', "\\1", keys))
 }
 
-context("config contract — whitelist agreement (I7)")
+context("config contract. Whitelist agreement (I7)")
 
 test_that("every Settings key the builder reads is in TABS_KNOWN_SETTINGS", {
   keys <- builder_read_keys()
@@ -116,7 +116,7 @@ test_that("the shipped template writes only whitelisted settings", {
                             paste(unknown, collapse = ", ")))
 })
 
-context("config contract — junk cannot flip defaults (I10)")
+context("config contract. Junk cannot flip defaults (I10)")
 
 test_that("a literal-'NA' cell keeps a default-TRUE toggle TRUE", {
   cfg <- list(enable_significance_testing = "NA", bonferroni_correction = "junk",
@@ -135,7 +135,7 @@ test_that("a junk cell keeps a default-FALSE toggle FALSE and a valid cell still
   expect_false(obj2$enable_significance_testing)
 })
 
-context("config contract — statistical junk refuses at load (I11)")
+context("config contract. Statistical junk refuses at load (I11)")
 
 test_that("junk alpha refuses with CFG_INVALID_SETTING naming the cell", {
   obj <- suppressWarnings(build_config_object(list(alpha = "0,05")))
@@ -161,13 +161,13 @@ test_that("a clean default config validates", {
   expect_true(validate_config_settings(obj))
 })
 
-context("config contract — dashboard scales and thresholds (M9)")
+context("config contract. Dashboard scales and thresholds (M9)")
 
 # M9 (production review 2026-08). The dashboard numerics take the safe_numeric
 # path with a fallback: junk in the cell became the DEFAULT, silently. A 0-5
 # project that typed "five" got a scale maximum of 10 and every gauge read at
 # half strength, with nothing anywhere saying so. These settings are statistical
-# settings — they decide what colour the client sees — so they refuse at load
+# settings, they decide what colour the client sees, so they refuse at load
 # like their siblings above.
 
 test_that("junk dashboard_scale_mean refuses instead of silently becoming 10", {
@@ -182,7 +182,7 @@ test_that("junk dashboard_scale_mean refuses instead of silently becoming 10", {
 })
 
 test_that("junk gauge thresholds refuse, naming the cell", {
-  # The net and custom pairs left this list when they were retired (I11) — a
+  # The net and custom pairs left this list when they were retired (I11): a
   # setting nothing reads cannot corrupt a number, and it now refuses to be
   # whitelisted at all.
   for (key in c("dashboard_green_mean", "dashboard_amber_mean",
@@ -206,7 +206,7 @@ test_that("a scale maximum of zero or below refuses (it normalises every gauge)"
 })
 
 test_that("blank and absent dashboard cells still take the default without complaint", {
-  # A cleared cell means "use the default", not "refuse" — these settings are
+  # A cleared cell means "use the default", not "refuse". These settings are
   # optional and most configs never carry them.
   expect_true(validate_config_settings(build_config_object(list()), list()))
   for (v in list("", "  ", NA)) {
@@ -219,7 +219,7 @@ test_that("blank and absent dashboard cells still take the default without compl
 })
 
 test_that("real dashboard values validate and reach config_obj intact", {
-  # A colour break may legitimately be negative (an index can sit below zero) —
+  # A colour break may legitimately be negative (an index can sit below zero),
   # the range rule applies to scale maxima only.
   raw <- list(dashboard_scale_mean = 5, dashboard_green_mean = 4,
               dashboard_amber_mean = 3, dashboard_amber_index = -10)
@@ -247,7 +247,7 @@ test_that("junk significance_min_base refuses, so low_base_threshold is never nu
   expect_equal(ok$significance_min_base, 50)
 })
 
-context("config contract — sampling_method (I5)")
+context("config contract. Sampling_method (I5)")
 
 test_that("case slips normalise to the canonical token", {
   obj <- build_config_object(list(sampling_method = "stratified"))
@@ -269,7 +269,7 @@ test_that("blank/absent stays Not_Specified without complaint", {
   expect_equal(build_config_object(list(sampling_method = ""))$sampling_method, "Not_Specified")
 })
 
-context("config contract — formerly dead settings now act (I9)")
+context("config contract. Formerly dead settings now act (I9)")
 
 test_that("index summary and ranking settings carry into config_obj", {
   cfg <- list(create_index_summary = "N", index_summary_decimal_places = 2,
@@ -291,7 +291,7 @@ test_that("absent optional settings stay NULL so consumer defaults hold", {
   expect_null(obj$decimal_places)
 })
 
-context("config contract — explicit v2 opt-out (I16)")
+context("config contract. Explicit v2 opt-out (I16)")
 
 test_that("html_report_v2_explicit marks whether the sheet set the value", {
   expect_true(build_config_object(list(html_report_v2 = "FALSE"))$html_report_v2_explicit)
@@ -299,7 +299,7 @@ test_that("html_report_v2_explicit marks whether the sheet set the value", {
   expect_false(build_config_object(list(html_report_v2 = "FALSE"))$html_report_v2)
 })
 
-context("config contract — retired settings are named, not ignored (classic report)")
+context("config contract. Retired settings are named, not ignored (classic report)")
 
 test_that("a config still carrying html_report is answered by name", {
   out <- capture.output(announce_retired_settings(list(html_report = "TRUE")))
@@ -336,7 +336,7 @@ test_that("the retired setting no longer reaches config_obj", {
 # ==============================================================================
 #
 # The class these pin: a Settings cell the loader could not read became the
-# DEFAULT, silently. Three shapes of it —
+# DEFAULT, silently. Three shapes of it,
 #   I2  population_size = "5,000" parsed to NULL, so the finite population
 #       correction switched off on a census project; every interval widened and
 #       letters could change, with nothing printed anywhere.
@@ -355,7 +355,7 @@ test_that("the retired setting no longer reaches config_obj", {
 # else is either canonical or refuses at load, naming the cell.
 # ==============================================================================
 
-context("config honesty — population_size (I2)")
+context("config honesty. Population_size (I2)")
 
 test_that("junk population_size refuses instead of silently disabling the FPC", {
   raw <- list(population_size = "5,000")
@@ -399,7 +399,7 @@ test_that("blank/absent population_size stays NULL without complaint", {
   }
 })
 
-context("config honesty — Y/N toggles refuse instead of defaulting (I3)")
+context("config honesty. Y/N toggles refuse instead of defaulting (I3)")
 
 test_that("junk apply_weighting refuses rather than running the study unweighted", {
   raw <- list(apply_weighting = "Yes please")
@@ -473,11 +473,11 @@ test_that("junk in a confidentiality toggle refuses rather than defaulting ON", 
   expect_error(validate_config_settings(obj, raw), class = "turas_refusal")
 })
 
-context("config honesty — generate_stats_pack and create_index_summary (I3)")
+context("config honesty. Generate_stats_pack and create_index_summary (I3)")
 
 test_that("generate_stats_pack = TRUE no longer switches the stats pack off", {
   # The consumer (run_crosstabs.R) tests toupper(...) == "Y" exactly, so "TRUE"
-  # used to mean "no stats pack" — a contractual deliverable dropped in silence.
+  # used to mean "no stats pack". A contractual deliverable dropped in silence.
   obj <- build_config_object(list(generate_stats_pack = "TRUE"))
   expect_equal(obj$generate_stats_pack, "Y")
   expect_true(toupper(obj$generate_stats_pack %||% "Y") == "Y")
@@ -512,7 +512,7 @@ test_that("generate_stats_pack defaults to Y and create_index_summary to NULL", 
                class = "turas_refusal")
 })
 
-context("config honesty — numeric settings refuse instead of defaulting (I3)")
+context("config honesty. Numeric settings refuse instead of defaulting (I3)")
 
 test_that("junk alpha_secondary refuses rather than disabling dual significance", {
   raw <- list(alpha_secondary = "ten percent")
@@ -557,7 +557,7 @@ test_that("every safe_numeric setting is covered by .TABS_NUMERIC_SETTINGS", {
                info = "read through safe_numeric but not in .TABS_NUMERIC_SETTINGS")
 })
 
-context("config honesty — qualitative confidentiality dials (I4)")
+context("config honesty. Qualitative confidentiality dials (I4)")
 
 test_that("a mis-cased dial no longer means the opposite of what it says", {
   # "Block" used to fall through every identical() test to "allow", shipping
@@ -638,21 +638,21 @@ test_that("the warning is silent when k protects, when the dial is off, or with 
 })
 
 # ==============================================================================
-# I11 — a dead setting must not bless itself onto the whitelist
+# I11. A dead setting must not bless itself onto the whitelist
 # ==============================================================================
 #
 # Production review 2026-08, I11. A name on TABS_KNOWN_SETTINGS is declared to be
 # a real setting, so it never raises the "unrecognised setting" warning. Fifteen
 # names sat there reading nothing: the classic HTML report's leftovers, and
 # `output_folder`/`output_file`, which were never read by Tabs at all. The
-# practical cost was the neighbourhood, not the name — an operator who wrote
+# practical cost was the neighbourhood, not the name. An operator who wrote
 # `output_folder` meaning `output_subfolder` was told nothing and found the
 # workbook in the default folder.
 #
 # They are now retired: named and answered by announce_retired_settings, off the
 # whitelist, out of build_config_object, off the template and out of the demo.
 
-context("config contract — dead settings are retired, not whitelisted (I11)")
+context("config contract. Dead settings are retired, not whitelisted (I11)")
 
 .I11_RETIRED <- c(
   "embed_frequencies", "include_summary", "show_charts", "dashboard_metrics",
@@ -682,14 +682,14 @@ test_that("a retired setting prints the boxed notice and names its replacement",
 })
 
 test_that("the retired list and the whitelist are disjoint", {
-  # A name on both would be announced AND blessed — the worst of both.
+  # A name on both would be announced AND blessed. The worst of both.
   expect_equal(intersect(names(TABS_RETIRED_SETTINGS), TABS_KNOWN_SETTINGS),
                character(0))
 })
 
 test_that("build_config_object no longer carries a retired key", {
   # A NULL-valued key is still PRESENT in names(), which is what flips
-  # `%in% names(config)` guards — so absence has to be asserted on names().
+  # `%in% names(config)` guards, so absence has to be asserted on names().
   obj <- build_config_object(list())
   for (k in .I11_RETIRED) expect_false(k %in% names(obj), info = k)
 })
@@ -711,7 +711,7 @@ test_that("the retired numeric settings left the validation lists with their rea
 })
 
 test_that("the shipped demo config carries no retired setting", {
-  # Otherwise every demo run boxes a RETIRED notice — which is exactly the
+  # Otherwise every demo run boxes a RETIRED notice, which is exactly the
   # signal the notice exists to make meaningful (M-E).
   demo <- file.path(turas_root, "examples/tabs/demo_survey/Demo_Crosstab_Config.xlsx")
   skip_if_not(file.exists(demo), "demo config not present")
@@ -721,7 +721,7 @@ test_that("the shipped demo config carries no retired setting", {
   expect_equal(intersect(keys, names(TABS_RETIRED_SETTINGS)), character(0))
 })
 
-test_that("heatmap_colour stays whitelisted — it is wired now, not dead", {
+test_that("heatmap_colour stays whitelisted. It is wired now, not dead", {
   expect_true("heatmap_colour" %in% TABS_KNOWN_SETTINGS)
   expect_false("heatmap_colour" %in% names(TABS_RETIRED_SETTINGS))
 })

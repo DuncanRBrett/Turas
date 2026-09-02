@@ -1,5 +1,5 @@
 /**
- * Pure formatting helpers — escaping, number formats, significance markup.
+ * Pure formatting helpers. Escaping, number formats, significance markup.
  * No DOM access; fully unit-tested in tests/run_tests.mjs.
  */
 (function (global) {
@@ -84,7 +84,7 @@
   /** Display precision for a specific metric.
    *
    *  An NPS is a mean-KIND row but a percentage-SCALED metric (type "nps",
-   *  scale_max 100), and the crosstab rounds it with decimal_places_percent —
+   *  scale_max 100), and the crosstab rounds it with decimal_places_percent,
    *  CCPB publishes 79, not 79.4. Keying purely off "is it a mean row" gives an
    *  NPS the ratings precision and reintroduces a digit the table never had. */
   fmt.decimalsForQ = function (q, isMean) {
@@ -93,7 +93,7 @@
     return fmt.decimalsFor(true);
   };
 
-  /** Round a value to the display precision — what the reader can actually see.
+  /** Round a value to the display precision. What the reader can actually see.
    *  Wave-on-wave CHANGE is the difference of two of these, never of the raw
    *  values, so the change reconciles with the two figures on screen. */
   fmt.toDisplay = function (value, isMean) {
@@ -101,7 +101,7 @@
     return Number(Number(value).toFixed(fmt.decimalsFor(isMean)));
   };
 
-  /** Index/mean score display — ONE rule everywhere a score card shows a
+  /** Index/mean score display. ONE rule everywhere a score card shows a
    *  mean (dashboard gauges, heatmap, tracking); en dash for null. */
   fmt.score = function (value, decimals) {
     if (value == null || (typeof value === "number" && isNaN(value))) return "–";
@@ -118,7 +118,7 @@
   /* ---------------- reported statistic (review 2026-08, C1) ----------------
    * A crosstab config that turns the column percentage off
    * (show_percent_column = N) puts ROW percentages or raw FREQUENCIES in the
-   * same value slot, and the data layer used to carry no field naming which —
+   * same value slot, and the data layer used to carry no field naming which,
    * so the v2 report labelled every one of them "%" and a counts-only table
    * shipped "142%", "80% B". The statistic now travels on the island (a
    * question's `stat`, or a row's own when it had to substitute), and the
@@ -141,7 +141,7 @@
    *
    * Same reasoning as the stat vocabulary above, and it lives beside it for the
    * same reason: the model, the waves engine and Differences each need it, and
-   * each of them used to carry its OWN copy — a regex on the row's LABEL that
+   * each of them used to carry its OWN copy. A regex on the row's LABEL that
    * recognised nothing but "Standard Deviation". Everything else, a Median
    * included, then read as the question's mean: displayed as one under a
    * filter, trended as one across waves, and tested as one in Differences.
@@ -161,13 +161,13 @@
     return fmt.meanStat(row) === "mean";
   };
 
-  /** True when the value is a percentage of SOME denominator — it gets a "%". */
+  /** True when the value is a percentage of SOME denominator. It gets a "%". */
   fmt.isPctStat = function (stat) {
     return stat === undefined || stat === null ||
       stat === fmt.COL_PCT || stat === "Row %";
   };
 
-  /** True when the value is a COLUMN percentage — the only quantity a Wilson
+  /** True when the value is a COLUMN percentage. The only quantity a Wilson
    *  interval, a data bar, a pp gap or a favourable-share scan may be built on. */
   fmt.isColPctStat = function (stat) {
     return stat === undefined || stat === null || stat === fmt.COL_PCT;

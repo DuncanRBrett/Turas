@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS — MICRODATA WRITER (V11, data-centric report v2)
+# TABS. MICRODATA WRITER (V11, data-centric report v2)
 # ==============================================================================
 # Emits the anonymised `data-micro` island (TR.MICRO) the v2 renderer's stats
 # engine recomputes from when a live filter or a custom ("+ Custom…") banner is
@@ -9,7 +9,7 @@
 #     banner_vars: { <banner_code>: [aggColumnIndex | -1  per respondent] },
 #     weights: [w per respondent] }
 #
-# Anonymity: ONLY zero-based row/column indices and weights — never a respondent
+# Anonymity: ONLY zero-based row/column indices and weights, never a respondent
 # identifier, raw answer string, or free text. Indices are meaningless without
 # the report they ship inside.
 #
@@ -21,7 +21,7 @@
 # (filtering / custom banners would otherwise be unweighted and wrong).
 #
 # Consumes the BUILT data layer (build_data_layer) so the row order it indexes
-# into is exactly the rows[] the renderer reads — the two can never drift.
+# into is exactly the rows[] the renderer reads. The two can never drift.
 # ==============================================================================
 
 if (!exists("%||%", mode = "function")) {
@@ -51,7 +51,7 @@ micro_display_map <- function(qcode, survey_structure) {
   if (nrow(qopt) == 0) {
     # Multi-mention options are keyed by slot code ({code}_1..{code}_N) rather
     # than the root code (the same convention prepare_question_data and the
-    # banner slot fallback read), so fall back to the slot rows — otherwise raw
+    # banner slot fallback read), so fall back to the slot rows. Otherwise raw
     # OptionText values never resolve when DisplayText differs and every live
     # filter / custom-banner recompute shows the option at 0%. Anchored to
     # digits so a prefix-sharing code (Q1 vs Q1_STAFF) can't leak options;
@@ -73,7 +73,7 @@ micro_display_map <- function(qcode, survey_structure) {
 #' Normalise a label for tolerant matching
 #'
 #' Lower-cases, turns any dash variant into a space, strips punctuation, and
-#' collapses whitespace — so "Yes  a casual" and "Yes – a casual" match. Used
+#' collapses whitespace, so "Yes  a casual" and "Yes – a casual" match. Used
 #' only as a fallback after exact matching, and only when unambiguous.
 #'
 #' @param x Character vector
@@ -81,7 +81,9 @@ micro_display_map <- function(qcode, survey_structure) {
 #' @keywords internal
 micro_normalize_label <- function(x) {
   x <- tolower(trimws(as.character(x)))
-  x <- gsub("[‐-―−–—-]", " ", x, perl = TRUE)  # dashes -> space
+  # U+2010 to U+2015 is the whole dash block, so the en and em dashes are
+  # already inside the range and need no literal of their own.
+  x <- gsub("[‐-―−-]", " ", x, perl = TRUE)  # dashes -> space
   x <- gsub("[^a-z0-9 ]", "", x, perl = TRUE)                          # strip punctuation
   trimws(gsub("\\s+", " ", x))
 }
@@ -94,7 +96,7 @@ micro_normalize_label <- function(x) {
 #' combined, plus a normalised fallback:
 #'   1. Every category row LABEL maps to its own index. This alone handles
 #'      questions whose categories are derived from the data (e.g. multi-mention
-#'      with no structure options) — there the stored value IS the label.
+#'      with no structure options): there the stored value IS the label.
 #'   2. When the structure defines options, each raw OptionText also maps to its
 #'      row via DisplayText, so raw values that differ from the display label
 #'      resolve, and options that exist but are not displayed (e.g.
@@ -238,7 +240,7 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
   # A BINNED numeric question's rows are ranges ("R100 - R249") and its stored
   # values are numbers, so no value ever matched a row label: every respondent
   # landed on NA and the whole distribution vanished the moment anyone filtered
-  # — five rows of 0% on a base of 0, with the mean above them still moving.
+  #. Five rows of 0% on a base of 0, with the mean above them still moving.
   # Bin first, using the engine's own binner, then map the bin's label.
   binned <- micro_numeric_bins(dl_q, survey_data, survey_structure)
   if (!is.null(binned) && has_cols) {
@@ -246,7 +248,7 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
   }
 
   # An UNBINNED numeric question has no category rows to land on, but it still
-  # has respondents who answered it — and the base row is read off this island.
+  # has respondents who answered it, and the base row is read off this island.
   # Without them a filtered view reported a mean above a base of zero.
   if (identical(dl_q$type, "numeric") && dl_q$code %in% names(survey_data)) {
     answered <- !is.na(suppressWarnings(as.numeric(survey_data[[dl_q$code]])))
@@ -255,7 +257,7 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
 
   maps <- micro_value_index_map(dl_q, survey_structure)
   if (is.null(maps) || !has_cols) {
-    return(I(rep(NA_integer_, n)))   # serialises to [null,…] — still length n
+    return(I(rep(NA_integer_, n)))   # serialises to [null,…]: still length n
   }
   if (identical(dl_q$type, "multi")) {
     return(micro_answers_multi(survey_data, dl_q$code, maps, n))
@@ -266,8 +268,8 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
 
 #' Per-respondent bin row indices for a binned numeric question
 #'
-#' Uses \code{categorize_numeric_bins()} — the same function the numeric
-#' processor bins with — so the recomputed distribution is the published one
+#' Uses \code{categorize_numeric_bins()}. The same function the numeric
+#' processor bins with, so the recomputed distribution is the published one
 #' when the audience is everyone. Bin labels are matched to the question's own
 #' category rows, so a bin the processor did not publish maps to nothing rather
 #' than to the wrong row.
@@ -351,7 +353,7 @@ micro_weights <- function(survey_data, config_obj) {
 #' Raw OptionText -> BoxCategory map for a box-category banner group
 #'
 #' Built from the group's own options (which carry BoxCategory). Options with
-#' no BoxCategory map to nothing (the respondent falls in no column — exactly
+#' no BoxCategory map to nothing (the respondent falls in no column, exactly
 #' how create_boxcategory_indices treats them).
 #'
 #' @param options The banner group's options data frame
@@ -374,10 +376,10 @@ micro_boxcat_value_map <- function(options) {
 #'
 #' For every banner group, each respondent maps to the zero-based AGG column
 #' index of the column whose option they match (MICRO_NO_COLUMN when none).
-#' Keyed by banner_code — the group id the engine's stats.columnsFor() reads.
+#' Keyed by banner_code. The group id the engine's stats.columnsFor() reads.
 #' Built-in single-response banners are covered. Box-category banners
 #' (BannerBoxCategory = 'Y') map raw value -> BoxCategory -> column, because
-#' their column labels are BoxCategory names, not option DisplayTexts — the
+#' their column labels are BoxCategory names, not option DisplayTexts. The
 #' DisplayText path could never match and every column recomputed to base 0
 #' under a live filter. Groups whose banner question has no options yield an
 #' all-(-1) vector (safe: the engine still boots, that banner simply shows only
@@ -463,7 +465,7 @@ micro_variable_type <- function(qcode, survey_structure) {
 #'
 #' @param qcode Question code
 #' @param survey_structure Loaded structure (needs $questions)
-#' @return list(min, max) — each numeric or NA when unset
+#' @return list(min, max): each numeric or NA when unset
 #' @keywords internal
 micro_numeric_range <- function(qcode, survey_structure) {
   none <- list(min = NA_real_, max = NA_real_)
@@ -559,16 +561,16 @@ micro_scores_for_question <- function(dl_q, survey_data, survey_structure, n) {
 #'
 #' A composite (e.g. Q_Engage = the mean of the twelve engagement items) has no
 #' column in the survey data and no row in the Questions sheet, so
-#' micro_scores_for_question() cannot see it — which left composites out of the
+#' micro_scores_for_question() cannot see it, which left composites out of the
 #' island entirely. They then could not recompute under a live filter, and the
 #' wave tracker skipped any Question_Mapping row pointing at one, silently
 #' (\code{wave_contribution()} drops a metric with no scores). This computes the
 #' same per-respondent vector the published composite is built from, by calling
-#' the composite processor's own maths — so a live recompute and a wave point
+#' the composite processor's own maths, so a live recompute and a wave point
 #' can never drift from the published figure.
 #'
 #' @param code The composite's code (e.g. "Q_Engage")
-#' @param survey_data Respondent data (the FULL frame — one score per row)
+#' @param survey_data Respondent data (the FULL frame, one score per row)
 #' @param survey_structure Loaded structure (needs $questions, $options)
 #' @param composite_defs The Composite_Metrics sheet, or NULL
 #' @return Numeric vector, one per respondent (NA where unscoreable), or NULL
@@ -626,7 +628,7 @@ micro_scores_for_composite <- function(code, survey_data, survey_structure,
   if (is.null(sc) || length(sc) != nrow(survey_data)) return(NULL)
   sc <- as.numeric(sc)
   # rowMeans/rowSums over an all-NA row yields NaN / 0; the processor already
-  # NAs those rows, but coerce defensively — a NaN would serialise as null and a
+  # NAs those rows, but coerce defensively. A NaN would serialise as null and a
   # spurious 0 would drag a tracked mean down.
   sc[!is.finite(sc)] <- NA_real_
   sc
@@ -677,7 +679,7 @@ micro_box_membership <- function(dl_q, survey_data, survey_structure, n) {
 }
 
 
-#' Build the complete TR.MICRO payload (pure — no file I/O)
+#' Build the complete TR.MICRO payload (pure, no file I/O)
 #'
 #' @param data_layer The built data layer (from build_data_layer)
 #' @param survey_data Raw respondent data frame
@@ -689,7 +691,7 @@ micro_box_membership <- function(dl_q, survey_data, survey_structure, n) {
 #'   recomputes under a live filter and can be tracked across waves. Omitted, the
 #'   island is exactly what it was before composites were scored.
 #' @return A list {n, answers, banner_vars, weights}, or NULL when microdata
-#'   cannot be built (no respondents or no structure) — the report then degrades
+#'   cannot be built (no respondents or no structure): the report then degrades
 #'   to published-only (no live filter / custom banner), exactly as before.
 #' @export
 build_microdata <- function(data_layer, survey_data, survey_structure,
@@ -724,7 +726,7 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
     weights     = I(micro_weights(survey_data, config_obj))
   )
   # Per-respondent mean scores (rating/Likert/NPS/numeric) and box-category
-  # membership — the sources for live mean / box-NET recompute; each omitted when
+  # membership. The sources for live mean / box-NET recompute; each omitted when
   # no question carries one.
   if (length(scores) > 0) out$scores <- scores
   if (length(boxes) > 0) out$boxes <- boxes

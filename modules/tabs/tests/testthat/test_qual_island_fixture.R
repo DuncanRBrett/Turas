@@ -1,9 +1,9 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE ISLAND FIXTURE (drift gate)
+# TABS MODULE. QUALITATIVE ISLAND FIXTURE (drift gate)
 # ==============================================================================
 #
 # The JS half of the qualitative gate reads a COMMITTED island JSON so that it
-# exercises the record shape R actually emits (production review 2026-08, I12a —
+# exercises the record shape R actually emits (production review 2026-08, I12a,
 # the main qual JS suite ran on a pre-I20 shape with no `rid` on any of its 86
 # fixture records, and the rekey suite had rids but no band / suppressed / demos).
 #
@@ -15,7 +15,7 @@
 #   Rscript modules/tabs/tests/fixtures/qual_island/generate_qual_island.R
 #
 # It also asserts, in R, that the fixture still carries every field it exists to
-# carry — a fixture that quietly lost its `rid`s would leave the JS suite testing
+# carry. A fixture that quietly lost its `rid`s would leave the JS suite testing
 # the legacy path again while looking green.
 #
 # Run with:
@@ -75,7 +75,7 @@ qif_island <- jsonlite::fromJSON(qif_json, simplifyVector = FALSE)
 qif_records <- unlist(lapply(qif_island$questions, function(q) q$records),
                       recursive = FALSE)
 
-test_that("every record carries a stable rid — the whole point of the fixture", {
+test_that("every record carries a stable rid. The whole point of the fixture", {
   rids <- vapply(qif_records, function(r) {
     if (is.null(r$rid)) NA_character_ else as.character(r$rid)
   }, character(1))

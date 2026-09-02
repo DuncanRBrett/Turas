@@ -1,5 +1,5 @@
 /**
- * Pattern recognition — Read view. One editable big-picture answer, the headline
+ * Pattern recognition. Read view. One editable big-picture answer, the headline
  * indices, then the cross-question patterns: one card per breakout group, the
  * weakest and strongest areas, and what moved. Each takeaway is editable so the
  * message lands in the client's language.
@@ -23,12 +23,12 @@
       return '<div class="tko-kpi"><div class="tko-kpi-label">' + fmt.escapeHtml(m.label || m.title) +
         '</div><div class="tko-kpi-val">' + ui.fmtVal(true, m.value) + ui.topBox(m) +
         '</div><div class="tko-kpi-foot"><span class="tko-kpi-band tko-band-' + (m.band || "na") +
-        '">' + fmt.escapeHtml(m.band || "—") + "</span>" + ui.apexTrend(m) + "</div></div>";
+        '">' + fmt.escapeHtml(m.band || "–") + "</span>" + ui.apexTrend(m) + "</div></div>";
     }).join("");
     return '<div class="tko-apex"><div class="tko-kicker">Group overview · ' +
       fmt.escapeHtml(project) + '</div><div class="tko-apex-main"><div class="tko-apex-answer">' +
       '<div class="tko-eyebrow">Key finding</div>' +
-      ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer — editable", seed) +
+      ui.editable("__apex__", "answer", answer, "tko-answer", "The one-line answer. Editable", seed) +
       "</div>" + (kpis ? '<div class="tko-apex-metrics">' + kpis + "</div>" : "") + "</div></div>";
   }
 
@@ -62,7 +62,7 @@
       // were the story. The counts say how the group falls across everything it
       // was scored on; the named example belongs in the editable sentence, in the
       // analyst's words rather than the engine's.
-      // A steady group gets the SAME card — it is read beside the ones with a
+      // A steady group gets the SAME card. It is read beside the ones with a
       // lean, so it has to be comparable at a glance, and its flatness is already
       // visible in the counts without quoting the sign test at the reader.
       return ui.synopsis(p);
@@ -75,7 +75,7 @@
       return rows + note;
     }
     if (p.kind === "split") {
-      // Navigation pointer only — no synthetic average-index rows (the "4.4 / 3.7
+      // Navigation pointer only. No synthetic average-index rows (the "4.4 / 3.7
       // that's nowhere else" fix). Names the cut; the portraits carry the detail.
       return TR.txt.block("patterns.split.note", {
         subject: p.subject,
@@ -108,7 +108,7 @@
     return rows + (spark ? '<div class="tko-mspark">' + spark + "</div>" : "");
   }
 
-  /** Caption under a confident-null card — the working that shows it was a real
+  /** Caption under a confident-null card. The working that shows it was a real
    *  test, not a pattern that simply wasn't computed. */
   function nullCaption(p) {
     if (p.id === "odd") {
@@ -122,7 +122,7 @@
   /** One pattern as an editable card. The takeaway is keyed by id + subject so a
    *  saved edit can never resurface under a different subject after a re-run.
    *  A confident-null pattern renders a compact, non-editable "we checked, nothing
-   *  real" card — the visible proof of the never-cry-wolf discipline. */
+   *  real" card. The visible proof of the never-cry-wolf discipline. */
   function cardHtml(p) {
     var meta = ui.patternMeta(p.id);
     if (p.nullResult) {
@@ -141,17 +141,17 @@
     return '<article class="tko-pcard tko-edge-' + meta.cls + '" data-snap-card>' +
       '<div class="tko-ptag tko-on-' + meta.cls + '">' + fmt.escapeHtml(meta.tag) + "</div>" +
       pin + headHtml(p) +
-      ui.editable(key, "takeaway", take, "tko-take", "Takeaway — editable", seed) +
+      ui.editable(key, "takeaway", take, "tko-take", "Takeaway. Editable", seed) +
       bodyHtml(p, meta.cls) + "</article>";
   }
 
-  /** Provenance line — how wide the scan was, and nothing else.
+  /** Provenance line. How wide the scan was, and nothing else.
    *
    *  It used to carry the whole audit trail on the reader's face: no-AI, the
    *  multiplicity method, and a sentence naming each never-cry-wolf check and
    *  its outcome. That is the working, not the finding, and it crowded the one
    *  fact a reader needs to size the scan. The checks and the correction are
-   *  unchanged — a confident-null card still shows its own working, and the FDR
+   *  unchanged. A confident-null card still shows its own working, and the FDR
    *  correction still gates what appears here at all. Only the line is shorter.
    *
    *  A hit from the demoted checks (odd-one-out, hidden two-camp split) is still
@@ -176,7 +176,7 @@
     return '<div class="tko-prov" role="note">' + fmt.escapeHtml(base) + "</div>";
   }
 
-  /** The honest empty state. "Nothing stands out" is a FINDING — it may only be
+  /** The honest empty state. "Nothing stands out" is a FINDING. It may only be
    *  claimed when something was actually scanned. A study with nothing the
    *  engine can score is told what the scan reads instead; one with questions
    *  but no comparable groups is told that. */
@@ -190,7 +190,7 @@
     return empty("patterns.empty.no_pattern");
   }
 
-  /** The groups a portrayed banner scanned that produced NO portrait — stated
+  /** The groups a portrayed banner scanned that produced NO portrait. Stated
    *  on the page so "where is the 4th centre?" has its answer: middling on
    *  everything is itself a reading, not an omission. */
   function noStoryHtml(t) {
@@ -201,7 +201,7 @@
     }).join(", ");
     // Neutral wording: this list now also carries groups whose gaps did not
     // hold up as a consistent story (incl. polarized ones the steady card
-    // refuses to claim) — "close to the overall" would overclaim for them.
+    // refuses to claim): "close to the overall" would overclaim for them.
     return TR.txt.block("patterns.no_story",
       { names: names, it_them: list.length === 1 ? "it" : "them" },
       { tag: "div", cls: "tko-cap tko-nostory" });
@@ -212,7 +212,7 @@
     if (cards) cards += noStoryHtml(t);
     var body = cards || emptyHtml(t);
     // Footer order: the reliability line (with the "how sure" entry point) sits
-    // directly above the provenance line — demoted from the apex, not deleted.
+    // directly above the provenance line. Demoted from the apex, not deleted.
     return apexHtml(t) + '<div class="tko-pgrid">' + body + "</div>" +
       ui.reliabilityRibbon(t.reliability) + provHtml(t);
   };

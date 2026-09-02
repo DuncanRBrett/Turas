@@ -7,17 +7,17 @@
  * Tracking tab at all, which put anonymity and a trend line in competition.
  * The R side now builds the current wave from published figures
  * (`published_wave_contribution()`); this suite proves the RENDERER does the
- * rest — that a scores-free current wave still:
+ * rest. That a scores-free current wave still:
  *
  *   1. pairs with history (waves.history) and carries a delta;
  *   2. is significance-tested, with the current SD derived from the published
  *      category distribution (sdFromModel), not from records;
- *   3. calls a small movement NOT significant — so (2) is a real test;
+ *   3. calls a small movement NOT significant, so (2) is a real test;
  *   4. reports currentPoint() as null, which is what makes the callers fall
  *      back to the published cell;
  *   5. keys history by question CODE when the current wave carries codes, and
  *      by normalised title when it does not;
- *   6. plots a mean-ONLY question untested — the one honest degrade, since a
+ *   6. plots a mean-ONLY question untested. The one honest degrade, since a
  *      hidden distribution leaves no spread to test with;
  *   7. behaves identically to today on the proportion path (proportions never
  *      carried scores).
@@ -81,7 +81,7 @@ function publishedRating(meanCell) {
   if (TR.d2) TR.d2._qIndex = null;
 }
 
-/** A prior wave, published-figures shape (mean + sd + base) — no records. */
+/** A prior wave, published-figures shape (mean + sd + base): no records. */
 const priorMean = (wave, year, mean, sd) => ({
   wave: wave, year: year, current: false, segments: [],
   questions: [{ match_key: "overall rating", title: "Overall rating",
@@ -104,7 +104,7 @@ function meanRow(meanCell, waves) {
   return TR.model.forQuestion("QM", null, [], {}).rows[2];
 }
 
-console.log("Published (no-microdata) current wave — suite:");
+console.log("Published (no-microdata) current wave. Suite:");
 
 run("a scores-free current wave still pairs with history and carries a delta", () => {
   const row = meanRow(8.9, [priorMean("2025", 2025, 7.0, 1.0),
@@ -120,7 +120,7 @@ run("a real movement is still called significant (SD from the published distribu
     "1.9 points on sd ~1.0 and base 800 must test significant without records");
 });
 
-run("a small movement is NOT significant — the test is real, not a rubber stamp", () => {
+run("a small movement is NOT significant. The test is real, not a rubber stamp", () => {
   const row = meanRow(8.9, [priorMean("2025", 2025, 8.85, 1.0),
     currentPublished("2026", 2026, true)]);
   assert(!row.delta.sig,
@@ -128,7 +128,7 @@ run("a small movement is NOT significant — the test is real, not a rubber stam
     JSON.stringify(row.delta.sig) + ")");
 });
 
-run("currentPoint() is null without scores — which is what makes the callers fall back", () => {
+run("currentPoint() is null without scores, which is what makes the callers fall back", () => {
   publishedRating(8.9);
   TR.PREV = { waves: [priorMean("2025", 2025, 7.0, 1.0),
     currentPublished("2026", 2026, true)] };
@@ -163,7 +163,7 @@ run("and by normalised title when it does not", () => {
   eq(row.delta.diff, 1.9, "same delta");
 });
 
-run("a mean-ONLY question plots untested — the one real difference vs a microdata build", () => {
+run("a mean-ONLY question plots untested. The one real difference vs a microdata build", () => {
   // The current wave's spread comes from the published category distribution.
   // A rating question that publishes only its mean (every category hidden) has
   // no distribution to derive one from, so its trend still draws but carries no
@@ -189,7 +189,7 @@ run("a mean-ONLY question plots untested — the one real difference vs a microd
   const row = TR.model.forQuestion("QM", null, [], {}).rows[0];
   assert(row.delta, "the trend still draws");
   eq(row.delta.diff, 1.9, "and the movement is still shown");
-  assert(!row.delta.sig, "but it is NOT tested — no distribution, no spread");
+  assert(!row.delta.sig, "but it is NOT tested. No distribution, no spread");
 });
 
 run("the proportion path is untouched (it never carried scores)", () => {

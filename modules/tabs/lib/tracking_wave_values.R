@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS — WAVE VALUES FROM MICRODATA (v2 aggregate tracking, upstream stage)
+# TABS. WAVE VALUES FROM MICRODATA (v2 aggregate tracking, upstream stage)
 # ==============================================================================
 # Derives the long values table (one row per metric: value, base, sd) for ONE
 # wave, from that wave's respondent-level data. This is the UPSTREAM twin of
@@ -7,18 +7,18 @@
 # this produces the values table in the first place.
 #
 # WHY IT EXISTS: historical waves usually survive only as published figures
-# typed from a spreadsheet — a mean and nothing else, so the renderer's Welch
+# typed from a spreadsheet. A mean and nothing else, so the renderer's Welch
 # test has no spread to work with and the wave plots untested (by design; see
 # 22w_waves.js meanLevel). Where the wave's raw data DOES still exist, this
 # recovers the base and the standard deviation the test needs, inside tested
 # Turas code with an auditable reconciliation against the published figures.
 #
-# THE RULES IT ENCODES — each verified against the v2 renderer it must feed:
+# THE RULES IT ENCODES. Each verified against the v2 renderer it must feed:
 #   mean        drop options flagged ExcludeFromIndex = Y; base = the count of
 #               valid numeric responses; sd = the SAME formula as sdOfScores()
 #               in 22w_waves.js, including the Kish effective base when the wave
 #               is weighted (so an unweighted wave reduces to the sample sd).
-#   proportion  base = ALL non-missing responses to the question — DK/NA stay
+#   proportion  base = ALL non-missing responses to the question. DK/NA stay
 #               IN the base. A NET sums its member options.
 #   nps         per-respondent +100 / 0 / -100 (9-10 / 7-8 / 0-6); the value is
 #               the mean of those, and an sd is recorded even though the bridge
@@ -27,14 +27,14 @@
 #               base = answered the question at all (any of its columns).
 #
 # HONEST BY CONSTRUCTION, like the bridge: a metric whose column is absent, or
-# whose category cannot be resolved, is SKIPPED and named — never guessed, never
+# whose category cannot be resolved, is SKIPPED and named, never guessed, never
 # silently dropped. Nothing here invents a base, an sd or a category.
 #
 # OFFLINE tool: used to PREPARE a values table, not called in the run_crosstabs
 # hot path. Depends on tracking_norm() + %||% (tracking_island.R), and on
 # apply_base_filter() (filter_utils.R) only when base_filters are supplied.
 #
-# READ YOUR WORKBOOKS WITH readxl, NOT openxlsx — two silent traps, both of which
+# READ YOUR WORKBOOKS WITH readxl, NOT openxlsx. Two silent traps, both of which
 # produce plausible-looking numbers rather than an error:
 #   1. openxlsx::read.xlsx() leaks the raw `xml:space="preserve"` attribute into
 #      the value of any cell that has trailing whitespace. Survey_Structure
@@ -45,7 +45,7 @@
 #      percentage (CCPB Q11 loses 37 of 764 that way).
 # readxl::read_excel(..., col_types = "text", na = character(0)) is what Turas's
 # own loader uses (data_loader.R:84) and is correct on both counts. Both traps
-# are caught by reconcile_wave_values() — which is the point of running it.
+# are caught by reconcile_wave_values(), which is the point of running it.
 # ==============================================================================
 
 if (!exists("%||%", mode = "function")) {
@@ -57,7 +57,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 
 #' Normalised option texts a question excludes from its mean
 #'
-#' Reads the Survey_Structure Options sheet's ExcludeFromIndex column — the same
+#' Reads the Survey_Structure Options sheet's ExcludeFromIndex column. The same
 #' flag the crosstab engine honours, so a wave's recovered mean matches the mean
 #' its own report published (typically DK / NA).
 #'
@@ -107,7 +107,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 #' @param data The wave's data frame.
 #' @param code Root QuestionCode.
 #' @param members Normalised member option texts; NULL = every column.
-#' @return list(member_cols, all_cols) — column names present in `data`.
+#' @return list(member_cols, all_cols): column names present in `data`.
 #' @keywords internal
 .twv_mm_columns <- function(options, data, code, members = NULL) {
   all_cols <- grep(paste0("^", code, "_[0-9]+$"), names(data), value = TRUE)
@@ -129,7 +129,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 #' @param data The wave's data frame.
 #' @param code Column name.
 #' @param excluded Normalised option texts to drop (DK / NA).
-#' @return list(scores, keep) — numeric vector and the logical row mask.
+#' @return list(scores, keep): numeric vector and the logical row mask.
 #' @keywords internal
 .twv_scores <- function(data, code, excluded) {
   raw <- data[[code]]
@@ -140,7 +140,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 }
 
 
-#' Mean, base and sd of a score vector — the renderer's own formula
+#' Mean, base and sd of a score vector. The renderer's own formula
 #'
 #' Mirrors meanOfScores()/sdOfScores() in assets/js/22w_waves.js exactly: the sd
 #' is carried on the KISH effective base n_eff = (sum w)^2 / sum(w^2), which
@@ -150,7 +150,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 #'
 #' @param scores Numeric vector.
 #' @param weights Optional numeric vector, same length; NULL = unweighted.
-#' @return list(value, base, sd) — sd NULL when it cannot be computed.
+#' @return list(value, base, sd): sd NULL when it cannot be computed.
 #' @keywords internal
 .twv_mean_stats <- function(scores, weights = NULL) {
   n <- length(scores)
@@ -214,7 +214,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
   if (!(code %in% names(data))) {
     # Two different questions are being asked of two different structures here.
     # WHICH option texts belong to the NET is the tracking definition's business
-    # (net_options, above) — that is the whole point of declaring the NET against
+    # (net_options, above): that is the whole point of declaring the NET against
     # one wave's structure. But WHICH data column carries which option text is a
     # fact about THIS wave's data, so it must be read from THIS wave's own
     # structure. Resolving the columns through net_options mapped a recovered
@@ -292,7 +292,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 #'
 #' Recovers the value, base and (for means/NPS) standard deviation of every
 #' tracked metric for one wave, in the exact shape
-#' `aggregate_wave_contributions()` consumes — so a historical wave whose raw
+#' `aggregate_wave_contributions()` consumes, so a historical wave whose raw
 #' data survives can carry real significance instead of plotting untested.
 #'
 #' @param data The wave's respondent-level data frame.
@@ -322,7 +322,7 @@ TRACKING_WAVE_METRIC_TYPES <- c("mean", "proportion", "nps", "multi")
 #'     skipped, "REFUSED" when nothing could be done}
 #'   \item{result}{data frame: metric_id, wave, metric_type, value, base, sd, n}
 #'   \item{skipped}{data frame of metric_id + reason for every metric not
-#'     computed — named, never silent}
+#'     computed. Named, never silent}
 #'   \item{warnings}{character vector of the same reasons}
 #'
 #' @examples
@@ -505,7 +505,7 @@ reconcile_wave_values <- function(values, published, tol_mean = 0.05, tol_pct = 
   if (any(!comparable)) {
     cat(sprintf("  (%d metric(s) had no published figure to check against)\n", sum(!comparable)))
   }
-  # An empty comparable slice must not pass vacuously — all(logical(0)) is TRUE,
+  # An empty comparable slice must not pass vacuously. All(logical(0)) is TRUE,
   # which turned "nothing was cross-checked" into "Clean." (review 2026-08, C5).
   if (sum(comparable) == 0L) {
     msg <- "no published figures for this wave - nothing was cross-checked"
@@ -575,7 +575,7 @@ splice_wave_values <- function(values, computed, wave) {
 }
 
 
-#' Console-visible TRS refusal (Turas runs in Shiny — errors must reach the console)
+#' Console-visible TRS refusal (Turas runs in Shiny, errors must reach the console)
 #' @keywords internal
 .twv_refuse <- function(code, message, how_to_fix) {
   cat("\n=== TURAS ERROR ===\n")

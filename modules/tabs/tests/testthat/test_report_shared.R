@@ -1,7 +1,7 @@
 # ==============================================================================
 # TABS MODULE - SHARED REPORT HELPERS TESTS
 # ==============================================================================
-# Tests for lib/report_shared.R — the row/banner shape helpers and the chart
+# Tests for lib/report_shared.R. The row/banner shape helpers and the chart
 # colour palette that the v2 data-layer writer classifies and colours through.
 #
 # These helpers lived inside the classic HTML report until it was retired
@@ -130,7 +130,7 @@ test_that("normalize_question_table forward-fills the option label onto sub-rows
 
 test_that("a dual-alpha Sig row inherits its option label instead of setting one", {
   # In dual-alpha mode the Sig rows carry a confidence label ("Sig. (95%)"),
-  # not the option label — it must not become the label every later row inherits.
+  # not the option label. It must not become the label every later row inherits.
   tbl <- data.frame(
     RowLabel = c("Very good", "", "Sig. (95%)", "Sig. (80%)", ""),
     RowType  = c("Frequency", "Column %", "Sig.", "Sig.2", "Column %"),

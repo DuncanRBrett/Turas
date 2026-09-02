@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE QUANT LAYER (themes -> DATA_AGG/DATA_MICRO via the
+# TABS MODULE. QUALITATIVE QUANT LAYER (themes -> DATA_AGG/DATA_MICRO via the
 #               EXISTING crosstab engine; zero new stats)
 # ==============================================================================
 #
@@ -107,7 +107,7 @@ qual_themed_artifacts <- function(question, id_to_idx, n) {
 #'
 #' @param questions Classified questions from the reader (themed ones are used).
 #' @param master The respondent master from `qual_build_respondent_master()`.
-#' @param demographic_cuts "allow" or "block" — block yields a Total-only banner.
+#' @param demographic_cuts "allow" or "block". Block yields a Total-only banner.
 #' @return list(survey_data, survey_structure, selection_df, themed_codes).
 qual_build_synthetic_inputs <- function(questions, master, demographic_cuts = "allow") {
   themed <- Filter(function(q) identical(q$type, "themed"), questions)

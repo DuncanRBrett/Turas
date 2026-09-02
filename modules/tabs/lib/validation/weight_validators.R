@@ -290,7 +290,7 @@ check_weight_distribution <- function(valid_weights, weight_values, weight_varia
 #' had no effect AND was reported to the operator as a probable typo
 #' (review 2026-08-21, I-25). If they should become configurable, register them
 #' in build_config_object, add them to TABS_KNOWN_SETTINGS and
-#' .TABS_NUMERIC_SETTINGS, and update that contract test — all four, or the
+#' .TABS_NUMERIC_SETTINGS, and update that contract test. All four, or the
 #' setting is inert again.
 #'
 #' V9.9.2 ENHANCEMENTS:

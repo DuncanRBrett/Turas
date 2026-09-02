@@ -8,7 +8,7 @@
 #   run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
 #
 # The recommended route is still the GUI (source("launch_turas.R");
-# launch_turas()) — it detects configs, shows progress and captures the
+# launch_turas()): it detects configs, shows progress and captures the
 # console. This wrapper exists for scripted/batch runs.
 # ==============================================================================
 
@@ -23,7 +23,7 @@
 #'   modules/tabs/templates/Crosstab_Config_Template.xlsx).
 #'
 #' @return Invisibly, TRUE on success; FALSE after a refusal/error (details
-#'   are printed to the console — Turas convention: errors must be visible).
+#'   are printed to the console. Turas convention: errors must be visible).
 run_tabs_analysis <- function(config_file) {
   if (missing(config_file) || is.null(config_file) || !nzchar(config_file)) {
     cat("\n=== TURAS ERROR ===\n")
@@ -80,7 +80,7 @@ run_tabs_analysis <- function(config_file) {
   }, add = TRUE)
 
   # The engine reads the global `config_file` and resolves its sibling scripts
-  # from the working directory — the same contract the GUI uses (run_tabs_gui.R).
+  # from the working directory. The same contract the GUI uses (run_tabs_gui.R).
   assign("config_file", normalizePath(config_file), envir = .GlobalEnv)
   setwd(tabs_lib_dir)
 
@@ -91,7 +91,7 @@ run_tabs_analysis <- function(config_file) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_TABS_RUN_FAILED\n")
     cat("Message:", conditionMessage(e), "\n")
-    cat("Fix: Read the refusal/output above this box — the engine names the failing step.\n")
+    cat("Fix: Read the refusal/output above this box. The engine names the failing step.\n")
     cat("===================\n\n")
     FALSE
   })

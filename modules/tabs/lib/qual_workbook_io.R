@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE WORKBOOK I/O (openxlsx reader + TRS refusals)
+# TABS MODULE. QUALITATIVE WORKBOOK I/O (openxlsx reader + TRS refusals)
 # ==============================================================================
 #
 # The I/O boundary for the qualitative reader: opens a coded-comment workbook,
@@ -34,7 +34,7 @@ qual_read_sheet_rows <- function(path, sheet) {
 #' Classify every sheet of a workbook, partitioning into usable questions and skips.
 #' @param path Path to the workbook.
 #' @param sheets Character vector of sheet names.
-#' @return list(questions, skipped) — `skipped` entries carry `sheet` and `reason`.
+#' @return list(questions, skipped): `skipped` entries carry `sheet` and `reason`.
 qual_classify_all_sheets <- function(path, sheets) {
   questions <- list()
   skipped <- list()
@@ -149,7 +149,7 @@ qual_read_workbook <- function(path, module = "TABS") {
 #' Enforce workbook integrity (production review 2026-08, I17/I18).
 #'
 #' Refuses on: a sheet whose verbatim column could not be told apart from a
-#' second prose column (the reader used to GUESS — an analyst's notes column
+#' second prose column (the reader used to GUESS, an analyst's notes column
 #' could ship as respondent quotes); blank ResponseIDs on rows that carry text
 #' (later stages silently drop them, comments vanish); duplicated ResponseIDs
 #' within one sheet (reader marks collide, bases inflate); and hide-LIKE markers
@@ -163,7 +163,7 @@ qual_read_workbook <- function(path, module = "TABS") {
 #' @return Invisibly NULL; refuses on integrity failures.
 qual_check_workbook_integrity <- function(path, parsed, module = "TABS") {
   # Collect EVERY problem across EVERY sheet before refusing, so one pass over
-  # the workbook fixes everything — refusing at the first offending sheet made
+  # the workbook fixes everything. Refusing at the first offending sheet made
   # the operator fix one sheet per re-run (Duncan, CCPB 2026-08-05).
   problems <- character(0)
 

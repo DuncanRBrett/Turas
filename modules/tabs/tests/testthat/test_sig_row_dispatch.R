@@ -4,11 +4,11 @@
 #
 # Numeric and Allocation questions passed row_type "rating" to
 # add_significance_row(), whose dispatch only knows proportion/topbox/mean/index
-# — every pair silently returned significant = FALSE and the Sig row shipped
+#. Every pair silently returned significant = FALSE and the Sig row shipped
 # all-blank, reading as "tested, nothing significant".
 #
 # These tests pin:
-#   1. add_significance_row() with mean-shaped data (values + weights — the
+#   1. add_significance_row() with mean-shaped data (values + weights, the
 #      exact shape both processors pass) letters a hand-calculated pair.
 #   2. An unknown row_type now REFUSES (CALC_UNKNOWN_SIG_ROW_TYPE) instead of
 #      silently emitting a blank Sig row.
@@ -58,7 +58,7 @@ source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
 source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))  # build_fpc_multipliers
 
 # batch_rbind copied from shared_functions.R (the orchestrator can't be sourced
-# under testthat — same approach as test_standard_processor.R)
+# under testthat. Same approach as test_standard_processor.R)
 batch_rbind <- function(row_list) {
   if (length(row_list) == 0) return(data.frame())
   all_cols <- unique(unlist(lapply(row_list, names)))
@@ -86,7 +86,7 @@ if (!exists("AVERAGE_ROW_TYPE", envir = globalenv()))
   assign("AVERAGE_ROW_TYPE", "Average", envir = globalenv())
 
 # --- Extract the significance functions from run_crosstabs.R (same technique
-#     as test_dual_significance.R — avoids executing the orchestrator) ---
+#     as test_dual_significance.R. Avoids executing the orchestrator) ---
 .rc_lines <- readLines(file.path(turas_root, "modules/tabs/lib/run_crosstabs.R"))
 .rc_start <- grep("^run_significance_tests_for_row <- function", .rc_lines)
 .rc_end   <- grep("^add_significance_row <- function", .rc_lines)
@@ -141,7 +141,7 @@ make_config <- function() {
     # fixture that predates a setting crashes with "argument is of length zero"
     # rather than failing an assertion. build_config_object() always supplies
     # them in production; a hand-built config here must too (review 2026-08-21,
-    # I-6). show_numeric_sd defaults ON in the real builder — keep it TRUE so
+    # I-6). show_numeric_sd defaults ON in the real builder. Keep it TRUE so
     # this fixture exercises the same shape a real run produces.
     show_numeric_sd = TRUE,
     show_percent_column = FALSE
@@ -149,9 +149,9 @@ make_config <- function() {
 }
 
 # ==============================================================================
-# 1. add_significance_row — mean-shaped data (the processors' shape)
+# 1. add_significance_row. Mean-shaped data (the processors' shape)
 # ==============================================================================
-context("add_significance_row — mean dispatch (C1)")
+context("add_significance_row. Mean dispatch (C1)")
 
 test_that("mean-shaped test data letters a hand-calculated significant pair", {
   td <- list()
@@ -202,9 +202,9 @@ test_that("an unknown row_type refuses instead of emitting a blank Sig row", {
 })
 
 # ==============================================================================
-# 2. process_numeric_question — end to end (C1 regression, numeric)
+# 2. process_numeric_question. End to end (C1 regression, numeric)
 # ==============================================================================
-context("process_numeric_question — significance letters (C1)")
+context("process_numeric_question. Significance letters (C1)")
 
 test_that("a numeric question with a significant group difference gets letters", {
   data <- data.frame(Q_SPEND = c(VALUES_A, VALUES_B) * 100)
@@ -241,9 +241,9 @@ test_that("a numeric question with a significant group difference gets letters",
 })
 
 # ==============================================================================
-# 3. build_allocation_sig_row — end to end (C1 regression, allocation)
+# 3. build_allocation_sig_row. End to end (C1 regression, allocation)
 # ==============================================================================
-context("build_allocation_sig_row — significance letters (C1)")
+context("build_allocation_sig_row. Significance letters (C1)")
 
 test_that("an allocation column with a significant group difference gets letters", {
   value_sets <- setNames(
@@ -276,7 +276,7 @@ test_that("an allocation column with a significant group difference gets letters
 # with a subset-length logical recycles, shifting every letter after the
 # dropped column onto the wrong column.
 
-context("add_significance_row — letter alignment when a column drops")
+context("add_significance_row. Letter alignment when a column drops")
 
 KEY_N <- "GRP3::North"
 KEY_M <- "GRP3::Central"
@@ -309,7 +309,7 @@ test_that("an empty middle column does not shift the letters of later columns", 
 
   expect_false(is.null(result))
   # North beats South, whose column letter is C. The recycled index used to
-  # return "B" — the letter of the EMPTY column.
+  # return "B". The letter of the EMPTY column.
   expect_equal(result[[KEY_N]][1], "C")
   expect_equal(result[[KEY_M]][1], "")
   expect_equal(result[[KEY_S]][1], "")

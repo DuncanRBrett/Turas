@@ -95,18 +95,18 @@ The Excel output is formatted and ready for delivery:
 Alongside the standard Excel output, Tabs generates a self-contained
 HTML report with:
 
--   **Dashboard** — Headline metrics displayed as gauges with RAG
+-   **Dashboard**. Headline metrics displayed as gauges with RAG
     (red/amber/green) thresholds, heatmap grids, and significant
     findings
--   **Group overview** — How each banner group compares to its peers
+-   **Group overview**. How each banner group compares to its peers
     across every question
--   **Crosstabs** — Full interactive tables with search, banner
+-   **Crosstabs**. Full interactive tables with search, banner
     switching, heatmap colouring, and export to clipboard/PNG
--   **Differences** — Significant banner gaps written as plain-English
+-   **Differences**. Significant banner gaps written as plain-English
     findings
--   **Story** — An ordered, annotated narrative built by pinning
+-   **Story**. An ordered, annotated narrative built by pinning
     charts, tables, and dashboard views, exportable to PowerPoint
--   **Report** — Background & method, executive summary, added slides,
+-   **Report**. Background & method, executive summary, added slides,
     and About
 -   **Tracking** and **Qualitative** tabs appear automatically when
     wave history or a comment workbook is configured
@@ -164,10 +164,10 @@ consider:
     has run; use the Tracker module for a standalone longitudinal study
 -   **Statistical modeling:** Use standard R packages like lm() or glm()
     for regression analysis
--   **Coding open ends:** Tabs reports verbatims — the Qualitative tab
+-   **Coding open ends:** Tabs reports verbatims. The Qualitative tab
     reads a coded-comment workbook, joins it to the crosstab by
     ResponseID and carries themes, sentiment and quotes into the report
-    — but the coding itself happens outside Tabs
+, but the coding itself happens outside Tabs
 
 ## Getting Started
 

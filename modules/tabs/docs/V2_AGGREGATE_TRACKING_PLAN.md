@@ -1,4 +1,4 @@
-# V2 Report — Aggregate-Wave Tracking (design & build plan)
+# V2 Report. Aggregate-Wave Tracking (design & build plan)
 
 **Status:** Design approved (direction), pre-build. Maps verified against code 2026-07-08.
 **Goal:** Show a full historical trend (e.g. CCPB 2011→2025) plus the live current
@@ -8,7 +8,7 @@ honest. Reusable for any tracker Duncan takes over.
 
 ---
 
-## 1. The key finding — the engine already supports this
+## 1. The key finding. The engine already supports this
 
 The v2 wave engine (`html_report_v2/assets/js/22w_waves.js`) reads a prior wave's
 value from **any of three shapes**, not just microdata:
@@ -19,7 +19,7 @@ value from **any of three shapes**, not just microdata:
 | **computed totals** | `stats{mean\|index\|nps, sd?}`, `seg_stats{}`, `base`, `bases{}` | **mean/NPS history (value-only)** |
 | **proportion rows** | `rows{ norm(label): {pct, n?, seg{}} }`, `base`, `bases{}` | **proportion/NET history** |
 
-`score_type` is written by R but **never read by JS** — the renderer decides
+`score_type` is written by R but **never read by JS**. The renderer decides
 mean-vs-proportion from the *current* question's row kind + label.
 
 **Honest significance is already how it works** (`22w_waves.js`):
@@ -31,14 +31,14 @@ mean-vs-proportion from the *current* question's row kind + label.
 
 So no renderer change is needed for aggregate values or proportions. An R
 assembler for the value-only + proportion shapes **already exists**:
-`tracker_segment_contributions()` (`tracking_segment_bridge.R`) — and its schema
+`tracker_segment_contributions()` (`tracking_segment_bridge.R`), and its schema
 is locked by `tests/testthat/test_tracking_segment_bridge.R`.
 
 ## 2. The only real gap
 
 `tracker_segment_contributions()` takes the classic tracker's `trend_results`,
 which are computed *from per-respondent microdata* (`compute_segment_trends()`).
-Historical aggregates have **no microdata** — only value + base per metric per
+Historical aggregates have **no microdata**, only value + base per metric per
 wave. So the gap is a **writer that emits the same, tested island shapes from a
 pre-computed values table** (the exact file the tracker-module aggregate feature
 already produces: `metric_id, wave, metric_type, value, base, sd`).
@@ -46,7 +46,7 @@ already produces: `metric_id, wave, metric_type, value, base, sd`).
 ## 3. How tracking wires into a run (verified)
 
 `run_crosstabs.R:793-819`, active when `html_report_v2_tracking = TRUE`:
-1. `load_question_mapping(question_mapping)` — canonical `QuestionCode` + `Wave*`
+1. `load_question_mapping(question_mapping)`. Canonical `QuestionCode` + `Wave*`
    columns + `TrackingSpecs`; `detect_wave_column()` finds the current wave's column.
 2. `wave_contribution()` builds the **current** wave from microdata (mean/NPS).
 3. writes the current wave's `*_wave.json` sidecar (forward path).
@@ -55,7 +55,7 @@ already produces: `metric_id, wave, metric_type, value, base, sd`).
 6. Tab shows **iff the island has > 1 wave**. Failures are swallowed (report still builds).
 
 The current wave's proportion values come **live from `TR.AGG`** (the crosstab),
-so proportions need no current-wave island contribution — only the *prior* waves
+so proportions need no current-wave island contribution, only the *prior* waves
 must carry them. Matching is by `match_key = tracking_norm(canonical code)`
 (current wave keys via the mapping), and proportion rows match the current
 question's category/NET row by `tracking_norm(label)`.
@@ -80,21 +80,21 @@ question's category/NET row by `tracking_norm(label)`.
    tabs report → the Tracking tab lights up 2011→2026. Verify in the produced HTML:
    the `data-prev` island carries the waves; spot-check values vs history; confirm
    honest sig (proportions tested where base exists; historical means untested).
-4. **Guardrails.** Full tabs suite green — R testthat (esp. `test_tracking_*`,
+4. **Guardrails.** Full tabs suite green. R testthat (esp. `test_tracking_*`,
    `test_report_v2_bundler`) + the `.mjs` renderer suites. Adversarial: category-label
    matching, mean with/without sd, the >1-wave gate, `waves_source` used raw.
 
 ## 5. Reusability
 
-Stage 1's writer is general — any tracker's aggregate values table → v2 tracking
-sidecars — so a future tracker Duncan takes over needs only a values table + a
+Stage 1's writer is general. Any tracker's aggregate values table → v2 tracking
+sidecars, so a future tracker Duncan takes over needs only a values table + a
 canonical mapping, not microdata. It is the v2 twin of the tracker-module
 aggregate-wave-ingest, and consumes the same values-file format.
 
 ## 6. Do-not-break list (from the tests)
 
-- `test_tracking_segment_bridge.R:119-122,140` — exact question field sets.
-- `wave_trends.mjs:40-46` — microdata schema.
-- `test_report_v2_bundler.R:138` — empty island inlines as `null`.
-- `run_crosstabs.R:808` — the >1-wave gate.
+- `test_tracking_segment_bridge.R:119-122,140`. Exact question field sets.
+- `wave_trends.mjs:40-46`. Microdata schema.
+- `test_report_v2_bundler.R:138`. Empty island inlines as `null`.
+- `run_crosstabs.R:808`. The >1-wave gate.
 - `waves_source` is consumed **raw** (no path resolution), unlike `question_mapping`.

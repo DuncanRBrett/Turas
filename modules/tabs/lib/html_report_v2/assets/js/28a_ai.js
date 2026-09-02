@@ -1,5 +1,5 @@
 /**
- * v2 AI insights (read-only) — per-question AI callouts, the AI executive
+ * v2 AI insights (read-only): per-question AI callouts, the AI executive
  * summary, and the model attribution line. Data comes from TR.AGG.ai, emitted
  * by the R data layer from the AI sidecar the classic report generates. These
  * are always labelled as AI and are visually distinct from the editable analyst
@@ -46,7 +46,7 @@
       return "<p>" + fmt.escapeHtml(p.trim()) + "</p>";
     }).join("");
     var flag = e.verified ? "" :
-      '<div class="ai-callout-caveat">Unverified draft &mdash; review before use.</div>';
+      '<div class="ai-callout-caveat">Unverified draft. Review before use.</div>';
     return '<div class="card ai-exec">' +
       '<div class="ai-callout-head"><span class="ai-spark">✦</span>' +
       "AI-assisted key findings</div>" +

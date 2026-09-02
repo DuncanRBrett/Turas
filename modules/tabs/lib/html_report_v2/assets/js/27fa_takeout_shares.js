@@ -1,8 +1,8 @@
 /**
- * Pattern recognition — share questions (the KeyShare mechanism).
+ * Pattern recognition. Share questions (the KeyShare mechanism).
  *
  * Rated questions summarise as an index; a closed single/multi question
- * summarises as ONE share — but only the analyst knows which share is the
+ * summarises as ONE share, but only the analyst knows which share is the
  * favourable one ("Always" on delivery-day is good; "Shop around" is not).
  * The Selection sheet's KeyShare column declares it (carried here as
  * q.key_share), and this module resolves that declaration into everything the
@@ -10,7 +10,7 @@
  * for the Welch/BH trust-gate, and a reliability stamp for share-only reports.
  *
  * Direction contract: a KeyShare is ALWAYS higher-is-better, by declaration.
- * Nothing here guesses valence — an undeclared question stays out of the scan,
+ * Nothing here guesses valence. An undeclared question stays out of the scan,
  * which is the honest default (see PATTERNS_KEY_SHARE_GUIDE.md).
  *
  * Pure given (TR.AGG, TR.MICRO); consumed by 27f_takeout_data.js. Unit-tested
@@ -23,7 +23,7 @@
   var shares = takeout._shares = {};
 
   /** Label normalisation for the KeyShare match: NBSP -> space (Alchemer option
-   *  text carries U+00A0), trimmed, case-insensitive. Exact match after that — a fuzzy
+   *  text carries U+00A0), trimmed, case-insensitive. Exact match after that. A fuzzy
    *  match could silently bind the wrong row, which is worse than no match. */
   function normLabel(s) {
     return String(s === null || s === undefined ? "" : s)
@@ -35,7 +35,7 @@
    * Resolve q.key_share to a row index on q.rows: NET rows first (an analyst
    * naming a grouping means the grouping, not a same-named option), then
    * category rows. Score-difference NETs (net_diffs) can never be a share.
-   * Returns -1 when nothing matches — the question then stays out of the scan
+   * Returns -1 when nothing matches. The question then stays out of the scan
    * rather than guessing.
    */
   function resolveRow(q) {
@@ -57,14 +57,14 @@
   /**
    * The scannable share questions: KeyShare declared, resolvable to a row, not
    * already a rated touchpoint (its index would double-count), and not a
-   * classification question (demographics describe the groups — they are cuts,
+   * classification question (demographics describe the groups, they are cuts,
    * not outcomes). Returns [{q, ri}].
    */
   shares.list = function (views) {
     var rated = {};
     try {
       views.indexQuestions().forEach(function (q) { rated[q.code] = true; });
-    } catch (e) { /* no rated questions — shares can still scan */ }
+    } catch (e) { /* no rated questions. Shares can still scan */ }
     var isClass = (TR.views && TR.views._isClassification) ||
       function () { return false; };
     var out = [];
@@ -74,13 +74,13 @@
       // column is a DIFFERENCES-tab lever (27d_diffs.js): it thins near-
       // duplicate finding cards. A KeyShare is the analyst's single declared
       // summary of its own question, so it cannot duplicate another question
-      // here — dropping it would silently remove a group portrait's input for a
+      // here. Dropping it would silently remove a group portrait's input for a
       // reason belonging to a different tab. The category-level lever
       // (project.insight_exclude_categories, via isClass above) is the one that
       // gates BOTH tabs.
       // A KeyShare is a SHARE of the column. A question reporting counts or row
       // percentages (show_percent_column = N) carries no such share, so it is
-      // not eligible — rather than joining the scan with a headcount read as a
+      // not eligible, rather than joining the scan with a headcount read as a
       // percentage (review 2026-08, C1).
       if (!TR.fmt.isColPctStat(q.stat)) return;
       var ri = resolveRow(q);
@@ -92,7 +92,7 @@
   /**
    * Per-respondent 0/100 score vector for one share question, so the SAME
    * weighted Welch loop that tests rated questions tests shares (a Welch t on a
-   * 0/100 encoding is the unpooled two-proportion z-test, in pp units — the
+   * 0/100 encoding is the unpooled two-proportion z-test, in pp units. The
    * variance floor comes out at 10pp via the shared scaleSpan(q) = 100 path).
    * 100 = in the KeyShare row, 0 = answered but outside it, null = no answer.
    * Denominator mirrors the published convention (tabulate/boxCounts): answered

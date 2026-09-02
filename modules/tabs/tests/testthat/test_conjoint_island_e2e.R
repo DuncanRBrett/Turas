@@ -4,7 +4,7 @@
 #
 # The unit tests in test_conjoint_island.R check the pieces. This builds an
 # actual v2 report with an actual conjoint contribution embedded, and asserts
-# the island survived the build — including a hostile attribute name, which is
+# the island survived the build, including a hostile attribute name, which is
 # what island escaping exists for.
 #
 # It reuses the bundler suite's fixtures, so it is the same build path a real
@@ -80,7 +80,7 @@ test_that("a report without a conjoint contribution carries a null island and no
   html <- build_probe()
 
   expect_true(grepl('id="data-cj"', html, fixed = TRUE))
-  # The island is present but empty — the shell then leaves the tab off.
+  # The island is present but empty. The shell then leaves the tab off.
   expect_true(grepl('id="data-cj">\nnull', html, fixed = TRUE) ||
                 grepl('id="data-cj">null', html, fixed = TRUE))
   expect_false(grepl('"kind":"conjoint"', html, fixed = TRUE))

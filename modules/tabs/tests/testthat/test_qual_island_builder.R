@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — DATA_QUAL ISLAND BUILDER TESTS
+# TABS MODULE. DATA_QUAL ISLAND BUILDER TESTS
 # ==============================================================================
 #
 # Known-answer tests for qual_island_builder.R: record assembly (id -> anonymous
@@ -58,7 +58,7 @@ first_record <- function(island_q, idx) {
 }
 
 # ==============================================================================
-# RECORD ASSEMBLY — index, theme remap, tier
+# RECORD ASSEMBLY. Index, theme remap, tier
 # ==============================================================================
 
 test_that("records map id -> anon index, remap theme labels to ids, and carry the tier", {
@@ -86,7 +86,7 @@ test_that("a record whose id is not in the master is skipped", {
 })
 
 # ==============================================================================
-# CONFIDENTIALITY — three verbatim-text modes
+# CONFIDENTIALITY. Three verbatim-text modes
 # ==============================================================================
 
 test_that("FULL mode ships the exact verbatim, no scrubbing", {
@@ -124,7 +124,7 @@ test_that("qual_scrub_text catches email, url and phone; leaves clean text alone
 })
 
 # ==============================================================================
-# ISLAND-LEVEL FLAGS — dial defaults validated safely
+# ISLAND-LEVEL FLAGS. Dial defaults validated safely
 # ==============================================================================
 
 test_that("demographics ride the island + records when allowed; omitted when blocked", {
@@ -147,7 +147,7 @@ test_that("demographics ride the island + records when allowed; omitted when blo
 })
 
 # ==============================================================================
-# DISCLOSURE INDEPENDENCE — the threshold does NOT silently re-tag comments
+# DISCLOSURE INDEPENDENCE. The threshold does NOT silently re-tag comments
 # ==============================================================================
 
 test_that("min_reporting_base does not override the tagging dial (independent by design)", {
@@ -222,11 +222,11 @@ test_that("invalid text mode falls back to hidden; dials and defaults carried", 
 })
 
 # ==============================================================================
-# VERBATIM SCOPE — which comments ship their text (all-except-hide / noteworthy)
+# VERBATIM SCOPE, which comments ship their text (all-except-hide / noteworthy)
 # ==============================================================================
 
 # A four-record master: one priority (tier 3), one plain noteworthy (tier 1),
-# one un-noteworthy (tier 0), one explicitly hidden — every comment is themed, so
+# one un-noteworthy (tier 0), one explicitly hidden. Every comment is themed, so
 # the distribution must count all four regardless of which text ships.
 scope_master <- list(id_to_idx = stats::setNames(0:3, c("1", "2", "3", "4")), n = 4L)
 scope_records <- list(
@@ -296,7 +296,7 @@ test_that("qual_verbatim_shows encodes the gate (hide always wins; scope picks t
 })
 
 # ==============================================================================
-# READER KEYS (I20) — the rid parameters are additive and default to absent
+# READER KEYS (I20): the rid parameters are additive and default to absent
 # ==============================================================================
 #
 # Every rid parameter defaults to NULL, so every pre-I20 caller (and every test
@@ -317,7 +317,7 @@ test_that("a rid_map stamps each record's token without disturbing idx", {
   r1 <- first_record(island$questions[[1]], 1L)
   expect_equal(r0$rid, "aaaaaaaaaaaaaaaa")
   expect_equal(r1$rid, "bbbbbbbbbbbbbbbb")
-  expect_equal(r0$idx, 0L)                      # idx is untouched — the masks still join on it
+  expect_equal(r0$idx, 0L)                      # idx is untouched. The masks still join on it
   expect_equal(r1$idx, 1L)
 })
 

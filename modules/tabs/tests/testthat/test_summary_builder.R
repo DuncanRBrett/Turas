@@ -9,13 +9,13 @@
 #     from composite_results) must fall through to the standard list instead
 #     of silently vanishing from the client-facing Index_Summary sheet
 #
-# Production review 2026-08, I12(b) — test blind spot. Index_Summary values were
+# Production review 2026-08, I12(b): test blind spot. Index_Summary values were
 # asserted nowhere (the workbook tests checked only that the sheet exists, plus
 # one disclosure-masking case), and five of the six functions that build it had
 # no direct test at all: build_index_summary_table, extract_metric_rows,
 # extract_composite_rows, insert_section_headers, format_summary_for_excel.
 # The sections below are known-answer tests for each, asserting the NUMBERS that
-# land in each banner column — not just the shape of the frame.
+# land in each banner column, not just the shape of the frame.
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_summary_builder.R")
@@ -39,7 +39,7 @@ detect_turas_root <- function() {
 
 turas_root <- detect_turas_root()
 
-# config_utils.R resolves script_dir at source time — pre-set it (as the other
+# config_utils.R resolves script_dir at source time. Pre-set it (as the other
 # tabs test files do) so sourcing works under testthat.
 .tabs_lib_dir <- file.path(turas_root, "modules/tabs/lib")
 assign("script_dir", .tabs_lib_dir, envir = globalenv())
@@ -48,10 +48,10 @@ source(file.path(turas_root, "modules/shared/lib/trs_refusal.R"))
 source(file.path(turas_root, "modules/tabs/lib/00_guard.R"))
 source(file.path(turas_root, "modules/tabs/lib/validation_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/config_utils.R"))
-# disclosure_suppressed_columns() / disclosure_marker() — the sub-k gate the
+# disclosure_suppressed_columns() / disclosure_marker(): the sub-k gate the
 # metric and composite extractors apply (production review 2026-08, C2).
 source(file.path(turas_root, "modules/tabs/lib/excel_utils.R"))
-# normalise_flag_column() + the shared yes/no vocabulary — ExcludeFromSummary is
+# normalise_flag_column() + the shared yes/no vocabulary. ExcludeFromSummary is
 # canonicalised at load, so the reader tests the word it actually receives.
 source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/crosstabs/data_setup.R"))
@@ -128,7 +128,7 @@ test_that("no composite_defs leaves the metrics intact (sorted, none dropped)", 
 })
 
 # ==============================================================================
-# I12(b) FIXTURES — a banner and question results shaped like the real engine's
+# I12(b) FIXTURES. A banner and question results shaped like the real engine's
 # ==============================================================================
 
 # Three banner columns, named with the engine's internal "Dim::Option" keys.
@@ -178,7 +178,7 @@ sb_comp_defs <- function(section = "Engagement", exclude = NA_character_,
 }
 
 # ==============================================================================
-# extract_metric_rows — WHICH rows are metrics, and do their numbers survive
+# extract_metric_rows, WHICH rows are metrics, and do their numbers survive
 # ==============================================================================
 
 context("summary_builder: extract_metric_rows (I12b)")
@@ -186,7 +186,7 @@ context("summary_builder: extract_metric_rows (I12b)")
 test_that("only metric rows are extracted, and each keeps its own column values", {
   out <- extract_metric_rows(list(Q1 = sb_question()), sb_banner(), list())
 
-  # The Average and the Top 2 Box Column % — and nothing else. The Frequency and
+  # The Average and the Top 2 Box Column %, and nothing else. The Frequency and
   # the plain-category Column % rows are not summary metrics.
   expect_equal(nrow(out), 2)
   expect_setequal(out$RowType, c("Average", "Column %"))
@@ -239,7 +239,7 @@ test_that("every metric row is tagged as a non-composite with its question code"
 })
 
 test_that("no metrics anywhere returns an empty frame that still has the banner columns", {
-  # The empty case flows straight into rbind downstream — a frame missing the
+  # The empty case flows straight into rbind downstream. A frame missing the
   # banner columns would drop them from the sheet.
   out <- extract_metric_rows(list(), sb_banner(), list())
   expect_equal(nrow(out), 0)
@@ -443,7 +443,7 @@ test_that("trailing whitespace is cleaned off a label", {
   expect_equal(out$RowLabel[4], "Q9 - Unrelated nine")
 })
 
-test_that("the source-question indent survives formatting — it is the only nesting cue", {
+test_that("the source-question indent survives formatting. It is the only nesting cue", {
   # organize_by_composite_groups indents a composite's source questions by two
   # spaces, and the Index_Summary writer has no indent style: it writes the label
   # string verbatim. Trimming through the indent leaves a source question looking
@@ -458,7 +458,7 @@ test_that("an empty frame passes straight through", {
 })
 
 # ==============================================================================
-# build_index_summary_table — the whole sheet, end to end
+# build_index_summary_table. The whole sheet, end to end
 # ==============================================================================
 
 context("summary_builder: build_index_summary_table (I12b)")
@@ -525,13 +525,13 @@ test_that("a sub-k column is withheld across the whole assembled sheet (C2)", {
 })
 
 # ==============================================================================
-# M-K — the composite's disclosure gate judges on the composite's OWN base
+# M-K. The composite's disclosure gate judges on the composite's OWN base
 # ==============================================================================
 #
 # Production review 2026-08, M-K (PLAUSIBLE at the time; reproduced here). The
 # gate used to borrow the FIRST source question's bases. Composites do share
-# their sources' respondent pool, but sources can be routed differently — one
-# asked of everyone, another of a sub-audience — so the borrowed base could name
+# their sources' respondent pool, but sources can be routed differently. One
+# asked of everyone, another of a sub-audience, so the borrowed base could name
 # the wrong column as sub-k. Both directions are wrong: withholding a column that
 # is safe, and publishing one that should have been withheld. The composite now
 # carries its own per-column bases (the people with a scoreable composite value,

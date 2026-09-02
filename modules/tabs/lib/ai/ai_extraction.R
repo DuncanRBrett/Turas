@@ -1,16 +1,16 @@
 # ==============================================================================
-# AI EXTRACTION — Tabs-Specific Data Extraction for AI Insights
+# AI EXTRACTION. Tabs-Specific Data Extraction for AI Insights
 # ==============================================================================
 #
 # Extracts structured data from Turas tabs analytical output (all_results)
-# for use as LLM prompt context. Only aggregated outputs are extracted —
+# for use as LLM prompt context. Only aggregated outputs are extracted,
 # never raw respondent data.
 #
 # Functions:
-#   extract_question_data()         — per-question structured extraction
-#   extract_question_data_compact() — reduced payload for exec summary
-#   extract_study_context()         — study-level context
-#   extract_sig_flags()             — translate sig letters to boolean flags
+#   extract_question_data(): per-question structured extraction
+#   extract_question_data_compact(): reduced payload for exec summary
+#   extract_study_context(): study-level context
+#   extract_sig_flags(): translate sig letters to boolean flags
 #
 # Dependencies:
 #   Uses all_results structure from run_crosstabs_analysis()

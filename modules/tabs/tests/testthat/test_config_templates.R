@@ -56,7 +56,7 @@ source(file.path(tabs_root, "lib", "generate_config_templates.R"))
 # type_utils.R provides safe_logical/safe_numeric, which build_config_object()
 # calls at runtime (not just define-time), so it must load before any test
 # calls build_config_object() directly.
-# Guarded — a missing dependency must not break the template tests.
+# Guarded. A missing dependency must not break the template tests.
 for (dep in c(file.path("lib", "validation_utils.R"),
               file.path("lib", "path_utils.R"),
               file.path("lib", "type_utils.R"),
@@ -164,7 +164,7 @@ test_that("crosstab config Settings sheet offers the Qualitative (comment) tab s
 test_that("every setting build_config_object reads is offered by the template", {
   # Regression guard (review 2026-08-13): the five tab-visibility flags and the
   # general decimal_places fallback were read by build_config_object and listed
-  # in TABS_KNOWN_SETTINGS, but appeared in NO template and in no documentation —
+  # in TABS_KNOWN_SETTINGS, but appeared in NO template and in no documentation,
   # the only way to discover them was to read the source. A setting the engine
   # honours must be discoverable from a freshly generated config.
   #
@@ -222,7 +222,7 @@ test_that("the generated Settings sheet carries no section header without fields
 test_that("crosstab config Settings sheet writes research_house in lowercase snake_case", {
   # Regression guard: this field was previously written as "Research_House",
   # which get_config_value() (an exact-match lookup) can never find since
-  # build_config_object() reads it as "research_house" — a silent no-op even
+  # build_config_object() reads it as "research_house". A silent no-op even
   # when the operator filled the cell in. Every other Settings-sheet field
   # uses lowercase_snake_case; this one must match that convention too.
   tmp <- tempfile(fileext = ".xlsx")
@@ -272,7 +272,7 @@ test_that("build_config_object loads heatmap_colour and research_house through t
 })
 
 test_that("html_report_v2_cover is whitelisted, logical, and defaults to FALSE", {
-  # The cover shipped with no operator control at all — it was gated purely in
+  # The cover shipped with no operator control at all. It was gated purely in
   # JavaScript, so a study could not decline it. The setting must survive all
   # three registration points or it is a silent no-op: the known-settings
   # whitelist (else an "unrecognised setting" warning), the logical list (else
@@ -319,7 +319,7 @@ test_that("html_report_v2_cover_findings parses a number, ALL, or nothing", {
 
 test_that("build_config_object loads qual_tag_dimensions through to the config object", {
   # Regression guard (Feature 2 host tags): config_obj is an explicit whitelist, not the
-  # raw settings — a qual_tag_dimensions row was read fine downstream but never assigned
+  # raw settings. A qual_tag_dimensions row was read fine downstream but never assigned
   # here, so the comment tag control silently never appeared even when the setting was set.
   skip_if_not(exists("build_config_object", mode = "function"))
   config_obj <- build_config_object(list(qual_tag_dimensions = "S03:Centre, S11:Channel"))
@@ -481,14 +481,14 @@ test_that("crosstab config template overwrites existing file", {
 })
 
 # ==============================================================================
-# MERGED SETTING ROWS — a setting with no Value cell must not vanish quietly
+# MERGED SETTING ROWS. A setting with no Value cell must not vanish quietly
 # ==============================================================================
 
 context("crosstabs_config: merged setting rows")
 
 # The Settings sheet formats SECTION HEADERS as a row merged across A:E. A real
 # setting row that picks up that formatting has no Value cell, readxl reads NA,
-# load_config_sheet drops the setting, and the run uses the default in silence —
+# load_config_sheet drops the setting, and the run uses the default in silence,
 # how CCPB W2026 lost question_mapping and shipped an unpaired Tracking tab.
 msr_fixture <- function(merge_rows = integer(0), merge_cols = 1:5) {
   path <- tempfile(fileext = ".xlsx")
@@ -539,7 +539,7 @@ test_that("an unmerged sheet says nothing at all", {
 })
 
 test_that("a merge that leaves the Value cell readable is not reported", {
-  f <- msr_fixture(merge_rows = 4, merge_cols = 2:5)   # B4:E4 — B is the anchor
+  f <- msr_fixture(merge_rows = 4, merge_cols = 2:5)   # B4:E4. B is the anchor
   on.exit(unlink(f), add = TRUE)
   expect_equal(length(capture.output(hits <- warn_merged_setting_rows(f))), 0)
   expect_equal(length(hits), 0)
@@ -569,7 +569,7 @@ test_that("TABS_KNOWN_SETTINGS is the shared list, not a private copy", {
 })
 
 # ==============================================================================
-# CASE-MISMATCHED SETTING NAMES — the lookup is exact, the typo check is not
+# CASE-MISMATCHED SETTING NAMES. The lookup is exact, the typo check is not
 # ==============================================================================
 
 context("crosstabs_config: case-mismatched setting names")
@@ -593,7 +593,7 @@ test_that("a variant that already has a correct twin is marked, with the collisi
 })
 
 test_that("correctly named settings, and genuine unknowns, are left alone", {
-  # An unknown name is the typo check's job, not this one — no double-reporting.
+  # An unknown name is the typo check's job, not this one. No double-reporting.
   expect_silent(h <- warn_case_mismatched_settings(
     list(apply_weighting = "FALSE", nonsense_setting = "x")))
   expect_equal(length(h), 0)
@@ -621,7 +621,7 @@ test_that("the CCPB case-variant labels are all recognised as canonical settings
 # The Selection sheet used to ship an example row `Total | N | Y | ... | Total`
 # captioned "always include as first banner". build_banner_structure() creates
 # the Total column itself and starts banner questions at column 2, so that row
-# names a question the Questions sheet does not have — which
+# names a question the Questions sheet does not have, which
 # check_banner_variables() logs as a BLOCKING Error. Anyone who filled the
 # template in around the example rows got a config that refused to run.
 
@@ -682,7 +682,7 @@ test_that("banner DisplayOrder starts at 2, leaving column 1 for Total", {
 # A tracker's mapping is the one file a study cannot build retrospectively: get
 # it wrong at wave one and wave two has no history to join to. Until 2026-08-13
 # the only shipped mapping template was the AGGREGATE one (a different contract
-# — live codes, one wave column), so a study on the raw-data path had no way to
+#. Live codes, one wave column), so a study on the raw-data path had no way to
 # discover that composites need SourceQuestions or that segment trends need a
 # Banners sheet, short of reading examples/sacs_segment_backfill.R.
 
@@ -728,11 +728,11 @@ test_that("the generated mapping loads through the real reader with a composite 
   expect_true(all(c("ENG01", "Engagement") %in% trimws(as.character(qm$QuestionCode))))
   comp <- qm[trimws(as.character(qm$QuestionCode)) == "Engagement", , drop = FALSE]
   expect_true(nzchar(trimws(as.character(comp$SourceQuestions[1]))),
-    info = "the composite example must show SourceQuestions filled — that is the whole point of the column")
+    info = "the composite example must show SourceQuestions filled. That is the whole point of the column")
 })
 
 test_that("the Banners sheet reads with its header in row 1 and no stray dimensions", {
-  # The backfill reads this sheet plainly, so row 1 must be the header — and
+  # The backfill reads this sheet plainly, so row 1 must be the header, and
   # anything in column A becomes a banner dimension. A help note written into
   # column A would silently become a breakout named after its own instructions.
   tmp <- tempfile(fileext = ".xlsx")

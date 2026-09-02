@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE PHASE-2 JOIN TESTS (comments -> host survey by ResponseID)
+# TABS MODULE. QUALITATIVE PHASE-2 JOIN TESTS (comments -> host survey by ResponseID)
 # ==============================================================================
 #
 # Drives the Phase-2 join seam: a coded-comment workbook is resolved against a host
@@ -33,7 +33,7 @@ local({
               "qual_workbook_reader.R", "qual_unions.R", "qual_workbook_io.R", "qual_assemble.R",
               "qual_island_builder.R", "qual_reader_keys.R",
               "qual_report.R", "score_utils.R",  # unions + band derivation
-              "data_loader.R")) {   # strip_leading_bom — the loader-side half of the BOM regression
+              "data_loader.R")) {   # strip_leading_bom. The loader-side half of the BOM regression
     source(file.path(lib, f), local = FALSE)
   }
 })
@@ -84,7 +84,7 @@ test_that("the host response-id column auto-detects via the anchor and the overr
 })
 
 # Production review 2026-08, M-I. Several host columns can answer to the "ID"
-# anchor — a row counter called "ID" sorts before the real "ResponseID" in plenty
+# anchor. A row counter called "ID" sorts before the real "ResponseID" in plenty
 # of exports. The first match won SILENTLY, and if the two columns happen to
 # share values the comments join to the WRONG respondents while every join
 # diagnostic still reads healthy. The pick is unchanged (first match, so no
@@ -311,14 +311,14 @@ test_that("the island question carries its source sheet name", {
 })
 
 # ==============================================================================
-# WORKBOOK PATH RESOLUTION — the contract run_crosstabs must satisfy
+# WORKBOOK PATH RESOLUTION. The contract run_crosstabs must satisfy
 # ==============================================================================
 #
 # CCPB W2026: a relative qual_workbook ("02 Data/…") resolves against the
 # project root ONLY when config_obj$config_file_path is set. The V2 pipeline
 # previously set config_file_path only inside the classic-HTML block, so a
 # V2-only run left it NULL and the relative path resolved against the run CWD
-# (tabs/lib) — the workbook was "not found" and the Qualitative tab silently
+# (tabs/lib): the workbook was "not found" and the Qualitative tab silently
 # dropped. run_crosstabs now sets config_file_path unconditionally; these pin
 # the resolver behaviour that fix depends on.
 
@@ -347,7 +347,7 @@ test_that("an absolute qual_workbook passes through regardless of config_file_pa
 
 
 test_that("numeric host IDs >= 1e5 join without scientific notation (I19)", {
-  # as.character(1e5) is "1e+05" while the workbook side reads "100000" —
+  # as.character(1e5) is "1e+05" while the workbook side reads "100000",
   # those respondents' comments silently unjoined (production review 2026-08).
   survey <- data.frame(ResponseID = c(100000, 200000, 42), stringsAsFactors = FALSE)
   map <- qual_host_id_to_idx(survey, "ResponseID")

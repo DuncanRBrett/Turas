@@ -1,8 +1,8 @@
 # ==============================================================================
 # Aggregate-wave tracking backfill (generic; reusable across trackers)
 # ==============================================================================
-# Turns a tracker's PUBLISHED HISTORY — waves that survive only as summary
-# figures (a %, a mean, an NPS net), with no respondent-level data — into the
+# Turns a tracker's PUBLISHED HISTORY. Waves that survive only as summary
+# figures (a %, a mean, an NPS net), with no respondent-level data. Into the
 # prior-wave `<wave>_wave.json` sidecars the v2 report's Tracking tab reads. A
 # v2 tabs build (html_report_v2_tracking + waves_source pointed at the output
 # folder + the same QuestionMap in Settings) then shows the full history as one
@@ -16,20 +16,20 @@
 # ------------------------------------------------------------------------------
 # TWO INPUTS YOU PREPARE PER PROJECT (see docs/AGGREGATE_TRACKING_GUIDE.md):
 #
-# 1. VALUES TABLE (long; .csv or .xlsx) — one row per (metric, wave):
+# 1. VALUES TABLE (long; .csv or .xlsx): one row per (metric, wave):
 #      metric_id    the LIVE survey QuestionCode this figure belongs to
-#                   (e.g. Q02). THIS IS THE LINK to the current wave — it must
+#                   (e.g. Q02). THIS IS THE LINK to the current wave. It must
 #                   equal the QuestionCode in the QuestionMap below.
 #      wave         the wave identifier (e.g. 2019). A 4-digit year in it becomes
 #                   the trend's x-axis position.
 #      metric_type  mean | proportion | nps
 #      value        the published figure, as reported (mean, %, NPS net)
-#      base         effective base n for that figure — OPTIONAL. Blank = unknown
+#      base         effective base n for that figure. OPTIONAL. Blank = unknown
 #                   => the point plots UNTESTED (never a fabricated base).
-#      sd           dispersion for a 'mean' — OPTIONAL. Blank = not recorded
+#      sd           dispersion for a 'mean'. OPTIONAL. Blank = not recorded
 #                   => the mean plots untested.
 #
-# 2. QUESTIONMAP (.xlsx, a "QuestionMap" sheet) — one row per tracked metric:
+# 2. QUESTIONMAP (.xlsx, a "QuestionMap" sheet): one row per tracked metric:
 #      QuestionCode   the canonical/live code (== metric_id above)
 #      QuestionText   the display title
 #      TrackingSpecs  mean | nps_score | category:<label>
@@ -96,7 +96,7 @@ cat(sprintf("\n%d sidecar(s) written to %s\n", length(paths), OUT))
 
 # --- Round-trip verify + honest-significance summary --------------------------
 priors <- read_wave_contributions(OUT)
-if (length(priors) == 0) stop("No sidecars read back — check the inputs.")
+if (length(priors) == 0) stop("No sidecars read back. Check the inputs.")
 
 all_q  <- do.call(c, lapply(priors, function(p) p$questions))
 keys   <- unique(vapply(all_q, function(q) as.character(q$match_key), character(1)))

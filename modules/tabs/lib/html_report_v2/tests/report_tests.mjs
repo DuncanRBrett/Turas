@@ -1,4 +1,4 @@
-// Report tab — statistical diagnostics panel (report.diagnosticsHtml) and the
+// Report tab. Statistical diagnostics panel (report.diagnosticsHtml) and the
 // About card (report.aboutHtml). Loads 32_report.js into a vm sandbox with a
 // minimal TR and asserts the diagnostics panel renders from
 // project.diagnostics (the interactive twin of the Excel stats pack), is
@@ -45,7 +45,7 @@ function boot(diagnostics, reportMeta, projectExtra, prev) {
   };
   if (prev) sandbox.TR.PREV = prev;
   // The construction note's words come from the callout registry, exactly as
-  // they do in a real build — see _text.mjs.
+  // they do in a real build. See _text.mjs.
   installText(sandbox);
   for (const f of ["21_stats.js", "32_report.js"]) {
     vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), sandbox, { filename: f });
@@ -67,7 +67,7 @@ const diag = {
   ] }
 };
 
-console.log("Report tab — statistical diagnostics panel:");
+console.log("Report tab. Statistical diagnostics panel:");
 
 run("absent diagnostics -> the panel is omitted entirely", () => {
   assert(boot(undefined).report.diagnosticsHtml() === "",
@@ -99,15 +99,15 @@ run("present -> TRS events render one row each, flagged by level", () => {
   assert(h.indexOf("Warnings &amp; events") >= 0, "the warnings section renders");
   assert(h.indexOf("rpt-diag-lvl partial") >= 0, "the event level is flagged with its class");
   assert(h.indexOf("CALC_CHART_SKIP") >= 0, "the event code renders");
-  assert(h.indexOf("Chart skipped — Base below threshold") >= 0, "title + message combine into the detail");
+  assert(h.indexOf("Chart skipped: Base below threshold") >= 0, "title + message combine into the detail");
 });
 
 run("no events -> a clean-run line, never an empty events table", () => {
   const clean = { status: "PASS",
     sections: [{ title: "Declaration", rows: [["Project", "X"]] }],
-    warnings: { summary: "No events — analysis ran cleanly", events: [] } };
+    warnings: { summary: "No events. Analysis ran cleanly", events: [] } };
   const h = boot(clean).report.diagnosticsHtml();
-  assert(h.indexOf("rpt-diag-clean") >= 0 && h.indexOf("No events — analysis ran cleanly") >= 0,
+  assert(h.indexOf("rpt-diag-clean") >= 0 && h.indexOf("No events. Analysis ran cleanly") >= 0,
     "the clean-run summary is shown");
   assert(h.indexOf("rpt-diag-events") < 0, "no events table when there are no events");
   assert(h.indexOf("rpt-diag-status pass") >= 0, "PASS status pill");
@@ -121,7 +121,7 @@ run("a malformed section (missing rows) is skipped, not crashed on", () => {
   assert(h.indexOf(">Empty<") < 0, "the row-less section is dropped rather than throwing");
 });
 
-console.log("\nReport tab — About card & report-construction note:");
+console.log("\nReport tab. About card & report-construction note:");
 
 run("analyst + contact render from the config-fed island meta", () => {
   const h = boot(undefined, {
@@ -157,7 +157,7 @@ run("the producing company interpolates into the note, with a TRL fallback", () 
 
 run("the stock note renders every paragraph the report is entitled to", () => {
   // The note is ONE authored entry whose blank lines become paragraphs. Asserts
-  // the paragraphs are SERVED, not what they say — the wording is the author's.
+  // the paragraphs are SERVED, not what they say. The wording is the author's.
   const h = boot(undefined, undefined).report.aboutHtml();
   const paras = TXT("report.construction.stock", { producer: "", waves_note: "" })
     .split(/\n\s*\n+/).map((x) => x.trim()).filter(Boolean);
@@ -191,7 +191,7 @@ run("a study can state how its own numbers were built, in place of the default",
 run("a declaration replaces the WHOLE stock block, not just its first sentence", () => {
   // Operator decision 2026-08-11: each study owns its Report construction
   // section. The stock reproducibility, AI and author-validation paragraphs used
-  // to render underneath a declaration regardless — so a config that restated
+  // to render underneath a declaration regardless, so a config that restated
   // them printed them twice (CCPB W2026 did exactly that), and a config that
   // deliberately left one out had it reinstated. The study is the authority on
   // how its own numbers were built, and it owns the assurances with it.
@@ -208,8 +208,8 @@ run("a declaration replaces the WHOLE stock block, not just its first sentence",
 });
 
 run("a note that writes its own producer line does not get a second one", () => {
-  // An author drafting this row opens the way the section reads — "This report
-  // was produced by …" — and the prepended copy printed the sentence twice on
+  // An author drafting this row opens the way the section reads, "This report
+  // was produced by …", and the prepended copy printed the sentence twice on
   // the client's page (CCPB W2026). Whoever says it, it is said exactly once.
   const own = boot(undefined, { company: "Acme Insights",
     construction: "This report was produced by Acme Insights using Turas Analytics, which " +
@@ -283,7 +283,7 @@ run("the note never claims that earlier waves go untested", () => {
 run("a wave that carries respondent data is not described as published-only", () => {
   // "Shown as previously published rather than recalculated" is a claim the
   // note is only entitled to when no earlier wave carries per-respondent
-  // scores — a wave with scores IS recalculated (22w_waves.js).
+  // scores. A wave with scores IS recalculated (22w_waves.js).
   const h = boot(undefined, undefined, undefined, MICRO_WAVES).report.aboutHtml();
   assert(h.indexOf(TXT("report.construction.prior_waves_published")) < 0,
     "a recalculated wave is not called a published one");
@@ -301,24 +301,27 @@ run("a report with no earlier waves says nothing about waves at all", () => {
 
 // The test that asserted the AI/accountability paragraph by its own key went
 // when the construction note became ONE authored entry (2026-08-18, Duncan:
-// "why not put them all in one? It is all one paragraph"). What it checked —
-// that the paragraph reaches the page — is covered by "the stock note renders
+// "why not put them all in one? It is all one paragraph"). What it checked,
+// that the paragraph reaches the page. Is covered by "the stock note renders
 // every paragraph the report is entitled to", which asserts every authored
-// paragraph renders and that the count matches. What it also checked — that the
-// wording says what it says — is the report author's, not the suite's.
+// paragraph renders and that the count matches. What it also checked. That the
+// wording says what it says. Is the report author's, not the suite's.
 
 run("the construction note contains no em dashes", () => {
   // Duncan's house style. Also the tell readers most associate with AI-written
   // prose, which is a poor look on the paragraph explaining our use of AI.
   const h = boot(undefined, undefined).report.aboutHtml();
   const note = h.slice(h.indexOf("Report construction"));
-  assert(note.indexOf("—") < 0, "an em dash crept into the report-construction note");
+  const EM = "\u2014";
+  assert(note.indexOf(EM) < 0 && note.indexOf("&mdash;") < 0 &&
+         note.indexOf("&#8212;") < 0,
+    "an em dash crept into the report-construction note");
 });
 
 run("the auto-generated methodology paragraph is gone from the Report tab", () => {
   // Removed 2026-08-11 (Duncan): it restated in prose what the Statistical
   // diagnostics panel and the How-to-read guide already carry, on the page whose
-  // job is the narrative. Nothing was lost — both other surfaces keep it.
+  // job is the narrative. Nothing was lost. Both other surfaces keep it.
   const h = boot(undefined, undefined, undefined,
     { waves: [{ wave: "2025" }, { wave: "W2026", current: true }] }).report.aboutHtml();
   ["Methodology (auto-generated)", "two-proportion pooled z-test", "Welch t-test",
@@ -368,7 +371,7 @@ run("no meta -> fields are omitted but the note still renders", () => {
   assert(h.indexOf("Report construction") >= 0, "the note renders regardless");
 });
 
-console.log("\nReport tab — read-only authored sections (config-sourced):");
+console.log("\nReport tab. Read-only authored sections (config-sourced):");
 
 run("background + exec render read-only from the config, one paragraph per line", () => {
   const TR = boot(undefined, {
@@ -405,7 +408,7 @@ run("the fieldwork fallback still supplies Background & method", () => {
   assert(h.indexOf("<p>Fieldwork: May 2026.</p>") >= 0, "the fieldwork line renders");
 });
 
-run("sectionText is config-only — legacy stored edits are ignored", () => {
+run("sectionText is config-only. Legacy stored edits are ignored", () => {
   const TR = boot(undefined, { exec_summary: "CFG TEXT" });
   TR.userState = { report: { sections: { exec: "OLD LOCAL EDIT" }, about: {}, slides: [] } };
   assert(TR.report.sectionText("exec") === "CFG TEXT",

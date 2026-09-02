@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — WAVE VALUES FROM MICRODATA TESTS (v2 aggregate tracking)
+# TABS MODULE. WAVE VALUES FROM MICRODATA TESTS (v2 aggregate tracking)
 # ==============================================================================
 #
 # Locks wave_values_from_microdata() / reconcile_wave_values()
@@ -11,7 +11,7 @@
 # against a real published figure:
 #   mean        DK/NA (ExcludeFromIndex=Y) dropped; base = valid numeric count;
 #               sd = sdOfScores() in 22w_waves.js, incl. the Kish effective base
-#   proportion  base = ALL non-missing responses — DK/NA stay IN the base
+#   proportion  base = ALL non-missing responses. DK/NA stay IN the base
 #   nps         per-respondent +100/0/-100, sd recorded
 #   multi       "any of" NET over member columns; base = answered at all
 #   honest      an unresolvable metric is SKIPPED AND NAMED, never guessed
@@ -131,7 +131,7 @@ test_that("a proportion KEEPS DK/NA in its base (the CCPB Q11 rule)", {
                    stringsAsFactors = FALSE), opts, wave = "2025")
   r <- val(m, "RATE")
   expect_equal(r$metric_type, "proportion")
-  expect_equal(r$base, 10)        # all ten answered — DK and NA included
+  expect_equal(r$base, 10)        # all ten answered. DK and NA included
   expect_equal(r$n, 3)            # three 10s
   expect_equal(r$value, 30)
   expect_true(is.na(r$sd))        # proportions never carry an sd
@@ -277,7 +277,7 @@ test_that("reconcile goes PARTIAL, not PASS, when NO metric has a published figu
                      metric_type = c("mean", "proportion"),
                      value = c(9.3, 32.5), base = c(750, 764),
                      sd = c(1.15, NA), stringsAsFactors = FALSE)
-  # empty published slice — exactly what the recovery script passes for a wave
+  # empty published slice. Exactly what the recovery script passes for a wave
   # absent from the values table
   pub <- data.frame(metric_id = character(0), value = numeric(0),
                     stringsAsFactors = FALSE)
@@ -403,7 +403,7 @@ test_that("a genuine 0% category (option exists, nobody chose it) still computes
 
 
 # ==============================================================================
-# M14 (review 2026-08) — a recovered wave's multi-mention COLUMNS are resolved
+# M14 (review 2026-08): a recovered wave's multi-mention COLUMNS are resolved
 # through that wave's OWN structure. Which option texts make up the NET is the
 # tracking definition's business (net_options); which data column carries which
 # option text is a fact about this wave's data. Reading the column map from
@@ -442,7 +442,7 @@ test_that("multi-mention member columns follow THIS wave's structure, not the NE
 
 test_that("the NET's MEMBERSHIP still comes from the tracking definition (M14)", {
   # Same data, but this wave's own structure tags a DIFFERENT option as the NET.
-  # Membership must follow net_options (Mon), not this wave's tag (Tue) — that
+  # Membership must follow net_options (Mon), not this wave's tag (Tue): that
   # is the whole point of declaring the NET against one wave's structure.
   d <- data.frame(
     MM_1 = c("Tue", "Tue", "Tue", NA),

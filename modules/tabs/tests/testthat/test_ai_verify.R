@@ -3,8 +3,8 @@
 # ==============================================================================
 #
 # Tests for AI verification and selectivity passes:
-#   - verify_callout()  — factual accuracy checking
-#   - rank_callouts()   — editorial quality filtering
+#   - verify_callout(): factual accuracy checking
+#   - rank_callouts(): editorial quality filtering
 #
 # These tests use mock prompt builders and do NOT make real API calls.
 # They test the logic flow, not the LLM output quality.
@@ -100,10 +100,10 @@ mock_build_prompt_error <- function(data, study_context, prompt_type) {
 }
 
 # ==============================================================================
-# TESTS: verify_callout — Skip / pass-through cases
+# TESTS: verify_callout. Skip / pass-through cases
 # ==============================================================================
 
-context("verify_callout — skip and pass-through")
+context("verify_callout. Skip and pass-through")
 
 test_that("skips verification when verify_callouts is FALSE", {
   config <- make_test_ai_config(verify = FALSE)
@@ -163,10 +163,10 @@ test_that("preserves callout fields through verification", {
 })
 
 # ==============================================================================
-# TESTS: rank_callouts — Skip and pass-through
+# TESTS: rank_callouts. Skip and pass-through
 # ==============================================================================
 
-context("rank_callouts — skip and pass-through")
+context("rank_callouts. Skip and pass-through")
 
 test_that("skips ranking when rank_callouts is FALSE", {
   config <- make_test_ai_config(rank = FALSE)
@@ -281,7 +281,7 @@ test_that("handles NULL callouts gracefully", {
     Q003 = make_test_callout(narrative = "Callout 3")
   )
 
-  # Should not error — NULL entries are skipped
+  # Should not error. NULL entries are skipped
   suppressWarnings({
     result <- rank_callouts(callouts, config, mock_build_prompt)
   })

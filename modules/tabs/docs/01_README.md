@@ -24,7 +24,7 @@ source("modules/tabs/run_tabs.R")
 run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
 ```
 
-A complete synthetic demo lives in `examples/tabs/demo_survey/` — run it with:
+A complete synthetic demo lives in `examples/tabs/demo_survey/`. Run it with:
 
 ``` r
 run_tabs_analysis("examples/tabs/demo_survey/Demo_Crosstab_Config.xlsx")

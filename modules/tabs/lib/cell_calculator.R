@@ -130,7 +130,7 @@ calculate_multi_mention_count <- function(data, option_text, column_names, weigh
 # ==============================================================================
 
 # calculate_weighted_percentage() is defined in weighting.R (canonical version).
-# Do not duplicate here — callers use the weighting.R definition which also
+# Do not duplicate here. Callers use the weighting.R definition which also
 # supports an optional decimal_places parameter.
 
 #' Create Column Percentage Row
@@ -168,7 +168,7 @@ create_percentage_row <- function(row_counts, banner_bases, internal_keys,
       base_info$unweighted
     }
     
-    # Calculate at the configured precision — calculate_weighted_percentage's
+    # Calculate at the configured precision. Calculate_weighted_percentage's
     # 0-dp default would pre-round to a whole number before format_output_value
     # rounds again, so configured decimals could never appear
     percentage <- calculate_weighted_percentage(row_counts[key], weighted_base,
@@ -246,7 +246,7 @@ create_row_percentage_row <- function(row_counts, banner_info, internal_keys,
           format_output_value(0, "percent", decimal_places_percent = decimal_places)
         }
       } else {
-        # Configured precision here too — see the column-percent note above
+        # Configured precision here too. See the column-percent note above
         percentage <- calculate_weighted_percentage(row_counts[key], banner_total,
                                                     decimal_places = decimal_places)
         row[[key]] <- format_output_value(
@@ -350,7 +350,7 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
   
   all_responses <- data[[question_col]]
 
-  # Find matching responses — vectorised with %in% instead of sapply
+  # Find matching responses. Vectorised with %in% instead of sapply
   resp_char <- trimws(as.character(all_responses))
   option_texts <- trimws(as.character(valid_options$OptionText))
   matching_responses <- !is.na(all_responses) & resp_char != "" & resp_char %in% option_texts
@@ -374,7 +374,7 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
   }
   names(option_values) <- option_texts
 
-  # Map responses to numeric values via lookup — no repeated c() concatenation
+  # Map responses to numeric values via lookup. No repeated c() concatenation
   valid_char <- trimws(as.character(valid_data))
   mapped_values <- option_values[valid_char]
 
@@ -464,7 +464,7 @@ calculate_likert_index <- function(data, question_col, options_info, weights) {
 #' 2026-08, I1). \code{$values} feeds two things and only two: the Standard
 #' Deviation row and the summary Sig. row's t-test. The published statistic is
 #' the NET of promoters and detractors, so a t-test on raw 0-10 ratings answers
-#' "is the mean RATING different" — a different question, with a different
+#' "is the mean RATING different". A different question, with a different
 #' answer. Executed before the fix: two columns both scoring NPS 0 (one made of
 #' 10s and 0s, one of 9s and 6s) drew a significance letter at p = 0.043.
 #'

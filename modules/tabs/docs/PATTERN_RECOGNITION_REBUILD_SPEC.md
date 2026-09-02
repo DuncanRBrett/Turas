@@ -1,17 +1,17 @@
-# Pattern recognition — rebuild spec (reader-first, tension-led)
+# Pattern recognition. Rebuild spec (reader-first, tension-led)
 
 **Status:** SPEC, not started. Decided 2026-06-28 with Duncan after reviewing the
 current tab on three live reports (SACAP Climate, SACAP Student, CCPB). This is a
-**rebuild**, not a wording patch — the deepest faults are in what each card chose
+**rebuild**, not a wording patch. The deepest faults are in what each card chose
 to *compute*, not how it reads.
 
-**Prerequisite — DONE:** the cross-report localStorage leak (a CCPB headline
+**Prerequisite. DONE:** the cross-report localStorage leak (a CCPB headline
 showing on SACAP) is fixed. All per-report stores (`turas_v2_takeout`,
 `_insights`, `_annotations`, `_story`, `_report`, `_banners`, `_composites`) now
 scope their key per project via `d2.storeKey` (20_data.js). Each report is
 discrete after a regen.
 
-**ctree / multi-way discovery is explicitly phase 3 — designed-for here, built
+**ctree / multi-way discovery is explicitly phase 3. Designed-for here, built
 later.** Key-driver stays "call the existing keydriver/catdriver module when
 needed", per Duncan.
 
@@ -20,22 +20,22 @@ needed", per Duncan.
 ## 1. What the tab is for (the 10-second job)
 
 A reader opening Patterns should, in ten seconds, get the **gist beyond the
-Dashboard** and be pointed at the **hidden story** — the things you miss reading
+Dashboard** and be pointed at the **hidden story**. The things you miss reading
 one question at a time. Duncan's own target output:
 
 > "Cape Town takes strain on most engagement metrics but believes its co-workers
-> are committed to quality more than any other big campus — what a tension that
+> are committed to quality more than any other big campus. What a tension that
 > produces."
 > "Marketing is low on satisfaction, person-centredness and recognition but high
 > on results-orientation."
 
-The unit of insight is a **group's character expressed as a contrast** — its lows
+The unit of insight is a **group's character expressed as a contrast**. Its lows
 and highs in the same breath. The tab is a GPS to those contrasts.
 
 ## 2. Why the current tab misses (diagnosis, from the real reports)
 
 - **Invents numbers that reconcile to nothing.** Campus "4.4 / 3.7" (average index
-  across all questions), area "Overall perceptions 40.8", call-centre "7.5" —
+  across all questions), area "Overall perceptions 40.8", call-centre "7.5",
   synthetic aggregates shown without a source; a researcher can't trace them, so
   they don't trust them.
 - **Averages across incompatible scales.** "Overall perceptions" blends an
@@ -48,26 +48,26 @@ and highs in the same breath. The tab is a GPS to those contrasts.
   invisibly); "why these 4 questions" is unexplained; the co-moving anchor pair is
   near-arbitrary.
 - **A non-pattern presented as a pattern.** Co-movement fires on most of the
-  survey (26 of ~30 on CCPB) — that's the general satisfaction halo, not a finding.
+  survey (26 of ~30 on CCPB): that's the general satisfaction halo, not a finding.
 - **Jargon and empty cards.** "survives correction"; cryptic confident-null text.
 
 ## 3. Three reader contracts (every card must pass all three)
 
-1. **Traceability** — every number shown is a real cell the reader can find in the
+1. **Traceability**. Every number shown is a real cell the reader can find in the
    crosstabs (a group's value and the rest's value on a *specific* question). No
    synthetic aggregate unless its working is shown and links to its rows.
-2. **Commensurability** — never average or compare across different scales. NPS,
+2. **Commensurability**, never average or compare across different scales. NPS,
    index and 0–100 each stay in their own lane. Aggregation only within one scale
    family.
-3. **Balance + plain language** — lows and highs get equal billing and equal
+3. **Balance + plain language**. Lows and highs get equal billing and equal
    visual weight; no statistician jargon on the face of a card; nulls read like a
    human or aren't drawn at all.
 
-## 4. Centrepiece — group portraits built around tension
+## 4. Centrepiece. Group portraits built around tension
 
 For each group worth profiling, read its **group-vs-the-rest** result on every
 question (the same disjoint vs-rest test built for composite banners and used by
-the Differences tab — see §9). From that set of findings:
+the Differences tab. See §9). From that set of findings:
 
 - **lows** = questions where the group is significantly *below* the rest;
   **highs** = significantly *above*. Each carries the group value, the rest value,
@@ -78,13 +78,13 @@ the Differences tab — see §9). From that set of findings:
 - **counter-spike** = the strongest finding in the *minority* direction (the high
   for a strained group; the low for a thriving one); 0 if none.
 - **tensionScore** = `leanScore × counterSpike`. High when a group leans hard one
-  way **and** breaks its own pattern sharply the other way — that contrast is the
+  way **and** breaks its own pattern sharply the other way. That contrast is the
   story.
-- **characterScore** = `max(Σe_low, Σe_high)`, base-weighted — how much the group
+- **characterScore** = `max(Σe_low, Σe_high)`, base-weighted. How much the group
   stands out overall, in its dominant direction. High for a uniformly extreme group
   (top, or bottom, on nearly everything) AND for a strong-leaning one.
 - **storyScore** = `characterScore + tensionScore`. A group is worth calling out for
-  EITHER reason — a sharp tension OR sheer uniform extremeness (e.g. top on 20 of
+  EITHER reason. A sharp tension OR sheer uniform extremeness (e.g. top on 20 of
   21 metrics, bottom-3 on everything). Ranking on character-plus-tension means a
   uniformly extreme group is never buried beneath a minor tension, while a genuine
   tension still rises among equally-extreme groups.
@@ -104,27 +104,27 @@ values**, never the effect size.
 ## 5. The 10-second GPS line
 
 The single sharpest tension, written as one or two plain sentences from the top
-card's *real* cells — e.g. "Cape Town carries a quiet tension: strained on
+card's *real* cells, e.g. "Cape Town carries a quiet tension: strained on
 engagement but proud of its people's quality." This replaces the auto-headline
 that was leaking. Editable inline (now scoped per report, so no cross-report
 leak). When no group shows real character, it states that plainly rather than
 manufacturing a headline.
 
-## 6. Tier 1.5 — widen the scan beyond banners (cheap discovery)
+## 6. Tier 1.5. Widen the scan beyond banners (cheap discovery)
 
 The microdata island carries *every* question, not just banner variables. Run the
 same vs-the-rest portrait scan over any **categorical / profile** variable's
 levels (not only the banner columns), so a subgroup you never crossed-by can still
 surface as a standout. JS-only, fully traceable, behind the same FDR gate. It
 finds **single-cut** surprises ("you didn't look here, but you should have"); it
-cannot find combinations — that's ctree (phase 3). Candidate cut-variables: single
+cannot find combinations. That's ctree (phase 3). Candidate cut-variables: single
 / multi categorical questions with adequate base, excluding the outcome questions
 themselves; optionally narrowed by a config `segment`-eligible tag (§8).
 
 ## 7. Shared card grammar (so ctree slots in unchanged)
 
-Every surfaced finding — banner portrait, single-variable surprise, or (later) a
-ctree segment — is the **same object**:
+Every surfaced finding. Banner portrait, single-variable surprise, or (later) a
+ctree segment. Is the **same object**:
 
 ```
 {
@@ -149,28 +149,28 @@ emits this shape; **no renderer change**.
   (§4), which carries both directions in one balanced card.
 - **Which split matters most → KEEP, reframed.** Drop the synthetic average-index
   ("4.4 / 3.7"). Instead: "the most and widest significant differences run by
-  *Campus* — start there", counting real significant vs-rest findings per banner.
+  *Campus*. Start there", counting real significant vs-rest findings per banner.
   A pure navigation pointer, fully traceable.
 - **Weakest / strongest area → KEEP only when commensurable.** Show a theme only
   if its questions share a scale family (auto-detected from `type`/`scale_max`
-  first; config `Scale_Family` tag as override — §8/config). Show the theme's real
+  first; config `Scale_Family` tag as override, §8/config). Show the theme's real
   member values, never a cross-scale average. If not commensurable, don't draw it.
 - **Co-movement → RETIRE for v1.** On these surveys it is the satisfaction halo,
   not a pattern. Optionally, the rigor footer notes "responses are dominated by a
   single overall sentiment" when ≥X% of pairs cohere. A future, inverted version
-  ("the few questions that move *independently* of the halo") may earn a card —
+  ("the few questions that move *independently* of the halo") may earn a card,
   not now.
 - **Odd-one-out / Hidden disagreement → DEMOTE to a quiet rigor footer.** No empty
   cards. One human line: "We also checked every group for a true exception and a
-  hidden two-camp split — nothing held up beyond chance." (Keeps the never-cry-wolf
+  hidden two-camp split. Nothing held up beyond chance." (Keeps the never-cry-wolf
   proof without the cryptic empty card.)
 - **Movement (waves) → KEEP as-is** (trackers); already traceable.
 
 ## 9. Comparison frame (decided)
 
-**vs the rest** is the spine — each group/segment against everyone not in it,
+**vs the rest** is the spine. Each group/segment against everyone not in it,
 disjoint by construction, every number a real cell. Where a **peer set** is
-defined (e.g. "big campuses"), add the peer annotation as extra punch — "and the
+defined (e.g. "big campuses"), add the peer annotation as extra punch, "and the
 highest of its peer group". vs-rest first, peer-relative as a sharpening overlay.
 
 ## 10. Config additions (optional; degrades gracefully to good)
@@ -178,18 +178,18 @@ highest of its peer group". vs-rest first, peer-relative as a sharpening overlay
 The engine runs zero-config off the existing islands. Config only sharpens it; an
 untagged project still gets tiers 1 and 1.5.
 
-- **`Scale_Family`** (per question) — groups questions that share a scale so areas
+- **`Scale_Family`** (per question): groups questions that share a scale so areas
   aggregate safely and NPS never mixes with index. Auto-detected where possible;
   this is the explicit override.
-- **Headline metric** — already exists as `project.takeout_headline` (27f); reuse
+- **Headline metric**. Already exists as `project.takeout_headline` (27f); reuse
   to lead the GPS line.
-- **`segment`-eligible / peer-set** (per banner/variable) — which variables are
+- **`segment`-eligible / peer-set** (per banner/variable), which variables are
   sensible cuts for tier 1.5, and which groups form a peer set for §9. Sensible
   default: categorical questions with adequate base, excluding outcomes.
 
 ## 10b. Curation & never-cry-wolf (carried over unchanged)
 
-The FDR / Benjamini-Hochberg trust-gate, the low-base guard, and the caps stay —
+The FDR / Benjamini-Hochberg trust-gate, the low-base guard, and the caps stay,
 they are the reason the current engine never cries wolf, and that discipline is
 the point. The rebuild changes *what is surfaced and how it reads*, not the
 statistical gate underneath.
@@ -199,25 +199,25 @@ statistical gate underneath.
 - `TR.stats` vs-rest primitives: `columnsFor`, `tabulate`, `netCounts`,
   `boxCounts`, `indexMeans`, `propZ`, `meanZ`, Kish `effectiveBase` (21_stats.js).
 - `27d_diffs.js` `collectFindings` / `restPct` already computes per-group,
-  per-question vs-rest findings with direction + effect — the tension engine
+  per-question vs-rest findings with direction + effect. The tension engine
   assembles **portraits** from this finder rather than re-deriving it.
 - `27da_takeout_stats.js` `cohenH` / `effectSize` for comparable ranking.
 - The FDR gate + CONST thresholds in `27e_takeout_engine.js`.
 
 ## 12. Integration per file
 
-- `27e_takeout_engine.js` — replace `groupPattern`/`splitPattern`/`areaPatterns`/
+- `27e_takeout_engine.js`. Replace `groupPattern`/`splitPattern`/`areaPatterns`/
   `comove`/`oddOne`/`bimodal` assembly with: `portraits()` (tension engine, §4),
   `variableScan()` (tier 1.5, §6), reframed `splitPointer()` (§8), commensurable
   `areaPattern()` (§8), and a `rigorFooter()` (§8). Keep `movement`.
-- `27g_takeout_components.js` — one `portraitCard()` for the shared grammar (§7);
+- `27g_takeout_components.js`. One `portraitCard()` for the shared grammar (§7);
   delete the per-pattern card variants; `gpsLine()` for §5; drop the
   "survives correction" chip from the face (tooltip only).
-- `27f_takeout_data.js` — curation/apex/veto keyed to the new portrait ids;
+- `27f_takeout_data.js`. Curation/apex/veto keyed to the new portrait ids;
   storage already scoped.
-- `27h_takeout_read.js` — render the GPS line + the portrait grid + the rigor
+- `27h_takeout_read.js`. Render the GPS line + the portrait grid + the rigor
   footer from the new objects.
-- `styles.css` — balanced two-direction card (lows and highs equal weight);
+- `styles.css`. Balanced two-direction card (lows and highs equal weight);
   retire the strain-dominant styling.
 
 ## 13. Verification (node harness, like composite_tests.mjs)
@@ -240,7 +240,7 @@ Then the suites: `takeout_tests.mjs`, `test_report_v2_bundler.R` (25),
 
 ## 14. Build order
 
-- **Phase 0 — DONE.** Per-report storage scoping (leak fix).
+- **Phase 0. DONE.** Per-report storage scoping (leak fix).
 - **Phase 1.** Card grammar + tension portraits on banners (§4, §7) + GPS line
   (§5); reframe the split pointer; make areas commensurable-only; demote nulls to
   the rigor footer; retire co-moving; balance the styling. Node harness.
@@ -248,9 +248,9 @@ Then the suites: `takeout_tests.mjs`, `test_report_v2_bundler.R` (25),
   (§6), same cards, same gate.
 - **Phase 2.** Config fields (`Scale_Family`, `segment`/peer-set) to sharpen areas
   and peer annotations; auto-detection first, config as override.
-- **Phase 3 — LATER (separate project).** ctree multi-way discovery: an R module
+- **Phase 3. LATER (separate project).** ctree multi-way discovery: an R module
   (partykit, weights, minbucket, NA-as-level, trivial-truth/collinearity guard),
   a precomputed subgroup island, rendered through the existing card grammar (§7).
   This is the only piece that moves computation into the R pipeline, so it carries
-  the most per-project robustness risk — scope it to the headline outcomes and
+  the most per-project robustness risk. Scope it to the headline outcomes and
   hold it to the same three contracts (§3).

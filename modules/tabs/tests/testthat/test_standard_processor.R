@@ -3,12 +3,12 @@
 # ==============================================================================
 #
 # Tests for core question processing pipeline:
-#   1. process_standard_question() — Single_Response processing
-#   2. process_standard_question() — Multi_Mention processing
-#   3. add_boxcategory_summaries() — BoxCategory aggregation
-#   4. add_summary_statistic() — Rating mean, Likert index, NPS score
-#   5. add_net_positive_row() — Top-bottom net calculation
-#   6. calculate_chi_square_row() — chi-square test
+#   1. process_standard_question(): Single_Response processing
+#   2. process_standard_question(): Multi_Mention processing
+#   3. add_boxcategory_summaries(): BoxCategory aggregation
+#   4. add_summary_statistic(): Rating mean, Likert index, NPS score
+#   5. add_net_positive_row(): Top-bottom net calculation
+#   6. calculate_chi_square_row(): chi-square test
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_standard_processor.R")
@@ -63,7 +63,7 @@ source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
 # Source weighting (needed for significance testing)
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
 
-# Source report_shared (build_fpc_multipliers / resolve_column_populations —
+# Source report_shared (build_fpc_multipliers / resolve_column_populations,
 # process_standard_question calls them on every significance path). Without it
 # the file only ran under tools/run_all_tests.R, where a sibling file had
 # already sourced it into the global environment.
@@ -209,10 +209,10 @@ make_processor_config <- function() {
 
 
 # ==============================================================================
-# 1. process_standard_question — Single_Response
+# 1. process_standard_question. Single_Response
 # ==============================================================================
 
-context("process_standard_question — Single_Response")
+context("process_standard_question. Single_Response")
 
 test_that("processes single-response question with frequency and column %", {
   data <- make_processor_test_data()
@@ -378,10 +378,10 @@ test_that("refuses missing question column", {
 
 
 # ==============================================================================
-# 2. process_standard_question — Multi_Mention
+# 2. process_standard_question. Multi_Mention
 # ==============================================================================
 
-context("process_standard_question — Multi_Mention")
+context("process_standard_question. Multi_Mention")
 
 test_that("processes multi-mention question", {
   data <- make_processor_test_data()
@@ -513,10 +513,10 @@ test_that("returns NULL when no BoxCategory defined", {
 
 
 # ==============================================================================
-# 4. add_summary_statistic — Rating mean
+# 4. add_summary_statistic. Rating mean
 # ==============================================================================
 
-context("add_summary_statistic — Rating/Likert/NPS")
+context("add_summary_statistic. Rating/Likert/NPS")
 
 test_that("calculates rating mean", {
   data <- make_processor_test_data()
@@ -910,7 +910,7 @@ test_that("proportion Sig. letters survive show_percent_column = N", {
   expect_true(any(nzchar(unlist(sig_hidden[, sig_cols])) &
                     unlist(sig_hidden[, sig_cols]) != "-"))
 
-  # With the percent row gone, the letters sit under the row that still shows —
+  # With the percent row gone, the letters sit under the row that still shows,
   # the frequency row for that option.
   first_sig <- which(hidden$RowType == "Sig.")[1]
   expect_equal(hidden$RowType[first_sig - 1], "Frequency")
@@ -1000,10 +1000,10 @@ test_that("weighted frequencies differ from unweighted", {
 
 
 # ==============================================================================
-# 9. calculate_likert_index — direct unit tests
+# 9. calculate_likert_index. Direct unit tests
 # ==============================================================================
 
-context("calculate_likert_index — direct")
+context("calculate_likert_index. Direct")
 
 test_that("likert index returns value between 1 and 5 for standard scale", {
   set.seed(42)
@@ -1065,10 +1065,10 @@ test_that("likert index returns NULL when no Index_Weight defined", {
 
 
 # ==============================================================================
-# 10. calculate_nps_score — direct unit tests
+# 10. calculate_nps_score. Direct unit tests
 # ==============================================================================
 
-context("calculate_nps_score — direct")
+context("calculate_nps_score. Direct")
 
 test_that("NPS score returns value between -100 and 100", {
   set.seed(42)
@@ -1121,10 +1121,10 @@ test_that("NPS score filters out DK and blank responses", {
 
 
 # ==============================================================================
-# 11. calculate_chi_square_row — direct unit tests
+# 11. calculate_chi_square_row. Direct unit tests
 # ==============================================================================
 
-context("calculate_chi_square_row — direct")
+context("calculate_chi_square_row. Direct")
 
 test_that("chi-square returns row with RowType ChiSquare for valid data", {
   # Simulate BoxCategory frequency results with strong association
@@ -1154,7 +1154,7 @@ test_that("chi-square returns row with RowType ChiSquare for valid data", {
 })
 
 test_that("chi-square returns NULL for insufficient data", {
-  # Only one row — need at least 2 for chi-square
+  # Only one row. Need at least 2 for chi-square
   boxcategory_results <- data.frame(
     RowLabel = "Top 2 Box",
     RowType = "Frequency",

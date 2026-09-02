@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 /**
- * PPTX visual QA gate (PPTX_BOARDROOM_SPEC.md WP6) — the last line of
+ * PPTX visual QA gate (PPTX_BOARDROOM_SPEC.md WP6): the last line of
  * defence before a deck reaches a boardroom: the other suites assert slide
  * XML strings; this one builds a REAL fixture deck covering every slide
- * archetype, validates the .pptx package structurally (every zip part —
- * including the embedded chart workbooks — must be well-formed XML) and
+ * archetype, validates the .pptx package structurally (every zip part,
+ * including the embedded chart workbooks. Must be well-formed XML) and
  * renders it through LibreOffice so a human (or agent) can eyeball the PNGs
  * for layout defects no string assert can see.
  *
  * Deck fixture (7 slides):
- *   1. cover            — authored exec summary + leading findings
- *   2. section divider  — numbered 01
- *   3. insight + bar    — weighted fixture (footer shows weighted/effective
+ *   1. cover. Authored exec summary + leading findings
+ *   2. section divider. Numbered 01
+ *   3. insight + bar. Weighted fixture (footer shows weighted/effective
  *                         bases), sig ▲▼ markers, analyst-insight callout
- *   4. quote slide      — 4 quotes incl. one with dropped (below-k) tags
- *   5. trend exhibit    — wave-delta chip + CI note in the footer
- *   6. Detail divider   — numbered 02 (auto-inserted for matrix pins)
- *   7. matrix slide     — index heatmap table
+ *   4. quote slide, 4 quotes incl. one with dropped (below-k) tags
+ *   5. trend exhibit. Wave-delta chip + CI note in the footer
+ *   6. Detail divider. Numbered 02 (auto-inserted for matrix pins)
+ *   7. matrix slide. Index heatmap table
  *
  * Rendering needs `soffice` (LibreOffice) on PATH and, for per-slide PNGs,
  * `pdftoppm` (poppler). Either being absent SKIPs the render checks with a
- * clear message — the structural gate still runs and CI stays green.
+ * clear message. The structural gate still runs and CI stays green.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/pptx_visual_qa.mjs
  */
@@ -51,11 +51,11 @@ function run(name, fn) {
   try { fn(); passed++; console.log("  ✓ " + name); }
   catch (e) { failed++; console.log("  ✗ " + name + "\n    " + e.message); }
 }
-function skip(name, why) { skipped++; console.log("  ~ SKIPPED " + name + " — " + why); }
+function skip(name, why) { skipped++; console.log("  ~ SKIPPED " + name + " – " + why); }
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function eq(a, b, msg) { if (a !== b) throw new Error(msg + ": expected " + JSON.stringify(b) + ", got " + JSON.stringify(a)); }
 
-/* ================= fixture deck — every archetype, weighted ================= */
+/* ================= fixture deck. Every archetype, weighted ================= */
 
 function setupFixture() {
   TR.AGG = {
@@ -71,7 +71,7 @@ function setupFixture() {
   TR.report = { sectionText: (s) => s === "exec"
     ? "Overall service holds up this wave: satisfaction is stable and the " +
       "branch channel keeps gaining share at the call centre's expense.\n" +
-      "The risk sits with recent graduates — their verbatims say support is " +
+      "The risk sits with recent graduates. Their verbatims say support is " +
       "too slow, and their KPI recovery is the most fragile."
     : "" };
   TR.conf = { methodNote: () => "Wilson 95%", modelIntervalKind: () => "props" };
@@ -82,9 +82,9 @@ function setupFixture() {
     _heatMatrix: () => ({
       head: ["Metric", "Total", "18–24", "25–34", "35+"],
       rows: [
-        ["Q10 — Overall Index", "7.4", "6.9", "7.5", "7.8"],
-        ["Q11 — Value Index", "7.1", "6.6", "7.2", "7.4"],
-        ["Q12 — Support Index", "6.2", "5.4", "6.3", "6.8"]
+        ["Q10. Overall Index", "7.4", "6.9", "7.5", "7.8"],
+        ["Q11. Value Index", "7.1", "6.6", "7.2", "7.4"],
+        ["Q12. Support Index", "6.2", "5.4", "6.3", "6.8"]
       ]
     })
   };
@@ -128,19 +128,19 @@ function fixtureItems() {
   return [
     { kind: "divider", title: "What moved this wave", note: "Service experience" },
     // insight + weighted bar chart with analyst note (archetype 3: the chart
-    // fills the body — chart+table+note on one slide squeezes fitMatrix down
+    // fills the body. Chart+table+note on one slide squeezes fitMatrix down
     // to a bases-only table, which is not the archetype)
     { q: "Q4", banner: "", filters: [], chartType: "bar", chartCols: [0],
       title: "Branch dominates and is pulling away",
       note: "Branch keeps growing at the call centre's expense.",
       flags: { chart: true, table: false, insight: true } },
-    // quote slide — 4 quotes, one with dropped below-k tags (archetype 5)
+    // quote slide, 4 quotes, one with dropped below-k tags (archetype 5)
     { kind: "snapshot", source: "qualitative",
       title: "Graduates want faster support",
       context: "4 of 12 shortlisted comments · Overall audience",
       html: "", lines: ["x"], moreN: 8, note: "",
       quotes: [
-        { text: "The branch staff sorted my registration in ten minutes — the app kept rejecting my documents.",
+        { text: "The branch staff sorted my registration in ten minutes. The app kept rejecting my documents.",
           q: "Why that score?", tags: ["Female", "25–34", "Promoter"], sentiment: "pos" },
         { text: "Support is far too slow. I waited three weeks for a reply and then had to phone anyway.",
           q: "Anything else?", tags: ["Male", "18–24", "Detractor"], sentiment: "neg" },
@@ -149,13 +149,13 @@ function fixtureItems() {
         { text: "The call centre is friendly but they never actually resolve the query first time.",
           q: "Why that score?", tags: ["Female", "35+"], sentiment: "neg" }
       ] },
-    // tracking trend exhibit — delta chip + CI note (archetype 6)
+    // tracking trend exhibit. Delta chip + CI note (archetype 6)
     { kind: "exhibit", title: "Service KPI recovers after the dip",
       qs: ["Q1"], banner: "", filters: [], ci: true,
       series: [{ code: "Q1", ri: 0, seg: "total", label: "Total" }],
       flags: { dist: false, trend: true, table: false, insight: true },
-      note: "Recovery is real but fragile — watch Wave 13." },
-    // matrix pin — auto-grouped behind the Detail divider (archetype 4)
+      note: "Recovery is real but fragile. Watch Wave 13." },
+    // matrix pin. Auto-grouped behind the Detail divider (archetype 4)
     { kind: "heatmap", banner: "", filters: [], note: "" }
   ];
 }
@@ -258,7 +258,7 @@ function xmlWellFormed(str, partName) {
 
 /* ================= build the deck ================= */
 
-console.log("PPTX visual QA gate — suite:");
+console.log("PPTX visual QA gate. Suite:");
 
 setupFixture();
 let slides, bytes;
@@ -272,7 +272,7 @@ run("fixture deck assembles: cover + divider 01 + bar + quotes + trend + Detail 
   assert(xmlOf(slides[0]).indexOf("Branch dominates and is pulling away") !== -1, "findings listed");
   assert(xmlOf(slides[1]).indexOf(">01<") !== -1, "story divider numbered 01");
   // WP6 render finding: a roundRect full-bleed background leaves white
-  // notched corners on the rendered divider — the background must be sharp
+  // notched corners on the rendered divider. The background must be sharp
   const FULL_BLEED = '<a:off x="0" y="0"/><a:ext cx="' +
     Math.round(13.333 * 914400) + '" cy="' + Math.round(7.5 * 914400) +
     '"/></a:xfrm><a:prstGeom prst="rect">';
@@ -365,13 +365,13 @@ if (!haveSoffice) {
       { timeout: 180000 });
     assert(!r.error && r.status === 0,
       "soffice exit " + (r.error ? r.error.message : r.status) +
-      (r.stderr ? " — " + String(r.stderr).slice(0, 300) : ""));
+      (r.stderr ? " – " + String(r.stderr).slice(0, 300) : ""));
     assert(existsSync(pdfPath), "PDF written");
     assert(statSync(pdfPath).size > 10000, "PDF has substance");
   });
 
   if (!havePdftoppm) {
-    skip("per-slide PNG render checks", "pdftoppm (poppler) not on PATH — PDF at " + pdfPath);
+    skip("per-slide PNG render checks", "pdftoppm (poppler) not on PATH. PDF at " + pdfPath);
   } else if (existsSync(pdfPath)) {
     run("pdftoppm rasterises one PNG per slide, none blank", () => {
       const r = spawnSync("pdftoppm",
@@ -394,6 +394,6 @@ if (!haveSoffice) {
 
 /* ================= summary ================= */
 
-const note = skipped ? " (" + skipped + " render check(s) SKIPPED — structural gate still ran)" : "";
+const note = skipped ? " (" + skipped + " render check(s) SKIPPED. Structural gate still ran)" : "";
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed" + note);
 process.exit(failed ? 1 : 0);

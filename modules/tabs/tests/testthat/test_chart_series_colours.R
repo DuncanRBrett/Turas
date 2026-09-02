@@ -3,10 +3,10 @@
 # ==============================================================================
 #
 # Tests for custom series colour support in nominal bar charts:
-#   1. Config parsing — chart_series_colour_1-8 fields
-#   2. Chart data assembly — series_colours array in chart_data JSON
-#   3. Backward compatibility — no series colours = existing behaviour
-#   4. Stacked bar isolation — custom series colours don't affect stacked bars
+#   1. Config parsing. Chart_series_colour_1-8 fields
+#   2. Chart data assembly. Series_colours array in chart_data JSON
+#   3. Backward compatibility. No series colours = existing behaviour
+#   4. Stacked bar isolation. Custom series colours don't affect stacked bars
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_chart_series_colours.R")
@@ -169,7 +169,7 @@ test_that("partial series colours (gaps) only includes non-null values", {
   config <- make_config_no_series()
   config$chart_series_colour_1 <- "#1B365D"
   config$chart_series_colour_3 <- "#E87722"
-  # 2 is NULL — should still get 2 colours (1 and 3, in order)
+  # 2 is NULL. Should still get 2 colours (1 and 3, in order)
   result <- extract_series_colours_compact(config)
   expect_length(result, 2)
   expect_equal(result[1], "#1B365D")

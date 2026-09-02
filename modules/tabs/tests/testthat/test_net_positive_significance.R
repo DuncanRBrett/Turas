@@ -7,7 +7,7 @@
 # it did not print. Decision (docs/tabs_production_review_2026-08/
 # NET_POSITIVE_SIG_DECISION.md): score each respondent +100 in the top box,
 # -100 in the bottom box, 0 otherwise, and test the weighted MEAN of that score
-# — which IS the printed net, and whose variance already carries the multinomial
+#, which IS the printed net, and whose variance already carries the multinomial
 # covariance between the two boxes.
 #
 # The two failure modes this file pins are the ones the decision brief named,
@@ -19,9 +19,9 @@
 #   B      50   60%     40%     +20      SAME net as A, top box 40pp apart
 #   C      50   20%     80%     -60      SAME top box as A, net 80pp apart
 #
-#   A vs C — the false negative. Identical top boxes, so the old test could
+#   A vs C. The false negative. Identical top boxes, so the old test could
 #            never letter them; they print 80 points apart.
-#   A vs B — the false positive. Identical printed nets, but a 40pp top-box gap
+#   A vs B. The false positive. Identical printed nets, but a 40pp top-box gap
 #            the old test lettered.
 #
 # Hand-derived expectations are in the comment above each assertion. Every
@@ -72,7 +72,7 @@ source(file.path(turas_root, "modules/tabs/lib/filter_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/data_loader.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
-# alpha_to_confidence_label — the dual-alpha Sig row labels come from here.
+# alpha_to_confidence_label. The dual-alpha Sig row labels come from here.
 source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))
 source(file.path(turas_root, "modules/tabs/lib/cell_calculator.R"))
 source(file.path(turas_root, "modules/tabs/lib/weighting.R"))
@@ -121,7 +121,7 @@ source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/standard_processor.R"))
 
 # ==============================================================================
-# FIXTURE — the three-column table described in the header
+# FIXTURE. The three-column table described in the header
 # ==============================================================================
 
 # Scores 1..5. Bottom 2 Box = {1, 2}; Top 2 Box = {4, 5}; 3 is unboxed middle.
@@ -226,7 +226,7 @@ np_run <- function(config = np_config(), weights = NULL, data = make_np_data()) 
 }
 
 # ==============================================================================
-# 1. THE PRINTED ROW — unchanged by this work
+# 1. THE PRINTED ROW. Unchanged by this work
 # ==============================================================================
 
 context("NET POSITIVE value is unchanged")
@@ -240,7 +240,7 @@ test_that("the printed net is still top box minus bottom box", {
 })
 
 # ==============================================================================
-# 2. THE SCORE — the per-respondent quantity the letters now test
+# 2. THE SCORE. The per-respondent quantity the letters now test
 # ==============================================================================
 
 context("net_positive_scores")
@@ -262,7 +262,7 @@ test_that("a respondent outside every box scores 0, so the mean IS the printed n
   # the column's base equals (top - bottom) / base, the published figure.
   # Non-answerers score 0 because the published row percentages them into the
   # denominator too (banner bases are the base-filtered column, not the
-  # answered base) — score and printed row must share one denominator.
+  # answered base): score and printed row must share one denominator.
   data <- make_np_data()
   data$Q[data$Grp == "A"][1:5] <- NA          # five A respondents did not answer
   r <- np_run(data = data)
@@ -282,7 +282,7 @@ context("NET POSITIVE letters test the printed net")
 
 test_that("columns with the SAME top box and different nets now letter (A vs C)", {
   # A and C both have a 20% top box, so the old top-box z-test saw z = 0 and
-  # could never letter them — while the page showed +20 against -60.
+  # could never letter them, while the page showed +20 against -60.
   #
   # Score means: A = +20, C = -60.  Population variances on the +-100 scale are
   # (t + b - (t-b)^2) * 100^2:
@@ -369,7 +369,7 @@ test_that("weighted runs test the weighted net on the effective base", {
 
 test_that("an EMPTY banner column drops out without shifting anyone's letters", {
   # A crossbreak with no respondents used to enter the test data anyway. It now
-  # drops out — and the letters of the columns that remain must be the ones they
+  # drops out, and the letters of the columns that remain must be the ones they
   # had before, not shifted by the gap (the letter-subsetting trap the final
   # 2026-08 review fixed in add_significance_row).
   data <- make_np_data()
@@ -426,7 +426,7 @@ test_that("a full-census column is excluded from pairing, not tested", {
 })
 
 # ==============================================================================
-# 5. THE INVARIANT — what is tested is what is printed
+# 5. THE INVARIANT. What is tested is what is printed
 # ==============================================================================
 
 context("NET POSITIVE tests what it prints")

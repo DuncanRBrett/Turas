@@ -1,8 +1,8 @@
 # ==============================================================================
-# TABS — AGGREGATE-WAVE BRIDGE (v2 data-centric report)
+# TABS. AGGREGATE-WAVE BRIDGE (v2 data-centric report)
 # ==============================================================================
 # Emits v2 wave-island PRIOR-wave contributions from a PRE-COMPUTED long values
-# table — one row per (metric, wave): a published figure + optional base + sd,
+# table. One row per (metric, wave): a published figure + optional base + sd,
 # with no respondent-level microdata. These are the historical waves that survive
 # only as spreadsheet aggregates (e.g. CCPB 2011->2024).
 #
@@ -19,7 +19,7 @@
 # match_key = tracking_norm(canonical code); a proportion row matches the current
 # question's category row by tracking_norm(label).
 #
-# HONEST BY CONSTRUCTION — the whole point of loading aggregates:
+# HONEST BY CONSTRUCTION. The whole point of loading aggregates:
 #   - a mean carries sd ONLY when the values table records it; a blank sd makes
 #     the renderer's Welch test return "no test", so historical means plot
 #     untested (never a fabricated arrow);
@@ -32,7 +32,7 @@
 # resolvable tracked category is SKIPPED with a console warning, not mis-keyed.
 #
 # Aggregate history is Total-only: contributions carry no segment breakouts
-# (segments = [], and questions omit seg_stats/bases — the renderer reads those
+# (segments = [], and questions omit seg_stats/bases, the renderer reads those
 # only when a segment is active). Depends on tracking_norm() + %||%
 # (tracking_island.R); the sidecar writer also uses write_wave_contribution().
 #
@@ -54,8 +54,8 @@ AGGREGATE_BRIDGE_METRIC_TYPES <- c("mean", "proportion", "nps")
 #'
 #' Reuses the tracker's spec grammar `category:<value>[=<display label>]`,
 #' optionally among comma-separated specs (e.g. "mean,category:Yes"). Returns the
-#' <value> — the option text the v2 crosstab row is matched on, so any display
-#' label after "=" is dropped — or NA when no category spec is present.
+#' <value>. The option text the v2 crosstab row is matched on, so any display
+#' label after "=" is dropped, or NA when no category spec is present.
 #'
 #' @param specs A single TrackingSpecs string (or NA).
 #' @return The category value, or NA_character_.
@@ -118,7 +118,7 @@ AGGREGATE_BRIDGE_METRIC_TYPES <- c("mean", "proportion", "nps")
 #' Build v2 wave-island prior-wave contributions from a pre-computed values table
 #'
 #' Turns a long table of published aggregates into the wave-island's prior-wave
-#' contributions, in the exact shapes the renderer reads — so historical waves
+#' contributions, in the exact shapes the renderer reads, so historical waves
 #' that have no microdata still light up the Tracking tab, with honest
 #' significance (see the file header).
 #'
@@ -128,7 +128,7 @@ AGGREGATE_BRIDGE_METRIC_TYPES <- c("mean", "proportion", "nps")
 #' QuestionCode == metric_id for the display title and the proportion category.
 #'
 #' @param values A data frame, one row per (metric, wave): columns metric_id,
-#'   wave, metric_type (mean|proportion|nps), value, and optional base, sd — the
+#'   wave, metric_type (mean|proportion|nps), value, and optional base, sd. The
 #'   shape load_aggregate_values() emits in `$values`. Assumed already validated
 #'   (unique metric/wave keys, numeric value); this function does not re-validate
 #'   ranges, only the presence of required columns.
@@ -156,7 +156,7 @@ aggregate_wave_contributions <- function(values, mapping = NULL, waves_meta = NU
   miss <- setdiff(need, names(values))
   if (length(miss) > 0) {
     cat(sprintf(
-      "[TURAS WARNING] Aggregate bridge: values table missing required column(s): %s — nothing emitted.\n",
+      "[TURAS WARNING] Aggregate bridge: values table missing required column(s): %s. Nothing emitted.\n",
       paste(miss, collapse = ", ")))
     return(list())
   }
@@ -202,7 +202,7 @@ aggregate_wave_contributions <- function(values, mapping = NULL, waves_meta = NU
         q <- list(match_key = mkey, title = title, base = base_out, stats = stats)
 
       } else if (identical(mtype, "nps")) {
-        # nps: the net, plus an sd ONLY when the values table records one — the
+        # nps: the net, plus an sd ONLY when the values table records one. The
         # same honest rule as the mean path. An NPS net IS testable when a
         # wave supplies the spread of its per-respondent +100/0/-100 scores
         # (the renderer treats NPS as a mean-kind row, so waves.sdAtWave reads
@@ -216,7 +216,7 @@ aggregate_wave_contributions <- function(values, mapping = NULL, waves_meta = NU
         cat_val <- info$category %||% NA_character_
         if (is.na(cat_val)) {
           cat(sprintf(
-            "[TURAS WARNING] Aggregate bridge: proportion metric '%s' has no TrackingSpecs category (category:<value>); skipped — cannot key its row.\n",
+            "[TURAS WARNING] Aggregate bridge: proportion metric '%s' has no TrackingSpecs category (category:<value>); skipped. Cannot key its row.\n",
             mid))
           next
         }
@@ -241,8 +241,8 @@ aggregate_wave_contributions <- function(values, mapping = NULL, waves_meta = NU
       questions = questions)
   }
 
-  # Oldest-first by year (NA keys keep input order, last). Cosmetic — the island
-  # assembler re-sorts — but keeps the emitted list tidy for inspection.
+  # Oldest-first by year (NA keys keep input order, last). Cosmetic. The island
+  # assembler re-sorts, but keeps the emitted list tidy for inspection.
   if (length(out_waves) > 1) {
     keys <- vapply(out_waves, function(w) {
       y <- suppressWarnings(as.numeric(w$year))

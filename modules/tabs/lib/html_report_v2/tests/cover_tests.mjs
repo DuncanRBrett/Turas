@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Exec-summary cover gate (READER_EXPERIENCE_PLAN bundle D) — three contracts:
+ * Exec-summary cover gate (READER_EXPERIENCE_PLAN bundle D): three contracts:
  *
  * G  Opt-in: the cover exists only where the study asked for it. The config's
  *    html_report_v2_cover rides the island as project.cover and gates every
@@ -10,7 +10,7 @@
  *
  * D1 Landing = exec summary: a saved/shared copy (user-state island present)
  *    that carries story content (pins incl. promoted hub insights, and/or an
- *    authored Report-tab executive summary / background) OPENS on a cover —
+ *    authored Report-tab executive summary / background) OPENS on a cover,
  *    title/client/wave, the analyst sections, 3–5 leading findings (each pin
  *    as its insight sentence over an evidence thumbnail rendered by the pin's
  *    OWN renderer) and an "Explore the dashboard →" action. Deep links
@@ -49,7 +49,7 @@ function eq(actual, expected, msg) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
   if (a !== e) throw new Error(msg + ": expected " + e + ", got " + a);
 }
-/** indexOf that refuses -1 — asserts presence AND returns the position. */
+/** indexOf that refuses -1. Asserts presence AND returns the position. */
 function at(hay, needle, msg) {
   const i = hay.indexOf(needle);
   if (i === -1) throw new Error(msg + ": missing " + JSON.stringify(needle));
@@ -108,7 +108,7 @@ function coverSandbox(opts) {
 const snap = (title) => ({ kind: "snapshot", source: "hub", title: title,
   context: "", html: "<div class='hx'>EVIDENCE</div>", lines: [], note: "" });
 
-console.log("Exec-summary cover (bundle D) — suite:");
+console.log("Exec-summary cover (bundle D): suite:");
 
 /* ---------------- the config gate (html_report_v2_cover) ---------------- */
 
@@ -124,7 +124,7 @@ run("gate: without html_report_v2_cover there is no cover, whatever else is true
   // and the landing / header link follow the same gate
   eq(shellSandbox(false).TR.shell.landingTab("", "takeout"), "takeout",
     "opted out -> today's landing");
-  // the same sandbox with the study opted in DOES open a cover — so the test
+  // the same sandbox with the study opted in DOES open a cover, so the test
   // above is failing on the gate, not on missing content
   const on = coverSandbox({ userState: { story: [snap("A finding")] },
     project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
@@ -133,10 +133,10 @@ run("gate: without html_report_v2_cover there is no cover, whatever else is true
 
 /* ---------------- D1: availability (all four combinations) ---------------- */
 
-run("D1: cover opens only when userState AND content — all four combinations", () => {
+run("D1: cover opens only when userState AND content. All four combinations", () => {
   // fresh + no content
   eq(coverSandbox({}).TR.reader.coverAvailable(), false, "fresh, no content");
-  // fresh + content (the analyst's own local story) — still no cover
+  // fresh + content (the analyst's own local story): still no cover
   const fresh = coverSandbox({});
   fresh.TR.story2.pinSnapshot(snap("Local pin"));
   eq(fresh.TR.reader.coverAvailable(), false, "fresh + content stays dashboard-first");
@@ -150,7 +150,7 @@ run("D1: cover opens only when userState AND content — all four combinations",
 
 run("D1: a config-authored exec summary or background alone is cover content", () => {
   // Sections are authored in the config (report_meta from the Comments sheet)
-  // and read-only in the app — the cover reads the SAME value the Report tab
+  // and read-only in the app. The cover reads the SAME value the Report tab
   // shows, so config sections alone (on a saved copy) are content…
   const exec = coverSandbox({ userState: {},
     project: { name: "P", report_meta: { exec_summary: "The findings that matter." } } });
@@ -233,11 +233,11 @@ const COVER_OPTS = {
     story: [
       snap("Value beats price in every region"),
       { kind: "divider", title: "Part 2", note: "" },
-      // an OLD question pin (no title field) — must still read as an insight
+      // an OLD question pin (no title field): must still read as an insight
       { kind: "question", q: "Q8", banner: "", filters: [],
         flags: { chart: false, table: true, insight: true }, note: "" }
     ],
-    // legacy locally-typed section — ignored now that sections are config-authored
+    // legacy locally-typed section. Ignored now that sections are config-authored
     report: { sections: { exec: "STALE LOCAL EDIT" }, about: {}, slides: [] }
   },
   project: { name: "CCS 2026", client: "CCS", wave: "Wave 2",
@@ -318,7 +318,7 @@ function pinSandbox() {
   });
 }
 
-run("D2: default-title chain — headline > surface default; the insight never titles", () => {
+run("D2: default-title chain. Headline > surface default; the insight never titles", () => {
   const sb = pinSandbox();
   const TR = sb.TR;
   TR.insights.set("Q7", "Course choice splits the campuses. More detail here.");
@@ -328,10 +328,10 @@ run("D2: default-title chain — headline > surface default; the insight never t
   const items = TR.story2.items();
   eq(items[0].title, "Registration is the pain point", "q.headline wins");
   eq(items[1].title, "",
-    "a stored insight does NOT title the pin — the pin body prints it in full");
+    "a stored insight does NOT title the pin. The pin body prints it in full");
   eq(TR.story2.pinTitle(items[1]), "Which course?",
     "the display chain falls to the question, not the insight");
-  eq(items[2].title, "", "else empty — each surface keeps its existing default");
+  eq(items[2].title, "", "else empty. Each surface keeps its existing default");
   eq(TR.story2.pinTitle(items[2]), "Plain short",
     "the display chain then falls to short_label/title");
 });
@@ -348,7 +348,7 @@ run("D2: story item + present title = the pin title; note stays editable as toda
   assert(html.indexOf('input') === -1 && html.indexOf("contenteditable") === -1,
     "no new title-editing control added");
   // present mode reads the same stored title
-  at(STORY_SRC, "model.code + \" — \" + (item.title || model.title)", "present title = pin title");
+  at(STORY_SRC, "model.code + \": \" + (item.title || model.title)", "present title = pin title");
 });
 
 // Priority comments ride the same question pin as the numbers: the block sits
@@ -378,7 +378,7 @@ run("priority comments render inside the pinned question card", () => {
     "an older pin renders unchanged");
 });
 
-run("D2: existing pins in saved copies render unchanged — no migration", () => {
+run("D2: existing pins in saved copies render unchanged. No migration", () => {
   const sb = coverSandbox(COVER_OPTS);
   const TR = sb.TR;
   const old = TR.story2.items()[2];   // the island's title-less question pin
@@ -421,14 +421,14 @@ const EXPORT_MODEL = {
 };
 
 run("D2: PPTX slide title = pin title when set, short_label/title default when not", () => {
-  // WP1 (boardroom spec): the question code no longer prefixes the slide title
-  // — it moves to the subtitle ("Q2 · <question text>") and the footer.
+  // WP1 (boardroom spec): the question code no longer prefixes the slide title,
+  // it moves to the subtitle ("Q2 · <question text>") and the footer.
   const exporter = exporterSandbox().TR.exporter;
   const withTitle = exporter.slideForModel(EXPORT_MODEL, "",
     { table: false, title: "Registration is the pain point" });
   at(withTitle.xml, "Registration is the pain point", "insight title on the slide");
   at(withTitle.xml, "Q2 · Flat single-select", "code + question text in the subtitle");
-  assert(withTitle.xml.indexOf("Q2 — ") === -1, "code no longer prefixes the title");
+  assert(withTitle.xml.indexOf("Q2: ") === -1, "code no longer prefixes the title");
   assert(withTitle.xml.indexOf("Flat short") === -1, "default title replaced");
   const without = exporter.slideForModel(EXPORT_MODEL, "", { table: false });
   at(without.xml, "Flat short", "title-less pins keep the existing default");
@@ -438,9 +438,9 @@ run("D2: image-deck/PNG card title = pin title when set, default when not", () =
   const exporter = exporterSandbox().TR.exporter;
   const withTitle = exporter.cardSvg(EXPORT_MODEL, "",
     { includeTable: false, title: "Registration is the pain point" });
-  at(withTitle, "Q2 — Registration is the pain point", "insight title on the card");
+  at(withTitle, "Q2: Registration is the pain point", "insight title on the card");
   const without = exporter.cardSvg(EXPORT_MODEL, "", { includeTable: false });
-  at(without, "Q2 — Flat short", "title-less pins keep the existing default");
+  at(without, "Q2: Flat short", "title-less pins keep the existing default");
 });
 
 
@@ -518,7 +518,7 @@ run("limit: a configured number is honoured", () => {
   eq(count(sb.TR.reader.coverHtml(), 'class="cf-title"'), 8, "eight findings rendered");
 });
 
-run("limit: 0 means ALL — every pin, however many", () => {
+run("limit: 0 means ALL. Every pin, however many", () => {
   const sb = coverSandbox(manyPins(14));
   sb.TR.AGG.project.cover_findings = 0;
   assert(sb.TR.reader.coverLimit() === Infinity, "0 is the no-limit sentinel");
@@ -630,7 +630,7 @@ run("a pinned section is NOT repeated as a leading finding", () => {
   eq(sb.TR.reader.coverEvidence().map((f) => f.title), ["A real finding"],
     "the two section pins are not evidence for the cover");
   const html = sb.TR.reader.coverHtml();
-  // each section's words appear exactly once — as the section, not again below
+  // each section's words appear exactly once, as the section, not again below
   eq(count(html, "What we found."), 1, "exec summary rendered once");
   eq(count(html, "How it was done."), 1, "background rendered once");
   eq(count(html, 'class="cf-title"'), 1, "one finding, not three");
@@ -640,7 +640,7 @@ run("a pinned section is NOT repeated as a leading finding", () => {
 
 run("the count line counts findings, not the sections it drops", () => {
   // 5 real pins + 2 section pins must read "5 of 5" and so print nothing,
-  // never "5 of 7" — the two it excludes are not findings being held back.
+  // never "5 of 7". The two it excludes are not findings being held back.
   const sb = coverSandbox({ userState: { story: [
     sectionPin("Executive summary"), snap("F1"), snap("F2"), snap("F3"),
     snap("F4"), snap("F5"), sectionPin("Background & method")] } });
@@ -649,7 +649,7 @@ run("the count line counts findings, not the sections it drops", () => {
     "nothing held back -> no count line");
 });
 
-run("only the narrative sections are dropped — every other pin source stays", () => {
+run("only the narrative sections are dropped. Every other pin source stays", () => {
   const other = ["dashboard", "patterns", "differences", "qualitative", "slide", "card"];
   const sb = coverSandbox({ userState: { story:
     other.map((src) => Object.assign(snap("P-" + src), { source: src })) } });

@@ -4,7 +4,7 @@ editor_options:
     wrap: 72
 ---
 
-# Turas AI Insights — Prompt Tuning Guide
+# Turas AI Insights. Prompt Tuning Guide
 
 ## Overview
 
@@ -23,12 +23,12 @@ All prompts are text constants in one file:
 modules/tabs/lib/ai/ai_prompts.R
 ```
 
-Six prompt constants: - `AI_SYSTEM_PROMPT` — persona and guardrails
-(shared across all callout calls) - `AI_CALLOUT_USER_PROMPT_TEMPLATE` —
-per-question analysis task - `AI_VERIFICATION_PROMPT_TEMPLATE` — factual
-accuracy check - `AI_SELECTIVITY_PROMPT_TEMPLATE` — editorial quality
-filter - `AI_EXEC_PATTERNS_PROMPT_TEMPLATE` — exec summary Stage 1
-(patterns) - `AI_EXEC_NARRATIVE_PROMPT_TEMPLATE` — exec summary Stage 2
+Six prompt constants: - `AI_SYSTEM_PROMPT`. Persona and guardrails
+(shared across all callout calls) - `AI_CALLOUT_USER_PROMPT_TEMPLATE`,
+per-question analysis task - `AI_VERIFICATION_PROMPT_TEMPLATE`. Factual
+accuracy check - `AI_SELECTIVITY_PROMPT_TEMPLATE`. Editorial quality
+filter - `AI_EXEC_PATTERNS_PROMPT_TEMPLATE`. Exec summary Stage 1
+(patterns) - `AI_EXEC_NARRATIVE_PROMPT_TEMPLATE`. Exec summary Stage 2
 (narrative)
 
 The `build_insight_prompt()` function assembles system + user prompts
@@ -40,7 +40,7 @@ with data interpolated. You edit the constants, not the function.
 
 ### Setup
 
-1.  Pick 3+ real past client datasets — not just the demo data. Choose
+1.  Pick 3+ real past client datasets, not just the demo data. Choose
     diversity:
 
     -   One with clean significance patterns
@@ -61,11 +61,11 @@ Score each callout 1-5:
 
 | Score | Meaning | Action |
 |---------------------|---------------------------|------------------------|
-| 5 | Would include in client report as-is | Keep — this is the target |
-| 4 | Useful observation, minor wording tweak | Keep — note what you'd change |
-| 3 | Technically correct but adds little | Fix — selectivity problem |
-| 2 | Misses the real story | Fix — prompt framing problem |
-| 1 | Factually wrong or contains recommendations | Fix — guardrail problem |
+| 5 | Would include in client report as-is | Keep. This is the target |
+| 4 | Useful observation, minor wording tweak | Keep. Note what you'd change |
+| 3 | Technically correct but adds little | Fix. Selectivity problem |
+| 2 | Misses the real story | Fix. Prompt framing problem |
+| 1 | Factually wrong or contains recommendations | Fix. Guardrail problem |
 
 **Target:** 60%+ of callouts score 4-5. Zero score 1.
 
@@ -78,7 +78,7 @@ Score each callout 1-5:
 These are the most dangerous. Fix first.
 
 **Numbers wrong?** The LLM can only cite what it's given. Check
-`extract_question_data()` output — is the data payload correct? Most
+`extract_question_data()` output. Is the data payload correct? Most
 "hallucination" problems are actually extraction problems.
 
 ``` r
@@ -181,9 +181,9 @@ sentences, not just one."
 
 ``` r
 # PROMPT VERSION LOG
-# V1 (2026-04-03) — Spec original
-# V2 (2026-04-05) — Added subgroup priority, tightened selectivity
-# V3 (2026-04-07) — Added negative examples, style guidance
+# V1 (2026-04-03): Spec original
+# V2 (2026-04-05): Added subgroup priority, tightened selectivity
+# V3 (2026-04-07): Added negative examples, style guidance
 ```
 
 3.  **Test across datasets.** A prompt that works for a CX study may
@@ -204,13 +204,13 @@ sentences, not just one."
 
 Tune separately from per-question callouts. Two stages:
 
-**Stage 1 (patterns — `AI_EXEC_PATTERNS_PROMPT_TEMPLATE`):** - Is it
+**Stage 1 (patterns, `AI_EXEC_PATTERNS_PROMPT_TEMPLATE`):** - Is it
 identifying the right 3-4 strongest/weakest measures? - Is the "dominant
 subgroup pattern" genuinely the most important dimension? - If not, add:
 "The most commercially relevant dimension is usually the one with the
 largest significant differences across the most questions."
 
-**Stage 2 (narrative — `AI_EXEC_NARRATIVE_PROMPT_TEMPLATE`):** - Does it
+**Stage 2 (narrative, `AI_EXEC_NARRATIVE_PROMPT_TEMPLATE`):** - Does it
 read like an executive summary or a list with connecting words? - Push
 for the Insight-Implications-Evidence structure - Add examples of good
 executive summaries from your past reports (anonymised)
@@ -222,7 +222,7 @@ executive summaries from your past reports (anonymised)
 The verification pass catches hallucinated numbers. If it's suppressing
 too many callouts:
 
-1.  Check `verification_issues` in the sidecar JSON — what's actually
+1.  Check `verification_issues` in the sidecar JSON. What's actually
     failing?
 2.  If the issues are legitimate, the problem is in the callout prompt,
     not verification

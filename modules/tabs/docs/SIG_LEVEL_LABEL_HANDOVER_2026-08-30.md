@@ -1,20 +1,20 @@
-# Handover — three v2 report defects found on the ASSA project
+# Handover. Three v2 report defects found on the ASSA project
 
 Three independent, small defects, each fixable on its own. All three are display
 or ordering issues: **no computed value in any report is wrong.**
 
-1. **The secondary significance level is labelled "80%" regardless of config** —
+1. **The secondary significance level is labelled "80%" regardless of config**,
    shared callouts + html_report_v2. ASSA is the only report currently affected.
-2. **Banner DisplayOrder is sorted as text**, so a tenth banner renders first —
+2. **Banner DisplayOrder is sorted as text**, so a tenth banner renders first,
    `banner.R`. One-line fix, mirrors what `data_setup.R` already does.
-3. **An Index row never says what scale it is on** — html_report_v2 renderer.
+3. **An Index row never says what scale it is on**. Html_report_v2 renderer.
    The data it needs already ships.
 
 Items 2 and 3 start after the horizontal rules below.
 
 ---
 
-# ITEM 1 — the HTML report hard-codes "80%" for the secondary significance level
+# ITEM 1. The HTML report hard-codes "80%" for the secondary significance level
 
 **Date:** 2026-08-30
 **Scope:** `modules/shared/lib/callouts/` + `modules/tabs/lib/html_report_v2/`
@@ -64,7 +64,7 @@ Two consequences for how you approach this:
 
 ---
 
-## 3. Evidence the numbers are fine (do not redo this — but you may re-verify)
+## 3. Evidence the numbers are fine (do not redo this, but you may re-verify)
 
 Recomputed every pairwise two-proportion z-test from the published counts in
 `ASSA_Annuity_Puzzle_Crosstabs_data.json` and compared against the letters the engine
@@ -91,7 +91,7 @@ Conclusion: the engine tests at the configured `alpha_secondary`. Only the wordi
 `alpha_secondary` became configurable; the prose that describes it did not follow.
 The secondary level used to be a fixed 0.20 convention and the help text still assumes it.
 
-### What is already correct (reuse these — do not reinvent)
+### What is already correct (reuse these, do not reinvent)
 
 | Location | What it does |
 |---|---|
@@ -100,16 +100,16 @@ The secondary level used to be a fixed 0.20 convention and the help text still a
 | `modules/tabs/lib/html_report_v2/assets/js/24a_reader.js:137-146` | `levelText(alpha)` → `Math.round((1-alpha)*100) + "%"`, plus `primaryLevel()` / `secondaryLevel()` and the `reader._levels()` accessor. **This is the correct helper.** Its own comment says the wording must never be a hard-coded "95%"/"80%". Only the reader layer uses it. |
 | `modules/tabs/lib/crosstabs/crosstabs_config.R:48` | `alpha_to_confidence_label(alpha)` → `"Sig. (95%)"` / `"Sig. (90%)"`. This is why **Excel is right**. Already covered by tests. |
 
-### What is wrong — user-visible hard-coded strings
+### What is wrong. User-visible hard-coded strings
 
-**Shared callouts (highest priority — these are the main legend and the long explainer):**
+**Shared callouts (highest priority, these are the main legend and the long explainer):**
 
 - `modules/shared/lib/callouts/callouts.json:286`
   > "…UPPERCASE letters = 95% confidence; with the 80% option on, **lowercase letters = 80%** (directional, weaker evidence)."
 - `modules/shared/lib/callouts/callouts.json:808`
   > "…we call it significant at the 95% level. At 80% it is less than one in 5… Upper case denotes significant at 95%, lowercase at 80%. Letters require a sample of at least {min_base} to show."
 
-Note `callouts.json` **already supports token substitution** — `{min_base}`, `{n}`,
+Note `callouts.json` **already supports token substitution**, `{min_base}`, `{n}`,
 `{threshold}`, `{interval_abbrev}`, `{universe}`, `{moe_pp}` and others are in use.
 Adding `{alpha_pct}` / `{alpha2_pct}` is consistent with the existing design, not a new
 mechanism. Renderer: `modules/shared/lib/callouts/callout_registry.R`.
@@ -118,13 +118,13 @@ mechanism. Renderer: `modules/shared/lib/callouts/callout_registry.R`.
 
 | File | Lines |
 |---|---|
-| `assets/js/25_cards.js` | 258 — `>95% + 80%</option>` (mode selector) |
-| `assets/js/27d_diffs.js` | 492 — `" — nearly significant (80%)"`; 580 — `>95% + 80%</option>` |
+| `assets/js/25_cards.js` | 258, `>95% + 80%</option>` (mode selector) |
+| `assets/js/27d_diffs.js` | 492, `", nearly significant (80%)"`; 580, `>95% + 80%</option>` |
 | `assets/js/27u_summary.js` | 98, 179, 231, 309, 322, 348 |
 | `assets/js/27v_visualise.js` | 172, 182 |
 
-**Lower priority — authoring/help metadata:**
-`assets/text_manifest.json` — three `*.context` / `token_help` strings referencing "the
+**Lower priority. Authoring/help metadata:**
+`assets/text_manifest.json`. Three `*.context` / `token_help` strings referencing "the
 80% level". These describe the feature to whoever edits copy; they are not rendered to
 report readers. Fix for consistency, not urgency.
 
@@ -162,12 +162,12 @@ report readers. Fix for consistency, not urgency.
 **Excel** label path only. Extend coverage so the **HTML** label path is asserted the same way:
 
 - a config with `alpha_secondary = 0.1` must render "90%" in the legend, the mode
-  selector and the tooltips — and must render **no** user-visible "80%".
+  selector and the tooltips, and must render **no** user-visible "80%".
 - a config with `alpha_secondary = 0.2` must still render "80%" everywhere (the no-op
   guarantee for CCPB / VAS / SACS).
 - a config with `alpha_secondary` absent must behave exactly as today (0.20 → "80%").
 
-JS suites live in `modules/tabs/lib/html_report_v2/tests/` —
+JS suites live in `modules/tabs/lib/html_report_v2/tests/`,
 `parity_stats_tests.mjs` and `reader_polish_tests.mjs` already reason about the 95%/80%
 letter sets. Note `reader_polish_tests.mjs:412` currently asserts the string
 `"lowercase = 80%"` is **absent**; check whether your change interacts with it.
@@ -223,12 +223,12 @@ Then re-run for a CCPB or SACS report and confirm the visible strings are **unch
   (`27u_summary.js`, `27t_tracking.js`) than ASSA does. Use it as the no-op regression case.
 - Reading `*.xlsx` written by openxlsx: `openpyxl` chokes on dangling drawings and
   collapsed dimensions. Parse the sheet XML directly, and handle **self-closing `<c/>`
-  cells** — a regex that assumes `<c …>…</c>` will silently shift columns.
+  cells**. A regex that assumes `<c …>…</c>` will silently shift columns.
 
 ---
 ---
 
-# ITEM 2 — banner DisplayOrder is sorted as text
+# ITEM 2. Banner DisplayOrder is sorted as text
 
 **Found:** 2026-08-30, same session, while adding an eighth banner to the ASSA project.
 **Scope:** `modules/tabs/lib/banner.R`
@@ -254,7 +254,7 @@ if ("DisplayOrder" %in% names(banner_questions) &&
 The config template stores `DisplayOrder` as **text** (verified in the ASSA
 workbook: every cell in column F of Selection is a shared string), so `order()`
 does a lexical sort. With eight banners numbered 2..9 plus one at 10, the order
-becomes `"10","2","3","4","6","7","8","9"` — the tenth banner renders **first**.
+becomes `"10","2","3","4","6","7","8","9"`. The tenth banner renders **first**.
 
 Observed live on ASSA: a banner at DisplayOrder 10 appeared as the leftmost tab,
 ahead of the one at 2.
@@ -279,7 +279,7 @@ if ("DisplayOrder" %in% names(options)) {
 The Selection path needs the same treatment. Coerce with `suppressWarnings(as.numeric(...))`
 before `order()`, and keep `na.last = TRUE` so a blank or non-numeric entry
 still sorts to the end rather than becoming an error. Check whether
-`banner.R:216-219` (the per-question option ordering) needs it too — it may
+`banner.R:216-219` (the per-question option ordering) needs it too. It may
 already be fed the coerced Options frame from data_setup.R, in which case leave
 it alone.
 
@@ -287,30 +287,30 @@ it alone.
 
 `order()` on a character vector is the whole bug, so the test is small:
 a Selection frame with banner DisplayOrders 2, 9 and 10 supplied **as
-character** must produce banner order 2, 9, 10 — not 10, 2, 9. Add it beside the
+character** must produce banner order 2, 9, 10, not 10, 2, 9. Add it beside the
 existing banner tests.
 
 ## Interim workaround now in place on ASSA
 
 The eight ASSA banners were renumbered 2..9 so lexical and numeric order agree.
-That config is correct either way and needs no change after the code fix — but
+That config is correct either way and needs no change after the code fix, but
 it will break again the moment a ninth banner pushes DisplayOrder to 10, so the
 code fix is the real remedy.
 
 ---
 ---
 
-# ITEM 3 — an Index row never says what scale it is on
+# ITEM 3. An Index row never says what scale it is on
 
 **Found:** 2026-08-31, same session, reading a Likert index on the ASSA project.
-**Scope:** `modules/tabs/lib/html_report_v2/` (renderer only — the data already ships)
+**Scope:** `modules/tabs/lib/html_report_v2/` (renderer only, the data already ships)
 **Type:** missing disclosure. No computed value is wrong.
 
 Independent of the two items above. Recorded here so one session can take all three.
 
 ## The defect
 
-A scale question renders a summary row — `Index`, `Mean` or `NPS Score` — and the
+A scale question renders a summary row, `Index`, `Mean` or `NPS Score`, and the
 report never states how it was scored. A reader sees `31.0` on one question and
 `8.5` on the next and has no way to know they are on different scales.
 
@@ -324,7 +324,7 @@ On ASSA, three different scoring schemes appear side by side:
 
 Two of them are labelled with the word "Mean"/"Index" and neither says which.
 The "Reading this table" panel says only that Index rows are "score-weighted
-means" — true, and not enough to interpret a number.
+means". True, and not enough to interpret a number.
 
 ## Why this is cheap to fix
 
@@ -339,7 +339,7 @@ the data layer:
 
 `21_stats.js:467`, `22w_waves.js:170` and `27d_diffs.js:193` all read it for the
 in-browser recompute. Nothing renders it. So this is a display change over data
-that is already present and already correct — no config work, no new column, and
+that is already present and already correct. No config work, no new column, and
 it cannot drift out of step with the engine.
 
 ## The fix
@@ -347,7 +347,7 @@ it cannot drift out of step with the engine.
 Surface `q.index_scores` on the summary row. Either a tooltip on the row label
 (the gold-edged `Index` row already has a distinct style to hang it off), or a
 line in the "Reading this table" panel naming the scale for the question on
-screen. Derive the wording from `index_scores` plus the question's type — do not
+screen. Derive the wording from `index_scores` plus the question's type. Do not
 hard-code "−100 to +100", because Rating questions are 0–10 and NPS is its own
 thing. Note that an NPS question's Options-sheet `Index_Weight` values are the
 raw 0–10 scores and are IGNORED by the engine, so read `index_scores`, not the

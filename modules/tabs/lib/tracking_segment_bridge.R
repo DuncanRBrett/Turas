@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS — TRACKING SEGMENT BRIDGE (v2 data-centric report, Phase 1b)
+# TABS. TRACKING SEGMENT BRIDGE (v2 data-centric report, Phase 1b)
 # ==============================================================================
 # Serialises the classic tracker module's per-segment trend output into the v2
 # wave-island's PRIOR-wave contributions, carrying COMPUTED per-segment totals
@@ -13,11 +13,11 @@
 #   Segments come from get_banner_segments(): "Total" (is_total) + one per banner
 #   value, each list(name, variable, value, is_total).
 #
-# Island consumer (assets/js/22w_waves.js) — already built for this:
+# Island consumer (assets/js/22w_waves.js): already built for this:
 #   meanValue -> waveQ.seg_stats[segKey].{mean,nps} (Total via waveQ.stats)
 #   baseOf    -> waveQ.bases[segKey]                (Total via waveQ.base)
 #   waves.segments() matches w.segments[].norm to the AGG banner-column label.
-# So the segment KEY is tracking_norm(segment value) — it matches the column
+# So the segment KEY is tracking_norm(segment value): it matches the column
 # label (e.g. "Western Cape" -> "western cape").
 #
 # DECISION (docs/SEGMENT_WAVE_TRENDS_PLAN.md): history = computed per-segment
@@ -36,7 +36,7 @@ if (!exists("%||%", mode = "function")) {
 #' A one-field named list, i.e. a JSON object `{field: value}`
 #'
 #' Kept explicit so jsonlite never collapses a single-entry stats block to an
-#' array — the renderer reads `waveQ.stats.mean` / `waveQ.seg_stats[k].mean`.
+#' array. The renderer reads `waveQ.stats.mean` / `waveQ.seg_stats[k].mean`.
 #'
 #' @keywords internal
 .tsb_stat <- function(field, value) {
@@ -188,7 +188,7 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
                   base = tbase, rows = rows, bases = bases)
 
       } else {
-        next                                             # multi_mention etc. — later phase
+        next                                             # multi_mention etc, later phase
       }
 
       questions[[length(questions) + 1]] <- q

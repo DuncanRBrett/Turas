@@ -79,7 +79,7 @@ context("tracking_island: wave_contribution")
 
 test_that("wave_contribution carries only metrics that have scores", {
   contrib <- wave_contribution(ti_data_layer(), ti_micro(), list(wave = "Wave 1", wave_order = 2024))
-  expect_equal(length(contrib$questions), 2)        # Q1, Q2 — not Q3
+  expect_equal(length(contrib$questions), 2)        # Q1, Q2, not Q3
   codes <- vapply(contrib$questions, function(q) q$title, character(1))
   expect_setequal(codes, c("Overall rating", "Recommend (NPS)"))
 })
@@ -243,7 +243,7 @@ test_that("no-mapping metrics occurrence-suffix duplicate titles (mirrors 22w en
   expect_true(any(grepl("question_mapping", out)))    # the reliable way to track them
 })
 
-test_that("duplicate-title keys survive a reorder — they follow the CODE (M14)", {
+test_that("duplicate-title keys survive a reorder. They follow the CODE (M14)", {
   # The suffix used to come from position in the data layer, so moving two
   # same-titled questions past each other handed each the other's key, and with
   # it the other's history. Same three questions, reordered: same keys.
@@ -407,13 +407,13 @@ test_that("read_wave_contributions keeps only the NEWEST sidecar per wave label"
 })
 
 # ==============================================================================
-# 6. pairing report — an unmatched tracker must be LOUD, not silently zero
+# 6. pairing report. An unmatched tracker must be LOUD, not silently zero
 # ==============================================================================
 
 context("tracking_island: pairing report")
 
 # A wave keyed by title (no Question_Mapping) against history keyed by canonical
-# code (built with one) — the CCPB W2026 failure. Every trend comes out empty and
+# code (built with one): the CCPB W2026 failure. Every trend comes out empty and
 # the tab would render "0 significant increases / 0 decreases / 0 stable".
 ti_contrib <- function(wave, year, keys) list(
   wave = wave, year = year, segments = list(),
@@ -480,7 +480,7 @@ test_that("a first wave (no history) is not a mismatch", {
 
 
 # ---------------------------------------------------------------------------
-# I24 — option-level pairing. A proportion trend pairs row by row on the
+# I24. Option-level pairing. A proportion trend pairs row by row on the
 # normalised option label alone (22w_waves.js rowValue), and contributes no
 # mean/NPS metric, so the question-level report above never looked at it: a
 # renamed option silently truncated that trend and read as "no movement".
@@ -552,7 +552,7 @@ test_that("a mean-only history reports nothing about options", {
 
 test_that("the option check runs even when this wave contributes no metric", {
   # A proportion-only tracker: nothing carries microdata scores, so the
-  # question-level report has an empty current contribution and says nothing —
+  # question-level report has an empty current contribution and says nothing,
   # exactly the case that had no check at all before.
   dl <- ti_dl("Q1", "Satisfaction", c("Extremely satisfied", "Satisfied"))
   priors <- list(ti_prior_rows("2025", 2025, "satisfaction",
@@ -573,7 +573,7 @@ test_that("build_tracking_island forwards the data layer to the option check", {
 })
 
 # ==============================================================================
-# 8. PUBLISHED (no-microdata) current wave — the confidentiality ship
+# 8. PUBLISHED (no-microdata) current wave. The confidentiality ship
 # ==============================================================================
 #
 # html_report_v2_microdata = FALSE ships no per-respondent records. The Tracking

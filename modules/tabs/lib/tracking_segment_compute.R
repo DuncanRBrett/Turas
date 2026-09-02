@@ -1,9 +1,9 @@
 # ==============================================================================
-# TABS — SEGMENT TREND COMPUTE (v2 data-centric report)
+# TABS. SEGMENT TREND COMPUTE (v2 data-centric report)
 # ==============================================================================
 # Config-driven orchestrator that turns per-respondent wave data into the
 # tracker `trend_results` shape (question -> segment -> wave_results) by calling
-# the classic tracker module's TESTED calculators — `calculate_weighted_mean`,
+# the classic tracker module's TESTED calculators, `calculate_weighted_mean`,
 # `calculate_nps_score`, `calculate_proportions` (modules/tracker/lib/
 # statistical_core.R). The result feeds `tracker_segment_contributions()`
 # (tracking_segment_bridge.R) -> the v2 wave island.
@@ -11,7 +11,7 @@
 # This is the "integrated tracker with segments" engine for the new format:
 # Total + each value of every banner dimension (e.g. Campus / Department /
 # Tenure), per wave, for each tracked metric. Segment cells with no data are
-# dropped (a metric or banner absent in a wave just leaves a gap — graceful).
+# dropped (a metric or banner absent in a wave just leaves a gap, graceful).
 #
 # Cross-wave matching is by COLUMN per wave (the caller supplies, per wave, the
 # data column for each metric and each banner dimension), so renumbered surveys
@@ -60,7 +60,7 @@ tracking_reset_unweighted_notices <- function() {
 # The metric's per-respondent value vector for one wave.
 #   * single-column metric -> `m$cols[[wid]]`.
 #   * composite / index     -> `m$sources[[wid]]` (>=1 source columns) resolved to
-#     the per-respondent mean of those columns (na.rm — a partial composite uses
+#     the per-respondent mean of those columns (na.rm, a partial composite uses
 #     the items the respondent answered), exactly how the data-layer composite
 #     (mean of its items) is computed.
 # Returns NULL when the metric is absent this wave (its column(s) missing).
@@ -115,12 +115,12 @@ tracking_reset_unweighted_notices <- function() {
 #'   `list(label = <e.g. "Campus">, cols = list(<wave id> = <column>))`.
 #' @param weight_col Optional weight column name. When supplied but absent from
 #'   a given wave, that wave is computed UNWEIGHTED and a console warning names
-#'   it — mixing weighted and unweighted waves in one trend is almost always an
+#'   it. Mixing weighted and unweighted waves in one trend is almost always an
 #'   export fault, not an intention (I-10).
 #'
 #' @return `list(trend_results = <question -> segment -> {metric_type,
 #'   question_text, wave_results}>, segments_meta = <segment_name -> {value,
-#'   variable, is_total}>)` — ready for `tracker_segment_contributions()`.
+#'   variable, is_total}>)`. Ready for `tracker_segment_contributions()`.
 #' @export
 compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NULL) {
   if (!is.list(waves) || length(waves) == 0) return(list(trend_results = list(), segments_meta = list()))
@@ -153,7 +153,7 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
       for (wid in wave_ids) {
         d <- wdata[[wid]]
         # The metric's per-respondent value vector this wave: a single data
-        # column, or — for a composite/index — the row-mean of several source
+        # column, or, for a composite/index, the row-mean of several source
         # columns (an engagement index = mean of its 12 items).
         metric_vec <- .tsc_metric_vector(m, wid, d)
         if (is.null(metric_vec)) next                               # metric absent this wave
@@ -167,7 +167,7 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
         # A weighted study whose export renamed the weight column in ONE wave
         # used to compute that wave unweighted, land it in the sidecars under an
         # implicit PASS, and plot it as genuine movement against its weighted
-        # neighbours — with nothing on the console. The sibling loader refuses
+        # neighbours, with nothing on the console. The sibling loader refuses
         # outright in this situation (wave_values_from_microdata ->
         # DATA_WEIGHT_MISSING); this path is an offline backfill tool, so it
         # names the wave and continues (review 2026-08-21, I-10).
@@ -198,7 +198,7 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
 #' Writes one `<wave>_wave.json` per wave carrying computed per-segment totals,
 #' into a `waves_source` directory. A normal v2 tabs build (run_crosstabs with
 #' `html_report_v2_tracking = TRUE` and `waves_source` pointed here) then reads
-#' them via `read_wave_contributions()` and assembles a segment-aware island —
+#' them via `read_wave_contributions()` and assembles a segment-aware island,
 #' NO pipeline change. Reuses compute_segment_trends() + the bridge +
 #' write_wave_contribution() (so the current wave stays the live tabs run).
 #'

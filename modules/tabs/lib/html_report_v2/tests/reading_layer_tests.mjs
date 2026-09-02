@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Reading layer gate (READER_EXPERIENCE_PLAN bundle B) — three contracts:
+ * Reading layer gate (READER_EXPERIENCE_PLAN bundle B): three contracts:
  *
- * B1 Read vs Analyse navigation: the tab bar renders two groups — READ
+ * B1 Read vs Analyse navigation: the tab bar renders two groups. READ
  *    (Dashboard · Patterns · Tracking · Qualitative · Story) then ANALYSE
- *    (Crosstabs · Differences · Report) — with a divider and aria-hidden
+ *    (Crosstabs · Differences · Report), with a divider and aria-hidden
  *    group labels; conditional tabs stay conditional; the tab ids (and so
  *    every saved-copy #hash deep link) are unchanged.
  * B2 Plain-language significance: a reader toggle (legend dialog + a compact
  *    control by the sig-mode select) that turns sig letters, composite arrows
- *    and Δ chips into focusable plain sentences built from the model — level
+ *    and Δ chips into focusable plain sentences built from the model. Level
  *    text derives from project.alpha (never hard-coded 95/80). Default ON for
  *    saved copies (user-state island present), OFF analyst-fresh; the
  *    reader's persisted choice owns once set.
@@ -41,7 +41,7 @@ function eq(actual, expected, msg) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
   if (a !== e) throw new Error(msg + ": expected " + e + ", got " + a);
 }
-/** indexOf that refuses -1 — asserts presence AND returns the position. */
+/** indexOf that refuses -1. Asserts presence AND returns the position. */
 function at(hay, needle, msg) {
   const i = hay.indexOf(needle);
   if (i === -1) throw new Error(msg + ": missing " + JSON.stringify(needle));
@@ -69,9 +69,9 @@ function shellSandbox(opts) {
   return sb;
 }
 
-console.log("Reading layer (bundle B) — suite:");
+console.log("Reading layer (bundle B): suite:");
 
-run("B1: full report — READ group first, ANALYSE after, exact order", () => {
+run("B1: full report. READ group first, ANALYSE after, exact order", () => {
   const sb = shellSandbox({ tracking: true, qual: true });
   eq(sb.TR.shell.tabGroups(), [
     { label: "Read", tabs: [["dashboard", "Dashboard"], ["takeout", "Group overview"],
@@ -123,7 +123,7 @@ run("B1: a tab switched off is never the tab the report opens on", () => {
     "a tab absent for want of data also falls back");
 
   // ASSA's actual shape, 28 Aug 2026: show_patterns AND show_dashboard both
-  // FALSE, comments on, no prior waves. Qualitative then leads the bar — and a
+  // FALSE, comments on, no prior waves. Qualitative then leads the bar, and a
   // comment tab is not a front door, so the fallback must skip it.
   const assa = shellSandbox({ qual: true,
     project: { tabs: { patterns: false, dashboard: false, tracking: false } } });
@@ -132,7 +132,7 @@ run("B1: a tab switched off is never the tab the report opens on", () => {
   eq(assa.TR.shell.visibleTab("takeout"), "crosstabs",
     "both overviews off -> the report opens on Crosstabs, never Qualitative");
 
-  // Story is not a front door either — a fresh report's Story tab is empty.
+  // Story is not a front door either. A fresh report's Story tab is empty.
   const storyOnly = shellSandbox({
     project: { tabs: { patterns: false, dashboard: false } } });
   eq(storyOnly.TR.shell.visibleTab("takeout"), "crosstabs",
@@ -151,7 +151,7 @@ run("B1: a tab switched off is never the tab the report opens on", () => {
     "the Dashboard still leads when it is in the bar");
 });
 
-run("B1: nav HTML — one divider, aria-hidden group labels, tab semantics intact", () => {
+run("B1: nav HTML. One divider, aria-hidden group labels, tab semantics intact", () => {
   const sb = shellSandbox({ tracking: true, qual: true });
   const html = sb.TR.shell._tabsNavHtml();
   assert(html.indexOf('<nav class="tabs" role="tablist">') === 0, "role=tablist preserved");
@@ -169,7 +169,7 @@ run("B1: nav HTML — one divider, aria-hidden group labels, tab semantics intac
   assert(html.indexOf('aria-selected="false"') !== -1, "aria-selected wiring unchanged");
 });
 
-run("B1: hash deep links keep working — ids unchanged, decode round-trips", () => {
+run("B1: hash deep links keep working. Ids unchanged, decode round-trips", () => {
   const sb = shellSandbox({ tracking: true, qual: true });
   // every id the grouped bar emits is still routed by shell.route (source-level)
   const shellSrc = readFileSync(path.join(JS_DIR, "24_shell.js"), "utf8");
@@ -241,20 +241,20 @@ const LETTER_MODEL = {
     { pct: 44, n: 44, sig: "" }, { pct: 51, n: 51, sig: "" }] }]
 };
 
-run("B2: letters case — exact sentence, letters resolved to labels + values", () => {
+run("B2: letters case. Exact sentence, letters resolved to labels + values", () => {
   const reader = readerSandbox({}).TR.reader;
   eq(reader.letterSentence(LETTER_MODEL, LETTER_MODEL.rows[0], 1),
     "Durban (62%) is meaningfully higher than Male (44%) and Cape Town (51%) " +
     "at the report's 95% level.", "letters sentence");
 });
 
-run("B2: lowercase-80 case with alpha 0.10 — level text derives from config", () => {
+run("B2: lowercase-80 case with alpha 0.10. Level text derives from config", () => {
   const sb = readerSandbox({ project: { alpha: 0.10 } });
   const model = JSON.parse(JSON.stringify(LETTER_MODEL));
   model.rows[0].cells[1].sig = "b";
   const s = sb.TR.reader.letterSentence(model, model.rows[0], 1);
   eq(s, "Durban (62%) is higher than Male (44%) at the weaker 80% level " +
-    "(directional) — not at the report's 90% level.", "lowercase sentence");
+    "(directional), not at the report's 90% level.", "lowercase sentence");
   assert(s.indexOf("95") === -1, "no hard-coded 95 anywhere with alpha 0.10");
   // both levels move with config: secondary 0.30 -> 70%
   const sb2 = readerSandbox({ project: { alpha: 0.10, alpha_secondary: 0.30 } });
@@ -262,7 +262,7 @@ run("B2: lowercase-80 case with alpha 0.10 — level text derives from config", 
     .indexOf("weaker 70% level") !== -1, "secondary level from alpha_secondary");
 });
 
-run("B2: mixed upper+lower letters — one sentence per level", () => {
+run("B2: mixed upper+lower letters. One sentence per level", () => {
   const reader = readerSandbox({}).TR.reader;
   const model = JSON.parse(JSON.stringify(LETTER_MODEL));
   model.rows[0].cells[1].sig = "Bc";
@@ -272,7 +272,7 @@ run("B2: mixed upper+lower letters — one sentence per level", () => {
     "dual-level sentence");
 });
 
-run("B2: arrow case — composite vs-the-rest, solid primary / hollow secondary", () => {
+run("B2: arrow case. Composite vs-the-rest, solid primary / hollow secondary", () => {
   const reader = readerSandbox({}).TR.reader;
   const model = JSON.parse(JSON.stringify(LETTER_MODEL));
   model.composite = true;
@@ -286,14 +286,14 @@ run("B2: arrow case — composite vs-the-rest, solid primary / hollow secondary"
     "level (directional).", "hollow arrow sentence");
 });
 
-run("B2: Δ chip sentence — wave named from the data, sig vs noise wording", () => {
+run("B2: Δ chip sentence. Wave named from the data, sig vs noise wording", () => {
   const reader = readerSandbox({}).TR.reader;
   eq(reader.deltaSentence({ prev: 58, diff: 4, isMean: false, sig: true, wave: "2025 H1" }),
     "This wave (62%) is meaningfully higher than 2025 H1 (58%) at the report's 95% level.",
     "significant change");
   eq(reader.deltaSentence({ prev: 8.4, diff: -0.2, isMean: true, sig: false, wave: "2025" }),
     "This wave (8.2) is lower than 2025 (8.4), but the change is within the " +
-    "survey's noise — not significant at the report's 95% level.", "non-sig change");
+    "survey's noise, not significant at the report's 95% level.", "non-sig change");
 });
 
 run("B2: default ON for saved copies, OFF analyst-fresh; persisted choice owns", () => {
@@ -320,7 +320,7 @@ function renderSandbox(opts) {
   return sb;
 }
 
-run("B2: explain ON — sig cell becomes a focusable tooltip carrying the sentence", () => {
+run("B2: explain ON. Sig cell becomes a focusable tooltip carrying the sentence", () => {
   const sb = renderSandbox({ userState: {} });
   const html = sb.TR.render.tableHtml(LETTER_MODEL, {});
   const span = at(html, '<span class="sg xpl" tabindex="0" data-explain="', "focusable sig span");
@@ -333,7 +333,7 @@ run("B2: explain ON — sig cell becomes a focusable tooltip carrying the senten
     "analyst-speak title replaced while explaining");
 });
 
-run("B2: explain OFF — legacy markup byte-identical (letters, arrows, chips)", () => {
+run("B2: explain OFF. Legacy markup byte-identical (letters, arrows, chips)", () => {
   const sb = renderSandbox({});
   const html = sb.TR.render.tableHtml(LETTER_MODEL, {});
   assert(html.indexOf('<span class="sg" title="Significantly higher than column(s) BC">▲BC</span>') !== -1,
@@ -344,7 +344,7 @@ run("B2: explain OFF — legacy markup byte-identical (letters, arrows, chips)",
     "legacy Δ chip title unchanged");
 });
 
-run("B2: explain ON — composite arrows and Δ chips carry sentences too", () => {
+run("B2: explain ON. Composite arrows and Δ chips carry sentences too", () => {
   const sb = renderSandbox({ userState: {} });
   const model = JSON.parse(JSON.stringify(LETTER_MODEL));
   model.composite = true;
@@ -368,7 +368,7 @@ run("B2: toggle lives in the legend dialog AND by the sig-mode control; tooltip 
   const cardsSrc = readFileSync(path.join(JS_DIR, "25_cards.js"), "utf8");
   // The Sig selector's markup moved into sigModeSelectHtml() when its option
   // labels started reading the project's configured levels, so adjacency is
-  // measured at the CALL SITE in renderControls — which is what the reader
+  // measured at the CALL SITE in renderControls, which is what the reader
   // actually sees side by side.
   at(cardsSrc, "data-sigmode>", "sig-mode select");
   const sig = at(cardsSrc, "sigModeSelectHtml(s.sigMode)", "sig-mode control");
@@ -385,7 +385,7 @@ run("B2: toggle lives in the legend dialog AND by the sig-mode control; tooltip 
 
 /* ---------------- B3: insight titles ---------------- */
 
-run("B3: fallback chain — headline wins, insight first sentence next, else null", () => {
+run("B3: fallback chain. Headline wins, insight first sentence next, else null", () => {
   const sb = readerSandbox({ insights: { Q8: "Registration drags scores down. Fix the queue first." } });
   const reader = sb.TR.reader;
   eq(reader.insightTitle({ code: "Q8", headline: "Registration is the pain point" }),
@@ -398,7 +398,7 @@ run("B3: fallback chain — headline wins, insight first sentence next, else nul
   eq(reader.insightTitle(null), null, "null-safe");
 });
 
-run("B3: crosstab header — headline leads, question drops to the secondary line", () => {
+run("B3: crosstab header. Headline leads, question drops to the secondary line", () => {
   const sb = readerSandbox({ insights: { Q7: "Course choice splits the campuses. More detail here." } });
   const TR = sb.TR;
   load(sb, "25_cards.js");
@@ -413,12 +413,12 @@ run("B3: crosstab header — headline leads, question drops to the secondary lin
     '<div class="qh-question">How was registration?</div>', "headline over title");
   eq(TR.cards2._titleHtml({ code: "Q7", title: "Which course?" }),
     "<h2>Which course?</h2>",
-    "a stored insight does NOT lead the header — it reads in full in the box below");
+    "a stored insight does NOT lead the header. It reads in full in the box below");
   eq(TR.cards2._titleHtml({ code: "Q6", title: "Plain question" }),
     "<h2>Plain question</h2>", "no insight -> plain header unchanged");
 });
 
-run("B3: dashboard card — insight line above the question line, anatomy intact", () => {
+run("B3: dashboard card. Insight line above the question line, anatomy intact", () => {
   const sb = readerSandbox({ insights: { Q8: "Strong scores. Detail follows." } });
   const TR = sb.TR;
   TR.charts = { clip: (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s)) };

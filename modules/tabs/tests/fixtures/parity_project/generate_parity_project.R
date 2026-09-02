@@ -1,11 +1,11 @@
 # ==============================================================================
-# CROSS-ENGINE PARITY FIXTURE — generator
+# CROSS-ENGINE PARITY FIXTURE. Generator
 # ==============================================================================
 #
 # Writes the small synthetic tabs project that the cross-engine parity harness
 # runs against (spec: docs/tabs_production_review_2026-08/CROSS_ENGINE_STATS_SPEC.md
-# section 3). Everything here is DETERMINISTIC — no RNG, no dates, no locale
-# dependence — so the generated workbooks and the island built from them are
+# section 3). Everything here is DETERMINISTIC. No RNG, no dates, no locale
+# dependence, so the generated workbooks and the island built from them are
 # reproducible byte for byte.
 #
 # REGENERATE WITH:
@@ -23,7 +23,7 @@
 #   Gamma    50   5000         0.01       1 (below 5% floor)      the floor
 #   Delta    50   (no row)     -          1 (unresolved)          no population
 #
-# Total base 200; population_size 5000 (coverage 4%, below the floor — the Total
+# Total base 200; population_size 5000 (coverage 4%, below the floor, the Total
 # column is never lettered anyway).
 #
 # Q1 is a Yes/No proportion question whose Beta-vs-Gamma pair is engineered to
@@ -48,7 +48,7 @@
 # letter, and the change is one a human can check by hand.
 #
 # Q2 is a 1-5 rating with a Top 2 Box net, an Index row AND a Standard Deviation
-# row — the summary block whose Sig. row is appended AFTER the Std Dev row, so
+# row. The summary block whose Sig. row is appended AFTER the Std Dev row, so
 # it pins the writer's mean-sig attachment (data_layer_writer.R mean_sig_for).
 #
 # Q3 is routed (BaseFilter Q1 == "Yes"), so its per-column bases are the Q1 Yes
@@ -58,8 +58,8 @@
 #
 # Q4 is an NPS question, added for review 2026-08 finding I1. Its Score row is
 # the one statistic whose per-respondent values the two engines derive
-# independently — R from calculate_nps_score(), JS from the category
-# distribution through nps_bucket_score() — so it is where a scale disagreement
+# independently. R from calculate_nps_score(), JS from the category
+# distribution through nps_bucket_score(), so it is where a scale disagreement
 # would show up as different published letters.
 #
 # Q5 is a 1-5 rating with BOTH boxes, added for review 2026-08 finding I5. It is
@@ -108,8 +108,8 @@ Q2_DIST <- rbind(
 # Q3 "Agree" counts, among that cohort's Q1 == "Yes" respondents only.
 Q3_AGREE <- c(Alpha = 14L, Beta = 27L, Gamma = 8L, Delta = 18L)
 
-# Q4 is an NPS question (review 2026-08, I1). Three answers only — 10, 8 and 5,
-# one per bucket — so the crosstab stays small and every NPS below is derivable
+# Q4 is an NPS question (review 2026-08, I1). Three answers only, 10, 8 and 5,
+# one per bucket, so the crosstab stays small and every NPS below is derivable
 # in one line. Counts are (promoters at 10, passives at 8, detractors at 5):
 #
 #   Alpha  24 /  8 /  8  (n=40)  NPS = (24- 8)/40*100 =  40   mean rating 8.6
@@ -125,7 +125,7 @@ Q3_AGREE <- c(Alpha = 14L, Beta = 27L, Gamma = 8L, Delta = 18L)
 # The Score row's Sig. letters are what the R engine writes into the island and
 # what the JS engine recomputes from the +-100 bucket scores. Before I1 the R
 # side t-tested the raw 0-10 ratings instead, so the two engines could letter
-# this row differently — the disagreement this question now gates against.
+# this row differently. The disagreement this question now gates against.
 Q4_DIST <- rbind(
   Alpha = c(24L,  8L,  8L),
   Beta  = c(30L, 12L, 18L),
@@ -146,9 +146,9 @@ Q4_SCORES <- c(10L, 8L, 5L)
 #   Gamma    50      20           0         30      60%      40%     +20
 #   Delta    50      40           0         10      20%      80%     -60
 #
-#   Beta vs Delta — IDENTICAL top boxes (20%), nets 80 points apart. The old
+#   Beta vs Delta. IDENTICAL top boxes (20%), nets 80 points apart. The old
 #     test compared top boxes, saw z = 0, and could never letter them.
-#   Beta vs Gamma — IDENTICAL nets (+20), top boxes 40 points apart. The old
+#   Beta vs Gamma. IDENTICAL nets (+20), top boxes 40 points apart. The old
 #     test lettered Gamma over Beta under two identical printed numbers.
 #
 # Both are ordinary data, not corner cases, which is why the fixture carries
@@ -211,7 +211,7 @@ build_structure_workbook <- function(path) {
   project <- data.frame(
     Setting = c("project_name", "project_code", "client_name",
                 "study_type", "study_date", "data_file", "total_sample",
-                # Declared so the weighted config passes validation — the
+                # Declared so the weighted config passes validation. The
                 # unweighted configs simply never read the Weight column.
                 "weight_column_exists", "weight_columns", "default_weight",
                 "weight_description"),
@@ -380,7 +380,7 @@ generate_parity_project <- function(dir = FIXTURE_DIR) {
 
   build_structure_workbook(file.path(dir, "Parity_Survey_Structure.xlsx"))
 
-  # Unweighted, dual alpha, with population — the main fixture.
+  # Unweighted, dual alpha, with population. The main fixture.
   build_config_workbook(file.path(dir, "Parity_Crosstab_Config.xlsx"),
                         "Parity_Crosstabs.xlsx", weighted = FALSE)
   # Weighted variant: same data, real Kish effective bases.
@@ -390,7 +390,7 @@ generate_parity_project <- function(dir = FIXTURE_DIR) {
   build_config_workbook(file.path(dir, "Parity_Crosstab_Config_NoPop.xlsx"),
                         "Parity_Crosstabs_NoPop.xlsx", weighted = FALSE,
                         with_population = FALSE)
-  # The plainest report Turas can produce — unweighted, single alpha, no
+  # The plainest report Turas can produce. Unweighted, single alpha, no
   # population. This is the batch's guardrail case: its output must be identical
   # to what pre-batch main produced, because none of the new code paths engage.
   build_config_workbook(file.path(dir, "Parity_Crosstab_Config_Plain.xlsx"),
@@ -408,7 +408,7 @@ PARITY_WORKBOOKS <- c(
 
 #' Write the fixture workbooks if any of them is missing
 #'
-#' The repo gitignores *.xlsx, so the workbooks are NOT committed — this
+#' The repo gitignores *.xlsx, so the workbooks are NOT committed. This
 #' generator is. Callers (the harness, the island regenerator) call this first;
 #' generation is deterministic, so a rebuilt workbook is the same workbook.
 ensure_parity_project <- function(dir = FIXTURE_DIR) {

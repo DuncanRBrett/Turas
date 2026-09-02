@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Question provenance gate — the Selection sheet's Source / Formula has to
+ * Question provenance gate. The Selection sheet's Source / Formula has to
  * reach the v2 report. A column worked out before the config ever saw it
  * arrives at the engine as a finished column, so a derived figure and an asked
  * one look identical on the page unless the config says which is which.
  *
  * P1 cards2._provenance: a Formula means derived, a Source alone means asked,
- *    neither means the card says nothing — and defensive on reports built
+ *    neither means the card says nothing, and defensive on reports built
  *    before the fields existed.
  * P2 The badge: DERIVED / ASKED beside the question code, escaped, with the
  *    source and formula in the tooltip. Nothing at all when undeclared.
@@ -74,7 +74,7 @@ const DERIVED = {
 const ASKED = { code: "Age", source: "survey question" };
 const SILENT = { code: "Gender" };
 
-console.log("Question provenance (Selection Source / Formula) — suite:");
+console.log("Question provenance (Selection Source / Formula): suite:");
 
 /* ---------------- P1: what counts as derived ---------------- */
 
@@ -90,7 +90,7 @@ run("P1: a Formula means derived; a Source alone means asked; neither -> null", 
   eq(TR.cards2._provenance("Gender"), null, "declares nothing -> nothing to say");
 });
 
-run("P1: defensive — unknown code and pre-feature data layers", () => {
+run("P1: defensive. Unknown code and pre-feature data layers", () => {
   const { TR } = cardsSandbox([SILENT]);
   eq(TR.cards2._provenance("NotAQuestion"), null, "unknown code is null-safe");
   // A report built before the columns existed has no source/formula keys at
@@ -106,7 +106,7 @@ run("P2: the note is for DERIVED questions only, formula first", () => {
   eq(TR.cards2._provNoteHtml("Elec_Spend"),
     '<div class="provnote"><b>Derived:</b> mean monthly spend among buyers  ·  ' +
     'electricity amount question</div>',
-    "the formula leads — it is the part that changes how the number reads");
+    "the formula leads. It is the part that changes how the number reads");
   // An asked question gets the badge and nothing else: 87 cards saying
   // "Source: survey question" would bury the lines that matter.
   TR = cardsSandbox([ASKED], on).TR;
@@ -117,7 +117,7 @@ run("P2: the note is for DERIVED questions only, formula first", () => {
 
 run("P3: the formula is never hidden; the toggle governs the source names", () => {
   const src = readFileSync(path.join(JS_DIR, "20_data.js"), "utf8");
-  at(src, "showSources: true", "default on — a reader should not have to find a checkbox");
+  at(src, "showSources: true", "default on. A reader should not have to find a checkbox");
 
   // Toggle ON: how it was worked out, then what from.
   const on = cardsSandbox([DERIVED], { showSources: true });
@@ -126,7 +126,7 @@ run("P3: the formula is never hidden; the toggle governs the source names", () =
   assert(noteOn.indexOf("electricity amount question") !== -1, "source shows");
 
   // Toggle OFF: the formula stays. A DERIVED badge with nothing beside it
-  // tells the reader the number was worked out and withholds how — and the
+  // tells the reader the number was worked out and withholds how, and the
   // control that would answer them is called "Sources", which is not what
   // they would go looking for.
   const { TR } = cardsSandbox([DERIVED], { showSources: false });
@@ -176,7 +176,7 @@ run("P4: badge and note sit in the question head", () => {
   const src = readFileSync(path.join(JS_DIR, "25_cards.js"), "utf8");
   at(src, 'provBadgeHtml(model.code) + sourceBadge', "badge beside the question code");
   at(src, "audienceHtml(model) + provNoteHtml(model.code)",
-    "note under the audience line — who was asked, then what the figure is");
+    "note under the audience line, who was asked, then what the figure is");
   assert(/\.badge-prov\s*\{/.test(CSS), ".badge-prov styled");
   assert(/\.badge-prov\.derived\s*\{/.test(CSS), "derived badge is distinguished");
   assert(/\.provnote\s*\{/.test(CSS), ".provnote styled");

@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — READER REPORT AI PROSE TESTS (mocked provider)
+# TABS MODULE. READER REPORT AI PROSE TESTS (mocked provider)
 # ==============================================================================
 #
 # The AI prose path is opt-in and calls a live model, so these tests stub the
@@ -46,7 +46,7 @@ suppressWarnings(suppressMessages(library(jsonlite)))
 
 # ---- stub the provider (no live call) ----------------------------------------
 # The reader_ai_prose functions live in globalenv (source(local=FALSE)), so the
-# stubs THEY call must also be in globalenv — a plain top-level assignment would
+# stubs THEY call must also be in globalenv. A plain top-level assignment would
 # land in testthat's test env, invisible to globalenv functions. We also force
 # the on-demand AI-layer loader to TRUE so it never re-sources the real provider
 # (which, with a live key in the env, would make live calls). The stub reads the
@@ -109,7 +109,7 @@ BAD <- modifyList(GOOD, list(verdict = "A remarkable 999 respondents drove the r
 
 context("reader_ai_prose: privacy of the payload")
 
-test_that("the facts payload is aggregates-only — no verbatims or microdata", {
+test_that("the facts payload is aggregates-only. No verbatims or microdata", {
   facts <- reader_ai_facts(mk_model())
   expect_true(!is.null(facts$headline) && length(facts$headline) >= 1)
   expect_true(!is.null(facts$items) && length(facts$items) >= 1)
@@ -181,7 +181,7 @@ test_that("disabled or no response leaves the deterministic narrative unchanged"
 })
 
 # ==============================================================================
-# WP1 — failure visibility: a degraded AI run must be marked, not hidden (§3.7)
+# WP1. Failure visibility: a degraded AI run must be marked, not hidden (§3.7)
 # ==============================================================================
 
 context("reader_ai_prose: failure visibility (WP1)")
@@ -211,7 +211,7 @@ test_that("a successful AI run records requested_mode = ai and no fallback", {
 })
 
 # ==============================================================================
-# WP2 — fact-sheet v2: fact ids + derived numbers + design facts, and a checker
+# WP2. Fact-sheet v2: fact ids + derived numbers + design facts, and a checker
 # that accepts legitimately derived figures but still rejects alien ones (§3.2/§3.6)
 # ==============================================================================
 
@@ -231,7 +231,7 @@ test_that("the facts payload carries stable ids, a derived pool and design facts
   # design facts ground the limits prose
   expect_false(is.null(facts$design))
   expect_equal(facts$design$censusOrSample, "Census")
-  # still aggregates only — no microdata / verbatim keys anywhere
+  # still aggregates only. No microdata / verbatim keys anywhere
   flat <- paste(names(unlist(facts)), collapse = " ")
   expect_false(grepl("record|verbatim|text|respondent|answers|micro", flat, ignore.case = TRUE))
 })

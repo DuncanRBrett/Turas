@@ -434,10 +434,10 @@ selection_declared_provenance <- function(selection_df, code) {
 #' @param all_results List, all question results
 #' @param composite_results List, composite results
 #' @param banner_info List, banner information
-#' @param composite_defs Data frame, the Composite_Metrics sheet. Optional —
+#' @param composite_defs Data frame, the Composite_Metrics sheet. Optional,
 #'   supplied so each composite can state its own provenance (which questions
 #'   feed it and how they combine) without the analyst retyping it.
-#' @param selection_df Data frame, the Selection sheet. Optional — an analyst's
+#' @param selection_df Data frame, the Selection sheet. Optional. An analyst's
 #'   own Source / Formula wins over the generated wording, per field.
 #' @return List, updated all_results
 #' @export
@@ -494,7 +494,7 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
 
     # Provenance. A composite is the one derived question the engine builds
     # itself, so it can say which questions feed it and how they combine
-    # without anyone declaring it — otherwise a calculated index would be the
+    # without anyone declaring it. Otherwise a calculated index would be the
     # one obviously derived figure on the page with nothing said about it.
     # The analyst's own words still win, per field.
     comp_def <- NULL
@@ -624,7 +624,7 @@ run_crosstabs_analysis <- function(config_result, data_result,
   log_message(sprintf("Processed %d questions", length(all_results)), "INFO")
 
   # NOTE: the checkpoint is NOT cleaned up here. It used to be, which threw away
-  # the whole analysis if composites, sheet building or the save then failed —
+  # the whole analysis if composites, sheet building or the save then failed,
   # the re-run started from zero (review 2026-08-21, M-11). run_crosstabs.R now
   # removes it only after the workbook is safely on disk.
 
@@ -637,7 +637,7 @@ run_crosstabs_analysis <- function(config_result, data_result,
     config_result$config_obj
   )
 
-  # A failed composite (REFUSED entry) makes the run PARTIAL — a contractual
+  # A failed composite (REFUSED entry) makes the run PARTIAL. A contractual
   # metric is absent from the deliverable (review 2026-08, I12).
   failed_comps <- names(Filter(
     function(x) is.list(x) && identical(x$status, "REFUSED"), composite_results))

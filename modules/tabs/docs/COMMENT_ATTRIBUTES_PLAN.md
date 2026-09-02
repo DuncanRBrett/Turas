@@ -1,4 +1,4 @@
-# Per-Comment Attributes — NPS split + demographic tagging
+# Per-Comment Attributes. NPS split + demographic tagging
 
 **Status:** BUILT + tested on branch `feature/tabs-comment-attributes` (verified against the
 live CCPB CSAT W2026 config/data) · Duncan wires his config + regenerates via `launch_turas`.
@@ -6,10 +6,10 @@ live CCPB CSAT W2026 config/data) · Duncan wires his config + regenerates via `
 **Module:** `tabs` (qualitative comment reporting in `html_report_v2`)
 
 > **What was built (all tested, no pipeline run on client data):**
-> - **Feature 1** — `CommentSheet` accepts a `Sheet:Band; …` mapping; band sheets reassemble
+> - **Feature 1**, `CommentSheet` accepts a `Sheet:Band; …` mapping; band sheets reassemble
 >   into one question (`qual_unions.R`); band derived from the recommend score + reconciled
 >   (`qual_derive_bands`); All/Detractor/Passive/Promoter segmented view (`27q_qualitative.js`).
-> - **Feature 2** — `qual_tag_dimensions` attaches host-survey tags via the join
+> - **Feature 2**, `qual_tag_dimensions` attaches host-survey tags via the join
 >   (`qual_attach_host_tags`), **band-aware** k-anonymised (`qual_kanon_tags_by_group`); reader
 >   🏷 Tags on/off + per-field toggle; chips read `Label: value`.
 > - Tests: `test_qual_unions.R` (55), `test_qual_host_tags.R` (21), `qual_tests.mjs` (+25 → 203);
@@ -26,7 +26,7 @@ spec) and §10 (confidentiality dials), and reuses the Phase-2 join from
 > question; **(2)** we want to tag comments with demographics/firmographics
 > (which centre, which channel), toggleable on/off, with a way to limit or
 > prevent tagging on confidential low-sample surveys. Everything below is
-> grounded in the current code — file:line references are to the tree as of
+> grounded in the current code. File:line references are to the tree as of
 > this date. Items marked *(to confirm)* are assumptions I have not verified
 > against client data.
 
@@ -38,7 +38,7 @@ Both asks are the **same underlying thing**: a *structured attribute attached to
 a comment*. One is a categorical band (NPS: detractor/passive/promoter); the
 other is a demographic value (centre, channel). The qual tab already carries
 per-comment attributes and already knows how to filter, display, and
-disclosure-gate them. So neither feature is a from-scratch build — both are new
+disclosure-gate them. So neither feature is a from-scratch build. Both are new
 **sourcing** and new **surfacing** of an attribute channel that exists.
 
 What already exists (verified in code):
@@ -57,10 +57,10 @@ What is genuinely new:
 - **Feature 1:** union several source sheets/columns into **one reported
   question**, stamp each comment with its band, and let the reader view by band.
   The reader is strictly one-sheet→one-question today (`qual_classify_sheet`),
-  and `qual_build_links()` overwrites by target — so the union is real new work.
-  *(Spec already sketched at `QUALITATIVE_TAB_PLAN.md` §3 line 83 — unbuilt.)*
+  and `qual_build_links()` overwrites by target, so the union is real new work.
+  *(Spec already sketched at `QUALITATIVE_TAB_PLAN.md` §3 line 83, unbuilt.)*
 - **Feature 2:** source tags from the **host survey microdata** (centre,
-  channel — not in the comment workbook) via the join, and add a **reader-facing
+  channel, not in the comment workbook) via the join, and add a **reader-facing
   on/off + field-pick toggle**. Display + gate exist; host-sourcing and the
   toggle do not.
 
@@ -74,25 +74,25 @@ tenure) is config, not code.
 
 An **attribute** attached to a comment has three independent properties:
 
-**A. Source** — where the value comes from:
-- `workbook` — a column in the coded comment workbook (today's `r.demos` path).
-- `host` — a banner/derived variable in the main survey, attached via the
+**A. Source**. Where the value comes from:
+- `workbook`. A column in the coded comment workbook (today's `r.demos` path).
+- `host`. A banner/derived variable in the main survey, attached via the
   ResponseID join (`idx` → host microdata). *(new)*
-- `derived` — computed from a host variable by a named rule; the first rule is
+- `derived`. Computed from a host variable by a named rule; the first rule is
   `nps_band` (0–6 Detractor / 7–8 Passive / 9–10 Promoter from the recommend
   score, reusing `nps_bucket_score()` thresholds). *(new)*
 
-**B. Usage** — how it may be used (config flags per attribute):
-- `filter` — narrows the audience (already the global-filter/mask path).
-- `split` — offers a view-by segmented control on the question (Feature 1's band).
-- `tag` — renders as a chip on the comment (Feature 2).
+**B. Usage**. How it may be used (config flags per attribute):
+- `filter`. Narrows the audience (already the global-filter/mask path).
+- `split`. Offers a view-by segmented control on the question (Feature 1's band).
+- `tag`. Renders as a chip on the comment (Feature 2).
 
-**C. Disclosure policy** — every attribute, whatever its source or usage, passes
+**C. Disclosure policy**. Every attribute, whatever its source or usage, passes
 through the **same** gate: `qual_kanon_tags()` (k-anonymity on the *combination*
 of shown attributes) + the audience k-gate + the `block`/`safe`/`allow` dial.
 This is the property that makes the model safe by construction: adding the NPS
 band as an attribute means it is automatically k-anonymised alongside centre and
-channel — three quasi-identifiers on one verbatim can't silently triangulate a
+channel. Three quasi-identifiers on one verbatim can't silently triangulate a
 person, because the combination is what's gated, and that logic already exists.
 
 The whole plan is: **implement `host` and `derived` sources, add the `split` and
@@ -100,24 +100,24 @@ The whole plan is: **implement `host` and `derived` sources, add the `split` and
 
 ---
 
-## 3. Feature 1 — NPS comments: three columns → one question, view by band
+## 3. Feature 1. NPS comments: three columns → one question, view by band
 
 ### 3.1 The problem, precisely located
 
 CCPB Q79 ("how likely to recommend") routes its follow-up "why?" into three
-survey columns by band, so the export — and the Comment Appendix builder, which
-emits **one sheet per open-end column** (`scripts/build_comment_appendix.py`) —
+survey columns by band, so the export, and the Comment Appendix builder, which
+emits **one sheet per open-end column** (`scripts/build_comment_appendix.py`),
 produces three sheets. The report can't present them as one question because:
 - the reader derives the question code from the sheet name, one question per
   sheet (`qual_workbook_reader.R` `qual_classify_sheet`);
 - `qual_build_links()` maps one closed target → one comment sheet, overwriting
   (`qual_report.R:185`).
 
-*(The exact CCPB column/sheet names are not verified here — to confirm against
+*(The exact CCPB column/sheet names are not verified here, to confirm against
 the live config. The three-band shape is stated in `QUALITATIVE_TAB_PLAN.md`
 §3 line 62.)*
 
-### 3.2 Recommended approach — in-engine union (honours §3 line 83)
+### 3.2 Recommended approach. In-engine union (honours §3 line 83)
 
 Declare in config that **N source sheets union into one reported question**, each
 source stamped with a **band label**, and the band becomes a first-class `split`
@@ -126,7 +126,7 @@ attribute on every record. Concretely:
 1. **Config contract (Selection sheet, the open-end row).** Extend `CommentSheet`
    to accept a *mapping* rather than a single sheet, e.g.
    `CommentSheet = "Q79_det:Detractor; Q79_pas:Passive; Q79_pro:Promoter"`
-   (single-sheet strings keep working unchanged — backward compatible). Add an
+   (single-sheet strings keep working unchanged, backward compatible). Add an
    optional `SplitDimension` label (default `"NPS band"`) and `SplitOrder`
    (display order of the bands).
 2. **Reader/assemble.** A new union step reads each mapped sheet, tags each
@@ -141,20 +141,20 @@ attribute on every record. Concretely:
    as `r.demos`, so it inherits `qual_kanon_tags`).
 
 **Theme harmonisation across the union (implementation watch-point).** The three
-band-sheets will usually carry *different* theme frames — promoters' themes
+band-sheets will usually carry *different* theme frames. Promoters' themes
 ("great service") aren't detractors' ("poor service"). When the sheets union into
 one question, the question's theme set becomes the union of the three, and the
 prevalence board shows each theme's salience with per-band valence (which is
 exactly what you want: the segmented control then reads "promoters raised X,
 detractors raised Y"). But if the same underlying theme was labelled differently
-per band, it will double-count until the labels are harmonised — and cross-sheet
+per band, it will double-count until the labels are harmonised, and cross-sheet
 theme-label merging is an explicit *unbuilt* refinement today
 (`qual_assemble.R:19-21`). So the union step needs a `theme_aliases`/label-merge
 pass (sketched at `QUALITATIVE_TAB_PLAN.md` §3 line 81) or a documented
 assumption that the coded workbook uses one theme frame across the bands. Flag,
 don't silently merge.
 
-### 3.3 Where the band label comes from — derive *and* validate
+### 3.3 Where the band label comes from. Derive *and* validate
 
 Prefer **deriving** the band from the host recommend score, with sheet-of-origin
 as fallback and a reconciliation flag:
@@ -165,18 +165,18 @@ as fallback and a reconciliation flag:
 - **Fallback:** if the recommend score isn't identified in config, use
   sheet-of-origin (the `CommentSheet` mapping label).
 - **Reconciliation (cheap QA, high honesty value):** when both are available and
-  disagree (a comment in the "promoter" sheet whose score is 6), flag it — a
+  disagree (a comment in the "promoter" sheet whose score is 6), flag it. A
   build-time count in the console (TRS-style) and an optional per-comment marker.
   This catches routing/coding drift for free because the join is already there.
 
 Config to identify the score: reuse `CommentLink` (the closed target is the NPS
-question) or a `NpsScoreQuestion` key; no `Q79` hardcoding — generic by
+question) or a `NpsScoreQuestion` key; no `Q79` hardcoding. Generic by
 `Variable_Type = "NPS"`.
 
-### 3.4 "View by band" UX — a segmented control on the question
+### 3.4 "View by band" UX. A segmented control on the question
 
 Add an `All / Detractors / Passives / Promoters` segmented control at the top of
-the question's drawer that filters the record list by the band attribute —
+the question's drawer that filters the record list by the band attribute,
 **local to the question**, mirroring the existing `sentimentFilter`
 (`27q:178`) and `tierFilter` (`27q:33`) patterns exactly. Low-risk, established
 pattern, and it reads naturally ("show me the promoters' reasons").
@@ -197,23 +197,23 @@ board and the diverging-sentiment chart then recompute per band for free
   (`feature/comment-appendix-builder`), the band is then "just a demographic" not
   a first-class split, and every study must run the builder correctly. **Viable
   interim; not the stable home.** If Duncan wants Q79 working this week, this is
-  the shortcut — but §3.2 is where it should live long-term.
-- **Pure global-filter-by-box** (no union): doesn't solve the ask — the three
+  the shortcut, but §3.2 is where it should live long-term.
+- **Pure global-filter-by-box** (no union): doesn't solve the ask. The three
   sheets remain three questions; you'd still can't present "Q79 comments" as one.
 
 ---
 
-## 4. Feature 2 — demographic / firmographic tagging
+## 4. Feature 2. Demographic / firmographic tagging
 
 ### 4.1 What's already there
 
 Comment cards already render demographic chips (`quoteCard` `27q:1478-1490`),
-already gated, already exported and fed into hubs — **sourced from the comment
+already gated, already exported and fed into hubs, **sourced from the comment
 workbook's own demographic columns** (the columns the reader finds between the ID
 and the verbatim, `qual_demo_columns`). A demographic becomes a curated banner
 dimension only if it appears in ≥50% of sheets (`qual_banner_dimensions`).
 
-### 4.2 The new capability — host-sourced tags
+### 4.2 The new capability. Host-sourced tags
 
 "Which centre / which channel" usually live in the **main survey**, not the
 comment workbook. The join makes them reachable per comment; the work is to
@@ -226,14 +226,14 @@ attach them:
   them through `qual_kanon_tags()` with the rest. Disclosure stays in one place
   (R), the JS is unchanged, the emitted island is already safe.
 - **Not JS-side.** Reading `TR.MICRO[qcode][r.idx]` in the browser would force us
-  to re-implement k-anonymity in JS — the gate lives in R and must stay there.
+  to re-implement k-anonymity in JS. The gate lives in R and must stay there.
 
 **Config:** a Settings key `qual_tag_dimensions` listing which host banner
 dimensions are taggable (e.g. `"Centre, Channel, Region"`). Empty/absent = today's
 behaviour (workbook demos only). The listed dimensions join the attribute set and
 are governed by the same `demographic_cuts` dial.
 
-### 4.3 The reader-facing toggle — bounded so it can only restrict
+### 4.3 The reader-facing toggle. Bounded so it can only restrict
 
 Add a control (qual-tab header) to **show/hide tags** and **pick which fields**
 show, with state in `userState` so it survives "Save copy" (same mechanism as
@@ -250,47 +250,47 @@ the reader only chooses how much of the cleared set to look at.
 
 Minor polish: chips render **value-only** today (`esc(r.demos[k])` → "Sandton").
 For "which centre" clarity when several dimensions show, render `label: value`
-("Centre: Sandton · Channel: App") — small change in `quoteCard`, or a compact
+("Centre: Sandton · Channel: App"): small change in `quoteCard`, or a compact
 `Centre ▸ Sandton` form.
 
 ---
 
-## 5. Confidentiality & disclosure (the crux — spans both features)
+## 5. Confidentiality & disclosure (the crux, spans both features)
 
-Duncan's question — *should we limit or prevent tagging on confidential
-low-sample surveys?* — is **already answered by the built engine**, and the
+Duncan's question, *should we limit or prevent tagging on confidential
+low-sample surveys?*. Is **already answered by the built engine**, and the
 attribute model extends that answer to the new sources without new risk.
 
 The three dials, and how to set them:
 
-- **`demographic_cuts = "block"`** — no tags at all; the tab is Total-only. This
+- **`demographic_cuts = "block"`**. No tags at all; the tab is Total-only. This
   is the "prevent tagging" setting for a confidential survey. Use for the most
   sensitive / smallest studies.
-- **`demographic_cuts = "safe"`** — k-anonymise tag combinations against
+- **`demographic_cuts = "safe"`**. K-anonymise tag combinations against
   `min_reporting_base` (k). Shows "Admin" when 70 share it, hides "Admin + <1yr"
   when only 3 do. **Recommended default for any client-facing report.**
-- **`demographic_cuts = "allow"`** — every tag; internal use only.
-- **Audience k-gate** (`TR.disclosure.audienceTooSmall()`, fails closed) — when
+- **`demographic_cuts = "allow"`**. Every tag; internal use only.
+- **Audience k-gate** (`TR.disclosure.audienceTooSmall()`, fails closed): when
   the filtered audience is below k the whole comment list is withheld, tags,
   quotes and even the count. Independent of the above; always on when k > 1.
 
 Consequences for the two features, by design:
 
 - The **NPS band** is an attribute, so it is k-anonymised in combination with
-  the demographics — you can't get "Promoter + SmallBranch + App" narrowing to
+  the demographics. You can't get "Promoter + SmallBranch + App" narrowing to
   one person, because the combination is gated. Adding the band costs no new
   disclosure logic.
 - **Host-sourced tags** pass through the same `qual_kanon_tags()` as workbook
-  tags — one gate, one code path.
+  tags. One gate, one code path.
 - The **reader toggle** cannot breach any of this (§4.3 invariant).
 
 Recommended defaults to bake into the config template and docs: client-facing
 report → `demographic_cuts = "safe"`, `min_reporting_base = 30` *(to confirm the
-number with Duncan — 30 is a common cell floor, not a verified house rule)*,
+number with Duncan, 30 is a common cell floor, not a verified house rule)*,
 verbatim `text_mode = "redacted"`; confidential/small study → `"block"`.
 
 **Honest limit (carry into the methodology note):** rule-based scrubbing +
-k-anon handle direct identifiers and small cells, not *contextual* ones — "the
+k-anon handle direct identifiers and small cells, not *contextual* ones, "the
 only male teller at the Newlands branch" can still self-identify from an
 un-tagged verbatim. This is already documented in `QUALITATIVE_TAB_BUILD_NOTES.md`
 §D; tagging raises the stakes, so the safe default and the block escape hatch
@@ -298,7 +298,7 @@ matter more, not less.
 
 ---
 
-## 6. Config schema — everything new in one place
+## 6. Config schema. Everything new in one place
 
 | Sheet | Key/Column | New? | Meaning |
 |---|---|---|---|
@@ -307,11 +307,11 @@ matter more, not less.
 | Selection | `SplitOrder` | new | Band display order. |
 | Selection | `NpsScoreQuestion` | new (optional) | Host NPS question to derive the band from; else `CommentLink` target; else sheet-of-origin. |
 | Settings | `qual_tag_dimensions` | new | Host banner dims to expose as tags, e.g. `"Centre, Channel"`. |
-| Settings | `demographic_cuts` | exists | `allow`/`safe`/`block` — the tagging ceiling. |
+| Settings | `demographic_cuts` | exists | `allow`/`safe`/`block`. The tagging ceiling. |
 | Settings | `min_reporting_base` | exists | k for k-anon + audience gate. |
 | Settings | `qual_confidentiality_mode` (text_mode) | exists | `hidden`/`redacted`/`full` verbatim scrub. |
 
-No `Q79`, no CCPB, no client specifics in code — all config.
+No `Q79`, no CCPB, no client specifics in code. All config.
 
 ---
 
@@ -319,65 +319,65 @@ No `Q79`, no CCPB, no client specifics in code — all config.
 
 1. **Attribute model refactor (internal, no behaviour change).** Generalise the
    record's `demos` bag into an attribute set carrying `{source, usage,
-   disclosure}` — keep `r.demos` as the serialised shape for JS back-compat.
+   disclosure}`. Keep `r.demos` as the serialised shape for JS back-compat.
    *Verify:* full qual suite green, island byte-identical on a workbook-only
    study (`test_qual_island_builder.R`, `qual_tests.mjs`).
-2. **Feature 2a — host-sourced tags.** Attach `qual_tag_dimensions` host values
+2. **Feature 2a. Host-sourced tags.** Attach `qual_tag_dimensions` host values
    in `build_integrated_qual_island`, folded through `qual_kanon_tags`.
-   *Verify:* known-answer R test — a host dim appears as a tag, k-anon suppresses
+   *Verify:* known-answer R test. A host dim appears as a tag, k-anon suppresses
    a below-k combination; audience gate still withholds below k.
-3. **Feature 2b — reader toggle.** Show/hide + field-pick in `userState`;
+3. **Feature 2b. Reader toggle.** Show/hide + field-pick in `userState`;
    assert the subtractive invariant in a JS test (toggling can't reveal a
    suppressed field). *Verify:* `qual_tests.mjs`, Save-copy round-trip.
-4. **Feature 1a — sheet union + band attribute.** Config parse, union step,
+4. **Feature 1a. Sheet union + band attribute.** Config parse, union step,
    `qual_build_links` one-target→one-unioned-question. *Verify:* three synthetic
    sheets → one question; band present per record; jump lights up.
-5. **Feature 1b — derive + reconcile + segmented view.** Derive band from host
+5. **Feature 1b. Derive + reconcile + segmented view.** Derive band from host
    NPS, reconciliation flag, `All/Det/Pas/Pro` control mirroring `sentimentFilter`.
    *Verify:* derived band matches `nps_bucket_score`; mismatch flagged;
    prevalence/sentiment recompute per band.
 6. **Docs + template.** Update `QUAL_COMMENT_APPENDIX_GUIDE.md`, the config
-   template generator (note: template `.xlsx` corrupts on openxlsx round-trip —
+   template generator (note: template `.xlsx` corrupts on openxlsx round-trip,
    edit the generator, not the binary), methodology-note copy.
 
 Testing is non-negotiable per house rule: synthetic fixtures for the union, the
 derive, the host-attach, the k-anon-with-band, and the toggle invariant. No stage
 ships without its test. Duncan regenerates the real SACS/CCPB report via
-`launch_turas` and eyeballs — the pipeline is never headless-run on his data.
+`launch_turas` and eyeballs. The pipeline is never headless-run on his data.
 
 ---
 
 ## 8. Open decisions for Duncan (each with a lean)
 
-1. **Feature 1 home — in-engine union (§3.2) vs upstream Python builder (§3.5).**
+1. **Feature 1 home. In-engine union (§3.2) vs upstream Python builder (§3.5).**
    *Lean: in-engine* for the stable solution; use the builder only if Q79 is
    needed before the engine work lands.
-2. **Band source — derive-from-score (self-correcting) vs trust-the-sheet.**
+2. **Band source. Derive-from-score (self-correcting) vs trust-the-sheet.**
    *Lean: derive + validate against sheet-of-origin*, flag mismatches. Needs the
    recommend score identified in config.
-3. **Client-facing disclosure defaults — the actual k.** *Lean: `safe` +
+3. **Client-facing disclosure defaults. The actual k.** *Lean: `safe` +
    `min_reporting_base = 30` + `text_mode = redacted`*; confirm the number (30 is
    a common floor, not a verified TRL rule).
-4. **Tag default — on or off for the reader.** *Lean: off by default*, reader
-   opts in — least busy, and consistent with "prevent getting too busy".
+4. **Tag default, on or off for the reader.** *Lean: off by default*, reader
+   opts in. Least busy, and consistent with "prevent getting too busy".
 
 ---
 
 ## 9. CCPB ground truth (verified 2026-07-15 against the live files)
 
 - **Q79 is the 0–10 recommend score** (values 5–10; 10→200, 9→98, 8→64, 7→26, 6→7, 5→1).
-  Band-from-score gives ~298 Promoters / ~90 Passives / ~8 Detractors — matching the three
+  Band-from-score gives ~298 Promoters / ~90 Passives / ~8 Detractors. Matching the three
   comment sheets' sizes (~262 / 76 / 6). So derivation works *and* validates the sheets.
 - **The Q79 "why?" is three sheets** in the Comment Appendix: `DetractorComment`,
-  `PassiveComment`, `PromoterComment` — band = sheet. They carry no demographics (only
+  `PassiveComment`, `PromoterComment`. Band = sheet. They carry no demographics (only
   ResponseID + verbatim), so centre/channel tags can *only* come from the host survey.
 - **The live config confirms the pain:** `Q79`'s `CommentSheet`/`CommentLink` are blank (its
   comments are unwireable today), while `Q75` shows the single-sheet pattern.
 - **Host firmographics:** `S03` = distribution centre (Worcester DC, Paarl DC, … MLP Calvinia),
-  `S11` = channel (Tellsell / Presell / Indirect). `S10` is the *interviewer* — never tag it.
+  `S11` = channel (Tellsell / Presell / Indirect). `S10` is the *interviewer*, never tag it.
 - **House base floor:** the config sets `significance_min_base = 30`, so `min_reporting_base = 30`
   is the natural disclosure k. The live config has `qual_demographic_cuts = allow` and
-  `min_reporting_base = True` (not a real number) — **both must change** (→ `safe`, → `30`)
+  `min_reporting_base = True` (not a real number): **both must change** (→ `safe`, → `30`)
   before host tags ship on the 8-detractor base.
 
 ### CCPB wiring (what Duncan sets in `CCPB_CSAT_W2026_Crosstab_Config.xlsx`)

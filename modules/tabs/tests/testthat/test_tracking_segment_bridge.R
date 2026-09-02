@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS MODULE — TRACKING SEGMENT BRIDGE TESTS (Phase 1b)
+# TABS MODULE. TRACKING SEGMENT BRIDGE TESTS (Phase 1b)
 # ==============================================================================
 #
 # Verifies tracker_segment_contributions() serialises the classic tracker's
 # per-segment trend output into the v2 wave-island prior-wave shape the renderer
-# (assets/js/22w_waves.js) reads — the schema locked by the JS gate test
+# (assets/js/22w_waves.js) reads. The schema locked by the JS gate test
 # "per-segment prior-wave trends" in prototypes/.../tests/run_tests_v2.mjs.
 #
 # Run with:

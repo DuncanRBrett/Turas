@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS — TRACKING ISLAND ASSEMBLER (V11, data-centric report v2, OPTION 3)
+# TABS. TRACKING ISLAND ASSEMBLER (V11, data-centric report v2, OPTION 3)
 # ==============================================================================
 # Assembles the `data-prev` tracking island (TR.PREV) the v2 renderer's wave
 # engine (assets/js/22w_waves.js) reads to light up the Tracking tab. The model
 # is anonymised per-wave microdata: each wave carries, per tracked metric, the
-# per-respondent SCORES (the rating for means; +-100/0 for NPS) — the renderer
+# per-respondent SCORES (the rating for means; +-100/0 for NPS): the renderer
 # recomputes each wave's value + dispersion from them, so nothing is pre-baked
 # and significance is recomputed the same way as the live (current) wave.
 #
@@ -12,7 +12,7 @@
 #   { schema_version: 1, kind: "tracking_microdata",
 #     waves: [ { wave, year, current, segments: [],
 #                questions: [ { match_key, title, base, score_type, scores } ] } ] }
-#   match_key = the renderer's model.norm(title) — how each wave question is
+#   match_key = the renderer's model.norm(title): how each wave question is
 #   matched to the current (AGG) question. The current wave is flagged.
 #
 # FORWARD PATH: each wave's own tabs run writes a *_wave.json contribution
@@ -21,7 +21,7 @@
 # pipeline is re-run. CCS history was a one-time backfill (kept out of the repo).
 #
 # SCOPE (documented): scores carry MEAN-kind metrics (rating/Likert/NPS). The
-# wave mean is unweighted (meanOfScores) — weighted trackers are a documented
+# wave mean is unweighted (meanOfScores): weighted trackers are a documented
 # follow-up (carry per-wave weights + weight meanOfScores). Proportion / NET
 # tracking over waves (per-wave distributions) is likewise a future extension.
 # ==============================================================================
@@ -117,16 +117,16 @@ detect_wave_column <- function(mapping, data_layer) {
   if (max(hits) == 0) return(NULL)
   # which.max() silently takes the FIRST column on a tie, so two waves whose
   # mapping columns match this data equally well resolved to whichever happened
-  # to be leftmost — and every metric then keyed off the wrong wave without a
+  # to be leftmost, and every metric then keyed off the wrong wave without a
   # word (review 2026-08, M14). A tie is a real ambiguity in the mapping: say so.
   tied <- wave_cols[hits == max(hits)]
   if (length(tied) > 1) {
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
-    cat("│ Context: Tabs tracking — ambiguous wave column\n")
+    cat("│ Context: Tabs tracking, ambiguous wave column\n")
     cat(sprintf("│ %d Question_Mapping wave columns match this data equally\n", length(tied)))
     cat(sprintf("│ well (%d of %d question codes each): %s\n",
                 max(hits), length(dl_codes), paste(tied, collapse = ", ")))
-    cat(sprintf("│ Using '%s' — the leftmost. If that is the wrong wave,\n", tied[1]))
+    cat(sprintf("│ Using '%s'. The leftmost. If that is the wrong wave,\n", tied[1]))
     cat("│ every tracked metric is keyed off the wrong column.\n")
     cat("│ How to fix: make each wave column list only ITS wave's\n")
     cat("│ question codes, so exactly one column matches this run.\n")
@@ -156,7 +156,7 @@ tracking_metrics <- function(data_layer, mapping = NULL) {
       for (i in seq_len(nrow(mapping))) {
         # trimws: an Excel-authored cell holding "Q1 " matched nothing and the
         # row was skipped in silence, so the metric simply stopped appearing in
-        # the Tracking tab — which reads as "not tracked", not "broken mapping".
+        # the Tracking tab, which reads as "not tracked", not "broken mapping".
         # The pairing report cannot catch it either, because it counts only the
         # metrics this wave contributes (review 2026-08-21, I-7).
         code <- trimws(as.character(mapping[[wc]][i]))
@@ -188,13 +188,13 @@ tracking_metrics <- function(data_layer, mapping = NULL) {
   # No mapping: list every question; wave_contribution keeps only those that
   # actually carry microdata scores (which only mean-kind questions do).
   # Duplicate normalised titles get an occurrence suffix (t, t#1, t#2, ...)
-  # mirroring the renderer's ensureIndexes (22w_waves.js) and extract_waves.py —
+  # mirroring the renderer's ensureIndexes (22w_waves.js) and extract_waves.py,
   # an unsuffixed duplicate key made two questions collide in the wave index
   # and one silently showed the other's trend.
   #
   # The suffix is ordered by question CODE, not by position in the data layer.
   # It used to be positional, so moving two same-titled questions past each other
-  # between waves handed each the other's key — and with it, the other's history
+  # between waves handed each the other's key, and with it, the other's history
   # (review 2026-08, M14). Codes are stable across a reorder; positions are not.
   # INSERTING a new same-titled question whose code sorts earlier still shifts
   # the suffixes, which is why the warning points at question_mapping: a
@@ -208,7 +208,7 @@ tracking_metrics <- function(data_layer, mapping = NULL) {
     idx <- idx[order(codes[idx])]
     suffix[idx] <- seq_along(idx) - 1L
     cat(sprintf(
-      "  [WARNING] Tracking: %d questions share the normalised title '%s' (%s) — keyed '%s' then '%s' by question code to keep their trends separate. Set 'question_mapping' to track them by a canonical key instead.\n",
+      "  [WARNING] Tracking: %d questions share the normalised title '%s' (%s): keyed '%s' then '%s' by question code to keep their trends separate. Set 'question_mapping' to track them by a canonical key instead.\n",
       length(idx), t, paste(codes[idx], collapse = ", "), t,
       paste(sprintf("%s#%d", t, seq_len(length(idx) - 1L)), collapse = ", ")))
   }
@@ -301,7 +301,7 @@ tracking_total_base <- function(dl_q) {
 #' Build this wave's tracking contribution from PUBLISHED figures only
 #'
 #' The confidentiality build (`html_report_v2_microdata = FALSE`) ships no
-#' per-respondent records, so `wave_contribution()` has no scores to work from —
+#' per-respondent records, so `wave_contribution()` has no scores to work from,
 #' and the Tracking tab used to be lost along with them, which put anonymity and
 #' a trend line in competition. They are not in competition: the renderer needs
 #' the current wave only to know WHICH metrics track and what their cross-wave
@@ -309,7 +309,7 @@ tracking_total_base <- function(dl_q) {
 #' when no scores are present (`waves.currentPoint()` returns null and both its
 #' callers fall back to the published cell, 22w_waves.js / 27t_tracking.js). The
 #' current wave's SD for the Welch test comes from `sdFromModel()`, derived from
-#' the published category distribution — so wave-on-wave significance still runs.
+#' the published category distribution, so wave-on-wave significance still runs.
 #' The one honest degrade: a question that publishes only its mean (every category
 #' hidden) has no distribution to take a spread from, so it plots untested where
 #' the microdata build would have tested it off the scores.
@@ -318,7 +318,7 @@ tracking_total_base <- function(dl_q) {
 #' minus `scores`/`weights`: nothing in it describes an individual.
 #'
 #' The metric set is deliberately the same one the microdata build of this same
-#' wave would produce — mean-kind metrics only — so the confidential copy and the
+#' wave would produce, mean-kind metrics only, so the confidential copy and the
 #' analyst's own copy show the same trend. (The mirror is the mean-row gate;
 #' `micro_scores_for_question()` also requires a Rating/Likert/NPS/Numeric
 #' variable type, so a categorical question that publishes a mean would appear
@@ -385,7 +385,7 @@ tracking_wave_keys <- function(w) {
 #'
 #' The renderer resolves a prior wave's row by `TR.model.norm(label)` against
 #' that wave's `rows` map (22w_waves.js rowValue), so these are the keys that
-#' have to match. Category and NET rows only — mean-kind rows pair at question
+#' have to match. Category and NET rows only. Mean-kind rows pair at question
 #' level, through the metric key.
 #'
 #' @param q A data-layer question
@@ -405,7 +405,7 @@ tracking_option_labels <- function(q) {
 
 #' Report how many of this wave's OPTION rows pair with the prior waves
 #'
-#' A proportion trend pairs row by row, on the normalised option label alone —
+#' A proportion trend pairs row by row, on the normalised option label alone,
 #' so renaming "Very satisfied" to "Extremely satisfied", or dropping a NET
 #' member, silently truncates that row's trend. The question-level report below
 #' cannot see it: it checks the mean/NPS metrics this wave contributes, and a
@@ -413,7 +413,7 @@ tracking_option_labels <- function(q) {
 #' is why a renamed option read as "no movement" rather than "no comparison"
 #' (review 2026-08, I24).
 #'
-#' Silent by design when no prior wave carries `rows` — a mean-only tracker has
+#' Silent by design when no prior wave carries `rows`. A mean-only tracker has
 #' no option pairing to report on.
 #'
 #' @param data_layer The built data layer (the live option labels)
@@ -473,7 +473,7 @@ tracking_report_option_pairing <- function(data_layer, priors, mapping = NULL,
     labels <- utils::head(h$unmatched, 6L)
     more <- length(h$unmatched) - length(labels)
     cat(sprintf(
-      "  [NOTE] Tracking: '%s' — %d of %d option(s) found no prior wave row, so those trends are empty: %s%s\n",
+      "  [NOTE] Tracking: '%s', %d of %d option(s) found no prior wave row, so those trends are empty: %s%s\n",
       h$title, length(h$unmatched), h$live,
       paste(sprintf("\"%s\"", labels), collapse = ", "),
       if (more > 0) sprintf(" (+%d more)", more) else ""))
@@ -483,10 +483,10 @@ tracking_report_option_pairing <- function(data_layer, priors, mapping = NULL,
                 length(out$questions) - length(shown)))
   }
   # Every option of every question missing is the shape of a renamed scale or a
-  # wave keyed a different way — not a handful of edits.
+  # wave keyed a different way, not a handful of edits.
   if (out$matched == 0L) {
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
-    cat("│ Context: Tabs tracking — no option row matched history\n")
+    cat("│ Context: Tabs tracking, no option row matched history\n")
     cat(sprintf("│ %d tracked option row(s) were checked and NONE pair with\n", out$checked))
     cat("│ a prior wave, so every proportion trend is empty. The\n")
     cat("│ Tracking tab will show no movement, which reads as 'nothing\n")
@@ -505,18 +505,18 @@ tracking_report_option_pairing <- function(data_layer, priors, mapping = NULL,
 #' The cross-wave key changes SHAPE with the config: `tracking_metrics()` keys by
 #' the canonical question code when a Question_Mapping is loaded, and by the
 #' normalised title when one is not. A wave built under one regime can never pair
-#' with history built under the other — and the Tracking tab renders that total
+#' with history built under the other, and the Tracking tab renders that total
 #' miss as a scorecard with no cards and "0 significant increases / 0 decreases /
 #' 0 stable", which reads as "nothing moved this wave" when the truth is "nothing
 #' was compared". So say it here, at build time, where the operator can see it.
 #'
 #' Only the metrics THIS wave contributes are checked (the mean/NPS kind that
-#' carry scores) — those are what the scorecard and the wave-on-wave counts are
+#' carry scores): those are what the scorecard and the wave-on-wave counts are
 #' built from.
 #'
 #' @param current_contribution This wave's contribution
 #' @param priors The prior wave contributions (already de-duplicated)
-#' @param data_layer Optional built data layer — supplying it also checks the
+#' @param data_layer Optional built data layer. Supplying it also checks the
 #'   OPTION rows a proportion trend pairs on (see tracking_report_option_pairing)
 #' @param mapping Optional Question_Mapping body, for the option-level check
 #' @return list(current, priors, matched, unmatched, options), invisibly
@@ -539,7 +539,7 @@ tracking_report_pairing <- function(current_contribution, priors,
   if (out$matched == 0L) {
     shape <- function(keys) if (length(keys)) sprintf("\"%s\"", keys[1]) else "(none)"
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
-    cat("│ Context: Tabs tracking — no metric matched history\n")
+    cat("│ Context: Tabs tracking, no metric matched history\n")
     cat(sprintf("│ %d prior wave(s) loaded, but none of this wave's %d tracked\n",
                 out$priors, out$current))
     cat("│ metrics share a cross-wave key with them, so every trend\n")
@@ -594,7 +594,7 @@ build_tracking_island <- function(current_contribution, prior_contributions = li
     }
   }
 
-  # Loud when this wave pairs with nothing — an unmatched tracker renders as
+  # Loud when this wave pairs with nothing. An unmatched tracker renders as
   # zeros, which read as findings rather than as a missing comparison. With a
   # data layer the option rows a proportion trend pairs on are checked too.
   tracking_report_pairing(current_contribution, priors, data_layer, mapping)
@@ -607,7 +607,7 @@ build_tracking_island <- function(current_contribution, prior_contributions = li
   }, numeric(1))
 
   # A wave with no derivable year (a label like "Baseline" carrying no 4-digit
-  # year) sorts to Inf — i.e. AFTER the current wave — so the renderer treats it
+  # year) sorts to Inf, i.e. AFTER the current wave, so the renderer treats it
   # as "the previous wave" for every delta chip, anchors vs-first on it, and
   # draws its point off the chart canvas because `year - y0` coerces null to 0.
   # It is never a usable comparison point, so drop it and say which one went
@@ -668,7 +668,7 @@ write_wave_contribution <- function(contribution, output_path) {
   if (is.null(contribution)) return(invisible(NULL))
   if (!requireNamespace("jsonlite", quietly = TRUE)) return(invisible(NULL))
   # Provenance for the dedupe. read_wave_contributions used to resolve two
-  # sidecars for the same wave by file mtime — but an mtime is when the file was
+  # sidecars for the same wave by file mtime, but an mtime is when the file was
   # last COPIED, not when its numbers were produced, so dropping a stale backup
   # into waves_source made it beat the genuine newer run (review 2026-08, M14).
   # Stamped here, at the one moment that means "this sidecar was produced now".
@@ -692,7 +692,7 @@ write_wave_contribution <- function(contribution, output_path) {
 #' Reads every *_wave.json under `waves_source` (skipping the current run's own
 #' file when given). Malformed files are skipped with a warning. When two
 #' sidecars carry the SAME wave label (a re-run of a wave under a different
-#' output filename left its stale sidecar behind), only the newest is kept —
+#' output filename left its stale sidecar behind), only the newest is kept,
 #' otherwise the duplicate would enter the island as extra "history".
 #'
 #' "Newest" is the sidecar's own recorded `built` stamp, not the file's mtime:
@@ -716,7 +716,7 @@ read_wave_contributions <- function(waves_source, exclude_path = NULL) {
                    normalizePath(exclude_path, mustWork = FALSE)]
   }
 
-  # Read first, then order — the ordering key lives INSIDE the file.
+  # Read first, then order. The ordering key lives INSIDE the file.
   recs <- list()
   for (f in files) {
     c <- tryCatch(jsonlite::read_json(f, simplifyVector = FALSE), error = function(e) NULL)
@@ -743,7 +743,7 @@ read_wave_contributions <- function(waves_source, exclude_path = NULL) {
     lbl <- as.character(c$wave %||% "")
     if (nzchar(lbl) && lbl %in% seen_labels) {
       cat(sprintf(
-        "  [NOTE] Tracking: skipped stale duplicate of wave '%s' (%s) — a newer sidecar for that wave was kept (by %s).\n",
+        "  [NOTE] Tracking: skipped stale duplicate of wave '%s' (%s): a newer sidecar for that wave was kept (by %s).\n",
         lbl, basename(r$file),
         if (r$stamped) "recorded build time" else "file date, which a copy resets"))
       next

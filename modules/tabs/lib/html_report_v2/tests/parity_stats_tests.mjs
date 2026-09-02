@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * CROSS-ENGINE STATISTICS PARITY — the JS half.
+ * CROSS-ENGINE STATISTICS PARITY. The JS half.
  *
  * The R engine (Excel workbook, and the letters carried into the island) and
  * this engine (live filters / custom banners, plus what the published view
  * renders) must not disagree on the same deliverable. This suite renders the
- * REAL island that R generated from the committed parity fixture — not a
+ * REAL island that R generated from the committed parity fixture, not a
  * hand-authored stub that could agree with R by coincidence.
  *
  *   fixture project : modules/tabs/tests/fixtures/parity_project/
@@ -69,7 +69,7 @@ function readIsland(name) {
 function loadIsland(island) {
   TR.PREV = null;
   TR.userState = null;
-  TR.MICRO = null;                       // published path only — no recompute
+  TR.MICRO = null;                       // published path only. No recompute
   TR.AGG = island;
   if (TR.d2) TR.d2._qIndex = null;
 }
@@ -94,8 +94,8 @@ function rawRow(island, code, label) {
 // JS-1. THE PUBLISHED VIEW RENDERS THE CARRIED LETTERS, VERBATIM
 // ============================================================================
 //
-// The default view must show exactly what R computed — the 95% letters from the
-// Sig. row and the 80% letters from the Sig.2 row — with no arithmetic of its
+// The default view must show exactly what R computed. The 95% letters from the
+// Sig. row and the 80% letters from the Sig.2 row, with no arithmetic of its
 // own. Recomputing the 80% letters here (what the model used to do) read the
 // published Frequency row, which format_output_value rounds to 0dp, so the
 // workbook and the report could letter the same pair differently.
@@ -105,7 +105,7 @@ function rawRow(island, code, label) {
 // applies the correction, so a weighted census is corrected for the first time
 // (the retired JS overlay was gated off for weighted designs entirely).
 
-console.log("Cross-engine parity — JS-1: carried letters, both alphas:");
+console.log("Cross-engine parity. JS-1: carried letters, both alphas:");
 
 const weightedIsland = readIsland("parity_island_weighted.json");
 
@@ -134,7 +134,7 @@ run("every proportion row's 95% letters are the carried sig, character for chara
   });
 });
 
-run("the 80% letters are sig2 MINUS sig, lowercased — not a recompute", () => {
+run("the 80% letters are sig2 MINUS sig, lowercased, not a recompute", () => {
   loadIsland(weightedIsland);
   ["Q1", "Q2", "Q3", "Q4"].forEach((code) => {
     const m = TR.model.forQuestion(code, "Cohort", [], { dual: true });
@@ -156,7 +156,7 @@ run("the 80% letters are sig2 MINUS sig, lowercased — not a recompute", () => 
 // Beta 39/60 vs Gamma 20/50 gives p = 0.008842 uncorrected, which sits BETWEEN
 // the Bonferroni-adjusted 95% threshold (0.05/6 = 0.008333) and the 80% one
 // (0.20/6 = 0.033333). Beta's universe of 150 corrects its base to 99.3333,
-// taking p to 0.003838 — across the 95% line. So it renders as an UPPERCASE C,
+// taking p to 0.003838. Across the 95% line. So it renders as an UPPERCASE C,
 // and the fact that it does is the FPC arriving from R rather than from here.
 // (Weighted designs get the correction too now; the retired overlay never did.)
 run("the engineered marginal pair renders at 95% once the FPC is applied", () => {
@@ -165,14 +165,14 @@ run("the engineered marginal pair renders at 95% once the FPC is applied", () =>
   const yes = rowByLabel(m, "Yes");
   eq(yes.cells[2].sig, "C", "Beta vs Gamma is 95%-significant after the correction");
   eq(yes.cells[3].sig, "", "Gamma earns nothing on the Yes row");
-  eq(yes.cells[1].sig, "", "Alpha is a full census — excluded from pairing");
+  eq(yes.cells[1].sig, "", "Alpha is a full census. Excluded from pairing");
 });
 
 // Before sig2 carriage the model gave mean rows NO 80% letters at all: it
 // recomputed them from published counts, and a mean row has no count to
 // recompute from. R has always tested means, so the letters existed in Excel
 // and not in the report.
-run("mean rows carry BOTH alphas — the 80% letters they never had", () => {
+run("mean rows carry BOTH alphas. The 80% letters they never had", () => {
   loadIsland(weightedIsland);
   const m = TR.model.forQuestion("Q2", "Cohort", [], { dual: true });
   const mean = rowByLabel(m, "Mean");
@@ -184,17 +184,17 @@ run("mean rows carry BOTH alphas — the 80% letters they never had", () => {
   eq(mean.cells[1].sig, "", "Alpha: a census is excluded from pairing");
   eq(mean.cells[2].sig, "C", "Beta: 95% vs Gamma (no duplicate lowercase)");
   eq(mean.cells[3].sig, "", "Gamma earns nothing");
-  eq(mean.cells[4].sig, "c", "Delta: 80%-only vs Gamma — the set difference");
+  eq(mean.cells[4].sig, "c", "Delta: 80%-only vs Gamma. The set difference");
 });
 
 // The Sig. row of a summary block is appended AFTER the Std Dev row, so the
 // label forward-fill labels it "Standard Deviation". If the writer matched on
-// label alone, the mean's letters would render on the SD row — which reports
+// label alone, the mean's letters would render on the SD row, which reports
 // spread and is never tested.
 // Q4 is the NPS question (review 2026-08, I1). Its per-respondent values are
-// the one statistic the two engines derive INDEPENDENTLY — R from
+// the one statistic the two engines derive INDEPENDENTLY. R from
 // calculate_nps_score(), JS from the published category distribution through
-// nps_bucket_score() — so a scale disagreement shows up here as different
+// nps_bucket_score(), so a scale disagreement shows up here as different
 // published letters. Before I1 the R side t-tested the raw 0-10 ratings.
 run("the NPS Score row is the mean of the +-100 buckets, in both engines", () => {
   const npsIsland = readIsland("parity_island.json");
@@ -235,7 +235,7 @@ run("the NPS SD is on the bucket scale, not the 0-10 rating scale", () => {
   // Alpha: 24 at +100, 8 at 0, 8 at -100, mean 40.
   //   sum of squared deviations = 24*60^2 + 8*40^2 + 8*140^2 = 256000
   //   sample variance = 256000/39 = 6564.10  ->  sd = 81.02
-  // The raw 0-10 ratings would give 1.87 — the number this row used to print
+  // The raw 0-10 ratings would give 1.87. The number this row used to print
   // underneath an NPS of 40.
   eq(sd.cells[1].mean, 81, "Alpha SD on the +-100 scale");
   assert(sd.cells[1].mean > 50, "an NPS SD is never a 0-10-scale number");
@@ -265,10 +265,10 @@ run("single-alpha rendering (dual off) shows the 95% letters only", () => {
 //
 // Reports built before sig2 carriage have no sig2 key. Those must keep working:
 // the model falls back to recomputing the 80% letters from the published counts,
-// exactly as it did before. (That path is the one with the rounding trap — which
+// exactly as it did before. (That path is the one with the rounding trap, which
 // is why it is a fallback and not the default.)
 
-console.log("\nCross-engine parity — JS-4: sig2-absent fallback:");
+console.log("\nCross-engine parity. JS-4: sig2-absent fallback:");
 
 /** A deep copy of an island with every row's sig2 removed. */
 function stripSig2(island) {
@@ -284,10 +284,10 @@ run("an old-style island renders 80% letters via the count recompute", () => {
   const yes = rowByLabel(m, "Yes");
   // "Cc": the carried 95% letter, plus the fallback's own 80% letter. The
   // recompute works from published counts and knows nothing of the FPC, so it
-  // cannot tell that C is already covered at the higher level — which is one
+  // cannot tell that C is already covered at the higher level, which is one
   // more reason the carried path is the default and this is only a fallback.
   eq(yes.cells[2].sig, "Cc", "the fallback still letters Beta at 80%");
-  // And the 95% letters are still the carried ones — only the 80% set is derived.
+  // And the 95% letters are still the carried ones, only the 80% set is derived.
   const raw = rawRow(old, "Q1", "Yes");
   yes.cells.forEach((cell, ci) => {
     const shown = (cell.sig || "").split("").filter((ch) => ch === ch.toUpperCase()).join("");
@@ -317,7 +317,7 @@ run("a sig2 of all-empty strings is carriage, not absence", () => {
   loadIsland(island);
   const m = TR.model.forQuestion("Q1", "Cohort", [], { dual: true });
   // sig still carries R's 95% letter; the point is that NO lowercase letter is
-  // derived — an empty sig2 took the carried path instead of the recompute.
+  // derived. An empty sig2 took the carried path instead of the recompute.
   eq(rowByLabel(m, "Yes").cells[2].sig, "C", "no 80% letter when R found none");
 });
 
@@ -335,9 +335,9 @@ run("a sig2 of all-empty strings is carriage, not absence", () => {
 //
 // The unweighted island's letters are FPC-corrected (R applies the correction),
 // so a like-for-like recompute has to size on the same corrected bases. That is
-// what ciBase carries — the same apply_fpc() result, ported.
+// what ciBase carries. The same apply_fpc() result, ported.
 
-console.log("\nCross-engine parity — JS-2: exact parity on proportions:");
+console.log("\nCross-engine parity. JS-2: exact parity on proportions:");
 
 const island = readIsland("parity_island.json");
 
@@ -397,7 +397,7 @@ run("JS-computed proportion letters equal R's carried letters at 80%", () => {
 });
 
 run("the engineered marginal pair agrees between the engines", () => {
-  // Beta vs Gamma on Q1 "Yes" — the pair whose p-value the FPC moves across the
+  // Beta vs Gamma on Q1 "Yes". The pair whose p-value the FPC moves across the
   // 95% threshold. Both engines must land on the same side of it.
   loadIsland(island);
   const m = TR.model.forQuestion("Q1", "Cohort", [], { dual: true });
@@ -436,7 +436,7 @@ run("the census column is excluded by BOTH engines", () => {
 // the band where the choice of distribution can decide it.
 const MEAN_Z_EPS = 0.05;
 
-console.log("\nCross-engine parity — JS-3: documented mean-test divergence:");
+console.log("\nCross-engine parity. JS-3: documented mean-test divergence:");
 
 run("mean decisions agree outside the t-vs-z band", () => {
   loadIsland(island);
@@ -468,12 +468,12 @@ run("mean decisions agree outside the t-vs-z band", () => {
     if (carried === computed) { agreed++; return; }
     // Disagreement: allowed only if the pair is inside the band. With one
     // letter of difference on this fixture we report it rather than assert a
-    // z-value we cannot recover from the model — the band is documented, and a
+    // z-value we cannot recover from the model. The band is documented, and a
     // disagreement outside it would show up as more than one column differing.
     borderline++;
     console.log("      (borderline, logged not failed) col " + ci +
       " R=" + JSON.stringify(carried) + " JS=" + JSON.stringify(computed) +
-      " — within the Welch-t / z band of +/-" + MEAN_Z_EPS + " on the z scale");
+      ", within the Welch-t / z band of +/-" + MEAN_Z_EPS + " on the z scale");
   });
   assert(agreed >= m.columns.length - 1,
     "at most one column may sit in the band (agreed " + agreed + " of " +
@@ -496,7 +496,7 @@ run("the mean divergence never reaches a proportion row", () => {
 });
 
 // Q5 is the NET POSITIVE question (review 2026-08, I5). Its letters test the
-// PRINTED net — the mean of the per-respondent +-100 score — in both engines:
+// PRINTED net, the mean of the per-respondent +-100 score, in both engines:
 // R computes them into the island, this engine renders them, and the computed
 // (filtered / custom banner) path recomputes the same score through
 // TR.stats.netScoreMeans. A disagreement would show up here as the published
@@ -523,14 +523,14 @@ run("the NET POSITIVE row renders R's net-based letters verbatim", () => {
   });
   eq(np.cells[2].sig.replace(/[a-z]/g, ""), "D", "Beta letters Delta on the net");
   eq(np.cells[3].sig.replace(/[a-z]/g, ""), "D", "Gamma letters Delta, and no longer Beta");
-  eq(np.cells[1].sig || "", "", "Alpha is a census — excluded from pairing");
+  eq(np.cells[1].sig || "", "", "Alpha is a census. Excluded from pairing");
 });
 
 run("a NET POSITIVE recompute scores the same +-100 the R engine does", () => {
   // The published island carries no microdata, so the computed path is
   // exercised against the same distribution rebuilt as per-respondent boxes:
   // Beta's 60 (12 top, 0 bottom) and Delta's 50 (10 top, 40 bottom). The score
-  // means must be the published +20 and -60 — the equality that makes the two
+  // means must be the published +20 and -60. The equality that makes the two
   // engines test the same quantity.
   loadIsland(island);
   const boxes = [], answers = [];

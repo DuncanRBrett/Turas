@@ -1,22 +1,22 @@
 /**
- * v2 Qualitative tab — pre-coded comment themes as quant + a verbatim quote drawer.
+ * v2 Qualitative tab. Pre-coded comment themes as quant + a verbatim quote drawer.
  *
  * Reads the DATA_QUAL island (TR.QUAL): per-question records keyed by the anonymous
  * index, carrying the verbatim (or null when hidden), a noteworthy tier, sentiment,
  * per-mention theme valences, and (when the demographic-cuts dial allows) the tagged
  * demographics. Themed questions show a prevalence board (% of commenters who mentioned
  * each theme, bar coloured by sentiment) and a quote drawer; raw questions show the
- * verbatim browser. Audience filtering is the global filter bar's job — composite cuts
+ * verbatim browser. Audience filtering is the global filter bar's job. Composite cuts
  * (e.g. Campus = Cape Town AND Q017 = Promoter AND Year = 1st) flow in via the cut mask,
  * so there is no per-tab demographic facet row. The noteworthy-tier filter, the sentiment
  * filter (only when coded) and the verbatim-text confidentiality are honoured here.
  *
  * Reader bundle C (READER_EXPERIENCE_PLAN.md): quote-first typography with the analyst's
  * curated selection leading (C1); theme cards carrying championed quotes + a closed-stat
- * chip when a closed question links here — declared q.linked_open or the ResponseID join,
+ * chip when a closed question links here. Declared q.linked_open or the ResponseID join,
  * both directions (C2); unthemed comments as a first-class "Everything else" card + a
  * theme-coverage bar (C3); and a keyboard-driven focus reading mode (C4). All of it is
- * presentation over the SAME gated record pools — no new data paths past the k-gates.
+ * presentation over the SAME gated record pools. No new data paths past the k-gates.
  */
 (function (global) {
   "use strict";
@@ -37,7 +37,7 @@
 
   /** Stable display/export order: highest noteworthy tier first (Priority ->
    *  Must-read -> Noteworthy -> the rest); within a tier the existing (data)
-   *  order is kept — so the comments to lead with are never buried by record id. */
+   *  order is kept, so the comments to lead with are never buried by record id. */
   qual.byTierDesc = function (records) {
     return (records || [])
       .map(function (r, i) { return { r: r, i: i }; })
@@ -72,7 +72,7 @@
   qual.OTHER_THEME = "__else__";
 
   /** Records (from a pool) that mentioned a given theme id. The sentinel
-   *  qual.OTHER_THEME selects the unthemed records instead — "Everything else"
+   *  qual.OTHER_THEME selects the unthemed records instead, "Everything else"
    *  rides the same theme -> drawer pipeline as a real theme. */
   qual.recordsForTheme = function (records, themeId) {
     if (themeId === qual.OTHER_THEME) return qual.unthemed(records);
@@ -89,7 +89,7 @@
     });
   };
 
-  /** Share of comments carrying at least one theme — the header coverage bar
+  /** Share of comments carrying at least one theme. The header coverage bar
    *  ("83% of comments themed"), from the existing assignments only. */
   qual.coverage = function (records) {
     var total = (records || []).length;
@@ -101,12 +101,12 @@
    * Theme x banner crosstab, computed from comment records + the banner's column
    * membership (TR.stats.columnsFor().columns, each with a per-respondent `member`
    * Uint8Array; member == null is the Total column). The base of each column is its
-   * COMMENTERS — records of this question whose idx falls in the column — so every
+   * COMMENTERS, records of this question whose idx falls in the column, so every
    * cell is a % of its column, never the grand total. Each cell carries salience
    * (% who raised the theme), the pos/mixed/neg split both ways (of the base, which
    * sums to salience; and of the mentioners, which sums to 100), the net sentiment,
-   * and a vs-the-rest significance flag on the active mode's metric (salience, or —
-   * in skew mode — positivity among mentioners). Columns below the disclosure
+   * and a vs-the-rest significance flag on the active mode's metric (salience, or,
+   * in skew mode. Positivity among mentioners). Columns below the disclosure
    * threshold are flagged suppressed. Pure given records + columns (+ TR.stats.propZ).
    */
   qual.themeCrosstab = function (records, themes, columns, opts) {
@@ -190,7 +190,7 @@
   };
 
   /** Whether a question carries overall comment-level sentiment coding at all. Only
-   *  sentiment-coded questions get the Positive/Mixed/Negative filter — a raw verbatim
+   *  sentiment-coded questions get the Positive/Mixed/Negative filter. A raw verbatim
    *  question, or a themed one with per-theme valence but no overall comment sentiment,
    *  has none, and would otherwise show a misleading "0 positive / 0 mixed / 0 negative"
    *  (reads as "we measured and found zero" when nothing was coded). */
@@ -256,7 +256,7 @@
   };
 
   /** The closed-stat chip for a qual question header ("📊 Rated 78.3 · n=106 ·
-   *  view Q28 ›") — the bidirectional half of the 💬 jump. "" when unlinked;
+   *  view Q28 ›"): the bidirectional half of the 💬 jump. "" when unlinked;
    *  the stat is omitted (link only) when the closed question has no mean row. */
   qual.closedStatChip = function (qcode) {
     var c = qual.closedFor(qcode);
@@ -272,25 +272,25 @@
       }
     }
     return '<button class="ql-statchip" data-qual-return="' + esc(c.code) +
-      '" title="Open ' + esc(c.title) + ' — the closed question these comments sit behind">📊 ' +
+      '" title="Open ' + esc(c.title) + ', the closed question these comments sit behind">📊 ' +
       (stat ? esc(stat) + " · " : "") + "view " + esc(c.code) + " ›</button>";
   };
 
   /** The analyst's one-line headline for a question (optional source-format
-   *  field) — the island's own field first, else the AGG entry's. "" if none. */
+   *  field): the island's own field first, else the AGG entry's. "" if none. */
   qual.headlineFor = function (q) {
     if (q && typeof q.headline === "string" && q.headline.trim()) return q.headline.trim();
     var agg = q && aggQuestion(q.code);
     return (agg && typeof agg.headline === "string" && agg.headline.trim()) ? agg.headline.trim() : "";
   };
 
-  /** The analyst-insight key for a qual question — its own code.
+  /** The analyst-insight key for a qual question. Its own code.
    *
    *  A qual code is QUAL_<SHEET SLUG> (qual_sheet_code, R side), so it can
    *  never collide with a crosstab QuestionCode: the two boxes stay separate
    *  even where a closed question and its open-end sit side by side. Because
    *  TR.insights falls back to TR.AGG.comments[key], a Comments-sheet row in
-   *  the config keyed on this code seeds this box — that is how a note ships
+   *  the config keyed on this code seeds this box. That is how a note ships
    *  to the client rather than living in one browser.
    *
    *  Deliberately banner-agnostic: the question page has no banner context
@@ -302,7 +302,7 @@
 
   /** Whether this exact verbatim text is still PUBLISHED by the current island
    *  (a record with non-null text). The Story tab refuses to render a frozen
-   *  qualitative pin whose quotes a rebuild has since withheld — hub pins used
+   *  qualitative pin whose quotes a rebuild has since withheld. Hub pins used
    *  to carry withheld text past a disclosure-tightening rebuild while
    *  priority pins re-resolved (review 2026-08, I20). No island (an
    *  aggregates-only or qual-less copy) publishes nothing. */
@@ -332,7 +332,7 @@
   qual.affordanceHtml = function (code) {
     var link = qual.linkFor(code);
     if (!link) return "";
-    // Count within the ACTIVE cut, so the number matches what the jump reveals —
+    // Count within the ACTIVE cut, so the number matches what the jump reveals,
     // and below the disclosure threshold even that count would leak, so no number.
     var filters = (TR.d2 && TR.d2.state && TR.d2.state.filters && TR.d2.state.filters.length)
       ? TR.d2.state.filters : null;
@@ -348,7 +348,7 @@
   // The AUTHORED half of the comment story: tier 3 ("p" in the coding workbook)
   // ships in the island, so it reads the same for every reader and needs no
   // freezing at pin time. The reader's own marks (shortlist / highlights / hubs)
-  // stay in the Qualitative tab and reach the story through a hub — two origins,
+  // stay in the Qualitative tab and reach the story through a hub. Two origins,
   // two routes, deliberately not merged here.
 
   /**
@@ -358,7 +358,7 @@
    * Deliberately FILTER-INDEPENDENT: priority is marked against the whole
    * question in the coding workbook, not against a cut, so narrowing the
    * audience must not silently empty the evidence beside the numbers. This is
-   * the rule a named hub already follows — a curated set is not a cut.
+   * the rule a named hub already follows. A curated set is not a cut.
    *
    * Disclosure travels with the payload, exactly as hubExhibit does: hidden
    * text (record.text == null) is never returned, and the demographic tags drop
@@ -368,7 +368,7 @@
    *
    * A band-split open-end (the NPS Detractor/Passive/Promoter union) returns all
    * its bands, ordered by the question's own band order, each quote carrying its
-   * band. The band is NOT a demographic tag — it mirrors a closed question that
+   * band. The band is NOT a demographic tag. It mirrors a closed question that
    * is already reported, so it is never k-anonymised away and never dropped.
    * Without it a detractor's gripe and a promoter's praise sit side by side on a
    * slide looking alike.
@@ -385,7 +385,7 @@
 
   /**
    * The same payload, asked for from the open-end itself rather than from the
-   * closed question in front of it — the Qualitative tab's own pin starts here.
+   * closed question in front of it. The Qualitative tab's own pin starts here.
    * Every disclosure and band rule above applies unchanged; only the way the
    * question is reached differs.
    *
@@ -432,7 +432,7 @@
   /**
    * Split a quote payload into one group per band, in the order the quotes
    * arrive (priorityQuotes has already put them in the question's band order).
-   * A payload with no bands — or all one band — comes back as a single group,
+   * A payload with no bands, or all one band, comes back as a single group,
    * so the caller can always iterate and the unbanded case is unchanged.
    * Returns [{ band, quotes }]; [] for an empty payload. Pure + node-testable.
    */
@@ -447,14 +447,14 @@
   };
 
   /** The quote block a pinned question carries in the Story, present mode and
-   *  the report — the same already-gated payload the deck's quote slide gets.
+   *  the report. The same already-gated payload the deck's quote slide gets.
    *  Pure + node-testable; "" when there is nothing to show. */
   qual.priorityBlockHtml = function (quotes) {
     if (!quotes || !quotes.length) return "";
     var groups = qual.groupQuotesByBand(quotes);
     var banded = groups.length > 1;   // one band only -> no sub-heads, as before
     var quoteHtml = function (qt) {
-      // band leads the attribution — it is the axis the reader is reading by
+      // band leads the attribution. It is the axis the reader is reading by
       var chip = [qt.q, qt.band].concat(qt.tags || []).filter(Boolean).join(" · ");
       return '<blockquote class="si-q ' + (qt.sentiment || "neu") + '">' +
         esc(qt.text) + (chip ? "<cite>" + esc(chip) + "</cite>" : "") +
@@ -471,14 +471,14 @@
   // ---- stable mark keys + the one-time re-key (I20) ---------------------------
   // A reader mark keys on the respondent's opaque `rid` token when the island
   // carries one (`qcode#@<rid>`), and on the positional `idx` when it does not
-  // (`qcode#<idx>`). `idx` shifts whenever the data is re-exported — add one
+  // (`qcode#<idx>`). `idx` shifts whenever the data is re-exported. Add one
   // respondent, or merely reorder the export, and an idx-keyed mark silently
   // re-attaches to a DIFFERENT respondent's comment. `rid` does not move.
   //
   // The "@" prefix keeps the two forms unambiguous by inspection (a hex token can
   // be all digits), so a key never has to be guessed at. Legacy mode is the
   // ABSENCE of the feature, not a second code path: an island built before this
-  // shipped — or by a build whose reader-key sidecar was missing or corrupt —
+  // shipped, or by a build whose reader-key sidecar was missing or corrupt,
   // produces byte-identical keys to the ones it always produced.
 
   /** The key suffix for a record; a bare idx or an already-built suffix passes through. */
@@ -493,7 +493,7 @@
   qual.markRef = markRef;                 // node gate + the render handlers
   qual.markKeyFor = markKeyFor;
 
-  // Store meta fields — never marks, never embedded in a saved copy.
+  // Store meta fields, never marks, never embedded in a saved copy.
   var STORE_META = { _owns: 1, _v: 1 };
   var MARK_STORE_V = 2;                   // stores keyed by rid carry _v: 2
 
@@ -515,7 +515,7 @@
   }
   qual._resetRekey = function () { rekeyCache = undefined; };   // node gate
 
-  /** True while this report's marks are rid-keyed — i.e. a persist should stamp _v. */
+  /** True while this report's marks are rid-keyed, i.e. a persist should stamp _v. */
   function ridKeyed() { return !!rekeyMap(); }
   function stampVersion(out) { if (ridKeyed()) out._v = MARK_STORE_V; return out; }
 
@@ -524,17 +524,17 @@
       if (typeof localStorage !== "undefined" && TR.d2) {
         localStorage.setItem(TR.d2.storeKey(key), JSON.stringify(obj));
       }
-    } catch (e) { /* storage blocked — the store stays in memory */ }
+    } catch (e) { /* storage blocked. The store stays in memory */ }
   }
 
   /**
    * Re-key a legacy idx-keyed store onto the rids, once.
-   *   kind "flat" — the shortlist / highlight stores ({ key: value } + _owns).
-   *   kind "hubs" — the hub store; only each hub's `marks` map is rewritten,
+   *   kind "flat". The shortlist / highlight stores ({ key: value } + _owns).
+   *   kind "hubs". The hub store; only each hub's `marks` map is rewritten,
    *                 seq / order / name / insight are carried verbatim.
    * A store already stamped `_v` is returned untouched (idempotent by
    * construction), and a `_v` store read against a rid-less island is NEVER
-   * re-keyed back toward idx — its marks are invisible until a rid-bearing
+   * re-keyed back toward idx. Its marks are invisible until a rid-bearing
    * island returns (the corrupt-sidecar case), but they are not destroyed.
    * Ownership (`_owns`) is preserved exactly as found: migration is not a reader
    * change, and claiming ownership here would stop the island seed merging.
@@ -584,7 +584,7 @@
     }
     out._v = MARK_STORE_V;
     if (dropped && typeof console !== "undefined" && console.info) {
-      console.info("Turas: " + dropped + " reader mark(s) dropped — the comments they " +
+      console.info("Turas: " + dropped + " reader mark(s) dropped. The comments they " +
         "pointed at are not in this data run.");
     }
     return { store: out, changed: true, dropped: dropped };
@@ -611,7 +611,7 @@
     var mig = migrateMarkStore(own, "flat");
     if (mig.changed) { own = mig.store; writeStore(SAVED_KEY, own); }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -668,12 +668,12 @@
       var raw = (typeof localStorage !== "undefined") && TR.d2 && localStorage.getItem(TR.d2.storeKey(HL_KEY));
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
-    // I20: the same one-time re-key as the shortlist — the stored range arrays
+    // I20: the same one-time re-key as the shortlist. The stored range arrays
     // ride across verbatim, only their keys change.
     var mig = migrateMarkStore(own, "flat");
     if (mig.changed) { own = mig.store; writeStore(HL_KEY, own); }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -723,7 +723,7 @@
   };
   qual.highlightsAll = function () { return hlStore(); };   // report.saveCopy embeds this
 
-  /** Wrap the stored ranges in <mark> (escaping each piece) — pure, node-testable. */
+  /** Wrap the stored ranges in <mark> (escaping each piece): pure, node-testable. */
   qual.renderHighlighted = function (text, ranges) {
     if (text == null) return "";
     if (!ranges || !ranges.length) return esc(text);
@@ -747,13 +747,13 @@
     return (records || []).filter(function (r) { return r.band === band; });
   };
 
-  /** How many of `records` fall in `band` ("" = every band) — for the segment counts.
+  /** How many of `records` fall in `band` ("" = every band), for the segment counts.
    *  Counts only shown comments, so the band buttons match the list they navigate. */
   qual.bandCount = function (q, records, band) {
     return qual.bandFilter(q, qual.shown(records), band).length;
   };
 
-  /** Records whose verbatim ships — i.e. NOT withheld by the build-time verbatim scope
+  /** Records whose verbatim ships, i.e. NOT withheld by the build-time verbatim scope
    *  or a "hide" marker (record.suppressed). Withheld comments are counted in every
    *  distribution (prevalence, coverage, crosstab all read the full audience) but never
    *  appear in the readable comment LIST, so this gate is applied only on the list path,
@@ -766,7 +766,7 @@
   /** A small header notation of the verbatim scope in force, so a reader always knows
    *  which comments they are looking at (and that the distribution still counts them all):
    *    - "noteworthy" scope  -> "★ Noteworthy comments only" (shown on every question,
-   *      it is a report-wide policy — even where a question happens to hide nothing);
+   *      it is a report-wide policy, even where a question happens to hide nothing);
    *    - "all" scope with hide markers -> "Uninformative comments hidden" (only where a
    *      question actually withholds one, since "all" with nothing hidden is the default).
    *  Nothing renders for the plain default (scope "all", no hides). Reads q.records (the
@@ -782,7 +782,7 @@
     }
     if (suppressed > 0) {
       return '<span class="ql-scopechip hide" title="' + suppressed + " uninformative comment" +
-        (suppressed === 1 ? "" : "s") + ' (marked hide) withheld from the list — still counted in the ' +
+        (suppressed === 1 ? "" : "s") + ' (marked hide) withheld from the list. Still counted in the ' +
         'distribution.">Uninformative comments hidden</span>';
     }
     return "";
@@ -814,7 +814,7 @@
   };
 
   /** Split records into the analyst's curated set (shortlisted or carrying a
-   *  highlight) and the rest, order preserved — curated-first rendering (C1).
+   *  highlight) and the rest, order preserved. Curated-first rendering (C1).
    *  Presentation-only: both halves come from the SAME gated record pool. */
   qual.curatedSplit = function (records, qcode) {
     var curated = [], rest = [];
@@ -825,14 +825,14 @@
     return { curated: curated, rest: rest };
   };
 
-  /** Up to `cap` championed quotes for a theme (C2). The rule (fix #1) — so the
+  /** Up to `cap` championed quotes for a theme (C2). The rule (fix #1), so the
    *  inline pair is never arbitrary:
    *    1. the analyst's shortlist always leads (explicit editorial picks win);
-   *    2. the remaining slots fill as a BALANCED SPREAD — one positive, one
-   *       negative — so the reader sees the theme's range, not just its loudest
+   *    2. the remaining slots fill as a BALANCED SPREAD. One positive, one
+   *       negative, so the reader sees the theme's range, not just its loudest
    *       side. Mixed/uncoded are the fallback, so a one-sided theme simply fills
    *       from the sentiment that exists (its dominant lean), best tier first.
-   *  Within any bucket the order is noteworthy tier desc, then comment ID asc —
+   *  Within any bucket the order is noteworthy tier desc, then comment ID asc,
    *  a stable, deterministic tie-break (never source array order). Hidden-text
    *  records never champion. */
   qual.championQuotes = function (records, themeId, qcode, cap) {
@@ -844,7 +844,7 @@
       if ((b.tier || 0) !== (a.tier || 0)) return (b.tier || 0) - (a.tier || 0);
       return a.idx - b.idx;                          // stable, deterministic tie-break
     };
-    // 1. the analyst's shortlist leads, outright — even two same-sentiment picks
+    // 1. the analyst's shortlist leads, outright, even two same-sentiment picks
     var saved = pool.filter(function (r) { return qual.isSaved(qcode, r); }).sort(byTier);
     var chosen = saved.slice(0, cap);
     if (chosen.length >= cap) return chosen;
@@ -888,7 +888,7 @@
 
   /** Export matrix: ID + demographics + Noteworthy + Sentiment + Themes + Verbatim.
    *  Pure + node-testable. Hidden verbatims export as "[hidden]" (the confidentiality
-   *  dial is honoured — no raw text leaks when text was withheld). When safeDemos is
+   *  dial is honoured. No raw text leaks when text was withheld). When safeDemos is
    *  false (the audience is below the disclosure threshold) the demographic columns AND the
    *  verbatim text export as "[hidden]" too, so a small cut can't be exported with any
    *  identifying detail attached. */
@@ -898,7 +898,7 @@
     var byId = {};
     (q.themes || []).forEach(function (t) { byId[String(t.id)] = t.label; });
     // The split band is a report-level axis (like Noteworthy/Sentiment), so it exports even
-    // when demographics are withheld — it never identifies on its own (it mirrors the
+    // when demographics are withheld. It never identifies on its own (it mirrors the
     // recommend question already reported).
     var bandCol = (q.split && (q.split.bands || []).length) ? [q.split.dim || "Band"] : [];
     var header = ["ID"].concat(bandCol).concat(dims).concat(["Noteworthy", "Sentiment", "Themes", "Verbatim"]);
@@ -920,19 +920,19 @@
   qual.exportXlsx = function (island, q, records) {
     if (!TR.xlsx || !TR.xlsx.download) return;
     // Below the disclosure threshold the drawer withholds the whole list (even the
-    // count) — the export must keep that promise: a row per comment (ID, tier,
+    // count): the export must keep that promise: a row per comment (ID, tier,
     // sentiment, themes) would reveal exactly what the gate suppresses on screen.
     if (TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) return;
     var safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
     var base = (TR.fmt && TR.fmt.slug) ? TR.fmt.slug(q.title || q.code || "comments") : "comments";
-    // keepText: verbatims, IDs and demographic values are prose / identifiers —
+    // keepText: verbatims, IDs and demographic values are prose / identifiers,
     // never coerce them to numbers (a "50%" comment or an 007 code would mangle).
     TR.xlsx.download(base + "_comments", "Comments",
       qual.exportRows(island, q, records, safeDemos), { keepText: true });
   };
 
   // ---- collection: the pool (all marks) aggregated across questions ----------
-  // The "collection" is a VIEW over the durable pool — every shortlisted (★) and
+  // The "collection" is a VIEW over the durable pool. Every shortlisted (★) and
   // every highlighted (✎) comment, gathered across all questions into one place. It
   // reads the existing shortlist + highlight stores and NEVER mutates them, so the
   // marks can't be lost by anything the collection does. Both stores are keyed
@@ -979,9 +979,9 @@
    * Returns { items: [...], orphans: N }. Each item is
    *   { qcode, idx, record, question, saved, highlighted, hubbed }
    * de-duplicated by mark key. A comment counts as pooled if it is shortlisted,
-   * highlighted OR filed in any hub — so "add to a hub" is itself a way to save a
+   * highlighted OR filed in any hub, so "add to a hub" is itself a way to save a
    * comment (shortlist + hub in one), no separate ★ needed. Orphans (keys with no
-   * matching record) are counted once over the union. Pure — no DOM, no storage.
+   * matching record) are counted once over the union. Pure. No DOM, no storage.
    */
   qual.collectPool = function (island, savedMap, hlMap, hubMap) {
     var res = recordIndex(island);
@@ -997,12 +997,12 @@
       var rec = slot && slot.byRef[m.ref];
       if (!rec) { orphans++; return; }
       // A record whose verbatim this report does not publish (qual_verbatim_scope
-      // "theme all, show some" — themed and demographically tagged, text withheld)
+      // "theme all, show some". Themed and demographically tagged, text withheld)
       // has nothing to contribute to a collection of quotes. It used to render as
       // "[quote hidden in this copy]", which reads like a fault. Counted, not shown.
       if (rec.text == null) { withheld++; return; }
       // idx comes from the RECORD (the respondent's position in this run), key from
-      // the store — in legacy mode they are the same two halves they always were.
+      // the store, in legacy mode they are the same two halves they always were.
       items.push({ qcode: m.qcode, idx: rec.idx, key: key, record: rec, question: slot.q,
                    saved: !!savedMap[key], highlighted: !!(hlMap[key] && hlMap[key].length),
                    hubbed: !!hubMap[key] });
@@ -1012,8 +1012,8 @@
 
   /**
    * Group collected items for display.
-   *   mode "question" (default) — by source question, in island order.
-   *   mode "theme" — by theme LABEL across questions (affinity grouping): a comment
+   *   mode "question" (default), by source question, in island order.
+   *   mode "theme", by theme LABEL across questions (affinity grouping): a comment
    *     appears under every theme it carries; comments with no coded theme fall in a
    *     "No theme" group. Theme groups rank by distinct-comment count desc, "No theme"
    *     last. Returns an ordered array of { key, label, items }. Pure + node-testable.
@@ -1049,7 +1049,7 @@
 
   /** Export matrix for the collection: ID + Question + demographics + Noteworthy +
    *  Sentiment + Themes + Shortlisted + Highlighted + Verbatim. Mirrors exportRows'
-   *  confidentiality rule — when safeDemos is false the demographic columns AND the
+   *  confidentiality rule. When safeDemos is false the demographic columns AND the
    *  verbatim export as "[hidden]", and a hidden verbatim always exports as "[hidden]".
    *  Pure + node-testable. */
   qual.collectionExportRows = function (island, items, safeDemos) {
@@ -1077,7 +1077,7 @@
 
   qual.exportCollectionXlsx = function (island, items, safeDemos) {
     if (!TR.xlsx || !TR.xlsx.download) return;
-    // The caller passes the view's gate (hub-specific when a hub is active — set in
+    // The caller passes the view's gate (hub-specific when a hub is active, set in
     // collectionMain) so the export can never be more revealing than the screen.
     if (safeDemos === undefined) safeDemos = !(TR.disclosure && TR.disclosure.audienceTooSmall());
     TR.xlsx.download("collection_comments", "Collection",
@@ -1085,7 +1085,7 @@
   };
 
   // ---- named reader hubs: named lenses over the pool -------------------------
-  // A hub is a NAMED SET of marks (mark keys) — a VIEW over the pool, never a
+  // A hub is a NAMED SET of marks (mark keys): a VIEW over the pool, never a
   // container: adding a comment to a hub, or renaming/deleting a hub, never touches a
   // mark, and the same mark can sit in several hubs. Reader hubs live in per-report
   // localStorage (mirroring the shortlist). qual.hubsAll() is exposed for the step-2
@@ -1110,7 +1110,7 @@
       if (typeof h.insight !== "string") h.insight = "";
     });
     var out = { seq: seq, order: order, byId: byId };
-    // The re-key stamp must survive normalisation — a store that lost it would be
+    // The re-key stamp must survive normalisation. A store that lost it would be
     // migrated a second time, and its (already rid-keyed) marks would all resolve
     // to nothing. See migrateMarkStore.
     if (s._v) out._v = s._v;
@@ -1187,14 +1187,14 @@
     s.order.forEach(function (id) { if (s.byId[id].marks[k]) out.push({ id: id, name: s.byId[id].name }); });
     return out;
   };
-  /** { "<markKey>": 1 } over every hub's members — the hub contribution to the pool, so
+  /** { "<markKey>": 1 } over every hub's members. The hub contribution to the pool, so
    *  a comment filed only in a hub still shows up in the collection. */
   qual.hubMarksUnion = function () {
     var s = hubsStore(), out = {};
     s.order.forEach(function (id) { Object.keys(s.byId[id].marks).forEach(function (k) { out[k] = 1; }); });
     return out;
   };
-  /** Take one comment out of the collection entirely — shortlist, highlighted
+  /** Take one comment out of the collection entirely. Shortlist, highlighted
    *  passages and hub memberships. The collection IS the union of those three, so
    *  clearing only the shortlist leaves a highlighted comment sitting there looking
    *  as though the control did nothing. One button, one meaning. */
@@ -1224,10 +1224,10 @@
   };
 
   /**
-   * Build a Story exhibit for a hub — its name, its one-line insight (the finding), a
+   * Build a Story exhibit for a hub. Its name, its one-line insight (the finding), a
    * coverage line, and up to `cap` illustrative quotes (with a compact demographic code
    * when safeDemos) + a "+N more" note. Returns a pinSnapshot payload
-   * { source, title, context, html, lines, quotes, moreN }. Pure + node-testable — the
+   * { source, title, context, html, lines, quotes, moreN }. Pure + node-testable. The
    * html is what the Story renders, the lines are what the image deck rasterises, and
    * quotes is the structured payload the editable deck's quote slide renders (WP4).
    * Every disclosure rule the exhibit applies travels into the payload: hidden text
@@ -1265,14 +1265,14 @@
     var lines = [name];
     if (insight) lines.push(insight);
     if (coverage) lines.push(coverage);
-    // structured quotes for the editable deck's quote slide (WP4) — built
+    // structured quotes for the editable deck's quote slide (WP4): built
     // beside lines so the two carry EXACTLY the same disclosure gates
     var quotes = [];
     shown.forEach(function (it) {
       var r = it.record;
-      if (r.text == null) return;   // hidden text stays hidden — never pinned
+      if (r.text == null) return;   // hidden text stays hidden, never pinned
       var code = demoCode(r);
-      lines.push("“" + r.text + "” — " + it.question.title + (code ? " (" + code + ")" : ""));
+      lines.push("“" + r.text + "”, " + it.question.title + (code ? " (" + code + ")" : ""));
       quotes.push({ text: r.text, q: it.question.title,
         tags: demoTags(r), sentiment: SENT[r.sentiment] || "neu" });
     });
@@ -1288,7 +1288,7 @@
   }
 
   // ---- focus reading mode (C4) -----------------------------------------------
-  // A full-width single-column reading view over an ALREADY-GATED record list —
+  // A full-width single-column reading view over an ALREADY-GATED record list,
   // the same records the drawer / collection is showing, zero new data logic.
   // focusHtml/focusNav are pure (node-testable); openFocus is the DOM shell.
 
@@ -1359,7 +1359,7 @@
     overlay.innerHTML = '<div class="ql-focus" role="dialog" aria-modal="true" ' +
       'aria-label="Focus reading mode">' + qual.focusHtml(entries, pos, opts) + "</div>";
     // lives INSIDE #app so saveCopy (which empties #app in its clone) can never
-    // bake an open focus view into a saved copy — mirrors the legend overlay
+    // bake an open focus view into a saved copy. Mirrors the legend overlay
     var host = document.getElementById("app") || document.body;
     host.appendChild(overlay);
     var panel = overlay.firstChild;
@@ -1397,7 +1397,7 @@
       var bq = e.target.closest(".ql-fq");
       if (bq) setPos(parseInt(bq.getAttribute("data-fi"), 10));
     });
-    // j/k + Esc, plus the same Tab trap as the legend panel — listeners die
+    // j/k + Esc, plus the same Tab trap as the legend panel. Listeners die
     // with the overlay node, so nothing stacks across opens
     overlay.addEventListener("keydown", function (e) {
       if (saveable && (e.key === "s" || e.key === "S")) {   // shortlist the comment being read
@@ -1473,7 +1473,7 @@
 
   qual.render = function (host) {
     // A re-render replaces the cards the chip was pointing at, so it can only be
-    // stale from here on — including the re-render the tab switch itself triggers.
+    // stale from here on, including the re-render the tab switch itself triggers.
     hlRemovePop();
     var island = TR.QUAL, d2 = TR.d2;
     if (!island || !island.questions || !island.questions.length) {
@@ -1495,7 +1495,7 @@
     var q = findQ(island, d2.state.qualQ) || island.questions[0];
     d2.state.qualQ = q.code;
 
-    // The cut is the live global filter — the ONE audience control. The filter bar is
+    // The cut is the live global filter. The ONE audience control. The filter bar is
     // visible on this tab and re-renders the comments, so the prevalence + drawer always
     // reflect the active filter ("the comments from the people in this cut"). Composite
     // filters (Campus = Cape Town AND Q017 = Promoter AND Year = 1st) all flow here, which
@@ -1504,7 +1504,7 @@
     var cutFilters = (d2.state.filters && d2.state.filters.length) ? d2.state.filters : null;
 
     // The pool (every shortlisted + highlighted comment) drives both the rail's "Your
-    // collection" count and the collection view itself — compute it once per render.
+    // collection" count and the collection view itself. Compute it once per render.
     var collected = qual.collectPool(island, qual.savedAll(), qual.highlightsAll(), qual.hubMarksUnion());
 
     var body;
@@ -1533,7 +1533,7 @@
       rail.scrollTop = railTop;
       // ...then nudge the selected item into view, exactly as the Crosstabs
       // sidebar does. "nearest" is a no-op when it is already on screen, so a
-      // click never moves the list — only arriving from elsewhere (a jump from
+      // click never moves the list, only arriving from elsewhere (a jump from
       // a closed question, a restored hash) scrolls, and only as far as needed.
       var cur = rail.querySelector('[aria-current="true"]');
       if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
@@ -1573,7 +1573,7 @@
         ' <span class="catn">(' + g.qs.length + ')</span></button>' +
         '<div class="catitems">' + items + '</div></div>';
     }).join("");
-    // A pinned "Your collection" entry sits above the question groups — the reader's
+    // A pinned "Your collection" entry sits above the question groups. The reader's
     // whole pool of marks (shortlisted + highlighted) in one place, across every question.
     var colCur = st.view === "collection" ? ' aria-current="true"' : "";
     var colBtn = '<button class="ql-railcol" data-col-open' + colCur +
@@ -1588,7 +1588,7 @@
     // The chart (overview) sits ABOVE the controls; tier/sentiment/shortlist sit directly
     // above the comment list they filter, so it's clear they narrow the list, not the chart.
     // Demographic filtering is the global audience bar's job (composite filters), so there
-    // is no per-tab facet row here. Themed questions get an Overview / Crosstab switch — the
+    // is no per-tab facet row here. Themed questions get an Overview / Crosstab switch. The
     // crosstab supplements the prevalence board, it does not replace it (Overview is default).
     var chart = "";
     if (q.type === "themed") {
@@ -1599,7 +1599,7 @@
     }
     // Clear separator + scroll anchor (fix #4): mark where the chart ends and the
     // comments begin, so the section start is unmissable and the header's jump
-    // button lands here. Themed only — raw questions show comments immediately.
+    // button lands here. Themed only. Raw questions show comments immediately.
     var divider = q.type === "themed"
       ? '<div class="ql-secdivider" id="ql-comments-anchor"><span class="ql-seclabel">💬 The comments</span></div>'
       : "";
@@ -1617,7 +1617,7 @@
   }
 
   /**
-   * The per-question analyst insight — the overall read on this question's
+   * The per-question analyst insight. The overall read on this question's
    * comments, in the same box the Crosstabs tab uses. It sits directly under
    * the header, above the board: on a page this long a note at the foot would
    * never be read, and the conclusion belongs ahead of the evidence.
@@ -1638,7 +1638,7 @@
 
   /**
    * Open the shared pin popover for the whole question card. Elements offered:
-   * the board (whichever view is showing) and the analyst insight — the two
+   * the board (whichever view is showing) and the analyst insight. The two
    * things inside the snap card.
    */
   function openQuestionPin(host, q, st) {
@@ -1668,7 +1668,7 @@
         label: st.themeView === "crosstab" ? "Themes by banner" : "Theme board" });
     }
     items.push({ key: "insight", label: "Key themes", checked: true });
-    // The analyst's priority comments, offered only when there are some — an
+    // The analyst's priority comments, offered only when there are some. An
     // always-on tickbox would be dead on most questions. The count is
     // filter-independent by design: priority is marked against the question,
     // not against the cut on screen. Same offer the Crosstabs pin box makes.
@@ -1699,7 +1699,7 @@
     var card = host.querySelector(".ql-qcard[data-snap-card]");
     if (!card || !TR.story2 || !TR.story2.pinSnapshot) return;
     // The clone carries each note's typed value (textarea cloning propagates it),
-    // so snapshotCard freezes what the analyst actually wrote — for this
+    // so snapshotCard freezes what the analyst actually wrote, for this
     // question's insight and, in the crosstab view, the nested themes x banner
     // note inside the board.
     var work = card.cloneNode(true);
@@ -1707,8 +1707,8 @@
       if (!flags[el.getAttribute("data-pinpart")]) el.remove();
     });
     work.querySelectorAll(PIN_DROP_SEL).forEach(function (el) { el.remove(); });
-    // Priority comments are not in the card — they live in the filtered list
-    // below it — so the ticked block is built and appended before snapshotting.
+    // Priority comments are not in the card. They live in the filtered list
+    // below it, so the ticked block is built and appended before snapshotting.
     // It arrives ALREADY disclosure-gated (hidden text absent, tags dropped
     // below k); priorityQuotesFor applies every rule the crosstab pin gets.
     var quotes = flags.comments ? qual.priorityQuotesFor(q) : [];
@@ -1724,7 +1724,7 @@
     if (flags.insight) bits.push("key themes");
     if (quotes.length) bits.push(quotes.length + " priority comment" + (quotes.length === 1 ? "" : "s"));
     // snapshotLines harvests by element selector and does not match a
-    // blockquote, so the quote lines are added beside it — same text, same
+    // blockquote, so the quote lines are added beside it. Same text, same
     // gates, so the image deck and the editable deck cannot diverge.
     var lines = TR.shell.snapshotLines(work);
     quotes.forEach(function (qt) {
@@ -1747,7 +1747,7 @@
   function headerHtml(island, q, audience) {
     var asked = q.base ? q.base.answered : 0;
     var shown = audience.length;
-    // Below the disclosure threshold the cut's commenter count is withheld too —
+    // Below the disclosure threshold the cut's commenter count is withheld too,
     // show only the (unfiltered) answered total, matching the gated drawer.
     var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
     var n = (gated || shown === asked) ? (asked + " answered") : (shown + " of " + asked + " answered");
@@ -1757,7 +1757,7 @@
     // the analyst's one-line insight for this question (optional headline field)
     var headline = qual.headlineFor(q);
     var headlineHtml = headline ? '<p class="ql-headline">' + esc(headline) + "</p>" : "";
-    // C3 coverage bar — how complete the theme frame is. Below k it reads the
+    // C3 coverage bar. How complete the theme frame is. Below k it reads the
     // UNFILTERED records (never cut-derived), matching the gated header count.
     var cov = "";
     if (q.type === "themed" && (q.themes || []).length) {
@@ -1771,9 +1771,9 @@
     // chart, so offer a jump straight to it (the section is anchored below the chart).
     var jump = q.type === "themed"
       ? '<button class="ql-jumpcomments" data-jump-comments ' +
-        'title="Skip the chart — jump to the comments and their filters">↓ Jump to comments</button>'
+        'title="Skip the chart. Jump to the comments and their filters">↓ Jump to comments</button>'
       : "";
-    // Pin to story — the same popover the Crosstabs tab opens, placed where the
+    // Pin to story. The same popover the Crosstabs tab opens, placed where the
     // qual page previously had no pin at all (only the themes x banner card
     // had one). Disabled below the disclosure threshold, exactly like Export:
     // the board is withheld there, so there is nothing worth pinning.
@@ -1789,10 +1789,10 @@
   }
 
   // One controls row: the noteworthy tier, the sentiment filter (with live counts),
-  // and — next to them — the shortlist toggle (per question) + Excel export.
+  // and, next to them, the shortlist toggle (per question) + Excel export.
   function controlsHtml(q, st, audience, island) {
     // Disclosure control: below k the board/crosstab/drawer are all withheld, so this
-    // row must not leak the cut either — no live sentiment counts, no export button
+    // row must not leak the cut either. No live sentiment counts, no export button
     // (it would emit a row per comment); the filters stay visible but disabled, with
     // the standard disclosure note.
     var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
@@ -1841,7 +1841,7 @@
     }
 
     // Tag display control (Feature 2): the reader can hide all tags to declutter, or toggle
-    // an individual dimension. Purely SUBTRACTIVE — it only hides fields the analyst already
+    // an individual dimension. Purely SUBTRACTIVE. It only hides fields the analyst already
     // cleared into the island (the demographic_cuts / k-anon gate runs in R), so it can never
     // reveal a suppressed value or lower k. Shown only when the island carries tag dimensions.
     var tagctl = "";
@@ -1868,7 +1868,7 @@
       (gated ? "" :
         '<button class="ql-export" data-qual-export title="Download the comments shown here as an Excel file">' +
         "⬇ Export</button>") + "</div>";
-    // Labelled "Filter the comments below" — these narrow the LIST, not the chart above.
+    // Labelled "Filter the comments below". These narrow the LIST, not the chart above.
     // On themed questions the section divider above already separates it, so drop the
     // controls' own top rule to avoid a double line (fix #4).
     var undivided = q.type === "themed" ? " undivided" : "";
@@ -1889,7 +1889,7 @@
     // 100% (proportion) diverging sentiment bars: every theme's bar is the SAME width
     // (W% of the track), pivoted so the neutral midpoint sits on a shared zero line. The
     // lean still reads as valence, but because the bar is proportion (not volume) no
-    // dominant theme can compress the others — every segment is generous, so the counts
+    // dominant theme can compress the others. Every segment is generous, so the counts
     // fit inside. Salience is the % + the ranking, not the bar length.
     var W = 48;                                       // bar width as % of track (<=50 so extremes never overflow)
     var seg = function (cls, count, tot) {
@@ -1908,7 +1908,7 @@
       var title = other
         ? (r.n + " of " + audience.length + " commented without raising a coded theme (" +
            r.pos + " positive, " + r.neu + " mixed, " + r.neg + " negative)")
-        : (r.label + " — " + r.n + " of " + audience.length + " raised it unprompted (" +
+        : (r.label + ": " + r.n + " of " + audience.length + " raised it unprompted (" +
            r.pos + " positive, " + r.neu + " mixed, " + r.neg + " negative)");
       // 1–2 championed quotes inline (C2), gated behind the inline-comments toggle
       // (fix #3, default off) so the chart overview stays clean until asked for.
@@ -1933,7 +1933,7 @@
         (champ ? '<div class="ql-champ">' + champ + "</div>" : "") + "</div>";
     };
     var body = rows.map(function (r) { return card(r, false); }).join("");
-    // C3: the unthemed comments as a first-class card — same treatment, ranked
+    // C3: the unthemed comments as a first-class card. Same treatment, ranked
     // last regardless of volume so the frame's themes always lead.
     var unthemed = qual.unthemed(audience);
     if (unthemed.length) {
@@ -1966,14 +1966,14 @@
 
   // ---- theme x banner crosstab (supplements the prevalence board) ------------
   // An "Overview / Crosstab" switch sits above the chart: Overview is the diverging
-  // prevalence board (default, unchanged); Crosstab is the theme x banner table —
+  // prevalence board (default, unchanged); Crosstab is the theme x banner table,
   // salience + net sentiment per column, expandable to the pos/mixed/neg split,
   // with an analyst insight that pins to the Story alongside the table.
 
   function hasBanner() {
     // The theme×banner crosstab recomputes from per-respondent banner membership
     // (columnsFor reads TR.MICRO.banner_vars), so an aggregates-only ship
-    // (html_report_v2_microdata = N ships TR.MICRO = null) cannot offer it —
+    // (html_report_v2_microdata = N ships TR.MICRO = null) cannot offer it,
     // hide the Overview/Crosstab toggle and fall back to the overview board,
     // the same trade that turns off live filters and custom banners.
     return !!(TR.AGG && TR.AGG.banner_groups && TR.AGG.banner_groups.length &&
@@ -2000,7 +2000,7 @@
          : sig === "down" ? ' <span class="ql-xsig down" title="significantly lower vs the rest">▼</span>' : "";
   }
   function xCell(cell, mode, suppressed, counts) {
-    if (suppressed) return '<td class="ql-xc supp"><span title="hidden — column below the confidentiality threshold">·</span></td>';
+    if (suppressed) return '<td class="ql-xc supp"><span title="hidden. Column below the confidentiality threshold">·</span></td>';
     var netCls = cell.net > 0 ? "pos" : cell.net < 0 ? "neg" : "mix";
     var net = '<span class="ql-xnet ' + netCls + '">net ' + (cell.net > 0 ? "+" : "") + cell.net + "%</span>";
     if (mode === "skew") {
@@ -2063,7 +2063,7 @@
     return '<section class="ql-xtab card" data-snap-card>' +
       '<div class="ql-xtop snap-pin"><span class="ql-xlbl">Cross themes by</span>' + bsel + modeSeg + countsBox +
         '<span class="ql-xspacer"></span><button class="ql-xpin" data-snap-pin ' +
-        'data-snap-source="qualitative" data-snap-title="' + esc(q.title + " — themes by " + bannerName) +
+        'data-snap-source="qualitative" data-snap-title="' + esc(q.title + ", themes by " + bannerName) +
         '" data-snap-context="' + esc(pinCtx) + '">📌 Pin to story</button></div>' +
       TR.txt.block("qual.xtab.caption", {
         banner: bannerName, mode: { html: modeLabel },
@@ -2080,7 +2080,7 @@
 
   function drawerHtml(island, q, st, audience) {
     // Disclosure control: when a composite filter (or a closed<->open jump) narrows the
-    // audience below the confidentiality threshold, withhold the WHOLE comment list — the
+    // audience below the confidentiality threshold, withhold the WHOLE comment list. The
     // verbatim text, the demographic tags and even the comment count could identify a person
     // on a small named cut. The threshold is on the respondent audience, so k = the full
     // sample hides comments on any sub-cut; only the full-sample view shows them.
@@ -2104,7 +2104,7 @@
     if (q.split && st.band != null && st.band !== "") caption = esc(st.band) + " · " + caption;
     var focusBtn = records.length
       ? '<button class="ql-focusbtn" data-qual-focus ' +
-        'title="Read these comments one at a time — j/k or arrows to move, Esc to close">⤢ Focus</button>'
+        'title="Read these comments one at a time. J/k or arrows to move, Esc to close">⤢ Focus</button>'
       : "";
     return '<div class="ql-drawer"><div class="ql-drawerhd">' + caption +
       ' <span class="ql-hint">(' + records.length + ")</span>" + focusBtn + "</div>" +
@@ -2113,12 +2113,12 @@
 
   // Curated-first (C1): the analyst's selection (shortlisted / highlighted)
   // leads under its own rubric; "show all N" expands the rest. Presentation
-  // only — both halves are the SAME already-gated visible-record list, and the
+  // only. Both halves are the SAME already-gated visible-record list, and the
   // shortlist-only view (already curated by definition) keeps its flat list.
   function drawerCardsHtml(records, q, st) {
     if (!records.length) {
       return '<p class="ql-empty">' + (st.savedOnly
-        ? "No shortlisted comments yet — use ＋ Shortlist on a comment."
+        ? "No shortlisted comments yet. Use ＋ Shortlist on a comment."
         : "No comments for this selection.") + "</p>";
     }
     var cardOf = function (r) { return quoteCard(r, q.code); };
@@ -2151,7 +2151,7 @@
              : r.tier >= 1 ? '<span class="ql-star" title="noteworthy">★</span>' : '';
     // Tags honour the reader's tag toggle (hide-all / per-field), and read "Label: value"
     // so several dimensions stay legible ("Centre: Worcester DC · Channel: Presell"). The
-    // toggle is subtractive only — a field absent from r.demos (gated/k-anon in R) can't appear.
+    // toggle is subtractive only. A field absent from r.demos (gated/k-anon in R) can't appear.
     var qst = qual._state || {};
     var tags = (!qst.tagsOff && r.demos ? Object.keys(r.demos) : [])
       .filter(function (k) { return r.demos[k] != null && !(qst.tagHide && qst.tagHide[k]); })
@@ -2161,7 +2161,7 @@
       esc(key) + '" aria-pressed="' + saved + '" title="' +
       (saved ? "Remove from your shortlist" : "Add to your shortlist") + '">' +
       (saved ? "✓ Shortlisted" : "＋ Shortlist") + "</button>";
-    // sentiment word beside the edge accent — the coding is never colour-only
+    // sentiment word beside the edge accent. The coding is never colour-only
     var sentWord = SENT_WORD[r.sentiment]
       ? '<span class="ql-sent ' + sent + '">' + SENT_WORD[r.sentiment] + "</span>" : "";
     return '<div class="ql-quote ' + sent + '" data-hl-key="' + esc(key) + '">' + star +
@@ -2173,7 +2173,7 @@
 
   function footerHtml(island, q) {
     var dropped = q.meta && q.meta.dropped_codes ? q.meta.dropped_codes : 0;
-    // Provenance of the verbatim text — plain language, and honest per text mode:
+    // Provenance of the verbatim text. Plain language, and honest per text mode:
     // "full" ships the comment untouched; "redacted" removes identifying details but
     // never rewrites; "hidden" shows no text at all, so the note is dropped.
     var verbatimNote =
@@ -2205,7 +2205,7 @@
   }
 
   // The hub selector bar: "All marks" + a chip per hub (name + pool-resolved count),
-  // a "＋ New hub" affordance, and — for the selected hub — inline rename / delete.
+  // a "＋ New hub" affordance, and, for the selected hub, inline rename / delete.
   // Only one inline text input is ever open (st.hubEditing is a single value).
   function hubBarHtml(st, total, resolvedCounts) {
     var chip = function (id, label, count, on) {
@@ -2230,7 +2230,7 @@
           '<button class="ql-hublink" data-hubrenamecancel>Cancel</button></span>'
         : '<button class="ql-hublink" data-hubrename title="Rename this hub">✎ Rename</button>' +
           '<button class="ql-hublink danger" data-hubdel ' +
-          'title="Delete this hub — its comments stay in the pool">🗑 Delete</button>';
+          'title="Delete this hub. Its comments stay in the pool">🗑 Delete</button>';
     }
     // The chips scroll horizontally (many hubs never wrap into a wall); New / rename /
     // delete stay pinned to the right, always in reach.
@@ -2242,7 +2242,7 @@
   // hubs this comment is already in shown as removable chips, plus a compact "Add to hub"
   // dropdown that scales to any number of hubs (a native menu, never a chip wall). Filing a
   // comment in a hub pools it, so this is also how you save a comment straight from the
-  // question list — shortlist and hub in one, no separate ★ needed.
+  // question list. Shortlist and hub in one, no separate ★ needed.
   function hubControlHtml(key) {
     var m = qual.splitMark(key);
     if (!m) return "";
@@ -2278,14 +2278,14 @@
       .map(function (id) { return '<span class="ql-cchip">' + esc(byId[id]) + "</span>"; }).join("");
     var tags = ctx.dropTags ? "" : (r.demos ? Object.keys(r.demos) : []).filter(function (k) { return r.demos[k] != null; })
       .map(function (k) { return '<span class="ql-tag">' + esc(r.demos[k]) + "</span>"; }).join("");
-    // The star is a control, not a badge — you can drop a comment from the
+    // The star is a control, not a badge. You can drop a comment from the
     // shortlist where you are reading it, instead of hunting it down on its own
     // question card. Reuses the [data-qual-save] handler that wires the question
     // cards, so there is one toggle path, not two.
     var flags = (it.saved ? '<span class="ql-cflag" title="shortlisted">★</span>' : "") +
       (it.highlighted ? '<span class="ql-cflag" title="has a highlighted passage">✎</span>' : "") +
       '<button class="ql-cremove" data-qual-unmark="' + esc(key) +
-      '" title="Remove this comment from your collection — clears its shortlist star, ' +
+      '" title="Remove this comment from your collection. Clears its shortlist star, ' +
       'any highlighted passage and any hub it is filed in">✕ Remove</button>';
     return '<div class="ql-quote ' + sent + ' ql-ccard" data-hl-key="' + esc(key) + '">' +
       '<div class="ql-qbody">' +
@@ -2306,7 +2306,7 @@
     var total = pool.items.length;
 
     // Resolve the selected hub (drop a stale selection), and count each hub's
-    // pool-resolved membership — its marks that are actually in the pool right now.
+    // pool-resolved membership. Its marks that are actually in the pool right now.
     if (st.hub != null && !qual.hubGet(st.hub)) st.hub = null;
     var poolKeys = {};
     pool.items.forEach(function (it) { poolKeys[it.key] = 1; });
@@ -2328,10 +2328,10 @@
       return head + hubBar + '<div class="ql-drawer">' +
         TR.txt.block("qual.collection.empty", null, { cls: "ql-empty" }) + "</div>";
     }
-    // A named hub is a hand-picked set — INDEPENDENT of the audience filter (show all its
+    // A named hub is a hand-picked set. INDEPENDENT of the audience filter (show all its
     // members). "All marks" is the exploratory view: it honours the live cut, and a below-k
     // cut hides it (a small cut-derived view could identify). A selected hub is NOT a cut,
-    // so that gate does not apply to it — a hub is shown whatever the filter.
+    // so that gate does not apply to it. A hub is shown whatever the filter.
     var cutDesc = (cutFilters && TR.d2 && TR.d2.filterDescription) ? TR.d2.filterDescription() : "";
     var shown;
     if (activeHub) {
@@ -2347,8 +2347,8 @@
 
     // §4 for a hub: the COMMENTS are never the secret (they live in their questions); what
     // the threshold protects is DEMOGRAPHIC tags on a small named set. So a hub with fewer
-    // than k distinct respondents keeps its comments but drops the per-comment tags — on
-    // screen AND in the exported exhibit — rather than being blocked from the report.
+    // than k distinct respondents keeps its comments but drops the per-comment tags, on
+    // screen AND in the exported exhibit, rather than being blocked from the report.
     var hubBelowK = !!(activeHub && TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
       qual.hubDistinctRespondents(shown) < TR.disclosure.minBase());
     var safeDemos = activeHub
@@ -2363,7 +2363,7 @@
       '<button class="ql-segbtn' + (groupBy === "theme" ? " on" : "") + '" data-colgroup="theme">By theme</button></div>';
     var actions = '<div class="ql-actions">' +
       (shown.length ? '<button class="ql-focusbtn" data-col-focus ' +
-        'title="Read these comments one at a time — j/k or arrows to move, Esc to close">⤢ Focus</button>' : "") +
+        'title="Read these comments one at a time. J/k or arrows to move, Esc to close">⤢ Focus</button>' : "") +
       '<button class="ql-export" data-col-export ' +
       'title="Download everything shown here as an Excel file">⬇ Export</button></div>';
 
@@ -2384,7 +2384,7 @@
     if (pool.orphans) cover += ' · <span class="ql-orphan" title="' +
       esc(TR.txt("qual.collection.orphans_tip")) + '">' + pool.orphans +
       " mark" + (pool.orphans === 1 ? "" : "s") + " no longer match this data</span>";
-    // The cover states the withholding — a marked comment whose verbatim this
+    // The cover states the withholding. A marked comment whose verbatim this
     // copy does not publish must not simply vanish from the collection
     // ("reads like the control did nothing"; review 2026-08, I21).
     if (pool.withheld) cover += ' · <span class="ql-orphan" title="' +
@@ -2395,19 +2395,19 @@
 
     // A selected hub gets an insight field (the one-line finding) + "Add to story". Never
     // blocked: a below-k hub just drops its demographic tags (safeDemos above), with a calm
-    // note — the comments themselves are already in the report.
+    // note. The comments themselves are already in the report.
     var insightBlock = "";
     if (activeHub) {
       var promote = shown.length === 0
         ? '<span class="ql-hubsmall">add comments to build this hub’s story</span>'
         : '<button class="ql-hubpromote" data-hub-promote ' +
-          'title="Add this hub — its finding + quotes — to the Story tab">📌 Add to story</button>' +
+          'title="Add this hub, its finding + quotes, to the Story tab">📌 Add to story</button>' +
           (hubBelowK ? '<span class="ql-hubsmall" title="Fewer than the confidentiality threshold of ' +
-            TR.disclosure.minBase() + ' distinct respondents — demographic tags are hidden in the report">🛡 tags hidden</span>' : "");
-      insightBlock = '<div class="insight ql-hubinsight"><div class="insight-head">Hub insight — the one-line finding' +
+            TR.disclosure.minBase() + ' distinct respondents. Demographic tags are hidden in the report">🛡 tags hidden</span>' : "");
+      insightBlock = '<div class="insight ql-hubinsight"><div class="insight-head">Hub insight. The one-line finding' +
         '<span class="ql-xspacer"></span>' + promote + "</div>" +
         '<textarea class="ql-hubinstext" data-hub-insight ' +
-        'placeholder="What’s the story of this hub? (one line — travels to the report when you add it to the Story)">' +
+        'placeholder="What’s the story of this hub? (one line, travels to the report when you add it to the Story)">' +
         esc(activeHub.insight || "") + "</textarea></div>";
     }
 
@@ -2527,7 +2527,7 @@
         var id = themeAttr(b.getAttribute("data-theme-focus"));
         var stTheme = { tier: st.tier, sentiment: st.sentiment, savedOnly: st.savedOnly, theme: id };
         qual.openFocus(qual.focusEntries(qual.visibleRecords(v.q, stTheme, v.audience), v.q),
-          { title: focusThemeLabel(v.q, id) + " — " + v.q.title, trigger: b,
+          { title: focusThemeLabel(v.q, id) + ": " + v.q.title, trigger: b,
             onSave: function () { st.showRest = true; }, onClose: function () { qual.render(host); } });
       });
     });
@@ -2681,7 +2681,7 @@
       qual.render(host);
     });
     // per-card add-to-hub dropdown (scales to any number of hubs) + remove-from-hub
-    // chips — present on BOTH the question drawer and the collection cards.
+    // chips. Present on BOTH the question drawer and the collection cards.
     host.querySelectorAll("[data-hubadd]").forEach(function (sel) {
       sel.addEventListener("change", function () {
         var m = qual.splitMark(sel.getAttribute("data-hubadd")), val = sel.value;
@@ -2709,7 +2709,7 @@
     if (promote) promote.addEventListener("click", function () {
       var v = qual._colview;
       if (!v || !v.hub || !TR.story2 || !TR.story2.pinSnapshot) return;
-      // Never blocked — a below-k hub already ships with its demographic tags dropped
+      // Never blocked. A below-k hub already ships with its demographic tags dropped
       // (v.safeDemos, set in collectionMain); the comments are safe to include.
       TR.story2.pinSnapshot(qual.hubExhibit(v.hub, v.items, { coverage: v.coverPlain, safeDemos: v.safeDemos }));
     });
@@ -2737,7 +2737,7 @@
 
   // The chip lives on document.body at position:fixed / z-index:50, so nothing in
   // the report clips it. It used to be cleared ONLY by the next mouseup inside the
-  // drawer — so selecting a passage and then leaving (switching to Crosstabs,
+  // drawer, so selecting a passage and then leaving (switching to Crosstabs,
   // scrolling, clicking anywhere else) stranded it on top of whatever came next.
   // These dismissors are global and registered once, not per render.
   var _hlDismissWired = false;
@@ -2752,7 +2752,7 @@
       if (t && t.closest && t.closest(".ql-hlpop")) return;   // the chip itself
       hlRemovePop();
     }, true);
-    // Nothing selected means nothing to highlight — covers keyboard and programmatic
+    // Nothing selected means nothing to highlight. Covers keyboard and programmatic
     // collapses that never produce a mouse event.
     document.addEventListener("selectionchange", function () {
       if (!_hlPop) return;
@@ -2766,7 +2766,7 @@
     }
   }
 
-  // Exposed for the regression test — the chip's lifecycle is otherwise reachable
+  // Exposed for the regression test. The chip's lifecycle is otherwise reachable
   // only through a real text selection.
   qual._hl = {
     wire: hlWireDismissors,

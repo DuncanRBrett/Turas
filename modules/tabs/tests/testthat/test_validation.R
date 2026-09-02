@@ -3,12 +3,12 @@
 # ==============================================================================
 #
 # Tests for the validation pipeline:
-#   1. Structure validators — duplicates, orphans, missing options, variable types
-#   2. Config validators — alpha, min_base, decimal places, output format
-#   3. Weight validators — weight variable, values, distribution
-#   4. Data validators — numeric questions, bin structure/overlaps/coverage
-#   5. Preflight validators — cross-referential checks (selection/data/config)
-#   6. Orchestrator — run_all_validations
+#   1. Structure validators. Duplicates, orphans, missing options, variable types
+#   2. Config validators. Alpha, min_base, decimal places, output format
+#   3. Weight validators. Weight variable, values, distribution
+#   4. Data validators. Numeric questions, bin structure/overlaps/coverage
+#   5. Preflight validators. Cross-referential checks (selection/data/config)
+#   6. Orchestrator. Run_all_validations
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_validation.R")
@@ -59,7 +59,7 @@ source(file.path(turas_root, "modules/tabs/lib/data_loader.R"))
 .tabs_lib_dir <- file.path(turas_root, "modules/tabs/lib")
 assign(".tabs_lib_dir", .tabs_lib_dir, envir = globalenv())
 
-# Define create_error_log (from shared_functions.R) — avoid sourcing the orchestrator
+# Define create_error_log (from shared_functions.R): avoid sourcing the orchestrator
 # Assign to globalenv so validation.R functions can find it
 create_error_log <- function() {
   data.frame(
@@ -171,7 +171,7 @@ make_test_selection <- function() {
 # 1. Structure Validators
 # ==============================================================================
 
-context("structure validators — check_duplicate_questions")
+context("structure validators. Check_duplicate_questions")
 
 test_that("passes with unique question codes", {
   questions <- make_test_questions()
@@ -194,7 +194,7 @@ test_that("detects duplicate question codes", {
 })
 
 
-context("structure validators — check_variable_types")
+context("structure validators. Check_variable_types")
 
 test_that("accepts valid variable types", {
   questions <- make_test_questions()
@@ -214,7 +214,7 @@ test_that("rejects invalid variable type", {
 })
 
 
-context("structure validators — check_missing_options")
+context("structure validators. Check_missing_options")
 
 test_that("passes when all questions have options", {
   questions <- make_test_questions()
@@ -241,7 +241,7 @@ test_that("detects question with no options", {
 })
 
 
-context("structure validators — check_orphan_options")
+context("structure validators. Check_orphan_options")
 
 test_that("passes when all options have parent questions", {
   questions <- make_test_questions()
@@ -267,7 +267,7 @@ test_that("detects orphan options", {
 })
 
 
-context("structure validators — check_ranking_questions")
+context("structure validators. Check_ranking_questions")
 
 test_that("passes when Ranking_Format is Position or Item", {
   questions <- data.frame(
@@ -336,7 +336,7 @@ test_that("errors when Ranking_Format column is entirely missing", {
 # 2. Config Validators
 # ==============================================================================
 
-context("config validators — check_alpha_config")
+context("config validators. Check_alpha_config")
 
 test_that("accepts valid alpha", {
   config <- make_test_config()
@@ -374,7 +374,7 @@ test_that("warns on high alpha", {
 })
 
 
-context("config validators — check_min_base")
+context("config validators. Check_min_base")
 
 test_that("accepts valid min_base", {
   config <- make_test_config()
@@ -394,7 +394,7 @@ test_that("warns on very small min_base", {
 })
 
 
-context("config validators — check_decimal_places")
+context("config validators. Check_decimal_places")
 
 test_that("accepts valid decimal places", {
   config <- make_test_config()
@@ -414,7 +414,7 @@ test_that("rejects negative decimal places", {
 })
 
 
-context("config validators — check_output_format")
+context("config validators. Check_output_format")
 
 test_that("accepts valid output format", {
   config <- make_test_config()
@@ -438,7 +438,7 @@ test_that("rejects invalid output format", {
 # 3. Weight Validators
 # ==============================================================================
 
-context("weight validators — check_weight_values_valid")
+context("weight validators. Check_weight_values_valid")
 
 test_that("accepts valid weight values", {
   weights <- c(1.0, 1.5, 0.8, 2.0, 1.2)
@@ -473,7 +473,7 @@ test_that("rejects infinite weights", {
 })
 
 
-context("weight validators — check_weight_distribution")
+context("weight validators. Check_weight_distribution")
 
 test_that("passes with reasonable weight distribution", {
   set.seed(42)
@@ -501,7 +501,7 @@ test_that("warns on high weight variability", {
 # 4. Data Validators
 # ==============================================================================
 
-context("data validators — check_bin_structure")
+context("data validators. Check_bin_structure")
 
 test_that("passes with valid bin structure", {
   options <- data.frame(
@@ -530,7 +530,7 @@ test_that("rejects bins where Min > Max", {
 })
 
 
-context("data validators — check_bin_overlaps")
+context("data validators. Check_bin_overlaps")
 
 test_that("passes with non-overlapping bins", {
   options <- data.frame(
@@ -563,7 +563,7 @@ test_that("detects overlapping bins", {
 # 5. Preflight Validators
 # ==============================================================================
 
-context("preflight — check_conflicting_display")
+context("preflight. Check_conflicting_display")
 
 test_that("passes when at least one display metric enabled", {
   config <- make_test_config()
@@ -585,7 +585,7 @@ test_that("warns when all display metrics disabled", {
 })
 
 
-context("preflight — check_duplicate_options")
+context("preflight. Check_duplicate_options")
 
 test_that("passes with unique options per question", {
   options <- make_test_options()
@@ -596,7 +596,7 @@ test_that("passes with unique options per question", {
 })
 
 
-context("preflight — check_preflight_colour_codes")
+context("preflight. Check_preflight_colour_codes")
 
 test_that("passes with valid hex colours", {
   config <- make_test_config()
@@ -630,7 +630,7 @@ test_that("checks colours whatever the report settings say", {
 })
 
 
-context("preflight — check_preflight_dashboard_scales")
+context("preflight. Check_preflight_dashboard_scales")
 
 test_that("passes with valid dashboard thresholds", {
   config <- make_test_config()
@@ -654,7 +654,7 @@ test_that("warns on inverted thresholds", {
   expect_true(nrow(warnings) > 0)
 })
 
-test_that("the check runs WITHOUT include_summary — it is retired (I11)", {
+test_that("the check runs WITHOUT include_summary. It is retired (I11)", {
   # It used to be gated on include_summary, which the classic HTML report owned.
   # Retiring that setting means config$include_summary is NULL, so the gate would
   # have returned early forever and silently killed the check for the mean and
@@ -684,7 +684,7 @@ test_that("the retired net and custom pairs are no longer checked", {
 })
 
 
-context("preflight — check_selection_vs_questions")
+context("preflight. Check_selection_vs_questions")
 
 test_that("passes when selected questions exist in structure", {
   selection <- make_test_selection()
@@ -710,7 +710,7 @@ test_that("detects selected question not in structure", {
 })
 
 
-context("preflight — check_data_column_coverage")
+context("preflight. Check_data_column_coverage")
 
 test_that("passes when data columns exist for selected questions", {
   selection <- make_test_selection()
@@ -743,10 +743,10 @@ test_that("detects missing data column", {
 
 
 # ==============================================================================
-# 6. Orchestrator — run_all_validations
+# 6. Orchestrator. Run_all_validations
 # ==============================================================================
 
-context("run_all_validations — orchestrator")
+context("run_all_validations. Orchestrator")
 
 test_that("runs full validation pipeline without errors on valid data", {
   config <- make_test_config()

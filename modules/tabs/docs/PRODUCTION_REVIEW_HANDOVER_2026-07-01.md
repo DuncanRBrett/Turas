@@ -1,6 +1,6 @@
-# Production Review — fix handover (continue in a new session)
+# Production Review. Fix handover (continue in a new session)
 
-**Branch:** `feature/tabs-qualitative-tab` (pre-merge to `main`). **Do NOT push/merge** — Duncan
+**Branch:** `feature/tabs-qualitative-tab` (pre-merge to `main`). **Do NOT push/merge**. Duncan
 regenerates the reports via `launch_turas` and merges himself.
 
 This continues the independent pre-merge review of the integrated v2 reporting system. Context:
@@ -15,11 +15,11 @@ independence stance: verify by reading code + running suites, don't trust these 
 
 ## Done this session (committed on this branch, all suites green)
 
-**Disclosure blocker — comment/identity side + quant sub-k suppression (Duncan eyeballed the comment side):**
+**Disclosure blocker. Comment/identity side + quant sub-k suppression (Duncan eyeballed the comment side):**
 - Fail-**closed** when microdata is absent (`21d_disclosure.js` `audienceBase` → null; `audienceTooSmall`
   treats unknown as too-small). Was failing OPEN.
 - Source de-identification via a **three-mode** `qual_demographic_cuts` dial (independent of `k`):
-  `block` (no tags in source) / `safe` (**k-anonymised** tags — broadest combo covering ≥k, finer
+  `block` (no tags in source) / `safe` (**k-anonymised** tags, broadest combo covering ≥k, finer
   crossings dropped; `qual_kanon_tags` in `qual_island_builder.R`) / `allow` (internal only).
 - Render + export gates: prevalence board, comment drawer, and the comment Excel export all withhold on
   a sub-k audience (`27q_qualitative.js`). Fixed an export path that leaked verbatim text.
@@ -30,7 +30,7 @@ independence stance: verify by reading code + running suites, don't trust these 
   base 1..k-1, strips letters pointing at a blanked column. **This closed Duncan's live n=1 leak** (filter
   → 1 respondent → their answers were showing). `k=1` (off) is a no-op → unprotected reports byte-identical.
 
-**Weighted crosstab significance/intervals (#6 — the E1 inversion):**
+**Weighted crosstab significance/intervals (#6, the E1 inversion):**
 - `data_layer_writer.R` serialises the **weighted base + Kish effective base** into published columns
   (weighted reports only; unweighted byte-identical).
 - `22_model.js` `sigCell` forms the weighted proportion on the weighted base and sizes the test on the
@@ -39,7 +39,7 @@ independence stance: verify by reading code + running suites, don't trust these 
 
 **Two more confirmed highs:**
 - **K1** Save-copy now persists Patterns/takeout curation (`27f` `snapshot()` + `32_report` `saveCopy`).
-- **L1** single-pass template fill (`build_report_v2.R`) — a verbatim containing `{{JS}}` can no longer
+- **L1** single-pass template fill (`build_report_v2.R`): a verbatim containing `{{JS}}` can no longer
   splice the bundle into an island and corrupt the report.
 
 Tests added/updated (all green): disclosure 16, qual 59, composite 10, takeout 26, tracking-nav 10,
@@ -49,7 +49,7 @@ portrait 8; R island 54, report 20, join 44, quant-layer 16, data-layer 194, bun
 
 ## Outstanding (priority order)
 
-### ~~1. `#5` — main Excel workbook disclosure coverage~~ — **DONE (2026-07-01 session), tested**
+### ~~1. `#5`, main Excel workbook disclosure coverage~~, **DONE (2026-07-01 session), tested**
 This **finishes the disclosure blocker**. Correction to the original pointer: the live workbook is NOT
 written by `excel_writer.R` `write_crosstab_workbook()` (that function is **legacy / test-only**). The live
 path is `workbook_builder.R` `create_crosstabs_workbook()` → `write_crosstabs_sheet()` →
@@ -59,45 +59,45 @@ path is `workbook_builder.R` `create_crosstabs_workbook()` → `write_crosstabs_
   **unweighted** base is in `[1, k-1]` (`k = config$min_reporting_base`); base 0 never flagged; `k<=1`
   returns `integer(0)` → **byte-identical when off**. Computed once per question in `write_single_question`.
 - `write_base_rows(..., suppressed_idx)` overwrites each withheld column's base cells with a marker
-  (`disclosure_marker(k)` → e.g. `n<10`) — more conservative than the HTML (which keeps the exact base),
+  (`disclosure_marker(k)` → e.g. `n<10`): more conservative than the HTML (which keeps the exact base),
   deliberate for a distributed file.
 - `write_question_table_fast(..., suppressed_idx)` blanks a withheld column (leaves its NA-initialised
   matrix column, collects **no** significance letters for it).
 - `create_guide_sheet()` gains a **CONFIDENTIALITY (DISCLOSURE CONTROL)** section, gated on `k>1`.
-- Tests: `test_workbook_builder.R` — pure `disclosure_suppressed_columns`/`disclosure_marker` unit tests +
+- Tests: `test_workbook_builder.R`. Pure `disclosure_suppressed_columns`/`disclosure_marker` unit tests +
   an end-to-end `create_crosstabs_workbook` read-back proving Female (n=3) blanks with a `n<10` marker while
   Male (n=50)/Total stay intact, and `k=1` is unmarked/full. (Also defined the missing `SIG2_ROW_TYPE`
-  constant in that file's setup — two `create_crosstabs_workbook` tests were silently isolation-broken.)
+  constant in that file's setup. Two `create_crosstabs_workbook` tests were silently isolation-broken.)
 - **Follow-ups (documented, not done, NOT leaks of the withheld column's own values):** (a) letters that
-  point AT a withheld column are not stripped from other columns — letters restart per banner group, so a
+  point AT a withheld column are not stripped from other columns. Letters restart per banner group, so a
   global strip would be unsafe across banners; (b) complementary (subtraction) suppression across a banner
-  group — same deferral as the HTML side (`applyDisclosureSuppression` calls it "the next increment").
+  group. Same deferral as the HTML side (`applyDisclosureSuppression` calls it "the next increment").
   The workbook is now at **parity** with the HTML's protection level.
 
-### 2. `#8` — weighted wave-on-wave significance uses the unweighted base  *(fully scoped)*
+### 2. `#8`. Weighted wave-on-wave significance uses the unweighted base  *(fully scoped)*
 `22w_waves.js`: `sdOfScores` computes the Kish `effN` (line ~201) but the sig tests `meanLevel`/`propLevel`
-feed the test the **unweighted** base → over-liberal flags on weighted trackers. Plan (Total path only —
+feed the test the **unweighted** base → over-liberal flags on weighted trackers. Plan (Total path only,
 segments carry pre-computed `seg_stats`, no per-respondent weights, so they fall back to the plain base):
 - add `effNfromWeights(w, n)` + `effBaseOf(waveQ, seg)` (Total: Kish over `waveQ.weights`) + `waves.currentEffBase()`;
 - thread `effBase` onto points in `waves.series` + `waves.currentPoint` **and** the current-wave push in
   `27t_tracking.js:266` (check `27u_summary.js` for a parallel push);
 - new `sigPair(p)` (weighted: `x = value%/100 * effBase` over `effBase`; unweighted: exact `p.x/p.base`);
 - `propLevel`/`meanLevel` use `effBase` not `base`.
-Needs a **weighted known-answer test** (effN < base flips a flag). Deferred deliberately — the weighted-
+Needs a **weighted known-answer test** (effN < base flips a flag). Deferred deliberately. The weighted-
 tracker path awaits a real weighted-project run; don't rush sig math.
 
-### 3. `#7` — JS↔R significance-convention parity  *(medium; census/weighted edge cases)*
+### 3. `#7`. JS↔R significance-convention parity  *(medium; census/weighted edge cases)*
 - **FPC on significance:** `22_model.js` `applyFpcSignificance` re-letters the DEFAULT view of a
   population report; the R engine applies no FPC to sig → on a census the HTML letters differ from the
   Excel. NOTE it's already gated `!weighted`, so this is **census-only**. Decide: port FPC into the R
   z-test, or gate the JS off. (`reportHasPopulation` / `population_size`.)
-- **eff_n rounding:** R `calculate_effective_n` rounds to integer; JS uses the float — boundary flips.
-- **z constants:** JS `Z_CRITICAL=1.96` / `Z_80=1.2816` vs R exact `qnorm` — hairline boundary divergence.
+- **eff_n rounding:** R `calculate_effective_n` rounds to integer; JS uses the float. Boundary flips.
+- **z constants:** JS `Z_CRITICAL=1.96` / `Z_80=1.2816` vs R exact `qnorm`. Hairline boundary divergence.
 - **#6 residual:** weighted **mean-row** 80% letters + weighted mean CI still use the unweighted SD path
   (the mean-SD machinery); pairs naturally with this task.
 
-### 4. `#11` — cluster 3/4/5 mediums + lows
-- **F1 (high):** `27e_takeout_engine.js:436` odd-one-out mixes raw scale points across scales — an NPS
+### 4. `#11`. Cluster 3/4/5 mediums + lows
+- **F1 (high):** `27e_takeout_engine.js:436` odd-one-out mixes raw scale points across scales. An NPS
   (±100) question fabricates a spurious "exception" against 1–5 thresholds. Normalise gaps to per-scale
   units, or exclude NPS/Score from the index-scale scan. (`27f_takeout_data.js:319` `gatherBimodality`
   has the sibling non-1..K bug.)
@@ -119,15 +119,15 @@ tracker path awaits a real weighted-project run; don't rush sig math.
 
 - **Disclosure (the hard blocker): CLOSED.** comment side + quant HTML suppression + `#5` (standalone Excel
   workbook) all **done**. Residual complementary-subtraction suppression is a documented follow-up on both
-  the HTML and workbook paths (equal on both), separately tracked — not a merge blocker.
-- **Weighted/census stats:** `#6` done (crosstab); `#8` (wave sig) + `#7` (FPC/parity) remain — block for
+  the HTML and workbook paths (equal on both), separately tracked, not a merge blocker.
+- **Weighted/census stats:** `#6` done (crosstab); `#8` (wave sig) + `#7` (FPC/parity) remain. Block for
   weighted/census deliverables.
 - The cluster-3/4/5 mediums are fix-forward, not individually merge-blocking.
 
 ## How to verify
 - JS (from `modules/tabs/lib/html_report_v2/`): `node tests/{qual,disclosure,tracking_nav,composite,portrait,takeout}_tests.mjs`.
 - R: `Rscript -e 'testthat::test_file("modules/tabs/tests/testthat/<f>.R")'` per file (test_dir on the
-  parent errors — tests live in `tests/testthat/`). Full `test_dir` is slow (~50s); run the changed files.
-- **Generated HTML is verified by Duncan via `launch_turas` — never `preview_start`, never headless-run
+  parent errors. Tests live in `tests/testthat/`). Full `test_dir` is slow (~50s); run the changed files.
+- **Generated HTML is verified by Duncan via `launch_turas`, never `preview_start`, never headless-run
   the pipeline on OneDrive data.** Regenerate the SACS report (`min_reporting_base: 10`) to eyeball
   disclosure; a weighted project (e.g. CCS) to eyeball the weighted stats.

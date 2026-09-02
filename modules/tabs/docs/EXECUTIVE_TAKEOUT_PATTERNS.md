@@ -4,22 +4,22 @@ Status: BUILT · 2026-06-28 · branch `feature/tabs-executive-takeout`
 Engine reworked to patterns (group / weakest area / strongest area / moved);
 `Theme` column added on the R side; both views re-shaped. node 16/16, v2 bundler
 25/25, html_report 87/87. Validated on three synthetic survey types (employee
-engagement, brand funnel, CX/CSAT) — same engine, sensible big-picture each.
+engagement, brand funnel, CX/CSAT): same engine, sensible big-picture each.
 Awaiting Duncan's launch_turas regen on a tagged SACS config.
 
 ## Why we're changing it
 
 The first Executive Takeout repeated the Dashboard and Differences tabs in a
-tidier box — its cards (e.g. "recognition 3.44", "Cape Town behind") are the
+tidier box. Its cards (e.g. "recognition 3.44", "Cape Town behind") are the
 same numbers already on those tabs. The only new things were the apex sentence
 and the four posture labels. Not enough to justify a tab.
 
-The reworked tab answers one question — **what's the big picture?** — and earns
+The reworked tab answers one question, **what's the big picture?**, and earns
 its place by saying things the other tabs can't, because they only ever show one
 question or one cell at a time:
 
 1. **The group that stands out** across the whole survey (no tagging needed).
-2. **The topic (area) that stands out** — a cluster of related questions (needs tagging).
+2. **The topic (area) that stands out**. A cluster of related questions (needs tagging).
 3. **What moved** most since last wave.
 
 These are cross-question by construction, so they don't duplicate anything.
@@ -28,18 +28,18 @@ These are cross-question by construction, so they don't duplicate anything.
 
 Two optional labels per question:
 
-- **Section** (Level 1) — the big bucket, from a short list seeded by a
+- **Section** (Level 1): the big bucket, from a short list seeded by a
   study-type template. Engagement → Basic Needs / Individual / Teamwork / Growth.
   Brand → Awareness / Consideration / Preference / Loyalty. CX → Product /
   Service / Price / Ease / Trust. Editable.
-- **Theme** (Level 2) — an optional finer label inside the section, free text,
+- **Theme** (Level 2): an optional finer label inside the section, free text,
   the study-specific nuance (e.g. "Recognition & voice", "Fair pay").
 
 The decisive principle: **the engine works on the *position* (which section,
 which theme), never on what the labels say.** "Group the questions, find the
 weakest group, find the group that's slipping" runs identically whether the
 sections are Recognition/Growth or Awareness/Loyalty. So we never need one master
-list of topics that fits every survey — that can't exist. Consistency comes from
+list of topics that fits every survey. That can't exist. Consistency comes from
 the *structure* + per-domain starter templates; meaning lives in the labels.
 
 Three rules make it practical (validated against Qualtrics topic models, Viva
@@ -62,16 +62,16 @@ disconnected. The framework adds an optional second column (**`Theme`**) on the
 same Selection sheet, carried the same way (`question_orchestrator.R` →
 `data_layer_writer.R` → a `q.theme` field → a `byTheme` group-by in JS, mirroring
 `d2.categories()` / the dashboard's `byCat`). Composites (Q_Engage/Q_Value) get a
-section too (today they have none). No new statistics — pure grouping + the
+section too (today they have none). No new statistics. Pure grouping + the
 patterns logic over numbers the report already computes.
 
 ## SACS worked example
 
-### Tagging (about a 20-minute job — the 12 engagement items are the Gallup Q12)
+### Tagging (about a 20-minute job, the 12 engagement items are the Gallup Q12)
 
 | Section | Theme | Questions (index /5) |
 |---|---|---|
-| Satisfaction | — (headline) | Q28 overall satisfaction **3.90** |
+| Satisfaction |, (headline) | Q28 overall satisfaction **3.90** |
 | Engagement | Clarity & resources | Q05 know what's expected **4.51**, Q06 materials & equipment |
 | Engagement | Recognition & voice | Q08 recognition **3.44**, Q11 opinions count **3.72**, Q15 progress conversations **3.75** |
 | Engagement | Belonging & care | Q09 manager cares, Q10 encourages development, Q12 mission matters, Q13 co-workers committed **4.20**, Q14 someone to relate to |
@@ -87,23 +87,23 @@ section scores.)
 Headlines (apex): **Satisfaction 3.90 · 69% satisfied (▲)** · **Engagement 4.08
 (▼, third year down)** · **Values 78% aligned (4.18)**.
 
-1. **The group under strain — Cape Town.** Least satisfied campus (3.38), lowest
+1. **The group under strain. Cape Town.** Least satisfied campus (3.38), lowest
    engagement (3.75), least values-aligned. Behind the rest right across the
    survey. *(Also: new staff the most positive; Marketing's satisfaction fell
    sharply.)*
-2. **Weakest area — Recognition & voice (≈3.6).** Recognition (3.44), opinions
-   counting (3.72) and progress conversations (3.75) all sit low — and all three
+2. **Weakest area. Recognition & voice (≈3.6).** Recognition (3.44), opinions
+   counting (3.72) and progress conversations (3.75) all sit low, and all three
    are falling year on year.
-3. **Strongest area — Clarity & purpose.** Knowing what's expected (4.51) is the
+3. **Strongest area. Clarity & purpose.** Knowing what's expected (4.51) is the
    single highest item; belief in the mission and committed colleagues hold the
    place together.
-4. **What moved — engagement's slow slide.** Down a third straight year
+4. **What moved. Engagement's slow slide.** Down a third straight year
    (4.31 → 4.16 → 4.08), led by the recognition theme; satisfaction edged up
    (3.83 → 3.90).
-5. **Values — aligned, with one soft value.** 78% aligned overall, but team-ness
+5. **Values. Aligned, with one soft value.** 78% aligned overall, but team-ness
    is the least-observed value (63%), and Cape Town is least aligned.
 
-None of these is on the Dashboard or Differences as a single statement — each one
+None of these is on the Dashboard or Differences as a single statement. Each one
 groups across questions (a theme) or across the whole survey (a segment). Drill
 into the Dashboard for the individual scores.
 
@@ -126,7 +126,7 @@ into the Dashboard for the individual scores.
 - **Customer satisfaction:** Sections = Product / Service / Price / Ease / Trust.
   → "Weakest area: Price-value; branch X consistently lowest; Ease improved."
 
-Same code, same four patterns — only the labels change.
+Same code, same four patterns, only the labels change.
 
 ## Build implications (next step, not yet built)
 

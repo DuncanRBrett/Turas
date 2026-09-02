@@ -1,13 +1,13 @@
 {
   "_meta": {
     "version": "1.0.0",
-    "description": "What authored text the v2 renderer needs. The words themselves live in the shared callout registry under module 'tabs' and are edited in the Callout Editor; this file is the renderer's contract with them. Validated at build time by report_text.R — a key here with no entry in the registry, or a placeholder in the registry that is not declared here, refuses the build.",
-    "format": "key -> { page, context, tokens }. page groups the entry in the Callout Editor and should match a v2 tab. context says where on that tab it renders, so an author knows what they are changing. tokens lists the {placeholders} the renderer supplies for that key, and token_help says in plain English what each one becomes — the Callout Editor shows that beside the text being edited; any other {lower_snake_case} in the authored text is a typo and refuses the build.",
-    "authoring": "Text is the CONTENT of its block — the renderer supplies the surrounding <p>/<div> and the data-txt-key tag. Inline markup is limited to strong em b i br p ul ol li h3 h4 span code sup sub, balanced, with no attributes. Blank text renders nothing at all, which is how an author switches a block off without touching code."
+    "description": "What authored text the v2 renderer needs. The words themselves live in the shared callout registry under module 'tabs' and are edited in the Callout Editor; this file is the renderer's contract with them. Validated at build time by report_text.R. A key here with no entry in the registry, or a placeholder in the registry that is not declared here, refuses the build.",
+    "format": "key -> { page, context, tokens }. page groups the entry in the Callout Editor and should match a v2 tab. context says where on that tab it renders, so an author knows what they are changing. tokens lists the {placeholders} the renderer supplies for that key, and token_help says in plain English what each one becomes. The Callout Editor shows that beside the text being edited; any other {lower_snake_case} in the authored text is a typo and refuses the build.",
+    "authoring": "Text is the CONTENT of its block. The renderer supplies the surrounding <p>/<div> and the data-txt-key tag. Inline markup is limited to strong em b i br p ul ol li h3 h4 span code sup sub, balanced, with no attributes. Blank text renders nothing at all, which is how an author switches a block off without touching code."
   },
   "report.construction.produced": {
     "page": "Report",
-    "context": "The attribution sentence. Used two ways: on its own in front of a study's own _REPORT_CONSTRUCTION note, and as {producer} inside the stock note below — so it is worded once and correct in both.",
+    "context": "The attribution sentence. Used two ways: on its own in front of a study's own _REPORT_CONSTRUCTION note, and as {producer} inside the stock note below, so it is worded once and correct in both.",
     "tokens": [
       "company"
     ],
@@ -22,31 +22,31 @@
   },
   "reader.legend.sig_letters": {
     "page": "How to read",
-    "context": "Legend panel, Significance letters — what a lettered cell means and what case signifies. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
+    "context": "Legend panel, Significance letters. What a lettered cell means and what case signifies. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary. Keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
       "dual_clause"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary. A study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
     }
   },
   "reader.legend.sig_letters_dual": {
     "page": "How to read",
-    "context": "Legend panel, Significance letters — the secondary-level clause spliced onto the sig-letters sentence. Rendered only on a study that configured a secondary level.",
+    "context": "Legend panel, Significance letters. The secondary-level clause spliced onto the sig-letters sentence. Rendered only on a study that configured a secondary level.",
     "tokens": [
       "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "reader.legend.low_base": {
     "page": "How to read",
-    "context": "Legend panel, Significance letters — only when the project sets a low-base threshold.",
+    "context": "Legend panel, Significance letters, only when the project sets a low-base threshold.",
     "tokens": [
       "low_base"
     ],
@@ -56,7 +56,7 @@
   },
   "reader.legend.moe_with_base": {
     "page": "How to read",
-    "context": "Legend panel, margin of error — when a published total base is known, so real numbers can be quoted.",
+    "context": "Legend panel, margin of error. When a published total base is known, so real numbers can be quoted.",
     "tokens": [
       "base",
       "moe_pp"
@@ -68,22 +68,22 @@
   },
   "reader.legend.moe_no_base": {
     "page": "How to read",
-    "context": "Legend panel, margin of error — the same point when no base is available to quote.",
+    "context": "Legend panel, margin of error. The same point when no base is available to quote.",
     "tokens": []
   },
   "reader.legend.weighted_fallback": {
     "page": "How to read",
-    "context": "Legend panel, Weighted data — only when the filter bar has no fuller weighting note to show.",
+    "context": "Legend panel, Weighted data, only when the filter bar has no fuller weighting note to show.",
     "tokens": []
   },
   "reader.legend.explain_toggle": {
     "page": "How to read",
-    "context": "Legend panel, Explain significance — the label beside the plain-language toggle.",
+    "context": "Legend panel, Explain significance. The label beside the plain-language toggle.",
     "tokens": []
   },
   "conf.footer.example": {
     "page": "Crosstabs",
-    "context": "Precision footer — the worked example, in the report's own numbers. {range_meaning} is one of the two keys below.",
+    "context": "Precision footer. The worked example, in the report's own numbers. {range_meaning} is one of the two keys below.",
     "tokens": [
       "article",
       "pct",
@@ -100,34 +100,34 @@
       "n": "the base it is calculated on",
       "lo": "the bottom of its range",
       "hi": "the top of its range",
-      "range_meaning": "what the range describes — one of the two 'Precision — range means' entries",
+      "range_meaning": "what the range describes, one of the two 'Precision, range means' entries",
       "interval_name": "'Confidence Interval' or 'Stability Interval', per the sampling design",
       "interval_abbrev": "'CI' or 'SI', per the sampling design"
     }
   },
   "conf.footer.range_meaning_group": {
     "page": "Crosstabs",
-    "context": "Precision footer — how the example's range reads when a finite population correction applies (it describes the whole group).",
+    "context": "Precision footer. How the example's range reads when a finite population correction applies (it describes the whole group).",
     "tokens": []
   },
   "conf.footer.range_meaning_rerun": {
     "page": "Crosstabs",
-    "context": "Precision footer — how the example's range reads without a correction (it describes a re-run).",
+    "context": "Precision footer. How the example's range reads without a correction (it describes a re-run).",
     "tokens": []
   },
   "conf.footer.what_95_means": {
     "page": "Crosstabs",
-    "context": "Precision footer — what 95% means. Probability samples only.",
+    "context": "Precision footer. What 95% means. Probability samples only.",
     "tokens": []
   },
   "conf.footer.reading_ranges": {
     "page": "Crosstabs",
-    "context": "Precision footer — the honest equivalent for a non-probability design, where 95% is not a coverage guarantee.",
+    "context": "Precision footer. The honest equivalent for a non-probability design, where 95% is not a coverage guarantee.",
     "tokens": []
   },
   "conf.footer.small_samples": {
     "page": "Crosstabs",
-    "context": "Precision footer — only when the report has a small column worth naming.",
+    "context": "Precision footer, only when the report has a small column worth naming.",
     "tokens": [
       "label",
       "n",
@@ -141,17 +141,17 @@
   },
   "conf.footer.comparing": {
     "page": "Crosstabs",
-    "context": "Precision footer — overlapping ranges mean the difference is noise.",
+    "context": "Precision footer. Overlapping ranges mean the difference is noise.",
     "tokens": []
   },
   "conf.footer.significant_means": {
     "page": "Crosstabs",
-    "context": "Precision footer — what 'significant' does and does not claim.",
+    "context": "Precision footer. What 'significant' does and does not claim.",
     "tokens": []
   },
   "conf.design.probability": {
     "page": "Crosstabs",
-    "context": "Precision footer, About this survey — a probability design.",
+    "context": "Precision footer, About this survey. A probability design.",
     "tokens": [
       "interval_abbrev"
     ],
@@ -161,7 +161,7 @@
   },
   "conf.design.non_probability": {
     "page": "Crosstabs",
-    "context": "Precision footer, About this survey — a non-probability design; the ranges are stability intervals, not confidence intervals.",
+    "context": "Precision footer, About this survey. A non-probability design; the ranges are stability intervals, not confidence intervals.",
     "tokens": [
       "interval_abbrev"
     ],
@@ -171,7 +171,7 @@
   },
   "conf.design.cluster": {
     "page": "Crosstabs",
-    "context": "Precision footer, About this survey — a cluster sample, whose clustering Turas does not adjust for.",
+    "context": "Precision footer, About this survey. A cluster sample, whose clustering Turas does not adjust for.",
     "tokens": [
       "precision_term"
     ],
@@ -181,7 +181,7 @@
   },
   "conf.fpc.lead_census_rate": {
     "page": "Crosstabs",
-    "context": "Precision footer, finite population correction — opening clause for a declared census where the response rate is known.",
+    "context": "Precision footer, finite population correction. Opening clause for a declared census where the response rate is known.",
     "tokens": [
       "rate",
       "universe"
@@ -193,7 +193,7 @@
   },
   "conf.fpc.lead_sample_rate": {
     "page": "Crosstabs",
-    "context": "Precision footer, finite population correction — opening clause for a sample whose coverage of the universe is known.",
+    "context": "Precision footer, finite population correction. Opening clause for a sample whose coverage of the universe is known.",
     "tokens": [
       "rate",
       "universe"
@@ -205,22 +205,22 @@
   },
   "conf.fpc.lead_known_sizes": {
     "page": "Crosstabs",
-    "context": "Precision footer, finite population correction — opening clause when group sizes are known but no response rate is.",
+    "context": "Precision footer, finite population correction. Opening clause when group sizes are known but no response rate is.",
     "tokens": []
   },
   "conf.fpc.body_census": {
     "page": "Crosstabs",
-    "context": "Precision footer, finite population correction — the census case, where non-response is the uncertainty that remains.",
+    "context": "Precision footer, finite population correction. The census case, where non-response is the uncertainty that remains.",
     "tokens": []
   },
   "conf.fpc.body_sample": {
     "page": "Crosstabs",
-    "context": "Precision footer, finite population correction — the sample case, where sampling uncertainty is unchanged because most of the universe was never asked.",
+    "context": "Precision footer, finite population correction. The sample case, where sampling uncertainty is unchanged because most of the universe was never asked.",
     "tokens": []
   },
   "tracking.unmatched.lead": {
     "page": "Tracking",
-    "context": "Tracking summary — shown when prior waves loaded but nothing matched. {priors} is the count, {span} the wave range.",
+    "context": "Tracking summary. Shown when prior waves loaded but nothing matched. {priors} is the count, {span} the wave range.",
     "tokens": [
       "priors",
       "waves_word",
@@ -234,103 +234,103 @@
   },
   "tracking.unmatched.cause": {
     "page": "Tracking",
-    "context": "Tracking summary — the usual cause, and the config setting that fixes it.",
+    "context": "Tracking summary. The usual cause, and the config setting that fixes it.",
     "tokens": []
   },
   "tracking.heatmap.legend": {
     "page": "Tracking",
-    "context": "Tracking summary — the heatmap's reading note. {soft_clause} appears only when the secondary level is switched on. The level word ({alpha_pct}) comes from the project's configured alpha — keep it rather than typing \"95%\", so a study testing at another level is described correctly.",
+    "context": "Tracking summary. The heatmap's reading note. {soft_clause} appears only when the secondary level is switched on. The level word ({alpha_pct}) comes from the project's configured alpha. Keep it rather than typing \"95%\", so a study testing at another level is described correctly.",
     "tokens": [
       "soft_clause",
       "alpha_pct"
     ],
     "token_help": {
       "soft_clause": "the hollow-arrow clause, added only when the secondary level is switched on",
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number"
     }
   },
   "tracking.heatmap.soft_clause": {
     "page": "Tracking",
-    "context": "Tracking summary — the hollow-arrow clause spliced into the heatmap note when the secondary level is on. Ends with a comma and a space because it sits mid-sentence; keep them. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
+    "context": "Tracking summary. The hollow-arrow clause spliced into the heatmap note when the secondary level is on. Ends with a comma and a space because it sits mid-sentence; keep them. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary. Keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "tracking.scorecard.bands": {
     "page": "Tracking",
-    "context": "Tracking summary — how the key-metric cards are coloured.",
+    "context": "Tracking summary. How the key-metric cards are coloured.",
     "tokens": []
   },
   "tracking.pulse.not_testable_tip": {
     "page": "Tracking",
-    "context": "Tracking summary — tooltip on the 'not testable' pulse chip.",
+    "context": "Tracking summary. Tooltip on the 'not testable' pulse chip.",
     "tokens": []
   },
   "tracking.pulse.sigmode_tip": {
     "page": "Tracking",
-    "context": "Tracking summary — tooltip on the significance-level selector.",
+    "context": "Tracking summary. Tooltip on the significance-level selector.",
     "tokens": []
   },
   "tracking.changes.none": {
     "page": "Tracking",
-    "context": "Tracking summary — no significant wave-on-wave changes, and the history could support a test.",
+    "context": "Tracking summary. No significant wave-on-wave changes, and the history could support a test.",
     "tokens": []
   },
   "tracking.changes.untestable": {
     "page": "Tracking",
-    "context": "Tracking summary — no test could run at all because the historical bases were not loaded.",
+    "context": "Tracking summary. No test could run at all because the historical bases were not loaded.",
     "tokens": []
   },
   "tracking.soft.intro": {
     "page": "Tracking",
-    "context": "Tracking summary — the 'nearly significant' card block. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
+    "context": "Tracking summary. The 'nearly significant' card block. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary. Keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "tracking.method.how_tested": {
     "page": "Tracking",
-    "context": "Tracking summary — the collapsed 'How wave-on-wave changes are tested' note.",
+    "context": "Tracking summary. The collapsed 'How wave-on-wave changes are tested' note.",
     "tokens": []
   },
   "tracking.empty": {
     "page": "Tracking",
-    "context": "Tracking tab — shown when no wave history is configured at all.",
+    "context": "Tracking tab. Shown when no wave history is configured at all.",
     "tokens": []
   },
   "visualise.legend.significance": {
     "page": "Tracking",
-    "context": "Tracking visualise — what a coloured arrow means and which test produced it. The level word ({alpha_pct}) comes from the project's configured alpha — keep it rather than typing \"95%\", so a study testing at another level is described correctly.",
+    "context": "Tracking visualise. What a coloured arrow means and which test produced it. The level word ({alpha_pct}) comes from the project's configured alpha. Keep it rather than typing \"95%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number"
     }
   },
   "visualise.ci_tip": {
     "page": "Tracking",
-    "context": "Tracking visualise — tooltip on the interval-bands toggle.",
+    "context": "Tracking visualise. Tooltip on the interval-bands toggle.",
     "tokens": []
   },
   "visualise.trendline_tip": {
     "page": "Tracking",
-    "context": "Tracking visualise — tooltip on the trendline toggle.",
+    "context": "Tracking visualise. Tooltip on the trendline toggle.",
     "tokens": []
   },
   "visualise.ci_note": {
     "page": "Tracking",
-    "context": "Tracking visualise — the note under the chart when interval bands are on. {softened} is added for non-probability designs.",
+    "context": "Tracking visualise. The note under the chart when interval bands are on. {softened} is added for non-probability designs.",
     "tokens": [
       "interval_term",
       "softened"
@@ -342,17 +342,17 @@
   },
   "visualise.ci_note_softened": {
     "page": "Tracking",
-    "context": "Tracking visualise — the clause appended to the interval note for non-probability designs. Starts with a space because it follows the previous sentence; keep it.",
+    "context": "Tracking visualise. The clause appended to the interval note for non-probability designs. Starts with a space because it follows the previous sentence; keep it.",
     "tokens": []
   },
   "visualise.note_tags": {
     "page": "Tracking",
-    "context": "Tracking visualise — how to tag a data point with a note.",
+    "context": "Tracking visualise. How to tag a data point with a note.",
     "tokens": []
   },
   "patterns.split.note": {
     "page": "Group overview",
-    "context": "Patterns — the 'widest differences run by X' navigation pointer. {gaps_clause} appears only when groups stand apart.",
+    "context": "Patterns. The 'widest differences run by X' navigation pointer. {gaps_clause} appears only when groups stand apart.",
     "tokens": [
       "subject",
       "gaps_clause"
@@ -364,7 +364,7 @@
   },
   "patterns.split.gaps_clause": {
     "page": "Group overview",
-    "context": "Patterns — the clause naming how many groups stand clearly apart.",
+    "context": "Patterns. The clause naming how many groups stand clearly apart.",
     "tokens": [
       "n",
       "groups_word"
@@ -376,7 +376,7 @@
   },
   "patterns.group.most_positive": {
     "page": "Group overview",
-    "context": "Patterns — names the most positive group under a group card.",
+    "context": "Patterns. Names the most positive group under a group card.",
     "tokens": [
       "subject"
     ],
@@ -386,7 +386,7 @@
   },
   "patterns.comove.note": {
     "page": "Group overview",
-    "context": "Patterns — the working under a co-movement card.",
+    "context": "Patterns. The working under a co-movement card.",
     "tokens": [
       "pairs"
     ],
@@ -396,7 +396,7 @@
   },
   "patterns.odd.caption": {
     "page": "Group overview",
-    "context": "Patterns — the working under an exception card.",
+    "context": "Patterns. The working under an exception card.",
     "tokens": [
       "cells"
     ],
@@ -406,17 +406,17 @@
   },
   "patterns.bimodal.note": {
     "page": "Group overview",
-    "context": "Patterns — the working under a two-camp split card.",
+    "context": "Patterns. The working under a two-camp split card.",
     "tokens": []
   },
   "patterns.movement.stable": {
     "page": "Group overview",
-    "context": "Patterns — shown when no metric shifted materially since the last wave.",
+    "context": "Patterns. Shown when no metric shifted materially since the last wave.",
     "tokens": []
   },
   "patterns.null.odd": {
     "page": "Group overview",
-    "context": "Patterns — the confident-null caption when exceptions were scanned and none survived.",
+    "context": "Patterns. The confident-null caption when exceptions were scanned and none survived.",
     "tokens": [
       "cells"
     ],
@@ -426,7 +426,7 @@
   },
   "patterns.null.bimodal": {
     "page": "Group overview",
-    "context": "Patterns — the confident-null caption when no two-camp split was found.",
+    "context": "Patterns. The confident-null caption when no two-camp split was found.",
     "tokens": [
       "scanned"
     ],
@@ -436,22 +436,22 @@
   },
   "patterns.empty.nothing_scorable": {
     "page": "Group overview",
-    "context": "Patterns — empty state: the study has nothing the scan can score, and what it would need.",
+    "context": "Patterns. Empty state: the study has nothing the scan can score, and what it would need.",
     "tokens": []
   },
   "patterns.empty.no_groups": {
     "page": "Group overview",
-    "context": "Patterns — empty state: questions to score but no breakout groups above the reporting floor.",
+    "context": "Patterns. Empty state: questions to score but no breakout groups above the reporting floor.",
     "tokens": []
   },
   "patterns.empty.no_pattern": {
     "page": "Group overview",
-    "context": "Patterns — empty state: the scan ran and found nothing, which is itself the finding.",
+    "context": "Patterns. Empty state: the scan ran and found nothing, which is itself the finding.",
     "tokens": []
   },
   "patterns.no_story": {
     "page": "Group overview",
-    "context": "Patterns — the groups that were scanned but produced no portrait, stated so their absence is not read as an omission.",
+    "context": "Patterns. The groups that were scanned but produced no portrait, stated so their absence is not read as an omission.",
     "tokens": [
       "names",
       "it_them"
@@ -463,51 +463,51 @@
   },
   "diffs.intro": {
     "page": "Differences",
-    "context": "Differences tab — what a card is and what the significance control does. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
+    "context": "Differences tab. What a card is and what the significance control does. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary. Keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
       "dual_clause"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary. A study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
     }
   },
   "diffs.intro_dual": {
     "page": "Differences",
-    "context": "Differences tab — the clause describing the significance control, spliced into the intro. Rendered only on a study that configured a secondary level.",
+    "context": "Differences tab. The clause describing the significance control, spliced into the intro. Rendered only on a study that configured a secondary level.",
     "tokens": [
       "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "qual.board.salience_hint": {
     "page": "Qualitative",
-    "context": "Themes board — how to read the diverging bars.",
+    "context": "Themes board. How to read the diverging bars.",
     "tokens": []
   },
   "qual.board.champ_rule": {
     "page": "Qualitative",
-    "context": "Themes board — which example comments are shown, when examples are switched on.",
+    "context": "Themes board, which example comments are shown, when examples are switched on.",
     "tokens": []
   },
   "qual.xtab.mode_skew": {
     "page": "Qualitative",
-    "context": "Themes × banner — what a cell means in sentiment-skew mode.",
+    "context": "Themes × banner. What a cell means in sentiment-skew mode.",
     "tokens": []
   },
   "qual.xtab.mode_salience": {
     "page": "Qualitative",
-    "context": "Themes × banner — what a cell means in salience mode.",
+    "context": "Themes × banner. What a cell means in salience mode.",
     "tokens": []
   },
   "qual.xtab.caption": {
     "page": "Qualitative",
-    "context": "Themes × banner — the caption under the table. {counts_clause} appears only when counts are shown.",
+    "context": "Themes × banner. The caption under the table. {counts_clause} appears only when counts are shown.",
     "tokens": [
       "banner",
       "mode",
@@ -515,43 +515,43 @@
     ],
     "token_help": {
       "banner": "the banner the themes are crossed by",
-      "mode": "what a cell means — one of the two 'Themes × banner' mode entries",
+      "mode": "what a cell means. One of the two 'Themes × banner' mode entries",
       "counts_clause": "the 'shown as counts' clause, added only when counts are switched on"
     }
   },
   "qual.xtab.counts_clause": {
     "page": "Qualitative",
-    "context": "Themes × banner — the clause added to the caption when cells show counts.",
+    "context": "Themes × banner. The clause added to the caption when cells show counts.",
     "tokens": []
   },
   "qual.footer.themes_salience": {
     "page": "Qualitative",
-    "context": "Comment footer — that themes are unprompted salience, not prompted incidence.",
+    "context": "Comment footer. That themes are unprompted salience, not prompted incidence.",
     "tokens": []
   },
   "qual.footer.demos_blocked": {
     "page": "Qualitative",
-    "context": "Comment footer — demographic cuts are switched off for this report.",
+    "context": "Comment footer. Demographic cuts are switched off for this report.",
     "tokens": []
   },
   "qual.footer.demos_safe": {
     "page": "Qualitative",
-    "context": "Comment footer — demographic tags appear only where the group is large enough.",
+    "context": "Comment footer. Demographic tags appear only where the group is large enough.",
     "tokens": []
   },
   "qual.footer.verbatim_full": {
     "page": "Qualitative",
-    "context": "Comment footer — the verbatims are as given and unedited.",
+    "context": "Comment footer. The verbatims are as given and unedited.",
     "tokens": []
   },
   "qual.footer.verbatim_redacted": {
     "page": "Qualitative",
-    "context": "Comment footer — the verbatims are as given with identifying details removed, never rewritten.",
+    "context": "Comment footer. The verbatims are as given with identifying details removed, never rewritten.",
     "tokens": []
   },
   "qual.footer.dropped_codes": {
     "page": "Qualitative",
-    "context": "Comment footer — stray codes quarantined out of the run.",
+    "context": "Comment footer. Stray codes quarantined out of the run.",
     "tokens": [
       "n",
       "codes_word"
@@ -563,27 +563,27 @@
   },
   "qual.collection.empty": {
     "page": "Qualitative",
-    "context": "Your collection — nothing marked yet, and how to mark something.",
+    "context": "Your collection. Nothing marked yet, and how to mark something.",
     "tokens": []
   },
   "qual.collection.hub_not_narrowed": {
     "page": "Qualitative",
-    "context": "Your collection — why a named hub ignores the audience filter.",
+    "context": "Your collection. Why a named hub ignores the audience filter.",
     "tokens": []
   },
   "qual.collection.orphans_tip": {
     "page": "Qualitative",
-    "context": "Your collection — tooltip on marks that no longer match the data.",
+    "context": "Your collection. Tooltip on marks that no longer match the data.",
     "tokens": []
   },
   "qual.collection.withheld_tip": {
     "page": "Qualitative",
-    "context": "Your collection — tooltip on marked comments whose text this copy does not publish.",
+    "context": "Your collection. Tooltip on marked comments whose text this copy does not publish.",
     "tokens": []
   },
   "qual.collection.empty_hub": {
     "page": "Qualitative",
-    "context": "Your collection — the selected hub is empty, and how to add to it.",
+    "context": "Your collection. The selected hub is empty, and how to add to it.",
     "tokens": [
       "hub"
     ],
@@ -593,17 +593,17 @@
   },
   "qual.collection.empty_cut": {
     "page": "Qualitative",
-    "context": "Your collection — no marks fall in the current cut.",
+    "context": "Your collection. No marks fall in the current cut.",
     "tokens": []
   },
   "report.intro": {
     "page": "Report",
-    "context": "Report tab — what this page holds.",
+    "context": "Report tab. What this page holds.",
     "tokens": []
   },
   "report.section_unset": {
     "page": "Report",
-    "context": "Report tab — shown in place of a narrative section the config has not filled in. {row} names the Comments-sheet row that fills it.",
+    "context": "Report tab. Shown in place of a narrative section the config has not filled in. {row} names the Comments-sheet row that fills it.",
     "tokens": [
       "row"
     ],
@@ -613,32 +613,32 @@
   },
   "report.added_slides.intro": {
     "page": "Report",
-    "context": "Report tab — what the reader's own Added slides are for and how to make one.",
+    "context": "Report tab. What the reader's own Added slides are for and how to make one.",
     "tokens": []
   },
   "filter.weighting.summary": {
     "page": "Crosstabs",
-    "context": "Filter bar — the collapsed weighted-data summary line.",
+    "context": "Filter bar. The collapsed weighted-data summary line.",
     "tokens": []
   },
   "filter.weighting.what": {
     "page": "Crosstabs",
-    "context": "Filter bar, weighted-data note — what weighting does to every figure. {by} names the weight variable when the study declares one.",
+    "context": "Filter bar, weighted-data note. What weighting does to every figure. {by} names the weight variable when the study declares one.",
     "tokens": [
       "by"
     ],
     "token_help": {
-      "by": "the weight variable clause, e.g. “ using ‘wt’” — empty when the study does not name one"
+      "by": "the weight variable clause, e.g. “ using ‘wt’”. Empty when the study does not name one"
     }
   },
   "filter.weighting.bases_lead": {
     "page": "Crosstabs",
-    "context": "Filter bar, weighted-data note — introduces the three base sizes.",
+    "context": "Filter bar, weighted-data note. Introduces the three base sizes.",
     "tokens": []
   },
   "disclosure.note_unverified": {
     "page": "Crosstabs",
-    "context": "Disclosure — the audience size cannot be verified in this view.",
+    "context": "Disclosure. The audience size cannot be verified in this view.",
     "tokens": [
       "k"
     ],
@@ -648,7 +648,7 @@
   },
   "disclosure.note_too_small": {
     "page": "Crosstabs",
-    "context": "Disclosure — the audience is below the confidentiality threshold.",
+    "context": "Disclosure. The audience is below the confidentiality threshold.",
     "tokens": [
       "n",
       "k"
@@ -660,12 +660,12 @@
   },
   "render.base.withheld_tip": {
     "page": "Crosstabs",
-    "context": "Crosstab base row — tooltip on a base withheld under the confidentiality threshold.",
+    "context": "Crosstab base row. Tooltip on a base withheld under the confidentiality threshold.",
     "tokens": []
   },
   "render.base.low_tip": {
     "page": "Crosstabs",
-    "context": "Crosstab base row — tooltip on a base below the low-base threshold.",
+    "context": "Crosstab base row. Tooltip on a base below the low-base threshold.",
     "tokens": [
       "threshold"
     ],
@@ -675,7 +675,7 @@
   },
   "render.base.low_fpc_tip": {
     "page": "Crosstabs",
-    "context": "Crosstab base row — the same warning where a finite population correction has already been applied.",
+    "context": "Crosstab base row. The same warning where a finite population correction has already been applied.",
     "tokens": [
       "threshold"
     ],
@@ -685,7 +685,7 @@
   },
   "render.base.coverage_tip": {
     "page": "Crosstabs",
-    "context": "Crosstab base row — tooltip on the coverage line under a census base.",
+    "context": "Crosstab base row. Tooltip on the coverage line under a census base.",
     "tokens": [
       "base",
       "population"
@@ -697,24 +697,24 @@
   },
   "render.base.effective_tip": {
     "page": "Crosstabs",
-    "context": "Crosstab base row — tooltip on the Effective base label.",
+    "context": "Crosstab base row. Tooltip on the Effective base label.",
     "tokens": []
   },
   "report.construction.stock": {
     "page": "Report",
-    "context": "About card — the whole Report construction section, as one entry. Blank lines separate paragraphs. {producer} is the attribution sentence above; {waves_note} is the earlier-waves sentence, which appears only when the report is entitled to claim it — move it to say it elsewhere, delete it to never say it. A study that fills in _REPORT_CONSTRUCTION in its config replaces this entire section.",
+    "context": "About card. The whole Report construction section, as one entry. Blank lines separate paragraphs. {producer} is the attribution sentence above; {waves_note} is the earlier-waves sentence, which appears only when the report is entitled to claim it. Move it to say it elsewhere, delete it to never say it. A study that fills in _REPORT_CONSTRUCTION in its config replaces this entire section.",
     "tokens": [
       "producer",
       "waves_note"
     ],
     "token_help": {
-      "producer": "the attribution sentence — 'This report was produced by … using Turas Analytics …'. Edited under 'Report construction — attribution'.",
-      "waves_note": "the earlier-waves sentence — 'Figures carried forward from earlier waves are shown as previously published rather than recalculated.' Appears only when the report carries earlier waves and none of them holds respondent-level data. Renders as nothing otherwise, leaving no empty paragraph."
+      "producer": "the attribution sentence, 'This report was produced by … using Turas Analytics …'. Edited under 'Report construction. Attribution'.",
+      "waves_note": "the earlier-waves sentence, 'Figures carried forward from earlier waves are shown as previously published rather than recalculated.' Appears only when the report carries earlier waves and none of them holds respondent-level data. Renders as nothing otherwise, leaving no empty paragraph."
     }
   },
   "cards.sig.explainer": {
     "page": "Crosstabs",
-    "context": "The whole 'Understanding the significance testing' panel under every crosstab card, as one entry. Blank lines separate paragraphs. {min_base} is the project's own low-base threshold, so a study configured to something other than 30 is described correctly — keep it rather than typing a number. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
+    "context": "The whole 'Understanding the significance testing' panel under every crosstab card, as one entry. Blank lines separate paragraphs. {min_base} is the project's own low-base threshold, so a study configured to something other than 30 is described correctly. Keep it rather than typing a number. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary. Keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "min_base",
       "alpha_pct",
@@ -723,40 +723,40 @@
       "dual_case_clause"
     ],
     "token_help": {
-      "min_base": "this project's low-base threshold — the sample a column needs before letters show, e.g. 30",
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
+      "min_base": "this project's low-base threshold. The sample a column needs before letters show, e.g. 30",
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
       "alpha_odds": "the primary level as odds, e.g. \"20\" for \"one in 20\"",
-      "dual_odds_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them",
-      "dual_case_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+      "dual_odds_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary. A study that switched dual significance off has no lowercase letters, so the sentence must not promise them",
+      "dual_case_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary. A study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
     }
   },
   "cards.sig.explainer_dual_odds": {
     "page": "Crosstabs",
-    "context": "Crosstab significance panel — the secondary level stated as odds, spliced after the primary one. Rendered only on a study that configured a secondary level.",
+    "context": "Crosstab significance panel. The secondary level stated as odds, spliced after the primary one. Rendered only on a study that configured a secondary level.",
     "tokens": [
       "alpha2_pct",
       "alpha2_odds"
     ],
     "token_help": {
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%",
       "alpha2_odds": "the secondary level as odds, e.g. \"5\" for \"one in 5\""
     }
   },
   "cards.sig.explainer_dual_case": {
     "page": "Crosstabs",
-    "context": "Crosstab significance panel — what upper and lower case mean. Rendered only on a study that configured a secondary level.",
+    "context": "Crosstab significance panel. What upper and lower case mean. Rendered only on a study that configured a secondary level.",
     "tokens": [
       "alpha_pct",
       "alpha2_pct"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "cards.reading.list": {
     "page": "Crosstabs",
-    "context": "The whole 'Reading this table' panel under every crosstab card, as one entry — ONE BULLET PER LINE. {legend_link} is the 'How to read this report' button the renderer supplies; keep it where you want the cross-reference to sit. The level word ({alpha2_pct}) comes from the project's configured alpha_secondary — keep it rather than typing \"80%\", so a study testing at another level (some set 90%) is described correctly.",
+    "context": "The whole 'Reading this table' panel under every crosstab card, as one entry. ONE BULLET PER LINE. {legend_link} is the 'How to read this report' button the renderer supplies; keep it where you want the cross-reference to sit. The level word ({alpha2_pct}) comes from the project's configured alpha_secondary. Keep it rather than typing \"80%\", so a study testing at another level (some set 90%) is described correctly.",
     "tokens": [
       "legend_link"
     ],
@@ -766,34 +766,34 @@
   },
   "filter.weighting.bases": {
     "page": "Crosstabs",
-    "context": "The three base sizes a weighted table shows, as one entry — ONE BULLET PER LINE. Follows the lead-in above.",
+    "context": "The three base sizes a weighted table shows, as one entry. ONE BULLET PER LINE. Follows the lead-in above.",
     "tokens": []
   },
   "reader.legend.arrows": {
     "page": "How to read",
-    "context": "Legend panel, Arrows & change chips — both bullets as one entry, ONE BULLET PER LINE. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary — keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
+    "context": "Legend panel, Arrows & change chips. Both bullets as one entry, ONE BULLET PER LINE. The level words ({alpha_pct}, {alpha2_pct}) come from the project's configured alpha / alpha_secondary. Keep them rather than typing \"95%\" or \"80%\", so a study testing at another level is described correctly.",
     "tokens": [
       "alpha_pct",
       "dual_clause"
     ],
     "token_help": {
-      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\" — supplied by the renderer from the project's alpha, so never type a number",
-      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary — a study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
+      "alpha_pct": "the report's primary significance level as words, e.g. \"95%\". Supplied by the renderer from the project's alpha, so never type a number",
+      "dual_clause": "the secondary-level clause, added ONLY when the study configured an alpha_secondary. A study that switched dual significance off has no lowercase letters, so the sentence must not promise them"
     }
   },
   "reader.legend.arrows_dual": {
     "page": "How to read",
-    "context": "Legend panel, Arrows & change chips — the hollow-arrow clause spliced into the composite bullet. Rendered only on a study that configured a secondary level.",
+    "context": "Legend panel, Arrows & change chips. The hollow-arrow clause spliced into the composite bullet. Rendered only on a study that configured a secondary level.",
     "tokens": [
       "alpha2_pct"
     ],
     "token_help": {
-      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\" — supplied from alpha_secondary, which some studies set to 90%"
+      "alpha2_pct": "the report's secondary (lowercase-letter) level as words, e.g. \"80%\". Supplied from alpha_secondary, which some studies set to 90%"
     }
   },
   "reader.legend.bands": {
     "page": "How to read",
-    "context": "Legend panel, Score bands — both bullets as one entry, ONE BULLET PER LINE. {bands} is the study's own banding, read off its questions, so it describes what the cards actually show.",
+    "context": "Legend panel, Score bands. Both bullets as one entry, ONE BULLET PER LINE. {bands} is the study's own banding, read off its questions, so it describes what the cards actually show.",
     "tokens": [
       "bands"
     ],

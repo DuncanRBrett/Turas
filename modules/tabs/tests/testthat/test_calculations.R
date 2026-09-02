@@ -3,9 +3,9 @@
 # ==============================================================================
 #
 # Tests for the 3 highest-risk calculation functions:
-#   1. calculate_rating_mean — weighted mean for rating scales
-#   2. calculate_cell_count / calculate_weighted_percentage — cell data
-#   3. weighted_z_test_proportions — significance testing
+#   1. calculate_rating_mean. Weighted mean for rating scales
+#   2. calculate_cell_count / calculate_weighted_percentage. Cell data
+#   3. weighted_z_test_proportions. Significance testing
 #
 # These are the functions most likely to produce wrong numbers in output.
 # All test values are hand-calculated and documented.
@@ -104,7 +104,7 @@ test_that("weighted mean matches hand-calculated value", {
 
 test_that("OptionValue overrides OptionText for numeric mapping", {
   # Text labels with explicit numeric values
-  # "Poor"=1, "Fair"=2, "Good"=3 — 3 responses: Poor, Good, Good
+  # "Poor"=1, "Fair"=2, "Good"=3, 3 responses: Poor, Good, Good
   # Mean: (1 + 3 + 3) / 3 = 7/3 = 2.333...
   data <- data.frame(
     Q1 = c("Poor", "Good", "Good"),
@@ -288,7 +288,7 @@ test_that("weighted percentage calculation is correct", {
   # 40 out of 100 = 40%
   expect_equal(calculate_weighted_percentage(40, 100), 40)
 
-  # 25 out of 200 = 12.5% — rounds to 12 at default decimal_places=0
+  # 25 out of 200 = 12.5%. Rounds to 12 at default decimal_places=0
   # (weighting.R version has decimal_places param, defaults to 0)
   expect_equal(calculate_weighted_percentage(25, 200), 12)
 
@@ -315,7 +315,7 @@ context("Significance testing (z-test)")
 
 test_that("clear significant difference is detected", {
   # Group 1: 80/100 = 80%, Group 2: 40/100 = 40%
-  # This is a large difference with decent sample sizes — must be significant
+  # This is a large difference with decent sample sizes. Must be significant
   result <- weighted_z_test_proportions(
     count1 = 80, base1 = 100,
     count2 = 40, base2 = 100,
@@ -342,7 +342,7 @@ test_that("equal proportions are not significant", {
 })
 
 test_that("small difference with small sample is not significant", {
-  # Group 1: 16/30, Group 2: 14/30 — too close to tell with n=30
+  # Group 1: 16/30, Group 2: 14/30. Too close to tell with n=30
   result <- weighted_z_test_proportions(
     count1 = 16, base1 = 30,
     count2 = 14, base2 = 30,

@@ -3,10 +3,10 @@
 # ==============================================================================
 #
 # Tests for data extraction from all_results for AI insights:
-#   - extract_question_data()         — per-question structured extraction
-#   - extract_question_data_compact() — reduced payload
-#   - extract_study_context()         — study-level context
-#   - extract_sig_flags()             — significance letter → boolean translation
+#   - extract_question_data(): per-question structured extraction
+#   - extract_question_data_compact(): reduced payload
+#   - extract_study_context(): study-level context
+#   - extract_sig_flags(): significance letter → boolean translation
 #
 # Uses synthetic fixtures matching real all_results structure.
 #
@@ -46,7 +46,7 @@ turas_root <- detect_turas_root()
 source(file.path(turas_root, "modules/tabs/lib/ai/ai_extraction.R"))
 
 # ==============================================================================
-# FIXTURES — Synthetic all_results matching real Turas output
+# FIXTURES. Synthetic all_results matching real Turas output
 # ==============================================================================
 
 make_test_banner_info <- function() {
@@ -306,7 +306,7 @@ test_that("ignores empty and dash sig values", {
 
   flags <- extract_sig_flags(q_result, banner_info)
 
-  # Total column has all empty sig values — should not appear
+  # Total column has all empty sig values. Should not appear
   total_flags <- Filter(function(f) f$column == "Total", flags)
   expect_equal(length(total_flags), 0L)
 })

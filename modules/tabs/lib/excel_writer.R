@@ -349,13 +349,13 @@ write_column_letters <- function(wb, sheet, banner_info, styles, current_row) {
 #' @param config List, configuration
 #' @return Integer, next row number
 #'
-#' @section NOT THE PRODUCTION WRITER — DO NOT WIRE THIS UP:
+#' @section NOT THE PRODUCTION WRITER. DO NOT WIRE THIS UP:
 #' The live path is `write_question_table_fast()` (defined in run_crosstabs.R,
 #' called from crosstabs/workbook_builder.R). This slow-path twin has no callers
 #' outside tests/testthat/test_excel_output.R, and it carries a latent
 #' data-integrity bug that the fast writer does not: its value loop advances
 #' `col_offset` only when a banner key is present in the row, so a row missing
-#' one key shifts every later value one column LEFT — printing real numbers
+#' one key shifts every later value one column LEFT. Printing real numbers
 #' under the wrong banner heading, with nothing to signal it. (It also calls
 #' `grepl()` on a possibly-NA value, which yields NA into `if()` and errors.)
 #' The fast writer is index-aligned into a fixed-width matrix and cannot shift.
@@ -1052,7 +1052,7 @@ calculate_composition_stats <- function(row_idx, data, master_weights, config) {
     } else {
       NA_real_
     }
-    # Display site: calculate_effective_n is fractional (V10.11) — the sample
+    # Display site: calculate_effective_n is fractional (V10.11): the sample
     # composition sheet shows a whole n, like every other base row.
     comp_row$Effective_n <- round(calculate_effective_n(valid_weights), 0)
   }
@@ -1565,7 +1565,7 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
 #' @param banner_info List, banner information (for letter assignments)
 #' @param styles List, style objects from create_excel_styles()
 #' @param very_small_base Numeric, the base below which the Summary sheet prints
-#'   its "Very small base" warning — the Guide must quote the same number the
+#'   its "Very small base" warning. The Guide must quote the same number the
 #'   writer uses (production review 2026-08, M-C)
 #' @return Invisible NULL
 #' @export
@@ -1675,7 +1675,7 @@ create_guide_sheet <- function(wb, config_obj, banner_info, styles,
     # does not document it (production review 2026-08, M-C).
     if (cfg_bool("enable_chi_square")) {
       add_entry("Chi-square (**)",
-                "A chi-square row tests whether the whole table of box categories differs across the banner. A double asterisk (**) at the end of that row means the result is significant — it is a significance marker, not a base-size warning.")
+                "A chi-square row tests whether the whole table of box categories differs across the banner. A double asterisk (**) at the end of that row means the result is significant. It is a significance marker, not a base-size warning.")
     }
 
     add_row("", "")
@@ -1707,8 +1707,8 @@ create_guide_sheet <- function(wb, config_obj, banner_info, styles,
   add_row("", "")
 
   # === BASE SIZE WARNINGS ===
-  # These describe what the SUMMARY sheet actually writes — words in the
-  # question list, styled amber and red — not asterisks. The old entries
+  # These describe what the SUMMARY sheet actually writes. Words in the
+  # question list, styled amber and red, not asterisks. The old entries
   # documented "*" and "**" markers that no writer has ever produced, while "**"
   # DOES appear in the workbook meaning a SIGNIFICANT chi-square: the Guide
   # defined the one marker a reader might meet as the opposite of its real

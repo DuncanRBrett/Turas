@@ -13,7 +13,7 @@
 #       difference rows but not NET POSITIVE or composites, so on a census
 #       project one table carried two universes.
 #   I6  The chi-square row read its counts back out of the FORMATTED Frequency
-#       rows — the one place a display rounding fed a statistical decision — and
+#       rows, the one place a display rounding fed a statistical decision, and
 #       had no design correction, so population-projected weights manufactured
 #       significance without limit. It was also the only significance path in
 #       the module with no known-answer test.
@@ -167,7 +167,7 @@ test_that("the published NPS is the weighted mean of the values it tests", {
 })
 
 test_that("two columns with the SAME NPS earn no letter (I1's repro)", {
-  # Both columns score NPS 0 — 10 promoters against 10 detractors — but out of
+  # Both columns score NPS 0, 10 promoters against 10 detractors, but out of
   # very different ratings, so their mean RATINGS are 5.0 and 7.5.
   #   A: ten 10s and ten 0s      B: ten 9s and ten 6s
   # Before the fix the summary Sig. row t-tested those raw ratings and called
@@ -206,7 +206,7 @@ test_that("a genuine NPS gap is still detected", {
 
 test_that("two uniform NPS columns are UNTESTABLE, not 'no different' (M-B)", {
   # A column where everyone is a promoter against one where everyone is a
-  # detractor — NPS +100 vs -100, the widest gap the metric allows — has zero
+  # detractor, NPS +100 vs -100, the widest gap the metric allows, has zero
   # variance on both sides, so the Welch t-test is undefined.
   #
   # The +-100 buckets make that case reachable on real data in a way the raw
@@ -214,7 +214,7 @@ test_that("two uniform NPS columns are UNTESTABLE, not 'no different' (M-B)", {
   # ordinary small-column outcome, while "every respondent gave exactly the same
   # rating" is rare.
   #
-  # Still no letter — a within-group SD of 0 cannot express the real sampling
+  # Still no letter. A within-group SD of 0 cannot express the real sampling
   # uncertainty of five respondents who happen to agree, so claiming p = 0 would
   # be as wrong as claiming p = 1. What changed (M-B, fixed 2026-08-06) is that
   # the module no longer REPORTS p = 1, which said the test ran and found
@@ -235,7 +235,7 @@ test_that("two uniform NPS columns are UNTESTABLE, not 'no different' (M-B)", {
 test_that("the Standard Deviation row is the SD of the tested values", {
   # Ten promoters and ten detractors: buckets are ten +100s and ten -100s, so
   # the sample SD is sqrt(sum((x - 0)^2)/19) = sqrt(20 * 10000 / 19) = 102.598.
-  # The raw ratings (ten 10s, ten 0s) would give 5.1299 — the number this row
+  # The raw ratings (ten 10s, ten 0s) would give 5.1299. The number this row
   # used to print under an NPS of 0.
   data <- data.frame(Q = c(rep(10, 10), rep(0, 10)), stringsAsFactors = FALSE)
   res <- calculate_nps_score(data, "Q", rep(1, 20))
@@ -280,7 +280,7 @@ test_that("published NPS values are unchanged for real 0-10 data", {
 #   Delta    50   (none)       1                       no universe
 #
 # Four testable columns, so the Bonferroni divisor is choose(4, 2) = 6 and the
-# adjusted alpha is 0.05/6 = 0.008333333 — the same divisor the category rows
+# adjusted alpha is 0.05/6 = 0.008333333. The same divisor the category rows
 # above the NET use.
 
 context("I5: FPC through NET POSITIVE and composites")
@@ -370,7 +370,7 @@ test_that("NET POSITIVE letters take the same FPC as the rows above them", {
   # Alpha vs Gamma, uncorrected:
   #   SE = sqrt(6641.0256/40 + 8163.2653/50) = 18.146378
   #   t  = 55 / 18.146378 = 3.030903, df = 86.69  ->  p = 0.003214 < 0.00833333
-  #   So without the correction Alpha prints "C" — on a column where every
+  #   So without the correction Alpha prints "C", on a column where every
   #   member of the universe was interviewed and there is no sampling error to
   #   test. With the FPC, Alpha's multiplier is Inf and the pair is not tested.
   #
@@ -488,7 +488,7 @@ test_that("composite letters take the same FPC as the rows above them", {
 test_that("composite subset resolution falls back to the banner key", {
   # banner_info$subsets is absent here (create_banner_structure does not build
   # it), so both the bases the FPC reads and the rows each test reads come from
-  # the key parser — one helper, so they cannot disagree.
+  # the key parser. One helper, so they cannot disagree.
   data <- data.frame(Cohort = fpc_cohort_column(), stringsAsFactors = FALSE)
   fx <- make_fpc_banner(data)
 
@@ -582,7 +582,7 @@ test_that("KNOWN ANSWER: a 3x2 matches base R's chisq.test", {
 
 test_that("the test reads the computed counts, not the rounded display row", {
   # A weighted table whose true counts are 28.4 / 21.6 (and the mirror). The
-  # published Frequency row rounds those to 28 / 22 — and before the fix that
+  # published Frequency row rounds those to 28 / 22, and before the fix that
   # rounded pair was the matrix the test read.
   #   unrounded: X2 = 4 * (3.4^2 / 25) = 1.8496  ->  p = 0.17381
   #   rounded:   X2 = 4 * (3.0^2 / 25) = 1.44    ->  p = 0.23014
@@ -788,7 +788,7 @@ test_that("END TO END: the engine's chi-square row is the corrected one", {
 
   # And it is NOT what the pre-fix path produced: the display-rounded counts on
   # the weighted scale, with no design correction. Both corrections move the
-  # number, and the design correction can only ever move it DOWN — a weighted
+  # number, and the design correction can only ever move it DOWN. A weighted
   # design never carries more information than the people it interviewed.
   pre_fix <- unname(chisq.test(round(cbind(male, female)),
                                correct = FALSE)$statistic)
@@ -803,7 +803,7 @@ test_that("the chi-square row no longer depends on a display toggle", {
   # Recomputing the counts has a third consequence, found in the adversarial
   # pass and kept: the row no longer needs boxcategory_frequency switched on.
   # Reading the published Frequency rows meant a display setting decided whether
-  # a statistical result appeared at all — the same defect M8 fixed for the
+  # a statistical result appeared at all. The same defect M8 fixed for the
   # proportion letters. Executed: with the toggle off the pre-fix engine printed
   # no chi-square row; it now prints the same one it prints with the toggle on.
   #
@@ -843,7 +843,7 @@ test_that("a question with no BoxCategory has no count matrix", {
 })
 
 # ==============================================================================
-# M-A / M-B — the two statistics that reported a number they had not computed
+# M-A / M-B. The two statistics that reported a number they had not computed
 # ==============================================================================
 #
 # Production review 2026-08. Both were "executed" findings: an SD row that
@@ -861,7 +861,7 @@ ma_sd_row <- function(values, weights = NULL) {
 }
 
 test_that("an empty column and a one-person column publish no SD, not 0.0", {
-  # 0.0 is a positive claim that the column has no spread — unknowable from one
+  # 0.0 is a positive claim that the column has no spread. Unknowable from one
   # respondent, meaningless with none.
   row <- ma_sd_row(list(Empty = numeric(0), One = 5, Three = c(4, 5, 6)))
   expect_true(is.na(row$Empty))
@@ -869,7 +869,7 @@ test_that("an empty column and a one-person column publish no SD, not 0.0", {
   expect_equal(as.numeric(row$Three), 1)     # sd(4,5,6) = 1, unchanged
 })
 
-test_that("a genuinely constant column still reports 0 — that IS its SD", {
+test_that("a genuinely constant column still reports 0. That IS its SD", {
   # Three respondents who all answered 5 have a real, computable SD of zero.
   # The fix must not confuse "no spread" with "not enough data to say".
   row <- ma_sd_row(list(Flat = c(5, 5, 5)))
@@ -899,7 +899,7 @@ test_that("two constant columns with DIFFERENT means report a failed test", {
   expect_false(res$significant)
 })
 
-test_that("two constant columns with the SAME mean report p = 1 — they really are alike", {
+test_that("two constant columns with the SAME mean report p = 1. They really are alike", {
   res <- weighted_t_test_means(rep(5, 40), rep(5, 40), rep(1, 40), rep(1, 40),
                                min_base = 30, alpha = 0.05)
   expect_equal(res$p_value, 1)

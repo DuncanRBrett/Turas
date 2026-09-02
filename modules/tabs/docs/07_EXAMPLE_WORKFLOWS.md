@@ -566,8 +566,8 @@ size and processing time.
 
 For extremely large analyses, split into multiple runs:
 
-Make one config workbook per batch — set `Include = N` on the questions a
-batch leaves out, and give each its own `output_filename` — then run them
+Make one config workbook per batch. Set `Include = N` on the questions a
+batch leaves out, and give each its own `output_filename`, then run them
 in turn:
 
 ``` r
@@ -739,14 +739,14 @@ Add these settings to your Settings sheet:
 
 ### Running the Analysis
 
-Run Tabs as normal — the report is written alongside the Excel file.
+Run Tabs as normal. The report is written alongside the Excel file.
 
 ### Viewing the Report
 
 Open the `.html` file in your browser. You'll see:
 1. The **Dashboard** with gauges for each rating and net-positive question, in the branded colour scheme
 2. **Crosstabs** with all your tables and charts, searchable and banner-switchable
-3. The **Story** tab (empty by default — pin any chart, table, or dashboard view to build a presentation, exportable to PowerPoint)
+3. The **Story** tab (empty by default, pin any chart, table, or dashboard view to build a presentation, exportable to PowerPoint)
 4. The **Report** tab, where an "Added slides" card lets you import images or text blocks alongside the config's background, executive summary and About sections
 
 ------------------------------------------------------------------------
@@ -758,7 +758,7 @@ Open the `.html` file in your browser. You'll see:
 You want to add an executive summary, background/method note, and
 supporting slides to your HTML report before sharing with the client.
 
-### Background, Method & Executive Summary — from Config
+### Background, Method & Executive Summary, from Config
 
 Add a **Comments** sheet to your config file with two reserved rows:
 
@@ -768,28 +768,28 @@ Add a **Comments** sheet to your config file with two reserved rows:
 | _EXECUTIVE_SUMMARY | Key finding: overall satisfaction increased by 5 points year-on-year... | | |
 
 These fill the **Report** tab's *Background & method* and *Executive
-summary* cards automatically — nothing needs retyping in the browser.
+summary* cards automatically. Nothing needs retyping in the browser.
 Both are pinnable (📌) to the **Story**.
 
-### Added Slides — In-Browser
+### Added Slides. In-Browser
 
 For supplementary exhibits (e.g. slides exported as images from a
 qualitative phase, or short text blocks):
 
 1. Open the HTML report and go to the **Report** tab
 2. Under **Added slides**, click **+ Import image** or **+ Text block**
-3. Caption it — the slide is stored in the HTML file itself
+3. Caption it. The slide is stored in the HTML file itself
 
-### Study Slides — from the Config
+### Study Slides, from the Config
 
-For exhibits that belong to the study rather than to one reader — and for
+For exhibits that belong to the study rather than to one reader, and for
 anything you want in the PowerPoint:
 
 1. Add an **AddedSlides** sheet to the config: `slide_title`, `content`,
    and `image_path` (relative to the config file's folder)
 2. Re-run. They render on the **Report** tab under *Study slides*,
    read-only, identical in every copy
-3. Pin one (📌) and it joins the **Story** — and exports as a genuine
+3. Pin one (📌) and it joins the **Story**, and exports as a genuine
    full-slide picture, the original file rather than a rendered card
 
 Keep images under 1.5 MB, and prefer PNG or JPG: an SVG or WebP slide shows
@@ -799,5 +799,5 @@ scratch exhibits that only matter to your own copy.
 ### Building the Story
 
 Pin any chart, table, dashboard view, or the Background/Executive
-summary cards (📌) — pinned items collect on the **Story** tab in order,
+summary cards (📌): pinned items collect on the **Story** tab in order,
 ready to present full-screen or export as an editable PowerPoint deck.

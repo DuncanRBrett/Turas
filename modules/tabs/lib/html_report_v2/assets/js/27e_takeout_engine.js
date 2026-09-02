@@ -1,11 +1,11 @@
 /**
- * Pattern recognition — engine (pure; no DOM, no LLM).
+ * Pattern recognition. Engine (pure; no DOM, no LLM).
  *
  * Answers "what's the big picture?" by stepping back from individual questions:
- *   - GROUP   — the breakout column that is consistently off across the survey
+ *   - GROUP. The breakout column that is consistently off across the survey
  *               (e.g. one campus behind on most questions). Needs no tagging.
- *   - AREA    — the weakest and strongest THEMES (clusters of tagged questions).
- *   - MOVEMENT — the headline metric or theme that moved most since last wave.
+ *   - AREA. The weakest and strongest THEMES (clusters of tagged questions).
+ *   - MOVEMENT. The headline metric or theme that moved most since last wave.
  *
  * Every number is pre-computed upstream; this module only groups, ranks and
  * selects. Generic: it operates on the POSITION of a question (its theme /
@@ -19,7 +19,7 @@
   var TR = global.TR = global.TR || {};
   var takeout = TR.takeout = TR.takeout || {};
 
-  /* Tunable thresholds — no magic numbers in the logic below. */
+  /* Tunable thresholds. No magic numbers in the logic below. */
   var CONST = takeout.CONST = {
     MIN_GROUP_HITS: 2,        // a column must be below the overall on >=N questions
     MIN_STRAIN_GAP: 0.02,     // ...and (reliability-weighted) >=2% of the scale below it
@@ -35,19 +35,19 @@
     // (no counter-spike), so storyScore ranks it last and the slice dropped it.
     // 8 covers a normal banner group; a wider one still truncates, in rank order.
     PORTRAIT_MAX: 8,
-    STEADY_MAX: 1,            // "steady group" cards (a scanned group with no lean —
+    STEADY_MAX: 1,            // "steady group" cards (a scanned group with no lean,
                               //   not standing out IS its story); the rest go to the
                               //   "also scanned" footnote
     COHEN_H_REFERENCE: 0.8,   // Cohen's "large" effect -> full weight
     MIN_MOVE_FRACTION: 0.03,  // a wave change must be >=N of the scale to count as a "move"
                               //   (0.03 -> 0.15 on a 5-pt scale, 3pp on a 0-100 metric);
-                              //   significance alone is not enough — a tiny change can test
+                              //   significance alone is not enough. A tiny change can test
                               //   significant on a large base yet mean nothing.
     // Multiple-comparison trust-gate. Scanning every breakout group x rated
     // question is hundreds of cells; ~5% look striking by luck, and tiny
     // homogeneous census cells produce absurd t-stats. Two guards: per-cell BH on
     // a variance-floored Welch test (badges single-cell claims, seeds odd-one-out),
-    // and a per-group directional sign-test (gates the group/split patterns — a
+    // and a per-group directional sign-test (gates the group/split patterns, a
     // consistent group like Cape Town has NO single significant cell, so gating it
     // on per-cell significance would wrongly delete it).
     VARIANCE_FLOOR_FRACTION: 0.1, // arm sd floored at 10% of the scale SPAN; (span*0.1)^2 (=0.16 on 1..5)
@@ -57,9 +57,9 @@
     SIGN_ALPHA: 0.05,         // BH level for the per-group sign-test family (gates group/split)
     SPLIT_MIN_CONSISTENT: 2,  // the winning split must contain >= this many sign-test-consistent groups
     // "The odd one out": a group below (above) almost everywhere yet the reverse
-    // on one question — a sign-flip against its OWN direction, large and real.
+    // on one question. A sign-flip against its OWN direction, large and real.
     ODD_MIN_GAP: 0.20,        // |gap to overall| floor, scale points
-    ODD_MIN_RESID: 0.30,      // |gap - the group's mean gap| floor — the break from its own pattern
+    ODD_MIN_RESID: 0.30,      // |gap - the group's mean gap| floor. The break from its own pattern
     ODD_MIN_TEST_BASE: 8,     // soft per-cell base floor so a flip can't rest on a thin census cell
     // "Hidden disagreement" (bimodality): a calm-looking average hiding two camps.
     BIMODAL_B: 0.5556,        // moment-form Sarle bimodality coefficient must exceed 5/9 (uniform reference)
@@ -104,7 +104,7 @@
 
   /**
    * GROUP pattern: which breakout column sits consistently below the overall
-   * across the survey, on the INDEX (a bidirectional, valenced measure — a low
+   * across the survey, on the INDEX (a bidirectional, valenced measure, a low
    * group reads as low, unlike significance letters which only mark a group being
    * higher). For each column we net the per-question gap to the overall, as a
    * fraction of each scale; the most-negative net is "under strain", the most-
@@ -150,13 +150,13 @@
   /**
    * Per (banner, question) extremes across every breakout column, so a portrait
    * can say a group is the highest / lowest of its peers (e.g. "the highest of any
-   * campus"). Cheap peer-relative annotation, no config — the §9 sharpening.
+   * campus"). Cheap peer-relative annotation, no config. The §9 sharpening.
    */
   // Key by question CODE (title only as a fallback for old islands): duplicate
   // question titles used to merge into one race, printing "highest of 6" in a
   // 3-column banner (review 2026-08, I6). ONE definition, because building this
   // key at the index and at the lookup separately is exactly how the two drifted
-  // apart — the lookup kept reading the title, every lookup missed, and the
+  // apart. The lookup kept reading the title, every lookup missed, and the
   // "highest of N" annotations silently stopped printing.
   function peerKey(group, gp) { return group + "||" + (gp.code || gp.title); }
 
@@ -187,22 +187,22 @@
   }
 
   /**
-   * GROUP PORTRAITS — the centrepiece (rebuild). For every breakout column, read
+   * GROUP PORTRAITS. The centrepiece (rebuild). For every breakout column, read
    * its INDEX gap to the overall on each rated question and assemble a BALANCED
    * portrait: the questions where it sits LOW and the questions where it sits HIGH
    * in one card. A group is worth calling out for EITHER reason: a sharp TENSION
-   * (it leans one way yet breaks its own pattern the other — Cape Town strained on
+   * (it leans one way yet breaks its own pattern the other, Cape Town strained on
    * engagement but proudest of co-worker quality), OR sheer uniform extremeness
-   * (top, or bottom, on nearly everything — 20 of 21 metrics). So ranking is by
+   * (top, or bottom, on nearly everything, 20 of 21 metrics). So ranking is by
    * storyScore = how much the group stands out overall (character, base-weighted)
-   * PLUS a tension boost — a uniformly extreme group is never buried beneath a
+   * PLUS a tension boost. A uniformly extreme group is never buried beneath a
    * minor tension, and a genuine tension still rises among equally-extreme groups.
-   * Gated on directional consistency when the FDR family is present (never-cry-wolf
-   * — a mixed, lean-less group is not a story), else on a materiality floor. Every
+   * Gated on directional consistency when the FDR family is present (never-cry-wolf,
+   * a mixed, lean-less group is not a story), else on a materiality floor. Every
    * number shown is a real cell: the group's value and the overall, both visible in
    * the crosstabs (no synthetic aggregate). Returns a ranked array; the caller
    * takes the top few and seeds the GPS line from #1.
-   * Input: same columns as groupPattern — [{column, group, base, gaps:[{title,
+   * Input: same columns as groupPattern, [{column, group, base, gaps:[{title,
    * value, total, scaleMax}]}].
    */
   function portraits(columns, gate) {
@@ -237,13 +237,13 @@
       // A column that cleared no question's base floor contributes NO cells to
       // the family (27f: both arms must clear it), so it never reaches groupAgg
       // and has no gate entry. Reading that absence as "no gate" let the thinnest
-      // column in the banner walk past the sign test the others had to pass —
+      // column in the banner walk past the sign test the others had to pass,
       // the one column least entitled to a claim (review 2026-08, M12). Gate
       // present + no entry = not consistent; only a gate-less run stays null.
       var g = cons[c.group + "::" + c.column];
       var consistent = gate ? (g ? g.consistent : false) : null;
       // character = how much the group stands out overall (its dominant direction's
-      // average gap, base-weighted) — high for a uniformly extreme group AND for a
+      // average gap, base-weighted): high for a uniformly extreme group AND for a
       // strong-leaning one. tension = the counter-spike against that lean.
       var tensionScore = leanScore * counterSpike * weight;
       var characterScore = Math.max(sumLow, sumHigh) / (c.gaps.length || 1) * weight;
@@ -276,7 +276,7 @@
 
   /**
    * SPLIT pattern: which breakout (campus / department / tenure / …) differentiates
-   * groups the most — the lens worth looking through. For each breakout we measure
+   * groups the most. The lens worth looking through. For each breakout we measure
    * how spread its groups' average gaps-to-overall are (base-weighted), and name
    * the breakout only if it both differentiates meaningfully AND clearly leads the
    * others (else no single split dominates -> omitted). Reuses the column data.
@@ -332,10 +332,10 @@
         if (m.delta && m.delta.sig) moving += (m.delta.diff < 0 ? -1 : 1);
       });
       // The area's SCORE is its summary question where one exists: the declared
-      // AreaSummary (the section-overall rating — respondents already weighed
+      // AreaSummary (the section-overall rating, respondents already weighed
       // the components in it), else the sole member of a one-question theme.
       // Only a multi-question theme with no declared overall falls back to the
-      // flat average — equal weights are a fallback, never the model.
+      // flat average. Equal weights are a fallback, never the model.
       t.summary = null;
       t.members.forEach(function (m) { if (!t.summary && m.summary) t.summary = m; });
       if (!t.summary && t.members.length === 1) t.summary = t.members[0];
@@ -349,7 +349,7 @@
   }
 
   // WEAKEST / STRONGEST area cards RETIRED (Duncan, 2026-08-05): the area race
-  // was nuanced past usefulness — a single tagged theme got crowned "weakest",
+  // was nuanced past usefulness. A single tagged theme got crowned "weakest",
   // and the flat-fallback copy asserted "its questions cluster low" on the
   // absolute level (review 2026-08, I6). The tab is a group-vs-peers overview;
   // areas were the one card family not about a GROUP. groupByTheme stays for
@@ -357,7 +357,7 @@
   // patterns_echo.
 
   /**
-   * MOVEMENT pattern: the headline metrics that moved since last wave — biggest
+   * MOVEMENT pattern: the headline metrics that moved since last wave. Biggest
    * riser AND biggest faller (two-sided). A move must be both significant AND
    * material (>= MIN_MOVE_FRACTION of the scale); a significant-but-trivial shift
    * is reported as "broadly stable", not dressed up as a move. Returns null only
@@ -390,7 +390,7 @@
    * single-striking-cell claims and seeds the odd-one-out; a per-group directional
    * sign-test (also BH-corrected) decides which groups are genuinely CONSISTENT.
    * The group/split patterns gate on the per-GROUP set (consistency), NEVER on the
-   * per-CELL set — a consistent group like Cape Town can have zero individually-
+   * per-CELL set. A consistent group like Cape Town can have zero individually-
    * significant cells, so gating it on per-cell significance would wrongly delete
    * it. No FPC anywhere (that lives in the reliability layer).
    */
@@ -434,14 +434,14 @@
 
   /**
    * THE ODD ONE OUT: a group that runs below (above) the overall almost everywhere
-   * yet is unexpectedly the reverse on ONE question — a sign-flip against its OWN
+   * yet is unexpectedly the reverse on ONE question. A sign-flip against its OWN
    * direction, large and real. Reads the SHARED cell family + the gate's per-cell
    * BH survivor set (no second family). A candidate must (1) flip against the
    * group's mean-gap direction, (2) clear an absolute gap floor AND a residual
    * floor (the break from the group's own pattern), (3) agree in sign with the
    * group-vs-rest Welch difference, (4) survive multiple-comparison correction, and
    * (5) sit on a credible base. Returns a typed confident-null marker when none
-   * survive (on real SACS, none do — every striking cell is a same-direction
+   * survive (on real SACS, none do, every striking cell is a same-direction
    * extreme, not an exception).
    */
   function oddOnePattern(fdr, gate) {
@@ -452,7 +452,7 @@
     fdr.cells.forEach(function (c, idx) {
       // KeyShare cells gap in pp on a 0–100 encoding; the fixed floors below
       // (ODD_MIN_GAP / ODD_MIN_RESID) are scale-point tuned, and the meanGap
-      // baseline is rated-only — so share cells sit out of this finder, exactly
+      // baseline is rated-only, so share cells sit out of this finder, exactly
       // as NPS does (same cross-scale-fabrication guard, F1).
       if (c.isPct) return;
       var meanGap = mg[c.banner + "::" + c.group];
@@ -480,14 +480,14 @@
 
   /**
    * HIDDEN DISAGREEMENT (bimodality): a question whose AVERAGE looks calm yet the
-   * distribution splits into two end-camps with a middle trough — a split the mean
+   * distribution splits into two end-camps with a middle trough. A split the mean
    * hides. Each question must clear ALL of: a moment-form Sarle coefficient above
    * the uniform reference (gB); a peak in each end band above the middle (gShape);
    * a real central dip (gDip); a calm mean (gCalm); real mass in each camp (gCamp);
    * an adequate base (gBase). The structural conjunction IS the multiplicity-safe
    * correction here (the false positives are systematic ceiling-skew, not random),
    * so this does NOT route through BH. Confident-null marker when none flag (on
-   * real SACS, every distribution is single-peaked — none do).
+   * real SACS, every distribution is single-peaked. None do).
    */
   function bimodalityPattern(bm) {
     if (!bm || !bm.questions || !bm.questions.length) return null;
@@ -523,7 +523,7 @@
   }
   takeout._bimodalityPattern = bimodalityPattern;
 
-  /** One-line statements of a rigor-check hit, for the footer (plain text —
+  /** One-line statements of a rigor-check hit, for the footer (plain text,
    *  the read view escapes them; every number is a real cell). */
   function round1(v) { return Math.round(v * 10) / 10; }
   function oddNote(odd) {
@@ -553,7 +553,7 @@
     var patterns = [];
     var gate = fdrGate(inputs.fdr);
     // A positive patterns_banner selection means EVERY column of the selected
-    // banner gets a card (portrait / steady / mixed), uncapped — the tab is an
+    // banner gets a card (portrait / steady / mixed), uncapped. The tab is an
     // overview of that banner, so a group must never silently vanish into the
     // also-scanned note (Duncan, 2026-08-05: 3 of 4 centres showed).
     var portrayAll = !!inputs.portrayAll;
@@ -566,11 +566,11 @@
       .forEach(function (p) { patterns.push(p); });
 
     // Groups scanned but with NO eligible portrait, on banners that did produce
-    // one — the reader who sees 3 of 4 centres will ask where the 4th went. Not
+    // one. The reader who sees 3 of 4 centres will ask where the 4th went. Not
     // standing out IS that group's story (Duncan's read), so the largest such
     // groups get a STEADY card: the claim is "runs with the overall", proven by
     // its own numbers (below/above counts, and its largest dips and leads shown
-    // as evidence — even the extremes are modest). Never a manufactured lean.
+    // as evidence, even the extremes are modest). Never a manufactured lean.
     // Eligible-but-capped groups are excluded (they have a story, just not a
     // top slot); a banner with no portraits at all keeps the empty state.
     // Beyond STEADY_MAX, the remainder is named in the "also scanned" note.
@@ -580,7 +580,7 @@
       eligibleKey[p.group + "::" + p.subject] = true;
     });
     if (portrayAll) {
-      // Every scanned banner is portrayed — even one where no group earned a
+      // Every scanned banner is portrayed, even one where no group earned a
       // portrait still cards all its columns (steady/mixed).
       (inputs.columns || []).forEach(function (c) { portrayedBanners[c.group] = true; });
     }
@@ -601,10 +601,10 @@
       var g = gate ? (gate.groups.filter(function (x) {
         return x.banner === c.group && x.group === c.column;
       })[0] || null) : null;
-      // "Steady" is a claim — "close to the overall almost everywhere". A group
+      // "Steady" is a claim, "close to the overall almost everywhere". A group
       // that failed portrait eligibility on OTHER grounds (sign test flat, too
       // few standouts) but carries material gaps is polarized/mixed, not steady
-      // (review 2026-08, I6). Under portrayAll it still gets a card — a MIXED
+      // (review 2026-08, I6). Under portrayAll it still gets a card. A MIXED
       // one that claims only its counts; otherwise it goes to the also-scanned
       // note, unclaimed.
       if (material > 0) {
@@ -637,28 +637,28 @@
       return { subject: p.subject, group: p.group, base: p.base };
     }).concat(noStoryExtra);
 
-    // Which cut divides the data most — a navigation pointer, NO synthetic average.
+    // Which cut divides the data most. A navigation pointer, NO synthetic average.
     var split = splitPattern(inputs.columns);
     if (split) {
       var consistentGroups = gate ? gate.groups.filter(function (x) {
         return x.banner === split.subject && x.consistent;
       }).length : null;
       if (gate) split.consistent = consistentGroups >= CONST.SPLIT_MIN_CONSISTENT;
-      // The split pointer is no longer a card — it said "differences run most
+      // The split pointer is no longer a card. It said "differences run most
       // by Centre" beside four Centre cards that already showed exactly that.
       // Still computed so the gate's consistency count keeps its meaning.
       if (!gate || split.consistent) { split.sigGaps = consistentGroups; }
     }
 
     // Weakest / strongest AREA cards retired (see the note at the old
-    // areaPatterns site) — the tab is a group-vs-peers overview only.
+    // areaPatterns site): the tab is a group-vs-peers overview only.
 
-    // Movement (trackers) — unchanged.
+    // Movement (trackers): unchanged.
     var moved = movementPattern(inputs.apex || []);
     if (moved) patterns.push(moved);
 
     // Co-moving RETIRED (the acquiescence halo, not a pattern). Odd-one-out and
-    // hidden disagreement DEMOTED to the rigor footer — still computed (the
+    // hidden disagreement DEMOTED to the rigor footer. Still computed (the
     // never-cry-wolf check), no card (the Phase-1 card set is banked). A hit
     // carries a one-line note so the footer states the finding, truthfully.
     var odd = oddOnePattern(inputs.fdr, gate);
@@ -680,7 +680,7 @@
       noStory: noStory,
       fdr: gate,
       rigor: rigor,
-      scope: inputs.scope || null,   // what was scannable — the read view's honest empty state
+      scope: inputs.scope || null,   // what was scannable. The read view's honest empty state
       themeCount: groupByTheme(inputs.levels || []).filter(function (t) {
         return t.name !== "(untagged)" && t.members.length >= CONST.MIN_AREA_MEMBERS;
       }).length,

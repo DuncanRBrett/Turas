@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verification gate for the COMPOSITE (profile) banner — the one tabs-v2 feature
+ * Verification gate for the COMPOSITE (profile) banner. The one tabs-v2 feature
  * that can introduce a SILENT statistical error, so it is checked by harness,
  * never by reasoning. Loads the real engine into a vm context over a hand-built
  * fixture and asserts:
@@ -9,7 +9,7 @@
  *      Total member === null.
  *   2. model.forQuestion(...,"composite:…") tags the model composite and emits
  *      vs-THE-REST arrows: ▲ above / ▼ below at 95%, hollow ▵/▿ at 80% (dual),
- *      "" when not different — bidirectional, and a confident "" for an
+ *      "" when not different. Bidirectional, and a confident "" for an
  *      overlapping column that genuinely matches the rest.
  *   3. NO cell ever carries an alphabetic pairwise letter (the trap), and the
  *      Total column is never tested.
@@ -100,7 +100,7 @@ const compId = TR.compositeBanners.add({
   ]
 });
 
-console.log("Composite banner — engine suite:");
+console.log("Composite banner. Engine suite:");
 
 /* ---------------- 1. columnsFor ---------------- */
 run("columnsFor builds heterogeneous, overlapping, letter-free columns", () => {
@@ -111,7 +111,7 @@ run("columnsFor builds heterogeneous, overlapping, letter-free columns", () => {
   eq(spec.columns[0].member, null, "Total membership is null (everyone)");
   eq(spec.columns.map((c) => c.label).join("|"),
     "Total|Marketing|Admin|Cape Town|Border", "labels in order");
-  // NO column carries a letter — this is what makes pairwise letters impossible.
+  // NO column carries a letter. This is what makes pairwise letters impossible.
   spec.columns.forEach((c) => eq(c.letter, "", "no letter on " + c.label));
   const [, mkt, adm, cpt] = spec.columns;
   eq(mkt.member[0], 1, "respondent 0 is Marketing");
@@ -173,7 +173,7 @@ run("THE TRAP: no cell ever carries an alphabetic pairwise letter", () => {
     [false, true].forEach((dual) => {
       const m = TR.model.forQuestion(code, compId, [], { dual: dual });
       everySig(m).forEach((sig) => assert(!/[A-Za-z]/.test(sig),
-        code + (dual ? " (dual)" : "") + ": pairwise letter leaked — '" + sig + "'"));
+        code + (dual ? " (dual)" : "") + ": pairwise letter leaked, '" + sig + "'"));
     });
   });
 });
@@ -243,7 +243,7 @@ run("disclosure blanks sub-threshold crosstab columns at the model level (task #
   TR.disclosure = priorDisc;
 });
 
-run("composite ids are monotonic — a freed id is never reissued (H)", () => {
+run("composite ids are monotonic. A freed id is never reissued (H)", () => {
   const spec = (label, r) => ({ name: label, columns: [{ code: "Q002", label: label, rows: [r] }] });
   const a = TR.compositeBanners.add(spec("A", 0));
   const b = TR.compositeBanners.add(spec("B", 1));      // b is the current max
@@ -256,7 +256,7 @@ run("composite ids are monotonic — a freed id is never reissued (H)", () => {
 });
 
 run("a stale composite story pin exports a placeholder slide, never crashes the deck", () => {
-  // audit 2026-07-02 30_story.js:536 — compositeMatrix() null (category renamed /
+  // audit 2026-07-02 30_story.js:536. CompositeMatrix() null (category renamed /
   // mean rows gone after a carry-forward) crashed matrixSlide->fitMatrix and killed
   // the WHOLE pptx export. Now: placeholder slide, live pins unaffected.
   vm.runInContext(readFileSync(path.join(JS_DIR, "30_story.js"), "utf8"), sandbox,
@@ -276,7 +276,7 @@ run("a stale composite story pin exports a placeholder slide, never crashes the 
   const slides = TR.story2._slidesFor(items);
   eq(slides.length, 3, "title + placeholder + live composite");
   eq(slides[1].kind, "divider", "the stale pin becomes a visible placeholder slide");
-  eq(slides[1].title, "Composite — Ghost", "the placeholder keeps the pin's title");
+  eq(slides[1].title, "Composite: Ghost", "the placeholder keeps the pin's title");
   assert(slides[1].note.indexOf("no longer resolves") >= 0,
     "the placeholder says the pin no longer resolves");
   eq(slides[2].kind, "matrix", "the live composite still exports its matrix slide");

@@ -1,4 +1,4 @@
-# Open-End (Verbatim) Coding — Project Plan
+# Open-End (Verbatim) Coding. Project Plan
 
 **Status:** Planning (pre-build) · **Date:** 2026-06-18 · **Owner:** Duncan Brett
 **Type:** Software capability (new TURAS analytics feature, spanning `tabs` + `tracker`)
@@ -14,16 +14,16 @@
 ## 1. Problem Statement
 
 Open-ended survey responses are currently a dead end in TURAS. `Open_End` is a
-recognised `Variable_Type`, but the crosstab engine deliberately skips it — it
+recognised `Variable_Type`, but the crosstab engine deliberately skips it. It
 warns on selection and produces empty tables. So the richest, most quotable part
 of a survey never reaches the report as analysable data, and never trends across
 waves. Researchers either pay a coding house, code by hand in Excel, or drop the
 open-ends into an appendix nobody reads. For trackers this is worse: when
 open-ends *are* coded, the frame drifts wave to wave, so the one thing a tracker
-exists to show — change over time — is exactly what a messy frame destroys. We
+exists to show, change over time, is exactly what a messy frame destroys. We
 need open-ends to become first-class TURAS data: coded to a stable, human-trusted
 frame, cross-tabbable and trackable like any closed question, with real
-respondent quotes available to bring the numbers to life — and we need it generic
+respondent quotes available to bring the numbers to life, and we need it generic
 enough to run any study from config.
 
 ---
@@ -40,22 +40,22 @@ overrides, and every code traces back to source quotes for audit.
 export, then cross-tab and report somewhere else. None of them own the whole
 chain. The academic work is also blunt about the one failure mode that matters
 for trackers: if the model re-invents themes each wave, the trend breaks. The fix
-is deductive coding — build the frame once, then classify later waves against the
+is deductive coding. Build the frame once, then classify later waves against the
 *fixed* frame, flagging genuinely new themes for review rather than absorbing
 them silently.
 
 **Recommended approach.** Build it native to TURAS rather than buy/bolt-on,
 because TURAS already owns the three hardest pieces:
 
-1. **AI infrastructure** — `ellmer`-based structured output, model-selectable
+1. **AI infrastructure**, `ellmer`-based structured output, model-selectable
    (Sonnet 4.6 / Opus 4.8), with a sidecar-JSON pattern that already supports
    pin / dismiss / edit / override and hash-caching. That is the human-in-the-loop
    scaffolding the whole industry says you need.
-2. **Multi-mention machinery** — a coded comment is just a multi-response
+2. **Multi-mention machinery**. A coded comment is just a multi-response
    variable; the microdata already stores multi-mention as an array of indices,
    so coded open-ends flow through crosstabs, significance testing and banners
    for free.
-3. **Stable wave keys** — the tracker's canonical `QuestionCode` mapping is what
+3. **Stable wave keys**. The tracker's canonical `QuestionCode` mapping is what
    holds a code frame still across waves.
 
 The differentiator: TURAS becomes the only pipeline where **coding → crosstabs →
@@ -70,7 +70,7 @@ design* because it rides the existing wave keys.
    human-approved frame and appears as a multi-mention variable in crosstabs and
    the tracker, identical in behaviour to a closed question. *Test:* selecting an
    `Open_End` question yields a non-empty, sig-tested crosstab and a wave trend.
-2. **No fabricated quotes — by construction.** 100% of quotes displayed in any
+2. **No fabricated quotes, by construction.** 100% of quotes displayed in any
    report are exact stored verbatims (after rule-based PII redaction); the model
    never authors quote text, only selects a comment ID, and a deterministic check
    confirms every cited ID exists before render. *Test:* every rendered quote
@@ -122,7 +122,7 @@ design* because it rides the existing wave keys.
 - **Verification.** Deterministic ID-existence check for quotes; sample re-code
   agreement statistic; sanity check of back-coded wave totals against priors.
 - **Optional embeddings cross-check** (phase 2): model-independent nearest-code
-  flagging and near-duplicate detection. *New dependency — requires approval.*
+  flagging and near-duplicate detection. *New dependency. Requires approval.*
 - **Rendering.** Coded results appear inline in crosstabs and the tracker; a
   voice-of-customer quotes panel renders exact stored quotes by ID with PII
   scrubbed; report carries an honest methodology note when history was re-coded.
@@ -135,15 +135,15 @@ design* because it rides the existing wave keys.
 
 ### Constraints & dependencies
 - `ellmer` already present (Anthropic). Embeddings would be an additional
-  dependency — deferred and gated on approval.
-- Cost scales with comment volume (5,000 is the current ceiling) — batching,
+  dependency. Deferred and gated on approval.
+- Cost scales with comment volume (5,000 is the current ceiling): batching,
   caching and Sonnet-for-bulk are first-class concerns, not optimisations.
 - Client data (SACS and others) stays local/gitignored.
 
 ### Scenarios
 - *As the analyst,* I declare 6 open-end questions in config, review and lock the
   AI-proposed frame, run coding, clear a short exception queue, scrub/approve a
-  handful of quotes, and publish — open-ends now trend across all 4 waves.
+  handful of quotes, and publish. Open-ends now trend across all 4 waves.
 - *Unhappy path:* gold-set agreement is poor → TURAS refuses to publish, prints
   the code/threshold/fix to console, and points me at the exception queue.
 - *Unhappy path:* a quote contains a name → rule-based redaction replaces it with
@@ -151,15 +151,15 @@ design* because it rides the existing wave keys.
 
 ### Data confidentiality & coding modes (critical)
 
-To AI-code a comment, its text must reach the model — so confidentiality hinges
+To AI-code a comment, its text must reach the model, so confidentiality hinges
 on *where the model runs*. Coding mode is a per-study config choice:
 
-- **Import / human coding** — no AI; TURAS tabulates existing codes. Nothing
+- **Import / human coding**. No AI; TURAS tabulates existing codes. Nothing
   leaves the machine. (The SACS first slice; identical to today's crosstab data.)
-- **Local model** — open-weights model via Ollama (`ellmer` already supports it);
+- **Local model**. Open-weights model via Ollama (`ellmer` already supports it);
   verbatims never leave the machine. Lower raw quality, offset by the trust cage;
   needs hardware.
-- **Cloud API (Anthropic)** — most capable; the *only* mode where comment text
+- **Cloud API (Anthropic)**. Most capable; the *only* mode where comment text
   leaves the machine. Must be governed.
 
 Governing the cloud mode (terms verified June 2026):
@@ -167,16 +167,16 @@ Governing the cloud mode (terms verified June 2026):
   apply to the API).
 - Standard API retains logs for a short abuse-monitoring window (recently cited
   as ~7 days) then deletes; a **Zero Data Retention** agreement removes even that.
-- Anthropic offers a **DPA / operator agreement** — the instrument POPIA's
+- Anthropic offers a **DPA / operator agreement**. The instrument POPIA's
   cross-border-transfer rules require.
 - **Data minimisation:** PII is scrubbed locally *before* text is sent, so the
-  third party only ever receives de-identified text. **Two scrub points** —
-  pre-send (confidentiality) and pre-display (the deliverable) — both rule-based
+  third party only ever receives de-identified text. **Two scrub points**,
+  pre-send (confidentiality) and pre-display (the deliverable): both rule-based
   and logged.
 
 Honest limits: rule-based scrubbing catches direct identifiers, not contextual
 ones ("the only female plumber in Calvinia"), so cloud mode *reduces* exposure
-but is not a hard guarantee — import and local modes are. And this is an
+but is not a hard guarantee. Import and local modes are. And this is an
 escalation over today's AI insights, which sends only aggregate stats and labels,
 never raw respondent text. Default conservative; sensitive clients →
 import/local only; greenfield scale studies → cloud with DPA + consent +
@@ -194,19 +194,19 @@ cross-tabbable, trackable data.
 
 **The trust cage** (directly answers the miscoding/hallucination concern):
 
-- *Hallucinated quotes — solved by design.* The model returns a comment **ID**,
+- *Hallucinated quotes. Solved by design.* The model returns a comment **ID**,
   never quote text; the report renders the exact stored string for that ID. The
   quote slot physically never carries model output. PII scrubbing is a separate,
-  logged, rule-based redaction of the real string — a redaction, never a
+  logged, rule-based redaction of the real string. A redaction, never a
   regeneration.
-- *Miscoding — driven down and made visible.* (1) You approve the frame first, so
+- *Miscoding. Driven down and made visible.* (1) You approve the frame first, so
   the model can't invent rogue categories. (2) Confidence + abstain route the
   ambiguous tail to a review queue. (3) Click any number to see the exact comments
   behind it (traceability). (4) A sample is re-coded and an honest agreement %
   prints on the deliverable. (5) A gold-set guard refuses auto-publish below
   threshold (TRS). (6) Temperature 0 + hash caching make it reproducible.
 
-**Frame harmonisation + agreement cross-check** (the SACS reality — coded but
+**Frame harmonisation + agreement cross-check** (the SACS reality, coded but
 messy/inconsistent across waves). Instead of trusting the drifted old coding *or*
 re-coding blind, do both and let them check each other:
 
@@ -221,7 +221,7 @@ re-coding blind, do both and let them check each other:
 This applies one frame uniformly across all four waves (kills coder drift), uses
 the human history to shrink the review pile to genuine disagreements, and catches
 errors in both directions. For the two greenfield studies there is no old code,
-so they lean on confidence + gold-set instead — the engine supports both paths.
+so they lean on confidence + gold-set instead. The engine supports both paths.
 
 **Climate-content note.** Climate verbatims carry a *stance* as well as a theme
 (concerned / sceptical / motivated / fatalistic) and are frequently multi-theme.
@@ -247,7 +247,7 @@ report should lead with whichever the base supports, using existing base-flaggin
   cross-question theme rollups; reuse of the engine by any module with verbatims
   (brand, segment).
 - **Commercial lens.** This removes a per-project dependency on external coding
-  houses/tools and becomes a genuine differentiator for TURAS — "we code, tab,
+  houses/tools and becomes a genuine differentiator for TURAS, "we code, tab,
   track and report your open-ends in one stable pipeline" is something the
   standalone tools structurally cannot say.
 
@@ -263,7 +263,7 @@ classify/select (never author displayed text).
 | Risk | Mitigation |
 |---|---|
 | **Miscoding** (wrong/missed code) | Approved frame, confidence+abstain queue, old/new agreement cross-check, traceability, sample agreement %, gold-set TRS refusal |
-| **Hallucinated quotes** | Solved by construction — model returns IDs, report renders stored strings; deterministic ID check |
+| **Hallucinated quotes** | Solved by construction. Model returns IDs, report renders stored strings; deterministic ID check |
 | **Cost/latency at 5,000 comments** | Batched classification, hash caching, Sonnet for bulk, verify on sample not census |
 | **Small base (SACS n≈150–200)** | Lead with quotes + directional read; honest base flags; coded crosstabs emphasised on the larger studies |
 | **Frame drift across waves** | Locked, human-approved frame; novel themes flagged not absorbed; explicit frame versioning |

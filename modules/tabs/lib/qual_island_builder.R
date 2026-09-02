@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — DATA_QUAL ISLAND BUILDER (records -> schema + confidentiality)
+# TABS MODULE. DATA_QUAL ISLAND BUILDER (records -> schema + confidentiality)
 # ==============================================================================
 #
 # Assembles the DATA_QUAL island from classified questions + the respondent master:
@@ -23,7 +23,7 @@
 QUAL_TEXT_MODES <- c("hidden", "redacted", "full")
 # Verbatim scope (dial 3): which comments ship readable text. "all" ships every comment
 # except hide-marked ones; "noteworthy" ships only tier >= 1 (noteworthy/must-read/
-# priority). Orthogonal to text mode — scope picks WHICH comments, text mode picks HOW
+# priority). Orthogonal to text mode. Scope picks WHICH comments, text mode picks HOW
 # their text is treated. Every comment is counted in the distribution regardless.
 QUAL_VERBATIM_SCOPES <- c("all", "noteworthy")
 # Report-level default for the noteworthy tier filter (dial honoured in the JS).
@@ -31,7 +31,7 @@ QUAL_NOTEWORTHY_DEFAULTS <- c("all", "noteworthy", "must_read", "priority")
 
 # Direct-identifier patterns scrubbed in REDACTED mode. These catch DIRECT identifiers
 # (email / URL / phone); contextual identifiers ("the only male diploma lecturer") are
-# NOT caught — that honest limit is documented in QUALITATIVE_TAB_BUILD_NOTES.md §D.
+# NOT caught. That honest limit is documented in QUALITATIVE_TAB_BUILD_NOTES.md §D.
 QUAL_PII_PATTERNS <- c(
   email = "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
   url   = "https?://[^[:space:]]+",
@@ -42,7 +42,7 @@ QUAL_PII_REPLACEMENT <- "[redacted]"
 
 #' Scrub direct-identifier PII from a verbatim (REDACTED mode), counting redactions.
 #' @param text A verbatim string (or NA/"").
-#' @return list(text, redactions) — `text` with identifiers replaced, `redactions` count.
+#' @return list(text, redactions): `text` with identifiers replaced, `redactions` count.
 qual_scrub_text <- function(text) {
   if (is.null(text) || is.na(text) || !nzchar(text)) return(list(text = text, redactions = 0L))
   scrubbed <- text
@@ -83,11 +83,11 @@ qual_cfg <- function(config, key, default) {
 #'
 #' The scope decides which comments are readable; every comment is counted in the theme
 #' distribution regardless (its text is the only thing withheld). A comment is shown when:
-#'   - scope "all"        — always, UNLESS it carries a hide marker; or
-#'   - scope "noteworthy" — only when it is tier >= 1 (noteworthy / must-read / priority),
+#'   - scope "all", always, UNLESS it carries a hide marker; or
+#'   - scope "noteworthy", only when it is tier >= 1 (noteworthy / must-read / priority),
 #'                          and a hide marker still withholds it (redundant, since a hide
 #'                          marker is tier 0, but explicit).
-#' An unthemed, un-noteworthy comment under "noteworthy" scope is simply not shown — it
+#' An unthemed, un-noteworthy comment under "noteworthy" scope is simply not shown. It
 #' still counts, it just carries no readable text (Duncan's rule: theme all, show some).
 #' @param rec A reader record (noteworthy_tier, hidden).
 #' @param scope "all" or "noteworthy".
@@ -105,7 +105,7 @@ qual_verbatim_shows <- function(rec, scope) {
 #' @param text_mode One of QUAL_TEXT_MODES.
 #' @param demo_labels Banner-dimension labels to carry as record demographics (empty
 #'   when the demographic-cuts dial is "block", so no demographics enter the island).
-#' @param scope Verbatim scope ("all" or "noteworthy") — governs whether THIS record's
+#' @param scope Verbatim scope ("all" or "noteworthy"): governs whether THIS record's
 #'   text ships. A withheld record is emitted with text = null and suppressed = TRUE, so
 #'   it still counts in the distribution but is never listed as a readable comment.
 #' @param rid The respondent's opaque reader-key token (`qual_reader_keys`), or NULL.
@@ -116,7 +116,7 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
                                       scope = "all", rid = NULL) {
   shows <- qual_verbatim_shows(rec, scope)
   # A withheld verbatim never enters the island as text (build-time confidentiality /
-  # curation) — no text mode, no PII scrub needed, nothing readable in the page source.
+  # curation): no text mode, no PII scrub needed, nothing readable in the page source.
   applied <- if (shows) qual_apply_text_mode(rec$text, text_mode) else list(text = NULL, redactions = 0L)
   theme_vals <- list()
   for (label in names(rec$themeVals)) {
@@ -130,7 +130,7 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
     sentiment = rec$sentiment, rating = rec$rating, themeVals = theme_vals
   )
   # The stable reader key. Uniform random, so it discloses nothing under any privacy
-  # dial (block / safe / hidden / aggregates-only) — it is the ONE field that survives
+  # dial (block / safe / hidden / aggregates-only): it is the ONE field that survives
   # a re-export, which is what stops a reader mark drifting onto another respondent.
   if (!is.null(rid) && length(rid) == 1L && !is.na(rid) && nzchar(rid)) record$rid <- as.character(rid)
   # suppressed = withheld from the readable list (scope or hide). Emitted only when true
@@ -138,7 +138,7 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
   # absent (the common case) reads as false, keeping the island lean.
   if (!shows) record$suppressed <- TRUE
   # The split band (NPS Detractor/Passive/Promoter etc.) is a first-class report-level
-  # axis, carried alongside sentiment — NOT a demographic tag, so it is never subject to
+  # axis, carried alongside sentiment, NOT a demographic tag, so it is never subject to
   # the demographic k-anonymisation (the band mirrors a closed question already reported).
   if (!is.null(rec$band) && !is.na(rec$band)) record$band <- as.character(rec$band)
   if (length(demo_labels)) {
@@ -301,14 +301,14 @@ qual_build_data_qual <- function(questions, master, config = list(), rid_map = N
           if (identical(raw_cuts, "safe")) "safe" else "allow"
   # Comment tagging is governed by the demographic_cuts dial, independent of the reporting
   # threshold: "block" ships no demographics at all (source-safe, Total-only); "allow" ships
-  # every tag (internal — a fine crossing can identify on a small sample); "safe" k-anonymises
+  # every tag (internal, a fine crossing can identify on a small sample); "safe" k-anonymises
   # the tags against min_reporting_base, so a comment shows only the broadest combination of
   # tags that still covers >= k people ("Admin" when there are 70, not "Admin + <1yr" when 3).
   default_tier <- qual_cfg(config, "noteworthy_default", "all")
   if (!default_tier %in% QUAL_NOTEWORTHY_DEFAULTS) default_tier <- "all"
   # Verbatim scope: which comments ship their readable text. "all" ships everything bar
   # hide-marked comments; "noteworthy" ships only tier >= 1 (plus hide still withholds).
-  # Withheld comments are still counted in every distribution — only their text is gone.
+  # Withheld comments are still counted in every distribution, only their text is gone.
   scope <- qual_cfg(config, "verbatim_scope", "all")
   if (!scope %in% QUAL_VERBATIM_SCOPES) scope <- "all"
   # Demographics ride the island unless blocked (then the tab is Total-only, no demos leak).
@@ -332,14 +332,14 @@ qual_build_data_qual <- function(questions, master, config = list(), rid_map = N
       cat("│ have anything to anonymise against; it is currently ",
           if (length(k) == 1L && !is.na(k)) k else "unset", ".\n", sep = "")
       cat("│ Demographic tags would ship RAW while the report claimed 'safe',\n")
-      cat("│ so the report now declares 'allow' — which is what it is doing.\n")
+      cat("│ so the report now declares 'allow', which is what it is doing.\n")
       cat("│ Fix: set min_reporting_base (e.g. 10) to get k-anonymised tags,\n")
       cat("│ or set qual_demographic_cuts = block to ship no tags at all.\n")
       cat("└────────────────────────────────────────────────────────────┘\n\n")
     } else {
       # Collect each unique respondent's demos + their split band (the real, non-empty band
       # wins if they appear in both a split and a non-split question) so tags are k-anonymised
-      # within the band — the band being a visible quasi-identifier once the segment exists.
+      # within the band. The band being a visible quasi-identifier once the segment exists.
       band_of <- new.env(parent = emptyenv()); ids <- character(0); rows <- list()
       for (q in questions) for (rec in q$records) {
         id <- as.character(rec$id)

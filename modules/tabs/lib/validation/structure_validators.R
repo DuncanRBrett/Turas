@@ -120,7 +120,7 @@ check_variable_types <- function(questions_df, error_log) {
     # Name the offending QuestionCodes, not just the bad values. On a structure
     # with 200 questions, "Invalid Variable_Type values found: numeric" left the
     # operator hunting for the row; the codes make it a one-line fix. (The check
-    # itself already refused the run — review 2026-08-21 wrongly reported this
+    # itself already refused the run. Review 2026-08-21 wrongly reported this
     # vocabulary gate as absent.)
     codes <- if ("QuestionCode" %in% names(questions_df)) {
       as.character(questions_df$QuestionCode[bad])
@@ -239,7 +239,7 @@ check_multi_mention_questions <- function(questions_df, error_log) {
 #' Validate Allocation questions have Columns > 1
 #'
 #' Allocation (constant-sum) questions must have Columns >= 2.
-#' A single-column allocation is degenerate — use Numeric instead.
+#' A single-column allocation is degenerate. Use Numeric instead.
 #'
 #' @keywords internal
 check_allocation_questions <- function(questions_df, error_log) {

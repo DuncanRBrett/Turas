@@ -1,11 +1,11 @@
 /**
- * Conjoint view — attribute importance, part-worth utilities with honest
+ * Conjoint view. Attribute importance, part-worth utilities with honest
  * intervals, model fit, and willingness to pay when the study produced it.
  *
  * FROZEN, NOT LIVE. Every other analysis tab recomputes from microdata when
  * the audience filter changes. Conjoint cannot: the model was fitted once, on
  * the whole sample. So this tab shows what was estimated and the filter bar is
- * hidden while it is open — the same contract as Tracking. The note at the top
+ * hidden while it is open. The same contract as Tracking. The note at the top
  * of the tab says so, rather than leaving the reader to notice the filter has
  * no effect.
  *
@@ -25,7 +25,7 @@
   }
 
   function num(v, dp) {
-    if (v === null || v === undefined || isNaN(v)) return "—";
+    if (v === null || v === undefined || isNaN(v)) return "–";
     return Number(v).toFixed(dp === undefined ? 1 : dp);
   }
 
@@ -54,14 +54,14 @@
     if (meta.filterNote) notes.push(esc(meta.filterNote));
     if (meta.unweightedNote) notes.push(esc(meta.unweightedNote));
 
-    // The market simulator is a separate file — a tool rather than report
+    // The market simulator is a separate file. A tool rather than report
     // content. Link to it when the study produced one; it sits beside this
     // report, so a relative link is right.
     var sim = "";
     if (meta.simulatorFile) {
       sim = '<p class="cj-note">Market simulator: <a href="' +
         esc(meta.simulatorFile) + '">' + esc(meta.simulatorFile) +
-        "</a> — open it beside this report to test product configurations.</p>";
+        "</a>. Open it beside this report to test product configurations.</p>";
     }
 
     return '<div class="cj-provenance">' +
@@ -78,7 +78,7 @@
     imp.importance.forEach(function (v) { if (v > max) max = v; });
 
     // An island whose writer had no SD column may carry sd as {} (a NULL
-    // serialised by jsonlite) — only a real array counts.
+    // serialised by jsonlite), only a real array counts.
     var sdArr = Array.isArray(imp.sd) ? imp.sd : null;
 
     // Descending: the attribute that drives choice most is read first.
@@ -116,17 +116,17 @@
         var base = b.isBaseline && b.isBaseline[i];
 
         // A baseline level is the reference the others are measured against.
-        // It carries no standard error and no interval — the utilities table
+        // It carries no standard error and no interval. The utilities table
         // stores its bounds equal to its own value, which would print as a
         // zero-width interval and read like an impossibly precise estimate.
-        var se = base ? "—"
-          : (b.se && b.se[i] != null ? num(b.se[i], 2) : "—");
-        var ci = base ? "—"
+        var se = base ? "–"
+          : (b.se && b.se[i] != null ? num(b.se[i], 2) : "–");
+        var ci = base ? "–"
           : ((b.ciLower && b.ciLower[i] != null && b.ciUpper[i] != null)
-              ? num(b.ciLower[i], 2) + " to " + num(b.ciUpper[i], 2) : "—");
+              ? num(b.ciLower[i], 2) + " to " + num(b.ciUpper[i], 2) : "–");
         var het = anyHet
           ? '<td class="cj-num">' +
-            (base ? "—" : (Array.isArray(b.heterogeneity) ? num(b.heterogeneity[i], 2) : "—")) + "</td>"
+            (base ? "–" : (Array.isArray(b.heterogeneity) ? num(b.heterogeneity[i], 2) : "–")) + "</td>"
           : "";
 
         return "<tr>" +
@@ -149,7 +149,7 @@
       : "Utilities are shown relative to each attribute's baseline level, which is zero.";
 
     var hetNote = anyHet
-      ? " Std. error is the precision of the estimated average. Heterogeneity (SD) is how much respondents differ from each other — a large one with a small standard error means a real split in the sample, not an imprecise estimate."
+      ? " Std. error is the precision of the estimated average. Heterogeneity (SD) is how much respondents differ from each other. A large one with a small standard error means a real split in the sample, not an imprecise estimate."
       : "";
 
     return '<section class="cj-panel"><h3>Part-worth utilities</h3>' +
@@ -160,7 +160,7 @@
   function fitHtml(fit) {
     if (!fit) return "";
     // An island written before the writer dropped NULL blocks carries
-    // "fit": {} — truthy, but with nothing to say. No panel for those either.
+    // "fit": {}. Truthy, but with nothing to say. No panel for those either.
     var any = [fit.mcFaddenR2, fit.hitRate, fit.chanceRate,
                fit.logLikelihoodFitted, fit.logLikelihoodNull,
                fit.nObservations, fit.nParameters].some(function (v) {
@@ -175,8 +175,8 @@
 
     var rows = [
       ["McFadden R²", num(fit.mcFaddenR2, 3)],
-      ["Hit rate", fit.hitRate != null ? num(fit.hitRate * 100) + "%" : "—"],
-      ["Chance rate", fit.chanceRate != null ? num(fit.chanceRate * 100) + "%" : "—"],
+      ["Hit rate", fit.hitRate != null ? num(fit.hitRate * 100) + "%" : "–"],
+      ["Chance rate", fit.chanceRate != null ? num(fit.chanceRate * 100) + "%" : "–"],
       ["Log-likelihood (fitted)", num(fit.logLikelihoodFitted, 1)],
       ["Log-likelihood (null)", num(fit.logLikelihoodNull, 1)],
       ["Observations", num(fit.nObservations, 0)],
@@ -198,11 +198,11 @@
     var rows = wtp.level.map(function (lv, i) {
       var base = wtp.isBaseline && wtp.isBaseline[i];
       var ci = (wtp.ciLower && wtp.ciLower[i] != null && wtp.ciUpper[i] != null)
-        ? cur + num(wtp.ciLower[i], 2) + " to " + cur + num(wtp.ciUpper[i], 2) : "—";
+        ? cur + num(wtp.ciLower[i], 2) + " to " + cur + num(wtp.ciUpper[i], 2) : "–";
       return "<tr><td>" + esc(wtp.attribute[i]) + "</td><td>" + esc(lv) +
         (base ? ' <span class="cj-baseline">(baseline)</span>' : "") + "</td>" +
         '<td class="cj-num">' + (base ? cur + "0.00" : cur + num(wtp.wtp[i], 2)) + "</td>" +
-        '<td class="cj-num">' + (base ? "—" : ci) + "</td></tr>";
+        '<td class="cj-num">' + (base ? "–" : ci) + "</td></tr>";
     }).join("");
 
     return '<section class="cj-panel"><h3>Willingness to pay</h3>' +

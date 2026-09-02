@@ -140,7 +140,7 @@ process_standard_question <- function(data, question_info, question_options,
   
   # Unmatched-value diagnostic: every answered value must match a configured
   # option. safe_equal's exact (trimmed) matching silently zero-counts anything
-  # else — e.g. "I re-registered" in the data vs "I reregistered" in the
+  # else, e.g. "I re-registered" in the data vs "I reregistered" in the
   # structure left 61% of a question's answers out of every row while the base
   # still counted them. Those respondents disappear from the percentages with
   # no visible failure, so this must be loud (console-visible under Shiny).
@@ -238,7 +238,7 @@ process_standard_question <- function(data, question_info, question_options,
     #
     # M8 (production review 2026-08): this used to require show_percent_column,
     # so a report published as counts-only silently lost every proportion
-    # letter — a display toggle deciding a statistical result. The test is on
+    # letter. A display toggle deciding a statistical result. The test is on
     # the column proportions (count / base) either way, and the base row is
     # unchanged, so the letters are the same letters. They are appended after
     # the option's shown rows, which puts them under the frequency row when the
@@ -552,7 +552,7 @@ create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
                                           banner_row_indices, internal_keys, config) {
   # NA, not 0 (production review 2026-08, M-A). A standard deviation needs two
   # observations. Initialising to 0 meant an EMPTY column and a ONE-PERSON column
-  # both published "0.0" — a positive claim that the column has no spread, which
+  # both published "0.0". A positive claim that the column has no spread, which
   # is unknowable from one respondent and meaningless with none. The numeric
   # processor has always NA-initialised the same statistic, so the two processors
   # published different answers to the same situation; they now agree.
@@ -577,7 +577,7 @@ create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
           mean_val <- sum(v * w) / sum(w)
           # V10.8: Bessel-corrected weighted variance (sample, not population).
           # A non-positive denominator (total weight <= 1) leaves the variance
-          # undefined — NA, not 0, for the same reason as the initialiser (M-A).
+          # undefined. NA, not 0, for the same reason as the initialiser (M-A).
           denom <- sum(w) - 1
           var_val <- if (denom > 0) sum(w * (v - mean_val)^2) / denom else NA_real_
           sd_values[key] <- sqrt(var_val)
@@ -954,7 +954,7 @@ get_sorted_boxcategories <- function(question_options) {
   }
 
   # Order boxes by their SCORE (mean OptionValue) ascending, so the unfavourable
-  # box is "bottom" and the favourable box is "top" — making NET POSITIVE the
+  # box is "bottom" and the favourable box is "top". Making NET POSITIVE the
   # favourable box minus the unfavourable one regardless of whether the scale is
   # displayed best-first or worst-first. This mirrors the Index, which scores by
   # OptionValue. Unscored boxes (e.g. DK/NA) sort last and are excluded from the
@@ -965,7 +965,7 @@ get_sorted_boxcategories <- function(question_options) {
     return(box_categories[order(cat_score, na.last = TRUE)])
   }
 
-  # Fallback: no usable OptionValue — order by DisplayOrder (legacy behaviour).
+  # Fallback: no usable OptionValue. Order by DisplayOrder (legacy behaviour).
   cat_order <- sapply(box_categories, function(cat) {
     opts <- question_options[question_options$BoxCategory == cat, ]
     if (nrow(opts) > 0 && "DisplayOrder" %in% names(opts)) {
@@ -1061,7 +1061,7 @@ create_net_positive_row <- function(top_category, bottom_category, row_counts_to
 #'
 #' WHAT THESE LETTERS TEST (review 2026-08, I5; decision recorded in
 #' docs/tabs_production_review_2026-08/NET_POSITIVE_SIG_DECISION.md). The row
-#' prints top box MINUS bottom box, and these letters test that difference —
+#' prints top box MINUS bottom box, and these letters test that difference,
 #' via the weighted mean of a per-respondent score (+100 top box, -100 bottom
 #' box, 0 otherwise, \code{net_positive_scores()}), whose mean IS the printed
 #' net. The same device the NPS Score row uses.
@@ -1071,8 +1071,8 @@ create_net_positive_row <- function(top_category, bottom_category, row_counts_to
 #' different bottom boxes printed different nets and could never letter against
 #' each other, while two columns printing the SAME net could. Testing the
 #' printed difference directly is not a matter of z-testing it as two
-#' independent proportions — top and bottom box are two cells of one
-#' multinomial and are negatively correlated — but the score's variance carries
+#' independent proportions. Top and bottom box are two cells of one
+#' multinomial and are negatively correlated, but the score's variance carries
 #' that covariance exactly (derivation in \code{net_positive_scores()}), so the
 #' existing weighted-t path is the whole implementation.
 #'
@@ -1087,7 +1087,7 @@ add_net_positive_significance <- function(net_scores, banner_row_indices,
   # Same per-column finite population correction the category rows and the NET
   # difference rows above this one already use (review 2026-08, I5). Without it
   # a census column correctly lost its letters on every category row and kept
-  # them on the NET POSITIVE row printed underneath — one table, two universes.
+  # them on the NET POSITIVE row printed underneath. One table, two universes.
   # All-1 (inert) when no Population sheet or population_size is configured.
   fpc_muls <- build_fpc_multipliers(
     banner_bases, resolve_column_populations(banner_info, config), internal_keys)
@@ -1105,7 +1105,7 @@ add_net_positive_significance <- function(net_scores, banner_row_indices,
 
   # "mean" routes to weighted_t_test_means(), which already applies the Kish
   # effective base, the FPC (including the Inf census exclusion), the min-base
-  # gate and the per-group Bonferroni divisor — the same wrapper every other
+  # gate and the per-group Bonferroni divisor. The same wrapper every other
   # mean row in the report goes through.
   sig_rows <- add_significance_row(
     test_data, banner_info, "mean", internal_keys,
@@ -1329,7 +1329,7 @@ boxcategory_count_matrix <- function(data, question_info, question_options,
 #' The multiplier that turns a column of weighted counts into effective counts:
 #' \code{effective base / weighted base}. Pearson's chi-square reads its inputs
 #' as a raw sample size, so on a weighted table it answers a question about the
-#' weighted total rather than about the people interviewed — with population-
+#' weighted total rather than about the people interviewed, with population-
 #' projected weights it manufactures significance without limit (executed: the
 #' same design at x10 weights moved p from 0.0455 to 0.0000). Scaling each
 #' column to its Kish effective base makes the test invariant to the scale of
@@ -1369,8 +1369,8 @@ chi_square_design_scales <- function(banner_bases, keys) {
 #' - Min expected: 0.5 (was 1.0) - allows smaller cells
 #' - Low expected %: 40% (was 20%) - more permissive for small groups
 #'
-#' WHAT THE TEST READS (review 2026-08, I6). \code{box_counts} — the unrounded
-#' counts from \code{boxcategory_count_matrix()} — is the input, scaled per
+#' WHAT THE TEST READS (review 2026-08, I6). \code{box_counts}. The unrounded
+#' counts from \code{boxcategory_count_matrix()}. Is the input, scaled per
 #' column to its effective base. Reading the published Frequency rows instead
 #' made this the one significance decision in the module fed by a display
 #' rounding: executed, a weighted table whose true counts were 28.4/21.6 shipped
@@ -1385,7 +1385,7 @@ chi_square_design_scales <- function(banner_bases, keys) {
 #' @param question_code Character, question code for error messages (optional)
 #' @param box_counts Numeric matrix from \code{boxcategory_count_matrix()}. NULL
 #'   falls back to the published Frequency rows, which are exact only on an
-#'   unweighted run — the engine always passes the matrix.
+#'   unweighted run. The engine always passes the matrix.
 #' @param banner_bases List of per-key bases, for the effective-base scaling.
 #'   NULL means no scaling (an unweighted table, or a direct unit call).
 #' @return Data frame with single chi-square row, or NULL if test not applicable

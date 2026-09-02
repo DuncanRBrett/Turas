@@ -1,6 +1,6 @@
 /**
  * v2 global filter bar + pickers. Filters apply to EVERY view (crosstabs,
- * dashboard, what-moved, findings, story) — the whole report recomputes
+ * dashboard, what-moved, findings, story): the whole report recomputes
  * from microdata with live bases and significance. Also hosts the custom
  * banner picker ("cross anything by anything").
  */
@@ -22,7 +22,7 @@
     // The weight variable is data, so it arrives escaped as a token; the clause
     // around it is authored, and disappears cleanly when no variable is named.
     var by = p.weight_variable ? " using ‘" + p.weight_variable + "’" : "";
-    // The three base definitions are one authored entry, one bullet per line —
+    // The three base definitions are one authored entry, one bullet per line,
     // they are read together and there is no condition between them.
     var bases = TR.txt("filter.weighting.bases").split(/\n+/)
       .map(function (line) { return line.trim(); })
@@ -67,7 +67,7 @@
     }).join("");
     var n = s.filters.length ? TR.stats.maskCount(TR.stats.mask(s.filters)) : TR.MICRO.n;
     // Disclosure control: warn (report-wide) when a composite filter narrows the audience
-    // below the confidentiality threshold — the views then withhold identifying detail.
+    // below the confidentiality threshold. The views then withhold identifying detail.
     var discWarn = (TR.disclosure && TR.disclosure.audienceTooSmall())
       ? '<div class="fb-warn" role="alert">🛡 ' + fmt.escapeHtml(TR.disclosure.note()) + "</div>"
       : "";
@@ -86,7 +86,7 @@
           " · add a filter to recompute tables and dashboard with your " +
           "area of interest.</span>") +
       // The weighted-bases explainer (weightingNote) renders inside the shared
-      // "How to read this" panel (A4) — no longer stacked under the filter bar.
+      // "How to read this" panel (A4): no longer stacked under the filter bar.
       "</div>" + discWarn + "<div id='fpicker' hidden></div>";
     holder.querySelectorAll("[data-fremove]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -161,15 +161,15 @@
       holder.hidden = true;
       return;
     }
-    // only one mode is meaningful — apply it without the extra choice
+    // only one mode is meaningful. Apply it without the extra choice
     if (!netLabels.length) { applyCustomBanner(code, "cat", holder); return; }
     if (!catCount) { applyCustomBanner(code, "net", holder); return; }
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      fmt.escapeHtml(q.code + " — column headers") +
+      fmt.escapeHtml(q.code + ", column headers") +
       '<button data-close aria-label="Close">✕</button></div>' +
-      '<button class="fpick-q" data-mode="net"><strong>Summary groupings (recommended)</strong> — ' +
+      '<button class="fpick-q" data-mode="net"><strong>Summary groupings (recommended)</strong>: ' +
       fmt.escapeHtml(TR.charts.clip(netLabels.join(" / "), 80)) + "</button>" +
-      '<button class="fpick-q" data-mode="cat"><strong>Detail categories</strong> — all ' +
+      '<button class="fpick-q" data-mode="cat"><strong>Detail categories</strong>: all ' +
       catCount + " values as separate columns</button></div>";
     holder.querySelector("[data-close]").addEventListener("click", function () {
       holder.hidden = true;
@@ -185,16 +185,16 @@
     var id = "custom:" + code + ":" + mode;
     TR.d2.state.banner = id;
     // Remember it as the live custom banner so switching to another banner does
-    // not lose it — it stays available as a tab until replaced or ★ saved.
+    // not lose it. It stays available as a tab until replaced or ★ saved.
     if (!TR.savedBanners.has(id)) TR.d2.state.customBanner = id;
     holder.hidden = true;
     TR.shell.route();
-    TR.shell.toast("Custom banner applied — kept as a tab · ★ save to keep it for good");
+    TR.shell.toast("Custom banner applied. Kept as a tab · ★ save to keep it for good");
   }
 
   /** Category rows observed inside the selected boxes (boxes[r] → answers[r]),
    *  ascending. null when any box member carries no shown single-category
-   *  answer (hidden / unshown option, multi-mention) — the box is then not
+   *  answer (hidden / unshown option, multi-mention): the box is then not
    *  decomposable into answer space. */
   function boxCatRows(q, boxIdxs) {
     var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
@@ -220,7 +220,7 @@
   /**
    * Build ONE audience-filter entry from picker selections ("c<idx>" category,
    * "n<idx>" decomposable NET, "b<idx>" box grouping). stats.mask evaluates an
-   * entry EITHER in box space (f.box) or in answer space — never both — so a
+   * entry EITHER in box space (f.box) or in answer space, never both, so a
    * box grouping ticked alongside plain values is expanded to the category
    * rows observed in its microdata box membership and the whole selection ORs
    * in answer space (a category index can never match box membership, so the
@@ -249,7 +249,7 @@
       var expanded = boxCatRows(q, boxList);
       if (!expanded) {
         return { error: "These groupings can't be combined with single " +
-          "values — apply the grouping as its own filter" };
+          "values. Apply the grouping as its own filter" };
       }
       expanded.forEach(function (ri) { cats[ri] = true; });
       return { filter: { q: q.code, rows: Object.keys(cats).map(Number) } };
@@ -263,7 +263,7 @@
   /**
    * Value picker. Offers category rows, decomposable NET rows (applied by
    * expanding to their member categories) AND box groupings for hidden-scale
-   * questions (applied by matching per-respondent box membership) — so an
+   * questions (applied by matching per-respondent box membership), so an
    * analyst can filter by "Top-2 box", "Promoter" or "Very Satisfied" alike.
    */
   function pickValues(code, holder) {
@@ -287,10 +287,10 @@
           (opt.net ? ' <span class="kindtag">net</span>' : "") + "</label>";
       }).join("") + "</div>" +
         '<button class="primary wide" data-apply>Apply filter</button>'
-      : '<p class="fpick-empty">No filterable values — this is a derived or ' +
+      : '<p class="fpick-empty">No filterable values. This is a derived or ' +
         "ranking metric.</p>";
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      fmt.escapeHtml(q.code + " — " + TR.charts.clip(q.title, 70)) +
+      fmt.escapeHtml(q.code + ": " + TR.charts.clip(q.title, 70)) +
       '<button data-close aria-label="Close">✕</button></div>' + body + "</div>";
     holder.querySelector("[data-close]").addEventListener("click", function () {
       holder.hidden = true;
@@ -306,7 +306,7 @@
       holder.hidden = true;
       filterBar.render();
       TR.shell.route();
-      TR.shell.toast("Filter applied — every view recomputed");
+      TR.shell.toast("Filter applied. Every view recomputed");
     });
   }
 
@@ -316,11 +316,11 @@
 
   // In-progress columns + name while the builder is open. A composite is a
   // hand-picked set of spotlight groups (each from any question) shown as columns
-  // across EVERY table and tested vs the rest — see 28c_composite.js.
+  // across EVERY table and tested vs the rest. See 28c_composite.js.
   var compositeDraft = [], compositeName = "";
 
   /** Spotlight-group options for a question: detail categories, decomposable NET
-   *  groupings (expanded to member rows) and hidden-scale box groupings — the
+   *  groupings (expanded to member rows) and hidden-scale box groupings. The
    *  same value set the audience filter offers, each ready to become one column.
    *  Each option already carries {rows, box?} so columnsFor rebuilds membership. */
   function groupOptionsFor(q) {
@@ -357,7 +357,7 @@
     holder.innerHTML = '<div class="fpick cb"><div class="fpick-head">' +
       "Build a composite banner" +
       '<button data-close aria-label="Close">✕</button></div>' +
-      '<p class="cb-help">Add the groups you want as columns — each can come from a ' +
+      '<p class="cb-help">Add the groups you want as columns. Each can come from a ' +
       "different question (e.g. Marketing, Admin, Cape Town, Tenure 5y+). Total is " +
       "always the first column, and every group is tested against the rest of the " +
       "sample, so columns may overlap.</p>" +
@@ -394,11 +394,11 @@
           if (c.box != null) col.box = c.box;
           return col;
         }) });
-      if (!id) { TR.shell.toast("Could not save — add at least one group"); return; }
+      if (!id) { TR.shell.toast("Could not save. Add at least one group"); return; }
       TR.d2.state.banner = id;
       holder.hidden = true;
       TR.shell.route();
-      TR.shell.toast("Composite banner applied — saved across reloads and in saved copies");
+      TR.shell.toast("Composite banner applied. Saved across reloads and in saved copies");
     });
   }
 
@@ -406,7 +406,7 @@
    *  searchable question list); "Back" returns to the builder. */
   function pickCompositeQuestion(holder) {
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      "Add a group — pick a question" +
+      "Add a group. Pick a question" +
       '<button data-cbback aria-label="Back">‹ Back</button></div>' +
       '<input type="search" id="fpick-search" placeholder="Search questions…">' +
       '<div class="fpick-list">' + TR.AGG.questions.map(function (q) {
@@ -443,7 +443,7 @@
       return;
     }
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      fmt.escapeHtml(q.code + " — pick one group") +
+      fmt.escapeHtml(q.code + ", pick one group") +
       '<button data-cbback aria-label="Back">‹ Back</button></div>' +
       '<div class="fpick-vals">' + options.map(function (opt, i) {
         return '<button class="fval pick" data-opt="' + i + '">' +
