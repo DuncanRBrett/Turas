@@ -253,6 +253,9 @@ make_reshape_fixture <- function() {
     Item_ID = c("APPLE", "BANANA", "CHERRY", "DATE"),
     Item_Label = c("Apple", "Banana", "Cherry", "Date"),
     Include = 1L, Anchor_Item = 0L,
+    # compute_maxdiff_counts merges Item_Group and Display_Order in, so a
+    # fixture without them errors before it scores anything.
+    Item_Group = "Fruit", Display_Order = 1:4,
     stringsAsFactors = FALSE
   )
   list(design = design, survey_mapping = survey_mapping, items = items)
@@ -322,11 +325,11 @@ test_that("C3: position-coded data produces NON-ZERO count scores", {
                              make_reshape_config("ITEM_POSITION"), verbose = FALSE)
   counts <- compute_maxdiff_counts(long, fx$items, weighted = FALSE, verbose = FALSE)
 
-  expect_true(sum(abs(counts$Best_Count)) > 0)
+  expect_true(sum(abs(counts$Times_Best)) > 0)
   # APPLE was picked best in T1 by both, and best again (position 3 = APPLE)
   # in T2 by both: 4 best picks.
-  expect_equal(counts$Best_Count[counts$Item_ID == "APPLE"], 4)
-  expect_equal(counts$Worst_Count[counts$Item_ID == "CHERRY"], 2)
+  expect_equal(counts$Times_Best[counts$Item_ID == "APPLE"], 4)
+  expect_equal(counts$Times_Worst[counts$Item_ID == "CHERRY"], 2)
 })
 
 test_that("C3: an out-of-range position refuses with context, not zeros", {

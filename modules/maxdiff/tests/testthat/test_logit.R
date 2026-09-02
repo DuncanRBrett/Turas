@@ -237,7 +237,8 @@ test_that("fit_aggregate_logit uses last item as anchor when none specified", {
     items_shown <- as.character(unlist(row[shown_cols]))
 
     for (pos in seq_along(items_shown)) {
-      item_id <- items_shown[pos]
+      # generate_test_data stores item NUMBERS in Shown_*; the ids are I{n}.
+      item_id <- paste0("I", items_shown[pos])
       long_rows[[length(long_rows) + 1]] <- data.frame(
         resp_id = row$Respondent_ID,
         version = row$Version,
@@ -281,7 +282,8 @@ test_that("fit_aggregate_logit uses designated anchor item", {
     items_shown <- as.character(unlist(row[shown_cols]))
 
     for (pos in seq_along(items_shown)) {
-      item_id <- items_shown[pos]
+      # generate_test_data stores item NUMBERS in Shown_*; the ids are I{n}.
+      item_id <- paste0("I", items_shown[pos])
       long_rows[[length(long_rows) + 1]] <- data.frame(
         resp_id = row$Respondent_ID,
         version = row$Version,

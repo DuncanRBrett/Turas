@@ -11,11 +11,12 @@ test_that("generate_random_design creates correct structure", {
   # No skip-on-failure: a design generator that errors is a failing test,
   # not an environmental skip (review S5).
   result <- generate_random_design(item_ids, items_per_task = 4,
-                                   tasks_per_respondent = 6, num_versions = 2)
+                                   tasks_per_respondent = 6, n_versions = 2)
 
   expect_true(is.data.frame(result))
   expect_true("Version" %in% names(result) || "version" %in% tolower(names(result)))
-  expect_true("Task" %in% names(result) || "task" %in% tolower(names(result)))
+  # The generators write Task_Number (04_design.R); "Task" never existed (M6).
+  expect_true("Task_Number" %in% names(result))
 })
 
 test_that("compute_pair_frequencies returns named pair counts", {
