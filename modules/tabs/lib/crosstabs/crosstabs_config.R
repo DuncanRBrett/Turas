@@ -368,12 +368,18 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     show_differences = safe_logical(get_config_value(config, "show_differences", TRUE), default = TRUE),
     show_tracking = safe_logical(get_config_value(config, "show_tracking", TRUE), default = TRUE),
     show_qualitative = safe_logical(get_config_value(config, "show_qualitative", TRUE), default = TRUE),
+    # Save copy (V15). ON by default, which is every report built before this
+    # setting existed. FALSE removes the header button, for a copy that is
+    # published rather than worked in: a public demo, or a client copy that
+    # must stay the one version of record. Nothing else about the report moves,
+    # and the story, insight and note editors are untouched.
+    show_save_copy = safe_logical(get_config_value(config, "show_save_copy", TRUE), default = TRUE),
 
     # Patterns-tab levers (optional). patterns_headline pins the apex KPI tiles
-    # to these question codes, in order (e.g. "Q78, Q79") — otherwise the tab
+    # to these question codes, in order (e.g. "Q78, Q79"): otherwise the tab
     # auto-detects satisfaction/overall-titled questions, which on a study with
     # many section ratings picks the wrong ones. patterns_exclude_banners keeps
-    # operational cuts (e.g. "Interviewer") out of the Patterns scan entirely —
+    # operational cuts (e.g. "Interviewer") out of the Patterns scan entirely,
     # a fieldwork-QC banner must never become the client-facing lead portrait.
     # Comma/semicolon-separated; parsed in the data layer.
     patterns_headline = get_config_value(config, "patterns_headline", NULL),
@@ -384,7 +390,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     patterns_banner = get_config_value(config, "patterns_banner", NULL),
     # Category names (beyond the built-in demographics/corpographics detection)
     # whose questions the Differences tab and the Patterns KeyShare scan treat
-    # as cuts, not outcomes — e.g. imputed spend families a study does not want
+    # as cuts, not outcomes, e.g. imputed spend families a study does not want
     # leading its findings. Comma/semicolon-separated; parsed in the data layer.
     # The JS consumer and its test predate this line; the setting was consumed
     # but never written until 2026-08 (DIFFERENCES_TAB_SCOPE.md, item 0).
@@ -819,6 +825,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "html_report_v2_cover",
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
   "show_qualitative",
+  "show_save_copy",
   "enable_ai_insights", "generate_reader_report", "reader_ai_prose",
   "index_summary_show_sections", "index_summary_show_base_sizes",
   "index_summary_show_composites"
@@ -1704,7 +1711,7 @@ TABS_KNOWN_SETTINGS <- c(
   # warned at for settings that work, and the merged-row/case diagnostics were
   # blind to them)
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
-  "show_qualitative", "patterns_headline", "patterns_exclude_banners",
+  "show_qualitative", "show_save_copy", "patterns_headline", "patterns_exclude_banners",
   "patterns_banner", "sampling_note", "insight_exclude_categories",
   # Checkpointing
   "enable_checkpointing",

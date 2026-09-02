@@ -80,6 +80,21 @@ test_that("the 8 settings the whitelist commits missed are now recognised", {
   }
 })
 
+test_that("show_save_copy is whitelisted, defaults on, and rides the data layer", {
+  expect_true("show_save_copy" %in% TABS_KNOWN_SETTINGS)
+
+  # Absent -> TRUE, so a config that never mentions it keeps the button.
+  expect_true(build_config_object(list(structure_file = "x.xlsx"))$show_save_copy)
+
+  # Only a readable FALSE switches it off; junk keeps the default, like its
+  # siblings, so a typo cannot silently strip a control from a client's report.
+  expect_false(build_config_object(list(show_save_copy = "FALSE"))$show_save_copy)
+  expect_false(build_config_object(list(show_save_copy = "N"))$show_save_copy)
+  expect_true(build_config_object(list(show_save_copy = "TRUE"))$show_save_copy)
+  expect_true(suppressWarnings(
+    build_config_object(list(show_save_copy = "garbage"))$show_save_copy))
+})
+
 test_that("dead settings are no longer blessed by the whitelist (I9)", {
   for (k in c("significance_level", "weight_na_threshold",
               "weight_zero_threshold", "weight_deff_warning",

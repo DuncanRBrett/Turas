@@ -254,22 +254,26 @@
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + subBits.join(" &middot; ") + "</div></div></div>" +
       '<div class="hdr-meta">' + clientLogo +
-      // D1: the cover is the saved-copy landing page, not a READ tab — this
+      // D1: the cover is the saved-copy landing page, not a READ tab. This
       // small header link is the only way back to it, and only exists when a
       // cover exists (saved copy + story content)
       (TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable()
         ? '<button class="hdr-legend hdr-cover" data-cover-open ' +
-          'title="Back to the report cover — executive summary and leading findings">' +
+          'title="Back to the report cover. Executive summary and leading findings">' +
           "Cover</button>" : "") +
       '<button class="hdr-legend" data-legend-open aria-haspopup="dialog" ' +
-      'title="How to read this report — significance letters, arrows, bands, precision">' +
+      'title="How to read this report. Significance letters, arrows, bands, precision">' +
       "ⓘ How to read</button>" +
-      '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
-      'insights, story and report sections embedded — ready to send">💾 Save copy</button>' +
+      // A study can switch Save copy off (show_save_copy = FALSE) for a report
+      // that is published rather than worked in. Default on, so a report built
+      // before the setting existed keeps the button.
+      (((TR.AGG.project && TR.AGG.project.tabs) || {}).save_copy === false ? "" :
+        '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
+        'insights, story and report sections embedded. Ready to send">💾 Save copy</button>') +
       "</div></div>" +
       tabsNavHtml() + "</header>" +
       '<div id="filterbar" class="filterbar"></div>' +
-      // A3: who the numbers describe — persistent on EVERY tab; polite so a
+      // A3: who the numbers describe. Persistent on EVERY tab; polite so a
       // cut change is announced without stealing focus
       '<div id="audstrip" class="audstrip" aria-live="polite"></div>' +
       '<div id="tabhost" class="tabhost"></div>' +

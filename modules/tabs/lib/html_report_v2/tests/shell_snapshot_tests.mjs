@@ -218,11 +218,26 @@ run("a note in a hidden tab measures 0 and is left alone, never collapsed", () =
   assert(note.style.height === "auto", "left at auto, not 0px: " + note.style.height);
 });
 
-run("typing keeps the box in step — one delegated input listener", () => {
+run("typing keeps the box in step. One delegated input listener", () => {
   assert(SHELL_SRC.indexOf('document.addEventListener("input"') !== -1,
     "delegated input listener wired in the shell");
   assert(SHELL_SRC.indexOf("e.target.matches(NOTE_SEL)") !== -1,
     "it grows exactly the note boxes");
+});
+
+run("show_save_copy: the header carries the button unless the study says otherwise", () => {
+  const SRC = readFileSync(path.join(JS_DIR, "24_shell.js"), "utf8");
+  assert(SRC.indexOf("save_copy === false") !== -1,
+    "the header gates the button on project.tabs.save_copy");
+  assert(SRC.indexOf('data-savecopy title=') !== -1, "the button itself is still built");
+  // Only an explicit false hides it: absent, null and true all keep the button,
+  // so every report built before the setting existed is unchanged.
+  const gate = (flags) => (flags || {}).save_copy === false;
+  assert(gate(undefined) === false, "no tabs block keeps the button");
+  assert(gate({}) === false, "no flag keeps the button");
+  assert(gate({ save_copy: true }) === false, "true keeps the button");
+  assert(gate({ save_copy: null }) === false, "null keeps the button");
+  assert(gate({ save_copy: false }) === true, "only an explicit false hides it");
 });
 
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");

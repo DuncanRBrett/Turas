@@ -250,28 +250,32 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     patterns    = isTRUE(config_obj$show_patterns %||% TRUE),
     differences = isTRUE(config_obj$show_differences %||% TRUE),
     tracking    = isTRUE(config_obj$show_tracking %||% TRUE),
-    qualitative = isTRUE(config_obj$show_qualitative %||% TRUE)
+    qualitative = isTRUE(config_obj$show_qualitative %||% TRUE),
+    # Not a tab: the header's Save copy button. It rides here because the
+    # renderer already reads this block, and because switching it off is the
+    # same kind of decision as hiding a tab.
+    save_copy   = isTRUE(config_obj$show_save_copy %||% TRUE)
   )
   # Patterns-tab levers (optional; omitted -> engine defaults, byte-identical).
   # patterns_headline -> island field takeout_headline (the JS contract predates
   # the tab's rename): the apex KPI question codes, in the order given.
-  # patterns_exclude_banners: banner labels/ids the Patterns scan must skip —
+  # patterns_exclude_banners: banner labels/ids the Patterns scan must skip,
   # operational cuts like Interviewer. I() keeps one-element lists as JSON
   # arrays under auto_unbox (the JS expects arrays).
   ph <- .dl_split_csv(config_obj$patterns_headline)
   if (length(ph) > 0) proj$takeout_headline <- I(ph)
   pxb <- .dl_split_csv(config_obj$patterns_exclude_banners)
   if (length(pxb) > 0) proj$patterns_exclude_banners <- I(pxb)
-  # patterns_banner: the POSITIVE selection — the Group overview portrays only
+  # patterns_banner: the POSITIVE selection. The Group overview portrays only
   # the named banner group(s) (label or id; comma-separated for more than one).
   pb <- .dl_split_csv(config_obj$patterns_banner)
   if (length(pb) > 0) proj$patterns_banner <- I(pb)
   # insight_exclude_categories: category names (matched case-insensitively in
   # JS) the Differences tab and the Patterns KeyShare scan treat as cuts, not
-  # outcomes — beyond the built-in demographics/corpographics detection.
+  # outcomes. Beyond the built-in demographics/corpographics detection.
   iec <- .dl_split_csv(config_obj$insight_exclude_categories)
   if (length(iec) > 0) proj$insight_exclude_categories <- I(iec)
-  # Fieldwork caveat for the "how sure" panel (substitution etc.) — plain text,
+  # Fieldwork caveat for the "how sure" panel (substitution etc.): plain text,
   # escaped at render; carried only when non-empty so old islands are unchanged.
   sn <- config_obj$sampling_note
   if (!is.null(sn) && length(sn) >= 1 && !is.na(sn[1]) && nzchar(trimws(sn[1]))) {
