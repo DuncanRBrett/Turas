@@ -129,7 +129,7 @@ build_report_v2_html <- function(data_json, config_obj,
                                   assets_dir = report_v2_assets_dir(),
                                   generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z"),
                                   prev_json = NULL, micro_json = NULL, qual_json = NULL,
-                                  cj_json = NULL) {
+                                  cj_json = NULL, md_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
   template_path <- file.path(assets_dir, "template.html")
@@ -200,6 +200,11 @@ build_report_v2_html <- function(data_json, config_obj,
   cj_inlined <- if (!is.null(cj_json) && nzchar(cj_json) && cj_json != "null") {
     escape_island(cj_json)
   } else "null"
+  # A MaxDiff contribution, the same way. The MaxDiff tab only appears when
+  # TR.MD has content.
+  md_inlined <- if (!is.null(md_json) && nzchar(md_json) && md_json != "null") {
+    escape_island(md_json)
+  } else "null"
 
   .report_v2_load_text_layer(assets_dir)
   js_bundle <- bundle_report_v2_js(assets_dir)
@@ -224,6 +229,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "{{DATA_QUAL}}"   = qual_inlined,
     "{{DATA_TEXT}}"   = escape_island(as.character(text_result$json)),
     "{{DATA_CJ}}"     = cj_inlined,
+    "{{DATA_MD}}"     = md_inlined,
     "{{JS}}"          = js_bundle
   ))
 
@@ -255,7 +261,7 @@ build_report_v2_html <- function(data_json, config_obj,
 write_html_report_v2 <- function(data_json, config_obj, output_path,
                                  assets_dir = report_v2_assets_dir(),
                                  prev_json = NULL, micro_json = NULL, qual_json = NULL,
-                                 cj_json = NULL) {
+                                 cj_json = NULL, md_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code:", code, "\n")
@@ -274,7 +280,8 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
   html <- tryCatch(
     build_report_v2_html(data_json, config_obj, assets_dir,
                          prev_json = prev_json, micro_json = micro_json,
-                         qual_json = qual_json, cj_json = cj_json),
+                         qual_json = qual_json, cj_json = cj_json,
+                         md_json = md_json),
     error = function(e) e)
   if (inherits(html, "error")) {
     return(refuse("REPORT_V2_BUILD_FAILED", conditionMessage(html),

@@ -340,6 +340,9 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # leave it blank and nothing about the report changes. The two modules meet
     # through this one file, the way the tracker meets its prior waves.
     conjoint_island = get_config_value(config, "conjoint_island", ""),
+    # Same arrangement for a MaxDiff study ({output}_md_island.json, written by
+    # the maxdiff module): named, the report gains a MaxDiff tab.
+    maxdiff_island = get_config_value(config, "maxdiff_island", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
     # Must be populated here — config_obj is an explicit whitelist, not the raw settings.
     qual_tag_dimensions = get_config_value(config, "qual_tag_dimensions", ""),
@@ -1681,7 +1684,7 @@ announce_retired_settings <- function(config, retired = TABS_RETIRED_SETTINGS) {
 TABS_KNOWN_SETTINGS <- c(
   # Weighting
   # Module contributions
-  "conjoint_island",
+  "conjoint_island", "maxdiff_island",
   # Weighting
   "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
   "show_weighted_base", "weight_label",

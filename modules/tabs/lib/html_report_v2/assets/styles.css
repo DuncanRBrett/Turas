@@ -1374,3 +1374,46 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
 @media (min-width: 900px) {
   .cj-attrs { grid-template-columns: 1fr 1fr; gap: 8px 26px; }
 }
+
+/* ---------------------------------------------------------------------------
+   MaxDiff tab (27y_maxdiff.js). The same shape as the conjoint tab: frozen
+   panels fed by the maxdiff module's island (13_v2_island.R). Kept as its own
+   block so the two views can drift apart without a shared selector snapping.
+   --------------------------------------------------------------------------- */
+.md-view { max-width: 1100px; }
+.md-view h2 { margin: 0 0 4px; }
+.md-panel { margin: 22px 0; }
+.md-panel h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.md-note { margin: 0 0 10px; font-size: .85rem; color: #555; line-height: 1.45; }
+.md-provenance p { margin: 2px 0; font-size: .9rem; }
+.md-stamp {
+  display: inline-block; margin: 6px 0 0; padding: 4px 8px; border-radius: 3px;
+  background: #fff4e0; color: #7a4b00; font-size: .82rem; line-height: 1.4;
+}
+.md-table { border-collapse: collapse; width: 100%; margin-bottom: 6px; }
+.md-table th, .md-table td {
+  padding: 5px 9px; border-bottom: 1px solid #e6e6e6; text-align: left;
+  font-size: .88rem;
+}
+.md-table th { font-weight: 600; border-bottom: 2px solid #ccc; }
+.md-table .md-num { text-align: right; font-variant-numeric: tabular-nums; }
+.md-barcell { width: 30%; padding-right: 0; }
+.md-bar {
+  display: inline-block; height: 11px; border-radius: 2px;
+  background: var(--brand, #323367); min-width: 1px;
+}
+/* Best on the right of a centre line, worst on the left, both from 0. */
+.md-bwcell { width: 26%; }
+.md-bw { position: relative; height: 12px; width: 100%; }
+.md-bw::before {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+  background: #bbb;
+}
+.md-bw-best, .md-bw-worst { position: absolute; top: 1px; height: 10px; border-radius: 2px; }
+.md-bw-best { left: 50%; background: var(--brand, #323367); }
+.md-bw-worst { right: 50%; background: #c9847a; }
+.md-tag {
+  display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: .78rem;
+  background: #eef0f6; color: #333;
+}
+.md-tag-must { background: #e2f3e6; color: #1f5b2d; }

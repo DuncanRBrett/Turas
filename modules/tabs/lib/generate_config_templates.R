@@ -574,6 +574,12 @@ generate_crosstab_config_template <- function(output_path,
                "({output}_cj_island.json, written by the conjoint module). Names it and the report ",
                "gains a Conjoint tab showing attribute importance, part-worth utilities, model fit ",
                "and WTP. Blank -> no Conjoint tab, and nothing else about the report changes."),
+             valid_values_text = "File path, or leave blank"),
+        list(name = "maxdiff_island", default = "", required = FALSE,
+             description = paste0("Path to a MaxDiff study's contribution file for this project ",
+               "({output}_md_island.json, written by the maxdiff module). Names it and the report ",
+               "gains a MaxDiff tab showing item scores, preference shares, TURF and must-haves, ",
+               "with the estimator named. Blank -> no MaxDiff tab, and nothing else changes."),
              valid_values_text = "File path, or leave blank")
       )
     ),
