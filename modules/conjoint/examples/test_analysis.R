@@ -1,159 +1,76 @@
 # ==============================================================================
-# TEST CONJOINT ANALYSIS WITH EXAMPLE DATA
+# RUN THE CONJOINT EXAMPLE END TO END
 # ==============================================================================
 #
-# This script tests the enhanced Turas conjoint module with example data
+# Runs the smartphone example (example_config.xlsx over sample_cbc_data.csv)
+# and prints what came out. Works from any working directory: it finds the
+# Turas root by walking up from this file, then sources the module's entry
+# point, which loads the rest of the module itself.
 #
-
-# Clear environment
-rm(list = ls())
-
-# Set working directory to Turas root
-setwd("/home/user/Turas")
-
-cat("\n")
-cat(rep("=", 80), "\n", sep = "")
-cat("TESTING ENHANCED TURAS CONJOINT MODULE\n")
-cat(rep("=", 80), "\n", sep = "")
-cat("\n")
-
-# ==============================================================================
-# STEP 1: Load required packages
+# Usage:
+#   Rscript modules/conjoint/examples/test_analysis.R
+# or, from R:
+#   source("modules/conjoint/examples/test_analysis.R")
 # ==============================================================================
 
-cat("1. Checking required packages...\n")
-
-required_packages <- c("mlogit", "survival", "openxlsx", "dplyr", "tidyr")
-
-for (pkg in required_packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    cat(sprintf("  ✗ Package '%s' not installed. Installing...\n", pkg))
-    install.packages(pkg, repos = "https://cloud.r-project.org/", quiet = TRUE)
+.find_turas_root <- function() {
+  home <- Sys.getenv("TURAS_HOME", "")
+  if (nzchar(home) && dir.exists(file.path(home, "modules", "conjoint"))) return(normalizePath(home))
+  start <- local({
+    args <- commandArgs(trailingOnly = FALSE)
+    file_arg <- grep("^--file=", args, value = TRUE)
+    if (length(file_arg) > 0) return(dirname(normalizePath(sub("^--file=", "", file_arg))))
+    getwd()
+  })
+  d <- start
+  for (i in 1:8) {
+    if (dir.exists(file.path(d, "modules", "conjoint", "R"))) return(d)
+    parent <- dirname(d)
+    if (identical(parent, d)) break
+    d <- parent
   }
-  suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+  stop("Cannot find the Turas root above ", start, ". Run from inside the Turas folder.")
 }
 
-cat("  ✓ All required packages loaded\n")
+turas_root <- .find_turas_root()
+setwd(turas_root)
 
-# ==============================================================================
-# STEP 2: Source module files
-# ==============================================================================
+cat("\n", strrep("=", 78), "\n", sep = "")
+cat("TURAS CONJOINT: EXAMPLE RUN\n")
+cat(strrep("=", 78), "\n\n", sep = "")
 
-cat("\n2. Sourcing module files...\n")
+cat("1. Loading the module from", file.path(turas_root, "modules", "conjoint"), "\n")
+source(file.path(turas_root, "modules", "conjoint", "R", "00_main.R"))
 
-module_files <- c(
-  "modules/conjoint/R/99_helpers.R",
-  "modules/conjoint/R/01_config.R",
-  "modules/conjoint/R/09_none_handling.R",
-  "modules/conjoint/R/02_data.R",
-  "modules/conjoint/R/03_estimation.R",
-  "modules/conjoint/R/04_utilities.R",
-  "modules/conjoint/R/05_simulator.R",         # Market simulator functions
-  "modules/conjoint/R/08_market_simulator.R",  # Excel simulator sheet
-  "modules/conjoint/R/07_output.R",
-  "modules/conjoint/R/00_main.R"
-)
+cat("\n2. Running the smartphone example (hierarchical Bayes)...\n\n")
+config_file <- file.path(turas_root, "modules", "conjoint", "examples", "example_config.xlsx")
+results <- run_conjoint_analysis(config_file = config_file, verbose = TRUE)
 
-for (file in module_files) {
-  file_path <- file.path(getwd(), file)
-  if (!file.exists(file_path)) {
-    stop(sprintf("ERROR: Module file not found: %s", file_path))
-  }
-  source(file_path)
-  cat(sprintf("  ✓ %s\n", basename(file)))
-}
+cat("\n", strrep("=", 78), "\n", sep = "")
+cat("RESULT\n")
+cat(strrep("=", 78), "\n\n", sep = "")
 
-cat("  ✓ All module files loaded successfully\n")
-
-# ==============================================================================
-# STEP 3: Run analysis
-# ==============================================================================
-
-cat("\n3. Running conjoint analysis with example data...\n\n")
-
-# Run analysis
-results <- tryCatch({
-  run_conjoint_analysis(
-    config_file = "modules/conjoint/examples/example_config.xlsx",
-    verbose = TRUE
-  )
-}, error = function(e) {
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("TEST FAILED\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\nError:\n")
-  cat(conditionMessage(e), "\n\n")
-  stop(e)
-})
-
-# ==============================================================================
-# STEP 4: Verify results
-# ==============================================================================
-
-cat("\n")
-cat(rep("=", 80), "\n", sep = "")
-cat("RESULTS SUMMARY\n")
-cat(rep("=", 80), "\n", sep = "")
-cat("\n")
-
-# Check results structure
-cat("Result structure:\n")
-cat(sprintf("  - Version: %s\n", results$version))
-cat(sprintf("  - Method: %s\n", results$model_result$method))
-cat(sprintf("  - Convergence: %s\n",
-            if(results$model_result$convergence$converged) "✓ Success" else "✗ Failed"))
-cat(sprintf("  - Elapsed time: %.2f seconds\n", results$elapsed_time))
-cat("\n")
-
-# Attribute importance
-cat("Attribute Importance (Top 3):\n")
-for (i in 1:min(3, nrow(results$importance))) {
-  cat(sprintf("  %d. %-20s: %5.1f%%\n",
-              i,
-              results$importance$Attribute[i],
-              results$importance$Importance[i]))
-}
-cat("\n")
-
-# Model fit
-if (results$model_result$method %in% c("mlogit", "clogit")) {
-  cat("Model Fit:\n")
-  cat(sprintf("  - McFadden R²: %.3f\n",
-              results$diagnostics$fit_statistics$mcfadden_r2))
-  cat(sprintf("  - Hit Rate: %.1f%%\n",
-              results$diagnostics$fit_statistics$hit_rate * 100))
-  cat(sprintf("  - AIC: %.1f\n", results$diagnostics$fit_statistics$aic))
-  cat("\n")
-}
-
-# Utilities sample
-cat("Sample Utilities (first attribute):\n")
-first_attr <- results$utilities$Attribute[1]
-first_attr_utils <- results$utilities[results$utilities$Attribute == first_attr, ]
-for (i in 1:nrow(first_attr_utils)) {
-  cat(sprintf("  %-20s: %7.3f %s (p=%0.3f)\n",
-              first_attr_utils$Level[i],
-              first_attr_utils$Utility[i],
-              first_attr_utils$Significance[i],
-              first_attr_utils$p_value[i]))
-}
-cat("\n")
-
-# Check output file
-output_file <- results$config$output_file
-if (file.exists(output_file)) {
-  cat(sprintf("✓ Output file created: %s\n", output_file))
-  cat(sprintf("  File size: %.1f KB\n", file.size(output_file) / 1024))
+if (!is.list(results) || is.null(results$importance)) {
+  cat("The run did not produce results. Status:",
+      if (is.list(results)) results$status else "unknown", "\n")
+  cat("Read the messages above; a refusal names the setting or file at fault.\n")
 } else {
-  cat(sprintf("✗ Output file NOT found: %s\n", output_file))
+  cat(sprintf("Status: %s (PARTIAL means the run finished with warnings; 50 respondents is small for HB)\n",
+              results$status))
+  cat(sprintf("Method: %s\n", results$model_result$method))
+  cat("\nAttribute importance:\n")
+  imp <- results$importance[order(-results$importance$Importance), ]
+  for (i in seq_len(nrow(imp))) {
+    cat(sprintf("  %d. %-16s %5.1f%%\n", i, imp$Attribute[i], imp$Importance[i]))
+  }
+  cat("\nFrom the simulated utilities, Price and Brand should lead and Screen Size should trail; the middle three are close.\n")
+
+  out_dir <- dirname(results$config$output_file)
+  cat("\nFiles in", out_dir, ":\n")
+  for (f in sort(list.files(out_dir))) cat("  ", f, "\n")
+  cat("\nThe *_cj_island.json is the Conjoint tab for a tabs v2 report (conjoint_island setting).\n")
+  cat("The *_tabs_importance.xlsx is a tabs Allocation question: paste its QUESTIONMAP_SNIPPET rows into a tabs config.\n")
+  cat("The *_simulator.html is the standalone market simulator; open it in a browser.\n")
 }
 
-cat("\n")
-cat(rep("=", 80), "\n", sep = "")
-cat("TEST COMPLETED SUCCESSFULLY!\n")
-cat(rep("=", 80), "\n", sep = "")
-cat("\n")
-
-# Return results invisibly
 invisible(results)

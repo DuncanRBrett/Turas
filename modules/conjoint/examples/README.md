@@ -1,222 +1,82 @@
-# Enhanced Conjoint Module - Examples
+# Conjoint example: a smartphone choice-based conjoint
 
-This directory contains complete working examples for the Enhanced Turas Conjoint Analysis module.
+A complete, runnable example for the Turas conjoint module. Fifty synthetic
+respondents each answered eight choice sets of three smartphones, described
+on five attributes. Everything here is synthetic.
 
-## Quick Start
+## Files
 
-**New to the module?** Start here:
+| File | What it is |
+|---|---|
+| `example_config.xlsx` | The config. Run this. Settings, Attributes and Instructions sheets. |
+| `sample_cbc_data.csv` | The choice data: one row per alternative shown (1,200 rows), `chosen` = 1 on the picked one. |
+| `create_example_config.R` | Rebuilds `example_config.xlsx` from scratch. |
+| `test_analysis.R` | Runs the example end to end and prints the result. |
+| `test_market_simulator.R` | Exercises the share-prediction and sensitivity functions on the example's utilities. |
+| `output/` | Where a run writes. |
 
-1. Read [`QUICK_START_GUIDE.md`](QUICK_START_GUIDE.md) - Comprehensive usage guide
-2. Examine `example_config.xlsx` - See how to structure your configuration
-3. Look at `sample_cbc_data.csv` - See the expected data format
-4. Run `test_analysis.R` - Test the module with example data
+## Run it
 
-## Files in This Directory
+From the Turas root, either through the GUI (`launch_turas()`, Conjoint,
+pick `example_config.xlsx`) or headless:
 
-### Configuration Files
-
-- **`example_config.xlsx`** - Complete example configuration file
-  - Demonstrates a smartphone choice-based conjoint study
-  - 5 attributes: Brand, Price, Screen Size, Battery Life, Camera Quality
-  - Includes Settings, Attributes, and Instructions sheets
-  - Ready to use with the sample data
-
-### Data Files
-
-- **`sample_cbc_data.csv`** - Realistic choice-based conjoint data
-  - 50 respondents
-  - 8 choice sets per respondent (400 total)
-  - 3 alternatives per choice set
-  - 1,200 total rows
-  - Generated with realistic preference patterns
-
-### Test Scripts
-
-- **`test_analysis.R`** - Complete end-to-end test script
-  - Loads all module files
-  - Runs analysis with example data
-  - Displays results summary
-  - Verifies output file creation
-  - Use this to test your R environment setup
-
-### Documentation
-
-- **`QUICK_START_GUIDE.md`** - Complete usage documentation
-  - Installation instructions
-  - Configuration file format
-  - Data file format
-  - Step-by-step examples
-  - Troubleshooting guide
-  - Best practices
-
-- **`README.md`** (this file) - Overview of examples directory
-
-### Generation Scripts
-
-- **`create_example_config.py`** - Script to regenerate the example config file
-- **`create_sample_data.py`** - Script to regenerate the sample data
-  - These are provided for reference and reproducibility
-  - You don't need to run these unless you want to modify the examples
-
-### Output Directory
-
-- **`output/`** - Directory where example results are saved
-  - `example_results.xlsx` will be created here when you run the analysis
-
-## How to Use These Examples
-
-### Option 1: Run the Example Analysis (Recommended for First-Time Users)
-
-```r
-# 1. Set working directory to Turas root
-setwd("/path/to/Turas")
-
-# 2. Load required packages
-library(mlogit)
-library(survival)
-library(openxlsx)
-library(dplyr)
-library(tidyr)
-
-# 3. Source all module files
-source("modules/conjoint/R/99_helpers.R")
-source("modules/conjoint/R/01_config.R")
-source("modules/conjoint/R/09_none_handling.R")
-source("modules/conjoint/R/02_data.R")
-source("modules/conjoint/R/03_estimation.R")
-source("modules/conjoint/R/04_utilities.R")
-source("modules/conjoint/R/07_output.R")
-source("modules/conjoint/R/00_main.R")
-
-# 4. Run the example
-results <- run_conjoint_analysis(
-  config_file = "modules/conjoint/examples/example_config.xlsx"
-)
-
-# 5. View results
-print(results$importance)
-print(results$utilities)
-
-# 6. Check the Excel output
-# Located at: modules/conjoint/examples/output/example_results.xlsx
+```bash
+Rscript -e 'source("modules/conjoint/R/00_main.R"); run_conjoint_analysis("modules/conjoint/examples/example_config.xlsx")'
 ```
 
-### Option 2: Use the Test Script
+or
 
-```r
-# Set working directory to Turas root
-setwd("/path/to/Turas")
-
-# Run the complete test script
-source("modules/conjoint/examples/test_analysis.R")
+```bash
+Rscript modules/conjoint/examples/test_analysis.R
 ```
 
-This will:
-- Check and install required packages
-- Load all module files
-- Run the analysis
-- Display a comprehensive results summary
-- Verify the output file was created
+The config asks for hierarchical Bayes (bayesm, in renv). A run takes a few
+seconds and writes into `output/`:
 
-### Option 3: Adapt for Your Own Data
+| Output | Setting |
+|---|---|
+| `example_results.xlsx` | always |
+| `example_results_stats_pack.xlsx` | `generate_stats_pack` |
+| `example_results_cj_island.json` | always. Point a tabs config's `conjoint_island` at it and the interactive report gains a Conjoint tab. |
+| `example_results_tabs_importance.xlsx` | `generate_tabs_export`. Each respondent's attribute importance as a tabs Allocation question (`CJIMP_1` .. `CJIMP_5`), with the QuestionMap and Options rows to paste. Needs `hb` or `latent_class`. |
+| `example_results_simulator.html` | `generate_html_simulator`. The standalone market simulator. |
 
-1. **Copy the example config**: `example_config.xlsx` → `my_study_config.xlsx`
-2. **Edit the Attributes sheet**:
-   - Change attribute names to match your study
-   - Update levels for each attribute
-   - Adjust NumLevels accordingly
-3. **Edit the Settings sheet**:
-   - Update `data_file` to point to your data
-   - Update `output_file` to your desired output location
-   - Adjust other settings as needed
-4. **Prepare your data file** in the same format as `sample_cbc_data.csv`
-5. **Run your analysis**:
-   ```r
-   results <- run_conjoint_analysis(
-     config_file = "path/to/my_study_config.xlsx"
-   )
-   ```
+Fifty respondents is small for HB. Expect a convergence warning and a
+PARTIAL status; that is the module being honest about the sample, not a
+fault in the example.
 
-## Expected Results from Example
+## What to expect
 
-When you run the example analysis, you should see:
+The data was simulated from known utilities:
 
-**Attribute Importance (approximate):**
-1. Price: ~35%
-2. Brand: ~29%
-3. Camera Quality: ~17%
-4. Battery Life: ~12%
-5. Screen Size: ~7%
+| Attribute | Levels, best to worst |
+|---|---|
+| Brand | Apple (+0.8), Samsung (+0.4), Google (+0.2), OnePlus (-1.4) |
+| Price | $299 (+1.2), $399 (+0.4), $499 (-0.3), $599 (-1.3) |
+| Screen Size | 6.7 inches (+0.6), 6.1 inches (0.0), 5.5 inches (-0.6) |
+| Battery Life | 24 hours (+0.8), 18 hours (0.0), 12 hours (-0.8) |
+| Camera Quality | Excellent (+0.7), Good (0.0), Basic (-0.7) |
 
-**Model Fit:**
-- McFadden R²: ~0.31 (Good)
-- Hit Rate: ~54% (vs. 33% chance rate)
+So Price and Brand should carry the most importance and Screen Size the
+least, with Battery Life and Camera Quality close together in the middle.
+The part-worth order within each attribute should match the table.
 
-**Excel Output:**
-- 6 sheets with professional formatting
-- Conditional formatting on utilities (green/red)
-- Comprehensive diagnostics and summaries
+## Adapt it for your own study
 
-## Understanding the Example Study
-
-The example simulates a smartphone conjoint study where:
-
-- **Respondents** evaluate different smartphone configurations
-- **Each choice set** presents 3 smartphone options
-- **Choices** are driven by realistic preference patterns:
-  - Strong preference for Apple and lower prices
-  - Moderate preference for larger screens and better batteries
-  - Moderate preference for better camera quality
-
-The data was generated with known "true" utilities:
-- **Brand**: Apple (+0.8) > Samsung (+0.4) > Google (+0.2) > OnePlus (-1.4)
-- **Price**: $299 (+1.2) > $399 (+0.4) > $499 (-0.3) > $599 (-1.3)
-- **Screen**: 6.7" (+0.6) > 6.1" (0.0) > 5.5" (-0.6)
-- **Battery**: 24h (+0.8) > 18h (0.0) > 12h (-0.8)
-- **Camera**: Excellent (+0.7) > Good (0.0) > Basic (-0.7)
-
-Your analysis should recover utilities close to these values!
+1. Copy `example_config.xlsx`.
+2. On the Attributes sheet, list your attributes and their levels
+   (`LevelNames`, comma-separated, in the order you want them reported).
+3. On the Settings sheet, point `data_file` at your data and `output_file` at
+   where the results should go. The data needs one row per alternative shown,
+   with respondent, choice-set and chosen columns named as in the settings.
+4. Run it as above.
 
 ## Troubleshooting
 
-### "Package 'mlogit' not installed"
-```r
-install.packages("mlogit")
-```
+A boxed SETTING RETIRED notice means the config carries a row nothing reads
+any more (older templates had `generate_html_report`, `baseline_handling`
+and others). The run continues; delete the row.
 
-### "Cannot find file example_config.xlsx"
-- Check your working directory with `getwd()`
-- Make sure you're in the Turas root directory
-- Use full paths if needed
-
-### "mlogit estimation failed"
-- This shouldn't happen with the example data
-- If it does, the module will automatically fall back to clogit
-- Check that all packages are properly installed
-
-### Still having issues?
-- See the Troubleshooting section in [`QUICK_START_GUIDE.md`](QUICK_START_GUIDE.md)
-- Check the specification documents in `modules/conjoint/`
-- Ensure you're using R version 4.0 or higher
-
-## Additional Resources
-
-- **Full Specification**: See `modules/conjoint/Part1_Core_Technical_Specification.md` (and Parts 2-5)
-- **Implementation Status**: See `modules/conjoint/IMPLEMENTATION_STATUS.md`
-- **Module Code**: See `modules/conjoint/R/` directory
-
-## Questions?
-
-1. Read the Quick Start Guide
-2. Review the specification documents
-3. Examine the example files
-4. Check the implementation status document
-5. Contact the Turas development team
-
----
-
-**Version:** 2.0.0
-**Date:** 2025-11-27
-**Status:** Production Ready
-
-**Happy analyzing!**
+A refusal naming `PKG_BAYESM_MISSING` or `PKG_MLOGIT_MISSING` means R was
+started outside the Turas folder, so renv did not activate. Run from the
+Turas root.

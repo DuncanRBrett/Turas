@@ -72,6 +72,33 @@ if (is.null(turas_root)) {
   demo_config <- file.path(turas_root, "modules", "conjoint", "examples", "example_config.xlsx")
   demo_data   <- file.path(turas_root, "modules", "conjoint", "examples", "sample_cbc_data.csv")
 
+  # The shipped example asks for HB (so a fresh user gets every deliverable).
+  # These tests are about the MNL path, so they run an MNL copy of it: the
+  # same Attributes, estimation_method = auto, no simulator or tabs export.
+  make_mnl_config <- function(src) {
+    if (!file.exists(src)) return(src)
+    settings <- openxlsx::read.xlsx(src, sheet = "Settings", skipEmptyRows = FALSE)
+    attrs <- openxlsx::read.xlsx(src, sheet = "Attributes", skipEmptyRows = FALSE)
+    settings$Value[settings$Setting == "estimation_method"] <- "auto"
+    # The loader validates data_file from the config before any override
+    # applies, and the copy lives in a temp dir, so point it at the data.
+    settings$Value[settings$Setting == "data_file"] <- demo_data
+    settings$Value[settings$Setting == "output_file"] <- tempfile(fileext = ".xlsx")
+    drop <- settings$Setting %in% c("generate_html_simulator", "generate_tabs_export",
+                                    "tabs_question_code", "generate_stats_pack",
+                                    "generate_market_simulator")
+    settings <- settings[!drop, , drop = FALSE]
+    out <- tempfile("mnl_config_", fileext = ".xlsx")
+    wb <- openxlsx::createWorkbook()
+    openxlsx::addWorksheet(wb, "Settings")
+    openxlsx::writeData(wb, "Settings", settings)
+    openxlsx::addWorksheet(wb, "Attributes")
+    openxlsx::writeData(wb, "Attributes", attrs)
+    openxlsx::saveWorkbook(wb, out, overwrite = TRUE)
+    out
+  }
+  mnl_config <- make_mnl_config(demo_config)
+
   test_that("MNL end-to-end: the committed example fixture is present", {
     expect_true(file.exists(demo_config), info = demo_config)
     expect_true(file.exists(demo_data), info = demo_data)
@@ -87,7 +114,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -112,7 +139,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -152,7 +179,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -184,7 +211,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -223,7 +250,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -252,7 +279,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -289,7 +316,7 @@ if (is.null(turas_root)) {
     output_file <- tempfile(fileext = ".xlsx")
 
     result <- run_conjoint_analysis(
-      config_file = demo_config,
+      config_file = mnl_config,
       data_file   = demo_data,
       output_file = output_file,
       verbose     = FALSE
@@ -327,11 +354,11 @@ if (is.null(turas_root)) {
     out2 <- tempfile(fileext = ".xlsx")
 
     r1 <- run_conjoint_analysis(
-      config_file = demo_config, data_file = demo_data,
+      config_file = mnl_config, data_file = demo_data,
       output_file = out1, verbose = FALSE
     )
     r2 <- run_conjoint_analysis(
-      config_file = demo_config, data_file = demo_data,
+      config_file = mnl_config, data_file = demo_data,
       output_file = out2, verbose = FALSE
     )
 

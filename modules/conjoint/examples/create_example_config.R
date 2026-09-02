@@ -1,33 +1,55 @@
 # ==============================================================================
-# CREATE EXAMPLE CONJOINT CONFIGURATION FILE
+# CREATE THE EXAMPLE CONJOINT CONFIGURATION FILE
 # ==============================================================================
 #
-# This script creates a realistic example configuration file for the
-# enhanced Turas conjoint module
+# Writes example_config.xlsx beside this script: a smartphone choice-based
+# conjoint (5 attributes, 3 to 4 levels each) over sample_cbc_data.csv.
 #
-
-library(openxlsx)
-
-# Output path
-output_file <- "/home/user/Turas/modules/conjoint/examples/example_config.xlsx"
-
-# Create workbook
-wb <- createWorkbook()
-
+# The config asks for hierarchical Bayes (bayesm), so a run produces every
+# deliverable the module has: the Excel workbook, the stats pack, the
+# interactive-report contribution (example_results_cj_island.json), the
+# crosstabbable importance export (example_results_tabs_importance.xlsx) and
+# the standalone market simulator (example_results_simulator.html).
+#
+# Usage, from the Turas root:
+#   Rscript modules/conjoint/examples/create_example_config.R
+#
+# Built from scratch with openxlsx. Never patch the shipped workbook with
+# loadWorkbook() + save: the round trip collapses sheet dimensions.
 # ==============================================================================
-# SHEET 1: Settings
-# ==============================================================================
 
-addWorksheet(wb, "Settings")
+.example_dir <- local({
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) return(dirname(normalizePath(sub("^--file=", "", file_arg))))
+  for (i in seq_len(sys.nframe())) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (is.character(ofile) && grepl("create_example_config[.]R$", ofile)) {
+      return(dirname(normalizePath(ofile)))
+    }
+  }
+  file.path(getwd(), "modules", "conjoint", "examples")
+})
+
+output_file <- file.path(.example_dir, "example_config.xlsx")
+
+saver <- local({
+  p <- file.path(.example_dir, "..", "..", "shared", "lib", "turas_save_workbook_atomic.R")
+  if (file.exists(p) && !exists("turas_saveWorkbook", mode = "function")) source(p)
+  if (exists("turas_saveWorkbook", mode = "function")) turas_saveWorkbook
+  else function(wb, file, overwrite = TRUE) openxlsx::saveWorkbook(wb, file, overwrite = overwrite)
+})
+
+wb <- openxlsx::createWorkbook()
+
+# --- Settings ------------------------------------------------------------------
 
 settings_data <- data.frame(
   Setting = c(
+    "project_name",
     "analysis_type",
     "estimation_method",
-    "baseline_handling",
     "choice_type",
-    "none_as_baseline",
-    "none_label",
     "data_file",
     "output_file",
     "respondent_id_column",
@@ -36,141 +58,114 @@ settings_data <- data.frame(
     "chosen_column",
     "confidence_level",
     "generate_market_simulator",
-    "include_diagnostics"
+    "generate_html_simulator",
+    "generate_tabs_export",
+    "tabs_question_code",
+    "generate_stats_pack"
   ),
   Value = c(
+    "Smartphone example",
     "choice",
-    "auto",
-    "first_level_zero",
+    "hb",
     "single",
-    "FALSE",
-    "None of these",
-    "examples/sample_cbc_data.csv",
-    "examples/output/example_results.xlsx",
+    "sample_cbc_data.csv",
+    "output/example_results.xlsx",
     "resp_id",
     "choice_set_id",
     "alternative_id",
     "chosen",
     "0.95",
-    "FALSE",
-    "TRUE"
+    "TRUE",
+    "TRUE",
+    "Y",
+    "CJIMP",
+    "Y"
   ),
   Description = c(
+    "Name shown in the outputs",
     "Analysis type: 'choice' or 'rating'",
-    "Estimation method: 'auto', 'mlogit', 'clogit', or 'hb'",
-    "How to handle baseline: 'first_level_zero' or 'all_levels_explicit'",
+    "Estimation method: 'auto', 'mlogit', 'clogit', 'hb' or 'latent_class'. HB gives each respondent their own part-worths, which is what the tabs export needs.",
     "Choice type: 'single', 'single_with_none', 'best_worst', 'continuous_sum'",
-    "Treat none option as baseline level (TRUE/FALSE)",
-    "Label for none option if applicable",
-    "Path to data file (relative to config file or absolute)",
-    "Path to output Excel file",
-    "Column name for respondent ID",
-    "Column name for choice set ID",
-    "Column name for alternative ID (optional)",
-    "Column name for chosen indicator (1=chosen, 0=not chosen)",
-    "Confidence level for intervals (0-1)",
-    "Generate interactive market simulator sheet (TRUE/FALSE)",
-    "Include detailed diagnostics in output (TRUE/FALSE)"
+    "Path to the data file (relative to this config, or absolute)",
+    "Path to the output Excel file; every other output takes its name from this",
+    "Column name for the respondent id",
+    "Column name for the choice-set id",
+    "Column name for the alternative id (optional)",
+    "Column name for the chosen indicator (1 = chosen, 0 = not chosen)",
+    "Confidence level for intervals (0 to 1)",
+    "Add the interactive market simulator sheet to the Excel workbook (TRUE/FALSE)",
+    "Write the standalone HTML market simulator, {output}_simulator.html (TRUE/FALSE)",
+    "Write per-respondent attribute importance as a tabs Allocation question, {output}_tabs_importance.xlsx (Y/N). Needs hb or latent_class.",
+    "QuestionCode for that export; the columns are {code}_1 .. {code}_k",
+    "Write the stats pack workbook, {output}_stats_pack.xlsx (Y/N)"
   ),
   stringsAsFactors = FALSE
 )
 
-writeData(wb, "Settings", settings_data, startRow = 1, startCol = 1)
+openxlsx::addWorksheet(wb, "Settings")
+openxlsx::writeData(wb, "Settings", settings_data, startRow = 1, startCol = 1)
 
-# Format Settings sheet
-headerStyle <- createStyle(
-  fontColour = "#FFFFFF",
-  fgFill = "#4F81BD",
-  halign = "center",
-  valign = "center",
-  textDecoration = "bold",
-  border = "TopBottomLeftRight"
+header_style <- openxlsx::createStyle(
+  fontColour = "#FFFFFF", fgFill = "#4F81BD", halign = "center", valign = "center",
+  textDecoration = "bold", border = "TopBottomLeftRight"
 )
+openxlsx::addStyle(wb, "Settings", header_style, rows = 1, cols = 1:3, gridExpand = TRUE)
+openxlsx::setColWidths(wb, "Settings", cols = 1:3, widths = c(30, 34, 90))
+openxlsx::freezePane(wb, "Settings", firstRow = TRUE)
 
-addStyle(wb, "Settings", headerStyle, rows = 1, cols = 1:3, gridExpand = TRUE)
-setColWidths(wb, "Settings", cols = 1:3, widths = c(30, 40, 60))
-freezePane(wb, "Settings", firstRow = TRUE)
-
-# ==============================================================================
-# SHEET 2: Attributes
-# ==============================================================================
-
-addWorksheet(wb, "Attributes")
+# --- Attributes ----------------------------------------------------------------
 
 attributes_data <- data.frame(
-  AttributeName = c(
-    "Brand",
-    "Price",
-    "Screen_Size",
-    "Battery_Life",
-    "Camera_Quality"
-  ),
-  AttributeLabel = c(
-    "Brand",
-    "Price",
-    "Screen Size",
-    "Battery Life",
-    "Camera Quality"
-  ),
+  AttributeName = c("Brand", "Price", "Screen_Size", "Battery_Life", "Camera_Quality"),
+  AttributeLabel = c("Brand", "Price", "Screen Size", "Battery Life", "Camera Quality"),
   NumLevels = c(4, 4, 3, 3, 3),
-  Level1 = c("Apple", "$299", "5.5 inches", "12 hours", "Basic"),
-  Level2 = c("Samsung", "$399", "6.1 inches", "18 hours", "Good"),
-  Level3 = c("Google", "$499", "6.7 inches", "24 hours", "Excellent"),
-  Level4 = c("OnePlus", "$599", NA, NA, NA),
-  Level5 = c(NA, NA, NA, NA, NA),
-  Level6 = c(NA, NA, NA, NA, NA),
+  LevelNames = c(
+    "Apple, Samsung, Google, OnePlus",
+    "$299, $399, $499, $599",
+    "5.5 inches, 6.1 inches, 6.7 inches",
+    "12 hours, 18 hours, 24 hours",
+    "Basic, Good, Excellent"
+  ),
   stringsAsFactors = FALSE
 )
 
-writeData(wb, "Attributes", attributes_data, startRow = 1, startCol = 1)
+openxlsx::addWorksheet(wb, "Attributes")
+openxlsx::writeData(wb, "Attributes", attributes_data, startRow = 1, startCol = 1)
+openxlsx::addStyle(wb, "Attributes", header_style, rows = 1, cols = 1:4, gridExpand = TRUE)
+openxlsx::setColWidths(wb, "Attributes", cols = 1:4, widths = c(20, 20, 12, 44))
+openxlsx::freezePane(wb, "Attributes", firstRow = TRUE)
 
-# Format Attributes sheet
-addStyle(wb, "Attributes", headerStyle, rows = 1, cols = 1:9, gridExpand = TRUE)
-setColWidths(wb, "Attributes", cols = 1:2, widths = c(20, 20))
-setColWidths(wb, "Attributes", cols = 3, widths = 15)
-setColWidths(wb, "Attributes", cols = 4:9, widths = c(15, 15, 15, 15, 15, 15))
-freezePane(wb, "Attributes", firstRow = TRUE)
-
-# Add instructions worksheet
-addWorksheet(wb, "Instructions")
+# --- Instructions ----------------------------------------------------------------
 
 instructions <- c(
-  "TURAS CONJOINT ANALYSIS - EXAMPLE CONFIGURATION",
+  "TURAS CONJOINT ANALYSIS: EXAMPLE CONFIGURATION",
   "",
-  "This is an example configuration file for a smartphone choice-based conjoint study.",
+  "A smartphone choice-based conjoint over sample_cbc_data.csv (50 respondents, 8 choice sets each, 3 alternatives per set).",
   "",
-  "STUDY DESIGN:",
-  "- Choice-based conjoint (CBC)",
-  "- 5 attributes with 3-4 levels each",
-  "- Auto estimation method (tries mlogit first, falls back to clogit)",
-  "- First level of each attribute used as reference (utility = 0)",
-  "",
-  "ATTRIBUTES:",
+  "ATTRIBUTES",
   "1. Brand: Apple, Samsung, Google, OnePlus",
   "2. Price: $299, $399, $499, $599",
-  "3. Screen Size: 5.5\", 6.1\", 6.7\"",
-  "4. Battery Life: 12h, 18h, 24h",
+  "3. Screen Size: 5.5, 6.1, 6.7 inches",
+  "4. Battery Life: 12, 18, 24 hours",
   "5. Camera Quality: Basic, Good, Excellent",
   "",
-  "TO USE THIS EXAMPLE:",
-  "1. Ensure sample_cbc_data.csv exists in the same directory",
-  "2. Run: source('modules/conjoint/R/00_main.R')",
-  "3. Run: results <- run_conjoint_analysis('examples/example_config.xlsx')",
-  "4. Check output in: examples/output/example_results.xlsx",
+  "TO RUN IT, from the Turas root:",
+  "  Rscript -e 'source(\"modules/conjoint/R/00_main.R\"); run_conjoint_analysis(\"modules/conjoint/examples/example_config.xlsx\")'",
   "",
-  "CUSTOMIZATION:",
-  "- Modify attribute names and levels in the Attributes sheet",
-  "- Adjust settings in the Settings sheet",
-  "- Update data_file path to point to your data",
+  "WHAT IT WRITES, into modules/conjoint/examples/output/:",
+  "  example_results.xlsx                 the workbook",
+  "  example_results_stats_pack.xlsx      the stats pack",
+  "  example_results_cj_island.json       the Conjoint tab for a tabs v2 report (conjoint_island setting)",
+  "  example_results_tabs_importance.xlsx per-respondent importance as a tabs Allocation question",
+  "  example_results_simulator.html       the standalone market simulator",
   "",
-  "For more information, see the specification documents in modules/conjoint/"
+  "The data was simulated from known utilities (see README.md); the HB run should recover their order.",
+  "50 respondents is small for HB, so expect a convergence warning and a PARTIAL status. That is honest, not a fault."
 )
+openxlsx::addWorksheet(wb, "Instructions")
+openxlsx::writeData(wb, "Instructions", data.frame(Instructions = instructions),
+                    startRow = 1, startCol = 1, colNames = FALSE)
+openxlsx::setColWidths(wb, "Instructions", cols = 1, widths = 120)
 
-writeData(wb, "Instructions", data.frame(Instructions = instructions),
-          startRow = 1, startCol = 1, colNames = FALSE)
-setColWidths(wb, "Instructions", cols = 1, widths = 100)
-
-# Save workbook
-saveWorkbook(wb, output_file, overwrite = TRUE)
-
-cat("✓ Example configuration created:", output_file, "\n")
+saver(wb, output_file, overwrite = TRUE)
+cat("Example configuration written:", output_file, "\n")
