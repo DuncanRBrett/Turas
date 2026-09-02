@@ -32,6 +32,8 @@ This approach forces trade-offs and produces more discriminating results than tr
 - Segment-level analysis with grouped bar chart visualisations
 - **Self-contained HTML report** with tabbed navigation, interactive table sorting, and SVG charts
 - **Interactive preference simulator** with portfolio builder, head-to-head comparison, and export
+- **MaxDiff tab in the tabs v2 report**: every run writes `{Project}_MaxDiff_Results_md_island.json`; a tabs config's `maxdiff_island` setting embeds it
+- **Crosstabbable preference shares**: `Generate_Tabs_Export = YES` writes each respondent's shares as a tabs Allocation question (`{Project}_MaxDiff_Results_tabs_shares.xlsx`), gated so the empirical-Bayes fallback refuses unless `Allow_Approx_Utilities_Export = YES` and is then stamped
 - Add-slides and add-images support for custom report content
 - Publication-ready ggplot2 visualizations (PNG)
 - Comprehensive Excel output with conditional formatting

@@ -24,6 +24,41 @@
 #'
 #' @return Invisibly, TRUE on success; FALSE after a refusal/error (details
 #'   are printed to the console — Turas convention: errors must be visible).
+# Where this file lives, captured when it is sourced. The frame that sourced
+# it knows; the Rscript --file argument knows only where the CALLER is, so a
+# script that does source("modules/tabs/run_tabs.R") from somewhere else used
+# to resolve lib/ beside itself and fail with "cannot change working directory".
+.tabs_runner_dir <- local({
+  for (i in seq_len(sys.nframe())) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (is.character(ofile) && length(ofile) == 1 && grepl("run_tabs[.]R$", ofile)) {
+      return(dirname(normalizePath(ofile, mustWork = FALSE)))
+    }
+    srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+    if (is.list(srcfile) && is.character(srcfile$filename) &&
+        grepl("run_tabs[.]R$", srcfile$filename)) {
+      return(dirname(normalizePath(srcfile$filename, mustWork = FALSE)))
+    }
+  }
+  args <- commandArgs(trailingOnly = FALSE)
+  fa <- sub("^--file=", "", grep("^--file=", args, value = TRUE))
+  if (length(fa) && grepl("run_tabs[.]R$", fa[1])) return(dirname(normalizePath(fa[1], mustWork = FALSE)))
+  NULL
+})
+
+#' The engine directory this runner will use, or NULL when it cannot be found.
+#' Exposed so a test can prove the resolution from a foreign caller.
+tabs_runner_lib_dir <- function() {
+  if (!is.null(.tabs_runner_dir)) {
+    lib <- file.path(.tabs_runner_dir, "lib")
+    if (file.exists(file.path(lib, "run_crosstabs.R"))) return(normalizePath(lib))
+  }
+  candidates <- c("modules/tabs/lib", "tabs/lib", "lib")
+  hit <- candidates[file.exists(file.path(candidates, "run_crosstabs.R"))]
+  if (length(hit)) return(normalizePath(hit[1]))
+  NULL
+}
+
 run_tabs_analysis <- function(config_file) {
   if (missing(config_file) || is.null(config_file) || !nzchar(config_file)) {
     cat("\n=== TURAS ERROR ===\n")
@@ -42,29 +77,16 @@ run_tabs_analysis <- function(config_file) {
     return(invisible(FALSE))
   }
 
-  # Resolve modules/tabs/lib relative to this script's own location.
-  this_file <- tryCatch(normalizePath(sys.frame(1)$ofile), error = function(e) NULL)
-  if (is.null(this_file)) {
-    args <- commandArgs(trailingOnly = FALSE)
-    fa <- sub("^--file=", "", grep("^--file=", args, value = TRUE))
-    if (length(fa)) this_file <- normalizePath(fa[1])
-  }
-  tabs_lib_dir <- if (!is.null(this_file)) {
-    file.path(dirname(this_file), "lib")
-  } else {
-    # Sourced without a file record (e.g. pasted into the console): fall back
-    # to the repo layout relative to the working directory.
-    candidates <- c("modules/tabs/lib", "tabs/lib", "lib")
-    hit <- candidates[file.exists(file.path(candidates, "run_crosstabs.R"))]
-    if (!length(hit)) {
-      cat("\n=== TURAS ERROR ===\n")
-      cat("Code: IO_ENGINE_NOT_FOUND\n")
-      cat("Message: Cannot locate modules/tabs/lib/run_crosstabs.R from the working directory.\n")
-      cat("Fix: setwd() to the Turas root, or source this file with source(\"modules/tabs/run_tabs.R\").\n")
-      cat("===================\n\n")
-      return(invisible(FALSE))
-    }
-    hit[1]
+  # Resolve modules/tabs/lib from this script's own location (captured when it
+  # was sourced), else from the repo layout relative to the working directory.
+  tabs_lib_dir <- tabs_runner_lib_dir()
+  if (is.null(tabs_lib_dir)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: IO_ENGINE_NOT_FOUND\n")
+    cat("Message: Cannot locate modules/tabs/lib/run_crosstabs.R from this file's location or the working directory.\n")
+    cat("Fix: setwd() to the Turas root, or source this file with source(\"modules/tabs/run_tabs.R\").\n")
+    cat("===================\n\n")
+    return(invisible(FALSE))
   }
 
   old_wd <- getwd()

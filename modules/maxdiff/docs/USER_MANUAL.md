@@ -484,6 +484,9 @@ defaults.
 | `Generate_HTML_Report` | `YES` | Produce self-contained HTML report |
 | `Generate_Simulator` | `YES` | Produce interactive HTML simulator |
 | `Generate_TURF` | `YES` | Run TURF portfolio analysis |
+| `Generate_Tabs_Export` | `NO` | Write each respondent's preference shares as a tabs Allocation question, `{Project}_MaxDiff_Results_tabs_shares.xlsx` (see 7.1). Needs `Generate_HB_Model = YES`. |
+| `Tabs_Question_Code` | `MDSHARE` | QuestionCode for that export; the columns are `{code}_1` .. `{code}_k` |
+| `Allow_Approx_Utilities_Export` | `NO` | Let the count-based empirical-Bayes fallback (no cmdstanr) through the tabs export. The QuestionText and METHOD sheet are then stamped "approximate: count-based". Genuine Stan estimates never need it. |
 | `Score_Rescale_Method` | `0_100` | `RAW`, `0_100`, or `PROBABILITY` |
 | `Export_Individual_Utils` | `YES` | Export individual-level utilities sheet |
 | `HB_Iterations` | `5000` | MCMC iterations after warmup |
@@ -687,6 +690,8 @@ After a successful analysis run, the output folder contains:
 | `{Project}_MaxDiff_Results.xlsx` | Main Excel results workbook |
 | `{Project}_MaxDiff_Results.html` | Self-contained HTML report |
 | `{Project}_MaxDiff_Results_simulator.html` | Interactive simulator |
+| `{Project}_MaxDiff_Results_md_island.json` | The module's contribution to the interactive (tabs v2) report. Point a tabs config's `maxdiff_island` setting at it and that report gains a MaxDiff tab: item scores, preference shares, TURF, must-haves, with the estimator named. Always written. |
+| `{Project}_MaxDiff_Results_tabs_shares.xlsx` | With `Generate_Tabs_Export = YES`: DATA (respondent id plus one share column per item, summing to 100), QUESTIONMAP_SNIPPET (the rows to paste into a tabs Survey_Structure) and METHOD (what the numbers are). Merge DATA onto the survey data by respondent id and tabs crosstabs the shares by banner. |
 | `{Project}_utility_bar.png` | Horizontal bar chart of rescaled scores |
 | `{Project}_best_worst.png` | Diverging bar chart (Best% left, Worst% right) |
 | `{Project}_utility_distribution.png` | Violin plot of individual utilities (HB only) |
