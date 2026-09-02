@@ -47,9 +47,31 @@ MAXDIFF_VERSION <- "11.1"
   if (exists("script_dir_override", envir = globalenv())) {
     return(get("script_dir_override", envir = globalenv()))
   }
+  # This file is normally reached by source("modules/maxdiff/R/00_main.R")
+  # from a script or a console somewhere else. The frame that sourced it
+  # knows where it is; the Rscript --file argument (below) knows only where
+  # the CALLER is, and a guard looked up there is silently never loaded, so
+  # the first refusal died with "could not find function maxdiff_refuse".
+  for (i in seq_len(sys.nframe())) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (is.character(ofile) && length(ofile) == 1 && grepl("00_main\\.R$", ofile)) {
+      return(dirname(normalizePath(ofile, mustWork = FALSE)))
+    }
+    srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+    if (is.list(srcfile) && is.character(srcfile$filename) &&
+        grepl("00_main\\.R$", srcfile$filename)) {
+      return(dirname(normalizePath(srcfile$filename, mustWork = FALSE)))
+    }
+  }
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- grep("^--file=", args, value = TRUE)
-  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  if (length(file_arg) > 0) {
+    d <- dirname(sub("^--file=", "", file_arg))
+    if (file.exists(file.path(d, "00_guard.R"))) return(d)
+  }
+  if (file.exists(file.path(getwd(), "modules", "maxdiff", "R", "00_guard.R"))) {
+    return(file.path(getwd(), "modules", "maxdiff", "R"))
+  }
   return(getwd())
 }
 

@@ -74,3 +74,32 @@ test_that("is_missing_value detects missing values", {
   expect_false(is_missing_value(0))
   expect_false(is_missing_value(FALSE))
 })
+
+# ------------------------------------------------------------------------------
+# Sourced from a script that lives somewhere else (the README recipe:
+# Rscript -e 'source("modules/maxdiff/R/00_main.R"); run_maxdiff(...)'), the
+# guard used to be looked up beside the CALLER, never found, and the first
+# refusal died with "could not find function maxdiff_refuse".
+# ------------------------------------------------------------------------------
+
+test_that("the guard is loaded when 00_main.R is sourced from another script", {
+  rscript <- file.path(R.home("bin"), "Rscript")
+  skip_if(!file.exists(rscript), "Rscript not found")
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  caller_dir <- tempfile("md_caller_")
+  dir.create(caller_dir)
+  caller <- file.path(caller_dir, "caller.R")
+  writeLines(c(
+    sprintf('setwd("%s")', tempdir()),
+    sprintf('source("%s")', main),
+    'cat("GUARD:", exists("maxdiff_refuse", mode = "function"), "\\n")',
+    'r <- tryCatch(run_maxdiff(file.path(tempdir(), "no_such_config.xlsx"), verbose = FALSE),',
+    '              error = function(e) e)',
+    'cat("CLASS:", paste(class(r), collapse = ","), "\\n")'
+  ), caller)
+  out <- suppressWarnings(system2(rscript, shQuote(caller), stdout = TRUE, stderr = TRUE))
+  expect_true(any(grepl("GUARD: TRUE", out, fixed = TRUE)), info = paste(out, collapse = "\n"))
+  expect_true(any(grepl("turas_refusal", out, fixed = TRUE)), info = paste(out, collapse = "\n"))
+  expect_false(any(grepl("could not find function", out, fixed = TRUE)))
+  unlink(caller_dir, recursive = TRUE)
+})
