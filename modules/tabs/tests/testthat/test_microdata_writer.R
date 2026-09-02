@@ -43,7 +43,7 @@ source(file.path(turas_root, "modules/tabs/lib/data_layer_writer.R"))
 source(file.path(turas_root, "modules/tabs/lib/microdata_writer.R"))
 
 # ==============================================================================
-# FIXTURE — a tiny survey covering single, multi, rating, hidden-rating, NPS
+# FIXTURE. A tiny survey covering single, multi, rating, hidden-rating, NPS
 # ==============================================================================
 
 mw_structure <- function() {
@@ -123,7 +123,7 @@ mw_build <- function(config = mw_config()) {
 }
 
 # ==============================================================================
-# 1. answers — single / multi / no-answer
+# 1. answers. Single / multi / no-answer
 # ==============================================================================
 
 context("microdata_writer: answers mapping")
@@ -156,7 +156,7 @@ test_that("every agg question has an answers array of length n (validate contrac
 })
 
 # ==============================================================================
-# 2. scores — rating value / NPS buckets, and index_scores
+# 2. scores. Rating value / NPS buckets, and index_scores
 # ==============================================================================
 
 context("microdata_writer: mean scores + index_scores")
@@ -225,7 +225,7 @@ test_that("build_microdata returns NULL with no respondents", {
                               mw_banner_info(), mw_config()))
 })
 
-test_that("the payload carries only indices/weights — no raw answers or ids", {
+test_that("the payload carries only indices/weights. No raw answers or ids", {
   micro <- mw_build()$micro
   json <- serialize_microdata(micro)
   expect_false(grepl("Yes|Male|Recommend", json))   # no raw labels / titles
@@ -331,15 +331,15 @@ test_that("derive_net_diffs returns NULL without a NET POSITIVE row", {
 
 test_that("derive_net_diffs orders by SCORE (favourable box = plus) when given box_scores", {
   # Best-first display: "Agree" appears before "Disagree" but is the favourable
-  # (higher-score) box. plus must be Agree, minus Disagree — i.e. Agree - Disagree
-  # — regardless of the display order (SACS Q05 regression).
+  # (higher-score) box. plus must be Agree, minus Disagree, i.e. Agree - Disagree
+  #. Regardless of the display order (SACS Q05 regression).
   rows <- list(
     list(kind = "net", label = "Agree"),       # 0 (favourable, displayed first)
     list(kind = "net", label = "Disagree"),    # 1 (unfavourable)
     list(kind = "net", label = "NET POSITIVE (Agree - Disagree)"))  # 2
   expect_equal(derive_net_diffs(rows, c(Agree = 4.5, Disagree = 1.5)),
                list("2" = list(plus = 0, minus = 1)))
-  # without scores it falls back to row order (last non-DK box = plus) — unchanged
+  # without scores it falls back to row order (last non-DK box = plus): unchanged
   expect_equal(derive_net_diffs(rows), list("2" = list(plus = 1, minus = 0)))
 })
 
@@ -370,7 +370,7 @@ test_that("box_category_scores averages the option score (OptionText or OptionVa
 context("microdata_writer: box-category banner groups")
 
 test_that("box-category banner groups map respondents via BoxCategory membership", {
-  # Banner on Q2 grouped into "Low (1-2)" / "High (3)" — column labels are
+  # Banner on Q2 grouped into "Low (1-2)" / "High (3)". Column labels are
   # BoxCategory names, so the DisplayText path can never match. Known answer:
   # Q2 data 3,1,2,3,2 -> High(2), Low(1), Low(1), High(2), Low(1).
   bi <- list(
@@ -492,7 +492,7 @@ test_that("Numeric scores stay unfiltered when no Min/Max is configured", {
 # COMPOSITE INDEX SCORES (Q_Engage / Q_Value and friends)
 # ==============================================================================
 # A composite has no column in the survey data and no row in the Questions
-# sheet, so micro_scores_for_question() cannot see it — which left it out of the
+# sheet, so micro_scores_for_question() cannot see it, which left it out of the
 # island entirely. It then could not recompute under a live filter, and the wave
 # tracker SILENTLY dropped any Question_Mapping row pointing at one
 # (wave_contribution() skips a metric with no scores). These gate the fix.
@@ -582,7 +582,7 @@ test_that("a WeightedMean composite honours its declared weights", {
 })
 
 test_that("a WeightedMean composite with unusable weights scores nothing rather than guessing", {
-  # Count mismatch and blank both return NULL — the composite is simply absent
+  # Count mismatch and blank both return NULL. The composite is simply absent
   # from the island. Silently averaging unweighted here would publish a number
   # that disagrees with the report.
   expect_null(mwc_build(mwc_defs("WeightedMean", "3"))$micro$scores$Q_IDX)

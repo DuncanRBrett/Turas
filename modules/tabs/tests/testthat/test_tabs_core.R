@@ -63,7 +63,7 @@ source(file.path(turas_root, "modules/tabs/lib/validation_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/path_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/config_utils.R"))
-# config_loader.R is now a stub — all functions moved to config_utils.R,
+# config_loader.R is now a stub. All functions moved to config_utils.R,
 # crosstabs_config.R, and data_setup.R
 
 
@@ -758,7 +758,7 @@ test_that("safe_numeric passes through numeric values", {
 })
 
 test_that("safe_numeric returns NA for NULL and NA", {
-  # NULL returns zero-length (not NA) — this is correct for as.numeric(NULL)
+  # NULL returns zero-length (not NA): this is correct for as.numeric(NULL)
   expect_length(safe_numeric(NULL), 0)
   expect_true(is.na(safe_numeric(NA)))
   # na_value parameter replaces NA results (but can't fix zero-length from NULL)
@@ -1306,7 +1306,7 @@ test_that("resolve_path refuses empty base_path", {
 })
 
 test_that("resolve_path returns base path for NULL relative_path", {
-  # NULL/empty relative_path means "just the base" — returns normalised base_path
+  # NULL/empty relative_path means "just the base". Returns normalised base_path
   result <- resolve_path("/base", NULL)
   expect_true(grepl("base", result, fixed = TRUE))
 })

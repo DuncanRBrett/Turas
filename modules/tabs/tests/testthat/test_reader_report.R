@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — READER REPORT TESTS (derivation + bundler)
+# TABS MODULE. READER REPORT TESTS (derivation + bundler)
 # ==============================================================================
 #
 # Drives the Reader report generator end to end:

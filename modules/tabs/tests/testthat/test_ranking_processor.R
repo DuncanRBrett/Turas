@@ -3,12 +3,12 @@
 # ==============================================================================
 #
 # Tests for ranking question processing across three submodules:
-#   ranking_validation.R  — validate_ranking_matrix(), validate_ranking_question()
-#   ranking_metrics.R     — calculate_percent_ranked_first(),
+#   ranking_validation.R. Validate_ranking_matrix(), validate_ranking_question()
+#   ranking_metrics.R. Calculate_percent_ranked_first(),
 #                           calculate_percent_top_n(), calculate_mean_rank()
-#   ranking_crosstabs.R   — format_ranking_value(), get_banner_subset_and_weights(),
+#   ranking_crosstabs.R. Format_ranking_value(), get_banner_subset_and_weights(),
 #                           create_ranking_rows_for_item()
-#   ranking.R             — normalize_rank_direction()
+#   ranking.R. Normalize_rank_direction()
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_ranking_processor.R")

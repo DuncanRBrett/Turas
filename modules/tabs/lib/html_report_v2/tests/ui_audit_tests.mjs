@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * UI audit gate (2026-07 findings) — three fixes:
+ * UI audit gate (2026-07 findings): three fixes:
  *
  * 1. Wave labels: the PUBLISHED badge, "new in …" badge and the dashboard's
  *    "▲▼ chips show change vs …" intro hard-coded 2025/2024. They must derive
@@ -55,7 +55,7 @@ load(cv, "25_cards.js");
 load(cv, "27_views.js");
 const cards2 = cv.TR.cards2, views = cv.TR.views;
 
-console.log("UI audit fixes — suite:");
+console.log("UI audit fixes. Suite:");
 
 run("non-tracking report: no wave named anywhere, no vs-wave phrasing", () => {
   tracking = { enabled: false, waves: [] };
@@ -208,7 +208,7 @@ function filterSandbox(micro) {
 }
 
 // Shown 5-point scale (rows 0-4) with a box-category NET "Top-2 box" (row 5,
-// no net_members — as real reports ship) and a decomposable NET (row 6).
+// no net_members, as real reports ship) and a decomposable NET (row 6).
 const Q1 = {
   code: "Q1",
   net_members: { "6": [0, 1] },

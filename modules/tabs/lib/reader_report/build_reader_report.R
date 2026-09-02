@@ -1,13 +1,13 @@
 # ==============================================================================
-# TABS — READER REPORT: BUNDLER + ENTRY POINT (V15)
+# TABS. READER REPORT: BUNDLER + ENTRY POINT (V15)
 # ==============================================================================
-# Assembles the self-contained *_Reader.html — a narrative summary that sits
+# Assembles the self-contained *_Reader.html. A narrative summary that sits
 # beside the crosstab and deep-links back into it. Mirrors build_report_v2.R:
 # a vendored template + CSS + JS under assets/, single-pass {{TOKEN}} fill, the
 # reader model inlined as a data-reader island, TRS refusals, and a
 # list(status, output_file, file_size_mb) return.
 #
-# The model comes from derive_reader_model() — pure derivation over the same
+# The model comes from derive_reader_model(): pure derivation over the same
 # data layer the crosstab used, so no statistic is recomputed and no figure can
 # appear here that is not in the crosstab. Deterministic by default; the AI
 # prose path (reader_ai_prose) overwrites model$prose upstream and is opt-in.
@@ -33,7 +33,7 @@ serialize_reader_model <- function(model) {
   jsonlite::toJSON(model, auto_unbox = TRUE, na = "null", null = "null", digits = 6)
 }
 
-#' Build the self-contained Reader HTML (pure — no file I/O).
+#' Build the self-contained Reader HTML (pure, no file I/O).
 #' @param model_json Serialised reader-model JSON
 #' @param model The reader model (for the title + theme colours)
 #' @param assets_dir Vendored assets directory
@@ -100,14 +100,14 @@ build_reader_report_html <- function(model_json, model,
     stop("[CFG_READER_EXTERNAL] bundled Reader report references an external URL.")
   }
   if (grepl("</script", read_text(js_path), fixed = TRUE)) {
-    stop("[CFG_READER_JS_EMBED] reader.js contains '</script' — cannot inline safely.")
+    stop("[CFG_READER_JS_EMBED] reader.js contains '</script'. Cannot inline safely.")
   }
   html
 }
 
 #' Generate the Reader report and write it to a self-contained HTML file.
 #'
-#' @param dl The data layer list (from build_data_layer) — NOT serialised.
+#' @param dl The data layer list (from build_data_layer), NOT serialised.
 #' @param prev_json Serialised tracking island JSON (string) or NULL.
 #' @param qual_json Serialised qualitative island JSON (string) or NULL.
 #' @param crosstab_file Basename of the sibling crosstab report (for deep links).
@@ -143,7 +143,7 @@ generate_reader_report <- function(dl, prev_json = NULL, qual_json = NULL,
   }
 
   # Parse the optional islands (strings) back to R objects; a bad island never
-  # sinks the report — that section just stays unavailable.
+  # sinks the report. That section just stays unavailable.
   safe_parse <- function(js) {
     if (is.null(js) || !nzchar(js) || identical(js, "null")) return(NULL)
     tryCatch(jsonlite::fromJSON(js, simplifyVector = FALSE), error = function(e) NULL)
@@ -161,7 +161,7 @@ generate_reader_report <- function(dl, prev_json = NULL, qual_json = NULL,
   }
 
   # AI prose (opt-in, reader_ai_prose): replace the templated narrative with
-  # model-drafted prose — aggregates only, every cited number checked against
+  # model-drafted prose. Aggregates only, every cited number checked against
   # the data. Any failure degrades silently to the deterministic narrative.
   if (exists("reader_apply_ai_prose", mode = "function")) {
     model <- tryCatch(reader_apply_ai_prose(model, config_obj), error = function(e) model)

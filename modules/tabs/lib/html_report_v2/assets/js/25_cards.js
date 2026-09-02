@@ -1,5 +1,5 @@
 /**
- * v2 crosstabs tab — sidebar (collapsible categories, search, hideable),
+ * v2 crosstabs tab. Sidebar (collapsible categories, search, hideable),
  * one active question with banner tabs (incl. NET-grouping custom banners),
  * controls (heatmap/chart/counts/deltas/detail/summary/dual-sig), sortable
  * columns, hideable rows+columns, multi-column typed charts, banner-aware
@@ -51,7 +51,7 @@
 
   /** Chart model: full rows and ALL columns (the chart picks its own
    *  columns by label, independent of table hiding), with the chart-row
-   *  kind resolved ("auto" prefers NET groupings on scale/NPS — Promoter,
+   *  kind resolved ("auto" prefers NET groupings on scale/NPS, Promoter,
    *  not 0–10). */
   cards2.chartModel = function () {
     var s = TR.d2.state;
@@ -62,7 +62,7 @@
     if (model) {
       model.chartKind = cards2.resolveChartKind(model);
       // "pct" covers column AND row percentages (both label with a "%"); a
-      // counts-only question charts as counts — the chart builders read the
+      // counts-only question charts as counts. The chart builders read the
       // model's own `stat` for that (C1).
       model.valueKind = model.chartKind === "mean" ? "mean" : "pct";
       model.hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
@@ -202,7 +202,7 @@
         cat.codes.map(function (code) {
           var q = d2.questionByCode(code);
           return '<a class="qlink" href="#" data-code="' + code + '" title="' +
-            fmt.escapeHtml(code + " — " + q.title) + '" data-search="' +
+            fmt.escapeHtml(code + ": " + q.title) + '" data-search="' +
             fmt.escapeHtml((code + " " + q.title).toLowerCase()) + '">' +
             '<span class="qc">' + code + "</span><span class='qt'>" +
             fmt.escapeHtml(q.title) + "</span></a>";
@@ -211,7 +211,7 @@
   }
 
   // Test hooks (the suite has no DOM, so the sidebar HTML and the state->DOM
-  // sync are reachable directly — mirrors _publishedBadgeHtml above).
+  // sync are reachable directly. Mirrors _publishedBadgeHtml above).
   cards2._sidebarHtml = sidebarHtml;
   cards2._catsAllHtml = catsAllHtml;
   cards2._syncCats = syncCats;
@@ -247,14 +247,14 @@
     };
     document.getElementById("controls").innerHTML =
       '<button data-act="toggleside" title="Show/hide the question list">⟨⟩ Question list</button>' +
-      '<button data-act="magcycle" class="magcyc" title="Cell magnitude — bars / heatmap / off">' +
+      '<button data-act="magcycle" class="magcyc" title="Cell magnitude. Bars / heatmap / off">' +
       "Magnitude: " + ({ bars: "Bars", heat: "Heat", off: "Off" }[s.heatmap] || "Bars") +
       "</button>" +
       toggle("showChart", "Chart") +
       toggle("showCounts", "Counts") +
       toggle("showIntervals", "Intervals",
         "Show the 95% interval as a range below each number") +
-      // Only offered when the study declares provenance — see hasProvenance().
+      // Only offered when the study declares provenance. See hasProvenance().
       (hasProvenance()
         ? toggle("showSources", "Sources",
             "Name the questions a derived figure was built from, beside the " +
@@ -263,7 +263,7 @@
         : "") +
       // Row scope is one explicit pick (not two checkboxes that can both go off
       // and empty the table). Global state, so it persists question to question.
-      '<label class="tg" title="Which rows show in the table — persists as you ' +
+      '<label class="tg" title="Which rows show in the table. Persists as you ' +
       'move between questions">Rows ' +
       '<select data-rowscope>' +
       '<option value="all"' + (rowScope === "all" ? " selected" : "") + ">All rows</option>" +
@@ -301,7 +301,7 @@
   }
 
   /** Row labels the chart would plot under the current "Chart plots" scope,
-   *  before any per-row unticks — the membership a "select all charts" spans. */
+   *  before any per-row unticks. The membership a "select all charts" spans. */
   function chartableRowLabels() {
     var cm = cards2.chartModel();
     if (!cm) return [];
@@ -315,7 +315,7 @@
    * Bulk select / clear a whole Table or Chart column in the panel. `on` = the
    * header checkbox's new state. Hidden-lists store what's OFF; chartColLabels
    * stores what's ON (and keeps the Total column so the chart always has one).
-   * Pure state mutation — exposed for the gate test; the UI re-renders after.
+   * Pure state mutation. Exposed for the gate test; the UI re-renders after.
    */
   cards2._setAll = function (which, on) {
     var st = TR.d2.state, cm = cards2.chartModel();
@@ -336,7 +336,7 @@
   };
 
   /** (Re)build the rows & columns panel for the active question. One
-   *  panel configures the table AND the chart — columns (table/chart
+   *  panel configures the table AND the chart. Columns (table/chart
    *  checks), row visibility, and which row kind the chart plots. */
   function buildColumnsPanel() {
     var menu = document.getElementById("colmenu");
@@ -371,7 +371,7 @@
     // hidden here can always be un-hidden here
     var q = TR.d2.questionByCode(s.activeQ);
     var hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
-    // which rows the chart WOULD plot before per-row unticks — the kind
+    // which rows the chart WOULD plot before per-row unticks. The kind
     // dropdown governs scope, the checkboxes govern membership within it
     var inScope = {};
     chartableRowLabels().forEach(function (l) { inScope[l] = true; });
@@ -388,8 +388,8 @@
         '"' + (hiddenRows.indexOf(row.label) === -1 ? " checked" : "") +
         "></label>" +
         '<label' + (chartable ? "" : ' title="' + (diff
-          ? "Score differences have no single base — never charted"
-          : "Outside the current “Chart plots” choice below — switch it to " +
+          ? "Score differences have no single base, never charted"
+          : "Outside the current “Chart plots” choice below. Switch it to " +
             "include this row kind") + '"') + ">" +
         '<input type="checkbox" data-cmchartrow="' + fmt.escapeHtml(row.label) +
         '"' + (chartChecked ? " checked" : "") + (chartable ? "" : " disabled") +
@@ -446,7 +446,7 @@
     menu.querySelectorAll("[data-cmall][data-mixed='1']").forEach(function (cb) {
       cb.indeterminate = true;   // header reflects a mixed selection
     });
-    // Restore the captured scroll onto the freshly-built nodes — the Columns and
+    // Restore the captured scroll onto the freshly-built nodes. The Columns and
     // Rows bodies rebuild in the same order, so index alignment holds.
     menu.scrollTop = keepPanelTop;
     var newBodies = menu.querySelectorAll(".cm-body");
@@ -460,13 +460,13 @@
         '" data-banner="' + g.id + '">' + fmt.escapeHtml(g.name) + "</button>";
     });
     // Total-only survey (no preset banners): expose an explicit "Total" tab so a
-    // custom banner can always be switched off — otherwise the custom tab is the
+    // custom banner can always be switched off. Otherwise the custom tab is the
     // only one and there is no way back to the Total column (e.g. CCS).
     if (!TR.AGG.banner_groups.length) {
       out.unshift('<button class="btab' + (s.banner === "" ? " on" : "") +
         '" data-banner="">Total</button>');
     }
-    // Saved custom banners — persistent tabs (survive reload, travel in saved
+    // Saved custom banners. Persistent tabs (survive reload, travel in saved
     // copies). Each is selectable and removable; the active one shows "on".
     TR.savedBanners.all().forEach(function (b) {
       var id = TR.savedBanners.id(b);
@@ -476,18 +476,18 @@
         '<span class="btab-x" data-banner-remove="' + id +
         '" role="button" aria-label="Remove saved banner">✕</span></button>');
     });
-    // Saved composite (profile) banners — same persistence as saved custom
+    // Saved composite (profile) banners. Same persistence as saved custom
     // banners; the ▦ glyph marks a hand-built set of spotlight groups (each from
     // any question, tested vs the rest) rather than one question's options.
     TR.compositeBanners.all().forEach(function (c) {
       out.push('<button class="btab saved composite' + (s.banner === c.id ? " on" : "") +
         '" data-banner="' + c.id +
-        '" title="Composite banner — spotlight groups vs the rest">▦ ' +
+        '" title="Composite banner. Spotlight groups vs the rest">▦ ' +
         fmt.escapeHtml(TR.charts.clip(c.name || "Composite", 26)) +
         '<span class="btab-x" data-banner-remove="' + c.id +
         '" role="button" aria-label="Remove composite banner">✕</span></button>');
     });
-    // The live (unsaved) custom banner — kept as a tab across navigation so it is
+    // The live (unsaved) custom banner. Kept as a tab across navigation so it is
     // not lost when you switch to another banner. Lazy-capture an active custom
     // banner (e.g. restored from the URL hash) into customBanner. ★ save promotes
     // it to a permanent saved tab above.
@@ -499,7 +499,7 @@
     if (live && !TR.savedBanners.has(live)) {
       var q = TR.d2.questionByCode(live.split(":")[1]);
       out.push('<button class="btab custom' + (s.banner === live ? " on" : "") +
-        '" data-banner="' + live + '" title="Live custom banner — ★ save to keep it">⚒ ' +
+        '" data-banner="' + live + '" title="Live custom banner, ★ save to keep it">⚒ ' +
         fmt.escapeHtml(TR.charts.clip(q ? q.title : live, 24)) +
         '<span class="btab-x save" data-act="save-banner" role="button" ' +
         'title="Save this custom banner" aria-label="Save this custom banner">★ save</span>' +
@@ -510,14 +510,14 @@
       out.push('<button class="btab add" data-act="custom-banner" ' +
         'title="Cross this question by any other question">+ Custom…</button>');
       out.push('<button class="btab add" data-act="composite-banner" ' +
-        'title="Build a profile banner — spotlight groups (e.g. Marketing, Cape Town, ' +
+        'title="Build a profile banner. Spotlight groups (e.g. Marketing, Cape Town, ' +
         'Tenure 5y+) shown across every table and tested vs the rest">+ Composite…</button>');
     }
     return '<div class="btabs" role="group" aria-label="Banner">' + out.join("") + "</div>";
   }
   cards2._bannerTabsHtml = bannerTabsHtml;   // exposed for the node gate
 
-  /** Wave names from the report's own tracking island — never hard-coded
+  /** Wave names from the report's own tracking island, never hard-coded
    *  years. current = the live wave's label, prev = the latest prior wave's;
    *  both "" (tracking false) on a report with no wave history. */
   cards2.waveLabels = function () {
@@ -533,7 +533,7 @@
       prev: last ? String(last.wave || last.label || last.year || "") : "" };
   };
 
-  /** PUBLISHED badge — names the wave only when the report tracks one. */
+  /** PUBLISHED badge. Names the wave only when the report tracks one. */
   function publishedBadgeHtml() {
     var wl = cards2.waveLabels();
     return '<span class="badge-published" title="Published ' +
@@ -542,7 +542,7 @@
   }
   cards2._publishedBadgeHtml = publishedBadgeHtml;
 
-  /** No-wave-history badge — "" on non-tracking reports (nothing to be new
+  /** No-wave-history badge, "" on non-tracking reports (nothing to be new
    *  relative to), else named after the current wave. */
   function noHistoryBadgeHtml() {
     var wl = cards2.waveLabels();
@@ -558,7 +558,7 @@
    * and the question text drops to a secondary line. A stored analyst insight
    * does NOT lead here: this card already prints the insight in full in its
    * own box below the table, so promoting its first sentence to the h2 said
-   * the same thing twice. (Cards elsewhere — dashboard gauges, story pins —
+   * the same thing twice. (Cards elsewhere, dashboard gauges, story pins,
    * have no insight box, so they keep the marked fallback.) No headline ->
    * the plain question h2, unchanged. Exposed for the node gate.
    */
@@ -575,7 +575,7 @@
   /**
    * The question's own audience line. A routed question (asked only of a
    * subset, whether by BaseFilter or by questionnaire routing the analyst
-   * labelled) reports a base smaller than the sample — without this the
+   * labelled) reports a base smaller than the sample, without this the
    * reader sees the shortfall and not the reason. "" when everyone was asked
    * and on reports built before the data layer carried it.
    */
@@ -588,14 +588,14 @@
 
   /**
    * Where this question's numbers came from. A study whose data is built before
-   * the config ever sees it — derived columns, composites, anything worked out
-   * upstream — hands the engine a finished column, so the only honest source of
+   * the config ever sees it. Derived columns, composites, anything worked out
+   * upstream. Hands the engine a finished column, so the only honest source of
    * this is the analyst's own declaration on the Selection sheet.
    *
    * The rule, stated here because it is a convention and not an inference: a
    * Formula means the number was WORKED OUT, so the question reads as derived;
    * a Source with no formula means it was ASKED, and the source names the
-   * question behind it. A question declaring neither says nothing at all —
+   * question behind it. A question declaring neither says nothing at all,
    * which is why a config without the columns looks exactly as it did before.
    */
   function provenance(code) {
@@ -609,7 +609,7 @@
   cards2._provenance = provenance;
 
   /** Does this report carry provenance at all? Decides whether the control bar
-   *  offers the Sources toggle — no study should grow a control for a column
+   *  offers the Sources toggle. No study should grow a control for a column
    *  it does not use. */
   var _hasProv = null;
   function hasProvenance() {
@@ -622,16 +622,16 @@
   }
   cards2._hasProvenance = hasProvenance;
 
-  /** The badge that sits with the question code — always on when the question
+  /** The badge that sits with the question code, always on when the question
    *  declares its provenance, because "is this asked or worked out?" is the
    *  kind of thing a reader should not have to go looking for. */
   function provBadgeHtml(code) {
     var p = provenance(code);
     if (!p) return "";
     var tip = p.derived
-      ? "Worked out from the data, not asked" + (p.source ? " — built from " + p.source : "") +
+      ? "Worked out from the data, not asked" + (p.source ? ", built from " + p.source : "") +
         (p.formula ? ". " + p.formula : "")
-      : "Asked in the survey" + (p.source ? " — " + p.source : "");
+      : "Asked in the survey" + (p.source ? ": " + p.source : "");
     return '<span class="badge-prov' + (p.derived ? " derived" : "") + '" title="' +
       fmt.escapeHtml(tip) + '">' + (p.derived ? "DERIVED" : "ASKED") + "</span>";
   }
@@ -639,7 +639,7 @@
   /**
    * The note under the title. DERIVED questions only.
    *
-   * An asked question needs no line — the badge is the whole story, and 87 of
+   * An asked question needs no line. The badge is the whole story, and 87 of
    * them saying "Source: survey question" is noise that would make the lines
    * that matter easier to skip. A derived one is the opposite case: the badge
    * announces that the number was worked out and then leaves the reader with
@@ -648,7 +648,7 @@
    * in the badge tooltip.
    *
    * The formula is not the toggle's to hide. A DERIVED badge with no
-   * explanation beside it is worse than no badge at all — it tells the reader
+   * explanation beside it is worse than no badge at all. It tells the reader
    * the number was worked out and then withholds how, and the control that
    * would answer it is named "Sources", which is not what they are looking
    * for. So the formula always shows; the toggle governs the source names
@@ -666,7 +666,7 @@
   cards2._provNoteHtml = provNoteHtml;
 
   /** The same sentence as one line, for an export that has no room for a
-   *  styled block — the card SVG's meta line and the PPTX slide kicker. */
+   *  styled block. The card SVG's meta line and the PPTX slide kicker. */
   function provNoteText(code) {
     var p = provenance(code);
     if (!p || !p.derived) return "";
@@ -683,7 +683,7 @@
 
     var sourceBadge = model.notRecomputable
       ? '<span class="badge-computed na" title="' +
-        fmt.escapeHtml("Derived ranking / score with no per-respondent data — it " +
+        fmt.escapeHtml("Derived ranking / score with no per-respondent data. It " +
           "can't be recomputed for a filtered or custom-banner subset, so no " +
           "figures are shown for this view.") + '">n/a under filter</span>'
       : model.fpcDefault
@@ -719,7 +719,7 @@
     }
     var contextStrip = contextBits.length
       ? '<div class="ctxstrip">⚠ ' + fmt.escapeHtml(contextBits.join("  ·  ")) +
-        " — shown on every pin and export</div>"
+        ", shown on every pin and export</div>"
       : "";
 
     // "💬 comments" jump when this question/composite is linked to an open-end.
@@ -737,7 +737,7 @@
       chartModel = cards2.chartModel();
       var kind = chartModel ? chartModel.chartKind : "detail";
       // row kind + chart columns are configured in the single
-      // "Rows & columns…" panel on the controls bar — no duplicate
+      // "Rows & columns…" panel on the controls bar. No duplicate
       // triggers here (the toolbar keeps only the chart type)
       html += '<div class="charttools"><label class="ctlab" for="charttype-sel">Type</label>' +
         '<select id="charttype-sel" data-charttypesel>' +
@@ -750,7 +750,7 @@
         (cards2.chartCols(chartModel).length === 1 ? "" : "s") + " · " +
         (kind === "summary" ? "groupings" : kind === "both" ? "detail + groupings"
           : kind === "mean" ? "index (mean)" : "detail rows") +
-        " — change under Rows &amp; columns…</span></div>" +
+        ", change under Rows &amp; columns…</span></div>" +
         '<div class="chart">' + safeChart(chartModel) + "</div>";
     }
     if (model.hiddenCount || model.hiddenRowCount) {
@@ -784,7 +784,7 @@
       a.classList.toggle("on", active);
       if (!active) return;
       // A collapsed group hides its links outright, so the marking and the
-      // scroll below did nothing — most visibly when prev/next stepped into a
+      // scroll below did nothing. Most visibly when prev/next stepped into a
       // collapsed group and the sidebar stopped saying where you were.
       var grp = a.closest && a.closest(".catgrp");
       if (grp && grp.getAttribute("data-cat")) {
@@ -803,7 +803,7 @@
         '<div class="chart-error">Nothing to chart for this row scope.</div>';
     } catch (e) {
       if (global.console) console.error("[TurasV2] chart failed:", e);
-      return '<div class="chart-error">Chart unavailable — the table is unaffected.</div>';
+      return '<div class="chart-error">Chart unavailable. The table is unaffected.</div>';
     }
   }
 
@@ -818,7 +818,7 @@
 
   /**
    * The two collapsible explainers under every crosstab card, plus the shared
-   * precision footer. All three are authored in the Callout Editor —
+   * precision footer. All three are authored in the Callout Editor,
    * cards.reading.* and cards.sig.* here, conf.* in 21c_confidence.js.
    *
    * The minimum base stays INTERPOLATED from the project: a literal 30 in the
@@ -854,7 +854,7 @@
 
   function explainersHtml() {
     var p = TR.AGG.project;
-    // Table-specific mechanics only — significance letters, arrows, Δ chips
+    // Table-specific mechanics only. Significance letters, arrows, Δ chips
     // and bands live in the ONE shared "How to read this" panel (A4).
     return '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">i</span> Reading this table' +
@@ -868,7 +868,7 @@
       '<div class="callout collapsed footer-callout"><button class="callout-head" data-callout>' +
       '<span class="callout-ico">σ</span> Understanding the significance testing' +
       '<span class="callout-chev">▼</span></button><div class="callout-body">' +
-      // One authored entry for the whole panel — blank lines separate the
+      // One authored entry for the whole panel. Blank lines separate the
       // paragraphs. Nothing here is conditional, so splitting it into six
       // entries only made the author hunt for the one they wanted to change.
       // The two secondary-level clauses are their own entries: a study with no
@@ -908,7 +908,7 @@
       { key: "insight", label: "Insight", checked: true }
     ];
     // The analyst's priority comments on the linked open-end, offered only when
-    // there are some — an always-on checkbox would be dead on most questions.
+    // there are some. An always-on checkbox would be dead on most questions.
     // The count is filter-independent by design (qual.priorityQuotes): priority
     // is marked against the question, not against the cut on screen.
     var priority = (TR.qual && TR.qual.priorityQuotes)
@@ -927,7 +927,7 @@
     }, tracked
       ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
         '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
-        "wave's distribution chart with the trend over waves below — exports " +
+        "wave's distribution chart with the trend over waves below. Exports " +
         'to PowerPoint as two editable chart objects on one slide">' +
         "📈 Pin distribution + trend</button>"
       : "");
@@ -935,7 +935,7 @@
     if (exhibitBtn) {
       exhibitBtn.addEventListener("click", function () {
         menu.hidden = true;
-        // the exhibit button sits under the same tickboxes — the comments one
+        // the exhibit button sits under the same tickboxes. The comments one
         // is the only element it shares with them, so it reads it directly
         var cb = menu.querySelector('[data-pf="comments"]');
         TR.story2.pinExhibit(!!(cb && cb.checked));
@@ -962,13 +962,13 @@
     if (btn) btn.setAttribute("aria-expanded", "false");
   }
 
-  /* one document-level closer for the columns panel — registered once,
+  /* one document-level closer for the columns panel. Registered once,
      so tab re-renders can never stack duplicates */
   if (typeof document !== "undefined" && !cards2._colMenuCloser) {
     cards2._colMenuCloser = true;
     document.addEventListener("click", function (e) {
       // a target detached mid-click was re-rendered by an in-panel action
-      // (e.g. a checkbox tick) — never treat that as an outside click
+      // (e.g. a checkbox tick), never treat that as an outside click
       if (e.target && e.target.isConnected === false) return;
       if (!e.target.closest('.pinwrap, [data-act="columns"]')) closeColMenu();
     });
@@ -1000,7 +1000,7 @@
         cards2.renderActive();
         return;
       }
-      // Remove / save a custom banner — intercept BEFORE the generic banner
+      // Remove / save a custom banner. Intercept BEFORE the generic banner
       // selection so the ✕ / ★ pills inside a tab don't double as "select".
       var brem = e.target.closest("[data-banner-remove]");
       if (brem) {
@@ -1027,7 +1027,7 @@
         var liveId = TR.d2.state.customBanner || TR.d2.state.banner;
         if (TR.savedBanners.add(liveId)) {
           TR.d2.state.customBanner = null;   // promoted to a saved (★) tab
-          TR.shell.toast("Custom banner saved — kept across reloads and in saved copies");
+          TR.shell.toast("Custom banner saved. Kept across reloads and in saved copies");
         }
         cards2.renderActive();
         return;
@@ -1057,7 +1057,7 @@
         if (at === -1) list.push(label);
         else list.splice(at, 1);
         cards2.renderActive();
-        buildColumnsPanel();   // panel lives in the controls bar — refresh it
+        buildColumnsPanel();   // panel lives in the controls bar. Refresh it
         return;
       }
       var cmChart = e.target.closest("[data-cmchart]");
@@ -1198,7 +1198,7 @@
       if (e.target.id === "qsearch") {
         var term = e.target.value.trim().toLowerCase();
         // While a term is typed, matches show even inside a collapsed group
-        // (CSS override — the reader's collapse state is left untouched and
+        // (CSS override, the reader's collapse state is left untouched and
         // comes back the moment the box is cleared).
         var side = e.target.closest && e.target.closest(".side");
         if (side) side.classList.toggle("searching", !!term);
@@ -1229,7 +1229,7 @@
       if (e.target.hasAttribute && e.target.hasAttribute("data-chartkindsel")) {
         TR.d2.state.chartKind = e.target.value;
         cards2.renderActive();
-        buildColumnsPanel();   // chartable rows changed — refresh the row checkboxes
+        buildColumnsPanel();   // chartable rows changed. Refresh the row checkboxes
         return;
       }
       if (e.target.hasAttribute && e.target.hasAttribute("data-rowscope")) {

@@ -6,7 +6,7 @@
 # config: a "bought for someone else" measure in a category nobody buys for
 # others, or a routed question no one reached. Before this, such a question
 # reached create_banner_row_indices with a zero-row frame, which refuses
-# (validate_data_frame, min_rows = 1) — and that refusal abandoned every
+# (validate_data_frame, min_rows = 1), and that refusal abandoned every
 # remaining question in the run.
 #
 # prepare_question_data must instead return an explained skip so the caller
@@ -47,7 +47,7 @@ source(file.path(turas_root, "modules/tabs/lib/validation_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/logging_utils.R"))
 # shared_functions.R sources its siblings relative to `script_dir`, which it
-# only computes when the variable is absent — set it so it resolves under testthat
+# only computes when the variable is absent. Set it so it resolves under testthat
 assign("script_dir", file.path(turas_root, "modules/tabs/lib"), envir = globalenv())
 source(file.path(turas_root, "modules/tabs/lib/shared_functions.R"))
 source(file.path(turas_root, "modules/tabs/lib/filter_utils.R"))
@@ -59,7 +59,7 @@ source(file.path(turas_root, "modules/tabs/lib/question_orchestrator.R"))
 
 # ------------------------------------------------------------------------------
 # Fixtures: 20 respondents. Nobody has BoughtForOther == "Yes", so any measure
-# based on that subgroup is empty — the shape of the real VAS case.
+# based on that subgroup is empty. The shape of the real VAS case.
 # ------------------------------------------------------------------------------
 
 make_data <- function() {
@@ -134,7 +134,7 @@ test_that("a base filter matching nobody yields an explained skip, not a refusal
   expect_match(result$reason, "BoughtForOther", fixed = TRUE)
 })
 
-test_that("the empty subgroup does not abort — a normal question still prepares", {
+test_that("the empty subgroup does not abort. A normal question still prepares", {
   data <- make_data()
   banner <- make_banner()
   weights <- rep(1, nrow(data))
@@ -182,7 +182,7 @@ test_that("an unfiltered question is untouched by the empty-subgroup path", {
 # ==============================================================================
 # setup_checkpointing() restores both the processed CODES and their RESULTS, but
 # only the codes were passed on: the restored results were dropped, so a run
-# resumed after a crash shipped without every question processed before it —
+# resumed after a crash shipped without every question processed before it,
 # silently, and still reporting PASS. On a live VAS run that lost the first 100
 # questions (all of Demographics, VAS wallet and the prepaid sections).
 

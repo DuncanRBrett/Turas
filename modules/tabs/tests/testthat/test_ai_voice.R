@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS — SHARED AI PROSE VOICE (TURAS_PROSE_VOICE injection contract)
+# TABS. SHARED AI PROSE VOICE (TURAS_PROSE_VOICE injection contract)
 # ==============================================================================
 # The single shared writing-voice fragment must be injected into every AI call
 # that writes reader-facing PROSE (callout, exec patterns, exec narrative, and

@@ -1,5 +1,5 @@
 /**
- * Pattern recognition — statistical primitives (pure; no DOM, no LLM).
+ * Pattern recognition. Statistical primitives (pure; no DOM, no LLM).
  *
  * The number-crunching the pattern engine (27e) stands on, factored out so the
  * engine file stays focused on pattern logic. Everything here is a deterministic
@@ -12,7 +12,7 @@
   var TR = global.TR = global.TR || {};
   var takeout = TR.takeout = TR.takeout || {};
 
-  /** Standard normal CDF Φ(x) — Zelen & Severo (A&S 26.2.17), |error| < 7.5e-8.
+  /** Standard normal CDF Φ(x): Zelen & Severo (A&S 26.2.17), |error| < 7.5e-8.
    *  Used to turn a Fisher-z statistic into a p-value for the FDR step. */
   function normalCdf(x) {
     var t = 1 / (1 + 0.2316419 * Math.abs(x));
@@ -44,7 +44,7 @@
 
   /** Benjamini-Hochberg FDR. Given p-values, returns the indices that survive at
    *  level alpha: the largest rank k with p(k) <= (k/m)*alpha rejects all p ranked
-   *  <= k. Valid under positive dependence (PRDS) — which inter-question
+   *  <= k. Valid under positive dependence (PRDS), which inter-question
    *  correlations on an attitude survey satisfy (all-positive), so BH (not the
    *  far more conservative Benjamini-Yekutieli) is the right correction here. */
   function bhFDR(pvals, alpha) {
@@ -143,7 +143,7 @@
   takeout._welchTest = welchTest;
 
   /** Two-sided exact sign test (binomial at p=0.5) over a group's per-question
-   *  below/above counts — the multiplicity-safe test of DIRECTIONAL CONSISTENCY
+   *  below/above counts. The multiplicity-safe test of DIRECTIONAL CONSISTENCY
    *  that gates the group/split patterns. (Treats questions as independent
    *  Bernoulli; positive inter-item r makes it mildly anti-conservative, which is
    *  safe here as it only ranks groups and SACS margins are far from the line.) */
@@ -189,7 +189,7 @@
 
   /** Full ahead / level / behind counts for one column's gaps, split by kind.
    *
-   *  RAW comparison — a gap counts whichever side of the overall it falls, with
+   *  RAW comparison. A gap counts whichever side of the overall it falls, with
    *  no materiality floor. The portrait's hits/gains counts apply that floor and
    *  so understate the misses on a group that is behind everywhere by a little;
    *  this is the honest denominator to show beside them.

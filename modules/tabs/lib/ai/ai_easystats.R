@@ -1,22 +1,22 @@
 # ==============================================================================
-# AI EASYSTATS — APA-Style Statistical Narration (Rule-Based, No LLM)
+# AI EASYSTATS. APA-Style Statistical Narration (Rule-Based, No LLM)
 # ==============================================================================
 #
 # Optional complement to AI insights. Uses the easystats ecosystem to generate
 # formal APA-style statistical narration for significance testing results.
 # This is deterministic, reproducible, and requires no API calls.
 #
-# This is NOT AI-generated content — it is rule-based narration from the
+# This is NOT AI-generated content. It is rule-based narration from the
 # easystats report() function. No AI label is needed.
 #
 # Functions:
-#   generate_apa_narration()      — APA narration for a question's sig results
-#   generate_all_apa_narrations() — batch narration for all questions
-#   build_apa_narration_panel()   — HTML rendering for narration
+#   generate_apa_narration(): APA narration for a question's sig results
+#   generate_all_apa_narrations(): batch narration for all questions
+#   build_apa_narration_panel(): HTML rendering for narration
 #
 # Dependencies:
-#   easystats/report (CRAN) — APA-style reporting
-#   stats (base R)          — chi-squared test
+#   easystats/report (CRAN): APA-style reporting
+#   stats (base R): chi-squared test
 #
 # Config:
 #   config$ai_insights$easystats_narration = TRUE/FALSE
@@ -182,7 +182,7 @@ generate_all_apa_narrations <- function(all_results, banner_info,
 
 #' Build HTML panel for APA narration
 #'
-#' Renders a distinct panel for the statistical narration — not styled as
+#' Renders a distinct panel for the statistical narration, not styled as
 #' AI content because it is deterministic and rule-based.
 #'
 #' @param narration List. Output of generate_apa_narration().

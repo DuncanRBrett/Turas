@@ -147,7 +147,7 @@ prepare_question_data <- function(question_code, base_filter,
   # ============================================================================
   # STEP 2b: AN EMPTY SUBGROUP IS A FINDING, NOT A FAILURE
   # ============================================================================
-  # A base filter can legitimately match nobody — a "bought for someone else"
+  # A base filter can legitimately match nobody. A "bought for someone else"
   # measure in a category nobody buys for others, a routed question no one
   # reached. That is a fact about the study, not a broken config. It must not
   # take the run down: create_banner_row_indices refuses on a zero-row frame
@@ -188,7 +188,7 @@ prepare_question_data <- function(question_code, base_filter,
   # ============================================================================
 
   # Allocation questions store data across {code}_1..{code}_N with NO bare
-  # {code} column, and a zero allocation is a real answer — so the base is
+  # {code} column, and a zero allocation is a real answer, so the base is
   # any-column-answered (non-NA). calculate_weighted_base has no Allocation
   # branch (its single-response path would report base 0), so compute here.
   is_allocation <- identical(as.character(question_info$Variable_Type), "Allocation")
@@ -242,7 +242,7 @@ prepare_question_data <- function(question_code, base_filter,
 #' Base sizes for an Allocation question (any-column-answered)
 #'
 #' A respondent is in base when ANY allocation slot holds a non-NA numeric
-#' value — zero is a real allocation and MUST count (unlike the multi-mention
+#' value. Zero is a real allocation and MUST count (unlike the multi-mention
 #' base, which treats numeric 0 as no-response). Mirrors the allocation
 #' processor's zero-is-data rule (allocation_processor.R).
 #'
@@ -430,7 +430,7 @@ process_single_question <- function(question_code, prepared_data,
 
   } else if (question_info$Variable_Type == "Allocation") {
     # ---------------------------------------------------------------------
-    # ALLOCATION QUESTIONS (constant-sum) — mean per option, by banner
+    # ALLOCATION QUESTIONS (constant-sum): mean per option, by banner
     # Previously unrouted: Allocation fell into the standard processor, which
     # refused on the missing bare {code} column (or mis-tabulated it as
     # single-choice). TRS v1.0: Processing failures must refuse, not warn.
@@ -618,7 +618,7 @@ process_single_question <- function(question_code, prepared_data,
   }
 
   # Extract theme (optional Level-2 grouping for the Executive Takeout patterns
-  # view; sits under Category/Section — e.g. Category "Engagement", Theme
+  # view; sits under Category/Section, e.g. Category "Engagement", Theme
   # "Recognition & voice"). Carried to the v2 data layer as q.theme.
   q_theme <- if (!is.null(question_row$Theme) &&
                  !is.na(question_row$Theme) &&
@@ -643,7 +643,7 @@ process_single_question <- function(question_code, prepared_data,
   }
 
   # Extract AreaSummary (optional, Y/blank): marks THE question that summarises
-  # its area/theme for the Patterns tab — the section-overall rating (e.g.
+  # its area/theme for the Patterns tab. The section-overall rating (e.g.
   # "satisfaction with the coolers overall"). The area then scores on this
   # question; its siblings become the explanation, not equal votes in a flat
   # average. Carried to the v2 data layer as q.area_summary (TRUE only).
@@ -658,14 +658,14 @@ process_single_question <- function(question_code, prepared_data,
   # or when a modelled figure should not lead a lay reader's page. Category-level
   # exclusion (Settings insight_exclude_categories) is the blunt version; this is
   # per question. Carried to the v2 data layer as q.exclude_from_insights (TRUE
-  # only). Differences-only by design — the Patterns/Group-overview KeyShare scan
+  # only). Differences-only by design. The Patterns/Group-overview KeyShare scan
   # ignores it (see 27d_diffs.js / 27fa_takeout_shares.js).
   q_exclude_from_insights <- !is.null(question_row$ExcludeFromInsights) &&
     !is.na(question_row$ExcludeFromInsights) &&
     identical(toupper(trimws(question_row$ExcludeFromInsights)), "Y")
 
   # Extract Source/Formula (optional): the question's provenance. Source names
-  # where the numbers come from — the survey question, or the columns a derived
+  # where the numbers come from. The survey question, or the columns a derived
   # one was built from; Formula states how it was worked out. Both are the
   # analyst's own words, because a column derived upstream arrives at the engine
   # as a finished column with nothing left to infer from. Carried to the v2 data
@@ -698,7 +698,7 @@ process_single_question <- function(question_code, prepared_data,
   # The ratio-of-totals pairing (RatioNumerator / RatioDenominator). Carried to
   # the v2 data layer so the report can recompute the row under an audience
   # filter from the two sibling columns' microdata scores. Without it the row
-  # would freeze at its published value while every other row moved — the same
+  # would freeze at its published value while every other row moved. The same
   # class of silent disagreement as a stale median.
   q_ratio <- NULL
   ratio_named <- vapply(NUMERIC_RATIO_COLS, function(col) {
@@ -793,7 +793,7 @@ process_all_questions <- function(questions_to_process, survey_data,
   for (q_idx in seq_len(nrow(questions_to_process))) {
     current_question_code <- questions_to_process$QuestionCode[q_idx]
 
-    # Progress logging — use the initial count (not the growing processed_questions
+    # Progress logging. Use the initial count (not the growing processed_questions
     # vector) so that (processed/total) shows correctly rather than ~doubling.
     total_processed <- n_initial_processed + q_idx
     if (!is.null(progress_callback)) {
@@ -813,7 +813,7 @@ process_all_questions <- function(questions_to_process, survey_data,
       survey_data, survey_structure, banner_info, master_weights
     )
 
-    # An empty subgroup is a deliberate, explained skip — it carries its own
+    # An empty subgroup is a deliberate, explained skip. It carries its own
     # reason and is NOT the "unexpected failure" case below.
     if (isTRUE(prepared_data$skip)) {
       skip_kind <- if (is.null(prepared_data$kind)) "unexpected" else prepared_data$kind
@@ -836,8 +836,8 @@ process_all_questions <- function(questions_to_process, survey_data,
     # signals a condition (stop) and takes the whole run down rather than
     # returning. This branch only becomes live if a future change wraps the call
     # in tryCatch to convert refusals into per-question skips. The engine is
-    # deliberately fail-fast — a research workbook silently missing a question is
-    # worse than a run that stops — so the refusal messages say the run stops
+    # deliberately fail-fast. A research workbook silently missing a question is
+    # worse than a run that stops, so the refusal messages say the run stops
     # (review 2026-08-21, I-1). Do not read this branch as evidence that
     # per-question skipping is in force; the live skip is the empty-subgroup one
     # above, which returns skip=TRUE rather than NULL.

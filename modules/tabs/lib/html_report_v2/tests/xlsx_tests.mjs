@@ -34,7 +34,7 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 const isNum = (xml, v) => xml === "<c><v>" + v + "</v></c>";
 const isText = (xml) => xml.indexOf('t="inlineStr"') !== -1;
 
-console.log("XLSX cell coercion — suite:");
+console.log("XLSX cell coercion. Suite:");
 
 run("native numbers and clean number strings stay numeric (matrix export)", () => {
   assert(isNum(cell(42), 42), "native number 42");

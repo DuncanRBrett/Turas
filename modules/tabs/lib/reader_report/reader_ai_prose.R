@@ -1,21 +1,21 @@
 # ==============================================================================
-# TABS — READER REPORT: AI PROSE PATH (V15, OPT-IN)
+# TABS. READER REPORT: AI PROSE PATH (V15, OPT-IN)
 # ==============================================================================
-# The deterministic Reader builds the whole report — visuals, structure, the
-# numbers, the honesty machinery — from the data layer. This module OPTIONALLY
+# The deterministic Reader builds the whole report. Visuals, structure, the
+# numbers, the honesty machinery, from the data layer. This module OPTIONALLY
 # replaces the templated narrative (title, argument, verdict, leverage, limits)
 # with prose drafted by a model, so the report reads like a considered document
 # rather than a filled-in template.
 #
-# PRIVACY: the model is sent AGGREGATES ONLY — the derived figures the report
+# PRIVACY: the model is sent AGGREGATES ONLY. The derived figures the report
 # already shows. Never the microdata, never verbatims. Every number the model
 # writes is checked against those aggregates (deterministic_number_check); if it
 # invents a figure, the AI prose is REJECTED and the deterministic prose stands.
 # So the model phrases the numbers; it never generates one, and the report says
 # so (disclosure mode = "ai" names the model).
 #
-# Enabled by config reader_ai_prose (off by default). Any failure — no key, no
-# ellmer, a provider error, a failed number check — degrades silently to the
+# Enabled by config reader_ai_prose (off by default). Any failure. No key, no
+# ellmer, a provider error, a failed number check. Degrades silently to the
 # deterministic prose. The report always builds.
 # ==============================================================================
 
@@ -30,7 +30,7 @@ if (!exists("%||%", mode = "function")) {
       exists("deterministic_number_check", mode = "function")) return(TRUE)
   lib <- get0(".tabs_lib_dir", ifnotfound = file.path("modules", "tabs", "lib"))
   shared_ai <- file.path(dirname(dirname(lib)), "shared", "lib", "ai")
-  # the prose-voice fragment is optional — its absence must not disable the layer
+  # the prose-voice fragment is optional. Its absence must not disable the layer
   voice_p <- file.path(shared_ai, "ai_voice.R")
   if (file.exists(voice_p)) source(voice_p, local = FALSE)
   ok <- TRUE
@@ -41,7 +41,7 @@ if (!exists("%||%", mode = "function")) {
   ok && exists("call_insight_model", mode = "function")
 }
 
-#' The structured output the model returns — the narrative only. The numbers,
+#' The structured output the model returns. The narrative only. The numbers,
 #' visuals and honesty machinery are the deterministic report's; the model fills
 #' these fields and nothing else.
 reader_prose_schema <- function() {
@@ -55,18 +55,18 @@ reader_prose_schema <- function() {
     title    = ts("A short, specific report title. Evocative is fine; overwrought is not. No colon-subtitle."),
     subtitle = ts("One sentence capturing the through-line of the story."),
     claims   = ellmer::type_array(
-      "The argument as 3 to 5 claims, in order, each defending a point. This is the spine — find the story, do not just restate the numbers.",
+      "The argument as 3 to 5 claims, in order, each defending a point. This is the spine. Find the story, do not just restate the numbers.",
       items = leaf()),
-    verdict  = ts("One paragraph: the point of view — what is really going on beneath the numbers."),
+    verdict  = ts("One paragraph: the point of view. What is really going on beneath the numbers."),
     leverage = ellmer::type_array(
       "2 to 4 ranked, specific actions, each tied to a named weak or falling item.",
       items = leaf()),
     limits   = ellmer::type_array(
-      "2 to 3 honest limits — what this survey cannot tell you.",
+      "2 to 3 honest limits. What this survey cannot tell you.",
       items = leaf()))
 }
 
-#' Aggregates-only facts for the model — the figures the report already shows.
+#' Aggregates-only facts for the model. The figures the report already shows.
 #' Never microdata, never verbatims. Also the source-of-truth for the number
 #' check, so anything the model cites must appear here.
 #'
@@ -183,7 +183,7 @@ reader_ai_facts_text <- function(facts) {
     p <- facts$people
     out <- paste0(out, ln("\nSUB-GROUPS (within ", p$group, "): lowest is ", p$lowest$label,
       " (n=", p$lowest$base, "), anchor is ", p$anchor$label, " at ", fnum(p$anchor$average),
-      " (n=", p$anchor$base, "). Small bases — directional only."))
+      " (n=", p$anchor$base, "). Small bases. Directional only."))
   }
   d <- facts$derived
   if (!is.null(d)) {
@@ -192,7 +192,7 @@ reader_ai_facts_text <- function(facts) {
       if (!is.null(d$nTracked)) paste0(d$nTracked, " tracked") else NULL,
       if (!is.null(d$nFalling)) paste0(d$nFalling, " of them lower than the base year") else NULL,
       if (!is.null(d$spread)) paste0("widest item gap ", fnum(d$spread)) else NULL)
-    if (length(dbits)) out <- paste0(out, ln("\nDERIVED (already computed — safe to cite): ",
+    if (length(dbits)) out <- paste0(out, ln("\nDERIVED (already computed, safe to cite): ",
       paste(dbits, collapse = "; "), "."))
   }
   dz <- facts$design
@@ -212,17 +212,17 @@ reader_ai_facts_text <- function(facts) {
 reader_ai_prompt <- function(facts) {
   system <- paste(
     "You are a sharp South African market-research analyst writing the reader-facing narrative for a survey report.",
-    "Your job is to find the STORY in the figures — the through-line, the argument a decision-maker can act on — not to restate the numbers.",
+    "Your job is to find the STORY in the figures, the through-line, the argument a decision-maker can act on, not to restate the numbers.",
     "",
     get0("TURAS_PROSE_VOICE", ifnotfound = ""),
     "",
     "HONESTY (hard rules). Use ONLY numbers that appear in the FACTS. Never invent, round beyond the given precision, or extrapolate a figure.",
-    "Never compute a figure of your own — no differences, sums or averages; to compare two given figures, set them side by side.",
-    "Every number you write must be traceable to the facts. Small-base sub-groups are leads, not verdicts — say so. Do not name a cause the data can't support.",
+    "Never compute a figure of your own. No differences, sums or averages; to compare two given figures, set them side by side.",
+    "Every number you write must be traceable to the facts. Small-base sub-groups are leads, not verdicts. Say so. Do not name a cause the data can't support.",
     "",
     "STRUCTURE. Return: a title; a one-sentence subtitle; the argument as 3-5 ordered claims (lead phrase + a sentence or two);",
     "a verdict paragraph (the point of view); 2-4 ranked leverage actions tied to named weak/falling items; 2-3 honest limits.",
-    "Lead with the strength if there is one, then the problem. Be specific — name the items and cite their numbers.")
+    "Lead with the strength if there is one, then the problem. Be specific. Name the items and cite their numbers.")
   user <- paste0(
     "Write the narrative for this study from the facts below. Only these numbers exist.\n\n",
     reader_ai_facts_text(facts))
@@ -247,11 +247,11 @@ reader_ai_prompt <- function(facts) {
 reader_generate_ai_prose <- function(model, config_obj = list()) {
   fail <- function(reason) list(prose = NULL, reason = reason)
   if (!.reader_ensure_ai_layer()) {
-    cat("  [Reader AI] AI layer unavailable (ellmer / shared ai modules) — keeping the on-device narrative.\n")
+    cat("  [Reader AI] AI layer unavailable (ellmer / shared ai modules): keeping the on-device narrative.\n")
     return(fail("the AI layer is unavailable (ellmer or API key missing)"))
   }
   model_id <- resolve_ai_model_alias(config_obj$ai_model %||% "")
-  if (!nzchar(model_id)) model_id <- "claude-opus-4-8"   # the reader is the flagship — default to the strong model
+  if (!nzchar(model_id)) model_id <- "claude-opus-4-8"   # the reader is the flagship. Default to the strong model
   ai_config <- list(provider = config_obj$ai_provider %||% "anthropic",
                     model = model_id, max_tokens = 3000L)
 
@@ -260,7 +260,7 @@ reader_generate_ai_prose <- function(model, config_obj = list()) {
   res <- tryCatch(call_insight_model(prompt, reader_prose_schema(), ai_config),
                   error = function(e) NULL)
   if (is.null(res) || !is.list(res) || !nzchar(res$verdict %||% "")) {
-    cat("  [Reader AI] No usable response — keeping the on-device narrative.\n")
+    cat("  [Reader AI] No usable response. Keeping the on-device narrative.\n")
     return(fail("no usable response from the model"))
   }
 
@@ -273,7 +273,7 @@ reader_generate_ai_prose <- function(model, config_obj = list()) {
     limits = .reader_as_leaves(res$limits))
 
   # Number check: every figure in the AI prose must exist in the facts we sent.
-  # Pass a clean, NA-free numeric vector as the source — the shared check treats
+  # Pass a clean, NA-free numeric vector as the source. The shared check treats
   # its argument as the source pool (extract_all_numbers is identity on a numeric
   # vector) and NA in the pool would break its any(... < tol) comparison. The
   # pool includes the fact-sheet v2 derived-numbers and design facts (they live
@@ -287,7 +287,7 @@ reader_generate_ai_prose <- function(model, config_obj = list()) {
   facts_numbers <- facts_numbers[!is.na(facts_numbers)]
   chk <- deterministic_number_check(narrative, facts_numbers)
   if (!isTRUE(chk$pass)) {
-    cat(sprintf("  [Reader AI] REJECTED — %s. Keeping the on-device narrative.\n",
+    cat(sprintf("  [Reader AI] REJECTED, %s. Keeping the on-device narrative.\n",
                 chk$issues %||% "a cited number is not in the data"))
     return(fail("a cited figure was not in the data"))
   }
@@ -295,7 +295,7 @@ reader_generate_ai_prose <- function(model, config_obj = list()) {
   list(prose = prose, reason = NULL)
 }
 
-#' Apply AI prose to the model when reader_ai_prose is on. Returns the model —
+#' Apply AI prose to the model when reader_ai_prose is on. Returns the model,
 #' enriched with AI prose + an "ai" disclosure when it succeeds. When the AI
 #' path was requested but degraded, the model is left on its deterministic
 #' narrative but its disclosure is stamped requested_mode="ai" + a
@@ -303,15 +303,15 @@ reader_generate_ai_prose <- function(model, config_obj = list()) {
 #' passing a degraded run off as an Opus draft. Never throws.
 reader_apply_ai_prose <- function(model, config_obj = list()) {
   if (!isTRUE(config_obj$reader_ai_prose)) return(model)
-  # AI prose was requested — record that on the disclosure whatever the outcome.
+  # AI prose was requested. Record that on the disclosure whatever the outcome.
   model$disclosure$requested_mode <- "ai"
   gen <- tryCatch(reader_generate_ai_prose(model, config_obj), error = function(e) {
-    cat(sprintf("  [Reader AI] error: %s — keeping the on-device narrative.\n", conditionMessage(e)))
+    cat(sprintf("  [Reader AI] error: %s. Keeping the on-device narrative.\n", conditionMessage(e)))
     list(prose = NULL, reason = "an unexpected error while drafting")
   })
   if (is.null(gen$prose)) {
     model$disclosure$fallback_reason <- gen$reason %||% "the AI narrative was unavailable"
-    cat("  [Reader AI] requested but unavailable — the report will show the on-device narrative and say so.\n")
+    cat("  [Reader AI] requested but unavailable. The report will show the on-device narrative and say so.\n")
     return(model)
   }
   prose <- gen$prose
@@ -327,7 +327,7 @@ reader_apply_ai_prose <- function(model, config_obj = list()) {
   }
   model$disclosure <- list(mode = "ai", requested_mode = "ai", model = prose$model,
     text = paste0("The narrative was drafted by ", prose$model,
-      " from the survey's aggregate figures — no individual responses or verbatims were sent. ",
+      " from the survey's aggregate figures. No individual responses or verbatims were sent. ",
       "Every number was computed by Turas, not the model, and checked against the data. Analyst-reviewed."))
   cat(sprintf("  [Reader AI] narrative drafted by %s (numbers verified).\n", prose$model))
   model

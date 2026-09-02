@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE SHEET-UNION TESTS
+# TABS MODULE. QUALITATIVE SHEET-UNION TESTS
 # ==============================================================================
 #
 # Known-answer tests for qual_unions.R: parsing the CommentSheet mapping, deriving
 # the synthetic union code, scanning the Selection sheet for union specs, and
-# reassembling member sheets into one band-stamped question — plus an end-to-end
+# reassembling member sheets into one band-stamped question, plus an end-to-end
 # check that the band + split survive into the DATA_QUAL island.
 #
 # Run with:
@@ -241,8 +241,8 @@ test_that("the score wins over sheet-of-origin, and mismatches reassign", {
 # The workbook integrity gate refuses on an ID duplicated WITHIN a sheet and
 # cannot see across sheets. A union concatenates its members, so the same defect
 # crossing a sheet boundary used to arrive unchecked: the respondent is counted
-# twice, sits in two bands at once, and — because both records inherit one idx
-# and one rid — collides on the IDENTICAL reader-mark key.
+# twice, sits in two bands at once, and, because both records inherit one idx
+# and one rid. Collides on the IDENTICAL reader-mark key.
 
 union_qs <- function(det = list(mk_rec("54", "must improve energy")),
                      pro = list(mk_rec("11", "best service"))) {
@@ -270,7 +270,7 @@ test_that("the refusal names the union, the ResponseID and BOTH sheets", {
 })
 
 test_that("every duplicate across every union is listed in ONE refusal", {
-  # One pass over the workbook must fix them all — the principle the per-sheet
+  # One pass over the workbook must fix them all. The principle the per-sheet
   # gate already follows.
   qs <- list(
     mk_reader_q("DetractorComment", list(mk_rec("54", "a"), mk_rec("8", "b"))),
@@ -282,7 +282,7 @@ test_that("every duplicate across every union is listed in ONE refusal", {
   expect_match(txt, "2 duplicated ResponseID")
 })
 
-test_that("the same ID in a NON-member sheet is untouched — sheets are separate questions", {
+test_that("the same ID in a NON-member sheet is untouched. Sheets are separate questions", {
   # Q02Comment is its own question; sharing a respondent with a union member is
   # ordinary (one person answers two open-ends) and must not refuse.
   qs <- c(union_qs(), list(mk_reader_q("Q02Comment", list(mk_rec("54", "unrelated")))))

@@ -1,10 +1,10 @@
-// Tracking navigation — regression suite for the Summary → Visualise jump.
+// Tracking navigation. Regression suite for the Summary → Visualise jump.
 //
 // Reproduces the bug where clicking a "Significant changes" card (or a KPI
 // scorecard card) landed on the Visualise view showing a STALE question/cut
 // rather than the card you clicked. Root cause: the click handler wrote a
-// dead `visSegs` state key and never updated `visSel` — the model the
-// Visualise view actually reads — so a prior selection survived the click.
+// dead `visSegs` state key and never updated `visSel`. The model the
+// Visualise view actually reads, so a prior selection survived the click.
 //
 // We load the real Summary (cardVisSel) and Visualise (selection / seriesSpecs)
 // helpers with a hand-built TR.trk stub, and assert the click resolves to the
@@ -66,7 +66,7 @@ function assert(cond, msg) {
   else { failed++; console.log("  ✗ " + msg); }
 }
 
-console.log("Tracking navigation — Summary → Visualise jump:");
+console.log("Tracking navigation. Summary → Visualise jump:");
 
 // 1. cardVisSel shape: a sig card carries the clicked metric AND its cut.
 let selObj = summary.cardVisSel("Q15::1", "tenure_1_3");
@@ -112,7 +112,7 @@ sel = vis._selection();
 assert(sel.metrics[0] === "Q15::1" && sel.segs[0] === "total",
   "no visSel → selection falls back to metricKey · Total");
 
-// 6. G2: twice-yearly trackers — the current wave's trend x-key must come from
+// 6. G2: twice-yearly trackers. The current wave's trend x-key must come from
 //    wave_order (2025.5), not the re-parsed 4-digit year, so it never collides
 //    with the H1 same-year wave (the published history keys that point as 2025).
 globalThis.TR.render = { CHART_TYPES: [] };
@@ -128,7 +128,7 @@ assert(render.currentYear() !== 2025,
 
 globalThis.TR.AGG = { project: { wave: "Annual 2025" } };
 assert(render.currentYear() === 2025,
-  "G2: annual tracker unchanged — parses 2025 from the wave label (byte-identical)");
+  "G2: annual tracker unchanged. Parses 2025 from the wave label (byte-identical)");
 
 globalThis.TR.AGG = { project: { wave: "H1 2026", wave_order: "2026" } };
 assert(render.currentYear() === 2026,
@@ -136,7 +136,7 @@ assert(render.currentYear() === 2026,
 
 
 // ---- I23: the pulse separates "stable" (tested) from "not testable" ---------
-// A no-SD history used to render "0 increases · 0 decreases · N stable" —
+// A no-SD history used to render "0 increases · 0 decreases · N stable",
 // untested metrics counted as findings; matrix tooltips said "not significant"
 // when no test ran.
 {

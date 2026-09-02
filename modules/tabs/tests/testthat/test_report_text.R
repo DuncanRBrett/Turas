@@ -2,7 +2,7 @@
 # TABS MODULE - AUTHORED REPORT TEXT (v2)
 # ==============================================================================
 #
-# Tests modules/tabs/lib/html_report_v2/report_text.R — the build-time contract
+# Tests modules/tabs/lib/html_report_v2/report_text.R. The build-time contract
 # between the renderer and the text an author writes in the Callout Editor.
 #
 # The point of these tests is the REFUSALS. There is deliberately no fallback
@@ -217,7 +217,7 @@ test_that("an override replaces the platform wording for this build only", {
     overrides = list("report.construction.stock" = "Figures come out of R."))
   payload <- jsonlite::fromJSON(res$json, simplifyVector = FALSE)
   expect_equal(payload[["report.construction.stock"]], "Figures come out of R.")
-  # the registry itself is untouched — the override lives for this build only
+  # the registry itself is untouched. The override lives for this build only
   expect_false(identical(base[["report.construction.stock"]]$text,
                          "Figures come out of R."))
 })
@@ -270,7 +270,7 @@ test_that("an edit made after the first read is picked up without restarting R",
   # launch_turas() is a long-running session: the Callout Editor writes the
   # registry from inside it and the analyst then regenerates a report from the
   # same session. A session-lifetime cache meant the edit could not reach the
-  # report — and a build could refuse against a registry that had been correct
+  # report, and a build could refuse against a registry that had been correct
   # on disk for hours. That is exactly how CCPB failed on 2026-08-18.
   path <- turas_callouts_path()
   original <- readLines(path, warn = FALSE)
@@ -300,7 +300,7 @@ test_that("an edit made after the first read is picked up without restarting R",
 context("report_text: placeholder descriptions")
 
 test_that("every declared token is described, and every description names a real token", {
-  # The Callout Editor shows token_help beside the text being edited — it is the
+  # The Callout Editor shows token_help beside the text being edited. It is the
   # only way an author looking at "{producer}" learns what it becomes. A token
   # added to the manifest without a description would leave a blank line there,
   # which is worse than useless: it looks explained.

@@ -2,7 +2,7 @@
 /**
  * Gate: four saved copies of ONE report keep four independent sets of pins.
  *
- * localStorage is shared across every page on a browser origin — and for
+ * localStorage is shared across every page on a browser origin, and for
  * file:// reports that is every report file on the machine. The store key was
  * scoped to project name + wave, which keeps two DIFFERENT surveys apart but
  * not two copies of the SAME one: an analyst who saves four differently-pinned
@@ -29,7 +29,7 @@ import vm from "node:vm";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS = path.join(HERE, "..", "assets", "js");
 
-/** One localStorage shared by every "file" in the run — exactly the trap. */
+/** One localStorage shared by every "file" in the run. Exactly the trap. */
 const STORE = new Map();
 const localStorage = {
   getItem: (k) => (STORE.has(k) ? STORE.get(k) : null),
@@ -77,7 +77,7 @@ const ORIG_KEY = "turas_v2_story:CCPB_2026_Main_Study_W2026";
 ok(orig.d2.storeKey("turas_v2_story") === ORIG_KEY,
   "an original report keeps the project+wave key");
 
-// A copy saved before this shipped carries state but no id — also unchanged.
+// A copy saved before this shipped carries state but no id, also unchanged.
 const legacy = openReport({ saved: true, story: [pin("Q1")] });
 ok(legacy.d2.storeKey("turas_v2_story") === ORIG_KEY,
   "a copy saved before copyId shipped keeps that key too, so nothing already annotated moves");
@@ -150,7 +150,7 @@ const savedB = saveCopyIsland(donor);      // ...and a second, from the same pag
 ok(typeof savedA.copyId === "string" && savedA.copyId.length > 0,
   "report.saveCopy writes a copyId into the copy's user-state island");
 ok(savedA.copyId !== savedB.copyId,
-  "two copies saved from the SAME report get different ids — which is the whole point");
+  "two copies saved from the SAME report get different ids, which is the whole point");
 ok(donor.d2.storeKey("turas_v2_story") === ORIG_KEY,
   "saving a copy does not move the workspace of the report you saved it from");
 ok(openReport(savedA).d2.storeKey("turas_v2_story") !== openReport(savedB).d2.storeKey("turas_v2_story"),

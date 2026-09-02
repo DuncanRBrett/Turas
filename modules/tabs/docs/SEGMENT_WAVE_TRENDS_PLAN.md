@@ -1,6 +1,6 @@
-# Plan — Per-segment prior-wave trends in the v2 report (Total + published dimensions)
+# Plan. Per-segment prior-wave trends in the v2 report (Total + published dimensions)
 
-**Status:** DELIVERED (verified 2026-08-21) — `lib/tracking_segment_compute.R` and its bridges exist with passing tests. This document is the design record, not an open plan. Branch: `feature/tabs-v2-segment-wave-trends` (stacked on
+**Status:** DELIVERED (verified 2026-08-21): `lib/tracking_segment_compute.R` and its bridges exist with passing tests. This document is the design record, not an open plan. Branch: `feature/tabs-v2-segment-wave-trends` (stacked on
 `fix/tabs-v2-banner-composite-fixes`, which adds the filter-suppression this feature refines).
 **Date:** 2026-06-18.
 
@@ -18,20 +18,20 @@ dimensions**, and support **proportions** (not just mean-kind metrics):
 PRIOR waves; the CURRENT wave stays live from the tabs microdata.**
 
 Why:
-1. Prior waves are **frozen, published figures of record** — pre-aggregated per-segment values
+1. Prior waves are **frozen, published figures of record**. Pre-aggregated per-segment values
    (means, proportions, NETs, bases) are the right representation; no live recompute needed.
 2. The `tracker` module is the **canonical longitudinal engine** (segments via `banner_trends.R`,
    every metric type via `metric_types.R`, significance, weighting). Single source of truth;
    no duplicated stats logic.
-3. **Compact** — pre-aggregated per-segment values fit the self-contained embedded report;
+3. **Compact**. Pre-aggregated per-segment values fit the self-contained embedded report;
    carrying per-respondent microdata for every historical wave would blow the size budget.
 
 **Boundary (explicit):** this serves *published* dimensions. It does **not** enable arbitrary
-*ad-hoc* filtering of history (a subgroup we never published) — that would need prior-wave
+*ad-hoc* filtering of history (a subgroup we never published): that would need prior-wave
 microdata and is out of scope. The recent filter-suppression fix remains the correct fallback
 for unpublished subgroups.
 
-## 3. Current state — the renderer is already built for this
+## 3. Current state. The renderer is already built for this
 
 The JS wave engine (`assets/js/22w_waves.js`) already reads per-segment hooks that the current
 writer never populates:
@@ -45,12 +45,12 @@ writer never populates:
 | `netValue` / `indexFromDistribution` | per-segment via `rowValue(...seg)` | 22w_waves.js:145-171 |
 
 The **Tracking** and **Visualise** "Segments for question" views already call
-`waves.series(q,row,ri,segNorm)` with a real segment — they render nothing today only because
+`waves.series(q,row,ri,segNorm)` with a real segment. They render nothing today only because
 `seg_stats`/`bases`/`rows[].seg` are empty.
 
-**The gap is the writer + a few render surfaces — not the data model.**
+**The gap is the writer + a few render surfaces, not the data model.**
 
-## 4. The bridge — `tracker` output → v2 wave island
+## 4. The bridge, `tracker` output → v2 wave island
 
 The tracker produces (Explore-mapped; field names to be confirmed in Phase 0):
 
@@ -95,7 +95,7 @@ Plus, per wave: `segments: [{ "norm": "<segKey>", "label": "...", "group": "..."
 The CURRENT wave continues to come from the live tabs run (scores + `banner_vars`), so
 current-wave figures always match the Crosstabs. **Open design point:** the current wave's
 *segment* trend point should be taken from the **live tabs banner-column value** (guaranteed to
-match Crosstabs) rather than duplicated into the island — see Phase 3.
+match Crosstabs) rather than duplicated into the island. See Phase 3.
 
 ## 5. Segment keying (collision risk)
 
@@ -111,13 +111,13 @@ channel both "Online").
 ## 6. Render surfaces
 
 1. **Tracking / Visualise "Segments for question":** lights up once the island carries
-   `seg_stats`/`bases`/`rows[].seg`. Minimal JS — wire the current-wave segment point from the
+   `seg_stats`/`bases`/`rows[].seg`. Minimal JS. Wire the current-wave segment point from the
    live model (§4 open point).
 2. **Crosstabs / Dashboard `attachDeltas`:** currently Total-only (`seg = null`,
    22w_waves.js:437). To show "Total + per-department" Δ/trend per banner column, compute deltas
    **per column**, mapping each banner column to its segment (`waves.segments()` already gives the
    column↔segment link).
-3. **Segment-aware filter:** refine the suppression from `fix/tabs-v2-banner-composite-fixes` —
+3. **Segment-aware filter:** refine the suppression from `fix/tabs-v2-banner-composite-fixes`,
    if an audience filter matches a published segment, show that segment's trend instead of
    suppressing; else keep suppressing (the fallback).
 
@@ -126,44 +126,44 @@ channel both "Online").
 - **CCPB:** re-run the tracker over the historical waves **with centre + channel** (per-respondent
   files; `wave_loader.R` is data-source agnostic) to emit the island. Backfill is one-time and
   kept out of the repo (as CCS history was).
-- **Next study:** greenfield — emit the segment-aware island from wave 1; no backfill.
+- **Next study:** greenfield. Emit the segment-aware island from wave 1; no backfill.
 - **Config:** the tracker's Banner sheet already defines break variables; the v2 side must know
-  which banner groups are *tracked dimensions* (shared config — the tabs/tracker already share
+  which banner groups are *tracked dimensions* (shared config, the tabs/tracker already share
   the Question_Mapping).
 
 ## 8. Phasing (each phase shippable + gated)
 
-- **Phase 0 — spike/confirm:** verify exact tracker field names against the code; confirm CCPB
+- **Phase 0. Spike/confirm:** verify exact tracker field names against the code; confirm CCPB
   historical respondent files carry centre + channel; lock the island schema (§4). Confirm
   independent dimensions (Total | by dept | by campus), **not** the full crossing.
-- **Phase 1 — bridge (means + NPS), Total + segments:** writer that serialises tracker
+- **Phase 1. Bridge (means + NPS), Total + segments:** writer that serialises tracker
   `trend_results` → island `stats`/`seg_stats`/`bases`/`segments`. Tracking-tab segment trends
   light up. Gate: synthetic 2-dimension fixture; per-segment values + bases assert through
   `valueAt`/`baseOf`.
-- **Phase 2 — proportions / NET per segment:** populate `rows[norm].pct/.seg`. Gate: proportion
+- **Phase 2. Proportions / NET per segment:** populate `rows[norm].pct/.seg`. Gate: proportion
   + NET segment trends.
-- **Phase 3 — Crosstabs/Dashboard per-column deltas + segment-aware filter** (refines the
+- **Phase 3. Crosstabs/Dashboard per-column deltas + segment-aware filter** (refines the
   suppression). Gate: per-column deltas; filter-matches-segment keeps trend, else suppresses.
-- **Phase 4 — CCPB backfill + next-study config**; verify against a real run.
-- **Phase 5 (optional hardening) — `group::label` segment keying** (§5 Option B).
+- **Phase 4. CCPB backfill + next-study config**; verify against a real run.
+- **Phase 5 (optional hardening): `group::label` segment keying** (§5 Option B).
 
 ## 9. Risks
 
 - **Data provenance (CCPB):** if historical respondent files lack centre/channel, prior segment
-  trends can't be reconstructed — Phase 0 gate.
-- **Current-vs-prior consistency:** current wave from tabs, priors from tracker — definitions must
+  trends can't be reconstructed. Phase 0 gate.
+- **Current-vs-prior consistency:** current wave from tabs, priors from tracker. Definitions must
   align (shared config). A prior discrepancy (weighted tracker, "I-WTRACK") was found and fixed
   before; same diligence here.
 - **Sparsity:** dimension × dimension cells get thin → low-base flags (existing) apply per segment.
 - **Label collisions:** §5.
 - **Size budget:** per-segment pre-aggregates are compact, but many waves × dimensions × options
-  add up — watch the `< 2 MB` artifact gate.
+  add up. Watch the `< 2 MB` artifact gate.
 
 ## 10. Decisions (resolved 2026-06-18)
 
 - **History = computed per-segment totals, NOT raw microdata.** Prior waves carry the published
   Total + per-dimension values, so the trend always equals what was reported. Raw data is retained
-  upstream in the tracker's wave files — any new breakdown is a tracker re-run + re-emit, not an
+  upstream in the tracker's wave files. Any new breakdown is a tracker re-run + re-emit, not an
   embedded-microdata change. The current wave stays live from the tabs microdata.
 - **Independent dimensions** (Total | by dept | by campus), not the full crossing.
 - **Tracking-tab segment trends first** (Phase 1); Crosstabs per-column deltas in Phase 3.
@@ -173,34 +173,34 @@ channel both "Online").
 - Focus is **build-going-forward**; CCPB backfill (Phase 4) is feasible since the tracker reads
   per-respondent wave files, contingent on those files carrying centre + channel.
 
-## 11. Progress (2026-06-18) — branch `feature/tabs-v2-segment-wave-trends`
+## 11. Progress (2026-06-18): branch `feature/tabs-v2-segment-wave-trends`
 
 **Done + tested (no real data needed; synthetic fixtures):**
-- **Phase 0** — tracker output shapes verified against the code; island schema locked.
-- **Phase 1a** — JS consumer validated: `waves.series(q,row,ri,seg)` reads `seg_stats`/`bases`;
+- **Phase 0**. Tracker output shapes verified against the code; island schema locked.
+- **Phase 1a**. JS consumer validated: `waves.series(q,row,ri,seg)` reads `seg_stats`/`bases`;
   `waves.segments()` matches segments to banner columns. JS gate.
-- **Phase 1b** — `tracker_segment_contributions()` (`lib/tracking_segment_bridge.R`) serialises the
+- **Phase 1b**, `tracker_segment_contributions()` (`lib/tracking_segment_bridge.R`) serialises the
   tracker's per-segment output → island prior-wave shape (means + NPS, values + bases). Output
   assembles via `build_tracking_island()` + `serialize_tracking_island()` into valid island JSON.
-- **Phase 2 proportions** — bridge branches on metric type; proportions → `rows[norm].pct` (Total)
+- **Phase 2 proportions**. Bridge branches on metric type; proportions → `rows[norm].pct` (Total)
   + `.seg[segKey]`. Renderer already reads it (no JS change).
-- **Phase 2 significance (means)** — bridge carries SD on `stats`/`seg_stats`; `sdAtWave` reads a
+- **Phase 2 significance (means)**. Bridge carries SD on `stats`/`seg_stats`; `sdAtWave` reads a
   stored SD so the Welch test runs per-segment without the distribution. Existing reports unaffected.
 - Gates: R bridge **46/0** (`tests/testthat/test_tracking_segment_bridge.R`); JS **79/0**
   (`prototypes/.../run_tests_v2.mjs`). Prototype ↔ production `22w_waves.js` byte-identical.
 
-**Remaining (needs a real tracker run / render verification — Duncan):**
+**Remaining (needs a real tracker run / render verification, Duncan):**
 - **Integration wiring:** run the tracker for a study → feed `tracker_segment_contributions()`
   output as `build_tracking_island()` prior_contributions (the current wave stays the live tabs
   contribution). Add `tracking_segment_bridge.R` to the tabs loader.
 - **Tracking-tab current-wave segment point** from the live tabs model (so it always matches
-  Crosstabs) — small JS + visual check via `launch_turas`.
-- **Phase 3** — Crosstabs/Dashboard per-column deltas + segment-aware filter (refines the
+  Crosstabs): small JS + visual check via `launch_turas`.
+- **Phase 3**. Crosstabs/Dashboard per-column deltas + segment-aware filter (refines the
   suppression fix).
-- **Phase 4** — CCPB backfill (needs the historical respondent files with centre + channel).
+- **Phase 4**. CCPB backfill (needs the historical respondent files with centre + channel).
 - Possible refinement: carry `eff_n` for exact weighted significance (currently `n_unweighted`).
 
-## 12. SACS worked example — data path VERIFIED on real data (2026-06-18)
+## 12. SACS worked example. Data path VERIFIED on real data (2026-06-18)
 
 Source: `OneDrive/DB Files/TurasProjects/SACAP/SACS/SACS-{2023,2024,2025}` (read-only).
 Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config existed.
@@ -212,8 +212,8 @@ Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config ex
   satisfaction** ("Taking everything into account how satisfied…", 2023 Q21 / 2024 Q26 / 2025 Q28).
 - **Segments**: Campus (2023 Q24 / 2024-25 Q02), Department (Q25 / Q03), Tenure (Q26 / Q04).
   Campus + Tenure category labels are **identical across all 3 years** (clean trends); **Department
-  was restructured** (labels differ → partial cross-year matching, gaps — handled gracefully).
-- **Excluded**: the values items (Integrity/Excellence/…) — reworded 2023→2024 ("I do what's
+  was restructured** (labels differ → partial cross-year matching, gaps, handled gracefully).
+- **Excluded**: the values items (Integrity/Excellence/…): reworded 2023→2024 ("I do what's
   right" → "SACAP demonstrates…"), so not comparable; and they're "values", not "engagement".
 
 **Verified (scratch driver, /tmp, nothing written to OneDrive):** real data → the tracker's
@@ -222,7 +222,7 @@ Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config ex
 13 items × 36 segments. Sample: overall satisfaction Total 4.08 → 3.83 → 3.90; by tenure
 "<1 year" 4.3→4.45 vs "3–5 years" 3.88→3.69. Per-segment bases small (campus n≈8–62) → low base.
 
-**Production wiring — BUILT + verified (2026-06-18):**
+**Production wiring. BUILT + verified (2026-06-18):**
 - `compute_segment_trends()` + `write_segment_wave_sidecars()`
   (`lib/tracking_segment_compute.R`) orchestrate the tracker's calculators over
   Total + each banner value per wave and write per-wave segment **sidecars**. The
@@ -238,7 +238,7 @@ Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config ex
 1. Run the backfill (`source(".../modules/tabs/examples/sacs_segment_backfill.R")` in R,
    or `Rscript` it) → writes `SACS_2023_wave.json` + `SACS_2024_wave.json` into
    `SACS-2025/wave_history/` (in the project; override with `SACS_SEG_OUT`).
-2. SACS-2025_Crosstab_Config — Settings (add rows): `html_report_v2` = TRUE,
+2. SACS-2025_Crosstab_Config. Settings (add rows): `html_report_v2` = TRUE,
    `html_report_v2_tracking` = TRUE, `waves_source` = `…/SACS-2025/wave_history`.
    Selection: Q02 (Campus) + Q03 (Department) are already banners; set Q04 (Tenure)
    `UseBanner` = Y, `BannerLabel` = Tenure so the live 2025 model carries those columns.
@@ -251,7 +251,7 @@ also emit its own segment sidecar, so 2026+ is automatic (no backfill step).
 ## 13. Question_Mapping is the canonical, generic mechanism (2026-06-19)
 
 Title-match (no mapping) links prior↔current only when wording is byte-identical
-across waves — fragile. The **Question_Mapping** is the robust, generic path,
+across waves. Fragile. The **Question_Mapping** is the robust, generic path,
 now wired both ends:
 - The live wave keys metrics by the **canonical `QuestionCode`** when a
   `question_mapping` is configured (`tracking_metrics` + `detect_wave_column`).
@@ -259,9 +259,9 @@ now wired both ends:
   `key`; the bridge sets `match_key = tracking_norm(key || title)`. So sidecars
   key by the canonical code too → the link survives **renumbering AND rewording**.
 - `sacs_segment_backfill.R` is now **mapping-driven + generic**: reads a
-  Question_Mapping workbook — `QuestionMap` (canonical code → per-wave column +
+  Question_Mapping workbook, `QuestionMap` (canonical code → per-wave column +
   TrackingSpecs) and `Banners` (Total/Campus/Department/Tenure → per-wave column)
-  — plus the prior data, and emits canonical-keyed sidecars. Latest `Wave*` col =
+, plus the prior data, and emits canonical-keyed sidecars. Latest `Wave*` col =
   live wave; earlier = priors.
 
 **SACS worked example:** `SACS-2025_Question_Mapping.xlsx` (13 metrics ×
@@ -273,17 +273,17 @@ Wave2023/24/25; banners Campus/Department/Tenure). Config Settings:
 ## 14. Composite / index metrics (2026-06-19)
 
 Composites (e.g. `Q_Engage` = mean of the 12 engagement items) are **not raw
-data columns** and — unlike items — carry **no per-respondent micro score**, so
+data columns** and, unlike items, carry **no per-respondent micro score**, so
 the live wave never emits them; they fall back to the renderer's title key
 (`aggKeys[code] = norm(q.title)`, `22w_waves.js`). They therefore track via a
 distinct mapping convention:
 
-- **QuestionMap `SourceQuestions` column** — a comma-list of source `QuestionCode`s
+- **QuestionMap `SourceQuestions` column**. A comma-list of source `QuestionCode`s
   (`ENG01,…,ENG12`). The backfill resolves each to that wave's column (via the
   item rows' `Wave*` map) and `compute_segment_trends` computes the metric as the
-  **per-respondent row-mean** of those columns (`.tsc_metric_vector`; na.rm — a
+  **per-respondent row-mean** of those columns (`.tsc_metric_vector`; na.rm. A
   partial composite uses the items answered), exactly as the data-layer composite.
-- **Keyed by title, not code** — the composite row's `QuestionText` must equal the
+- **Keyed by title, not code**. The composite row's `QuestionText` must equal the
   **data-layer composite title** (SACS: `Engagement`); the backfill sets `key =
   NULL` so the sidecar `match_key = norm(QuestionText)`, matching the live wave's
   title fallback. `Wave*` cells stay blank (it is not a data column).
@@ -292,7 +292,7 @@ distinct mapping convention:
   `stats.index` (the bridge exposes mean as index too).
 
 **Verified on real SACS:** the `Q_Engage` row computes Index **4.305 (2023) /
-4.163 (2024)** by Total + Campus/Department/Tenure — matching the deck's
+4.163 (2024)** by Total + Campus/Department/Tenure. Matching the deck's
 4.31 / 4.16 trend (2025 live = 4.08). To add `Q_Value` similarly: map the values
 items, then add a `Q_Value` composite row (`QuestionText = Values`); note values
 were reworded for 2023, so it is comparable 2024+ only.

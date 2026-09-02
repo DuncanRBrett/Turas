@@ -7,7 +7,7 @@
  * so a cell kept claiming "higher than C" after column C was hidden. The letter
  * is rendered verbatim by render.matrix, so the dangling reference reached the
  * on-screen table, the clipboard/TSV, the per-question XLSX export and the PPTX
- * matrix at once — a client reading "significantly higher than C" against a
+ * matrix at once. A client reading "significantly higher than C" against a
  * table that has no column C.
  *
  * applyDisclosureSuppression already stripped letters for suppressed columns
@@ -83,7 +83,7 @@ function sigOf(model, rowIdx) {
   return model.rows[rowIdx].cells.map((c) => (c && c.sig) || "");
 }
 
-console.log("Hidden columns — suite:");
+console.log("Hidden columns. Suite:");
 
 run("baseline: with nothing hidden every published letter survives", () => {
   loadFixture();
@@ -101,7 +101,7 @@ run("hiding a column removes it AND every letter pointing at it", () => {
   assert(!m.columns.some((c) => c.label === "Gamma"), "Gamma is gone");
   eq(m.hiddenCount, 1, "hiddenCount reports the drop");
 
-  // The D letters must not survive — no column D remains to point at.
+  // The D letters must not survive. No column D remains to point at.
   const row0 = sigOf(m, 0);
   assert(!row0.join("").includes("D"), "no cell still claims significance vs D, got " + JSON.stringify(row0));
   // Row 2's only letters ("BC") lived in Gamma's cell, which left with the
@@ -136,7 +136,7 @@ run("hiding two columns strips both their letters", () => {
 });
 
 run("the rendered table carries no dangling letter either", () => {
-  // The strip happens at model level precisely so every consumer inherits it —
+  // The strip happens at model level precisely so every consumer inherits it,
   // screen, clipboard, XLSX and PPTX all render these same cells.
   loadFixture();
   const m = TR.model.forQuestion("Q1", "Cohort", [], { dual: false, hiddenCols: ["Gamma"] });

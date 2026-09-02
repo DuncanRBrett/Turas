@@ -46,7 +46,7 @@ build_index_summary_table <- function(results_list, composite_results,
   }
 
   # Extract composite rows (results_list rides along only as the fallback for a
-  # composite result built before it carried its own bases — see M-K)
+  # composite result built before it carried its own bases. See M-K)
   composite_rows <- extract_composite_rows(
     composite_results,
     banner_info,
@@ -241,7 +241,7 @@ extract_metric_rows <- function(results_list, banner_info, config) {
 #' @param banner_info Banner structure
 #' @param composite_defs Composite definitions
 #' @param config Configuration
-#' @param results_list All question results — lets a composite borrow its first
+#' @param results_list All question results. Lets a composite borrow its first
 #'   source question's bases for the disclosure gate (composites share their
 #'   sources' respondent pool)
 #' @return Data frame with composite rows
@@ -316,7 +316,7 @@ extract_composite_rows <- function(composite_results, banner_info,
       }
 
       # Add source questions info to the label (comp_def is NULL when no
-      # composite_defs were supplied — referencing it unguarded crashed, M6)
+      # composite_defs were supplied. Referencing it unguarded crashed, M6)
       if (!is.null(comp_def) && nrow(comp_def) > 0 &&
           !is.null(comp_def$SourceQuestions) && length(comp_def$SourceQuestions) > 0 && !is.na(comp_def$SourceQuestions[1])) {
         source_codes <- trimws(strsplit(as.character(comp_def$SourceQuestions[1]), ",")[[1]])
@@ -337,7 +337,7 @@ extract_composite_rows <- function(composite_results, banner_info,
 
       # Disclosure control (C2): withhold the same sub-k columns the Crosstabs
       # sheet withholds. The composite's OWN per-column bases are used when it
-      # carries them — the people who actually have a scoreable composite value,
+      # carries them. The people who actually have a scoreable composite value,
       # which is the same base its finite population correction reads
       # (production review 2026-08, M-K). Borrowing the first source question's
       # bases was a guess, and a wrong one whenever the sources are routed
@@ -527,7 +527,7 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
 
   # Add remaining standard metrics that aren't part of any EMITTED composite.
   # Source questions are only re-emitted under composites present in
-  # composite_metrics (the loops above) — a composite hidden from the summary
+  # composite_metrics (the loops above): a composite hidden from the summary
   # (ExcludeFromSummary=Y, index_summary_show_composites=FALSE, or missing from
   # composite_results) never appears there, so its source questions must fall
   # through to the standard list or they silently vanish from Index_Summary.
@@ -695,8 +695,8 @@ format_summary_for_excel <- function(metrics_df, banner_info, config) {
 
   # Clean up display. Trim AROUND the nesting indent, not through it: the two
   # spaces organize_by_composite_groups puts on a composite's source questions are
-  # the sheet's only nesting cue — write_index_summary_sheet writes the label
-  # string verbatim into column 1 and applies no indent style — so a blanket
+  # the sheet's only nesting cue. Write_index_summary_sheet writes the label
+  # string verbatim into column 1 and applies no indent style, so a blanket
   # trimws() left every source question flush against the margin, indistinguishable
   # from an unrelated standalone one (production review 2026-08, I12b).
   label <- metrics_df$RowLabel

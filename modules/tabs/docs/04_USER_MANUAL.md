@@ -282,10 +282,10 @@ source("modules/tabs/run_tabs.R")
 ok <- run_tabs_analysis("path/to/My_Crosstab_Config.xlsx")
 
 if (!ok) {
-  # Every refusal and warning is already printed to the console — Turas
+  # Every refusal and warning is already printed to the console. Turas
   # convention is that errors must be visible where the run happened.
   # The workbook's Error Log and Run_Status sheets hold the same detail.
-  stop("Tabs run did not complete — see the console output above.")
+  stop("Tabs run did not complete, see the console output above.")
 }
 ```
 
@@ -345,7 +345,7 @@ Open the output Excel file. You'll find these sheets:
 | Sheet | Purpose |
 |----|----|
 | Summary | Project info, settings used, question list with base sizes |
-| Guide | How to read this report — explains row types, significance letters, weighting, index scores |
+| Guide | How to read this report. Explains row types, significance letters, weighting, index scores |
 | Index_Summary | Consolidated mean/index scores across all banner columns |
 | Error Log | Any validation warnings or errors found during processing |
 | Run_Status | TRS pass/partial/refused status with timing |
@@ -355,7 +355,7 @@ Open the output Excel file. You'll find these sheets:
 ### Guide Sheet
 
 The Guide sheet is automatically generated and explains how to interpret
-the output. It adapts to your configuration — for example, the
+the output. It adapts to your configuration, for example, the
 significance testing section only appears if significance testing is
 enabled, and the weighting section only appears if weighting is applied.
 This makes the Excel file self-documenting for anyone who receives it.
@@ -429,8 +429,8 @@ re-running the analysis.
 Set `alpha_secondary` and optionally `alpha_default` in your Settings sheet:
 
 ```
-alpha            = 0.05    # primary level (required — existing setting)
-alpha_secondary  = 0.10    # second level (optional — leave blank to disable)
+alpha            = 0.05    # primary level (required, existing setting)
+alpha_secondary  = 0.10    # second level (optional, leave blank to disable)
 alpha_default    = primary # which level the report opens on (primary or secondary)
 ```
 
@@ -464,7 +464,7 @@ These settings in your config's Settings sheet control how the report looks:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `html_report_v2` | (GUI: on) | TRUE forces the report on; FALSE forces it off, even from the GUI |
-| `brand_colour` | #323367 | Primary brand colour (hex) — used for headers, gauges, and accents |
+| `brand_colour` | #323367 | Primary brand colour (hex): used for headers, gauges, and accents |
 | `accent_colour` | #CC9900 | Secondary accent colour (hex) |
 | `chart_palette_preset` | warm | Colour palette for ordinal/scale charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `red` (Coca-Cola-inspired muted red), or `brand` (monochromatic gradient from brand_colour) |
 | `chart_bar_colour` | (brand) | Colour for simple bar charts (hex) |
@@ -475,7 +475,7 @@ See the [Template Reference](06_TEMPLATE_REFERENCE.md) for the full list of sett
 
 The HTML file is saved in your output folder with the same base name as
 your Excel file (e.g., `My_Analysis.html`). Open it in any modern
-browser — Chrome, Firefox, Edge, or Safari. No internet connection is
+browser. Chrome, Firefox, Edge, or Safari. No internet connection is
 required.
 
 ### Report Navigation
@@ -484,17 +484,17 @@ The tab bar is split into two groups:
 
 **Read**
 
-- **Dashboard** — Headline gauges, heatmap grid, and significant findings
-- **Group overview** — How each banner group compares to its peers across every question
-- **Tracking** *(appears when wave history is configured)* — Wave-on-wave trends
-- **Qualitative** *(appears when a comment workbook is configured)* — Coded comment themes and a verbatim quote drawer
-- **Story** — Your ordered, annotated narrative of pinned questions and exhibits, presentable full-screen or exportable to editable PowerPoint
+- **Dashboard**. Headline gauges, heatmap grid, and significant findings
+- **Group overview**. How each banner group compares to its peers across every question
+- **Tracking** *(appears when wave history is configured)*. Wave-on-wave trends
+- **Qualitative** *(appears when a comment workbook is configured)*. Coded comment themes and a verbatim quote drawer
+- **Story**. Your ordered, annotated narrative of pinned questions and exhibits, presentable full-screen or exportable to editable PowerPoint
 
 **Analyse**
 
-- **Crosstabs** — Interactive tables with search, banner switching, and heatmap colouring
-- **Differences** — Significant banner gaps, written as plain-English findings
-- **Report** — Background & method, executive summary, added slides, and About
+- **Crosstabs**. Interactive tables with search, banner switching, and heatmap colouring
+- **Differences**. Significant banner gaps, written as plain-English findings
+- **Report**. Background & method, executive summary, added slides, and About
 
 Any tab can be switched off per-report from Settings
 (`show_dashboard`, `show_patterns`, `show_tracking`, `show_qualitative`,
@@ -503,38 +503,38 @@ Any tab can be switched off per-report from Settings
 
 ### Using Charts and Tables
 
-- **Heatmap toggle** — Click the heatmap icon to colour-code cells by value
-- **Banner switching** — Use the dropdown to switch between banner groups
-- **Search** — Type in the search box to filter questions
-- **Copy to clipboard** — Click the clipboard icon on any table to copy it
-- **Export as PNG** — Click the camera icon to download a table as an image
-- **Chart palette** — Set `chart_palette_preset` in your config to change the ordinal chart colours across the entire report
+- **Heatmap toggle**. Click the heatmap icon to colour-code cells by value
+- **Banner switching**. Use the dropdown to switch between banner groups
+- **Search**. Type in the search box to filter questions
+- **Copy to clipboard**. Click the clipboard icon on any table to copy it
+- **Export as PNG**. Click the camera icon to download a table as an image
+- **Chart palette**. Set `chart_palette_preset` in your config to change the ordinal chart colours across the entire report
 
 ### Added Slides
 
 On the **Report** tab, the "Added slides" card lets you bring in material
-from outside the crosstab data — e.g. slides exported as images from a
+from outside the crosstab data, e.g. slides exported as images from a
 qualitative phase (in PowerPoint: right-click a slide → *Save as
 Picture*), or short text blocks with a caption. Use **+ Import image** or
 **+ Text block**, then edit the caption inline. Added slides persist in
 the browser and travel inside any saved copy of the report.
 
 For narrative that should come from the config instead of being typed in
-the browser — background & method, executive summary — use the
+the browser, background & method, executive summary, use the
 **Comments** sheet's reserved `_BACKGROUND` / `_EXECUTIVE_SUMMARY` rows;
 see [Template Reference](06_TEMPLATE_REFERENCE.md). A third reserved row,
 `_REPORT_CONSTRUCTION`, states how the study's numbers were actually built when
-other stages sit around Turas — a derived engine ahead of it, a preparation
+other stages sit around Turas. A derived engine ahead of it, a preparation
 layer, pages that compute in the browser. It replaces the whole *Report
-construction* section of the About card — the standard paragraphs on
+construction* section of the About card. The standard paragraphs on
 reproducibility, AI and author review go with it, so write whichever of those
 you want into the row. Leave the row out and the report reads exactly as before.
 
-### The report's explanatory text — where it lives
+### The report's explanatory text. Where it lives
 
-Everything the report says *about itself* — the "How to read this report"
+Everything the report says *about itself*. The "How to read this report"
 panel, the significance explainers, the precision footer, the weighting note,
-the About card's construction note — is written by you, not by the code and not
+the About card's construction note. Is written by you, not by the code and not
 by a model. It lives in the **Callout Editor** (a tile on the `launch_turas()`
 home screen, module `tabs`). Edit a sentence there and every study picks it up
 at its next generation.
@@ -543,7 +543,7 @@ To find the entry behind a paragraph, open a generated report and press
 **ctrl+alt+K**. Every authored block wears its key; click one to copy it, then
 paste it into the editor's filter. Gold badges are platform text from the
 editor; navy `config:` badges are text this study wrote in its own config.
-Press the same keys again to hide them — the badges are author-only and never
+Press the same keys again to hide them. The badges are author-only and never
 appear in a pin, an export or a saved copy.
 
 Each entry is a whole block, not a sentence: blank lines between paragraphs,
@@ -552,12 +552,12 @@ significance testing" panel is one entry, and so is the Report construction
 note. Some entries carry **placeholders** in curly brackets, like `{producer}` or
 `{waves_note}`. The report fills each one in when it builds. The editor lists
 them under the text you are editing and says in plain words what each becomes,
-which of them your text is currently using, and — as you type — flags any that
+which of them your text is currently using, and, as you type, flags any that
 are not real. Move a placeholder to say that thing somewhere else, or delete it
 to never say it at all; invent one and the next build stops and names it rather
 than printing the brackets into a client's report.
 
-Two more things worth knowing. Text applies at the **next report generation** —
+Two more things worth knowing. Text applies at the **next report generation**,
 an editor save changes nothing in an HTML file that already exists. And clearing
 an entry to blank is a legitimate way to switch a block off; deleting the entry
 outright will stop the next build instead.
@@ -567,16 +567,16 @@ When one study alone must word something differently, use the config's
 `Key` and your wording in `Text`. The sheet ships empty and should usually stay
 that way.
 
-### Study Slides — from the config
+### Study Slides, from the config
 
 For exhibits that belong to the study rather than to one reader, fill in the
 config's **AddedSlides** sheet: a title, some text, and optionally an
 `image_path`. They render on the **Report** tab under *Study slides*,
-read-only, identical in every copy, and they survive a rebuild — unlike the
+read-only, identical in every copy, and they survive a rebuild. Unlike the
 in-browser card above, which lives in whoever's browser made it.
 
 Each study slide carries a pin (📌). Pin one and it joins the **Story**; from
-there it exports to PowerPoint as a **genuine full-slide picture** — the
+there it exports to PowerPoint as a **genuine full-slide picture**. The
 original file rather than a screenshot of a card, so it is the sharpest thing
 in the deck. Images are limited to 1.5 MB each; a bigger file is refused with
 a console message and the slide keeps its text. See
@@ -586,7 +586,7 @@ format caveats.
 ### The Story Tab
 
 Pin any chart, table, or dashboard heatmap by clicking its pin icon
-(📌) — pinned items collect on the **Story** tab as an ordered,
+(📌): pinned items collect on the **Story** tab as an ordered,
 annotated narrative. Add section dividers, reorder items, present the
 story full-screen, or export it as a native, editable PowerPoint deck.
 The story persists in the browser and travels inside any saved copy of
@@ -668,13 +668,13 @@ Q_Gender == "Female" & Q_Age %in% c("18-24", "25-34")
 ### Saying Where a Question's Numbers Came From
 
 Turas only ever sees a finished column. If a figure was worked out
-before the data reached it — a derived column, a composite, anything
-computed upstream — nothing in the data says so, and on the page it
+before the data reached it. A derived column, a composite, anything
+computed upstream. Nothing in the data says so, and on the page it
 looks exactly like a question someone was asked.
 
 Two Selection columns close that gap:
 
-1.  In the Source column, name where the numbers come from — the survey
+1.  In the Source column, name where the numbers come from. The survey
     question, or the columns a derived figure was built from
 2.  For a derived figure, in the Formula column, say how it was worked
     out in plain words
@@ -682,7 +682,7 @@ Two Selection columns close that gap:
 The report then badges each question **ASKED** or **DERIVED** beside its
 code. A derived question always carries its formula as a line under the
 base, and that line travels with the question into a pinned card and a
-PowerPoint slide. An asked question shows no line — the badge says
+PowerPoint slide. An asked question shows no line. The badge says
 everything, and its Source sits in the badge tooltip.
 
 The **Sources** toggle on the controls bar governs only the source names
@@ -706,7 +706,7 @@ Example:
 | Q01                 | survey question                 |                                                |
 | Spend_PerTransaction| Q01 spend and Q02 transactions  | monthly spend / monthly transactions, among buyers |
 
-Leave both blank and nothing changes — no badges, and the Sources toggle
+Leave both blank and nothing changes. No badges, and the Sources toggle
 does not appear. Only a study that declares its provenance gets it.
 
 Composites are the exception: Turas builds them, so it knows the answer

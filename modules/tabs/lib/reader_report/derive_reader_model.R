@@ -1,15 +1,15 @@
 # ==============================================================================
-# TABS — READER REPORT: DERIVE THE READER MODEL (V15)
+# TABS. READER REPORT: DERIVE THE READER MODEL (V15)
 # ==============================================================================
 # Turns the data layer (dl) already built for the crosstab into the compact
-# "reader model" the Reader report renders from. This is PURE derivation — it
+# "reader model" the Reader report renders from. This is PURE derivation. It
 # reads numbers the crosstab already computed and never recomputes a statistic,
 # so a figure in the Reader can only ever be a figure that is in the crosstab.
 #
 # Everything here comes from `dl` (aggregates), with two optional inputs parsed
 # from islands the crosstab already carries: `prev` (tracking waves, for the
 # 2-wave deltas) and `qual` (coded open-ends, for the theme bars). Both are
-# optional — the model degrades section-by-section, so a single-wave or
+# optional. The model degrades section-by-section, so a single-wave or
 # comments-free study still yields a valid Reader.
 #
 # NO AI here. The narrative prose in $prose is templated from the numbers. The
@@ -72,14 +72,14 @@ if (!exists("%||%", mode = "function")) {
 
 #' Derive the reader model from the crosstab data layer.
 #'
-#' @param dl The data layer list (from build_data_layer) — NOT serialised.
+#' @param dl The data layer list (from build_data_layer), NOT serialised.
 #' @param prev Parsed tracking island (list) or NULL.
 #' @param qual Parsed qualitative island (list) or NULL.
 #' @param config_obj The tabs config object.
 #' @param crosstab_file Basename of the sibling crosstab report (for deep links).
 #'
 #' @return A list (the reader model), ready for serialize + render. Never throws
-#'   on a missing optional section — it sets that section's `available = FALSE`.
+#'   on a missing optional section. It sets that section's `available = FALSE`.
 #' @export
 derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(),
                                 crosstab_file = "") {
@@ -154,7 +154,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
          value = .rr_index(q),
          delta = item_delta(q))
   })
-  # rank by current index (ascending — weakest first, as the delta chart wants)
+  # rank by current index (ascending, weakest first, as the delta chart wants)
   items <- items[order(vapply(items, function(x) x$value %||% Inf, numeric(1)))]
 
   # ---- headline cards --------------------------------------------------------
@@ -239,7 +239,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
       people <- list(available = TRUE, groupName = grp_name, lowest = lowest, anchor = anchor)
       if (isTRUE(lowest$low)) for (mm in lowest$metrics) if (!is.null(mm$value) && !is.na(mm$value)) {
         reg[[length(reg) + 1L]] <- list(
-          figure = sprintf("%s — %s %s", lowest$label, mm$name, format(mm$value, nsmall = 2)),
+          figure = sprintf("%s, %s %s", lowest$label, mm$name, format(mm$value, nsmall = 2)),
           base = paste0("n=", lowest$base), section = "The people")
       }
     }
@@ -282,7 +282,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
   }
   if (isTRUE(people$available)) {
     claims[[length(claims) + 1L]] <- list(lead = "Pattern, not proof.",
-      body = sprintf("Across %s, %s sits lowest%s — a lead to check, not a verdict at this base.",
+      body = sprintf("Across %s, %s sits lowest%s. A lead to check, not a verdict at this base.",
                      tolower(people$groupName), people$lowest$label,
                      if (isTRUE(people$lowest$low)) sprintf(" (n=%s)", people$lowest$base) else ""))
   }
@@ -294,7 +294,7 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
     claims = claims,
     limits = list(
       list(lead = "Why it looks the way it does.",
-           body = "The survey measures a state, not its cause. It ranks the symptoms; it can't say what drives them — that takes conversation, not more tables."),
+           body = "The survey measures a state, not its cause. It ranks the symptoms; it can't say what drives them. That takes conversation, not more tables."),
       list(lead = "Sub-groups are leads, not verdicts.",
            body = sprintf("Below the top line the cells get small. Treat a group-level difference as something to check%s, never as a ranking.",
                           if (isTRUE(people$available) && isTRUE(people$lowest$low))
@@ -306,14 +306,14 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
   leverage <- lapply(seq_along(lev_src), function(i) {
     it <- lev_src[[i]]
     list(n = i, lead = sprintf("Lift “%s”.", it$short),
-         body = sprintf("It sits at %s%s — the %s place to look.",
+         body = sprintf("It sits at %s%s. The %s place to look.",
                         format(.rr_round(it$value), nsmall = 2),
                         if (!is.null(it$delta) && !is.na(it$delta))
                           sprintf(", down %s since %s", format(abs(it$delta), nsmall = 2), ref_year) else "",
                         ord_words[min(i, 5L)]))
   })
   verdict <- list(lead = "The read",
-    body = sprintf("The base is %s: the strongest item, “%s”, sits at %s. The work is at the other end — “%s” at %s%s. The leverage below is ranked by where the numbers are weakest.",
+    body = sprintf("The base is %s: the strongest item, “%s”, sits at %s. The work is at the other end, “%s” at %s%s. The leverage below is ranked by where the numbers are weakest.",
                    if (!is.na(strongest$value) && strongest$value >= scale_max1 * 0.75) "solid" else "mixed",
                    strongest$short, format(.rr_round(strongest$value), nsmall = 2),
                    weakest$short, format(.rr_round(weakest$value), nsmall = 2),
@@ -323,13 +323,13 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
 
   # ---- glossary (plain + technical for the survey terms in play) -------------
   glossary <- list(
-    list(term = "Index", plain = "The average score on the rating scale — higher is more positive.",
+    list(term = "Index", plain = "The average score on the rating scale. Higher is more positive.",
          tech = "Mean of the coded scale points on the Total column."),
     list(term = "Net positive", plain = "The share who are positive minus the share who are negative.",
          tech = "%(top box) − %(bottom box); it ignores the neutral middle."),
-    list(term = "Base (n)", plain = "How many people answered — a small base moves around more.",
+    list(term = "Base (n)", plain = "How many people answered. A small base moves around more.",
          tech = "Unweighted respondents in the group; every figure below the threshold is in the register."),
-    list(term = "Directional", plain = "A pattern from a group too small to prove — a lead, not a fact.",
+    list(term = "Directional", plain = "A pattern from a group too small to prove. A lead, not a fact.",
          tech = sprintf("Base below the reporting threshold of %s.", low_thr)),
     list(term = "Significance", plain = "A gap too big to be chance alone.",
          tech = "Pairwise at the configured alpha; with small cells and many columns few gaps reach it."))
@@ -338,13 +338,13 @@ derive_reader_model <- function(dl, prev = NULL, qual = NULL, config_obj = list(
   tot_base <- if (length(scale_qs)) .rr_base(scale_qs[[1]], 1L)$n else NA
   grp_names <- paste(vapply(bgroups, function(g) as.character(g$name %||% g$id), character(1)), collapse = ", ")
   practitioner <- list(list(after = "standing", title = "Design and bases",
-    body = sprintf("%sThe Total column is the safe line%s. Sub-group cells are thinner, and some fall below the reporting threshold of %s — those figures are marked directional and listed in the register.",
+    body = sprintf("%sThe Total column is the safe line%s. Sub-group cells are thinner, and some fall below the reporting threshold of %s. Those figures are marked directional and listed in the register.",
                    if (nzchar(proj$sampling_method %||% "")) paste0(proj$sampling_method, ". ") else "",
                    if (!is.na(tot_base)) sprintf(" (n=%s)", tot_base) else "", low_thr)))
   if (isTRUE(people$available)) {
     practitioner[[length(practitioner) + 1L]] <- list(after = "people",
       title = "Why sub-groups rarely reach significance",
-      body = sprintf("Split the sample across %s and the cells collapse; most sub-group gaps do not clear significance. The consistency of a pattern across measures is stronger evidence than any single small cell — which is why %s is offered as a lead, confirmed in conversation, not a verdict.",
+      body = sprintf("Split the sample across %s and the cells collapse; most sub-group gaps do not clear significance. The consistency of a pattern across measures is stronger evidence than any single small cell, which is why %s is offered as a lead, confirmed in conversation, not a verdict.",
                      grp_names, people$lowest$label))
   }
 

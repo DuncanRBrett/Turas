@@ -4,7 +4,7 @@
 #
 # A numeric question's rows are RANGES ("R100 - R249") and its stored values are
 # NUMBERS, so the island's value-to-row lookup matched nothing: every respondent
-# landed on NA. Under an audience filter the whole distribution then vanished —
+# landed on NA. Under an audience filter the whole distribution then vanished,
 # five bins reading 0% on a base of 0, with a live mean still moving above them.
 # Found on the Electrum VAS report, 2026-08-14, by driving the real report.
 #
@@ -131,7 +131,7 @@ test_that("a bin the table does not publish maps to nothing, not to a neighbour"
 })
 
 # ==============================================================================
-# UNBINNED NUMERICS — no rows to land on, but a base to get right
+# UNBINNED NUMERICS. No rows to land on, but a base to get right
 # ==============================================================================
 
 test_that("an unbinned numeric records who answered, so the base is not zero", {

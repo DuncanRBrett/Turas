@@ -3,14 +3,14 @@
  * Gate for the SUMMARY ROWS of a numeric question under an audience filter.
  *
  * Every one of these rows is `kind: "mean"` in the data layer, and the reader
- * used to recognise only "Standard Deviation" — by its LABEL. Everything else
+ * used to recognise only "Standard Deviation", by its LABEL. Everything else
  * fell through to the recomputed mean. So a filtered view printed the mean in
  * the Median row: on the Electrum VAS electricity table, R563.68 under a Male
  * filter in a row whose real value for that audience is R300. Found 2026-08-14
  * by driving the real report, not by reading the code.
  *
  * The row now says WHICH statistic it is (`mstat`, from the RowType in R) and
- * each is recomputed its own way — or left blank. A blank cell is a cell the
+ * each is recomputed its own way, or left blank. A blank cell is a cell the
  * reader can question; a plausible wrong number is not.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/numeric_stat_rows_tests.mjs
@@ -40,7 +40,7 @@ function run(name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function near(got, want, msg) {
   assert(got !== null && Math.abs(got - want) < 0.005,
-    msg + " — got " + got + ", expected " + want);
+    msg + ", got " + got + ", expected " + want);
 }
 
 /* ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ const SEX = [0, 0, 0, 0, 1, 1, 1, 1];      // 0 = male, 1 = female
 function island() {
   return {
     n: 8,
-    // VALUE's answers are the BIN each respondent falls in — what the R island
+    // VALUE's answers are the BIN each respondent falls in. What the R island
     // now writes for a binned numeric. SEX's are its row indices, which is what
     // a filter matches on.
     answers: { VALUE: [0, 0, 0, 1, 1, 1, 1, 1], SEX: [0, 0, 0, 0, 1, 1, 1, 1] },
@@ -193,7 +193,7 @@ run("a respondent with a zero denominator is left out of the ratio", () => {
   sandbox.TR.MICRO.scores.TXN = [1, 1, 1, 0, 1, 1, 1, 1];   // the big one has none
   const rat = TR.stats.ratioOfTotals(q.ratio, TR.stats.columnsFor("Sex").columns,
     TR.stats.mask(MALE));
-  near(rat[0].mean, 100, "300 / 3 — the 7000 leaves with its zero denominator");
+  near(rat[0].mean, 100, "300 / 3. The 7000 leaves with its zero denominator");
 });
 
 run("only the headline mean carries significance letters", () => {
@@ -201,7 +201,7 @@ run("only the headline mean carries significance letters", () => {
   ["Median", "Mean per transaction", "Standard Deviation"].forEach((lbl) => {
     const got = cellsFor(q, MALE, lbl);
     got.row.cells.forEach((c) => {
-      assert(!c.sig, lbl + " must carry no letters — a test nobody specified");
+      assert(!c.sig, lbl + " must carry no letters. A test nobody specified");
     });
   });
 });

@@ -4,7 +4,7 @@
 #
 # A conjoint study contributes a JSON file; a tabs run for the same project
 # embeds it as the data-cj island and the shell shows a Conjoint tab. This is
-# the same arrangement the tracker uses for prior waves — the two modules meet
+# the same arrangement the tracker uses for prior waves. The two modules meet
 # through one file.
 #
 # The load-bearing property is that NOTHING changes for a report without
@@ -44,7 +44,7 @@ test_that("cj_json defaults to NULL, so existing callers are unchanged", {
   src <- paste(readLines(file.path(v2_dir, "build_report_v2.R"), warn = FALSE),
                collapse = "\n")
   expect_true(grepl("cj_json = NULL", src, fixed = TRUE))
-  # Absent, the token renders "null" — not an empty string, which would be
+  # Absent, the token renders "null", not an empty string, which would be
   # invalid JSON and would take the whole report down.
   expect_true(grepl('cj_inlined <- if (!is.null(cj_json)', src, fixed = TRUE))
   expect_true(grepl('"{{DATA_CJ}}"     = cj_inlined', src, fixed = TRUE))
@@ -100,7 +100,7 @@ test_that("the shell shows the tab only when there is a contribution", {
   expect_true(grepl('d2.state.tab === "conjoint") TR.conjoint.render(host)',
                     shell, fixed = TRUE))
 
-  # Frozen: the audience filter cannot apply, so the bar is hidden — the same
+  # Frozen: the audience filter cannot apply, so the bar is hidden. The same
   # treatment Tracking gets, for the same reason.
   expect_true(grepl('d2.state.tab === "conjoint";', shell, fixed = TRUE))
 })
@@ -206,7 +206,7 @@ test_that("an empty island renders a message rather than throwing", {
   expect_equal(out, "OK")
 })
 
-test_that("degenerate blocks — fit {}, no heterogeneity, no sd — render clean", {
+test_that("degenerate blocks, fit {}, no heterogeneity, no sd, render clean", {
   # jsonlite used to serialise an absent block as {} (truthy in JS): an HB
   # island showed a Model fit panel of seven em-dashes, and an MNL island
   # (no Heterogeneity_SD column) crashed utilitiesHtml on ({}).some. The

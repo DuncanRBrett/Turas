@@ -102,7 +102,7 @@ if (!exists("turas_refuse", mode = "function")) {
 # a census reported in the workbook, in the stats pack and in the interactive
 # report all engage the correction on identical terms.
 #
-# Same multi-path resolution as trs_refusal.R above — the working directory
+# Same multi-path resolution as trs_refusal.R above. The working directory
 # differs between the GUI, a Turas-root run and a testthat run.
 
 if (!exists("apply_fpc", mode = "function")) {
@@ -113,7 +113,7 @@ if (!exists("apply_fpc", mode = "function")) {
 
   # Walk up from the working directory looking for the Turas root. testthat runs
   # from modules/{module}/tests/testthat, the GUI from modules/tabs/lib, a
-  # console session from the root — a fixed set of "../.." guesses misses at
+  # console session from the root. A fixed set of "../.." guesses misses at
   # least one of those, and a missing FPC is not a failure mode worth risking.
   fpc_walk <- local({
     found <- NULL
@@ -148,7 +148,7 @@ if (!exists("apply_fpc", mode = "function")) {
   }
 
   # No silent fallback. A missing FPC would leave every census column testing on
-  # its raw base — fewer letters than the data supports, with nothing to say so.
+  # its raw base. Fewer letters than the data supports, with nothing to say so.
   if (!fpc_loaded) {
     cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
     cat("│ Context: Tabs guard layer - finite population correction\n")
@@ -654,7 +654,7 @@ validate_dual_significance_config <- function(config_obj) {
       how_to_fix = c(
         "Set alpha_secondary to a value different from alpha",
         sprintf(
-          "Current alpha: %s — try alpha_secondary: 0.10 for a 90%% confidence secondary level",
+          "Current alpha: %s. Try alpha_secondary: 0.10 for a 90%% confidence secondary level",
           config_obj$alpha
         )
       )

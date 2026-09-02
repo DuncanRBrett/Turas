@@ -77,7 +77,7 @@ function loadFixture() {
   if (TR.d2) TR.d2._qIndex = null;             // drop any cached question index
 }
 
-console.log("Weighted-base display — suite:");
+console.log("Weighted-base display. Suite:");
 
 /* ---------------- 1. model carries the weighted + effective bases ---------------- */
 run("publishedModel columns expose baseW + baseEff from the serialized bases", () => {
@@ -214,7 +214,7 @@ run("weighting callout appears only when weighted and explains the three bases",
 });
 
 /* ---------------- 7. weighted wave-on-wave significance (#8) ---------------- */
-// The wave z-test must be sized on the KISH effective base, not the raw count —
+// The wave z-test must be sized on the KISH effective base, not the raw count,
 // otherwise a weighted tracker over-flags movements. Known-answer: a 50%->65%
 // move on 100 respondents is 95%-significant; the same move on a Kish effective
 // base of 40 is only 80%. Unweighted points (no effBase) are byte-identical.
@@ -226,7 +226,7 @@ run("weighted wave delta is sized on the effective base, not the raw base (#8)",
     [{ value: 50, base: 100, effBase: 40, x: 50 }, { value: 65, base: 100, effBase: 40, x: 65 }],
     true, "dual");
   eq(w[1].sig_prev, false, "not 95%-significant on the effective base (40)");
-  eq(w[1].soft_prev, true, "but 80%-significant — the effective base downgraded the flag");
+  eq(w[1].soft_prev, true, "but 80%-significant. The effective base downgraded the flag");
 
   // the SAME numbers unweighted (no effBase) stay 95%-significant on the raw base
   const u = TR.waves.cellsFor(
@@ -259,17 +259,17 @@ run("tested_prev separates 'flat' from 'untestable' (historical bases not loaded
   TR.AGG = { project: { low_base_threshold: 30 } };
 
   // The CCPB case: the current wave carries a spread + base, but the prior wave is a
-  // bare aggregate (mean only, no spread) — so the wave-on-wave test cannot run.
+  // bare aggregate (mean only, no spread), so the wave-on-wave test cannot run.
   const noPrevSd = TR.waves.cellsFor(
     [{ value: 8.5, base: 380 }, { value: 8.8, sd: 1.2, base: 396 }], false, "95");
   eq(noPrevSd[1].sig_prev, false, "cannot be 95%-sig without the prior wave's spread");
-  eq(noPrevSd[1].tested_prev, false, "flagged NOT testable — prior wave has no spread");
+  eq(noPrevSd[1].tested_prev, false, "flagged NOT testable. Prior wave has no spread");
 
   // both waves carry a spread + base -> the test runs (here it lands flat, not untestable)
   const flat = TR.waves.cellsFor(
     [{ value: 8.7, sd: 1.2, base: 380 }, { value: 8.8, sd: 1.2, base: 396 }], false, "95");
   eq(flat[1].sig_prev, false, "small move on a wide spread is not significant");
-  eq(flat[1].tested_prev, true, "but it WAS testable — both waves carry the inputs");
+  eq(flat[1].tested_prev, true, "but it WAS testable. Both waves carry the inputs");
 
   // proportions: a prior wave with no base is untestable
   const noPrevBase = TR.waves.cellsFor(
@@ -299,7 +299,7 @@ run("FPC gate: fpcApplies mirrors the material floor", () => {
 run("FPC gate: fpcActiveReport false for a thin sample, true for a near-census", () => {
   TR.AGG = { project: { population_size: 14563, low_base_threshold: 30 },
     columns: [{ label: "Total" }], questions: [] };
-  TR.MICRO = { n: 396 };                                  // 2.7% coverage — CCPB shape
+  TR.MICRO = { n: 396 };                                  // 2.7% coverage. CCPB shape
   assert(!TR.conf.fpcActiveReport(), "population set but 2.7% coverage -> not a finite-population study");
   TR.MICRO = { n: 10000 };                                 // 68.7% coverage
   assert(TR.conf.fpcActiveReport(), "68.7% coverage -> FPC materially active");
@@ -309,7 +309,7 @@ run("FPC gate: fpcActiveReport false for a thin sample, true for a near-census",
 });
 
 run("FPC callout wording: 'responded' + non-response caveat only on a DECLARED census", () => {
-  // CCPB shape: Stratified, 5.2% coverage — just above the material floor, so
+  // CCPB shape: Stratified, 5.2% coverage, just above the material floor, so
   // the FPC sentence appears, but it must speak coverage, never "responded"
   // (most of the universe was never asked).
   TR.AGG = { project: { population_size: 14563, low_base_threshold: 30,
@@ -380,13 +380,13 @@ run("FPC callout: no census/FPC framing for a thin sample; present for a near-ce
   const base = { low_base_threshold: 30, sampling_method: "Stratified" };
   TR.AGG = { project: Object.assign({ population_size: 14563 }, base),
     columns: [{ label: "Total" }], questions: [], banner_groups: [] };
-  TR.MICRO = { n: 396 };                                  // 2.7% — a sample
+  TR.MICRO = { n: 396 };                                  // 2.7%. A sample
   let html = TR.conf.calloutHtml();
   assert(html.indexOf('data-txt-key="conf.fpc.') === -1,
     "thin sample: no population-correction sentence of any kind");
   assert(html.indexOf('data-txt-key="conf.design.probability"') !== -1,
     "thin sample reads as a plain probability sample");
-  TR.MICRO = { n: 10000 };                                 // 68.7% — genuinely finite-population
+  TR.MICRO = { n: 10000 };                                 // 68.7%. Genuinely finite-population
   html = TR.conf.calloutHtml();
   assert(html.indexOf('data-txt-key="conf.fpc.body_sample"') !== -1,
     "near-census: FPC sentence present");

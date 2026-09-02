@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * M11 (production review 2026-08) — survey text is not safe as an object key.
+ * M11 (production review 2026-08): survey text is not safe as an object key.
  *
  * The v2 data layer indexes questions by code and groups them by Selection
  * Category using plain `{}` objects as maps. A category or code that collides
- * with something on Object.prototype — "constructor", "toString", "valueOf",
- * "hasOwnProperty" — reads back as an inherited function instead of "absent",
+ * with something on Object.prototype, "constructor", "toString", "valueOf",
+ * "hasOwnProperty". Reads back as an inherited function instead of "absent",
  * and the report either crashes on boot or silently treats a function as a
  * question. Neither is a value the analyst typed; both come free with `{}`.
  *
@@ -59,7 +59,7 @@ function dataSandbox(questions) {
 
 const q = (code, category) => ({ code: code, category: category, rows: [] });
 
-console.log("Poison object keys in the v2 data layer (M11) — suite:");
+console.log("Poison object keys in the v2 data layer (M11): suite:");
 
 run("P1 a Selection Category named 'constructor' groups instead of crashing", () => {
   const d2 = dataSandbox([

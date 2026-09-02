@@ -1,5 +1,5 @@
 /**
- * v2 analyst insights — per-question notes persisted in localStorage,
+ * v2 analyst insights. Per-question notes persisted in localStorage,
  * carried into story slides and exportable/importable as JSON so they
  * survive report regeneration and can be shared between analysts.
  */
@@ -20,7 +20,7 @@
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -46,14 +46,14 @@
         Object.keys(store()).forEach(function (k) { out[k] = store()[k]; });
         localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(out));
       }
-    } catch (e) { /* storage full/blocked — insights stay in-memory */ }
+    } catch (e) { /* storage full/blocked. Insights stay in-memory */ }
   }
 
   /**
    * Config-provided default for a question (the classic report's Comments
    * sheet, carried as TR.AGG.comments[code] = [{banner, text}]). Banner-
    * specific entry wins; general entry (banner null) is the fallback. Shown
-   * until the analyst types their own — their edit always takes precedence.
+   * until the analyst types their own. Their edit always takes precedence.
    */
   function configDefault(code, banner) {
     var all = (TR.AGG && TR.AGG.comments) || {};

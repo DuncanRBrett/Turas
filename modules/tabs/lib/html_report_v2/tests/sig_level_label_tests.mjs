@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * SIGNIFICANCE LEVEL LABELLING — the report must call the level it tested at.
+ * SIGNIFICANCE LEVEL LABELLING. The report must call the level it tested at.
  *
  * Defect 2026-08-30: alpha_secondary became configurable, but the prose that
  * describes it did not follow. The engines (R and the in-browser recompute)
  * honoured alpha_secondary correctly; the HTML report told the reader the
  * lowercase letters meant 80% whatever the config said. ASSA "Unlocking the
- * Annuity Puzzle" runs at alpha_secondary = 0.1 — its letters were computed at
+ * Annuity Puzzle" runs at alpha_secondary = 0.1. Its letters were computed at
  * 90% and labelled 80%. The Excel crosstab labelled the same letters "Sig.
  * (90%)" correctly, so the two deliverables disagreed in wording only.
  *
@@ -15,8 +15,8 @@
  *       the odds form ("one in 20"), and falls back to 0.05 / 0.20.
  *   L2  Every authored sentence about significance takes its levels as tokens,
  *       and the manifest declares them (the R build refuses otherwise).
- *   L3  The rendered surfaces — legend, crosstab footer, the three mode
- *       selectors, the tracking summary — say the configured level and nothing
+ *   L3  The rendered surfaces. Legend, crosstab footer, the three mode
+ *       selectors, the tracking summary. Say the configured level and nothing
  *       else. On a 0.1 project that means "90%" and NO user-visible "80%".
  *   L4  THE NO-OP GUARANTEE. On alpha_secondary = 0.2, and on a config that
  *       sets it at all, every one of those surfaces still reads exactly "80%".
@@ -29,12 +29,12 @@
  *       which the R engine honours by emitting no sig2 letters at all) is not
  *       offered it, cannot enter it, cannot compute it, and is not told about
  *       it. Before this, alpha_secondary defaulted to 0.20 in the island, so
- *       such a report still offered "95% + 80%" — and choosing it made
+ *       such a report still offered "95% + 80%", and choosing it made
  *       22_model.js RECOMPUTE 80% letters from the published counts that the
  *       Excel crosstab does not have (2026-08-31).
  *
  * Confidence INTERVALS are a separate, deliberately fixed 95% convention
- * (21c_confidence.js, Z95_EXACT) and are out of scope here — a "95% SI" string
+ * (21c_confidence.js, Z95_EXACT) and are out of scope here. A "95% SI" string
  * is correct at any alpha.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/sig_level_label_tests.mjs
@@ -97,7 +97,7 @@ function statsBox(project, extraFiles) {
 /* ==========================================================================
    L1. The wording comes from the configured alphas
    ========================================================================== */
-console.log("L1 — level wording derives from the config:");
+console.log("L1. Level wording derives from the config:");
 
 run("levelText turns an alpha into the words a reader sees", () => {
   const S = statsBox({}).stats;
@@ -117,7 +117,7 @@ run("levelOdds turns it into the odds form the explainer needs", () => {
 run("ASSA's config (alpha_secondary = 0.1) words the secondary level as 90%", () => {
   const S = statsBox({ alpha: 0.05, alpha_secondary: 0.1 }).stats;
   eq(S.levelPrimary(), "95%", "primary");
-  eq(S.levelSecondary(), "90%", "secondary — the level the engine actually tests at");
+  eq(S.levelSecondary(), "90%", "secondary. The level the engine actually tests at");
   eq(S.oddsSecondary(), "10", "and the odds move with it");
 });
 
@@ -155,10 +155,10 @@ run("levelVars supplies all four tokens together, never half of them", () => {
 /* ==========================================================================
    L2. The authored text is tokenised and the manifest declares the tokens
    ========================================================================== */
-console.log("\nL2 — authored text carries tokens, not typed numbers:");
+console.log("\nL2. Authored text carries tokens, not typed numbers:");
 
 run("no significance callout hard-codes a level", () => {
-  // The real catalogue, not the mutated one — this asserts the SHAPE of the
+  // The real catalogue, not the mutated one. This asserts the SHAPE of the
   // authored text (no bare percentage), never its wording.
   const reg = JSON.parse(readFileSync(
     path.join(HERE, "..", "..", "..", "..", "shared", "lib", "callouts",
@@ -173,7 +173,7 @@ run("no significance callout hard-codes a level", () => {
 
 run("every alpha token used is declared in text_manifest.json", () => {
   // report_text.R REFUSES the build on an undeclared token, so an author who
-  // adds {alpha2_pct} to a tenth entry would break the report, not this test —
+  // adds {alpha2_pct} to a tenth entry would break the report, not this test,
   // but catching it here names the file to fix.
   const reg = JSON.parse(readFileSync(
     path.join(HERE, "..", "..", "..", "..", "shared", "lib", "callouts",
@@ -300,7 +300,7 @@ function allSurfaces(project) {
   return s.explainers + "\n\n" + s.rest;
 }
 
-console.log("\nL3 — an alpha_secondary = 0.1 report (ASSA) never says 80%:");
+console.log("\nL3. An alpha_secondary = 0.1 report (ASSA) never says 80%:");
 
 run("every rendered surface names 90%, and none of them says 80%", () => {
   const html = allSurfaces({ alpha: 0.05, alpha_secondary: 0.1,
@@ -311,7 +311,7 @@ run("every rendered surface names 90%, and none of them says 80%", () => {
   assert(html.indexOf("{alpha") === -1, "no token shipped unsubstituted");
 });
 
-console.log("\nL4 — the no-op guarantee for CCPB / VAS / SACS:");
+console.log("\nL4. The no-op guarantee for CCPB / VAS / SACS:");
 
 run("alpha_secondary = 0.2 still reads 80% everywhere", () => {
   const html = allSurfaces({ alpha: 0.05, alpha_secondary: 0.2,
@@ -367,13 +367,13 @@ run("the explainer's odds move with the level, not just the percentage", () => {
   assert(ten.indexOf(lead + "5") === -1,
          "and never the default's odds of 5");
   assert(dflt.indexOf(lead + "5") !== -1,
-         "while a default project still states odds of 5 — the no-op guarantee");
+         "while a default project still states odds of 5. The no-op guarantee");
 });
 
 /* ==========================================================================
    L5. Persisted state must not move with the wording
    ========================================================================== */
-console.log("\nL5 — the option VALUES are state, not wording:");
+console.log("\nL5. The option VALUES are state, not wording:");
 
 run("the crosstab and Differences selectors keep value=\"95\" / \"dual\"", () => {
   const TR = statsBox({ alpha: 0.05, alpha_secondary: 0.1 },
@@ -390,7 +390,7 @@ run("the crosstab and Differences selectors keep value=\"95\" / \"dual\"", () =>
 /* ==========================================================================
    L6. No renderer may type a significance level again
    ========================================================================== */
-console.log("\nL6 — the source itself carries no typed significance level:");
+console.log("\nL6. The source itself carries no typed significance level:");
 
 // Confidence INTERVALS are a separate, deliberately fixed 95% convention
 // (21c_confidence.js, Z95_EXACT): those strings are correct at any alpha and
@@ -406,13 +406,13 @@ const CI_ALLOWED = [
   'return " \u00b7 95% " + TR.conf.labels().interval_abbrev + " " +',
   'return \'<p class="moechip" title="Worst-case 95% \' +',
   'parts.push("95% " + (rel.sigNote || "confidence"));',
-  '? " \u2014 95% " + TR.conf.labels().interval_abbrev + " " +',
+  '? ", 95% " + TR.conf.labels().interval_abbrev + " " +',
   '"> 95% " + TR.conf.labels().interval_abbrev + " bands</label>" +',
   'rows.push([sr.label + " \u00b7 95% " + abbrev + " lo"].concat(boundRow("lo")));',
   'rows.push([sr.label + " \u00b7 95% " + abbrev + " hi"].concat(boundRow("hi")));',
   '\'<th class="cj-num">95% CI</th>\' +',
   // The two defensive fallbacks in the reader, used only when TR.stats is
-  // absent — they reproduce the platform defaults, they do not assert a level.
+  // absent. They reproduce the platform defaults, they do not assert a level.
   'return TR.stats && TR.stats.levelPrimary ? TR.stats.levelPrimary() : "95%";',
   'return TR.stats && TR.stats.levelSecondary ? TR.stats.levelSecondary() : "80%";',
   'var hi = S && S.levelPrimary ? S.levelPrimary() : "95%";',
@@ -428,7 +428,7 @@ run("no JS module types a level outside the confidence-interval convention", () 
       const t = line.trim();
       if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
       // A trailing // comment is prose about the code, not something a reader
-      // ever sees — cut it before looking for a typed level.
+      // ever sees. Cut it before looking for a typed level.
       const code = line.split("//")[0];
       if (!/\b(?:80|90|95|99)%/.test(code)) return;
       if (CI_ALLOWED.some((ok) => line.indexOf(ok) !== -1)) return;
@@ -453,7 +453,7 @@ run("the sig-letter tooltip names the level the letters were tested at", () => {
 /* ==========================================================================
    L7. A study with no secondary level is never offered one
    ========================================================================== */
-console.log("\nL7 — dual significance switched off (blank alpha_secondary):");
+console.log("\nL7. Dual significance switched off (blank alpha_secondary):");
 
 const OFF = { alpha: 0.05, alpha_secondary: 0.2, dual_significance: false,
               low_base_threshold: 30, wave: "2026" };
@@ -462,7 +462,7 @@ const ON = { alpha: 0.05, alpha_secondary: 0.2,
 
 run("hasSecondary reads the flag, and only an explicit false switches it off", () => {
   eq(statsBox(OFF).stats.hasSecondary(), false, "explicit false");
-  eq(statsBox(ON).stats.hasSecondary(), true, "flag absent — a dual study");
+  eq(statsBox(ON).stats.hasSecondary(), true, "flag absent. A dual study");
   eq(statsBox({}).stats.hasSecondary(), true,
      "an older island carries no flag and must behave exactly as before");
 });
@@ -480,7 +480,7 @@ run("no selector offers the dual option", () => {
          /value="95"/.test(TR.cards2._sigModeSelectHtml("95")),
          "but Off and the primary level remain");
   eq(TR.views._diffSigOptions(false), "",
-     "the Differences control is dropped entirely — one option is not a choice");
+     "the Differences control is dropped entirely. One option is not a choice");
 });
 
 run("the dual option is still offered when the study HAS a secondary level", () => {
@@ -504,11 +504,11 @@ run("dualMode stays false even when the state says dual", () => {
 });
 
 /**
- * A published question with NO sig2 — exactly what R emits with dual off, and
+ * A published question with NO sig2. Exactly what R emits with dual off, and
  * also what a pre-sig2-carriage island looks like.
  *
  * Row 0 is a pair that clears the secondary level but NOT the primary one
- * (54% vs 46% on n=200 each) — the only shape that can show whether the
+ * (54% vs 46% on n=200 each): the only shape that can show whether the
  * recompute fallback fired, since a pair that clears BOTH gets an uppercase
  * letter either way. Row 1 carries a letter R itself assigned.
  */
@@ -527,7 +527,7 @@ function noSig2Model(project) {
                     { label: "Female", letter: "B", group: "g" }];
   TR.AGG.banner_groups = [{ id: "g", name: "Gender", columns: [1, 2] }];
   TR.conf = { fpcActiveReport: () => false };
-  // Ask for dual explicitly — the point is that the engine refuses.
+  // Ask for dual explicitly. The point is that the engine refuses.
   return TR.model._publishedModel(q, "g", true);
 }
 
@@ -585,7 +585,7 @@ run("no secondary-level clause is rendered anywhere", () => {
 
 run("the tracking summary shows no secondary-level clause either", () => {
   // These two are spliced by 27u_summary on TR.stats.dualMode(), so they should
-  // already self-suppress — asserted rather than assumed.
+  // already self-suppress. Asserted rather than assumed.
   const TRon = statsBox(ON);
   const v = TRon.stats.levelVars();
   const off = surfaces(OFF).tracking;
@@ -598,7 +598,7 @@ run("the tracking summary shows no secondary-level clause either", () => {
   assert(on.length > 0 && off.length > 0, "both summaries actually rendered");
 });
 
-run("a dual study still gets every clause — the no-op mirror", () => {
+run("a dual study still gets every clause. The no-op mirror", () => {
   const on = surfaces(ON);
   const all = on.explainers + "\n" + on.rest;
   clauseTexts().forEach(function (c) {

@@ -1,5 +1,5 @@
 /**
- * v2 renderers — crosstab table HTML (heatmap, counts, low-base, deltas),
+ * v2 renderers. Crosstab table HTML (heatmap, counts, low-base, deltas),
  * export matrix/TSV/clipboard flavours, and the per-question bar chart.
  * All pure string builders over the view model from 22_model.js.
  *
@@ -21,7 +21,7 @@
    * would otherwise enforce different standards.
    *
    * Returns the marker for a suppressed column and null for every other, so an
-   * unprotected report (k <= 1 — nothing is ever flagged) renders byte-identically.
+   * unprotected report (k <= 1, nothing is ever flagged) renders byte-identically.
    * TR.disclosure is guarded: the flag only ever arrives from a model built with
    * it loaded, and "n<k" mirrors disclosure_marker()'s own unknown-k branch. */
   var WITHHELD_TITLE = function () { return TR.txt("render.base.withheld_tip"); };
@@ -42,7 +42,7 @@
   /** The crosstab heat tint's base colour. `heatmap_colour` overrides the brand
    *  colour when the config sets it; the field is ABSENT on every report that
    *  does not, so an unset report tints exactly as it always has (production
-   *  review 2026-08, I11 — the setting was whitelisted and documented but read
+   *  review 2026-08, I11. The setting was whitelisted and documented but read
    *  by nothing, so it was a silent no-op). */
   TR.charts.heatOf = function () {
     return (TR.AGG && TR.AGG.project.heatmap_colour) || TR.charts.brandOf();
@@ -54,8 +54,8 @@
 
   /* ---- chart colour scheme (mirrors the classic report's palette) ----
    * The data layer carries project.chart_palette (the resolved preset, 7
-   * colours) so v2 colours categories semantically — negative = red,
-   * positive = green — instead of a flat brand ramp. Absent (older islands /
+   * colours) so v2 colours categories semantically. Negative = red,
+   * positive = green. Instead of a flat brand ramp. Absent (older islands /
    * the SACAP prototype) -> null, and callers fall back to brand shades, so
    * nothing changes for those reports. */
   TR.charts.chartPalette = function () {
@@ -128,7 +128,7 @@
   };
 
   // Config-precision formatters (review 2026-08, I13): the crosstab tab and its
-  // export matrix hard-coded whole-% / 1dp means, ignoring DECIMAL PLACES — an
+  // export matrix hard-coded whole-% / 1dp means, ignoring DECIMAL PLACES. An
   // NPS published as 79 displayed "79.0", and percent_decimals=1 workbooks
   // (46.3%) displayed "46%". Means resolve per model: an NPS/0-100 metric takes
   // percent precision (fmt.decimalsForQ), everything else ratings precision.
@@ -139,7 +139,7 @@
   }
   // Review 2026-08 (C1): a config with show_percent_column = N puts ROW
   // percentages or raw FREQUENCIES in the same value slot, and every one of them
-  // used to be printed with a "%" — a counts-only workbook shipped "142%",
+  // used to be printed with a "%". A counts-only workbook shipped "142%",
   // "80% B". The statistic travels on the model; the vocabulary is TR.fmt's.
   var statOf = fmt.statOf, isPct = fmt.isPctStat, fmtValue = fmt.value;
   render.statOf = statOf;
@@ -148,10 +148,10 @@
    *  and the export note; "" for the ordinary column percentage. */
   render.statNote = function (model) {
     // A filtered / custom-banner recompute always produces COLUMN percentages.
-    // When the published question reported something else, say so — otherwise
+    // When the published question reported something else, say so. Otherwise
     // the numbers silently change unit as the reader applies a filter (C1).
     if (model && model.statWas) {
-      return "Column % — recomputed (published as " +
+      return "Column %. Recomputed (published as " +
         fmt.statName(model.statWas) + ")";
     }
     var stat = statOf(model, null);
@@ -276,7 +276,7 @@
         : fmt.base(col.base)) +
         // Coverage of a known universe: a small base that is most of its group
         // is a near-complete count, not a fragile sample. That framing is only
-        // true on a DECLARED census — on a sample the base cell stays a plain n
+        // true on a DECLARED census, on a sample the base cell stays a plain n
         // (the tiny FPC still applies to the intervals, silently). "5% of
         // 14 563" under every base on a stratified sample reads as noise.
         (colFpc && col.coverage != null &&
@@ -298,8 +298,8 @@
     // Weighted base + Kish effective base rows (weighted reports only; the
     // per-column values come from the data layer / recompute, rounded like the
     // workbook). The unweighted row above always shows (it anchors the low-base
-    // flag and is the disclosure requirement); the weighted base — least useful
-    // interpretively, and identical to unweighted on the Total — can be dropped
+    // flag and is the disclosure requirement); the weighted base. Least useful
+    // interpretively, and identical to unweighted on the Total. Can be dropped
     // for simpler client tables via show_weighted_base. Effective base is gated
     // by show_effective_n. Both default on (undefined -> shown) so a report
     // generated before these flags existed is unchanged.
@@ -341,7 +341,7 @@
         // true (older pins) -> bars; the heat tint only when explicitly "heat".
         var mag = opts.heatmap === true ? "bars" : (opts.heatmap || "off");
         // The tint is scaled against a 0–100 maximum, which only holds for a
-        // percentage — a count of 142 would peg every cell at full strength.
+        // percentage. A count of 142 would peg every cell at full strength.
         var style = mag === "heat" && (row.kind === "mean" || rowIsPct)
           ? heat(row.kind === "mean" ? cell.mean : cell.pct, 100) : "";
         var body;
@@ -358,7 +358,7 @@
               : TR.reader.letterSentence(model, row, i)) : "";
           if (model.composite) {
             // composite (profile) banner: cell.sig is a vs-the-rest arrow
-            // (▲ above / ▼ below the rest), not column letters — render it as-is
+            // (▲ above / ▼ below the rest), not column letters. Render it as-is
             // with a matching tooltip and a down-class for the red ▼ / ▿.
             var down = /[▼▿]/.test(cell.sig);
             body += '<span class="sg' + (down ? " dn" : "") +
@@ -391,7 +391,7 @@
         }
         // magnitude data bar under category % cells (doesn't obscure the text).
         // The bar's width IS the value read as a percentage of 100, so a count
-        // row gets none — 142 would simply fill the track (C1).
+        // row gets none, 142 would simply fill the track (C1).
         if (mag === "bars" && row.kind !== "mean" && rowIsPct &&
             cell.pct !== null && cell.pct !== undefined) {
           body += '<div class="dbar"><div class="dbf" style="width:' +
@@ -417,14 +417,14 @@
     // Same unit note as the on-screen corner cell, so a pasted / PPTX'd table
     // never reads a column of counts as percentages.
     var unitNote = render.statNote(model);
-    var head = [unitNote ? "Response — " + unitNote : "Response"];
+    var head = [unitNote ? "Response: " + unitNote : "Response"];
     model.columns.forEach(function (col) {
       var label = col.label + (col.letter ? " (" + col.letter + ")" : "");
       head = head.concat(perCol(label, label + " lo", label + " hi"));
     });
     // Weighted reports mirror the on-screen base block (tableHtml): the
     // unweighted row is relabelled and the weighted + Kish effective bases
-    // follow, gated by the same show_weighted_base / show_effective_n flags —
+    // follow, gated by the same show_weighted_base / show_effective_n flags,
     // an export labelled plain "Base (n=)" next to weighted percentages reads
     // as unweighted counts.
     var wproj = (TR.AGG && TR.AGG.project) || {};
@@ -547,7 +547,7 @@
       : ["category"];
     var rows = pick(kinds);
     if (!rows.length) rows = pick(["category", "net"]);
-    // per-row chart selection from the Rows & columns panel — rows the
+    // per-row chart selection from the Rows & columns panel. Rows the
     // user unticked for the chart (the table is governed separately)
     var hidden = model.hiddenChartRows || [];
     if (hidden.length) {
@@ -594,7 +594,7 @@
 
   /**
    * Transpose a mean ("Index") plot so each charted column becomes its own
-   * labelled bar (its mean) — the column identity then reads off the axis next
+   * labelled bar (its mean): the column identity then reads off the axis next
    * to the bar, instead of from a legend. Returns {model, cols} unchanged for
    * any non-mean plot, or when the Index row is unticked (nothing to chart), so
    * distribution charts and the empty case are untouched.
@@ -651,14 +651,14 @@
     var plotW = W - LABEL - VAL;
     var x = S.linear(data.axisMax, plotW);
     var palette = render.palette();
-    // Single series: colour each bar by its category (semantic palette) — the
+    // Single series: colour each bar by its category (semantic palette): the
     // classic-report look. Multiple columns stay series-coloured so the cuts
     // remain distinguishable.
     var catColours = cols.length === 1 ? render.categoryColours(data.rows) : null;
     var body = [], y = 8;
     var labelLineH = 12;
     data.rows.forEach(function (r, ri) {
-      // full label, wrapped — the row grows to fit the text (no ellipses)
+      // full label, wrapped. The row grows to fit the text (no ellipses)
       var labelLines = S.wrapText(r.label, 32);
       var barBlock = (barH + 2) * cols.length - 2;
       var rowH = Math.max(barBlock, labelLines.length * labelLineH - 2);
@@ -698,7 +698,7 @@
       body.push(legend.body);
       y += legend.height + 6;
     }
-    return S.root(W, y + 4, model.code + " — chart", body.join(""));
+    return S.root(W, y + 4, model.code + ", chart", body.join(""));
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

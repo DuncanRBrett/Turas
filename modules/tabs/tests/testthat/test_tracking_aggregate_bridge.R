@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — AGGREGATE-WAVE BRIDGE TESTS (v2 aggregate tracking, stage 1)
+# TABS MODULE. AGGREGATE-WAVE BRIDGE TESTS (v2 aggregate tracking, stage 1)
 # ==============================================================================
 #
 # Locks aggregate_wave_contributions() / write_aggregate_wave_sidecars()
@@ -87,7 +87,7 @@ test_that("mean question carries exactly the locked island fields", {
                   c("match_key", "title", "base", "stats"))
 })
 
-test_that("NPS with NO recorded sd carries the net only — a published net can't be tested", {
+test_that("NPS with NO recorded sd carries the net only. A published net can't be tested", {
   q2 <- res[[2]]$questions[[2]]                           # HQ2 nps, 2025 (sd = NA)
   expect_equal(q2$stats$nps, 65)
   expect_equal(q2$match_key, "hq2")
@@ -102,7 +102,7 @@ test_that("NPS carries an sd WHEN the values table records one, so the net can t
   # An NPS net is testable once a wave supplies the spread of its per-respondent
   # +100/0/-100 scores: the renderer treats NPS as a mean-kind row, so
   # waves.sdAtWave() reads stats.sd and the Welch test runs. Recording the sd is
-  # the ONLY thing that switches it on — the rule stays "honest when recorded".
+  # the ONLY thing that switches it on. The rule stays "honest when recorded".
   with_sd <- values
   with_sd$sd[with_sd$metric_id == "HQ2" & with_sd$wave == "2025"] <- 48.02
   out <- aggregate_wave_contributions(with_sd, mapping, waves_meta)

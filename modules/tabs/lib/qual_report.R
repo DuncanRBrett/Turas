@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE COMMENT REPORT (orchestration)
+# TABS MODULE. QUALITATIVE COMMENT REPORT (orchestration)
 # ==============================================================================
 #
 # Self-contained Phase-1 entry: a coded-comment workbook -> a v2 HTML comment
@@ -65,7 +65,7 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
 #' by ResponseID so the island shares the main report's anonymous MICRO row index (and
 #' therefore the main banner + the live-filter masks the closed<->open jump relies on),
 #' then builds the DATA_QUAL island honouring the confidentiality dials. Unlike the
-#' standalone report this does NOT need themed questions — it ships the verbatim/record
+#' standalone report this does NOT need themed questions. It ships the verbatim/record
 #' island only; the prevalence board computes from the records in the JS.
 #'
 #' @param qual_workbook Path to the coded-comment .xlsx (relative paths resolve against
@@ -78,7 +78,7 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
 #'   their option display labels instead of the raw (often coded) data values.
 #' @return list(status, json, island, matched, total, id_column). `status` is "PASS"
 #'   (json populated), "NO_ID_COLUMN" (no response-id column resolved) or "NO_MATCHES"
-#'   (id column found but no workbook respondent joined — likely a wrong id column).
+#'   (id column found but no workbook respondent joined, likely a wrong id column).
 #'   The caller falls back to the standalone *_qual_report.html on a non-PASS status.
 #' @export
 build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data, module = "TABS",
@@ -133,7 +133,7 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
 #' and qual_confidentiality_mode != "full". So a report with k > 1 but demos/full text still
 #' in the island is protected on screen yet reconstructable via View-Source on a sub-k cut.
 #' This nudges the operator to the source-safe combination WITHOUT overriding their explicit
-#' dial choice (the dials are independent by design — see qual_build_data_qual).
+#' dial choice (the dials are independent by design, see qual_build_data_qual).
 #'
 #' @param config_obj The tabs config object.
 #' @return invisible(NULL); emits a console warning as a side effect.
@@ -184,7 +184,7 @@ qual_warn_source_disclosure <- function(config_obj) {
 #' @param valid_targets Optional character vector of the codes that actually render a
 #'   card (closed-question codes + composite codes). When supplied, a `CommentLink`
 #'   whose target is not among them is collected in `unlinked_targets` so the caller can
-#'   warn — this catches a mistyped target (e.g. `Q_Values` when the composite is
+#'   warn. This catches a mistyped target (e.g. `Q_Values` when the composite is
 #'   `Q_Value`), which would otherwise just silently never show the jump affordance.
 #' @return list(links, generic, unresolved, unlinked_targets). `links` is the target-keyed
 #'   map; `generic` are qcodes coded but not linked; `unresolved` are CommentSheet values
@@ -212,7 +212,7 @@ qual_build_links <- function(selection_df, island, valid_targets = NULL) {
     open_end <- trimws(as.character(selection_df$QuestionCode[i]))
     # A CommentSheet may name several band sheets (union) or one sheet. A union resolves
     # to the synthetic union code (shared with qual_apply_sheet_unions); a single sheet
-    # to its own sheet code — so the jump lands on the ONE reassembled question either way.
+    # to its own sheet code, so the jump lands on the ONE reassembled question either way.
     spec <- qual_parse_comment_sheet(sheet)
     if (!length(spec$members)) next
     if (isTRUE(spec$union)) {
@@ -262,7 +262,7 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
     project_name = config_obj$project_name))
   if (is.null(quant$agg)) qual_refuse_no_themes(qual_path, module)
 
-  # Stable reader keys (I20) — see build_integrated_qual_island. Phase 1 and Phase 2
+  # Stable reader keys (I20): see build_integrated_qual_island. Phase 1 and Phase 2
   # share one keying rule: the ids are `names(master$id_to_idx)` in both.
   reader_keys <- qual_reader_keys(names(master$id_to_idx), config_obj)
   island <- qual_build_data_qual(read_result$questions, master, list(
@@ -277,7 +277,7 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
   # from the user's config (logos, colours, the show_* tab flags) and mark it as
   # the comment report. The Qualitative tab gates on project + the DATA_QUAL island.
   quant$agg$project <- build_dl_project(config_obj, tracking_enabled = FALSE)
-  quant$agg$project$name <- paste0(quant$agg$project$name, " — Comments")
+  quant$agg$project$name <- paste0(quant$agg$project$name, ", Comments")
 
   # html_report_v2_microdata = FALSE is the confidential ship: the microdata
   # island's banner_vars would rejoin per-respondent demographics to every

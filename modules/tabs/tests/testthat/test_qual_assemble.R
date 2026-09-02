@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE SELF-CONTAINED ASSEMBLY TESTS
+# TABS MODULE. QUALITATIVE SELF-CONTAINED ASSEMBLY TESTS
 # ==============================================================================
 #
 # Known-answer tests for qual_assemble.R: respondent union by ID, banner curation

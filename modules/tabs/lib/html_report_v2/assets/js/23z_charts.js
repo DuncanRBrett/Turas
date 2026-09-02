@@ -1,5 +1,5 @@
 /**
- * Chart-type library — bar (grouped), column, stacked (100% bar & column),
+ * Chart-type library. Bar (grouped), column, stacked (100% bar & column),
  * pie/donut and dot plot, all pure SVG strings over the same view model so any
  * of them can back the crosstab chart, pins and PNG export. PPTX keeps editable
  * shapes for bar/column/stacked and falls back to bar for the other types.
@@ -23,7 +23,7 @@
   function fmtMean(v) {
     return v === null || v === undefined ? "–" : Number(v).toFixed(1);
   }
-  /** True when the model's values are counts, not percentages of anything —
+  /** True when the model's values are counts, not percentages of anything,
    *  a counts-only config (show_percent_column = N). Stacked / pie charts are
    *  unaffected: they normalise to their own total, so their labels are real
    *  shares whatever the inputs are. (Review 2026-08, C1.) */
@@ -66,7 +66,7 @@
   /** Dispatcher used by cards, story and exports. */
   render.chartBy = function (type, model, cols) {
     if (!Array.isArray(cols)) cols = [cols || 0];
-    // The "Index (mean)" plot is a rating series — the horizontal bar and the
+    // The "Index (mean)" plot is a rating series. The horizontal bar and the
     // column chart both scale + label ratings (meanScale); stacked / pie / dot /
     // line assume 0–100% shares, so a mean plot in one of those falls back to
     // the (default) bar chart.
@@ -102,7 +102,7 @@
       cols.forEach(function (ci, k) {
         var v = r.cells[ci] ? r.cells[ci].pct : null;
         // negative values (an NPS headline in a composite exhibit) floor
-        // at the axis — a negative height is invalid SVG and the rect
+        // at the axis. A negative height is invalid SVG and the rect
         // would silently vanish; the label still shows the true value
         var h = v === null ? 0 : Math.max(v, 0) / data.axisMax * plotH;
         body.push(S.el("rect", { x: cx - groupW / 2 + k * barW,
@@ -129,7 +129,7 @@
       body.push(legend.body);
       y += legend.height;
     }
-    return S.root(W, y + 14, model.code + " — column chart", body.join(""));
+    return S.root(W, y + 14, model.code + ", column chart", body.join(""));
   };
 
   function wrapLabel(body, label, cx, y, slotW) {
@@ -199,7 +199,7 @@
     }), LABEL, y + 6, W - LABEL - 10);
     body.push(legend.body);
     return S.root(W, y + legend.height + 12,
-      model.code + " — stacked", body.join(""));
+      model.code + ", stacked", body.join(""));
   };
 
   /**
@@ -220,7 +220,7 @@
     cols.forEach(function (ci, k) {
       var col = model.columns[ci];
       // Each column normalises to its own total so the stack always fills 100%
-      // (negatives floor at 0 — a backwards segment is invalid and would hide).
+      // (negatives floor at 0, a backwards segment is invalid and would hide).
       var total = 0;
       data.rows.forEach(function (r) {
         total += Math.max((r.cells[ci] ? r.cells[ci].pct : 0) || 0, 0);
@@ -249,7 +249,7 @@
     }), padL, y, W - padL * 2);
     body.push(legend.body);
     return S.root(W, y + legend.height + 12,
-      model.code + " — stacked column", body.join(""));
+      model.code + ", stacked column", body.join(""));
   };
 
   /** Donut of one column's category rows. */
@@ -257,9 +257,9 @@
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
     var W = 660, H = 230, cx = 170, cy = H / 2, R = 88, r0 = 46;
-    // Pie slices are categories — colour them semantically (warm palette).
+    // Pie slices are categories. Colour them semantically (warm palette).
     var palette = render.categoryColours(data.rows);
-    // negative values cannot be a share of a whole — floor at 0 so a
+    // negative values cannot be a share of a whole. Floor at 0 so a
     // negative NPS headline cannot draw a backwards arc
     var sliceOf = function (r) {
       return Math.max((r.cells[colIndex] && r.cells[colIndex].pct) || 0, 0);
@@ -280,7 +280,7 @@
       };
       if (sweep > Math.PI * 2 - 1e-4) {
         // 100% slice: an SVG arc whose endpoints coincide renders as nothing,
-        // so the donut would vanish — draw the full ring as a stroked circle
+        // so the donut would vanish. Draw the full ring as a stroked circle
         body.push(S.el("circle", { cx: cx, cy: cy, r: (R + r0) / 2,
           fill: "none", stroke: palette[i % palette.length],
           "stroke-width": R - r0 }));
@@ -326,7 +326,7 @@
     }), 320, 40, W - 330);
     body.push(legend.body);
     return S.root(W, Math.max(H, 50 + legend.height),
-      model.code + " — pie", body.join(""));
+      model.code + ", pie", body.join(""));
   };
 
   /** Dot plot: rows on y, one dot per selected column on a shared axis. */
@@ -340,7 +340,7 @@
     var palette = render.palette();
     var body = [], y = 12;
     data.rows.forEach(function (r) {
-      // full label, wrapped — the row grows to fit (no ellipses)
+      // full label, wrapped. The row grows to fit (no ellipses)
       var lines = S.wrapText(r.label, 32);
       var thisRowH = Math.max(rowH, lines.length * 12 + 6);
       var labelTop = y + 4 - (lines.length - 1) * 6;
@@ -371,7 +371,7 @@
     }), LABEL, y + 6, W - LABEL - 10);
     body.push(legend.body);
     return S.root(W, y + legend.height + 10,
-      model.code + " — dot plot", body.join(""));
+      model.code + ", dot plot", body.join(""));
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

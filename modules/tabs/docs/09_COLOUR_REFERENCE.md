@@ -15,9 +15,9 @@ These colours are set per-project in the crosstab configuration and flow through
 |-------|---------|--------|
 | `brand_colour` | `#323367` (deep navy) | Hex 6-digit |
 
-**Used in:** the report's own accent throughout — sidebar and header
+**Used in:** the report's own accent throughout. Sidebar and header
 chrome, active tabs and chips, focus states, dashboard section headings
-and gauge labels — and as the first series colour in charts, with
+and gauge labels, and as the first series colour in charts, with
 brand-derived shades filling later series.
 
 ### 1.2 Accent Colour
@@ -43,12 +43,12 @@ own value (0 up to 0.45 at 100%), so a 73% cell reads clearly darker than a 3%
 one.
 
 **Resolution order:**
-1. `heatmap_colour` — explicit override per project
-2. `brand_colour` — the default
+1. `heatmap_colour`. Explicit override per project
+2. `brand_colour`. The default
 3. Hard fallback (the built-in brand default)
 
 **Corrected 2026-08:** this section previously described the retired classic
-report — it said the tint defaulted to `accent_colour`, and `heatmap_colour` was
+report. It said the tint defaulted to `accent_colour`, and `heatmap_colour` was
 in fact read by nothing at all, so setting it did precisely nothing (production
 review 2026-08, I11). The interactive report tints on `brand_colour` unless
 `heatmap_colour` is set, which now works. Setting it changes the tint on the
@@ -76,7 +76,7 @@ HTML report; the interactive report's gauges read the mean and index pairs only.
 
 **Used in:** the single-series default. With one banner column charted,
 this colour replaces the brand colour at the front of the series palette.
-It has no effect when `chart_series_colour_*` values are set — those take
+It has no effect when `chart_series_colour_*` values are set. Those take
 the lead (see below).
 
 ### 1.6 Custom Series Colours (Banner Breaks)
@@ -100,11 +100,11 @@ sequence (brand, accent, brand shades, then distinguishable defaults).
 Blank and malformed values are dropped before the palette is built, so a
 placeholder like "Optional" left in the template cannot reach a chart.
 
-**Sentiment charts are never affected** — stacked bars for ordinal and
+**Sentiment charts are never affected**. Stacked bars for ordinal and
 scale questions always colour from `chart_palette_preset`, whatever the
 series colours say.
 
-**Example 1 — Full corporate palette:**
+**Example 1. Full corporate palette:**
 
 | Setting | Value | Effect |
 |---------|-------|--------|
@@ -115,7 +115,7 @@ series colours say.
 | `chart_series_colour_4` | `#5B9A7D` | 4th break: sage |
 | `chart_series_colour_5` | `#8E4585` | 5th break: purple |
 
-**Example 2 — Hybrid (custom Total, rest auto-generated):**
+**Example 2. Hybrid (custom Total, rest auto-generated):**
 
 | Setting | Value | Effect |
 |---------|-------|--------|
@@ -124,7 +124,7 @@ series colours say.
 | `chart_series_colour_2` | *(blank)* | Auto-generated, avoids red hues |
 | `chart_series_colour_3` | *(blank)* | Auto-generated, distinct from above |
 
-**Example 3 — No custom colours (auto-generation only):**
+**Example 3. No custom colours (auto-generation only):**
 
 Leave all `chart_series_colour_*` fields blank. The system generates a visually distinct palette from `chart_bar_colour` for any number of banner series.
 

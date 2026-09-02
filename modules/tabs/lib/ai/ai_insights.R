@@ -1,5 +1,5 @@
 # ==============================================================================
-# AI INSIGHTS — Tabs Module Orchestrator
+# AI INSIGHTS. Tabs Module Orchestrator
 # ==============================================================================
 #
 # Main entry point for AI insight generation in the tabs module.
@@ -7,17 +7,17 @@
 #   selectivity → executive summary → sidecar save.
 #
 # Functions:
-#   generate_all_insights() — orchestrate full AI insights pipeline
-#   generate_executive_summary() — two-stage executive summary
+#   generate_all_insights(): orchestrate full AI insights pipeline
+#   generate_executive_summary(): two-stage executive summary
 #
 # Dependencies:
-#   modules/shared/lib/ai/ai_provider.R  — create_ai_chat, call_insight_model
-#   modules/shared/lib/ai/ai_schemas.R   — verification_schema, selectivity_schema
-#   modules/shared/lib/ai/ai_utils.R     — sidecar read/write, hashing
-#   modules/shared/lib/ai/ai_verify.R    — verify_callout, rank_callouts
-#   modules/tabs/lib/ai/ai_extraction.R  — extract_question_data, extract_study_context
-#   modules/tabs/lib/ai/ai_prompts.R     — build_insight_prompt
-#   modules/tabs/lib/ai/ai_schemas_tabs.R — ai_callout_schema, exec_*_schema
+#   modules/shared/lib/ai/ai_provider.R. Create_ai_chat, call_insight_model
+#   modules/shared/lib/ai/ai_schemas.R. Verification_schema, selectivity_schema
+#   modules/shared/lib/ai/ai_utils.R. Sidecar read/write, hashing
+#   modules/shared/lib/ai/ai_verify.R. Verify_callout, rank_callouts
+#   modules/tabs/lib/ai/ai_extraction.R. Extract_question_data, extract_study_context
+#   modules/tabs/lib/ai/ai_prompts.R. Build_insight_prompt
+#   modules/tabs/lib/ai/ai_schemas_tabs.R. Ai_callout_schema, exec_*_schema
 #
 # Usage:
 #   source("modules/tabs/lib/ai/ai_insights.R")
@@ -34,7 +34,7 @@
 #' and saves everything back to the JSON sidecar.
 #'
 #' Returns NULL if AI insights are disabled or if all generation fails.
-#' Never throws — all errors are caught and logged.
+#' Never throws. All errors are caught and logged.
 #'
 #' @param all_results Named list. Full analysis results from run_crosstabs_analysis().
 #' @param banner_info List. Banner structure from create_banner_structure().
@@ -292,11 +292,11 @@ generate_all_insights <- function(all_results, banner_info, config_obj,
 #' @return List with narrative, confidence, data_limitations, or NULL on failure.
 generate_executive_summary <- function(all_q_data, study_context, ai_config) {
 
-  # Check context window — use compact if payload is large
+  # Check context window. Use compact if payload is large
   estimated_tokens <- estimate_tokens(all_q_data)
   if (estimated_tokens > 80000) {
-    cat("    [INFO] Large payload detected — using compact extraction for exec summary\n")
-    # Re-extract compact versions — but we don't have q_result here,
+    cat("    [INFO] Large payload detected. Using compact extraction for exec summary\n")
+    # Re-extract compact versions, but we don't have q_result here,
     # so we truncate the existing data
     all_q_data <- lapply(all_q_data, function(q) {
       list(

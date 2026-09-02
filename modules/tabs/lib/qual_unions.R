@@ -1,8 +1,8 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE SHEET UNIONS (split-by-band comment questions)
+# TABS MODULE. QUALITATIVE SHEET UNIONS (split-by-band comment questions)
 # ==============================================================================
 #
-# Some open-ends are captured in SEVERAL comment sheets split by a routing cut —
+# Some open-ends are captured in SEVERAL comment sheets split by a routing cut,
 # the canonical case is an NPS "why?" follow-up routed into Detractor / Passive /
 # Promoter sheets (e.g. CCPB Q79). The reader is one-sheet -> one-question, and the
 # jump map (qual_build_links) is one-target -> one-sheet, so three band sheets could
@@ -11,7 +11,7 @@
 # This file adds a config-driven UNION: an open-end's `CommentSheet` cell may name
 # several sheets, each tagged with a band, and the members are reassembled into one
 # reported question. Each record carries its `band` as a first-class split attribute
-# (NOT a demographic tag — the band is the report-level split axis, always shown and
+# (NOT a demographic tag, the band is the report-level split axis, always shown and
 # never k-anonymised away; centre/channel tags stay in `demos`). The question carries
 # a `split = list(dim, bands)` so the JS can offer an All / <band> segmented view.
 #
@@ -116,17 +116,17 @@ qual_selection_unions <- function(selection_df) {
 #' Refuse when one respondent appears in more than one member sheet of a union.
 #'
 #' The workbook integrity gate (`qual_check_workbook_integrity`) refuses on a
-#' ResponseID duplicated WITHIN a sheet, and cannot see across sheets — but a
+#' ResponseID duplicated WITHIN a sheet, and cannot see across sheets, but a
 #' union concatenates its members, so the same defect crossing a sheet boundary
 #' arrived unchecked (production review 2026-08, I7). It is the same defect with
 #' the same consequences, and on a union it is slightly worse: the two records
 #' share an `idx` AND a `rid`, so they collide on the IDENTICAL reader-mark key
-#' (`qcode#@<rid>`) — shortlisting one shortlists both, and the collection's
+#' (`qcode#@<rid>`): shortlisting one shortlists both, and the collection's
 #' record index keeps only one of them. The respondent also sits in two bands at
 #' once, so the split view contradicts itself.
 #'
 #' Every offending union and id is collected before refusing, so one pass over
-#' the workbook fixes them all — the principle the per-sheet gate already follows.
+#' the workbook fixes them all. The principle the per-sheet gate already follows.
 #'
 #' @param unions Union specs from `qual_selection_unions()`.
 #' @param by_code Named list of classified questions, keyed by question code.
@@ -256,7 +256,7 @@ qual_apply_sheet_unions <- function(questions, unions, module = "TABS") {
 # Sheet-of-origin gives each comment a band, but which sheet the "why?" text landed
 # in can drift from the actual 0-10 score (routing/coding error). Since the comments
 # are joined to the host survey, we can derive each respondent's band straight from
-# the score column and let it WIN — flagging (console, Shiny-visible) where the sheet
+# the score column and let it WIN. Flagging (console, Shiny-visible) where the sheet
 # disagreed. This is self-correcting and needs no per-study code: the score question
 # defaults to the union's CommentLink target (the NPS question it explains).
 
@@ -333,7 +333,7 @@ qual_derive_bands <- function(questions, unions, survey_data, id_to_idx) {
       q$records[[ri]]$band <- lab                  # the score wins
     }
     if (mism > 0L) {
-      cat(sprintf(paste0("  Qualitative: %s — %d of %d comment band(s) reassigned from the ",
+      cat(sprintf(paste0("  Qualitative: %s, %d of %d comment band(s) reassigned from the ",
                          "recommend score '%s' (sheet-of-origin disagreed).\n"),
                   q$code, mism, derived_n, score_q))
     }

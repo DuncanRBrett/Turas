@@ -11,13 +11,13 @@
 # Spec: docs/tabs_production_review_2026-08/CROSS_ENGINE_STATS_SPEC.md
 #
 # Sections, in the order the spec's stages landed them:
-#   R-4  Fractional n_eff (D3) — means and proportions gate on the same base
-#   R-2  Carriage integrity (D4) — the island carries R's letters verbatim
+#   R-4  Fractional n_eff (D3): means and proportions gate on the same base
+#   R-2  Carriage integrity (D4): the island carries R's letters verbatim
 #   R-1  Finite population correction through the tabs path (D2)
-#   R-3  The no-population guardrail — fpc_mul defaults are inert
-#   R-5  The NPS Score row (I1) — the values R tests are the values it prints,
+#   R-3  The no-population guardrail. Fpc_mul defaults are inert
+#   R-5  The NPS Score row (I1): the values R tests are the values it prints,
 #        and the report reproduces them from the same +-100 buckets
-#   R-6  The NET POSITIVE row (I5) — its letters test the printed net, via the
+#   R-6  The NET POSITIVE row (I5): its letters test the printed net, via the
 #        same +-100 score device, and the census column is still excluded
 #
 # Every expected value below is hand-derived in the comment above it. A parity
@@ -62,7 +62,7 @@ PARITY_DIR <- file.path(turas_root, "modules/tabs/tests/fixtures/parity_project"
 # Shared with the island regenerator so the harness and the committed island
 # can never be built by different code. The loader sources the lib files into
 # the global environment (they must be visible to each other), so turas_root has
-# to be there too — under testthat this file's top level is NOT globalenv.
+# to be there too. Under testthat this file's top level is NOT globalenv.
 assign("turas_root", turas_root, envir = globalenv())
 
 # The fixture workbooks are gitignored (*.xlsx across the repo); the generator
@@ -114,7 +114,7 @@ parity_run <- function(config_name = "Parity_Crosstab_Config.xlsx") {
 # has always returned the raw fraction. Proportion tests ride the latter via
 # banner_bases[[key]]$effective; the mean test recomputes its own n_eff through
 # the former. So on the very same column, an n_eff of 29.63 FAILED a min_base of
-# 30 for proportions and PASSED it for means — one table, two bases.
+# 30 for proportions and PASSED it for means. One table, two bases.
 #
 # THE FIXTURE WEIGHTS, hand-derived. 26 respondents at weight 1 and 7 at
 # weight 2 (n = 33):
@@ -175,7 +175,7 @@ test_that("n_eff 29.63 does NOT test at min_base 30 for MEANS", {
 })
 
 test_that("n_eff 29.63 does NOT test at min_base 30 for PROPORTIONS either", {
-  # Same base, same gate — the point of D3 is that these two agree. A 10%/60%
+  # Same base, same gate. The point of D3 is that these two agree. A 10%/60%
   # split across weighted bases of 40 would be significant if it were tested.
   res <- weighted_z_test_proportions(
     count1 = 4,  base1 = 40,
@@ -232,9 +232,9 @@ test_that("unit weights still return exactly n (no design effect)", {
 #
 # The island must carry R's letters, not a paraphrase of them. For every
 # question, every row's `sig` has to equal that row's Sig. row in the crosstab
-# table and `sig2` its Sig.2 row, cell for cell. If the writer ever drifts —
+# table and `sig2` its Sig.2 row, cell for cell. If the writer ever drifts,
 # picks the wrong row, drops the Total placeholder differently, silently blanks
-# a column — this fails.
+# a column. This fails.
 
 context("R-2: carriage integrity")
 
@@ -242,7 +242,7 @@ context("R-2: carriage integrity")
 # Mirrors the writer's own resolution, including the summary-block special case
 # documented in data_layer_writer.R's mean_sig_for(): a summary block's Sig. row
 # is appended AFTER the Std Dev row, so the label forward-fill labels it
-# "Standard Deviation" — it still tests the headline statistic.
+# "Standard Deviation". It still tests the headline statistic.
 expected_sig_cells <- function(table, keys, lbl, src, kind, rtype, sig_type) {
   blank <- rep("", length(keys))
   row_src <- if ("RowSource" %in% names(table)) {
@@ -266,7 +266,7 @@ expected_sig_cells <- function(table, keys, lbl, src, kind, rtype, sig_type) {
   }, character(1), USE.NAMES = FALSE)
 }
 
-# The RowType a mean row was built from — the writer's mrt[1].
+# The RowType a mean row was built from. The writer's mrt[1].
 mean_rtype_for <- function(table, lbl, src) {
   mean_types <- c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare")
   row_src <- if ("RowSource" %in% names(table)) {
@@ -368,7 +368,7 @@ test_that("a summary block's letters land on the mean, never on Std Dev", {
   mean_row <- Filter(function(r) r$label == "Mean", q2$rows)[[1]]
   sd_row   <- Filter(function(r) r$label == "Standard Deviation", q2$rows)[[1]]
 
-  # INDEPENDENTLY DERIVED from the fixture's rating distribution — recomputed
+  # INDEPENDENTLY DERIVED from the fixture's rating distribution. Recomputed
   # below from the counts in generate_parity_project.R, with no Turas code in
   # the path, so this is a check and not a re-blessing of whatever came out.
   #
@@ -392,7 +392,7 @@ test_that("a summary block's letters land on the mean, never on Std Dev", {
 test_that("the committed island matches a fresh rebuild", {
   # The JS half of this harness renders the committed parity_island.json. If the
   # writer changes and the island is not regenerated, the two engines are being
-  # tested against different data — so pin them together here.
+  # tested against different data, so pin them together here.
   skip_if_not(requireNamespace("jsonlite", quietly = TRUE), "jsonlite not available")
   committed_path <- file.path(PARITY_DIR, "parity_island.json")
   skip_if_not(file.exists(committed_path), "committed island not found")
@@ -415,7 +415,7 @@ test_that("the committed island matches a fresh rebuild", {
 # R-1. FINITE POPULATION CORRECTION, THROUGH THE TABS PATH (D2)
 # ==============================================================================
 #
-# apply_fpc() has its own tests in the confidence module — these test the
+# apply_fpc() has its own tests in the confidence module. These test the
 # WIRING: that a column's universe reaches the pairwise tests, that a census is
 # excluded from pairing rather than tested, that a below-floor column is left
 # alone, and that a corrected column flips a hand-computed marginal pair.
@@ -536,7 +536,7 @@ test_that("a corrected column flips a hand-computed marginal pair", {
 
 test_that("min_base gates on the CORRECTED base", {
   # 22 respondents out of a universe of 40: coverage 55%, mul = 39/18 = 2.1667,
-  # so the corrected base is 47.67 — above a min_base of 30 that the raw 22
+  # so the corrected base is 47.67. Above a min_base of 30 that the raw 22
   # fails. The instability flag is raised against the corrected base too, so the
   # test gate has to agree with it.
   mul <- apply_fpc(1, 22, 40)
@@ -558,7 +558,7 @@ test_that("the fixture's letters are FPC-corrected end to end", {
   q1 <- Filter(function(q) q$code == "Q1", run$island$questions)[[1]]
   yes <- Filter(function(r) r$label == "Yes", q1$rows)[[1]]
 
-  # Beta (col 3) now carries an uppercase C at 95% — the flip derived above.
+  # Beta (col 3) now carries an uppercase C at 95%. The flip derived above.
   expect_equal(unlist(yes$sig), c("", "", "C", "", ""))
   # The census column earns nothing and is named by nobody.
   expect_equal(yes$sig[[2]], "")
@@ -592,7 +592,7 @@ test_that("without a population the letters are the uncorrected ones", {
   yes <- Filter(function(r) r$label == "Yes", q1$rows)[[1]]
 
   # The pre-FPC answer for the engineered pair: nothing at 95%, Beta at 80%.
-  # (With the population configured this same pair reads c("","","C","","") —
+  # (With the population configured this same pair reads c("","","C","",""),
   # see R-1. That difference IS the correction, and nothing else changed.)
   expect_equal(unlist(yes$sig),  c("", "", "", "", ""))
   expect_equal(unlist(yes$sig2), c("", "", "C", "", ""))
@@ -633,7 +633,7 @@ test_that("the NPS Score row publishes promoters minus detractors", {
   q4 <- Filter(function(q) q$code == "Q4", run$island$questions)[[1]]
   score <- Filter(function(r) r$label == "NPS Score", q4$rows)[[1]]
 
-  # A mean-kind row carries its values in `pct` like any other row — the JS
+  # A mean-kind row carries its values in `pct` like any other row. The JS
   # model is what re-labels them cell.mean.
   expect_equal(score$kind, "mean")
   expect_equal(unlist(score$pct), c(-1, 40, 20, -70, 10))
@@ -649,7 +649,7 @@ test_that("the NPS Standard Deviation is on the +-100 bucket scale", {
   #   sample variance = 256000/39 = 6564.103  ->  sd = 81.0192, shown as 81.0
   expect_equal(sd_row$pct[[2]], round(sqrt(256000 / 39), 1))
   expect_equal(sd_row$pct[[2]], 81)
-  # The 0-10 ratings would give 1.9 — the number this row printed before I1.
+  # The 0-10 ratings would give 1.9. The number this row printed before I1.
   expect_gt(sd_row$pct[[2]], 50)
 })
 
@@ -684,7 +684,7 @@ test_that("the engine's NPS values ARE the values it tests", {
 # ==============================================================================
 #
 # Q5 prints top box MINUS bottom box, and since I5 its letters test THAT
-# difference — through the per-respondent +-100 net score, whose weighted mean
+# difference. Through the per-respondent +-100 net score, whose weighted mean
 # is the printed net. Before I5 the letters came from a z-test of the top box
 # alone, so the row tested a quantity it did not print.
 #
@@ -720,7 +720,7 @@ test_that("the engine's NPS values ARE the values it tests", {
 #     lettered Gamma over Beta on a 60%-vs-20% top-box gap. A letter under two
 #     identical printed numbers.
 #   - Beta GAINS "D": Beta and Delta have the SAME 20% top box, so the old test
-#     saw z = 0 and could never letter them — while the page showed +20
+#     saw z = 0 and could never letter them, while the page showed +20
 #     against -60.
 #   - Gamma keeps "D" and Alpha (the census) letters nothing, either way.
 
@@ -747,7 +747,7 @@ test_that("a column with the same top box but a different net now letters", {
 test_that("a column with the same printed net no longer letters", {
   run <- parity_run()
   sig <- unlist(np_row(run$island, "sig"))
-  # Gamma's letters are "D" alone — the "B" the top-box test used to print
+  # Gamma's letters are "D" alone. The "B" the top-box test used to print
   # against a column showing the identical +20 is gone.
   expect_equal(sig[[4]], "D")
   expect_false(grepl("B", sig[[4]], fixed = TRUE))

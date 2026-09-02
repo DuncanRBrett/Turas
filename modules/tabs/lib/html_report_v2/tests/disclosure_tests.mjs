@@ -1,4 +1,4 @@
-// Disclosure control — re-identification protection threshold. Node, no DOM.
+// Disclosure control. Re-identification protection threshold. Node, no DOM.
 // Stubs TR.AGG.project / TR.MICRO / TR.stats / TR.d2 and checks the threshold logic,
 // the live audience base, and the "set k = N to forbid any drill-down" property.
 import fs from "node:fs";
@@ -24,7 +24,7 @@ function assert(cond, msg) {
 
 console.log("Disclosure control:");
 
-// Off by default (no config / k<=1) — existing reports are unaffected.
+// Off by default (no config / k<=1): existing reports are unaffected.
 TR.AGG = { project: {} };
 assert(disc.minBase() === 1 && disc.active() === false, "no config -> k=1, control off");
 TR.AGG.project.min_reporting_base = 1;
@@ -76,8 +76,8 @@ TR.MICRO = savedMicro;
  * A suppressed column's BASE (production review 2026-08, CRITICAL C2)
  *
  * applyDisclosureSuppression blanks a sub-k column's cells and strips the
- * letters pointing at it, but the base row still printed the exact headcount
- * — "4 ⚠" on screen, in the TSV, and in the PPTX / XLSX matrix — while the
+ * letters pointing at it, but the base row still printed the exact headcount,
+ * "4 ⚠" on screen, in the TSV, and in the PPTX / XLSX matrix, while the
  * Excel writer for the same run withholds it as "n<10"
  * (excel_writer.R write_base_rows + disclosure_marker). Two deliverables of
  * one run enforced different disclosure standards, and the HTML named the
@@ -162,12 +162,12 @@ check("the marker mirrors the workbook's disclosure_marker(k): n<10",
 check("an unsuppressed column has no marker",
   () => RS.render.baseMarker(supModel.columns[1]) === null);
 
-// 1. on screen — every base row: unweighted, weighted, effective.
+// 1. on screen. Every base row: unweighted, weighted, effective.
 check("all three base rows mask the suppressed column",
   () => (supBaseBlock.match(/n&lt;10/g) || []).length === 3);
 check("the exact headcount 4 appears nowhere in the base block",
   () => !/>4 ?⚠?</.test(supBaseBlock) && supBaseBlock.indexOf(">4<") === -1);
-check("the worst-case margin (98/√n) is dropped — ±49.0pp inverts to n=4",
+check("the worst-case margin (98/√n) is dropped, ±49.0pp inverts to n=4",
   () => supBaseBlock.indexOf("±49.0pp") === -1);
 
 // 2. the unsuppressed columns are untouched, ⚠ flag and margins included.
@@ -177,7 +177,7 @@ check("…and their effective bases",
   () => supBaseBlock.indexOf(">190<") !== -1 && supBaseBlock.indexOf(">186<") !== -1);
 check("…and their margins of error", () => supBaseBlock.indexOf("±6.9pp") !== -1);
 
-// 3. the export matrix / TSV — the PPTX and clipboard read the same rows.
+// 3. the export matrix / TSV. The PPTX and clipboard read the same rows.
 const supTsvBases = supTsv.split("\n").filter((l) => /^(Base|Effective)/.test(l));
 check("three base rows in the export", () => supTsvBases.length === 3);
 check("every exported base row masks the suppressed column",
@@ -185,7 +185,7 @@ check("every exported base row masks the suppressed column",
 check("no bare 4 anywhere in the export", () => !/\t4( |\t|$)/.test(supTsv));
 
 // 4. the wave strip prints the CURRENT column-0 base, which is suppressed when
-//    the whole filtered audience falls below k (the n=1-cut case) — the strip
+//    the whole filtered audience falls below k (the n=1-cut case): the strip
 //    sits on the same card as the table, so it must mask it too.
 const strip = RS.render.waveStripHtml({
   history: [{ year: 2025, base: 190 }],

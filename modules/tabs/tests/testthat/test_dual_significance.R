@@ -4,11 +4,11 @@
 #
 # Known-answer tests for the dual significance level feature.
 # Covers:
-#   1. alpha_to_confidence_label()  — label helper
-#   2. validate_dual_significance_config()  — TRS guard validation
-#   3. build_config_object()  — config parsing for new fields
-#   4. add_significance_row() in dual-alpha mode  — known-answer calculation
-#   5. detect_available_stats()  — has_sig2 flag
+#   1. alpha_to_confidence_label(): label helper
+#   2. validate_dual_significance_config(): TRS guard validation
+#   3. build_config_object(): config parsing for new fields
+#   4. add_significance_row() in dual-alpha mode. Known-answer calculation
+#   5. detect_available_stats(): has_sig2 flag
 #
 # All statistical expected values are hand-calculated and documented.
 #
@@ -82,8 +82,8 @@ rm(.rc_lines, .rc_start, .rc_end, .rc_next)
 # HELPER: minimal banner_info for two banner columns
 # ==============================================================================
 # banner_info mirrors the structure used by add_significance_row():
-#   banner_info$banner_info[[<code>]]$internal_keys  — column keys
-#   banner_info$banner_info[[<code>]]$letters        — named vector of letters
+#   banner_info$banner_info[[<code>]]$internal_keys. Column keys
+#   banner_info$banner_info[[<code>]]$letters. Named vector of letters
 make_two_column_banner <- function(key_a = "GRP::A", key_b = "GRP::B") {
   list(
     banner_info = list(
@@ -119,9 +119,9 @@ test_that("converts 0.20 to 'Sig. (80%)'", {
 
 
 # ==============================================================================
-# 2. validate_dual_significance_config() — TRS guard
+# 2. validate_dual_significance_config(): TRS guard
 # ==============================================================================
-context("validate_dual_significance_config — guard")
+context("validate_dual_significance_config. Guard")
 
 # Helper: build a minimal config_obj list for guard tests
 make_cfg <- function(alpha = 0.05, alpha_secondary = NULL,
@@ -186,9 +186,9 @@ test_that("refuses when alpha_default is not 'primary' or 'secondary'", {
 
 
 # ==============================================================================
-# 3. build_config_object() — new field parsing
+# 3. build_config_object(): new field parsing
 # ==============================================================================
-context("build_config_object — dual significance fields")
+context("build_config_object. Dual significance fields")
 
 # Helper: build a minimal named-list config (mirrors what load_config_sheet returns)
 make_raw_config <- function(...) {
@@ -231,9 +231,9 @@ test_that("alpha_secondary is NULL when config value is blank string", {
 
 
 # ==============================================================================
-# 4. add_significance_row() — dual-alpha known-answer tests
+# 4. add_significance_row(): dual-alpha known-answer tests
 # ==============================================================================
-context("add_significance_row — dual-alpha mode")
+context("add_significance_row. Dual-alpha mode")
 
 # --- Known-answer setup -------------------------------------------------
 #
@@ -254,8 +254,8 @@ context("add_significance_row — dual-alpha mode")
 #   alpha = 0.01  (secondary): 0.0169 > 0.01 → NOT significant
 #
 # Therefore:
-#   Primary sig row   — Group A column: "B", Group B column: ""
-#   Secondary sig row — Group A column: "",  Group B column: ""
+#   Primary sig row. Group A column: "B", Group B column: ""
+#   Secondary sig row. Group A column: "",  Group B column: ""
 # -----------------------------------------------------------------------
 
 KEY_A <- "GRP::A"
@@ -318,7 +318,7 @@ test_that("dual-alpha mode: primary row has confidence label", {
 })
 
 test_that("known-answer: primary sig (alpha=0.05) finds A > B, secondary (alpha=0.01) finds nothing", {
-  # p ≈ 0.0169 — below 0.05 but above 0.01
+  # p ≈ 0.0169. Below 0.05 but above 0.01
   td <- make_sig_test_data(count_a = 60, count_b = 45, base = 100)
   bi <- make_two_column_banner()
   ic <- c(TOTAL_KEY, KEY_A, KEY_B)
@@ -342,7 +342,7 @@ test_that("known-answer: primary sig (alpha=0.05) finds A > B, secondary (alpha=
 })
 
 test_that("known-answer: both levels significant when p is very small", {
-  # Large difference — p will be far below both 0.05 and 0.10
+  # Large difference. P will be far below both 0.05 and 0.10
   # Group A: 80/100, Group B: 30/100
   # p_pool = 110/200 = 0.55; SE ≈ 0.0704; z ≈ 7.1; p ≈ 0 (effectively)
   td <- make_sig_test_data(count_a = 80, count_b = 30, base = 100)
@@ -364,8 +364,8 @@ test_that("known-answer: both levels significant when p is very small", {
 })
 
 test_that("known-answer: neither level significant when difference is negligible", {
-  # Group A: 50/100, Group B: 49/100 — effectively equal
-  # p_pool ≈ 0.495; SE ≈ 0.0707; z ≈ 0.14; p ≈ 0.44 — not significant at any reasonable level
+  # Group A: 50/100, Group B: 49/100. Effectively equal
+  # p_pool ≈ 0.495; SE ≈ 0.0707; z ≈ 0.14; p ≈ 0.44, not significant at any reasonable level
   td <- make_sig_test_data(count_a = 50, count_b = 49, base = 100)
   bi <- make_two_column_banner()
   ic <- c(TOTAL_KEY, KEY_A, KEY_B)
@@ -416,15 +416,15 @@ test_that("backward compatibility: single-alpha mode is unchanged vs. pre-V10.10
 
   expect_equal(nrow(result), 1L)
   expect_equal(result$RowType, "Sig.")
-  expect_equal(result$RowLabel, "")   # blank label — backward compatible
+  expect_equal(result$RowLabel, "")   # blank label. Backward compatible
   expect_equal(result[[KEY_A]], "B")  # significance still computed correctly
 })
 
 
 # ==============================================================================
-# 5. detect_available_stats() — has_sig2 flag
+# 5. detect_available_stats(): has_sig2 flag
 # ==============================================================================
-context("detect_available_stats — has_sig2")
+context("detect_available_stats. Has_sig2")
 
 make_table_with_row_types <- function(types) {
   data.frame(

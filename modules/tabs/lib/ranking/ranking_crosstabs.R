@@ -275,7 +275,7 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
     }
 
     # Calculate metrics with error handling (delegated to helper)
-    # V10.8: Use tryCatch with return value — assignments inside error closures
+    # V10.8: Use tryCatch with return value. Assignments inside error closures
     # create local bindings and are silently discarded (R scoping rules).
     metrics <- tryCatch({
       calculate_banner_ranking_metrics(

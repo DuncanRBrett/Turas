@@ -3,9 +3,9 @@
 # ==============================================================================
 #
 # Tests for banner structure creation and index calculation:
-#   1. banner.R — create_banner_structure, process_standard_banner,
+#   1. banner.R. Create_banner_structure, process_standard_banner,
 #                 generate_excel_letters, get_banner_label, validate_banner_structure
-#   2. banner_indices.R — create_banner_row_indices, calculate_banner_bases,
+#   2. banner_indices.R. Create_banner_row_indices, calculate_banner_bases,
 #                         create_single_choice_indices, get_column_weights
 #
 # Run with:
@@ -183,7 +183,7 @@ test_that("handles NA BannerLabel", {
 
 
 # ==============================================================================
-# 3. create_banner_structure — full integration
+# 3. create_banner_structure. Full integration
 # ==============================================================================
 
 context("create_banner_structure")
@@ -309,7 +309,7 @@ test_that("rejects banner with length mismatch", {
 
 
 # ==============================================================================
-# 6. create_banner_row_indices — single-choice banner
+# 6. create_banner_row_indices. Single-choice banner
 # ==============================================================================
 
 context("create_banner_row_indices")
@@ -527,7 +527,7 @@ test_that("slot-indexed Multi_Mention banner creates structure without error", {
   expect_true("Ina Paarman's Kitchen" %in% result$columns)
 })
 
-test_that("slot-indexed banner deduplicates options — each brand appears once", {
+test_that("slot-indexed banner deduplicates options. Each brand appears once", {
   result <- create_banner_structure(
     make_slot_indexed_selection(),
     make_slot_indexed_survey_structure()
@@ -641,7 +641,7 @@ test_that("duplicated DisplayText yields unique internal keys and a console warn
   )
   expect_true(any(grepl("duplicated DisplayText", out)))
   expect_equal(anyDuplicated(banner$internal_keys), 0L)
-  # Display labels are unchanged — both columns still read "Other"
+  # Display labels are unchanged. Both columns still read "Other"
   expect_equal(banner$columns, c("Total", "North", "Other", "Other"))
   expect_equal(banner$internal_keys,
                c("TOTAL::Total", "Region::North", "Region::Other", "Region::Other#1"))
@@ -656,7 +656,7 @@ test_that("each duplicated-label option keeps its OWN respondents", {
                      stringsAsFactors = FALSE)
   idx <- create_banner_row_indices(data, banner)$row_indices
   expect_equal(idx[["Region::Other"]], c(2L, 4L))    # East respondents
-  expect_equal(idx[["Region::Other#1"]], 3L)         # West respondents — not overwritten
+  expect_equal(idx[["Region::Other#1"]], 3L)         # West respondents, not overwritten
   expect_equal(idx[["Region::North"]], 1L)
 })
 

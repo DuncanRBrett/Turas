@@ -3,9 +3,9 @@
 # ==============================================================================
 #
 # Tests for APA-style statistical narration using easystats:
-#   - generate_apa_narration()      — per-question narration
-#   - generate_all_apa_narrations() — batch narration
-#   - build_apa_narration_panel()   — HTML rendering
+#   - generate_apa_narration(): per-question narration
+#   - generate_all_apa_narrations(): batch narration
+#   - build_apa_narration_panel(): HTML rendering
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_ai_easystats.R")

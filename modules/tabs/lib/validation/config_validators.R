@@ -162,7 +162,7 @@ check_numeric_settings <- function(config, error_log) {
               outlier_method, paste(valid_outlier_methods, collapse = ", ")),
       "", "Warning"
     )
-    # Note: config mutation removed — the local copy is discarded since this
+    # Note: config mutation removed. The local copy is discarded since this
     # function only returns error_log. build_config_object() in crosstabs_config.R
     # handles defaults independently via get_config_value(..., "IQR").
   }
@@ -173,7 +173,7 @@ check_numeric_settings <- function(config, error_log) {
 #' Validate and normalize output format
 #'
 #' There is one writer: the Excel workbook. "csv" was offered by the template
-#' and accepted here for a long time, but no CSV writer was ever built — a
+#' and accepted here for a long time, but no CSV writer was ever built. A
 #' config asking for it silently received .xlsx. It is still accepted (so an
 #' existing config keeps running) but says plainly what it will get.
 #'
@@ -185,13 +185,13 @@ check_output_format <- function(config, error_log, verbose) {
   if (identical(tolower(trimws(as.character(output_format))), "csv")) {
     error_log <- log_issue(
       error_log, "Validation", "Output Format Not Available",
-      paste("output_format = 'csv' is not implemented — tabs writes an Excel",
+      paste("output_format = 'csv' is not implemented. Tabs writes an Excel",
             "workbook. The run continues and produces .xlsx. Set output_format",
             "to xlsx to silence this."),
       "", "Warning"
     )
     if (verbose) {
-      cat("  [WARNING] output_format 'csv' is not implemented — writing .xlsx.\n")
+      cat("  [WARNING] output_format 'csv' is not implemented. Writing .xlsx.\n")
     }
   } else if (!output_format %in% valid_formats) {
     error_log <- log_issue(
@@ -200,7 +200,7 @@ check_output_format <- function(config, error_log, verbose) {
               output_format, paste(valid_formats, collapse = ", ")),
       "", "Warning"
     )
-    # Note: config mutation removed — the local copy is discarded since this
+    # Note: config mutation removed. The local copy is discarded since this
     # function only returns error_log. build_config_object() handles the
     # "excel" → "xlsx" normalization independently.
   } else if (output_format == "excel") {

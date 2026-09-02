@@ -3,11 +3,11 @@
 # ==============================================================================
 #
 # Tests the full tabs pipeline using demo data:
-#   1. Config loading — load_crosstabs_config()
-#   2. Data loading — load_crosstabs_data()
-#   3. Analysis — run_crosstabs_analysis()
-#   4. Excel output — create_crosstabs_workbook()
-#   5. Interactive report data layer — write_data_layer()
+#   1. Config loading. Load_crosstabs_config()
+#   2. Data loading. Load_crosstabs_data()
+#   3. Analysis. Run_crosstabs_analysis()
+#   4. Excel output. Create_crosstabs_workbook()
+#   5. Interactive report data layer. Write_data_layer()
 #
 # These tests are slower (Excel I/O) but prove the complete system works.
 #
@@ -430,7 +430,7 @@ test_that("output Crosstabs sheet contains data rows", {
 # A composite (COMP_SAT = the mean of Q002..Q005) has no column in the data and
 # no row in the Questions sheet, so it used to be absent from TR.MICRO.scores.
 # It therefore could not recompute under a live filter, and the wave tracker
-# SILENTLY dropped any Question_Mapping row naming one — the fault that cost
+# SILENTLY dropped any Question_Mapping row naming one. The fault that cost
 # SACS its Overall Engagement trend. Gated end to end on the demo project,
 # because the unit test cannot prove the real pipeline wires composite_defs
 # through.
@@ -524,8 +524,8 @@ test_that("the island's composite mean reconciles with every published composite
     recomputed <- stats::weighted.mean(sc[keep], w = w[keep])
 
     # The published cell is DISPLAY-ROUNDED (decimal_places_index), so the gate
-    # is that the island lands on the figure the reader sees — half of the last
-    # displayed place — not bit-identity with an unrounded intermediate.
+    # is that the island lands on the figure the reader sees. Half of the last
+    # displayed place, not bit-identity with an unrounded intermediate.
     dp <- suppressWarnings(as.numeric(config_obj_dp(built)))
     tol <- 0.5 * 10^(-dp) + 1e-9
     expect_lt(abs(recomputed - published), tol,
@@ -533,7 +533,7 @@ test_that("the island's composite mean reconciles with every published composite
                       code, recomputed, published, dp))
     checked <- checked + 1L
   }
-  # A loop that reconciled nothing would pass in silence — the exact shape of
+  # A loop that reconciled nothing would pass in silence. The exact shape of
   # useless test this gate exists to prevent.
   expect_gt(checked, 0)
 })

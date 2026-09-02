@@ -263,7 +263,7 @@ test_that("half-filled, inverted or non-numeric scale bounds are ignored", {
 
 test_that("a declared answer scale never becomes the denominator of an NPS", {
   # ASSA, 28 Aug 2026. Q35_RECOMMEND is answered 0-10 and correctly declared
-  # Scale_Min 0 / Scale_Max 10 — but its headline row is an NPS Score, a net
+  # Scale_Min 0 / Scale_Max 10, but its headline row is an NPS Score, a net
   # balance on -100..+100. The declaration used to override the metric's own
   # 100, so the dashboard rendered an NPS of 48 as "48.0/10": a gauge bar 480%
   # of full, clipped to a solid green bar, and a pinned NPS chart on a 0-10
@@ -485,7 +485,7 @@ test_that("load_comments_sheet without a Headline column has no headlines attrib
 })
 
 # ==============================================================================
-# BYTE-IDENTICAL GUARANTEE — no new columns == columns present but all blank
+# BYTE-IDENTICAL GUARANTEE. No new columns == columns present but all blank
 # ==============================================================================
 
 test_that("a config without the new columns is byte-identical to all-blank columns", {

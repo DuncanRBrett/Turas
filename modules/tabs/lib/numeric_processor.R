@@ -697,8 +697,8 @@ detect_outliers_iqr <- function(values) {
 #' @export
 categorize_numeric_bins <- function(values, option_info) {
   # No rows, or no Min/Max columns, means no bins. A Numeric question can carry
-  # Options rows that are display labels rather than bin definitions — a
-  # frequency cascade's answer texts, say — and the Options sheet then has no
+  # Options rows that are display labels rather than bin definitions. A
+  # frequency cascade's answer texts, say, and the Options sheet then has no
   # Min/Max at all. option_info$Min is NULL in that case, and order(NULL) raises
   # "argument 1 is not a vector", which surfaced as a bare
   # DATA_NUMERIC_QUESTION_FAILED naming the question but not the cause.

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * PPTX boardroom style gate (PPTX_BOARDROOM_SPEC.md WP0–WP2) — regressions
+ * PPTX boardroom style gate (PPTX_BOARDROOM_SPEC.md WP0–WP2): regressions
  * where the editable deck drifted from the boardroom template:
  *   - WP0: TR.pptx.STYLE is the single style source (Arial theme + text runs,
  *     no ad-hoc sizes/colours in the slide builders), shared header/footer
  *     chrome on every content slide;
- *   - WP1: metadata footer everywhere — question text, n= (weighted Σw +
+ *   - WP1: metadata footer everywhere. Question text, n= (weighted Σw +
  *     effective n on weighted reports), sig note, wave, Turas wordmark, page
  *     numbers; question code demoted from the title to the subtitle;
  *   - WP2: emphasis series in brand vs muted context greys, data labels on
@@ -135,7 +135,7 @@ function sigModel() {
   };
 }
 
-console.log("PPTX boardroom style — suite:");
+console.log("PPTX boardroom style. Suite:");
 
 /* ---------------- WP0: style foundation ---------------- */
 
@@ -150,7 +150,7 @@ run("TR.pptx.STYLE carries the spec constants (font, palette, scale, grid)", () 
   eq(STYLE.FOOTER.rule.y, 6.72, "footer hairline y");
 });
 
-run("theme fonts are Arial — no Calibri anywhere in the package", () => {
+run("theme fonts are Arial. No Calibri anywhere in the package", () => {
   proj();
   const bytes = TR.pptx.package([TR.exporter.dividerSlide("Section", "sub")],
     { project: TR.AGG.project });
@@ -202,7 +202,7 @@ run("question code moves out of the title into the subtitle", () => {
   const slide = TR.exporter.slideForModel(flatModel(), "",
     { table: true, title: "Branch still dominates" });
   at(slide.xml, "Branch still dominates", "insight title leads");
-  notAt(slide.xml, "Q7 — ", "no code prefix on the title");
+  notAt(slide.xml, "Q7, ", "no code prefix on the title");
   at(slide.xml, "SERVICE", "category kicker in grey caps");
 });
 
@@ -411,7 +411,7 @@ const QUOTES = [
   { text: "It is fine I suppose", q: "Anything else?", tags: [], sentiment: "neu" }
 ];
 
-run("quoteSlide: quote typography — glyph, italic quote, attribution, NO table", () => {
+run("quoteSlide: quote typography. Glyph, italic quote, attribution, NO table", () => {
   proj();
   const slide = TR.exporter.quoteSlide({ title: "Masters",
     meta: "Faster support wanted", quotes: QUOTES, moreN: 0, note: "" });

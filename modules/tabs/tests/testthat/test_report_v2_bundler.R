@@ -137,14 +137,14 @@ test_that("fills every token and embeds the data island", {
   expect_true(grepl("\"schema_version\":2", html, fixed = TRUE))
   # empty islands inlined as null
   expect_true(grepl('id="data-micro">\nnull', html) || grepl("null", html, fixed = TRUE))
-  # self-contained — no external resources
+  # self-contained. No external resources
   expect_false(grepl('(src|href)="https?://', html))
 })
 
 test_that("no-micro ship (html_report_v2_microdata = FALSE): null island, NO respondent records", {
   # The flag ships exactly this: micro NULL -> serialize_microdata(NULL) ==
   # "null" -> a null DATA_MICRO island. The confidentiality guarantee is
-  # NEGATIVE, so assert the ABSENCE of microdata markers in the built HTML —
+  # NEGATIVE, so assert the ABSENCE of microdata markers in the built HTML,
   # not just the presence of "null" somewhere (which is vacuously true).
   dl <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
   json <- serialize_data_layer(dl)
@@ -154,7 +154,7 @@ test_that("no-micro ship (html_report_v2_microdata = FALSE): null island, NO res
   expect_false(grepl("\"banner_vars\"", html_off, fixed = TRUE))
   expect_false(grepl("\"weights\"", html_off, fixed = TRUE))
 
-  # The same build WITH a micro payload embeds those markers — proving the
+  # The same build WITH a micro payload embeds those markers. Proving the
   # negative assertions above are meaningful, not green-by-construction.
   micro_json <- paste0('{"n":2,"answers":{"Q1":[0,1]},',
                        '"banner_vars":{"Gender":[0,1]},"weights":[1,1]}')
@@ -179,7 +179,7 @@ test_that("escapes </ inside the embedded JSON so it cannot break the script", {
 test_that("a verbatim with '<!--' + '<script' cannot enter the double-escaped state (I14)", {
   # Per the HTML parser, "<!--" followed by "<script" inside a <script> element
   # enters the double-escaped state: the island's own </script> no longer
-  # closes it and it swallows the next island — DATA_QUAL poison swallowed the
+  # closes it and it swallows the next island. DATA_QUAL poison swallowed the
   # {{JS}} tag and shipped a BLANK report. A respondent pasting an HTML email
   # template into an open-end is a sufficient trigger.
   q <- make_dl_q_single()
@@ -241,7 +241,7 @@ test_that("refuses an empty data layer", {
 })
 
 # ==============================================================================
-# 4. additive-only contract — v2 never clobbers the classic outputs
+# 4. additive-only contract. V2 never clobbers the classic outputs
 # ==============================================================================
 
 context("report_v2_bundler: additive-only output paths")

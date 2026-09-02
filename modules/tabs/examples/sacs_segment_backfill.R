@@ -4,7 +4,7 @@
 # Reads a Question_Mapping workbook and the prior waves' data, then writes one
 # `<wave>_wave.json` segment sidecar per prior wave into a `waves_source` folder.
 # A v2 tabs build (html_report_v2_tracking + waves_source + the same
-# question_mapping in Settings) then assembles a segment-aware island — and the
+# question_mapping in Settings) then assembles a segment-aware island, and the
 # sidecars key by the CANONICAL QuestionCode, matching how the live wave keys
 # when a mapping is configured (so the link survives renumbering / rewording).
 #
@@ -50,7 +50,7 @@ qm <- load_question_mapping(QMAP)
 if (is.null(qm)) stop("Could not read QuestionMap sheet from: ", QMAP)
 
 # The Banners sheet drives the per-group trend lines. It used to be read with a
-# bare read.xlsx(), which takes ROW 1 as the header — so a sheet carrying a title
+# bare read.xlsx(), which takes ROW 1 as the header, so a sheet carrying a title
 # block produced a frame with no BreakLabel column, no segment dimensions, and a
 # run that finished "successfully" with Total-only sidecars and not one word about
 # it. Scan for the header row, and say so loudly when the sheet is there but
@@ -66,7 +66,7 @@ read_banners <- function(path) {
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
     cat("│ The mapping has a Banners sheet but no 'BreakLabel' header\n")
     cat("│ in its first 10 rows, so NO segment dimensions were read.\n")
-    cat("│ The sidecars will carry Total only — every per-group trend\n")
+    cat("│ The sidecars will carry Total only. Every per-group trend\n")
     cat("│ line will be empty for these waves.\n")
     cat("│ How to fix: put BreakLabel in column A of the header row.\n")
     cat("└───────────────────────────────────────────────────────┘\n\n")
@@ -104,7 +104,7 @@ metrics <- lapply(seq_len(nrow(qm)), function(i) {
     # composite / index: the metric value is the mean of its source items.
     #
     # This used to pass key = NULL, which puts the bridge on the TITLE path
-    # (tracking_norm(QuestionText)) — correct back when the live wave emitted no
+    # (tracking_norm(QuestionText)): correct back when the live wave emitted no
     # composite at all, so the renderer's aggKeys fell back to the title too.
     # A composite now DOES carry per-respondent micro scores and so appears in
     # the live contribution keyed by its canonical QuestionCode; aggKeys then
@@ -131,7 +131,7 @@ segment_dims <- lapply(seg_rows, function(i) list(
   label = as.character(banners$BreakLabel[i]), cols = per_wave(banners[i, ])))
 cat("Segment dimensions:", if (length(segment_dims))
   paste(vapply(segment_dims, function(d) d$label, character(1)), collapse = ", ")
-  else "NONE — the sidecars will carry Total only", "\n")
+  else "NONE. The sidecars will carry Total only", "\n")
 
 paths <- write_segment_wave_sidecars(
   waves, metrics, segment_dims, OUT_DIR,

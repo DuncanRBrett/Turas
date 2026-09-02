@@ -17,8 +17,8 @@ name plus wave, not by file or build (`d2.storeKey`, `20_data.js`):
 
 So regenerating the same project at the same wave and opening it in the same
 browser re-attaches the previous session's state to the new file. This is
-deliberate — it is what lets you regenerate ten times while writing a report and
-keep your commentary each time — but it means a report you want to see *clean*
+deliberate. It is what lets you regenerate ten times while writing a report and
+keep your commentary each time, but it means a report you want to see *clean*
 needs the state cleared, or a browser that never had it.
 
 ## The stores
@@ -44,12 +44,12 @@ Eleven state stores plus two reader UI preferences:
 There is no clear-everything control in the report, by design. The Story tab's
 "Clear" empties story items only.
 
-## Option 1 — a private window
+## Option 1. A private window
 
 For "what will the client see?", open the fresh report in a private/incognito
 window. Nothing carries in, nothing persists, nothing to undo.
 
-## Option 2 — the bookmarklet (recommended)
+## Option 2. The bookmarklet (recommended)
 
 One-time setup: make a new bookmark in the bookmarks bar, name it
 `Turas: clear working state`, and paste this as the URL.
@@ -59,13 +59,13 @@ javascript:(function(){var K=["turas_v2_story","turas_v2_insights","turas_v2_ann
 ```
 
 Open the report, click the bookmark, confirm. It scopes every deletion through
-`TR.d2.storeKey`, so only this project and wave are affected — other Turas
+`TR.d2.storeKey`, so only this project and wave are affected. Other Turas
 reports and other sites keep their state.
 
 Works on every report you have already generated, since it needs nothing baked
 into the file.
 
-## Option 3 — the console
+## Option 3. The console
 
 Same thing, pasted into the report's DevTools console, then reload:
 
@@ -76,7 +76,7 @@ Same thing, pasted into the report's DevTools console, then reload:
 ## What *not* to use
 
 DevTools "Clear site data" works, but when reports are opened as `file://` URLs
-browsers generally treat all local files as one storage origin — so it wipes
+browsers generally treat all local files as one storage origin, so it wipes
 every Turas report's state on the machine, not just the one in front of you.
 
 ## One thing to know about saved copies
@@ -85,7 +85,7 @@ Clearing localStorage removes the `_owns` marker, so on reload every store
 re-seeds from the `user-state` island. In a report you generated, that island is
 `null` and clearing is permanent. In a **saved copy** the island holds the
 author's baked-in version, so clearing means *revert to the version in the
-file*, not delete. Same action, different meaning — check which file you are
+file*, not delete. Same action, different meaning. Check which file you are
 looking at.
 
 To hand someone a clean report, send the freshly generated one. `report.saveCopy`

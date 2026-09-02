@@ -1,5 +1,5 @@
 /**
- * v2 story builder — an ordered, annotated narrative of four item kinds:
+ * v2 story builder. An ordered, annotated narrative of four item kinds:
  * pinned questions (with chart/table/insight flags), section dividers,
  * pinned dashboard heatmaps, and composites (all index metrics of a
  * section in one exhibit). Present full-screen or export a native,
@@ -27,7 +27,7 @@
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -73,7 +73,7 @@
   /* ---------------- pin creators ---------------- */
 
   // The first banner group's id, or "" (the Total column) on a Total-only
-  // report. banner_groups[0].id thrown unguarded — pinning a tracking view or a
+  // report. banner_groups[0].id thrown unguarded. Pinning a tracking view or a
   // composite exhibit on a no-banner survey (e.g. CCS) crashed and nothing
   // pinned.
   function firstBanner() {
@@ -82,7 +82,7 @@
 
   // The banner to record on a pinned story item. A custom or composite banner is
   // a live spec that a pinned exhibit can't recompute, so it resolves to the
-  // first banner — or "" (Total) on a Total-only survey. (addExhibit read
+  // first banner, or "" (Total) on a Total-only survey. (addExhibit read
   // banner_groups[0].id unguarded here and crashed on CCS.)
   function pinBanner() {
     var b = TR.d2.state.banner;
@@ -95,7 +95,7 @@
     var s = TR.d2.state;
     var chartState = TR.cards2.chartState();
     // D2: the default pin title is the analyst headline (reader.headlineTitle).
-    // NOT the insight's first sentence — the pin body prints the insight in
+    // NOT the insight's first sentence. The pin body prints the insight in
     // full below the table, so titling the pin with it said it twice. "" keeps
     // each surface's existing default (story head = title, PPTX =
     // short_label/title); older pins carry no title field and render unchanged.
@@ -126,11 +126,11 @@
       note: ""
     });
     touch();
-    TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
+    TR.shell.toast("Pinned to story (" + load().length + "): see the Story tab");
   };
 
   /** The flagship two-panel pin: this-wave distribution + trend-over-waves.
-   *  `withComments` comes from the pin menu's own priority-comments tickbox —
+   *  `withComments` comes from the pin menu's own priority-comments tickbox,
    *  the exhibit-then-evidence pair a findings deck is usually built as. */
   story2.pinExhibit = function (withComments) {
     var s = TR.d2.state;
@@ -144,7 +144,7 @@
       hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
       note: "" });
     touch();
-    TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
+    TR.shell.toast("Trend exhibit pinned (" + load().length + "): see the Story tab");
   };
 
   /** Pin a tracking Visualise view exactly as selected: explicit series
@@ -162,7 +162,7 @@
       distType: "column", note: spec.note || "" });
     touch();
     TR.shell.toast("Pinned exactly as selected (" + load().length +
-      ") — see the Story tab");
+      "): see the Story tab");
   };
 
   /** Composite exhibit: any tracked questions, each via its headline metric. */
@@ -174,7 +174,7 @@
     var holder = document.getElementById("story-picker");
     holder.hidden = false;
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">Composite ' +
-      "exhibit — pick any tracked questions (any sections); each contributes " +
+      "exhibit. Pick any tracked questions (any sections); each contributes " +
       'its headline metric<button data-close aria-label="Close">✕</button></div>' +
       '<div class="fpick-list">' + tracked.map(function (q) {
         return '<label class="fpick-q"><input type="checkbox" value="' + q.code +
@@ -225,7 +225,7 @@
       title: snap.title || "Pinned card", context: snap.context || "",
       html: snap.html || "", lines: (snap.lines || []).slice(), note: "" };
     // WP4: a structured quotes payload (qual hub exhibits) exports as a
-    // quote-typography slide. Additive — the payload arrives ALREADY
+    // quote-typography slide. Additive. The payload arrives ALREADY
     // disclosure-gated (hidden text absent, below-k tags dropped); old pins
     // without it keep the table fallback unchanged.
     if (snap.quotes && snap.quotes.length) {
@@ -234,7 +234,7 @@
     }
     load().push(item);
     touch();
-    TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
+    TR.shell.toast("Pinned to story (" + load().length + "): see the Story tab");
   };
 
   /** A config-authored study slide, pinned by INDEX into project.slides rather
@@ -246,7 +246,7 @@
     if (!(idx >= 0)) return;
     load().push({ kind: "slide", slide: idx, title: title || "", note: "" });
     touch();
-    TR.shell.toast("Slide pinned to story (" + load().length + ") — see the Story tab");
+    TR.shell.toast("Slide pinned to story (" + load().length + "): see the Story tab");
   };
 
   /** The authored slide a "slide" item points at, or null when the config no
@@ -277,7 +277,7 @@
     });
     var holder = document.getElementById("story-picker");
     holder.hidden = false;
-    holder.innerHTML = '<div class="fpick"><div class="fpick-head">Composite — all index ' +
+    holder.innerHTML = '<div class="fpick"><div class="fpick-head">Composite. All index ' +
       'metrics of a section in one exhibit<button data-close aria-label="Close">✕</button></div>' +
       cats.map(function (cat) {
         return '<button class="fpick-q" data-cat="' + fmt.escapeHtml(cat.title) + '">' +
@@ -344,7 +344,7 @@
     }));
     var body = models.map(function (m) {
       var row = m.rows.filter(function (r) { return r.kind === "mean"; })[0];
-      return { kind: "row", cells: [m.code + " — " + TR.charts.clip(m.title, 60)]
+      return { kind: "row", cells: [m.code + ": " + TR.charts.clip(m.title, 60)]
         .concat(row.cells.map(function (c) {
           return c.mean === null ? "–" : c.mean.toFixed(1);
         })) };
@@ -374,7 +374,7 @@
   }
 
   /**
-   * Display title for any pin — the stored title first (D2 question pins,
+   * Display title for any pin. The stored title first (D2 question pins,
    * snapshots, titled tracking exhibits), else the analyst headline, else the
    * item kind's existing default. The insight is never borrowed as a title
    * here: the pin already shows it in full. Read-only: old pins are never
@@ -397,17 +397,17 @@
       return (sl && sl.title) || "Study slide";
     }
     if (item.kind === "heatmap") return "Index heatmap";
-    if (item.kind === "composite") return "Composite — " + item.category;
+    if (item.kind === "composite") return "Composite: " + item.category;
     return item.kind === "divider" ? (item.title || "Section") : "Pinned card";
   };
 
-  /** Evidence-only body of an item (no head/controls/commentary) — the cover
+  /** Evidence-only body of an item (no head/controls/commentary): the cover
    *  (24a) renders findings through the SAME renderers as the story tab, so
    *  each pin's disclosure gates travel with it. "" when nothing resolves. */
   /** A frozen qualitative pin is STALE once any quote it froze is no longer
    *  published by the current island (hide-marked since, scope tightened,
    *  confidentiality mode changed, island absent from this copy). The whole
-   *  frozen payload — html included — must not render: priority pins
+   *  frozen payload, html included, must not render: priority pins
    *  re-resolve on every render for exactly this reason (review 2026-08, I20). */
   function qualPinStale(item) {
     if (!item || item.source !== "qualitative") return false;
@@ -421,7 +421,7 @@
   story2._qualPinStale = qualPinStale;   // exposed for the node gate
 
   var QUAL_STALE_NOTE = "This pinned collection references comments this copy " +
-    "no longer publishes — re-pin it from the Qualitative tab.";
+    "no longer publishes. Re-pin it from the Qualitative tab.";
 
   /** The picture (and/or words) of an authored slide, resolved from the island
    *  at render time. Shared by the story card, the cover thumbnail and present
@@ -467,7 +467,7 @@
         intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>";
   };
 
-  /** The priority comments a question pin carries, or [] — recomputed from the
+  /** The priority comments a question pin carries, or []: recomputed from the
    *  island on every render rather than frozen into the pin, because tier 3 is
    *  authored in the coding workbook and is the same for every reader. Guarded:
    *  a report without a qual island has no TR.qual at all. */
@@ -520,7 +520,7 @@
       '<button data-sact="pptx" class="primary"' + (list.length ? "" : " disabled") +
       ' title="Editable native PowerPoint charts (Edit Data)">Download .pptx (editable)</button>' +
       '<button data-sact="pptx-img" class="primary"' + (list.length ? "" : " disabled") +
-      ' title="Pixel-perfect image slides — exactly what is on screen (not editable)">' +
+      ' title="Pixel-perfect image slides. Exactly what is on screen (not editable)">' +
       "Download .pptx (images)</button>" +
       '<button data-sact="divider">+ Section divider</button>' +
       /* the exhibit builder replaces the parked per-section composite;
@@ -528,7 +528,7 @@
          back-compat with previously saved pins */
       '<button data-sact="exhibit">+ Composite exhibit…</button>' +
       '<button data-sact="export" title="Save your insights + pinned story to a small ' +
-      'file. Re-import it into a future wave report to carry your commentary forward — ' +
+      'file. Re-import it into a future wave report to carry your commentary forward, ' +
       'Save copy is a frozen snapshot and cannot do that.">Export insights JSON</button>' +
       '<label class="t-btnish" title="Merge insights + story from a previous Export back ' +
       'into this report (e.g. carry last wave commentary forward).">Import JSON' +
@@ -564,11 +564,11 @@
     if (item.kind === "divider") {
       return '<div class="card story-item story-divider" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + "</span>" +
-        '<strong class="divider-title">— ' + fmt.escapeHtml(item.title) + " —</strong>" +
+        '<strong class="divider-title">, ' + fmt.escapeHtml(item.title) + ", </strong>" +
         buttons + "</div></div>";
     }
     if (item.kind === "exhibit") {
-      // elements were chosen at pin time — story shows exactly the pin
+      // elements were chosen at pin time. Story shows exactly the pin
       var exModels = TR.exhibit.models(item);
       var exFlags = item.flags || {};
       return '<div class="card story-item" data-i="' + i + '">' +
@@ -593,9 +593,9 @@
         fmt.escapeHtml(item.note || "") + "</textarea></div>";
     }
     if (item.kind === "snapshot") {
-      // pinned "as it looks" — the card's own HTML, re-shown verbatim (unless a
+      // pinned "as it looks". The card's own HTML, re-shown verbatim (unless a
       // rebuild withheld any of its quotes, in which case the frozen payload
-      // must not render — I20)
+      // must not render. I20)
       var snapBody = qualPinStale(item)
         ? '<p class="si-ctx">' + fmt.escapeHtml(QUAL_STALE_NOTE) + "</p>"
         : (item.html || "");
@@ -612,7 +612,7 @@
     if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
       var title = item.kind === "heatmap" ? "Index heatmap"
-        : "Composite — " + item.category;
+        : "Composite: " + item.category;
       return '<div class="card story-item" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". " +
         (item.kind === "heatmap" ? "HEAT" : "COMP") + "</span><strong>" +
@@ -715,7 +715,7 @@
     }
   }
 
-  /** WP3 cover: the same content as the HTML cover — project head, the
+  /** WP3 cover: the same content as the HTML cover. Project head, the
    *  authored exec summary (report.sectionText) and the leading findings as
    *  pin-title insight lines (story2.pinTitle, the reader chain). Falls back
    *  to the plain title slide when the exporter has no cover (node stubs). */
@@ -726,7 +726,7 @@
     // long list would compress into something unreadable. The config setting
     // governs the HTML cover only, and says so in the template and the docs.
     // Same two exclusions as the HTML cover: dividers, and pins of the Report
-    // tab's narrative sections — this slide already carries the exec summary as
+    // tab's narrative sections. This slide already carries the exec summary as
     // its own text, and a finding line reading "Background & method" is a
     // heading, not a finding. Each such pin still gets its own slide below.
     var findings = list.filter(function (it) {
@@ -738,7 +738,7 @@
     return TR.exporter.coverSlide({ exec: exec, findings: findings });
   }
 
-  // Data-table pin kinds — the deck's "Detail" tail when no appendix flags
+  // Data-table pin kinds. The deck's "Detail" tail when no appendix flags
   // are in play (WP5).
   function isDetailItem(item) {
     return item.kind === "heatmap" || item.kind === "composite";
@@ -747,7 +747,7 @@
   function slidesFor(list) {
     // WP5 deck tail: pins flagged appendix:true go behind an "Appendix"
     // divider. When the analyst marked nothing, matrix/table pins (heatmap /
-    // composite) group behind a "Detail" divider — but only on a MIXED deck;
+    // composite) group behind a "Detail" divider, but only on a MIXED deck;
     // an all-tables deck has nothing to separate and keeps its order.
     var main = list, tail = [], tailTitle = "";
     if (list.some(function (it) { return !!it.appendix; })) {
@@ -776,7 +776,7 @@
         ? TR.qual.groupQuotesByBand(quotes) : [{ band: "", quotes: quotes }];
       groups.forEach(function (g) {
         slides.push(TR.exporter.quoteSlide({
-          title: g.band ? title + " — " + g.band : title,
+          title: g.band ? title + ": " + g.band : title,
           kicker: apx ? "Appendix" : "In their words",
           meta: meta || "", quotes: g.quotes, moreN: 0, note: "" }));
       });
@@ -800,7 +800,7 @@
       if (item.kind === "slide") {
         // The authored picture goes in as a real picture. A slide whose image
         // cannot be decoded (or a text-only slide) still gets a slide, carrying
-        // its words — the deck never silently loses a pinned exhibit.
+        // its words. The deck never silently loses a pinned exhibit.
         var sl = slideOf(item);
         var pic = sl && TR.exporter.slidePicture ? TR.exporter.slidePicture(sl) : null;
         if (pic) {
@@ -819,20 +819,20 @@
       }
       if (item.kind === "composite") {
         // a stale pin (category no longer resolves -> null matrix) must not
-        // crash the whole deck — a visible placeholder slide, like the
+        // crash the whole deck. A visible placeholder slide, like the
         // stale-question-pin guard in present mode
         var cm = compositeMatrix(item);
         slides.push(cm
-          ? TR.exporter.matrixSlide("Composite — " + item.category,
+          ? TR.exporter.matrixSlide("Composite: " + item.category,
               contextLine(item) + (item.note ? " · " + item.note : ""), cm,
               { kicker: apx ? "Appendix" : "Composite" })
-          : TR.exporter.dividerSlide("Composite — " + item.category,
+          : TR.exporter.dividerSlide("Composite: " + item.category,
               "This pin no longer resolves in this report."));
         return;
       }
       if (item.kind === "snapshot") {
         // A stale qualitative pin exports a placeholder, never its frozen
-        // (since-withheld) quotes — mirror of the stale-composite rule (I20).
+        // (since-withheld) quotes. Mirror of the stale-composite rule (I20).
         if (qualPinStale(item)) {
           slides.push(TR.exporter.dividerSlide(item.title || "Pinned card",
             QUAL_STALE_NOTE));
@@ -876,7 +876,7 @@
       tail.forEach(function (item) { emit(item, tailTitle === "Appendix"); });
     }
     // WP1: resolve footer page-number tokens now the deck length is known
-    // (the node gates stub TR.exporter without paginate — tokens never appear
+    // (the node gates stub TR.exporter without paginate, tokens never appear
     // there because the stubs emit no chrome)
     return TR.exporter.paginate ? TR.exporter.paginate(slides) : slides;
   }
@@ -903,7 +903,7 @@
         contextLine(item) + (item.note ? " · " + item.note : ""), null, heatmapMatrix(item));
     }
     if (item.kind === "composite") {
-      return TR.exporter.cardSvgRaw("Composite — " + item.category,
+      return TR.exporter.cardSvgRaw("Composite: " + item.category,
         contextLine(item) + (item.note ? " · " + item.note : ""), null, compositeMatrix(item));
     }
     if (item.kind === "snapshot") {
@@ -943,7 +943,7 @@
   }
 
   /** The image deck's card list: one card per item, plus a companion quote card
-   *  wherever a pin carries priority comments — so the image deck shows the same
+   *  wherever a pin carries priority comments, so the image deck shows the same
    *  evidence as the editable deck rather than silently dropping it. */
   function imageCards(list) {
     var cards = [];
@@ -951,7 +951,7 @@
       cards.push(itemCardSvg(item));
       var quotes = quotesFor(item);
       if (quotes.length && TR.exporter.quoteCardSvg) {
-        // an exhibit has no single question model — its own title chain answers
+        // an exhibit has no single question model. Its own title chain answers
         var model = item.kind === "question" ? modelFor(item) : null;
         var head = item.title || (model ? model.title : story2.pinTitle(item));
         var meta = model ? contextLine(item, model) : (filterNote(item) || "");
@@ -959,7 +959,7 @@
         var groups = (TR.qual && TR.qual.groupQuotesByBand)
           ? TR.qual.groupQuotesByBand(quotes) : [{ band: "", quotes: quotes }];
         groups.forEach(function (g) {
-          cards.push(TR.exporter.quoteCardSvg("In their words — " + head +
+          cards.push(TR.exporter.quoteCardSvg("In their words, " + head +
             (g.band ? " · " + g.band : ""), meta, g.quotes));
         });
       }
@@ -972,7 +972,7 @@
   function topAction(action) {
     if (action === "clear") {
       // Clear wipes an afternoon's pinning in one click, writes the empty state
-      // straight to storage, and sets the ownership marker — so a reload will
+      // straight to storage, and sets the ownership marker, so a reload will
       // NOT bring the pins back from the island seed. The only recovery is an
       // earlier Export insights JSON or a saved copy. Ask first, and say what
       // survives (the insight notes live in their own store and are untouched).
@@ -1062,11 +1062,11 @@
         '<div class="pr-table snap-body">' + presentBody + "</div>";
     } else if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
-      // a stale composite pin (null matrix) must not crash present mode —
+      // a stale composite pin (null matrix) must not crash present mode,
       // same guard as the stale question pin below
       body = matrix
         ? "<h1>" + (item.kind === "heatmap" ? "Index heatmap"
-            : "Composite — " + fmt.escapeHtml(item.category)) + "</h1>" +
+            : "Composite, " + fmt.escapeHtml(item.category)) + "</h1>" +
           '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item)) + "</p>" +
           (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
           '<div class="pr-table">' + matrixTable(matrix) + "</div>"
@@ -1074,14 +1074,14 @@
           '<p class="pr-ctx">This pin no longer resolves in this report.</p></div>';
     } else if (!modelFor(item)) {
       // a stale pin (question no longer in this report) must not crash
-      // present mode — itemHtml and the PPTX path already skip it
+      // present mode. ItemHtml and the PPTX path already skip it
       body = '<div class="pr-divider"><h1>Unavailable exhibit</h1>' +
         '<p class="pr-ctx">This pin references a question that is not in ' +
         "this report.</p></div>";
     } else {
       var model = modelFor(item);
       var flags = item.flags || { table: true, insight: true };
-      body = "<h1>" + fmt.escapeHtml(model.code + " — " + (item.title || model.title)) + "</h1>" +
+      body = "<h1>" + fmt.escapeHtml(model.code + ": " + (item.title || model.title)) + "</h1>" +
         '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</p>" +
         ((flags.insight !== false && (item.note || TR.insights.get(item.q, item.banner))) ?
           '<div class="pr-note">' +

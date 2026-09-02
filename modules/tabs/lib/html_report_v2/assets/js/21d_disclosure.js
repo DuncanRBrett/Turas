@@ -1,14 +1,14 @@
 /**
  * v2 disclosure control (re-identification protection).
  *
- * Composite audience filters can narrow a report onto a handful of people — fine on a
+ * Composite audience filters can narrow a report onto a handful of people. Fine on a
  * 1,363-student survey, dangerous on a 200-person staff survey where "Finance · female ·
  * 10y+" is one identifiable person. This module is the single source of truth for "is the
  * current view small enough to risk identifying someone?". Every view consults it rather
  * than each re-implementing a threshold.
  *
  * The dial is one configurable minimum base k (project.min_reporting_base; 1 = off). The
- * live audience base is the number of respondents matching the global filter — which is N
+ * live audience base is the number of respondents matching the global filter, which is N
  * when unfiltered, so setting k = N forbids any sub-group drill-down (only the full-sample
  * view ever shows identifying detail). Below k the renderer withholds the comment
  * demographic tags (and, next, small crosstab cells).
@@ -29,7 +29,7 @@
   disc.active = function () { return disc.minBase() > 1; };
 
   /** Respondents matching the live global filter (= the whole sample when unfiltered).
-   *  Returns null when the base cannot be computed (no microdata island) — the caller
+   *  Returns null when the base cannot be computed (no microdata island): the caller
    *  MUST treat that as "unknown", never as "large" (see audienceTooSmall: fail closed). */
   disc.audienceBase = function () {
     if (!TR.MICRO) return null;
@@ -39,7 +39,7 @@
 
   /** True when the live audience is too small to show identifying detail (tags, quotes).
    *  Fails CLOSED: if disclosure is engaged but the base can't be verified (microdata
-   *  absent — e.g. the build degraded to published-only), withhold detail rather than
+   *  absent, e.g. the build degraded to published-only), withhold detail rather than
    *  assume the audience is safe. */
   disc.audienceTooSmall = function () {
     if (!disc.active()) return false;

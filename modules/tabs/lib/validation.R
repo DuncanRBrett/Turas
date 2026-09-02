@@ -1576,7 +1576,7 @@ run_all_validations <- function(survey_structure, survey_data, config,
 #
 # V9.9.5 ENHANCEMENTS (EXTERNAL REVIEW FIXES):
 # 1. Type coverage: Added integer64 (data.table, DB extracts) and labelled (haven)
-# 2. Weight validation thresholds — weight_na_threshold (10),
+# 2. Weight validation thresholds. Weight_na_threshold (10),
 #    weight_zero_threshold (5), weight_deff_warning (3). NOTE: these were
 #    described here as "configurable" but never were: they are not registered in
 #    build_config_object, so config_obj never carries them and the defaults

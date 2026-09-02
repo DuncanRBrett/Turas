@@ -1,5 +1,5 @@
 /**
- * v2 tracking annotations — analyst notes tagged to a data point of a
+ * v2 tracking annotations. Analyst notes tagged to a data point of a
  * tracked metric ("Campaign launched", "COVID wave"). Keyed metric::year,
  * persisted in localStorage, hydrated from saved copies (user-state
  * island) and embedded by "Save copy" alongside insights and the story.
@@ -22,7 +22,7 @@
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.

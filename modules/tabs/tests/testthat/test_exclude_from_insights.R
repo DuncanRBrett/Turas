@@ -4,7 +4,7 @@
 #
 # DIFFERENCES_TAB_SCOPE.md item 4. A Selection-sheet column that drops ONE
 # question from the Differences tab's findings while leaving it in the crosstabs
-# — the lever a study needs when several near-duplicate views of one measure
+#. The lever a study needs when several near-duplicate views of one measure
 # (Own / Other / Total) each raise their own card.
 #
 # The declaration crosses five layers, and a break in any one is SILENT (the
@@ -69,8 +69,8 @@ source(file.path(.tabs_lib_dir, "question_orchestrator.R"))
 # FIXTURES
 # ==============================================================================
 
-# The flag is question-type agnostic — it is read from the Selection row, not
-# from the data — so the cheapest routed question serves: an Allocation, which
+# The flag is question-type agnostic. It is read from the Selection row, not
+# from the data, so the cheapest routed question serves: an Allocation, which
 # test_allocation_processor.R already proves runs on this source chain.
 efi_data <- function() data.frame(
   BUDGET_1 = c(50, 25, 0, 25),
@@ -106,7 +106,7 @@ efi_run <- function(...) {
 # ORCHESTRATOR EXTRACTION
 # ==============================================================================
 
-context("ExcludeFromInsights — orchestrator extraction")
+context("ExcludeFromInsights. Orchestrator extraction")
 
 test_that("a 'Y' becomes TRUE on the question result", {
   expect_true(isTRUE(efi_run(ExcludeFromInsights = "Y")$exclude_from_insights))
@@ -115,7 +115,7 @@ test_that("a 'Y' becomes TRUE on the question result", {
 test_that("case and surrounding whitespace do not defeat it", {
   # A config read from a workbook arrives already canonicalised to "Y"/"N" by
   # the loader's gate loop, but process_single_question is also called with
-  # hand-built question rows, so its own toupper(trimws()) is a second line —
+  # hand-built question rows, so its own toupper(trimws()) is a second line,
   # tested here because that is the path a caller bypassing the loader takes.
   expect_true(isTRUE(efi_run(ExcludeFromInsights = " y ")$exclude_from_insights))
   expect_true(isTRUE(efi_run(ExcludeFromInsights = "Y ")$exclude_from_insights))

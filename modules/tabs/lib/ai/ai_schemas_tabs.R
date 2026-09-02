@@ -1,16 +1,16 @@
 # ==============================================================================
-# AI SCHEMAS TABS — Tabs-Specific Structured Output Type Definitions
+# AI SCHEMAS TABS. Tabs-Specific Structured Output Type Definitions
 # ==============================================================================
 #
 # Defines ellmer type_object schemas specific to the tabs module:
-#   - ai_callout_schema      — per-question AI insight callout
-#   - exec_patterns_schema   — executive summary Stage 1 (pattern identification)
-#   - exec_narrative_schema  — executive summary Stage 2 (narrative generation)
+#   - ai_callout_schema. Per-question AI insight callout
+#   - exec_patterns_schema. Executive summary Stage 1 (pattern identification)
+#   - exec_narrative_schema. Executive summary Stage 2 (narrative generation)
 #
 # Shared schemas (verification, selectivity) live in modules/shared/lib/ai/.
 #
 # Dependencies:
-#   ellmer (CRAN) — type_object, type_boolean, type_string, type_array, type_enum
+#   ellmer (CRAN): type_object, type_boolean, type_string, type_array, type_enum
 #
 # Usage:
 #   source("modules/tabs/lib/ai/ai_schemas_tabs.R")
@@ -61,22 +61,22 @@ exec_patterns_schema <- ellmer::type_object(
   strongest_measures = ellmer::type_array(
     "The 3-4 measures with the highest positive scores. Each entry must
      be a self-contained string in the format:
-     '{q_code}: {measure} — {score} ({why notable})'
-     Example: 'Q3: Brand Trust — 72% (highest score across all measures,
+     '{q_code}: {measure}, {score} ({why notable})'
+     Example: 'Q3: Brand Trust, 72% (highest score across all measures,
      significantly above Q7 Satisfaction at 54%)'",
     items = ellmer::type_string(
-      "One strong measure: '{q_code}: {measure} — {score} ({why notable})'"
+      "One strong measure: '{q_code}: {measure}, {score} ({why notable})'"
     )
   ),
 
   weakest_measures = ellmer::type_array(
     "The 3-4 measures with the lowest or most concerning scores. Each
      entry must be a self-contained string in the format:
-     '{q_code}: {measure} — {score} ({why concerning})'
-     Example: 'Q9: Delivery Speed — 31% good/excellent (lowest score,
+     '{q_code}: {measure}, {score} ({why concerning})'
+     Example: 'Q9: Delivery Speed, 31% good/excellent (lowest score,
      significantly below category average)'",
     items = ellmer::type_string(
-      "One weak measure: '{q_code}: {measure} — {score} ({why concerning})'"
+      "One weak measure: '{q_code}: {measure}, {score} ({why concerning})'"
     )
   ),
 

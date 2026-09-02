@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE WORKBOOK I/O TESTS
+# TABS MODULE. QUALITATIVE WORKBOOK I/O TESTS
 # ==============================================================================
 #
 # Integration tests for qual_workbook_io.R: writes a known workbook to a temp
 # file, reads it back through qual_read_workbook(), and checks the TRS refusals.
-# Deterministic — the fixture workbook is built from literal cells in tempdir().
+# Deterministic. The fixture workbook is built from literal cells in tempdir().
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_qual_workbook_io.R")
@@ -72,7 +72,7 @@ get_question <- function(res, code) {
 }
 
 # ==============================================================================
-# HAPPY PATH — reads a real .xlsx end to end
+# HAPPY PATH. Reads a real .xlsx end to end
 # ==============================================================================
 
 test_that("qual_read_workbook reads themed + raw, skips Contents, through openxlsx", {
@@ -101,7 +101,7 @@ test_that("qual_read_workbook reads themed + raw, skips Contents, through openxl
 })
 
 # ==============================================================================
-# TRS REFUSALS — every hard failure stops loudly with a typed code
+# TRS REFUSALS. Every hard failure stops loudly with a typed code
 # ==============================================================================
 
 test_that("missing file raises IO_QUAL_FILE_MISSING", {
@@ -128,7 +128,7 @@ test_that("a workbook with no question sheets raises DATA_QUAL_NO_QUESTIONS", {
 
 
 # ==============================================================================
-# Production review 2026-08 — I17/I18 integrity refusals at the I/O boundary
+# Production review 2026-08. I17/I18 integrity refusals at the I/O boundary
 # ==============================================================================
 
 write_one_sheet_workbook <- function(rows) {

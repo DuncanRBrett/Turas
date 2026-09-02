@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Study slides — exhibits authored in the config's AddedSlides sheet, carried
+ * Study slides. Exhibits authored in the config's AddedSlides sheet, carried
  * on the island as project.slides. Four contracts:
  *
  * S1 Authored, read-only: they render in their own Report-tab card, one per
@@ -45,7 +45,7 @@ function at(hay, needle, msg) {
   return i;
 }
 
-/* The picture is never decoded as an image by any of this code — it is decoded
+/* The picture is never decoded as an image by any of this code. It is decoded
  * as BYTES and handed to the pptx writer. So the fixtures carry known bytes
  * behind a real data-URI prefix; asserting the round-trip is the actual
  * contract. (The R suite parses genuine PNG/JPEG headers; that is its job.) */
@@ -53,7 +53,7 @@ const PNG_BYTES = "PNGPAYLOAD-0123";
 const JPG_BYTES = "JPEGPAYLOAD-45";
 const b64 = (s) => Buffer.from(s, "binary").toString("base64");
 const SLIDES = [
-  { title: "Qual phase — what customers said", text: "Six focus groups, March.",
+  { title: "Qual phase. What customers said", text: "Six focus groups, March.",
     image: "data:image/png;base64," + b64(PNG_BYTES), w: 1280, h: 720 },
   { title: "Method note", text: "Fieldwork ran in July." },
   { title: "Photo board", image: "data:image/jpeg;base64," + b64(JPG_BYTES), w: 800, h: 600 }
@@ -78,7 +78,7 @@ function slideSandbox(opts) {
     "23y_xlsx.js", "29_export.js"]) load(sb, f);
   const TR = sb.TR;
   TR.AGG = {
-    // "slides" in opts, not opts.slides — a test needs to express an island
+    // "slides" in opts, not opts.slides. A test needs to express an island
     // that carries no slides key at all (every report built before this)
     project: { name: "CCPB 2026", client: "CCPB", wave: "W2026",
       slides: "slides" in opts ? opts.slides : SLIDES },
@@ -111,7 +111,7 @@ function slideSandbox(opts) {
   return sb;
 }
 
-console.log("Study slides (config AddedSlides -> report, story, deck) — suite:");
+console.log("Study slides (config AddedSlides -> report, story, deck): suite:");
 
 /* ---------------- S1: authored, read-only, in their own card ------------- */
 
@@ -121,7 +121,7 @@ run("S1: no authored slides -> no card at all", () => {
     "project.slides absent from an older island");
 });
 
-run("S1: one card per row — picture, words and caption", () => {
+run("S1: one card per row. Picture, words and caption", () => {
   const html = slideSandbox({}).TR.report.studySlidesHtml();
   at(html, "<h3>Study slides</h3>", "the card is headed as authored slides");
   eq(html.split('class="added-slide"').length - 1, 3, "one tile per sheet row");
@@ -129,7 +129,7 @@ run("S1: one card per row — picture, words and caption", () => {
   at(html, "Six focus groups, March.", "the row's text renders");
   at(html, '<span class="as-cap">Method note</span>', "the caption is static text");
   assert(html.indexOf('class="as-title"') === -1,
-    "no editable caption input — the report author owns these");
+    "no editable caption input. The report author owns these");
   // a text-only row is a slide too
   const textOnly = slideSandbox({ slides: [{ title: "T", text: "Just words" }] })
     .TR.report.studySlidesHtml();
@@ -161,9 +161,9 @@ run("S1: every tile is pinnable, and each pin names its own row", () => {
 
 /* ---------------- S2: pinned by reference, not by copy ------------------- */
 
-run("S2: a pinned slide stores an index — the picture is never duplicated", () => {
+run("S2: a pinned slide stores an index. The picture is never duplicated", () => {
   const TR = slideSandbox({}).TR;
-  TR.story2.pinSlide(0, "Qual phase — what customers said");
+  TR.story2.pinSlide(0, "Qual phase. What customers said");
   const items = TR.story2.items();
   eq(items.length, 1, "one story item");
   eq(items[0].kind, "slide", "its own item kind");
@@ -181,7 +181,7 @@ run("S2: the story resolves the picture from the island at render time", () => {
   const TR = slideSandbox({}).TR;
   TR.story2.pinSlide(0, "");
   const item = TR.story2.items()[0];
-  eq(TR.story2.pinTitle(item), "Qual phase — what customers said",
+  eq(TR.story2.pinTitle(item), "Qual phase. What customers said",
     "an untitled pin takes the slide's own caption");
   const body = TR.story2.itemBodyHtml(item);
   at(body, "data:image/png;base64,", "the body renders the current picture");
@@ -273,7 +273,7 @@ run("S4: a pin whose row was deleted says so, everywhere, without crashing", () 
   at(TR.story2._itemHtml(item, 0), "no longer in the project configuration",
     "…and so does the story card");
   eq(TR.story2.pinTitle(item), "Study slide", "the title falls back, never blank");
-  // and the deck still builds — a missing picture must not lose the slide
+  // and the deck still builds. A missing picture must not lose the slide
   const slides = TR.story2._slidesFor(TR.story2.items());
   assert(slides.length >= 1, "the deck still has a slide for the pin");
   const cards = TR.story2._imageCards(TR.story2.items());

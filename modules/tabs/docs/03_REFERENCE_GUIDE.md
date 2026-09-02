@@ -175,7 +175,7 @@ distribute a fixed total (e.g. 100 points) across multiple options.
 banner - Optional: significance testing between banner columns on each
 option's mean
 
-**Data format:** Multiple columns — one per option — named with a common
+**Data format:** Multiple columns, one per option, named with a common
 root and numeric suffix ({code}_1, {code}_2, ..., {code}_N). Values sum
 to the allocation total (often 100) per respondent. Zero allocations are
 retained as meaningful data.
@@ -279,19 +279,19 @@ calculated in a single run.
 
 | Setting | Required | Default | Description |
 |---|---|---|---|
-| `alpha_secondary` | No | *(blank — feature off)* | Second significance level (e.g. `0.10` for 90% confidence). Must differ from `alpha`. Leave blank to disable. |
+| `alpha_secondary` | No | *(blank, feature off)* | Second significance level (e.g. `0.10` for 90% confidence). Must differ from `alpha`. Leave blank to disable. |
 | `alpha_default` | No | `primary` | Which level the HTML report opens on: `primary` or `secondary`. |
 
 **Outputs when enabled:**
 
--   **Excel:** Two sig rows appear — e.g. "Sig. (95%)" and "Sig. (90%)" — so
+-   **Excel:** Two sig rows appear, e.g. "Sig. (95%)" and "Sig. (90%)", so
     both levels are visible simultaneously in the crosstab workbook.
 -   **HTML report:** A segmented button ("95% | 90%") appears in the controls
     bar. Clicking switches which significance badges are shown. When
     printing, only the primary level is shown.
 
 **When to use:** When you have a pre-agreed secondary threshold for
-subgroup analysis — typically when presenting to clients who want to see
+subgroup analysis. Typically when presenting to clients who want to see
 "directional" differences alongside confirmed differences. The level
 should be set before analysis, not chosen after seeing the data.
 
@@ -361,7 +361,7 @@ The output is an Excel workbook with these sheets:
 **Summary sheet:** Project information, the settings the run used, and
 the question list with base sizes.
 
-**Guide sheet:** How to read the report — row types, significance
+**Guide sheet:** How to read the report. Row types, significance
 letters, weighting and index scores, adapted to what the run enabled.
 
 **Crosstabs sheet:** Every question's crosstab, one after another. There
@@ -585,7 +585,7 @@ reader can filter the audience and build banners without a server. For
 the full account see
 [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md).
 
-(The earlier pre-rendered HTML report — the "classic" report — was
+(The earlier pre-rendered HTML report, the "classic" report, was
 retired in August 2026. A config that still sets `html_report` is told so
 on load and the setting does nothing.)
 
@@ -594,14 +594,14 @@ on load and the setting does nothing.)
 -   **Dashboard** with configurable RAG thresholds for Net Positive,
     Rating Mean, and Index metrics
 -   **Live audience filter and custom banners** recomputed in the browser
--   **Semantic chart palettes** — `warm`, `cool`, `research`, `teal`,
+-   **Semantic chart palettes**, `warm`, `cool`, `research`, `teal`,
     `red` or `brand` via `chart_palette_preset`
--   **Differences and Group overview tabs** — where the significant
+-   **Differences and Group overview tabs**. Where the significant
     movements are, and how a selected banner's groups compare
--   **Qualitative tab** — coded verbatims joined to the crosstab by
+-   **Qualitative tab**. Coded verbatims joined to the crosstab by
     ResponseID, when a comment workbook is configured
--   **Tracking tab** — wave history, when tracking is configured
--   **Pins, Story and export** — pin any table or chart into a curated
+-   **Tracking tab**. Wave history, when tracking is configured
+-   **Pins, Story and export**. Pin any table or chart into a curated
     presentation view; copy tables to the clipboard; export to PPTX
 
 ### Configuration

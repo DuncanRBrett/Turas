@@ -1,10 +1,10 @@
 /**
- * Composite banners — a "profile banner" the analyst assembles by hand: a set
+ * Composite banners. A "profile banner" the analyst assembles by hand: a set
  * of spotlight groups (each from ANY question) shown as columns across EVERY
  * table, e.g. Total · Marketing · Admin · Cape Town Campus · Tenure 5y+.
  *
  * Unlike a normal banner (the mutually-exclusive options of ONE question) a
- * composite's columns come from different questions and may OVERLAP — a
+ * composite's columns come from different questions and may OVERLAP. A
  * respondent can be both Marketing AND Cape Town. Because of that overlap the
  * report never runs the pairwise column-vs-column z-test on a composite (it
  * assumes disjoint samples); significance is each column vs THE REST, which is
@@ -14,8 +14,8 @@
  * island) so it survives reload and travels with the report, exactly like saved
  * custom banners and the story. Stored as
  *   { id:"composite:<token>", name, columns:[ {code, label, rows:[rowIndex…],
- *     box?:boxRowIndex} ] }
- * — the per-column {rows, box} mirrors the audience-filter shape so columnsFor
+ *     box?:boxRowIndex} ] },
+ * the per-column {rows, box} mirrors the audience-filter shape so columnsFor
  * rebuilds membership with the same memberArray / boxMemberArray helpers.
  */
 (function (global) {
@@ -39,7 +39,7 @@
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -51,7 +51,7 @@
       cache = JSON.parse(JSON.stringify(TR.userState.composites));
     }
     if (Array.isArray(own)) {
-      // un-owning local composites merge ADDITIVELY by id — a stale pre-existing
+      // un-owning local composites merge ADDITIVELY by id. A stale pre-existing
       // store for this project key must not hide the island's composites
       var have = {};
       cache.forEach(function (b) { have[b.id] = true; });
@@ -67,7 +67,7 @@
         localStorage.setItem(TR.d2.storeKey(KEY),
           JSON.stringify({ _owns: true, items: store() }));
       }
-    } catch (e) { /* storage full/blocked — composites stay in-memory */ }
+    } catch (e) { /* storage full/blocked. Composites stay in-memory */ }
   }
 
   comp.all = function () { return store(); };
@@ -84,11 +84,11 @@
   comp.has = function (bannerId) { return !!comp.get(bannerId); };
 
   /** Next MONOTONIC token (no RNG, so the node harness sees predictable ids).
-   *  It never reissues a freed id — removing the highest composite and adding a
+   *  It never reissues a freed id. Removing the highest composite and adding a
    *  new one used to reuse that id, and the new (differently-defined) profile
    *  banner then inherited the removed one's saved analyst insight/note. The
    *  high-water mark is the max of any live id, the persisted counter and the
-   *  in-memory counter, so ids only ever climb — within a session and across
+   *  in-memory counter, so ids only ever climb. Within a session and across
    *  them (persisted where storage is available). */
   function nextToken() {
     var maxExisting = 0;
@@ -105,14 +105,14 @@
     seqHW = next;
     try {
       if (global.localStorage) localStorage.setItem(TR.d2.storeKey(SEQ_KEY), String(next));
-    } catch (e) { /* storage blocked — seqHW keeps the session monotonic */ }
+    } catch (e) { /* storage blocked. SeqHW keeps the session monotonic */ }
     return String(next);
   }
 
   /**
    * Persist a composite spec {name, columns:[{code,label,rows,box?}]}. Assigns
    * and returns its "composite:<token>" id, or null when the spec carries no
-   * columns — a composite needs at least one spotlight column besides Total.
+   * columns. A composite needs at least one spotlight column besides Total.
    */
   comp.add = function (spec) {
     if (!spec || !Array.isArray(spec.columns) || !spec.columns.length) return null;

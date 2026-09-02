@@ -3,13 +3,13 @@
 # ==============================================================================
 #
 # Tests for shared AI utility functions:
-#   - build_sidecar_path()      — path derivation
-#   - read_ai_sidecar()         — JSON sidecar loading
-#   - write_ai_sidecar()        — atomic JSON sidecar writing
-#   - compute_data_hash()       — content-hash caching
-#   - is_callout_cache_valid()  — cache validity checking
-#   - estimate_tokens()         — token count estimation
-#   - create_default_sidecar()  — template generation
+#   - build_sidecar_path(): path derivation
+#   - read_ai_sidecar(): JSON sidecar loading
+#   - write_ai_sidecar(): atomic JSON sidecar writing
+#   - compute_data_hash(): content-hash caching
+#   - is_callout_cache_valid(): cache validity checking
+#   - estimate_tokens(): token count estimation
+#   - create_default_sidecar(): template generation
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_ai_utils.R")

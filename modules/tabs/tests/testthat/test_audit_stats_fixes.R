@@ -3,17 +3,17 @@
 # ==============================================================================
 #
 # Known-answer regression tests pinning five already-applied audit fixes:
-#   1. weighting.R run_net_difference_tests — Bonferroni divisor is PER BANNER
+#   1. weighting.R run_net_difference_tests. Bonferroni divisor is PER BANNER
 #      GROUP (choose(cols-in-group, 2)), not choose(all columns, 2)
-#   2. composite_processor.R test_composite_significance — pairs tested only
+#   2. composite_processor.R test_composite_significance. Pairs tested only
 #      WITHIN a banner group (never vs Total, never cross-group), per-group
 #      Bonferroni divisor
-#   3. cell_calculator.R create_percentage_row — percentages honour the
+#   3. cell_calculator.R create_percentage_row. Percentages honour the
 #      configured decimal_places (were pre-rounded to integers)
-#   4. standard_processor.R process_standard_question — loud console diagnostic
+#   4. standard_processor.R process_standard_question. Loud console diagnostic
 #      (DATA_UNMATCHED_OPTION_VALUES) when answered values match no configured
 #      OptionText
-#   5. data_layer_writer.R — build_dl_project emits alpha_secondary/bonferroni;
+#   5. data_layer_writer.R. Build_dl_project emits alpha_secondary/bonferroni;
 #      .validate_column_populations drops impossible populations
 #      (CFG_POPULATION_BELOW_BASE)
 #
@@ -71,7 +71,7 @@ source(file.path(turas_root, "modules/tabs/lib/composite_processor.R"))
 # build_fpc_multipliers() / resolve_column_populations(): every significance call
 # in standard_processor.R goes through them. Without this the file only ran
 # under tools/run_all_tests.R, where a sibling test file had already sourced
-# report_shared.R into the global environment — the test_file() invocation
+# report_shared.R into the global environment. The test_file() invocation
 # documented in this header errored.
 source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 
@@ -102,7 +102,7 @@ source(file.path(turas_root, "modules/tabs/lib/data_layer_writer.R"))
 
 
 # ==============================================================================
-# 1. run_net_difference_tests — PER-GROUP Bonferroni divisor
+# 1. run_net_difference_tests. PER-GROUP Bonferroni divisor
 # ==============================================================================
 
 context("run_net_difference_tests per-group Bonferroni")
@@ -183,7 +183,7 @@ test_that("net letter IS granted under the per-group divisor (2-col group)", {
 
 
 # ==============================================================================
-# 2. test_composite_significance — within-group only + per-group divisor
+# 2. test_composite_significance. Within-group only + per-group divisor
 # ==============================================================================
 
 context("test_composite_significance group isolation")
@@ -291,7 +291,7 @@ test_that("composite Bonferroni divisor is per banner group, not global", {
   )
 
   # Fixture sanity: the P-vs-Q p-value sits BETWEEN the per-group threshold
-  # (0.05/1) and the old global threshold (0.05/15) — so a granted letter
+  # (0.05/1) and the old global threshold (0.05/15), so a granted letter
   # proves the divisor is choose(2,2), not choose(6,2)
   raw <- weighted_t_test_means(values1 = v1[1:96], values2 = v1[97:192],
                                min_base = 30, alpha = 0.05)
@@ -310,7 +310,7 @@ test_that("composite Bonferroni divisor is per banner group, not global", {
   )
 
   expect_false(is.null(sig_row))
-  # Letter granted at alpha/choose(2,2) — the old global alpha/15 blocked it
+  # Letter granted at alpha/choose(2,2): the old global alpha/15 blocked it
   expect_identical(sig_row[["Var1::P"]], "B")
   expect_identical(sig_row[["Var1::Q"]], "")
   # Identical-mean 4-column group letters nothing
@@ -322,7 +322,7 @@ test_that("composite Bonferroni divisor is per banner group, not global", {
 
 
 # ==============================================================================
-# 3. create_percentage_row — honours decimal_places
+# 3. create_percentage_row. Honours decimal_places
 # ==============================================================================
 
 context("create_percentage_row decimal places")
@@ -377,7 +377,7 @@ test_that("percentage row rounds (not truncates) at configured precision", {
 
 
 # ==============================================================================
-# 4. process_standard_question — unmatched-value diagnostic
+# 4. process_standard_question. Unmatched-value diagnostic
 # ==============================================================================
 
 context("process_standard_question unmatched-value diagnostic")
@@ -448,7 +448,7 @@ make_audit_question <- function() {
 
 test_that("unmatched answered values trigger the boxed console diagnostic", {
   # Data says "I re-registered" (hyphen) 3 times; the structure only knows
-  # "I reregistered" — exactly the silent zero-count bug the diagnostic catches
+  # "I reregistered". Exactly the silent zero-count bug the diagnostic catches
   data <- data.frame(
     Gender = c(rep("Male", 5), rep("Female", 5)),
     Q1 = c(rep("I reregistered", 7), rep("I re-registered", 3)),
@@ -509,7 +509,7 @@ test_that("no unmatched-value warning when every answer matches an option", {
 
 
 # ==============================================================================
-# 5a. build_dl_project — alpha_secondary + bonferroni emission
+# 5a. build_dl_project. Alpha_secondary + bonferroni emission
 # ==============================================================================
 
 context("build_dl_project alpha_secondary and bonferroni")
@@ -540,7 +540,7 @@ test_that("build_dl_project honours configured bonferroni FALSE (logical and str
 })
 
 test_that("build_dl_project alpha_secondary: valid values kept, junk falls back to 0.20", {
-  # NOTE: alpha is set explicitly (as real configs always do) — an alpha-less
+  # NOTE: alpha is set explicitly (as real configs always do): an alpha-less
   # list would let R's $ partial matching resolve config_obj$alpha to
   # alpha_secondary and distort the fixture
   proj_num <- build_dl_project(list(project_title = "T", alpha = 0.05,
@@ -551,7 +551,7 @@ test_that("build_dl_project alpha_secondary: valid values kept, junk falls back 
                                     alpha_secondary = "0.15"))
   expect_equal(proj_str$alpha_secondary, 0.15)
 
-  # The config loader stringifies empty cells to "NA" — must fall back to 0.20
+  # The config loader stringifies empty cells to "NA". Must fall back to 0.20
   proj_na_str <- build_dl_project(list(project_title = "T", alpha = 0.05,
                                        alpha_secondary = "NA"))
   expect_equal(proj_na_str$alpha_secondary, 0.20)
@@ -580,8 +580,8 @@ test_that("build_dl_project flags dual significance OFF, and only when it is off
                                   alpha_secondary = "NA"))
   expect_false(off_na$dual_significance)
 
-  # Emitted ONLY when off, so an island from a dual study — and every fixture
-  # already committed — is byte-identical to before.
+  # Emitted ONLY when off, so an island from a dual study, and every fixture
+  # already committed. Is byte-identical to before.
   on <- build_dl_project(list(project_title = "T", alpha = 0.05,
                               alpha_secondary = 0.10))
   expect_null(on$dual_significance)
@@ -607,7 +607,7 @@ test_that("alpha_default = secondary is still ignored on a single-alpha study", 
 
 
 # ==============================================================================
-# 5b. .validate_column_populations — impossible populations dropped
+# 5b. .validate_column_populations. Impossible populations dropped
 # ==============================================================================
 
 context(".validate_column_populations")

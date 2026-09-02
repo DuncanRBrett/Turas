@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * Saved-copy state resurrection gate (audit 2026-07-02) — the ownership marker.
+ * Saved-copy state resurrection gate (audit 2026-07-02): the ownership marker.
  *
  * Every user-state store seeds from the saved-copy island (#user-state) and
  * merges localStorage. Two defect shapes are checked here across ALL stores:
- *   (a) tombstone-less merge — a deletion is key-absence, so an island-seeded
+ *   (a) tombstone-less merge. A deletion is key-absence, so an island-seeded
  *       item resurrected on every reload (qual shortlist/highlights, story,
  *       insights, chart annotations);
- *   (b) wholesale replacement — stale pre-existing localStorage for the same
+ *   (b) wholesale replacement. Stale pre-existing localStorage for the same
  *       project key hid the island's authored content entirely (report
  *       sections, saved banners, composites).
  * The fix (one design, applied per store): persisted state carries _owns:true
  * once the READER changes anything; owning state is authoritative on load (the
- * island seed is ignored — deletions durable); un-owning legacy state seeds
+ * island seed is ignored. Deletions durable); un-owning legacy state seeds
  * from the island and merges WITHOUT claiming ownership (for the array/section
  * stores: additively, so the island's authored content stays visible).
  *
@@ -69,8 +69,8 @@ function boot(files, island, store) {
 }
 const parse = (store, key) => JSON.parse(store.get(key + ":proj"));
 
-/* ================= (a) tombstone-less merge — deletions must survive ======= */
-console.log("Ownership marker — deletions survive reload:");
+/* ================= (a) tombstone-less merge. Deletions must survive ======= */
+console.log("Ownership marker. Deletions survive reload:");
 
 run("qual shortlist: un-starring an island-seeded comment stays deleted", () => {
   const island = { qualSaved: { "Q1#0": 1, "Q1#2": 1 } };
@@ -111,7 +111,7 @@ run("story: a reader deletion survives reload; a cleared story stays cleared", (
   const b = boot(["30_story.js"], island, a.store);               // reload
   eq(b.TR.story2.items().length, 1, "the deleted item STAYS deleted");
   eq(b.TR.story2.items()[0].title, "B", "the surviving item is the right one");
-  // Clear persists an owned EMPTY story — it must beat the island on reload.
+  // Clear persists an owned EMPTY story. It must beat the island on reload.
   const cleared = new Map([["turas_v2_story:proj", JSON.stringify({ _owns: true, items: [] })]]);
   const c = boot(["30_story.js"], island, cleared);
   eq(c.TR.story2.items().length, 0, "a cleared story stays cleared (empty owned array wins)");
@@ -119,7 +119,7 @@ run("story: a reader deletion survives reload; a cleared story stays cleared", (
 
 run("story: Clear asks first, and a declined confirm changes nothing", () => {
   // Clear wipes the story, persists the empty state and sets the ownership
-  // marker, so a reload will not bring the pins back. There is no undo — the
+  // marker, so a reload will not bring the pins back. There is no undo. The
   // only recovery is an earlier Export insights JSON. So it must ask.
   const island = { story: [{ kind: "divider", title: "A", note: "" },
                            { kind: "divider", title: "B", note: "" }] };
@@ -185,8 +185,8 @@ run("chart annotations: deleting an island-seeded tag stays deleted", () => {
   eq(b.TR.notes.forMetric("X")[0].text, "COVID wave", "and it is the right one");
 });
 
-/* ====== (b) wholesale replacement — island content must stay visible ======= */
-console.log("\nOwnership marker — stale un-owning localStorage never hides the island:");
+/* ====== (b) wholesale replacement. Island content must stay visible ======= */
+console.log("\nOwnership marker. Stale un-owning localStorage never hides the island:");
 
 run("report sections: the island's authored content beats stale un-owning local state", () => {
   const island = { report: {
@@ -256,7 +256,7 @@ run("legacy un-owning map state still merges over the island (back-compat)", () 
   eq(a.TR.qual.isSaved("Q1", 0), true, "island mark visible");
   eq(a.TR.qual.isSaved("Q5", 1), true, "legacy local mark visible");
   eq(a.store.get("turas_v2_qualsaved:proj"), JSON.stringify({ "Q5#1": 1 }),
-    "loading rewrites nothing — legacy state stays un-owning until the reader changes something");
+    "loading rewrites nothing. Legacy state stays un-owning until the reader changes something");
 });
 
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");

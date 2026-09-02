@@ -1,15 +1,15 @@
-# Turas AI Insights — User Guide (Tabs Module)
+# Turas AI Insights. User Guide (Tabs Module)
 
 ## What it does
 
-AI Insights adds optional AI-generated observational callouts to your HTML crosstab reports. The AI spots patterns, flags notable differences, and surfaces things worth attention. Your role remains strategic interpretation — "here's what it means for the business."
+AI Insights adds optional AI-generated observational callouts to your HTML crosstab reports. The AI spots patterns, flags notable differences, and surfaces things worth attention. Your role remains strategic interpretation, "here's what it means for the business."
 
 Two complementary voices, honestly labelled:
 
 | Content | Source | Labelled as AI? | Visual style |
 |---------|--------|-----------------|--------------|
-| **AI callout** | LLM-generated | Yes — always | Grey background, sparkle icon |
-| **Researcher commentary** | Comments sheet (you write it) | No — never | Brand-colour border |
+| **AI callout** | LLM-generated | Yes, always | Grey background, sparkle icon |
+| **Researcher commentary** | Comments sheet (you write it) | No, never | Brand-colour border |
 | **Executive summary (reviewed)** | AI-drafted, researcher-edited | No (model named in methodology note) | Standard styling |
 | **Executive summary (unreviewed)** | AI-generated, no review | Yes | Grey background |
 
@@ -23,11 +23,11 @@ your crosstab config:
 | `enable_ai_insights` | `TRUE` |
 | `ai_model` | `Sonnet 4.6` (default) or `Opus 4.8` |
 
-- **Sonnet 4.6** — faster and lower cost; the sensible default.
-- **Opus 4.8** — highest quality analytical reasoning; use for flagship reports.
-- **Any exact model ID** (e.g. `claude-sonnet-4-6`) — typed verbatim, so you can
+- **Sonnet 4.6**. Faster and lower cost; the sensible default.
+- **Opus 4.8**. Highest quality analytical reasoning; use for flagship reports.
+- **Any exact model ID** (e.g. `claude-sonnet-4-6`): typed verbatim, so you can
   adopt a newer Anthropic model the moment it ships, without a code update.
-- **Blank** — hands control to the JSON sidecar (see *Provider switching* below);
+- **Blank**. Hands control to the JSON sidecar (see *Provider switching* below);
   needed only for non-Anthropic providers.
 
 `ai_model` is authoritative: switch it and re-run, and the callouts regenerate so
@@ -83,7 +83,7 @@ AI insights generate automatically during HTML report generation when the sideca
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `true` | Master switch — set false to disable |
+| `enabled` | boolean | `true` | Master switch. Set false to disable |
 | `provider` | string | `"anthropic"` | `"anthropic"`, `"openai"`, `"google"`, or `"ollama"` |
 | `model` | string | varies | Model identifier for the provider |
 | `temperature` | number | `0.3` | LLM temperature (0.0–1.0) |
@@ -104,7 +104,7 @@ For Anthropic models, just set `ai_model` in the config (`Sonnet 4.6` / `Opus 4.
 To switch **provider**, leave `ai_model` blank and edit the sidecar:
 
 ```json
-// Claude (default — or just set ai_model in the config)
+// Claude (default, or just set ai_model in the config)
 "provider": "anthropic",
 "model": "claude-sonnet-4-6",
 "api_key_env": "ANTHROPIC_API_KEY"
@@ -161,19 +161,19 @@ AI insights are purely additive. A report with AI disabled is identical to a rep
 ## File layout
 
 ```
-modules/shared/lib/ai/       — Shared AI infrastructure
-  ai_provider.R               — Provider abstraction
-  ai_schemas.R                — Verification/selectivity schemas
-  ai_utils.R                  — Sidecar persistence, caching
-  ai_verify.R                 — Verification and selectivity passes
+modules/shared/lib/ai/. Shared AI infrastructure
+  ai_provider.R. Provider abstraction
+  ai_schemas.R. Verification/selectivity schemas
+  ai_utils.R. Sidecar persistence, caching
+  ai_verify.R. Verification and selectivity passes
 
-modules/tabs/lib/ai/          — Tabs-specific AI code
-  ai_insights.R               — Main orchestrator
-  ai_prompts.R                — Prompt templates
-  ai_extraction.R             — Data extraction
-  ai_schemas_tabs.R           — Callout/exec summary schemas
-  ai_rendering.R              — HTML rendering
-  ai_easystats.R              — APA statistical narration
+modules/tabs/lib/ai/. Tabs-specific AI code
+  ai_insights.R. Main orchestrator
+  ai_prompts.R. Prompt templates
+  ai_extraction.R. Data extraction
+  ai_schemas_tabs.R. Callout/exec summary schemas
+  ai_rendering.R. HTML rendering
+  ai_easystats.R. APA statistical narration
 ```
 
 ## Troubleshooting
@@ -182,7 +182,7 @@ modules/tabs/lib/ai/          — Tabs-specific AI code
 |---------|----------|
 | No AI callouts appear | Check sidecar exists and `enabled` is true |
 | API key error | Set `ANTHROPIC_API_KEY` in environment |
-| All callouts suppressed | Check verification isn't failing — set `verify_callouts: false` temporarily |
-| Callouts are generic | Refine prompts in `ai_prompts.R` — see prompt tuning guide |
-| Report is slow | ~30 API calls for 27 questions takes 2-4 minutes — this is expected |
+| All callouts suppressed | Check verification isn't failing. Set `verify_callouts: false` temporarily |
+| Callouts are generic | Refine prompts in `ai_prompts.R`. See prompt tuning guide |
+| Report is slow | ~30 API calls for 27 questions takes 2-4 minutes. This is expected |
 | Changes not reflected | Delete the question's entry in the sidecar to force regeneration |

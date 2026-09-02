@@ -3,10 +3,10 @@
 # ==============================================================================
 #
 # Tests for workbook builder orchestration functions (workbook_builder.R):
-#   1. get_style_config() — style parameter extraction with defaults
-#   2. build_project_info() — project info list construction
-#   3. save_workbook_safe() — directory creation and file save
-#   4. create_crosstabs_workbook() — full workbook orchestration
+#   1. get_style_config(): style parameter extraction with defaults
+#   2. build_project_info(): project info list construction
+#   3. save_workbook_safe(): directory creation and file save
+#   4. create_crosstabs_workbook(): full workbook orchestration
 #
 # These tests focus on orchestration gaps NOT covered by test_excel_output.R,
 # which already tests the low-level write_* and create_*_sheet functions.
@@ -499,7 +499,7 @@ test_that("handles empty all_results gracefully", {
 
 
 # ==============================================================================
-# 5. Disclosure control — the standalone workbook (#5)
+# 5. Disclosure control. The standalone workbook (#5)
 # ==============================================================================
 #
 # The distributed .xlsx is a distinct code path from the HTML report and does
@@ -655,7 +655,7 @@ test_that("k = 10 blanks the Female sub-k column and marks its base", {
   expect_true(any(grepl("n<10", r$guide)))
 })
 
-test_that("k = 1 (off) reports the Female column in full — no marker, no note", {
+test_that("k = 1 (off) reports the Female column in full. No marker, no note", {
   config <- make_wb_test_config()
   config$min_reporting_base <- 1
   r <- build_and_read_crosstabs(config)
@@ -716,7 +716,7 @@ test_that("k = 10 withholds the sub-k column on EVERY sheet, not just Crosstabs 
 
   # Q1: full-sample question with an Average row (feeds Index_Summary) whose
   # Female mean (6.9) is a distinctive leak needle. Q2: a filtered question
-  # whose TOTAL base is itself sub-k (3) — the Summary-list leak.
+  # whose TOTAL base is itself sub-k (3): the Summary-list leak.
   results <- make_disc_results(female_base = 3)
   avg_row <- data.frame(
     RowLabel = "Mean", RowType = "Average",
@@ -790,7 +790,7 @@ test_that("k = 10 withholds the sub-k column on EVERY sheet, not just Crosstabs 
   expect_true(any(as.character(unlist(scomp[male_row, ])) == "97", na.rm = TRUE))
 
   # Summary: Q2's withheld Total base (3) must not be stated in the question
-  # list. Assert on Q2's own row — a bare "3" appears legitimately elsewhere
+  # list. Assert on Q2's own row. A bare "3" appears legitimately elsewhere
   # on the sheet (e.g. the banner column count).
   smry_df <- openxlsx::read.xlsx(tmp, sheet = "Summary",
                                  colNames = FALSE, skipEmptyRows = FALSE)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Trendline toggle — the dashed least-squares fit line on the tracking
+ * Trendline toggle. The dashed least-squares fit line on the tracking
  * Visualise chart and its pinned exhibits (Absolute mode only; the
  * checkbox mirrors the 95% CI bands toggle):
  *   - render._olsFit known answers + degenerate inputs;
@@ -21,7 +21,7 @@ import vm from "node:vm";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
 
-const stored = {};   // localStorage shim — lets the suite read pinned items back
+const stored = {};   // localStorage shim. Lets the suite read pinned items back
 const sandbox = { console, TextEncoder,
   localStorage: { getItem: (k) => stored[k] || null,
     setItem: (k, v) => { stored[k] = v; } } };
@@ -48,7 +48,7 @@ function near(a, b, tol, msg) {
 /* ---------------- fixtures ---------------- */
 
 // Pseudo-row style model (cells carry no current value, so wavePoints
-// plots exactly the waves given — the Visualise path).
+// plots exactly the waves given. The Visualise path).
 function model(rows) {
   TR.AGG = { project: { name: "Trendline fixture", wave: "Wave 12" } };
   return { code: "Q1", title: "KPI over waves", chartKind: "summary",
@@ -67,7 +67,7 @@ function circles(svg) {
     .map((m) => ({ cx: +m[1], cy: +m[2] }));
 }
 
-console.log("Trendline toggle — suite:");
+console.log("Trendline toggle. Suite:");
 
 /* ---------------- 1. the fit itself ---------------- */
 run("_olsFit known answer: (0,1)(1,3)(2,5) -> slope 2, intercept 1", () => {
@@ -199,7 +199,7 @@ function pinSetup() {
     columns: [{ label: "Total", base: 200 }],
     rows: [{ kind: "net", label: "Top2 (NET)", waves: [], cells: [{ pct: 61 }] }] }) };
 }
-const pinSpec = (trendline) => ({ title: "Q1 · KPI — Top2 · Total",
+const pinSpec = (trendline) => ({ title: "Q1 · KPI. Top2 · Total",
   qs: ["Q1"], series: [{ code: "Q1", ri: 0, seg: "total", label: "Total" }],
   annotations: [], ci: false, trendline: trendline, note: "" });
 

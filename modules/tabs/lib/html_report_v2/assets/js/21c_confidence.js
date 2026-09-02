@@ -1,5 +1,5 @@
 /**
- * v2 confidence layer — sampling-method-aware terminology plus Wilson
+ * v2 confidence layer. Sampling-method-aware terminology plus Wilson
  * score intervals, ported from the production confidence module so every
  * number in the report can state its reliability honestly.
  *
@@ -13,7 +13,7 @@
  * Intervals: calculate_proportion_ci_wilson() from 04_proportions.R,
  * ported verbatim and known-answer tested against R output. Mean-kind
  * intervals use z·SD/√n on distribution-derived SDs (TR.waves.scoreMap +
- * sdFromPairs — the same single SD source the significance tests use);
+ * sdFromPairs. The same single SD source the significance tests use);
  * the R module's t-based mean CI differs by under 1.5% at the bases in
  * this report (n ≥ 70), documented in the README.
  *
@@ -28,7 +28,7 @@
 
   // 95% two-sided critical value matching R's qnorm(0.975), so interval
   // known answers agree with the confidence module to 1e-9. DISPLAY
-  // intervals only — significance testing keeps the settled
+  // intervals only. Significance testing keeps the settled
   // TR.stats.Z95 = 1.96 (guardrail: the sig methodology must not fork).
   var Z95_EXACT = 1.959963984540054;
   conf.Z95_EXACT = Z95_EXACT;
@@ -69,7 +69,7 @@
    * back to the cautious non-probability framing, exactly as the R does.
    * @param {string} [method] - Random | Stratified | Cluster | Census |
    *   Quota | Online_Panel | Self_Selected | Convenience | Not_Specified
-   * @returns {object} labels — see STANDARD_LABELS/SOFTENED_LABELS keys
+   * @returns {object} labels. See STANDARD_LABELS/SOFTENED_LABELS keys
    *   plus sampling_method_normalised.
    */
   conf.labels = function (method) {
@@ -88,7 +88,7 @@
   /**
    * Short method tag for meta lines and band notes. The bracket must name
    * what was actually computed: proportions use Wilson, but mean/Index/NPS
-   * intervals are z·SD/√n on the distribution-derived SD — calling those
+   * intervals are z·SD/√n on the distribution-derived SD. Calling those
    * "Wilson" would be dishonest on exported artifacts.
    * @param {string} [kind] - "props" (default): "95% SI (Wilson)";
    *   "means": "95% SI (z·SD/√n)"; "mixed": both named.
@@ -117,7 +117,7 @@
   /* ---------------- Wilson score interval ---------------- */
 
   /**
-   * Wilson score 95% interval for a proportion — verbatim port of
+   * Wilson score 95% interval for a proportion. Verbatim port of
    * calculate_proportion_ci_wilson() (04_proportions.R). Asymmetric
    * around p; never leaves [0,1]; accurate for small n and extreme p.
    * @param {number} p - observed proportion in [0,1]
@@ -150,7 +150,7 @@
   /**
    * Symmetric 95% interval for a mean on a known SD: mean ± z·SD/√n.
    * The SD must come from the shared distribution-derived source
-   * (TR.waves.scoreMap + sdFromPairs / TR.trk.sdAt) — never recompute it.
+   * (TR.waves.scoreMap + sdFromPairs / TR.trk.sdAt), never recompute it.
    */
   conf.meanCI = function (mean, sd, n) {
     if (mean === null || mean === undefined ||
@@ -169,7 +169,7 @@
 
   // Below this sampling fraction the finite-population correction is negligible
   // (about 2.5% narrowing at 5% coverage) and, more importantly, the study is a
-  // sample — not a census. Below the floor the FPC is NOT applied and no census
+  // sample, not a census. Below the floor the FPC is NOT applied and no census
   // framing is shown, so a thin sample with a configured population_size reads as
   // the ordinary sample it is. Standard textbook FPC cut-off.
   var FPC_MIN_COVERAGE = 0.05;
@@ -256,12 +256,12 @@
   /**
    * Data-derived worked example for the explainer: among non-difference
    * NET rows with a solid Total base, the one with the largest base
-   * (ties: largest value) — deterministic for any project's data.
+   * (ties: largest value): deterministic for any project's data.
    */
   /** "a" or "an" for a whole percentage read aloud: an EIGHT, an ELEVEN, an
    *  EIGHTEEN, an EIGHTY-something. Everything else takes "a". The example is
    *  generated from the report's own data, so the article has to be chosen, not
-   *  written — CCPB W2026 read "a 88%" on the client's page. */
+   *  written. CCPB W2026 read "a 88%" on the client's page. */
   function article(n) {
     return (n === 8 || n === 11 || n === 18 || (n >= 80 && n <= 89)) ? "an" : "a";
   }
@@ -270,7 +270,7 @@
   function workedExample() {
     var best = null;
     // When the Total universe is known, the table's Total intervals are
-    // FPC-corrected — so the worked example must use the same effective base,
+    // FPC-corrected, so the worked example must use the same effective base,
     // otherwise the callout quotes a wider range than the table shows.
     var totalN = TR.AGG.columns && TR.AGG.columns[0] && TR.AGG.columns[0].population;
     (TR.AGG.questions || []).forEach(function (q) {
@@ -300,12 +300,12 @@
   }
 
   /**
-   * Smallest column of the default banner group on the fullest question —
+   * Smallest column of the default banner group on the fullest question,
    * the honest "small groups swing more" example (e.g. Durban n=75).
    *
    * Disclosure control (C2): this picks the SMALLEST column by construction, so
-   * it is the sentence most likely to name a below-k group and its exact size —
-   * "Legal has only 4 respondents" — while the crosstab beside it withholds that
+   * it is the sentence most likely to name a below-k group and its exact size,
+   * "Legal has only 4 respondents", while the crosstab beside it withholds that
    * very base as "n<10". Columns the control would withhold are therefore not
    * eligible as the example; when none of the group's columns is disclosable the
    * bullet is dropped, as it already is on a report with no banner groups.
@@ -344,12 +344,12 @@
   function fpcNote() {
     // Only when the FPC materially applies (known universe AND coverage above the
     // floor). A thin sample with a configured population_size returns "" here, so
-    // the design sentence reads as the plain sample it is — no census framing.
+    // the design sentence reads as the plain sample it is. No census framing.
     if (!conf.fpcActiveReport()) return "";
     var rr = conf.responseRate();
     var census = conf.labels().sampling_method_normalised === "census";
     // A lead clause and a body, joined here. "Responded" (and the non-response
-    // caveat) presume everyone was invited — true only for a declared census. On
+    // caveat) presume everyone was invited. True only for a declared census. On
     // a sample the same number is coverage of the universe, and most of the
     // universe was never asked, so the honest note is that the correction exists
     // and is modest. Which pair a report gets is code's decision; the words in
@@ -397,7 +397,7 @@
       // worked example with real numbers, and it NAMES the concept (so the
       // CI/SI/MOE jargon elsewhere has an anchor). The tail matches the
       // inference: corrected ranges describe the whole group, uncorrected ones
-      // describe a re-run — two short authored phrases rather than a branch
+      // describe a re-run. Two short authored phrases rather than a branch
       // inside one long sentence.
       bullets.push(li("conf.footer.example", {
         article: article(Math.round(ex.pct)),
@@ -411,7 +411,7 @@
         interval_abbrev: labels.interval_abbrev
       }));
     }
-    // what the "95%" actually means — kept honest for non-probability designs,
+    // what the "95%" actually means. Kept honest for non-probability designs,
     // where a wobble band is not a formal coverage guarantee
     bullets.push(li(labels.is_probability ? "conf.footer.what_95_means"
                                           : "conf.footer.reading_ranges"));
@@ -427,7 +427,7 @@
     }
     bullets.push(li("conf.footer.comparing"));
     bullets.push(li("conf.footer.significant_means"));
-    // Analyst's fieldwork caveat (config sampling_note) — the honest asterisk
+    // Analyst's fieldwork caveat (config sampling_note): the honest asterisk
     // where fieldwork deviated from the textbook design (substitution rules,
     // replaced clusters, low response). Free text: escaped, sentence-terminated.
     var fieldNote = TR.AGG && TR.AGG.project && TR.AGG.project.sampling_note;

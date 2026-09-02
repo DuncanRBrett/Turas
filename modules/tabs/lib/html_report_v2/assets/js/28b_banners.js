@@ -1,9 +1,9 @@
 /**
- * Saved custom banners — a custom banner ("cross anything by anything") the
+ * Saved custom banners. A custom banner ("cross anything by anything") the
  * analyst chooses to keep. Persisted in localStorage and embedded in saved
  * copies (the user-state island) so it survives reload and travels with the
  * report, exactly like insights and the story. Stored as an array of
- * { code, mode, name } — the same triple state.banner encodes as the id
+ * { code, mode, name }. The same triple state.banner encodes as the id
  * "custom:<code>:<mode>".
  */
 (function (global) {
@@ -25,7 +25,7 @@
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -37,7 +37,7 @@
       cache = JSON.parse(JSON.stringify(TR.userState.banners));
     }
     if (Array.isArray(own)) {
-      // un-owning local banners merge ADDITIVELY by id — a stale pre-existing
+      // un-owning local banners merge ADDITIVELY by id. A stale pre-existing
       // store for this project key must not hide the island's saved banners
       var have = {};
       cache.forEach(function (b) { have[saved.id(b)] = true; });
@@ -53,7 +53,7 @@
         localStorage.setItem(TR.d2.storeKey(KEY),
           JSON.stringify({ _owns: true, items: store() }));
       }
-    } catch (e) { /* storage full/blocked — saved banners stay in-memory */ }
+    } catch (e) { /* storage full/blocked. Saved banners stay in-memory */ }
   }
 
   /** The "custom:code:mode" id (matches what state.banner carries). */

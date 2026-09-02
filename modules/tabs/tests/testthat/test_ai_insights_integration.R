@@ -175,7 +175,7 @@ write_test_sidecar <- function(sidecar, sidecar_path) {
 # TESTS: Sidecar detection and loading
 # ==============================================================================
 
-context("generate_all_insights — sidecar loading")
+context("generate_all_insights. Sidecar loading")
 
 test_that("returns NULL when no sidecar file exists", {
   all_results <- make_integration_all_results()
@@ -208,7 +208,7 @@ test_that("returns NULL when sidecar has enabled=FALSE", {
 # TESTS: Graceful degradation
 # ==============================================================================
 
-context("generate_all_insights — graceful degradation")
+context("generate_all_insights. Graceful degradation")
 
 test_that("returns result structure even when all API calls fail", {
   all_results <- make_integration_all_results()
@@ -263,7 +263,7 @@ test_that("sidecar is saved even when all API calls fail", {
 # TESTS: Cache behaviour
 # ==============================================================================
 
-context("generate_all_insights — cache behaviour")
+context("generate_all_insights. Cache behaviour")
 
 test_that("cached callouts are preserved when data hash matches", {
   all_results <- make_integration_all_results()
@@ -338,7 +338,7 @@ test_that("changing ai_model invalidates cached callouts so they regenerate", {
     result <- generate_all_insights(all_results, banner_info, config_obj, tmp_path)
   })
 
-  # The config model is authoritative — it overrides the sidecar's old model.
+  # The config model is authoritative. It overrides the sidecar's old model.
   expect_equal(result$ai_config$model, "claude-opus-4-8")
   # The cached hash is dropped, so this was treated as a cache miss (regeneration
   # attempted) rather than a silent reuse of the Sonnet-written callout.
@@ -349,7 +349,7 @@ test_that("changing ai_model invalidates cached callouts so they regenerate", {
 # TESTS: Idempotency
 # ==============================================================================
 
-context("generate_all_insights — idempotency")
+context("generate_all_insights. Idempotency")
 
 test_that("manually suppressed callouts are not regenerated", {
   all_results <- make_integration_all_results()
@@ -430,7 +430,7 @@ test_that("edited narrative text is preserved when data unchanged", {
 # TESTS: Model display name
 # ==============================================================================
 
-context("generate_all_insights — model attribution")
+context("generate_all_insights. Model attribution")
 
 test_that("result includes model_display_name", {
   all_results <- make_integration_all_results()
@@ -499,7 +499,7 @@ test_that("blank ai_model leaves the sidecar's own model untouched", {
     result <- generate_all_insights(all_results, banner_info, config_obj, tmp_path)
   })
 
-  # No override — the hand-edited provider/model are respected.
+  # No override. The hand-edited provider/model are respected.
   expect_equal(result$ai_config$model, "gpt-4.1")
   expect_equal(result$model_display_name, "gpt-4.1 (OpenAI)")
 })

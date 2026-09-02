@@ -1,11 +1,11 @@
-# Pattern recognition — advanced patterns, empirically-grounded design
+# Pattern recognition. Advanced patterns, empirically-grounded design
 
 Status: **ALL BUILT** · 2026-06-28 · branch `feature/tabs-executive-takeout`
 
 Companion to [PATTERN_RECOGNITION.md](PATTERN_RECOGNITION.md). This file holds the
 **statistical design** for the advanced patterns, every number measured on the
 **real SACS-2025** data (n=167, 20 rated 5-pt questions Q05–Q28, banners
-Campus/Department/Tenure) via the headless real-engine harness — never reasoned.
+Campus/Department/Tenure) via the headless real-engine harness, never reasoned.
 The two promises stand: *find what a question-by-question read misses*, and *never
 cry wolf*. Each pattern was designed by a multi-agent pass (empirical probe → three
 independent design lenses → judge → adversarial verification → synthesis) and is
@@ -18,11 +18,11 @@ backed by known-answer tests + a real-engine harness check.
 | Which split matters most | `6346e42f` | Campus (Durban 4.39 / Cape Town 3.70) |
 | Questions that move together | `5dddd312` | 3 bundles (values battery / manager-support / role-basics) above the 0.38 acquiescence floor |
 | FDR multiple-comparison trust-gate | `855e2eac` | 380 cells scanned; **4** badged (Head Office/Q11, new-staff Q13/Q25/Q28); Cape Town kept via the sign-test (signP 4e-4) |
-| The odd one out | `49dbc028` | **confident null** — 0 of 380 (every striking cell is a same-direction extreme) |
-| Hidden disagreement (bimodality) | `49dbc028` | **confident null** — 0 of 20 (every distribution single-peaked) |
+| The odd one out | `49dbc028` | **confident null**, 0 of 380 (every striking cell is a same-direction extreme) |
+| Hidden disagreement (bimodality) | `49dbc028` | **confident null**, 0 of 20 (every distribution single-peaked) |
 
 The confident nulls are a feature, not a gap: each renders a compact "we checked,
-nothing real" card that shows its working — the visible never-cry-wolf proof.
+nothing real" card that shows its working. The visible never-cry-wolf proof.
 **Still later:** Direction reversal / Simpson's (needs wave × subgroup data).
 
 The fully reconciled, as-built statistical spec (the synthesis the multi-agent pass
@@ -32,7 +32,7 @@ empirically-grounded design notes, kept for the measured numbers.
 
 ---
 
-## A. Multiple-comparison correction (FDR) — the cross-cutting anti-shadow gate
+## A. Multiple-comparison correction (FDR): the cross-cutting anti-shadow gate
 
 **Status: designed + validated; implement with an adversarial pass (it touches the
 verified-good group/split behaviour).**
@@ -41,15 +41,15 @@ verified-good group/split behaviour).**
 The implicit family on SACS is **380 cells** = 19 reportable breakout groups (each
 with ≥ the census floor of 5 responses) × 20 rated questions. Multiplicity *is*
 biting: a naive p<.05 scan lights up **41–42 of 380** cells when the global-null
-expectation is **19.0** — roughly half the naive hits are plausibly noise.
+expectation is **19.0**. Roughly half the naive hits are plausibly noise.
 
-But the dominant cry-wolf source here is **not** raw multiplicity — it is **tiny
+But the dominant cry-wolf source here is **not** raw multiplicity. It is **tiny
 homogeneous census cells**. "Registrars Office" has n=5 and all five answered "5"
 on Q16 → zero within-group variance → Welch SE collapses → t=10.9 → **p=8.8e-21**,
 the single top-ranked cell in the whole survey, a pure shadow. 60/380 cells sit on
 bases of 5–9; 2 cells have literal zero variance.
 
-### Design (decisive — no menu of options)
+### Design (decisive, no menu of options)
 1. **Derive p-values in JS** (the R z-test letters expose no p-values): a
    **weighted Welch two-sample mean test**, group-vs-rest within each banner,
    Kish-weight-aware (SACS weights = 1 ⇒ reduces to the plain test). Source:
@@ -70,25 +70,25 @@ bases of 5–9; 2 cells have literal zero variance.
 5. **Two guards for two pattern shapes** (the decisive architectural call):
    - **(a) Per-cell BH** on the 380-cell family → flags/ranks *single-striking-cell*
      claims (the odd-one-out) and badges evidence rows ("survives correction").
-   - **(b) A directional-consistency test** — one sign-test / aggregate net-gap z
+   - **(b) A directional-consistency test**. One sign-test / aggregate net-gap z
      **per group** (inherently multiplicity-safe) → gates the **group-under-strain**
      and **which-split** patterns, because those are about *consistency across
      cells*, not any one cell. This is what **preserves Cape Town**: it has **zero**
      individually-BH-significant cells, yet 18/20 questions below the rest gives a
      sign-test **p=2.0e-4**. Gating group on per-cell BH would *delete the
-     verified-good baseline* — the key trap.
+     verified-good baseline*. The key trap.
 
 ### Expected SACS result
 Per-cell BH (variance-floored, no FPC) survivors = **4**: Head Office/Q11 (n=62,
-diff +0.79, p=1.5e-5) and Less-than-a-year/Q13,Q25,Q28 (n~21, diff ~+0.62) — the
+diff +0.79, p=1.5e-5) and Less-than-a-year/Q13,Q25,Q28 (n~21, diff ~+0.62): the
 new-staff-thriving signal. Group/split unchanged (gated by the consistency test).
 
 ### Provenance / confident-null wording
 > no AI · scanned N groups × M questions = K cells · corrected for multiplicity
-> (Benjamini-Hochberg) · X stand-alone differences survive — the rest is
+> (Benjamini-Hochberg) · X stand-alone differences survive. The rest is
 > consistency, not single cells.
 
-When X=0 **and** no consistent group: *"nothing survives correction — and that's
+When X=0 **and** no consistent group: *"nothing survives correction, and that's
 the headline."*
 
 ### CONST additions
@@ -98,7 +98,7 @@ the headline."*
 
 ## B. Questions that move together  ·  IMPLEMENTING
 
-**Status: designed + validated; building now (greenfield — no existing behaviour
+**Status: designed + validated; building now (greenfield, no existing behaviour
 at risk).**
 
 ### What the real data showed
@@ -107,27 +107,27 @@ Pearson **r = 0.381**, with **zero** negative pairs (classic acquiescence /
 common-method variance). The single-factor signature is overwhelming (mean
 item-to-global-mean r = 0.641). **Naive thresholds collapse the survey:** r≥0.5
 merges 16/20 questions into one bundle; r≥0.3 merges all 20. Naive significance is
-just as useless — 178/190 pairs are p<.05 and **all 178 survive BH-FDR**, because
+just as useless, 178/190 pairs are p<.05 and **all 178 survive BH-FDR**, because
 with this much shared variance virtually every pair is "real". *Multiplicity
 correction on raw r does nothing; the problem is the global factor.*
 
 ### Design
 1. **Pairwise-complete, weight-aware Pearson** over `TR.MICRO.scores` (support
    weights; SACS = 1).
-2. **Control for the global factor** — the fix that works on this data. Form each
+2. **Control for the global factor**. The fix that works on this data. Form each
    respondent's overall mean across answered rated items (the global factor g) and
    take the **partial correlation**:
    `partial_r(a,b | g) = (r_ab − r_ag·r_bg) / sqrt((1−r_ag²)(1−r_bg²))`.
    This drops mean partial r to −0.050 and leaves only 62/190 positive.
 3. **Three joint gates** to keep an edge:
-   - **Strength** — `partial_r ≥ 0.20` **AND** the candidate bundle's within-bundle
+   - **Strength**, `partial_r ≥ 0.20` **AND** the candidate bundle's within-bundle
      mean *raw* r is **above the live acquiescence floor** (the survey's own mean
      inter-item r, = 0.381 here). A bundle must cohere *above baseline*, not merely
      positively.
-   - **Stability / multiplicity** — **BH-FDR at .05** across all C(k,2)=190 pairs,
+   - **Stability / multiplicity**, **BH-FDR at .05** across all C(k,2)=190 pairs,
      keeping only **positive** partial edges (18 survive); require a minimum
      pairwise base (≥30, comfortably met at ~150).
-   - **Structure** — connected components on the surviving edges; report bundles of
+   - **Structure**. Connected components on the surviving edges; report bundles of
      **≥2** questions, each annotated with within-bundle mean r vs the floor and its
      **anchor edge** (strongest, most stable) as headline evidence.
 4. **Confident null** when no bundle clears floor + FDR.
@@ -156,7 +156,7 @@ constant.
 ## C. The odd one out  ·  PROBE INCOMPLETE
 
 Design intent in [PATTERN_RECOGNITION.md](PATTERN_RECOGNITION.md) §6: a group that
-breaks its OWN pattern — residual of its gap on a question vs its average gap,
+breaks its OWN pattern. Residual of its gap on a question vs its average gap,
 large relative to the group's own spread, on a reliable base, corrected for the
 (group × question) residuals scanned (ties into FDR guard (a) above). The empirical
 probe did not finish (session limit). **Re-run the design workflow after the 12pm
@@ -174,12 +174,12 @@ reset.**
 
 ## Build order (revised)
 1. **BH-FDR primitive** in the engine (pure, reusable) + variance-floored Welch
-   p-values — small, testable, used by both B and A.
-2. **Questions that move together** (B) — greenfield, highest "human-can't-see"
+   p-values. Small, testable, used by both B and A.
+2. **Questions that move together** (B): greenfield, highest "human-can't-see"
    value, validated.
-3. **FDR gate + provenance** (A) — with an adversarial pass, since it touches
+3. **FDR gate + provenance** (A), with an adversarial pass, since it touches
    group/split.
-4. **Odd one out** (C) and **Hidden disagreement** (D) — after the workflow re-run.
+4. **Odd one out** (C) and **Hidden disagreement** (D): after the workflow re-run.
 
 Each ships with known-answer tests **and** a real-engine harness check before it is
 called done.
@@ -187,13 +187,13 @@ called done.
 
 ---
 
-# Appendix — as-built statistical spec (multi-agent synthesis, adversarial fixes folded in)
+# Appendix. As-built statistical spec (multi-agent synthesis, adversarial fixes folded in)
 
-# Pattern Recognition v2 — Implementation Spec: FDR Trust-Gate, Odd-One-Out, Hidden Disagreement
+# Pattern Recognition v2. Implementation Spec: FDR Trust-Gate, Odd-One-Out, Hidden Disagreement
 
 **Status:** all three families survived adversarial verification. Required fixes from the verdicts are folded in below and marked **[FIX]**. Everything is deterministic, no-AI, reproduces exactly on re-run, and reuses the shipped primitives (`_normalCdf`, `_partialCorr`, `_corrPValue`, `_bhFDR`). Co-movement is untouched.
 
-**Build order (load-bearing):** FDR family `gatherCellFamily` → FDR gate → odd-one-out (consumes the *same* family object). Bimodality is independent and greenfield. **One** Welch computation and **one** per-cell BH pass are shared between FDR gate-A and odd-one-out — never two families.
+**Build order (load-bearing):** FDR family `gatherCellFamily` → FDR gate → odd-one-out (consumes the *same* family object). Bimodality is independent and greenfield. **One** Welch computation and **one** per-cell BH pass are shared between FDR gate-A and odd-one-out, never two families.
 
 **Page order (unchanged spine, two inserts):**
 `apex → group (now gated) → split (now gated) → comove → ODD → weak/strong area → moved → BIMODAL? → provenance (FDR-stamped)`
@@ -202,12 +202,12 @@ Bimodality sits with the within-question diagnostic reads. Per the design it is 
 
 ---
 
-## Family 1 — FDR multiple-comparison trust-gate (cross-cutting)
+## Family 1. FDR multiple-comparison trust-gate (cross-cutting)
 
 ### Purpose (the human-missed insight)
 Two distinct things a question-by-question reader gets wrong, fixed by two distinct guards:
 - **Single striking cells lie.** Scanning 19 groups × 20 questions = 380 cells, ~19 will clear p<.05 by chance; the loudest cell on real SACS (Registrars Office n=5, all answered "5" on Q16, t=10.9, p=8.8e-21) is a zero-variance census artefact, not a finding. **Guard A** (per-cell variance-floored Welch Student-t, BH-corrected) ranks/badges single-cell claims and seeds odd-one-out.
-- **Consistency is invisible to per-cell tests.** Cape Town (the verified-good strain group) is below on 18/20 questions yet has **zero** individually-significant cells. **Guard B** (per-group directional sign-test, BH-corrected across groups) is what proves Cape Town is genuinely consistent and gates the group/split patterns. **Gate on B's set D, never on A's per-cell set S** — that is the Cape-Town-safe contract.
+- **Consistency is invisible to per-cell tests.** Cape Town (the verified-good strain group) is below on 18/20 questions yet has **zero** individually-significant cells. **Guard B** (per-group directional sign-test, BH-corrected across groups) is what proves Cape Town is genuinely consistent and gates the group/split patterns. **Gate on B's set D, never on A's per-cell set S**. That is the Cape-Town-safe contract.
 
 This is not a card. It badges, gates, and supplies the provenance / confident-null line. It never re-orders or deletes the verified-good baseline.
 
@@ -215,7 +215,7 @@ This is not a card. It badges, gates, and supplies the provenance / confident-nu
 
 **New pure fns in 27e** (all reuse `_bhFDR`; add a Student-t tail):
 
-`_studentT(t, df)` — two-sided Student-t tail = `I_{df/(df+t²)}(df/2, 1/2)` via regularised incomplete beta (Lentz continued fraction + log-gamma).
+`_studentT(t, df)`. Two-sided Student-t tail = `I_{df/(df+t²)}(df/2, 1/2)` via regularised incomplete beta (Lentz continued fraction + log-gamma).
 - **[FIX, required] Guard non-finite t → return 1** (not 0). A degenerate SE yielding NaN t must give p=1, never p=0. Order of guards: `if (!isFinite(t)) return 1; if (df <= 0) return 1;` then clamp `|t|` to a large finite bound (e.g. 1e6) before the beta call.
 - Known-answers (pinned): `_studentT(3,50)≈0.00420`, `_studentT(3,5)≈0.0301`, `_studentT(0,10)=1.0`, `df≤0→1`.
 
@@ -234,8 +234,8 @@ This is not a card. It badges, gates, and supplies the provenance / confident-nu
 - `dir = below>above ? 'below' : 'above'`.
 - Known-answers (pinned): `_signTest(18,2)=4.02e-4`, `_signTest(2,18)=4.02e-4`, `_signTest(13,7)=0.263`, `_signTest(10,10)=1.000`, `_signTest(19,1)=4.0e-5`.
 
-`_fdrGate(fdr, opts)` — consumes the shared family object built by `gatherCellFamily` (§ data source) and returns the `fdr` output object:
-- **Layer A (per-cell):** `bhAll = _bhFDR(cells.map(c=>c.welchP), FDR_ALPHA)` → full keep set (seeds odd-one-out). `badge = bhAll ∩ {nG ≥ BADGE_MIN_BASE} ∩ {!flooredG}`. On SACS badge == bhAll (all 4 survivors nG≥12, unfloored) — belt-and-braces guarantees a tiny/homogeneous cell can never earn the chip on a future dataset.
+`_fdrGate(fdr, opts)`. Consumes the shared family object built by `gatherCellFamily` (§ data source) and returns the `fdr` output object:
+- **Layer A (per-cell):** `bhAll = _bhFDR(cells.map(c=>c.welchP), FDR_ALPHA)` → full keep set (seeds odd-one-out). `badge = bhAll ∩ {nG ≥ BADGE_MIN_BASE} ∩ {!flooredG}`. On SACS badge == bhAll (all 4 survivors nG≥12, unfloored): belt-and-braces guarantees a tiny/homogeneous cell can never earn the chip on a future dataset.
 - **Layer B (per-group):** for each reportable group, `_signTest(below, above)` over the rated Qs using the *same unfloored* `diff` signs; `signGate = _bhFDR(signPs, SIGN_ALPHA)` → survivor set **D**. A group is "genuinely consistent" iff `g ∈ D`.
 
 **No FPC in either statistic.** Verified: FPC-in-the-SE balloons BH survivors (4 → far more). FPC stays in the reliability layer only.
@@ -247,7 +247,7 @@ This is not a card. It badges, gates, and supplies the provenance / confident-nu
 `gatherCellFamily(views)` (new, in 27f) builds the **one** shared family:
 - Reportable groups = `TR.AGG.banner_groups` `[{id,name}]` × distinct positive `TR.MICRO.banner_vars[bid]` codes whose arm n ≥ CENSUS_FLOOR. SACS = 19 groups.
 - **Code→label join (verified):** `banner_vars` hold survey **option values**, not positions. Sort the distinct non-negative codes ASCENDING and align positionally to `views._modelFor(qcode, bid).columns.slice(1)` (non-Total columns).
-- **[FIX, required]** Assert `count(distinct positive codes) === columns.length − 1` (a label-count/order check). On mismatch, **skip that banner** (degrade, console TRS-style note) — never mislabel. Do **NOT** assert base-equality: model base is per-question non-null while micro code-count is raw group size (3 off-by-one cases exist on SACS: Head Office 63/62, Operations 20/19, 5y+ 43/42). Use a tolerance check `|nIn − column.base| ≤ 2` only as a secondary sanity-skip on individual cells.
+- **[FIX, required]** Assert `count(distinct positive codes) === columns.length − 1` (a label-count/order check). On mismatch, **skip that banner** (degrade, console TRS-style note), never mislabel. Do **NOT** assert base-equality: model base is per-question non-null while micro code-count is raw group size (3 off-by-one cases exist on SACS: Head Office 63/62, Operations 20/19, 5y+ 43/42). Use a tolerance check `|nIn − column.base| ≤ 2` only as a secondary sanity-skip on individual cells.
 - Per (group × rated qcode with `TR.MICRO.scores`): build arms from `scores[q]` split by `banner_vars[bid]===code`, dropping null score **or** code<0 on both arms; `weights` from `TR.MICRO.weights` (SACS=1). Run `_welchTest` (NO FPC). Carry `nIn`, `diff`, `flooredG`, `welchP`, and the title (via `views.indexQuestions()`).
 - Composites (`Q_*` with no `scores` key) carry no per-respondent vector → excluded. Family = 20 rated Qs × 19 groups = **380** testable cells.
 - Scale span `R` per question from the index scale (`touchpointMax(q) − scaleMin`, =4 here). CENSUS_FLOOR = `project.min_report_base || MIN_CENSUS_BASE(5)`.
@@ -264,9 +264,9 @@ SPLIT_MIN_CONSISTENT   = 2      // winning banner must contain ≥2 sign-test-co
 // CENSUS_FLOOR reused from 27f's MIN_CENSUS_BASE(5) / project.min_report_base
 // Badge not-floored rule: drop any BH survivor whose GROUP arm was variance-floored (no constant)
 ```
-**[FIX, doc]** SPLIT_MIN_CONSISTENT=2 is an additive **veto floor**, not a selector — on SACS all three banners clear it, so banner choice still rests on the existing `SPLIT_LEAD_RATIO=1.25` on directional spread. Document this so the next implementer is not surprised.
+**[FIX, doc]** SPLIT_MIN_CONSISTENT=2 is an additive **veto floor**, not a selector, on SACS all three banners clear it, so banner choice still rests on the existing `SPLIT_LEAD_RATIO=1.25` on directional spread. Document this so the next implementer is not surprised.
 
-**[FIX, doc]** The sign-test treats questions as independent Bernoulli; positive inter-item r (0.38) makes the true null variance larger than np(1−p), so signP is mildly anti-conservative. Safe here — it is a relative BH-gated rank and SACS margins (4e-4) are far from the boundary. Flag in a code comment.
+**[FIX, doc]** The sign-test treats questions as independent Bernoulli; positive inter-item r (0.38) makes the true null variance larger than np(1−p), so signP is mildly anti-conservative. Safe here. It is a relative BH-gated rank and SACS margins (4e-4) are far from the boundary. Flag in a code comment.
 
 Reuse unchanged: `STRAIN_RELIABLE_BASE=30`, `MIN_GROUP_HITS=2`, `MIN_STRAIN_GAP=0.02`, `MIN_SPLIT_DIFF=0.02`, `SPLIT_LEAD_RATIO=1.25`. The gate is an **additive veto** layered on these existing selectors.
 
@@ -288,16 +288,16 @@ In `buildPatterns`, after computing `group`/`split` but **gating on `gate.groups
 - **When `inputs.fdr` is null (no microdata): SKIP the gate entirely**; group/split fall back to today's `MIN_GROUP_HITS`/`MIN_SPLIT_DIFF` behaviour unchanged.
 
 ### Cry-wolf gate
-On a structureless study **both guards fall silent together**. Verified on synthetic independent-uniform-Likert null (160 resp, 19 groups, 20 Qs, 20 seeds): per-cell BH survivors avg 0.15 (FDR-controlled), badged avg 0.10, per-group sign-test survivors (D) = **0.00 across all 20 seeds**. So on noise `badge.count→0` AND no consistent group ⇒ the page prints the confident-null line deterministically. (Permuting real SACS vectors is NOT a valid null — it preserves acquiescence; the synthetic independent generator is the correct probe.)
+On a structureless study **both guards fall silent together**. Verified on synthetic independent-uniform-Likert null (160 resp, 19 groups, 20 Qs, 20 seeds): per-cell BH survivors avg 0.15 (FDR-controlled), badged avg 0.10, per-group sign-test survivors (D) = **0.00 across all 20 seeds**. So on noise `badge.count→0` AND no consistent group ⇒ the page prints the confident-null line deterministically. (Permuting real SACS vectors is NOT a valid null, it preserves acquiescence; the synthetic independent generator is the correct probe.)
 
 ### Expected real-SACS result (measured)
 - K = 380; 60/380 on bases 5–9; 2 arms zero-variance. Naive p<.05 = 41–42 (vs global-null 19.0).
 - **Variance-floored Welch Student-t BH = exactly 4**, badged = same 4 (all nG≥12, unfloored):
   - Head Office / Q11 (n=62, +0.79, p=1.5e-5)
-  - Less-than-a-year / Q13 (n=21, +0.61, p=3.2e-5), Q25 (n=21, +0.62, p=1.1e-4), Q28 (n=20, +0.63, p=2.7e-4) — the new-staff-thriving signal.
+  - Less-than-a-year / Q13 (n=21, +0.61, p=3.2e-5), Q25 (n=21, +0.62, p=1.1e-4), Q28 (n=20, +0.63, p=2.7e-4): the new-staff-thriving signal.
   - Registrars/Q16,Q12 (n=5) and Finance/Q14 (n=10) correctly drop out (t-tail demotes below BH line).
 - **Sign-test preserves the baseline:** Cape Town 18/20 below ⇒ signP=4.0e-4 (∈ D, consistent) with **0 per-cell BH survivors**. Campus split: Head Office/Cape Town/Durban/Online all ∈ D and Campus leads on directional spread ⇒ Campus stays the winning split.
-- Provenance: `"no AI · scanned 19 groups × 20 questions = 380 cells · corrected for multiplicity (Benjamini-Hochberg) · 4 stand-alone differences survive — the rest is consistency, not single cells."` When badge.count=0 and no consistent group: `"nothing survives correction — and that's the headline."`
+- Provenance: `"no AI · scanned 19 groups × 20 questions = 380 cells · corrected for multiplicity (Benjamini-Hochberg) · 4 stand-alone differences survive, the rest is consistency, not single cells."` When badge.count=0 and no consistent group: `"nothing survives correction, and that's the headline."`
 
 ### Test cases (known-answer + null)
 - `_studentT(3,50)≈0.0042`; `_studentT(3,5)≈0.030`; `_studentT(0,10)=1.0`; `df≤0→1`; **non-finite t → 1** (regression guard for the NaN trap).
@@ -307,7 +307,7 @@ On a structureless study **both guards fall silent together**. Verified on synth
 - `_signTest`: (18,2)→4.02e-4; (2,18)→4.02e-4; (13,7)→0.263; (10,10)→1.000; (19,1)→4.0e-5.
 - `_bhFDR([.001,.008,.039,.041,.9],.05)→{0,1}`; all-null `[.4,.5,.6,.7,.8]→[]` ⇒ confident-null path.
 - Badge guard on real SACS: BH-keep 4 → badge 4; labels golden = {Head Office/Q11, Less-than-a-year/Q13,Q25,Q28}.
-- **Cape Town gate:** groupPattern sets subject='Cape Town Campus', consistent=true (∈ D), evidence rows carry `survives=false` (0 per-cell survivors) — proves consistency-gating keeps it.
+- **Cape Town gate:** groupPattern sets subject='Cape Town Campus', consistent=true (∈ D), evidence rows carry `survives=false` (0 per-cell survivors): proves consistency-gating keeps it.
 - Census-floor: arm n=4 produces NO cell, excluded from that group's sign-test qn.
 - Code→label join: Department distinct codes sorted [7..19] align to non-Total columns; assert `count===columns.length−1` or skip-and-warn.
 - **NULL (synthetic, seeded):** 160×19×20 independent uniform-Likert → per-cell BH survivors ≤1 avg AND sign-test survivors=0 → badge.count 0 + no consistent group → confident-null line.
@@ -316,39 +316,39 @@ On a structureless study **both guards fall silent together**. Verified on synth
 - **27e:** add `_studentT`, `_welchTest`, `_signTest`, `_fdrGate`; CONST above. In `buildPatterns`: `if (inputs.fdr) { var gate=_fdrGate(inputs.fdr); result.fdr=gate; }` then gate group/split on `gate.groups` (D) and tag evidence `.survives` from `gate.badge`. Expose `takeout._fdrGate`, `takeout._studentT`, `takeout._welchTest`, `takeout._signTest`.
 - **27f:** add `gatherCellFamily(views)`; wire into `gather()` as `inputs.fdr` (try/catch→null).
 - **27g:** add `ui.survivesChip(on)` → `'<span class="tko-badge tko-survives">survives correction</span>'`; extend `ui.groupRow` to append when `e.survives`.
-- **27h:** `provHtml(t)` reads `t.fdr` for the live K/groupCount/badge.count line; when `t.fdr && t.fdr.badge.count===0 && no consistent group`, render `"nothing survives correction — and that's the headline."`. Page order unchanged; provenance now FDR-stamped. FPC stays in `21c_confidence` reliabilityRibbon — explicitly NOT inside `gatherCellFamily`.
+- **27h:** `provHtml(t)` reads `t.fdr` for the live K/groupCount/badge.count line; when `t.fdr && t.fdr.badge.count===0 && no consistent group`, render `"nothing survives correction, and that's the headline."`. Page order unchanged; provenance now FDR-stamped. FPC stays in `21c_confidence` reliabilityRibbon. Explicitly NOT inside `gatherCellFamily`.
 
 ---
 
-## Family 2 — The odd one out
+## Family 2. The odd one out
 
 ### Purpose (the human-missed insight)
-A breakout group that is LOW (or HIGH) on almost everything yet **unexpectedly the reverse on one question** — a sign-flip against the group's own direction; the exception worth explaining. This is distinct from "group under strain" (the group's general *level*) and from a same-direction extreme (its strongest point in the *same* direction, already implied by the strain/thriving signal). On SACS it returns a **confident null**.
+A breakout group that is LOW (or HIGH) on almost everything yet **unexpectedly the reverse on one question**. A sign-flip against the group's own direction; the exception worth explaining. This is distinct from "group under strain" (the group's general *level*) and from a same-direction extreme (its strongest point in the *same* direction, already implied by the strain/thriving signal). On SACS it returns a **confident null**.
 
 ### Formula, estimator, decision rule
 Per group g (each reportable column from `gatherColumnStrain`) with gaps `gap_q = value_q − total_q` across its k rated questions:
-- `meanGap_g = mean_q(gap_q)` [direction]; `dir_g = sign(meanGap_g)`; `sdGap_g = popSD_q(gap_q)` **[DISPLAY/RANK ONLY — never a gate]**.
+- `meanGap_g = mean_q(gap_q)` [direction]; `dir_g = sign(meanGap_g)`; `sdGap_g = popSD_q(gap_q)` **[DISPLAY/RANK ONLY, never a gate]**.
 
 A cell (g,q) is an odd-one-out candidate iff **ALL**:
 1. **Sign-flip:** `gap_q ≠ 0 AND sign(gap_q) ≠ dir_g`.
 2a. **Absolute materiality:** `|gap_q| ≥ ODD_MIN_GAP` (0.20 scale pts).
 2b. **Residual materiality:** `|gap_q − meanGap_g| ≥ ODD_MIN_RESID` (0.30 scale pts). Required to reject gap-vs-total contamination (one extreme group drags the total, flipping others slightly); verified to reject all contamination flips while keeping a planted break.
 3. **Respondent significance** via the **shared** variance-floored weighted Welch from FDR gate-A (`_welchTest`, NO FPC) AND sign-consistency `sign(welchDiff) === sign(gap_q)` (drops base-composition reversals, e.g. Pretoria gap +0.35 but Welch −0.66).
-4. **Survives** the **single shared** per-cell BH-FDR pass (`fdr.survivors`) — do NOT build a second family.
-5. **Test-arm base floor** `nIn ≥ ODD_MIN_TEST_BASE` (8) — soft belt-and-braces so a flip cannot rest on a 5–7-person homogeneous census cell; deliberately NOT the n≥30 sample frame.
+4. **Survives** the **single shared** per-cell BH-FDR pass (`fdr.survivors`): do NOT build a second family.
+5. **Test-arm base floor** `nIn ≥ ODD_MIN_TEST_BASE` (8): soft belt-and-braces so a flip cannot rest on a 5–7-person homogeneous census cell; deliberately NOT the n≥30 sample frame.
 
 Rank survivors by `|resid|` (display); emit the largest as THE odd one out, with up to `EVIDENCE_MAX` runner-ups. Return a typed null marker when none survive.
 
 **[FIX, required] Use the Welch-Satterthwaite Student-t p (`_studentT`), not `2·_normalCdf(−|t|)`.** The shared family must be identical to FDR gate-A's; the t-distribution yields the 4 BH survivors gate-A predicts (the normal-approx gives 10 and is anti-conservative on small bases). The SACS odd-null is invariant (0 flip survivors either way), so zero downside.
 
-**[FIX, doc] Strike "gaps read from `row.cells[i].mean` at full precision."** Agg `cell.mean` is rounded to 2dp (4.47 vs micro 4.468). Immaterial to the 0.20/0.30 thresholds, and the Welch uses full-precision micro — but state that gaps come from the rounded display means and that this is acceptable given the threshold margins.
+**[FIX, doc] Strike "gaps read from `row.cells[i].mean` at full precision."** Agg `cell.mean` is rounded to 2dp (4.47 vs micro 4.468). Immaterial to the 0.20/0.30 thresholds, and the Welch uses full-precision micro, but state that gaps come from the rounded display means and that this is acceptable given the threshold margins.
 
 **[FIX, doc/impl] `meanGap`/`dir`:** compute as `mean(gap/scaleMax)` to match `groupPattern`'s normalization (it uses `gap/scaleMax`), OR document that odd-one-out assumes a single `scaleMax` per banner and guard accordingly. On SACS (uniform scaleMax=5) the two agree in sign; for a mixed-scale banner they could disagree.
 
 ### Data source
 - `gatherColumnStrain(views)` → per-column gaps (census floor 5 already applied) for `meanGap`/`dir`/`resid`/flip detection.
 - The shared **`gatherCellFamily`** object (§ Family 1) supplies `welchDiff/welchP/nIn/flooredG` per (column × rated qcode) and the BH survivor set. **Exactly one Welch computation, one BH pass** shared with FDR gate-A. Build order: `gatherCellFamily` → `oddOnePattern`.
-- **[FIX, impl]** Gaps carry **title only**, not qcode — add the explicit title→qcode join via `views.indexQuestions()` in 27f so each gap maps to a `scores` vector. Composites (2 cells) lack scores → in the 418-cell display scan but not the 380-cell FDR family; add a one-line comment so a future reader doesn't "fix" the 418-vs-380 discrepancy.
+- **[FIX, impl]** Gaps carry **title only**, not qcode. Add the explicit title→qcode join via `views.indexQuestions()` in 27f so each gap maps to a `scores` vector. Composites (2 cells) lack scores → in the 418-cell display scan but not the 380-cell FDR family; add a one-line comment so a future reader doesn't "fix" the 418-vs-380 discrepancy.
 - Positional column-label→banner-code join as in Family 1, with the same `count===columns.length−1` assert and per-cell `|nIn − column.base| ≤ 2` sanity-skip (set `welchP=null` on mismatch rather than mis-attribute).
 - FPC kept OUT of the Welch; stays in the reliability layer.
 
@@ -375,15 +375,15 @@ Confident-null marker (the SACS case): `{ id:'odd', kind:'odd', nullResult:true,
 
 `PATTERN_META.odd = { tag:'The odd one out', cls:'odd' }`.
 
-**Takeaway (firing):** `"<Group> runs <below|above> the overall almost everywhere — yet on '<title>' it is unexpectedly <higher|lower> (<value> vs <total>, +<gap> against its usual <meanGap>)."` Badge on a surviving flip: `"exception · survives multiplicity correction"`.
+**Takeaway (firing):** `"<Group> runs <below|above> the overall almost everywhere, yet on '<title>' it is unexpectedly <higher|lower> (<value> vs <total>, +<gap> against its usual <meanGap>)."` Badge on a surviving flip: `"exception · survives multiplicity correction"`.
 
-**Confident-null line (SACS):** `"No group breaks its own pattern — every exception is either too small to matter or sits on a census cell too thin to trust."` Caption: `"scanned 19 groups × 20 rated questions = 380 cells · corrected for multiplicity (Benjamini-Hochberg) · an exception must oppose the group's own direction, clear 0.30 scale points, and survive correction · 0 survive."`
+**Confident-null line (SACS):** `"No group breaks its own pattern. Every exception is either too small to matter or sits on a census cell too thin to trust."` Caption: `"scanned 19 groups × 20 rated questions = 380 cells · corrected for multiplicity (Benjamini-Hochberg) · an exception must oppose the group's own direction, clear 0.30 scale points, and survive correction · 0 survive."`
 
 ### Cry-wolf gate
-A cell must be a sign-flip against `meanGap` direction AND survive BH over the shared 380-cell family. Verified: of the per-cell BH survivors on SACS, **zero are flips** (all same-direction extremes — Head Office/Q11 meanGap +0.14 is its strongest *same*-direction point; Less-than-a-year survivors all upward; Registrars n=5 same-direction). The flip∩BH intersection is empty *before* materiality. Adding materiality + welch sign-consistency + nIn≥8 hardens it: 89–92 sign-flips exist, the largest material (Cape Town +0.22 on co-workers-committed, resid +0.57) is Welch p=0.258 (noise), every material flip sits on base<30. SACS survivor count = **0 across the full grid `resid∈{0.20,0.25,0.30,0.40} × nIn∈{0,8,30}`**. The detector is alive: planted synthetic flip (n=40, gap +0.60, resid +1.08) → exactly 1 ODD survivor, p≈1.7e-24, in BH; 9–13 contamination flips all rejected by `ODD_MIN_RESID=0.30`.
+A cell must be a sign-flip against `meanGap` direction AND survive BH over the shared 380-cell family. Verified: of the per-cell BH survivors on SACS, **zero are flips** (all same-direction extremes, Head Office/Q11 meanGap +0.14 is its strongest *same*-direction point; Less-than-a-year survivors all upward; Registrars n=5 same-direction). The flip∩BH intersection is empty *before* materiality. Adding materiality + welch sign-consistency + nIn≥8 hardens it: 89–92 sign-flips exist, the largest material (Cape Town +0.22 on co-workers-committed, resid +0.57) is Welch p=0.258 (noise), every material flip sits on base<30. SACS survivor count = **0 across the full grid `resid∈{0.20,0.25,0.30,0.40} × nIn∈{0,8,30}`**. The detector is alive: planted synthetic flip (n=40, gap +0.60, resid +1.08) → exactly 1 ODD survivor, p≈1.7e-24, in BH; 9–13 contamination flips all rejected by `ODD_MIN_RESID=0.30`.
 
 ### Expected real-SACS result
-**Confident null** — `oddOnePattern` returns the typed null marker; no firing `{id:'odd'}`. Naive own-SD `|z|≥2` would fire ~18–20 cells (incl. Q11 #1-dispersion double-counted across 4 groups); the guarded detector flags none. Does NOT promote Head Office/Q11 (same-direction extreme) nor any tiny-cell flip.
+**Confident null**, `oddOnePattern` returns the typed null marker; no firing `{id:'odd'}`. Naive own-SD `|z|≥2` would fire ~18–20 cells (incl. Q11 #1-dispersion double-counted across 4 groups); the guarded detector flags none. Does NOT promote Head Office/Q11 (same-direction extreme) nor any tiny-cell flip.
 
 ### Test cases
 - **NULL (real SACS):** `oddOnePattern(columns, fdr) → {nullResult:true, familyCells:380, survivors:0}`; assert no firing `id==='odd'` and read view contains "No group breaks its own pattern". (0 survivors across resid{0.20–0.40} × base{0,8,30}.)
@@ -397,17 +397,17 @@ A cell must be a sign-flip against `meanGap` direction AND survive BH over the s
 - **Degenerate:** `columns=[]` or no MICRO → typed null, no crash.
 
 ### Integration per file
-- **27e:** CONST `ODD_MIN_GAP=0.20`, `ODD_MIN_RESID=0.30`, `ODD_MIN_TEST_BASE=8` (reuse `VARIANCE_FLOOR_FRACTION`/`FDR_ALPHA`/`FDR_METHOD`). Add pure `oddOnePattern(columns, fdr)` — filters `fdr.cells` to `isFlip AND |gap|≥ODD_MIN_GAP AND |resid|≥ODD_MIN_RESID AND welchAgrees AND nIn≥ODD_MIN_TEST_BASE AND fdr.survivors.has(idx)`; ranks by `|resid|`; returns firing pattern or null marker. In `buildPatterns` after comove: `var odd=oddOnePattern(inputs.columns, inputs.fdr); if (odd) patterns.push(odd);`. Expose `takeout._oddOnePattern`. **Reads the shared family; NEVER feeds back into group/split gates.**
+- **27e:** CONST `ODD_MIN_GAP=0.20`, `ODD_MIN_RESID=0.30`, `ODD_MIN_TEST_BASE=8` (reuse `VARIANCE_FLOOR_FRACTION`/`FDR_ALPHA`/`FDR_METHOD`). Add pure `oddOnePattern(columns, fdr)`. Filters `fdr.cells` to `isFlip AND |gap|≥ODD_MIN_GAP AND |resid|≥ODD_MIN_RESID AND welchAgrees AND nIn≥ODD_MIN_TEST_BASE AND fdr.survivors.has(idx)`; ranks by `|resid|`; returns firing pattern or null marker. In `buildPatterns` after comove: `var odd=oddOnePattern(inputs.columns, inputs.fdr); if (odd) patterns.push(odd);`. Expose `takeout._oddOnePattern`. **Reads the shared family; NEVER feeds back into group/split gates.**
 - **27f:** `gatherCellFamily` (shared) carries `gap/meanGap/resid/dir/isFlip/welchDiff/welchP/nIn/flooredG` + the title→qcode join. `inputs.fdr` already wired.
 - **27g:** `PATTERN_META.odd`; `ui.patternSeed` case `'odd'` (firing + null phrasing); `ui.oddRow(flip)` (full-wrap label, bar + cell value vs its own-pattern expectation).
-- **27h:** `headHtml/bodyHtml/footHtml` branch for `kind==='odd'` — exception row via `ui.groupRow` + same-direction context rows + working caption; when `nullResult`, render the confident-null line + "0 survive" caption rather than an empty card.
+- **27h:** `headHtml/bodyHtml/footHtml` branch for `kind==='odd'`. Exception row via `ui.groupRow` + same-direction context rows + working caption; when `nullResult`, render the confident-null line + "0 survive" caption rather than an empty card.
 
 ---
 
-## Family 3 — Hidden disagreement (bimodality)
+## Family 3. Hidden disagreement (bimodality)
 
 ### Purpose (the human-missed insight)
-A rated question whose **mean looks calm** (mid-scale) yet the distribution splits into **two genuine end-camps** with a middle trough — a split the average hides and a question-by-question read misses. Additive/greenfield like co-movement; touches no existing pattern. On SACS: a **confident null** (every distribution is a single-peaked left-skew ceiling).
+A rated question whose **mean looks calm** (mid-scale) yet the distribution splits into **two genuine end-camps** with a middle trough. A split the average hides and a question-by-question read misses. Additive/greenfield like co-movement; touches no existing pattern. On SACS: a **confident null** (every distribution is a single-peaked left-skew ceiling).
 
 ### Formula, estimator, decision rule
 Pure helper `_bimodalStat(counts, K)` on a per-question weighted category-count vector `counts[0..K-1]` (weight 1 absent; null scores skipped). `n=Σcounts`. If `n<4` return null.
@@ -426,17 +426,17 @@ b  = (G1² + 1) / (G2 + 3(n−1)²/((n−2)(n−3)))           // b ∈ (0,1]
 
 **Flag iff ALL** (logical AND):
 1. `gB`: `b > BIMODAL_B`.
-2. `gShape`: **end-peaked** — `bMax>mMax AND tMax>mMax` (a peak in each end band, antimode in the middle). Even K → `bMax>0 AND tMax>0`. This hardened band test (not "any two local maxima") robustly rejects Q08's central-mode shape.
+2. `gShape`: **end-peaked**, `bMax>mMax AND tMax>mMax` (a peak in each end band, antimode in the middle). Even K → `bMax>0 AND tMax>0`. This hardened band test (not "any two local maxima") robustly rejects Q08's central-mode shape.
 3. `gDip`: `dipFrac ≥ BIMODAL_MIN_DIP` (central trough ≥5pp below the lower end-peak; rejects thin-tail blips). Even K → reduces to "both ends carry mass" (deferred to gCamp).
 4. `gCalm`: `calmFrac ≤ BIMODAL_CALM_FRAC` ⇒ |mean−mid| ≤ 0.5 on 1..5.
 5. `gCamp`: `minCamp ≥ BIMODAL_MIN_CAMP` (each end-camp carries real mass).
 6. `gBase`: `n ≥ BIMODAL_MIN_BASE`.
 
-**No per-question BH/FDR** — the false positives are *systematic* (ceiling skew inflates b on every question), not random noise; the structural gate IS the multiplicity-safe, scan-size-invariant correction. Do NOT route through `_bhFDR`.
+**No per-question BH/FDR**. The false positives are *systematic* (ceiling skew inflates b on every question), not random noise; the structural gate IS the multiplicity-safe, scan-size-invariant correction. Do NOT route through `_bhFDR`.
 
 `bimodalityPattern(bm)` maps each question through `_bimodalStat` + the 6 gates, keeps survivors, sorts by `dipFrac` desc, returns null when none flag.
 
-**[FIX, required] gB threshold mismatch.** The code computes SAS-corrected b but 0.5556 = 5/9 is the uniform reference for the *uncorrected* moment-form b; a true uniform passes gB (gB is near-inert, n-dependent). Either (a) **threshold the moment-form `(g1²+1)/(g2+3)` against 0.5556** for a scan-size-invariant, correctly-rationalised filter, OR (b) keep SAS b but raise/justify the threshold and delete the false "Sarle uniform reference 5/9" rationale. **Recommend (a)** — it makes gB genuinely mean "possibly bimodal." Pin a known-answer test that a large-n uniform is REJECTED by the gate.
+**[FIX, required] gB threshold mismatch.** The code computes SAS-corrected b but 0.5556 = 5/9 is the uniform reference for the *uncorrected* moment-form b; a true uniform passes gB (gB is near-inert, n-dependent). Either (a) **threshold the moment-form `(g1²+1)/(g2+3)` against 0.5556** for a scan-size-invariant, correctly-rationalised filter, OR (b) keep SAS b but raise/justify the threshold and delete the false "Sarle uniform reference 5/9" rationale. **Recommend (a)**. It makes gB genuinely mean "possibly bimodal." Pin a known-answer test that a large-n uniform is REJECTED by the gate.
 
 **[FIX, doc/test] Correct two false claims:** SACS Q08 `index_scores` are **ascending** (1=Strongly Disagree…5=Strongly Agree), not reversed `[5,4,3,2,1]`; and SACS Q08 SAS b = **0.5436** (already <0.5556, rejected by gB outright), not "near the line, rescued by gShape." Keep band-on-raw-micro + K-from-`scale_max` (correct), and add a deliberately-reversed-scale guard test since no real reversed scale exists in SACS to exercise it.
 
@@ -444,7 +444,7 @@ b  = (G1² + 1) / (G2 + 3(n−1)²/((n−2)(n−3)))           // b ∈ (0,1]
 `gatherBimodality(views)` (new, in 27f), mirroring `gatherComovement`:
 - Iterate `views.indexQuestions()`, keep questions whose code carries `micro.scores`.
 - **[FIX, impl]** Accumulate **genuinely weighted** category counts (`micro.weights` is PRESENT on SACS = all-ones, not absent): `counts[round(score)−1] += weight`, skipping null scores. `n` = non-null count.
-- **[FIX, impl]** `K = touchpointMax(q)` — call the **local** `touchpointMax` inside 27f; do **NOT** call `takeout.touchpointMax` (private to the 27f IIFE, undefined on the namespace).
+- **[FIX, impl]** `K = touchpointMax(q)`. Call the **local** `touchpointMax` inside 27f; do **NOT** call `takeout.touchpointMax` (private to the 27f IIFE, undefined on the namespace).
 - Band on the **raw ascending 1..K** `micro.scores` (verified distinct={1..5} ascending), derive K from `scale_max`; never key off `index_scores` order.
 - Runs only on the OVERALL distribution (never subgroup cuts), so base is full ~154 and `BIMODAL_MIN_BASE=30` never bites. Uses a dedicated shape floor (30), NOT the census report floor (5): a 5-person cell can be reported for a mean but cannot evidence a two-camp shape.
 - Return `{ questions:[{code,title}], counts, scaleMax:K }` or null when MICRO absent / <1 rated Q. Wire into `gather()` as `inputs.bimodal` (try/catch→null).
@@ -468,17 +468,17 @@ or `null` (confident null → no card; read view shows the explicit scanned-N co
 
 `PATTERN_META.bimodal = { tag:'Hidden disagreement', cls:'bimodal' }`. Card heading: `flaggedCount + ' question(s) split into two camps'`. Per-question row via `ui.bimodalRow(q)`: full label (wrap, never ellipsis) + mini three-segment bar (low | middle | high) + `'X% low · Y% high · mean Z (looks calm)'`. `antimode` rendered in scale terms (the middle of 1..K), not a raw index.
 
-Caption: `"scanned N questions for hidden disagreement · flags only a genuine two-camp split (peaks at both ends, a calm average, real mass in each camp) — not mere spread or skew"`.
+Caption: `"scanned N questions for hidden disagreement · flags only a genuine two-camp split (peaks at both ends, a calm average, real mass in each camp), not mere spread or skew"`.
 
-**Confident-null line (SACS):** `"no AI · scanned 20 questions for hidden disagreement · every distribution is single-peaked, not two camps — no split hides behind a calm average."` Must render as an explicit scanned-N provenance line, visibly distinct from a pattern-not-computed omission.
+**Confident-null line (SACS):** `"no AI · scanned 20 questions for hidden disagreement · every distribution is single-peaked, not two camps. No split hides behind a calm average."` Must render as an explicit scanned-N provenance line, visibly distinct from a pattern-not-computed omission.
 
 ### Cry-wolf gate
-The decisive conjunction: CALM-MEAN (`calmFrac≤0.25`) AND BALANCED-CAMPS (`minCamp≥0.20`) AND END-PEAKED-WITH-DIP (peak in each end band, antimode, dip≥5pp). On SACS: **0 of 20** (verified). Proof it is not always-off: synthetic 40/8/4/8/40 (b≈0.83) and milder 28/14/12/14/32 (b≈0.69) both pass. Naive Sarle b>0.5556 fires 11/20 SACS ceilings; the structural gate takes 11→0 with NO FDR. Q08 rejected on gShape (central mode) AND gB (real b=0.5436) — robust, not razor-thin.
+The decisive conjunction: CALM-MEAN (`calmFrac≤0.25`) AND BALANCED-CAMPS (`minCamp≥0.20`) AND END-PEAKED-WITH-DIP (peak in each end band, antimode, dip≥5pp). On SACS: **0 of 20** (verified). Proof it is not always-off: synthetic 40/8/4/8/40 (b≈0.83) and milder 28/14/12/14/32 (b≈0.69) both pass. Naive Sarle b>0.5556 fires 11/20 SACS ceilings; the structural gate takes 11→0 with NO FDR. Q08 rejected on gShape (central mode) AND gB (real b=0.5436): robust, not razor-thin.
 
-**[FIX, doc — sensitivity caveat before any non-SACS dataset]** `MIN_DIP=0.05` (5pp antimode) is a fairly low bar; on a genuinely polarised survey a shallow ripple like 30/22/18/22/28 (dip 8pp) would flag as "two camps" where a human might call it "spread." Acceptable for SACS (0/20). Re-confirm sensitivity (and pin a synthetic **weighted** test using Kish n_eff for `BIMODAL_MIN_BASE`, plus a 4-pt/7-pt fixture) before claiming weighted/scale generality.
+**[FIX, doc, sensitivity caveat before any non-SACS dataset]** `MIN_DIP=0.05` (5pp antimode) is a fairly low bar; on a genuinely polarised survey a shallow ripple like 30/22/18/22/28 (dip 8pp) would flag as "two camps" where a human might call it "spread." Acceptable for SACS (0/20). Re-confirm sensitivity (and pin a synthetic **weighted** test using Kish n_eff for `BIMODAL_MIN_BASE`, plus a 4-pt/7-pt fixture) before claiming weighted/scale generality.
 
 ### Expected real-SACS result
-**Confident null** — 0 of 20 flagged. Naive Sarle b>0.5556 would fire on 11/20 (all ceilings, means 3.72–4.51); guarded flags none. Closest-to-calm Q08 (mean 3.44, dist 12/10/28/20/29) peaks in the MIDDLE → rejected. Engine emits no card; read view renders the scanned-20 confident-null block.
+**Confident null**, 0 of 20 flagged. Naive Sarle b>0.5556 would fire on 11/20 (all ceilings, means 3.72–4.51); guarded flags none. Closest-to-calm Q08 (mean 3.44, dist 12/10/28/20/29) peaks in the MIDDLE → rejected. Engine emits no card; read view renders the scanned-20 confident-null block.
 
 ### Test cases
 - **SACS overall (20 rated Qs):** `bimodalityPattern → null`; no `'bimodal'` card; read view shows scanned-20 confident-null block. Pin via the real-engine harness.
@@ -494,7 +494,7 @@ The decisive conjunction: CALM-MEAN (`calmFrac≤0.25`) AND BALANCED-CAMPS (`min
 - **[FIX]** Reversed-scale guard: a deliberately high-skew reversed-scale Q is still rejected (proves band-on-raw-micro).
 
 ### Integration per file
-- **27e:** CONST above. Add `_bimodalStat(counts,K)` and pure `bimodalityPattern(bm)`; expose `takeout._bimodalStat`, `takeout._bimodalityPattern`. In `buildPatterns` **after `comovementPattern`, before `areaPatterns`**: `var bimodal=bimodalityPattern(inputs.bimodal); if (bimodal) patterns.push(bimodal);`. NOT routed through `_bhFDR` — cannot perturb the FDR path that gates Cape Town.
+- **27e:** CONST above. Add `_bimodalStat(counts,K)` and pure `bimodalityPattern(bm)`; expose `takeout._bimodalStat`, `takeout._bimodalityPattern`. In `buildPatterns` **after `comovementPattern`, before `areaPatterns`**: `var bimodal=bimodalityPattern(inputs.bimodal); if (bimodal) patterns.push(bimodal);`. NOT routed through `_bhFDR`. Cannot perturb the FDR path that gates Cape Town.
 - **27f:** `gatherBimodality(views)` (local `touchpointMax`, weighted counts); wire into `gather()` as `inputs.bimodal` (try/catch→null).
 - **27g:** `PATTERN_META.bimodal`; `ui.bimodalRow(q)` (full wrapping label + low|middle|high bar + summary line); `ui.patternSeed` branch for `id==='bimodal'` (flagged vs confident-null wording).
 - **27h:** `headHtml/bodyHtml/footHtml` branches for `kind==='bimodal'` (heading 'N question(s) split into two camps'; body = `bimodalRow` per question + caption; foot deep-link `bimodal:['crosstabs','see the distributions →']`); when absent, surface the explicit scanned-N confident-null line in `provHtml`/empty wording. Add CSS `.tko-bimodal` for the bar colour.
@@ -503,14 +503,14 @@ The decisive conjunction: CALM-MEAN (`calmFrac≤0.25`) AND BALANCED-CAMPS (`min
 
 ## Cross-cutting required-fix summary (all folded above)
 
-1. **`_studentT` non-finite t → return 1** (not 0) — both FDR gate-A and odd-one-out depend on it.
+1. **`_studentT` non-finite t → return 1** (not 0): both FDR gate-A and odd-one-out depend on it.
 2. **Code→label join asserts count, not base-equality** (3 off-by-one base cases on SACS); skip-and-warn on count mismatch.
 3. **Enforce CENSUS_FLOOR (≥2, =5) on both arms before `_welchTest`** (n=1 → df=0).
 4. **Odd-one-out uses the Student-t p**, not normal-approx (gives gate-A's 4 survivors, not 10).
 5. **Bimodality gB:** threshold the moment-form b against 5/9; delete the false SAS-uniform-5/9 rationale; correct the Q08 ascending-scale and b=0.5436 facts; add a reversed-scale guard test; pin a large-n-uniform rejection test; pin a weighted + 4-pt/7-pt test before non-SACS use.
 6. **Docs:** SPLIT_MIN_CONSISTENT is an additive veto floor not a selector; sign-test is independent-Bernoulli (mildly anti-conservative); odd-one-out gaps are rounded display means; meanGap normalization matches `groupPattern` (or guard single-scaleMax); composite 418-vs-380 one-line comment.
 
-All three families survive; none needs deferral. Each returns a **confident null on real SACS** (FDR badges 4 cells but the headline is "the rest is consistency"; odd-one-out = 0 survivors; bimodality = 0 of 20) while the verified-good Cape Town strain / Campus split / new-staff-thriving / co-movement baseline is untouched — the gate badges and vetoes, it never re-orders or deletes.
+All three families survive; none needs deferral. Each returns a **confident null on real SACS** (FDR badges 4 cells but the headline is "the rest is consistency"; odd-one-out = 0 survivors; bimodality = 0 of 20) while the verified-good Cape Town strain / Campus split / new-staff-thriving / co-movement baseline is untouched. The gate badges and vetoes, it never re-orders or deletes.
 
 **Relevant files:**
 - Engine: `/Users/duncan/Dev/Turas/modules/tabs/lib/html_report_v2/assets/js/27e_takeout_engine.js`

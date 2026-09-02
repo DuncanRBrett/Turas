@@ -188,7 +188,7 @@ process_banner_question <- function(banner_questions, banner_idx,
   is_boxcategory <- !is.na(banner_questions$BannerBoxCategory[banner_idx]) &&
                     banner_questions$BannerBoxCategory[banner_idx] == "Y"
   
-  # Get options — exact root-code lookup
+  # Get options. Exact root-code lookup
   options <- survey_structure$options[
     survey_structure$options$QuestionCode == banner_code &
     (survey_structure$options$ShowInOutput == "Y" |
@@ -281,7 +281,7 @@ process_standard_banner <- function(banner_code, question_info, options, start_c
   # Create internal keys for data lookup. Keys must be unique per OPTION: two
   # options sharing a DisplayText would otherwise collide on one key, and the
   # second option's row set silently overwrites the first's in
-  # create_single_choice_indices (subset_indices[[internal_key]] <- ...) — both
+  # create_single_choice_indices (subset_indices[[internal_key]] <- ...): both
   # columns then show the second option's respondents. Duplicates get a
   # positional "#<n>" suffix on the KEY only; the displayed column label is
   # unchanged.
@@ -290,7 +290,7 @@ process_standard_banner <- function(banner_code, question_info, options, start_c
   if (any(dup_keys)) {
     dup_labels <- unique(as.character(banner_columns[dup_keys]))
     cat(sprintf(
-      "  [WARNING] Banner '%s': duplicated DisplayText %s across options — columns are kept separate (internal keys disambiguated by option position). Consider distinct DisplayText labels.\n",
+      "  [WARNING] Banner '%s': duplicated DisplayText %s across options. Columns are kept separate (internal keys disambiguated by option position). Consider distinct DisplayText labels.\n",
       banner_code,
       paste(sprintf("'%s'", dup_labels), collapse = ", ")
     ))

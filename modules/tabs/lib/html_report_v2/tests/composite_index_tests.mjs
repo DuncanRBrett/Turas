@@ -4,16 +4,16 @@
  *
  * A composite carries per-respondent scores in the microdata island so it can
  * recompute under a live filter and be tracked across waves (microdata_writer.R
- * micro_scores_for_composite). That is a genuine gain — but it also makes the
+ * micro_scores_for_composite). That is a genuine gain, but it also makes the
  * composite look, to any code that scans `TR.MICRO.scores`, exactly like one
  * more rated question. It is not: it is the AVERAGE of rated questions that are
  * themselves in the report.
  *
  * Two things must therefore hold at once, and they pull in opposite directions:
- *   1. `views.indexQuestions()` KEEPS composites — they belong on the dashboard,
+ *   1. `views.indexQuestions()` KEEPS composites. They belong on the dashboard,
  *      in the reader's band legend and in the level gathering, as they always did.
  *   2. The per-respondent score families (odd-one-out cells, two-camps) DROP
- *      them — otherwise a composite competes with its own components, and its
+ *      them. Otherwise a composite competes with its own components, and its
  *      average-of-averages spread reads as a fabricated pattern.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/composite_index_tests.mjs
@@ -54,7 +54,7 @@ const composite = { code: "Q_IDX", title: "Overall Index", type: "single",
   composite: true, scale_max: 5, rows: [meanRow] };
 const nps = { code: "QN", title: "Recommend", type: "nps", scale_max: 100,
   rows: [meanRow] };
-// A rated question whose scale is wider than 10 — kept out of the families for
+// A rated question whose scale is wider than 10. Kept out of the families for
 // its own (pre-existing) reason, so the composite rule is not doing this work.
 const wide = { code: "Q100", title: "0-100 slider", type: "scale", scale_max: 100,
   rows: [meanRow] };
@@ -76,18 +76,18 @@ const byCode = (c) => TR.AGG.questions.find((q) => q.code === c);
 run("indexQuestions KEEPS the composite (dashboard, legend, levels unchanged)", () => {
   const codes = TR.views.indexQuestions().map((q) => q.code);
   assert(codes.indexOf("Q_IDX") !== -1,
-    "composite must stay in indexQuestions — it is a dashboard metric; got " + codes.join(","));
+    "composite must stay in indexQuestions. It is a dashboard metric; got " + codes.join(","));
   assert(codes.indexOf("Q1") !== -1, "rated items must stay too");
 });
 
 run("the score families DROP the composite", () => {
   assert(eligible(byCode("Q1"), TR.MICRO) === true, "a rated item is eligible");
   assert(eligible(byCode("Q_IDX"), TR.MICRO) === false,
-    "a composite must never enter the cell / two-camps families — it would compete with its own components");
+    "a composite must never enter the cell / two-camps families. It would compete with its own components");
 });
 
 run("the composite is excluded by its FLAG, not by a side effect of its shape", () => {
-  // Same question, same scale, same scores — only the flag differs. If this
+  // Same question, same scale, same scores, only the flag differs. If this
   // passes for one and fails for the other, the guard is the flag.
   const twin = Object.assign({}, byCode("Q_IDX"), { composite: false, code: "Q1" });
   assert(eligible(twin, TR.MICRO) === true,
@@ -105,7 +105,7 @@ run("a report with no composites behaves exactly as before", () => {
   // The flag is absent (not false) on every question of an ordinary study.
   const plain = { code: "Q9", type: "scale", scale_max: 5, rows: [meanRow] };
   assert(eligible(plain, { scores: { Q9: [1, 2] } }) === true,
-    "an unflagged question must be eligible — no behaviour change for studies without composites");
+    "an unflagged question must be eligible. No behaviour change for studies without composites");
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");

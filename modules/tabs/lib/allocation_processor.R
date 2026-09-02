@@ -8,7 +8,7 @@
 #   per option, cross-tabbed by banner, with optional significance testing.
 #
 # DESIGN NOTES:
-#   - Zero allocation is meaningful data — never filter it out.
+#   - Zero allocation is meaningful data, never filter it out.
 #   - Output is means (not percentages); downstream formatting handles display.
 #   - Significance testing: one row per option, comparing means across banner segs.
 #
@@ -65,7 +65,7 @@ process_allocation_question <- function(data, question_info, question_options,
 
   if (is.na(n_cols) || n_cols < 1L) {
     log_message(
-      sprintf("Allocation: invalid Columns for %s — skipping", code),
+      sprintf("Allocation: invalid Columns for %s. Skipping", code),
       level = "WARNING",
       verbose = config$verbose
     )
@@ -317,7 +317,7 @@ build_allocation_sig_row <- function(value_sets, weight_sets, banner_info,
     weights <- weight_sets[[key]]
 
     if (length(values) == 0L) next
-    # Same invariant as build_allocation_mean_row: aligned or refuse — a
+    # Same invariant as build_allocation_mean_row: aligned or refuse. A
     # truncated weight vector feeds the t-test wrong respondent weights.
     check_allocation_alignment(values, weights, key)
 

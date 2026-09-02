@@ -1,5 +1,5 @@
 # ==============================================================================
-# CROSS-ENGINE PARITY FIXTURE — tabs pipeline loader
+# CROSS-ENGINE PARITY FIXTURE. Tabs pipeline loader
 # ==============================================================================
 #
 # Sources the tabs pipeline into the calling environment so the parity fixture

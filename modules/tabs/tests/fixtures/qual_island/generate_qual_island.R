@@ -1,16 +1,16 @@
 # ==============================================================================
-# QUALITATIVE ISLAND FIXTURE — generator
+# QUALITATIVE ISLAND FIXTURE. Generator
 # ==============================================================================
 #
 # Builds a DATA_QUAL island through the REAL builder (`qual_build_data_qual`) and
 # writes it to JSON. That JSON is COMMITTED and is what the JS half of the
-# qualitative gate reads — so the JS suite exercises the record shape R actually
+# qualitative gate reads, so the JS suite exercises the record shape R actually
 # emits, not a hand-authored stub that agrees with R by coincidence.
 #
 # WHY THIS EXISTS (production review 2026-08, I12a). The main qual JS suite ran
 # on a pre-I20 island shape: 86 hand-written fixture records, not one of them
 # carrying a `rid`. The rekey suite had rids but no `band`, no `suppressed` and
-# no `demos`. So the shape production emits — all four fields on one record —
+# no `demos`. So the shape production emits. All four fields on one record,
 # was exercised by no JS test at all, and every mark helper (which keys on
 # `rid` when it is present) was tested only on its legacy fallback path.
 #
@@ -75,12 +75,12 @@ qual_fixture_island <- function(turas_root) {
 
   d <- function(dept, tenure) list(Dept = dept, Tenure = tenure)
 
-  # Q1 — a themed, band-split open-end (the NPS Detractor/Passive/Promoter union).
+  # Q1. A themed, band-split open-end (the NPS Detractor/Passive/Promoter union).
   # Tier 0 records have their text withheld by verbatim_scope = "noteworthy";
   # respondent 4 is tier 2 but hide-marked, so it is withheld despite the tier.
   # Two of them are tier 3 (priority) in two different bands, so the priority-quote
-  # path — the crosstab pin, which reads tier >= 3 and orders by the declared band
-  # order — has something to find. A fixture with no priority record would leave
+  # path. The crosstab pin, which reads tier >= 3 and orders by the declared band
+  # order. Has something to find. A fixture with no priority record would leave
   # that path returning [] and looking tested.
   q1_records <- list(
     rec("1", "Great value for the price", 3L, 1L, list(Price = 1L),
@@ -98,7 +98,7 @@ qual_fixture_island <- function(turas_root) {
     records = q1_records, meta = list(dropped_codes = 0L),
     split = list(dim = "NPS", bands = c("Detractor", "Passive", "Promoter")))
 
-  # Q2 — a plain raw open-end, no themes, no split. Respondent 1 appears in both
+  # Q2. A plain raw open-end, no themes, no split. Respondent 1 appears in both
   # questions, so the same rid must key marks on two different comments.
   q2 <- list(
     code = "Q2", title = "Anything else?", type = "raw", sheet = "Q2",
@@ -114,7 +114,7 @@ qual_fixture_island <- function(turas_root) {
     banner_dims = list(list(label = "Dept",   values = c("Admin", "Finance")),
                        list(label = "Tenure", values = c("1-4 yrs", "5+ yrs"))))
 
-  # Real tokens from the real minter, made reproducible by a fixed seed — a
+  # Real tokens from the real minter, made reproducible by a fixed seed. A
   # committed fixture must not churn on every regeneration.
   set.seed(20260806L)
   rid_map <- stats::setNames(

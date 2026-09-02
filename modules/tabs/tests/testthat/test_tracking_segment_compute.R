@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — SEGMENT TREND COMPUTE TESTS
+# TABS MODULE. SEGMENT TREND COMPUTE TESTS
 # ==============================================================================
 # compute_segment_trends() orchestrates the tracker's calculators over per-
 # respondent wave data into the trend_results shape the bridge consumes. Mirrors

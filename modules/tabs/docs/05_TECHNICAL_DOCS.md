@@ -71,7 +71,7 @@ if (exists("tabs_source", mode = "function")) {
 > **Line counts below are indicative, not maintained.** Several drifted badly
 > enough to mislead (this tree once listed `run_crosstabs_helpers.R`,
 > `question_dispatcher.R` and a 684-line `config_loader.R`, none of which exist
-> — routing lives in `question_orchestrator.R`, and `config_loader.R` is a
+>. Routing lives in `question_orchestrator.R`, and `config_loader.R` is a
 > 14-line stub that says so in its own header). Treat the tree as a map of
 > which concerns live roughly where, and trust the files themselves for detail
 > (review 2026-08-21, I-27).
@@ -83,7 +83,7 @@ modules/tabs/
 ├── lib/
 │   ├── 00_guard.R                # TRS guard layer & sourcing utilities (~786 lines)
 │   ├── run_crosstabs.R           # Core orchestration (~1,220 lines)
-│   ├── config_loader.R           # STUB (14 lines) — kept only as a source()
+│   ├── config_loader.R           # STUB (14 lines): kept only as a source()
 │   │                             #   target; real config loading lives in
 │   │                             #   config_utils.R + crosstabs/crosstabs_config.R
 │   ├── config_utils.R            # Configuration utilities (~293 lines)
@@ -183,15 +183,15 @@ all_results → data layer (JSON islands) → bundler → single self-contained 
 | `ai_insights_step.R` | Refreshes the AI insights sidecar the data layer reads (opt-in) |
 | `html_report_v2/build_report_v2.R` | Inlines template, CSS, renderer and islands into one file |
 
-**Renderer:** `lib/html_report_v2/assets/js/` — around 42 dependency-free
+**Renderer:** `lib/html_report_v2/assets/js/`. Around 42 dependency-free
 modules, concatenated in filename order (namespace and format first, then
 data/stats/model, then the tabs). Its own Node test suites live in
 `lib/html_report_v2/tests/`.
 
 **Key design decisions:**
-- Single self-contained HTML file — CSS, JS and data inline, no external requests
-- Data, not pre-rendered tables — the reader can refilter and rebanner offline
-- Zero JavaScript dependencies — no build step, no framework, no CDN
+- Single self-contained HTML file. CSS, JS and data inline, no external requests
+- Data, not pre-rendered tables. The reader can refilter and rebanner offline
+- Zero JavaScript dependencies. No build step, no framework, no CDN
 - Islands are escaped on the way in, so verbatim text cannot break the page
 
 Cross-reference: [Data-Centric Report v2](11_DATA_CENTRIC_REPORT_V2.md) for the report's architecture, and `modules/tabs/lib/html_report_v2/` for the renderer itself.
@@ -251,7 +251,7 @@ execution with a clear message.
 > Note `build_config_object()` is a WHITELIST: a Settings key it does not read
 > is silently absent from `config_obj`. Adding a setting means editing it, plus
 > `TABS_KNOWN_SETTINGS`, plus the numeric/logical coercion lists, plus the
-> template — and adding a consumer. `test_config_contract.R` gates most of those
+> template, and adding a consumer. `test_config_contract.R` gates most of those
 > pairs.
 
 Loads and parses Excel configuration files into R data structures.
@@ -433,7 +433,7 @@ weighted, effective)
 
 Routes questions to the appropriate processor based on `Variable_Type`. Unknown
 types are refused before they reach dispatch, by `check_variable_types()` in
-`validation/structure_validators.R` — the vocabulary is case-sensitive.
+`validation/structure_validators.R`. The vocabulary is case-sensitive.
 
 ``` r
 process_question(question_code, base_filter, survey_data,
@@ -508,7 +508,7 @@ process_allocation_question(data, question_info, question_options,
 ```
 
 **Algorithm:** For each option (column {code}_1 ... {code}_N):
-1. Collect raw values per banner segment — NAs excluded, zeros retained
+1. Collect raw values per banner segment. NAs excluded, zeros retained
 2. Compute weighted or unweighted mean per banner column
 3. Build an Average row for that option
 4. Optionally append a significance row (t-test between banner columns)
@@ -525,7 +525,7 @@ RowSource = "individual") and an optional `Sig.` row.
 
 **No BoxCategory / Summary layers:** Allocation bypasses the
 BoxCategory and Summary Statistic steps that standard questions go
-through — the dispatcher returns allocation results directly.
+through. The dispatcher returns allocation results directly.
 
 ### Ranking Processor (ranking.R)
 
@@ -966,7 +966,7 @@ process_custom_question <- function(prepared_data, config, error_log) {
 
 3.  **Update dispatch** in `question_orchestrator.R` (there is no
     `question_dispatcher.R`), and add the new type to the vocabulary in
-    `validation/structure_validators.R`'s `check_variable_types()` — otherwise
+    `validation/structure_validators.R`'s `check_variable_types()`. Otherwise
     every config naming it is refused as an invalid Variable_Type:
 
 ``` r

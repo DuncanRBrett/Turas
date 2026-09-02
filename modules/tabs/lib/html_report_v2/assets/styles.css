@@ -1,4 +1,4 @@
-/* Turas data-centric SACAP report v2 — design system.
+/* Turas data-centric SACAP report v2. Design system.
    SIZE-EXCEPTION: single cohesive stylesheet. */
 
 :root {
@@ -39,7 +39,7 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .tabbtn:hover { color: #fff; background: rgba(255, 255, 255, .08); }
 .tabbtn[aria-selected="true"] { background: var(--bg); color: var(--brand); }
 .tabbtn .count { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 10.5px; }
-/* B1: Read vs Analyse groups — subtle labels + a divider, active-tab look unchanged */
+/* B1: Read vs Analyse groups. Subtle labels + a divider, active-tab look unchanged */
 .tabs { align-items: center; flex-wrap: wrap; }
 .tabgrp-label { font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #7f8aa8; padding: 0 6px 2px 4px; user-select: none; }
 .tabsep { width: 1px; height: 22px; background: rgba(255, 255, 255, .22); margin: 0 10px 2px; flex: none; }
@@ -58,7 +58,7 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 /* disclosure-control warning (audience below the confidentiality threshold) */
 .fb-warn { max-width: 1480px; margin: 6px auto 0; padding: 7px 28px; font-size: 12px; font-weight: 600;
   color: #8a5300; background: #fff6e5; border-top: 1px solid #f0d9a8; }
-/* ---------- audience strip (A3 — who the numbers describe, every tab) ---------- */
+/* ---------- audience strip (A3, who the numbers describe, every tab) ---------- */
 .audstrip { background: #f3f2ee; border-bottom: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
 .audstrip:empty { display: none; }
 .audstrip > * { vertical-align: baseline; }
@@ -68,7 +68,7 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .aud-sep { margin: 0 7px; color: var(--faint); }
 .aud-wave { font-weight: 600; color: var(--brand); }
 
-/* ---------- "How to read this" panel (A4 — one legend for the whole report) ---------- */
+/* ---------- "How to read this" panel (A4, one legend for the whole report) ---------- */
 .hdr-legend { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: 999px; padding: 4px 14px; font-size: 11.5px; font-weight: 600; cursor: pointer; }
 .hdr-legend:hover { background: rgba(255,255,255,.25); }
 .legend-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(20, 26, 43, .45); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; }
@@ -180,8 +180,8 @@ button.primary:hover { filter: brightness(1.18); }
 .qhead .qmeta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .qcode { background: var(--soft); color: var(--brand); font-weight: 800; font-size: 11px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--line); }
 .badge-published, .badge-computed, .badge-prev, .badge-prov { font-size: 9.5px; font-weight: 700; letter-spacing: .8px; padding: 3px 9px; border-radius: 999px; }
-/* Provenance (Selection Source/Formula): ASKED is quiet — it is the ordinary
-   case — and DERIVED stands out, because a worked-out number is the one a
+/* Provenance (Selection Source/Formula): ASKED is quiet. It is the ordinary
+   case, and DERIVED stands out, because a worked-out number is the one a
    reader should know not to read as a straight survey answer. */
 .badge-prov { background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
 .badge-prov.derived { background: #efeaf7; color: #5b3f8c; border-color: #d8cdea; }
@@ -193,15 +193,15 @@ button.primary:hover { filter: brightness(1.18); }
 .qnav button { border: 1px solid var(--line); background: #fff; border-radius: 7px; width: 28px; height: 26px; cursor: pointer; color: var(--muted); }
 .qnav button:hover { color: var(--brand); border-color: var(--brand); }
 .qc-card h2 { font-size: 15.5px; margin: 8px 0 10px; }
-/* B3: insight-led question header — headline leads, question text drops down */
+/* B3: insight-led question header. Headline leads, question text drops down */
 .qc-card h2.qh-insight { margin-bottom: 2px; }
 .qh-question { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
-/* Question's own audience (Selection FilterLabel / BaseFilter) — a routed
+/* Question's own audience (Selection FilterLabel / BaseFilter): a routed
    question's base is smaller than the sample, and this says why. */
 .qaudience { font-size: 12px; color: var(--ink); background: var(--soft); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 4px 10px; margin: 0 0 10px; }
 .qaudience b { font-weight: 700; }
 /* Where the numbers came from (Selection Source/Formula), shown while the
-   "Sources" toggle is on. Sits under the audience line — that says who was
+   "Sources" toggle is on. Sits under the audience line. That says who was
    asked, this says what the figure actually is. */
 .provnote { font-size: 12px; color: var(--muted); background: var(--soft); border-left: 3px solid #b9a6dd; border-radius: 0 6px 6px 0; padding: 4px 10px; margin: 0 0 10px; }
 .provnote b { font-weight: 700; color: var(--ink); }
@@ -232,7 +232,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .ct th.lab { text-align: left; min-width: 200px; }
 .ct th.total { background: #1a2744; }
 .ct .clt { font-size: 9.5px; opacity: .7; font-weight: 700; letter-spacing: 1px; font-family: ui-monospace, monospace; }
-/* Corner-cell unit note — shown only when the table reports something other
+/* Corner-cell unit note. Shown only when the table reports something other
    than the column percentage (counts, row %, or a filtered recompute). */
 .ct .cunit { font-size: 9.5px; opacity: .8; font-weight: 500; text-transform: none; letter-spacing: .2px; margin-top: 2px; }
 .ct td { padding: 5px 9px; text-align: center; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
@@ -243,7 +243,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .ct .rm td { font-style: italic; color: #475569; font-weight: 600; background: #faf8f4; }
 .ct .rm td.lab { border-left: 3px solid var(--accent); padding-left: 11px; }
 .ct .sg { color: var(--green); font-weight: 800; font-size: 9px; margin-left: 3px; font-family: ui-monospace, monospace; }
-.ct .sg.dn { color: var(--red, #c0392b); }   /* composite ▼ / ▿ — significantly below the rest */
+.ct .sg.dn { color: var(--red, #c0392b); }   /* composite ▼ / ▿. Significantly below the rest */
 .ct .fq { font-size: 10px; color: var(--muted); }
 .ct .dbar { height: 4px; background: var(--soft); border-radius: 2px; margin-top: 4px; overflow: hidden; }
 .ct .dbf { height: 100%; background: var(--brand); opacity: .55; border-radius: 2px; }
@@ -251,14 +251,14 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .civ { font-size: 10px; color: var(--faint); line-height: 1.15; font-style: normal; font-weight: 400; cursor: help; }
 .moechip { margin: 8px 0 0; padding: 7px 11px; background: #faf8f5; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; color: #475569; cursor: help; }
 .ct .lowb { color: #a3402f; font-weight: 600; }
-/* a withheld column's base marker ("n<10") — muted, not the low-base warning */
+/* a withheld column's base marker ("n<10"): muted, not the low-base warning */
 .ct .supb, .ws .supb { color: #6b7280; font-style: italic; cursor: help; }
 .ct .idxd { font-size: 10px; color: var(--faint); font-weight: 400; }
 .delta { font-size: 9.5px; font-weight: 600; margin-left: 4px; padding: 1px 5px; border-radius: 5px; }
 .delta.up { color: var(--green); background: #e8f0eb; }
 .delta.down { color: var(--red); background: #f9ecea; }
 .delta.sig { font-weight: 800; box-shadow: inset 0 0 0 1px currentColor; }
-/* B2: plain-language significance — a focusable CSS tooltip on sig letters,
+/* B2: plain-language significance. A focusable CSS tooltip on sig letters,
    composite arrows and Δ chips. The bubble is a pseudo-element with
    pointer-events none, so it can NEVER block clicking through the cell. */
 .xpl { position: relative; cursor: help; }
@@ -277,13 +277,13 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .insight { margin-top: 14px; }
 .insight-head { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
 .insight-head .hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
-/* height is set inline by shell.autoGrowNotes — the box grows to its text.
+/* height is set inline by shell.autoGrowNotes. The box grows to its text.
    max-height caps it on a very long note; the scrollbar that then appears is
    the "there is more below" signal. */
 .insight textarea, .si-note { width: 100%; min-height: 56px; max-height: 60vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font: 12.5px var(--font); resize: vertical; background: #fffdf6; }
 .insight textarea:focus, .si-note:focus { border-color: var(--accent); }
 
-/* AI insights (read-only, always labelled — distinct from the analyst note) */
+/* AI insights (read-only, always labelled, distinct from the analyst note) */
 .ai-callout { margin-top: 14px; background: #fdf8ec; border: 1px solid #ecd9a6; border-left: 3px solid var(--accent); border-radius: 8px; padding: 11px 14px; }
 .ai-callout-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #9a7b15; margin-bottom: 5px; }
 .ai-callout-head .ai-spark { color: var(--accent); font-size: 12px; }
@@ -300,7 +300,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .dash-cat h3 { font-size: 12px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: var(--faint); margin: 6px 2px; }
 .gauges { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 /* A1 fixed card anatomy: the WRAP is the card chrome; the gauge button fills it.
-   Score top-left + code top-right are flex siblings in .ghead — structurally
+   Score top-left + code top-right are flex siblings in .ghead. Structurally
    incapable of overlapping at any title length; the title clamps to 2 lines;
    one .gmeta footer row carries the Δ chip, 💬 pill and 📌 pin. */
 .gauge-wrap { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--gc); border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -312,7 +312,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .gauge .gd.down { color: var(--red); }
 .gauge .gv { font-size: 24px; font-weight: 800; color: var(--gc); }
 .gauge .gt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11.5px; color: var(--ink); margin-top: 8px; }
-/* B3: insight line in the title area — ONE clipped line above the question
+/* B3: insight line in the title area. ONE clipped line above the question
    line (which drops to the secondary tone), so the A1 slots never overlap. */
 .gauge .gi { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.35; }
 .gauge .gi + .gt { margin-top: 2px; color: var(--muted); }
@@ -436,7 +436,7 @@ table.trk.haspick th:nth-child(2), table.trk.haspick td:nth-child(2) { position:
 .moved.trk tr.grp td, .moved.trk tr.cat td { position: static; }
 .stickyhdr { position: sticky; left: 12px; display: inline-block; }
 /* Significance / change colouring applies in the Explorer (moved trk) too, not
-   only the .hm matrix — significant cells colour green up / red down. */
+   only the .hm matrix. Significant cells colour green up / red down. */
 .moved.trk td.hm-up { background: #e8f0eb; color: var(--green); font-weight: 800; text-align: center; }
 .moved.trk td.hm-down { background: #f9ecea; color: var(--red); font-weight: 800; text-align: center; }
 .moved.trk td.hm-flat { color: var(--faint); text-align: center; }
@@ -477,7 +477,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .story-actions .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .t-btnish { display: inline-flex; align-items: center; cursor: pointer; }
 .si-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }
-/* Pin titles are full question wording, not clipped — flex-basis 0 (not auto) keeps the
+/* Pin titles are full question wording, not clipped. Flex-basis 0 (not auto) keeps the
    title on the head row and wraps it in place, instead of its full hypothetical width
    bumping it, the context line and the buttons onto separate lines. */
 .si-head > strong { flex: 1 1 0; min-width: 0; }
@@ -496,7 +496,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* Present mode runs on the report's own paper, not a dark stage: it reads
    better projected, the charts and tables were drawn for a light ground
    anyway, and the deck then looks like the rest of the report. Every colour
-   below is a token — no present-only palette to keep in step. */
+   below is a token. No present-only palette to keep in step. */
 #present-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 300; overflow: auto; }
 .present { max-width: 1240px; margin: 0 auto; padding: 26px 40px; color: var(--ink); }
 .pr-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 22px; }
@@ -527,7 +527,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
   .tabhost, .fb-in, .hdr-in, .tabs { padding-left: 14px; padding-right: 14px; }
 }
 @media print {
-  /* hide interactive chrome — keep content (gauge cards are buttons, so target
+  /* hide interactive chrome. Keep content (gauge cards are buttons, so target
      control classes, never the button tag) */
   .filterbar, .tabs, .controls, .side, .qnav, .heat-actions, .sa-btns, .pinwrap,
   .tg, .t-btn, .t-btnish, .btab, .scopebar, .rowx, #qsearch,
@@ -566,7 +566,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .catgrp.collapsed .catchev { transform: rotate(-90deg); }
 .catsall { display: block; margin: 0 0 2px auto; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 8px; font: 700 10px var(--font); letter-spacing: .8px; text-transform: uppercase; color: var(--muted); cursor: pointer; }
 .catsall:hover { color: var(--brand); border-color: var(--brand); }
-/* a search match shows even inside a collapsed group — the collapse itself is kept */
+/* a search match shows even inside a collapsed group. The collapse itself is kept */
 .side.searching .catgrp.collapsed .catitems { display: block; }
 .side.searching .catgrp.collapsed .catchev { transform: none; }
 
@@ -587,7 +587,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 
 /* tracking scope + findings */
 .scopebar { display: flex; gap: 6px; margin: 10px 0 4px; }
-/* Differences — question-grouped finding cards (27d_diffs.js) */
+/* Differences. Question-grouped finding cards (27d_diffs.js) */
 .df-card { padding: 12px 16px; }
 .df-qhead { display: flex; align-items: baseline; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .df-qhead .linklike { font-weight: 700; font-size: 13.5px; text-align: left; }
@@ -644,7 +644,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .added-slide img { width: 100%; display: block; }
 .as-text { padding: 14px; font-size: 13px; min-height: 80px; white-space: pre-wrap; }
 .as-foot { display: flex; gap: 6px; padding: 7px 9px; border-top: 1px solid var(--line); background: var(--soft); }
-/* Config-authored study slides: the caption is static text, not an input — the
+/* Config-authored study slides: the caption is static text, not an input. The
    report author owns it, so the reader reads it. */
 .as-cap { flex: 1; font-size: 12px; color: var(--muted); align-self: center; overflow-wrap: anywhere; }
 .si-slide-img { width: 100%; display: block; border-radius: 8px; }
@@ -653,7 +653,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .as-foot button:hover { color: var(--red); }
 .footer-callout { margin-top: 14px; }
 
-/* Report tab — statistical diagnostics (the interactive twin of the Excel stats pack) */
+/* Report tab. Statistical diagnostics (the interactive twin of the Excel stats pack) */
 .rpt-diag { margin-top: 12px; }
 .rpt-diag > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
   font-size: 14px; font-weight: 700; color: var(--brand); }
@@ -687,7 +687,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .si-flag input { accent-color: var(--brand); }
 
 /* columns panel (table/chart per column) */
-/* (single .colmenu definition lives below — keep them together) */
+/* (single .colmenu definition lives below, keep them together) */
 .cm-head, .cm-row { display: grid; grid-template-columns: 1fr 44px 44px; gap: 6px; align-items: center; }
 .cm-head span:not(:first-child), .cm-row label { text-align: center; }
 .cm-row { padding: 3px 0; border-top: 1px solid var(--soft); font-size: 12px; }
@@ -719,18 +719,18 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .qlink .qt { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
 
 /* ============================================================================
- * Pattern recognition — the one-page Read view (apex answer + pattern cards).
+ * Pattern recognition. The one-page Read view (apex answer + pattern cards).
  * Posture colours are AA-contrast on white and always paired with a glyph and a
  * text label, so colour is never the sole signal. Editorial serif for the voice.
  * ==========================================================================*/
 :root {
-  --tko-protect: #176e51;     /* strong — green  */
-  --tko-act:     #9a5410;     /* exposed — amber */
-  --tko-watch:   #245a94;     /* moving — blue   */
-  --tko-decide:  #5b4296;     /* fork — violet   */
-  --tko-comove:  #0f766e;     /* co-movement — teal */
-  --tko-odd:     #be185d;     /* odd one out — rose */
-  --tko-bimodal: #4f46e5;     /* hidden disagreement — indigo */
+  --tko-protect: #176e51;     /* strong. Green  */
+  --tko-act:     #9a5410;     /* exposed. Amber */
+  --tko-watch:   #245a94;     /* moving. Blue   */
+  --tko-decide:  #5b4296;     /* fork. Violet   */
+  --tko-comove:  #0f766e;     /* co-movement. Teal */
+  --tko-odd:     #be185d;     /* odd one out. Rose */
+  --tko-bimodal: #4f46e5;     /* hidden disagreement. Indigo */
   --tko-serif: Georgia, "Times New Roman", "Iowan Old Style", serif;
 }
 .tko-page { gap: 18px; }
@@ -810,7 +810,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-prov { font-family: var(--font); font-size: 11px; color: var(--faint); line-height: 1.6; }
 .tko-empty { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; color: var(--muted); font-size: 13.5px; }
 
-/* inline editing — looks like text until you touch it */
+/* inline editing. Looks like text until you touch it */
 .tko-ed { border-radius: 6px; padding: 2px 5px; margin: 0 -5px; cursor: text; transition: background .12s; }
 .tko-ed:hover { background: var(--soft); }
 .tko-ed:focus { background: #fff; outline: 2px solid var(--accent); outline-offset: 0; }
@@ -832,7 +832,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-ph { font-size: 16px; font-weight: 700; color: var(--ink); margin: 3px 0 0; display: inline-block; }
 .tko-pscore { font-size: 13px; font-weight: 600; color: var(--muted); }
 .tko-take { font-family: var(--tko-serif); font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 11px; }
-/* Rows: the question label sits on its own line and ALWAYS wraps in full — never
+/* Rows: the question label sits on its own line and ALWAYS wraps in full, never
    truncated (see PATTERN_RECOGNITION.md "wrap, never ellipsis"); bar + value beneath. */
 .tko-row { margin: 8px 0; }
 .tko-rl { display: block; font-size: 11.5px; color: var(--ink); white-space: normal; overflow-wrap: anywhere; line-height: 1.35; margin-bottom: 4px; }
@@ -840,7 +840,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .tko-track { height: 9px; background: #eef0f7; border-radius: 5px; overflow: hidden; }
 .tko-fill { display: block; height: 100%; border-radius: 5px; background: var(--brand); }
 .tko-fill.tko-strain { background: var(--red); } .tko-fill.tko-weak { background: var(--tko-act); } .tko-fill.tko-strong { background: var(--tko-protect); } .tko-fill.tko-moved { background: var(--tko-watch); } .tko-fill.tko-odd { background: var(--tko-odd); }
-/* confident-null cards — the visible never-cry-wolf proof */
+/* confident-null cards. The visible never-cry-wolf proof */
 .tko-null { background: #fbfbfd; }
 .tko-take-null { font-style: italic; color: var(--muted); }
 /* two-camp distribution bar (hidden disagreement) */
@@ -852,11 +852,11 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* portrait card (rebuild): lows and highs side by side, equal billing */
 .tko-edge-focus { border-left-color: var(--brand); }
 .tko-on-focus { color: var(--brand); }
-/* The steady group — no lean either way; a calm slate, deliberately quieter
+/* The steady group. No lean either way; a calm slate, deliberately quieter
    than the brand-edged portraits. */
 .tko-edge-steady { border-left-color: #64748b; }
 .tko-on-steady { color: #64748b; }
-/* Synopsis strip — where the group stands, above where it lags and leads. The
+/* Synopsis strip. Where the group stands, above where it lags and leads. The
    anchor carries the declared headline questions as absolute values; the tally
    carries the raw ahead/level/behind split, rated and share counted apart. */
 .tko-syn { display: flex; flex-wrap: wrap; gap: 8px 26px; align-items: flex-start;
@@ -945,16 +945,16 @@ table.ws td.sparkcell { padding: 1px 8px; }
   font: inherit; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 12px; cursor: pointer;
   white-space: nowrap; }
 .ql-jumpcomments:hover { border-color: var(--brand); background: var(--bg); }
-/* question-level Pin popover — same control as the Crosstabs tab, right-aligned
+/* question-level Pin popover. Same control as the Crosstabs tab, right-aligned
    in the header meta row. It carries its own auto margin so a verbatim-only
    question (no jump button) still pushes it right; where the jump button is
-   present that one already claimed the space, so this margin resets to 0 —
+   present that one already claimed the space, so this margin resets to 0,
    two auto margins would split the gap and strand the jump button mid-row. */
 .ql-qpinwrap { margin-left: auto; }
 .ql-jumpcomments + .ql-qpinwrap { margin-left: 0; }
 /* .snap-pin is BOTH the "strip me from a snapshot" marker and a styled
    hover-reveal badge (absolute, 45% opacity). This pin is an ordinary inline
-   control in the header, so it resets the badge styling — exactly as the
+   control in the header, so it resets the badge styling. Exactly as the
    themes x banner control bar does above. position stays relative: the
    popover anchors to it. */
 .ql-qpinwrap.snap-pin { position: relative; top: auto; right: auto; z-index: auto;
@@ -976,7 +976,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-secdivider { display: flex; align-items: center; gap: 12px; margin: 28px 0 8px; scroll-margin-top: 88px; }
 .ql-secdivider::after { content: ""; flex: 1; height: 2px; background: var(--line); border-radius: 2px; }
 .ql-seclabel { font-weight: 700; font-size: 14px; color: var(--ink); white-space: nowrap; }
-/* on themed questions the divider above already separates it — drop the double rule */
+/* on themed questions the divider above already separates it. Drop the double rule */
 .ql-controls.undivided { border-top: 0; padding-top: 0; margin-top: 0; }
 .ql-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .ql-segbtn { border: 0; border-right: 1px solid var(--line); background: var(--card); padding: 5px 11px;
@@ -1061,7 +1061,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
   box-shadow: var(--shadow); border-radius: 6px; padding: 11px 14px; margin-bottom: 8px;
   display: flex; align-items: flex-start; gap: 8px; }
 .ql-quote.pos { border-left-color: var(--green); } .ql-quote.neg { border-left-color: var(--red); }
-/* C1 quote-first: a clear quote glyph opens every verbatim (decorative — a CSS
+/* C1 quote-first: a clear quote glyph opens every verbatim (decorative, a CSS
    pseudo-element, so it never shifts the highlight character offsets) */
 .ql-quote::before { content: "❝"; color: var(--line); font-size: 17px; line-height: 1; flex: 0 0 auto; }
 .ql-qtext { flex: 1; font-size: 15px; line-height: 1.6; max-width: 65ch; overflow-wrap: anywhere; }
@@ -1077,7 +1077,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-qfoot { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .ql-qid { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ql-star { color: var(--accent); } .ql-star.must { font-size: 16px; }
-/* Priority (tier 3, "lead with") — the strongest of the three: larger + bold so the
+/* Priority (tier 3, "lead with"): the strongest of the three: larger + bold so the
    hierarchy reads by size/weight, not colour alone (backed by the title + filter label). */
 .ql-star.priority { font-size: 19px; font-weight: 700; }
 /* Shortlist + export: the per-comment save toggle and the drawer toolbar. */
@@ -1096,7 +1096,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* disclosure-control notice above the comment list (demographic tags withheld) */
 .ql-disclosure { font-size: 12px; font-weight: 600; color: #8a5300; background: #fff6e5;
   border: 1px solid #f0d9a8; border-radius: 8px; padding: 8px 12px; margin: 4px 0 12px; }
-/* Comment Hubs — the collection view (every shortlisted + highlighted mark, in one place) */
+/* Comment Hubs. The collection view (every shortlisted + highlighted mark, in one place) */
 .ql-railcol { display: flex; align-items: flex-start; gap: 8px; text-align: left; width: 100%;
   border: 1px solid var(--accent); background: var(--card); border-radius: 8px; padding: 7px 10px;
   cursor: pointer; font: inherit; margin-bottom: 8px; }
@@ -1115,7 +1115,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
   padding: 0; cursor: pointer; overflow-wrap: anywhere; text-align: left; }
 .ql-cjump:hover { text-decoration: underline; }
 .ql-cflag { font-size: 11px; color: var(--accent); }
-/* an explicit control on a collection card — takes the comment out of the
+/* an explicit control on a collection card. Takes the comment out of the
    collection, rather than a star you have to know is clickable */
 .ql-cremove { margin-left: auto; background: none; border: 1px solid var(--line);
   border-radius: 5px; padding: 1px 7px; cursor: pointer; font: inherit;
@@ -1124,7 +1124,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-cthemes { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
 .ql-cchip { font-size: 11px; color: var(--brand); background: var(--bg); border: 1px solid var(--brand);
   border-radius: 999px; padding: 1px 8px; }
-/* Comment Hubs — named reader hubs (selector bar + per-card add-to-hub picker) */
+/* Comment Hubs. Named reader hubs (selector bar + per-card add-to-hub picker) */
 .ql-hubbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0 0 10px; }
 .ql-hubchips { display: flex; align-items: center; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0;
   padding-bottom: 2px; }
@@ -1155,7 +1155,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-hubaddsel { font: inherit; font-size: 11px; color: var(--muted); background: var(--card);
   border: 1px dashed var(--line); border-radius: 999px; padding: 2px 8px; cursor: pointer; max-width: 170px; }
 .ql-hubaddsel:hover { border-color: var(--accent); color: var(--accent); }
-/* Comment Hubs — hub insight + promote-to-story exhibit */
+/* Comment Hubs. Hub insight + promote-to-story exhibit */
 .ql-hubinsight { margin: 0 0 12px; }
 .ql-hubinstext { width: 100%; box-sizing: border-box; min-height: 40px; border: 1px solid var(--line);
   border-radius: 8px; font: inherit; font-size: 13px; padding: 7px 10px; resize: vertical; }
@@ -1179,7 +1179,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-viewtog { margin-bottom: 12px; }
 .ql-xtab { padding: 14px 16px; margin-bottom: 4px; }
 .ql-xtop { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
-/* the control bar carries snap-pin only so it is stripped from a pinned snapshot —
+/* the control bar carries snap-pin only so it is stripped from a pinned snapshot,
    undo the corner-button positioning so it lays out in normal flow, not over the table */
 .ql-xtop.snap-pin { position: static; top: auto; right: auto; z-index: auto; opacity: 1;
   background: transparent; padding: 0; border-radius: 0; }
@@ -1218,7 +1218,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-xsub2 .ql-xhl { padding-left: 22px; }
 .ql-xsubv { color: var(--ink); }
 .ql-xc.supp { color: var(--muted); }
-/* Reader bundle C — qualitative presentation (C1–C4) */
+/* Reader bundle C. Qualitative presentation (C1–C4) */
 /* sentiment word marker: the edge accent is never colour-only */
 .ql-sent { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .ql-sent.pos { color: var(--green); } .ql-sent.neg { color: var(--red); }
@@ -1290,7 +1290,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .ql-fsave:hover { border-color: var(--accent); color: var(--accent); }
 .ql-fsave.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Reader bundle D — the exec-summary cover (D1), the saved-copy landing page */
+/* Reader bundle D. The exec-summary cover (D1), the saved-copy landing page */
 .hdr-cover { margin-right: 8px; }
 .cover { max-width: 980px; margin: 0 auto; }
 .cover-head { text-align: center; padding: 34px 28px 30px; }
@@ -1309,7 +1309,7 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .cover-thumb::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: linear-gradient(rgba(255,255,255,0), var(--card)); pointer-events: none; }
 /* An imported study slide is a picture, not a table to peek at: it fits whole.
    The generic rules above crop at 280px behind a fade and scale the body to 82%
-   at 122% width — on a wide ratings map that cut the visual in half. Here the
+   at 122% width, on a wide ratings map that cut the visual in half. Here the
    crop, the scale and the fade all come off, and the image is bounded by height
    so a tall slide still cannot run away with the page. */
 .cover-thumb.is-slide { max-height: none; overflow: visible; }
@@ -1323,8 +1323,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* ---------------------------------------------------------------------------
    Author-only text-key badges (shell.textKeys, ctrl+alt+K or #keys=1).
    Every block whose words come from the Callout Editor carries data-txt-key.
-   The attribute is always in the DOM — it costs nothing and gives the node
-   tests a stable hook — but it only becomes visible when the author asks.
+   The attribute is always in the DOM. It costs nothing and gives the node
+   tests a stable hook, but it only becomes visible when the author asks.
    Purely presentational, so nothing about the report changes when it is off.
 --------------------------------------------------------------------------- */
 body.txt-keys [data-txt-key],
@@ -1344,7 +1344,7 @@ body.txt-keys [data-txt-config]::after {
   padding: 1px 6px; border-radius: 3px;
   pointer-events: none; white-space: nowrap; z-index: 5;
 }
-/* Text this STUDY wrote in its own config, not platform text — a different
+/* Text this STUDY wrote in its own config, not platform text. A different
    colour, because the Callout Editor is the wrong place to go looking for it. */
 body.txt-keys [data-txt-config] { outline-color: var(--brand); }
 body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-config); background: var(--brand); }
