@@ -83,7 +83,7 @@ const ISLAND = {
                     meanUtility: [1.2, 0.1, -1.3], sdUtility: [0.4, 0.9, 0.6], note: "Class note." }
 };
 
-console.log("MaxDiff tab — suite:");
+console.log("MaxDiff tab: suite");
 
 run("availability: null, empty, and a scored island", () => {
   assert(viewSandbox(null).TR.maxdiff.available() === false, "null island is unavailable");
@@ -175,7 +175,7 @@ run("an empty island renders a sentence rather than throwing", () => {
 
 run("no em dash reaches the reader from this view", () => {
   const src = readFileSync(path.join(JS_DIR, "27y_maxdiff.js"), "utf8");
-  lacks(src, "—", "em dash in the view source");
+  lacks(src, "\u2014", "em dash in the view source");
   lacks(src, "&mdash;", "named em dash");
 });
 
