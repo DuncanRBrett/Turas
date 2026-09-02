@@ -83,10 +83,15 @@
 
       var callout = document.getElementById("overview-callout");
       if (callout && stats) {
-        var method = stats.method || "Hierarchical Bayes";
-        var text = "This simulator uses <strong>" + method + "</strong> utility estimates from <strong>" +
+        var method = stats.method || "utility";
+        var esc = function (s) {
+          return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        };
+        var text = "This simulator uses <strong>" + esc(method) + "</strong> utility estimates from <strong>" +
           stats.nRespondents.toLocaleString() + " respondents</strong> to model preference. " +
-          "Use it to explore shares, compare items head-to-head, and optimise portfolios.";
+          "Use it to explore shares, compare items head-to-head, and optimise portfolios." +
+          (stats.estimationNote ? " " + esc(stats.estimationNote) : "");
         SimCharts.renderCallout(text, callout);
       }
     }

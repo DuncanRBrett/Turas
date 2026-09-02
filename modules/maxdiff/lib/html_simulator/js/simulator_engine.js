@@ -287,7 +287,11 @@ var SimEngine = (function() {
       bottomItem: bottomItem.label,
       bottomShare: Math.round(bottomItem.share * 10) / 10,
       shareRange: Math.round((topItem.share - bottomItem.share) * 10) / 10,
-      method: (data.individual_utils && data.individual_utils.length > 0) ? "Hierarchical Bayes" : "Aggregate Logit",
+      // The island names the estimator; the fallback is a guess kept only
+      // for simulators built before the label travelled with the data.
+      method: data.method || ((data.individual_utils && data.individual_utils.length > 0) ? "Hierarchical Bayes" : "Aggregate Logit"),
+      approximate: !!data.approximate,
+      estimationNote: data.estimation_note || "",
       hasIndividual: !!(data.individual_utils && data.individual_utils.length > 0)
     };
   }
@@ -311,7 +315,9 @@ var SimEngine = (function() {
     var hasIndividual = !!(data.individual_utils && data.individual_utils.length > 0);
 
     var result = {
-      method: hasIndividual ? "Hierarchical Bayes" : "Aggregate Logit",
+      method: data.method || (hasIndividual ? "Hierarchical Bayes" : "Aggregate Logit"),
+      approximate: !!data.approximate,
+      estimationNote: data.estimation_note || "",
       nItems: n,
       nRespondents: hasIndividual ? data.individual_utils.length : 0,
       nSegments: data.segments ? data.segments.length : 0,

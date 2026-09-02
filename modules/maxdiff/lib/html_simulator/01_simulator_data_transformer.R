@@ -55,6 +55,24 @@ build_simulator_data <- function(hb_results, logit_results, config,
     } else {
       indiv_mat <- as.matrix(indiv_df)
     }
+    # The engine pairs utilities[i] with items[i] BY POSITION and the column
+    # names do not travel. The fallback's reshape() writes the item columns in
+    # alphabetical order while items follow the config, so before this every
+    # share, head-to-head and reach figure was computed on the wrong items.
+    # Align the columns to the item list; refuse to guess if one is missing.
+    wanted <- vapply(item_list, function(it) it$id, character(1))
+    if (!is.null(colnames(indiv_mat))) {
+      missing_cols <- setdiff(wanted, colnames(indiv_mat))
+      if (length(missing_cols) > 0) {
+        message(sprintf(
+          "[TRS INFO] MAXD_SIM_UTILS_MISSING: individual utilities have no column for %s; those items are dropped from the simulator.",
+          paste(missing_cols, collapse = ", ")))
+        keep <- vapply(item_list, function(it) it$id %in% colnames(indiv_mat), logical(1))
+        item_list <- item_list[keep]
+        wanted <- wanted[keep]
+      }
+      indiv_mat <- indiv_mat[, wanted, drop = FALSE]
+    }
     item_ids <- colnames(indiv_mat)
 
     # Get segment data if available
@@ -115,26 +133,50 @@ build_simulator_data <- function(hb_results, logit_results, config,
     }
   }
 
-  # Segment definitions for filter
+  # Segment definitions for the filter. The engine filters respondents by
+  # `segments[variable] === value`, so every entry needs a LEVEL value. A
+  # SEGMENT_SETTINGS row is one per group (Variable_Name, blank Segment_Def)
+  # since Session A; such a row is expanded here into one entry per level
+  # observed in the data. Before this, the group row produced a single entry
+  # with an empty value that matched nobody, and choosing it zeroed every
+  # share. A row whose Segment_Def names a value ('Region == "Gauteng"') is
+  # kept as that one level.
   seg_defs <- list()
   if (!is.null(config$segment_settings) && nrow(config$segment_settings) > 0) {
     for (i in seq_len(nrow(config$segment_settings))) {
       seg_var <- config$segment_settings$Variable_Name[i]
-
-      # Extract the actual data value from Segment_Def (e.g., 'Age_Group == "18-34"' -> "18-34")
+      seg_id <- config$segment_settings$Segment_ID[i]
+      seg_label <- config$segment_settings$Segment_Label[i] %||% seg_id
       seg_def <- config$segment_settings$Segment_Def[i] %||% ""
-      filter_val <- ""
-      m <- regmatches(seg_def, regexpr('"([^"]+)"', seg_def, perl = TRUE))
-      if (length(m) == 1) filter_val <- gsub('^"|"$', '', m)
+      if (is.na(seg_def)) seg_def <- ""
 
-      seg_defs[[i]] <- list(
-        id = config$segment_settings$Segment_ID[i],
-        label = config$segment_settings$Segment_Label[i],
-        variable = seg_var,
-        value = filter_val
-      )
+      m <- regmatches(seg_def, regexpr('"([^"]+)"', seg_def, perl = TRUE))
+      if (length(m) == 1) {
+        seg_defs[[length(seg_defs) + 1]] <- list(
+          id = seg_id, label = seg_label, variable = seg_var,
+          value = gsub('^"|"$', '', m)
+        )
+      } else if (!is.null(raw_data) && seg_var %in% names(raw_data)) {
+        lv <- as.character(raw_data[[seg_var]])
+        lv <- sort(unique(lv[!is.na(lv) & nzchar(lv)]))
+        for (v in lv) {
+          seg_defs[[length(seg_defs) + 1]] <- list(
+            id = paste0(seg_id, ":", v), label = paste0(seg_label, ": ", v),
+            variable = seg_var, value = v
+          )
+        }
+      } else {
+        message(sprintf(
+          "[TRS INFO] MAXD_SIM_SEGMENT_SKIPPED: segment '%s' has no level value and '%s' is not a data column; it is left out of the simulator's filter.",
+          seg_id, seg_var))
+      }
     }
   }
+
+  # Name the estimator honestly. Without cmdstanr the module's "HB" is an
+  # empirical-Bayes fallback on count scores, and the simulator used to call
+  # that "Hierarchical Bayes" on its Overview and Diagnostics panels.
+  est <- .md_sim_estimator(hb_results, logit_results)
 
   list(
     project_name = config$project_settings$Project_Name %||% "MaxDiff",
@@ -143,6 +185,10 @@ build_simulator_data <- function(hb_results, logit_results, config,
     individual_utils = indiv_list,
     segments = seg_defs,
     n_respondents = length(indiv_list),
+    method = est$label,
+    method_code = est$code,
+    approximate = est$approximate,
+    estimation_note = est$note,
     n_items = length(item_list),
     analyst_name = config$project_settings$Analyst_Name %||% "",
     analyst_email = config$project_settings$Analyst_Email %||% "",
@@ -150,4 +196,25 @@ build_simulator_data <- function(hb_results, logit_results, config,
     appendices = config$project_settings$Appendices %||% "",
     closing_notes = config$project_settings$Closing_Notes %||% ""
   )
+}
+
+
+#' Which estimator produced the utilities the simulator runs on
+#' @keywords internal
+.md_sim_estimator <- function(hb_results, logit_results) {
+  if (!is.null(hb_results) && !is.null(hb_results$individual_utilities)) {
+    m <- hb_results$model_fit$method %||% hb_results$diagnostics$method %||% ""
+    if (identical(m, "cmdstanr")) {
+      return(list(code = "stan_hb", label = "Stan hierarchical Bayes", approximate = FALSE,
+                  note = "Individual utilities are posterior means from the Stan model."))
+    }
+    return(list(code = "empirical_bayes", label = "Empirical Bayes fallback (count-based)",
+                approximate = TRUE,
+                note = paste0("cmdstanr was not available, so the individual utilities ",
+                              "are empirical-Bayes shrunken best-minus-worst counts, not ",
+                              "Bayesian posterior estimates. Shares, head-to-head ",
+                              "probabilities and reach are computed from those.")))
+  }
+  list(code = "aggregate_logit", label = "Aggregate logit", approximate = FALSE,
+       note = "One conditional logit fitted to the whole sample; no individual utilities.")
 }
