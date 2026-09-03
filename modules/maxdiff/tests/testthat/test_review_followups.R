@@ -309,3 +309,46 @@ test_that("F5: the report labels the column as spread, and shows SE only when a 
   expect_true(grepl("Spread (SD)", html2, fixed = TRUE))
   expect_true(grepl(">SE<", html2, fixed = TRUE))
 })
+
+# ------------------------------------------------------------------------------
+# The Stan HB path, executed for real (needs cmdstanr + CmdStan; PROG-1)
+# ------------------------------------------------------------------------------
+
+test_that("Stan HB rank-recovers known utilities, anchors the designated item, and fills HB_Mean_SE", {
+  skip_if(!requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not installed")
+  skip_if(inherits(try(cmdstanr::cmdstan_path(), silent = TRUE), "try-error"), "CmdStan not installed")
+
+  TRUE_UTILS <- c(I1 = 1.6, I2 = 0.9, I3 = 0.3, I4 = -0.2, I5 = -0.9, I6 = -1.7)
+  set.seed(21); ids <- names(TRUE_UTILS); rows <- list()
+  for (r in 1:40) for (t in 1:8) {
+    shown <- sample(ids, 4); u <- TRUE_UTILS[shown]
+    best <- sample(shown, 1, prob = exp(u) / sum(exp(u))); rem <- setdiff(shown, best)
+    worst <- sample(rem, 1, prob = exp(-TRUE_UTILS[rem]) / sum(exp(-TRUE_UTILS[rem])))
+    for (p in seq_along(shown)) rows[[length(rows) + 1]] <- data.frame(
+      resp_id = paste0("R", r), version = 1L, task = t, item_id = shown[p], position = p,
+      is_best = as.integer(shown[p] == best), is_worst = as.integer(shown[p] == worst),
+      weight = 1, stringsAsFactors = FALSE)
+  }
+  long <- do.call(rbind, rows); long$obs_id <- seq_len(nrow(long))
+  items <- .rf_items(ids); items$Anchor_Item <- c(0L, 1L, 0L, 0L, 0L, 0L)   # I2, not last
+  config <- list(project_settings = list(Seed = 42L),
+                 output_settings = list(HB_Iterations = 400L, HB_Warmup = 200L, HB_Chains = 2L))
+
+  out <- capture.output(res <- suppressMessages(fit_hb_model(long, items, config, verbose = FALSE)))
+  expect_equal(res$model_fit$method, "cmdstanr")
+
+  pop <- res$population_utilities
+  est <- pop$HB_Utility_Mean[match(ids, pop$Item_ID)]
+  expect_gt(cor(est, TRUE_UTILS, method = "spearman"), 0.9)
+  # The designated anchor is the zero, and the columns come back in the configured order.
+  expect_equal(est[2], 0)
+  expect_equal(names(res$individual_utilities), c("resp_id", ids))
+  expect_true(all(res$individual_utilities$I2 == 0))
+  # Precision of the mean is populated for every non-anchor item; spread is the
+  # spread of the shipped individual utilities.
+  expect_true(all(is.finite(pop$HB_Mean_SE[pop$Item_ID != "I2"])))
+  expect_equal(pop$HB_Utility_SD[pop$Item_ID == "I1"], sd(res$individual_utilities$I1), tolerance = 1e-8)
+  # Diagnostics are numbers, not a crash.
+  expect_true(is.numeric(res$diagnostics$n_divergences))
+  expect_true(is.finite(res$diagnostics$mean_rhat))
+})

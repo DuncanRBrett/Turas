@@ -350,8 +350,21 @@ stan_declared_data <- function(stan_data) {
 #' @keywords internal
 get_stan_model_path <- function() {
 
-  # Look for Stan file in module directory
+  # Look for the Stan file relative to the MODULE first, then the working
+  # directory. The cwd-only list meant the model was found only when R was
+  # started in the repo root (found the first day the path ran for real,
+  # 2026-09-03: the test runner's cwd is tests/testthat).
+  module_dirs <- character(0)
+  if (exists("script_dir_override", envir = globalenv())) {
+    module_dirs <- c(module_dirs, get("script_dir_override", envir = globalenv()))
+  }
+  if (exists("get_script_dir", mode = "function")) {
+    module_dirs <- c(module_dirs, tryCatch(get_script_dir(), error = function(e) NULL))
+  }
+  module_dirs <- module_dirs[!is.na(module_dirs) & nzchar(module_dirs)]
   possible_paths <- c(
+    file.path(module_dirs, "..", "stan", "maxdiff_hb.stan"),
+    file.path(module_dirs, "stan", "maxdiff_hb.stan"),
     "stan/maxdiff_hb.stan",
     "../stan/maxdiff_hb.stan",
     "modules/maxdiff/stan/maxdiff_hb.stan",
@@ -456,9 +469,14 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
   rownames(population_utilities) <- NULL
 
   # Diagnostics
+  # sampler_diagnostics() returns a draws_array (iteration x chain x
+  # variable); the old 2-D index crashed the first time this ever ran on a
+  # real fit (2026-09-03, the day cmdstanr was installed). The data-frame
+  # form is flat and safe.
+  sampler_df <- fit$sampler_diagnostics(format = "df")
   diagnostics <- list(
-    n_divergences = sum(fit$sampler_diagnostics()[, "divergent__"]),
-    max_treedepth_exceeded = sum(fit$sampler_diagnostics()[, "treedepth__"] >= 10),
+    n_divergences = sum(sampler_df$divergent__, na.rm = TRUE),
+    max_treedepth_exceeded = sum(sampler_df$treedepth__ >= 10, na.rm = TRUE),
     mean_rhat = mean(mu_summary$rhat, na.rm = TRUE),
     min_ess = min(mu_summary$ess_bulk, na.rm = TRUE)
   )
@@ -844,9 +862,12 @@ check_hb_convergence_auto <- function(fit, parameters = NULL, verbose = TRUE) {
   # ============================================================================
 
   tryCatch({
-    sampler_diag <- fit$sampler_diagnostics()
-    if ("divergent__" %in% colnames(sampler_diag)) {
-      diagnostics$n_divergences <- sum(sampler_diag[, "divergent__"])
+    # draws_array has no colnames, so the old check was always FALSE and the
+    # divergence count silently never ran (found on the first real fit,
+    # 2026-09-03). The data-frame form is flat.
+    sampler_diag <- fit$sampler_diagnostics(format = "df")
+    if ("divergent__" %in% names(sampler_diag)) {
+      diagnostics$n_divergences <- sum(sampler_diag$divergent__, na.rm = TRUE)
 
       if (diagnostics$n_divergences > 0) {
         pct_divergent <- 100 * diagnostics$n_divergences / nrow(sampler_diag)
