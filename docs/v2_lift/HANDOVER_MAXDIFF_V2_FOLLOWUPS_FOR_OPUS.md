@@ -160,9 +160,31 @@ Excel. So the work is roughly: head to head, segments, diagnostics and the
 charts, plus whatever the overview and preferences panels say that the v2 tab
 does not.
 
-**Open question for Duncan before a session starts.** Once the v2 tab carries
-those panels, does the standalone classic report get retired (the tab becomes
-the only HTML deliverable, matching conjoint's end state), or does maxdiff keep
-a standalone v2-styled report of its own alongside the tab? The first is
-markedly less work and leaves one place to maintain. The second is a new
-deliverable. Nothing should be built until this is answered.
+**Duncan answered on 2026-09-03: retire it once the tab reaches parity.** So
+maxdiff lands on conjoint's end state after all, but by widening the tab first
+rather than by dropping the report and losing four panels. Order matters: parity
+first, retirement second, never the reverse.
+
+**The work, in order.**
+
+1. Widen the island. `13_v2_island.R` currently leaves HB diagnostics, the
+   per-respondent utilities and the per-segment tables in the Excel on purpose;
+   its header comment says so and would need rewriting. Add blocks for head to
+   head, segments and diagnostics. Watch the F2 lesson: per-row fields are
+   vectors, scalars in a block stay unboxed, or the panel silently vanishes.
+2. Widen the tab. `27y_maxdiff.js` grows from four panels to seven. Charts are
+   the open sub-question: the classic report has its own chart builder (767
+   lines) and v2 has its own charting, so this is a port, not a copy.
+3. Prove parity on a real config before anything is deleted. The shipped Karoo
+   example runs both paths today, so run it with `Generate_HTML_Report = YES`
+   and read the classic report and the widened tab side by side, panel by panel.
+   Duncan does the eyeball through `launch_turas()`; a session does not.
+4. Retire, following `2fdcb38f` and the conjoint precedent. `Generate_HTML_Report`
+   joins `MAXDIFF_RETIRED_SETTINGS` with a message naming it, so a live config
+   carrying the row is answered rather than told it looks like a typo. Delete
+   `modules/maxdiff/lib/html_report/` (6,615 lines) and `test_html_report.R`.
+   Turn the setting off in the shipped Karoo config, and note the same Excel
+   caution as R3: edit the cell in Excel or openpyxl, never `loadWorkbook()` and
+   save.
+
+Step 4 does not start until Duncan has done step 3.
