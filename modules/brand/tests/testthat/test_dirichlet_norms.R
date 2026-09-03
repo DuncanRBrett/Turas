@@ -120,34 +120,40 @@ test_that("market share sums to 100 (§5.6)", {
 
 test_that("DJ_Flag = 'over' when SCR_Dev_Pct >= 20", {
   skip_if_not_installed("NBDdirichlet")
-  # Construct a fixture where brand A has clearly higher observed SCR than expected
-  set.seed(1)
-  n <- 100
-  brands <- c("A", "B", "C", "D")
+  # Brand A is a niche brand whose 30 buyers buy nothing else (observed
+  # SCR = 100 percent); brands B to E are bought promiscuously by the other
+  # 270 respondents. Dirichlet expects a 10 percent penetration brand to hold
+  # roughly a third of its buyers' category purchases, so A sits far above
+  # the line and the others sit on it.
+  set.seed(3)
+  n <- 300
+  brands <- c("A", "B", "C", "D", "E")
   nb <- length(brands)
   pen_mat <- matrix(0L, n, nb, dimnames = list(NULL, brands))
   x_mat   <- matrix(0.0, n, nb, dimnames = list(NULL, brands))
 
-  # Brand A: high loyalty — almost all purchases go to A
-  pen_mat[1:60, 1] <- 1L
-  x_mat[1:60, 1]  <- 10  # very high buy rate for A
+  pen_mat[1:30, 1] <- 1L
+  x_mat[1:30, 1]  <- 6
 
   for (bi in 2:nb) {
-    idx <- sample(n, 40)
+    idx <- sample(31:n, 150)
     pen_mat[idx, bi] <- 1L
-    x_mat[idx, bi]  <- sample(1:3, 40, replace = TRUE)
+    x_mat[idx, bi]  <- sample(1:3, 150, replace = TRUE)
   }
   m_vec <- rowSums(x_mat)
-  m_vec[m_vec == 0] <- 0
 
   res <- run_dirichlet_norms(pen_mat = pen_mat, x_mat = x_mat, m_vec = m_vec,
                              brand_codes = brands, target_months = 3L)
-  # The test verifies the flag logic is applied — may be PARTIAL on small n
-  expect_true(res$status %in% c("PASS", "PARTIAL", "REFUSED"))
-  if (!identical(res$status, "REFUSED")) {
-    expect_true("DJ_Flag" %in% names(res$norms_table))
-    expect_true(all(res$norms_table$DJ_Flag %in% c("over", "under", "on_line")))
-  }
+  # A refusal here would hide the flag logic entirely; the fixture is built
+  # so brand A's observed SCR sits far above the Dirichlet line.
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
+  expect_true("DJ_Flag" %in% names(res$norms_table))
+  expect_true(all(res$norms_table$DJ_Flag %in% c("over", "under", "on_line")))
+  expect_equal(res$norms_table$DJ_Flag[res$norms_table$BrandCode == "A"], "over")
+  expect_true(all(res$norms_table$DJ_Flag[res$norms_table$BrandCode != "A"] == "on_line"))
+  # The DJ curve interpolates through distinct expected penetrations
+  expect_true(any(is.finite(res$dj_curve$y_fit_scr)))
+  expect_true(any(is.finite(res$dj_curve$y_fit_w)))
 })
 
 test_that("DJ_Flag = 'on_line' when |SCR_Dev_Pct| < 20", {
@@ -315,4 +321,91 @@ test_that("weighted and unweighted paths both return PASS/PARTIAL", {
                                 weights = w, target_months = 3L)
   expect_true(res_uw$status %in% c("PASS", "PARTIAL", "REFUSED"))
   expect_true(res_wt$status %in% c("PASS", "PARTIAL", "REFUSED"))
+})
+
+
+# ==============================================================================
+# EXPECTED (THEORETICAL) VALUES: C1 regression, review 2026-07-12
+# The previous extractor probed fields the dirichlet object never defines,
+# so every expected value was NA under PASS. These tests pin the values to
+# the package's own closures.
+# ==============================================================================
+
+test_that("expected values are finite, in range and match the package closures", {
+  skip_if_not_installed("NBDdirichlet")
+  fix <- make_known_fixture()
+  res <- run_dirichlet_norms(pen_mat = fix$pen_mat, x_mat = fix$x_mat,
+                             m_vec = fix$m_vec, brand_codes = c("A", "B", "C"),
+                             focal_brand = "A", target_months = 3L)
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
+  exp_df <- res$expected
+
+  for (col in c("Penetration_Pct_Exp", "BuyRate_Exp", "SCR_Pct_Exp",
+                "Pct100Loyal_Exp")) {
+    expect_true(all(is.finite(exp_df[[col]])), info = col)
+  }
+  expect_true(all(exp_df$Penetration_Pct_Exp > 0 & exp_df$Penetration_Pct_Exp <= 100))
+  expect_true(all(exp_df$SCR_Pct_Exp > 0 & exp_df$SCR_Pct_Exp <= 100))
+  expect_true(all(exp_df$Pct100Loyal_Exp >= 0 & exp_df$Pct100Loyal_Exp <= 100))
+  expect_true(all(exp_df$BuyRate_Exp > 0))
+
+  # Independent recomputation straight from the package, same inputs the
+  # engine feeds it: cat_pen = 1 (every respondent buys), mean purchases = 3,
+  # equal shares (3/9 each), observed pens 2/3, 2/3, 1/3.
+  d <- suppressWarnings(NBDdirichlet::dirichlet(
+    cat.pen = 1, cat.buyrate = 3, brand.share = c(3, 3, 3) / 9,
+    brand.pen.obs = c(2 / 3, 2 / 3, 1 / 3)))
+  pen <- vapply(1:3, d$brand.pen, numeric(1))
+  br  <- vapply(1:3, d$brand.buyrate, numeric(1))
+  wp  <- vapply(1:3, d$wp, numeric(1))
+  expect_equal(exp_df$Penetration_Pct_Exp, pen * 100, tolerance = 1e-8)
+  expect_equal(exp_df$BuyRate_Exp, br, tolerance = 1e-8)
+  expect_equal(exp_df$SCR_Pct_Exp, br / wp * 100, tolerance = 1e-8)
+
+  # Deviations and the DJ curve now carry numbers, and the focal summary too
+  expect_true(all(is.finite(res$norms_table$SCR_Dev_Pct)))
+  # (The DJ curve is undefined on this toy: equal shares give one distinct
+  # expected penetration, so there is nothing to interpolate through. The
+  # curve is asserted on the five-brand fixture above.)
+  expect_false(is.na(res$metrics_summary$focal_scr_exp))
+  expect_false(is.na(res$metrics_summary$focal_pen_exp))
+  expect_false(is.na(res$metrics_summary$focal_loyal_exp))
+})
+
+test_that("100 percent loyal expected value follows double jeopardy (falls with penetration)", {
+  skip_if_not_installed("NBDdirichlet")
+  set.seed(7)
+  n <- 200
+  brands <- c("A", "B", "C", "D", "E")
+  shares <- c(0.40, 0.25, 0.15, 0.12, 0.08)
+  pen_mat <- matrix(0L, n, 5, dimnames = list(NULL, brands))
+  x_mat   <- matrix(0, n, 5, dimnames = list(NULL, brands))
+  for (bi in 1:5) {
+    idx <- sample(n, round(n * (0.15 + shares[bi])))
+    pen_mat[idx, bi] <- 1L
+    x_mat[idx, bi]  <- sample(1:6, length(idx), replace = TRUE)
+  }
+  m_vec <- rowSums(x_mat)
+  res <- run_dirichlet_norms(pen_mat, x_mat, m_vec, brands, target_months = 3L)
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
+  e <- res$expected[order(-res$expected$Penetration_Pct_Exp), ]
+  expect_true(all(diff(e$Pct100Loyal_Exp) <= 1e-9))
+  expect_true(all(diff(e$BuyRate_Exp) <= 1e-9))
+})
+
+test_that("an object without the package closures is refused, not NA under PASS", {
+  stub <- list(nbrand = 2L)
+  expect_error(.dn_extract_expected(stub, c("A", "B")), "lacks")
+  na_df <- data.frame(BrandCode = c("A", "B"),
+                      Penetration_Pct_Exp = c(NA_real_, 20),
+                      BuyRate_Exp = c(2, 3), SCR_Pct_Exp = c(NA_real_, NA_real_),
+                      Pct100Loyal_Exp = c(10, 150))
+  probs <- .dn_expected_problems(na_df)
+  expect_length(probs, 3L)
+  expect_true(any(grepl("Penetration_Pct_Exp \\(1 of 2", probs)))
+  expect_true(any(grepl("SCR_Pct_Exp \\(2 of 2", probs)))
+  expect_true(any(grepl("Pct100Loyal_Exp \\(1 of 2", probs)))
+  expect_length(.dn_expected_problems(data.frame(
+    Penetration_Pct_Exp = 30, BuyRate_Exp = 2, SCR_Pct_Exp = 40,
+    Pct100Loyal_Exp = 12)), 0L)
 })
