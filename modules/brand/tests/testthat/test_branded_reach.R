@@ -146,6 +146,8 @@ test_that("IPK Wave 1: run_branded_reach returns the placeholder payload", {
 # Source the panel-data builder + HTML renderer (engines already sourced)
 source(file.path(ROOT, "modules", "brand", "R", "10d_br_output.R"))
 source(file.path(ROOT, "modules", "brand", "lib", "html_report",
+                 "panels", "00_json_island.R"))
+source(file.path(ROOT, "modules", "brand", "lib", "html_report",
                  "panels", "10_branded_reach_panel.R"))
 
 

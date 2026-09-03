@@ -18,6 +18,8 @@ local({
   }
   root <- find_root()
   source(file.path(root, "modules", "brand", "lib", "html_report",
+                   "panels", "00_json_island.R"), local = FALSE)
+  source(file.path(root, "modules", "brand", "lib", "html_report",
                    "panels", "08_cat_buying_panel.R"), local = FALSE)
 })
 

@@ -68,7 +68,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     sprintf('<div class="ma-panel" id="%s" data-focal-colour="%s" data-chip-default="%s" style="--ma-brand:%s"%s>',
             panel_id, focal_colour, chip_default, focal_colour, excel_attr),
     sprintf('<script type="application/json" class="ma-panel-data">%s</script>',
-            json_payload),
+            .br_json_island(json_payload)),
     .ma_sub_tabs(has_attrs, has_ceps, default_tab, has_advantage = has_advantage),
     .ma_focus_bar(panel_data),
 

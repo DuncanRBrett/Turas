@@ -1525,7 +1525,7 @@ render_cat_buying_panel <- function(panel_data) {
   )
   sprintf(
     '<script type="application/json" class="cb-panel-chart-data">%s</script>',
-    json_str)
+    .br_json_island(json_str))
 }
 
 
@@ -1822,7 +1822,7 @@ render_cat_buying_panel <- function(panel_data) {
   )
   sprintf(
     '<script type="application/json" class="cb-panel-data" id="cb-data-%s">%s</script>',
-    .cb_esc(cat_code), json_str)
+    .cb_esc(cat_code), .br_json_island(json_str))
 }
 
 

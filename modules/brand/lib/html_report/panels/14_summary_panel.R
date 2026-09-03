@@ -86,7 +86,7 @@ build_brand_summary_panel <- function(results, config) {
               .brsum_esc(default_cat), .brsum_esc(focal_brand),
               .brsum_esc(focal_colour)),
         sprintf('<script type="application/json" class="brsum-data">%s</script>',
-                json_payload),
+                .br_json_island(json_payload)),
         .brsum_header(),
         .brsum_dropdown_bar(payload),
         '<div class="brsum-dashboard" data-brsum-fade>',
