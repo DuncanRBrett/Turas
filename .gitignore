@@ -135,3 +135,6 @@ prototypes/report-redesign/fable/v2/data/ccs_*.json
 # Callout Editor keeps timestamped copies of the registry beside it; these are
 # local safety copies, not repo content (the registry itself IS tracked).
 modules/shared/lib/callouts/backups/
+
+# Compiled Stan executable written by cmdstanr beside the model; rebuilt on demand
+modules/maxdiff/stan/maxdiff_hb
