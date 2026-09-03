@@ -210,6 +210,7 @@ source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "stats_diagnostics.R"))
 source(file.path(script_dir, "patterns_echo.R"))
 source(file.path(script_dir, "microdata_writer.R"))
+source(file.path(script_dir, "delivery_manifest.R"))
 source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
 source(file.path(script_dir, "reader_report", "derive_reader_model.R"))
@@ -660,6 +661,46 @@ format_output_value <- function(value, type = "frequency",
 }
 
 
+#' Read a Pricing Contribution For This Project
+#'
+#' The pricing module writes `{output}_pr_island.json` when it runs. A tabs run
+#' embeds it when `pricing_island` names it. Returns NULL for every ordinary
+#' tabs run, so nothing about a report without pricing changes.
+#'
+#' @param config_obj The tabs config object.
+#' @return A single JSON string, or NULL.
+#' @keywords internal
+.read_pricing_contribution <- function(config_obj) {
+  path <- config_obj$pricing_island
+  if (is.null(path) || !nzchar(trimws(as.character(path)))) return(NULL)
+
+  path <- as.character(path)
+  if (!file.exists(path)) {
+    cat(sprintf(paste0("\n[WARNING] pricing_island points at a file that is not there: %s\n",
+                       "  The report is built without the Pricing tab.\n\n"), path))
+    return(NULL)
+  }
+
+  txt <- tryCatch(paste(readLines(path, warn = FALSE), collapse = ""),
+                  error = function(e) NULL)
+  if (is.null(txt) || !nzchar(trimws(txt))) return(NULL)
+
+  ok <- tryCatch({
+    parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+    identical(parsed$meta$kind, "pricing")
+  }, error = function(e) FALSE)
+
+  if (!isTRUE(ok)) {
+    cat(sprintf(paste0("\n[WARNING] %s is not a pricing contribution file.\n",
+                       "  The report is built without the Pricing tab.\n\n"),
+                basename(path)))
+    return(NULL)
+  }
+
+  txt
+}
+
+
 #' Read a Conjoint Contribution For This Project
 #'
 #' The conjoint module writes `{output}_cj_island.json` when it runs. A tabs run
@@ -964,7 +1005,12 @@ if (.html_report_v2_on) {
           cat("    No *_wave.json is written by this build - keep the one from your microdata run.\n")
         }
         if (.mrb_set) {
-          cat("    Disclosure detail panels: hidden (fail-closed without a microdata base).\n")
+          # Column suppression reads the PUBLISHED bases, so it works here exactly
+          # as it does on a microdata build. Comment detail is gated on the live
+          # audience, which without microdata is the published full sample
+          # (21d_disclosure.js audienceBase). Both hold at once; neither setting
+          # has to be given up for the other.
+          cat("    Disclosure: sub-k columns still suppress; comment detail is gated on the full sample.\n")
         }
         cat("\n")
       } else if (is.null(micro) && .mrb_set) {
@@ -975,23 +1021,12 @@ if (.html_report_v2_on) {
         cat("\n[WARNING] Disclosure threshold (min_reporting_base =", .mrb,
             ") is set but the microdata island is unavailable.\n")
         cat("  The report hides ALL identifying detail (fail-closed). Restore the microdata to re-enable filtered views.\n\n")
-      } else if (!is.null(micro) && .mrb_set) {
-        # Duncan's C3 decision (production review 2026-08): render-time
-        # suppression is a viewing convenience; microdata = N is the
-        # confidential ship. A k-gated build that still carries microdata must
-        # say so in terms the operator can act on before the file leaves.
-        cat("\n┌─── TURAS DISCLOSURE WARNING ────────────────────────────────┐\n")
-        cat("│ min_reporting_base =", .mrb, "hides sub-k cells ON SCREEN, but this\n")
-        cat("│ build carries the microdata island: the withheld numbers and every\n")
-        cat("│ respondent's coded banner values sit in the PAGE SOURCE (View Source).\n")
-        cat("│\n")
-        cat("│ For a deliverable where the k-gate is a PROMISE (anonymity-sensitive\n")
-        cat("│ studies), ship the confidential build instead:\n")
-        cat("│   html_report_v2_microdata = FALSE\n")
-        cat("│ (published figures only - live filters and computed views are off).\n")
-        cat("│ This copy is fine as the analyst's own working copy.\n")
-        cat("└─────────────────────────────────────────────────────────────┘\n\n")
       }
+      # A build that DOES carry the island is no longer warned about here. It is
+      # reported, along with everything else the file contains, in the delivery
+      # manifest printed once the report is written (delivery_manifest.R). The
+      # old warning fired only when min_reporting_base was set, so the ordinary
+      # build said nothing at all about what was in it.
 
       # Tabs-integrated tracker (OFF by default): emit this wave's contribution,
       # then, when enabled and a waves_source resolves, assemble the tracking
@@ -1144,6 +1179,8 @@ if (.html_report_v2_on) {
       cj_json_main <- .read_conjoint_contribution(config_result$config_obj)
       # And a MaxDiff study's contribution, the same way (13_v2_island.R).
       md_json_main <- .read_maxdiff_contribution(config_result$config_obj)
+      # And a pricing study's, the same way again (14_v2_island.R).
+      pr_json_main <- .read_pricing_contribution(config_result$config_obj)
 
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
                            sub("\\.xlsx$", "_report.html", v2_out),
@@ -1151,12 +1188,22 @@ if (.html_report_v2_on) {
                            micro_json = serialize_microdata(micro),
                            qual_json = qual_json_main,
                            cj_json = cj_json_main,
-                           md_json = md_json_main)
+                           md_json = md_json_main,
+                           pr_json = pr_json_main)
     }, error = function(e) {
       cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
       cat("  The Excel and HTML outputs were not affected.\n\n")
       NULL
     })
+
+    # What is actually in the file, printed on EVERY build, before any delivery
+    # step runs. See delivery_manifest.R for why this is unconditional.
+    if (!is.null(report_v2_result) && identical(report_v2_result$status, "PASS")) {
+      .manifest <- tabs_print_delivery_manifest(
+        micro, qual_json_main, config_result$config_obj,
+        report_v2_result$output_file)
+      assign("TURAS_LAST_DELIVERY_MANIFEST", .manifest, envir = .GlobalEnv)
+    }
 
     if (!is.null(report_v2_result) && report_v2_result$status == "PASS" &&
         exists("turas_prepare_deliverable", mode = "function")) {

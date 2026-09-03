@@ -31,6 +31,8 @@
     if (TR.conjoint && TR.conjoint.available()) read.push(["conjoint", "Conjoint"]);
     // MaxDiff, the same way: only when the project contributed one.
     if (TR.maxdiff && TR.maxdiff.available()) read.push(["maxdiff", "MaxDiff"]);
+    // Pricing, the same way again.
+    if (TR.pricing && TR.pricing.available()) read.push(["pricing", "Pricing"]);
     read.push(["story", "Story"]);
     var analyse = [["crosstabs", "Crosstabs"]];
     if (on("differences")) analyse.push(["findings", "Differences"]);
@@ -67,6 +69,7 @@
     TR.QUAL = parseIsland("data-qual");          // qualitative verbatims (null when absent)
     TR.CJ = parseIsland("data-cj");              // conjoint contribution (null when absent)
     TR.MD = parseIsland("data-md");              // maxdiff contribution (null when absent)
+    TR.PR = parseIsland("data-pr");              // pricing contribution (null when absent)
     TR.userState = parseIsland("user-state");   // saved-copy annotations
     // The report's authored prose, keyed. Installed before anything renders,
     // because every explainer on every tab reads from it (see 02_text.js).
@@ -309,6 +312,7 @@
     else if (d2.state.tab === "qualitative") TR.qual.render(host);
     else if (d2.state.tab === "conjoint") TR.conjoint.render(host);
     else if (d2.state.tab === "maxdiff") TR.maxdiff.render(host);
+    else if (d2.state.tab === "pricing") TR.pricing.render(host);
     else if (d2.state.tab === "story") TR.story2.renderTab(host);
     else TR.report.renderTab(host);
     // The audience filter recomputes from this wave's microdata; prior waves
@@ -318,6 +322,7 @@
     var fb = document.getElementById("filterbar");
     if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout" ||
       d2.state.tab === "maxdiff" ||
+      d2.state.tab === "pricing" ||
       d2.state.tab === "cover" || d2.state.tab === "conjoint";
     if (TR.reader) TR.reader.renderStrip();
     shell.autoGrowNotes(host);   // every tab render lands here

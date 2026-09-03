@@ -1421,3 +1421,40 @@ body.txt-keys [data-txt-config]::after { content: "config: " attr(data-txt-confi
   background: #eef0f6; color: #333;
 }
 .md-tag-must { background: #e2f3e6; color: #1f5b2d; }
+
+/* ---------------------------------------------------------------------------
+   Pricing tab (27z_pricing.js). The same shape as the Conjoint and MaxDiff
+   tabs: frozen panels fed by the pricing module's island (14_v2_island.R).
+   Kept as its own block so the three views can drift apart without a shared
+   selector snapping. Chart colours are literal in the SVG, not here, so a
+   rasterised chart looks like the one on the page.
+   --------------------------------------------------------------------------- */
+.pr-view { max-width: 1100px; }
+.pr-view h2 { margin: 0 0 4px; }
+.pr-panel { margin: 22px 0; }
+.pr-panel h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.pr-note { margin: 0 0 10px; font-size: .85rem; color: #555; line-height: 1.45; }
+.pr-provenance p { margin: 2px 0 6px; font-size: .9rem; }
+.pr-frozen { font-style: italic; }
+.pr-stamp {
+  display: inline-block; margin: 6px 0 10px; padding: 4px 8px; border-radius: 3px;
+  background: #fff4e0; color: #7a4b00; font-size: .82rem; line-height: 1.4;
+}
+.pr-ranges { margin: 0 0 6px; font-size: .95rem; }
+.pr-headline { margin: 0 0 4px; font-size: 2rem; font-weight: 600; color: var(--brand, #323367); }
+.pr-rec { border-left: 3px solid var(--brand, #323367); padding-left: 12px; }
+.pr-table { border-collapse: collapse; width: 100%; margin-bottom: 6px; }
+.pr-table th, .pr-table td {
+  padding: 5px 9px; border-bottom: 1px solid #e6e6e6; text-align: left;
+  font-size: .88rem;
+}
+.pr-table th { font-weight: 600; border-bottom: 2px solid #ccc; }
+.pr-table .pr-num { text-align: right; font-variant-numeric: tabular-nums; }
+.pr-chart { margin: 4px 0 12px; }
+.pr-chart svg { width: 100%; height: auto; max-width: 720px; display: block; }
+.pr-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 2px; }
+.pr-key { display: inline-flex; align-items: center; font-size: .8rem; color: #555; }
+.pr-swatch {
+  display: inline-block; width: 11px; height: 11px; border-radius: 2px;
+  margin-right: 5px;
+}
