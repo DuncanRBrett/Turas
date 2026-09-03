@@ -3,6 +3,10 @@
 > Section 3 is answered. The shape decision and the Opus build brief are in
 > `HANDOVER_ALLOCATION_LIVE_RECOMPUTE_FOR_OPUS.md` (2026-09-03). Read this
 > brief for the why, that handover for the what.
+>
+> BUILT 2026-09-03 on `feature/allocation-live-recompute`. What shipped, the
+> verification numbers and the one ruling that did not survive contact with the
+> code are in `NOTES_ALLOCATION_LIVE_RECOMPUTE_BUILD.md`.
 
 Written 2026-09-03. The design half is for one short Fable session; the build
 half is for Opus 5 at high effort against whatever that session decides. Read

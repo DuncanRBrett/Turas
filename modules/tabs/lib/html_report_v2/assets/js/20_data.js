@@ -159,6 +159,21 @@
           errors.push({ code: "DATA_MICRO_Q", message: "microdata missing/short for " + q.code });
         }
       });
+      // An Allocation question's per-item value series. Each is indexed by
+      // respondent exactly like answers and scores are, so a short one would
+      // silently read undefined for the respondents past its end and recompute
+      // an item's mean off a truncated audience.
+      var series = micro.series || {};
+      Object.keys(series).forEach(function (code) {
+        var byRow = series[code] || {};
+        Object.keys(byRow).forEach(function (ri) {
+          var s = byRow[ri];
+          if (!Array.isArray(s) || s.length !== n) {
+            errors.push({ code: "DATA_MICRO_SERIES",
+              message: "series row " + ri + " of " + code + " is not length " + n });
+          }
+        });
+      });
     }
     return { ok: errors.length === 0, errors: errors };
   };

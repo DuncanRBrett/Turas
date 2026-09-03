@@ -554,5 +554,153 @@ run("a NET POSITIVE recompute scores the same +-100 the R engine does", () => {
   TR.MICRO = null;
 });
 
+// ============================================================================
+// JS-6. ALLOCATION QUESTIONS (2026-09)
+// ============================================================================
+//
+// Q6 is the fixture's ALLOCATION question: three items published as three MEAN
+// rows under one code. It is the only row family the reader recomputes from
+// TR.MICRO.series rather than TR.MICRO.scores, and the only one where a
+// row-to-column pairing can silently shift by a column.
+//
+// The series here is rebuilt from the SAME constants generate_parity_project.R
+// uses, so the two engines are working from identical numbers, and the letters
+// are compared against what R actually carried into the committed island.
+//
+// R runs a Welch t and this engine runs a z on the same means and bases (the
+// documented divergence in JS-3), so the two agree except within a band around
+// alpha. Q6's two engineered pairs sit well clear of both critical values on
+// either distribution, which is why they can be asserted exactly.
+
+console.log("\nCross-engine parity. JS-6: allocation questions:");
+
+// Cohort sizes and the two allocation constants, mirroring the generator.
+const Q6_COHORTS = [["Alpha", 40], ["Beta", 60], ["Gamma", 50], ["Delta", 50]];
+const Q6_M1 = { Alpha: 50, Beta: 50, Gamma: 30, Delta: 50 };
+const Q6_M2 = { Alpha: 33, Beta: 37, Gamma: 33, Delta: 30 };
+
+/** The fixture's Q6 series + base markers, respondent for respondent. */
+function q6Micro() {
+  const bank = [], retail = [], other = [], cohortCol = [], answers = [];
+  Q6_COHORTS.forEach(([name, n], ci) => {
+    for (let i = 0; i < n; i++) {
+      const alt = i % 2 === 0 ? 1 : -1;
+      const b = Q6_M1[name] + 10 * alt;
+      const r = Q6_M2[name] - 17 * alt;
+      bank.push(b); retail.push(r); other.push(100 - b - r);
+      cohortCol.push(ci + 1);          // 1..4, the banner column index
+      answers.push(-2);                // answered, no category row to land on
+    }
+  });
+  return { n: bank.length,
+    answers: { Q6: answers },
+    series: { Q6: { "0": bank, "1": retail, "2": other } },
+    banner_vars: { Cohort: cohortCol },
+    weights: bank.map(() => 1) };
+}
+
+/** JS-side letters for one allocation item row, sized the way R sized it.
+ *  seriesMeans returns the Kish effective base in k; R tested on the
+ *  FPC-corrected base, which the model carries as ciBase, so swap it in exactly
+ *  as jsLetters does for proportions. A census column (ciBase Infinity) drops
+ *  out, which is how R excludes it. */
+function q6Letters(model, rowIndex, dual) {
+  const spec = TR.stats.columnsFor("Cohort");
+  const mask = new Uint8Array(TR.MICRO.n).fill(1);
+  const raw = TR.stats.seriesMeans({ code: "Q6" }, rowIndex, spec.columns, mask);
+  const letters = model.columns.map((c) => c.letter);
+  const cells = raw.map((m, i) => {
+    const col = model.columns[i];
+    const size = (col && col.ciBase != null) ? col.ciBase : m.k;
+    if (size === Infinity || !size) return { mean: null, sd: 0, k: 0 };
+    return { mean: m.mean, sd: m.sd, k: size };
+  });
+  return TR.stats.sigLetters(cells, letters, model.lowBaseThreshold, true, dual);
+}
+
+run("the JS recompute reproduces every published allocation mean", () => {
+  loadIsland(island);
+  TR.MICRO = q6Micro();
+  const spec = TR.stats.columnsFor("Cohort");
+  const mask = new Uint8Array(TR.MICRO.n).fill(1);
+  const round1 = (v) => Math.round(v * 10) / 10;
+  [["Bank", 0, [45, 50, 50, 30, 50]],
+   ["Retailer", 1, [33.5, 33, 37, 33, 30]],
+   ["Other", 2, [21.6, 17, 13, 37, 20]]].forEach(([label, ri, want]) => {
+    const got = TR.stats.seriesMeans({ code: "Q6" }, ri, spec.columns, mask);
+    got.forEach((m, i) => {
+      eq(round1(m.mean), want[i], "Q6 / " + label + " col " + i + " recomputed mean");
+    });
+    // ...and the published row says the same, so the island and the recompute
+    // are pinned to each other, not merely each to my arithmetic.
+    const raw = rawRow(island, "Q6", label);
+    got.forEach((m, i) => {
+      eq(round1(m.mean), Number(raw.pct[i]), "Q6 / " + label + " col " + i + " vs published");
+    });
+  });
+  TR.MICRO = null;
+});
+
+run("JS-computed allocation letters equal R's carried letters at 95%", () => {
+  loadIsland(island);
+  TR.MICRO = q6Micro();
+  const m = TR.model.forQuestion("Q6", "Cohort", [], { dual: false });
+  ["Bank", "Retailer", "Other"].forEach((label, ri) => {
+    const raw = rawRow(island, "Q6", label);
+    const js = q6Letters(m, ri, false);
+    raw.sig.forEach((carriedRaw, ci) => {
+      const carried = String(carriedRaw || "").replace(/-/g, "").split("").sort().join("");
+      const computed = (js[ci] || "").split("")
+        .filter((ch) => ch === ch.toUpperCase()).sort().join("");
+      eq(computed, carried, "Q6 / " + label + " col " + ci + " (95%)");
+    });
+  });
+  TR.MICRO = null;
+});
+
+run("JS-computed allocation letters equal R's carried letters at 80%", () => {
+  loadIsland(island);
+  TR.MICRO = q6Micro();
+  const m = TR.model.forQuestion("Q6", "Cohort", [], { dual: true });
+  ["Bank", "Retailer", "Other"].forEach((label, ri) => {
+    const raw = rawRow(island, "Q6", label);
+    const js = q6Letters(m, ri, true);
+    raw.sig2.forEach((carriedRaw, ci) => {
+      const carried = String(carriedRaw || "").replace(/-/g, "").split("").sort().join("");
+      const computed = (js[ci] || "").toUpperCase().split("").sort().join("");
+      eq(computed, carried, "Q6 / " + label + " col " + ci + " (80% union)");
+    });
+  });
+  TR.MICRO = null;
+});
+
+run("the 80%-only item is lettered at 80% and NOT at 95%, in both engines", () => {
+  // Retailer, Beta vs Delta. The case a single-alpha report shows as no
+  // difference at all, and the one most likely to drift if either engine's
+  // critical value or Bonferroni divisor moves.
+  loadIsland(island);
+  TR.MICRO = q6Micro();
+  const raw = rawRow(island, "Q6", "Retailer");
+  eq(String(raw.sig[2] || ""), "", "R carries no 95% letter on Beta");
+  eq(String(raw.sig2[2] || ""), "D", "R carries an 80% letter on Beta");
+  const m = TR.model.forQuestion("Q6", "Cohort", [], { dual: true });
+  const js = q6Letters(m, 1, true);
+  eq((js[2] || "").replace(/[a-z]/g, ""), "", "JS: nothing at 95% either");
+  eq((js[2] || "").toUpperCase(), "D", "JS: the same 80% letter");
+  TR.MICRO = null;
+});
+
+run("the weighted island carries the same allocation letters", () => {
+  // The untested half. Every allocation study so far has been unweighted, so
+  // this is the only weighted allocation check that exists.
+  const w = readIsland("parity_island_weighted.json");
+  const bank = rawRow(w, "Q6", "Bank");
+  const retail = rawRow(w, "Q6", "Retailer");
+  eq(String(bank.sig[2] || ""), "C", "weighted Bank: Beta still beats Gamma at 95%");
+  eq(String(bank.sig[4] || ""), "C", "weighted Bank: Delta still beats Gamma at 95%");
+  eq(String(retail.sig[2] || ""), "", "weighted Retailer: nothing at 95%");
+  eq(String(retail.sig2[2] || ""), "D", "weighted Retailer: the 80% letter survives");
+});
+
 console.log("\n" + (failed === 0 ? "✓ " : "✗ ") + passed + " passed, " + failed + " failed");
 process.exit(failed === 0 ? 0 : 1);

@@ -40,6 +40,7 @@ source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/data_layer_writer.R"))
 source(file.path(turas_root, "modules/tabs/lib/microdata_writer.R"))
 source(file.path(turas_root, "modules/tabs/lib/numeric_processor.R"))
+source(file.path(turas_root, "modules/tabs/lib/allocation_processor.R"))
 
 # ------------------------------------------------------------------------------
 # Two spend bands and one unbinned count, over six respondents.
@@ -197,11 +198,13 @@ alloc_structure <- function() {
       stringsAsFactors = FALSE))
 }
 
+# Respondent 3 allocated zero to every item: zero is an ANSWER, so they are in
+# the base. Respondent 5 has no slot filled at all and is not.
 alloc_data <- function() {
-  data.frame(WALLETLOC_1 = c(50, 30, 0, 10),
-             WALLETLOC_2 = c(30, 40, 0, 20),
-             WALLETLOC_3 = c(20, 30, 0, 70),
-             SPEND = c(1, 2, 3, 4), stringsAsFactors = FALSE)
+  data.frame(WALLETLOC_1 = c(50, 30, 0, 10, NA),
+             WALLETLOC_2 = c(30, 40, 0, 20, NA),
+             WALLETLOC_3 = c(20, 30, 0, 70, NA),
+             SPEND = c(1, 2, 3, 4, 5), stringsAsFactors = FALSE)
 }
 
 # Two shapes, because the row CLASS is what decides which path the island
@@ -218,13 +221,144 @@ alloc_dl_q <- function(kind = "mean") {
        }))
 }
 
-test_that("an allocation question carries a full-length column of NA", {
-  for (kind in c("mean", "category")) {
-    answers <- micro_answers_for_question(alloc_dl_q(kind), alloc_data(),
-                                          alloc_structure(), 4)
-    expect_equal(length(answers), 4L, info = kind)
-    expect_true(all(is.na(as.integer(answers))), info = kind)
+# This test used to assert a full column of NA for BOTH shapes. The "mean"
+# shape now marks the base instead (the series carries the values), which is
+# what makes an Allocation recomputable under a filter. The "category" shape is
+# the pre-fce6cbc1 one that broke the report and still has to hold.
+test_that("an allocation question marks who is in the base", {
+  answers <- micro_answers_for_question(alloc_dl_q("mean"), alloc_data(),
+                                        alloc_structure(), 5)
+  expect_equal(length(answers), 5L)
+  # -2 for anyone with at least one non-NA numeric slot, which is
+  # calculate_allocation_base() restated per respondent. Zero counts.
+  expect_equal(as.integer(answers), c(-2L, -2L, -2L, -2L, NA_integer_))
+})
+
+test_that("the old category shape still carries a full-length column of NA", {
+  # No mean rows, so no row can be paired with a column: the series refuses and
+  # the answers column stays all-NA rather than claiming a base.
+  answers <- micro_answers_for_question(alloc_dl_q("category"), alloc_data(),
+                                        alloc_structure(), 5)
+  expect_equal(length(answers), 5L)
+  expect_true(all(is.na(as.integer(answers))))
+})
+
+# ------------------------------------------------------------------------------
+# TR.MICRO.series: one value series per allocation ITEM
+# ------------------------------------------------------------------------------
+# scores[code] is one number per respondent and six consumers assume exactly
+# that, so an Allocation's k series go under a new key instead, keyed by the
+# item's zero-based position in the question's data-layer rows[].
+
+test_that("a series carries each item's raw slot values, keyed by row index", {
+  series <- micro_series_for_question(alloc_dl_q(), alloc_data(),
+                                      alloc_structure(), 5)
+  expect_equal(sort(names(series)), c("0", "1", "2"))
+  # Row 0 is option 1, therefore column WALLETLOC_1. Zero is kept as a value;
+  # the unfilled respondent is NA.
+  expect_equal(as.numeric(series[["0"]]), c(50, 30, 0, 10, NA))
+  expect_equal(as.numeric(series[["1"]]), c(30, 40, 0, 20, NA))
+  expect_equal(as.numeric(series[["2"]]), c(20, 30, 0, 70, NA))
+})
+
+test_that("every series is length n, and a blank slot is NA not dropped", {
+  for (n in c(1L, 5L, 25L)) {
+    series <- micro_series_for_question(alloc_dl_q(), alloc_data(),
+                                        alloc_structure(), n)
+    for (k in names(series)) {
+      expect_equal(length(series[[k]]), n, info = paste("n =", n, "row", k))
+    }
   }
+  # Non-numeric text in a slot is NA, exactly as collect_allocation_values()
+  # treats it, not a zero that would drag the recomputed mean down.
+  d <- alloc_data()
+  d$WALLETLOC_2[1] <- "n/a"
+  series <- micro_series_for_question(alloc_dl_q(), d, alloc_structure(), 5)
+  expect_true(is.na(as.numeric(series[["1"]])[1]))
+})
+
+test_that("a non-allocation question gets no series at all", {
+  dl_q <- list(code = "SPEND", type = "numeric",
+               rows = list(list(kind = "mean", label = "Mean", mstat = "mean")))
+  expect_null(micro_series_for_question(dl_q, alloc_data(), alloc_structure(), 5))
+})
+
+test_that("duplicate option labels refuse the series out loud", {
+  st <- alloc_structure()
+  st$options$OptionText <- c("Bank", "Other", "Other")
+  st$options$DisplayText <- c("Bank", "Other", "Other")
+  # The data layer collapses two same-labelled rows into one (pair_ids), so no
+  # row-to-column pairing is safe and the whole question refuses.
+  expect_output(
+    series <- micro_series_for_question(alloc_dl_q(), alloc_data(), st, 5),
+    "Other")
+  expect_null(series)
+  # ... and with no series there are no base markers either.
+  expect_output(
+    answers <- micro_answers_for_question(alloc_dl_q(), alloc_data(), st, 5))
+  expect_true(all(is.na(as.integer(answers))))
+})
+
+test_that("a row out of option order refuses rather than shifting a series", {
+  # Retailer and Other swapped in the published rows. Pairing row j with option
+  # j would hand every Retailer cell the Other column's numbers.
+  dl_q <- alloc_dl_q()
+  dl_q$rows <- dl_q$rows[c(1, 3, 2)]
+  expect_output(
+    series <- micro_series_for_question(dl_q, alloc_data(), alloc_structure(), 5),
+    "not in option order")
+  expect_null(series)
+})
+
+test_that("a missing slot column refuses rather than inventing a series", {
+  d <- alloc_data()
+  d$WALLETLOC_3 <- NULL
+  expect_output(
+    series <- micro_series_for_question(alloc_dl_q(), d, alloc_structure(), 5),
+    "WALLETLOC_3")
+  expect_null(series)
+})
+
+test_that("a mean-row count that disagrees with Columns refuses", {
+  dl_q <- alloc_dl_q()
+  dl_q$rows <- dl_q$rows[1:2]     # data layer dropped a row
+  expect_output(
+    series <- micro_series_for_question(dl_q, alloc_data(), alloc_structure(), 5),
+    "declares 3 columns")
+  expect_null(series)
+})
+
+test_that("the island carries series for an allocation and omits the key without one", {
+  banner <- list(columns = "Total", internal_keys = "TOTAL::Total",
+                 banner_info = list())
+  cfg <- list(apply_weighting = FALSE)
+  dl_alloc <- list(questions = list(alloc_dl_q()))
+  micro <- build_microdata(dl_alloc, alloc_data(), alloc_structure(), banner, cfg)
+  expect_true(!is.null(micro$series))
+  expect_equal(sort(names(micro$series[["WALLETLOC"]])), c("0", "1", "2"))
+  # scores stays flat: the allocation contributes nothing to it.
+  expect_null(micro$scores[["WALLETLOC"]])
+
+  # A report with no allocation question is byte-identical to before: no key.
+  dl_num <- list(questions = list(
+    list(code = "SPEND", type = "numeric",
+         rows = list(list(kind = "mean", label = "Mean", mstat = "mean")))))
+  micro2 <- build_microdata(dl_num, alloc_data(), alloc_structure(), banner, cfg)
+  expect_null(micro2$series)
+})
+
+test_that("serialize_microdata renders a series as a length-n array at n = 1", {
+  banner <- list(columns = "Total", internal_keys = "TOTAL::Total",
+                 banner_info = list())
+  cfg <- list(apply_weighting = FALSE)
+  dl_alloc <- list(questions = list(alloc_dl_q()))
+  micro <- build_microdata(dl_alloc, alloc_data()[1, , drop = FALSE],
+                           alloc_structure(), banner, cfg)
+  json <- serialize_microdata(micro)
+  # A one-respondent series must stay an ARRAY, never unbox to a bare number:
+  # the reader indexes it by respondent row.
+  expect_true(grepl('"series"', json, fixed = TRUE))
+  expect_true(grepl('"0":[50]', json, fixed = TRUE))
 })
 
 test_that("the island entry is never zero-length, whatever the row count", {

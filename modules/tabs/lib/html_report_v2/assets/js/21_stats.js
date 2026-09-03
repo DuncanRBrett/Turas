@@ -538,6 +538,35 @@
   };
 
   /**
+   * Mean + sd + effective base per column for ONE ITEM of an Allocation
+   * (constant-sum) question, from TR.MICRO.series[code][rowIndex].
+   *
+   * An Allocation publishes one mean row per item, so it needs k score series
+   * under one question code and TR.MICRO.scores holds exactly one. The series
+   * island carries them keyed by the item's zero-based position in the
+   * question's rows[], which is the same `ri` the model iterates rows with.
+   *
+   * Returns the same {mean, sd, k} shape indexMeans returns, so each item row
+   * is tested exactly like any other numeric mean. null when this row carries
+   * no series, which the model renders as blank cells rather than as a
+   * neighbouring item's number.
+   */
+  stats.seriesMeans = function (q, rowIndex, columns, mask) {
+    var all = TR.MICRO.series;
+    if (!all || !Object.prototype.hasOwnProperty.call(all, q.code)) return null;
+    var byRow = all[q.code];
+    var key = String(rowIndex);
+    // hasOwnProperty, not a truthiness test: a question code or a row key of
+    // "constructor" would otherwise read back the inherited function (M11).
+    if (!byRow || !Object.prototype.hasOwnProperty.call(byRow, key)) return null;
+    var series = byRow[key];
+    if (!series) return null;
+    return columns.map(function (col) {
+      return weightedMeanColumn(function (r) { return series[r]; }, mask, col);
+    });
+  };
+
+  /**
    * Ratio of totals per column: Σw·numerator / Σw·denominator, over everyone in
    * the audience holding both, with a denominator above zero. This is the
    * average of the UNITS (the average transaction), not of the people (the

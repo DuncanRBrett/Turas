@@ -824,5 +824,64 @@ run("37. the sort control offers exactly three orders, balanced in the middle", 
   assert(/\(balanced\)/.test(html), "and the balanced option says so on its face");
 });
 
+/* ---------------------------------------------------------------------------
+ * Allocation questions are excluded from Differences (D7).
+ * An Allocation carries one series per ITEM row, not one score per question, so
+ * a scan built around a single headline mean would report item 1 as though it
+ * were the question. Row-aware findings are a follow-up; until then it must
+ * raise nothing at all.
+ * ------------------------------------------------------------------------- */
+
+function allocFixture(D) {
+  const n = 40;
+  const bannerVars = [], bank = [], retail = [];
+  for (let r = 0; r < n; r++) {
+    const male = r < 20;
+    bannerVars.push(male ? 0 : 1);
+    // A gap far wider than the mean fixture's, so the scan would certainly
+    // raise a finding if it read these as a question-level score.
+    bank.push(male ? 80 : 20);
+    retail.push(male ? 20 : 80);
+  }
+  const q = { code: "QA", title: "Share of wallet", category: "Wallet",
+    type: "single",
+    rows: [{ kind: "mean", label: "Bank", mstat: "mean" },
+           { kind: "mean", label: "Retailer", mstat: "mean" }] };
+  D.MICRO = { n: n, answers: { QA: bannerVars.map(() => -2) },
+              series: { QA: { "0": bank, "1": retail } },
+              banner_vars: { Gender: bannerVars }, boxes: {}, weights: null };
+  D.AGG = { project: { low_base_threshold: 10 },
+            columns: [{ label: "Male", letter: "A" }, { label: "Female", letter: "B" }],
+            banner_groups: [{ id: "Gender", name: "Gender" }],
+            questions: [q] };
+  D.d2 = { state: { sigMode: "95", filters: [] },
+           hasMicrodata: () => true, firstBanner: () => "Gender",
+           groupCols: () => [0, 1],
+           catRows: () => [],
+           questionByCode: (c) => (c === "QA" ? q : null) };
+  D.model = { forQuestion: () => ({ columns: [{ label: "Total", letter: "", base: 40 }],
+    rows: q.rows.map((r) => ({ kind: r.kind, label: r.label, stat: "Column %", cells: [] })) }) };
+  return D;
+}
+
+run("38. an allocation question raises no Differences finding", () => {
+  const D = allocFixture(sandbox(true));
+  eq(D.views._collectFindings("Gender").length, 0,
+     "an allocation's items are not a single headline mean");
+});
+
+run("39. …and it is excluded even if indexMeans later learns to read series", () => {
+  const D = allocFixture(sandbox(true));
+  // The guard is on the question carrying `series` and no `scores`, so it holds
+  // independently of what indexMeans does. Prove it by handing indexMeans a
+  // working answer: without the guard, this is exactly the shape that would
+  // report item 1 as "Share of wallet".
+  D.stats.indexMeans = () => ([
+    { mean: 80, sd: 1, k: 20 }, { mean: 20, sd: 1, k: 20 }
+  ]);
+  eq(D.views._collectFindings("Gender").length, 0,
+     "the exclusion does not depend on indexMeans returning null");
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

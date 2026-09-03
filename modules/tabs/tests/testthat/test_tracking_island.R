@@ -103,6 +103,35 @@ test_that("wave_contribution drops NA scores and counts the base accordingly", {
   expect_equal(as.numeric(contrib$questions[[1]]$scores), c(6, 8))
 })
 
+# An ALLOCATION question carries its values under micro$series (one per item
+# row), never under micro$scores, because it has k means and no single
+# per-respondent score. wave_contribution reads scores only, so it contributes
+# nothing to a wave. Per-item wave tracking is a follow-up and needs a per-item
+# key in Question_Mapping; until then a metric silently keyed to item 1 would be
+# worse than no metric at all.
+test_that("an allocation question contributes no wave metric", {
+  dl <- list(questions = list(
+    list(code = "WALLET", title = "Share of wallet", type = "single",
+         rows = list(list(kind = "mean", label = "Bank", mstat = "mean"),
+                     list(kind = "mean", label = "Retailer", mstat = "mean")))))
+  micro <- list(
+    n = 3,
+    scores = list(),
+    series = list(WALLET = list("0" = I(c(80, 20, 50)), "1" = I(c(20, 80, 50)))),
+    weights = I(c(1, 1, 1)))
+  expect_null(wave_contribution(dl, micro, list(wave = "W", wave_order = 2024)))
+
+  # Alongside a question that DOES carry scores, only that one is tracked: the
+  # allocation is skipped, not the whole contribution.
+  dl2 <- list(questions = c(dl$questions, list(
+    list(code = "Q1", title = "Overall rating", type = "scale"))))
+  micro2 <- micro
+  micro2$scores <- list(Q1 = I(c(6, 8, 7)))
+  contrib <- wave_contribution(dl2, micro2, list(wave = "W", wave_order = 2024))
+  expect_equal(length(contrib$questions), 1L)
+  expect_equal(contrib$questions[[1]]$code, "Q1")
+})
+
 test_that("wave_contribution returns NULL when no metric carries scores", {
   expect_null(wave_contribution(ti_data_layer(),
               list(n = 3, scores = list(), weights = I(c(1, 1, 1))),

@@ -283,5 +283,52 @@ run("a stale composite story pin exports a placeholder slide, never crashes the 
   eq(slides[2].rows, 1, "live matrix carries its one index metric (Q007)");
 });
 
+/* ---------------- 4. allocation rows carry no composite arrows (D7) ---------------- */
+run("an allocation's item rows carry no composite arrows", () => {
+  // applyCompositeSignificance tests mean rows through indexMeans, which is
+  // null for an Allocation (no scores, no category rows for index_scores). The
+  // rows still RECOMPUTE from their series, so the values are real; what stays
+  // blank is the vs-the-rest arrow. A row-aware composite test is a follow-up,
+  // and until it exists a blank is the honest cell.
+  // Added for this test only: an extra question in the shared fixture changes
+  // what the story/exhibit gathering counts as an index metric.
+  const allocQ = { code: "Q009", title: "Share of wallet", type: "single",
+    category: "Test",
+    rows: [{ kind: "mean", label: "Bank", mstat: "mean" },
+           { kind: "mean", label: "Retailer", mstat: "mean" }] };
+  TR.AGG.questions.push(allocQ);
+  TR.MICRO.answers.Q009 = idx.map(() => -2);   // the allocation base marker
+  // Marketing allocates heavily to Bank, Admin to Retailer: a gap this wide
+  // would certainly earn an arrow if the composite path tested these rows.
+  TR.MICRO.series = { Q009: {
+    "0": idx.map((i) => (i < 20 ? 80 + (i % 2) : 20 + (i % 2))),
+    "1": idx.map((i) => (i < 20 ? 20 - (i % 2) : 80 - (i % 2)))
+  } };
+  TR.d2._qIndex = null;
+  let m;
+  try {
+    m = TR.model.forQuestion("Q009", compId, [], { dual: false });
+  } finally {
+    TR.AGG.questions.pop();
+    delete TR.MICRO.answers.Q009;
+    delete TR.MICRO.series;
+    TR.d2._qIndex = null;
+  }
+  assert(m.composite === true, "model flagged composite");
+  const bank = m.rows.find((r) => r.label === "Bank");
+  const retail = m.rows.find((r) => r.label === "Retailer");
+  assert(bank && retail, "both item rows present");
+  // The values are recomputed per item, so this is not passing because the
+  // question dropped out of the model altogether.
+  assert(bank.cells[1].mean !== null && bank.cells[1].mean > 79,
+    "Marketing's Bank mean recomputed, got " + bank.cells[1].mean);
+  assert(retail.cells[1].mean !== null && retail.cells[1].mean < 21,
+    "Marketing's Retailer mean recomputed, got " + retail.cells[1].mean);
+  // ...and no arrow, and certainly no pairwise letter, on any cell.
+  m.rows.forEach((r) => r.cells.forEach((c, i) => {
+    eq(c.sig || "", "", "no marker on " + r.label + " / " + m.columns[i].label);
+  }));
+});
+
 console.log("\n" + (failed ? "✗ " : "✓ ") + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

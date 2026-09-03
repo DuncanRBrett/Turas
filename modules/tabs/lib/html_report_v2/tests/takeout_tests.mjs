@@ -1309,5 +1309,33 @@ run("gather sets portrayAll only when patterns_banner matches a banner", () => {
   assert(takeout.gather().portrayAll === false, "unset -> legacy behaviour");
 });
 
+/* ---------------------------------------------------------------------------
+ * Allocation questions stay out of the Patterns cell family (D7).
+ * familyEligible reads micro.scores only, so an Allocation is excluded by
+ * construction. This pins that, so nobody later "fixes" it by reading series:
+ * the family runs ONE Welch per question over a per-respondent score, and an
+ * Allocation has k of them.
+ * ------------------------------------------------------------------------- */
+run("an allocation question is not eligible for the Patterns cell family", () => {
+  const rows = [{ kind: "mean", label: "Bank", mstat: "mean" },
+                { kind: "mean", label: "Retailer", mstat: "mean" }];
+  const series = { QA: { "0": [80, 80, 20, 20], "1": [20, 20, 80, 80] } };
+
+  // As a real Allocation arrives: no scale_max and no index_scores.
+  const real = { code: "QA", title: "Share of wallet", type: "single", rows: rows };
+  assert(takeout._familyEligible(real, { n: 4, scores: {}, series: series }) === false,
+    "a real allocation must not enter the family");
+
+  // scale_max pinned so the ONLY thing left deciding is the scores check. This
+  // is the assertion that fails if anyone teaches familyEligible to read series.
+  const scaled = { code: "QA", title: "Share of wallet", type: "single",
+    rows: rows, scale_max: 10 };
+  assert(takeout._familyEligible(scaled, { n: 4, scores: {}, series: series }) === false,
+    "a series is not a score: the family must not pick this up");
+  assert(takeout._familyEligible(scaled, { n: 4, scores: { QA: [1, 2, 3, 4] } }) === true,
+    "a real per-respondent score is still eligible, so the check above is not "
+    + "passing for the wrong reason");
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

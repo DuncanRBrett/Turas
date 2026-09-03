@@ -160,6 +160,48 @@ Q5_DIST <- rbind(
   Delta = c(20L, 20L,  0L,  5L,  5L)
 )
 
+# Q6 is an ALLOCATION (constant-sum) question: three items, Q6_1..Q6_3, each a
+# number, summing to 100 per respondent, published as one MEAN row per item
+# (review 2026-09). It is the fixture's only question with k mean rows under one
+# code, and the only one whose live recompute reads TR.MICRO.series rather than
+# TR.MICRO.scores.
+#
+# Within a cohort respondents alternate between two allocations, so every mean
+# below is EXACT (all four cohort sizes are even) and the within-cohort SD is
+# non-zero, which a t-test needs. item1 = M1 + S1*alt, item2 = M2 - S2*alt,
+# item3 = the remainder, with alt = +1, -1, +1, ...
+#
+#   Cohort   n    Bank (S1=10)   Retailer (S2=17)   Other
+#   ------   --   ------------   ----------------   -----
+#   Alpha    40        50               33            17
+#   Beta     60        50               37            13
+#   Gamma    50        30               33            37
+#   Delta    50        50               30            20
+#
+# Two separations are built in on purpose, because D9 asks the parity gate to
+# cover both alpha levels on this row family:
+#   Bank, Gamma vs Beta:   a 20-point gap on sd ~10.1. Statistic ~11.5 after the
+#     FPC, far past the Bonferroni-adjusted primary threshold (0.05/6). A 95%
+#     letter.
+#   Retailer, Beta vs Delta: a 7-point gap on sd ~17.1. Statistic ~2.35 after
+#     the FPC, between the adjusted 80% and 95% critical values. An 80%-ONLY
+#     letter, the case a single-alpha test shows as no difference at all.
+#
+# The Retailer spread is 17 rather than a rounder 15 for a specific reason. R
+# runs a Welch t and the v2 reader runs a z on the same means and bases, so
+# their critical values differ slightly (about 2.68 vs 2.638 at the adjusted
+# primary level). At spread 15 this pair computed to ~2.665, which falls BETWEEN
+# them: R said no letter, the reader said a letter, and the parity gate could
+# only log the disagreement instead of pinning it. At 17 the statistic sits
+# clear of both engines' thresholds in the same direction, so both must letter
+# it at 80% and neither at 95%. Do not round it back.
+# Every respondent allocates: the empty-form base rule (D3) is pinned in the
+# unit suites, and an exact hand-derivable mean is what this fixture is for.
+Q6_MEAN1 <- c(Alpha = 50, Beta = 50, Gamma = 30, Delta = 50)
+Q6_MEAN2 <- c(Alpha = 33, Beta = 37, Gamma = 33, Delta = 30)
+Q6_SPREAD1 <- 10
+Q6_SPREAD2 <- 17
+
 # Weights, one constant per cohort plus a deliberate within-cohort split so the
 # Kish effective base is genuinely below the raw n (a constant weight would make
 # n_eff == n and quietly test nothing).
@@ -184,6 +226,11 @@ build_survey_data <- function() {
     q4 <- rep(Q4_SCORES, times = Q4_DIST[coh, ])
     # Q5: the NET POSITIVE rating, counts from Q5_DIST.
     q5 <- rep(1:5, times = Q5_DIST[coh, ])
+    # Q6: the allocation. alt = +1, -1, +1, ... so each item's mean is exact.
+    alt <- rep(c(1, -1), length.out = n)
+    q6_1 <- Q6_MEAN1[[coh]] + Q6_SPREAD1 * alt
+    q6_2 <- Q6_MEAN2[[coh]] - Q6_SPREAD2 * alt
+    q6_3 <- 100 - q6_1 - q6_2
     w <- rep(COHORT_WEIGHT[[coh]], n)
     w[seq(3, n, by = 3)] <- w[seq(3, n, by = 3)] * WEIGHT_BUMP
 
@@ -195,6 +242,9 @@ build_survey_data <- function() {
       Q3 = q3,
       Q4 = q4,
       Q5 = q5,
+      Q6_1 = q6_1,
+      Q6_2 = q6_2,
+      Q6_3 = q6_3,
       Weight = w,
       stringsAsFactors = FALSE
     )
@@ -224,22 +274,24 @@ build_structure_workbook <- function(path) {
   )
 
   questions <- data.frame(
-    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5"),
+    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6"),
     QuestionText = c("Cohort",
                      "Have you used the service in the last month?",
                      "How would you rate the service?",
                      "The service is good value for money",
                      "How likely are you to recommend us?",
-                     "How satisfied are you overall?"),
+                     "How satisfied are you overall?",
+                     "Split 100 points across these three"),
     Variable_Type = c("Single_Response", "Single_Response", "Rating",
-                      "Single_Response", "NPS", "Rating"),
-    Columns = c(1L, 1L, 1L, 1L, 1L, 1L),
+                      "Single_Response", "NPS", "Rating", "Allocation"),
+    # Q6's Columns is the slot count: it reads Q6_1..Q6_3, not a bare Q6.
+    Columns = c(1L, 1L, 1L, 1L, 1L, 1L, 3L),
     Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy",
-                 "Satisfaction"),
+                 "Satisfaction", "Value"),
     # Optional columns the data-layer writer reads. Present-but-blank rather
     # than absent, so the fixture does not warn its way through every run.
-    ShortLabel = c("", "", "", "", "", ""),
-    LinkedOpenQuestion = c("", "", "", "", "", ""),
+    ShortLabel = c("", "", "", "", "", "", ""),
+    LinkedOpenQuestion = c("", "", "", "", "", "", ""),
     stringsAsFactors = FALSE
   )
 
@@ -273,7 +325,10 @@ build_structure_workbook <- function(path) {
     # a deliberately unboxed middle: an answer in no box still counts in the
     # base and scores 0.
     opt("Q5", as.character(1:5), 1:5,
-        box = c("Bottom 2 Box", "Bottom 2 Box", NA, "Top 2 Box", "Top 2 Box"))
+        box = c("Bottom 2 Box", "Bottom 2 Box", NA, "Top 2 Box", "Top 2 Box")),
+    # Q6's three allocation items. The option labels ARE the published mean-row
+    # labels, and the writer checks its row-to-column pairing against them.
+    opt("Q6", c("Bank", "Retailer", "Other"), 1:3)
   )
 
   wb <- createWorkbook()
@@ -342,18 +397,19 @@ build_config_workbook <- function(path, output_filename, weighted,
   )
 
   selection <- data.frame(
-    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5"),
-    Include = c("N", "Y", "Y", "Y", "Y", "Y"),
-    UseBanner = c("Y", "N", "N", "N", "N", "N"),
-    BannerLabel = c("Cohort", "", "", "", "", ""),
-    DisplayOrder = c(1L, NA, NA, NA, NA, NA),
+    QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6"),
+    Include = c("N", "Y", "Y", "Y", "Y", "Y", "Y"),
+    UseBanner = c("Y", "N", "N", "N", "N", "N", "N"),
+    BannerLabel = c("Cohort", "", "", "", "", "", ""),
+    DisplayOrder = c(1L, NA, NA, NA, NA, NA, NA),
     # Q4's Score row is native to the NPS type and does not need CreateIndex.
-    CreateIndex = c("N", "N", "Y", "N", "N", "N"),
+    # Q6's mean rows are native to the Allocation type for the same reason.
+    CreateIndex = c("N", "N", "Y", "N", "N", "N", "N"),
     # Q3 is routed: only respondents who answered Yes to Q1 were asked it.
-    BaseFilter = c("", "", "", "Q1 == 'Yes'", "", ""),
-    FilterLabel = c("", "", "", "Used the service in the last month", "", ""),
+    BaseFilter = c("", "", "", "Q1 == 'Yes'", "", "", ""),
+    FilterLabel = c("", "", "", "Used the service in the last month", "", "", ""),
     Category = c("Demographics", "Usage", "Satisfaction", "Value", "Advocacy",
-                 "Satisfaction"),
+                 "Satisfaction", "Value"),
     stringsAsFactors = FALSE
   )
 

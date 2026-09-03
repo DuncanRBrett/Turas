@@ -9,6 +9,7 @@
     "low_base_threshold": 30,
     "alpha": 0.05,
     "alpha_secondary": 0.2,
+    "alpha_default": "primary",
     "bonferroni": true,
     "sampling_method": "Not_Specified",
     "sig_note": "Capital letters mark a column whose value is significantly higher than the lettered column at the 95% level; the Total column is not tested. Ranges around values are stability intervals.",
@@ -27,7 +28,8 @@
       "patterns": true,
       "differences": true,
       "tracking": true,
-      "qualitative": true
+      "qualitative": true,
+      "save_copy": true
     },
     "weighted": true,
     "weight_label": "Weighted",
@@ -949,6 +951,151 @@
       "gauge_amber": null,
       "filter_label": "Used the service in the last month",
       "base_filter": "Q1 == 'Yes'"
+    },
+    {
+      "code": "Q6",
+      "title": "Split 100 points across these three",
+      "category": "Value",
+      "theme": "",
+      "key_share": "",
+      "type": "single",
+      "bases": [
+        {
+          "n": 200,
+          "low": false,
+          "nWeighted": 276,
+          "nEff": 173.77497947
+        },
+        {
+          "n": 40,
+          "low": false,
+          "nWeighted": 79.6,
+          "nEff": 37.04490178
+        },
+        {
+          "n": 60,
+          "low": false,
+          "nWeighted": 60,
+          "nEff": 55.55555556
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 74.4,
+          "nEff": 46.31325301
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 62,
+          "nEff": 46.31325301
+        }
+      ],
+      "rows": [
+        {
+          "kind": "mean",
+          "label": "Bank",
+          "mstat": "mean",
+          "pct": [
+            44.7,
+            50.2,
+            50,
+            30,
+            50
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ],
+          "sig2": [
+            "",
+            "",
+            "C",
+            "",
+            "C"
+          ]
+        },
+        {
+          "kind": "mean",
+          "label": "Retailer",
+          "mstat": "mean",
+          "pct": [
+            33.1,
+            32.7,
+            37,
+            33,
+            30
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "D",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": "mean",
+          "label": "Other",
+          "mstat": "mean",
+          "pct": [
+            22.2,
+            17.1,
+            13,
+            37,
+            20
+          ],
+          "n": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "BD",
+            "B"
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            "B"
+          ]
+        }
+      ],
+      "scale_max": null,
+      "gauge_green": null,
+      "gauge_amber": null,
+      "stat": "Average"
     },
     {
       "code": "Q4",

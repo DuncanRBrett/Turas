@@ -249,14 +249,23 @@ expected_sig_cells <- function(table, keys, lbl, src, kind, rtype, sig_type) {
     s <- trimws(as.character(table$RowSource)); ifelse(is.na(s), "", s)
   } else rep("", nrow(table))
 
+  by_label <- function() {
+    table[!is.na(table$RowLabel) & !is.na(table$RowType) &
+          table$RowLabel == lbl & row_src == src &
+          table$RowType == sig_type, , drop = FALSE]
+  }
   if (identical(kind, "mean") && identical(src, "summary")) {
     if (!rtype %in% c("Average", "Index", "Score")) return(blank)
     sel <- table[!is.na(table$RowType) & row_src == "summary" &
                  table$RowType == sig_type, , drop = FALSE]
+    # SEVERAL summary Sig. rows means several mean blocks in one table: an
+    # ALLOCATION question emits one Average row per option, each with its own
+    # Sig. row directly under it, so the forward-filled label IS the
+    # discriminator. Mirrors mean_sig_for() in data_layer_writer.R, which this
+    # helper exists to check rather than to re-derive.
+    if (nrow(sel) > 1) sel <- by_label()
   } else {
-    sel <- table[!is.na(table$RowLabel) & !is.na(table$RowType) &
-                 table$RowLabel == lbl & row_src == src &
-                 table$RowType == sig_type, , drop = FALSE]
+    sel <- by_label()
   }
   if (nrow(sel) != 1) return(blank)
   vapply(keys, function(k) {
@@ -280,8 +289,9 @@ mean_rtype_for <- function(table, lbl, src) {
 test_that("the fixture produces the shape the parity harness assumes", {
   run <- parity_run()
   expect_equal(run$analysis$run_status, "PASS")
-  # Q5 carries the NET POSITIVE row (review 2026-08, I5).
-  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3", "Q4", "Q5"))
+  # Q5 carries the NET POSITIVE row (review 2026-08, I5); Q6 is the ALLOCATION
+  # question, the only one with k mean rows under a single code (review 2026-09).
+  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"))
   # Dual alpha is on: 0.05 primary, 0.20 secondary.
   expect_equal(run$config$config_obj$alpha, 0.05)
   expect_equal(run$config$config_obj$alpha_secondary, 0.20)
@@ -782,4 +792,86 @@ test_that("the weighted run tests the weighted net on the effective base", {
   expect_equal(sig[[3]], "D")
   expect_equal(sig[[4]], "D")
   expect_equal(sig[[2]], "")
+})
+
+
+# ==============================================================================
+# R-6. ALLOCATION QUESTIONS (2026-09)
+# ==============================================================================
+#
+# Q6 is the fixture's only ALLOCATION question: three items published as three
+# MEAN rows under one code. It is here because it is the only row family the v2
+# reader recomputes from TR.MICRO.series rather than TR.MICRO.scores, and the
+# only one where a row-to-column pairing can silently shift. The letters below
+# are what R carries into the island; parity_stats_tests.mjs recomputes the same
+# rows in JS from the same numbers and must land on them too.
+# ==============================================================================
+
+context("R-6: allocation questions")
+
+alloc_row <- function(island, label, field) {
+  q <- Filter(function(x) identical(x$code, "Q6"), island$questions)[[1]]
+  r <- Filter(function(x) identical(x$label, label), q$rows)[[1]]
+  unlist(lapply(r[[field]], function(v) if (is.null(v)) "" else v))
+}
+
+test_that("an allocation publishes one mean row per item, in option order", {
+  run <- parity_run()
+  q <- Filter(function(x) identical(x$code, "Q6"), run$island$questions)[[1]]
+  expect_equal(vapply(q$rows, function(r) r$label, character(1)),
+               c("Bank", "Retailer", "Other"))
+  # Every row is a mean, and every one is the HEADLINE mean. The reader keys
+  # its series on the row's position here, so the order is part of the contract.
+  expect_true(all(vapply(q$rows, function(r) identical(r$kind, "mean"), logical(1))))
+  expect_true(all(vapply(q$rows, function(r) identical(r$mstat, "mean"), logical(1))))
+})
+
+test_that("each item's published mean is the hand-derived cohort mean", {
+  run <- parity_run()
+  # Total | Alpha | Beta | Gamma | Delta. Exact by construction: each cohort
+  # alternates two allocations and every cohort size is even.
+  expect_equal(alloc_row(run$island, "Bank", "pct"), c(45, 50, 50, 30, 50))
+  expect_equal(alloc_row(run$island, "Retailer", "pct"), c(33.5, 33, 37, 33, 30))
+  expect_equal(alloc_row(run$island, "Other", "pct"), c(21.6, 17, 13, 37, 20))
+})
+
+test_that("an item separating at 95% is lettered on the primary alpha", {
+  run <- parity_run()
+  # Bank: Gamma 30 against Beta 50 and Delta 50, on sd ~10.1. Both clear the
+  # Bonferroni-adjusted 0.05/6 threshold, so both carry C.
+  expect_equal(alloc_row(run$island, "Bank", "sig"), c("", "", "C", "", "C"))
+  expect_equal(alloc_row(run$island, "Bank", "sig2"), c("", "", "C", "", "C"))
+})
+
+test_that("an item separating only at 80% is lettered on sig2 and NOT on sig", {
+  run <- parity_run()
+  # Retailer: Beta 37 against Delta 30 on sd ~15.1, Welch t ~ 2.41. That sits
+  # between the adjusted 80% and 95% critical values, so it is the case a
+  # single-alpha report shows as no difference at all.
+  expect_equal(alloc_row(run$island, "Retailer", "sig"), c("", "", "", "", ""))
+  expect_equal(alloc_row(run$island, "Retailer", "sig2"), c("", "", "D", "", ""))
+})
+
+test_that("each item is tested on its own, not on its siblings", {
+  run <- parity_run()
+  # Same question, same respondents, three different verdicts: Bank goes
+  # against Gamma, Other goes to Gamma, and Retailer separates for nobody at
+  # 95%. A test that read item 1 as "the question" would print Bank's letters
+  # on all three rows.
+  expect_equal(alloc_row(run$island, "Other", "sig"), c("", "", "", "BD", "B"))
+  expect_false(identical(alloc_row(run$island, "Bank", "sig"),
+                         alloc_row(run$island, "Other", "sig")))
+})
+
+test_that("the weighted run carries the same allocation letters", {
+  # The untested half: every allocation study so far has been unweighted, so
+  # this is the only place the weighted path's letters are checked at all.
+  run <- parity_run("Parity_Crosstab_Config_Weighted.xlsx")
+  expect_equal(alloc_row(run$island, "Bank", "sig"), c("", "", "C", "", "C"))
+  expect_equal(alloc_row(run$island, "Retailer", "sig"), c("", "", "", "", ""))
+  expect_equal(alloc_row(run$island, "Retailer", "sig2"), c("", "", "D", "", ""))
+  # The within-cohort weight bump moves Alpha's mean off its unweighted 50;
+  # the cohorts with a flat pattern across the bumped respondents do not move.
+  expect_equal(alloc_row(run$island, "Bank", "pct")[[3]], 50)
+  expect_equal(alloc_row(run$island, "Bank", "pct")[[4]], 30)
 })

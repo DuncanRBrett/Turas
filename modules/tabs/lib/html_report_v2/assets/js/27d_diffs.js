@@ -176,6 +176,14 @@
       if (!row && r.kind === "mean" && TR.fmt.isHeadlineMean(r)) row = r;
     });
     if (!row) return out;
+    // An ALLOCATION question carries one series per item row, not one score for
+    // the question, so there is no single "headline mean" to scan: this would
+    // report item 1 as though it were the question. indexMeans already returns
+    // null for it (no scores, and no category rows to hang index_scores on), so
+    // this is explicit rather than incidental, and stays right if indexMeans
+    // ever learns to read series. Row-aware findings are a follow-up.
+    if (TR.MICRO.series && TR.MICRO.series[q.code] &&
+        !(TR.MICRO.scores && TR.MICRO.scores[q.code])) return out;
     var means = TR.stats.indexMeans(q, spec.columns, mask);
     if (!means) return out;                       // ranking / no-score question
     var scores = TR.MICRO.scores && TR.MICRO.scores[q.code];

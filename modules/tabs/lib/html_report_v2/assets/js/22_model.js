@@ -183,6 +183,10 @@
   function recomputable(q) {
     if (TR.MICRO.boxes && TR.MICRO.boxes[q.code]) return true;
     if (TR.MICRO.scores && TR.MICRO.scores[q.code]) return true;
+    // An Allocation question carries one series per item row instead of one
+    // score. The answers channel below already says true for it (the writer
+    // marks its base), but the contract is stated here rather than inferred.
+    if (TR.MICRO.series && TR.MICRO.series[q.code]) return true;
     var a = TR.MICRO.answers[q.code];
     if (!a) return false;
     for (var i = 0; i < a.length; i++) {
@@ -217,6 +221,24 @@
 
     var rows = q.rows.map(function (r, ri) {
       if (r.kind === "mean") {
+        // An Allocation item row has its OWN series, so it recomputes per row
+        // and is tested like any other numeric mean (one Welch per item,
+        // independently of its siblings, which is what R's per-option Sig. row
+        // does). This sits before the question-level blank-out because such a
+        // question has no scores and therefore no `means` at all.
+        // Gated on the row being the headline MEAN (every Allocation item row
+        // is: its RowType is "Average"). A spread or a median row carrying a
+        // series would need its own recompute, so it falls through and blanks
+        // rather than printing the mean under another statistic's label.
+        var srs = TR.fmt.isHeadlineMean(r)
+          ? TR.stats.seriesMeans(q, ri, spec.columns, mask) : null;
+        if (srs) {
+          var srsSig = TR.stats.sigLetters(srs, letters, threshold, true, dual);
+          return rowModel(r, srs.map(function (m, i) {
+            return { mean: m.mean, n: null, pct: null,
+              sig: srsSig ? srsSig[i] : "" };
+          }));
+        }
         if (!means) {
           return rowModel(r, spec.columns.map(function () {
             return { mean: null, n: null, pct: null, sig: "" };

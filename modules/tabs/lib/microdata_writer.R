@@ -225,16 +225,31 @@ micro_answers_for_question <- function(dl_q, survey_data, survey_structure, n) {
                 perl = TRUE)) > 0
 
   # An ALLOCATION question has no bare data column and no category rows: it is
-  # {code}_1..{code}_N of numbers, published as one mean row per option. There
-  # is nowhere in this island to put N numbers per respondent, so it carries
-  # none - the same place Ranking is in. Without this it fell through to the
-  # single-response path, which indexed a column that does not exist and
-  # returned a zero-length vector: the report then refused to open at all
-  # ("DATA_MICRO_Q microdata missing/short"). A full-length column of NA is
-  # honest and well-formed - recomputable() reads it as "no microdata" and a
-  # filtered view says so rather than inventing figures.
+  # {code}_1..{code}_N of numbers, published as one mean row per option. Its N
+  # numbers per respondent live under TR.MICRO.series (one per item row), not
+  # here, because this island holds exactly one value per respondent per
+  # question. What this column carries is WHO IS IN THE BASE: the
+  # answered-but-unshown sentinel for any respondent with at least one non-NA
+  # numeric slot, which is calculate_allocation_base() restated per
+  # respondent, so a base recomputed under a filter is the published base
+  # rule. stats.tabulate counts -2 in the base and tallies nothing, which is
+  # right: an Allocation has no category rows to land on.
+  #
+  # Only when the series built. If the pairing was refused (duplicate labels,
+  # rows out of option order) the column stays all-NA, recomputable() reads it
+  # as "no microdata", and the card keeps its "n/a under filter" badge. A base
+  # with blank rows under it would be worse than the badge.
+  #
+  # Before this it was always a full-length column of NA. That was the honest
+  # stop-gap for the crash it fixed: the single-response path indexed a column
+  # that does not exist and returned a zero-length vector, so the report
+  # refused to open at all ("DATA_MICRO_Q microdata missing/short").
   if (identical(micro_variable_type(dl_q$code, survey_structure), "Allocation")) {
-    return(I(rep(NA_integer_, n)))
+    series <- micro_series_for_question(dl_q, survey_data, survey_structure, n)
+    if (is.null(series) || length(series) == 0) return(I(rep(NA_integer_, n)))
+    answered <- rep(FALSE, n)
+    for (s in series) answered <- answered | !is.na(as.numeric(s))
+    return(I(ifelse(answered, MICRO_ANSWERED_UNSHOWN, NA_integer_)))
   }
 
   # A BINNED numeric question's rows are ranges ("R100 - R249") and its stored
@@ -519,6 +534,141 @@ micro_score_value_map <- function(qcode, survey_structure, vt) {
 }
 
 
+#' Declared slot count for an Allocation question (from the structure)
+#'
+#' The same Columns cell process_allocation_question() reads, so the writer and
+#' the published table agree on how many slots the question has.
+#'
+#' @param qcode Question code
+#' @param survey_structure Loaded structure (needs $questions)
+#' @return Integer slot count, or NA_integer_
+#' @keywords internal
+micro_allocation_n_cols <- function(qcode, survey_structure) {
+  q <- survey_structure$questions
+  if (is.null(q) || !all(c("QuestionCode", "Columns") %in% names(q))) {
+    return(NA_integer_)
+  }
+  row <- q[!is.na(q$QuestionCode) & q$QuestionCode == qcode, , drop = FALSE]
+  if (nrow(row) == 0) return(NA_integer_)
+  suppressWarnings(as.integer(row$Columns[1]))
+}
+
+
+#' Boxed console warning that one Allocation question carries no series
+#'
+#' Visible in the console the Shiny app runs in, which is where Duncan reads
+#' them. The published table is untouched; only the live recompute is refused.
+#'
+#' @param code Question code
+#' @param reason One-line reason
+#' @return NULL, invisibly
+#' @keywords internal
+micro_series_refuse <- function(code, reason) {
+  cat("\n")
+  cat("┌─── TURAS WARNING ───────────────────────┐\n")
+  cat("│ Allocation question: ", code, "\n", sep = "")
+  cat("│ ", reason, "\n", sep = "")
+  cat("│ The published table is unchanged. This question will say\n")
+  cat("│ 'n/a under filter' in the v2 report instead of recomputing.\n")
+  cat("└────────────────────────────────────┘\n\n")
+  invisible(NULL)
+}
+
+
+#' Per-respondent value series for each item of an Allocation question
+#'
+#' An Allocation question is {code}_1..{code}_N of numbers published as one MEAN
+#' row per option, so it needs N score series under one question code and
+#' TR.MICRO.scores holds exactly one. These go under TR.MICRO.series instead,
+#' keyed by the item's ZERO-BASED position in the question's data-layer rows[]
+#' (the convention boxes and net_members already use), so the index the writer
+#' emits is the index the renderer reads.
+#'
+#' Row j is paired with option j and therefore with column {code}_j, which is
+#' the order process_allocation_question() builds its rows in. The pairing is
+#' CHECKED against build_allocation_labels() before it is trusted: a label
+#' mismatch means the data layer reordered or dropped a row, and a series
+#' shifted by one column is the silent failure this guard exists to prevent.
+#' On any mismatch, or on duplicate labels (which the data layer collapses to
+#' one row via pair_ids), the whole question gets NO series and says so.
+#'
+#' @param dl_q One built data-layer question (with $rows, $code)
+#' @param survey_data Respondent data
+#' @param survey_structure Loaded structure (needs $questions, $options)
+#' @param n Respondent count
+#' @return Named list of length-n numeric vectors keyed by zero-based row
+#'   index, or NULL when the question is not an Allocation or the pairing
+#'   cannot be trusted
+#' @keywords internal
+micro_series_for_question <- function(dl_q, survey_data, survey_structure, n) {
+  if (!identical(micro_variable_type(dl_q$code, survey_structure), "Allocation")) {
+    return(NULL)
+  }
+  code <- as.character(dl_q$code)
+  n_cols <- micro_allocation_n_cols(code, survey_structure)
+  if (is.na(n_cols) || n_cols < 1L) return(NULL)
+
+  # Filtered exactly as prepare_question_data() filters it for the processor
+  # (Variable_Type is not Multi_Mention, so it is the plain code match, in
+  # sheet order, unsorted). Any other order would resolve different labels and
+  # refuse every Allocation question.
+  opts <- survey_structure$options
+  qo <- if (is.null(opts) || !("QuestionCode" %in% names(opts))) {
+    NULL
+  } else {
+    opts[opts$QuestionCode == code, , drop = FALSE]
+  }
+  labels <- build_allocation_labels(qo, code, n_cols)
+
+  dup <- unique(labels[duplicated(labels)])
+  if (length(dup) > 0) {
+    micro_series_refuse(code, paste0(
+      "two or more options resolve to the same label ('",
+      paste(dup, collapse = "', '"),
+      "'), so no row can be matched to its own column."))
+    return(NULL)
+  }
+
+  rows <- dl_q$rows
+  if (is.null(rows) || length(rows) == 0) return(NULL)
+  mean_idx <- which(vapply(rows, function(r) identical(r$kind, "mean"), logical(1)))
+  if (length(mean_idx) != n_cols) {
+    micro_series_refuse(code, paste0(
+      "the published table has ", length(mean_idx), " mean rows but the question ",
+      "declares ", n_cols, " columns, so the rows cannot be paired with them."))
+    return(NULL)
+  }
+
+  series <- list()
+  for (j in seq_along(mean_idx)) {
+    ri <- mean_idx[j]
+    got <- trimws(as.character(rows[[ri]]$label %||% ""))
+    want <- trimws(as.character(labels[j]))
+    if (!identical(got, want)) {
+      micro_series_refuse(code, paste0(
+        "row ", j, " is labelled '", got, "' but option ", j, " resolves to '",
+        want, "', so the rows are not in option order."))
+      return(NULL)
+    }
+    col_name <- paste0(code, "_", j)
+    if (!(col_name %in% names(survey_data))) {
+      micro_series_refuse(code, paste0(
+        "column '", col_name, "' is missing from the survey data."))
+      return(NULL)
+    }
+    # The raw slot values, exactly what collect_allocation_values() averages:
+    # zero is a value, blank and non-numeric are NA, and no range filter
+    # applies (an Allocation has no Min_Value / Max_Value).
+    v <- suppressWarnings(as.numeric(survey_data[[col_name]]))
+    vals <- rep(NA_real_, n)
+    m <- min(n, length(v))
+    if (m > 0) vals[seq_len(m)] <- v[seq_len(m)]
+    series[[as.character(ri - 1L)]] <- I(vals)
+  }
+  series
+}
+
+
 #' Per-respondent numeric scores for a question carrying a mean
 #'
 #' The robust mean-recompute source: a numeric score per respondent (NA when no
@@ -690,7 +840,11 @@ micro_box_membership <- function(dl_q, survey_data, survey_structure, n) {
 #'   composite index carries per-respondent scores like any rated question, so it
 #'   recomputes under a live filter and can be tracked across waves. Omitted, the
 #'   island is exactly what it was before composites were scored.
-#' @return A list {n, answers, banner_vars, weights}, or NULL when microdata
+#' @return A list {n, answers, banner_vars, weights}, plus {scores}, {boxes} and
+#'   {series} when any question carries them. `series` is
+#'   \code{series[[qcode]][["<zero-based row index>"]]} = a length-n numeric
+#'   vector: the per-item value series of an Allocation question, one entry per
+#'   published mean row. NULL when microdata
 #'   cannot be built (no respondents or no structure): the report then degrades
 #'   to published-only (no live filter / custom banner), exactly as before.
 #' @export
@@ -706,6 +860,7 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
   answers <- list()
   scores <- list()
   boxes <- list()
+  series <- list()
   for (q in data_layer$questions) {
     answers[[q$code]] <- micro_answers_for_question(q, survey_data, survey_structure, n)
     sc <- micro_scores_for_question(q, survey_data, survey_structure, n)
@@ -718,6 +873,11 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
     if (!is.null(sc) && any(!is.na(sc))) scores[[q$code]] <- I(sc)
     bx <- micro_box_membership(q, survey_data, survey_structure, n)
     if (!is.null(bx)) boxes[[q$code]] <- I(bx)
+    # An Allocation question carries one series per item row instead of one
+    # score (see micro_series_for_question). NULL for every other type, so no
+    # existing report gains a key.
+    sr <- micro_series_for_question(q, survey_data, survey_structure, n)
+    if (!is.null(sr) && length(sr) > 0) series[[q$code]] <- sr
   }
   out <- list(
     n           = n,
@@ -730,6 +890,9 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
   # no question carries one.
   if (length(scores) > 0) out$scores <- scores
   if (length(boxes) > 0) out$boxes <- boxes
+  # Per-item value series for Allocation (constant-sum) questions. Omitted when
+  # no question carries one, so every existing report's island is unchanged.
+  if (length(series) > 0) out$series <- series
   out
 }
 
