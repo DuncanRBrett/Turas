@@ -73,8 +73,9 @@ run_monadic_analysis <- function(data, config) {
     # Top-box coding: >= threshold counts as "would buy"
     intents <- as.numeric(as.numeric(intents_raw) >= scale_threshold)
   } else {
-    # Binary: coerce to 0/1
-    intents <- as.numeric(as.numeric(intents_raw) > 0)
+    # Exact values only (review H5): "any positive number is a buy" read
+    # 1 = Yes / 2 = No data as 100% intent in every cell.
+    intents <- code_monadic_binary_intent(intents_raw, mon$binary_coding %||% "ZERO_ONE", intent_col)
   }
 
   # Extract weights if available
@@ -384,12 +385,11 @@ monadic_bootstrap_ci <- function(prices, intents, weights = NULL, model_type, pr
   n <- length(prices)
   alpha <- 1 - conf_level
 
-  # Weighted resampling probability
-  resample_prob <- if (!is.null(weights) && !all(weights == 1)) {
-    weights / sum(weights)
-  } else {
-    NULL
-  }
+  # One resampling policy across the module (review M14): respondents are
+  # resampled with equal probability and carry their weights into the glm.
+  # Resampling with weighted probabilities AND fitting with the weights, as
+  # this used to, counted the weights twice.
+  resample_prob <- NULL
 
   boot_optimal_rev <- numeric(n_boot)
   boot_optimal_profit <- numeric(n_boot)
@@ -472,6 +472,67 @@ monadic_bootstrap_ci <- function(prices, intents, weights = NULL, model_type, pr
     n_successful = successful,
     n_attempted = n_boot
   )
+}
+
+
+#' Code A Declared-Binary Monadic Intent Column
+#'
+#' 0/1 under ZERO_ONE, 1/2 under ONE_TWO (1 = would buy, 2 = would not);
+#' yes/no text in the usual spellings. Anything else refuses, naming the
+#' values and, when the data look like 1/2, the setting that fixes it.
+#'
+#' @param x The raw intent column.
+#' @param coding "ZERO_ONE" or "ONE_TWO".
+#' @param col_name For the refusal text.
+#' @return Numeric 0/1 vector with NA where the answer was missing.
+#' @keywords internal
+code_monadic_binary_intent <- function(x, coding = "ZERO_ONE", col_name = "intent") {
+  coding <- toupper(coding)
+  if (is.logical(x)) return(as.numeric(x))
+  if (is.character(x) || is.factor(x)) {
+    txt <- tolower(trimws(as.character(x)))
+    out <- rep(NA_real_, length(txt))
+    out[txt %in% c("1", "yes", "y", "true")] <- 1
+    out[txt %in% c("0", "no", "n", "false")] <- 0
+    unknown <- unique(txt[!is.na(txt) & nzchar(txt) & is.na(out)])
+    if (length(unknown) > 0) {
+      pricing_refuse(
+        code = "DATA_MONADIC_INTENT_NOT_BINARY",
+        title = "The Monadic Intent Column Is Not Yes/No",
+        problem = sprintf("Column '%s' holds text values other than yes/no: %s", col_name,
+                          paste(head(unknown, 6), collapse = ", ")),
+        why_it_matters = "Every value that is not recognised would be read as No.",
+        how_to_fix = "Recode the column to 0/1, or set Intent_Type = scale with a Scale_Threshold."
+      )
+    }
+    return(out)
+  }
+  v <- suppressWarnings(as.numeric(x))
+  allowed <- if (identical(coding, "ONE_TWO")) c(1, 2) else c(0, 1)
+  off <- unique(v[!is.na(v) & !v %in% allowed])
+  if (length(off) > 0) {
+    looks_one_two <- all(unique(v[!is.na(v)]) %in% c(1, 2)) && !identical(coding, "ONE_TWO")
+    pricing_refuse(
+      code = "DATA_MONADIC_INTENT_NOT_BINARY",
+      title = "The Monadic Intent Column Is Not Coded 0/1",
+      problem = sprintf("Column '%s' is declared binary but holds %s.", col_name,
+                        paste(head(sort(off), 6), collapse = ", ")),
+      why_it_matters = "Any positive number used to count as a purchase, so 1 = Yes / 2 = No data read as 100% intent in every price cell.",
+      how_to_fix = c(
+        if (looks_one_two) "The values are 1 and 2: set Binary_Coding = ONE_TWO on the Monadic sheet (1 = would buy, 2 = would not).",
+        "Otherwise recode the column to 0/1, or set Intent_Type = scale with a Scale_Threshold."
+      )
+    )
+  }
+  out <- rep(NA_real_, length(v))
+  if (identical(coding, "ONE_TWO")) {
+    out[!is.na(v) & v == 1] <- 1
+    out[!is.na(v) & v == 2] <- 0
+  } else {
+    out[!is.na(v) & v == 1] <- 1
+    out[!is.na(v) & v == 0] <- 0
+  }
+  out
 }
 
 

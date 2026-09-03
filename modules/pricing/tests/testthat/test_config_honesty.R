@@ -186,6 +186,14 @@ test_that("GG_Stop_Early_Imputation accepts NONE and NO_AFTER_STOP only (C2)", {
                "CFG_GG_STOP_EARLY_IMPUTATION")
 })
 
+test_that("the tabs export settings refuse until the exporter exists", {
+  expect_error(apply_pricing_defaults(list(analysis_method = "gabor_granger", generate_tabs_export = "Y")),
+               "FEATURE_TABS_EXPORT_PENDING")
+  expect_error(apply_pricing_defaults(list(analysis_method = "gabor_granger", export_wtp = "Y")),
+               "FEATURE_TABS_EXPORT_PENDING")
+  expect_false(apply_pricing_defaults(list(analysis_method = "gabor_granger"))$generate_tabs_export)
+})
+
 test_that("Generate_Stats_Pack reaches the flat config (H8)", {
   cfg <- .normalize_setting_names(list(Generate_Stats_Pack = "N"))
   expect_equal(cfg$generate_stats_pack, "N")

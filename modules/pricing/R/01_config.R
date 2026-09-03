@@ -489,8 +489,8 @@ PRICING_KNOWN_SETTINGS <- list(
   ),
   Monadic = c(
     "Price_Column", "Intent_Column", "Intent_Type", "Scale_Threshold",
-    "Model_Type", "Min_Cell_Size", "Prediction_Points", "Confidence_Intervals",
-    "Bootstrap_Iterations", "Confidence_Level"
+    "Binary_Coding", "Model_Type", "Min_Cell_Size", "Prediction_Points",
+    "Confidence_Intervals", "Bootstrap_Iterations", "Confidence_Level"
   ),
   Validation = c("Min_Completeness", "Min_Sample", "Price_Min", "Price_Max")
 )
@@ -870,6 +870,7 @@ load_monadic_config <- function(config_file) {
     "Intent_Column" = "intent_column",
     "Intent_Type" = "intent_type",
     "Scale_Threshold" = "scale_threshold",
+    "Binary_Coding" = "binary_coding",
     "Model_Type" = "model_type",
     "Min_Cell_Size" = "min_cell_size",
     "Prediction_Points" = "prediction_points",
@@ -1035,6 +1036,18 @@ apply_pricing_defaults <- function(settings) {
     settings$generate_tabs_export %||% "N"), 1, 1)) %in% c("Y", "T")
   settings$tabs_question_code <- settings$tabs_question_code %||% "GGACC"
   settings$export_wtp <- toupper(substr(as.character(settings$export_wtp %||% "N"), 1, 1)) %in% c("Y", "T")
+  # The exporter is the v2 session's work (handover section 4, B3). Until it
+  # lands a Y must not pass in silence: that is the Flag_Outliers defect
+  # again. Refuse by name.
+  if (isTRUE(settings$generate_tabs_export) || isTRUE(settings$export_wtp)) {
+    pricing_refuse(
+      code = "FEATURE_TABS_EXPORT_PENDING",
+      title = "The Tabs Export Is Not Built Yet",
+      problem = "Generate_Tabs_Export or Export_WTP is Y, and this version of the pricing module has no exporter behind those settings.",
+      why_it_matters = "A setting that is accepted and does nothing looks like a setting that worked.",
+      how_to_fix = "Set both to N for now. The export (the Gabor-Granger acceptance grid as a crosstab question) arrives with the pricing v2 session."
+    )
+  }
 
   # Stop-early Gabor-Granger ladders (review C2): refuse by default when the
   # per-rung bases differ; NO_AFTER_STOP is the explicit opt-in.

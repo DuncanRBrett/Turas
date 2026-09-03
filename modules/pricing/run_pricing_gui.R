@@ -187,7 +187,7 @@ run_pricing_gui <- function() {
         div(class = "turas-card",
           checkboxInput("generate_stats_pack",
                         "Generate stats pack (diagnostic workbook for advanced review)",
-                        value = FALSE),
+                        value = TRUE),
           actionButton("run_analysis", "Run Pricing Analysis",
                        class = "btn turas-btn-run",
                        icon = icon("play")),

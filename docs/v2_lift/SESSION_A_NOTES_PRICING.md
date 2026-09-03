@@ -21,7 +21,7 @@ of the Karoo example.
 | A2 C1 | `fit_vw_psm()`: one routine that runs `psm_analysis_weighted()` on a `survey::svydesign` when a weight is configured, else `psm_analysis()`; refusal `MODEL_VW_WEIGHTED_FAILED`, never a fallback |
 | A3 C3 + H3 | `validate` wired to the behaviour (`flag_only` keeps intransitives, default `drop`); bootstrap uses the same routine, flag and weights; `estimate` column is the headline point, bootstrap mean in its own column; `n_analysed` from psm's own count; strict ordering rule aligned with psm's |
 | A4 C2 | Per-rung bases compared; `DATA_GG_UNEQUAL_BASES` refusal naming the counts; `GG_Stop_Early_Imputation = NO_AFTER_STOP` imputes No above the first No, stamped in diagnostics and the stats pack |
-| A5 H4 + H5 + H6 | Monadic weights normalised to mean 1, grossing weights refuse, p-value caveat; declared-binary columns validated (`DATA_GG_NOT_BINARY`), `Binary_Coding = ONE_TWO`; `auto` refuses; weighted cell means with `weighted_n` |
+| A5 H4 + H5 + H6 | Monadic weights normalised to mean 1, grossing weights refuse, p-value caveat; declared-binary columns validated on both engines (`DATA_GG_NOT_BINARY`, `DATA_MONADIC_INTENT_NOT_BINARY`), `Binary_Coding = ONE_TWO` on the GaborGranger and Monadic sheets; `auto` refuses; weighted cell means with `weighted_n`. The monadic half was missed in the first commit and landed in the follow-up. |
 | A6 H7 + H8 + M2 | Stats pack "Effective N (Kish)" from `modules/shared/lib/effective_n.R`, "Valid N" separate; `Generate_Stats_Pack` read from the flat config, GUI checkbox authoritative; `monotonicity_violations` returned so the Excel block renders |
 | A7 M1 + M14 | PAVA (`smooth_isotonic`) wired to `Smoothing_Method`, default isotonic; raw curve kept as `purchase_intent_raw`; GG bootstrap vectorised, smooths inside each replicate, same resampling policy as VW (equal-probability resampling carrying weights) |
 | A8 M4, M6 to M13 | Unknown-name warning, duplicate refusal, `PRICING_RETIRED_SETTINGS` (interpolation and outlier settings retired by name); divider regex; `Min_Sample` enforced; `PI_Scale` wired to psm; template example rows titled `[Example]` and filtered; dead Phase-3 output blocks deleted from `06_output.R`; GUI captures console output through a sink so a crash keeps its context; docs and sample config corrected |
@@ -47,7 +47,13 @@ of the Karoo example.
    writer keys its Declaration on `data_used$weight_variable`, which pricing
    never passed. Now passed.
 6. **Segment insights printed `$`** whatever the currency. Threaded through.
-7. **A Python slip truncated the template generator mid-session** (a write
+7. **The advisor review after the first commit caught four things**, fixed in
+   the follow-up commit: the monadic engine still coded any positive number
+   as a buy (H5 was only half done), three new export settings had no
+   consumer (the retired-settings defect in a new coat, now a refusal until
+   Session B), the GUI stats-pack checkbox defaulted to off once it became
+   authoritative, and the monadic bootstrap counted the weights twice.
+8. **A Python slip truncated the template generator mid-session** (a write
    that read the file after opening it for writing). Restored from git and
    re-patched; the file parses and regenerates the template. Noted so a
    reviewer diffing the generator sees why its history is two edits.
@@ -60,11 +66,13 @@ of the Karoo example.
 - **A5, grossing weights.** Refused when the mean raw weight exceeds 5;
   below that the weights are normalised to mean 1 and used. The handover
   said "refuse grossing-scale"; 5 is the line drawn.
-- **A7, resampling policy.** One policy for both bootstraps: respondents
-  resampled with equal probability, each carrying its weight, estimated by
-  the headline's routine. The old VW bootstrap resampled with weighted
-  probabilities and an unweighted estimator. Recorded as `attr(ci, "policy")`
-  and in the stats pack.
+- **A7, resampling policy.** One policy for all three bootstraps:
+  respondents resampled with equal probability, each carrying its weight,
+  estimated by the headline's routine. The old VW bootstrap resampled with
+  weighted probabilities and an unweighted estimator; the old monadic
+  bootstrap resampled with weighted probabilities and then fitted with the
+  weights, counting them twice. Recorded as `attr(ci, "policy")` for VW and
+  GG and in the stats pack.
 - **A8, M9.** `PI_Scale` was wired rather than removed (psm has the
   parameter). `Interpolation_Method` retired.
 - **A8, M13.** The 07/08/09 tier is untouched and still not wired; only the
@@ -77,6 +85,13 @@ of the Karoo example.
   Duncan.
 - **Handover ruling R1** (monotonicity default `drop`) was taken as
   recommended, since Duncan had not ruled at the start of the session.
+- **Tabs export settings.** `Generate_Tabs_Export`, `Tabs_Question_Code` and
+  `Export_WTP` are in the template for Session B. Until the exporter exists a
+  `Y` refuses (`FEATURE_TABS_EXPORT_PENDING`) rather than passing in silence,
+  which would be the outlier-settings defect again.
+- **GUI stats pack checkbox** now defaults to on. With the H8 fix the
+  checkbox is authoritative, and stats packs are contractual (`04c3c3c0`), so
+  a default of off would have dropped them from every GUI run.
 
 ## What was executed
 
@@ -85,7 +100,7 @@ of the Karoo example.
   variant in the test, all through `run_pricing_analysis()`.
 - `psm_analysis_weighted()` executed on the Karoo data and in the tests,
   including the weight-of-2-equals-duplication golden.
-- The pricing suite from the repo root: **989 pass / 0 fail / 0 skip / 0 error / 14 warnings** (baseline 63 warnings; one of the 14 is psm's own note that flag_only kept inconsistent respondents, which is the point of that test).
+- The pricing suite from the repo root: **997 pass / 0 fail / 0 skip / 0 error / 14 warnings** (baseline 63 warnings; one of the 14 is psm's own note that flag_only kept inconsistent respondents, which is the point of that test).
 
 ## Not verified
 

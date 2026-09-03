@@ -330,6 +330,21 @@ test_that("monadic cell means are weighted and the p-value carries its caveat (H
   expect_match(we$model_summary$p_value_caveat, "frequency weights")
 })
 
+test_that("1/2-coded monadic intent refuses as binary and passes under ONE_TWO (H5)", {
+  d <- generate_monadic_data(n = 300)
+  d$intent12 <- ifelse(d$purchase_intent == 1, 1, 2)
+  cfg <- mon_cfg(); cfg$monadic$intent_column <- "intent12"
+  err <- tryCatch(quiet(run_monadic_analysis(d, cfg)), error = function(e) conditionMessage(e))
+  expect_match(err, "DATA_MONADIC_INTENT_NOT_BINARY")
+  expect_match(err, "ONE_TWO")
+  cfg$monadic$binary_coding <- "ONE_TWO"
+  r12 <- quiet(run_monadic_analysis(d, cfg))
+  r01 <- quiet(run_monadic_analysis(d, mon_cfg()))
+  expect_equal(r12$observed_data$observed_intent, r01$observed_data$observed_intent)
+  expect_equal(code_monadic_binary_intent(c(0, 1, NA)), c(0, 1, NA))
+  expect_error(code_monadic_binary_intent(c(0, 1, 3)), "DATA_MONADIC_INTENT_NOT_BINARY")
+})
+
 test_that("grossing weights refuse and mean-1 weights are used as given (H4)", {
   d <- generate_monadic_data(n = 300)
   d$w <- 1200

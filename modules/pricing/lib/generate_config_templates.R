@@ -193,7 +193,7 @@ build_settings_def <- function() {
           name = "Generate_Tabs_Export",
           required = FALSE,
           default = "N",
-          description = "Write {output}_tabs_pricing.xlsx: the Gabor-Granger acceptance grid as 0/1 columns a tabs (crosstab) project can read as a Multi_Mention question, with a QuestionMap snippet and a METHOD sheet. Needs ID_Variable.",
+          description = "Write {output}_tabs_pricing.xlsx: the Gabor-Granger acceptance grid as 0/1 columns a tabs (crosstab) project can read as a Multi_Mention question, with a QuestionMap snippet and a METHOD sheet. Needs ID_Variable. Not built yet: Y refuses until the pricing v2 session lands.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),
           numeric_range = NULL, integer_range = NULL
@@ -210,7 +210,7 @@ build_settings_def <- function() {
           name = "Export_WTP",
           required = FALSE,
           default = "N",
-          description = "Also export a per-respondent willingness-to-pay column (midpoint of the Van Westendorp cheap and expensive answers), stamped as derived on the METHOD sheet.",
+          description = "Also export a per-respondent willingness-to-pay column (midpoint of the Van Westendorp cheap and expensive answers), stamped as derived on the METHOD sheet. Not built yet: Y refuses until the pricing v2 session lands.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),
           numeric_range = NULL, integer_range = NULL
@@ -688,6 +688,15 @@ build_monadic_settings_def <- function() {
           description = "Top-box threshold if Intent_Type = scale. Values >= this count as 'would buy'.",
           valid_values_text = "Integer on intent scale",
           dropdown = NULL, numeric_range = NULL, integer_range = c(1, 10)
+        ),
+        list(
+          name = "Binary_Coding",
+          required = FALSE,
+          default = "ZERO_ONE",
+          description = "For Intent_Type = binary: ZERO_ONE means 1 = would buy, 0 = would not. ONE_TWO means 1 = would buy, 2 = would not (the usual survey export). Any other value refuses.",
+          valid_values_text = "ZERO_ONE or ONE_TWO",
+          dropdown = c("ZERO_ONE", "ONE_TWO"),
+          numeric_range = NULL, integer_range = NULL
         )
       )
     ),
