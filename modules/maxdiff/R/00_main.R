@@ -1219,13 +1219,17 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
     NULL
   }
 
-  # Events raised AFTER this point (simulator, HTML report) used to reach
-  # only the warnings vector, never trs_state, so the closing banner said
-  # '[TRS PASS] COMPLETED SUCCESSFULLY' over a missing report (review F2).
-  # note_late() records them for the fold-in at the end of this function.
+  # Events raised AFTER this point (tabs export, island, simulator, HTML
+  # report) used to reach only the warnings vector, never trs_state, so the
+  # closing banner said '[TRS PASS] COMPLETED SUCCESSFULLY' over a missing
+  # deliverable (review F2). note_late() records them for the fold-in at the
+  # end of this function. A step with its own refusal code passes it in, so
+  # the run state names the actual refusal and not a generic warning.
   late_warnings <- character()
-  note_late <- function(msg) {
+  late_events <- list()
+  note_late <- function(msg, code = "MAXD_WARNING", title = "Analysis warning") {
     late_warnings <<- c(late_warnings, msg)
+    late_events[[length(late_events) + 1L]] <<- list(code = code, title = title, problem = msg)
     add_warning(msg)
   }
 
@@ -1269,17 +1273,15 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       export_maxdiff_shares_for_tabs(results, config, verbose = verbose),
       turas_refusal = function(e) {
         cat(conditionMessage(e))
-        add_warning(sprintf("Tabs export not produced: %s", e$code %||% "refused"))
-        if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
-          turas_run_state_partial(trs_state, e$code %||% "MODEL_TABS_EXPORT",
-                                  "Tabs export not produced",
-                                  problem = e$problem %||% conditionMessage(e))
-        }
+        note_late(sprintf("Tabs export not produced: %s", e$code %||% "refused"),
+                  code = e$code %||% "MODEL_TABS_EXPORT",
+                  title = "Tabs export not produced")
         NULL
       },
       error = function(e) {
         cat(sprintf("\n[TRS PARTIAL] MAXD_TABS_EXPORT_FAILED: %s\n", conditionMessage(e)))
-        add_warning(sprintf("Tabs export: %s", conditionMessage(e)))
+        note_late(sprintf("Tabs export: %s", conditionMessage(e)),
+                  code = "MAXD_TABS_EXPORT_FAILED", title = "Tabs export failed")
         NULL
       }
     )
@@ -1292,10 +1294,17 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
   if (!is.null(output_path) && exists("write_maxdiff_island", mode = "function")) {
     results$v2_island <- tryCatch(
       write_maxdiff_island(results, config, verbose = verbose),
-      turas_refusal = function(e) { cat(conditionMessage(e)); NULL },
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        note_late(sprintf("Interactive-report contribution not produced: %s", e$code %||% "refused"),
+                  code = e$code %||% "MAXD_ISLAND_REFUSED",
+                  title = "Interactive-report contribution not produced")
+        NULL
+      },
       error = function(e) {
         cat(sprintf("\n[TRS PARTIAL] MAXD_ISLAND_FAILED: %s\n", conditionMessage(e)))
-        add_warning(sprintf("Interactive-report contribution: %s", conditionMessage(e)))
+        note_late(sprintf("Interactive-report contribution: %s", conditionMessage(e)),
+                  code = "MAXD_ISLAND_FAILED", title = "Interactive-report contribution failed")
         NULL
       }
     )
@@ -1375,10 +1384,10 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
   # Fold the late events into the run state so the banner, the GUI and the
   # returned run_result all tell the truth (review F2). The Run_Status sheet
   # was written before these steps and is not rewritten.
-  if (length(late_warnings) > 0) {
+  if (length(late_events) > 0) {
     if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
-      for (warn in late_warnings) {
-        turas_run_state_partial(trs_state, "MAXD_WARNING", "Analysis warning", problem = warn)
+      for (ev in late_events) {
+        turas_run_state_partial(trs_state, ev$code, ev$title, problem = ev$problem)
       }
       if (exists("turas_run_state_result", mode = "function")) {
         results$run_result <- turas_run_state_result(trs_state)

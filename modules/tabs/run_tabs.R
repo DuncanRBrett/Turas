@@ -12,18 +12,6 @@
 # console. This wrapper exists for scripted/batch runs.
 # ==============================================================================
 
-#' Run one tabs analysis from a crosstab config workbook
-#'
-#' Sets the global `config_file` the engine expects, sources
-#' `modules/tabs/lib/run_crosstabs.R` from its own directory (the engine
-#' resolves its siblings relative to the working directory), and restores
-#' the working directory and globals afterwards.
-#'
-#' @param config_file Path to a Crosstab_Config .xlsx (as built from
-#'   modules/tabs/templates/Crosstab_Config_Template.xlsx).
-#'
-#' @return Invisibly, TRUE on success; FALSE after a refusal/error (details
-#'   are printed to the console. Turas convention: errors must be visible).
 # Where this file lives, captured when it is sourced. The frame that sourced
 # it knows; the Rscript --file argument knows only where the CALLER is, so a
 # script that does source("modules/tabs/run_tabs.R") from somewhere else used
@@ -59,6 +47,18 @@ tabs_runner_lib_dir <- function() {
   NULL
 }
 
+#' Run one tabs analysis from a crosstab config workbook
+#'
+#' Sets the global `config_file` the engine expects, sources
+#' `modules/tabs/lib/run_crosstabs.R` from its own directory (the engine
+#' resolves its siblings relative to the working directory), and restores
+#' the working directory and globals afterwards.
+#'
+#' @param config_file Path to a Crosstab_Config .xlsx (as built from
+#'   modules/tabs/templates/Crosstab_Config_Template.xlsx).
+#'
+#' @return Invisibly, TRUE on success; FALSE after a refusal/error (details
+#'   are printed to the console. Turas convention: errors must be visible).
 run_tabs_analysis <- function(config_file) {
   if (missing(config_file) || is.null(config_file) || !nzchar(config_file)) {
     cat("\n=== TURAS ERROR ===\n")

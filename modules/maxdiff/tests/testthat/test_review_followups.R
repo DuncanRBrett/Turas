@@ -352,3 +352,66 @@ test_that("Stan HB rank-recovers known utilities, anchors the designated item, a
   expect_true(is.numeric(res$diagnostics$n_divergences))
   expect_true(is.finite(res$diagnostics$mean_rhat))
 })
+
+# ------------------------------------------------------------------------------
+# F2 again, for the steps the v2 branch added after the F2 fix was written:
+# the tabs export (11b) and the island (11c) run AFTER run_result is built and
+# were using add_warning() alone, so a refusal there left the verdict at PASS.
+# ------------------------------------------------------------------------------
+
+test_that("F2: a refused tabs export changes the verdict, it is not just a warning", {
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  skip_if(!file.exists(main))
+  source(main, local = FALSE)
+
+  W <- tempfile("md_tabsgate_"); dir.create(W); on.exit(unlink(W, recursive = TRUE), add = TRUE)
+  ids <- sprintf("ITEM_%02d", 1:4); set.seed(11); K <- 3; nT <- 4
+  des <- do.call(rbind, lapply(seq_len(nT), function(t) {
+    sh <- c(ids[((t - 1) %% 4) + 1], sample(setdiff(ids, ids[((t - 1) %% 4) + 1]), K - 1))
+    data.frame(Version = 1L, Task_Number = t, Item1_ID = sh[1], Item2_ID = sh[2],
+               Item3_ID = sh[3], stringsAsFactors = FALSE) }))
+  openxlsx::write.xlsx(list(DESIGN = des), file.path(W, "design.xlsx"))
+  nR <- 20
+  dat <- data.frame(RespID = 10000 + seq_len(nR), Version = 1L)
+  for (t in seq_len(nT)) {
+    dat[[sprintf("MD_T%d_Best", t)]] <- sample(K, nR, replace = TRUE)
+    dat[[sprintf("MD_T%d_Worst", t)]] <- sample(K, nR, replace = TRUE)
+  }
+  for (t in seq_len(nT)) {
+    bad <- dat[[sprintf("MD_T%d_Best", t)]] == dat[[sprintf("MD_T%d_Worst", t)]]
+    dat[[sprintf("MD_T%d_Worst", t)]][bad] <- (dat[[sprintf("MD_T%d_Best", t)]][bad] %% K) + 1
+  }
+  write.csv(dat, file.path(W, "data.csv"), row.names = FALSE)
+
+  ps <- data.frame(
+    Setting_Name = c("Project_Name", "Mode", "Raw_Data_File", "Design_File", "Output_Folder",
+                     "Respondent_ID_Variable", "Choice_Value_Type", "Seed"),
+    Value = c("GATE", "ANALYSIS", file.path(W, "data.csv"), file.path(W, "design.xlsx"),
+              file.path(W, "output"), "RespID", "ITEM_POSITION", "1"),
+    stringsAsFactors = FALSE)
+  items <- data.frame(Item_ID = ids, Item_Label = paste("Item", 1:4), Include = 1L,
+                      Anchor_Item = 0L, Display_Order = 1:4, stringsAsFactors = FALSE)
+  mapping <- data.frame(
+    Field_Type = c("VERSION", rep(c("BEST_CHOICE", "WORST_CHOICE"), nT)),
+    Field_Name = c("Version", as.vector(rbind(sprintf("MD_T%d_Best", 1:nT),
+                                              sprintf("MD_T%d_Worst", 1:nT)))),
+    Task_Number = c(NA, rep(1:nT, each = 2)), stringsAsFactors = FALSE)
+  # HB off, so the exporter has no respondent utilities and must refuse.
+  os <- data.frame(
+    Setting_Name = c("Generate_Aggregate_Logit", "Generate_HB_Model", "Generate_HTML_Report",
+                     "Generate_Simulator", "Generate_TURF", "Generate_Charts",
+                     "Generate_Stats_Pack", "Generate_Tabs_Export"),
+    Value = c("YES", "NO", "NO", "NO", "NO", "NO", "NO", "YES"), stringsAsFactors = FALSE)
+  cfgp <- file.path(W, "config.xlsx")
+  openxlsx::write.xlsx(list(PROJECT_SETTINGS = ps, ITEMS = items, SURVEY_MAPPING = mapping,
+                            OUTPUT_SETTINGS = os), cfgp)
+
+  out <- capture.output(res <- suppressMessages(run_maxdiff(cfgp, verbose = FALSE)), type = "output")
+
+  # The refusal happened and was printed.
+  expect_false(inherits(res, "turas_refusal_result"))
+  expect_true(any(grepl("MODEL_NO_RESPONDENT_UTILITIES", out)))
+  expect_true(any(grepl("Tabs export not produced", unlist(res$warnings))))
+  # And it reached the verdict the banner, the GUI and the caller read.
+  expect_false(identical(res$run_result$status, "PASS"))
+})
