@@ -128,19 +128,32 @@ write_pricing_output <- function(results, plots, validation, config, output_file
   # Add weight statistics if available
   if (!is.null(validation$weight_summary)) {
     ws <- validation$weight_summary
+    # "Effective Sample Size" is the Kish effective n from the shared helper,
+    # computed on the analysed (clean) cases. This row used to print the count
+    # of valid weights under that label (review H7, fixed in the stats pack by
+    # Session A and here by the review follow-up). Valid N is its own row.
+    eff_n <- NA_real_
+    if (exists("calculate_effective_n", mode = "function") &&
+        !is.null(validation$clean_data) &&
+        !is.null(config$weight_var) && !is.na(config$weight_var) &&
+        config$weight_var %in% names(validation$clean_data)) {
+      eff_n <- calculate_effective_n(as.numeric(validation$clean_data[[config$weight_var]]))
+    }
     summary_items <- c(summary_items,
                       "",
                       "WEIGHTING",
                       "Weighting Applied",
-                      "Effective Sample Size",
+                      "Valid N (cases with a usable weight)",
+                      "Effective Sample Size (Kish, analysed cases)",
                       "Weight Range",
                       "Weight Mean (SD)")
     summary_values <- c(summary_values,
                        "",
                        "",
                        "Yes",
-                       sprintf("%.1f", ws$n_valid),
-                       sprintf("%.2f - %.2f", ws$min, ws$max),
+                       as.character(ws$n_valid),
+                       if (is.finite(eff_n)) sprintf("%.1f", eff_n) else "not computed",
+                       sprintf("%.2f to %.2f", ws$min, ws$max),
                        sprintf("%.2f (%.2f)", ws$mean, ws$sd))
   } else {
     summary_items <- c(summary_items, "", "WEIGHTING", "Weighting Applied")
