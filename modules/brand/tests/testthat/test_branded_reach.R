@@ -319,3 +319,107 @@ test_that("placeholder branded-reach payload renders friendly empty state", {
   # No insight strip (no insights to surface)
   expect_false(grepl("br-reach-insight-strip", html, fixed = TRUE))
 })
+
+
+# ------------------------------------------------------------------------------
+# H4 (production review 2026-07-12): the attribution question is a closed
+# list (brand code, DK, OTHER). Out-of-domain values among ad-seers used to
+# sit in n_seen but in no row, so pct_of_seen silently under-summed.
+# ------------------------------------------------------------------------------
+
+.mk_misattr_inputs <- function(brand_values) {
+  n <- length(brand_values)
+  data <- data.frame(
+    REACH_SEEN_AD1  = rep(1L, n),
+    REACH_BRAND_AD1 = brand_values,
+    stringsAsFactors = FALSE
+  )
+  assets <- data.frame(
+    AssetCode = "AD1", AssetLabel = "Ad 1", Category = "DSS", Brand = "IPK",
+    SeenQuestionCode = "REACH_SEEN_AD1", BrandQuestionCode = "REACH_BRAND_AD1",
+    MediaQuestionCode = "REACH_MEDIA_AD1", stringsAsFactors = FALSE
+  )
+  brands <- data.frame(BrandCode = c("IPK", "ROB"),
+                       BrandLabel = c("Ina Paarman", "Robertsons"),
+                       stringsAsFactors = FALSE)
+  list(data = data, assets = assets, brands = brands)
+}
+
+test_that("misattribution shares sum to 1 over a closed-list column", {
+  inp <- .mk_misattr_inputs(c("IPK", "IPK", "ROB", "DK", "OTHER", "IPK"))
+  out <- compute_br_misattribution(inp$data, inp$assets, inp$brands,
+                                   cat_code = "DSS")
+  expect_equal(out$status, "PASS")
+  tbl <- out$tables[["AD1"]]
+  expect_equal(sum(tbl$pct_of_seen), 1, tolerance = 1e-12)
+  expect_equal(tbl$n[tbl$BrandCode == "IPK"], 3)
+  expect_true(tbl$is_correct[tbl$BrandCode == "IPK"])
+  expect_equal(sum(tbl$is_correct), 1L)
+})
+
+test_that("misattribution refuses on an attribution value outside the closed list", {
+  inp <- .mk_misattr_inputs(c("IPK", "Knorr", "ROB", "DK", "ipk", NA))
+  out <- compute_br_misattribution(inp$data, inp$assets, inp$brands,
+                                   cat_code = "DSS")
+  expect_equal(out$status, "REFUSED")
+  expect_equal(out$code, "DATA_REACH_BRAND_CODE_UNKNOWN")
+  expect_true(grepl("Knorr", out$message, fixed = TRUE))
+  expect_true(grepl("ipk", out$message, fixed = TRUE))
+  expect_true(grepl("REACH_BRAND_AD1", out$message, fixed = TRUE))
+})
+
+test_that("misattribution ignores stray values from respondents who did not see the ad", {
+  inp <- .mk_misattr_inputs(c("IPK", "Knorr", "ROB"))
+  inp$data$REACH_SEEN_AD1 <- c(1L, 2L, 1L)   # respondent 2 did not see it
+  out <- compute_br_misattribution(inp$data, inp$assets, inp$brands,
+                                   cat_code = "DSS")
+  expect_equal(out$status, "PASS")
+  expect_equal(sum(out$tables[["AD1"]]$pct_of_seen), 1, tolerance = 1e-12)
+})
+
+test_that("misattribution refuses when the asset's Brand is a label, not a BrandCode", {
+  inp <- .mk_misattr_inputs(c("IPK", "ROB"))
+  inp$assets$Brand <- "Ina Paarman"
+  out <- compute_br_misattribution(inp$data, inp$assets, inp$brands,
+                                   cat_code = "DSS")
+  expect_equal(out$status, "REFUSED")
+  expect_equal(out$code, "CFG_REACH_ASSET_BRAND_UNKNOWN")
+})
+
+
+test_that("run_branded_reach reports PARTIAL with a warning when misattribution refuses", {
+  inp <- .mk_misattr_inputs(c("IPK", "Knorr", "ROB", "DK"))
+  media <- data.frame(MediaCode = "TV", MediaLabel = "TV", DisplayOrder = 1L,
+                      stringsAsFactors = FALSE)
+  out <- run_branded_reach(data = inp$data,
+                           structure = list(marketing_reach = inp$assets,
+                                            reach_media = media),
+                           brand_list = inp$brands,
+                           cat_code = "DSS", focal_brand = "IPK")
+  expect_equal(out$status, "PARTIAL")
+  expect_true(any(grepl("DATA_REACH_BRAND_CODE_UNKNOWN|not a DSS brand code",
+                        out$warnings)))
+  expect_equal(length(out$misattribution), 0L)
+  # Reach metrics are kept
+  expect_equal(length(out$ads), 1L)
+})
+
+
+test_that("run_branded_reach (structure wrapper) reaches the engine and returns ads + misattribution", {
+  # Regression: the wrapper used to call itself with the engine's argument
+  # list ("unused arguments"), so every configured Branded Reach element
+  # refused in production. Nothing exercised the wired path before.
+  inp <- .mk_misattr_inputs(c("IPK", "IPK", "ROB", "DK", "OTHER", "IPK"))
+  media <- data.frame(MediaCode = "TV", MediaLabel = "TV", DisplayOrder = 1L,
+                      stringsAsFactors = FALSE)
+  out <- run_branded_reach(data = inp$data,
+                           structure = list(marketing_reach = inp$assets,
+                                            reach_media = media),
+                           brand_list = inp$brands,
+                           cat_code = "DSS", focal_brand = "IPK")
+  expect_equal(out$status, "PASS")
+  expect_equal(length(out$ads), 1L)
+  expect_true("AD1" %in% names(out$misattribution))
+  expect_equal(sum(out$misattribution[["AD1"]]$pct_of_seen), 1, tolerance = 1e-12)
+  expect_false(isTRUE(out$placeholder))
+})

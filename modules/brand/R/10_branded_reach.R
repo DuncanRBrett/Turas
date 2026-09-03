@@ -21,14 +21,14 @@
 # VERSION: 1.0
 # ==============================================================================
 
-BRAND_BRANDED_REACH_VERSION <- "1.0"
+BRAND_BRANDED_REACH_VERSION <- "1.1"
 
 # Sentinel note rendered by the panel-data builder when Branded Reach has
 # no MarketingReach assets configured (e.g. IPK Wave 1).
 BR_PLACEHOLDER_NOTE <- "Data not yet collected for Branded Reach"
 
 
-#' Run branded-reach analysis for one category
+#' Run branded-reach analysis for one category (engine, explicit asset list)
 #'
 #' @param data Data frame. Already filtered to focal-category respondents
 #'   (the per-category orchestrator in 00_main.R does this filter upstream).
@@ -52,7 +52,7 @@ BR_PLACEHOLDER_NOTE <- "Data not yet collected for Branded Reach"
 #'
 #' @examples
 #' \dontrun{
-#'   res <- run_branded_reach(
+#'   res <- run_branded_reach_assets(
 #'     data        = cat_data,
 #'     asset_list  = structure$marketing_reach,
 #'     brand_list  = cat_brands,
@@ -64,7 +64,7 @@ BR_PLACEHOLDER_NOTE <- "Data not yet collected for Branded Reach"
 #' }
 #'
 #' @export
-run_branded_reach <- function(data, asset_list, brand_list, media_list,
+run_branded_reach_assets <- function(data, asset_list, brand_list, media_list,
                                weights = NULL, cat_code = NULL,
                                focal_brand = NULL,
                                seen_recognised_value = 1L) {
@@ -103,8 +103,12 @@ run_branded_reach <- function(data, asset_list, brand_list, media_list,
     weights = weights, cat_code = cat_code,
     seen_recognised_value = seen_recognised_value
   )
+  br_warnings <- character(0)
   if (identical(misattr$status, "REFUSED")) {
-    # Misattribution refusal is non-fatal — keep metrics + media mix
+    # Misattribution refusal is non-fatal: keep metrics + media mix, but
+    # say so upward instead of reporting PASS with an empty table.
+    br_warnings <- c(br_warnings,
+      sprintf("Branded reach misattribution skipped: %s", misattr$message))
     misattr <- list(status = "PARTIAL", tables = list(),
                     message = misattr$message)
   }
@@ -116,12 +120,15 @@ run_branded_reach <- function(data, asset_list, brand_list, media_list,
     seen_recognised_value = seen_recognised_value
   )
   if (identical(mediamx$status, "REFUSED")) {
+    br_warnings <- c(br_warnings,
+      sprintf("Branded reach media mix skipped: %s", mediamx$message))
     mediamx <- list(status = "PARTIAL", tables = list(),
                     message = mediamx$message)
   }
 
   list(
-    status = "PASS",
+    status = if (length(br_warnings) > 0) "PARTIAL" else "PASS",
+    warnings = br_warnings,
     ads = metrics$ads,
     misattribution = misattr$tables %||% list(),
     media_mix      = mediamx$tables %||% list(),
@@ -206,7 +213,11 @@ run_branded_reach <- function(data, structure, brand_list,
     return(.br_placeholder_result(data, cat_code, focal_brand, weights))
   }
 
-  run_branded_reach(
+  # NOTE: this used to call run_branded_reach() again, i.e. itself, with the
+  # engine's argument list, so any project with a MarketingReach sheet failed
+  # with "unused arguments" inside the orchestrator's tryCatch and Branded
+  # Reach silently became a REFUSED element. The engine now has its own name.
+  run_branded_reach_assets(
     data        = data,
     asset_list  = asset_list,
     brand_list  = brand_list,

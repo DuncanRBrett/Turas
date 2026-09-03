@@ -35,6 +35,17 @@ test_that("guard_alchemer_parser_shape refuses legacy column-per-brand shape", {
                "DATA_LEGACY_COLUMN_PER_BRAND")
 })
 
+test_that("guard_alchemer_parser_shape ignores blank-header X columns (openxlsx names them X1..)", {
+  df <- data.frame(
+    Response.ID = 1:3, BRANDAWARE_DSS_1 = c("IPK", "ROB", NA),
+    X1 = NA, X2 = NA, X3 = NA, X4 = NA, X5 = NA, X6 = ""
+  )
+  expect_silent(guard_alchemer_parser_shape(df))
+  # but five X columns that carry data are still a raw export
+  df$X1 <- 1; df$X2 <- 2; df$X3 <- 3; df$X4 <- 4; df$X5 <- 5
+  expect_error(guard_alchemer_parser_shape(df), "DATA_NO_ALCHEMER_PARSER_OUTPUT")
+})
+
 test_that("guard_alchemer_parser_shape refuses non-data-frame", {
   expect_error(guard_alchemer_parser_shape(list()),
                "DATA_NOT_DATA_FRAME")

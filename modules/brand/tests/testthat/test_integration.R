@@ -51,7 +51,8 @@ for (f in brand_files) {
 # Creates a complete test environment: config files + synthetic survey data
 
 .create_integration_fixtures <- function(tmp_dir = tempdir(),
-                                          n_resp = 200, seed = 42) {
+                                          n_resp = 200, seed = 42,
+                                          weight_values = NULL) {
   set.seed(seed)
 
   config_path <- file.path(tmp_dir, "Brand_Config.xlsx")
@@ -104,6 +105,8 @@ for (f in brand_files) {
     data[[paste0("WOM_NEG_SHARE_", brand)]] <- rbinom(n_resp, 1, 0.02)
   }
 
+  if (!is.null(weight_values)) data$WT <- weight_values
+
   write.csv(data, data_path, row.names = FALSE)
 
   # --- Create Brand_Config.xlsx ---
@@ -124,6 +127,11 @@ for (f in brand_files) {
               "0.05", "30", "75"),
     stringsAsFactors = FALSE
   )
+  if (!is.null(weight_values)) {
+    settings <- rbind(settings, data.frame(Setting = "weight_variable",
+                                           Value = "WT",
+                                           stringsAsFactors = FALSE))
+  }
   openxlsx::writeData(wb_cfg, "Settings", settings)
 
   openxlsx::addWorksheet(wb_cfg, "Categories")
@@ -349,4 +357,53 @@ test_that("run_brand completes in reasonable time", {
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
   expect_true(result$elapsed_seconds < 30)
+})
+
+
+# ==============================================================================
+# Review 2026-07-12 follow-ups: M1 (shape guard wired), M8 (weights numeric)
+# ==============================================================================
+
+test_that("run_brand refuses a raw Alchemer export before any element runs (M1)", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_rawexport")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  fixtures <- .create_integration_fixtures(tmp_dir)
+  # Overwrite the data file with a raw-export shape: X1..X6 placeholder
+  # headers carrying data, no parser columns.
+  raw <- as.data.frame(matrix(sample(1:5, 60, TRUE), nrow = 10,
+                              dimnames = list(NULL, paste0("X", 1:6))))
+  write.csv(raw, fixtures$data_path, row.names = FALSE)
+
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "REFUSED")
+  expect_equal(result$code, "DATA_NO_ALCHEMER_PARSER_OUTPUT")
+  expect_true(grepl("AlchemerParser", paste(result$how_to_fix, collapse = " ")))
+})
+
+test_that("run_brand refuses a non-numeric weight column with the offending values named (M8)", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_badweights")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  w <- rep("1.2", 200); w[c(5, 40)] <- c("n/a", "1,5")
+  fixtures <- .create_integration_fixtures(tmp_dir, weight_values = w)
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "REFUSED")
+  expect_equal(result$code, "DATA_WEIGHT_NOT_NUMERIC")
+  expect_true(grepl("n/a", result$message, fixed = TRUE))
+  expect_true(grepl("1,5", result$message, fixed = TRUE))
+})
+
+test_that("run_brand coerces numeric-looking text weights and runs weighted (M8)", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_textweights")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  fixtures <- .create_integration_fixtures(
+    tmp_dir, weight_values = as.character(round(runif(200, 0.5, 2), 3)))
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_true(result$status %in% c("PASS", "PARTIAL"))
+  expect_false(is.null(result$results$categories[["Dry Seasonings & Spices"]]))
 })

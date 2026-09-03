@@ -109,6 +109,124 @@ brand_with_refusal_handler <- function(expr) {
 }
 
 
+#' Normalise any refusal-shaped object to the module's list contract
+#'
+#' \code{with_refusal_handler()} returns a \code{turas_refusal_result} with
+#' \code{run_status = "REFUSE"}; the engines return plain lists with
+#' \code{status = "REFUSED"}. Callers that must return a refusal upward get
+#' one shape from here.
+#'
+#' @param x Anything.
+#' @return A list with status, code, message and how_to_fix when \code{x}
+#'   is a refusal; NULL otherwise.
+#' @keywords internal
+.brand_as_refusal <- function(x) {
+  is_ref <- inherits(x, "turas_refusal_result") ||
+    (is.list(x) && (identical(x$status, "REFUSED") || isTRUE(x$refused)))
+  if (!is_ref) return(NULL)
+  list(
+    status     = "REFUSED",
+    code       = x$code %||% "BUG_UNHANDLED",
+    message    = x$message %||% x$problem %||% "Refused",
+    how_to_fix = x$how_to_fix %||% NULL
+  )
+}
+
+
+#' Coerce a weight column to numeric or refuse
+#'
+#' Weights arrive as whatever the data file held. A character column (a
+#' stray "n/a", a thousands separator) used to error somewhere downstream
+#' with a message about arithmetic on non-numeric arguments. Now: numeric-
+#' looking text is coerced, anything else is a DATA_WEIGHT_NOT_NUMERIC
+#' refusal naming the offending values (review 2026-07-12, M8).
+#'
+#' @param w Vector from the data frame.
+#' @param weight_col Column name, for the message.
+#' @return list(weights = numeric) or a refusal list.
+#' @keywords internal
+.brand_coerce_weights <- function(w, weight_col) {
+  w_num <- suppressWarnings(as.numeric(as.character(w)))
+  bad   <- !is.na(w) & !(is.character(w) & trimws(as.character(w)) == "") &
+           is.na(w_num)
+  if (any(bad)) {
+    offenders <- unique(as.character(w[bad]))
+    msg <- sprintf(
+      "Weight column '%s' holds %d non-numeric value(s): %s",
+      weight_col, sum(bad),
+      paste(head(offenders, 8), collapse = ", "))
+    cat("\n=== TURAS BRAND ERROR ===\n[DATA_WEIGHT_NOT_NUMERIC] ", msg,
+        "\nHow to fix: make every cell in the weight column a number (blank or NA rows are treated as weight 0).\n=========================\n\n", sep = "")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_WEIGHT_NOT_NUMERIC",
+      message = msg,
+      how_to_fix = sprintf(
+        "Make every cell in '%s' numeric, or point weight_variable at a numeric column.",
+        weight_col)))
+  }
+  list(weights = w_num)
+}
+
+
+#' Decide what the GUI tells the analyst after a run
+#'
+#' Pure function so the decision is testable outside Shiny. The engine's
+#' PARTIAL status, its warnings and the two output generators' results all
+#' feed one verdict: \code{level} is "success", "partial" or "error".
+#' A generator refusal is never reported as success (review 2026-07-12,
+#' M2) and a PARTIAL run is never announced as "completed successfully"
+#' (H5).
+#'
+#' @param res Result of \code{run_brand()}.
+#' @param html_result,xlsx_result Generator results (lists with status).
+#' @param out_html,out_xlsx The paths the generators were asked to write.
+#' @return list(level, success, headline, warnings, html_path, xlsx_path).
+#' @keywords internal
+brand_gui_outcome <- function(res, html_result = NULL, xlsx_result = NULL,
+                              out_html = NULL, out_xlsx = NULL) {
+  if (is.null(res) || identical(res$status, "REFUSED")) {
+    return(list(level = "error", success = FALSE,
+                headline = paste(res$message %||% "Brand analysis refused",
+                                 collapse = "\n"),
+                warnings = character(0), html_path = NULL, xlsx_path = NULL))
+  }
+
+  gen_check <- function(gen, path, label) {
+    ok <- !is.null(gen) && identical(gen$status, "PASS") &&
+          !is.null(path) && file.exists(path)
+    if (ok) return(list(path = path, problem = NULL))
+    reason <- gen$message %||% gen$code %||%
+      if (is.null(gen)) "generator did not run" else "generator did not return PASS"
+    list(path = NULL,
+         problem = sprintf("%s was not written: %s", label,
+                           paste(reason, collapse = " ")))
+  }
+  html <- gen_check(html_result, out_html, "HTML report")
+  xlsx <- gen_check(xlsx_result, out_xlsx, "Excel report")
+
+  gen_problems <- c(html$problem, xlsx$problem)
+  run_warnings <- as.character(res$warnings %||% character(0))
+  all_warnings <- c(gen_problems, run_warnings)
+
+  level <- if (length(all_warnings) > 0 || identical(res$status, "PARTIAL"))
+    "partial" else "success"
+
+  headline <- if (identical(level, "success")) {
+    "Brand analysis completed successfully."
+  } else if (length(gen_problems) > 0) {
+    sprintf("Brand analysis ran, but %s. See Step 5 and the console.",
+            paste(sub(":.*$", "", gen_problems), collapse = " and "))
+  } else {
+    sprintf("Brand analysis completed with %d warning(s). See Step 5 and the console.",
+            length(run_warnings))
+  }
+
+  list(level = level, success = TRUE, headline = headline,
+       warnings = all_warnings, html_path = html$path, xlsx_path = xlsx$path)
+}
+
+
 # ==============================================================================
 # GUARD VALIDATION FUNCTIONS
 # ==============================================================================

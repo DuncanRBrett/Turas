@@ -65,7 +65,16 @@ guard_alchemer_parser_shape <- function(data) {
   }
 
   # Telltale 1: raw Alchemer placeholders X1, X2, ...
+  # openxlsx names blank header cells the same way, so a parsed export with
+  # trailing empty columns must not trip this: only X-columns that carry
+  # data count as raw-export evidence.
   raw_placeholders <- grepl("^X[0-9]+$", cols)
+  if (any(raw_placeholders)) {
+    has_data <- vapply(cols[raw_placeholders], function(cn) {
+      any(!is.na(data[[cn]]) & nzchar(trimws(as.character(data[[cn]]))))
+    }, logical(1))
+    raw_placeholders[raw_placeholders] <- has_data
+  }
   if (sum(raw_placeholders) >= 5L) {
     .brand_v2_refuse(
       code = "DATA_NO_ALCHEMER_PARSER_OUTPUT",

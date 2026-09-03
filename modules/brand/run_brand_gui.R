@@ -26,7 +26,10 @@ run_brand_gui <- function() {
     cat("\n=== BRAND ERROR ===\n")
     cat(msg)
     cat("===================\n\n")
-    stop(msg, call. = FALSE)
+    # The launcher cannot continue without Shiny; return the refusal to the
+    # caller (launch_turas) instead of raising an R error.
+    return(invisible(list(status = "REFUSED", code = "PKG_MISSING_DEPENDENCY",
+                          message = msg)))
   }
 
   library(shiny)
@@ -338,14 +341,20 @@ run_brand_gui <- function() {
             progress$set(value = 0.85, detail = "Generating Excel report...")
             xlsx_result <- generate_brand_excel(res, out_xlsx, config = cfg)
 
+            # One verdict for engine status, engine warnings and the two
+            # generators (brand_gui_outcome in R/00_guard.R). A generator
+            # refusal is reported as a problem, never as success.
+            outcome <- brand_gui_outcome(res, html_result, xlsx_result,
+                                         out_html, out_xlsx)
             list(
               success    = TRUE,
+              level      = outcome$level,
+              headline   = outcome$headline,
+              warnings   = outcome$warnings,
               result     = res,
               output_dir = output_dir,
-              html_path  = if (identical(html_result$status, "PASS") ||
-                                file.exists(out_html)) out_html else NULL,
-              xlsx_path  = if (identical(xlsx_result$status, "PASS") ||
-                                file.exists(out_xlsx)) out_xlsx else NULL
+              html_path  = outcome$html_path,
+              xlsx_path  = outcome$xlsx_path
             )
           }
 
@@ -372,10 +381,17 @@ run_brand_gui <- function() {
         if (run_result$success) {
           analysis_result(run_result)
 
+          is_partial <- identical(run_result$level, "partial")
           console_output(paste0(
             console_output(),
-            sprintf("\n\n%s\n\u2713 ANALYSIS COMPLETE\n%s\n",
-                    strrep("=", 80), strrep("=", 80))
+            sprintf("\n\n%s\n%s\n%s\n",
+                    strrep("=", 80),
+                    if (is_partial) "\u26a0 ANALYSIS COMPLETE WITH WARNINGS"
+                    else "\u2713 ANALYSIS COMPLETE",
+                    strrep("=", 80)),
+            if (is_partial) paste0(
+              paste(sprintf("  - %s", run_result$warnings), collapse = "\n"),
+              "\n") else ""
           ))
 
           # Open HTML in browser if requested
@@ -386,8 +402,9 @@ run_brand_gui <- function() {
 
           save_recent_project(config_file())
           progress$set(value = 1.0, detail = "Complete!")
-          showNotification("Brand analysis completed successfully!",
-                           type = "message", duration = 5)
+          showNotification(run_result$headline,
+                           type = if (is_partial) "warning" else "message",
+                           duration = if (is_partial) NULL else 5)
 
         } else {
           analysis_result(list(error = run_result$error))
@@ -433,7 +450,9 @@ run_brand_gui <- function() {
       } else {
         res <- result$result
 
-        n_warnings <- length(res$warnings)
+        # Generator problems and engine warnings together (brand_gui_outcome)
+        shown_warnings <- result$warnings %||% res$warnings
+        n_warnings <- length(shown_warnings)
         elapsed    <- round(res$elapsed_seconds %||% 0, 1)
 
         div(class = "turas-card",
@@ -451,7 +470,7 @@ run_brand_gui <- function() {
             if (n_warnings > 0) {
               tagList(
                 strong("Warnings:"), br(),
-                lapply(res$warnings, function(w) tagList("  \u2022 ", w, br())),
+                lapply(shown_warnings, function(w) tagList("  \u2022 ", w, br())),
                 br()
               )
             },

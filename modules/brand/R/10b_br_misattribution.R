@@ -12,7 +12,7 @@
 # VERSION: 1.0
 # ==============================================================================
 
-BRAND_BRANDED_REACH_MISATTRIBUTION_VERSION <- "1.0"
+BRAND_BRANDED_REACH_MISATTRIBUTION_VERSION <- "1.1"
 
 
 #' Build per-ad misattribution table
@@ -90,6 +90,42 @@ compute_br_misattribution <- function(data, asset_list, brand_list,
 
     pick_codes <- as.character(data[[brand_col]])
     pick_codes[!seen_mask] <- NA_character_
+
+    # The attribution question is a CLOSED list: a category brand code, "DK"
+    # or "OTHER" (10_branded_reach.R header; the OptionMap for reach.brand.*
+    # enumerates it). Any other value among ad-seers would sit in n_seen but
+    # in no row, so the shares would under-sum silently. Refuse instead
+    # (review 2026-07-12, H4; option domain confirmed closed).
+    unknown <- setdiff(unique(pick_codes[seen_mask & !is.na(pick_codes)]),
+                       all_codes)
+    if (length(unknown) > 0) {
+      msg <- sprintf(
+        "Branded reach misattribution for asset '%s': column '%s' holds %d value(s) that are not a %s brand code, DK or OTHER: %s",
+        asset_id, brand_col, length(unknown),
+        if (is.null(cat_code) || !nzchar(cat_code)) "category" else cat_code,
+        paste(head(unknown, 10), collapse = ", "))
+      cat("\n=== TURAS BRAND ERROR ===\n[DATA_REACH_BRAND_CODE_UNKNOWN] ", msg,
+          "\nHow to fix: recode these values to a BrandCode from the Brands sheet, or to DK / OTHER, before running.\n=========================\n\n", sep = "")
+      return(list(
+        status = "REFUSED",
+        code = "DATA_REACH_BRAND_CODE_UNKNOWN",
+        message = msg,
+        how_to_fix = "Recode the attribution column to a BrandCode from the Brands sheet, or to DK / OTHER. The list is closed by design."
+      ))
+    }
+    if (!correct %in% brand_codes) {
+      msg <- sprintf(
+        "Branded reach misattribution for asset '%s': MarketingReach Brand '%s' is not a BrandCode in the category brand list (%s)",
+        asset_id, correct, paste(brand_codes, collapse = ", "))
+      cat("\n=== TURAS BRAND ERROR ===\n[CFG_REACH_ASSET_BRAND_UNKNOWN] ", msg,
+          "\nHow to fix: set the Brand column on the MarketingReach sheet to the brand's BrandCode, not its label.\n=========================\n\n", sep = "")
+      return(list(
+        status = "REFUSED",
+        code = "CFG_REACH_ASSET_BRAND_UNKNOWN",
+        message = msg,
+        how_to_fix = "Set the MarketingReach Brand column to the BrandCode used in the Brands sheet."
+      ))
+    }
 
     counts <- vapply(all_codes, function(bc) {
       sum(w[seen_mask & !is.na(pick_codes) & pick_codes == bc])
