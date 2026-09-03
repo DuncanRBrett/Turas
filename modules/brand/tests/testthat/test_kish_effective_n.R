@@ -138,3 +138,15 @@ test_that(".brand_meets_min_base is the shared disclosure predicate; NA never pa
   expect_true(.brand_meets_min_base(0, 0))        # suppress_base = 0 never suppresses
   expect_true(exists("meets_min_base", mode = "function"))
 })
+
+
+test_that("funnel stage flags accept text thresholds from a Settings sheet", {
+  aware <- matrix(0L, 50, 2, dimnames = list(NULL, c("F", "C")))
+  aware[1:40, 1] <- 1L; aware[1:10, 2] <- 1L
+  stages <- list(aware = list(key = "aware", matrix = aware))
+  sm <- calculate_stage_metrics(stages, weights = NULL, warn_base = "75", suppress_base = "30")
+  expect_equal(sm$warning_flag[sm$brand_code == "F"], "warn")      # 40 < 75
+  expect_equal(sm$warning_flag[sm$brand_code == "C"], "suppress")  # 10 < 30
+  sm2 <- calculate_stage_metrics(stages, weights = NULL, warn_base = "junk", suppress_base = NA)
+  expect_true(all(sm2$warning_flag %in% c("warn", "none", "suppress")))
+})

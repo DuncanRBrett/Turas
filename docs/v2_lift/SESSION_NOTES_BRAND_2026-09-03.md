@@ -44,8 +44,33 @@ was followed.
 Suites: brand full suite after Session A 2273 / 0 fail; after B 2298 / 0; after
 C 2311 / 0 (2 errors from a test that sourced `11_demographics.R` without
 `00_guard.R`, fixed by adding the source line). **Final full-suite tally on the
-branch tip: 2346 pass, 0 fail, 0 error, 2 skip, 1 warn** (61 files). Baseline
+branch tip (after the late fixes below): 2360 pass, 0 fail, 0 error, 2 skip,
+1 warn** (61 files). Baseline
 was 2155 / 0 / 2 skip / 1 warn.
+
+## Late fixes after the advisor pass (same evening)
+
+- The branded-reach PARTIAL warning was appended with `<<-` at loop level
+  inside `run_brand()`, which skips the local `warnings_list` and writes a
+  global instead, so the warning would never have reached `res$warnings`.
+  Changed to plain assignment. The pre-existing Audience Lens refusal path
+  (a few lines below) had the identical loop-level `<<-` and was fixed the
+  same way. Proved end to end: `run_brand()` on the integration fixture with
+  a MarketingReach sheet and an out-of-domain attribution value returns
+  PARTIAL, carries the misattribution warning, and leaves no global
+  `warnings_list` behind; the clean-values variant returns a PASS branded
+  reach with one ad and a misattribution table (test_integration.R).
+- `calculate_stage_metrics()` now coerces `warn_base` / `suppress_base` to
+  numeric before the shared gate, which refuses a text threshold; the
+  Settings sheet delivers these as text and `run_funnel()` already coerced
+  them, so this closes the direct-call path only (test in
+  test_kish_effective_n.R).
+- Scope check: `git diff --stat main..HEAD -- modules/shared` is empty;
+  every changed file is under `modules/brand/` or `docs/v2_lift/`.
+- The GUI launcher's package guard now returns a refusal list instead of
+  `stop()`; `launch_turas.R` runs the GUI by sourcing the script, so the
+  return value is not consumed. Shiny itself was not executed this session;
+  the GUI file was parsed and its verdict helper unit-tested.
 
 ## Not adopted from v2, and why (C4)
 

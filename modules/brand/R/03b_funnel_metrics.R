@@ -85,6 +85,13 @@ calculate_stage_metrics <- function(stages, weights = NULL,
                                     warn_base = 75, suppress_base = 0) {
   if (length(stages) == 0) return(.empty_stage_df())
 
+  # Thresholds may arrive as text from a Settings sheet; the shared gate
+  # refuses a non-numeric threshold, so coerce here.
+  warn_base     <- suppressWarnings(as.numeric(warn_base))
+  suppress_base <- suppressWarnings(as.numeric(suppress_base))
+  if (!is.finite(warn_base))     warn_base     <- 75
+  if (!is.finite(suppress_base)) suppress_base <- 0
+
   n_resp <- nrow(stages[[1]]$matrix)
   w <- weights %||% rep(1, n_resp)
   sum_w <- sum(w, na.rm = TRUE)

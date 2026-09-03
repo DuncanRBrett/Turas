@@ -52,7 +52,8 @@ for (f in brand_files) {
 
 .create_integration_fixtures <- function(tmp_dir = tempdir(),
                                           n_resp = 200, seed = 42,
-                                          weight_values = NULL) {
+                                          weight_values = NULL,
+                                          reach_values = NULL) {
   set.seed(seed)
 
   config_path <- file.path(tmp_dir, "Brand_Config.xlsx")
@@ -106,6 +107,12 @@ for (f in brand_files) {
   }
 
   if (!is.null(weight_values)) data$WT <- weight_values
+  if (!is.null(reach_values)) {
+    # One ad, everyone saw it, attribution values supplied by the caller
+    data$REACH_SEEN_AD1    <- 1L
+    data$REACH_BRAND_AD1   <- rep_len(reach_values, n_resp)
+    data$REACH_MEDIA_AD1_1 <- "TV"
+  }
 
   write.csv(data, data_path, row.names = FALSE)
 
@@ -130,6 +137,11 @@ for (f in brand_files) {
   if (!is.null(weight_values)) {
     settings <- rbind(settings, data.frame(Setting = "weight_variable",
                                            Value = "WT",
+                                           stringsAsFactors = FALSE))
+  }
+  if (!is.null(reach_values)) {
+    settings <- rbind(settings, data.frame(Setting = "element_branded_reach",
+                                           Value = "Y",
                                            stringsAsFactors = FALSE))
   }
   openxlsx::writeData(wb_cfg, "Settings", settings)
@@ -247,6 +259,19 @@ for (f in brand_files) {
     OrderIndex = 1:5,
     stringsAsFactors = FALSE
   ))
+  if (!is.null(reach_values)) {
+    openxlsx::addWorksheet(wb_ss, "MarketingReach")
+    openxlsx::writeData(wb_ss, "MarketingReach", data.frame(
+      AssetCode = "AD1", AssetLabel = "TV ad", Category = "DSS", Brand = "IPK",
+      SeenQuestionCode = "REACH_SEEN_AD1", BrandQuestionCode = "REACH_BRAND_AD1",
+      MediaQuestionCode = "REACH_MEDIA_AD1", MediaType = "TV", ImagePath = "",
+      stringsAsFactors = FALSE))
+    openxlsx::addWorksheet(wb_ss, "ReachMedia")
+    openxlsx::writeData(wb_ss, "ReachMedia", data.frame(
+      MediaCode = "TV", MediaLabel = "TV", DisplayOrder = 1L,
+      stringsAsFactors = FALSE))
+  }
+
 
   openxlsx::saveWorkbook(wb_ss, structure_path, overwrite = TRUE)
 
@@ -406,4 +431,44 @@ test_that("run_brand coerces numeric-looking text weights and runs weighted (M8)
   result <- run_brand(fixtures$config_path, verbose = FALSE)
   expect_true(result$status %in% c("PASS", "PARTIAL"))
   expect_false(is.null(result$results$categories[["Dry Seasonings & Spices"]]))
+})
+
+
+# ==============================================================================
+# Branded reach through run_brand(): the element runs when configured, and a
+# misattribution refusal surfaces as PARTIAL with a warning (not swallowed)
+# ==============================================================================
+
+test_that("run_brand runs Branded Reach when a MarketingReach sheet exists", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_reach_ok")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+  if (exists("warnings_list", envir = globalenv())) rm("warnings_list", envir = globalenv())
+
+  fixtures <- .create_integration_fixtures(tmp_dir, reach_values = c("IPK", "ROB", "DK", "OTHER"))
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  br <- result$results$categories[["Dry Seasonings & Spices"]]$branded_reach
+  expect_false(is.null(br))
+  expect_equal(br$status, "PASS")
+  expect_equal(length(br$ads), 1L)
+  expect_true("AD1" %in% names(br$misattribution))
+  expect_false(any(grepl("Branded reach", result$warnings)))
+})
+
+test_that("run_brand reports PARTIAL with the misattribution warning on an out-of-domain attribution", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_reach_bad")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+  if (exists("warnings_list", envir = globalenv())) rm("warnings_list", envir = globalenv())
+
+  fixtures <- .create_integration_fixtures(tmp_dir, reach_values = c("IPK", "Knorr", "ROB", "DK"))
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "PARTIAL")
+  expect_true(any(grepl("misattribution skipped", result$warnings, fixed = TRUE)))
+  expect_true(any(grepl("Knorr", result$warnings, fixed = TRUE)))
+  # The warning reached run_brand's own list, not a stray global
+  expect_false(exists("warnings_list", envir = globalenv()))
+  br <- result$results$categories[["Dry Seasonings & Spices"]]$branded_reach
+  expect_equal(br$status, "PARTIAL")
+  expect_equal(length(br$ads), 1L)
 })

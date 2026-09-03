@@ -831,10 +831,12 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           list(status = "REFUSED", message = e$message)
         }
       )
+      # Loop level, not inside a handler closure: plain assignment reaches
+      # run_brand's warnings_list (a <<- here would skip it for the global).
       br_res <- cat_result$branded_reach
       if (is.list(br_res) && identical(br_res$status, "PARTIAL") &&
           length(br_res$warnings) > 0) {
-        warnings_list <<- c(warnings_list,
+        warnings_list <- c(warnings_list,
           sprintf("%s: %s", cat_name, br_res$warnings))
       }
     }
@@ -859,7 +861,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         })
 
       if (is.list(al_audiences) && identical(al_audiences$status, "REFUSED")) {
-        warnings_list <<- c(warnings_list,
+        # loop level: plain assignment (a <<- here skipped the local list)
+        warnings_list <- c(warnings_list,
           sprintf("[AUDIENCE LENS %s] %s: %s",
                   al_audiences$code, cat_name, al_audiences$message))
         cat_result$audience_lens <- al_audiences
