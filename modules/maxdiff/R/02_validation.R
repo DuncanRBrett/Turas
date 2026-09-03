@@ -434,6 +434,15 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
         "Design contains item IDs not in the ITEMS sheet: %s",
         paste(unknown_in_design, collapse = ", ")))
     }
+    # The other direction (review F10): an included item no design row
+    # shows gets NA counts, and the report then dropped its counts table
+    # and diverging chart with a one-line console notice.
+    never_fielded <- setdiff(items$Item_ID[items$Include == 1], design_items)
+    if (length(never_fielded) > 0) {
+      issues <- c(issues, sprintf(
+        "Item(s) %s are set Include = 1 but appear in no design row, so they were never shown to anyone. Set Include = 0 for them, or fix the DESIGN file.",
+        paste(never_fielded, collapse = ", ")))
+    }
   }
 
   # ============================================================================
@@ -633,6 +642,15 @@ validate_maxdiff_weights <- function(weights, verbose = TRUE) {
 
   if (is.null(weights)) {
     return(list(valid = TRUE, issues = issues, warnings = warnings_list))
+  }
+
+  # A non-numeric column (a "1,2" locale export, text) must refuse with the
+  # column named, not crash in the comparison below (review F8).
+  if (!is.numeric(weights)) {
+    issues <- c(issues, sprintf(
+      "Weights column is %s, not numeric (e.g. '%s'). Export weights as plain numbers with a decimal point.",
+      class(weights)[1], paste(utils::head(unique(as.character(weights)), 3), collapse = "', '")))
+    return(list(valid = FALSE, issues = issues, warnings = warnings_list))
   }
 
   # Check for NAs

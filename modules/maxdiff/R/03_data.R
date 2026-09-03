@@ -525,14 +525,20 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
       if (choice_value_type == "ITEM_POSITION") {
         decode_position <- function(v, which_choice) {
           if (is.na(v)) return(NA_character_)
-          p <- suppressWarnings(as.integer(v))
-          if (is.na(p) || p < 1 || p > length(items_shown)) {
+          p_num <- suppressWarnings(as.numeric(v))
+          # A fractional value is a corrupt export, not a position (review
+          # F7): as.integer("2.7") silently gave 2 before.
+          p <- if (!is.na(p_num) && p_num == round(p_num)) as.integer(p_num) else NA_integer_
+          # A position that lands on an empty design slot decodes to nothing
+          # (review F6): the range check must count real items, not columns.
+          n_real <- sum(!is.na(items_shown) & nzchar(items_shown))
+          if (is.na(p) || p < 1 || p > n_real || is.na(items_shown[p]) || !nzchar(items_shown[p])) {
             maxdiff_refuse(
               code = "DATA_CHOICE_POSITION_INVALID",
               title = "Choice Position Out Of Range",
               problem = sprintf(
-                "Respondent %s, task %s: %s choice '%s' is not a position between 1 and %d",
-                resp_id, task_num, which_choice, v, length(items_shown)),
+                "Respondent %s, task %s: %s choice '%s' is not a whole-number position between 1 and %d (the items this task actually shows)",
+                resp_id, task_num, which_choice, v, n_real),
               why_it_matters = "Choice_Value_Type = ITEM_POSITION says these cells carry task positions; a value outside the task cannot be decoded, and guessing would credit the wrong item.",
               how_to_fix = c(
                 "Check the export: positions must be 1-based within each task.",
@@ -713,7 +719,19 @@ compute_study_summary <- function(long_data, config, verbose = TRUE) {
   resp_versions <- unique(long_data[, c("resp_id", "version")])
   version_dist <- table(resp_versions$version)
 
+  # Tasks the models cannot use (M2, review F11): a task without exactly one
+  # best and one worst stays in the counts denominators but is dropped by
+  # logit and HB. The count is computed here, once, so SUMMARY and the
+  # stats pack can disclose it whether or not either model ran.
+  task_key <- paste(long_data$resp_id, long_data$version, long_data$task, sep = "_")
+  best_per_task <- tapply(long_data$is_best, task_key, function(x) sum(x, na.rm = TRUE))
+  worst_per_task <- tapply(long_data$is_worst, task_key, function(x) sum(x, na.rm = TRUE))
+  n_tasks_total <- length(best_per_task)
+  n_tasks_dropped <- sum(best_per_task != 1 | worst_per_task != 1)
+
   summary_stats <- list(
+    n_tasks_total = n_tasks_total,
+    n_tasks_dropped_from_models = n_tasks_dropped,
     n_respondents = n_respondents,
     n_tasks = n_tasks,
     n_items = n_items,
