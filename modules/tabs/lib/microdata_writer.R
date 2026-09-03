@@ -7,7 +7,19 @@
 #
 #   { n, answers: { <qcode>: [rowIndex | [rowIndex…] | -2 | null  per respondent] },
 #     banner_vars: { <banner_code>: [aggColumnIndex | -1  per respondent] },
-#     weights: [w per respondent] }
+#     weights: [w per respondent],
+#     scores:  { <qcode>: [score | null  per respondent] },
+#     boxes:   { <qcode>: [boxIndex | null  per respondent] },
+#     series:  { <qcode>: { "<zero-based rows[] index>": [value | null  per
+#                                                         respondent] } } }
+#
+# scores, boxes and series are each omitted when no question carries one, so a
+# report gains a key only when it gains the feature. `series` is the ALLOCATION
+# (constant-sum) case: such a question publishes one mean row per item, so it
+# needs k series under one code where `scores` holds exactly one number per
+# respondent. Its `answers` column carries the -2 marker (who is in the base)
+# rather than a row index, because an Allocation has no category rows to land
+# on. See micro_series_for_question().
 #
 # Anonymity: ONLY zero-based row/column indices and weights, never a respondent
 # identifier, raw answer string, or free text. Indices are meaningless without
