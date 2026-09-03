@@ -722,7 +722,7 @@ The main results table. One row per item.
 | Logit_Utility   | Utility from aggregate logit model                       |
 | Logit_SE        | Standard error of logit utility                          |
 | HB_Utility_Mean | Population mean utility from HB model                    |
-| HB_Utility_SD   | Standard deviation of HB utility across respondents      |
+| HB_Utility_SD   | Under the empirical-Bayes fallback: spread of the shrunken scores across respondents. Under Stan HB: posterior SD of the population mean (a precision, not a spread). MODEL_DIAGNOSTICS says which ran. |
 | Rescaled_Score  | Utility on the chosen rescaling (0-100 by default)       |
 | Rank            | Preference rank (1 = most preferred)                     |
 

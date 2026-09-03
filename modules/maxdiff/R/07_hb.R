@@ -613,7 +613,10 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
     HB_ESS = NA_real_,
     # Honest stamp (M5): under EB these columns are the POPULATION SPREAD of
     # shrunken count scores, not a posterior SE / credible interval. The
-    # stamp travels into the Excel output beside the numbers.
+    # report transformer reads this stamp to label the column; the Excel
+    # workbook carries model_fit$method on MODEL_DIAGNOSTICS instead
+    # (review F5). Note the Stan path's HB_Utility_SD is the posterior SD of
+    # the population mean, a precision, NOT a spread.
     Estimation_Method = "Empirical Bayes (count-based; SD/Q5/Q95 are population spread, not posterior uncertainty)",
     stringsAsFactors = FALSE
   )

@@ -105,7 +105,13 @@ if (!exists("classify_appeal", mode = "function")) {
 }
 
 # Override run_turf_analysis to add maxdiff-specific refusal handling
-.shared_run_turf <- run_turf_analysis
+# Capture the SHARED engine, never this file's own wrapper: sourcing this
+# file twice in one session (interactive re-source, or sourcing 00_main.R
+# after the module files) used to capture the wrapper itself, and every TURF
+# call then failed with "unused arguments" (review F12).
+if (!isTRUE(attr(run_turf_analysis, "maxdiff_wrapper"))) {
+  .shared_run_turf <- run_turf_analysis
+}
 
 #' @rdname run_turf_analysis
 #' @description MaxDiff wrapper around shared TURF engine. Adds maxdiff-specific
@@ -155,6 +161,7 @@ run_turf_analysis <- function(individual_utils, items,
     label_col = "Item_Label"
   )
 }
+attr(run_turf_analysis, "maxdiff_wrapper") <- TRUE
 
 
 # ==============================================================================

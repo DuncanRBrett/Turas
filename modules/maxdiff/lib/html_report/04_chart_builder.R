@@ -495,6 +495,13 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
   n <- nrow(hb_pop)
   means <- hb_pop$HB_Utility_Mean
   sds <- hb_pop$HB_Utility_SD
+  # HB_Utility_SD means two things (review F5): under the EB fallback it is
+  # the spread of shrunken scores ACROSS respondents (a heterogeneity, which
+  # is what this quadrant is built to show); under Stan it is the posterior
+  # SD of the population mean, a precision. Label the axis for what it is.
+  .is_eb <- !any(grepl("Stan", hb_pop$Estimation_Method %||% "Empirical Bayes"))
+  y_label <- if (.is_eb) "Spread across respondents (SD)" else "Posterior SD of the mean (precision, not heterogeneity)"
+  title_stat <- if (.is_eb) "Spread Across Respondents" else "Posterior SD of the Mean"
   labels <- hb_pop$Item_Label %||% hb_pop$Item_ID
 
   chart_width <- 720
@@ -572,7 +579,7 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
   # Axis labels
   axis_labels <- paste0(
     sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500">Mean Utility</text>', ml + cw / 2, mt + ch + 40),
-    sprintf('<text x="%d" y="%g" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500" transform="rotate(-90, %d, %g)">Standard Deviation</text>', ml - 50, mt + ch / 2, ml - 50, mt + ch / 2)
+    sprintf('<text x="%d" y="%g" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500" transform="rotate(-90, %d, %g)">%s</text>', ml - 50, mt + ch / 2, ml - 50, mt + ch / 2, y_label)
   )
 
   # Dots + labels
@@ -593,7 +600,7 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
                     ml, mt, cw, ch)
 
   svg_wrap(paste(quadrants, grid_svg, med_lines, q_labels, border, axis_labels, dots, sep = "\n"),
-           chart_width, chart_height, "Item Strategy Quadrant: Mean Utility vs Standard Deviation")
+           chart_width, chart_height, paste0("Item Strategy Quadrant: Mean Utility vs ", title_stat))
 }
 
 
