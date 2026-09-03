@@ -10,9 +10,11 @@
 #     attribute importance as a crosstabbable Allocation question;
 #   - a MaxDiff tab (the maxdiff module's island) and the per-respondent
 #     preference shares as a crosstabbable Allocation question;
-#   - links to the two standalone simulators, copied beside the report.
+#   - a Pricing tab (the pricing module's island) and the Gabor-Granger
+#     acceptance ladder as a crosstabbable Multi_Mention question;
+#   - links to the three standalone simulators, copied beside the report.
 #
-# The same 600 synthetic respondents answer all three instruments, so the
+# The same 600 synthetic respondents answer all four instruments, so the
 # module exports join to the survey data by respondent id. Everything is
 # synthetic; no client data is involved at any point.
 #
@@ -22,6 +24,7 @@
 # Writes into <out_dir> (default examples/integrated_demo/Output):
 #   conjoint/   the CBC data, config and the conjoint module's outputs
 #   maxdiff/    the MaxDiff design, data, config and the module's outputs
+#   pricing/    the pricing data, config and the module's outputs
 #   tabs/       the survey data, structure, config, and report/ with the
 #               final Karoo_Demo_Crosstabs_report.html and both simulators
 # ==============================================================================
@@ -39,6 +42,7 @@ suppressPackageStartupMessages(library(openxlsx))
 source(file.path(turas_root, "modules", "shared", "lib", "turas_save_workbook_atomic.R"))
 options(turas.example.no_run = TRUE)
 source(file.path(turas_root, "examples", "maxdiff", "create_maxdiff_example.R"))
+source(file.path(turas_root, "examples", "pricing", "create_pricing_example.R"))
 
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 say <- function(...) cat(sprintf(...), "\n", sep = "")
@@ -186,7 +190,17 @@ md <- build_maxdiff_example(turas_root, md_dir, respondents = frame,
 say("4. MaxDiff design generated and choices simulated: %s", basename(md$config))
 
 # ==============================================================================
-# 5. RUN THE TWO MODULES
+# 4b. THE PRICING STUDY (the same respondents, priced)
+# ==============================================================================
+
+pr_dir <- file.path(out_dir, "pricing")
+pr <- build_pricing_example(turas_root, pr_dir, respondents = frame,
+                            file_stem = "Karoo_Pricing", seed = SEED + 4,
+                            verbose = FALSE, tabs_export = TRUE, simulator = TRUE)
+say("4b. Pricing answers simulated and configs written: %s", basename(pr$config))
+
+# ==============================================================================
+# 5. RUN THE THREE MODULES
 # ==============================================================================
 
 say("\n5a. Running the conjoint module (HB, bayesm)...")
@@ -211,8 +225,19 @@ cs <- md_res$count_scores[order(-md_res$count_scores$Net_Score), ]
 say("    status %s; top items by net score: %s", md_res$run_result$status %||% "?",
     paste(head(cs$Item_ID, 3), collapse = ", "))
 
+say("\n5c. Running the pricing module (Van Westendorp and Gabor-Granger)...")
+source(file.path(turas_root, "modules", "pricing", "R", "00_main.R"))
+pr_res <- run_pricing_analysis(pr$config)
+pr_island <- file.path(pr_dir, "Output", "Karoo_Pricing_Results_pr_island.json")
+pr_export <- file.path(pr_dir, "Output", "Karoo_Pricing_Results_tabs_pricing.xlsx")
+pr_sim <- file.path(pr_dir, "Output", "Karoo_Pricing_Results_simulator.html")
+for (f in c(pr_island, pr_export, pr_sim)) if (!file.exists(f)) stop("[DEMO] pricing did not write ", f)
+pp <- pr_res$results$van_westendorp$price_points
+say("    status %s; VW price points: PMC R%.2f, OPP R%.2f, IDP R%.2f, PME R%.2f",
+    pr_res$run_result$status %||% "?", pp$PMC, pp$OPP, pp$IDP, pp$PME)
+
 # ==============================================================================
-# 6. JOIN THE TWO EXPORTS TO THE SURVEY DATA BY RESPONDENT ID
+# 6. JOIN THE THREE EXPORTS TO THE SURVEY DATA BY RESPONDENT ID
 # ==============================================================================
 
 cj_shares <- read.xlsx(cj_export, sheet = "DATA")
@@ -222,11 +247,21 @@ cj_opts <- read.xlsx(cj_export, sheet = "QUESTIONMAP_SNIPPET", startRow = 6)
 md_qm <- read.xlsx(md_export, sheet = "QUESTIONMAP_SNIPPET", startRow = 2, rows = 2:3)
 md_opts <- read.xlsx(md_export, sheet = "QUESTIONMAP_SNIPPET", startRow = 6)
 
+# The pricing export's own QuestionMap and Options rows come back on the
+# result object, so nothing has to be parsed out of the workbook.
+pr_grid <- read.xlsx(pr_export, sheet = "DATA")
+pr_qm <- pr_res$tabs_export$questionmap
+pr_qm <- pr_qm[pr_qm$QuestionCode == pr_res$tabs_export$question_code, ]
+pr_opts <- pr_res$tabs_export$options
+pr_code <- pr_res$tabs_export$question_code
+
 survey <- merge(survey, cj_shares, by = "RespID", all.x = TRUE, sort = FALSE)
 survey <- merge(survey, md_shares, by = "RespID", all.x = TRUE, sort = FALSE)
+survey <- merge(survey, pr_grid, by = "RespID", all.x = TRUE, sort = FALSE)
 survey <- survey[order(survey$RespID), ]
-say("\n6. Exports joined by RespID: %d of %d have conjoint importance, %d of %d have MaxDiff shares",
-    sum(!is.na(survey$CJIMP_1)), n, sum(!is.na(survey$MDSHARE_1)), n)
+say("\n6. Exports joined by RespID: %d of %d have conjoint importance, %d of %d have MaxDiff shares, %d of %d are in the pricing base",
+    sum(!is.na(survey$CJIMP_1)), n, sum(!is.na(survey$MDSHARE_1)), n,
+    sum(survey$pricing_valid %in% 1), n)
 
 # ==============================================================================
 # 7. THE TABS PROJECT: data, structure, config
@@ -254,19 +289,23 @@ q_text <- c(
   CJIMP = cj_qm$QuestionText[1],
   MDSHARE = md_qm$QuestionText[1]
 )
+q_text[[pr_code]] <- pr_qm$QuestionText[1]
 q_type <- c(Region = "Single_Response", Gender = "Single_Response", Age_Group = "Single_Response",
             Segment = "Single_Response", Q001 = "NPS", Q002 = "Rating", Q003 = "Rating",
             Q004 = "Rating", Q005 = "Rating", Q006 = "Likert", Q007 = "Likert",
             Q008 = "Single_Response", Q009 = "Single_Response",
             CJIMP = "Allocation", MDSHARE = "Allocation")
+q_type[[pr_code]] <- "Multi_Mention"
 q_cols <- c(Region = 1, Gender = 1, Age_Group = 1, Segment = 1, Q001 = 1, Q002 = 1, Q003 = 1,
             Q004 = 1, Q005 = 1, Q006 = 1, Q007 = 1, Q008 = 1, Q009 = 1,
             CJIMP = cj_qm$Columns[1], MDSHARE = md_qm$Columns[1])
+q_cols[[pr_code]] <- pr_qm$Columns[1]
 q_cat <- c(Region = "Demographics", Gender = "Demographics", Age_Group = "Demographics",
            Segment = "Demographics", Q001 = "Overall", Q002 = "Overall", Q003 = "Product",
            Q004 = "Product", Q005 = "Service", Q006 = "Attitudes", Q007 = "Attitudes",
            Q008 = "Buying behaviour", Q009 = "Buying behaviour",
            CJIMP = "What drives choice (conjoint)", MDSHARE = "What matters most (MaxDiff)")
+q_cat[[pr_code]] <- "What they would pay (pricing)"
 codes <- names(q_text)
 
 questions_df <- data.frame(QuestionCode = codes, QuestionText = unname(q_text[codes]),
@@ -299,6 +338,13 @@ add_opts("Q008", c("Weekly", "Monthly", "Quarterly", "Less often"))
 add_opts("Q009", c("Online shop", "Subscription", "In store", "Marketplace"))
 add_opts("CJIMP", cj_opts$OptionText)
 add_opts("MDSHARE", md_opts$OptionText)
+# The pricing ladder is a Multi_Mention, and tabs looks a Multi_Mention's
+# options up by COLUMN name ({code}_1, {code}_2, ...), not by the question
+# code the way an Allocation does. The export writes its Options rows already
+# keyed that way, so they are used as they came.
+for (i in seq_len(nrow(pr_opts))) {
+  add_opts(pr_opts$QuestionCode[i], pr_opts$OptionText[i])
+}
 options_df <- do.call(rbind, opt_rows)
 
 structure_path <- file.path(tabs_dir, "Karoo_Demo_Survey_Structure.xlsx")
@@ -343,7 +389,7 @@ config_path <- file.path(tabs_dir, "Karoo_Demo_Crosstab_Config.xlsx")
                 "show_net_positive", "project_title", "brand_colour", "fieldwork_dates",
                 "dashboard_scale_mean", "dashboard_green_mean", "dashboard_amber_mean",
                 "html_report_v2", "html_report_v2_microdata",
-                "conjoint_island", "maxdiff_island"),
+                "conjoint_island", "maxdiff_island", "pricing_island"),
     Value = c(basename(structure_path), "report", "Karoo_Demo_Crosstabs.xlsx", "xlsx",
               "FALSE", "TRUE", "TRUE", "TRUE",
               "FALSE", "0", "1", "1", "1",
@@ -354,7 +400,7 @@ config_path <- file.path(tabs_dir, "Karoo_Demo_Crosstab_Config.xlsx")
               "#0d8a8a", "Synthetic data, September 2026",
               "10", "7", "5",
               "TRUE", "TRUE",
-              cj_island, md_island),
+              cj_island, md_island, pr_island),
     stringsAsFactors = FALSE)
   wb <- createWorkbook()
   addWorksheet(wb, "Settings"); writeData(wb, "Settings", settings)
@@ -377,14 +423,19 @@ if (!isTRUE(ok) || !file.exists(report)) stop("[DEMO] tabs did not write ", repo
 # The islands link to their simulators by file name, relative to the report.
 file.copy(cj_sim, file.path(report_dir, basename(cj_sim)), overwrite = TRUE)
 file.copy(md_sim, file.path(report_dir, basename(md_sim)), overwrite = TRUE)
+file.copy(pr_sim, file.path(report_dir, basename(pr_sim)), overwrite = TRUE)
 
 html <- paste(readLines(report, warn = FALSE), collapse = "\n")
 say("\n=== DONE ===")
 say("Report:              %s (%.1f MB)", report, file.size(report) / 1e6)
 say("Conjoint tab:        %s", if (grepl('"kind":"conjoint"', html, fixed = TRUE)) "present" else "MISSING")
 say("MaxDiff tab:         %s", if (grepl('"kind":"maxdiff"', html, fixed = TRUE)) "present" else "MISSING")
+say("Pricing tab:         %s", if (grepl('"kind":"pricing"', html, fixed = TRUE)) "present" else "MISSING")
 say("Conjoint simulator:  %s", file.path(report_dir, basename(cj_sim)))
 say("MaxDiff simulator:   %s", file.path(report_dir, basename(md_sim)))
-say("Open the report in a browser. The Conjoint and MaxDiff tabs sit in the Read group;")
-say("CJIMP and MDSHARE are Allocation questions in the crosstabs, so the importance and the")
-say("preference shares can be read by region, gender, age and customer segment.")
+say("Pricing simulator:   %s", file.path(report_dir, basename(pr_sim)))
+say("Open the report in a browser. The Conjoint, MaxDiff and Pricing tabs sit in the Read")
+say("group. CJIMP and MDSHARE are Allocation questions in the crosstabs and %s is a", pr_code)
+say("Multi_Mention, so importance, preference shares and the acceptance ladder can all be")
+say("read by region, gender, age and customer segment. The three module tabs are frozen:")
+say("they show what was estimated on the whole sample and hide the audience filter.")
