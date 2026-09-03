@@ -223,8 +223,9 @@ Verified by execution, from the repo root:
 - F2 by a stubbed refusing report module: the banner reads `COMPLETED WITH 1 EVENT(S)` and `run_result$status` is PARTIAL with the refusal in `warnings`. Before the fix the same probe ended `[TRS PASS]` with zero warnings.
 - F10 fired on my own earlier probe config (two template items never fielded) and named them; the probe was corrected to field every item.
 
+F5, ruled and implemented later the same day (`9591c187`): `HB_Utility_SD`, `Q5` and `Q95` are the spread of utilities across respondents on both HB paths, computed by one helper from the shipped individual utilities; the precision of the population mean moves to `HB_Mean_SE` (with `HB_Mean_Q5` / `HB_Mean_Q95`), NA under the fallback. The report always labels the column Spread (SD) and shows an SE column only when a posterior exists. Under the fallback the spread numbers narrow, because they were measured on the unshrunken scores before and on the shrunken individual utilities now. Suite 957 / 0 / 0 / 0.
+
 Not done, deliberately:
-- F5 needs Duncan's ruling on what `HB_Utility_SD` should mean; the labels now say which statistic they are, nothing was recomputed.
 - The Run_Status sheet in the results workbook is written before the report step, so a report refusal appears in the console, the banner, the GUI and `run_result`, but not on that sheet.
 - The Stan sampling path is still not executed (PROG-1).
 - The F12 name collisions with the confidence and conjoint modules are untouched.
