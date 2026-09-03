@@ -47,9 +47,13 @@ build_simulator_data <- function(hb_results, logit_results, config,
   # Build individual utilities array
   indiv_list <- list()
   if (!is.null(hb_results$individual_utilities)) {
-    # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+    # Drop the ID column BY NAME, then non-numeric columns (review C2 / F3):
+    # a numeric resp_id passed the is.numeric filter and became element 1 of
+    # every respondent's utilities vector, which the engine indexes by item
+    # position - every item would read the previous item's utility.
     indiv_df <- hb_results$individual_utilities
     if (is.data.frame(indiv_df)) {
+      indiv_df <- indiv_df[, !(names(indiv_df) %in% c("resp_id", "respondent_id", "Respondent_ID")), drop = FALSE]
       numeric_cols <- sapply(indiv_df, is.numeric)
       indiv_mat <- as.matrix(indiv_df[, numeric_cols, drop = FALSE])
     } else {

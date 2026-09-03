@@ -450,6 +450,23 @@ transform_turf_section <- function(results, config) {
 }
 
 
+#' Drop respondent-ID columns from an individual-utilities table
+#'
+#' A NUMERIC respondent ID survives an is.numeric filter and becomes an
+#' item (review C2 / F3): the diagnostics transformer crashed on it and the
+#' head-to-head matrix grew a resp_id row. Strip by name first; the engine's
+#' strip_respondent_id_cols() does the same for the estimation layer.
+#' @keywords internal
+.md_drop_id_cols <- function(x, id_names = c("resp_id", "respondent_id", "Respondent_ID")) {
+  if (is.data.frame(x)) {
+    x <- x[, !(names(x) %in% id_names), drop = FALSE]
+  } else if (is.matrix(x) && !is.null(colnames(x))) {
+    x <- x[, !(colnames(x) %in% id_names), drop = FALSE]
+  }
+  x
+}
+
+
 transform_diagnostics_section <- function(results, config) {
 
   logit_fit <- NULL
@@ -493,7 +510,8 @@ transform_diagnostics_section <- function(results, config) {
   pop <- results$hb_results$population_utilities
 
   if (!is.null(indiv)) {
-    # Get numeric columns
+    # Get numeric ITEM columns (the ID column is dropped by name first, F3)
+    indiv <- .md_drop_id_cols(indiv)
     if (is.data.frame(indiv)) {
       numeric_cols <- vapply(indiv, is.numeric, logical(1))
       item_ids <- names(indiv)[numeric_cols]
@@ -737,7 +755,8 @@ transform_h2h_section <- function(results, config) {
   indiv_utils <- results$hb_results$individual_utilities
 
   if (!is.null(indiv_utils) && exists("compute_head_to_head", mode = "function")) {
-    # Get item column names (exclude non-numeric like resp_id)
+    # Get item column names (the ID column is dropped by name first, F3)
+    indiv_utils <- .md_drop_id_cols(indiv_utils)
     if (is.data.frame(indiv_utils)) {
       numeric_cols <- vapply(indiv_utils, is.numeric, logical(1))
       item_ids <- names(indiv_utils)[numeric_cols]
@@ -909,7 +928,8 @@ transform_utility_distributions <- function(results) {
   indiv <- results$hb_results$individual_utilities
   if (is.null(indiv)) return(NULL)
 
-  # Get numeric columns only
+  # Get numeric ITEM columns only (the ID column is dropped by name first, F3)
+  indiv <- .md_drop_id_cols(indiv)
   if (is.data.frame(indiv)) {
     numeric_cols <- vapply(indiv, is.numeric, logical(1))
     item_ids <- names(indiv)[numeric_cols]
@@ -991,14 +1011,16 @@ enrich_segment_scores <- function(segment_scores, individual_utils, raw_data,
     return(segment_scores)
   }
 
-  # Get numeric item columns from individual utilities
+  # Get numeric item columns from individual utilities (the ID column is
+  # read for the join, then dropped by name before the numeric filter, F3)
   if (is.data.frame(individual_utils)) {
-    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
     resp_ids <- if ("resp_id" %in% names(individual_utils)) {
       individual_utils$resp_id
     } else {
       seq_len(nrow(individual_utils))
     }
+    individual_utils <- .md_drop_id_cols(individual_utils)
+    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
     utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
   } else {
     utils_mat <- as.matrix(individual_utils)
@@ -1154,14 +1176,15 @@ compute_segment_h2h <- function(individual_utils, raw_data, segment_settings,
     return(NULL)
   }
 
-  # Get numeric item columns
+  # Get numeric item columns (ID read for the join, then dropped by name, F3)
   if (is.data.frame(individual_utils)) {
-    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
     resp_ids <- if ("resp_id" %in% names(individual_utils)) {
       individual_utils$resp_id
     } else {
       seq_len(nrow(individual_utils))
     }
+    individual_utils <- .md_drop_id_cols(individual_utils)
+    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
     utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
   } else {
     utils_mat <- as.matrix(individual_utils)
