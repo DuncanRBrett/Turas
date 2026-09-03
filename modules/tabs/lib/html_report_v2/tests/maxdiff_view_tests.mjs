@@ -120,22 +120,31 @@ run("a render carries the estimator's words, the stamp, and every panel", () => 
   has(h, "Where respondents agree and disagree", "discrimination panel");
   has(h, "Spread (SD)", "EB spread is labelled spread, never SE");
   lacks(h, "Posterior SD", "EB is not labelled posterior");
+  lacks(h, "Mean SE", "the EB fallback has no posterior, so no standard error column");
+  has(h, "no standard error for the mean", "and the note says so");
   has(h, 'href="Demo_MaxDiff_Results_simulator.html"', "simulator link");
   has(h, "md-tag-must", "must-have tag");
   // Best-liked item first.
   assert(h.indexOf("Free delivery") < h.indexOf("Gift wrap"), "sorted by share, descending");
 });
 
-run("Stan provenance is labelled as posterior, and gets no stamp", () => {
+run("Stan gets no stamp, one meaning for the spread, and the mean's SE beside it", () => {
   const isl = JSON.parse(JSON.stringify(ISLAND));
   isl.meta.method = "stan_hb";
   isl.meta.methodLabel = "Stan hierarchical Bayes";
   isl.meta.estimationNote = "Individual utilities are posterior means from the Stan model.";
+  isl.scores.hbMeanSe = [0.04, 0.05, 0.06];
   const sb = viewSandbox(isl);
   const host = { innerHTML: "" };
   sb.TR.maxdiff.render(host);
-  has(host.innerHTML, "Posterior SD", "posterior label");
-  lacks(host.innerHTML, 'class="md-stamp"', "no stamp on genuine HB");
+  const h = host.innerHTML;
+  lacks(h, 'class="md-stamp"', "no stamp on genuine HB");
+  // Duncan's F5 ruling: HB_Utility_SD is the spread across respondents on BOTH
+  // paths. Calling it a posterior SD under Stan is the mislabelling F5 ended.
+  has(h, "Spread (SD)", "the spread keeps one label on both paths");
+  lacks(h, "Posterior SD", "the spread is never called a posterior SD");
+  has(h, "Mean SE", "the precision of the mean is its own column");
+  has(h, "posterior standard deviation of the population mean", "and the note says what it is");
 });
 
 run("a hostile label is escaped everywhere it appears", () => {

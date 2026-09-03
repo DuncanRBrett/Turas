@@ -120,6 +120,25 @@ test_that("scores travel in config item order with shares that sum to 100", {
   expect_equal(isl$meta$simulatorFile, "IslandTest_MaxDiff_Results_simulator.html")
 })
 
+test_that("the mean's standard error travels only when a posterior produced one", {
+  # F5: HB_Utility_SD is the spread across respondents on BOTH paths, so the
+  # only thing that tells them apart in the island is HB_Mean_SE.
+  f <- make_island_fixture(with_hb = "stan")
+  f$results$hb_results$population_utilities$HB_Mean_SE <-
+    c(.04, .05, .06, .07, .08, .09)
+  isl <- serialize_maxdiff_layer(f$results, f$config, verbose = FALSE)
+  expect_equal(isl$scores$hbMeanSe, c(.04, .05, .06, .07, .08, .09))
+  expect_true(!is.null(isl$scores$hbSpread))
+
+  # Under the fallback the column exists in the frame but is empty, and an
+  # array of nulls is worse than no array at all.
+  g <- make_island_fixture(with_hb = "eb")
+  g$results$hb_results$population_utilities$HB_Mean_SE <- NA_real_
+  isl2 <- serialize_maxdiff_layer(g$results, g$config, verbose = FALSE)
+  expect_null(isl2$scores$hbMeanSe)
+  expect_true(!is.null(isl2$scores$hbSpread))
+})
+
 test_that("absent blocks are absent in the JSON, never an empty object", {
   fx <- make_island_fixture(with_hb = "none", with_logit = FALSE)
   isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)

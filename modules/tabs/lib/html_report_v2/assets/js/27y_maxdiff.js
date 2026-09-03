@@ -85,14 +85,22 @@
       "</div>";
   }
 
-  /** The column that carries the headline utility, and what its spread means. */
+  /**
+   * The column that carries the headline utility, its spread, and where there
+   * is a posterior to take one from, the precision of the population mean.
+   * The spread is the spread across respondents on BOTH hierarchical paths,
+   * so it carries one label; only the mean's standard error tells the paths
+   * apart, and under the empirical-Bayes fallback there is not one.
+   */
   function utilityColumns(meta, sc) {
     if (arr(sc.hbUtility)) {
       return {
         value: sc.hbUtility,
         spread: arr(sc.hbSpread),
+        se: arr(sc.hbMeanSe),
         label: "Utility",
-        spreadLabel: meta.method === "stan_hb" ? "Posterior SD" : "Spread (SD)"
+        spreadLabel: "Spread (SD)",
+        seLabel: "Mean SE"
       };
     }
     if (arr(sc.logitUtility)) {
@@ -133,7 +141,8 @@
       '<th class="md-num">Best</th><th class="md-num">Worst</th>';
     if (net) head += '<th class="md-num">Net</th>';
     if (util) head += '<th class="md-num">' + esc(util.label) + "</th>" +
-      (util.spread ? '<th class="md-num">' + esc(util.spreadLabel) + "</th>" : "");
+      (util.spread ? '<th class="md-num">' + esc(util.spreadLabel) + "</th>" : "") +
+      (util.se ? '<th class="md-num">' + esc(util.seLabel) + "</th>" : "");
     if (rescaled) head += '<th class="md-num">Score</th>';
     head += "</tr>";
 
@@ -160,6 +169,7 @@
       if (util) {
         r += '<td class="md-num">' + num(util.value[i], 2) + "</td>";
         if (util.spread) r += '<td class="md-num">' + num(util.spread[i], 2) + "</td>";
+        if (util.se) r += '<td class="md-num">' + num(util.se[i], 3) + "</td>";
       }
       if (rescaled) r += '<td class="md-num">' + num(rescaled[i], 0) + "</td>";
       return r + "</tr>";
@@ -171,6 +181,11 @@
     }
     if (best && worst) {
       notes.push("Best and Worst are the share of the times an item was shown that it was picked as best or worst.");
+    }
+    if (util && util.spread && util.label === "Utility") {
+      notes.push(util.se
+        ? "Spread (SD) is how much the item's utility varies across respondents, not the precision of the average. Mean SE is that precision: the posterior standard deviation of the population mean."
+        : "Spread (SD) is how much the item's utility varies across respondents, not the precision of the average. This run has no posterior, so there is no standard error for the mean.");
     }
     if (rescaled) {
       var rm = sc.rescaleMethod;

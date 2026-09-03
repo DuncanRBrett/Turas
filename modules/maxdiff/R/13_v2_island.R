@@ -84,6 +84,13 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     if (is.null(df) || !col %in% names(df)) return(NULL)
     num(df[[col]][match(ids, df$Item_ID)])
   }
+  # As pick(), but a column that is entirely missing stays out of the island
+  # rather than arriving as an array of nulls the view has to guess about.
+  pick_present <- function(df, col, ids) {
+    v <- pick(df, col, ids)
+    if (is.null(v) || all(is.na(v))) return(NULL)
+    v
+  }
 
   ids <- as.character(included$Item_ID)
   labels <- as.character(included$Item_Label %||% included$Item_ID)
@@ -141,10 +148,12 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     logitUtility = pick(logit$utilities, "Logit_Utility", ids),
     logitSe = pick(logit$utilities, "Logit_SE", ids),
     hbUtility = pick(hb$population_utilities, "HB_Utility_Mean", ids),
-    # Under Stan this is the posterior SD of the population mean; under EB it
-    # is the spread of shrunken count scores across respondents. The meta
-    # block names which, so the view labels the column honestly.
+    # One meaning on both paths, per Duncan's F5 ruling: the spread of the
+    # shipped individual utilities across respondents, a heterogeneity. The
+    # precision of the population mean is a separate column, and exists only
+    # where there is a posterior to take it from.
     hbSpread = pick(hb$population_utilities, "HB_Utility_SD", ids),
+    hbMeanSe = pick_present(hb$population_utilities, "HB_Mean_SE", ids),
     share = shares,
     rescaled = rescaled,
     rescaleMethod = if (!is.null(rescaled)) rescale_method else NULL
