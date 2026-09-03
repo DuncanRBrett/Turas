@@ -147,6 +147,34 @@ run("Stan gets no stamp, one meaning for the spread, and the mean's SE beside it
   has(h, "posterior standard deviation of the population mean", "and the note says what it is");
 });
 
+run("F1: the Stan provenance panel and the table note agree about the spread", () => {
+  const isl = JSON.parse(JSON.stringify(ISLAND));
+  isl.meta.method = "stan_hb";
+  isl.meta.methodLabel = "Stan hierarchical Bayes";
+  // The note as 13_v2_island.R now writes it.
+  isl.meta.estimationNote = "Individual utilities are posterior means from the Stan model. Spread (SD) is how far those utilities vary across respondents; Mean SE is the precision of the population mean (its posterior standard deviation).";
+  isl.scores.hbMeanSe = [0.04, 0.05, 0.06];
+  const sb = viewSandbox(isl);
+  const host = { innerHTML: "" };
+  sb.TR.maxdiff.render(host);
+  const prov = host.innerHTML.match(/<div class="md-provenance">[\s\S]*?<\/div>/)[0];
+  has(prov, "across respondents", "the panel says the spread is across respondents");
+  assert(!/spread column is the posterior/i.test(prov), "the panel never calls the spread a posterior SD");
+  assert(!/posterior SD of the population mean/i.test(host.innerHTML), "that phrase is gone from the whole tab");
+});
+
+run("F2: a one-step TURF renders its panel when the island keeps it an array", () => {
+  const isl = JSON.parse(JSON.stringify(ISLAND));
+  isl.turf = { thresholdMethod: "ABOVE_MEAN", nRespondents: 300, maxItems: 5,
+               step: [1], itemId: ["A"], label: ["Free delivery"], reachPct: [100],
+               incrementalPct: [100], frequency: [1], note: "Reach note." };
+  const sb = viewSandbox(isl);
+  const host = { innerHTML: "" };
+  sb.TR.maxdiff.render(host);
+  has(host.innerHTML, "Portfolio reach (TURF)", "one-step turf panel");
+  has(host.innerHTML, "100.0%", "its reach");
+});
+
 run("a hostile label is escaped everywhere it appears", () => {
   const sb = viewSandbox(ISLAND);
   const host = { innerHTML: "" };

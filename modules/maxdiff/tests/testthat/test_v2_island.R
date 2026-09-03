@@ -56,6 +56,9 @@ make_island_fixture <- function(with_hb = "eb", with_logit = TRUE, with_turf = F
 
   os <- get_default_output_settings()
   os$Generate_Simulator <- TRUE
+  # The standalone simulator file exists only when the classic HTML report is
+  # off (review F3); the default has it on.
+  os$Generate_HTML_Report <- FALSE
   os$Anchor_Variable <- "MustHave"
   config <- list(
     project_settings = list(Project_Name = "IslandTest", Weight_Variable = NULL),
@@ -137,6 +140,49 @@ test_that("the mean's standard error travels only when a posterior produced one"
   isl2 <- serialize_maxdiff_layer(g$results, g$config, verbose = FALSE)
   expect_null(isl2$scores$hbMeanSe)
   expect_true(!is.null(isl2$scores$hbSpread))
+})
+
+test_that("F1: the Stan note never calls the spread a posterior SD", {
+  fx <- make_island_fixture(with_hb = "stan")
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  # One meaning on both paths: the spread is across respondents; the mean's
+  # precision is named as Mean SE and never as "the spread".
+  expect_match(isl$meta$estimationNote, "across respondents", fixed = TRUE)
+  expect_false(grepl("spread column is the posterior", isl$meta$estimationNote, ignore.case = TRUE))
+  expect_match(isl$meta$estimationNote, "Mean SE", fixed = TRUE)
+})
+
+test_that("F3: no simulator file is named when the classic HTML report embeds it", {
+  fx <- make_island_fixture(with_hb = "eb")
+  fx$config$output_settings$Generate_Simulator <- TRUE
+  fx$config$output_settings$Generate_HTML_Report <- TRUE
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_null(isl$meta$simulatorFile)
+  # YES/NO strings, the shape a config sheet carries before parsing, agree.
+  fx$config$output_settings$Generate_HTML_Report <- "NO"
+  isl <- serialize_maxdiff_layer(fx$results, fx$config, verbose = FALSE)
+  expect_equal(isl$meta$simulatorFile, "IslandTest_MaxDiff_Results_simulator.html")
+})
+
+test_that("F2: a one-step TURF is written as arrays, not scalars", {
+  fx <- make_island_fixture(with_hb = "eb", with_turf = TRUE, with_anchor = TRUE)
+  it <- fx$results$turf_results$incremental_table[1, , drop = FALSE]
+  fx$results$turf_results$incremental_table <- it
+  res <- write_maxdiff_island(fx$results, fx$config, verbose = FALSE)
+  txt <- paste(readLines(res$output_file, warn = FALSE), collapse = "")
+  expect_true(grepl('"step":[1]', txt, fixed = TRUE), info = txt)
+  expect_true(grepl('"reachPct":[40]', txt, fixed = TRUE))
+  expect_true(grepl('"itemId":["', txt, fixed = TRUE))
+  # The block's own scalars stay scalars, and so does everything in meta.
+  expect_true(grepl('"thresholdMethod":"ABOVE_MEAN"', txt, fixed = TRUE))
+  expect_true(grepl('"maxItems":3', txt, fixed = TRUE))
+  expect_true(grepl('"threshold":0.5', txt, fixed = TRUE))
+  expect_true(grepl('"method":"empirical_bayes"', txt, fixed = TRUE))
+  expect_true(grepl('"nItems":6', txt, fixed = TRUE))
+  back <- jsonlite::fromJSON(res$output_file, simplifyVector = FALSE)
+  expect_true(is.list(back$turf$step))
+  expect_equal(length(back$turf$step), 1)
+  unlink(fx$out_dir, recursive = TRUE)
 })
 
 test_that("absent blocks are absent in the JSON, never an empty object", {

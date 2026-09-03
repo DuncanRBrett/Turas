@@ -235,9 +235,13 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
     "aggregate_logit" = "Aggregate conditional logit",
     "counts" = "Count scores")
   estimation_note <- switch(method,
+    # F5 ruling, and review F1 of this branch: the spread column is the
+    # spread across respondents on both paths; the precision of the mean is
+    # its own column and is only named here, never as "the spread".
     "stan_hb" = paste0("Individual utilities are posterior means from the Stan ",
-                       "model; the spread column is the posterior SD of the ",
-                       "population mean."),
+                       "model. Spread (SD) is how far those utilities vary ",
+                       "across respondents; Mean SE is the precision of the ",
+                       "population mean (its posterior standard deviation)."),
     "empirical_bayes" = paste0("cmdstanr was not available, so the utilities are ",
                                "empirical-Bayes shrunken best-minus-worst counts, ",
                                "not Bayesian posterior estimates. The spread column ",
@@ -273,7 +277,11 @@ serialize_maxdiff_layer <- function(results, config, verbose = TRUE) {
       "respond to the audience filter. To break preference shares by audience, ",
       "use the crosstab export (Generate_Tabs_Export)."
     ),
-    simulatorFile = if (isTRUE(config$output_settings$Generate_Simulator) &&
+    # Step 12 writes a standalone simulator only when the classic HTML report
+    # is OFF; with it on, the simulator is embedded in that report and no
+    # file of this name exists (review F3). Same condition as 00_main.R.
+    simulatorFile = if (parse_yes_no(config$output_settings$Generate_Simulator %||% FALSE) &&
+                        !parse_yes_no(config$output_settings$Generate_HTML_Report %||% FALSE) &&
                         !is.null(results$output_path)) {
       basename(sub("[.]xlsx$", "_simulator.html", results$output_path))
     } else NULL,
@@ -328,8 +336,8 @@ write_maxdiff_island <- function(results, config, output_file = NULL, verbose = 
     if (identical(output_file, base)) output_file <- paste0(base, "_md_island.json")
   }
 
-  jsonlite::write_json(island, output_file, auto_unbox = TRUE,
-                       na = "null", digits = 6, pretty = FALSE)
+  jsonlite::write_json(.maxdiff_island_keep_arrays(island), output_file,
+                       auto_unbox = TRUE, na = "null", digits = 6, pretty = FALSE)
 
   if (verbose) cat(sprintf("  Interactive-report contribution: %s\n", basename(output_file)))
 
@@ -338,4 +346,36 @@ write_maxdiff_island <- function(results, config, output_file = NULL, verbose = 
     output_file = output_file,
     n_items = length(island$scores$itemId)
   )
+}
+
+
+#' Keep the island's per-row vectors as JSON arrays whatever their length
+#'
+#' `auto_unbox = TRUE` writes every length-1 vector as a scalar. A TURF that
+#' stops after one item (Karoo under Stan: FRESH reaches 100% at step 1) then
+#' arrives as `"step": 1`, and the view's array check treats the whole block
+#' as absent (review F2). Every per-row field in the four table blocks is
+#' wrapped in `I()`, which jsonlite honours as "always an array"; the named
+#' scalars in those blocks, and everything in `meta`, stay unboxed.
+#'
+#' @param island The list from `serialize_maxdiff_layer()`.
+#' @return The same list with per-row vectors marked `AsIs`.
+#' @keywords internal
+.maxdiff_island_keep_arrays <- function(island) {
+  scalars <- list(
+    scores = "rescaleMethod",
+    turf = c("thresholdMethod", "nRespondents", "maxItems", "note"),
+    anchor = c("variable", "threshold"),
+    discrimination = "note"
+  )
+  for (block in names(scalars)) {
+    b <- island[[block]]
+    if (is.null(b)) next
+    for (field in names(b)) {
+      if (field %in% scalars[[block]]) next
+      if (is.atomic(b[[field]]) && !inherits(b[[field]], "AsIs")) b[[field]] <- I(b[[field]])
+    }
+    island[[block]] <- b
+  }
+  island
 }
