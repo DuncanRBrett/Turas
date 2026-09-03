@@ -1,4 +1,4 @@
-# Executive Takeout — architecture & build plan
+# Executive Takeout. Architecture & build plan
 
 Status: v1 BUILT + review passes 1-2 · branch `feature/tabs-executive-takeout` · 2026-06-27
 
@@ -12,7 +12,7 @@ Review pass 2 (aligned to the real SACS PowerPoint deck, kept GENERIC):
 - Participation line (response = base/population) when a population is set.
 - Headline detection is generic: composites always + keyword set
   (satisf|overall|recommend|nps|csat) + optional config override
-  project.takeout_headline = [codes]. No SACS-specific hardcoding anywhere —
+  project.takeout_headline = [codes]. No SACS-specific hardcoding anywhere,
   every feature keys off data-layer STRUCTURE with graceful fallback.
 node suite 20/20, bundler 25/25.
 
@@ -26,7 +26,7 @@ rank RELATIVE to the median (real scales sit mid-band, so absolute bands hid the
 weakest items), and level scores are normalised to the same 0..1 effect footing
 so subgroup standouts (e.g. Cape Town vs Durban satisfaction) compete with
 touchpoint levels. Battery consistency is suppressed when category is blank
-(SACS carries no categories) — tagging categories would re-enable the Decide
+(SACS carries no categories): tagging categories would re-enable the Decide
 fork. Awaiting Duncan's launch_turas verification on the live report.
 
 ## The problem it solves
@@ -34,13 +34,13 @@ fork. Awaiting Duncan's launch_turas verification on the live report.
 The v2 crosstabs report is excellent at "find anything" (dashboard gauges, the
 80-finding Differences view, tracking) but it never *states the argument*. A
 busy executive opening `SACS-2025_Crosstabs_report.html` confronts ~10,000
-numbers across 22 questions x 24 banner cuts, organised by question and banner —
+numbers across 22 questions x 24 banner cuts, organised by question and banner,
 not by what matters. The two most summary-worthy numbers (the Engagement and
 Values composite indices) are physically the *last* two items.
 
 The Executive Takeout is the one surface that takes the view for them: a single,
 beautiful, scannable page that answers the study's question whether or not
-anyone scrolls — and it does so deterministically, with **no AI/LLM call**, for
+anyone scrolls, and it does so deterministically, with **no AI/LLM call**, for
 consistency and privacy.
 
 ## Design principles
@@ -55,7 +55,7 @@ consistency and privacy.
 3. **Rank by effect size, gate by significance.** Findings arrive already
    significance- and base-gated; the Takeout re-ranks by Cohen's *h* (proportions)
    and standardized gap (means), never by p-value, plus a battery-consistency
-   bonus — the signal a senior analyst reports.
+   bonus. The signal a senior analyst reports.
 4. **Human-in-the-loop is a feature.** The engine surfaces and ranks; the
    researcher edits every line into client language, promotes/vetoes, and writes
    the apex answer. Curation persists (localStorage + saved-copy island), exactly
@@ -71,8 +71,8 @@ consistency and privacy.
 | `27e_takeout_engine.js` | Pure: score, battery bonus, route, dedupe, cap, `buildTakeout` | no | node + #selftest |
 | `27f_takeout_data.js` | Gather inputs from AGG/views/waves (I/O) + curation state (localStorage) | reads globals | #selftest |
 | `27g_takeout_components.js` | Shared render atoms: card, two-bar, editable field, reliability ribbon, posture meta | yes | visual |
-| `27h_takeout_read.js` | Read view — apex + four posture lanes | yes | visual |
-| `27i_takeout_present.js` | Present view — Wrapped full-screen sequence | yes | visual |
+| `27h_takeout_read.js` | Read view. Apex + four posture lanes | yes | visual |
+| `27i_takeout_present.js` | Present view. Wrapped full-screen sequence | yes | visual |
 | `27k_takeout.js` | Thin controller: gather -> build -> apply curation -> dispatch + wire toggle/edits | yes | visual |
 
 Wiring (`24_shell.js`): add `['takeout','Executive takeout']` first in `tabList()`,
@@ -101,7 +101,7 @@ becomes `takeout`; `state.takeoutView` ('read'|'present') added to state + hash.
   delta{diff,sig,year}, base, batteryK, score, posture }
 ```
 
-`id = code + '|' + column + '|' + metric` — stable across regenerations, so a
+`id = code + '|' + column + '|' + metric`. Stable across regenerations, so a
 researcher's edit to a finding's text survives a re-run for unchanged questions.
 
 ## Routing rules (deterministic, disclosed to the reader)
@@ -127,14 +127,14 @@ posture, keep top-N by score; dedupe exact `(code,column,metric)` collisions.
 - battery bonus: ×(1 + `BATTERY_BONUS_PER_ITEM`·(k−1)), where k = items in the
   same category on which this column deviates the same direction with sig.
 
-All thresholds live in one `CONST` block in the engine — no magic numbers.
+All thresholds live in one `CONST` block in the engine. No magic numbers.
 
 ## Human-in-the-loop / persistence
 
 `27f` curation store mirrors `28_insights.js`: seeds from `TR.userState`, then
 localStorage takes precedence; `set` writes back. Editable per finding:
 `claim`, `soWhat`; plus the apex `answer`; plus `veto` (hide) and posture
-override. All text is stored raw and **escaped on render** (`fmt.escapeHtml`) —
+override. All text is stored raw and **escaped on render** (`fmt.escapeHtml`),
 no XSS. A "Reset to engine" control reverts all curation.
 
 ## Accessibility (WCAG AA, non-negotiable)
@@ -148,10 +148,10 @@ no XSS. A "Reset to engine" control reverts all curation.
 
 ## Verification gates
 
-- `node modules/tabs/lib/html_report_v2/tests/takeout_tests.mjs` — known-answer
+- `node modules/tabs/lib/html_report_v2/tests/takeout_tests.mjs`. Known-answer
   suite for the pure engine (Cohen's h, scoring, routing, cap/dedupe, battery
   bonus) + a source structure check (<=300 active lines/file, <=50/function).
 - `#selftest` in-browser cases: `buildTakeout` over live AGG yields a valid,
   capped takeout; graceful with no microdata / no waves.
-- `Rscript -e "testthat::test_dir('modules/tabs/tests')"` — existing suite stays
+- `Rscript -e "testthat::test_dir('modules/tabs/tests')"`. Existing suite stays
   green (bundler picks up the new files; nothing in R changes).

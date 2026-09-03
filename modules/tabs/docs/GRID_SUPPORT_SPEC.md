@@ -1,4 +1,4 @@
-# Grid Question Support — Development Spec
+# Grid Question Support. Development Spec
 
 **Version:** 0.1 (deferred stream) **Module:** `modules/tabs` **Status:** Design captured; implementation deferred. Not scheduled.
 
@@ -6,7 +6,7 @@
 
 ## 1. Context
 
-Tabs' validator already declares `Grid_Single` and `Grid_Multi` as accepted `Variable_Type` values (`modules/tabs/lib/validation/structure_validators.R:113`, `data_validators.R:166`), but no downstream code processes them. They are paper types today — declared valid, never rendered or crosstabbed.
+Tabs' validator already declares `Grid_Single` and `Grid_Multi` as accepted `Variable_Type` values (`modules/tabs/lib/validation/structure_validators.R:113`, `data_validators.R:166`), but no downstream code processes them. They are paper types today. Declared valid, never rendered or crosstabbed.
 
 This spec defines what "first-class grid support" means, so when the first paying consumer needs it (likely brand Mental Availability or a brand × attribute tracking grid) it can be built against a fixed design rather than invented under pressure.
 
@@ -23,11 +23,11 @@ Known consumers (current or imminent):
 
 | Consumer | Grid shape | Type |
 |----|----|----|
-| Brand MA — CEP × brand matrix | `brand_matrix` | Grid_Multi |
-| Brand D&B — statement × brand ratings | `brand_matrix` | Grid_Single |
-| Brand equity — BHI statements × brand | `brand_matrix` | Grid_Single |
-| Ad diagnostics — statement × ad exposure | `statement_matrix` | Grid_Single |
-| Tracker — standard brand attribute grid | `brand_matrix` | Grid_Single |
+| Brand MA. CEP × brand matrix | `brand_matrix` | Grid_Multi |
+| Brand D&B. Statement × brand ratings | `brand_matrix` | Grid_Single |
+| Brand equity. BHI statements × brand | `brand_matrix` | Grid_Single |
+| Ad diagnostics. Statement × ad exposure | `statement_matrix` | Grid_Single |
+| Tracker. Standard brand attribute grid | `brand_matrix` | Grid_Single |
 
 Out of scope for this spec (stay bespoke): Conjoint, MaxDiff, Segment clustering inputs, Keydriver / Catdriver feature matrices. Their compute semantics differ; they borrow grid *inputs* but not grid *outputs*.
 
@@ -38,26 +38,26 @@ Out of scope for this spec (stay bespoke): Conjoint, MaxDiff, Segment clustering
 ### 3.1 Export convention
 
 -   One row per respondent (standard Alchemer / Qualtrics shape).
--   One column per **cell** — a grid of *R* rows × *C* columns produces *R* × *C* columns in the data.
--   `Grid_Single`: each cell holds an integer or string code. Maps to an OptionMap scale (shared across all cells in the grid — single scale per grid).
+-   One column per **cell**. A grid of *R* rows × *C* columns produces *R* × *C* columns in the data.
+-   `Grid_Single`: each cell holds an integer or string code. Maps to an OptionMap scale (shared across all cells in the grid, single scale per grid).
 -   `Grid_Multi`: each cell holds 0/1/NA.
 
 ### 3.2 ColumnPattern
 
 QuestionMap declares the pattern explicitly:
 
--   `{code}_{row_code}_{col_code}` — most common (e.g. `q10_cep01_brandA`)
--   `{code}_r{row_index}c{col_index}` — numeric indices
+-   `{code}_{row_code}_{col_code}`. Most common (e.g. `q10_cep01_brandA`)
+-   `{code}_r{row_index}c{col_index}`. Numeric indices
 -   Custom patterns supported via literal template matching; guard refuses loud on mismatch (`CFG_PATTERN_MISMATCH`).
 
 ### 3.3 Dimension lists
 
 Grid rows and columns resolve against **named lists** stored in Survey_Structure. A grid declares two list references:
 
--   `Grid_Row_List` — name of a list sheet (e.g. `CEPs`, `Statements`). Provides row codes, labels, display order.
--   `Grid_Col_List` — name of a list sheet (e.g. `Brands`, `Ads`). Provides column codes, labels, display order.
+-   `Grid_Row_List`. Name of a list sheet (e.g. `CEPs`, `Statements`). Provides row codes, labels, display order.
+-   `Grid_Col_List`. Name of a list sheet (e.g. `Brands`, `Ads`). Provides column codes, labels, display order.
 
-Reusing existing list sheets (`Brands`, `CEPs`, `Assets`, `Categories`) means no new sheet types for most grids — a CEP × brand matrix points `Grid_Row_List = CEPs`, `Grid_Col_List = Brands`.
+Reusing existing list sheets (`Brands`, `CEPs`, `Assets`, `Categories`) means no new sheet types for most grids. A CEP × brand matrix points `Grid_Row_List = CEPs`, `Grid_Col_List = Brands`.
 
 ------------------------------------------------------------------------
 
@@ -72,7 +72,7 @@ Two new columns on the Questions sheet (nullable for non-grid rows):
 
 `OptionMapScale` continues to carry the cell scale name for `Grid_Single` (and Likert/Rating grids). Blank for `Grid_Multi`.
 
-One QuestionMap row per grid — not per cell.
+One QuestionMap row per grid, not per cell.
 
 ------------------------------------------------------------------------
 
@@ -88,10 +88,10 @@ Each cell computed as a standard proportion / mean / rating:
 
 ### 5.2 Bases
 
--   **Row base** — respondents answering anywhere in the row (any non-NA cell). Default for row-normalised views.
--   **Column base** — respondents answering anywhere in the column. Default for column-normalised views.
--   **Cell base** — respondents with a valid cell value. Used for cell-level low-base flags.
--   **Filter base** — optional filter applied across all cells identically (e.g. aware of brand).
+-   **Row base**. Respondents answering anywhere in the row (any non-NA cell). Default for row-normalised views.
+-   **Column base**. Respondents answering anywhere in the column. Default for column-normalised views.
+-   **Cell base**. Respondents with a valid cell value. Used for cell-level low-base flags.
+-   **Filter base**. Optional filter applied across all cells identically (e.g. aware of brand).
 
 Low-base warn/suppress inherits tabs defaults (`warn_base = 30`, `suppress_base = 0`) unless overridden in the grid's config.
 
@@ -106,13 +106,13 @@ Reuses the existing `significance.R` two-proportion / t-test primitives. No new 
 
 ### 5.4 Crosstab by segment
 
-Grid × segment produces a *third* dimension. Output structures must support it — flatten to long format on export; render as small multiples (one grid per segment) in the report layer.
+Grid × segment produces a *third* dimension. Output structures must support it. Flatten to long format on export; render as small multiples (one grid per segment) in the report layer.
 
 ------------------------------------------------------------------------
 
 ## 6. Render layer
 
-### 6.1 Primary view — heatmap table
+### 6.1 Primary view. Heatmap table
 
 Rows × columns matrix, cells coloured by value with significance markers:
 
@@ -121,11 +121,11 @@ Rows × columns matrix, cells coloured by value with significance markers:
 -   Clickable cells link to the underlying crosstab (cell × segment breakout).
 -   Row totals and column totals in margin cells where meaningful.
 
-### 6.2 Alternate — ordered dot grid
+### 6.2 Alternate. Ordered dot grid
 
-Particularly useful for `Grid_Multi` with many columns — each row plotted as a dot strip across columns, sized or coloured by value. Good for visual scan of "which brand owns each CEP".
+Particularly useful for `Grid_Multi` with many columns. Each row plotted as a dot strip across columns, sized or coloured by value. Good for visual scan of "which brand owns each CEP".
 
-### 6.3 Alternate — small multiples
+### 6.3 Alternate. Small multiples
 
 One mini-chart per row, columns as bars. Good for 5–10 row grids.
 
@@ -133,10 +133,10 @@ One mini-chart per row, columns as bars. Good for 5–10 row grids.
 
 Configurable:
 
--   `default` — declared display order from list sheets
--   `by_row_total_desc` — rows sorted by row mean / sum
--   `by_col_total_desc` — columns sorted similarly
--   `by_focal_col_desc` — rows sorted by the focal column (e.g. IPK)
+-   `default`. Declared display order from list sheets
+-   `by_row_total_desc`. Rows sorted by row mean / sum
+-   `by_col_total_desc`. Columns sorted similarly
+-   `by_focal_col_desc`. Rows sorted by the focal column (e.g. IPK)
 
 ### 6.5 Show-counts toggle
 
@@ -182,7 +182,7 @@ Per-grid overrides via a new `GridConfig` sheet keyed on grid code (optional; Se
 
 ------------------------------------------------------------------------
 
-## 9. Migration — brand MA as first consumer
+## 9. Migration. Brand MA as first consumer
 
 When this work lands, brand Mental Availability migrates from its bespoke CEP × brand matrix renderer to the tabs grid engine:
 
@@ -192,7 +192,7 @@ When this work lands, brand Mental Availability migrates from its bespoke CEP ×
 
 Brand D&B follows the same pattern for statement × brand performance grids.
 
-Modules that stay bespoke (Conjoint, MaxDiff, Keydriver, Catdriver) are unaffected — their grid-shaped inputs remain module-internal.
+Modules that stay bespoke (Conjoint, MaxDiff, Keydriver, Catdriver) are unaffected. Their grid-shaped inputs remain module-internal.
 
 ------------------------------------------------------------------------
 
@@ -200,9 +200,9 @@ Modules that stay bespoke (Conjoint, MaxDiff, Keydriver, Catdriver) are unaffect
 
 ### 10.1 Known-answer fixtures
 
--   **Grid_Single fixture** — 10 respondents × 3 rows × 3 columns with a 5-point OptionMap scale. Hand-calculated means, top-box, sig flags.
--   **Grid_Multi fixture** — 10 respondents × 3 rows × 3 columns binary. Hand-calculated % per cell and row/col totals.
--   **Sparse grid fixture** — one row with no responses, one column with all zeros. Validates zero-base handling.
+-   **Grid_Single fixture**, 10 respondents × 3 rows × 3 columns with a 5-point OptionMap scale. Hand-calculated means, top-box, sig flags.
+-   **Grid_Multi fixture**, 10 respondents × 3 rows × 3 columns binary. Hand-calculated % per cell and row/col totals.
+-   **Sparse grid fixture**. One row with no responses, one column with all zeros. Validates zero-base handling.
 
 ### 10.2 Edge cases
 
@@ -211,7 +211,7 @@ Modules that stay bespoke (Conjoint, MaxDiff, Keydriver, Catdriver) are unaffect
 -   Inverted OptionMap (code 1 = worst, 5 = best) remaps correctly.
 -   Missing dimension list → guard refuses `CFG_GRID_LIST_MISSING`.
 -   Cell pattern resolves to a non-existent column → `CFG_PATTERN_MISMATCH`.
--   Weighted parity — weights all equal 1 produce unweighted-identical output.
+-   Weighted parity. Weights all equal 1 produce unweighted-identical output.
 
 ### 10.3 Integration
 
@@ -234,19 +234,19 @@ Modules that stay bespoke (Conjoint, MaxDiff, Keydriver, Catdriver) are unaffect
 
 Before scheduling this work:
 
--   [ ] Confirm consumer list in §2 is still accurate — any other modules planning grid-shaped outputs by the time this builds?
--   [ ] Confirm `Grid_Row_List` / `Grid_Col_List` schema addition (§4) — naming and referenced-list approach.
--   [ ] Confirm render view set (§6) — heatmap primary, dot grid + small multiples alternates. Any others?
--   [ ] Confirm significance scope options (§5.3, §8) — vs_row / vs_col / vs_grid / focal_cell covers real use cases.
--   [ ] Confirm migration sequence (§9) — brand MA first, then brand D&B. Any earlier consumer?
--   [ ] Confirm "deferred bespoke" list (§11, §2 out-of-scope) — still accurate.
+-   [ ] Confirm consumer list in §2 is still accurate. Any other modules planning grid-shaped outputs by the time this builds?
+-   [ ] Confirm `Grid_Row_List` / `Grid_Col_List` schema addition (§4): naming and referenced-list approach.
+-   [ ] Confirm render view set (§6): heatmap primary, dot grid + small multiples alternates. Any others?
+-   [ ] Confirm significance scope options (§5.3, §8): vs_row / vs_col / vs_grid / focal_cell covers real use cases.
+-   [ ] Confirm migration sequence (§9): brand MA first, then brand D&B. Any earlier consumer?
+-   [ ] Confirm "deferred bespoke" list (§11, §2 out-of-scope): still accurate.
 
 ------------------------------------------------------------------------
 
 ## 13. Interim behaviour (until this lands)
 
--   Tabs validator **continues** to accept `Grid_Single` / `Grid_Multi` in the whitelist. Do not remove them — when Duncan next sees a project with a grid, it should not refuse at validation.
--   Consumer modules needing grid data today declare the cells as the most appropriate non-grid type (compound Multi_Mention with `brand_matrix` cardinality) and render matrix views inside their own panels — as brand MA does today.
+-   Tabs validator **continues** to accept `Grid_Single` / `Grid_Multi` in the whitelist. Do not remove them. When Duncan next sees a project with a grid, it should not refuse at validation.
+-   Consumer modules needing grid data today declare the cells as the most appropriate non-grid type (compound Multi_Mention with `brand_matrix` cardinality) and render matrix views inside their own panels, as brand MA does today.
 -   This document is the reference when the first paying consumer requests native grid output. Update it when that happens; then schedule.
 
 ------------------------------------------------------------------------

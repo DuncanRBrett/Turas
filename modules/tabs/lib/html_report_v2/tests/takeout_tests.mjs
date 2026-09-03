@@ -3,7 +3,7 @@
  * Verification gate for the Pattern recognition engine. Runs:
  *   1. known-answer tests for the pure engine (Cohen's h, effect size, the group
  *      / area / movement patterns, build + graceful fallback) and the curation
- *      state — hand-verifiable expected values.
+ *      state. Hand-verifiable expected values.
  *   2. an end-to-end render over stubbed live surfaces (gather -> build -> read
  *      view) exercising tagging, index+top-box, multi-banner and participation.
  *   3. a source structure check (no takeout JS file over 300 active lines).
@@ -25,7 +25,7 @@ const JS_DIR = path.join(HERE, "..", "assets", "js");
 // summary-question scoring + scale-family race (2026-07-17), then to 410 when
 // the no-story collection grew into the steady-group card (2026-07-23). The
 // pure number-crunching is already factored into 27da_takeout_stats.js; what
-// remains is small, single-purpose pattern functions — the file is long
+// remains is small, single-purpose pattern functions. The file is long
 // because there are many of them, not because any one is. Keep individual
 // functions well under 100 lines.
 const MAX_ACTIVE_LINES = 410;
@@ -50,7 +50,7 @@ function run(name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function close(a, e, tol, msg) { if (Math.abs(a - e) > tol) throw new Error(msg + ": expected ~" + e + ", got " + a); }
 
-console.log("Pattern recognition — engine known-answer suite:");
+console.log("Pattern recognition. Engine known-answer suite:");
 
 run("Cohen's h known answers", () => {
   close(takeout.cohenH(0.5, 0.5), 0, 1e-9, "h(.5,.5)=0");
@@ -120,9 +120,9 @@ run("SPLIT pattern: null when no single breakout dominates", () => {
   assert(takeout._splitPattern(columns) === null, "two equally-differentiating splits -> none named");
 });
 
-run("buildPatterns assembles portraits + movement — area cards retired", () => {
+run("buildPatterns assembles portraits + movement. Area cards retired", () => {
   const empty = takeout.buildPatterns({});
-  assert(empty.patterns.length === 0, "nothing in, nothing out — no crash");
+  assert(empty.patterns.length === 0, "nothing in, nothing out. No crash");
   const t = takeout.buildPatterns({
     columns: [
       { column: "Cape Town", group: "Campus", base: 40, gaps: [
@@ -144,7 +144,7 @@ run("buildPatterns assembles portraits + movement — area cards retired", () =>
   const ids = t.patterns.map((p) => p.id);
   assert(t.patterns.some((p) => p.kind === "portrait"), "portrait present");
   assert(!t.patterns.some((p) => p.kind === "area"),
-    "area cards retired — tagged themes build NO weak/strong card");
+    "area cards retired. Tagged themes build NO weak/strong card");
   assert(ids.indexOf("moved") !== -1, "movement pattern present");
 });
 
@@ -185,7 +185,7 @@ run("statistical primitives: normal CDF, partial correlation, Fisher-z p, BH-FDR
 });
 
 run("FDR primitives: Student-t tail, Welch test, sign test", () => {
-  // Student-t two-sided tail — published table values
+  // Student-t two-sided tail. Published table values
   close(takeout._studentT(3, 50), 0.00420, 5e-4, "t(3,50)");
   close(takeout._studentT(3, 5), 0.0301, 5e-4, "t(3,5)");
   close(takeout._studentT(0, 10), 1.0, 1e-9, "t(0,df)=1");
@@ -366,7 +366,7 @@ run("end-to-end: tagging, index+top-box, multi-banner, participation, read view"
   assert(read.indexOf("tko-reliability") > read.indexOf("tko-pgrid"),
     "reliability ribbon sits in the footer, not the apex");
   // The "How sure are these numbers?" entry point was removed from this tab on
-  // 2026-08-12 — it did not work for the reader here. The explainer is still
+  // 2026-08-12. It did not work for the reader here. The explainer is still
   // reached from Crosstabs and Tracking, so only the broken route is gone.
   assert(read.indexOf("data-howsure") === -1, "no how-sure entry point on the Group overview");
   assert(read.indexOf('data-edit="') !== -1, "editable hooks present");
@@ -404,7 +404,7 @@ run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
   // A 0–10 RATED scale split into hard camps at 0 and 10. "round(v) - 1"
   // dropped v=0, so the bottom camp vanished and the split read as unimodal.
   // The bottom camp must be counted. (Typed "scale", not "nps": NPS questions
-  // are excluded from this scan entirely — see the C4 test below.)
+  // are excluded from this scan entirely. See the C4 test below.)
   const N = 40, sc = [];
   for (let i = 0; i < N; i++) sc.push(i < 20 ? 0 : 10);
   TR.conf = { fpcActiveReport: () => false };
@@ -420,11 +420,11 @@ run("BIMODALITY counts the bottom camp of a 0-based scale (F3)", () => {
   assert(q.scaleMax === 11, "0-based scale binned over 0..10 (11 bins), got " + q.scaleMax);
 });
 
-run("BIMODALITY excludes production-encoded NPS — no fabricated two-camp claim (C4)", () => {
+run("BIMODALITY excludes production-encoded NPS. No fabricated two-camp claim (C4)", () => {
   // Production NPS microdata is bucketed −100/0/+100 with scale_max 100
   // (score_utils.R / data_layer_writer.R). The old binning dropped every
   // detractor (idx −100) and the passive/promoter lumps then flagged as "two
-  // camps behind a calm average" — a false claim built from a distribution
+  // camps behind a calm average". A false claim built from a distribution
   // missing a third of respondents. NPS must not enter the scan at all.
   const N = 60, nps = [];
   for (let i = 0; i < N; i++) nps.push(i < 18 ? -100 : i < 36 ? 0 : 100); // 30/30/40 split
@@ -441,7 +441,7 @@ run("BIMODALITY excludes production-encoded NPS — no fabricated two-camp claim
 
 run("BIMODALITY excludes 0-100 composite/score metrics (C4 companion)", () => {
   // A 0-100 score metric's 101-bin histogram makes the two-camp gate
-  // meaningless — same eligibility as the odd-one-out cell family.
+  // meaningless. Same eligibility as the odd-one-out cell family.
   const N = 40, sc = [];
   for (let i = 0; i < N; i++) sc.push(i < 20 ? 20 : 80);
   TR.conf = { fpcActiveReport: () => false };
@@ -479,7 +479,7 @@ run("census k-gate honours project.min_reporting_base, not the hard-coded 5 (aud
   assert(cols.length === 2, "no configured k -> census fallback of 5 admits both");
 });
 
-run("reliability ribbon speaks the DECLARED design — FPC-active never means census", () => {
+run("reliability ribbon speaks the DECLARED design. FPC-active never means census", () => {
   // CCPB shape: stratified sample of 753 from a 14,563 universe. population_size
   // switches the FPC on, but the ribbon must say "Stratified sample", and the
   // universe line reads coverage ("of a universe of"), not "response".
@@ -517,7 +517,7 @@ run("reliability ribbon speaks the DECLARED design — FPC-active never means ce
     ribbon2.indexOf("% response of") !== -1, "declared census unchanged: " + ribbon2);
 });
 
-run("peer chips need a field of 3+ — 'highest of 2' is empty praise", () => {
+run("peer chips need a field of 3+, 'highest of 2' is empty praise", () => {
   // On filtered questions (cooler-request follow-ups) only 2 centres clear the
   // reporting floor; one of two is always highest, so no chip and no
   // "of any centre" seed phrasing. At 3+ the chip returns.
@@ -536,7 +536,7 @@ run("peer chips need a field of 3+ — 'highest of 2' is empty praise", () => {
 run("a scanned group with no lean becomes the STEADY card; overflow goes to the note", () => {
   // Four groups on one banner: two with strong opposite leans (portraits), two
   // flat. The larger flat one becomes a steady CARD (STEADY_MAX = 1) whose claim
-  // is steadiness — the smaller flat one goes to the also-scanned note. An
+  // is steadiness. The smaller flat one goes to the also-scanned note. An
   // eligible group appears in neither.
   const gap = (t, v, tot) => ({ title: t, value: v, total: tot, scaleMax: 5 });
   const columns = [
@@ -567,16 +567,16 @@ run("a scanned group with no lean becomes the STEADY card; overflow goes to the 
   assert(blockOf(page, "patterns.no_story").indexOf("FlatSmall (n = 60)") !== -1,
     "note names only the overflow");
   assert(page.indexOf("Also scanned: Flat (") === -1, "the carded group is not in the note");
-  // a banner with NO portraits at all keeps the empty state — no steady card either
+  // a banner with NO portraits at all keeps the empty state. No steady card either
   const t2 = takeout.buildPatterns({ columns: [columns[2]], scope: { rated: 3, shares: 0 } });
   assert(t2.patterns.filter((p) => p.kind === "steady").length === 0 && t2.noStory.length === 0,
     "no portrayed banner -> no steady card, no note");
 });
 
-run("census floor needs real coverage — a 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {
+run("census floor needs real coverage. A 5% study keeps the n>=30 sample floor (the fountain-cell fix)", () => {
   // CCPB shape: population_size configured (FPC active for intervals) but only
   // ~5% of the universe interviewed. A thin filtered cell (n=16 fountain owners
-  // in one centre) must NOT enter the strain scan — it is a sample of hundreds,
+  // in one centre) must NOT enter the strain scan. It is a sample of hundreds,
   // not most of its own population. Same fixture as audit #1 except coverage.
   TR.conf = { fpcActiveReport: () => true, responseRate: () => ({ n: 750, N: 14563 }) };
   TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
@@ -599,7 +599,7 @@ run("census floor needs real coverage — a 5% study keeps the n>=30 sample floo
   assert(takeout._reportingFloor(TR.AGG.project) === 5, "near-census -> analyst floor (fallback 5)");
 });
 
-run("Patterns tab ignores the live audience filter — published full-sample view (audit #2)", () => {
+run("Patterns tab ignores the live audience filter. Published full-sample view (audit #2)", () => {
   const seen = [];
   TR.conf = { fpcActiveReport: () => false };
   TR.d2 = { state: { banner: "B", filters: [{ q: "Q9", rows: [1] }] }, storeKey: (k) => k };
@@ -674,7 +674,7 @@ run("reliability MoE applies the FPC the rest of the report applies (M12)", () =
   assert(relFor(1000, 1000).moePct === 0, "a full census is measured, not estimated -> ±0.0pp");
 });
 
-run("reliability response rate is clamped — never '108% response' (M12)", () => {
+run("reliability response rate is clamped, never '108% response' (M12)", () => {
   const relFor = (base, pop) => {
     TR.conf = { fpcActiveReport: () => false, labels: () => ({}),
       maxMoePct: (n) => 1.96 * Math.sqrt(0.25 / n) * 100, fpcBase: (e) => e };
@@ -727,7 +727,7 @@ run("rigor footer states a hit inline, never points at nonexistent cards (audit 
 run("the provenance line states the scan's width and nothing else", () => {
   // Operator decision 2026-08-11: the line carried no-AI, the multiplicity
   // method and a sentence per never-cry-wolf check. That is the working, not
-  // the finding. The correction and the checks are unchanged — only the line.
+  // the finding. The correction and the checks are unchanged, only the line.
   const cells = [];
   for (let i = 0; i < 20; i++) {
     cells.push({ banner: "Campus", group: "Odd", q: "Q" + i, qtitle: "Q" + i, nIn: 40,
@@ -742,7 +742,7 @@ run("the provenance line states the scan's width and nothing else", () => {
     .forEach((gone) => assert(prov.indexOf(gone) === -1, "the line still carries: " + gone));
 });
 
-run("curation reset()/deletions survive reload — owning state beats the island seed (audit #5)", () => {
+run("curation reset()/deletions survive reload. Owning state beats the island seed (audit #5)", () => {
   const mem = {};
   sandbox.localStorage = { getItem: (k) => (k in mem ? mem[k] : null),
     setItem: (k, v) => { mem[k] = String(v); } };
@@ -766,7 +766,7 @@ run("curation reset()/deletions survive reload — owning state beats the island
   st.reset();
   st = reload();
   assert(st.getText("b", "takeaway", "seed") === "seed" && !st.isVetoed("v1") &&
-    st.getApex("seed") === "seed", "reset is durable — the island cannot resurrect edits");
+    st.getApex("seed") === "seed", "reset is durable. The island cannot resurrect edits");
   // a legacy localStorage state (no _owns marker) still merges over the island exactly as before
   mem["test::turas_v2_takeout"] = JSON.stringify({ version: 2, text: { "c::takeaway": "legacy" } });
   st = reload();
@@ -776,7 +776,7 @@ run("curation reset()/deletions survive reload — owning state beats the island
 });
 
 // ---------------------------------------------------------------------------
-// KeyShare — share questions join the scan (tier one)
+// KeyShare. Share questions join the scan (tier one)
 // ---------------------------------------------------------------------------
 
 run("KeyShare row resolution: NETs first, no diff rows, NBSP/case/space-safe, no guessing", () => {
@@ -815,7 +815,7 @@ run("KeyShare eligibility: rated and classification questions stay out", () => {
     "only the declared, non-rated, non-classification share scans");
 });
 
-run("KeyShare ignores ExcludeFromInsights — it is a Differences-tab lever, by design", () => {
+run("KeyShare ignores ExcludeFromInsights. It is a Differences-tab lever, by design", () => {
   // DIFFERENCES_TAB_SCOPE.md item 4 asked for this divergence to be chosen, not
   // silent. A question dropped from the Differences findings (near-duplicate
   // card, modelled figure) still carries the analyst's declared share, so it
@@ -877,7 +877,7 @@ run("KeyShare strain gathering: the declared share joins as a real % cell (known
   assert(g.reliability.n === 80, "share-only study still stamps n from the Total base, got " + g.reliability.n);
 });
 
-run("KeyShare skips a counts-only question — a headcount is not a share (C1)", () => {
+run("KeyShare skips a counts-only question. A headcount is not a share (C1)", () => {
   // Same fixture as above, but the question reports FREQUENCIES
   // (show_percent_column = N). The scan weighs every gap as a fraction of a
   // 0–100 share scale, so 62 people must never join it as "62%".
@@ -906,7 +906,7 @@ run("KeyShare skips a counts-only question — a headcount is not a share (C1)",
 run("KeyShare portraits render as percentages, and the tension sentence speaks share", () => {
   TR.charts = { clip: (s, n) => String(s == null ? "" : s).slice(0, n) };
   // Depot A: strained on two rated questions, yet leads every depot on the share.
-  // Three depots — the "leads every depot" peer boast needs a field of 3+.
+  // Three depots. The "leads every depot" peer boast needs a field of 3+.
   const cols = [
     { column: "A", group: "Depot", base: 40, gaps: [
       { title: "Ease of ordering", value: 3.0, total: 3.8, scaleMax: 5 },
@@ -929,7 +929,7 @@ run("KeyShare portraits render as percentages, and the tension sentence speaks s
   assert(seed.indexOf("leads every depot on “Correct delivery day” (84% vs 71% overall)") !== -1,
     "tension sentence quotes the share cells: " + seed);
   assert(seed.indexOf("questions scored") === -1,
-    "the seed no longer repeats the count — the card's own line carries it");
+    "the seed no longer repeats the count. The card's own line carries it");
   const html = takeout.readView.html(t);
   assert(/on \d+ of \d+ areas with a rating or frequency comparison/.test(html),
     "the card states how the group falls across the whole scanned set");
@@ -982,9 +982,9 @@ run("KeyShare cells join the trust-gate family; odd-one-out never reads them (kn
   close(aGroup.meanGap, -0.5, 1e-6, "meanGap stays rated-only scale points (3.5 - 4.0)");
   assert(aGroup.qn === 2, "sign test counts BOTH cells, got " + aGroup.qn);
   assert(gate.survivorSet[g.fdr.cells.indexOf(aCell)],
-    "a 50pp A-vs-B split survives BH — the share is genuinely gated, not decoration");
+    "a 50pp A-vs-B split survives BH. The share is genuinely gated, not decoration");
   // The share cell FLIPS A's rated direction (below on rating, far above on the
-  // share) with a huge gap — everything the odd-one-out looks for — yet it must
+  // share) with a huge gap, everything the odd-one-out looks for, yet it must
   // never fire on a pp cell (scale-point floors, F1 guard).
   const odd = takeout._oddOnePattern(g.fdr, gate);
   assert(odd && odd.nullResult, "odd-one-out ignores isPct cells");
@@ -1082,9 +1082,9 @@ run("synopsis tally: raw ahead/level/behind, rated and share counted apart", () 
   assert(takeout._tallyGaps().rated.n === 0, "no gaps at all is safe");
 });
 
-run("synopsis tally is RAW — it does not apply the materiality floor", () => {
+run("synopsis tally is RAW. It does not apply the materiality floor", () => {
   // Every gap is tiny but negative: the portrait's own hits count filters these
-  // out, the tally must not. This is the Metro South case — behind everywhere
+  // out, the tally must not. This is the Metro South case. Behind everywhere
   // by a little, and the filtered count says so far less loudly.
   const gaps = [];
   for (let i = 0; i < 8; i++) gaps.push({ value: 3.99, total: 4.0, scaleMax: 5 });
@@ -1163,7 +1163,7 @@ run("patterns_banner: a typo falls back to ALL banners (echo names it, scan stay
   TR.AGG = { project: { patterns_banner: ["Centres"] },   // typo
     banner_groups: [{ id: "S03", name: "Centre" }, { id: "S09", name: "Channel" }] };
   assert(takeout._scanBannerGroups().length === 2,
-    "no silent empty tab on a typo — full set + echo warning");
+    "no silent empty tab on a typo. Full set + echo warning");
 });
 
 run("patterns_banner: exclude still applies after the positive selection", () => {
@@ -1176,7 +1176,7 @@ run("patterns_banner: exclude still applies after the positive selection", () =>
 
 run("steady gate: a polarized group (material gaps, no lean) is NOT called steady", () => {
   // Review I6: a group at ±0.8 on a 5-pt scale with ups and downs cancelling
-  // used to earn "nobody's problem child". Material gaps now disqualify it —
+  // used to earn "nobody's problem child". Material gaps now disqualify it,
   // it goes to the also-scanned note, unclaimed.
   const gaps = [];
   for (let i = 0; i < 4; i++) gaps.push({ title: "Up " + i, value: 4.6, total: 3.8, scaleMax: 5 });
@@ -1194,7 +1194,7 @@ run("steady gate: a polarized group (material gaps, no lean) is NOT called stead
     groups: [
       { banner: "Centre", group: "Strained", base: 40, below: 8, above: 0, qn: 8, meanGap: -0.5 },
       // the I6 shape: the sign test is FLAT (4 below, 4 above cancel) but the
-      // gaps themselves are material — polarized, not steady
+      // gaps themselves are material. Polarized, not steady
       { banner: "Centre", group: "Polarized", base: 40, below: 4, above: 4, qn: 8, meanGap: 0 },
       { banner: "Centre", group: "Calm", base: 40, below: 0, above: 8, qn: 8, meanGap: 0.004 }
     ] } });
@@ -1255,7 +1255,7 @@ run("peer chips: an exact tie at the top crowns no one (I6)", () => {
 
 
 run("portrayAll: EVERY column of a selected banner gets a card (CCPB 4-centres case)", () => {
-  // Duncan 2026-08-05: with patterns_banner set, 3 of 4 centres showed — the
+  // Duncan 2026-08-05: with patterns_banner set, 3 of 4 centres showed. The
   // 4th (mixed: material gaps, no consistent lean) fell between portrait and
   // steady into the also-scanned note. Under a positive selection every
   // column cards: portrait, steady or MIXED, uncapped, nothing in also-scanned.

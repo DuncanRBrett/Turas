@@ -2,7 +2,7 @@
  * Minimal deterministic ZIP writer (method = STORE, fixed timestamp) plus
  * CRC-32. This is all OOXML needs: a .pptx is a zip of XML parts, and
  * PowerPoint accepts stored (uncompressed) entries. ~120 lines replace the
- * compression half of a 0.94 MB vendored library. Pure — tested in node.
+ * compression half of a 0.94 MB vendored library. Pure. Tested in node.
  */
 (function (global) {
   "use strict";

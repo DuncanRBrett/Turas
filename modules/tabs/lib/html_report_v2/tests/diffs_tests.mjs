@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Differences view — behavioural gate (production review 2026-08, I12c).
+ * Differences view. Behavioural gate (production review 2026-08, I12c).
  *
  * `27d_diffs.js` builds the lay reader's "where groups differ" view: which
  * findings appear, what each is measured against, and the sentence each becomes.
  * It shipped with three hooks explicitly exposed "for the differences gate test"
  * (`views._isClassification`, `views._collectFindings`, `views._diffLineHtml`)
- * and no such test — only two incidental checks in stat_label_tests.mjs, both
+ * and no such test, only two incidental checks in stat_label_tests.mjs, both
  * about the C1 stat label. Everything else the view decides was untested: which
  * questions are excluded as tautological cuts, what "the rest" is and when it is
  * unavailable, which rows are suppressed on a scale, the tautological 0%/100%
@@ -17,7 +17,7 @@
  * The mean-finding half runs on the REAL statistics module (21_stats.js) over
  * real per-respondent microdata, so it tests the arithmetic the report performs
  * rather than a stub that agrees with it. The categorical half stubs
- * `TR.model.forQuestion` — the model has its own suites, and what is under test
+ * `TR.model.forQuestion`. The model has its own suites, and what is under test
  * here is what the view does with a model's letters.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/diffs_tests.mjs
@@ -45,14 +45,15 @@ function near(a, b, tol, msg) {
   }
 }
 
-/** A fresh sandbox with the view module loaded. `withStats` also loads the real
- *  statistics engine, for the microdata paths. */
-function sandbox(withStats) {
+/** A fresh sandbox with the view module loaded. 21_stats.js always loads: the
+ *  microdata paths need its tabulations, and every view now words its
+ *  significance levels through TR.stats.levelPrimary/Secondary rather than a
+ *  hard-coded "95%"/"80%". `withStats` is kept for call-site readability. */
+function sandbox(withStats) {   // eslint-disable-line no-unused-vars
   const box = { console };
   box.globalThis = box; box.window = box;
   vm.createContext(box);
-  const files = ["00_namespace.js", "01_format.js"];
-  if (withStats) files.push("21_stats.js");
+  const files = ["00_namespace.js", "01_format.js", "21_stats.js"];
   files.push("27_views.js", "27d_diffs.js");
   for (const f of files) {
     vm.runInContext(readFileSync(path.join(JS_DIR, f), "utf8"), box, { filename: f });
@@ -65,7 +66,7 @@ function sandbox(withStats) {
    1. Classification questions are cuts, not outcomes
    ========================================================================== */
 
-console.log("Differences — classification exclusion:");
+console.log("Differences. Classification exclusion:");
 
 run("1. the built-in classification categories are excluded", () => {
   const D = sandbox();
@@ -94,15 +95,15 @@ run("3. a study extends the list through project.insight_exclude_categories", ()
 });
 
 /* ==========================================================================
-   2. Categorical findings — letters, the rest, and what is suppressed
+   2. Categorical findings. Letters, the rest, and what is suppressed
    ========================================================================== */
 
-console.log("\nDifferences — categorical findings:");
+console.log("\nDifferences. Categorical findings:");
 
 /**
  * One question over a Total + three gender columns, with the letters the model
  * would have published. `cells` is [total, A, B, C] as {pct, n, sig}.
- * No microdata, unweighted — so "the rest" comes from the exact count identity.
+ * No microdata, unweighted, so "the rest" comes from the exact count identity.
  */
 function catFixture(D, opts) {
   opts = opts || {};
@@ -163,7 +164,7 @@ run("7. a classification question raises no findings even when it has letters", 
 });
 
 run("8. an answer nobody outside the group gives is tautological, not a difference", () => {
-  // Male 85%, and the rest 0% — a defining trait of the group (their own plant,
+  // Male 85%, and the rest 0%. A defining trait of the group (their own plant,
   // their own city), not something discovered.
   const D = catFixture(sandbox(), { rows: [{ kind: "category", label: "Our region",
     stat: "Column %",
@@ -191,7 +192,7 @@ run("10. a scale question suppresses its raw scale points but keeps its NETs", (
   eq(found[0].kind, "net", "a scale point beside a top-box that contains it reads wrong");
 });
 
-run("11. a choice question keeps its categories — there the categories ARE the story", () => {
+run("11. a choice question keeps its categories. There the categories ARE the story", () => {
   const cells = [{ pct: 60, n: 120, sig: "" }, { pct: 85, n: 85, sig: "BC" },
                  { pct: 40, n: 20, sig: "" }, { pct: 30, n: 15, sig: "" }];
   const D = catFixture(sandbox(), { type: "multi",
@@ -212,7 +213,7 @@ run("12. a row that is not a column percentage raises no pp gap (C1)", () => {
 
 run("13. a weighted report with no microdata cannot compute the rest, and says so", () => {
   // The published n is a weighted frequency while the bases are unweighted, so
-  // the count identity breaks — the finding falls back to the overall figure
+  // the count identity breaks. The finding falls back to the overall figure
   // rather than printing a rest it cannot stand behind.
   const D = catFixture(sandbox(), { project: { weighted: true } });
   const f = D.views._collectFindings("Gender")[0];
@@ -224,7 +225,7 @@ run("13. a weighted report with no microdata cannot compute the rest, and says s
    3. The 95% / 95%+80% toggle
    ========================================================================== */
 
-console.log("\nDifferences — the significance toggle:");
+console.log("\nDifferences. The significance toggle:");
 
 /** Male solidly ahead (BC); Female nearly-significantly ahead (bc, lower case). */
 function softFixture(D, sigMode) {
@@ -265,15 +266,15 @@ run("16. a solid finding always outranks a soft one, whatever the scores", () =>
 });
 
 /* ==========================================================================
-   4. Mean / index / NPS findings — real stats over real microdata
+   4. Mean / index / NPS findings. Real stats over real microdata
    ========================================================================== */
 
-console.log("\nDifferences — mean / index / NPS findings:");
+console.log("\nDifferences. Mean / index / NPS findings:");
 
 /**
  * 40 respondents, 20 Male + 20 Female, on a 1–10 index question. Male scores
  * 3s and 4s (mean 3.5); Female 7s and 8s (mean 7.5). Male is decisively BELOW
- * the rest — which is exactly the finding a lay reader most wants surfaced and
+ * the rest, which is exactly the finding a lay reader most wants surfaced and
  * which the published tables carry no significance for.
  */
 function meanFixture(D, opts) {
@@ -281,7 +282,7 @@ function meanFixture(D, opts) {
   const n = 40;
   const males = opts.males === undefined ? 20 : opts.males;
   // A spread of 4/5/6/5 gives sd ≈ 0.82, so a 0.4 gap over 20-a-side lands
-  // between the 80% and 95% critical values — a "nearly significant" mean.
+  // between the 80% and 95% critical values. A "nearly significant" mean.
   const SOFT = [4, 5, 6, 5];
   const bannerVars = [], scores = [];
   for (let r = 0; r < n; r++) {
@@ -306,7 +307,7 @@ function meanFixture(D, opts) {
            groupCols: () => [0, 1],
            catRows: () => [{ label: "Any", index: 0 }],
            questionByCode: (c) => (c === "Q2" ? q : null) };
-  // No published letters for a mean row — that is the whole reason this path
+  // No published letters for a mean row. That is the whole reason this path
   // recomputes. The model contributes only the row list.
   D.model = { forQuestion: () => ({ columns: [{ label: "Total", letter: "", base: 40 }],
     rows: q.rows.map((r) => ({ kind: r.kind, label: r.label, stat: "Column %", cells: [] })) }) };
@@ -314,7 +315,7 @@ function meanFixture(D, opts) {
   return D;
 }
 
-run("17. a group significantly BELOW the rest is a finding — bidirectional by design", () => {
+run("17. a group significantly BELOW the rest is a finding. Bidirectional by design", () => {
   const D = meanFixture(sandbox(true));
   const found = D.views._collectFindings("Gender");
   eq(found.length, 2, "both groups stand out against the other");
@@ -332,7 +333,7 @@ run("18. a group that does not differ from the rest raises nothing, in either mo
   eq(meanFixture(sandbox(true), { flat: true })
        .views._collectFindings("Gender").length, 0,
      "5s and 6s either side of the cut is not a difference at 95%");
-  // Dual mode widens the net to 80% — it must not widen it to "any gap at all".
+  // Dual mode widens the net to 80%. It must not widen it to "any gap at all".
   eq(meanFixture(sandbox(true), { flat: true, sigMode: "dual" })
        .views._collectFindings("Gender").length, 0,
      "…nor at 80%");
@@ -364,7 +365,7 @@ run("19b. a small group is gated on ITS OWN base, not only on the rest's", () =>
   eq(found.length, 0, "and the mirror finding is gated by the same 5 people as the rest");
 });
 
-run("20. the disclosure gate is honoured — a recomputed mean never resurrects a withheld column", () => {
+run("20. the disclosure gate is honoured. A recomputed mean never resurrects a withheld column", () => {
   // The crosstab blanks columns below min_reporting_base; a mean recomputed from
   // microdata must not report on them either.
   const D = meanFixture(sandbox(true), {
@@ -389,22 +390,22 @@ run("22. an NPS row prints whole numbers, a mean prints one decimal", () => {
    4b. Reciprocal mean pairs on a two-level banner (SCOPE item 1)
    ========================================================================== */
 
-console.log("\nDifferences — reciprocal pairs on a two-level banner:");
+console.log("\nDifferences. Reciprocal pairs on a two-level banner:");
 
 /** The level count production derives, from the same stub the view reads. */
 function levels(D, banner) { return D.d2.groupCols(banner).length; }
 
-run("22b. a two-level banner tells one mean finding twice — the mirror is collapsed", () => {
+run("22b. a two-level banner tells one mean finding twice. The mirror is collapsed", () => {
   const D = meanFixture(sandbox(true));
   const both = D.views._collectFindings("Gender");
-  eq(both.length, 2, "collectFindings still emits both ends — its contract is unchanged");
+  eq(both.length, 2, "collectFindings still emits both ends. Its contract is unchanged");
   eq(levels(D, "Gender"), 2, "Gender is a two-level cut");
   const shown = D.views._collapseReciprocal(both, levels(D, "Gender"));
   eq(shown.length, 1, "the reader sees one line, not the same finding from both ends");
   eq(shown[0].column, "Female", "the higher side leads");
   eq(shown[0].direction, "ahead", "…so the kept line names the group that is ahead");
   near(shown[0].value, 7.5, 1e-9, "its own mean");
-  near(shown[0].rest, 3.5, 1e-9, "and the rest — which on a two-level cut is the other level");
+  near(shown[0].rest, 3.5, 1e-9, "and the rest, which on a two-level cut is the other level");
 });
 
 run("22c. the view renders the collapsed list, not the raw one", () => {
@@ -419,11 +420,11 @@ run("22d. on three or more levels 'A vs the rest' and 'B vs the rest' are differ
   const D = meanFixture(sandbox(true));
   const both = D.views._collectFindings("Gender");
   eq(D.views._collapseReciprocal(both, 3).length, 2,
-     "a three-level banner keeps every finding — nothing there is a mirror");
+     "a three-level banner keeps every finding. Nothing there is a mirror");
   eq(D.views._collapseReciprocal(both, 1).length, 2, "and a single-level cut has no pair either");
 });
 
-run("22e. a proportion finding is never collapsed — a significance letter is directional", () => {
+run("22e. a proportion finding is never collapsed. A significance letter is directional", () => {
   const D = catFixture(sandbox());
   const found = D.views._collectFindings("Gender");
   eq(found.length, 1, "the fixture's one percentage finding");
@@ -455,7 +456,7 @@ run("22h. a finding with no counterpart is left alone", () => {
 });
 
 run("22i. a report with no microdata has no mean findings, so no level count is sought", () => {
-  // catFixture's d2 stub carries no groupCols at all — bannerLevels must never
+  // catFixture's d2 stub carries no groupCols at all. BannerLevels must never
   // reach for it when hasMicrodata() is false.
   const D = catFixture(sandbox());
   assert(!D.d2.groupCols, "the fixture has no groupCols to call");
@@ -466,7 +467,7 @@ run("22i. a report with no microdata has no mean findings, so no level count is 
    5. The sentence a client actually reads
    ========================================================================== */
 
-console.log("\nDifferences — the rendered line:");
+console.log("\nDifferences. The rendered line:");
 
 run("23. a percentage finding names the groups it beats and the rest it beat them by", () => {
   const D = catFixture(sandbox());
@@ -498,7 +499,7 @@ run("25. a mean finding reads in its own units, not in percentage points", () =>
   assert(/Mean 3\.5/.test(html), "the metric and its value");
   assert(/7\.5 of the rest/.test(html), "against the rest's value");
   assert(/·\s*−4\.0/.test(html), "the gap in points, signed");
-  assert(!/pp/.test(html), "never 'pp' — this is not a proportion");
+  assert(!/pp/.test(html), "never 'pp'. This is not a proportion");
   assert(/statistically behind the rest/.test(html), "and the direction is stated");
 });
 
@@ -529,7 +530,7 @@ run("28. a hostile row label cannot inject markup into the sentence", () => {
   assert(/&lt;img/.test(html), "and survives as text");
 });
 
-run("28b. nor can a hostile COLUMN name — it appears in the bars as well as the lead", () => {
+run("28b. nor can a hostile COLUMN name. It appears in the bars as well as the lead", () => {
   // The column label is rendered twice by two different paths (the sentence lead
   // and the comparison bar), so both need escaping.
   const D = sandbox();
@@ -561,8 +562,8 @@ run("28c. a hostile group NAME in the beaten list is escaped too", () => {
 
 run("29. the card header leads with the question text; the code stays reachable, not shown", () => {
   // DIFFERENCES_TAB_SCOPE.md item 2: the code prefix is engineering vocabulary
-  // in a lay deliverable. It must still be reachable — hover and search — and
-  // the pin keeps "code — title" so a pinned card traces to its crosstab.
+  // in a lay deliverable. It must still be reachable, hover and search, and
+  // the pin keeps "code. Title" so a pinned card traces to its crosstab.
   const D = catFixture(sandbox());
   const f = D.views._collectFindings("Gender")[0];
   const html = D.views._diffCardHtml({ code: f.code, title: f.title,
@@ -573,14 +574,14 @@ run("29. the card header leads with the question text; the code stays reachable,
   assert(/title="Q1"/.test(head), "the code survives as a hover title");
   assert(/data-goq="Q1"/.test(head), "and the jump-to-question link still keys on it");
   assert(/data-search="[^"]*q1/.test(html), "search still finds the code");
-  assert(/data-snap-title="Q1 — Are you aware\?"/.test(html),
-    "the pin keeps code — title for traceability");
+  assert(/data-snap-title="Q1: Are you aware\?"/.test(html),
+    "the pin keeps code. Title for traceability");
 });
 
 run("30. ExcludeFromInsights takes ONE question out of the findings, and nothing else", () => {
   // DIFFERENCES_TAB_SCOPE.md item 4: the per-question opt-out. The flagged
   // question keeps its crosstab (untouched here) but raises no finding; an
-  // otherwise identical twin still does, so the flag — not the fixture — is
+  // otherwise identical twin still does, so the flag, not the fixture, is
   // what silenced it.
   const cells = [{ pct: 60, n: 120, sig: "" }, { pct: 85, n: 85, sig: "BC" },
                  { pct: 40, n: 20, sig: "" }, { pct: 30, n: 15, sig: "" }];
@@ -605,7 +606,7 @@ run("30. ExcludeFromInsights takes ONE question out of the findings, and nothing
 run("30b. …including MEAN findings, which are the case the column was built for", () => {
   // The motivating study excludes imputed SPEND measures, which on a two-level
   // banner raise mean findings (and, since decision E, could raise proportion
-  // findings too — the flag must silence both). The skip sits above
+  // findings too. The flag must silence both). The skip sits above
   // meanFindings() in the same per-question loop; this pins that, rather than
   // inferring it.
   const D = meanFixture(sandbox(true));
@@ -620,11 +621,11 @@ run("30b. …including MEAN findings, which are the case the column was built fo
    6. Decision E and the balanced score (DIFFERENCES_RANKING_DESIGN.md)
    ========================================================================== */
 
-console.log("\nDifferences — the two-level gate and the balanced score:");
+console.log("\nDifferences. The two-level gate and the balanced score:");
 
 /**
  * A TWO-level banner (Total + Male/Female), no microdata. Male 75% vs
- * Female 45% on "Yes" — the letters carry whatever significance the fixture
+ * Female 45% on "Yes". The letters carry whatever significance the fixture
  * declares. The rest for Male is the exact count identity:
  * (120 − 75) / (200 − 100) = 45%.
  */
@@ -652,7 +653,7 @@ run("31. on a TWO-level banner, beating the single sibling IS a finding (decisio
   // Test 5 pins the other half: on three levels one letter stays a pairwise
   // result, not a standout. On two levels the single sibling is ALL the
   // siblings, so one letter is the strongest breadth statement the banner
-  // allows — and "who buys what" can finally surface on Gender.
+  // allows, and "who buys what" can finally surface on Gender.
   const D = catFixture2(sandbox());
   const found = D.views._collectFindings("Gender");
   eq(found.length, 1, "one letter carries the finding on a two-level cut");
@@ -683,11 +684,11 @@ run("32. the balanced proportion score is Cohen's h times the share of siblings 
   // And on the THREE-level fixture: two of two beatable siblings, h capped.
   const T = catFixture(sandbox());
   near(T.views._collectFindings("Gender")[0].scoreBalanced, 100, 1e-9,
-       "85% vs 35% is past Cohen's large — effect caps at 1, strength is 2/2");
+       "85% vs 35% is past Cohen's large. Effect caps at 1, strength is 2/2");
 });
 
 run("33. the balanced mean score is CAPPED where the legacy score runs away", () => {
-  // meanFixture: 3.5 vs 7.5 with sd ≈ 0.5 over 20-a-side — |z| is many times
+  // meanFixture: 3.5 vs 7.5 with sd ≈ 0.5 over 20-a-side, |z| is many times
   // the critical value. The legacy score multiplies by |z|/1.96 unbounded; the
   // balanced score caps evidence at 3× the critical value, so here it is
   // exactly the effect term: |gap| / range × 100 = 4/8 × 100 = 50.
@@ -700,12 +701,12 @@ run("33. the balanced mean score is CAPPED where the legacy score runs away", ()
 
 run("34. the robust range ignores an outlier on an OBSERVED scale, keeps a DESIGNED one whole", () => {
   const D = sandbox();
-  // Designed: ≤ 12 distinct values (a 0–10 scale) — outliers are impossible,
+  // Designed: ≤ 12 distinct values (a 0–10 scale): outliers are impossible,
   // the full range stands.
   const designed = [];
   for (let i = 0; i < 100; i++) designed.push(i % 11);
   eq(D.views._robustRange(designed, 10), 10, "a rating scale keeps min–max");
-  // Observed: 20 distinct values 0..19, five of each — nearest-rank p5/p95
+  // Observed: 20 distinct values 0..19, five of each. Nearest-rank p5/p95
   // are 0 and 18. One 10,000 spender must not set the denominator.
   const spend = [];
   for (let i = 0; i < 100; i++) spend.push(i % 20);
@@ -730,7 +731,7 @@ run("35. an outlier-carrying spend measure scores on the robust range END TO END
   // 20 Male around 14.5, 20 Female around 49, one UNBANNERED respondent at
   // 500 (21 distinct values → an observed scale). The outlier sits in "the
   // rest" of every group and in the full range (0–500), but the balanced
-  // score must divide by the robust p5–p95 range instead — so it comes out
+  // score must divide by the robust p5–p95 range instead, so it comes out
   // LARGER than the same gap measured against the outlier-stretched range.
   const D = sandbox(true);
   const n = 41, bannerVars = [], scores = [];
@@ -757,14 +758,14 @@ run("35. an outlier-carrying spend measure scores on the robust range END TO END
   const found = D.views._collectFindings("Gender");
   assert(found.length >= 1, "the outlier-dragged rest still leaves a finding");
   const f = found[0];
-  eq(f.scaleMax, 500, "the DISPLAY range still holds the outlier — bars and Takeout untouched");
+  eq(f.scaleMax, 500, "the DISPLAY range still holds the outlier. Bars and Takeout untouched");
   assert(f.scoreBalanced > Math.abs(f.gap) / (f.scaleMax - f.scaleMin) * 100,
     "the balanced score beats the full-range effect, so the robust range is in the denominator");
   assert(f.scoreBalanced <= 100, "and stays on the 0–100 scale");
 });
 
 run("36. the balanced sort reorders where the legacy sort over-ranks certainty", () => {
-  // QA: a tiny gap measured with extreme precision — huge |z|, small effect.
+  // QA: a tiny gap measured with extreme precision. Huge |z|, small effect.
   // QB: a broad gap at ordinary precision. The legacy sort leads with QA
   // (unbounded |z| multiplier); the balanced sort leads with QB (evidence
   // capped, size on its own scale decides).
@@ -799,7 +800,7 @@ run("36. the balanced sort reorders where the legacy sort over-ranks certainty",
   eq(legacy[0].code, "QA", "the legacy sort leads with the huge-z sliver");
   eq(balanced[0].code, "QB", "the balanced sort leads with the big difference");
   eq(balanced.length, legacy.length,
-     "the findings SET is identical — only the order moves, so 'top N of M' stays honest");
+     "the findings SET is identical, only the order moves, so 'top N of M' stays honest");
 });
 
 run("36b. a soft finding still never outranks a solid one under the balanced sort", () => {

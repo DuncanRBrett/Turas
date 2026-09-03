@@ -1,5 +1,5 @@
 /**
- * Pattern recognition — controller / tab. Orchestrates the deterministic engine
+ * Pattern recognition. Controller / tab. Orchestrates the deterministic engine
  * and the single Read layout, and owns all interaction wiring (inline editing
  * and reset-to-engine). Thin by design:
  * gather -> build -> render -> wire. Registered as a top-level tab in 24_shell.js
@@ -17,11 +17,11 @@
     return takeout.buildPatterns(takeout.gather());
   };
 
-  /** The reset control + edit hint (no view toggle — Read is the only view). */
+  /** The reset control + edit hint (no view toggle, Read is the only view). */
   function headHtml() {
     var reset = takeout.state.hasCuration()
       ? '<button class="tko-reset" data-tko-reset title="Throw away your edits, ' +
-        'vetoes and apex answer — restore exactly what the engine produced">' +
+        'vetoes and apex answer. Restore exactly what the engine produced">' +
         "Discard my edits</button>" : "";
     return '<div class="tko-head"><div class="tko-head-actions">' + reset +
       '<span class="tko-edithint"><svg class="tko-glyph" viewBox="0 0 24 24" aria-hidden="true">' +
@@ -46,7 +46,7 @@
 
   /** Persist one edited field; "__apex__" is the answer, everything else is a
    *  pattern's takeaway keyed by id::field. An edit equal to the engine's seed
-   *  (or empty) is NOT stored — that keeps an unedited seed from going stale when
+   *  (or empty) is NOT stored. That keeps an unedited seed from going stale when
    *  the engine's wording changes on a re-run. Stored as plain text. */
   function saveEdit(el, host) {
     var key = el.getAttribute("data-edit");
@@ -62,7 +62,7 @@
 
   /** Attach all interaction handlers (idempotent per render). */
   function wire(host) {
-    // inline editing — save on blur so we never lose the caret mid-edit
+    // inline editing. Save on blur so we never lose the caret mid-edit
     host.addEventListener("focusout", function (e) {
       if (e.target && e.target.getAttribute && e.target.getAttribute("data-edit")) {
         saveEdit(e.target, host);
@@ -71,7 +71,7 @@
     host.addEventListener("click", function (e) {
       if (e.target.closest("[data-tko-reset]")) {
         takeout.state.reset();
-        announce(host, "Edits discarded — back to the engine's selection");
+        announce(host, "Edits discarded. Back to the engine's selection");
         takeout.render(host);
       }
     });

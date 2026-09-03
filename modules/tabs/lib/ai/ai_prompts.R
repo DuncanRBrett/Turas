@@ -1,5 +1,5 @@
 # ==============================================================================
-# AI PROMPTS — Tabs-Specific Prompt Templates
+# AI PROMPTS. Tabs-Specific Prompt Templates
 # ==============================================================================
 #
 # Text constants for all LLM prompts used in the tabs AI insights pipeline.
@@ -7,11 +7,11 @@
 # touching logic.
 #
 # Prompt types:
-#   - ai_callout       — per-question observational callout
-#   - verification     — factual accuracy check
-#   - selectivity      — editorial quality filter
-#   - exec_patterns    — executive summary Stage 1 (pattern identification)
-#   - exec_narrative   — executive summary Stage 2 (narrative generation)
+#   - ai_callout. Per-question observational callout
+#   - verification. Factual accuracy check
+#   - selectivity. Editorial quality filter
+#   - exec_patterns. Executive summary Stage 1 (pattern identification)
+#   - exec_narrative. Executive summary Stage 2 (narrative generation)
 #
 # Usage:
 #   source("modules/tabs/lib/ai/ai_prompts.R")

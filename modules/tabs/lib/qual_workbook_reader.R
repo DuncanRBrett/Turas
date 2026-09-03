@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE WORKBOOK READER (pure classification + normalisation)
+# TABS MODULE. QUALITATIVE WORKBOOK READER (pure classification + normalisation)
 # ==============================================================================
 #
 # Turns one coded-comment worksheet into a structured qual question. The logic is
@@ -34,14 +34,14 @@ QUAL_SENTIMENT_CODES <- c("1", "2", "3")
 QUAL_MISSING_TOKENS  <- c("", "-")
 
 # Noteworthy-column codes (case-insensitive), graded into three tiers. Any non-blank
-# value is at least "noteworthy" (tier 1) — so legacy marks like "y" still count — and
+# value is at least "noteworthy" (tier 1), so legacy marks like "y" still count, and
 # an explicit single-letter code promotes it: "m" -> must-read (tier 2), "p" -> priority
 # (tier 3, the "lead with in a presentation" comments). Word aliases kept for back-compat.
 QUAL_PRIORITY_MARKERS <- c("p", "priority")
 QUAL_MUSTREAD_MARKERS <- c("m", "must read", "must-read", "must", "must-read!", "critical")
 
 # Verbatim-suppression markers (case-insensitive). "hide"/"hidden" in the noteworthy
-# column withholds THIS comment's verbatim text from the report — it is counted in the
+# column withholds THIS comment's verbatim text from the report. It is counted in the
 # theme distribution like any other, but its text never ships (the build-time twin of a
 # reader who does not want a comment surfaced). A hide marker is NOT noteworthy: it
 # forces tier 0, so it can never be mistaken for an editorial "feature this" mark. This
@@ -81,7 +81,7 @@ qual_id_norm <- function(x) {
 # A column is the overall-sentiment column only if at least this fraction of its
 # rows are populated (sentiment is dense; themes are sparse).
 QUAL_SENTIMENT_DENSITY_MIN <- 0.5
-# The overall-sentiment column is almost entirely valid {1,2,3} codes — this guards
+# The overall-sentiment column is almost entirely valid {1,2,3} codes. This guards
 # against a mislabelled but mostly-text column being read as sentiment.
 QUAL_SENTIMENT_PURITY_MIN <- 0.8
 # A theme column may carry the odd quarantined stray, so it needs only a MAJORITY of
@@ -199,7 +199,7 @@ qual_detect_verbatim_col <- function(header, col_values, exclude) {
 #' Detect the overall-sentiment column: right of the verbatim, name-matched, dense, codes ⊆ {1,2,3}.
 #'
 #' Some workbooks mislabel it (e.g. SACAP NPS calls it "Theme"), so the name match is
-#' necessary but not sufficient — density + code purity disambiguate it from a theme.
+#' necessary but not sufficient. Density + code purity disambiguate it from a theme.
 #' @return The sentiment column index, or NA_integer_.
 qual_detect_sentiment_col <- function(header, col_values, verbatim_col, note_col) {
   if (is.na(verbatim_col)) return(NA_integer_)
@@ -334,8 +334,8 @@ qual_noteworthy_tier <- function(marker, mustread = QUAL_MUSTREAD_MARKERS,
 
 #' Whether a noteworthy-column marker withholds this comment's verbatim ("hide"/"hidden").
 #' Case-insensitive. A hidden comment is still counted in every distribution; only its
-#' text is withheld (build-time). Kept separate from the tier so the two axes — editorial
-#' emphasis vs suppression — never collide in one value.
+#' text is withheld (build-time). Kept separate from the tier so the two axes. Editorial
+#' emphasis vs suppression, never collide in one value.
 #' @param marker The raw noteworthy cell value.
 #' @return TRUE when the marker is a hide token.
 qual_verbatim_hidden <- function(marker) {
@@ -347,7 +347,7 @@ qual_verbatim_hidden <- function(marker) {
 qual_record_from_row <- function(r, roles) {
   cell <- function(c) if (!is.na(c) && length(r) >= c) r[[c]] else ""
   id <- qual_id_norm(cell(roles$id)); text <- cell(roles$verbatim)
-  # A repeated header row (some sheets stack sub-tables) is not a respondent — skip it
+  # A repeated header row (some sheets stack sub-tables) is not a respondent. Skip it
   # without counting, so its header labels never leak in as data.
   if (grepl(QUAL_ID_PATTERN, id, ignore.case = TRUE)) return(list(record = NULL, dropped = 0L))
   if (!nzchar(id) && !nzchar(text)) return(list(record = NULL, dropped = 0L))
@@ -382,7 +382,7 @@ qual_record_from_row <- function(r, roles) {
 #' rows (which later stages silently drop), duplicated IDs (which collide reader
 #' marks and inflate bases), hide-like invalid markers (which would SHIP the
 #' verbatim the analyst meant to withhold), unrecognised markers (promoted to
-#' tier 1 — reported, not refused), and the hide-marked count.
+#' tier 1. Reported, not refused), and the hide-marked count.
 #' @return `list(records, dropped_codes, integrity)`.
 qual_extract_records <- function(rows, header_row, roles) {
   records <- list(); dropped <- 0L

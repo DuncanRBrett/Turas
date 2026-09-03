@@ -1,10 +1,10 @@
 # ==============================================================================
-# CROSS-ENGINE PARITY FIXTURE — island regenerator
+# CROSS-ENGINE PARITY FIXTURE. Island regenerator
 # ==============================================================================
 #
 # Runs the parity project through the real tabs pipeline and writes the v2 data
 # layer ("the island") to JSON. That JSON is COMMITTED and is what the JS half
-# of the parity harness renders — so the JS suite is testing R's actual output,
+# of the parity harness renders, so the JS suite is testing R's actual output,
 # not a hand-authored stub that agrees with R by coincidence.
 #
 # REGENERATE WITH (from the Turas root):
@@ -36,7 +36,7 @@ detect_turas_root <- function() {
 turas_root <- detect_turas_root()
 FIXTURE_DIR <- file.path(turas_root, "modules/tabs/tests/fixtures/parity_project")
 
-# The workbooks are gitignored (*.xlsx) — the deterministic generator is what
+# The workbooks are gitignored (*.xlsx): the deterministic generator is what
 # lives in git, so write them if this is a fresh checkout. Sourced in a local
 # environment: the generator defines its own FIXTURE_DIR, which would otherwise
 # clobber the absolute one resolved above.

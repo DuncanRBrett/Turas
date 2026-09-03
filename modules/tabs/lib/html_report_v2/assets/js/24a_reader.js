@@ -1,5 +1,5 @@
 /**
- * v2 reader layer — the persistent audience strip (who the numbers describe,
+ * v2 reader layer. The persistent audience strip (who the numbers describe,
  * on EVERY tab) and the single "How to read this" legend panel that
  * consolidates the scattered per-tab legends (sig letters, ▲▵ arrows, bands,
  * precision, weighted bases). The shell renders both; this module owns the
@@ -13,7 +13,7 @@
 
   /* ---------------- audience strip (A3) ---------------- */
 
-  /** Largest published Total base across questions — the "full sample" figure
+  /** Largest published Total base across questions. The "full sample" figure
    *  when there is no microdata to count (published-only reports, Patterns). */
   function publishedTotalBase() {
     var best = null;
@@ -25,7 +25,7 @@
   }
   reader._publishedTotalBase = publishedTotalBase;
 
-  /** Weighted (Σw) + Kish effective base of the live audience — null when the
+  /** Weighted (Σw) + Kish effective base of the live audience. Null when the
    *  report is unweighted or carries no per-respondent weights. Mirrors the
    *  accumulation in 21_stats.js (weightAt/effectiveBase are module-private). */
   function weightedAudience(fullSample) {
@@ -45,8 +45,8 @@
 
   /**
    * The strip's HTML for a tab. Reuses the existing state APIs (d2.state,
-   * stats.mask/maskCount via disclosure.audienceBase, d2.filterDescription)
-   * — never a forked recompute.
+   * stats.mask/maskCount via disclosure.audienceBase, d2.filterDescription),
+   * never a forked recompute.
    */
   reader.audienceStripHtml = function (tab) {
     var p = (TR.AGG && TR.AGG.project) || {};
@@ -61,7 +61,7 @@
       return out;
     };
     if (tab === "takeout" || tab === "moved") {
-      // Patterns + Tracking deliberately ignore the live filter — they read the
+      // Patterns + Tracking deliberately ignore the live filter. They read the
       // full published sample (prior waves have no microdata to filter).
       bits.push('<span class="aud-cut">' +
         (tab === "takeout" ? "Group overview reads" : "Tracking shows") +
@@ -90,7 +90,7 @@
   };
 
   /** Render the strip into its shell slot (aria-live sits on the container).
-   *  The cover is a landing page, not an analysis surface — no strip there
+   *  The cover is a landing page, not an analysis surface. No strip there
    *  (:empty hides the container). */
   reader.renderStrip = function () {
     if (typeof document === "undefined") return;
@@ -108,8 +108,8 @@
   /**
    * Whether plain-language significance is on. The reader's own persisted
    * choice is authoritative once set (ownership: read the existing store
-   * first); otherwise saved copies (TR.userState island present) default ON —
-   * they go to client readers — and analyst-fresh reports default OFF.
+   * first); otherwise saved copies (TR.userState island present) default ON,
+   * they go to client readers, and analyst-fresh reports default OFF.
    */
   reader.explainOn = function () {
     if (explainCached !== null) return explainCached;
@@ -118,7 +118,7 @@
       if (typeof localStorage !== "undefined") {
         stored = localStorage.getItem(TR.d2.storeKey(EXPLAIN_KEY));
       }
-    } catch (e) { /* storage unavailable — fall to the default */ }
+    } catch (e) { /* storage unavailable. Fall to the default */ }
     explainCached = stored === null ? !!TR.userState : stored === "1";
     return explainCached;
   };
@@ -129,23 +129,24 @@
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(TR.d2.storeKey(EXPLAIN_KEY), on ? "1" : "0");
       }
-    } catch (e) { /* storage unavailable — in-memory only */ }
+    } catch (e) { /* storage unavailable. In-memory only */ }
   };
 
-  // Level wording derives from the project's configured alphas (21_stats.js —
-  // the one source the tests use), NEVER a hard-coded "95%"/"80%" string.
-  function levelText(alpha) { return Math.round((1 - alpha) * 100) + "%"; }
+  // Level wording derives from the project's configured alphas (21_stats.js,
+  // the one source the tests use), NEVER a hard-coded "95%"/"80%" string. The
+  // wording helpers themselves now live there too, so the legend, the mode
+  // selectors and these sentences cannot drift apart.
   function primaryLevel() {
-    return levelText(TR.stats && TR.stats.alphaPrimary ? TR.stats.alphaPrimary() : 0.05);
+    return TR.stats && TR.stats.levelPrimary ? TR.stats.levelPrimary() : "95%";
   }
   function secondaryLevel() {
-    return levelText(TR.stats && TR.stats.alphaSecondary ? TR.stats.alphaSecondary() : 0.20);
+    return TR.stats && TR.stats.levelSecondary ? TR.stats.levelSecondary() : "80%";
   }
   reader._levels = function () {
     return { primary: primaryLevel(), secondary: secondaryLevel() };
   };
 
-  /** The cell's displayed value as text (mean 1dp, % rounded) — null when
+  /** The cell's displayed value as text (mean 1dp, % rounded): null when
    *  absent. `row` supplies the statistic, so a counts-only question's sentence
    *  says "Male (80)" and not "Male (80%)" (review 2026-08, C1). */
   function valText(kind, cell, row) {
@@ -205,7 +206,7 @@
     }
     if (loRefs.length) {
       return head + " is higher than " + joinList(loRefs) + " at the weaker " +
-        secondaryLevel() + " level (directional) — not at the report's " +
+        secondaryLevel() + " level (directional), not at the report's " +
         primaryLevel() + " level.";
     }
     return "";
@@ -243,7 +244,7 @@
       ? "This wave (" + cur + ") is meaningfully " + dir + " than " + wave +
         " (" + prev + ") at the report's " + primaryLevel() + " level."
       : "This wave (" + cur + ") is " + dir + " than " + wave + " (" + prev +
-        "), but the change is within the survey's noise — not significant at the report's " +
+        "), but the change is within the survey's noise, not significant at the report's " +
         primaryLevel() + " level.";
   };
 
@@ -259,7 +260,7 @@
   /**
    * The analyst's own headline for a question (Comments-sheet Headline
    * column, q.headline), or null. This is the only title a surface may use
-   * when it ALSO prints the insight in full below — the crosstab card and the
+   * when it ALSO prints the insight in full below. The crosstab card and the
    * story pin both do, and promoting the insight there said it twice.
    */
   reader.headlineTitle = function (q) {
@@ -273,8 +274,8 @@
   /**
    * The one-line insight title for a question's card / header. The analyst
    * headline always wins; absent that, the first sentence of a stored analyst
-   * insight (28_insights.js — clearly marked by the caller via
-   * source:"insight"); otherwise null — this bundle never auto-generates a
+   * insight (28_insights.js, clearly marked by the caller via
+   * source:"insight"); otherwise null. This bundle never auto-generates a
    * sentence. For surfaces that show the line ALONE (dashboard gauge tiles):
    * anything that also shows the insight box wants headlineTitle.
    */
@@ -297,7 +298,7 @@
    *
    *  Two kinds are skipped. Dividers are structure, not findings. And a pin of a
    *  Report-tab narrative section is skipped because the cover ALREADY renders
-   *  that section, above the findings, from the same authored text — an analyst
+   *  that section, above the findings, from the same authored text. An analyst
    *  who pinned their background or executive summary was seeing it twice.
    *  data-snap-source="report" is emitted only by those two section cards
    *  (32_report.js), so this drops nothing else. The pin itself is untouched:
@@ -323,7 +324,7 @@
     return (isFinite(n) && n >= 1) ? Math.floor(n) : 5;
   };
 
-  /** The cover's leading findings — the evidence pins the limit admits. */
+  /** The cover's leading findings. The evidence pins the limit admits. */
   reader.coverFindings = function () {
     return reader.coverEvidence().slice(0, reader.coverLimit());
   };
@@ -336,7 +337,7 @@
    * background section. Analyst-fresh reports keep today's landing exactly.
    *
    * The config gate is first and absolute. A cover changes what a client sees
-   * when they open the file, so it is opted into per project — a report built
+   * when they open the file, so it is opted into per project. A report built
    * from a config that never mentions the setting behaves as it did before the
    * cover existed, on every copy, saved or not.
    */
@@ -351,7 +352,7 @@
   };
 
   /** Where "Explore the dashboard →" lands: the first READ tab (dashboard
-   *  unless flag-gated off) — never a hard-coded id. */
+   *  unless flag-gated off), never a hard-coded id. */
   reader.exploreTarget = function () {
     return TR.shell.tabGroups()[0].tabs[0][0];
   };
@@ -364,11 +365,11 @@
 
   /**
    * The cover page: report title/client/wave, the analyst headline sections
-   * (Report-tab background then executive summary, when authored — the same
-   * order the Report tab itself lists them in), then the leading findings — each story pin as its insight sentence (pin title)
+   * (Report-tab background then executive summary, when authored, the same
+   * order the Report tab itself lists them in), then the leading findings. Each story pin as its insight sentence (pin title)
    * over a compact evidence thumbnail. Thumbnails re-use each pin's own
-   * renderer (story2.itemBodyHtml), so disclosure gates travel with the pin
-   * — never re-derived here.
+   * renderer (story2.itemBodyHtml), so disclosure gates travel with the pin,
+   * never re-derived here.
    */
   reader.coverHtml = function () {
     var p = (TR.AGG && TR.AGG.project) || {};
@@ -440,13 +441,13 @@
     var wrap = document.createElement("div");
     wrap.innerHTML = reader.coverHtml();
     host.replaceChildren(wrap);
-    // fresh wrapper per render — the listener dies with the node
+    // fresh wrapper per render. The listener dies with the node
     wrap.addEventListener("click", function (e) {
       if (e.target.closest("[data-cover-explore]")) {
         TR.shell.goTab(reader.exploreTarget());
         // Land at the TOP of the dashboard. The explore button at the foot of
-        // the cover sits far down the page — and nothing in the tab switch
-        // resets scroll — so the reader arrived part-way down a tab they had
+        // the cover sits far down the page, and nothing in the tab switch
+        // resets scroll, so the reader arrived part-way down a tab they had
         // never seen. The tab bar is not sticky, so every other route into a
         // tab already starts from the top; this was the one that did not.
         reader.scrollToTop();
@@ -462,7 +463,7 @@
   function decodeEntities(s) {
     return String(s)
       .replace(/&ge;/g, "≥").replace(/&le;/g, "≤")
-      .replace(/&ndash;/g, "–").replace(/&mdash;/g, "—")
+      .replace(/&[mn]dash;/g, "–")
       .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
       .replace(/&nbsp;/g, " ")
       .replace(/&amp;/g, "&");
@@ -471,8 +472,8 @@
   /** The consolidated legend: sig letters (incl. lowercase 80%), ▲▵ arrows,
    *  strong/moderate/weak bands, the precision estimate, weighted bases.
    *
-   *  Every sentence here is authored in the Callout Editor under reader.legend.*
-   *  — what stays in code is which sections a given report is entitled to show
+   *  Every sentence here is authored in the Callout Editor under reader.legend.*,
+   *  what stays in code is which sections a given report is entitled to show
    *  (a low-base threshold, a banding, a weighted design). The <li> wrappers
    *  carry the data-txt-key, so an author can find any line of it on the page.
    */
@@ -493,12 +494,23 @@
         .join("");
     };
     var sections = [];
+    // The authored sentences name the levels; the renderer supplies them, so a
+    // project on a non-default alpha_secondary is described correctly. The
+    // secondary-level clauses are separate entries, spliced in only when the
+    // study HAS a secondary level. A study that switched it off has no
+    // lowercase letters and must not be promised any.
+    var lv = TR.stats.levelVars();
+    var dualClause = function (key) {
+      return { dual_clause: { html: TR.stats.hasSecondary() ? TR.txt(key, lv) : "" } };
+    };
     sections.push("<h3>Significance letters</h3><ul>" +
-      li("reader.legend.sig_letters") +
+      li("reader.legend.sig_letters",
+         Object.assign({}, lv, dualClause("reader.legend.sig_letters_dual"))) +
       (lowBase ? li("reader.legend.low_base", { low_base: lowBase }) : "") + "</ul>");
     sections.push("<h3>Arrows &amp; change chips</h3><ul>" +
-      lines("reader.legend.arrows") + "</ul>");
-    // Read the bands off the questions, like the dashboard does — a study that
+      lines("reader.legend.arrows",
+            Object.assign({}, lv, dualClause("reader.legend.arrows_dual"))) + "</ul>");
+    // Read the bands off the questions, like the dashboard does. A study that
     // configures dashboard_green_mean is not banded on % of scale, and saying
     // so here would contradict the cards the reader is looking at.
     //
@@ -569,7 +581,7 @@
         if (restoreFocus && restoreFocus.focus) restoreFocus.focus();
       }
     });
-    // focus trap + Esc — listeners die with the overlay node
+    // focus trap + Esc. Listeners die with the overlay node
     overlay.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
         reader.closeLegend();
@@ -603,7 +615,7 @@
 
   /**
    * Whether the dashboard's precision box should render collapsed (to the ⓘ).
-   * First call reads the persisted flag, then marks it seen — so the box stays
+   * First call reads the persisted flag, then marks it seen, so the box stays
    * expanded for the WHOLE first session and collapses on later ones. Local
    * per-report UI state only (d2.storeKey namespace): deliberately NOT baked
    * into saved copies, so every recipient gets one full first view too.
@@ -617,7 +629,7 @@
         if (!seen && typeof localStorage !== "undefined") {
           localStorage.setItem(TR.d2.storeKey(PE_KEY), "1");
         }
-      } catch (e) { /* storage unavailable (file:// privacy modes) — stay expanded */ }
+      } catch (e) { /* storage unavailable (file:// privacy modes): stay expanded */ }
       peSeenAtBoot = seen;
     }
     return peSeenAtBoot;

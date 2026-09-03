@@ -1,17 +1,17 @@
-# Qualitative Tab — Phase 1 Build Notes & Architecture Decisions
+# Qualitative Tab. Phase 1 Build Notes & Architecture Decisions
 
 **Companion to** `QUALITATIVE_TAB_PLAN.md` (the spec). **Date:** 2026-06-29 ·
 **Branch:** `feature/tabs-qualitative-tab`.
 
 This note records (A) what the four real coded workbooks actually look like, (B) the
 column-classification algorithm the adapter uses, (C) the architecture decision taken
-with Duncan on 2026-06-29, and (D) the confidentiality model — which gained a **third
+with Duncan on 2026-06-29, and (D) the confidentiality model, which gained a **third
 dial** in that conversation. It is the build contract for Phase 1; the spec is the why,
 this is the how.
 
 > The four workbooks live in `prototypes/qual/*.xlsx`. They are caught by the
 > `*.xlsx` rule in `.gitignore` (only `templates/**` is re-included), so they are
-> **never committed** — they carry real verbatims. Build against them locally; ship
+> **never committed**. They carry real verbatims. Build against them locally; ship
 > only synthetic fixtures in the test suite.
 
 ---
@@ -26,7 +26,7 @@ this is the how.
 | **Helderberg** (residents) | 14 | all raw | Segment/Persona, NPS category, Status (+ Rating) | r0 or r1 | none (raw) | **none** | **no Noteworthy column at all**; `"-"` = missing demographic; Rating 0–10; one sheet renames `Segment` → `Persona run 3` (intra-workbook column drift) |
 
 **Invariants that drive the design:**
-- The header row position is **not fixed** — detect it, never offset to it.
+- The header row position is **not fixed**. Detect it, never offset to it.
 - Column names drift (whitespace, `"Theme"` for sentiment, `Segment`/`Persona run 3`),
   so classify by **name-regex + value-type sampling + position relative to the
   verbatim**, never by absolute column index.
@@ -52,13 +52,13 @@ needed in tests). A thin `openxlsx` reader wraps it.
    else the verbatim column's own header (SACS); else the sheet name. Trim + collapse
    whitespace.
 4. **Classify each header column** (name trimmed + whitespace-collapsed):
-   - **ID**: `/^(response\s*)?id$/i` — the join key (used internally to union
+   - **ID**: `/^(response\s*)?id$/i`. The join key (used internally to union
      respondents across sheets; carried only as the anon index downstream).
-   - **Noteworthy**: `/noteworthy/i` — optional; any non-blank cell = noteworthy.
+   - **Noteworthy**: `/noteworthy/i`. Optional; any non-blank cell = noteworthy.
    - **Verbatim**: prefer header `/^(comment|comments|verbatim|response|feedback)$/i`;
      else the column whose **sampled data cells have the largest mean length** (handles
      SACS, where the verbatim header is the question text). Exactly one.
-   - **Rating**: `/rating/i` — numeric closed cut (range varies 1–5, 0–10); kept as a
+   - **Rating**: `/rating/i`. Numeric closed cut (range varies 1–5, 0–10); kept as a
      cut + per-record value.
    - **Overall sentiment**: a column named `/overall\s*sentiment|^sentiment$|^theme$/i`
      **whose non-blank values ⊆ {1,2,3}** (the `^theme$` clause catches the Student-NPS
@@ -81,7 +81,7 @@ needed in tests). A thin `openxlsx` reader wraps it.
 
 ---
 
-## C. Architecture decision — self-contained first → join eventual (2026-06-29)
+## C. Architecture decision. Self-contained first → join eventual (2026-06-29)
 
 **Duncan's steer:** the comments *are* part of the main survey data, so joining (not
 duplicating demographics) is the eventual target; he asked for guidance on sequencing,
@@ -102,7 +102,7 @@ studies (see D).
   with aligning IDs), which we don't have in-repo and which would block all testing.
 - **Not throwaway:** `DATA_QUAL`, the theme→`AGG`/`MICRO` serialisation, the JS tab and
   every confidentiality gate are byte-identical across models. **The join swaps exactly
-  one seam** — where the banner columns + respondent index come from. Build that seam as
+  one seam**. Where the banner columns + respondent index come from. Build that seam as
   one isolated function (`qual_resolve_banner_and_index()` or similar) so Phase 2 adds a
   code path, not a rewrite. The "don't duplicate demographics" payoff lands at the join;
   the self-contained path then survives as the standalone qual-only-report fallback.
@@ -110,26 +110,26 @@ studies (see D).
 **Split-by-cut (CCPB NPS):** Phase 1 ingests each sheet as an independent question (NPS
 bands stay separate). Reassembly into one question with the band as a banner dimension is
 **Phase 2** (spec §14), and CCPB's trio is *irregular* (different question + frame per
-band) — so reassembly is auto-with-override and must not force-merge incompatible frames.
+band), so reassembly is auto-with-override and must not force-merge incompatible frames.
 
 ---
 
-## D. Confidentiality — three orthogonal dials
+## D. Confidentiality. Three orthogonal dials
 
 Spec §10 had two; Duncan added a third on 2026-06-29. All three are independent config
 switches read by the R inliner, with runtime state scoped per report via `d2.storeKey`.
 
-1. **Tab visibility** (§10a) — `show_qualitative` (+ the generic `show_*` family).
+1. **Tab visibility** (§10a): `show_qualitative` (+ the generic `show_*` family).
    Whole-tab on/off; also self-hides when `DATA_QUAL` is null (Tracking pattern).
-2. **Verbatim text level** (§10b) — `qual_confidentiality_mode ∈ {hidden, redacted,
+2. **Verbatim text level** (§10b): `qual_confidentiality_mode ∈ {hidden, redacted,
    full}`, **default `hidden`**. HIDDEN ships numbers only (text nulled in the island);
    REDACTED ships rule-scrubbed text (logged diff); FULL ships exact text. PII scrub runs
    **at ingest**, before any string enters the island.
-3. **Demographic association** (§10c, NEW) — `qual_demographic_cuts ∈ {allow, block}`,
+3. **Demographic association** (§10c, NEW): `qual_demographic_cuts ∈ {allow, block}`,
    **default `allow`** (cuts are the core analytical value); room to go per-demographic
-   later. When `block`: the qual tab renders **Total-only** — prevalence, sentiment and
+   later. When `block`: the qual tab renders **Total-only**. Prevalence, sentiment and
    verbatims still show, but no banner columns, no demographic chips on quote cards, no
-   "which group over-mentions" standout — and the island records carry no demographic
+   "which group over-mentions" standout, and the island records carry no demographic
    fields. The control to stop "the only X in dept Y" being triangulable.
 
 **Composition:** with text HIDDEN (default) nothing is re-identifiable regardless of
@@ -139,13 +139,13 @@ A small/anonymous study (SACS staff) would set `qual_confidentiality_mode` up to
 
 ---
 
-## D2. Noteworthy tiers (triage, not confidentiality — Duncan 2026-06-29)
+## D2. Noteworthy tiers (triage, not confidentiality, Duncan 2026-06-29)
 
 The noteworthy flag is a **tier**, not a boolean: `2 = must-read`, `1 = noteworthy`,
 `0 = other`. The reader captures the raw marker and derives the tier
 (`qual_noteworthy_tier`); the boolean `noteworthy` stays as `tier >= 1` for back-compat.
 Marker-agnostic + case-insensitive, so today's binary markers ("Yes"/"x") read as tier 1
-and a coder's "Must read" reads as tier 2 — the must-read tier is dormant until a workbook
+and a coder's "Must read" reads as tier 2. The must-read tier is dormant until a workbook
 uses a stronger marker. The must-read marker set is `QUAL_MUSTREAD_MARKERS` (a config hook
 for studies with custom markers).
 
@@ -156,21 +156,21 @@ must-read. This is the "show noteworthy-only, or switch noteworthy vs all" contr
 
 ---
 
-## D3. Phase 2 — integrated join + closed↔open jump (Duncan 2026-06-29)
+## D3. Phase 2. Integrated join + closed↔open jump (Duncan 2026-06-29)
 
 Decision: the qual content moves from a separate `*_qual_report.html` into the **one** main
 v2 report (Turas report = the full deliverable, replacing the deck). That means the **join**:
 the comment workbook's respondents join to the main survey by `ResponseID`, so a comment and
 a closed answer from the same person share the anonymous MICRO index and the main banner. This
-is the `qual_assemble.R` seam — only the index/banner source swaps (union-by-workbook →
+is the `qual_assemble.R` seam, only the index/banner source swaps (union-by-workbook →
 match-against-survey); the DATA_QUAL schema, theme serialisation and the tab are unchanged.
 
-**Config contract (Selection sheet — two optional columns on the OPEN-END's row):**
-- `CommentSheet` — the comment-workbook sheet that codes this open-end (sheets are topic-named,
+**Config contract (Selection sheet, two optional columns on the OPEN-END's row):**
+- `CommentSheet`. The comment-workbook sheet that codes this open-end (sheets are topic-named,
   so the pipeline can't infer it). Open-ends are already Selection rows (`Include = N`).
-- `CommentLink` — the closed question or **composite** this diagnostic open-end explains;
+- `CommentLink`. The closed question or **composite** this diagnostic open-end explains;
   blank = generic/standalone. The resolver looks the target up across closed questions AND
-  composites (composites live in Survey_Structure and render on the Dashboard — they do NOT
+  composites (composites live in Survey_Structure and render on the Dashboard, they do NOT
   need moving to Selection; the resolver is composite-aware).
 
 **Worked example (SACS-2025_Crosstab_Config_rebuilt.xlsx; join key confirmed = ResponseID):**
@@ -187,7 +187,7 @@ match-against-survey); the DATA_QUAL schema, theme serialisation and the tab are
 **The jump.** On the linked closed/composite's card (Dashboard for composites, Crosstabs for
 Q25/Q28) a "💬 N comments" affordance appears. Clicking it switches to the qual view, selects
 the linked open-end, and applies the current cut as a filter (`stats.mask` of the active
-column/cell → keep comment records whose idx is in the mask) — i.e. "the comments from the
+column/cell → keep comment records whose idx is in the mask), i.e. "the comments from the
 people in this cell," the diagnostic *why* behind the score. A breadcrumb + back restores the
 closed question and column (URL-hash state, so browser-back works too). Generic opens (no
 `CommentLink`) just live in the Qualitative tab standalone.
@@ -197,21 +197,21 @@ export comments to Excel (client-side via the bundled xlsx writer; honours the c
 mode + current filter/saved set).
 
 **Methodology note:** since it's now client-facing, reframe prevalence as *salience* ("raised
-this"), soften the theme×cut significance, and let the verbatims lead — the jump reframes the
+this"), soften the theme×cut significance, and let the verbatims lead. The jump reframes the
 whole thing around the closed finding, which is the methodologically right shape (open-end
 mentions are salience, not incidence).
 
 > TEMPLATE GOTCHA: `Crosstab_Config_Template.xlsx` has an embedded drawing and does NOT survive
-> an openxlsx load→save round-trip (it breaks the drawing ref and corrupts the file — reverted).
+> an openxlsx load→save round-trip (it breaks the drawing ref and corrupts the file, reverted).
 > History (092c3e44) added Category/CategoryOrder by editing the binary directly in Excel.
 > The generator (`generate_config_templates.R`) is the cleaner source but had drifted (lacked
 > Category/CategoryOrder); `CommentSheet`/`CommentLink` are now added to it. To refresh the live
 > template, add the two headers in Excel (cols M/N) or do a careful generator-resync + fresh
-> regenerate — never an openxlsx round-trip of the existing file.
+> regenerate, never an openxlsx round-trip of the existing file.
 
-### D3.1 — Phase-2 AS-BUILT (the join; one deliberate divergence from the plan above)
+### D3.1. Phase-2 AS-BUILT (the join; one deliberate divergence from the plan above)
 
-**The join (DONE, tested — `test_qual_join.R`, 28 assertions).** When `qual_workbook` is set,
+**The join (DONE, tested, `test_qual_join.R`, 28 assertions).** When `qual_workbook` is set,
 the comments are joined into the ONE main v2 report by ResponseID and ride in as the `qual_json`
 of the *main* `write_html_report_v2` call (see `run_crosstabs.R` html_report_v2 block). The seam:
 
@@ -220,7 +220,7 @@ of the *main* `write_html_report_v2` call (see `run_crosstabs.R` html_report_v2 
   but **re-keys the anonymous index to the host survey's MICRO rows** (`id_to_idx` = workbook
   ResponseID → host 0-based row, `n` = `nrow(survey_data)`). The host id column auto-detects via
   the `^(response )?id$` anchor; `qual_join_id_column` (new config key) overrides it. Commenters
-  with no host row resolve to NA and are dropped (the island builder already skipped NA — this is
+  with no host row resolve to NA and are dropped (the island builder already skipped NA, this is
   why that guard was there).
 - `build_integrated_qual_island(qual_workbook, config_obj, survey_data)` (`qual_report.R`) reads
   + classifies + joins + builds the island, returning `status ∈ {PASS, NO_ID_COLUMN, NO_MATCHES}`.
@@ -235,23 +235,23 @@ The plan above said "merge theme Qs + DATA_QUAL into the main dl/micro." But the
 renders **every** `TR.AGG.questions` with no filter (`25_cards.js` sidebarHtml / `20_data.js`
 d2.categories), and the qual tab's prevalence board computes **from the DATA_QUAL records directly**
 (`27q_qualitative.js` `qual.prevalence`), not from a dl AGG question. So merging the synthetic
-theme questions would dump raw theme×banner questions into the **client-facing** Crosstabs list —
+theme questions would dump raw theme×banner questions into the **client-facing** Crosstabs list,
 which fights the very reframe this phase is about ("soften the theme×cut significance, let the
 verbatims lead"). The integrated path therefore ships the verbatim/record island only; this also
 lifts the standalone path's "needs themes" restriction (a verbatim-only workbook can now integrate).
 The theme×banner **significance** crosstab (render via `model.forQuestion`) remains a separate,
 not-yet-built TODO; if it's ever wanted in the integrated report, run the qual quant layer against
-the *host* banner and append under a dedicated tab/section flag — do NOT let it leak into Crosstabs.
+the *host* banner and append under a dedicated tab/section flag. Do NOT let it leak into Crosstabs.
 
-### D3.2 — Phase-2 AS-BUILT (the closed↔open jump; DONE, tested)
+### D3.2. Phase-2 AS-BUILT (the closed↔open jump; DONE, tested)
 
-A "💬 N comments" affordance renders on every card whose code is a `project.qualLinks` target —
+A "💬 N comments" affordance renders on every card whose code is a `project.qualLinks` target,
 on the Crosstabs question card (`25_cards.js` qhead) and on the Dashboard index/composite gauge
 (`27_views.js`). `TR.qual.affordanceHtml(code)` returns it (or "") so neither card file needs to
 know the link rules. Clicking it (`TR.qual.jumpTo`, delegated in `24_shell.js`) switches to the
 Qualitative tab and focuses the linked open-end. The cut is **the live global filter**, which the
 qual tab always honours (`TR.qual.maskFilter` keeps DATA_QUAL records whose `idx` passes
-`stats.mask(d2.state.filters)`) — the filter bar stays visible on this tab and re-renders the
+`stats.mask(d2.state.filters)`): the filter bar stays visible on this tab and re-renders the
 comments, so the analyst can also adjust the cut after jumping. The jump itself doesn't change the
 filter; it just pre-sets the breadcrumb against whatever cut was active. "the comments from the
 people in the current cut". A breadcrumb (`‹ Back to <Q> …  cut: …`)
@@ -259,15 +259,15 @@ shows the source + cut and restores the closed view; browser-back works because 
 `history.pushState`es a new entry and the focus/source round-trip through the hash (`qq` / `qfrom`;
 the cut is the existing `filter=`). The focused open-end moved from `qual._state.q` into
 `d2.state.qualQ` so it is hash-addressable. A tab-bar click or a rail pick clears the breadcrumb
-(`qual.clearJump`) — only an actual jump shows a cut.
+(`qual.clearJump`), only an actual jump shows a cut.
 
 **Cut granularity (deliberate v1):** the cut is the report-wide live filter, not a single banner
 column. So the analyst filters to the segment of interest (the filter bar), reads the closed
 numbers, then clicks 💬 to read that segment's verbatims. A per-banner-column 💬 ("just the
 Detractors column") is a worthwhile follow-up but needs the table renderer to translate a column
-into a filter spec — noted, not built. Tests: `qual_tests.mjs` jump-helper block (8 new, 20 total).
+into a filter spec. Noted, not built. Tests: `qual_tests.mjs` jump-helper block (8 new, 20 total).
 
-### D3.3 — Phase-2 AS-BUILT (shortlist + Excel export; DONE, tested)
+### D3.3. Phase-2 AS-BUILT (shortlist + Excel export; DONE, tested)
 
 Each comment card has a **＋ Shortlist / ✓ Shortlisted** toggle; the drawer header carries a
 **★ Shortlist (N)** "saved only" filter and a **⬇ Export Excel** button. The shortlist persists
@@ -276,86 +276,87 @@ localStorage, and `report.saveCopy` now embeds `qualSaved: TR.qual.savedAll()` i
 island, so a starred set survives "Save copy" and travels with the file. Keys are `qcode#idx`.
 
 Export (`TR.qual.exportXlsx` → the bundled `TR.xlsx.download`, no dependency) writes exactly the
-records the drawer is showing — the cut + facet + theme + tier + saved-only set, via the shared
+records the drawer is showing. The cut + facet + theme + tier + saved-only set, via the shared
 `qual.visibleRecords` so the table and the export never drift. Columns: ID, each demographic dim,
 Noteworthy, Sentiment, Themes, Verbatim. **The confidentiality dial is honoured: a hidden verbatim
 exports as `[hidden]`, never the raw text.** Tests: `qual_tests.mjs` shortlist/export block (13 new,
 33 total).
 
-### D3.4 — Phase-2 AS-BUILT (salience reframe; DONE)
+### D3.4. Phase-2 AS-BUILT (salience reframe; DONE)
 
-Since the comments are now client-facing, the prevalence board leads with **"What people raised"**
-and frames the % as **salience** — the share who raised each theme *unprompted* (what stood out),
-explicitly "not a prompted incidence rate." Row tooltips read "N of M raised this unprompted"; the
-themed footer carries the same caveat. There is no theme×cut significance to soften because the
-integrated view does not render the sig crosstab (D3.1) — the verbatims lead, reached via the
+Since the comments are now client-facing, the prevalence board frames the % as **salience**. The
+share who raised each theme *unprompted* (what stood out), explicitly "not a prompted incidence
+rate." (The board header itself was later shortened to **"Theme"** with a two-line hint; the
+salience framing lives on in the tooltips and the themed footer.) Row tooltips read "N of M
+raised this unprompted"; the themed footer carries the same caveat. There is no theme×cut significance to soften because the
+integrated view does not render the sig crosstab (D3.1): the verbatims lead, reached via the
 prevalence board and the closed→open jump, which is the methodologically right shape (open-end
-mentions are salience, not incidence — Duncan's own quant-analysis standard).
+mentions are salience, not incidence. Duncan's own quant-analysis standard).
 
 **Phase 2 status: all five items (join · links · jump · shortlist+export · salience) BUILT + tested**
 (R: `test_qual_join.R` 39; JS: `qual_tests.mjs` 33; existing qual + bundler suites green). Verify via
-`launch_turas` on a real SACS/Student project (it's generated HTML — never `preview_start`).
+`launch_turas` on a real SACS/Student project (it's generated HTML, never `preview_start`).
 
-### D3.5 — Phase-2 ROUND 2 (Duncan's review of the live SACS/SACAP report; all DONE)
+### D3.5. Phase-2 ROUND 2 (Duncan's review of the live SACS/SACAP report; all DONE)
 
 After the first build, Duncan ran it and iterated. As-built now:
 
-- **Sentiment filter** — an All / Positive / Mixed / Negative segmented control (each with a live
+- **Sentiment filter**. An All / Positive / Mixed / Negative segmented control (each with a live
   count) filters the comment list. Helpers `sentimentFilter` / `sentimentCounts` /
   `poolBeforeSentiment`. It filters the LIST, not the chart (filtering the chart by sentiment would
   collapse the diverging bars to one side).
-- **Filter layout (perception fix)** — the tier + sentiment + ★ Shortlist + ⬇ Export controls sit
+- **Filter layout (perception fix)**. The tier + sentiment + ★ Shortlist + ⬇ Export controls sit
   directly ABOVE the comment list (below the chart) under a "Filter the comments below:" label +
   divider, so it's obvious they narrow the list, not the overview chart. (Tier/sentiment changing
   the list but not the chart had looked broken.)
-- **Highlight a passage** — select text in a comment → a "✎ Highlight" chip → mark it; click a mark
+- **Highlight a passage**. Select text in a comment → a "✎ Highlight" chip → mark it; click a mark
   to remove. Stored as char ranges per `qcode#idx` (localStorage + `qualHighlights` saved-copy
   slice), survives Save copy. `qual.renderHighlighted` is the pure wrapper; selection wiring +
   offset math in `wire()`. Confidentiality-safe (hidden text has nothing to mark).
-- **CommentLink target validation** — `qual_build_links(selection_df, island, valid_targets)` now
+- **CommentLink target validation**, `qual_build_links(selection_df, island, valid_targets)` now
   flags a `CommentLink` that matches no rendered card; `run_crosstabs` warns at gen time. Surfaced
   by the live SACS config: Q24's `CommentLink` was `Q_Values` but the composite is `Q_Value`
-  (Duncan fixed it). NB the resolver verified Satisfaction (Q29→Q28) is wired correctly — Q28 is a
+  (Duncan fixed it). NB the resolver verified Satisfaction (Q29→Q28) is wired correctly. Q28 is a
   closed Likert, so its 💬 lives on the **Q28 Crosstabs card** (not the Dashboard like the composites).
 
-- **THE THEME CHART — final design: a 100% diverging sentiment bar.** This went through several
+- **THE THEME CHART. Final design: a 100% diverging sentiment bar.** This went through several
   iterations (filled chips → quiet count column → absolute-length diverging → inline/below labels)
   and the ROOT-CAUSE lesson is worth keeping: **never size these bars by volume.** With absolute
   lengths, one dominant theme (SACS Atmosphere, 82/135) compresses every other bar into slivers, so
-  per-segment count labels collide or vanish — no labelling trick fixes that. Per Duncan's own chart
+  per-segment count labels collide or vanish. No labelling trick fixes that. Per Duncan's own chart
   guide ("100% stacked is the standard for rating distributions; label each segment"), the bar now
   shows each theme's sentiment **mix (proportion)**: every bar is the SAME width (`W = 48%` of the
   track) and pivots so the neutral midpoint sits on a shared zero line. The lean reads as valence
   (negative left / positive right / mixed centre); counts sit inside each segment (only a genuine
-  1-comment sliver drops to the tooltip). **Bar length is no longer volume — volume is the salience
+  1-comment sliver drops to the tooltip). **Bar length is no longer volume. Volume is the salience
   % + n= + the ranking.** `f = (neg + mixed/2)/tot`, `barLeft = 50 − f·W`. If a future tweak is
-  asked, do NOT revert to absolute lengths — that reintroduces the compression.
+  asked, do NOT revert to absolute lengths. That reintroduces the compression.
 
-Tests after round 2: `qual_tests.mjs` 47, `test_qual_join.R` 44, bundler 25 — all green.
+Tests after round 2: `qual_tests.mjs` 47, `test_qual_join.R` 44, bundler 25. All green.
 
 ## E. Phase-1 file plan
 
 **R (new, `modules/tabs/lib/` convention):**
-- `qual_workbook_reader.R` — pure column-classification + normalisation + per-record
+- `qual_workbook_reader.R`. Pure column-classification + normalisation + per-record
   extraction (operates on in-memory sheet rows; TRS-compliant; testable without xlsx) +
   a thin `openxlsx` reader wrapper.
-- `qual_island_builder.R` — assemble the self-contained respondent master + banner +
+- `qual_island_builder.R`. Assemble the self-contained respondent master + banner +
   theme/raw questions; emit the `DATA_QUAL` island (§11 schema), apply the three
   confidentiality dials; isolate the banner/index seam for the future join.
 - Serialise theme questions into `DATA_AGG`/`DATA_MICRO` via the existing
-  `process_standard_question()` path (synthetic `Multi_Mention` question) — **verify the
+  `process_standard_question()` path (synthetic `Multi_Mention` question): **verify the
   significance is genuinely correct, not just present.**
 
 **JS (new):** `27q_qualitative.js` defining `TR.qual.render(host)` (auto-bundled by
-filename) — prevalence board, theme×banner crosstab (`model.forQuestion`), quote drawer
+filename): prevalence board, theme×banner crosstab (`model.forQuestion`), quote drawer
 (reusing `stats.mask` for click-to-evidence), raw browser. Tab registered in `tabList()`
 + `shell.route()` (`24_shell.js`), island parsed in `shell.boot`.
 
 **Config:** Settings keys `qual_workbook` (path), `show_qualitative`,
 `qual_confidentiality_mode`, `qual_demographic_cuts`, `qual_noteworthy_default`
-({all, noteworthy, must_read}), `qual_verbatim_scope` ({all, noteworthy} — which
+({all, noteworthy, must_read}), `qual_verbatim_scope` ({all, noteworthy}, which
 comments ship readable text; `hide`/`hidden` in the Noteworthy column withholds one
-comment, counted-not-shown) — added to `build_config_object()` and attached to `proj`
+comment, counted-not-shown): added to `build_config_object()` and attached to `proj`
 in `build_dl_project()`.
 
 **As-built so far (commits on `feature/tabs-qualitative-tab`):** `qual_workbook_reader.R`
@@ -367,7 +368,7 @@ the existing engine, task 3), `qual_report.R` + the pipeline wiring (DATA_QUAL i
 the additive `run_crosstabs.R` hook that emits a `*_qual_report.html`, task 4). ~158 test
 assertions green; all verified against the four real workbooks + a significance known-answer +
 an end-to-end report build (HIDDEN ships zero raw text, FULL ships it). **The whole R backend +
-wiring is done — the comment report builds.** Remaining: the JS Qualitative tab (task 5), which
+wiring is done. The comment report builds.** Remaining: the JS Qualitative tab (task 5), which
 is what makes the dedicated tab appear (until then the report builds with the themes as ordinary
 Crosstabs questions + the DATA_QUAL island present).
 
@@ -380,13 +381,13 @@ the same `{{DATA_QUAL}}` placeholder.
 `Multi_Mention` question (one option per theme; a respondent's mentioned theme labels left-
 packed into `code_1..code_k` slot columns), the embedded demographics become a real banner via
 `create_banner_structure`, and it all runs through `process_all_questions` → `build_data_layer`
-→ `build_microdata`. Significance is byte-identical to a closed question — nothing theme-aware
+→ `build_microdata`. Significance is byte-identical to a closed question. Nothing theme-aware
 touches the stats. A `QUAL_NO_THEME_SENTINEL` seats zero-theme commenters into the base so theme
 prevalence reads "% of commenters". `demographic_cuts="block"` → Total-only banner. The standalone
 test bootstraps the chain by cd-ing into `lib/` and extracting `run_crosstabs.R`'s sig functions
 by source-line (it has an unguarded main), mirroring `test_e2e_integration.R`. Per-mention
 sentiment stays in `DATA_QUAL.records.themeVals` (not MICRO) for Phase 1; the JS joins it to
-the banner by anon index — add `micro$sentiments[[qcode]]` later only if live-filtered sentiment
+the banner by anon index. Add `micro$sentiments[[qcode]]` later only if live-filtered sentiment
 recompute is needed.
 
 **Island wiring:** `{{DATA_QUAL}}` placeholder in `template.html`; token replace in

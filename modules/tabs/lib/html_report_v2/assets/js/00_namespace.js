@@ -1,5 +1,5 @@
 /**
- * Turas data-centric report prototype (fable) — namespace + constants.
+ * Turas data-centric report prototype (fable): namespace + constants.
  *
  * Every module attaches to the TR namespace. Modules numbered 00–06 and
  * 13–15 are pure (no DOM access) so they can be unit-tested in node.

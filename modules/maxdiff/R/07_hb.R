@@ -350,8 +350,21 @@ stan_declared_data <- function(stan_data) {
 #' @keywords internal
 get_stan_model_path <- function() {
 
-  # Look for Stan file in module directory
+  # Look for the Stan file relative to the MODULE first, then the working
+  # directory. The cwd-only list meant the model was found only when R was
+  # started in the repo root (found the first day the path ran for real,
+  # 2026-09-03: the test runner's cwd is tests/testthat).
+  module_dirs <- character(0)
+  if (exists("script_dir_override", envir = globalenv())) {
+    module_dirs <- c(module_dirs, get("script_dir_override", envir = globalenv()))
+  }
+  if (exists("get_script_dir", mode = "function")) {
+    module_dirs <- c(module_dirs, tryCatch(get_script_dir(), error = function(e) NULL))
+  }
+  module_dirs <- module_dirs[!is.na(module_dirs) & nzchar(module_dirs)]
   possible_paths <- c(
+    file.path(module_dirs, "..", "stan", "maxdiff_hb.stan"),
+    file.path(module_dirs, "stan", "maxdiff_hb.stan"),
     "stan/maxdiff_hb.stan",
     "../stan/maxdiff_hb.stan",
     "modules/maxdiff/stan/maxdiff_hb.stan",
@@ -403,16 +416,35 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
   mu_vars <- paste0("mu[", seq_len(stan_data$J), "]")
   mu_summary <- summary_df[summary_df$variable %in% mu_vars, ]
 
-  # Build population utilities data frame
+  # Individual utilities (beta) first: the spread columns below are computed
+  # from them.
+  draws <- fit$draws(format = "df")
+
+  individual_utilities <- extract_individual_utilities(
+    draws, stan_data$R, stan_data$J,
+    stan_data$item_ids, stan_data$resp_ids
+  )
+
+  # HB_Utility_SD / Q5 / Q95 mean ONE thing on both HB paths (Duncan's ruling
+  # on review F5, 2026-09-03): the spread of utilities ACROSS RESPONDENTS,
+  # which is what the strategy quadrant and the manual describe. The
+  # precision of the population mean (the posterior SD of mu, what this
+  # column used to hold) moves to HB_Mean_SE, with its credible interval in
+  # HB_Mean_Q5 / HB_Mean_Q95, where it cannot be read as heterogeneity.
+  spread <- hb_spread_across_respondents(individual_utilities, stan_data$item_ids)
+
   population_utilities <- data.frame(
     Item_ID = stan_data$item_ids,
     HB_Utility_Mean = mu_summary$mean,
-    HB_Utility_SD = mu_summary$sd,
-    HB_Utility_Q5 = mu_summary$q5,
-    HB_Utility_Q95 = mu_summary$q95,
+    HB_Utility_SD = spread$sd,
+    HB_Utility_Q5 = spread$q5,
+    HB_Utility_Q95 = spread$q95,
+    HB_Mean_SE = mu_summary$sd,
+    HB_Mean_Q5 = mu_summary$q5,
+    HB_Mean_Q95 = mu_summary$q95,
     HB_Rhat = mu_summary$rhat,
     HB_ESS = mu_summary$ess_bulk,
-    Estimation_Method = "Stan HB (cmdstanr posterior)",
+    Estimation_Method = "Stan HB (cmdstanr posterior; SD/Q5/Q95 are the spread across respondents, HB_Mean_SE the precision of the mean)",
     stringsAsFactors = FALSE
   )
 
@@ -427,15 +459,6 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
   population_utilities$Rank <- rank(-population_utilities$HB_Utility_Mean,
                                     ties.method = "min")
 
-  # Individual utilities (beta)
-  # Extract draws for each respondent-item combination
-  draws <- fit$draws(format = "df")
-
-  individual_utilities <- extract_individual_utilities(
-    draws, stan_data$R, stan_data$J,
-    stan_data$item_ids, stan_data$resp_ids
-  )
-
   # prepare_stan_data reorders items so the designated anchor sits last
   # (the model's beta[r,J] = 0 slot). Deliverables keep the configured
   # item order, so map the columns back (M1).
@@ -446,9 +469,14 @@ extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
   rownames(population_utilities) <- NULL
 
   # Diagnostics
+  # sampler_diagnostics() returns a draws_array (iteration x chain x
+  # variable); the old 2-D index crashed the first time this ever ran on a
+  # real fit (2026-09-03, the day cmdstanr was installed). The data-frame
+  # form is flat and safe.
+  sampler_df <- fit$sampler_diagnostics(format = "df")
   diagnostics <- list(
-    n_divergences = sum(fit$sampler_diagnostics()[, "divergent__"]),
-    max_treedepth_exceeded = sum(fit$sampler_diagnostics()[, "treedepth__"] >= 10),
+    n_divergences = sum(sampler_df$divergent__, na.rm = TRUE),
+    max_treedepth_exceeded = sum(sampler_df$treedepth__ >= 10, na.rm = TRUE),
     mean_rhat = mean(mu_summary$rhat, na.rm = TRUE),
     min_ess = min(mu_summary$ess_bulk, na.rm = TRUE)
   )
@@ -496,6 +524,31 @@ reorder_utility_columns <- function(individual_utilities, item_order) {
   item_cols <- intersect(item_order, names(individual_utilities))
   other_cols <- setdiff(names(individual_utilities), item_cols)
   individual_utilities[, c(other_cols, item_cols), drop = FALSE]
+}
+
+
+#' Spread of utilities across respondents, per item
+#'
+#' The statistic HB_Utility_SD / Q5 / Q95 carry on BOTH HB paths (review F5
+#' ruling): the standard deviation and the 5th / 95th percentiles of the
+#' respondents' utilities for each item. Under Stan the respondent
+#' utilities are posterior means, so this is the spread of those means.
+#'
+#' @param individual_utilities Data frame, resp_id plus one column per item.
+#' @param item_ids Character vector of item columns to summarise, in order.
+#' @return List of numeric vectors sd, q5, q95, one entry per item (NA for
+#'   an item with no column).
+#' @keywords internal
+hb_spread_across_respondents <- function(individual_utilities, item_ids) {
+  get_col <- function(id) {
+    if (is.data.frame(individual_utilities) && id %in% names(individual_utilities)) {
+      as.numeric(individual_utilities[[id]])
+    } else NA_real_
+  }
+  sd_v <- vapply(item_ids, function(id) { v <- get_col(id); if (all(is.na(v))) NA_real_ else stats::sd(v, na.rm = TRUE) }, numeric(1))
+  q5_v <- vapply(item_ids, function(id) { v <- get_col(id); if (all(is.na(v))) NA_real_ else unname(stats::quantile(v, 0.05, na.rm = TRUE)) }, numeric(1))
+  q95_v <- vapply(item_ids, function(id) { v <- get_col(id); if (all(is.na(v))) NA_real_ else unname(stats::quantile(v, 0.95, na.rm = TRUE)) }, numeric(1))
+  list(sd = unname(sd_v), q5 = unname(q5_v), q95 = unname(q95_v))
 }
 
 
@@ -601,19 +654,32 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
   # Population utilities (guard against items not in data)
   safe_mean <- pop_mean[included_items]
   safe_mean[is.na(safe_mean)] <- 0
-  safe_var <- pop_var[included_items]
-  safe_var[is.na(safe_var)] <- 0
+  # Spread ACROSS RESPONDENTS of the utilities actually shipped (the shrunken
+  # individual scores), by the same helper the Stan path uses, so
+  # HB_Utility_SD / Q5 / Q95 have one definition on both paths (review F5
+  # ruling). Before this the EB path reported the spread of the UNshrunken
+  # scores, which is wider than the individual utilities in INDIVIDUAL_UTILS.
+  spread <- hb_spread_across_respondents(individual_utilities, included_items)
+  spread$sd[is.na(spread$sd)] <- 0
+  spread$q5[is.na(spread$q5)] <- safe_mean[is.na(spread$q5)]
+  spread$q95[is.na(spread$q95)] <- safe_mean[is.na(spread$q95)]
   population_utilities <- data.frame(
     Item_ID = included_items,
     HB_Utility_Mean = safe_mean,
-    HB_Utility_SD = sqrt(safe_var),
-    HB_Utility_Q5 = safe_mean - 1.645 * sqrt(safe_var),
-    HB_Utility_Q95 = safe_mean + 1.645 * sqrt(safe_var),
+    HB_Utility_SD = spread$sd,
+    HB_Utility_Q5 = spread$q5,
+    HB_Utility_Q95 = spread$q95,
+    # No posterior here, so no precision of the mean (review F5): the
+    # column exists so both paths share one schema, and stays NA.
+    HB_Mean_SE = NA_real_,
+    HB_Mean_Q5 = NA_real_,
+    HB_Mean_Q95 = NA_real_,
     HB_Rhat = NA_real_,
     HB_ESS = NA_real_,
     # Honest stamp (M5): under EB these columns are the POPULATION SPREAD of
-    # shrunken count scores, not a posterior SE / credible interval. The
-    # stamp travels into the Excel output beside the numbers.
+    # shrunken count scores, the same meaning the Stan path now gives them.
+    # The report transformer reads this stamp; the Excel workbook carries
+    # model_fit$method on MODEL_DIAGNOSTICS.
     Estimation_Method = "Empirical Bayes (count-based; SD/Q5/Q95 are population spread, not posterior uncertainty)",
     stringsAsFactors = FALSE
   )
@@ -796,9 +862,12 @@ check_hb_convergence_auto <- function(fit, parameters = NULL, verbose = TRUE) {
   # ============================================================================
 
   tryCatch({
-    sampler_diag <- fit$sampler_diagnostics()
-    if ("divergent__" %in% colnames(sampler_diag)) {
-      diagnostics$n_divergences <- sum(sampler_diag[, "divergent__"])
+    # draws_array has no colnames, so the old check was always FALSE and the
+    # divergence count silently never ran (found on the first real fit,
+    # 2026-09-03). The data-frame form is flat.
+    sampler_diag <- fit$sampler_diagnostics(format = "df")
+    if ("divergent__" %in% names(sampler_diag)) {
+      diagnostics$n_divergences <- sum(sampler_diag$divergent__, na.rm = TRUE)
 
       if (diagnostics$n_divergences > 0) {
         pct_divergent <- 100 * diagnostics$n_divergences / nrow(sampler_diag)

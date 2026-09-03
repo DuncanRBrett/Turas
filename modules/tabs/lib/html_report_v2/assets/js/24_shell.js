@@ -1,5 +1,5 @@
 /**
- * v2 shell — boot, header, report tabs, routing, and the About tab.
+ * v2 shell. Boot, header, report tabs, routing, and the About tab.
  * Tab content renderers live in their own modules (cards/views/story);
  * the shell owns the frame and the state→DOM routing.
  */
@@ -10,7 +10,7 @@
   var shell = TR.shell = {};
 
   /**
-   * B1 Read vs Analyse navigation: the tab bar renders two visual groups —
+   * B1 Read vs Analyse navigation: the tab bar renders two visual groups,
    * reading surfaces first, the analyst workbenches after a divider. Story/
    * Crosstabs/Report are always present; the rest are gated by the per-report
    * visibility flags in project.tabs (default-on, so existing reports are
@@ -58,7 +58,7 @@
   shell.boot = function () {
     // Read before anything renders: d2.render() replaces the address bar with
     // d2.encodeHash() (20_data.js), which is a curated whitelist and drops any
-    // flag not in it — including keys=1.
+    // flag not in it, including keys=1.
     var bootHash = typeof location !== "undefined" ? location.hash : "";
     var agg = parseIsland("data-agg"), micro = parseIsland("data-micro"),
         prev = parseIsland("data-prev"), verify = parseIsland("data-verify");
@@ -81,13 +81,15 @@
     d2.state.banner = (agg.banner_groups && agg.banner_groups.length)
       ? agg.banner_groups[0].id : "";
     // alpha_default: which significance level the report OPENS on. Only
-    // meaningful when the study configured a secondary level — with one alpha
+    // meaningful when the study configured a secondary level, with one alpha
     // there is nothing to open "on". Set BEFORE decodeHash so a shared or
     // saved URL still wins over the config default. The setting was registered,
     // validated and documented for a long time while nothing read it, so
     // "alpha_default = secondary" silently did nothing (review 2026-08-21, I-25).
+    // alpha_secondary always carries a number (it falls back to 0.20), so it
+    // cannot say whether the study HAS a secondary level. HasSecondary() can.
     if (agg.project && agg.project.alpha_default === "secondary" &&
-        agg.project.alpha_secondary) {
+        TR.stats.hasSecondary()) {
       d2.state.sigMode = "dual";
     }
     d2.decodeHash(location.hash);
@@ -95,7 +97,7 @@
       d2.state.activeQ = agg.questions[0].code;
     }
     d2.state.tab = shell.landingTab(location.hash, d2.state.tab);
-    document.title = agg.project.name + " — Turas Report v2";
+    document.title = agg.project.name + ", Turas Report v2";
     applyTheme();
     document.getElementById("app").innerHTML = frameHtml();
     TR.filterBar.render();
@@ -148,7 +150,7 @@
       shell.textKeys.on = !!on;
       document.body.classList.toggle("txt-keys", shell.textKeys.on);
       shell.toast(on
-        ? "Text keys shown — click one to copy it for the Callout Editor"
+        ? "Text keys shown. Click one to copy it for the Callout Editor"
         : "Text keys hidden");
     }
   };
@@ -162,6 +164,44 @@
     if (/(^#|[&#])tab=/.test(hash || "")) return current;
     return (TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable())
       ? "cover" : current;
+  };
+
+  /* Tabs that are in the bar but are not FRONT DOORS. Each shows a slice
+   * rather than an overview: Qualitative is the comment tab, Story is the
+   * analyst's own pinned collection (empty in a fresh report), Conjoint is a
+   * sub-study. Dashboard, Group overview and Tracking ARE overviews and stay
+   * eligible. */
+  var NOT_A_LANDING_TAB = ["qualitative", "story", "conjoint"];
+
+  /**
+   * The tab the report should actually SHOW.
+   *
+   * A tab switched off in the config, or absent for want of data, is not in the
+   * bar, so if state.tab still names it the reader lands on a surface with no
+   * button and no way back to it. Fall back to the first tab that IS in the bar
+   * and is a front door. "cover" is exempt: it is a landing page rather than a
+   * tab in the bar, and route() checks its availability separately just above.
+   *
+   * Found 2026-08-28 on ASSA, in two steps. First: the study set
+   * show_patterns = FALSE, the Group overview button correctly disappeared from
+   * the bar, and the report still OPENED on that tab, because d2.state.tab
+   * defaults to "takeout" (20_data.js) and nothing reconciled the default
+   * against the flags. Then, once show_dashboard went FALSE as well, falling
+   * back to the plain first visible tab opened the report on Qualitative,
+   * hence the skip list above, which sends it to the Crosstabs instead.
+   */
+  shell.visibleTab = function (want) {
+    if (want === "cover") return want;
+    var ids = tabGroups().reduce(function (acc, g) {
+      return acc.concat(g.tabs.map(function (t) { return t[0]; }));
+    }, []);
+    if (ids.indexOf(want) >= 0) return want;
+    var landable = ids.filter(function (id) {
+      return NOT_A_LANDING_TAB.indexOf(id) === -1;
+    });
+    // Crosstabs is unconditional, so `landable` is never empty in practice;
+    // ids[0] is the last resort rather than an undefined tab id.
+    return landable.length ? landable[0] : ids[0];
   };
 
   function parseIsland(id) {
@@ -217,22 +257,26 @@
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + subBits.join(" &middot; ") + "</div></div></div>" +
       '<div class="hdr-meta">' + clientLogo +
-      // D1: the cover is the saved-copy landing page, not a READ tab — this
+      // D1: the cover is the saved-copy landing page, not a READ tab. This
       // small header link is the only way back to it, and only exists when a
       // cover exists (saved copy + story content)
       (TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable()
         ? '<button class="hdr-legend hdr-cover" data-cover-open ' +
-          'title="Back to the report cover — executive summary and leading findings">' +
+          'title="Back to the report cover. Executive summary and leading findings">' +
           "Cover</button>" : "") +
       '<button class="hdr-legend" data-legend-open aria-haspopup="dialog" ' +
-      'title="How to read this report — significance letters, arrows, bands, precision">' +
+      'title="How to read this report. Significance letters, arrows, bands, precision">' +
       "ⓘ How to read</button>" +
-      '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
-      'insights, story and report sections embedded — ready to send">💾 Save copy</button>' +
+      // A study can switch Save copy off (show_save_copy = FALSE) for a report
+      // that is published rather than worked in. Default on, so a report built
+      // before the setting existed keeps the button.
+      (((TR.AGG.project && TR.AGG.project.tabs) || {}).save_copy === false ? "" :
+        '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
+        'insights, story and report sections embedded. Ready to send">💾 Save copy</button>') +
       "</div></div>" +
       tabsNavHtml() + "</header>" +
       '<div id="filterbar" class="filterbar"></div>' +
-      // A3: who the numbers describe — persistent on EVERY tab; polite so a
+      // A3: who the numbers describe. Persistent on EVERY tab; polite so a
       // cut change is announced without stealing focus
       '<div id="audstrip" class="audstrip" aria-live="polite"></div>' +
       '<div id="tabhost" class="tabhost"></div>' +
@@ -249,6 +293,9 @@
         !(TR.reader && TR.reader.coverAvailable && TR.reader.coverAvailable())) {
       d2.state.tab = "dashboard";
     }
+    // ...and the same for any tab the config switched off or the data cannot
+    // support: never render a surface whose button is not in the bar.
+    d2.state.tab = shell.visibleTab(d2.state.tab);
     document.querySelectorAll(".tabbtn").forEach(function (btn) {
       btn.setAttribute("aria-selected",
         String(btn.getAttribute("data-tab") === d2.state.tab));
@@ -267,7 +314,7 @@
     // The audience filter recomputes from this wave's microdata; prior waves
     // are pre-aggregated, so a filter can't apply on Tracking. The Executive
     // Takeout summarises the published view, so it hides the bar too. The
-    // cover is a landing page, not an analysis surface — no filter bar.
+    // cover is a landing page, not an analysis surface. No filter bar.
     var fb = document.getElementById("filterbar");
     if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout" ||
       d2.state.tab === "maxdiff" ||
@@ -278,7 +325,7 @@
   };
 
   shell.goTab = function (tab) {
-    // A tab-bar click is plain navigation, never a jump — drop any stale qual
+    // A tab-bar click is plain navigation, never a jump. Drop any stale qual
     // breadcrumb so opening Qualitative directly is a clean browse.
     if (TR.qual && TR.qual.clearJump) TR.qual.clearJump();
     TR.d2.state.tab = tab;
@@ -319,7 +366,7 @@
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-cover-open]")) shell.goTab("cover");
     });
-    // One "How to read this" panel for the whole report — every ⓘ trigger
+    // One "How to read this" panel for the whole report. Every ⓘ trigger
     // (header, collapsed PE box, crosstabs footer) opens the same dialog.
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-legend-open]") && TR.reader) TR.reader.openLegend();
@@ -335,7 +382,7 @@
     });
     // Pin any on-screen card to the story "as it looks on the page". One
     // delegated listener serves every surface (patterns / dashboard /
-    // differences) — each card carries data-snap-card and a data-snap-pin
+    // differences): each card carries data-snap-card and a data-snap-pin
     // control with the title / source / context to record.
     document.addEventListener("click", function (e) {
       var pin = e.target.closest("[data-snap-pin]");
@@ -361,7 +408,7 @@
         lines: shell.snapshotLines(card)
       });
     });
-    // Note boxes follow the typing — one delegated listener for every surface.
+    // Note boxes follow the typing. One delegated listener for every surface.
     document.addEventListener("input", function (e) {
       if (e.target && e.target.matches && e.target.matches(NOTE_SEL)) {
         growNote(e.target);
@@ -413,7 +460,7 @@
   function growNote(ta) {
     if (!ta || !ta.style) return;
     ta.style.height = "auto";
-    // A textarea in a hidden tab measures 0 — leave it alone rather than
+    // A textarea in a hidden tab measures 0. Leave it alone rather than
     // collapse it; the next render on a visible tab sizes it properly.
     if (!(ta.scrollHeight > 0)) return;
     // Everything here is border-box but scrollHeight is content+padding only,
@@ -457,7 +504,7 @@
     return clone.outerHTML;
   };
 
-  /** Plain-text lines from a card — used only for the deck export of a snapshot
+  /** Plain-text lines from a card. Used only for the deck export of a snapshot
    *  pin (the on-screen story keeps the exact HTML; the SVG/PPTX path has no way
    *  to rasterise arbitrary HTML, so it renders the same content as a card). */
   shell.snapshotLines = function (cardEl) {
@@ -466,7 +513,7 @@
       t = (t || "").replace(/\s+/g, " ").trim();
       if (t && out.indexOf(t) === -1) out.push(t);
     }
-    // headings / captions / prose — skip anything inside a table, whose cells are
+    // headings / captions / prose. Skip anything inside a table, whose cells are
     // harvested row-by-row below so the tabular layout survives.
     cardEl.querySelectorAll(
       "h1,h2,h3,h4,strong,p,li,.tko-take,.tko-note,.tko-cap,.df-sentence,.df-beats,.gv,.gt,.gn"
@@ -476,7 +523,7 @@
     });
     // Analyst notes. The deck path harvests text from element selectors, which
     // never matched a textarea (live card) or a .snap-frozen-note (a snapshot
-    // already frozen by snapshotCard) — so a pinned insight showed in the
+    // already frozen by snapshotCard), so a pinned insight showed in the
     // on-screen story and vanished from the PowerPoint. The note is usually
     // the point of the pin, so it is harvested before the table figures.
     cardEl.querySelectorAll("textarea, .snap-frozen-note").forEach(function (el) {
@@ -484,7 +531,7 @@
       add(el.value != null ? el.value : el.textContent);
     });
     // Table rows: join each row's cells so a pinned crosstab carries its NUMBERS,
-    // not just its title (I1 — the deck/PNG export had the caption but no figures).
+    // not just its title (I1, the deck/PNG export had the caption but no figures).
     cardEl.querySelectorAll("table tr").forEach(function (tr) {
       if (tr.closest(".snap-pin")) return;
       var cells = [];

@@ -3,12 +3,12 @@
 # ==============================================================================
 #
 # Tests for Variable_Type = "Allocation" (constant-sum / budget allocation):
-#   1. build_allocation_labels()         — label resolution
-#   2. collect_allocation_values()       — per-banner value extraction
-#   3. compute_allocation_weighted_mean() — weighted / unweighted mean
-#   4. build_allocation_mean_row()       — row structure and known values
-#   5. process_allocation_question()     — end-to-end processing
-#   6. Validation helpers               — check_allocation_columns()
+#   1. build_allocation_labels(): label resolution
+#   2. collect_allocation_values(): per-banner value extraction
+#   3. compute_allocation_weighted_mean(): weighted / unweighted mean
+#   4. build_allocation_mean_row(): row structure and known values
+#   5. process_allocation_question(): end-to-end processing
+#   6. Validation helpers. Check_allocation_columns()
 #
 # KNOWN-ANSWER FIXTURE:
 #   50 respondents, 3 options summing to 100 per respondent.
@@ -222,7 +222,7 @@ test_that("NAs are excluded from value vector", {
 
 context("compute_allocation_weighted_mean")
 
-test_that("unweighted mean matches base R mean — known answer", {
+test_that("unweighted mean matches base R mean. Known answer", {
   # mean(c(50, 50, 30, 30)) = 40
   vals <- c(50, 50, 30, 30)
   result <- compute_allocation_weighted_mean(vals, rep(1, 4), is_weighted = FALSE)
@@ -230,7 +230,7 @@ test_that("unweighted mean matches base R mean — known answer", {
   expect_equal(result, 40)
 })
 
-test_that("weighted mean is correct — known answer", {
+test_that("weighted mean is correct. Known answer", {
   # values 60 and 20 with weights 3 and 1: (60*3 + 20*1)/(3+1) = 200/4 = 50
   vals    <- c(60, 20)
   weights <- c(3,  1)
@@ -290,7 +290,7 @@ test_that("row has correct RowLabel and RowType", {
   expect_equal(row$RowSource, "summary")
 })
 
-test_that("Total mean is 40.0 for Brand A — known answer", {
+test_that("Total mean is 40.0 for Brand A. Known answer", {
   data        <- make_alloc_data()
   indices     <- make_alloc_banner_indices()
   value_sets  <- collect_allocation_values(data, "Q1_1", indices)
@@ -307,7 +307,7 @@ test_that("Total mean is 40.0 for Brand A — known answer", {
   expect_equal(as.numeric(row[["TOTAL::Total"]]), 40.0)
 })
 
-test_that("Segment means are 50.0 and 30.0 for Brand A — known answer", {
+test_that("Segment means are 50.0 and 30.0 for Brand A. Known answer", {
   data        <- make_alloc_data()
   indices     <- make_alloc_banner_indices()
   value_sets  <- collect_allocation_values(data, "Q1_1", indices)
@@ -326,10 +326,10 @@ test_that("Segment means are 50.0 and 30.0 for Brand A — known answer", {
 
 
 # ==============================================================================
-# 5. process_allocation_question — end to end
+# 5. process_allocation_question. End to end
 # ==============================================================================
 
-context("process_allocation_question — happy path")
+context("process_allocation_question. Happy path")
 
 test_that("returns data frame with one row per option", {
   data        <- make_alloc_data()
@@ -366,7 +366,7 @@ test_that("row labels match option text", {
   expect_equal(result$RowLabel, c("Brand A", "Brand B", "Brand C"))
 })
 
-test_that("total means are 40, 35, 25 — known answers", {
+test_that("total means are 40, 35, 25. Known answers", {
   data        <- make_alloc_data()
   q_info      <- make_alloc_question_info()
   opts        <- make_alloc_options()
@@ -401,7 +401,7 @@ test_that("all rows have RowType = 'Average'", {
 })
 
 
-context("process_allocation_question — edge cases")
+context("process_allocation_question. Edge cases")
 
 test_that("zero allocation in one segment yields mean of 0, not NA", {
   # Seg A allocates 0 to Brand C; Seg B allocates 60 to Brand C
@@ -499,9 +499,9 @@ test_that("missing data column returns NA mean for that segment", {
 })
 
 
-context("process_allocation_question — weighted")
+context("process_allocation_question. Weighted")
 
-test_that("weighted means are correct — known answer", {
+test_that("weighted means are correct. Known answer", {
   # 4 respondents: 2 in Seg A (w=2), 2 in Seg B (w=1)
   # Q1_1: A=80,80, B=20,20
   # Seg A weighted mean: (80*2 + 80*2)/(2+2) = 80

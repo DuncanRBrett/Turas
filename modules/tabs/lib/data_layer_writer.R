@@ -1,8 +1,8 @@
 # ==============================================================================
-# TABS — DATA-LAYER WRITER (V11, data-centric report v2)
+# TABS. DATA-LAYER WRITER (V11, data-centric report v2)
 # ==============================================================================
 # Emits the `data-agg` JSON island consumed by the v2 (data-centric) renderer,
-# alongside the existing Excel/HTML outputs. Aggregates only — no microdata.
+# alongside the existing Excel/HTML outputs. Aggregates only. No microdata.
 #
 # The shape is documented and verified in
 # prototypes/report-redesign/fable/v2/SESSION_1_TABS_WRITER.md. The renderer's
@@ -13,11 +13,11 @@
 #
 # Row classification runs through the shared helpers in report_shared.R
 # (normalize_question_table, detect_available_stats, classify_row_labels), which
-# must be sourced first — they define what counts as a category / NET / mean row
+# must be sourced first. They define what counts as a category / NET / mean row
 # for every consumer of a question table.
 # ==============================================================================
 
-# Null-coalesce — defined locally only if the tabs helper is not already in scope
+# Null-coalesce. Defined locally only if the tabs helper is not already in scope
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
@@ -28,7 +28,7 @@ if (!exists("%||%", mode = "function")) {
 #' @param vt Character, the tabs question/Variable type
 #' @return One of "single" | "multi" | "scale" | "nps" | "numeric". Numeric
 #'   open-counts map to "numeric" (not "scale") so the v2 index dashboard can
-#'   tell a rated touchpoint apart from an unbounded count — only scale/nps
+#'   tell a rated touchpoint apart from an unbounded count, only scale/nps
 #'   questions are colour-banded against a scale maximum.
 #' @export
 map_question_type <- function(vt) {
@@ -72,7 +72,7 @@ build_sig_note <- function(alpha = 0.05, sampling_method = "Not_Specified") {
 #' Encode an image file as a base64 data URI for inline embedding
 #'
 #' Supports SVG / PNG / JPG. Returns NULL when the path is missing, the file
-#' does not exist, the format is unsupported, or base64enc is unavailable — the
+#' does not exist, the format is unsupported, or base64enc is unavailable. The
 #' renderer then falls back to the brand dot.
 #'
 #' @param path Absolute path to a logo image, or NULL
@@ -105,7 +105,7 @@ encode_logo_data_uri <- function(path) {
 #' @export
 build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # The config loader surfaces an empty cell as the literal string "NA", so
-  # treat that (and whitespace-only) as blank — no display/metadata field is
+  # treat that (and whitespace-only) as blank. No display/metadata field is
   # ever legitimately "NA", and shipping a bare "NA" into the report header or
   # the About panel would look like a defect.
   blank <- function(x) {
@@ -124,9 +124,20 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (length(alpha) != 1L || is.na(alpha) || alpha <= 0 || alpha >= 1) alpha <- 0.05
   # The secondary (dual-sig) level and the Bonferroni flag travel with the report
   # so the in-browser recompute engine tests at the SAME levels as the published
-  # letters (the config loader can hand us "NA" strings — treat those as absent).
-  alpha2 <- suppressWarnings(as.numeric(config_obj[["alpha_secondary"]]))
-  if (length(alpha2) != 1L || is.na(alpha2) || alpha2 <= alpha || alpha2 >= 1) alpha2 <- 0.20
+  # letters (the config loader can hand us "NA" strings, treat those as absent).
+  alpha2_raw <- suppressWarnings(as.numeric(config_obj[["alpha_secondary"]]))
+  # Blank alpha_secondary DISABLES dual significance. That is the documented
+  # contract (00_guard.R: "Leave alpha_secondary blank to disable the dual
+  # significance feature") and run_crosstabs.R honours it, emitting no Sig.2 row
+  # and no sig2 letters. The number below still falls back to 0.20 so the
+  # recompute engine always has a level to work with, which meant the report
+  # could not tell "switched off" from "set to 0.2": it went on offering a
+  # "95% + 80%" option, and picking it made the browser RECOMPUTE 80% letters
+  # from the published counts (22_model.js) that the Excel crosstab does not
+  # have. So the fact travels separately.
+  has_secondary <- length(alpha2_raw) == 1L && !is.na(alpha2_raw)
+  alpha2 <- alpha2_raw
+  if (!has_secondary || alpha2 <= alpha || alpha2 >= 1) alpha2 <- 0.20
   bon_raw <- config_obj$bonferroni_correction
   bonferroni <- if (is.logical(bon_raw)) {
     isTRUE(bon_raw)
@@ -145,20 +156,18 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     alpha_secondary    = alpha2,
     # Which level the report OPENS on. The setting has been registered,
     # validated and offered by the config template for a long time, but nothing
-    # ever consumed it — so an operator who set alpha_default = secondary got no
+    # ever consumed it, so an operator who set alpha_default = secondary got no
     # warning and no effect (review 2026-08-21, I-25). Only meaningful when a
     # secondary level is configured; the renderer ignores it otherwise.
     alpha_default      = {
       # Only honoured when the study actually CONFIGURED a secondary level.
       # alpha_secondary above always carries a number (it falls back to 0.20),
-      # so the renderer cannot tell configured from defaulted — and
+      # so the renderer cannot tell configured from defaulted, and
       # validate_dual_significance_config() returns early when the setting is
       # absent, so "alpha_default = secondary" on a single-alpha study is never
       # refused either. Without this gate such a study would open in dual mode
       # showing an 80% level it never asked for.
       ad <- tolower(trimws(as.character(config_obj$alpha_default %||% "primary")))
-      has_secondary <- !is.null(config_obj[["alpha_secondary"]]) &&
-        !is.na(suppressWarnings(as.numeric(config_obj[["alpha_secondary"]])))
       if (identical(ad, "secondary") && has_secondary) "secondary" else "primary"
     },
     bonferroni         = bonferroni,
@@ -166,10 +175,15 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     sig_note           = build_sig_note(alpha, sm),
     tracking           = list(enabled = isTRUE(tracking_enabled), default_scope = "all")
   )
+  # Emitted ONLY when the study switched dual significance off, so every island
+  # from a study that uses it, and every fixture already committed, is
+  # byte-identical to before. The renderer reads `!== false`, so an older island
+  # with no flag behaves exactly as it does today.
+  if (!has_secondary) proj$dual_significance <- FALSE
   # The crosstab heat tint's base colour. Emitted ONLY when the operator set it,
   # so an island from a config that never mentions heatmap_colour is byte-identical
   # to the ones already committed and the tint stays on the brand colour
-  # (production review 2026-08, I11 — the setting was whitelisted, templated and
+  # (production review 2026-08, I11, the setting was whitelisted, templated and
   # documented, and read by nothing).
   if (!blank(config_obj$heatmap_colour)) {
     proj$heatmap_colour <- as.character(config_obj$heatmap_colour)
@@ -199,13 +213,13 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   # Disclosure-control threshold (V13). Carried only when actually engaged (>1), so a
   # report without it is byte-identical to today. The renderer hides identifying detail
   # (comment demographic tags now, small cells next) whenever the live filtered audience
-  # falls below it — set it to the full sample size to forbid any sub-group drill-down.
+  # falls below it. Set it to the full sample size to forbid any sub-group drill-down.
   mrb <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
   if (length(mrb) == 1L && !is.na(mrb) && mrb > 1) {
     proj$min_reporting_base <- mrb
   }
   # Current wave's order key for the trend axis (twice-yearly / sub-annual
-  # trackers). Carried only when config wave_order is set — annual trackers key
+  # trackers). Carried only when config wave_order is set. Annual trackers key
   # off the parsed 4-digit year and stay byte-identical. Without it the renderer's
   # current-wave x-key re-parses the year, so a 2025 H2 point collides with the
   # 2025 H1 wave (which the published history already keys as 2025).
@@ -215,7 +229,7 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   }
   # Display precision (config DECIMAL PLACES). The crosstab rounds to these for
   # display and tests on the underlying counts; the renderer must use the SAME
-  # places or a tab can show a figure — or a wave-on-wave change — that the
+  # places or a tab can show a figure, or a wave-on-wave change, that the
   # published table cannot reproduce. Significance is unaffected: it never reads
   # these. Defaults match the config template, so an older config is unchanged.
   dp <- function(key, fallback) {
@@ -236,28 +250,32 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     patterns    = isTRUE(config_obj$show_patterns %||% TRUE),
     differences = isTRUE(config_obj$show_differences %||% TRUE),
     tracking    = isTRUE(config_obj$show_tracking %||% TRUE),
-    qualitative = isTRUE(config_obj$show_qualitative %||% TRUE)
+    qualitative = isTRUE(config_obj$show_qualitative %||% TRUE),
+    # Not a tab: the header's Save copy button. It rides here because the
+    # renderer already reads this block, and because switching it off is the
+    # same kind of decision as hiding a tab.
+    save_copy   = isTRUE(config_obj$show_save_copy %||% TRUE)
   )
   # Patterns-tab levers (optional; omitted -> engine defaults, byte-identical).
   # patterns_headline -> island field takeout_headline (the JS contract predates
   # the tab's rename): the apex KPI question codes, in the order given.
-  # patterns_exclude_banners: banner labels/ids the Patterns scan must skip —
+  # patterns_exclude_banners: banner labels/ids the Patterns scan must skip,
   # operational cuts like Interviewer. I() keeps one-element lists as JSON
   # arrays under auto_unbox (the JS expects arrays).
   ph <- .dl_split_csv(config_obj$patterns_headline)
   if (length(ph) > 0) proj$takeout_headline <- I(ph)
   pxb <- .dl_split_csv(config_obj$patterns_exclude_banners)
   if (length(pxb) > 0) proj$patterns_exclude_banners <- I(pxb)
-  # patterns_banner: the POSITIVE selection — the Group overview portrays only
+  # patterns_banner: the POSITIVE selection. The Group overview portrays only
   # the named banner group(s) (label or id; comma-separated for more than one).
   pb <- .dl_split_csv(config_obj$patterns_banner)
   if (length(pb) > 0) proj$patterns_banner <- I(pb)
   # insight_exclude_categories: category names (matched case-insensitively in
   # JS) the Differences tab and the Patterns KeyShare scan treat as cuts, not
-  # outcomes — beyond the built-in demographics/corpographics detection.
+  # outcomes. Beyond the built-in demographics/corpographics detection.
   iec <- .dl_split_csv(config_obj$insight_exclude_categories)
   if (length(iec) > 0) proj$insight_exclude_categories <- I(iec)
-  # Fieldwork caveat for the "how sure" panel (substitution etc.) — plain text,
+  # Fieldwork caveat for the "how sure" panel (substitution etc.): plain text,
   # escaped at render; carried only when non-empty so old islands are unchanged.
   sn <- config_obj$sampling_note
   if (!is.null(sn) && length(sn) >= 1 && !is.na(sn[1]) && nzchar(trimws(sn[1]))) {
@@ -295,13 +313,13 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   client_logo <- encode_logo_data_uri(config_obj$client_logo_path)
   if (!is.null(client_logo)) proj$client_logo <- client_logo
 
-  # Chart colours — carry the configured palette so v2 charts follow the colour
+  # Chart colours. Carry the configured palette so v2 charts follow the colour
   # scheme instead of a flat brand ramp. The resolved 7-colour
   # palette (chart_palette_preset + any per-sentiment overrides) lets the
   # renderer colour categories semantically (negative -> red, positive -> green);
   # chart_series carries configured banner-series colours for multi-column
   # charts; chart_bar_colour is the single-series bar default. get_palette_colours
-  # comes from report_shared.R, sourced alongside the writer — guard so the
+  # comes from report_shared.R, sourced alongside the writer. Guard so the
   # writer still works without it (the renderer then keeps its brand-shade
   # fallback). Only well-formed hex values are carried so template placeholder
   # text (e.g. "Optional") never reaches the renderer.
@@ -318,7 +336,7 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     proj$chart_bar_colour <- trimws(as.character(config_obj$chart_bar_colour))
   }
 
-  # Report metadata — pre-fills the v2 Report tab's Background & method,
+  # Report metadata. Pre-fills the v2 Report tab's Background & method,
   # Executive summary and (read-only) About from the config's Comments sheet
   # and closing section. Background/exec stay
   # editable (analyst can refine); the analyst's edits persist. Carried only
@@ -343,12 +361,12 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   )
   if (any(nzchar(unlist(meta)))) proj$report_meta <- meta
 
-  # Study slides — exhibits authored in the config's AddedSlides sheet (text
+  # Study slides. Exhibits authored in the config's AddedSlides sheet (text
   # blocks, or images resolved and embedded by load_qualitative_sheet). Carried
   # only when the sheet holds usable rows, so a config without one emits a
   # byte-identical island. These are the REPORT AUTHOR's, distinct from the
   # reader's own Added slides, which live in browser state and never come from
-  # here — hence read-only in the app, like the narrative sections.
+  # here. Hence read-only in the app, like the narrative sections.
   slides <- Filter(Negate(is.null), lapply(config_obj$qualitative_slides %||% list(),
     function(s) {
       title <- if (blank(s$title)) "" else trimws(as.character(s$title))
@@ -359,7 +377,7 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
       out <- list(title = title, text = text)
       if (nzchar(img)) {
         out$image <- img
-        # intrinsic pixels, when the format let us read them — the deck export
+        # intrinsic pixels, when the format let us read them. The deck export
         # needs them to place the picture without stretching it
         if (!is.null(s$image_w) && !is.null(s$image_h)) {
           out$w <- as.integer(s$image_w)
@@ -376,7 +394,7 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
 #' Build the columns[] array of the data layer
 #'
 #' One entry per banner column (Total first), in banner_info$internal_keys
-#' order — the order every row.pct/n/sig array is indexed by.
+#' order. The order every row.pct/n/sig array is indexed by.
 #'
 #' @param banner_info Banner structure from create_banner_structure()
 #' @param config_obj Optional config object; when it carries a population_size
@@ -392,7 +410,7 @@ build_dl_columns <- function(banner_info, config_obj = NULL) {
   c2b     <- banner_info$column_to_banner
 
   # Population inputs (all optional). resolve_column_populations() in
-  # report_shared.R is the ONE resolver — the significance engine calls it too,
+  # report_shared.R is the ONE resolver. The significance engine calls it too,
   # so a column's interval and its letters engage the FPC on the same terms.
   frame <- config_obj$population_frame
   col_pops <- resolve_column_populations(banner_info, config_obj)
@@ -410,7 +428,7 @@ build_dl_columns <- function(banner_info, config_obj = NULL) {
   }
 
   # Collect each non-total column's (banner label, subgroup label) so we can
-  # report any Population row that matched no column (a typo / stale label) —
+  # report any Population row that matched no column (a typo / stale label),
   # otherwise an unmatched group silently gets a standard interval.
   col_idents <- list()
 
@@ -477,7 +495,7 @@ build_dl_columns <- function(banner_info, config_obj = NULL) {
               n_ok, nrow(frame)))
   if (any(!matched)) {
     cat("  [WARNING] These Population rows matched NO report column (check spelling",
-        "against the banner labels — they keep a standard interval):\n")
+        "against the banner labels. They keep a standard interval):\n")
     for (r in which(!matched)) {
       ban <- frame$banner[r]
       tag <- if (!is.na(ban) && nzchar(trimws(ban))) sprintf(" [Banner: %s]", ban) else ""
@@ -529,7 +547,7 @@ build_dl_banner_groups <- function(banner_info) {
 #' Ordered by the Selection sheet's CategoryOrder (numeric) then
 #' first-appearance, like the crosstab workbook (workbook_builder.R).
 #' Categories without a CategoryOrder sort after those with one (key = Inf),
-#' keeping appearance order — so a config that sets no order is unchanged.
+#' keeping appearance order, so a config that sets no order is unchanged.
 #'
 #' @param all_results The tabs results list
 #' @return Character vector of category labels, ordered
@@ -596,7 +614,7 @@ build_dl_categories <- function(all_results) {
 
 #' Find a question's row on the structure workbook's Questions sheet
 #'
-#' Looks the code up in survey_structure$questions (exact, case-sensitive —
+#' Looks the code up in survey_structure$questions (exact, case-sensitive,
 #' the same matching prepare_question_data uses). Source of the optional
 #' reader-experience columns (ShortLabel, Scale_Min/Scale_Max,
 #' LinkedOpenQuestion).
@@ -642,7 +660,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
 
   # The quantity that lands in each row's `pct` array. A config that turns the
   # column percentage off (show_percent_column = N) puts ROW percentages or raw
-  # FREQUENCIES there instead — the island used to carry no field naming it, so
+  # FREQUENCIES there instead. The island used to carry no field naming it, so
   # the v2 renderer labelled every one of them "%" and a counts-only table
   # shipped "142%" (review 2026-08, C1). `stat` travels with the values so the
   # renderer, the exports and the Patterns scan know what they are holding.
@@ -674,7 +692,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       "mean")
   }
 
-  # Rows are keyed by (RowLabel, RowSource) — NOT label alone — so a
+  # Rows are keyed by (RowLabel, RowSource), NOT label alone, so a
   # BoxCategory NET sharing its label with a displayed option (e.g. box
   # "Satisfied" grouping options that include "Satisfied") keeps BOTH rows.
   # Unique labels collapsed the pair and silently dropped the NET row from the
@@ -718,7 +736,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   #
   # A "summary" block (standard_processor / numeric_processor) is emitted as the
   # headline statistic (Average | Index | Score), THEN Median / Mode / Std Dev /
-  # Outliers, THEN its Sig. row — so normalize_question_table's forward-fill
+  # Outliers, THEN its Sig. row, so normalize_question_table's forward-fill
   # labels that Sig. row with whichever descriptive row came last. Matching on
   # label alone would hang the mean's letters on Std Dev, which is never tested.
   # The block's sig row tests the headline statistic, so it goes there and
@@ -733,13 +751,13 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       # goes to the mean regardless of which descriptive row the forward-fill
       # labelled it with.
       if (nrow(sel) == 1) return(sig_cells(sel))
-      # SEVERAL sig rows means several mean blocks in one table — an Allocation
+      # SEVERAL sig rows means several mean blocks in one table. An Allocation
       # question emits one Average row per option, each with its own Sig. row.
       # This used to return nothing, so a multi-option allocation showed letters
       # in the Excel workbook and none in the report: the same Excel/report
       # disagreement the D1 work removed for numeric questions (review
-      # 2026-08-21, I-5). Here the forward-filled label IS the discriminator —
-      # each Sig. row inherits its own Average row's label — so match on it.
+      # 2026-08-21, I-5). Here the forward-filled label IS the discriminator,
+      # each Sig. row inherits its own Average row's label, so match on it.
       if (nrow(sel) > 1) return(sig_for(lbl, src, sig_type))
       return(rep("", length(keys)))
     }
@@ -770,7 +788,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     src <- row_src[ri]
     lbl_types <- unique(table$RowType[!is.na(table$RowLabel) &
                                       table$RowLabel == lbl & row_src == src])
-    # Base rows are carried by bases[] — skip them here
+    # Base rows are carried by bases[]: skip them here
     if (length(lbl_types) > 0 && all(lbl_types %in% base_types)) next
 
     cl <- src_class(src)
@@ -786,10 +804,10 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       # Mean rows carry R's letters like every other row (D1: the R engine is
       # the source of truth for every published statistic). Before this they
       # carried none, so the published view showed a bare Average while the
-      # workbook lettered it — and the 80% set-difference below would have read
+      # workbook lettered it, and the 80% set-difference below would have read
       # a 95% result as an 80%-only one.
       # WHICH statistic this mean-kind row is. Without it the reader had only
-      # the label to go on, and recognised nothing but "Standard Deviation" —
+      # the label to go on, and recognised nothing but "Standard Deviation",
       # so under a filter every Median row silently redisplayed the recomputed
       # MEAN (electricity: median R310 published, R563.68 shown to anyone who
       # filtered to men, whose real median is R300). Row TYPE decides now.
@@ -804,7 +822,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     } else {
       pr <- vals_for(lbl, src, primary_stat)
       # A row absent from the question's primary statistic substitutes another
-      # one — so a single row can hold a different quantity from its neighbours
+      # one, so a single row can hold a different quantity from its neighbours
       # (a Frequency-only row sitting among column percentages). Record which,
       # so the renderer labels THAT row for what it is instead of printing a
       # count with a percent sign beside real percentages (C1).
@@ -820,7 +838,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       # Box-category rows (e.g. "Good (9 - 10)", "Top 2 Box") carry a real
       # Frequency in the source, so the "Counts" toggle shows n= for them.
       # Only a true "NET POSITIVE" row is a percentage-point
-      # difference, not a count — it keeps a null n, matching the renderer's
+      # difference, not a count. It keeps a null n, matching the renderer's
       # computed path which also nulls that row's n.
       is_net_diff <- kind == "net" && grepl("^NET POSITIVE", lbl, ignore.case = TRUE)
       crow <- list(
@@ -874,7 +892,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
                else as.character(theme_val[1])
 
   # KeyShare = the analyst-declared favourable share for the Patterns scan
-  # (Selection sheet column; see question_orchestrator.R). "" when undeclared —
+  # (Selection sheet column; see question_orchestrator.R). "" when undeclared,
   # the JS then leaves the question out of the scan.
   key_share_val <- q_result$key_share
   key_share_val <- if (is.null(key_share_val) || length(key_share_val) == 0 || is.na(key_share_val[1])) ""
@@ -893,7 +911,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # BaseFilter / FilterLabel = the question's own audience (Selection sheet).
   # A routed question ("asked only of shops that allow signwriting") reports a
   # smaller base than the survey total, and the base on its own never says WHY
-  # — so the analyst's label travels with the question and the card states the
+  #, so the analyst's label travels with the question and the card states the
   # audience next to the n. FilterLabel wins when both are set; the raw filter
   # expression is the fallback (the same rule the Excel workbook applies).
   # A label with no BaseFilter is legitimate: the routing happened in the
@@ -941,7 +959,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     }
   } else if (is_composite) {
     # A composite index (e.g. Q_Engage / Q_Value) is the mean of rated items, so
-    # it sits on the project's rating scale — but it maps to type "single" and so
+    # it sits on the project's rating scale, but it maps to type "single" and so
     # skips the block above. Give it the index scale_max + thresholds so it
     # appears AND colours on the dashboard like the touchpoints it summarises.
     scale_max   <- as.numeric(config_obj$dashboard_scale_index %||% config_obj$dashboard_scale_mean %||% 10)
@@ -952,7 +970,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # index_scores (display label -> numeric score) lets the renderer recompute
   # means/NPS from microdata under a live filter or custom banner. Omitted
   # (NULL -> absent in JSON) when the structure is not supplied or the type
-  # carries no per-option score — the published mean still shows unfiltered.
+  # carries no per-option score. The published mean still shows unfiltered.
   index_scores <- derive_index_scores(q_result, survey_structure)
   # net_diffs (NET POSITIVE = favourable box - unfavourable box) lets that row
   # recompute too; box NET rows recompute from per-respondent box membership
@@ -988,13 +1006,13 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
 
   # ExcludeFromInsights: the analyst has taken this question out of the
   # Differences tab's findings (Selection sheet column) while leaving it in the
-  # crosstabs — the per-question version of insight_exclude_categories. Emitted
+  # crosstabs. The per-question version of insight_exclude_categories. Emitted
   # only when TRUE so an unflagged config produces a byte-identical island.
   if (isTRUE(q_result$exclude_from_insights)) out$exclude_from_insights <- TRUE
 
   # Composite index (e.g. Q_Engage = the mean of the twelve engagement items).
   # A composite now carries per-respondent scores in the microdata island like
-  # any rated question, so it recomputes live and can be tracked across waves —
+  # any rated question, so it recomputes live and can be tracked across waves,
   # but it is the AVERAGE of questions that are themselves in the report, so the
   # Patterns families that scan every rated question must skip it or it competes
   # with its own components. The renderer cannot tell a composite from an
@@ -1007,7 +1025,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   if (nzchar(filter_label_val)) out$filter_label <- filter_label_val
   if (nzchar(base_filter_val)) out$base_filter <- base_filter_val
 
-  # Provenance: same rule — a config without the columns produces byte-identical
+  # Provenance: same rule. A config without the columns produces byte-identical
   # output, so only a study that declares where its numbers come from gets the
   # source note on its cards.
   if (nzchar(source_val)) out$source <- source_val
@@ -1019,31 +1037,45 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # produces byte-identical output.
   #
   # [[ ]] not $: srow is a tibble, and $ on a tibble column that does not exist
-  # warns ("Unknown or uninitialised column"). Harmless — .dl_chr_cell() treats
-  # NULL as absent — but it fired once per optional column per question, which
+  # warns ("Unknown or uninitialised column"). Harmless, .dl_chr_cell() treats
+  # NULL as absent, but it fired once per optional column per question, which
   # was 150 of the tabs suite's warnings and exactly the noise that buries a
   # real one (review 2026-08-21, M-19).
   srow <- .dl_structure_question_row(out$code, survey_structure)
   if (!is.null(srow)) {
     # E/A2: analyst-authored short label for tight surfaces (cards, chart and
-    # PPTX titles) — replaces mid-word auto-truncation of the question text.
+    # PPTX titles): replaces mid-word auto-truncation of the question text.
     sl <- .dl_chr_cell(srow[["ShortLabel"]])
     if (nzchar(sl)) out$short_label <- sl
 
-    # E: explicit scale bounds — remove scale inference; feed bands, index
+    # E: explicit scale bounds. Remove scale inference; feed bands, index
     # maths and chart axes. Only honoured when BOTH parse as numbers and
     # min < max; a half-filled or inverted pair is ignored (inference stands).
     smin <- suppressWarnings(as.numeric(.dl_chr_cell(srow[["Scale_Min"]])))
     smax <- suppressWarnings(as.numeric(.dl_chr_cell(srow[["Scale_Max"]])))
+    # Scale_Min/Scale_Max describe the ANSWER scale. They may override the
+    # inferred max only where the headline summary statistic sits on that SAME
+    # scale. A Mean/Average does. An Index does too WHENEVER the study's
+    # Index_Weight values are the scale values (the 1-5 Likert case), so the
+    # declaration is honoured there and the index weights stay the authority.
+    #
+    # An NPS Score never does: it is a net promoter balance on -100..+100 no
+    # matter what the underlying question was answered on. Found on ASSA
+    # 28 Aug 2026. Q35_RECOMMEND correctly declared Scale_Max = 10 for its 0-10
+    # answer scale, and that 10 overrode the NPS metric's own 100. The dashboard
+    # printed an NPS of 48 as "48.0/10", a gauge 480% of full and green with it,
+    # and a pinned NPS chart drew its bar on a 0-10 axis. The metric's
+    # denominator is not the question's.
+    nps_score <- identical(metric_type, "Score")
     if (length(smin) == 1L && length(smax) == 1L &&
-        !is.na(smin) && !is.na(smax) && smin < smax) {
+        !is.na(smin) && !is.na(smax) && smin < smax && !nps_score) {
       out$scale_min <- smin
       out$scale_max <- smax   # explicit declaration overrides the inferred max
     }
 
     # E/C2: declared closed->open question link (the open-end that explains
     # this closed question). Emitted here; build_data_layer() validates the
-    # target against the run and drops it — with a console NOTE — when broken.
+    # target against the run and drops it, with a console NOTE, when broken.
     lo <- .dl_chr_cell(srow[["LinkedOpenQuestion"]])
     if (nzchar(lo)) out$linked_open <- lo
   }
@@ -1126,7 +1158,7 @@ build_dl_comments <- function(config_obj) {
 #' (\code{<config>_ai_insights.json}) and shapes it for the v2 data layer: the
 #' per-question callouts the model flagged as noteworthy, the executive summary,
 #' and a human-readable model attribution. Returns NULL when AI insights are
-#' disabled, the sidecar is absent/unreadable, or nothing noteworthy exists — so
+#' disabled, the sidecar is absent/unreadable, or nothing noteworthy exists, so
 #' the \code{ai} key is omitted and AI-free reports stay byte-identical.
 #'
 #' This helper performs file I/O and therefore lives OUTSIDE the pure
@@ -1154,7 +1186,7 @@ build_dl_ai <- function(config_obj) {
     !nzchar(v) || identical(v, "NA")
   }
 
-  # Per-question callouts — only those the model flagged as noteworthy.
+  # Per-question callouts, only those the model flagged as noteworthy.
   callouts <- list()
   qs <- sc$questions %||% list()
   for (code in names(qs)) {
@@ -1184,7 +1216,7 @@ build_dl_ai <- function(config_obj) {
 }
 
 
-#' Build the complete data-agg structure (pure — no file I/O)
+#' Build the complete data-agg structure (pure, no file I/O)
 #'
 #' @param all_results List of question results
 #' @param banner_info Banner structure
@@ -1249,11 +1281,11 @@ build_data_layer <- function(all_results, banner_info, config_obj,
 
 #' Validate declared closed->open question links against the run
 #'
-#' A LinkedOpenQuestion must name a question that exists in this run — either a
+#' A LinkedOpenQuestion must name a question that exists in this run. Either a
 #' processed question (all_results) or one defined on the structure workbook's
 #' Questions sheet (open-ends are typically defined there but not crosstabbed).
-#' A broken code is reported with a console NOTE — never silently, Turas runs
-#' under Shiny — and the \code{linked_open} key is dropped for that question.
+#' A broken code is reported with a console NOTE, never silently, Turas runs
+#' under Shiny, and the \code{linked_open} key is dropped for that question.
 #' Questions without the field pass through untouched (byte-identical).
 #'
 #' @param questions Question list from build_dl_question()
@@ -1274,7 +1306,7 @@ build_data_layer <- function(all_results, banner_info, config_obj,
     if (!(lo %in% known)) {
       cat(sprintf(paste0(
         "  [NOTE] Question %s: LinkedOpenQuestion \"%s\" does not match any question ",
-        "in this run — link omitted. Check the code against the Questions sheet.\n"),
+        "in this run. Link omitted. Check the code against the Questions sheet.\n"),
         questions[[i]]$code, lo))
       questions[[i]]$linked_open <- NULL
     }
@@ -1290,7 +1322,7 @@ build_data_layer <- function(all_results, banner_info, config_obj,
 #' intervals, a clamped "100% of N" coverage note beside a visibly larger
 #' base, and broken significance letters. The population is dropped for that
 #' column (standard intervals apply) and the problem is reported loudly on
-#' the console — Turas runs under Shiny, so silence would hide it.
+#' the console. Turas runs under Shiny, so silence would hide it.
 #'
 #' @param columns Column list from build_dl_columns()
 #' @param questions Question list from build_dl_question() (bases per column)
@@ -1313,7 +1345,7 @@ build_data_layer <- function(all_results, banner_info, config_obj,
       cat("│ Code: CFG_POPULATION_BELOW_BASE\n")
       cat(sprintf("│ Column: %s\n", columns[[i]]$label))
       cat(sprintf(
-        "│ Configured population N = %s is SMALLER than the achieved\n│ base n = %s — impossible, so the finite population\n",
+        "│ Configured population N = %s is SMALLER than the achieved\n│ base n = %s. Impossible, so the finite population\n",
         format(pop, big.mark = ","), format(achieved, big.mark = ",")
       ))
       cat("│ correction is DISABLED for this column (standard intervals).\n")
@@ -1377,7 +1409,7 @@ write_data_layer <- function(all_results, banner_info, config_obj,
                   "Install it with renv::install('jsonlite')."))
   }
   if (is.null(all_results) || !is.list(all_results) || length(all_results) == 0) {
-    return(refuse("DATA_NO_QUESTIONS", "all_results is empty — nothing to emit.",
+    return(refuse("DATA_NO_QUESTIONS", "all_results is empty. Nothing to emit.",
                   "Run the crosstab analysis before writing the data layer."))
   }
   if (is.null(banner_info) || is.null(banner_info$internal_keys) ||

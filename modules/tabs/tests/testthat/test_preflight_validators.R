@@ -449,13 +449,13 @@ test_that("valid colours produce no issues", {
 
 
 # ==============================================================================
-# check_option_values_vs_data — matching against the right coding
+# check_option_values_vs_data. Matching against the right coding
 # (regression: ASSA 2026-08)
 # ==============================================================================
 #
 # The check used to prefer OptionCode, then OptionValue, and never fell back to
 # OptionText. On a Likert whose data holds words and whose Options carry the
-# scale position in OptionValue — an ordinary setup — every real answer read as
+# scale position in OptionValue, an ordinary setup, every real answer read as
 # an "Undefined Data Value" and every option as an "Unused Option Value". One
 # study produced 53 such warnings, loud enough to bury a true one.
 
@@ -545,7 +545,7 @@ test_that("an undefined data value is reported however thin the base", {
           "check_option_values_vs_data not available")
 
   fx <- make_worded_likert()
-  # One respondent — the unused check is gated off, the undefined one is not.
+  # One respondent. The unused check is gated off, the undefined one is not.
   survey_data <- data.frame(Q22 = "Brilliant", stringsAsFactors = FALSE)
 
   result <- check_option_values_vs_data(fx$questions, fx$options, survey_data,

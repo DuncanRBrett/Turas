@@ -72,7 +72,7 @@ run_tabs_gui <- function() {
   
   # === HELPER FUNCTIONS ===
 
-  # Recent projects — persistent storage via shared utilities (max TURAS_MAX_RECENTS)
+  # Recent projects. Persistent storage via shared utilities (max TURAS_MAX_RECENTS)
   load_recent_projects <- function() turas_load_recents("tabs")
   save_recent_projects <- function(r) turas_save_recents("tabs", r)
   add_recent_project   <- function(p) turas_add_recent("tabs", p)
@@ -80,7 +80,7 @@ run_tabs_gui <- function() {
   detect_config_files <- function(project_dir) {
     if (!dir.exists(project_dir)) return(character(0))
     files <- list.files(project_dir, pattern = "\\.xlsx$", full.names = FALSE, ignore.case = TRUE)
-    # A structure workbook is an INPUT to a config, not a runnable config —
+    # A structure workbook is an INPUT to a config, not a runnable config,
     # pre-selecting Survey_Structure.xlsx gave every fresh project a spurious
     # failed run on its first click (review 2026-08, I16).
     files <- files[!grepl("Structure", files, ignore.case = TRUE)]
@@ -410,14 +410,14 @@ run_tabs_gui <- function() {
         assign("config_file", file.path(data$path, current_config), envir = .GlobalEnv)
 
         # The interactive report is the output. (An explicit html_report_v2 =
-        # FALSE in the config still wins — see run_crosstabs, I16.)
+        # FALSE in the config still wins. See run_crosstabs, I16.)
         assign("TURAS_HTML_REPORT_V2", TRUE, envir = .GlobalEnv)
 
         # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",
                isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
-        # Reader report (narrative summary, separate file) — the GUI choice
+        # Reader report (narrative summary, separate file): the GUI choice
         # overrides the config's generate_reader_report setting.
         assign("TURAS_GENERATE_READER_REPORT",
                isTRUE(input$generate_reader_report), envir = .GlobalEnv)
@@ -485,7 +485,7 @@ run_tabs_gui <- function() {
           # Run analysis and capture ALL console output (including validation errors)
           #
           # BOTH streams, not just stdout. sink(type = "output") captures cat()
-          # — the TRS refusal boxes and TURAS WARNING boxes — but NOT anything
+          #, the TRS refusal boxes and TURAS WARNING boxes, but NOT anything
           # emitted through message(), which goes to stderr: the
           # "[TRS PARTIAL] Skipping ..." notices, the run-status line and the
           # checkpoint notes. Those reached only the terminal that launched
@@ -517,7 +517,7 @@ run_tabs_gui <- function() {
         })
 
         # Read captured output. The message stream is appended under its own
-        # heading rather than interleaved — the two sinks buffer independently,
+        # heading rather than interleaved. The two sinks buffer independently,
         # so their true ordering is not recoverable and a fabricated interleave
         # would read as a sequence that never happened.
         captured_output <- readLines(output_file, warn = FALSE)
@@ -585,7 +585,7 @@ run_tabs_gui <- function() {
         # Every global this GUI SETS must be removed here. The three report
         # toggles below were set on each run but never cleared, so a later
         # scripted run_tabs_analysis() in the same R session silently inherited
-        # the last GUI run's choices — AI prose still on, for instance, because
+        # the last GUI run's choices. AI prose still on, for instance, because
         # a previous run ticked it (review 2026-08-21, I-21/M-9).
         for (gvar in c("config_file", "TURAS_PREPARE_DELIVERABLE", "TURAS_CLIENT_NAME",
                        "TURAS_HTML_REPORT_V2", "TURAS_GENERATE_READER_REPORT",

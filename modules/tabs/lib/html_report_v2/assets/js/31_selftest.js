@@ -1,5 +1,5 @@
 /**
- * v2 in-browser self-test — append #selftest to the URL. Mirrors the node
+ * v2 in-browser self-test. Append #selftest to the URL. Mirrors the node
  * suite's core known answers, including live golden spot-checks of the
  * stats engine against the published tables embedded in this very file.
  */
@@ -16,7 +16,7 @@
 
   /** TRUE only when the SACAP prototype dataset is bundled. The `fixture`
    *  cases below assert that dataset's published numbers (question codes,
-   *  titles, wave counts) — on any other project they would crash or fail
+   *  titles, wave counts), on any other project they would crash or fail
    *  and falsely report a healthy stats engine as broken, so run() skips
    *  them unless this exact data is present. */
   selftest2.fixturePresent = function () {
@@ -275,7 +275,7 @@
       { name: "every authored text key the renderer asked for was present", fn: function () {
         // The build refuses on a key that is declared but unauthored, so a miss
         // here means the renderer asked for a key it never declared in
-        // text_manifest.json — caught in development rather than shipping as a
+        // text_manifest.json. Caught in development rather than shipping as a
         // silently empty paragraph. Reports the keys, not a bare count, so the
         // fix is obvious.
         eq(TR.txt.misses(), [], "text keys asked for but not in the catalogue");
@@ -307,8 +307,8 @@
         "</h2><ul>" + results.map(function (r) {
           return "<li>" + (r.skipped ? "○" : r.ok ? "✓" : "✗") + " " +
             TR.fmt.escapeHtml(r.name) +
-            (r.skipped ? " — skipped (fixture not present)" : "") +
-            (r.error ? " — <code>" + TR.fmt.escapeHtml(r.error) + "</code>" : "") + "</li>";
+            (r.skipped ? ", skipped (fixture not present)" : "") +
+            (r.error ? ", <code>" + TR.fmt.escapeHtml(r.error) + "</code>" : "") + "</li>";
         }).join("") + "</ul>";
       var host = document.getElementById("tabhost");
       if (host) host.prepend(panel);

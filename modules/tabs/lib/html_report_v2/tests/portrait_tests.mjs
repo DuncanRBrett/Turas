@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verification gate for the rebuilt Pattern recognition tab (Phase 1 — tension
+ * Verification gate for the rebuilt Pattern recognition tab (Phase 1, tension
  * portraits). Loads the pure engine over a hand-built fixture and asserts the
  * three reader contracts hold: traceable (every shown value is a real cell),
  * commensurable (no cross-scale area), balanced + tension-led (lows AND highs,
@@ -56,7 +56,7 @@ const columns = [
     g("Person-centred", 3.2, 3.9), g("Results oriented", 4.4, 3.7) ] }
 ];
 
-console.log("Pattern recognition rebuild — portrait engine suite:");
+console.log("Pattern recognition rebuild. Portrait engine suite:");
 
 run("portraits: tension groups rank first; flat group excluded", () => {
   const ps = takeout._portraits(columns, null);
@@ -69,7 +69,7 @@ run("portraits: tension groups rank first; flat group excluded", () => {
     "uniform Durban ranks below both tension groups");
 });
 
-run("a portrait is balanced — lows AND highs, with a real counter-spike", () => {
+run("a portrait is balanced. Lows AND highs, with a real counter-spike", () => {
   const ct = takeout._portraits(columns, null).find((p) => p.subject === "Cape Town");
   eq(ct.lean, "strained", "Cape Town leans strained");
   eq(ct.lows.length, 4, "four low questions");
@@ -87,7 +87,7 @@ run("uniform thriving group has no counter-spike, ~zero tension", () => {
   eq(d.tensionScore, 0, "zero tension");
 });
 
-run("traceability — every shown value is a real fixture cell", () => {
+run("traceability. Every shown value is a real fixture cell", () => {
   const ct = takeout._portraits(columns, null).find((p) => p.subject === "Cape Town");
   const cell = columns[0].gaps.find((x) => x.title === "Opinions count");
   const row = ct.lows.find((r) => r.label === "Opinions count");
@@ -95,7 +95,7 @@ run("traceability — every shown value is a real fixture cell", () => {
   eq(row.rest, cell.total, "row baseline == overall cell");          // not a synthetic aggregate
 });
 
-run("peer annotation — Cape Town is bottom on lows, top on its spike", () => {
+run("peer annotation. Cape Town is bottom on lows, top on its spike", () => {
   const ct = takeout._portraits(columns, null).find((p) => p.subject === "Cape Town");
   eq(ct.highs[0].peerTop, true, "top campus on the quality spike (4.6 > 4.0)");
   eq(ct.lows[0].peerBottom, true, "bottom campus on its worst question");
@@ -104,7 +104,7 @@ run("peer annotation — Cape Town is bottom on lows, top on its spike", () => {
 run("peer annotation survives real island gaps, which always carry a code", () => {
   // The fixture above omits `code`, so both the peer index and its lookup fall
   // back to the title and agree by accident. A real island always carries codes
-  // (27f_takeout_data.js pushes q.code onto every gap) — and when the index
+  // (27f_takeout_data.js pushes q.code onto every gap), and when the index
   // keyed on code while the lookup still keyed on title, EVERY lookup missed,
   // peerCount fell to 0, and the "highest of N" / "leads every X" annotations
   // in 27g silently stopped printing. Same fixture, codes attached: the
@@ -117,7 +117,7 @@ run("peer annotation survives real island gaps, which always carry a code", () =
   eq(ct.highs[0].peerCount, 3, "raced against all three campuses, not zero");
 });
 
-run("peer races are per question CODE — a repeated title is not one race", () => {
+run("peer races are per question CODE. A repeated title is not one race", () => {
   // Two DIFFERENT questions sharing a title in a 3-column banner used to merge
   // into a single 6-runner race and print "highest of 6" (review 2026-08, I6).
   const dup = columns.slice(0, 3).map((c) => ({ ...c,
@@ -134,7 +134,7 @@ run("a column missing from the gate is gated OUT, not waved through (M12)", () =
   // FDR family (27f: both arms must clear the floor), so it never reaches
   // groupAgg and has no gate entry. Reading that absence as "no gate present"
   // let the thinnest column in the banner skip the sign test every other column
-  // had to pass — the one column least entitled to a claim.
+  // had to pass. The one column least entitled to a claim.
   const gate = { groups: [
     { banner: "Campus", group: "Cape Town", consistent: true, signP: 0.01, dir: "below" },
     { banner: "Campus", group: "Durban", consistent: true, signP: 0.02, dir: "above" }] };
@@ -143,29 +143,29 @@ run("a column missing from the gate is gated OUT, not waved through (M12)", () =
     "Marketing has no gate entry, so it earns no portrait (got " + named.join(", ") + ")");
   assert(named.indexOf("Cape Town") !== -1, "a gated-and-consistent column still earns one");
   // With no gate at all, nothing is claimed about consistency and the
-  // materiality floor alone decides — unchanged.
+  // materiality floor alone decides. Unchanged.
   assert(takeout._portraits(columns, null).map((p) => p.subject).indexOf("Marketing") !== -1,
     "gate-less runs are untouched");
 });
 
-run("uniform extremeness is a story too — top on nearly everything is not buried", () => {
+run("uniform extremeness is a story too. Top on nearly everything is not buried", () => {
   // A group top on every metric (no counter-spike, zero tension) must still
-  // out-rank a group with only a faint tension — character carries it.
+  // out-rank a group with only a faint tension. Character carries it.
   const star = { column: "Star", group: "Campus", base: 40, gaps: [
     g("Q1", 4.6, 3.7), g("Q2", 4.5, 3.8), g("Q3", 4.7, 3.9), g("Q4", 4.6, 3.8), g("Q5", 4.5, 3.9) ] };
   const faint = { column: "Faint", group: "Campus", base: 40, gaps: [
     g("Q1", 3.6, 3.7), g("Q2", 3.7, 3.8), g("Q3", 4.2, 3.9) ] };   // tiny lean + tiny spike
   const ps = takeout._portraits([star, faint], null);
   eq(ps[0].subject, "Star", "uniform-extreme group leads the faint tension");
-  eq(ps[0].counterSpike, 0, "Star has no tension — it's pure extremeness");
+  eq(ps[0].counterSpike, 0, "Star has no tension. It's pure extremeness");
   assert(ps[0].uniform === true, "flagged uniform");
-  // the sweep is called out on the card's own lean line — the seed sentence no
+  // the sweep is called out on the card's own lean line. The seed sentence no
   // longer repeats the count (it carries the named example instead)
   assert(takeout.ui.leanLine(ps[0]).indexOf("on 5 of 5 areas") !== -1,
     "card calls out the sweep: " + takeout.ui.leanLine(ps[0]));
 });
 
-run("area cards are RETIRED — no weak/strong pattern, engine export gone", () => {
+run("area cards are RETIRED. No weak/strong pattern, engine export gone", () => {
   // Duncan 2026-08-05: the strongest/weakest area race was nuanced past
   // usefulness. The tab is a group-vs-peers overview only.
   assert(takeout._areaPatterns === undefined, "areaPatterns no longer exported");

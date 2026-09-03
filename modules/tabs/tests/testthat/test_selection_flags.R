@@ -6,7 +6,7 @@
 # the Options sheet's ShowInOutput / ExcludeFromIndex used to be read with an
 # exact `== "Y"` test by the engine and with `toupper(...) == "Y"` by several
 # preflight validators. A lowercase "y" passed validation and was then dropped by
-# the engine — a question, a banner, an index row or a response option vanished
+# the engine. A question, a banner, an index row or a response option vanished
 # from the deliverable with nothing printed anywhere.
 #
 # These tests pin the contract: both sheets are canonicalised to "Y"/"N" at their
@@ -99,10 +99,10 @@ flag_survey_structure <- function(show_in_output = c("Y", "Y")) {
 
 
 # ==============================================================================
-# 1. Selection sheet — Include
+# 1. Selection sheet. Include
 # ==============================================================================
 
-context("Y-flag normalisation — Include")
+context("Y-flag normalisation. Include")
 
 test_that("a lowercase Include 'y' keeps the question in the analysis", {
   res <- load_selection(data.frame(
@@ -156,10 +156,10 @@ test_that("engine and preflight now select the same questions", {
 
 
 # ==============================================================================
-# 2. Selection sheet — UseBanner and BannerBoxCategory
+# 2. Selection sheet. UseBanner and BannerBoxCategory
 # ==============================================================================
 
-context("Y-flag normalisation — UseBanner / BannerBoxCategory")
+context("Y-flag normalisation. UseBanner / BannerBoxCategory")
 
 test_that("a lowercase UseBanner 'y' still builds the banner", {
   res <- load_selection(data.frame(
@@ -205,10 +205,10 @@ test_that("blank UseBanner leaves a Total-only banner", {
 
 
 # ==============================================================================
-# 3. Selection sheet — CreateIndex
+# 3. Selection sheet. CreateIndex
 # ==============================================================================
 
-context("Y-flag normalisation — CreateIndex")
+context("Y-flag normalisation. CreateIndex")
 
 test_that("a lowercase CreateIndex 'y' opens the engine's index gate", {
   res <- load_selection(data.frame(
@@ -227,10 +227,10 @@ test_that("a lowercase CreateIndex 'y' opens the engine's index gate", {
 
 
 # ==============================================================================
-# 4. Options sheet — ShowInOutput and ExcludeFromIndex
+# 4. Options sheet. ShowInOutput and ExcludeFromIndex
 # ==============================================================================
 
-context("Y-flag normalisation — Options sheet")
+context("Y-flag normalisation. Options sheet")
 
 test_that("a lowercase ShowInOutput 'y' still shows the option", {
   opts <- prepare_options_columns(flag_survey_structure(c("y", "Y"))$options)
@@ -286,7 +286,7 @@ test_that("a blank ExcludeFromIndex still means N", {
 # 5. Unreadable tokens refuse rather than defaulting to "no"
 # ==============================================================================
 
-context("Y-flag normalisation — unreadable tokens refuse")
+context("Y-flag normalisation. Unreadable tokens refuse")
 
 test_that("an unreadable Include token refuses instead of dropping the question", {
   expect_error(
@@ -320,7 +320,7 @@ test_that("an unreadable ShowInOutput token refuses instead of hiding the option
 
 
 # ==============================================================================
-# 6. normalise_flag_column — unit behaviour
+# 6. normalise_flag_column. Unit behaviour
 # ==============================================================================
 
 context("normalise_flag_column")
@@ -365,16 +365,16 @@ test_that("logical and numeric columns normalise without a detour through text",
 
 
 # ==============================================================================
-# Optional Selection columns — carry-through
+# Optional Selection columns. Carry-through
 # ==============================================================================
 
 context("optional Selection columns survive the loader")
 
 test_that("ExcludeFromInsights is carried through and canonicalised like its siblings", {
   # DIFFERENCES_TAB_SCOPE.md item 4: the per-question Differences opt-out. The
-  # loader's optional-column loop is the first of its five touch points — a
+  # loader's optional-column loop is the first of its five touch points. A
   # column missing from that vector is silently dropped before the orchestrator
-  # ever sees it — and it joins the Y/N gate loop, so "Yes" acts and junk
+  # ever sees it, and it joins the Y/N gate loop, so "Yes" acts and junk
   # refuses instead of quietly meaning "no" (C3).
   res <- load_selection(data.frame(
     QuestionCode = c("Q1", "Q2", "Q3", "Q4"),
@@ -386,7 +386,7 @@ test_that("ExcludeFromInsights is carried through and canonicalised like its sib
   expect_equal(res$selection_df$ExcludeFromInsights, c("Y", "N", "Y", "Y"))
 
   # A config written before the column existed still loads, with every question
-  # free to raise findings — nothing downstream has to test for its absence.
+  # free to raise findings. Nothing downstream has to test for its absence.
   bare <- load_selection(data.frame(
     QuestionCode = "Q1", Include = "Y", stringsAsFactors = FALSE))
   expect_true("ExcludeFromInsights" %in% names(bare$selection_df))

@@ -1,8 +1,8 @@
 /**
  * Authored report text (TR.txt).
  *
- * The interpretive prose in this report — the explainers, legends and method
- * notes — is written by the report author in the Turas Callout Editor, not in
+ * The interpretive prose in this report. The explainers, legends and method
+ * notes. Is written by the report author in the Turas Callout Editor, not in
  * this renderer. It arrives in the #data-text island, keyed, and every place
  * that shows a sentence asks for it here.
  *
@@ -15,7 +15,7 @@
  * author deliberately switched that block off.
  *
  * MARKUP AND ESCAPING
- * Authored text is trusted HTML — it is written by the report author and
+ * Authored text is trusted HTML. It is written by the report author and
  * validated at build time against a small whitelist of balanced, attribute-free
  * inline tags. Placeholder VALUES are not trusted: they come from the data and
  * the project config, so every one is HTML-escaped before it is substituted.
@@ -26,7 +26,7 @@
  * wording the author is entitled to change, and drives the author-only key
  * badges (see shell.textKeys).
  *
- * Pure — no DOM access — so it unit-tests in node like the other 00–06 modules.
+ * Pure, no DOM access, so it unit-tests in node like the other 00–06 modules.
  */
 (function (global) {
   "use strict";
@@ -37,13 +37,13 @@
   var CATALOGUE = {};
 
   /** Keys asked for that the catalogue does not hold. Empty in a report that
-   *  built cleanly — the build refuses on an unauthored key — so this can only
+   *  built cleanly, the build refuses on an unauthored key, so this can only
    *  fill if the renderer asks for a key it never declared in the manifest.
    *  Surfaced by the #selftest case in 31_selftest.js. */
   var MISSES = [];
 
   // Character-for-character fmt.escapeHtml (01_format.js), including the
-  // apostrophe. This module loads before 01_format, so it cannot call it — but
+  // apostrophe. This module loads before 01_format, so it cannot call it, but
   // token values are the SAME values the renderer used to escape itself, and a
   // milder escaper here would change the emitted HTML for any value carrying an
   // apostrophe ("each scale's maximum"). Displayed text would be identical and
@@ -77,7 +77,7 @@
       if (!Object.prototype.hasOwnProperty.call(vars, name)) return whole;
       var v = vars[name];
       // {html: "..."} is the renderer explicitly passing markup it built
-      // itself — an in-sentence control, a formatted figure. Everything else
+      // itself. An in-sentence control, a formatted figure. Everything else
       // is data and is escaped. The distinction is deliberate: it keeps a
       // sentence whole for the author instead of splitting it around a button.
       return (v && typeof v === "object" && typeof v.html === "string")
@@ -116,7 +116,7 @@
     return CATALOGUE;
   };
 
-  /** Keys asked for and not found — for the selftest and for tests. */
+  /** Keys asked for and not found, for the selftest and for tests. */
   txt.misses = function () { return MISSES.slice(); };
 
   /** Every key the catalogue carries. Used by the key-badge overlay. */

@@ -1,4 +1,4 @@
-# Data-centric report v2 — renderer assets
+# Data-centric report v2. Renderer assets
 
 Vendored, dependency-free renderer for the data-centric (v2) tabs report.
 Bundled at run time by `../build_report_v2.R` into a single self-contained
@@ -6,12 +6,12 @@ Bundled at run time by `../build_report_v2.R` into a single self-contained
 
 ## Contents
 
-- `js/` — 30 modules: the 5 shared engine modules (`00_namespace`, `01_format`,
+- `js/`, 30 modules: the 5 shared engine modules (`00_namespace`, `01_format`,
   `03_svg`, `13_zip`, `14_pptx_parts`) load first, then the 25 v2 modules
   (`20_*`–`32_*`, including `28a_ai` for read-only AI insights).
   `bundle_report_v2_js()` enforces that order.
-- `styles.css` — the report stylesheet.
-- `template.html` — the shell with the `{{TITLE}}`, `{{CSS}}`, `{{JS}}` and the
+- `styles.css`. The report stylesheet.
+- `template.html`. The shell with the `{{TITLE}}`, `{{CSS}}`, `{{JS}}` and the
   four data-island tokens (`{{DATA_AGG}}`, `{{DATA_MICRO}}`, `{{DATA_PREV}}`,
   `{{DATA_VERIFY}}`).
 
@@ -33,7 +33,7 @@ prior-wave and verification islands are inlined as `null`. The renderer
 degrades gracefully (no live filtering, no Tracking tab). Those islands arrive
 with the microdata and tracking-config sessions.
 
-Note: appending `#selftest` to an aggregates-only report shows **9/15** — the
+Note: appending `#selftest` to an aggregates-only report shows **9/15**. The
 6 "failures" are the built-in microdata and wave-tracking checks, which have no
 data to run against in this cut (not defects). They return to 15/15 once those
 islands are wired. End-user reports never invoke the selftest panel.

@@ -4,7 +4,7 @@
 # A checkpoint may only be resumed into the run that created it. Before this
 # guard existed, checkpoints carried only results + a timestamp against a
 # constant filename per output folder, so a resume could silently graft one
-# run's numbers into another run's workbook — either after the operator edited
+# run's numbers into another run's workbook. Either after the operator edited
 # the config/data between runs, or across two configs sharing an output folder.
 #
 # These are BEHAVIOURAL tests: they save and load real checkpoint files in a

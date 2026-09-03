@@ -1,11 +1,11 @@
 /**
- * Pattern recognition — data layer. Two responsibilities, kept separate:
+ * Pattern recognition. Data layer. Two responsibilities, kept separate:
  *   GATHER (I/O boundary): assemble the engine's inputs from the already-
  *     computed report objects (views._collectFindings, views.indexQuestions,
  *     wave deltas, TR.conf reliability). Every source is wrapped so a missing
  *     piece (no microdata, no waves) degrades to empty, never crashes the tab.
- *   STATE (curation): the researcher's edits — claim/so-what text per finding,
- *     the apex answer, and vetoes — persisted in localStorage and seeded from
+ *   STATE (curation): the researcher's edits. Claim/so-what text per finding,
+ *     the apex answer, and vetoes. Persisted in localStorage and seeded from
  *     the saved-copy island, exactly like analyst insights (28_insights.js).
  */
 (function (global) {
@@ -27,7 +27,7 @@
     return max > 0 ? max : 100;
   }
 
-  /** Band a touchpoint value strong / moderate / weak — the gauge thresholds
+  /** Band a touchpoint value strong / moderate / weak. The gauge thresholds
    *  when configured, else 75% / 50% of the scale maximum (dashboard parity). */
   function touchpointBand(value, q) {
     if (value === null || value === undefined) return null;
@@ -44,13 +44,13 @@
   takeout._touchpointBand = touchpointBand;
 
   /** A composite index (e.g. Q_Engage / Q_Value): rated touchpoint that maps to
-   *  a "single" type — it summarises the others, so it belongs in the apex. */
+   *  a "single" type. It summarises the others, so it belongs in the apex. */
   function isComposite(q) {
     return q.type !== "scale" && q.type !== "nps" &&
       typeof q.scale_max === "number" && q.scale_max > 0;
   }
 
-  /** Headline-metric keywords (generic across studies — satisfaction, overall
+  /** Headline-metric keywords (generic across studies, satisfaction, overall
    *  opinion, recommendation/NPS). A study can override this entirely by listing
    *  question codes in project.takeout_headline. */
   var HEADLINE_RE = /satisf|overall|recommend|\bnps\b|csat|net promoter/i;
@@ -71,7 +71,7 @@
 
   /**
    * Banner groups the Patterns scan may read. patterns_exclude_banners (config)
-   * names operational cuts — Interviewer, fieldwork admin — that must never
+   * names operational cuts, Interviewer, fieldwork admin, that must never
    * become a client-facing portrait; matched on the banner's label or id,
    * case/space/NBSP-insensitive. No config -> every banner group, as before.
    */
@@ -79,7 +79,7 @@
     var groups = (TR.AGG && TR.AGG.banner_groups) || [];
     var norm = (takeout._shares && takeout._shares._normLabel) ||
       function (s) { return String(s || "").trim().toLowerCase(); };
-    // patterns_banner (config): the POSITIVE selection — the tab is an overview
+    // patterns_banner (config): the POSITIVE selection. The tab is an overview
     // of the named banner group(s) only (Duncan, 2026-08-05: "limited to the
     // selected banner"; comma-separated for a second banner later). Matched on
     // label or id like the exclude lever; validated by patterns_echo, so a
@@ -94,7 +94,7 @@
         return want[norm(g.name)] || want[norm(g.id)];
       });
       if (picked.length) groups = picked;
-      // no match: fall through to the full set — patterns_echo names the typo
+      // no match: fall through to the full set. Patterns_echo names the typo
     }
     var ex = (TR.AGG && TR.AGG.project && TR.AGG.project.patterns_exclude_banners) || [];
     if (!Array.isArray(ex)) ex = [ex];
@@ -119,7 +119,7 @@
 
   /** The favourable top-box: the first NET row that is not a computed difference
    *  (Turas builds NETs favourable-first). Returns {pct,label} or null when the
-   *  question carries no NET (pure mean / NPS / numeric) — then the index shows
+   *  question carries no NET (pure mean / NPS / numeric), then the index shows
    *  alone. Generic: keys off row.kind + net_diffs, never off labels. */
   function topBoxOf(q, model) {
     var rows = q.rows || [];
@@ -130,7 +130,7 @@
       var cell = mrow && mrow.cells[0];
       // A top box is a SHARE of the column. On a counts-only / row-%-only
       // question the same slot holds a headcount or a row percentage, and the
-      // apex printed it as "142% top box" (review 2026-08, C1) — such a
+      // apex printed it as "142% top box" (review 2026-08, C1): such a
       // question simply carries no top-box share.
       if (mrow && !TR.fmt.isColPctStat(mrow.stat)) return null;
       if (cell && cell.pct !== null && cell.pct !== undefined) {
@@ -176,7 +176,7 @@
         scaleMin: 0, scaleMax: touchpointMax(q),
         topBox: topBoxOf(q, model) };
       // A composite is always a headline. A keyword match (satisfaction / overall
-      // / NPS) is a headline ONLY when the question is untagged — if the analyst
+      // / NPS) is a headline ONLY when the question is untagged. If the analyst
       // grouped it into a section/theme, they meant it as a driver, not a headline.
       var tagged = !!(q.category || q.theme);
       var isApex = override ? (override.indexOf(q.code) !== -1)
@@ -196,14 +196,14 @@
   /**
    * For the "group under strain" pattern: every breakout column's INDEX on every
    * rated question, compared to the overall. The index is bidirectional (a low
-   * group reads as low — unlike significance letters, which only ever mark a
+   * group reads as low. Unlike significance letters, which only ever mark a
    * group being higher), so this finds the consistently-lowest segment cleanly
    * and reads intuitively in the evidence. Low-base columns are dropped. Returns
    * [{column, group, gaps:[{title, value, total, scaleMax}]}].
    */
   // Minimum responses to report a subgroup in a census (anonymity / meaning),
   // when the n>=30 sample-error floor doesn't apply. The analyst's disclosure k
-  // (project.min_reporting_base — the SAME key 21d_disclosure.js reads; the data
+  // (project.min_reporting_base, the SAME key 21d_disclosure.js reads; the data
   // layer emits it only when > 1) overrides; 5 is only the no-config fallback.
   var MIN_CENSUS_BASE = 5;
 
@@ -215,7 +215,7 @@
   // The census floor replaces the n>=30 sample floor only when the study
   // genuinely approaches its universe. Merely configuring a population_size
   // activates the FPC for intervals (harmless at any coverage), but "a small
-  // subgroup is most of its own population" is only true near full coverage —
+  // subgroup is most of its own population" is only true near full coverage,
   // on a 5%-coverage customer study, 16 fountain owners are a sample of
   // hundreds, and cells that thin must not seed portraits or the cell family.
   var CENSUS_COVERAGE_MIN = 0.5;
@@ -235,7 +235,7 @@
 
   /** The Patterns tab summarises the PUBLISHED full-sample view (the shell hides
    *  the filter bar on it for exactly that reason), so every model it reads must
-   *  ignore the live audience filter — empty filters, never TR.d2.state.filters.
+   *  ignore the live audience filter. Empty filters, never TR.d2.state.filters.
    *  The microdata scans (cell family, bimodality) already run unmasked. */
   function publishedModel(views, code, banner) {
     if (TR.model && typeof TR.model.forQuestion === "function") {
@@ -248,7 +248,7 @@
   function gatherColumnStrain(views) {
     var proj = (TR.AGG && TR.AGG.project) || {};
     // In a near-census of a small finite population the sample-error floor (30)
-    // is the wrong frame — a small subgroup is most of its own population, so the
+    // is the wrong frame. A small subgroup is most of its own population, so the
     // finite-population correction makes it reliable. reportingFloor() grants the
     // census floor only near full coverage; true samples keep n>=30.
     var floor = reportingFloor(proj);
@@ -269,7 +269,7 @@
           if (!col.base || col.base < floor) return;        // below the reporting floor
           var key = g.name + "::" + col.label;
           var c = cols[key] || (cols[key] = { column: col.label, group: g.name, base: 0, gaps: [] });
-          if (col.base > c.base) c.base = col.base;   // largest base seen — for reliability weighting
+          if (col.base > c.base) c.base = col.base;   // largest base seen, for reliability weighting
           // code rides along so the card can pick out the declared headline
           // questions (patterns_headline) as its absolute anchor
           c.gaps.push({ code: q.code, title: q.title, value: v, total: total,
@@ -326,8 +326,8 @@
     });
     var conf = TR.conf || {};
     var labels = typeof conf.labels === "function" ? conf.labels() : {};
-    // "Census" is the DECLARED design, never inferred from the FPC being active
-    // — a configured universe turns the FPC on at any coverage, but a stratified
+    // "Census" is the DECLARED design, never inferred from the FPC being active,
+    // a configured universe turns the FPC on at any coverage, but a stratified
     // sample of 5% of an outlet universe is not a census and must not be
     // labelled one. (The Patterns reporting floor makes the same distinction
     // via reportingFloor().)
@@ -340,7 +340,7 @@
       // every significance test does; the displayed n stays the respondent count.
       // And when a universe is configured the base is finite-population corrected
       // first, exactly as the crosstab base row (23_render.js) and every interval
-      // (22_model.js ciBase) already do — a census ribbon claiming ±2.7pp while
+      // (22_model.js ciBase) already do. A census ribbon claiming ±2.7pp while
       // the table beneath it says ±0.0pp was the report disagreeing with itself
       // (review 2026-08, M12). fpcBase is a no-op without a usable population or
       // below the coverage floor, so ordinary samples are unchanged.
@@ -381,10 +381,10 @@
    * never drift apart. Four conditions, each with a reason:
    *
    *  - it carries per-respondent scores (nothing to test otherwise);
-   *  - it is not NPS — those are bucketed −100/0/+100 (score_utils.R), which
+   *  - it is not NPS. Those are bucketed −100/0/+100 (score_utils.R), which
    *    swamps gap floors tuned for 1–5 scale points and makes the camp binning
    *    meaningless (production review 2026-08, C4);
-   *  - its scale tops out at 10 — a ±100 metric would clear a small-scale floor
+   *  - its scale tops out at 10. A ±100 metric would clear a small-scale floor
    *    on a trivial wobble, a fabricated "odd one out";
    *  - it is NOT A COMPOSITE. A composite index is the mean of rated questions
    *    that are themselves in the family, so including it would let it compete
@@ -425,16 +425,16 @@
     if (!micro || !micro.scores || !micro.banner_vars) return null;
     var weights = micro.weights || null;
     var proj = (TR.AGG && TR.AGG.project) || {};
-    // Per-arm floor: shared with the strain scan — the census floor only near
+    // Per-arm floor: shared with the strain scan. The census floor only near
     // full coverage (a subgroup is then most of its own population); a true
     // sample keeps n>=30.
     var floor = reportingFloor(proj);
     // The odd-one-out finder (the only consumer of this family) tests each cell's
     // gap against FIXED scale-point floors AND against the group's mean gap across
-    // the family — both only meaningful within one comparable scale band. Restrict
+    // the family. Both only meaningful within one comparable scale band. Restrict
     // the family to small-range rating scales (max ≤ 10): an NPS / score question
-    // (±100) would otherwise clear a floor tuned for 1–5 points on a trivial wobble
-    // — a fabricated "odd one out" — and its ±100 gaps would swamp the mean-gap
+    // (±100) would otherwise clear a floor tuned for 1–5 points on a trivial wobble,
+    // a fabricated "odd one out", and its ±100 gaps would swamp the mean-gap
     // baseline. Strain/thrive keep NPS: they normalise each gap by scaleMax; this
     // family does not.
     var qs = views.indexQuestions().filter(function (q) { return familyEligible(q, micro); });
@@ -444,7 +444,7 @@
     // One family, two sources: rated questions test their per-respondent index
     // scores; KeyShare questions test a 0/100 in-the-share encoding (a Welch t
     // on 0/100 IS the unpooled two-proportion z, in pp; touchpointMax(q)=100
-    // puts the shared variance floor at 10pp). Share cells are marked isPct —
+    // puts the shared variance floor at 10pp). Share cells are marked isPct,
     // the odd-one-out finder skips them (its gap floors are scale-point tuned)
     // but the per-cell BH pass and the per-group sign test read them in full,
     // so share-heavy studies get the same never-cry-wolf gate as rated ones.
@@ -489,7 +489,7 @@
             base: 0, below: 0, above: 0, qn: 0, qnRated: 0, gapSum: 0 });
           if (!ga.qn) order.push(gkey);
           if (gx.length > ga.base) ga.base = gx.length;
-          // qn / below / above feed the per-group sign test — every cell counts.
+          // qn / below / above feed the per-group sign test. Every cell counts.
           // gapSum stays RATED-ONLY (scale points): it becomes meanGap, the
           // odd-one-out baseline, and pp gaps would corrupt its units.
           ga.qn++;
@@ -526,7 +526,7 @@
     if (!micro || !micro.scores) return null;
     var weights = micro.weights || null;
     // Same eligibility as the odd-one-out cell family: rated small-range scales
-    // only. NPS microdata is bucketed −100/0/+100 (score_utils.R) — the binning
+    // only. NPS microdata is bucketed −100/0/+100 (score_utils.R): the binning
     // below dropped the −100 camp and the remaining two lumps read as a
     // fabricated "two camps" split; a 0–100 composite's 101-bin histogram makes
     // the camp gate meaningless. Both stay out (production review 2026-08, C4).
@@ -536,7 +536,7 @@
     var out = qs.map(function (q) {
       var K = touchpointMax(q), sc = micro.scores[q.code];
       // Detect a 0-based scale (NPS 0–10 / raw recommend). "round(v) - 1" assumed
-      // 1..K, so v=0 mapped to idx -1 and the detractor camp was dropped — a real
+      // 1..K, so v=0 mapped to idx -1 and the detractor camp was dropped. A real
       // two-camp 0–10 split then read as unimodal. Keep 1..K exactly as before;
       // for a 0-based scale bin from 0 (K+1 bins) so the bottom camp is counted.
       var lo = Infinity;
@@ -573,7 +573,7 @@
     try { fdr = gatherCellFamily(views); } catch (e) { fdr = null; }
     var bimodal = null;
     try { bimodal = gatherBimodality(views); } catch (e) { bimodal = null; }
-    // Scan scope — what the engine could actually read. The read view words its
+    // Scan scope. What the engine could actually read. The read view words its
     // empty state from this, so "we scanned and found nothing" is only ever
     // claimed when something was scanned (rated indexes or KeyShare shares).
     var ratedCount = 0, shareItems = [];
@@ -583,12 +583,12 @@
     try {
       relItems = relItems.concat(takeout._shares.reliabilityItems(views, shareItems,
         function (code) { return publishedModel(views, code); }));
-    } catch (e) { /* shares module absent — rated items alone stamp reliability */ }
+    } catch (e) { /* shares module absent. Rated items alone stamp reliability */ }
     var reliability = gatherReliability(relItems);
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
     // A POSITIVE banner selection (patterns_banner matched at least one group)
     // means the tab is an overview of THAT banner: every one of its columns
-    // gets a card — portrait, steady or mixed — with no caps and no
+    // gets a card, portrait, steady or mixed, with no caps and no
     // also-scanned overflow (Duncan, 2026-08-05: "it should show every column
     // in a banner").
     var portrayAll = false;
@@ -628,7 +628,7 @@
       var raw = global.localStorage && localStorage.getItem(TR.d2.storeKey(KEY));
       if (raw) saved = JSON.parse(raw) || null;
     } catch (e) { saved = null; /* island-only context */ }
-    // An OWNING localStorage state (_owns — written as the full post-edit state on
+    // An OWNING localStorage state (_owns, written as the full post-edit state on
     // every persist) replaces the island seed entirely, so reset() and deletions
     // survive a reload instead of the tombstone-less merge resurrecting island-
     // baked edits. A legacy state (no marker) merges over the island as before.
@@ -644,7 +644,7 @@
 
   function merge(target, src, expectVersion) {
     if (!src) return;
-    // Ignore curation saved under an older engine — its seeds/subjects no longer
+    // Ignore curation saved under an older engine. Its seeds/subjects no longer
     // match, so honouring it is exactly what produced stale, contradictory cards.
     if (src.version !== expectVersion) return;
     if (src.text) Object.keys(src.text).forEach(function (k) { target.text[k] = src.text[k]; });
@@ -655,13 +655,13 @@
   function persist() {
     try {
       // From the first edit on, the reader's copy owns the full state (island
-      // included, since it was merged into the cache) — see store().
+      // included, since it was merged into the cache): see store().
       store()._owns = true;
       if (global.localStorage) localStorage.setItem(TR.d2.storeKey(KEY), JSON.stringify(store()));
-    } catch (e) { /* storage full/blocked — curation stays in memory */ }
+    } catch (e) { /* storage full/blocked. Curation stays in memory */ }
   }
 
-  /** Curation API. Text is stored raw and escaped on render — never trusted. */
+  /** Curation API. Text is stored raw and escaped on render, never trusted. */
   takeout.state = {
     getText: function (id, field, fallback) {
       var v = store().text[id + "::" + field];

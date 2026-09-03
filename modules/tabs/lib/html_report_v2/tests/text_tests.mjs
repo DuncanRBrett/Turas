@@ -1,4 +1,4 @@
-// TR.txt (02_text.js) — the lookup every authored sentence goes through.
+// TR.txt (02_text.js): the lookup every authored sentence goes through.
 //
 // Covered here because the rest of the suite exercises it only in passing: a
 // regression in escaping or substitution would show up as garbled prose in a
@@ -35,7 +35,7 @@ run("returns the authored string", () => {
   eq(boot({ "a.b": "Hello." }).txt("a.b"), "Hello.", "plain lookup");
 });
 
-run("blank text renders nothing — that is how a block is switched off", () => {
+run("blank text renders nothing. That is how a block is switched off", () => {
   const TR = boot({ "a.b": "" });
   eq(TR.txt("a.b"), "", "blank key returns empty");
   eq(TR.txt.block("a.b"), "", "and leaves no empty element behind");
@@ -55,14 +55,14 @@ run("placeholders substitute", () => {
 
 run("token VALUES are escaped exactly as fmt.escapeHtml would", () => {
   // The renderer used to escape these values itself. Any divergence changes the
-  // emitted HTML of every report — the apostrophe was the one that got away.
+  // emitted HTML of every report. The apostrophe was the one that got away.
   const TR = boot({ "a.b": "{v}" });
   ["each scale's maximum", 'He said "no" & left', "<script>x</script>", "a > b"]
     .forEach((v) => eq(TR.txt("a.b", { v: v }), TR.fmt.escapeHtml(v),
       "escaping matches fmt.escapeHtml for: " + v));
 });
 
-run("{html:} values are inserted raw — markup the renderer built itself", () => {
+run("{html:} values are inserted raw. Markup the renderer built itself", () => {
   eq(boot({ "a.b": "See {link}." }).txt("a.b", { link: { html: "<button>go</button>" } }),
     "See <button>go</button>.", "raw markup survives");
 });
@@ -74,7 +74,7 @@ run("an unsupplied token is left as written, not blanked", () => {
     "the brace group stays");
 });
 
-run("authored markup is NOT escaped — the text is trusted, the values are not", () => {
+run("authored markup is NOT escaped. The text is trusted, the values are not", () => {
   eq(boot({ "a.b": "A <strong>claim</strong>." }).txt("a.b"),
     "A <strong>claim</strong>.", "inline markup renders");
 });

@@ -1,19 +1,19 @@
 /**
- * Tracking Explorer + Visualise — the tracker module's explorer UX on the
+ * Tracking Explorer + Visualise. The tracker module's explorer UX on the
  * published wave history.
  *
  * Explorer = the overview heatmap with two modes:
- *   Questions for segment — every key (or all) tracked metric for one
+ *   Questions for segment. Every key (or all) tracked metric for one
  *     segment, value-in-cell with green/amber/red threshold colouring;
  *     tick several metrics -> Visualise overlays them for that segment.
- *   Segments for question — one metric across Total + every tracked
+ *   Segments for question. One metric across Total + every tracked
  *     segment; tick segments -> Visualise overlays them for that metric.
- * Both share display modes (Absolute / vs Previous / vs Baseline — change
+ * Both share display modes (Absolute / vs Previous / vs Baseline, change
  * cells colour only when significant), sort, wave chips, a legend and
  * Excel export.
  *
  * Visualise = the ticked selection as a multi-series wave chart with CI
- * bands, data-point ANNOTATIONS (click a point to tag it — "Campaign
+ * bands, data-point ANNOTATIONS (click a point to tag it, "Campaign
  * launched"), value-label modes, wave chips, y-axis override, low-base
  * warnings, a colour-keyed series table with optional change rows, an
  * insight note, Excel, and a pin popover that chooses WHICH elements to
@@ -41,7 +41,7 @@
     return trk().metricList("key").map(function (m) {
       return '<option value="' + m.key + '"' +
         (selected === m.key ? " selected" : "") + ">" + m.code + " · " +
-        fmt.escapeHtml(TR.charts.clip(m.short || m.title, 40)) + " — " +
+        fmt.escapeHtml(TR.charts.clip(m.short || m.title, 40)) + ": " +
         fmt.escapeHtml(TR.charts.clip(m.label, 24)) + "</option>";
     }).join("");
   }
@@ -53,7 +53,7 @@
 
   /* ---------------- the Visualise selection model ---------------- */
 
-  /** {metrics: [metricKey], segs: [segId]} — one side is usually 1. */
+  /** {metrics: [metricKey], segs: [segId]}. One side is usually 1. */
   function selection() {
     var s = trk().state;
     if (!s.visSel || !s.visSel.metrics || !s.visSel.metrics.length) {
@@ -81,7 +81,7 @@
 
   function specLabel(spec, sel) {
     if (sel.metrics.length > 1) {
-      // question TEXT, not the code — codes are meaningless on a chart.
+      // question TEXT, not the code. Codes are meaningless on a chart.
       // No display clipping: the chart legend wraps and the table cells
       // wrap; the bound below only guards against degenerate data.
       return TR.charts.clip(spec.metric.title, 300) + " · " +
@@ -94,10 +94,10 @@
   function visTitle(sel, specs) {
     if (sel.metrics.length === 1 && specs.length) {
       var m = specs[0].metric;
-      // Full question text — the header (.heathead h3) wraps, so don't ellipsis
+      // Full question text. The header (.heathead h3) wraps, so don't ellipsis
       // it; the bounds below only guard against degenerate data (matches
       // specLabel). Previously clip(…,60) truncated the question mid-word.
-      return m.code + " · " + TR.charts.clip(m.title, 300) + " — " +
+      return m.code + " · " + TR.charts.clip(m.title, 300) + " · " +
         TR.charts.clip(m.label, 120) +
         (sel.segs.length > 1 ? " · " + sel.segs.length + " segments"
           : " · " + specs[0].segLabel);
@@ -131,7 +131,7 @@
     return '<div class="trklegend"><span class="lg cb-g">strong · ≥70% / 7+ ' +
       "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
       "<span class='lg cb-r'>weak</span>" +
-      TR.txt.block("visualise.legend.significance", null,
+      TR.txt.block("visualise.legend.significance", TR.stats.levelVars(),
                    { tag: "span", cls: "lg" }) +
       "<span class='lg'>⚠ base under " +
       (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
@@ -153,7 +153,7 @@
       var band = trk().band(trk().kpiType(metric), c.value);
       return '<td class="wv cb-' + band + (c.current ? " curw" : "") +
         '" title="base n=' + fmt.base(c.base) +
-        (low ? " — below threshold, excluded from significance" : "") + '">' +
+        (low ? ", below threshold, excluded from significance" : "") + '">' +
         trk().fmtVal(c.value, metric.isMean, metric.q) + (low ? " ⚠" : "") + "</td>";
     }
     var change = display === "prev" ? c.change_prev : c.change_base;
@@ -168,8 +168,9 @@
     var mark = sig ? (dir ? "▲" : "▼") : soft ? (dir ? "△" : "▽") : "";
     return '<td class="wv ' + cls +
       '" title="' + trk().fmtVal(c.value, metric.isMean, metric.q) + " in " + c.year +
-      (sig ? " · significant at 95%"
-        : soft ? " · significant at 80% (not 95%)" : "") + '">' +
+      (sig ? " · significant at " + TR.stats.levelPrimary()
+        : soft ? " · significant at " + TR.stats.levelSecondary() +
+          " (not " + TR.stats.levelPrimary() + ")" : "") + '">' +
       mark + trk().changeText(change, metric.isMean).replace("pp", "") + "</td>";
   }
 
@@ -178,8 +179,9 @@
     return '<td class="wv ' + (last.change_prev >= 0 ? "up" : "down") +
       (last.sig_prev ? " dsig" : last.soft_prev ? " dsig soft" : "") +
       '" title="latest vs previous wave' +
-      (last.sig_prev ? " · significant at 95%"
-        : last.soft_prev ? " · significant at 80% (not 95%)" : "") + '">' +
+      (last.sig_prev ? " · significant at " + TR.stats.levelPrimary()
+        : last.soft_prev ? " · significant at " + TR.stats.levelSecondary() +
+          " (not " + TR.stats.levelPrimary() + ")" : "") + '">' +
       (last.change_prev >= 0 ? "▲ +" : "▼ −") +
       Math.abs(last.change_prev).toFixed(isMean ? 1 : 0) +
       (isMean ? "" : "pp") + "</td>";
@@ -272,7 +274,7 @@
       entries = trk().metricList(scope).map(function (m) {
         var cells = trk().points(m, s.segment);
         return { metric: m, cells: cells, last: lastOf(cells),
-          exportLabel: m.code + " " + m.title + " — " + m.label };
+          exportLabel: m.code + " " + m.title + ": " + m.label };
       }).filter(function (e) { return e.cells.length; });
       exportName = "tracking_" + (s.segment || "total");
       pickAttr = function (e) { return e.metric.key; };
@@ -323,7 +325,7 @@
     if (mode === "qfs") {
       var groups = [
         { title: "Means, indexes & NPS", match: function (m) { return m.isMean; } },
-        { title: "Top-box NETs (% — significance-tested)",
+        { title: "Top-box NETs (%, significance-tested)",
           match: function (m) { return !m.isMean; } }];
       var emitted = 0;
       groups.forEach(function (g) {
@@ -344,7 +346,7 @@
           emitted++;
           html.push(rowHtml(e,
             '<td class="lab"><button class="linklike" data-vis="' + e.metric.key +
-            '" title="' + fmt.escapeHtml(e.metric.title + " — " + e.metric.label) +
+            '" title="' + fmt.escapeHtml(e.metric.title + ": " + e.metric.label) +
             '">' + e.metric.code + " · " +
             fmt.escapeHtml(TR.charts.clip(e.metric.short || e.metric.title, 42)) + "</button>" +
             '<div class="idxd">' + fmt.escapeHtml(TR.charts.clip(e.metric.label, 36)) +
@@ -354,7 +356,7 @@
       if (entries.length > MAX_ROWS) {
         html.push('<tr><td colspan="' + (years.length + 4) +
           '" class="trknote">Showing ' + MAX_ROWS + " of " + entries.length +
-          " rows — search to narrow.</td></tr>");
+          " rows. Search to narrow.</td></tr>");
       }
     } else {
       entries.forEach(function (e) {
@@ -474,9 +476,9 @@
   /* ---------------- Visualise view ---------------- */
 
   /** 95% interval bounds {lo, hi} at a point: Wilson score on the
-   *  published base for proportions (asymmetric — never a plain ±);
+   *  published base for proportions (asymmetric, never a plain ±);
    *  for means, indexes and NPS z·SD/√n with the SD derived from the
-   *  published distribution (TR.trk.sdAt — the same spread that powers
+   *  published distribution (TR.trk.sdAt, the same spread that powers
    *  their sig testing; the single SD source). */
   function ciBounds(metric, segId, point) {
     if (metric.diff) return null;     // score differences: no single base

@@ -7,7 +7,7 @@
 #
 # Bin validation was gated on the rows alone, so every such question went into
 # the bin checks. check_bin_structure() logged a "Missing Bin Columns" Error per
-# question, and check_bin_overlaps() read option_info$Min on an absent column —
+# question, and check_bin_overlaps() read option_info$Min on an absent column,
 # NULL, so as.numeric() gives numeric(0), is.na() gives logical(0), and
 # `logical(0) || logical(0)` evaluates to NA. The `if` then failed with "missing
 # value where TRUE/FALSE needed" and took the entire validation run down with a
@@ -99,13 +99,13 @@ test_that("a Numeric question with label options and no bins validates quietly",
   )
 
   expect_s3_class(result, "data.frame")
-  # Nothing about bins — no "Missing Bin Columns" Error, which would have been
+  # Nothing about bins. No "Missing Bin Columns" Error, which would have been
   # logged once per question across the whole structure.
   expect_false(any(grepl("Bin", result$Issue_Type, ignore.case = TRUE)))
   expect_equal(sum(result$Severity == "Error"), 0)
 })
 
-test_that("real bins are still checked — overlaps are still caught", {
+test_that("real bins are still checked. Overlaps are still caught", {
   # The fix must not buy safety by switching bin validation off.
   el <- create_error_log()
 
@@ -165,7 +165,7 @@ test_that("has_bin_columns and is_usable_bound answer the edge cases", {
 # The same premise in the processor, not just the validator
 # ==============================================================================
 # Validation was only half of it. categorize_numeric_bins() sorted the options by
-# option_info$Min, which is NULL when the column does not exist — and order(NULL)
+# option_info$Min, which is NULL when the column does not exist, and order(NULL)
 # raises "argument 1 is not a vector". That surfaced as
 # DATA_NUMERIC_QUESTION_FAILED naming the question and not the cause, on the
 # first Numeric question whose options were labels.

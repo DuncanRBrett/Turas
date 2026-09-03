@@ -386,7 +386,7 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
 #' For extreme weights, scales by w/mean(w) internally (scale-invariant)
 #' This prevents numeric overflow with very large weights
 #'
-#' V10.11: THE RESULT IS FRACTIONAL — IT IS A STATISTIC, NOT A COUNT.
+#' V10.11: THE RESULT IS FRACTIONAL. IT IS A STATISTIC, NOT A COUNT.
 #' It used to be integer-rounded here, which put the mean test on a different
 #' base from the proportion test on the very same column: proportions ride
 #' \code{calculate_effective_base()} (cell_calculator.R), which has always been
@@ -409,7 +409,7 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
 #' REFERENCE: Kish, L. (1965). Survey Sampling. New York: John Wiley & Sons.
 #'
 #' @param weights Numeric vector, weights
-#' @return Numeric, effective sample size (fractional — round at display time)
+#' @return Numeric, effective sample size (fractional, round at display time)
 #' @export
 #' @examples
 #' eff_n <- calculate_effective_n(weights)
@@ -816,7 +816,7 @@ calculate_weighted_mean <- function(values, weights) {
 #' @param min_base Integer, minimum base size for testing (default: 30)
 #' @param alpha Numeric, significance level (e.g., 0.05 for 95% CI, default: 0.05)
 #' @param fpc_mul1 Numeric, finite population correction multiplier for group 1's
-#'   effective base — \code{apply_fpc(1, n_actual, N)}, so 1 means no correction
+#'   effective base, \code{apply_fpc(1, n_actual, N)}, so 1 means no correction
 #'   and \code{Inf} means a full census. Default 1 keeps every existing caller
 #'   byte-identical.
 #' @param fpc_mul2 Numeric, the same for group 2.
@@ -885,8 +885,8 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
   }
   
   # Determine sample sizes to use. The FPC multiplier applies to whichever base
-  # the test actually rides — the Kish effective base when weighted, the raw base
-  # when not — so weighting and the correction stack instead of competing.
+  # the test actually rides. The Kish effective base when weighted, the raw base
+  # when not, so weighting and the correction stack instead of competing.
   n1 <- if (is_weighted && !is.null(eff_n1)) eff_n1 else base1
   n2 <- if (is_weighted && !is.null(eff_n2)) eff_n2 else base2
   n1 <- .fpc_scale_base(n1, fpc_mul1)
@@ -900,7 +900,7 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
 
-  # Check minimum base size — on the CORRECTED base, so the gate agrees with the
+  # Check minimum base size, on the CORRECTED base, so the gate agrees with the
   # instability flag, which is also raised against the corrected base.
   if (!all(meets_min_base(c(n1, n2), min_base))) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
@@ -959,8 +959,8 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
 #' Apply a finite population correction multiplier to a base
 #'
 #' The multiplier comes from \code{apply_fpc(1, n_actual, N)} in
-#' modules/shared/lib/fpc.R and is 1 whenever the correction does not engage —
-#' no configured universe, or coverage below FPC_MIN_COVERAGE — so a report
+#' modules/shared/lib/fpc.R and is 1 whenever the correction does not engage,
+#' no configured universe, or coverage below FPC_MIN_COVERAGE, so a report
 #' without a Population sheet is byte-identical. \code{Inf} (a full census)
 #' passes straight through for the caller to detect.
 #'
@@ -998,8 +998,8 @@ calculate_t_test_stats <- function(mean1, mean2, var1, var2, eff_n1, eff_n2) {
 
   # A zero or unreadable standard error is not evidence of "no difference"
   # (production review 2026-08, M-B). Returning p = 1 said the test ran and found
-  # nothing, so two columns of all-5s and all-3s — and, since the NPS rows moved
-  # to the +-100 buckets, an all-promoter column against an all-detractor one —
+  # nothing, so two columns of all-5s and all-3s, and, since the NPS rows moved
+  # to the +-100 buckets, an all-promoter column against an all-detractor one,
   # reported the same p as two identical columns.
   #
   # The split:
@@ -1015,7 +1015,7 @@ calculate_t_test_stats <- function(mean1, mean2, var1, var2, eff_n1, eff_n2) {
   #                         null at se == 0).
   #   * se unreadable    -> a variance that could not be computed is a failed
   #                         computation, never a completed test.
-  # No letter appears in any of these cases, before or after — what changes is
+  # No letter appears in any of these cases, before or after. What changes is
   # that the module stops reporting a p-value it did not calculate.
   if (is.na(se) || se == 0) {
     testable <- !is.na(se) && !is.na(mean1) && !is.na(mean2) && mean1 == mean2
@@ -1079,7 +1079,7 @@ calculate_t_test_stats <- function(mean1, mean2, var1, var2, eff_n1, eff_n2) {
 #' @param min_base Integer, minimum base size for testing (default: 30)
 #' @param alpha Numeric, significance level (default: 0.05)
 #' @param fpc_mul1 Numeric, finite population correction multiplier for group 1's
-#'   internally computed effective n — \code{apply_fpc(1, n_actual, N)}. Default
+#'   internally computed effective n, \code{apply_fpc(1, n_actual, N)}. Default
 #'   1 keeps every existing caller byte-identical; \code{Inf} is a full census.
 #' @param fpc_mul2 Numeric, the same for group 2.
 #' @return List with $significant (logical), $p_value (numeric), $higher (logical)
@@ -1148,13 +1148,13 @@ weighted_t_test_means <- function(values1, values2,
   eff_n1 <- .fpc_scale_base(calculate_effective_n(weights1), fpc_mul1)
   eff_n2 <- .fpc_scale_base(calculate_effective_n(weights2), fpc_mul2)
 
-  # A full census column is excluded from pairing — no sampling error to test.
+  # A full census column is excluded from pairing. No sampling error to test.
   # Also keeps Inf out of the Welch df, which would NaN the p-value.
   if (!is.finite(eff_n1) || !is.finite(eff_n2)) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
 
-  # Check minimum base size — on the CORRECTED base (see the z-test).
+  # Check minimum base size, on the CORRECTED base (see the z-test).
   if (!all(meets_min_base(c(eff_n1, eff_n2), min_base))) {
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
@@ -1422,7 +1422,7 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
 
   # Dual-alpha toggle (V10.10). The Bonferroni thresholds are computed PER
   # BANNER GROUP inside the loop below: tests only ever run within a group, and
-  # the regular category rows divide by the group's own choose(k, 2) — a global
+  # the regular category rows divide by the group's own choose(k, 2): a global
   # divisor would letter the NET row at a stricter alpha than the category rows
   # directly above it in the same table.
   dual <- !is.null(alpha2)
@@ -1486,7 +1486,7 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
         fpc_i <- if (is.null(data_i$fpc_mul)) 1 else data_i$fpc_mul
         fpc_j <- if (is.null(data_j$fpc_mul)) 1 else data_j$fpc_mul
 
-        # Test net1: col_i vs col_j — p_value computed once, used for both thresholds
+        # Test net1: col_i vs col_j. P_value computed once, used for both thresholds
         r1 <- weighted_z_test_proportions(
           data_i$count1, data_i$base,
           data_j$count1, data_j$base,
@@ -1590,7 +1590,7 @@ summarize_weights <- function(weights, label = "Weight Summary") {
     cat("  Sum:              ", format(round(sum(nonzero_weights), 1), big.mark = ","), "\n")
   }
   
-  # Display site: n_eff is fractional (V10.11) — round for the console summary.
+  # Display site: n_eff is fractional (V10.11): round for the console summary.
   cat("  Effective n:      ", format(round(eff_n, 0), big.mark = ","), "\n")
   
   if (!is.na(design_effect)) {

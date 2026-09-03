@@ -5,8 +5,8 @@
  * A crosstab config that turns the column percentage off
  * (show_percent_column = N) puts ROW percentages or raw FREQUENCIES into the
  * island's `pct` slot. Nothing named the quantity, so the v2 renderer labelled
- * every one of them "%": a counts-only run shipped "142%", "80% B", "62%" —
- * headcounts with percent signs and significance letters — into the crosstab,
+ * every one of them "%": a counts-only run shipped "142%", "80% B", "62%",
+ * headcounts with percent signs and significance letters. Into the crosstab,
  * the TSV, the PPTX matrix, the data bars and the Wilson intervals. The same
  * fall-through substitutes per ROW, so a Frequency-only row rendered as "37%"
  * beside a genuine 37.0%.
@@ -16,11 +16,11 @@
  *   2. a count prints as a count, in the table, the TSV and the export matrix,
  *      with the unit named on the table's face;
  *   3. nothing that assumes a column proportion is built on a non-column-%
- *      value — no Wilson interval, no data bar, no heat tint;
+ *      value. No Wilson interval, no data bar, no heat tint;
  *   4. a row percentage keeps its "%" but declares its denominator, and gets
  *      no Wilson interval (whose base is the column, not the row);
  *   5. an ordinary column-% report is completely unchanged;
- *   6. a filtered recompute — always a column % — says what the question was
+ *   6. a filtered recompute, always a column %, says what the question was
  *      published as, instead of silently swapping units.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/stat_label_tests.mjs
@@ -62,7 +62,7 @@ function cellValues(html) {
 }
 
 /* ---------------- fixture ---------------- */
-// Total + a Gender banner. `stat` is set per test — absent means the ordinary
+// Total + a Gender banner. `stat` is set per test. Absent means the ordinary
 // column percentage, exactly as every island built before this field existed.
 function loadFixture(stat, rowStats) {
   TR.PREV = null;
@@ -118,7 +118,7 @@ function priorWave() {
   TR.waves.reset();
 }
 
-console.log("Reported-statistic labelling (C1) — suite:");
+console.log("Reported-statistic labelling (C1): suite:");
 
 /* ---------------- 1. the statistic travels ---------------- */
 run("the island's stat reaches the model, question-level and per row", () => {
@@ -148,7 +148,7 @@ run("a counts-only table prints headcounts, not '142%'", () => {
   assert(!/\d%/.test(html.replace(/style="[^"]*"/g, "")),
     "no percent sign anywhere in the rendered counts table");
   assert(html.includes("Counts (n)"), "the corner cell names the unit");
-  // the letters still ride along — R tested the proportions behind the counts
+  // the letters still ride along. R tested the proportions behind the counts
   assert(html.includes("▲B"), "significance letters are unaffected");
 });
 
@@ -156,7 +156,7 @@ run("the export matrix and TSV carry the counts and the unit", () => {
   loadFixture("Frequency");
   const m = TR.model.forQuestion("Q1", "Gender", [], { dual: false });
   const tsv = TR.render.tsv(m);
-  assert(tsv.split("\n")[0].startsWith("Response — Counts (n)"),
+  assert(tsv.split("\n")[0].startsWith("Response: Counts (n)"),
     "the matrix head names the unit, got: " + tsv.split("\n")[0]);
   assert(/\nYes\t142\t80 B\t62/.test(tsv), "counts land unsuffixed in the TSV:\n" + tsv);
   assert(!/142%/.test(tsv), "no '142%' anywhere in the export");
@@ -190,7 +190,7 @@ run("a row-%-only table keeps its '%' but declares the denominator", () => {
   assert(cellValues(html)[0].endsWith("%"), "a row percentage is still a percentage");
   assert(html.includes("Row % (of the row total)"), "the corner cell names the denominator");
   assert(!m.rows[0].cells[1].ci,
-    "no Wilson interval — its base is the column, not the row");
+    "no Wilson interval. Its base is the column, not the row");
 });
 
 /* ---------------- 5. a mixed table: per-row substitution ---------------- */
@@ -242,12 +242,12 @@ run("a filtered recompute of an ordinary question carries no note", () => {
 });
 
 /* ---------------- 8. wave trending and the confidence example ---------------- */
-run("a counts row is not trended — no delta chip, no wave series", () => {
+run("a counts row is not trended. No delta chip, no wave series", () => {
   loadFixture("Frequency");
   priorWave();
   const m = TR.model.forQuestion("Q1", "Gender", [], { dual: false });
   assert(!m.rows[0].waves, "no wave series on a counts row");
-  assert(!m.rows[0].delta, "and no delta — 142 counts vs a 70% prior is not a change");
+  assert(!m.rows[0].delta, "and no delta, 142 counts vs a 70% prior is not a change");
   const html = TR.render.tableHtml(m, { showDeltas: true });
   assert(!html.includes("delta"), "no wave chip rendered");
 });
@@ -287,7 +287,9 @@ function diffsSandbox() {
   box.window = box;
   vm.createContext(box);
   installText(box);
-  for (const file of ["00_namespace.js", "01_format.js", "27_views.js", "27d_diffs.js"]) {
+  // 21_stats supplies the level wording and dualMode() the views read.
+  for (const file of ["00_namespace.js", "01_format.js", "21_stats.js",
+                      "27_views.js", "27d_diffs.js"]) {
     vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), box, { filename: file });
   }
   return box.TR;

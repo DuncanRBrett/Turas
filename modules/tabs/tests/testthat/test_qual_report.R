@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE COMMENT REPORT TESTS (end-to-end wiring)
+# TABS MODULE. QUALITATIVE COMMENT REPORT TESTS (end-to-end wiring)
 # ==============================================================================
 #
 # Drives build_qual_report_v2 end to end: a synthetic coded-comment .xlsx ->
@@ -104,7 +104,7 @@ test_that("build_qual_report_v2 writes a report carrying a non-null DATA_QUAL is
 })
 
 # ==============================================================================
-# CONFIDENTIALITY: html_report_v2_microdata = FALSE is the confidential ship —
+# CONFIDENTIALITY: html_report_v2_microdata = FALSE is the confidential ship,
 # the standalone comment report must honour it exactly as run_crosstabs does
 # (final review 2026-08). The microdata island carries banner_vars, which
 # rejoins per-respondent demographics to every comment via idx in View-Source.
@@ -128,7 +128,7 @@ test_that("html_report_v2_microdata = FALSE keeps microdata out of the comment r
   expect_equal(res$status, "PASS")
 
   html <- paste(readLines(out, warn = FALSE), collapse = "\n")
-  # The island must be the null placeholder — "banner_vars" appears in the
+  # The island must be the null placeholder, "banner_vars" appears in the
   # bundled renderer source, so the check has to read the island itself.
   expect_equal(extract_micro_island(html), "null")
 })
@@ -202,7 +202,7 @@ test_that("a configured run writes the reader-key sidecar and ships rids in the 
     expect_match(token, "^[0-9a-f]{16}$")
     expect_true(grepl(paste0('"rid":"', token, '"'), html, fixed = TRUE))
   }
-  # The sidecar stays in the project folder — the report never names or embeds it.
+  # The sidecar stays in the project folder. The report never names or embeds it.
   expect_false(grepl("reader_keys", html, fixed = TRUE))
 
   # Rebuilding the same project reuses the tokens (that is the whole point).

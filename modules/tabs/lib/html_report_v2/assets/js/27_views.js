@@ -1,5 +1,5 @@
 /**
- * v2 analytical views — Dashboard (gauges + heatmap with its own banner
+ * v2 analytical views. Dashboard (gauges + heatmap with its own banner
  * picker, Excel export and pin-to-story) and Differences (banner-
  * filterable, sortable, names what each cell beats). The Tracking view
  * lives in 27t_tracking.js and shares this module's helpers.
@@ -84,7 +84,7 @@
     // scale / nps questions, PLUS composite indices (e.g. Q_Engage / Q_Value)
     // which map to type "single" but carry a scale_max. Numeric open-counts
     // (type "numeric", e.g. "hours lost") also have a mean but no scale maximum,
-    // so colour-banding them as "% of scale" is meaningless — excluded.
+    // so colour-banding them as "% of scale" is meaningless. Excluded.
     return TR.AGG.questions.filter(function (q) {
       if (!q.rows.some(function (r) { return r.kind === "mean"; })) return false;
       if (q.type === "scale" || q.type === "nps") return true;
@@ -110,7 +110,7 @@
 
   /**
    * The dashboard's plain-language precision chip: worst-case ±pp at the
-   * overall base vs the smallest column of the heatmap banner — all
+   * overall base vs the smallest column of the heatmap banner. All
    * computed live from the report's own bases.
    */
   function moeChipHtml(qs, heatModels) {
@@ -133,7 +133,7 @@
     });
     if (!overall) return "";
     // After the first viewed session the precision sentence simply drops away on the
-    // dashboard — the header's "ⓘ How to read" button already reopens the same legend,
+    // dashboard. The header's "ⓘ How to read" button already reopens the same legend,
     // so a second "how to read this report" link here would just duplicate it.
     if (TR.reader && TR.reader.peCollapsed()) {
       return "";
@@ -142,12 +142,12 @@
       ", overall percentages are stable to about ±" +
       TR.conf.maxMoePct(overall).toFixed(1) + "pp";
     if (smallest) {
-      bits += "; smaller sample subsets are more volatile — " + fmt.escapeHtml(smallest.label) +
+      bits += "; smaller sample subsets are more volatile, " + fmt.escapeHtml(smallest.label) +
         " (n=" + fmt.base(smallest.n) + ") about ±" +
         TR.conf.maxMoePct(smallest.n).toFixed(1) + "pp";
     }
     return '<p class="moechip" title="Worst-case 95% ' +
-      labels.precision_term + " at each base — see “How sure can I be of " +
+      labels.precision_term + " at each base. See “How sure can I be of " +
       'these numbers?” on the Crosstabs tab">' +
       labels.moe_name + " (" + labels.moe_abbrev + "): " + bits + ".</p>";
   }
@@ -170,7 +170,7 @@
 
   /* ---------------- Dashboard ---------------- */
 
-  /** "▲▼ chips show change vs <prev wave>. " — named from the tracking
+  /** "▲▼ chips show change vs <prev wave>. ". Named from the tracking
    *  island (never a hard-coded year), and only when at least one gauge
    *  actually carries a delta chip (non-tracking / filtered reports: ""). */
   function deltaIntro(hasDelta) {
@@ -182,7 +182,7 @@
   views._deltaIntro = deltaIntro;   // exposed for the node gate
 
   /**
-   * A1 fixed card anatomy — one gauge card, fixed slots: score top-left ·
+   * A1 fixed card anatomy. One gauge card, fixed slots: score top-left ·
    * question code top-right (structural flex head, nothing absolute over the
    * score) · band bar · title clamped to 2 lines · ONE meta row at the foot
    * holding the Δ chip + 💬 comments pill + 📌 pin. Exposed for the node gate.
@@ -198,7 +198,7 @@
       ? TR.render.sparkline(pts, true, { w: 212, h: 28 }) : "";
     var short = TR.d2.shortLabel(q);
     // B3: analyst insight line (headline / marked insight first sentence) sits
-    // in the TITLE AREA above the question line — one CSS-clamped line, so the
+    // in the TITLE AREA above the question line. One CSS-clamped line, so the
     // A1 slots stay overlap-proof. Absent -> nothing (never auto-generated).
     var ins = (TR.reader && TR.reader.insightTitle) ? TR.reader.insightTitle(q) : null;
     var insHtml = ins
@@ -206,14 +206,14 @@
         (ins.source === "insight" ? ' <span class="gi-src">analyst insight</span>' : "") +
         "</span>"
       : "";
-    // The base sits in the meta row — muted, and amber when below the reporting
+    // The base sits in the meta row. Muted, and amber when below the reporting
     // threshold, so thin (often conditional) touchpoints flag themselves.
     var base = (model.columns && model.columns[0]) ? model.columns[0].base : null;
     var lowBase = (TR.AGG && TR.AGG.project && TR.AGG.project.low_base_threshold) || 30;
     var nHtml = (base !== null && base !== undefined)
       ? '<span class="gn' + (base < lowBase ? " low" : "") + '"' +
         (base < lowBase ? ' title="Base below the reporting threshold (' + lowBase +
-          ") — read with caution\"" : "") + ">n=" + fmt.base(base) + "</span>"
+          "): read with caution\"" : "") + ">n=" + fmt.base(base) + "</span>"
       : "";
     return '<div class="gauge-wrap" data-snap-card style="--gc:' + gc + '">' +
       '<button class="gauge" data-goq="' + q.code + '" title="' +
@@ -231,7 +231,7 @@
       '<span class="gmeta">' + nHtml +
       (row ? TR.render.deltaChip(row.delta) : "") +
       '<button class="snap-pin" data-snap-pin data-snap-source="dashboard" data-snap-title="' +
-      fmt.escapeHtml(q.code + " — " + short) + '" data-snap-context="' +
+      fmt.escapeHtml(q.code + ": " + short) + '" data-snap-context="' +
       fmt.escapeHtml((q.category || "") + " · index") +
       '" title="Pin this card to the story" aria-label="Pin card to story">📌</button>' +
       "</span></div>";
@@ -256,7 +256,7 @@
     var html = ['<div class="page"><div class="dash-intro card">' +
       "<h2>Experience dashboard</h2><p>Index scores for every rated touchpoint" +
       ": " + bandLegend(qs) + ". " +
-      (TR.d2.filtersActive() ? "<strong>Filtered audience — recomputed live.</strong> " : "") +
+      (TR.d2.filtersActive() ? "<strong>Filtered audience. Recomputed live.</strong> " : "") +
       deltaIntro(hasDelta) + "Click any card or cell to open the full table.</p>" +
       moeChipHtml(qs, heatModels) + "</div>"];
 
@@ -307,7 +307,7 @@
     qs.forEach(function (q) {
       var row = meanRow(models[q.code]);
       if (!row) return;
-      rows.push([q.code + " — " + q.title].concat(row.cells.map(function (c) {
+      rows.push([q.code + ": " + q.title].concat(row.cells.map(function (c) {
         return c.mean === null ? "" : Math.round(c.mean * 10) / 10;
       })));
     });
@@ -329,7 +329,7 @@
       '<button data-act="heat-pin" class="primary">📌 Pin to story</button></span></div>' +
       "<div class='heatwrap'><table class='heatgrid'><thead><tr><th></th>"];
     first.columns.forEach(function (col) {
-      html.push("<th>" + fmt.escapeHtml(col.label) + "</th>");   // full banner header — wraps, never ellipsed
+      html.push("<th>" + fmt.escapeHtml(col.label) + "</th>");   // full banner header. Wraps, never ellipsed
     });
     html.push("</tr></thead><tbody>");
     qs.forEach(function (q) {
@@ -338,7 +338,7 @@
       if (!row) return;
       html.push('<tr><td class="lab"><button class="linklike" data-goq="' + q.code +
         '" title="' + fmt.escapeHtml(q.title) + '">' +
-        fmt.escapeHtml(TR.d2.shortLabel(q)) + "</button></td>");   // full question label — wraps in the 280px lab column
+        fmt.escapeHtml(TR.d2.shortLabel(q)) + "</button></td>");   // full question label. Wraps in the 280px lab column
       var max = scoreMax(q);
       row.cells.forEach(function (cell, i) {
         var v = cell.mean;

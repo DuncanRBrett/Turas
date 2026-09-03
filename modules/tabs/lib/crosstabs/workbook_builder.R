@@ -516,7 +516,7 @@ write_crosstabs_sheet <- function(wb, all_results, banner_info, config_obj, styl
   )
 
   if (has_categories) {
-    # Determine category order — use CategoryOrder when available, else first-occurrence order
+    # Determine category order. Use CategoryOrder when available, else first-occurrence order
     seen_cats <- character(0)
     cat_order <- character(0)
     cat_sort_key <- numeric(0)
@@ -562,7 +562,7 @@ write_crosstabs_sheet <- function(wb, all_results, banner_info, config_obj, styl
       }
     }
   } else {
-    # No categories — write flat (original behaviour)
+    # No categories. Write flat (original behaviour)
     for (q_code in q_codes) {
       question_results <- all_results[[q_code]]
       current_row <- write_single_question(wb, "Crosstabs", question_results, q_code,

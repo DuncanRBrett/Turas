@@ -3,10 +3,10 @@
 # ==============================================================================
 #
 # Tests for numeric question processing:
-#   1. detect_outliers_iqr() — IQR outlier detection
-#   2. categorize_numeric_bins() — bin assignment
-#   3. calculate_numeric_statistics() — mean, SD, median, mode
-#   4. process_numeric_question() — end-to-end numeric processing
+#   1. detect_outliers_iqr(): IQR outlier detection
+#   2. categorize_numeric_bins(): bin assignment
+#   3. calculate_numeric_statistics(): mean, SD, median, mode
+#   4. process_numeric_question(): end-to-end numeric processing
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_numeric_processor.R")
@@ -175,10 +175,10 @@ test_that("handles NA values in input", {
 
 
 # ==============================================================================
-# 3. calculate_numeric_statistics — unweighted
+# 3. calculate_numeric_statistics. Unweighted
 # ==============================================================================
 
-context("calculate_numeric_statistics — unweighted")
+context("calculate_numeric_statistics. Unweighted")
 
 test_that("calculates mean correctly", {
   data <- data.frame(Q1 = c(10, 20, 30, 40, 50))
@@ -243,10 +243,10 @@ test_that("handles all NA values", {
 
 
 # ==============================================================================
-# 4. calculate_numeric_statistics — weighted
+# 4. calculate_numeric_statistics. Weighted
 # ==============================================================================
 
-context("calculate_numeric_statistics — weighted")
+context("calculate_numeric_statistics. Weighted")
 
 test_that("calculates weighted mean correctly", {
   data <- data.frame(Q1 = c(10, 20, 30))

@@ -5,12 +5,12 @@ editor_options:
     wrap: 72
 ---
 
-# Finite Population Correction (FPC) — design & build plan
+# Finite Population Correction (FPC): design & build plan
 
-**Status:** Built 2026-06-26 — all phases A–G complete; awaiting Duncan's launch_turas regen + eyeball on a real population config (SACS). **Owner:** Duncan (decisions locked 2026-06-26) **Trigger:** Census / full-invite surveys (e.g. SACS, student surveys) where the universe is small and response is partial. Two recurring pains:
+**Status:** Built 2026-06-26. All phases A–G complete; awaiting Duncan's launch_turas regen + eyeball on a real population config (SACS). **Owner:** Duncan (decisions locked 2026-06-26) **Trigger:** Census / full-invite surveys (e.g. SACS, student surveys) where the universe is small and response is partial. Two recurring pains:
 
 1.  A whole-population invite that gets \~30% response still shows intervals as wide as an infinite-population random sample, and small subgroups get flagged "unstable" even though they cover most of their (small) population.
-2.  A small cohort (e.g. a Masters course, n≈20) that is a **75% response of a 27-person universe** is a near-complete count, not a fragile sample — but it is currently treated as a tiny, unstable sample.
+2.  A small cohort (e.g. a Masters course, n≈20) that is a **75% response of a 27-person universe** is a near-complete count, not a fragile sample, but it is currently treated as a tiny, unstable sample.
 
 ## The statistics
 
@@ -35,13 +35,13 @@ n_eff_fpc = n_eff_kish * (N - 1) / (N - n_actual)
 ## Decisions (locked)
 
 1.  **Input model: per-subgroup population frame + total.** A study-level total universe plus optional per-column cohort sizes, so a small high-response column inside a low-response report is corrected on its *own* coverage.
-2.  **FPC flows into significance too** (not just displayed intervals) — flags and intervals stay consistent. Opt-in: unconfigured ⇒ unchanged.
+2.  **FPC flows into significance too** (not just displayed intervals): flags and intervals stay consistent. Opt-in: unconfigured ⇒ unchanged.
 3.  **Coverage-aware small-base flag.** The "unstable" warning fires on the **FPC-adjusted effective base** vs the threshold, not raw `n`; where a base is suppressed-from-warning we annotate `n of N (xx%)`. Unconfigured ⇒ identical.
 
 ## Config surface
 
-- `population_size` — Settings field: total universe (for the Total column FPC and the overall coverage/response rate). Optional.
-- **`Population` sheet** (new, optional) — one row per banner subgroup: \| Banner \| Group \| Population \| \|---\|---\|---\| \| Study level \| Masters \| 27 \| \| Study level \| Honours \| 40 \|
+- `population_size`. Settings field: total universe (for the Total column FPC and the overall coverage/response rate). Optional.
+- **`Population` sheet** (new, optional): one row per banner subgroup: \| Banner \| Group \| Population \| \|---\|---\|---\| \| Study level \| Masters \| 27 \| \| Study level \| Honours \| 40 \|
   - `Banner` = banner question/label the column belongs to (optional; blank = match by `Group` value across any banner).
   - `Group` = the subgroup/column label as shown in the report.
   - `Population` = integer N for that subgroup.
@@ -49,16 +49,16 @@ n_eff_fpc = n_eff_kish * (N - 1) / (N - n_actual)
 
 ## Build phases
 
-- **A. R config** — read `population_size`; load optional `Population` sheet to `config_obj$population_frame`; register keys. *(crosstabs_config.R, data_loader.R)*
+- **A. R config**. Read `population_size`; load optional `Population` sheet to `config_obj$population_frame`; register keys. *(crosstabs_config.R, data_loader.R)*
 
-- **B. R writer** — `build_dl_project` emits `population_size` + total `coverage`; `build_dl_columns` resolves each column's `population` + `coverage` from the frame and emits them. *(data_layer_writer.R)* + testthat.
+- **B. R writer**, `build_dl_project` emits `population_size` + total `coverage`; `build_dl_columns` resolves each column's `population` + `coverage` from the frame and emits them. *(data_layer_writer.R)* + testthat.
 
-- **C. R confidence helper (source of truth)** — `calculate_fpc_factor(n, N)` and `apply_fpc(n_eff, n_actual, N)` in 03_study_level.R, with known-answer testthat. The JS ports these verbatim and the gate asserts agreement.
+- **C. R confidence helper (source of truth)**, `calculate_fpc_factor(n, N)` and `apply_fpc(n_eff, n_actual, N)` in 03_study_level.R, with known-answer testthat. The JS ports these verbatim and the gate asserts agreement.
 
-- **D. JS FPC (prototype src/js)** — implemented as an **overlay on the published default view** (the report of record), NOT a recompute, so the shown numbers never move:
+- **D. JS FPC (prototype src/js)**. Implemented as an **overlay on the published default view** (the report of record), NOT a recompute, so the shown numbers never move:
 
   - `21c_confidence.js`: `conf.fpcMul/fpcBase/coverage/reportHasPopulation/ responseRate`; design sentence gains the coverage + non-response caveat.
-  - `22_model.js`: `publishedModel` carries each column's `population`, `coverage` and `ciBase` (the FPC effective base); `attachIntervals` widths read `ciBase` (so intervals narrow — `Infinity` ⇒ zero width); a new `applyFpcSignificance` post-pass re-letters significance from the **published %s and `ciBase`** (never microdata) for **unweighted** population reports — weighted designs keep standard significance (their design effect isn't in the published layer) but still get FPC intervals. FPC is suppressed under a live filter / custom banner (`fpcDefault = !custom && !filtered && reportHasPopulation`).
+  - `22_model.js`: `publishedModel` carries each column's `population`, `coverage` and `ciBase` (the FPC effective base); `attachIntervals` widths read `ciBase` (so intervals narrow, `Infinity` ⇒ zero width); a new `applyFpcSignificance` post-pass re-letters significance from the **published %s and `ciBase`** (never microdata) for **unweighted** population reports. Weighted designs keep standard significance (their design effect isn't in the published layer) but still get FPC intervals. FPC is suppressed under a live filter / custom banner (`fpcDefault = !custom && !filtered && reportHasPopulation`).
   - `23_render.js`: base row shows `xx% of N` and sizes the worst-case margin on `ciBase`; low-base flag is coverage-aware (set from `ciBase < threshold`).
   - `25_cards.js`: a population default view is badged `PUBLISHED · FPC`.
   - writer emits `project.weighted` so the JS can gate the sig re-lettering.
@@ -68,13 +68,13 @@ n_eff_fpc = n_eff_kish * (N - 1) / (N - n_actual)
 
 - **E. Sync** prototype `src/js` → production `modules/tabs/lib/html_report_v2/assets/js` (byte-identical).
 
-- **F. Template + docs** — `generate_config_templates.R` (population_size field + Population sheet w/ guidance); CHANGELOG.
+- **F. Template + docs**, `generate_config_templates.R` (population_size field + Population sheet w/ guidance); CHANGELOG.
 
-- **G. Verify** — full tabs testthat + `run_tests_v2.mjs` green; confirm unconfigured reports are byte-identical.
+- **G. Verify**. Full tabs testthat + `run_tests_v2.mjs` green; confirm unconfigured reports are byte-identical.
 
 ## Out of scope (follow-up)
 
-- The classic (opt-in) HTML/Excel crosstab significance engine is **not** wired to FPC in this pass — only the v2 interactive report (the default). The R helper in phase C gives that path a tested function to adopt later.
+- The classic (opt-in) HTML/Excel crosstab significance engine is **not** wired to FPC in this pass, only the v2 interactive report (the default). The R helper in phase C gives that path a tested function to adopt later.
 - FPC under arbitrary live filters / custom banners (unknown sub-population N): intentionally reverts to standard intervals.
 - **Weighted** population reports get FPC intervals + coverage-aware low-base flags but keep standard significance (the published layer carries only the unweighted base, not the Kish effective base needed to combine the design effect with FPC). Census designs are unweighted in practice. To extend: emit a per-column effective base in the data layer and feed it as the pre-FPC base.
 
@@ -87,5 +87,5 @@ n_eff_fpc = n_eff_kish * (N - 1) / (N - n_actual)
 ## How to use (operator)
 
 1.  Settings → `population_size` = total invited universe (e.g. all students).
-2.  Optional `Population` sheet: one row per banner column — `Group` (label as shown), `Population` (cohort size), optional `Banner` (the banner question).
+2.  Optional `Population` sheet: one row per banner column, `Group` (label as shown), `Population` (cohort size), optional `Banner` (the banner question).
 3.  Regenerate the v2 report. Intervals narrow with coverage; small high-response groups stop being flagged unstable; the design note states the response rate and the non-response caveat.

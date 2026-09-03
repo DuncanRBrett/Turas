@@ -1,5 +1,5 @@
 /**
- * v2 stats engine — recomputes any table from the embedded respondent-level
+ * v2 stats engine. Recomputes any table from the embedded respondent-level
  * microdata: filter masks, column memberships (built-in or custom banners),
  * weighted column %, NETs (sums, unions, differences), index means, and
  * two-proportion z-tests / Welch t-tests for significance letters.
@@ -46,7 +46,7 @@
   stats.zCrit = function (alpha) { return -qnorm(alpha / 2); };
 
   /** The project's configured primary / secondary (dual-sig) levels, with the
-   *  conventional 0.05 / 0.20 defaults — the same defaults the R engine uses,
+   *  conventional 0.05 / 0.20 defaults. The same defaults the R engine uses,
    *  so a report with no explicit config behaves exactly as before. */
   function projAlpha() {
     var p = TR.AGG && TR.AGG.project;
@@ -59,28 +59,85 @@
     var lo = projAlpha();
     return (a > lo && a < 1) ? a : 0.20;
   }
-  // The configured levels themselves — the reader layer words its plain-language
+  // The configured levels themselves. The reader layer words its plain-language
   // sentences from these ("the report's 95% level"), never a hard-coded 95/80.
   stats.alphaPrimary = projAlpha;
   stats.alphaSecondary = projAlpha2;
+  /**
+   * How a level is WORDED. Every user-visible "95%" / "80%" in the report. The
+   * legends, the mode selectors, the tooltips and the authored prose's
+   * {alpha_pct}/{alpha2_pct} tokens. Comes from here, so a project on
+   * alpha_secondary = 0.1 reads "90%" everywhere instead of being told 80%
+   * while the engine tests at 90 (defect 2026-08-30).
+   *
+   * Confidence INTERVALS are a separate, deliberately fixed 95% convention
+   * (21c_confidence.js, Z95_EXACT): those strings are not level wording and
+   * must not be routed through here.
+   */
+  stats.levelText = function (alpha) { return Math.round((1 - alpha) * 100) + "%"; };
+  /** The same level as odds ("one in 20" at 0.05, "one in 5" at 0.20). The
+   *  explainer says both, and interpolating only the percentage would leave it
+   *  claiming "at 90% it is less than one in 5". */
+  stats.levelOdds = function (alpha) { return String(Math.round(1 / alpha)); };
+  stats.levelPrimary = function () { return stats.levelText(projAlpha()); };
+  stats.levelSecondary = function () { return stats.levelText(projAlpha2()); };
+  stats.oddsPrimary = function () { return stats.levelOdds(projAlpha()); };
+  stats.oddsSecondary = function () { return stats.levelOdds(projAlpha2()); };
+  /** The four level tokens every authored sentence about significance takes.
+   *  One object so a call site cannot supply half of them and ship a literal
+   *  "{alpha2_pct}" to the reader. */
+  stats.levelVars = function () {
+    return {
+      alpha_pct: stats.levelPrimary(),
+      alpha2_pct: stats.levelSecondary(),
+      alpha_odds: stats.oddsPrimary(),
+      alpha2_odds: stats.oddsSecondary()
+    };
+  };
+  /**
+   * Does this study HAVE a secondary level at all?
+   *
+   * Blank alpha_secondary switches dual significance off: the R engine then
+   * emits no Sig.2 row and no sig2 letters. alpha_secondary in the island
+   * always carries a number (it falls back to 0.20), so it cannot answer this,
+   * the writer sends `dual_significance: false` instead, and only when the
+   * feature is off, which keeps every island from a dual study byte-identical.
+   * An older island has no flag and behaves exactly as it did before.
+   *
+   * Everything that offers, enters or computes the secondary level is gated on
+   * this. Without it the report offered a "95% + 80%" option on a study that
+   * switched the level off, and choosing it made 22_model.js recompute 80%
+   * letters from the published counts. Letters the Excel crosstab does not
+   * have (2026-08-31).
+   */
+  stats.hasSecondary = function () {
+    var p = TR.AGG && TR.AGG.project;
+    return !(p && p.dual_significance === false);
+  };
+  /** The report's live dual-significance state: the reader asked for it AND the
+   *  study has a secondary level. The one place anything should ask. */
+  stats.dualMode = function () {
+    return stats.hasSecondary() && TR.d2 && TR.d2.state &&
+      TR.d2.state.sigMode === "dual";
+  };
   /** Bonferroni is the R engine's default; only an explicit false disables it. */
   stats.bonferroni = function () {
     var p = TR.AGG && TR.AGG.project;
     return !(p && p.bonferroni === false);
   };
   /** Critical z at the project's primary / secondary level over m comparisons
-   *  (Bonferroni divisor — pass 1, or omit, for a single planned test). With
+   *  (Bonferroni divisor, pass 1, or omit, for a single planned test). With
    *  the default config these reduce to the familiar 1.96 / 1.2816. */
   stats.zPrimary = function (m) { return stats.zCrit(projAlpha() / (m > 1 ? m : 1)); };
   stats.zSecondary = function (m) { return stats.zCrit(projAlpha2() / (m > 1 ? m : 1)); };
-  // Fixed conventional constants — for 95% intervals and scale normalisation,
+  // Fixed conventional constants, for 95% intervals and scale normalisation,
   // NOT for significance tests (those honour the configured alpha above).
   stats.Z95 = 1.96;
   stats.Z80 = 1.2816;
 
   /**
    * Per-respondent weight. Absent TR.MICRO.weights (e.g. unweighted projects
-   * and the SACAP fixture) every respondent weighs 1 — so every weighted
+   * and the SACAP fixture) every respondent weighs 1, so every weighted
    * accumulation below collapses to the unweighted count and the recompute is
    * byte-identical to the pre-weighting engine. When weights ARE present the
    * tabulations reproduce the published WEIGHTED figures (sum of weights), and
@@ -95,7 +152,7 @@
   /**
    * Is this a weighted report? The island carries a weight per respondent and
    * an unweighted project's are all 1 (microdata_writer.R), so "weighted" is
-   * "some weight is not 1" — not merely "weights exist". Cached: the vector
+   * "some weight is not 1", not merely "weights exist". Cached: the vector
    * does not change within a page.
    */
   var weightedFlag = null;
@@ -198,7 +255,7 @@
     if (banner && banner.indexOf("composite:") === 0) {
       // Profile banner: one spotlight column per stored spec entry, each from a
       // (possibly different) question and each its own membership. The columns
-      // may OVERLAP, so they carry NO letter — composites are never pairwise
+      // may OVERLAP, so they carry NO letter. Composites are never pairwise
       // tested; significance is computed vs THE REST (model.applyComposite-
       // Significance). Unknown token (e.g. a shared hash whose spec never
       // travelled) shows Total only rather than crashing.
@@ -224,7 +281,7 @@
       var mode = bits[2] || "cat";
       var q = TR.d2.questionByCode(code);
       // A saved custom banner (localStorage / shared #hash) can outlive its
-      // question across a regen — show Total only rather than crashing, the
+      // question across a regen. Show Total only rather than crashing, the
       // same missing-spec behaviour the composite branch has above.
       if (!q) {
         return { columns: columns, custom: true, missing: true };
@@ -241,7 +298,7 @@
           defs.push({ label: q.rows[ri].label, members: q.net_members[String(ri)] });
         });
         // hidden-scale questions publish only boxes (no shown categories to
-        // decompose into) — make each box NET row a column via box membership.
+        // decompose into): make each box NET row a column via box membership.
         if (!defs.length) {
           TR.d2.boxRows(q).forEach(function (br) {
             defs.push({ label: br.label, boxRi: br.index });
@@ -292,8 +349,8 @@
         if (col.member && !col.member[r]) continue;
         var a = answers[r];
         var answered = a !== null && a !== undefined;
-        // Hidden-scale box-only questions (CCS/CSAT style) carry no raw answer
-        // — only the respondent's box membership records that they answered.
+        // Hidden-scale box-only questions (CCS/CSAT style) carry no raw answer,
+        // only the respondent's box membership records that they answered.
         // Fall back to it so the base / % denominator reflect the real
         // respondent universe (matching the box-category recompute) instead of
         // collapsing to 0. Shown scales have both (answer ⇒ box), so this is a
@@ -372,7 +429,7 @@
         if (!mask[r]) continue;
         if (col.member && !col.member[r]) continue;
         var b = boxes[r];
-        // The denominator is the FULL answered base — the published convention,
+        // The denominator is the FULL answered base. The published convention,
         // and the one restPct / the composite vs-the-rest test already use: an
         // answer that belongs to no box (e.g. Neutral under partial BoxCategory
         // coverage) still counts in the base, just never in the numerator. Box
@@ -394,7 +451,7 @@
    * score function (null score = excluded). mean = Σws/Σw (the published
    * weighted mean, exact). The SD reduces to the prior unweighted (k-1) sample
    * variance when every weight is 1; weighted it is the population variance
-   * scaled by effBase/(effBase-1), sized by the effective base — for sig / CI.
+   * scaled by effBase/(effBase-1), sized by the effective base, for sig / CI.
    */
   function weightedMeanColumn(scoreOf, mask, col) {
     var sum = 0, sumSq = 0, wbase = 0, sumW2 = 0;
@@ -416,7 +473,7 @@
 
   /**
    * Mean + sd per column for a scale/NPS question. Prefers a carried
-   * per-respondent score array (TR.MICRO.scores[code]) — robust to hidden
+   * per-respondent score array (TR.MICRO.scores[code]): robust to hidden
    * categories (rating scales that publish only the mean) and to display-label
    * recodes, and the source the tabs microdata writer emits. Falls back to
    * mapping each respondent's category-row answer through q.index_scores (the
@@ -453,7 +510,7 @@
    * showed the recomputed MEAN in the Median row (VAS electricity: R563.68 in
    * a row whose true value for that audience was R300).
    *
-   * Weighted runs return null — the R engine prints "N/A (weighted)" in this
+   * Weighted runs return null. The R engine prints "N/A (weighted)" in this
    * row for the same reason, and a weighted median needs a definition nobody
    * has chosen here. null renders as no value, never as a wrong one.
    */
@@ -484,7 +541,7 @@
    * Ratio of totals per column: Σw·numerator / Σw·denominator, over everyone in
    * the audience holding both, with a denominator above zero. This is the
    * average of the UNITS (the average transaction), not of the people (the
-   * average person's transaction) — different numbers off the same respondents,
+   * average person's transaction): different numbers off the same respondents,
    * and the row exists precisely to show both.
    *
    * Mirrors calculate_ratio_of_totals() in numeric_processor.R exactly, so the
@@ -512,13 +569,13 @@
    * Mean +-100 NET POSITIVE score per column: +100 in the favourable box, -100
    * in the unfavourable box, 0 for any other response in the base. That mean IS
    * the printed net (top% - bottom%), so a NET POSITIVE row's letters test the
-   * number the row shows — the device the NPS Score row already uses, and the
+   * number the row shows. The device the NPS Score row already uses, and the
    * one the R engine adopted for this row (review 2026-08, I5; decision in
    * docs/tabs_production_review_2026-08/NET_POSITIVE_SIG_DECISION.md).
    *
    * Testing the printed difference is not a two-independent-proportions z-test:
    * the two boxes are cells of one multinomial and are negatively correlated.
-   * The score carries that covariance itself — for X in {+1,0,-1} with
+   * The score carries that covariance itself, for X in {+1,0,-1} with
    * P(+1)=t, P(-1)=b, Var(X) = t + b - (t-b)^2, exactly Var(p_top - p_bottom)*n.
    *
    * Base rule mirrors boxCounts(): an answer belonging to no box still counts
@@ -593,7 +650,7 @@
   stats.sigLetters = function (cells, letters, lowBaseThreshold, isMean, dual) {
     var sizeOf = function (cell) { return isMean ? cell.k : cell.base; };
     // Bonferroni divisor mirrors R (run_crosstabs.R run_significance_tests_for_row):
-    // choose(k, 2) over ALL the group's non-Total columns — low-base columns still
+    // choose(k, 2) over ALL the group's non-Total columns. Low-base columns still
     // count in the divisor even though their own tests are skipped.
     var k = cells.length - 1;
     var m = stats.bonferroni() ? k * (k - 1) / 2 : 1;

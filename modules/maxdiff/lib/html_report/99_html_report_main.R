@@ -600,6 +600,8 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
 
         if (!is.null(seg_indiv) && nrow(seg_indiv) >= 5) {
           seg_dist <- tryCatch({
+            # ID column dropped by name before the numeric filter (F3)
+            if (exists(".md_drop_id_cols", mode = "function")) seg_indiv <- .md_drop_id_cols(seg_indiv)
             numeric_cols <- if (is.data.frame(seg_indiv)) vapply(seg_indiv, is.numeric, logical(1)) else rep(TRUE, ncol(seg_indiv))
             if (is.data.frame(seg_indiv)) {
               item_ids <- names(seg_indiv)[numeric_cols]

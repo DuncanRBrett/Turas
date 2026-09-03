@@ -3,10 +3,10 @@
 # ==============================================================================
 #
 # Tests for data loading, path resolution, and config parsing:
-#   1. path_utils.R — resolve_path (absolute detection, trimws, relative)
-#   2. config_utils.R — load_config_sheet (header auto-detect)
-#   3. data_loader.R — load_survey_structure, load_survey_data
-#   4. data_setup.R — load_and_validate_data, load_question_selection
+#   1. path_utils.R. Resolve_path (absolute detection, trimws, relative)
+#   2. config_utils.R. Load_config_sheet (header auto-detect)
+#   3. data_loader.R. Load_survey_structure, load_survey_data
+#   4. data_setup.R. Load_and_validate_data, load_question_selection
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_data_loading.R")
@@ -52,10 +52,10 @@ source(file.path(turas_root, "modules/tabs/lib/data_loader.R"))
 
 
 # ==============================================================================
-# 1. resolve_path — absolute path detection
+# 1. resolve_path. Absolute path detection
 # ==============================================================================
 
-context("resolve_path — absolute paths")
+context("resolve_path. Absolute paths")
 
 test_that("detects Unix absolute paths and returns them directly", {
   result <- resolve_path("/base/dir", "/absolute/path/file.txt")
@@ -76,10 +76,10 @@ test_that("joins relative paths with base", {
 
 
 # ==============================================================================
-# 2. resolve_path — whitespace handling
+# 2. resolve_path. Whitespace handling
 # ==============================================================================
 
-context("resolve_path — whitespace trimming")
+context("resolve_path. Whitespace trimming")
 
 test_that("trims leading whitespace from relative path", {
   result <- resolve_path("/base/dir", "  sub/file.txt")
@@ -110,10 +110,10 @@ test_that("handles NA relative_path", {
 
 
 # ==============================================================================
-# 3. resolve_path — ./ prefix stripping
+# 3. resolve_path, ./ prefix stripping
 # ==============================================================================
 
-context("resolve_path — ./ prefix")
+context("resolve_path, ./ prefix")
 
 test_that("strips ./ prefix from relative paths", {
   result <- resolve_path("/base/dir", "./sub/file.txt")
@@ -123,10 +123,10 @@ test_that("strips ./ prefix from relative paths", {
 
 
 # ==============================================================================
-# 4. resolve_path — empty base_path
+# 4. resolve_path. Empty base_path
 # ==============================================================================
 
-context("resolve_path — invalid inputs")
+context("resolve_path. Invalid inputs")
 
 test_that("refuses empty base_path", {
   result <- tryCatch(
@@ -167,10 +167,10 @@ test_that("refuses empty path", {
 
 
 # ==============================================================================
-# 6. load_config_sheet — auto-detect header row
+# 6. load_config_sheet. Auto-detect header row
 # ==============================================================================
 
-context("load_config_sheet — header auto-detect")
+context("load_config_sheet. Header auto-detect")
 
 test_that("loads standard config with Setting/Value in row 1", {
   # Create temp config file
@@ -248,7 +248,7 @@ test_that("rejects duplicate settings", {
 
 
 # ==============================================================================
-# 7. load_survey_structure — with demo data
+# 7. load_survey_structure, with demo data
 # ==============================================================================
 
 context("load_survey_structure")
@@ -271,7 +271,7 @@ test_that("loads demo survey structure successfully", {
 
 
 # ==============================================================================
-# 8. .read_table_sheet — header auto-detect for table sheets
+# 8. .read_table_sheet. Header auto-detect for table sheets
 # ==============================================================================
 
 context(".read_table_sheet")
@@ -301,7 +301,7 @@ test_that("reads table sheet with standard headers", {
 })
 
 # ==============================================================================
-# 9. load_survey_data_smart — RDS cache type fidelity (audit fix)
+# 9. load_survey_data_smart. RDS cache type fidelity (audit fix)
 # ==============================================================================
 
 context("load_survey_data_smart: cache fidelity")
@@ -325,7 +325,7 @@ test_that("RDS cache round-trips text option codes byte-identically", {
     first <- load_survey_data_smart(xlsx, auto_cache = TRUE, cache_threshold_mb = 0))
   expect_true(file.exists(file.path(d, "survey_cache.rds")))
 
-  # Second run loads the cache — results must be IDENTICAL to the first run
+  # Second run loads the cache. Results must be IDENTICAL to the first run
   out2 <- capture.output(
     second <- load_survey_data_smart(xlsx, auto_cache = TRUE, cache_threshold_mb = 0))
   expect_true(any(grepl("RDS cache", out2)))
@@ -355,7 +355,7 @@ test_that("a legacy CSV cache is ignored (never read) and noted on the console",
 
 
 # ==============================================================================
-# data_loader.R — strip_leading_bom (column-name hygiene)
+# data_loader.R. Strip_leading_bom (column-name hygiene)
 # ==============================================================================
 #
 # Regression: an Alchemer UTF-8 export prefixes the first column header with an
@@ -364,7 +364,7 @@ test_that("a legacy CSV cache is ignored (never read) and noted on the console",
 # (see test_qual_join.R). load_survey_data now strips a leading BOM at the load
 # boundary via strip_leading_bom(); these are the known-answer tests for it.
 
-context("data_loader — strip_leading_bom")
+context("data_loader. Strip_leading_bom")
 
 BOM <- intToUtf8(65279L)   # U+FEFF, built explicitly (no invisible BOM in source)
 

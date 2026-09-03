@@ -1,5 +1,5 @@
 /**
- * v2 exports — Tier A (clipboard editable table, hi-res PNG assembled as
+ * v2 exports. Tier A (clipboard editable table, hi-res PNG assembled as
  * pure SVG) and Tier B (native PPTX slides: real text, real tables, bars
  * as editable shapes) built from view-model matrices. Uses the v1 zip +
  * package plumbing (TR.zip / TR.pptx.package).
@@ -10,13 +10,13 @@
 (function (global) {
   "use strict";
   // esc strips XML-1.0-illegal characters as well as escaping entities (see
-  // TR.xlsx.escape) — a stray control char in a verbatim otherwise corrupts
+  // TR.xlsx.escape): a stray control char in a verbatim otherwise corrupts
   // the slide part.
   var TR = global.TR, fmt = TR.fmt, S = TR.svg, esc = TR.xlsx.escape;
 
   var exporter = TR.exporter = {};
   var EMU = 914400, SLIDE_W = 13.333, SLIDE_H = 7.5;
-  // WP0: all slide styling flows from TR.pptx.STYLE (14_pptx_parts.js) — the
+  // WP0: all slide styling flows from TR.pptx.STYLE (14_pptx_parts.js): the
   // aliases below are the ONLY colour/size sources the slide builders use.
   var STYLE = TR.pptx.STYLE, SIZE = STYLE.SIZE, MARGIN = STYLE.MARGIN;
   var INK = STYLE.INK, GREY = STYLE.GREY, WHITE = STYLE.PAPER, ZEBRA = STYLE.ZEBRA;
@@ -27,7 +27,7 @@
     var html = TR.render.clipboardHtml(model);
     var text = TR.render.tsv(model);
     var done = function (ok) {
-      TR.shell.toast(ok ? "Table copied — paste into PowerPoint, Word or Excel"
+      TR.shell.toast(ok ? "Table copied. Paste into PowerPoint, Word or Excel"
         : "Copy blocked by the browser");
     };
     if (navigator.clipboard && global.ClipboardItem) {
@@ -97,7 +97,7 @@
   exporter.cardSvg = function (model, note, opts) {
     opts = opts || {};
     var meta = [TR.AGG.project.name, TR.AGG.project.wave,
-      model.notRecomputable ? "n/a under filter — not recomputable"
+      model.notRecomputable ? "n/a under filter, not recomputable"
         : model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
       // the question's own audience travels with every export of it, so a
       // routed question's smaller base is never read as a shortfall
@@ -110,11 +110,11 @@
       note || ""].filter(Boolean).join(" · ");
     var matrix = opts.includeTable !== false ? TR.render.matrix(model) : null;
     // D2: a pin's stored insight title leads the card when the caller has one
-    return exporter.cardSvgRaw(model.code + " — " +
+    return exporter.cardSvgRaw(model.code + ": " +
       (opts.title || model.short_label || model.title), meta, opts.chartSvg, matrix);
   };
 
-  /** Companion quote card for the image deck — the verbatims a pinned question
+  /** Companion quote card for the image deck. The verbatims a pinned question
    *  carries, laid out as quote blocks rather than a one-column table (the same
    *  choice quoteSlide makes for the editable deck). Quotes arrive ALREADY
    *  disclosure-gated; this renders, it never re-derives. */
@@ -245,7 +245,7 @@
   function para(text, o) {
     if (!text && !o.delta) return "<a:p/>";
     var run = function (t, colour, bold) {
-      // optional alpha (percent) — the divider ordinal is 20%-alpha white
+      // optional alpha (percent): the divider ordinal is 20%-alpha white
       var fill = o.alpha
         ? '<a:srgbClr val="' + colour + '"><a:alpha val="' +
           Math.round(o.alpha * 1000) + '"/></a:srgbClr>'
@@ -296,7 +296,7 @@
       "<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>";
   }
 
-  // Filled ellipse with a thin white halo — a dot-plot marker.
+  // Filled ellipse with a thin white halo. A dot-plot marker.
   function ellipseShape(id, box, colour) {
     return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="Dot"/><p:cNvSpPr/>' +
       "<p:nvPr/></p:nvSpPr><p:spPr>" +
@@ -310,7 +310,7 @@
 
   /**
    * Horizontal dot plot as native shapes (PowerPoint has no dot-plot chart
-   * type). Mirrors render.dotChart — category labels left, a faint baseline
+   * type). Mirrors render.dotChart. Category labels left, a faint baseline
    * per row, vertical gridlines + % ticks, one positioned dot per column,
    * coloured from the report palette. Editable shapes (no "Edit Data", which
    * a dot plot does not need). Returns the shape XML for the slide tree.
@@ -392,7 +392,7 @@
     var grid = '<a:gridCol w="' + inch(labelW) + '"/>';
     for (var i = 1; i < nCols; i++) grid += '<a:gridCol w="' + inch(colW) + '"/>';
     // Explicit borders + fills so the formatting survives in PowerPoint, which
-    // (unlike LibreOffice) drops cell fills when the table carries no style id —
+    // (unlike LibreOffice) drops cell fills when the table carries no style id,
     // see the "No Style, No Grid" tableStyleId below. Stat rows (Index / NPS /
     // NET) get a gold left edge, mirroring the report's accent rule.
     var BORDER = STYLE.BORDER, line = function (side, w, clr) {
@@ -425,7 +425,7 @@
       '<p:xfrm><a:off x="' + inch(box.x) + '" y="' + inch(box.y) + '"/>' +
       '<a:ext cx="' + inch(box.w) + '" cy="' + inch(box.h) + '"/></p:xfrm>' +
       '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">' +
-      // "No Style, No Grid" — PowerPoint then applies no theme table style and
+      // "No Style, No Grid". PowerPoint then applies no theme table style and
       // renders exactly the cell fills/borders above (without a style id it
       // drops them and shows a blank default).
       '<a:tbl><a:tblPr firstRow="1">' +
@@ -435,13 +435,13 @@
   }
 
   /** Fit a matrix to a slide's row budget. When rows must be dropped the
-   *  last visible row says how many — a silently truncated table reads
+   *  last visible row says how many. A silently truncated table reads
    *  as complete, which misstates the data. */
   function fitMatrix(matrix, maxRows) {
     if (matrix.body.length <= maxRows) return matrix;
     var kept = matrix.body.slice(0, Math.max(maxRows - 1, 1));
     var note = ["… +" + (matrix.body.length - kept.length) +
-      " more rows — see the full report"];
+      " more rows. See the full report"];
     while (note.length < matrix.head.length) note.push("");
     return { head: matrix.head,
       body: kept.concat([{ kind: "base", cells: note }]) };
@@ -584,7 +584,7 @@
   /**
    * A config-authored study slide's picture, ready for imageSlide: the ORIGINAL
    * file's bytes, not a re-render. Nothing is rasterised, so the picture reaches
-   * PowerPoint at its authored resolution — sharper than any card in the deck.
+   * PowerPoint at its authored resolution. Sharper than any card in the deck.
    * The intrinsic size travels from the config (R reads it out of the file
    * header); without it imageSlide falls back to filling the slide.
    * @param {Object} slide - an entry of TR.AGG.project.slides
@@ -623,7 +623,7 @@
     return '<c:catAx><c:axId val="111111111"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + catPos + '"/>' +
-      // 0.75pt FAINT category axis line — the only chart rule (no gridlines)
+      // 0.75pt FAINT category axis line. The only chart rule (no gridlines)
       '<c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="' + STYLE.FAINT +
       '"/></a:solidFill></a:ln></c:spPr>' +
       '<c:crossAx val="222222222"/></c:catAx>' +
@@ -677,7 +677,7 @@
       : STYLE.CONTEXT[(k - 1) % STYLE.CONTEXT.length];
   }
 
-  /** True when every charted row label is an exact sentiment term — the only
+  /** True when every charted row label is an exact sentiment term. The only
    *  case a single-series bar keeps the semantic red/green palette (colour IS
    *  the meaning, e.g. Detractor/Passive/Promoter). semanticColour() answers
    *  index-independently ONLY on an exact map hit; the ordinal gradient for
@@ -689,7 +689,7 @@
     });
   }
 
-  /** The headline row of a single-series chart — the top NET when NETs are
+  /** The headline row of a single-series chart. The top NET when NETs are
    *  charted, else the max value: the one bar rendered in brand. */
   function headlineIndex(rows, ci) {
     var pool = rows.some(function (r) { return r.kind === "net"; })
@@ -766,7 +766,7 @@
   }
 
   /**
-   * Series for a 100%-stacked bar: TRANSPOSED relative to chartSeries —
+   * Series for a 100%-stacked bar: TRANSPOSED relative to chartSeries,
    * categories are the selected columns (one bar each) and there is one
    * series per row (the segments that stack), coloured by segment. Mirrors
    * the on-screen render.stackedChart so the PPTX matches the report/PNG.
@@ -810,7 +810,7 @@
 
   /** Declared scale bounds for honest mean axes: the model's own fields when
    *  the pin carried them, else the source question's Scale_Min/Scale_Max
-   *  (guarded — export sandboxes and stale pins have no TR.d2 / question).
+   *  (guarded, export sandboxes and stale pins have no TR.d2 / question).
    *  null when nothing is declared (data-driven fixed max stands). */
   function scaleOf(model) {
     var min = model.scale_min, max = model.scale_max;
@@ -832,7 +832,7 @@
    */
   exporter.buildChart = function (model, type, cols) {
     // A question pinned on the trend-over-waves chart ("line") exports the
-    // wave-history line chart, matching the screen — a bar of current-wave
+    // wave-history line chart, matching the screen. A bar of current-wave
     // values would silently drop the tracking story. Only a model with no
     // wave history at all falls through to the bar chart.
     if (type === "line") {
@@ -841,7 +841,7 @@
       type = "bar";
     }
     // A mean ("Index") plot renders as a clustered bar/column with each charted
-    // column as its own labelled bar — mirrors the on-screen chart (coerce a
+    // column as its own labelled bar. Mirrors the on-screen chart (coerce a
     // percentage type to bar, then transpose columns -> labelled bars).
     if (model.valueKind === "mean" && type !== "column" && type !== "bar") type = "bar";
     // capture the declared scale BEFORE the mean transpose rebuilds the model
@@ -857,7 +857,7 @@
     var meanScale = model.valueKind === "mean";
     // A counts-only question (show_percent_column = N) charts headcounts, so
     // the data labels and the value axis take a plain number format instead of
-    // the default 0"%" — a bar of 142 was labelled "142%" (2026-08, C1).
+    // the default 0"%". A bar of 142 was labelled "142%" (2026-08, C1).
     var countScale = !meanScale &&
       !TR.fmt.isPctStat(TR.fmt.statOf(model, null));
     var lblFmt = meanScale ? "0.0" : countScale ? "0" : null;
@@ -891,7 +891,7 @@
         '<c:overlap val="100"/>' +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
       // Percent-stacked normalises to fractions, so the literal-% value axis is
-      // meaningless (and the pin shows none) — hide it; the segment labels carry
+      // meaningless (and the pin shows none): hide it; the segment labels carry
       // the %s.
       axesXml = chartAxes("l", "b", null, true);
     } else if (type === "stackedcol") {
@@ -931,7 +931,7 @@
       ((cols.length > 1 || type === "pie" || type === "stacked" || type === "stackedcol")
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
-      // Default chart font — clean Arial in the report ink so axis/legend text
+      // Default chart font. Clean Arial in the report ink so axis/legend text
       // matches the on-screen look.
       '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">' +
       '<a:solidFill><a:srgbClr val="' + STYLE.CHART_INK + '"/></a:solidFill>' +
@@ -958,7 +958,7 @@
           }));
         }));
     // the sheet MUST be named Sheet1: the c:f formula refs above say
-    // Sheet1!… — on "Edit Data" Excel resolves them against the embedded
+    // Sheet1!…, on "Edit Data" Excel resolves them against the embedded
     // workbook, and any other sheet name turns every series into #REF!
     return { xml: xml, workbook: TR.xlsx.bytes("Sheet1", workbookRows),
       sentiment: sentiment };
@@ -972,7 +972,7 @@
   exporter.buildTrendChart = function (model) {
     var all = TR.render.trendRows(model);
     if (!all.length) return null;
-    // Mean-scale (0-10) rows and percentage/index rows never share an axis —
+    // Mean-scale (0-10) rows and percentage/index rows never share an axis,
     // the dominant group wins, the rest are dropped with a note. Mirrors
     // render.trendChart exactly so the export matches the pinned view.
     var small = all.filter(function (r) {
@@ -1034,7 +1034,7 @@
     }).join("");
     var pctOnly = rows.every(function (r) { return r.kind !== "mean"; });
     // Fixed value axis matching the pin: 0 (or the negative floor for NPS) to a
-    // nice max, with means anchored to at least 10 — so auto-scaling never
+    // nice max, with means anchored to at least 10, so auto-scaling never
     // exaggerates a small wave-on-wave move. meanScale comes from the scale
     // split above, exactly as on screen.
     var lo = 0, hi = 0;
@@ -1058,7 +1058,7 @@
       (rows.length > 1
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
-      // Default chart font — clean Arial in the report ink so axis/legend text
+      // Default chart font. Clean Arial in the report ink so axis/legend text
       // matches the on-screen look.
       '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">' +
       '<a:solidFill><a:srgbClr val="' + STYLE.CHART_INK + '"/></a:solidFill>' +
@@ -1082,7 +1082,7 @@
    * chart, rels rId2..rId(1+n)) + optional table + insight band, on the
    * shared header/body/footer grid.
    * @param {object} spec - {title, meta, charts, matrix, note, kicker,
-   *   footer, chip} — kicker defaults to TRACKING; footer fields (qcode,
+   *   footer, chip}. Kicker defaults to TRACKING; footer fields (qcode,
    *   qtext, base…) are optional and omitted segments drop gracefully;
    *   chip = {text, up} draws the wave-delta chip (WP5) top-right of BODY
    *   on the callout chrome (CALLOUT_BG + GOOD/BAD edge).
@@ -1146,7 +1146,7 @@
    * WP2 sig markers: ▲/▼ beside the emphasis values whose wave delta the
    * model marks significant. A native chart's internals aren't addressable
    * from the slide, so the markers are positioned text boxes on the chart
-   * frame's category slots (same technique as dotPlotShapes value labels) —
+   * frame's category slots (same technique as dotPlotShapes value labels),
    * approximate but honest. Wave deltas exist on the Total column only, so a
    * non-Total emphasis, a transposed mean plot or a non-bar/column type gets
    * no markers (the tables keep the letters).
@@ -1219,7 +1219,7 @@
       var dcols = (flags.chartCols && flags.chartCols.length) ? flags.chartCols : [0];
       var chartH = flags.table ? Math.min(2.9, bottom - top - 1.4) : bottom - top;
       if ((flags.chartType || "bar") === "dot") {
-        // A horizontal dot plot has no native PowerPoint chart type — draw it
+        // A horizontal dot plot has no native PowerPoint chart type. Draw it
         // as shapes (matches the on-screen pin; no chart part for this slide).
         content += dotPlotShapes(next, { x: MARGIN, y: top, w: STYLE.BODY.w, h: chartH },
           model, dcols);
@@ -1293,18 +1293,18 @@
         [para(subtitle || "", { size: SIZE.lead, colour: STYLE.ON_BRAND_MUTED })]));
   };
 
-  /** Sentiment names for the quote-slide chip line — the marker colour is
+  /** Sentiment names for the quote-slide chip line. The marker colour is
    *  never colour-only (spec archetype 5): the chip says the word. */
   var SENT_WORD = { pos: "Positive", neg: "Negative", neu: "Mixed" };
 
   /**
-   * Verbatim/quote slide (WP4): up to 4 quotes in quote typography — gold
+   * Verbatim/quote slide (WP4): up to 4 quotes in quote typography. Gold
    * opening-quote glyph, italic ink quote on a 9.5" measure, grey attribution
    * chip line (question · demo tags · sentiment word) and a sentiment edge
-   * rect — never a one-column table. spec = {title, meta, kicker, quotes:
+   * rect, never a one-column table. spec = {title, meta, kicker, quotes:
    * [{text, q, tags, sentiment}], moreN, note}. Quotes arrive ALREADY
    * disclosure-gated (hidden text was never put in the payload; below-k tags
-   * were dropped at pin time) — this renders, it never re-derives.
+   * were dropped at pin time): this renders, it never re-derives.
    */
   exporter.quoteSlide = function (spec) {
     var id = 1;
@@ -1324,7 +1324,7 @@
       var y = top + i * blockH;
       var sentC = qt.sentiment === "pos" ? STYLE.GOOD
         : qt.sentiment === "neg" ? STYLE.BAD : GREY;
-      // sentiment edge — colour is reinforced by the chip's sentiment word
+      // sentiment edge. Colour is reinforced by the chip's sentiment word
       content += fillRect(next(), { x: MARGIN, y: y + 0.06, w: 0.05,
         h: Math.max(blockH - 0.18, 0.2) }, sentC);
       content += textBox(next(), { x: MARGIN + 0.18, y: y - 0.04, w: 0.75, h: 0.7 },
@@ -1348,7 +1348,7 @@
   };
 
   /** Generic title + native table slide (heatmaps, composites, snapshots) on
-   *  the shared grid. opts = {kicker, footer} — both optional. */
+   *  the shared grid. opts = {kicker, footer}. Both optional. */
   exporter.matrixSlide = function (title, metaLine, matrix, opts) {
     opts = opts || {};
     var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
@@ -1371,7 +1371,7 @@
    * Exec-summary cover (WP3): white page, brand rule down the left edge,
    * REPORT kicker, project name, client · wave · date, the authored exec
    * summary (first two paragraphs) and the leading findings as numbered
-   * insight lines with gold chips — the same content as the HTML cover
+   * insight lines with gold chips. The same content as the HTML cover
    * (reader.coverFindings / report.sectionText), passed in by the deck
    * assembler so this stays data-source-agnostic. Degrades to a clean title
    * cover when spec carries no exec text / findings.
@@ -1405,7 +1405,7 @@
         execParas);
       y += 1.62;
     }
-    // leading findings only when story pins exist — same rule as the HTML
+    // leading findings only when story pins exist. Same rule as the HTML
     // cover (coverAvailable); a pin-less deck keeps a clean title cover
     var findings = (spec.findings || []).filter(Boolean).slice(0, 5);
     findings.forEach(function (text, i) {
@@ -1419,7 +1419,7 @@
         [para(TR.charts.clip(text, 130), { size: SIZE.lead, bold: true, colour: INK })]);
       y += rowH;
     });
-    // text wordmark, cover only (Duncan's locked decision — no logo asset)
+    // text wordmark, cover only (Duncan's locked decision, no logo asset)
     content += textBox(next(), { x: SLIDE_W - MARGIN - 4.2, y: 7.02, w: 4.2, h: 0.32 },
       [para("Turas · The Research LampPost",
         { size: SIZE.footer, colour: GREY, align: "r" })]);
@@ -1439,7 +1439,7 @@
       textBox(next(), { x: 1, y: 3.7, w: SLIDE_W - 2, h: 0.9 },
         [para([p.client, p.wave].filter(Boolean).join(" · "),
           { size: SIZE.lead, colour: STYLE.ON_BRAND_MUTED }),
-         para(itemCount + " exhibits · built natively inside the Turas report — every table and bar is editable",
+         para(itemCount + " exhibits · built natively inside the Turas report. Every table and bar is editable",
           { size: SIZE.body, colour: STYLE.ON_BRAND_MUTED })]));
   };
 
@@ -1450,7 +1450,7 @@
       bytes = TR.pptx.package(slideXmls, { project: TR.AGG.project });
     } catch (e) {
       if (global.console) console.error("[TurasV2] pptx failed:", e);
-      TR.shell.toast("PPTX build failed — see console");
+      TR.shell.toast("PPTX build failed. See console");
       return;
     }
     var blob = new Blob([bytes], {
@@ -1462,7 +1462,7 @@
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-    TR.shell.toast("Native PowerPoint downloaded — fully editable");
+    TR.shell.toast("Native PowerPoint downloaded. Fully editable");
   };
 
   /** SVG string -> {bytes, w, h} PNG at `scale`. Browser only (canvas). */
@@ -1501,7 +1501,7 @@
     if (!cards.length) { TR.shell.toast("Nothing to export"); return; }
     TR.shell.toast("Rendering " + cards.length + " image slide(s)…");
     // An entry may be an already-rendered picture ({png}) rather than an SVG
-    // card — a config-authored study slide IS an image, so it goes through at
+    // card. A config-authored study slide IS an image, so it goes through at
     // its own resolution instead of being rasterised down to a card.
     Promise.all(cards.map(function (card) {
       if (card && card.png) return Promise.resolve(card.png);
@@ -1520,11 +1520,11 @@
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
-        TR.shell.toast("Image PowerPoint downloaded — pixel-perfect");
+        TR.shell.toast("Image PowerPoint downloaded. Pixel-perfect");
       })
       .catch(function (e) {
         if (global.console) console.error("[TurasV2] image deck failed:", e);
-        TR.shell.toast("Image export failed — see console");
+        TR.shell.toast("Image export failed. See console");
       });
   };
 

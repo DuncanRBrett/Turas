@@ -11,7 +11,7 @@ editor_options:
 This document explains every field in the Survey_Structure template, and
 the Crosstab Config template's settings that have a dedicated entry
 below. When you're filling in a template and wondering "what does this
-field do?", start here — for a setting with no entry of its own, check
+field do?", start here, for a setting with no entry of its own, check
 the Additional Settings Reference at the end of the Settings Sheet
 section.
 
@@ -106,7 +106,7 @@ Output folder if it doesn't exist.
 #### output_format
 
 **What it does:** Names the output file format. Excel is the only writer
-Tabs has — a config asking for `csv` still receives an .xlsx workbook,
+Tabs has. A config asking for `csv` still receives an .xlsx workbook,
 and the run says so.
 
 **Required:** Yes
@@ -220,7 +220,7 @@ weighted.
 **What it does:** Sets the percentage of NA (missing) weights that
 triggers a warning.
 
-**Required:** No — **not included in the generated template.** The
+**Required:** No, **not included in the generated template.** The
 validator (`weight_validators.R`) still reads this key with the default
 below if you add the row yourself; it just isn't pre-filled for you.
 
@@ -237,7 +237,7 @@ problem with your data or weight variable specification.
 **What it does:** Sets the percentage of zero weights that triggers a
 warning.
 
-**Required:** No — **not included in the generated template**, same as
+**Required:** No, **not included in the generated template**, same as
 `weight_na_threshold` above; still read if added by hand.
 
 **What to enter:** A number from 0 to 100.
@@ -253,7 +253,7 @@ problem.
 **What it does:** Sets the Design Effect (DEFF) threshold that triggers
 a warning.
 
-**Required:** No — **not included in the generated template**, same as
+**Required:** No, **not included in the generated template**, same as
 `weight_na_threshold` above; still read if added by hand.
 
 **What to enter:** A number from 1 to 10.
@@ -505,7 +505,7 @@ lower it (to 20) if needed, but be aware results become less reliable.
 
 #### min_reporting_base
 
-**What it does:** Disclosure control — the reporting threshold *k* below
+**What it does:** Disclosure control. The reporting threshold *k* below
 which the report hides identifying detail so a filtered cut cannot narrow
 onto identifiable people.
 
@@ -515,10 +515,10 @@ onto identifiable people.
 
 **Default:** `1`
 
-**What it governs:** (1) the audience gate — when a live filter narrows the
+**What it governs:** (1) the audience gate. When a live filter narrows the
 comment audience below *k*, the whole comment list (text, tags, even the
 count) is withheld; (2) the `qual_demographic_cuts = safe` tag
-k-anonymisation — a comment shows only the broadest combination of
+k-anonymisation. A comment shows only the broadest combination of
 demographic tags that still covers ≥ *k* respondents (and, on a band-split
 question, ≥ *k* within its NPS band). `1` disables both. For a client-facing
 or sensitive study set a real floor (e.g. `30`, matching
@@ -550,7 +550,7 @@ conservative about claiming differences are real.
 ### Ranking Settings
 
 These settings only affect Ranking question types. **None of the four
-are included in the generated Crosstab_Config template** — add the
+are included in the generated Crosstab_Config template**. Add the
 Setting row yourself if you need to override a default; the engine
 validates and reads them either way.
 
@@ -559,7 +559,7 @@ validates and reads them either way.
 **What it does:** Sets the percentage of tied rankings that triggers a
 warning.
 
-**Required:** No — not in the generated template (see above).
+**Required:** No, not in the generated template (see above).
 
 **What to enter:** A number from 0 to 100.
 
@@ -574,7 +574,7 @@ data quality issues or ambiguous instructions.
 **What it does:** Sets the percentage of ranking gaps that triggers a
 warning.
 
-**Required:** No — not in the generated template (see above).
+**Required:** No, not in the generated template (see above).
 
 **What to enter:** A number from 0 to 100.
 
@@ -588,7 +588,7 @@ data problems.
 
 **What it does:** Sets the expected completion rate for rankings.
 
-**Required:** No — not in the generated template (see above).
+**Required:** No, not in the generated template (see above).
 
 **What to enter:** A number from 0 to 100.
 
@@ -603,7 +603,7 @@ completed all ranking positions, Tabs warns you.
 
 **Note:** Not in the generated template. Validated and accepted at load
 like its three siblings above, but not currently read by any ranking
-calculation — setting it has no effect yet.
+calculation. Setting it has no effect yet.
 
 ------------------------------------------------------------------------
 
@@ -711,7 +711,7 @@ Currently only IQR (Interquartile Range) method is supported.
 
 #### decimal_places
 
-**What it does:** General fallback — the workbook builder uses this for
+**What it does:** General fallback. The workbook builder uses this for
 cells that have no type-specific setting of their own (the four
 `decimal_places_*` settings above take precedence wherever they apply).
 
@@ -719,7 +719,7 @@ cells that have no type-specific setting of their own (the four
 
 **What to enter:** A number from 0 to 4, or leave blank.
 
-**Default:** blank — each consumer keeps its own default, which is how
+**Default:** blank. Each consumer keeps its own default, which is how
 every report behaved before this row existed.
 
 ------------------------------------------------------------------------
@@ -851,12 +851,12 @@ Net positive = percentage positive minus percentage negative.
 
 These settings control the interactive HTML report generated alongside
 the Excel output. (`html_report`, the retired classic report's switch, is
-no longer read — a config that still carries it is told so on load.)
+no longer read. A config that still carries it is told so on load.)
 
 | Setting | Description | Values | Default |
 |----|----|----|----|
 | `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
-| `accent_colour` | Secondary accent colour (hex) — also the default heatmap tint source | Any hex colour | #CC9900 |
+| `accent_colour` | Secondary accent colour (hex), also the default heatmap tint source | Any hex colour | #CC9900 |
 | `heatmap_colour` | Base colour for the crosstab heat tint. Leave blank and the tint uses `brand_colour`; set it to tint in a different colour without changing anything else. | Any hex colour | *(brand_colour)* |
 | `chart_palette_preset` | Chart colour scheme | warm / cool / research / teal / red / brand | warm |
 | `logo_path` | Path to logo image for report header | File path (relative or absolute) | (none) |
@@ -868,7 +868,7 @@ no longer read — a config that still carries it is told so on load.)
 
 ### Data-Centric Report v2 Settings (optional)
 
-Additive, off by default — the classic Excel/HTML outputs are unchanged. These
+Additive, off by default. The classic Excel/HTML outputs are unchanged. These
 build the interactive, self-contained **data-centric report v2** (live audience
 filter, custom banners, confidence intervals) and an optional **Tracking tab**.
 Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
@@ -876,21 +876,21 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | Setting | Description | Values | Default |
 |----|----|----|----|
 | `html_report_v2` | Also build the interactive report (`*_report.html`) | TRUE / FALSE | FALSE |
-| `sampling_method` | Sample design — drives honest CI vocabulary. Probability designs (Random / Stratified / Cluster / Census) → CI/MOE; everything else → stability/PE | Not_Specified / Random / Stratified / Cluster / Census / Quota / Online_Panel / Convenience | Not_Specified |
+| `sampling_method` | Sample design. Drives honest CI vocabulary. Probability designs (Random / Stratified / Cluster / Census) → CI/MOE; everything else → stability/PE | Not_Specified / Random / Stratified / Cluster / Census / Quota / Online_Panel / Convenience | Not_Specified |
 | `wave` | Wave label (v2 header + tracking trend label) | Text, e.g. `Wave 25 - May 2026` | (none) |
 | `html_report_v2_tracking` | Add a Tracking tab built from per-wave microdata. Needs `html_report_v2=TRUE` + a `waves_source` | TRUE / FALSE | FALSE |
 | `html_report_v2_cover` | Open **saved copies** on a cover page: report title, the Comments sheet's background and executive summary, and your Story pins as leading findings. Affects only copies made with *Save copy*, and only when there is story content to show. Your own generated report always lands on the dashboard | TRUE / FALSE | FALSE |
 | `html_report_v2_cover_findings` | How many Story pins the cover lists. `ALL` lists every pin. When the cover does stop short it says so on the page ("Showing 5 of 12 pinned findings"). The exported PowerPoint cover is one slide and always shows the first 5 | Whole number ≥ 1, or `ALL` | 5 |
 | `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |
 | `wave_order` | Numeric x-axis order key (e.g. `2025.5` for twice-yearly) | Number | *(year parsed from `wave`)* |
-| `question_mapping` | Path to the classic tracker's `Question_Mapping.xlsx` — links waves by a canonical key (robust to renames) + curates tracked metrics | File path, or blank to auto-detect in `waves_source` | *(auto)* |
+| `question_mapping` | Path to the classic tracker's `Question_Mapping.xlsx`. Links waves by a canonical key (robust to renames) + curates tracked metrics | File path, or blank to auto-detect in `waves_source` | *(auto)* |
 
 ### Tab Visibility (v2 report)
 
 Which tabs the interactive report carries. Crosstabs is always on; every
 other tab is includable per report, so a study can withhold one without
 changing anything else. A tab also self-hides when its data island is
-absent, so these only ever take a tab away — never add one that has
+absent, so these only ever take a tab away, never add one that has
 nothing behind it.
 
 | Setting | Description | Values | Default |
@@ -921,13 +921,13 @@ When enabled, Turas generates AI-assisted observational callouts for
 each question using a large language model. Pick the model with
 `ai_model`: **Sonnet 4.6** (faster, lower cost) or **Opus 4.8** (highest
 quality). You can also type any exact model ID (e.g. `claude-sonnet-4-6`)
-to adopt a newer model without waiting for a template update — unknown
+to adopt a newer model without waiting for a template update. Unknown
 values pass straight through to the API. Leave `ai_model` blank to drive
 the model from the JSON sidecar instead (needed when switching to a
 non-Anthropic provider such as OpenAI or a local Ollama model).
 
 A JSON sidecar file is auto-created alongside your config Excel with
-default settings. Callouts are cached — re-runs with unchanged data make
+default settings. Callouts are cached. Re-runs with unchanged data make
 no API calls. Changing `ai_model` to a different model regenerates the
 callouts so they are written by the newly selected model.
 
@@ -949,29 +949,29 @@ code → wire → run, including the NPS "why?" split and host-survey tags):
 
 | Setting | Description | Values | Default |
 |----|----|----|----|
-| `qual_workbook` | Path to the coded-comment workbook (Comment Appendix), relative to the config file — include the subfolder. Blank = no comment tab | e.g. `02 Data/<project> Comment Appendix.xlsx` | (blank) |
+| `qual_workbook` | Path to the coded-comment workbook (Comment Appendix), relative to the config file. Include the subfolder. Blank = no comment tab | e.g. `02 Data/<project> Comment Appendix.xlsx` | (blank) |
 | `qual_confidentiality_mode` | How verbatim text is shown | `hidden` (numbers only), `redacted` (auto-scrub names/emails/numbers), `full` | hidden |
 | `qual_demographic_cuts` | Demographic tags on comments | `allow` (all), `safe` (k-anonymised), `block` (none) | allow |
 | `qual_noteworthy_default` | Which noteworthy tier the comment filter opens on | `all`, `noteworthy`, `must_read`, `priority` | all |
-| `qual_verbatim_scope` | Which comments ship readable text (build-time curation, not a reader filter) | `all` (every comment except those marked `hide`), `noteworthy` (only tier 1+ — noteworthy / must-read / priority) | all |
+| `qual_verbatim_scope` | Which comments ship readable text (build-time curation, not a reader filter) | `all` (every comment except those marked `hide`), `noteworthy` (only tier 1+, noteworthy / must-read / priority) | all |
 | `qual_tag_dimensions` | Host-survey columns shown as comment tags, via the join; values show as their Survey_Structure DisplayText | comma list of `Column` or `Column:Label`, e.g. `S01:Centre, S09:Channel` | (blank) |
 | `qual_join_id_column` | Override the auto-detected respondent-id column | a column name, or blank | (blank) |
 
 **Confidentiality.** Comment tags carry re-identification risk on small
 cells, so `qual_demographic_cuts = safe` k-anonymises tag *combinations*
-against `min_reporting_base` (see Significance Testing Settings) — and does
+against `min_reporting_base` (see Significance Testing Settings), and does
 so *within each NPS band*, so a tag common overall but unique among (say)
 the detractors is suppressed for them. Use `safe` for any client-facing
 report that carries tags, `block` for a confidential low-sample study.
 `min_reporting_base` also withholds the whole comment list when a filtered
 cut falls below it. The default `qual_confidentiality_mode = hidden` shows
-no verbatim text — set `redacted` or `full` to display comments.
+no verbatim text. Set `redacted` or `full` to display comments.
 
-**Verbatim scope — theme all, show some.** `qual_verbatim_scope` curates
+**Verbatim scope. Theme all, show some.** `qual_verbatim_scope` curates
 which comments ship their *readable text*, independently of which are
 *counted*. Every comment (themed or not) is always counted in the theme
 distribution, coverage and base sizes; scope only governs whose verbatim is
-readable. This is a build-time curation — a withheld comment's text is absent
+readable. This is a build-time curation. A withheld comment's text is absent
 from the file (not merely hidden in the UI), the same confidentiality
 guarantee as omitting microdata. Two ways to withhold, both keyed on the
 comment workbook's noteworthy column:
@@ -981,7 +981,7 @@ comment workbook's noteworthy column:
   (forced tier 0), so it does not collide with the tier marks. Use it to drop
   an uninformative or identifying comment while still counting it.
 - `qual_verbatim_scope = noteworthy` withholds *every* comment that is not
-  tier 1+ — so only the comments you flagged noteworthy / must-read /
+  tier 1+, so only the comments you flagged noteworthy / must-read /
   priority are readable, and the rest are counted but not shown. Use it to
   ship a curated handful of quotes from a large body of comments (e.g. 100 of
   1000) while the numbers still reflect all 1000.
@@ -990,19 +990,19 @@ A small header chip on each question names the scope in force ("Noteworthy
 comments only" or "Uninformative comments hidden"), so the reader always
 knows which comments they are seeing. `qual_verbatim_scope` composes with
 `qual_confidentiality_mode` (scope picks *which* comments; the mode picks
-*how* their text is treated — `full` / `redacted` / `hidden`).
+*how* their text is treated, `full` / `redacted` / `hidden`).
 
 **NPS "why?" split.** An open-end routed into Detractor / Passive /
 Promoter sheets is reassembled into one question via the Selection sheet's
-`CommentSheet` mapping — see `CommentSheet`, `SplitDimension` and
+`CommentSheet` mapping. See `CommentSheet`, `SplitDimension` and
 `NpsScoreQuestion` under the Selection Sheet below.
 
 ------------------------------------------------------------------------
 
 ## Additional Settings Reference
 
-These settings **are** in the generated template — each has a row with
-its own default and help text — but don't have a dedicated `####` entry
+These settings **are** in the generated template. Each has a row with
+its own default and help text, but don't have a dedicated `####` entry
 above. Descriptions below are the template's own help text.
 
 ### Significance display
@@ -1010,13 +1010,13 @@ above. Descriptions below are the template's own help text.
 | Setting | Default | Description |
 |---------|---------|--------------|
 | `alpha_secondary` | *(blank)* | Second significance level for the HTML report toggle. Leave blank to disable; must differ from `alpha`. E.g. `0.10` adds a 90% confidence toggle alongside the primary level. |
-| `alpha_default` | `primary` | Which level the HTML report opens on when `alpha_secondary` is set — `primary` or `secondary`. |
+| `alpha_default` | `primary` | Which level the HTML report opens on when `alpha_secondary` is set, `primary` or `secondary`. |
 
 ### Weighting
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `show_weighted_base` | `TRUE` | Show the weighted base row (the % denominator). Turn off for simpler client tables — the unweighted count and effective base still show. |
+| `show_weighted_base` | `TRUE` | Show the weighted base row (the % denominator). Turn off for simpler client tables. The unweighted count and effective base still show. |
 
 ### Summary dashboard
 
@@ -1043,24 +1043,24 @@ above. Descriptions below are the template's own help text.
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `html_report_v2_microdata` | `TRUE` | Embed the anonymised per-respondent microdata island in the v2 report (coded answer indices + weights — no names, IDs or text). Powers the live filter, custom banners and COMPUTED views. Set `FALSE` for a confidentiality ship to insider populations (e.g. a small staff survey sent to the employer): the file then carries published aggregates only, and the live features switch off for that build. The Tracking tab still works — its current wave is built from the published figures — but no `*_wave.json` is written, so keep the one from your microdata run. **`FALSE` is required wherever `min_reporting_base` is a promise** — with the island present, sub-k detail is reconstructable from the page source. Tip: keep `TRUE` for your own working copy and build the client copy with `FALSE` from a second config. |
+| `html_report_v2_microdata` | `TRUE` | Embed the anonymised per-respondent microdata island in the v2 report (coded answer indices + weights, no names, IDs or text). Powers the live filter, custom banners and COMPUTED views. Set `FALSE` for a confidentiality ship to insider populations (e.g. a small staff survey sent to the employer): the file then carries published aggregates only, and the live features switch off for that build. The Tracking tab still works, its current wave is built from the published figures, but no `*_wave.json` is written, so keep the one from your microdata run. **`FALSE` is required wherever `min_reporting_base` is a promise**, with the island present, sub-k detail is reconstructable from the page source. Tip: keep `TRUE` for your own working copy and build the client copy with `FALSE` from a second config. |
 | `population_size` | *(blank)* | Total universe size for a census / full-invite study (e.g. all staff or students invited). Enables the finite population correction in the v2 report: intervals narrow as coverage of the universe rises, and a small base that is most of a known group is no longer flagged unstable. Per-group sizes go in the optional Population sheet. Blank = no correction. |
-| `sampling_note` | *(blank)* | Fieldwork caveat appended to the "How sure can I be of these numbers?" sentence in the v2 report — e.g. substitution when a selected store was unavailable, replaced clusters, low response. Plain text, one or two sentences. |
+| `sampling_note` | *(blank)* | Fieldwork caveat appended to the "How sure can I be of these numbers?" sentence in the v2 report, e.g. substitution when a selected store was unavailable, replaced clusters, low response. Plain text, one or two sentences. |
 
 ### Group overview tab (optional)
 
 | Setting | Default | Description |
 |---------|---------|--------------|
 | `patterns_banner` | *(blank)* | The banner group(s) the Group overview tab portrays (label or id, comma-separated for more than one). The tab is an overview of the SELECTED banner's groups. Blank = every banner group is scanned. |
-| `patterns_exclude_banners` | *(blank)* | Banners the Group overview tab must skip, comma-separated (label or code, e.g. `Interviewer`) — operational cuts are fieldwork QC, not client story. The banner still works everywhere else (crosstabs, Differences); it just never becomes a portrait. |
+| `patterns_exclude_banners` | *(blank)* | Banners the Group overview tab must skip, comma-separated (label or code, e.g. `Interviewer`): operational cuts are fieldwork QC, not client story. The banner still works everywhere else (crosstabs, Differences); it just never becomes a portrait. |
 | `patterns_headline` | *(blank)* | Pin the Group overview apex KPI tiles to these question codes, in order. Blank = auto-detect from question titles, which on a study with many section ratings can pick the wrong ones. |
 
 ### Reader report (optional)
 
 | Setting | Default | Description |
 |---------|---------|--------------|
-| `generate_reader_report` | `FALSE` | Also build the narrative Reader report (a `*_Reader.html` file) — a plain-language summary beside the crosstab that deep-links into its tables. Requires `html_report_v2 = TRUE`. Deterministic and on-device by default: no data leaves this machine. |
-| `reader_ai_prose` | `FALSE` | Draft the Reader narrative with an AI model instead of the built-in template (only used when `generate_reader_report = TRUE`). Requires an Anthropic API key in the `ANTHROPIC_API_KEY` environment variable. Only aggregate figures are sent — never microdata or verbatims — and every number the model writes is checked against the data. Falls back to the on-device narrative (and says so) if the model is unavailable. |
+| `generate_reader_report` | `FALSE` | Also build the narrative Reader report (a `*_Reader.html` file): a plain-language summary beside the crosstab that deep-links into its tables. Requires `html_report_v2 = TRUE`. Deterministic and on-device by default: no data leaves this machine. |
+| `reader_ai_prose` | `FALSE` | Draft the Reader narrative with an AI model instead of the built-in template (only used when `generate_reader_report = TRUE`). Requires an Anthropic API key in the `ANTHROPIC_API_KEY` environment variable. Only aggregate figures are sent, never microdata or verbatims, and every number the model writes is checked against the data. Falls back to the on-device narrative (and says so) if the model is unavailable. |
 
 ### Analyst & closing section / study identification
 
@@ -1071,8 +1071,8 @@ above. Descriptions below are the template's own help text.
 | `verbatim_filename` | *(blank)* | Path to a verbatim comments file for inclusion in the report. |
 | `closing_notes` | *(blank)* | Custom text for the closing section of the HTML report. |
 | `generate_stats_pack` | `Y` | Generate a diagnostic stats pack workbook alongside the main output (`{output}_stats_pack.xlsx`). Stats packs are contractual deliverables on some engagements. |
-| `project_name` | *(blank)* | Project name — appears in the stats pack Declaration sheet for identification and sign-off. Leave blank if not using the stats pack. |
-| `research_house` | *(blank)* | Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name. |
+| `project_name` | *(blank)* | Project name. Appears in the stats pack Declaration sheet for identification and sign-off. Leave blank if not using the stats pack. |
+| `research_house` | *(blank)* | Research organisation name. Appears in the stats pack Declaration sheet. Use your company or white-label partner name. |
 
 ------------------------------------------------------------------------
 
@@ -1083,7 +1083,7 @@ The Selection sheet tells Tabs which questions to analyze and how.
 **The Y/N columns (Include, UseBanner, BannerBoxCategory, CreateIndex).**
 Case and surrounding spaces do not matter: `Y`, `y`, `Yes` and `TRUE` all mean
 yes; `N`, `n`, `No` and `FALSE` all mean no. A blank cell means no. Anything
-else — `maybe`, `x`, a stray character — stops the run with
+else, `maybe`, `x`, a stray character, stops the run with
 `CFG_INVALID_FLAG_VALUE` naming the row, rather than being read as "no" and
 dropping the question from the deliverable in silence.
 
@@ -1135,7 +1135,7 @@ questions where options are stored per-slot in the Options sheet (e.g.,
 supported as banners. The banner processor automatically discovers the
 options from the slot codes, deduplicates by option text, and assigns a
 respondent to a column if they selected that option in **any** slot. No
-special configuration is required — simply set `UseBanner = Y` on the
+special configuration is required. Simply set `UseBanner = Y` on the
 root question code as normal.
 
 ### Column: BannerBoxCategory
@@ -1198,7 +1198,7 @@ meaningful.
 
 **What it does:** Brings a closed Single_Response or Multi_Mention
 question into the Patterns tab's cross-question scan by naming its key
-share — the one answer (or BoxCategory / NET grouping) whose share
+share. The one answer (or BoxCategory / NET grouping) whose share
 summarises the question.
 
 **Required:** No. Blank means the question stays out of the Patterns
@@ -1206,12 +1206,12 @@ scan, which is the honest default: the data cannot tell which answer is
 the good one, so nothing is scanned until you say.
 
 **What to enter:** The exact label of an option, BoxCategory or NET row
-— matched after trimming, ignoring case and non-breaking spaces. A
+, matched after trimming, ignoring case and non-breaking spaces. A
 grouping (NET/box) wins over a same-named single option.
 
 **The one rule:** the share you name must be one where a HIGHER share is
 BETTER. If the natural summary of a question is a problem share, name
-the favourable complement instead — on "Is language a problem?" enter
+the favourable complement instead, on "Is language a problem?" enter
 `Not a problem`, not the problem options.
 
 **Examples:** - `Always` (delivery on the correct day) - `Yes` (offered
@@ -1220,7 +1220,7 @@ a sales promotion) - `Not a problem` (language difficulty, flipped) -
 
 **When to leave blank:** Profile and preference questions with no good
 or bad direction (order method, franchise vs independent, who takes the
-order) — and rated questions, where CreateIndex already summarises them
+order), and rated questions, where CreateIndex already summarises them
 (a KeyShare on a rated question is ignored).
 
 **See:** `PATTERNS_KEY_SHARE_GUIDE.md` for worked examples from live
@@ -1230,7 +1230,7 @@ studies.
 
 **What it does:** Keeps this question out of the **Differences tab's
 findings** while it stays in the crosstabs, the dashboard and every
-other tab exactly as before. Nothing is dropped from the deliverable —
+other tab exactly as before. Nothing is dropped from the deliverable,
 the question simply stops competing for a place in "where groups
 differ".
 
@@ -1238,12 +1238,12 @@ differ".
 the default for every question.
 
 **What to enter:** `Y` to keep it out. `N` or blank to leave it in. Read
-like the other Y/N gate columns — any case, `Yes`/`No` and `TRUE`/`FALSE`
-accepted — and a value Turas cannot read stops the run naming the row,
+like the other Y/N gate columns. Any case, `Yes`/`No` and `TRUE`/`FALSE`
+accepted, and a value Turas cannot read stops the run naming the row,
 rather than quietly meaning "no".
 
 **When to use Y:** When several near-duplicate views of one measure each
-raise their own card and crowd the ranking — a study carrying
+raise their own card and crowd the ranking. A study carrying
 `Own_SpendPerTxn`, `Total_SpendPerTxn` and `Total_MonthlySpend` for the
 same category tells one story three times, so mark two of them and keep
 the one you want read. Also for a modelled or imputed figure that should
@@ -1261,14 +1261,14 @@ that scan, and dropping it would silently remove a group portrait's
 input for a reason belonging to a different tab. If you want a question
 out of **both** tabs, use `insight_exclude_categories`, which gates both.
 
-### Column: AreaSummary — RETIRED
+### Column: AreaSummary. RETIRED
 
 **This column is absent from the generated Selection template and has no
 effect.** The strongest/weakest AREA cards it fed were retired in
 2026-08; if a config still carries an `AreaSummary` mark, the Group
 overview tab's console + diagnostics echo says so rather than acting on
 it silently (see `patterns_echo.R`). Remove the column from older
-configs — there is nothing to migrate it to.
+configs. There is nothing to migrate it to.
 
 ### Column: Source
 
@@ -1287,7 +1287,7 @@ about where this question came from.
 
 **When to use:** Whenever a reader could reasonably wonder whether a
 figure was asked or worked out. That is always true of a study whose
-data is built before Turas sees it — derived columns, composites,
+data is built before Turas sees it. Derived columns, composites,
 anything computed upstream arrives as a finished column and the engine
 has no way to tell the difference.
 
@@ -1298,7 +1298,7 @@ words. A question with a formula is badged **DERIVED** on its card; a
 question with a Source and no formula is badged **ASKED**.
 
 A derived question shows the formula as a line under its base, on by
-default — the badge raises the question and the answer should not be
+default. The badge raises the question and the answer should not be
 behind a control a reader has to find. The line also travels into a
 pinned card and a PowerPoint slide, which is where a derived figure is
 most likely to be misread. An asked question shows no line: the badge is
@@ -1315,19 +1315,19 @@ understand, not code.
 `transactions a month across ALL respondents; non-buyer = 0`
 
 **When to use:** On every column computed before the data reached
-Turas. Two figures that look alike often are not — a per-person average
+Turas. Two figures that look alike often are not. A per-person average
 of each buyer's own ratio is a different number from total spend over
 total transactions, and the formula is what stops a reader confusing
 them.
 
 **Note:** These two columns are the only thing that distinguishes an
 asked figure from a derived one, and neither is inferred. A config that
-leaves both blank produces exactly the report it always did — no
+leaves both blank produces exactly the report it always did. No
 badges, and no Sources toggle on the controls bar.
 
 **Composites are the exception.** A composite is built by Turas, so it
 already knows which questions feed it and how they combine, and it fills
-its own Source and Formula from the Composite_Metrics sheet — you get
+its own Source and Formula from the Composite_Metrics sheet. You get
 `Q01, Q02, Q03` and `mean of the 3 source questions` without typing
 anything. Give the composite a Source or Formula on the Selection sheet
 and yours wins, per field: write only a Formula and the generated source
@@ -1386,13 +1386,13 @@ question is without switching to the Survey_Structure file.
 
 **What to enter:** The comment-workbook sheet name (e.g. `Q06Comment`). For
 an NPS-style "why?" routed into several band sheets, list them as
-`Sheet:Band; Sheet:Band; …` to reassemble into ONE question — e.g.
+`Sheet:Band; Sheet:Band; …` to reassemble into ONE question, e.g.
 `DetractorComment:Detractor; PassiveComment:Passive; PromoterComment:Promoter`
-(`:` is safe as the separator — Excel forbids it in a sheet name).
+(`:` is safe as the separator, Excel forbids it in a sheet name).
 
 ### Column: CommentLink
 
-**What it does:** The closed question or composite the open-end explains —
+**What it does:** The closed question or composite the open-end explains,
 puts a "💬 comments" jump affordance on that card.
 
 **Required:** No (blank = a standalone/generic open-end)
@@ -1410,7 +1410,7 @@ segmented-view label and the export column header).
 
 ### Column: NpsScoreQuestion
 
-**What it does:** The 0–10 recommend question the band is DERIVED from — the
+**What it does:** The 0–10 recommend question the band is DERIVED from. The
 score wins over which sheet the comment text landed in, and mismatches are
 logged to the console.
 
@@ -1854,7 +1854,7 @@ order they're listed.
 -   Blank = Include in output (showing the option is the default)
 
 **When to exclude:** You might have internal codes or "Don't know"
-responses you don't want to display. Set those to `N` — leaving the cell
+responses you don't want to display. Set those to `N`. Leaving the cell
 blank shows them.
 
 ### Column: ExcludeFromIndex
@@ -2128,9 +2128,9 @@ If one bin ends at 34, the next should start at 35.
 
 ## ReportText Sheet
 
-The v2 report's explanatory text — the "How to read this report" panel, the
+The v2 report's explanatory text. The "How to read this report" panel, the
 significance explainers, the precision footer, the weighting note, the About
-card's construction note — is authored once, platform-wide, in the **Callout
+card's construction note. Is authored once, platform-wide, in the **Callout
 Editor** (launched from `launch_turas()`, module `tabs`). Change it there and
 every study picks it up at its next generation.
 
@@ -2161,8 +2161,8 @@ the Callout Editor under module `tabs`.
     attributes, and any `{placeholders}` the key declares must survive.
 -   Overriding is per-build. The registry is untouched, so the platform wording
     is still there for every other study.
--   For a study's *narrative* — background, executive summary, how its numbers
-    were built — use the **Comments** sheet's `_BACKGROUND`,
+-   For a study's *narrative*. Background, executive summary, how its numbers
+    were built. Use the **Comments** sheet's `_BACKGROUND`,
     `_EXECUTIVE_SUMMARY` and `_REPORT_CONSTRUCTION` rows instead. This sheet is
     for the report's standing explanatory furniture.
 
@@ -2170,15 +2170,15 @@ the Callout Editor under module `tabs`.
 
 ## AddedSlides Sheet
 
-Exhibits from outside the crosstab data — a qual-phase slide exported as
-an image, a photo board, a method note — authored here rather than typed
+Exhibits from outside the crosstab data. A qual-phase slide exported as
+an image, a photo board, a method note. Authored here rather than typed
 into the browser, so they are identical in every copy of the report and
 survive a rebuild.
 
 They appear on the v2 Report tab under **Study slides**, read-only (the
 report author owns them, like the `_BACKGROUND` / `_EXECUTIVE_SUMMARY`
 sections). Each one carries a pin: pin it and it joins the **Story**, and
-exports to PowerPoint as a genuine full-slide picture — the original file,
+exports to PowerPoint as a genuine full-slide picture. The original file,
 not a screenshot of a card, so it is the sharpest thing in the deck.
 
 This is separate from the Report tab's own **Added slides** card, which is
@@ -2186,7 +2186,7 @@ the reader's scratch space in the browser. Both can be used at once.
 
 | Column         | Description                                    | Required |
 |----------------|-------------------------------------------------|----------|
-| `slide_title`  | Slide heading — also the pin's title in the story | Yes    |
+| `slide_title`  | Slide heading, also the pin's title in the story | Yes    |
 | `content`      | Slide body text                                | Yes      |
 | `display_order`| Sort order (blank = sheet row order)           | No       |
 | `image_path`   | Path to an image file to embed in the slide    | No       |
@@ -2195,7 +2195,7 @@ the reader's scratch space in the browser. Both can be used at once.
 
 - Image paths can be relative (to the config file's own folder) or absolute
 - Displayed formats: PNG, JPG, GIF, SVG, WEBP. **PowerPoint export covers
-  PNG, JPG and GIF** — an SVG or WebP slide shows in the report but exports
+  PNG, JPG and GIF**. An SVG or WebP slide shows in the report but exports
   as its text, so use PNG or JPG for anything destined for a deck
 - **Images are limited to 1.5 MB each**, the same limit as the in-browser
   import. A larger file is refused with a console message naming the slide
@@ -2245,13 +2245,13 @@ pulled from the config" section).
 `_REPORT_CONSTRUCTION` exists because the About card's standard sentence
 describes a report that Turas built on its own, and says the published figures
 are computed in R. That is accurate for a stock report. It stops being accurate
-the moment a study puts other stages around Turas — a derived-variable engine
+the moment a study puts other stages around Turas. A derived-variable engine
 ahead of it, a preparation layer that builds composite columns, extra pages that
 compute their figures in the reader's browser from their own embedded data.
 Turas cannot see those stages, so it does not guess: the study declares them and
 the declaration stands in place of the standard text.
 
-**A declaration replaces the whole section**, not just the first sentence — the
+**A declaration replaces the whole section**, not just the first sentence. The
 stock paragraphs on reproducibility, AI as a working tool and author review go
 with it. A study that says how its own numbers were built is the authority on
 that, and it owns the assurances too, including whether the report says anything
@@ -2259,14 +2259,14 @@ about AI. If you want any of those paragraphs, write them into the row yourself.
 
 The producer line ("This report was produced by … using Turas Analytics") is
 kept either way, so a declaration cannot accidentally drop the attribution. Your
-text is added *after* it — do not open the row by repeating it, or the sentence
+text is added *after* it. Do not open the row by repeating it, or the sentence
 prints twice.
 
 **Leave the row out and nothing changes.** A config that says nothing renders
 exactly the report it rendered before this row existed.
 
 Blank lines in the cell become separate paragraphs. Write it in plain words, and
-do not put `&`, `<` or `>` in the cell — `openxlsx` hands R the literal `&gt;`
+do not put `&`, `<` or `>` in the cell, `openxlsx` hands R the literal `&gt;`
 and the text arrives mangled. Write "and" rather than an ampersand.
 
 The row is the report author's own words. It is a statement about how the study
@@ -2278,7 +2278,7 @@ was run and who stands behind it, so it should read as the author would say it.
 # Chapter 3: Tracking Question_Mapping Template
 
 `Tracking_QuestionMap_Template.xlsx` links a study's waves together so the
-v2 report can draw a trend. You need it only for a tracking study — but you
+v2 report can draw a trend. You need it only for a tracking study, but you
 need it from **wave one**, because a mapping written at wave two has already
 lost wave one.
 
@@ -2286,8 +2286,8 @@ lost wave one.
 > thing.** This one is for studies where each wave's raw respondent data
 > still exists: its `QuestionCode` is a canonical key you invent, deliberately
 > independent of any wave's question numbering, and it carries one
-> `Wave<YEAR>` column per wave. The *other* one —
-> `Aggregate_QuestionMap_Template.xlsx` — is for history that survives only
+> `Wave<YEAR>` column per wave. The *other* one,
+> `Aggregate_QuestionMap_Template.xlsx`. Is for history that survives only
 > as published figures in a values table; there `QuestionCode` **is** the live
 > survey code and there is a single wave column. Using the wrong one produces
 > a mapping that reads without error and tracks nothing. If you hold the raw
@@ -2304,13 +2304,13 @@ wave. It is the single most important cell in the file.
 
 **Required:** Yes.
 
-**What to enter:** A code you invent and then never change — `ENG01`,
+**What to enter:** A code you invent and then never change, `ENG01`,
 `SAT_OVERALL`, `NPS`. It must **not** be a survey question code: the survey
 renumbers between waves (SACS asked engagement item 1 as `Q01` in 2023 and
 `Q05` from 2024), and the join key must not move when it does.
 
-**The trap:** the key is normalised before matching — lower-cased with
-punctuation stripped — so `Q_Engage` becomes `qengage`. A composite named
+**The trap:** the key is normalised before matching. Lower-cased with
+punctuation stripped, so `Q_Engage` becomes `qengage`. A composite named
 `Q_Engage` here will not join history keyed `engagement`. Name the row for
 the metric (`Engagement`), and put the code the data uses (`Q_Engage`) in
 the wave column.
@@ -2319,7 +2319,7 @@ the wave column.
 
 **What it does:** The display title for the metric in the report.
 
-**Required:** No — falls back to QuestionCode.
+**Required:** No. Falls back to QuestionCode.
 
 ### Column: TrackingSpecs
 
@@ -2333,7 +2333,7 @@ the wave column.
 **What it does:** Marks the row as a **composite** and names the canonical
 codes it averages (e.g. `ENG01,ENG02,...,ENG12`).
 
-**Required:** No — leave blank on an ordinary question.
+**Required:** No. Leave blank on an ordinary question.
 
 **Who reads it:** the tabs tracker does **not**. It reads a composite
 straight from the Survey_Structure's Composite_Metrics sheet, so a live wave
@@ -2344,7 +2344,7 @@ it in if you might ever backfill; it costs nothing if you don't.
 
 ### Column: Wave\<YEAR\>
 
-**What it does:** This metric's question code in that wave's **data** — one
+**What it does:** This metric's question code in that wave's **data**. One
 column per wave, e.g. `Wave2024`, `Wave2025`, `Wave2026`.
 
 **What to enter:** The data column for that year (`Q05`), or blank if the
@@ -2352,7 +2352,7 @@ metric wasn't asked that wave.
 
 **Which column is "live":** the report works it out by matching your data
 against each wave column and taking the best fit. If two columns list
-identical codes it says so and takes the leftmost — harmless when the codes
+identical codes it says so and takes the leftmost. Harmless when the codes
 really are identical, but fill only the current wave's column on a new row
 and the ambiguity never arises.
 
@@ -2364,7 +2364,7 @@ whole-sample trends.
 
 | Column | Meaning |
 |---|---|
-| `BreakLabel` | The dimension's name — `Total`, `Campus`, `Department`. |
+| `BreakLabel` | The dimension's name, `Total`, `Campus`, `Department`. |
 | `Wave<YEAR>` | The banner question's code in that wave's data. `Total` leaves these blank: it means all respondents. |
 
 **Two rules this sheet enforces quietly, so know them:**
@@ -2373,7 +2373,7 @@ whole-sample trends.
    QuestionMap. The backfill scans the first ten rows for `BreakLabel` and
    warns loudly if it can't find one, but a template that needs the fallback
    is a template inviting a silent Total-only run.
-2. **Anything in column A becomes a dimension.** Don't write notes there —
+2. **Anything in column A becomes a dimension.** Don't write notes there,
    a help sentence in column A becomes a breakout named after itself.
 
 ## When the trend lines have gaps
@@ -2383,7 +2383,7 @@ of two things:
 
 - **A wave contributed no segments.** A normal tabs run records the whole
   sample only; per-group figures for a prior wave come from the segment
-  backfill. Re-running that wave does not change this — only the backfill
+  backfill. Re-running that wave does not change this, only the backfill
   does.
 - **A label changed.** Prior waves join to the current report by the
   normalised group LABEL, and the banner it came from is ignored. So

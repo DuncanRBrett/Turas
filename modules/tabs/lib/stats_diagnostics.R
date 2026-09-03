@@ -36,7 +36,7 @@ build_tabs_diagnostics <- function(config_result, data_result,
   config_obj <- config_result$config_obj
 
   # Data receipt. The data file is declared on the STRUCTURE workbook's
-  # Project sheet (data_setup.R), not in Settings — read it from where the run
+  # Project sheet (data_setup.R), not in Settings. Read it from where the run
   # actually found it, falling back to a Settings override (review 2026-08, I4).
   project_data_file <- tryCatch(
     get_config_value(data_result$survey_structure$project, "data_file", NULL),
@@ -81,7 +81,7 @@ build_tabs_diagnostics <- function(config_result, data_result,
   n_partials <- sum(vapply(run_result$events %||% list(),
                            function(e) identical(e$level, "PARTIAL"), logical(1)))
   trs_summary <- if (n_events == 0) {
-    "No events — ran cleanly"
+    "No events. Ran cleanly"
   } else {
     parts <- character(0)
     if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
@@ -97,10 +97,10 @@ build_tabs_diagnostics <- function(config_result, data_result,
     "Analysis Type"              = "Cross-tabulation",
     "Questions Processed"        = as.character(n_questions),
     "Questions Skipped"          = as.character(n_skipped),
-    "Weighting"                  = if (is_weighted) sprintf("Yes — %s", weight_var) else "No",
-    "Effective N"                = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "—",
+    "Weighting"                  = if (is_weighted) sprintf("Yes, %s", weight_var) else "No",
+    "Effective N"                = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "–",
     "Significance Testing"       = if (sig_enabled) "Enabled" else "Disabled",
-    "Alpha (p-value threshold)"  = if (sig_enabled) sprintf("%.3f", alpha_val) else "—",
+    "Alpha (p-value threshold)"  = if (sig_enabled) sprintf("%.3f", alpha_val) else "–",
     "Minimum Base Size"          = as.character(min_base_val),
     "Bonferroni Correction"      = if (sig_enabled && isTRUE(config_obj$bonferroni_correction)) "Applied" else "Not applied",
     "Interactive Report"         = if (isTRUE(config_obj$html_report_v2)) "Generated" else "Not requested",
@@ -112,7 +112,7 @@ build_tabs_diagnostics <- function(config_result, data_result,
   # Finite population correction. Stated only when a universe is actually
   # configured, so a sample study's Declaration is unchanged. Reads the real
   # config keys (population_size, the Population sheet) rather than a flag that
-  # might not reflect what the engine did — the lesson of review finding I4.
+  # might not reflect what the engine did. The lesson of review finding I4.
   pop_size <- suppressWarnings(as.numeric(config_obj$population_size))
   pop_size <- if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) pop_size else NULL
   pop_frame <- config_obj$population_frame
@@ -131,7 +131,7 @@ build_tabs_diagnostics <- function(config_result, data_result,
         sprintf("%d declared on the Population sheet", n_subgroups)
     }
     assumptions[["Finite population correction"]] <- sprintf(
-      paste0("Applied — significance and intervals use finite-population-",
+      paste0("Applied. Significance and intervals use finite-population-",
              "corrected effective bases. Coverage at or below %.0f%% is left ",
              "uncorrected; a fully counted column is reported without ",
              "significance letters."),
@@ -204,7 +204,7 @@ build_tabs_diagnostics <- function(config_result, data_result,
 #' Pure transform of a stats-pack payload into a compact, JSON-friendly object
 #' the Report tab renders (project$diagnostics). Curated per the operator
 #' decision: identity, data received & used, assumptions/parameters, TRS
-#' warnings and reproducibility — the raw config echo is left to the Excel pack.
+#' warnings and reproducibility. The raw config echo is left to the Excel pack.
 #'
 #' Sections are ordered [label, value] rows so key order is deterministic in the
 #' island (never relies on JSON object key ordering).
@@ -218,9 +218,9 @@ diagnostics_for_island <- function(payload) {
 
   # Coerce a scalar to a clean display string; NULL/NA/empty -> em dash.
   disp <- function(x) {
-    if (is.null(x) || length(x) == 0) return("—")
+    if (is.null(x) || length(x) == 0) return("–")
     x <- x[[1]]
-    if (length(x) == 0 || is.na(x) || !nzchar(as.character(x))) return("—")
+    if (length(x) == 0 || is.na(x) || !nzchar(as.character(x))) return("–")
     as.character(x)
   }
   row <- function(label, value) c(as.character(label), disp(value))
@@ -272,8 +272,8 @@ diagnostics_for_island <- function(payload) {
     row("R version",     payload$r_version),
     row("Packages",      if (!is.null(payload$packages)) paste(payload$packages, collapse = ", ") else NULL),
     # Naming R alone understated where the arithmetic happens. R computes the
-    # published figures; every COMPUTED view the reader makes — filters, custom
-    # banners, wave-on-wave comparisons and their significance — is recomputed
+    # published figures; every COMPUTED view the reader makes. Filters, custom
+    # banners, wave-on-wave comparisons and their significance. Is recomputed
     # by Turas's own engine inside this file, in the browser. Both are Turas and
     # both are deterministic, but a reader told only "R" is told half of it.
     row("Compute engines", paste0(
@@ -303,7 +303,7 @@ diagnostics_for_island <- function(payload) {
     )
   })
   summary_txt <- if (length(events_raw) == 0) {
-    "No events — analysis ran cleanly"
+    "No events. Analysis ran cleanly"
   } else {
     sprintf("%d event(s) recorded", length(events_raw))
   }

@@ -8,7 +8,7 @@
  *
  * Also gates render.pieChart's full-circle case: a slice at 100% of the total
  * makes sweep = 2π, so the SVG arc's endpoints coincide and the whole donut
- * rendered as nothing — it must now draw a visible full ring.
+ * rendered as nothing. It must now draw a visible full ring.
  *
  * Run: node modules/tabs/lib/html_report_v2/tests/charts_tests.mjs
  */
@@ -33,7 +33,7 @@ vm.runInContext(readFileSync(path.join(JS_DIR, "23z_charts.js"), "utf8"), sandbo
 const repel = sandbox.TR.render.repel;
 const pieChart = sandbox.TR.render.pieChart;
 
-// pieChart deps normally supplied by 23_render.js — minimal stand-ins
+// pieChart deps normally supplied by 23_render.js. Minimal stand-ins
 sandbox.TR.render.chartRows = (model) => ({ rows: model.rows, axisMax: 100 });
 sandbox.TR.render.categoryColours = (rows) =>
   rows.map((r, i) => ["#1b6e53", "#b3372f", "#a8842c"][i % 3]);
@@ -54,7 +54,7 @@ function run(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
-console.log("Chart geometry — suite:");
+console.log("Chart geometry. Suite:");
 
 run("repel never pushes a label below minPos (crowded backward sweep)", () => {
   // 5 labels bunched at the bottom, gap 10 wider than the 12-tall track: the

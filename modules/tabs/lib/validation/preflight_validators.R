@@ -54,7 +54,7 @@ check_selection_vs_questions <- function(selection_df, questions_df, error_log) 
   sel_codes <- unique(selection_df$QuestionCode)
   q_codes <- unique(questions_df$QuestionCode)
 
-  # "Total" is a magic banner code that the tabs engine produces internally —
+  # "Total" is a magic banner code that the tabs engine produces internally,
   # the standard Crosstab_Config template ships with it on row 5 of Selection.
   # It must NOT be required to also appear in the Survey_Structure Questions
   # sheet, otherwise every freshly-generated config fails preflight.
@@ -130,7 +130,7 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
     #
     # OptionText is the answer, by definition ("EXACT value from data file").
     # OptionCode and OptionValue are alternative codings that only SOMETIMES
-    # carry it — OptionValue in particular is the numeric a mean is computed
+    # carry it. OptionValue in particular is the numeric a mean is computed
     # from, and on a Likert it routinely holds the scale position 1..5 while the
     # data holds the words. Preferring it there made every real answer read as
     # undefined and every option as unused: 53 spurious warnings on one study,
@@ -157,7 +157,7 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
 
     if (length(data_values) == 0 || length(defined_values) == 0) next
 
-    # "Unused" is only meaningful against the coding the data actually speaks —
+    # "Unused" is only meaningful against the coding the data actually speaks,
     # reporting the unmatched 1..5 of a Likert's OptionValue alongside its
     # matched labels would reinstate half the noise. Pick the candidate that
     # covers the most of the data and judge unused options against that one.
@@ -183,11 +183,11 @@ check_option_values_vs_data <- function(questions_df, options_df, survey_data,
     #
     # Absence only means something when the option had a fair chance of being
     # picked. On a pilot export an unused scale point is arithmetic, not a
-    # config error — and reporting one per question buries the warnings that
+    # config error, and reporting one per question buries the warnings that
     # matter. Gate on the conventional expected-cell floor of 5: with a base of
     # n spread over k options, an option is expected about n/k times, so below
     # 5 the check is uninformative and stays quiet. The Undefined check above is
-    # NOT gated — a value the config cannot describe is a fault at any base.
+    # NOT gated. A value the config cannot describe is a fault at any base.
     answered_base <- sum(!is.na(survey_data[[col_name]]) &
                          trimws(as.character(survey_data[[col_name]])) != "")
     expected_per_option <- answered_base / max(length(unused_pool), 1L)
@@ -740,7 +740,7 @@ check_data_column_coverage <- function(selection_df, questions_df, survey_data,
 
     if (var_type == "Allocation") {
       # Allocation (constant-sum) spreads across {code}_1..{code}_N with NO
-      # bare column, exactly like Multi_Mention — check_allocation_columns()
+      # bare column, exactly like Multi_Mention. Check_allocation_columns()
       # verifies those members. Looking for a bare column here raised a hard
       # ERROR on every allocation question and blocked the run (VAS 2026, the
       # first study to use the type).
@@ -806,7 +806,7 @@ check_preflight_logo_files <- function(config, error_log) {
 #' Validates that brand_colour, accent_colour, and chart_bar_colour are valid
 #' hex colour codes. Unconditional since the classic report was retired: the
 #' interactive report reads the same three fields, and only well-formed hex
-#' reaches its renderer — junk simply disappears without this warning.
+#' reaches its renderer. Junk simply disappears without this warning.
 #'
 #' @param config List, configuration object
 #' @param error_log Data frame, error log
@@ -842,7 +842,7 @@ check_preflight_colour_codes <- function(config, error_log) {
 #'
 #' Validates that the dashboard colour break thresholds are logically ordered
 #' (green > amber). Runs unconditionally: it used to be gated on
-#' `include_summary`, which was retired with the classic HTML report — and a
+#' `include_summary`, which was retired with the classic HTML report, and a
 #' retired setting is absent from `config_obj`, so the gate would have read NULL
 #' and returned early forever, silently killing the check for the pairs that ARE
 #' live (production review 2026-08, I11). The pairs always have defaults, so

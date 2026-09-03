@@ -1,5 +1,5 @@
 /**
- * v2 wave history — matches 2025 questions to the published results of
+ * v2 wave history. Matches 2025 questions to the published results of
  * every prior wave (TR.PREV.waves; any number of waves) and serves trend
  * series for the Total column AND for banner segments where the wave
  * workbooks carry them (sparse: e.g. Campus 2020-2022+2024, more in 2024).
@@ -7,7 +7,7 @@
  * Matching is by normalised title, occurrence-ordered for duplicate titles,
  * mirroring pipeline/extract_waves.py (which also applies the cross-wave
  * title + segment aliases). History values are always published wave
- * figures — the synthetic microdata never filters prior waves.
+ * figures. The synthetic microdata never filters prior waves.
  *
  * SIZE-EXCEPTION: one wave-history engine; the Total and per-segment read
  * paths share the NET member-sum / NET POSITIVE / Index-recompute fallback
@@ -72,7 +72,7 @@
 
   /** Per-respondent scores for q in the CURRENT wave (the island wave flagged
    *  `current`), or null. Lets the live model derive the current point's SD
-   *  from microdata when its published distribution is absent — so wave-on-wave
+   *  from microdata when its published distribution is absent, so wave-on-wave
    *  significance holds without any pre-calculated figure. */
   waves.currentScores = function (q) {
     ensureIndexes();
@@ -98,7 +98,7 @@
 
   /** Current-wave point {value, base, sd} recomputed from microdata (Total),
    *  or null. Treating the current wave exactly like history keeps the whole
-   *  series internally consistent — full precision, no rounded summary. */
+   *  series internally consistent. Full precision, no rounded summary. */
   waves.currentPoint = function (q) {
     var s = waves.currentScores(q);
     if (!s || !s.length) return null;
@@ -178,7 +178,7 @@
   /* ---------- microdata recompute (per-respondent scores) ----------
    * A wave question may carry `scores`: per-respondent metric values (the
    * rating for means; +100/0/-100 for NPS). When present, the headline value
-   * and its SD are recomputed directly from them — the flexible model that
+   * and its SD are recomputed directly from them. The flexible model that
    * needs no published distribution and no pre-baked significance. Absent
    * (e.g. SACAP), every path below falls back to stats/distribution, so
    * existing reports are byte-for-byte unaffected. Total column only for now
@@ -228,7 +228,7 @@
 
   /**
    * Published value of view-model row ri in one wave question, or null.
-   * ri indexes q.rows — attachDeltas runs before row ops reorder them.
+   * ri indexes q.rows. AttachDeltas runs before row ops reorder them.
    */
   waves.valueAt = function (q, row, ri, waveQ, seg) {
     if (row.kind === "mean") return meanValue(q, row, waveQ, seg);
@@ -256,7 +256,7 @@
    * weighted tracker. These size it on n_eff, mirroring the crosstab weighted
    * z-test (22_model.js sigCell) and the R engine (weighting.R). Total path only:
    * segments and computed-totals waves have no per-respondent weights, so they
-   * fall back to the plain base — and an unweighted study has n_eff === n, so
+   * fall back to the plain base, and an unweighted study has n_eff === n, so
    * every path below is byte-identical there. */
   function effNfromWeights(w, n) {
     if (!w || !w.length) return n;
@@ -280,7 +280,7 @@
   }
 
   /** (count, base) a proportion test runs on. Weighted report: the shown %
-   *  carried on the effective base (x = %·n_eff over n_eff) — the weighted
+   *  carried on the effective base (x = %·n_eff over n_eff): the weighted
    *  z-test form. Unweighted report: the exact integer count, byte-identical.
    *  Weightedness is the PROJECT flag, never inferred from n_eff === base: a
    *  constant (e.g. expansion) weight has n_eff exactly n while p.x is the
@@ -295,7 +295,7 @@
     // pRaw is the unrounded proportion when the point's source has one (the
     // current wave does; a published prior wave does not). Without it the
     // weighted branch rebuilt the count from the DISPLAY-rounded cell, so on a
-    // 0dp report the test saw 47% for anything from 46.5 to 47.5 — the rounding
+    // 0dp report the test saw 47% for anything from 46.5 to 47.5. The rounding
     // trap, and the reason this chip could disagree with the Tracking tab on the
     // same movement (review 2026-08, I3).
     var pct = (p.pRaw !== null && p.pRaw !== undefined) ? p.pRaw : p.value;
@@ -362,7 +362,7 @@
   };
 
   /** SD of a mean-kind row in the CURRENT wave from a view model's Total
-   *  column (rows still aligned with q.rows — pre row-ops). */
+   *  column (rows still aligned with q.rows, pre row-ops). */
   function sdFromModel(q, row, viewModel) {
     var scores = waves.scoreMap(q, row);
     if (!scores) return null;
@@ -370,7 +370,7 @@
     Object.keys(scores).forEach(function (ri) {
       var srow = viewModel.rows[ri];
       // The SD is derived from the category DISTRIBUTION, which only holds as
-      // column percentages — a counts-only row would inflate it (2026-08, C1).
+      // column percentages. A counts-only row would inflate it (2026-08, C1).
       if (srow && !TR.fmt.isColPctStat(srow.stat)) return;
       var cell = srow && srow.cells[0];
       if (cell && cell.pct !== null && cell.pct !== undefined) {
@@ -399,7 +399,7 @@
     var az = Math.abs(z);
     return az > TR.stats.zPrimary(1) ? 2 : az > TR.stats.zSecondary(1) ? 1 : 0;
   }
-  /** Strong (95%) Welch test — unchanged semantics for non-dual callers. */
+  /** Strong (95%) Welch test. Unchanged semantics for non-dual callers. */
   function meanSigBetween(a, b) { return meanLevel(a, b) === 2; }
 
   /** Count for sig testing: published n (Total only), else pct-derived. */
@@ -429,7 +429,7 @@
     var az = Math.abs(z);
     return az > TR.stats.zPrimary(1) ? 2 : az > TR.stats.zSecondary(1) ? 1 : 0;
   }
-  /** Strong (95%) proportion test — unchanged semantics for non-dual callers. */
+  /** Strong (95%) proportion test. Unchanged semantics for non-dual callers. */
   function sigBetween(a, b) { return propLevel(a, b) === 2; }
 
   /**
@@ -481,7 +481,7 @@
       if (a.sd !== undefined && a.sd !== null) return meanLevel(a, b);
       return 0;
     };
-    // Could the test between two waves actually RUN — i.e. did both waves carry the
+    // Could the test between two waves actually RUN, i.e. did both waves carry the
     // inputs it needs (bases >= the reporting threshold, a count for proportions, a
     // spread for means)? propLevel/meanLevel return 0 both when a test runs and finds
     // nothing AND when it can't run at all, so this separates "flat" from "untestable"
@@ -497,7 +497,7 @@
     // Display precision: the reader must be able to reproduce a change by
     // subtracting the two figures on screen, so both ENDPOINTS are rounded
     // first and the difference taken after. level() above still reads the raw
-    // points — significance is computed on the underlying values, exactly as
+    // points. Significance is computed on the underlying values, exactly as
     // the crosstab does (it tests counts and bases, never the rounded cell).
     var dp = decimals == null ? fmt.decimalsFor(!canSig) : decimals;
     var disp = function (v) {
@@ -530,7 +530,7 @@
   waves.attachDeltas = function (q, viewModel) {
     // Prior waves are published full-sample Totals (no microdata to filter), so
     // under an audience filter a wave delta compares filtered-now against
-    // unfiltered-prior — misleading. Render the filtered view as untracked; the
+    // unfiltered-prior. Misleading. Render the filtered view as untracked; the
     // filter bar explains the trend is hidden.
     if (viewModel.filtered) {
       viewModel.history = [];
@@ -572,19 +572,19 @@
         sd: isMean && !row.diff ? sdFromModel(q, row, viewModel) : undefined };
       // The proportion half of I3. `cur` is the published cell, rounded for
       // display, but the island carries the exact weighted proportion: cell.n is
-      // the WEIGHTED count and col0.baseW the weighted base — the same pair
+      // the WEIGHTED count and col0.baseW the weighted base. The same pair
       // 22_model.js:367 already divides for Wilson intervals. Carry it so the
       // TEST reads full precision; the displayed delta below still subtracts
       // rounded ends, so what the reader sees reconciles with the published
-      // figures. History points keep their published value — a prior wave has no
-      // finer source — exactly as the mean half of I3 left them.
+      // figures. History points keep their published value. A prior wave has no
+      // finer source. Exactly as the mean half of I3 left them.
       if (canSig && col0.baseW > 0 &&
           row.cells[0].n !== null && row.cells[0].n !== undefined) {
         curPoint.pRaw = row.cells[0].n / col0.baseW * 100;
       }
       // I3 (review 2026-08): a mean row's TEST inputs come from the microdata
-      // recompute when available — full precision, the same inputs the
-      // Tracking tab tests — never the display-rounded published cell. The
+      // recompute when available. Full precision, the same inputs the
+      // Tracking tab tests, never the display-rounded published cell. The
       // DISPLAYED delta below still subtracts rounded ends (dgap), so what the
       // reader sees reconciles with the published figures; only the sig call
       // uses the raw values, and the chip can no longer disagree with the

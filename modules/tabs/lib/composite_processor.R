@@ -62,7 +62,7 @@ load_composite_definitions <- function(survey_structure_file) {
     composite_defs <- .read_table_sheet(survey_structure_file, "Composite_Metrics",
                                          required_cols = required_cols)
 
-    # Empty sheet — treat as no composites defined (not an error)
+    # Empty sheet. Treat as no composites defined (not an error)
     if (nrow(composite_defs) == 0) {
       cat("  [INFO] Composite_Metrics sheet is empty - no composites to process\n")
       return(NULL)
@@ -135,7 +135,7 @@ load_composite_definitions <- function(survey_structure_file) {
     return(composite_defs)
 
   }, error = function(e) {
-    # A TRS refusal raised INSIDE this block already names its own cause and fix —
+    # A TRS refusal raised INSIDE this block already names its own cause and fix,
     # re-signal it untouched. Wrapping it as a read error told an operator who had
     # typed an unreadable ExcludeFromSummary value to go looking for a corrupt
     # file (production review 2026-08, I12b).
@@ -305,7 +305,7 @@ validate_composite_definitions <- function(composite_defs, questions_df, survey_
 #' A Likert stores words and carries its score in `Index_Weight`; a Rating or NPS
 #' stores the point itself, with `OptionValue` as an override. Without this map
 #' `calculate_composite_values()` coerces the raw column and a whole battery of
-#' "TRUE"/"FALSE"/"Not sure" becomes NA — see its `options_df` note.
+#' "TRUE"/"FALSE"/"Not sure" becomes NA. See its `options_df` note.
 #'
 #' Mirrors `derive_index_scores()` in score_utils.R (Rating -> option value,
 #' Likert -> Index_Weight), but keys on OptionText, because that is what the data
@@ -363,7 +363,7 @@ composite_source_score_map <- function(q_code, questions_df, options_df) {
 #' answers are mapped through its Options (Index_Weight for a Likert, OptionValue
 #' or OptionText for a Rating/NPS) before averaging. Without them the raw column
 #' is coerced with `as.numeric()`, which is correct only for genuinely numeric
-#' sources — a Likert holding words coerces to all-NA and the composite silently
+#' sources. A Likert holding words coerces to all-NA and the composite silently
 #' becomes a blank cell.
 #'
 #' @param data_subset Survey data subset
@@ -406,7 +406,7 @@ calculate_composite_values <- function(data_subset, source_questions,
   source_values_matrix <- matrix(NA_real_, nrow = nrow(data_subset),
                                   ncol = length(source_questions))
 
-  # Sources that hold data but contribute nothing — the shape that used to ship
+  # Sources that hold data but contribute nothing. The shape that used to ship
   # a blank composite without a word.
   unscored <- character(0)
 
@@ -434,7 +434,7 @@ calculate_composite_values <- function(data_subset, source_questions,
 
   if (length(unscored) > 0) {
     cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
-    cat("│ Context: composite metric — source question(s) scored nothing\n")
+    cat("│ Context: composite metric. Source question(s) scored nothing\n")
     cat("│ These sources hold answers, but not one of them could be\n")
     cat("│ turned into a number, so they contribute NOTHING to the\n")
     cat("│ composite (and if they are its only sources, the score is\n")
@@ -623,7 +623,7 @@ process_composite_question <- function(composite_def, data, questions_df,
 
     # Calculate composite value. questions_df/options_df let the sources be
     # scored through their Options (Index_Weight for a Likert, OptionValue for a
-    # Rating) instead of coerced raw — without them a battery of worded answers
+    # Rating) instead of coerced raw, without them a battery of worded answers
     # averages to NA and the composite ships blank.
     composite_value <- calculate_composite_values(
       data_subset = data_subset,
@@ -714,7 +714,7 @@ process_composite_question <- function(composite_def, data, questions_df,
   # The composite's OWN per-column bases, so the Index_Summary's disclosure gate
   # judges on the people actually in this composite rather than borrowing the
   # first source question's bases (production review 2026-08, M-K). Sources can
-  # be routed differently — one asked of everyone, another of a sub-audience —
+  # be routed differently. One asked of everyone, another of a sub-audience,
   # in which case the borrowed base named the wrong column as sub-k, withholding
   # a safe column or, worse, publishing a withheld one.
   comp_bases <- tryCatch(
@@ -743,7 +743,7 @@ process_composite_question <- function(composite_def, data, questions_df,
 #'
 #' \code{banner_info$subsets} is the fast path; when it carries no entry for a
 #' key (or an empty one) the key is parsed back to its banner question and value
-#' and the rows are found in the data — the same fallback the main composite
+#' and the rows are found in the data. The same fallback the main composite
 #' calculation uses. Extracted so the per-column bases the finite population
 #' correction is built from and the rows each pairwise test reads are resolved
 #' by one piece of code rather than two copies.
@@ -755,7 +755,7 @@ process_composite_question <- function(composite_def, data, questions_df,
 #' The composite's own per-column unweighted base
 #'
 #' Respondents in the column who have a scoreable composite value. This is the
-#' base the finite population correction reads and — since M-K — the base the
+#' base the finite population correction reads and, since M-K, the base the
 #' Index_Summary's disclosure gate reads, so the two cannot disagree about who
 #' is in a column.
 #'
@@ -810,7 +810,7 @@ test_composite_significance <- function(data, composite_code, source_questions,
                                         questions_df = NULL, options_df = NULL) {
 
   # Calculate composite values for full dataset (for variance calculation).
-  # These MUST be scored the same way the published value was — pass the
+  # These MUST be scored the same way the published value was. Pass the
   # structure through, or a worded source yields all-NA here and the composite
   # is significance-tested against nothing while its printed value is fine.
   composite_values <- calculate_composite_values(
@@ -865,8 +865,8 @@ test_composite_significance <- function(data, composite_code, source_questions,
   # Finite population correction, per banner column (review 2026-08, I5).
   # A composite is a mean row sitting among category rows that are already
   # corrected; before this it was the one row on a census table that kept its
-  # letters. n_actual is this composite's own UNWEIGHTED base in the column —
-  # respondents with a scoreable composite value — matching the definition
+  # letters. n_actual is this composite's own UNWEIGHTED base in the column,
+  # respondents with a scoreable composite value. Matching the definition
   # build_fpc_multipliers() documents for every other row type. All-1 (inert)
   # with no universe configured, so non-population reports are unchanged.
   composite_bases <- composite_column_bases(composite_values, data, banner_info)
@@ -920,7 +920,7 @@ test_composite_significance <- function(data, composite_code, source_questions,
       bonf_corr <- !is.null(config$bonferroni_correction) && config$bonferroni_correction
       min_base <- if (!is.null(config$significance_min_base)) config$significance_min_base else 30
 
-      # Apply Bonferroni correction if enabled — divided by this banner GROUP's
+      # Apply Bonferroni correction if enabled. Divided by this banner GROUP's
       # comparison count, the same divisor the regular category rows use, so a
       # composite row and the rows above it letter at the same adjusted alpha
       test_alpha <- if (bonf_corr) {
@@ -1016,7 +1016,7 @@ process_all_composites <- function(composite_defs, data, questions_df,
     }, error = function(e) {
       # A composite is a contractual metric: an error must not demote to a
       # one-line warning while the run stays PASS (review 2026-08, I12). Box it
-      # for the Shiny console and record a REFUSED entry — the analysis runner
+      # for the Shiny console and record a REFUSED entry. The analysis runner
       # turns any such entry into run_status PARTIAL.
       cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
       cat("│ Context: Composite processing\n")
@@ -1045,7 +1045,7 @@ process_all_composites <- function(composite_defs, data, questions_df,
 #' shows on the question card, so a composite is never the one obviously
 #' calculated figure on the page with nothing said about it.
 #'
-#' The Selection sheet still wins per field — see add_composites_to_results().
+#' The Selection sheet still wins per field. See add_composites_to_results().
 #'
 #' @param composite_def One-row data frame from the Composite_Metrics sheet.
 #'
@@ -1085,7 +1085,7 @@ composite_provenance <- function(composite_def) {
   }
 
   # The weights only join the sentence when they parse and there is one per
-  # source question — a half-read weight list would describe a calculation the
+  # source question. A half-read weight list would describe a calculation the
   # engine did not do.
   weight_note <- ""
   if (identical(tolower(calc), "weightedmean") && "Weights" %in% names(composite_def) &&
@@ -1104,7 +1104,7 @@ composite_provenance <- function(composite_def) {
     sprintf("weighted mean of the %s%s", noun, weight_note)
   } else if (nzchar(calc)) {
     # An unrecognised type is the analyst's word, used verbatim rather than
-    # guessed at — the validator is what rejects a type the engine cannot run.
+    # guessed at. The validator is what rejects a type the engine cannot run.
     sprintf("%s of the %s", calc, noun)
   } else {
     sprintf("combined from the %s", noun)

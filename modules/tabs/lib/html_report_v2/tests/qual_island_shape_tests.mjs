@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Qualitative tab — the island shape R ACTUALLY EMITS (production review 2026-08, I12a).
+ * Qualitative tab. The island shape R ACTUALLY EMITS (production review 2026-08, I12a).
  *
  * The blind spot this closes: the main qual suite (qual_tests.mjs) runs on
- * hand-authored records, not one of which carries a `rid` — a pre-I20 shape. The
+ * hand-authored records, not one of which carries a `rid`. A pre-I20 shape. The
  * rekey suite (qual_rekey_tests.mjs) has rids but no `band`, no `suppressed` and
- * no `demos`. So the record production emits — all four on one record — was
+ * no `demos`. So the record production emits, all four on one record, was
  * exercised by no JS test, and every mark helper (which keys on `rid` whenever
  * the island carries one) was only ever tested on its legacy idx fallback.
  *
@@ -52,7 +52,7 @@ const Q1 = ISLAND.questions[0], Q2 = ISLAND.questions[1];
 const RID = {};                                   // idx -> rid, straight off the fixture
 ISLAND.questions.forEach((q) => q.records.forEach((r) => { RID[q.code + ":" + r.idx] = r.rid; }));
 
-/** A fresh module load over a fresh in-memory localStorage — one "reload". */
+/** A fresh module load over a fresh in-memory localStorage. One "reload". */
 function load() { return loadWith(ISLAND); }
 
 /** The same, against a specific island (for the confidentiality-dial cases). */
@@ -76,7 +76,7 @@ function loadWith(island) {
     },
     d2: { storeKey: (k) => k + "::fixture" },
     QUAL: island,
-    // The ResponseID join that points a closed question at its open-end — what
+    // The ResponseID join that points a closed question at its open-end. What
     // priorityQuotes resolves through in production.
     AGG: { project: { qualLinks: { QC1: { qcode: "Q1", title: "Why that score?" } } } }
   };
@@ -88,13 +88,13 @@ function loadWith(island) {
   return box.TR.qual;
 }
 
-console.log("Qualitative island — the shape R emits (I12a):");
+console.log("Qualitative island. The shape R emits (I12a):");
 
 /* ===== 1. the record shape itself ========================================== */
 
 run("1. the fixture is the production shape: rid + band + suppressed + demos", () => {
   // Guards the suite against a fixture that silently lost the fields it exists
-  // to carry — which would leave everything below testing the legacy path green.
+  // to carry, which would leave everything below testing the legacy path green.
   const r = Q1.records[2];
   assert(/^[0-9a-f]{16}$/.test(r.rid), "record carries a 16-hex rid");
   eq(r.band, "Passive", "record carries its split band");
@@ -107,7 +107,7 @@ run("1. the fixture is the production shape: rid + band + suppressed + demos", (
 run("2. an un-themed record's themeVals arrives as [] and is handled as empty", () => {
   // R serialises an empty named list as a JSON ARRAY, not an object. A
   // hand-written {} fixture hides this; Object.keys([]) is [] so the helpers
-  // must — and do — treat it as no themes rather than throwing.
+  // must, and do, treat it as no themes rather than throwing.
   const q = load();
   const bare = Q2.records[0];
   assert(Array.isArray(bare.themeVals), "the fixture really does carry [] here");
@@ -145,7 +145,7 @@ run("4. the SAME respondent in two questions gets one identity, two marks", () =
 
 run("5. two records that share an idx across questions do not collide", () => {
   // Q1 idx 0 and Q2 idx 0 are the same person; Q1 idx 1 and Q2 idx 4 are not.
-  // Under legacy idx keying "Q1#0" and "Q2#0" were already distinct by qcode —
+  // Under legacy idx keying "Q1#0" and "Q2#0" were already distinct by qcode,
   // what rid keying adds is that the key survives a re-export.
   const q = load();
   q.toggleSave("Q1", Q1.records[1]);
@@ -182,7 +182,7 @@ run("7. the pool resolves rid keys back to the real records", () => {
 
 run("7b. a mark on a WITHHELD comment is counted as withheld, not as an orphan", () => {
   // A quote collection has nothing to show for a comment whose text this report
-  // does not publish — but the mark is not stale either, and must not be
+  // does not publish, but the mark is not stale either, and must not be
   // reported as a broken reference.
   const q = load();
   const gone = Q1.records[2];                       // suppressed: text is null
@@ -191,7 +191,7 @@ run("7b. a mark on a WITHHELD comment is counted as withheld, not as an orphan",
   const pool = q.collectPool(ISLAND, saved, {});
   eq(pool.items.length, 0, "nothing to render");
   eq(pool.withheld, 1, "counted as withheld");
-  eq(pool.orphans, 0, "and NOT as an orphan — the record exists, its text does not");
+  eq(pool.orphans, 0, "and NOT as an orphan. The record exists, its text does not");
 });
 
 run("7c. an idx key never resolves against this rid-bearing island", () => {
@@ -213,14 +213,14 @@ run("8. shown() drops exactly the three withheld records", () => {
   // The withheld ones are still in the pool the distributions read.
   const prev = q.prevalence(Q1.records, Q1.themes);
   const service = prev.filter((p) => p.label === "Service")[0];
-  eq(service.n, 2, "Service is mentioned twice — including by a withheld comment");
+  eq(service.n, 2, "Service is mentioned twice, including by a withheld comment");
   eq(service.pct, 50, "…and that mention still counts toward the 4-commenter base");
 });
 
 run("9. a hide-marked comment is withheld even though its tier would ship it", () => {
   const q = load();
   const hidden = Q1.records[3];
-  eq(hidden.tier, 2, "tier 2 — must-read");
+  eq(hidden.tier, 2, "tier 2. Must-read");
   assert(hidden.suppressed === true, "and yet withheld");
   assert(q.shown(Q1.records).indexOf(hidden) === -1, "so it is not in the readable list");
   // It still passes the tier filter, because the distribution counts it.
@@ -259,7 +259,7 @@ run("12. bandFilter cuts Q1 by its declared bands", () => {
 
 run("13. bandCount counts only the comments the reader can actually read", () => {
   const q = load();
-  // 2 detractors, but one of them is the hide-marked record — the button must
+  // 2 detractors, but one of them is the hide-marked record. The button must
   // match the list it navigates to.
   eq(q.bandCount(Q1, Q1.records, "Detractor"), 1, "1 readable detractor");
   eq(q.bandCount(Q1, Q1.records, "Promoter"), 1, "1 readable promoter");
@@ -321,7 +321,7 @@ run("18. a sub-k audience withholds the tags AND the text on export", () => {
   eq(rows[1][3], "[hidden]", "Tenure withheld");
   eq(rows[1][rows[1].length - 1], "[hidden]", "and the verbatim with them");
   eq(rows[1][1], "Promoter",
-     "…but the band still exports — it mirrors a closed question already reported");
+     "…but the band still exports. It mirrors a closed question already reported");
 });
 
 run("19. a quote carries its demographic tags as attribution", () => {

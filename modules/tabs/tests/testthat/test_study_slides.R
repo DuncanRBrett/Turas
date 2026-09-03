@@ -10,7 +10,7 @@
 #   - .slide_image_pixel_size(): intrinsic size read from the file's own header,
 #     in base R, so a slide exported to PowerPoint keeps its aspect ratio
 #   - TABS_SLIDE_IMAGE_MAX_BYTES: the config route embeds at BUILD time and had
-#     no size limit at all — an oversized picture is refused (loudly) and the
+#     no size limit at all. An oversized picture is refused (loudly) and the
 #     slide keeps its text, rather than a 12 MB report nobody can send
 #
 # Run with:
@@ -50,7 +50,7 @@ source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
 source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))
 
 # ==============================================================================
-# FIXTURES — real image files, written by base R's own devices
+# FIXTURES. Real image files, written by base R's own devices
 # ==============================================================================
 
 # Genuine PNG/JPEG/GIF-less fixtures: grDevices writes real files, so the header
@@ -167,7 +167,7 @@ test_that("an image just under the limit is still embedded", {
 
   slides <- load_qualitative_sheet(cfg)
   expect_true(grepl("^data:image/png;base64,", slides[[1]]$image_data))
-  # no header on this filler, so no size — and that must not fail the load
+  # no header on this filler, so no size, and that must not fail the load
   expect_null(slides[[1]]$image_w)
 })
 
@@ -224,7 +224,7 @@ test_that("a missing image file says so loudly and keeps the slide", {
 
 test_that("a path pasted with quotes around it still resolves", {
   # Found the hard way on CCPB (2026-08-11): the image_path cell held
-  # /Users/…/RatingsMap.png' — one trailing apostrophe, picked up from copying
+  # /Users/…/RatingsMap.png'. One trailing apostrophe, picked up from copying
   # the path. The file existed, the path looked right in the sheet, and the
   # slide rendered text-only. Dragging a file into a terminal or using a
   # "copy as path" command is the normal way to fill this cell, so wrapping

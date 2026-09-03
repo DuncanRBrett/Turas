@@ -3,9 +3,9 @@
 # ==============================================================================
 #
 # Tests for the shared AI provider abstraction layer:
-#   - create_ai_chat()         — provider construction with error handling
-#   - call_insight_model()     — structured LLM calls with graceful degradation
-#   - get_model_display_name() — human-readable model attribution
+#   - create_ai_chat(): provider construction with error handling
+#   - call_insight_model(): structured LLM calls with graceful degradation
+#   - get_model_display_name(): human-readable model attribution
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_ai_provider.R")
@@ -157,7 +157,7 @@ test_that("defaults to anthropic when provider is NULL", {
 
 test_that("refuses when ellmer package is missing", {
   skip_if(requireNamespace("ellmer", quietly = TRUE) == FALSE,
-          "Test requires ellmer NOT installed — skipping in normal environment")
+          "Test requires ellmer NOT installed. Skipping in normal environment")
   # This test validates the pattern but can only truly fail
   # in an environment without ellmer. The code path is tested via the
   # requireNamespace check in create_ai_chat.

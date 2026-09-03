@@ -134,7 +134,7 @@ make_dl_q_scale <- function() {
 }
 
 # Numeric open-count: a Mean (Average) + Standard Deviation summary, no
-# category / NET rows. Mirrors numeric_processor's output — RowType "Average"
+# category / NET rows. Mirrors numeric_processor's output. RowType "Average"
 # sets metric_type, so without the type gate this would wrongly receive a
 # scale_max and land on the index dashboard alongside genuine ratings.
 make_dl_q_numeric <- function() {
@@ -158,7 +158,7 @@ make_dl_q_numeric <- function() {
 
 # Rating whose box-category rows carry a real Frequency (as the live crosstab
 # does), plus a NET POSITIVE difference row. Exercises the "Counts" toggle: box
-# rows must emit n; the NET POSITIVE row (a pp gap, not a count) must not — even
+# rows must emit n; the NET POSITIVE row (a pp gap, not a count) must not, even
 # though this fixture deliberately gives it a Frequency to prove the guard fires.
 make_dl_q_boxcounts <- function() {
   list(
@@ -223,7 +223,7 @@ make_dl_config <- function(...) {
 }
 
 # ==============================================================================
-# 1. build_data_layer — top-level shape
+# 1. build_data_layer. Top-level shape
 # ==============================================================================
 
 context("data_layer_writer: top-level shape")
@@ -261,7 +261,7 @@ test_that("Patterns levers: headline + banner exclusion emitted as arrays, omitt
                    patterns_exclude_banners = "Interviewer"))
   expect_equal(as.character(dl$project$takeout_headline), c("Q78", "Q79"))
   expect_equal(as.character(dl$project$patterns_exclude_banners), "Interviewer")
-  # one-element value must SERIALISE as a JSON array under auto_unbox — the JS
+  # one-element value must SERIALISE as a JSON array under auto_unbox. The JS
   # contract expects arrays (a bare string would substring-match question codes)
   expect_identical(
     as.character(jsonlite::toJSON(dl$project$patterns_exclude_banners, auto_unbox = TRUE)),
@@ -279,7 +279,7 @@ test_that("insight_exclude_categories reaches the island as an array, omitted wh
     make_dl_config(insight_exclude_categories = "Flights, Long distance bus"))
   expect_equal(as.character(dl$project$insight_exclude_categories),
                c("Flights", "Long distance bus"))
-  # one-element value must SERIALISE as a JSON array under auto_unbox — the JS
+  # one-element value must SERIALISE as a JSON array under auto_unbox. The JS
   # calls .some() on it, so a bare string would silently match nothing
   dl1 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(insight_exclude_categories = "Flights"))
@@ -292,7 +292,7 @@ test_that("insight_exclude_categories reaches the island as an array, omitted wh
 })
 
 test_that("heatmap_colour reaches the island only when the config sets it (I11)", {
-  # The setting was whitelisted, templated and documented — and read by nothing,
+  # The setting was whitelisted, templated and documented, and read by nothing,
   # so it was a silent no-op. It is now carried to the report, but ONLY when set:
   # an island from a config that never mentions it must stay byte-identical, and
   # the tint must stay on the brand colour for every existing report.
@@ -312,7 +312,7 @@ test_that("heatmap_colour reaches the island only when the config sets it (I11)"
 })
 
 test_that("study slides reach the island, or are absent entirely", {
-  # The AddedSlides sheet was loaded and then dropped — nothing read
+  # The AddedSlides sheet was loaded and then dropped. Nothing read
   # config_obj$qualitative_slides, so a filled-in sheet changed no report. It is
   # carried now, but a config without the sheet must still emit no key at all.
   slides <- list(
@@ -357,7 +357,7 @@ test_that("study slides survive the JSON round trip as an array of objects", {
 test_that("the exec-summary cover reaches the island only when the study opts in", {
   # The cover changes what a client sees when they open a SAVED copy, so it is a
   # per-project decision. A config that never mentions html_report_v2_cover must
-  # emit no cover key at all — every report built before the setting existed then
+  # emit no cover key at all. Every report built before the setting existed then
   # keeps landing exactly where it always did, saved or not.
   dl <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(html_report_v2_cover = TRUE))
@@ -367,7 +367,7 @@ test_that("the exec-summary cover reaches the island only when the study opts in
   expect_null(dl0$project$cover)
   expect_false("cover" %in% names(dl0$project))
 
-  # anything that is not a literal TRUE leaves the island untouched — a blank or
+  # anything that is not a literal TRUE leaves the island untouched. A blank or
   # unreadable cell must never switch a client-facing default on
   for (v in list(FALSE, "", "   ", NA, NULL)) {
     dlb <- build_data_layer(make_dl_results(), make_dl_banner_info(),
@@ -385,14 +385,14 @@ test_that("the cover's findings count rides the island only when the study set i
   expect_false("cover_findings" %in% names(dl$project))
 
   # NB make_dl_config is a plain list, whereas in production config_obj is the
-  # OUTPUT of build_config_object — so the values here are the parsed ones (a
+  # OUTPUT of build_config_object, so the values here are the parsed ones (a
   # number, or 0 for ALL), which is exactly what the writer receives live.
   dl12 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(html_report_v2_cover = TRUE, html_report_v2_cover_findings = 12))
   expect_equal(dl12$project$cover_findings, 12)
 
   # 0 is the ALL sentinel and must survive to the island, since the renderer
-  # reads 0 as "no limit" — a dropped 0 would silently mean five again.
+  # reads 0 as "no limit". A dropped 0 would silently mean five again.
   dla <- build_data_layer(make_dl_results(), make_dl_banner_info(),
     make_dl_config(html_report_v2_cover = TRUE, html_report_v2_cover_findings = 0))
   expect_equal(dla$project$cover_findings, 0)
@@ -408,7 +408,7 @@ test_that("a raw Settings cell reaches the island through the WHOLE chain", {
   # The unit tests above each prove one hop. This one runs the operator's actual
   # cell through build_config_object and then the writer, because a setting can
   # be registered, parsed and emitted correctly at every step and still not join
-  # up — which is how the AddedSlides sheet stayed dead for a year.
+  # up, which is how the AddedSlides sheet stayed dead for a year.
   skip_if_not(exists("build_config_object", mode = "function"))
   chain <- function(cell) {
     cfg <- build_config_object(list(html_report_v2 = "TRUE",
@@ -476,7 +476,7 @@ test_that("filter_label / base_filter (the question's own audience) reach the da
 
 test_that("source / formula (the question's provenance) reach the data layer", {
   # A column derived before the config ever sees it arrives at the engine as a
-  # finished column — the analyst's declaration is the only thing that can say
+  # finished column. The analyst's declaration is the only thing that can say
   # it was worked out rather than asked, so it has to travel with the question.
   q <- make_dl_q_single()
   q$source <- "PrepaidElectricity amount question"
@@ -518,8 +518,8 @@ test_that("area_summary (the area's overall-question marker) is TRUE-only, absen
 })
 
 test_that("exclude_from_insights (the Differences opt-out) is TRUE-only, absent otherwise", {
-  # DIFFERENCES_TAB_SCOPE.md item 4. The question stays in the crosstabs — only
-  # the island flag changes — and an unflagged config must produce a byte-
+  # DIFFERENCES_TAB_SCOPE.md item 4. The question stays in the crosstabs, only
+  # the island flag changes, and an unflagged config must produce a byte-
   # identical island, so the key is absent rather than FALSE.
   q <- make_dl_q_scale()
   q$exclude_from_insights <- TRUE
@@ -864,7 +864,7 @@ test_that("build_data_layer emits questions in category order (Overall first)", 
 })
 
 # ==============================================================================
-# 3. question pivot — kinds, cell arrays, type mapping
+# 3. question pivot. Kinds, cell arrays, type mapping
 # ==============================================================================
 
 context("data_layer_writer: question pivot")
@@ -967,14 +967,14 @@ test_that("numeric questions are kept off the index dashboard (type + null scale
   dl <- build_data_layer(list(Q3 = make_dl_q_numeric()), make_dl_banner_info(), cfg)
   q <- Filter(function(q) q$code == "Q3", dl$questions)[[1]]
 
-  # Mapped to its own type, not "scale" — the renderer's indexQuestions() filter
+  # Mapped to its own type, not "scale". The renderer's indexQuestions() filter
   # keys on this to skip it.
   expect_equal(q$type, "numeric")
   # No scale maximum: an open count has no "% of scale" reading. NA -> null.
   expect_true(is.na(q$scale_max))
   expect_true(is.na(q$gauge_green))
   expect_true(is.na(q$gauge_amber))
-  # It DOES still carry a Mean row — i.e. the old "any mean row" dashboard
+  # It DOES still carry a Mean row, i.e. the old "any mean row" dashboard
   # filter would have wrongly included it; the type gate is what now excludes it.
   expect_true(any(vapply(q$rows, function(r) identical(r$kind, "mean"), logical(1))))
 })
@@ -992,7 +992,7 @@ test_that("box-category rows carry counts; NET POSITIVE rows do not (Counts togg
   expect_equal(good$n[[1]], 48)
   expect_equal(by_label("Poor (1 - 5)")$n[[1]], 12)
 
-  # A NET POSITIVE row is a percentage-point difference, not a count — n stays
+  # A NET POSITIVE row is a percentage-point difference, not a count. N stays
   # null even though this fixture planted a Frequency on it.
   np <- by_label("NET POSITIVE (Good - Poor)")
   expect_equal(np$kind, "net")
@@ -1014,7 +1014,7 @@ test_that("project carries the configured chart palette + series colours", {
 })
 
 # ==============================================================================
-# 4. write_data_layer — on-disk JSON honours the renderer contract
+# 4. write_data_layer. On-disk JSON honours the renderer contract
 # ==============================================================================
 
 context("data_layer_writer: write + JSON contract")
@@ -1155,7 +1155,7 @@ test_that("dl$ai is attached when ai is supplied and omitted otherwise", {
 })
 
 # ==============================================================================
-# Weighted base serialisation (D1/E1) — the renderer needs the weighted + effective
+# Weighted base serialisation (D1/E1): the renderer needs the weighted + effective
 # base to recompute proportions/significance correctly, not the unweighted base.
 # ==============================================================================
 
@@ -1175,7 +1175,7 @@ test_that("weighted reports serialise the weighted + effective base; unweighted 
   expect_equal(wq$bases[[2]]$nWeighted, 70)
   expect_equal(wq$bases[[2]]$nEff, 44)
 
-  # Unweighted (default): byte-identical — no nWeighted/nEff keys at all.
+  # Unweighted (default): byte-identical. No nWeighted/nEff keys at all.
   uq <- build_dl_question(q, bi, make_dl_config(apply_weighting = FALSE), low_base = 30)
   expect_equal(uq$bases[[1]]$n, 100)
   expect_null(uq$bases[[1]]$nWeighted)
@@ -1183,13 +1183,13 @@ test_that("weighted reports serialise the weighted + effective base; unweighted 
 })
 
 # ==============================================================================
-# ROWS KEYED BY (RowLabel, RowSource) — a box NET sharing an option's label
+# ROWS KEYED BY (RowLabel, RowSource): a box NET sharing an option's label
 # must keep BOTH rows (audit fix: unique labels dropped the NET row)
 # ==============================================================================
 
 context("data_layer_writer: label collisions (option vs box NET)")
 
-# 5-point-style scale where the BoxCategory NET is named "Satisfied" — the same
+# 5-point-style scale where the BoxCategory NET is named "Satisfied". The same
 # label as one of its member options. Classic Excel shows both rows.
 make_dl_q_label_collision <- function() {
   list(
@@ -1244,7 +1244,7 @@ test_that("a table without RowSource still keys by label alone (unchanged)", {
   q_def <- make_dl_q_label_collision()
   q_def$table$RowSource <- NULL
   q <- build_dl_question(q_def, make_dl_banner_info(), make_dl_config(), low_base = 30)
-  # Without RowSource the two "Satisfied" parents can't be told apart — the
+  # Without RowSource the two "Satisfied" parents can't be told apart. The
   # legacy single-row behaviour is preserved (first values win)
   sat_rows <- Filter(function(r) identical(r$label, "Satisfied"), q$rows)
   expect_length(sat_rows, 1)
@@ -1274,7 +1274,7 @@ test_that("a question with a malformed table is skipped BY NAME on the console (
 # A config that turns the column percentage off (show_percent_column = N) puts
 # ROW percentages or raw FREQUENCIES into the same `pct` slot. The island
 # carried nothing naming the quantity, so the v2 renderer labelled all of them
-# "%" and a counts-only run shipped "142%", "80% B". `stat` now names it — and
+# "%" and a counts-only run shipped "142%", "80% B". `stat` now names it, and
 # is emitted ONLY when it is not the column percentage, so every ordinary
 # config produces a byte-identical island.
 
@@ -1301,7 +1301,7 @@ test_that("a counts-only question names its statistic on the island", {
   q <- build_dl_question(make_dl_q_counts_only(), make_dl_banner_info(),
                          make_dl_config(), low_base = 30)
   expect_equal(q$stat, "Frequency")
-  # the values ARE the raw counts — the point of the flag
+  # the values ARE the raw counts. The point of the flag
   expect_equal(unlist(q$rows[[1]]$pct), c(142, 80, 62))
 })
 
@@ -1320,7 +1320,7 @@ test_that("an ordinary column-% question emits NO stat key (byte-identical)", {
 })
 
 test_that("a Frequency-only row among column %s carries its own stat", {
-  # The fall-through substitutes Frequency for a row with no Column % — that
+  # The fall-through substitutes Frequency for a row with no Column %. That
   # row's 37 people rendered as "37%" beside a real 37.0% (C1).
   qdef <- list(
     question_code = "Q_MIX", question_text = "Mixed", category = "Awareness",
@@ -1349,7 +1349,7 @@ test_that("a Frequency-only row among column %s carries its own stat", {
 # ==============================================================================
 # numeric_processor honours show_numeric_median / show_numeric_mode and writes
 # those rows to the workbook, but the data layer's mean_types whitelist omitted
-# them — so the "mean" branch hit `next` and the rows vanished on the way into
+# them, so the "mean" branch hit `next` and the rows vanished on the way into
 # the interactive report. The Excel and the v2 report disagreed silently.
 
 make_dl_q_numeric_full <- function() {
@@ -1386,7 +1386,7 @@ test_that("Median and Mode rows survive into the data layer", {
 })
 
 test_that("adding Median/Mode does not change the headline metric type", {
-  # metric_type keys off Average/Mean/Index/Score only — a Median row must not
+  # metric_type keys off Average/Mean/Index/Score only. A Median row must not
   # claim it, or a plain numeric question would land on the index dashboard
   # alongside genuine ratings. Compared against the Mean+StdDev fixture rather
   # than a hard-coded value, so this asserts the INVARIANT: the extra rows
@@ -1406,7 +1406,7 @@ test_that("adding Median/Mode does not change the headline metric type", {
 # RowSource="summary" and each followed by its own Sig. row. mean_sig_for's
 # "exactly one sig row per summary block" guard then saw N sig rows and carried
 # NONE, so a multi-option allocation showed significance letters in the Excel
-# workbook and none in the v2 report — the Excel/report disagreement the D1 work
+# workbook and none in the v2 report. The Excel/report disagreement the D1 work
 # removed for numeric questions. VAS 2026's wallet questions are 6-option
 # allocations, so this is the shape that matters.
 
@@ -1454,14 +1454,14 @@ test_that("a multi-option allocation carries EVERY option's letters, not none", 
   expect_equal(unlist(q$rows[[2]]$sig), c("", "", "A"))
   expect_equal(unlist(q$rows[[3]]$sig), c("", "B", ""))
 
-  # Each option keeps its OWN letters — the whole point is that the blocks are
+  # Each option keeps its OWN letters. The whole point is that the blocks are
   # told apart rather than one block's letters being copied to all of them.
   expect_false(identical(unlist(q$rows[[1]]$sig), unlist(q$rows[[2]]$sig)))
 })
 
 test_that("each allocation option keeps its own values alongside its own letters", {
   # A mean-kind row carries its values in pct[] (the shared numeric channel),
-  # with mstat naming the statistic — so the values and the letters must line up
+  # with mstat naming the statistic, so the values and the letters must line up
   # per option, not just the letters.
   q <- allocation_dl(c("Groceries", "Transport"))
   expect_equal(unlist(q$rows[[1]]$pct), c(31, 33, 29))
@@ -1483,7 +1483,7 @@ test_that("a six-option allocation (the VAS 2026 wallet shape) loses nothing", {
 #
 # published_wave_contribution() (tracking_island.R) builds the current wave from
 # published figures when the microdata island is switched off. Its gate is "the
-# question publishes a mean", which has to hold for a COMPOSITE index too — the
+# question publishes a mean", which has to hold for a COMPOSITE index too. The
 # composite is exactly the metric a staff climate tracker leads on, and the
 # microdata build tracks it (micro_scores_for_composite). If the gate missed it,
 # the confidential copy would silently drop the headline trend.

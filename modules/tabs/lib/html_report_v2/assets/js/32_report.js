@@ -1,5 +1,5 @@
 /**
- * v2 Report tab — the narrative wrapper around the numbers: background &
+ * v2 Report tab. The narrative wrapper around the numbers: background &
  * method and executive summary (authored in the config, read-only here,
  * pinnable to the story), added slides (text blocks or imported images,
  * e.g. from a qual phase), and About (analyst + contact from the config, the
@@ -8,7 +8,7 @@
  *
  * Also owns "Save copy": clones this document with the user's insights,
  * story and report sections embedded, so the saved .html opens for anyone
- * with all annotations intact — still a single self-contained file.
+ * with all annotations intact. Still a single self-contained file.
  *
  * SIZE-EXCEPTION: one narrative workspace + the save-copy serialiser.
  */
@@ -42,7 +42,7 @@
       if (raw) own = JSON.parse(raw) || null;
     } catch (e) { /* island-only */ }
     // Ownership marker: once the reader changes anything here, the persisted
-    // localStorage state carries _owns:true and is authoritative — the island
+    // localStorage state carries _owns:true and is authoritative. The island
     // seed is ignored on load, so deletions stay deleted. State without the
     // marker (legacy / first visit) seeds from the island and merges without
     // claiming ownership; only a reader change through the persist path does.
@@ -59,7 +59,7 @@
     cache.about = cache.about || {};
     cache.slides = cache.slides || [];
     if (own && typeof own === "object") {
-      // un-owning local state fills gaps ADDITIVELY — a stale pre-existing store
+      // un-owning local state fills gaps ADDITIVELY. A stale pre-existing store
       // for this project key must not hide the island's authored sections/slides
       Object.keys(own.sections || {}).forEach(function (k) {
         if (!(k in cache.sections)) cache.sections[k] = own.sections[k];
@@ -84,20 +84,20 @@
           { _owns: true, sections: s.sections, about: s.about, slides: s.slides }));
       }
     } catch (e) {
-      TR.shell.toast("Browser storage is full — use Save copy to keep your work");
+      TR.shell.toast("Browser storage is full. Use Save copy to keep your work");
     }
   }
 
   report.data = function () { return store(); };
 
-  /** Effective text of a narrative section — authored by the report author in
+  /** Effective text of a narrative section. Authored by the report author in
    *  the config (project.report_meta via the Comments sheet) and read-only in
    *  the app, so this is always the config value. Legacy section edits in
    *  stored state are deliberately ignored. The cover (24a) reads the same
    *  value the Report tab shows. */
   report.sectionText = function (sec) { return sectionDefault(sec); };
 
-  /* Defaults imported from the config (project.report_meta) — shown until the
+  /* Defaults imported from the config (project.report_meta): shown until the
    * analyst types their own. A field set in localStorage (even to "") wins, so
    * the analyst can always override; an untouched field falls back here. */
   function metaOf() { return (TR.AGG.project && TR.AGG.project.report_meta) || {}; }
@@ -126,7 +126,7 @@
       TR.txt.block("report.intro") + "</div>");
     html.push(report.sectionsHtml());
 
-    // AI-assisted key findings (read-only, labelled) — shown only when present.
+    // AI-assisted key findings (read-only, labelled): shown only when present.
     html.push(TR.ai.execSummaryHtml());
 
     // Authored exhibits from the config, above the reader's own scratch ones.
@@ -141,7 +141,7 @@
         return '<div class="added-slide" data-i="' + i + '">' +
           (slide.image
             // FileReader data URLs only today, but stored state outlives
-            // the writer — escape the attribute like every other value
+            // the writer. Escape the attribute like every other value
             ? '<img src="' + fmt.escapeHtml(slide.image) + '" alt="' +
               fmt.escapeHtml(slide.title || "Added slide") + '">'
             : '<div class="as-text">' + fmt.escapeHtml(slide.text || "") + "</div>") +
@@ -154,22 +154,22 @@
     // configuration; the report-construction note and methodology are
     // standard text, not an editable workspace.
     html.push(report.aboutHtml());
-    // Statistical diagnostics — the interactive twin of the Excel stats pack
+    // Statistical diagnostics. The interactive twin of the Excel stats pack
     // (empty string when the island carries none, e.g. an older report).
     html.push(report.diagnosticsHtml());
     html.push("</div>");
-    // fresh wrapper per render — never stack duplicate listeners
+    // fresh wrapper per render, never stack duplicate listeners
     var wrap = document.createElement("div");
     wrap.innerHTML = html.join("");
     host.replaceChildren(wrap);
     wire(wrap);
   };
 
-  /** Background & method + Executive summary — authored by the report author
+  /** Background & method + Executive summary. Authored by the report author
    * in the config (Comments sheet _BACKGROUND / _EXECUTIVE_SUMMARY rows, with
    * the fieldwork-dates fallback) and rendered read-only, one paragraph per
    * line. A populated card is a data-snap-card with the standard snap-pin, so
-   * the section can be pinned to the story — the shell's document-level
+   * the section can be pinned to the story. The shell's document-level
    * handler (24_shell) does the capture; no wiring here. A pure function of
    * the data island so it is unit-testable. */
   report.sectionsHtml = function () {
@@ -191,11 +191,11 @@
     }).join("");
   };
 
-  /** Study slides — exhibits the REPORT AUTHOR put in the config's AddedSlides
+  /** Study slides. Exhibits the REPORT AUTHOR put in the config's AddedSlides
    *  sheet, carried on the data island as project.slides. Distinct from the
    *  reader's own Added slides above: these are authored, so they are read-only
    *  here, exactly like the narrative sections. They are deliberately NOT merged
-   *  into the reader's slide store — that store takes ownership on first edit
+   *  into the reader's slide store. That store takes ownership on first edit
    *  and would then ignore anything a later run authored. */
   report.slides = function () {
     var s = (TR.AGG && TR.AGG.project && TR.AGG.project.slides) || [];
@@ -226,7 +226,7 @@
   };
 
   /** The About card: analyst + contact (config-fed, shown when set), then the
-   * standard report-construction note — how the report is produced and where
+   * standard report-construction note. How the report is produced and where
    * AI does and does not act. The note's "names the model" promise is kept by
    * the auto-methodology block below (TR.ai.methodologyHtml names the model
    * whenever AI content is present). A pure function of the data island so it
@@ -238,18 +238,18 @@
    * is edited in the Callout Editor; only the rules below are code. The stock
    * text describes a stock Turas report: R computes the PUBLISHED figures, and every
    * COMPUTED view is recalculated in the reader's browser by Turas's own
-   * engine. The one sentence that is not always true — earlier waves shown as
-   * previously published rather than recalculated — renders only when the
+   * engine. The one sentence that is not always true. Earlier waves shown as
+   * previously published rather than recalculated. Renders only when the
    * report carries earlier waves and none of them holds respondent-level
    * scores (a wave with scores IS recalculated, by 22w_waves.js).
    *
    * That default stops being true the moment a study puts other stages around
-   * Turas — a derived-variable engine ahead of it, a preparation layer that
+   * Turas. A derived-variable engine ahead of it, a preparation layer that
    * builds composite columns, pages that compute in the browser from their own
    * embedded data. The engine cannot know about those, so the STUDY declares
    * them, in the config's Comments sheet under _REPORT_CONSTRUCTION.
    *
-   * A declaration replaces the WHOLE stock block — the default sentence and the
+   * A declaration replaces the WHOLE stock block. The default sentence and the
    * reproducibility, AI and author-validation paragraphs with it. It used to
    * replace only the first sentence, which meant a config that restated any of
    * those paragraphs printed them twice, and a config that deliberately left one
@@ -259,11 +259,11 @@
    * including whether it says anything about AI.
    *
    * The producer line is kept either way, so a declaration cannot accidentally
-   * drop the attribution — the declared text is written to FOLLOW it. Unless the
+   * drop the attribution. The declared text is written to FOLLOW it. Unless the
    * study wrote its own: an author drafting this row naturally opens "This report
    * was produced by …", and prepending a second copy printed the sentence twice
    * on the client's page. So when the declaration already names the producer, it
-   * is left to say it in its own words. Attribution is still guaranteed — one of
+   * is left to say it in its own words. Attribution is still guaranteed. One of
    * the two always renders.
    */
   /** Earlier waves this report can compare against. TR.PREV always carries the
@@ -289,7 +289,7 @@
 
   /**
    * The words here are authored in the Callout Editor, not written in this
-   * file — see 02_text.js. What stays in code is the logic: who owns the
+   * file. See 02_text.js. What stays in code is the logic: who owns the
    * attribution sentence, and which paragraphs a given report is entitled to
    * show. Blank any of these keys in the editor and that paragraph simply does
    * not render.
@@ -314,13 +314,13 @@
       }).join("");
     }
 
-    // The stock note is ONE authored entry, written as it reads — blank lines
+    // The stock note is ONE authored entry, written as it reads. Blank lines
     // between paragraphs, exactly like the config row a study would write. Two
     // things inside it cannot be plain text and so arrive as placeholders:
     //   {producer}   the attribution sentence, because the declared-note path
     //                above uses the same sentence on its own;
     //   {waves_note} the earlier-waves sentence, because only the code knows
-    //                when the report is entitled to make that claim — it needs
+    //                when the report is entitled to make that claim. It needs
     //                earlier waves, none of them carrying respondent-level
     //                scores (a wave with scores IS recalculated, 22w_waves.js).
     // An author moves {waves_note} to say it somewhere else, or deletes it to
@@ -356,9 +356,9 @@
   /**
    * What the About card still says for itself.
    *
-   * The auto-generated methodology paragraph that used to open this block —
+   * The auto-generated methodology paragraph that used to open this block,
    * project name, significance level, Bonferroni, which test each metric uses,
-   * the low-base cut-off, the wave-test exception — was removed on 2026-08-11.
+   * the low-base cut-off, the wave-test exception. Was removed on 2026-08-11.
    * It restated in prose what the Statistical diagnostics panel and the
    * How-to-read guide both carry, on a page whose job is the narrative.
    *
@@ -388,7 +388,7 @@
         (p.weight_variable ? " using ‘" + fmt.escapeHtml(p.weight_variable) + "’" : "") +
         " so the sample matches the known profile of the population; percentages, means and " +
         "significance are all calculated on the weights. Each table shows the <em>unweighted " +
-        "base</em> (the number of people who answered — judge robustness on this), the " +
+        "base</em> (the number of people who answered, judge robustness on this), the " +
         "<em>weighted base</em> (the denominator the percentages use) and the <em>effective " +
         "base</em> (the sample's effective size after weighting, on which significance tests " +
         "and confidence intervals are sized, since weighting reduces precision).</p>";
@@ -397,7 +397,7 @@
       TR.ai.methodologyHtml();
   }
 
-  // The statistical diagnostics panel — the interactive twin of the Excel stats
+  // The statistical diagnostics panel. The interactive twin of the Excel stats
   // pack (project.diagnostics, attached by the R build; a curated subset). A pure
   // function of the island object so it is unit-testable; "" when absent, so old
   // reports (and any build that couldn't attach it) simply omit the panel.
@@ -418,7 +418,7 @@
     var warn;
     if (!evs.length) {
       warn = '<div class="rpt-diag-sec rpt-diag-warn"><h4>Warnings &amp; events</h4>' +
-        '<p class="rpt-diag-clean">✓ ' + esc(w.summary || "No events — ran cleanly") + "</p></div>";
+        '<p class="rpt-diag-clean">✓ ' + esc(w.summary || "No events. Ran cleanly") + "</p></div>";
     } else {
       warn = '<div class="rpt-diag-sec rpt-diag-warn"><h4>Warnings &amp; events</h4>' +
         '<table class="rpt-diag-tbl rpt-diag-events"><thead><tr><th>Level</th><th>Code</th>' +
@@ -427,7 +427,7 @@
           e = e || {};
           var lvl = String(e.level || "INFO").toUpperCase();
           var cls = lvl === "REFUSE" ? "refuse" : lvl === "PARTIAL" ? "partial" : "info";
-          var detail = [e.title, e.message].filter(function (x) { return x && x !== "—"; }).join(" — ");
+          var detail = [e.title, e.message].filter(function (x) { return x && !/^\s*[-\u2013]\s*$/.test(x); }).join(": ");
           return '<tr><td><span class="rpt-diag-lvl ' + cls + '">' + esc(lvl) + "</span></td>" +
             "<td>" + esc(e.code) + "</td><td>" + esc(detail) + "</td></tr>";
         }).join("") + "</tbody></table></div>";
@@ -472,7 +472,7 @@
         var file = imageInput.files[0];
         if (!file) return;
         if (file.size > 1.5 * 1024 * 1024) {
-          TR.shell.toast("Image too large — keep imported slides under 1.5 MB each");
+          TR.shell.toast("Image too large. Keep imported slides under 1.5 MB each");
           return;
         }
         var reader = new FileReader();
@@ -488,9 +488,20 @@
 
   /* ---------------- save a portable annotated copy ---------------- */
 
+  /** A private localStorage namespace for the copy about to be written.
+   *  EVERY save mints a fresh one, so pinning four different stories out of one
+   *  report gives four independent copies that can sit open in one browser
+   *  without overwriting each other (see d2.storeKey). Re-saving a copy starts a
+   *  new namespace too, and loses nothing: the new file seeds from the state
+   *  baked into it here. The original report mints nothing and is unaffected. */
+  function newCopyId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
   report.saveCopy = function () {
     var state = {
       saved: true,
+      copyId: newCopyId(),
       insights: TR.insights.all(),
       annotations: TR.notes.all(),
       story: TR.story2.items(),
@@ -505,7 +516,7 @@
     // form. An HTML comment opener followed by a script opener inside a script
     // island puts the HTML parser into its double-escaped state, after which
     // this island's own closing tag no longer closes it and the following
-    // islands plus the JS bundle are swallowed — a blank report. The build side
+    // islands plus the JS bundle are swallowed. A blank report. The build side
     // has escaped this way since review 2026-08 (I14, triggered by a respondent
     // pasting an HTML email into an open-end); saveCopy still had the weaker
     // closing-tag-only guard, so an analyst pasting the same markup into an
@@ -521,7 +532,7 @@
     if (app) app.innerHTML = "";
     var island = clone.querySelector("#user-state");
     if (!island) {
-      TR.shell.toast("Save failed — user-state island missing");
+      TR.shell.toast("Save failed. User-state island missing");
       return;
     }
     island.textContent = json;
@@ -534,7 +545,7 @@
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-    TR.shell.toast("Annotated copy saved — single file, send it to anyone");
+    TR.shell.toast("Annotated copy saved. Single file, send it to anyone");
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

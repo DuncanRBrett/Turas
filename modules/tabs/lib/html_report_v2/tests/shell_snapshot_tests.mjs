@@ -6,7 +6,7 @@
  * crosstab pinned to the Story exported with its title and none of its numbers
  * (I1). This checks the numbers now survive, row by row.
  *
- * Also gates shell.autoGrowNotes — the analyst note boxes (crosstab Insight,
+ * Also gates shell.autoGrowNotes. The analyst note boxes (crosstab Insight,
  * story-pin commentary, qual/visualise insights) open at their full height
  * instead of clipping a long note at three lines with nothing to say so.
  *
@@ -47,15 +47,15 @@ function fakeCard(proseTexts, rows) {
   };
 }
 
-console.log("Shell snapshot export — suite:");
+console.log("Shell snapshot export. Suite:");
 
 run("snapshotLines harvests table rows with their numbers (I1)", () => {
   const card = fakeCard(
-    ["Theme crosstab — Course", "Salience by course"],
+    ["Theme crosstab. Course", "Salience by course"],
     [["Theme", "Total", "Diploma"], ["Financial", "45%", "50%"], ["Educators", "62%", "70%"]]
   );
   const lines = TR.shell.snapshotLines(card);
-  assert(lines.indexOf("Theme crosstab — Course") !== -1, "title still harvested");
+  assert(lines.indexOf("Theme crosstab. Course") !== -1, "title still harvested");
   assert(lines.indexOf("Financial · 45% · 50%") !== -1, "data row + numbers harvested");
   assert(lines.indexOf("Educators · 62% · 70%") !== -1, "second data row harvested");
   assert(lines.indexOf("Theme · Total · Diploma") !== -1, "header row harvested");
@@ -70,7 +70,7 @@ run("empty cells are dropped, no orphan separators", () => {
 /* ---------------- analyst notes in a snapshot ---------------- */
 /*
  * A tiny DOM, modelling the cloning rule snapshotCard depends on: a cloned
- * textarea DOES carry the analyst's typed value, not the markup default — the
+ * textarea DOES carry the analyst's typed value, not the markup default. The
  * HTML spec has textarea's cloning steps propagate the API value and the dirty
  * flag, and Chrome was checked directly. That is what lets a pin freeze a note
  * typed since the last render, which matters because the qual insight boxes
@@ -205,7 +205,7 @@ run("autoGrowNotes sizes each note box to its content (+ the border-box border)"
   assert(notes[1].style.height === "58px", "short note sized too: " + notes[1].style.height);
 });
 
-run("one selector, matching the CSS rule — both the insight box and the pin note", () => {
+run("one selector, matching the CSS rule. Both the insight box and the pin note", () => {
   const root = fakeRoot([]);
   TR.shell.autoGrowNotes(root);
   assert(root.seen[0] === ".insight textarea, textarea.si-note",
@@ -218,11 +218,26 @@ run("a note in a hidden tab measures 0 and is left alone, never collapsed", () =
   assert(note.style.height === "auto", "left at auto, not 0px: " + note.style.height);
 });
 
-run("typing keeps the box in step — one delegated input listener", () => {
+run("typing keeps the box in step. One delegated input listener", () => {
   assert(SHELL_SRC.indexOf('document.addEventListener("input"') !== -1,
     "delegated input listener wired in the shell");
   assert(SHELL_SRC.indexOf("e.target.matches(NOTE_SEL)") !== -1,
     "it grows exactly the note boxes");
+});
+
+run("show_save_copy: the header carries the button unless the study says otherwise", () => {
+  const SRC = readFileSync(path.join(JS_DIR, "24_shell.js"), "utf8");
+  assert(SRC.indexOf("save_copy === false") !== -1,
+    "the header gates the button on project.tabs.save_copy");
+  assert(SRC.indexOf('data-savecopy title=') !== -1, "the button itself is still built");
+  // Only an explicit false hides it: absent, null and true all keep the button,
+  // so every report built before the setting existed is unchanged.
+  const gate = (flags) => (flags || {}).save_copy === false;
+  assert(gate(undefined) === false, "no tabs block keeps the button");
+  assert(gate({}) === false, "no flag keeps the button");
+  assert(gate({ save_copy: true }) === false, "true keeps the button");
+  assert(gate({ save_copy: null }) === false, "null keeps the button");
+  assert(gate({ save_copy: false }) === true, "only an explicit false hides it");
 });
 
 console.log("\n" + (failed ? "✗ " + failed + " failed, " : "✓ ") + passed + " passed");

@@ -187,7 +187,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     significance_min_base = safe_numeric(get_config_value(config, "significance_min_base", default_min_base)),
     bonferroni_correction = safe_logical(get_config_value(config, "bonferroni_correction", TRUE), default = TRUE),
 
-    # Dual significance level toggle (optional — V10.10)
+    # Dual significance level toggle (optional, V10.10)
     # Set alpha_secondary to enable a second significance level in HTML reports.
     # Leave blank/absent to disable the feature (zero impact on existing reports).
     alpha_secondary = {
@@ -219,7 +219,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE), default = FALSE),
     outlier_method = get_config_value(config, "outlier_method", "IQR"),
 
-    # Stats pack (contractual deliverable — defaults to Y). Canonicalised to
+    # Stats pack (contractual deliverable, defaults to Y). Canonicalised to
     # "Y"/"N" because the consumer tests `toupper(...) == "Y"` exactly: a
     # perfectly reasonable `TRUE` in the cell read as "not Y" and switched the
     # contractual deliverable off in silence (production review 2026-08, I3).
@@ -228,7 +228,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     generate_stats_pack = normalise_flag_setting(
       get_config_value(config, "generate_stats_pack", "Y"), default = "Y"),
 
-    # (html_report — the classic HTML report — is RETIRED. It is not read here
+    # (html_report, the classic HTML report, is RETIRED. It is not read here
     # any more; a config that still carries the row is answered by name in
     # TABS_RETIRED_SETTINGS rather than silently ignored.)
 
@@ -237,11 +237,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Excel workbook. The workbook is untouched when FALSE.
     html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE), default = FALSE),
     # Whether the Settings sheet EXPLICITLY set html_report_v2 (I16): an
-    # explicit FALSE must beat the GUI's default-ON — a confidentiality-driven
+    # explicit FALSE must beat the GUI's default-ON. A confidentiality-driven
     # opt-out was silently overridden before. Internal, not a Settings name.
     html_report_v2_explicit = !is.null(get_config_value(config, "html_report_v2", NULL)),
     # V13 confidentiality dial (ON by default = today's behaviour). FALSE omits
-    # the anonymised per-respondent DATA_MICRO island from the v2 report — the
+    # the anonymised per-respondent DATA_MICRO island from the v2 report. The
     # aggregates-only ship for insider populations (small staff surveys) where
     # coded records + banner cuts could re-identify individuals. Only an
     # explicit FALSE disables: a blank or stringified-"NA" cell keeps the island
@@ -287,15 +287,15 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Numeric x-axis order key for this wave (e.g. 2025 or 2025.5 for twice-yearly
     # so two same-year waves never collide). Blank -> derived from the wave label.
     wave_order = get_config_value(config, "wave_order", ""),
-    # Sample design — drives honest confidence vocabulary in the v2 report
+    # Sample design. Drives honest confidence vocabulary in the v2 report
     # (probability designs speak CI/MOE; non-probability designs speak the
     # softened SI/PE). Cautious default: Not_Specified -> SI/PE. The value is
     # normalised to its canonical token here ("stratified" -> "Stratified");
-    # an unrecognised token refuses in validate_config_settings (I5) — it
+    # an unrecognised token refuses in validate_config_settings (I5): it
     # would otherwise silently flip the whole report's confidence vocabulary.
     sampling_method = normalise_sampling_method(
       get_config_value(config, "sampling_method", "Not_Specified")),
-    # Total universe size for a census / full-invite design — drives the finite
+    # Total universe size for a census / full-invite design. Drives the finite
     # population correction (FPC) on the Total column and the report's overall
     # response/coverage rate. Per-subgroup populations live in the optional
     # Population sheet. Blank/absent -> no correction (byte-identical to today).
@@ -316,7 +316,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Each dial is normalised to its canonical lowercase token, then refused in
     # validate_config_settings if it is not one of them (I4). Every consumer
     # compares with identical(), so "Block" used to mean ALLOW and "Noteworthy"
-    # used to mean ALL — a capital letter silently opened a confidentiality gate.
+    # used to mean ALL. A capital letter silently opened a confidentiality gate.
     qual_workbook = get_config_value(config, "qual_workbook", ""),
     qual_confidentiality_mode = normalise_enum_setting(
       get_config_value(config, "qual_confidentiality_mode", "hidden"),
@@ -329,7 +329,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
       .TABS_QUAL_ENUMS$qual_noteworthy_default, "all"),
     # Verbatim scope: which comments ship readable text. "all" = every comment except
     # hide-marked ones; "noteworthy" = only tier >= 1 (noteworthy/must-read/priority).
-    # Withheld comments still count in the distribution — only their text is withheld.
+    # Withheld comments still count in the distribution, only their text is withheld.
     qual_verbatim_scope = normalise_enum_setting(
       get_config_value(config, "qual_verbatim_scope", "all"),
       .TABS_QUAL_ENUMS$qual_verbatim_scope, "all"),
@@ -344,7 +344,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # the maxdiff module): named, the report gains a MaxDiff tab.
     maxdiff_island = get_config_value(config, "maxdiff_island", ""),
     # Host-survey columns exposed as comment tags (Feature 2): "Col:Label, Col:Label".
-    # Must be populated here — config_obj is an explicit whitelist, not the raw settings.
+    # Must be populated here. Config_obj is an explicit whitelist, not the raw settings.
     qual_tag_dimensions = get_config_value(config, "qual_tag_dimensions", ""),
     # Whitelisted alongside their siblings above (qual_*, min_reporting_base
     # already loaded below): heatmap_colour and research_house are both
@@ -355,8 +355,8 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     research_house = get_config_value(config, "research_house", "The Research LampPost"),
 
     # Disclosure control (V13). The minimum audience base below which the report
-    # withholds identifying detail — the demographic tags on comments now, small
-    # crosstab cells next — so a composite filter (e.g. 1st-year promoters in Cape
+    # withholds identifying detail. The demographic tags on comments now, small
+    # crosstab cells next, so a composite filter (e.g. 1st-year promoters in Cape
     # Town) cannot be narrowed onto a handful of identifiable people. Default 1 = off
     # (existing reports unchanged). For a small / sensitive sample such as a 200-person
     # staff climate survey, set it to 10; set it to the full sample size to forbid
@@ -371,12 +371,18 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     show_differences = safe_logical(get_config_value(config, "show_differences", TRUE), default = TRUE),
     show_tracking = safe_logical(get_config_value(config, "show_tracking", TRUE), default = TRUE),
     show_qualitative = safe_logical(get_config_value(config, "show_qualitative", TRUE), default = TRUE),
+    # Save copy (V15). ON by default, which is every report built before this
+    # setting existed. FALSE removes the header button, for a copy that is
+    # published rather than worked in: a public demo, or a client copy that
+    # must stay the one version of record. Nothing else about the report moves,
+    # and the story, insight and note editors are untouched.
+    show_save_copy = safe_logical(get_config_value(config, "show_save_copy", TRUE), default = TRUE),
 
     # Patterns-tab levers (optional). patterns_headline pins the apex KPI tiles
-    # to these question codes, in order (e.g. "Q78, Q79") — otherwise the tab
+    # to these question codes, in order (e.g. "Q78, Q79"): otherwise the tab
     # auto-detects satisfaction/overall-titled questions, which on a study with
     # many section ratings picks the wrong ones. patterns_exclude_banners keeps
-    # operational cuts (e.g. "Interviewer") out of the Patterns scan entirely —
+    # operational cuts (e.g. "Interviewer") out of the Patterns scan entirely,
     # a fieldwork-QC banner must never become the client-facing lead portrait.
     # Comma/semicolon-separated; parsed in the data layer.
     patterns_headline = get_config_value(config, "patterns_headline", NULL),
@@ -387,7 +393,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     patterns_banner = get_config_value(config, "patterns_banner", NULL),
     # Category names (beyond the built-in demographics/corpographics detection)
     # whose questions the Differences tab and the Patterns KeyShare scan treat
-    # as cuts, not outcomes — e.g. imputed spend families a study does not want
+    # as cuts, not outcomes, e.g. imputed spend families a study does not want
     # leading its findings. Comma/semicolon-separated; parsed in the data layer.
     # The JS consumer and its test predate this line; the setting was consumed
     # but never written until 2026-08 (DIFFERENCES_TAB_SCOPE.md, item 0).
@@ -441,23 +447,23 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # V10.9.0 AI Insights (optional, default FALSE)
     enable_ai_insights = safe_logical(get_config_value(config, "enable_ai_insights", FALSE), default = FALSE),
 
-    # AI model selection — friendly label ("Sonnet 4.6"/"Opus 4.8") or an exact
+    # AI model selection. Friendly label ("Sonnet 4.6"/"Opus 4.8") or an exact
     # model ID. Resolved in the AI layer; blank uses the sidecar/default model.
     ai_model = get_config_value(config, "ai_model", NULL),
 
-    # V15 Reader report — a separate narrative-summary file written beside the
+    # V15 Reader report. A separate narrative-summary file written beside the
     # crosstab that deep-links back into it. Opt-in; the GUI checkbox sets
     # TURAS_GENERATE_READER_REPORT, which overrides this. The report is
     # DETERMINISTIC by default (built on-device from the data layer, no AI,
     # nothing leaves the machine). reader_ai_prose sends AGGREGATES ONLY to the
-    # model to draft the prose — never microdata or verbatims — and stays off
+    # model to draft the prose, never microdata or verbatims, and stays off
     # unless the operator explicitly turns it on.
     generate_reader_report = safe_logical(get_config_value(config, "generate_reader_report", FALSE), default = FALSE),
     reader_ai_prose = safe_logical(get_config_value(config, "reader_ai_prose", FALSE), default = FALSE),
 
     # Index summary (I9): these Settings were whitelisted but never carried
     # into config_obj, so their downstream get_config_value() reads always saw
-    # the default — setting create_index_summary = N did nothing, silently.
+    # the default. Setting create_index_summary = N did nothing, silently.
     # NULL-when-absent defers to each consumer's own default (create_index_
     # summary's default is composites-driven in create_index_summary_safe).
     # Y/N flag (create_index_summary_safe reads the flag vocabulary), so it is
@@ -482,7 +488,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
       if (is.null(raw)) NULL else safe_numeric(raw, 1)
     },
 
-    # Ranking thresholds (I9): same gap — whitelisted, documented, never carried.
+    # Ranking thresholds (I9): same gap. Whitelisted, documented, never carried.
     ranking_tie_threshold_pct = {
       raw <- get_config_value(config, "ranking_tie_threshold_pct", NULL)
       if (is.null(raw)) NULL else safe_numeric(raw, 5)
@@ -574,7 +580,7 @@ normalise_enum_setting <- function(x, tokens, default) {
 
 #' Validate the statistical settings after build_config_object
 #'
-#' A junk cell in a statistical setting must refuse AT LOAD, naming the cell —
+#' A junk cell in a statistical setting must refuse AT LOAD, naming the cell,
 #' not crash mid-run inside a z-test where the orchestrator re-brands it as a
 #' per-question DATA_ fault (production review 2026-08, I11). An unrecognised
 #' sampling_method must refuse rather than silently soften the report's whole
@@ -582,7 +588,7 @@ normalise_enum_setting <- function(x, tokens, default) {
 #'
 #' The same argument covers every OTHER cell whose junk value silently became a
 #' default (I2/I3/I4): a Y/N toggle warned one scrollback line and ran the
-#' opposite way (`apply_weighting` — every published number wrong-by-weighting),
+#' opposite way (`apply_weighting`, every published number wrong-by-weighting),
 #' an unparseable number became the default it was meant to override
 #' (`population_size` switching the FPC off on a census project,
 #' `alpha_secondary` switching dual significance off), and a mis-cased
@@ -652,7 +658,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   }
   # Y/N toggles (I3). safe_logical() prints one scrollback line and returns the
   # default, so `apply_weighting = "Yes please"` ran the whole study unweighted
-  # — every published number wrong — with all the weight preflight checks
+  #, every published number wrong, with all the weight preflight checks
   # skipped because they gate on the parsed FALSE.
   for (key in .TABS_LOGICAL_SETTINGS) {
     raw <- if (!is.null(raw_settings)) raw_settings[[key]] else NULL
@@ -687,7 +693,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   }
   # html_report_v2_cover_findings. Not in .TABS_NUMERIC_SETTINGS because "ALL"
   # is a legal value, so the generic number test would refuse it. Junk here would
-  # silently mean "five" — the very cap the operator was trying to lift.
+  # silently mean "five". The very cap the operator was trying to lift.
   raw_cf <- if (!is.null(raw_settings)) raw_settings[["html_report_v2_cover_findings"]] else NULL
   if (!is_blank_setting(raw_cf)) {
     tok <- toupper(trimws(as.character(raw_cf[[1]])))
@@ -753,7 +759,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   }
 
   # "safe" k-anonymises demographic tag COMBINATIONS against min_reporting_base
-  # — but the anonymiser only engages when k > 1 (qual_island_builder.R), and
+  #, but the anonymiser only engages when k > 1 (qual_island_builder.R), and
   # min_reporting_base defaults to 1. So the source-safe-looking combination
   # 'safe' + default k ships every raw tag combination while reading as
   # protected. This is the operator's choice to make, so it warns rather than
@@ -780,7 +786,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
 # The dashboard settings that must parse as numbers. Every one of them is read
 # through safe_numeric() with a fallback, so an unparseable cell would otherwise
 # become the default in silence (M9).
-# The net and custom pairs left this list when they were retired (I11) — a
+# The net and custom pairs left this list when they were retired (I11): a
 # setting nothing reads cannot have its value corrupted.
 .TABS_DASHBOARD_NUMERIC_SETTINGS <- c(
   "dashboard_scale_mean", "dashboard_scale_index",
@@ -789,7 +795,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
 )
 
 # EVERY Settings cell that must parse as a number (I2/I3). The dashboard family
-# above plus the statistical, display, ranking and universe settings — each read
+# above plus the statistical, display, ranking and universe settings. Each read
 # through safe_numeric()/as.numeric() with a fallback, so junk in the cell
 # became the value the operator was overriding. test_config_contract.R parses
 # build_config_object and fails if a numeric setting is added without joining
@@ -822,6 +828,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "html_report_v2_cover",
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
   "show_qualitative",
+  "show_save_copy",
   "enable_ai_insights", "generate_reader_report", "reader_ai_prose",
   "index_summary_show_sections", "index_summary_show_base_sizes",
   "index_summary_show_composites"
@@ -834,7 +841,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
 
 # The qualitative confidentiality dials and their allowed tokens (I4). These
 # MUST match QUAL_TEXT_MODES / QUAL_VERBATIM_SCOPES / QUAL_NOTEWORTHY_DEFAULTS
-# in qual_island_builder.R and the template dropdowns — test_config_contract.R
+# in qual_island_builder.R and the template dropdowns. Test_config_contract.R
 # reads both files and fails on drift.
 .TABS_QUAL_ENUMS <- list(
   qual_confidentiality_mode = c("hidden", "redacted", "full"),
@@ -855,7 +862,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
 #' Case/whitespace-insensitive: "stratified" and " STRATIFIED " both resolve to
 #' "Stratified", so a casing slip cannot silently soften the report's whole
 #' confidence vocabulary to "Not specified". A token with no canonical match is
-#' returned trimmed as-is — validate_config_settings() refuses on it.
+#' returned trimmed as-is. Validate_config_settings() refuses on it.
 #'
 #' @param x Raw Settings-sheet value
 #' @return Canonical token, or the trimmed original when unrecognised
@@ -924,7 +931,7 @@ load_comments_sheet <- function(config_file) {
     # A usable Comment cell (same test the historical row filter applied)
     has_comment <- function(x) !is.na(x) && nzchar(trimws(x))
 
-    # Filter valid rows — QuestionCode is always required; Comment may be blank
+    # Filter valid rows. QuestionCode is always required; Comment may be blank
     # on a row that only carries a Headline (V13.x)
     df <- df[!is.na(df$QuestionCode) & nzchar(trimws(df$QuestionCode)), , drop = FALSE]
     if (nrow(df) == 0) return(NULL)
@@ -960,7 +967,7 @@ load_comments_sheet <- function(config_file) {
     # Filter out special rows from question comments
     df <- df[!trimws(toupper(df$QuestionCode)) %in% special_codes, , drop = FALSE]
 
-    # Optional per-question analyst headline (reader experience plan §E) — the
+    # Optional per-question analyst headline (reader experience plan §E): the
     # first non-blank Headline per question wins. The loader can surface an
     # empty cell as the literal string "NA"; treat that as blank.
     headlines <- list()
@@ -1134,7 +1141,7 @@ TABS_SLIDE_IMAGE_MAX_BYTES <- 1.5 * 1024 * 1024
 #' Intrinsic Pixel Size of an Image, From Its Header
 #'
 #' Reads width/height out of the file's own header for the formats whose header
-#' is fixed and trivially parsed. Pure base R — no image package is added for
+#' is fixed and trivially parsed. Pure base R. No image package is added for
 #' this. The dimensions travel to the report so a slide exported to PowerPoint
 #' keeps its aspect ratio; without them the deck writer stretches the picture to
 #' fill the slide.
@@ -1160,7 +1167,7 @@ TABS_SLIDE_IMAGE_MAX_BYTES <- 1.5 * 1024 * 1024
       identical(as.integer(raw[1:2]), c(255L, 216L))) {
     # Walk the marker segments to the first frame header (SOF0/1/2/…), whose
     # payload carries the real dimensions. SOF4 (0xC4), SOF8 (0xC8) and SOFC
-    # (0xCC) are NOT frame headers — they are Huffman/JPEG-LS tables.
+    # (0xCC) are NOT frame headers. They are Huffman/JPEG-LS tables.
     i <- 3L
     sof <- c(0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
              0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF)
@@ -1184,7 +1191,7 @@ TABS_SLIDE_IMAGE_MAX_BYTES <- 1.5 * 1024 * 1024
 #' changing what every other study says.
 #'
 #' The sheet ships empty on purpose. A key with no row, or a row with a blank
-#' Text cell, uses the platform wording — so an override only exists where an
+#' Text cell, uses the platform wording, so an override only exists where an
 #' analyst deliberately typed one, and a stale copy of the platform text can
 #' never sit in an old config quietly overriding an improvement made since.
 #'
@@ -1204,7 +1211,7 @@ load_report_text_sheet <- function(config_file) {
     # the client report ships in the wrong voice. The authored-text system
     # refuses the build for an unknown KEY, so an unreadable SHEET must not be
     # quieter than that (review 2026-08-21, I-28). A missing sheet is still a
-    # clean no-op — that is the normal case for most projects.
+    # clean no-op. That is the normal case for most projects.
     read_err <- NULL
     df <- tryCatch(.read_table_sheet(config_file, "ReportText", c("Key", "Text")),
                    error = function(e) { read_err <<- conditionMessage(e); NULL })
@@ -1216,7 +1223,7 @@ load_report_text_sheet <- function(config_file) {
         why_it_matters = paste0(
           "The sheet exists, so this study intends to override some report wording. ",
           "Continuing would silently publish the platform's default wording instead ",
-          "of the study's own — a difference nobody would notice until a client did."),
+          "of the study's own. A difference nobody would notice until a client did."),
         how_to_fix = c(
           "Open the config's ReportText sheet and check it has 'Key' and 'Text' header columns",
           "Check the sheet is not corrupt (re-save the workbook from Excel)",
@@ -1348,7 +1355,7 @@ load_qualitative_sheet <- function(config_file) {
         tryCatch({
             img_size <- file.info(img_path)$size
             # Refuse the image, keep the slide. The whole run must not fail over
-            # an oversized picture, but the operator has to be told plainly —
+            # an oversized picture, but the operator has to be told plainly,
             # a silently dropped exhibit is exactly the kind of thing nobody
             # notices until the client asks where it went.
             if (!is.na(img_size) && img_size > TABS_SLIDE_IMAGE_MAX_BYTES) {
@@ -1373,7 +1380,7 @@ load_qualitative_sheet <- function(config_file) {
             slide$image_data <- sprintf("data:%s;base64,%s",
               mime, base64enc::base64encode(raw))
             # Intrinsic size, so the PowerPoint export keeps the aspect ratio.
-            # Absent for formats with no readable header — the report still
+            # Absent for formats with no readable header. The report still
             # shows the image; only the deck falls back to fitting the slide.
             px <- .slide_image_pixel_size(raw, ext)
             if (!is.null(px) && px$w > 0 && px$h > 0) {
@@ -1409,7 +1416,7 @@ load_qualitative_sheet <- function(config_file) {
 #'
 #' An explicit `question_mapping` is tried as-is, then relative to the project
 #' root and the config directory. When blank, a `*Question_Mapping*.xlsx` is
-#' auto-detected in `waves_source`, the project root, or the config directory —
+#' auto-detected in `waves_source`, the project root, or the config directory,
 #' so pointing `waves_source` at a tracker's Crosswave folder is enough.
 #'
 #' @param raw_path The configured question_mapping value (may be blank)
@@ -1464,7 +1471,7 @@ excel_col_number <- function(letters_ref) {
 #' shipped a Tracking tab with 14 prior waves loaded and nothing paired to them.
 #'
 #' Section headers are merged exactly the same way, so a merge is only reported
-#' when its column-A text is a KNOWN setting name — headers never are.
+#' when its column-A text is a KNOWN setting name. Headers never are.
 #'
 #' Diagnostic only: it reads the file again and never alters the config or throws.
 #'
@@ -1501,7 +1508,7 @@ warn_merged_setting_rows <- function(config_file, sheet_name = "Settings",
       if (is.na(name) || !nzchar(name) || !(name %in% known)) next
       found[[length(found) + 1]] <- list(name = name, row = row, ref = ref)
     }
-    # Sheet order, not the arbitrary order the merges are stored in — the
+    # Sheet order, not the arbitrary order the merges are stored in. The
     # operator is going to walk down the sheet fixing them.
     found[order(vapply(found, function(h) h$row, integer(1)))]
   }, error = function(e) list())
@@ -1510,7 +1517,7 @@ warn_merged_setting_rows <- function(config_file, sheet_name = "Settings",
   cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
   cat(sprintf("│ Context: config '%s' sheet\n", sheet_name))
   cat("│ These setting rows are merged across columns, so they have\n")
-  cat("│ no Value cell and are being IGNORED — whatever you meant to\n")
+  cat("│ no Value cell and are being IGNORED. Whatever you meant to\n")
   cat("│ set there is not reaching the run:\n")
   for (h in hits) {
     cat(sprintf("│   %-28s (row %d, merged %s)\n", h$name, h$row, h$ref))
@@ -1525,12 +1532,12 @@ warn_merged_setting_rows <- function(config_file, sheet_name = "Settings",
 #' Warn about setting names that differ from the canonical one only by case
 #'
 #' `get_config_value()` looks settings up with an exact `[[name]]`, so a sheet
-#' that says `Research_House` never answers a request for `research_house` — the
+#' that says `Research_House` never answers a request for `research_house`. The
 #' run silently takes the default. The typo check above cannot see this: it
 #' lower-cases before comparing, so a case variant looks perfectly valid.
 #'
 #' When the canonical spelling is ALSO present the variant is merely redundant,
-#' and that is said explicitly — renaming it would produce two identically named
+#' and that is said explicitly. Renaming it would produce two identically named
 #' rows, which `load_config_sheet()` refuses outright.
 #'
 #' @param config The loaded settings list (names are the sheet's labels)
@@ -1545,7 +1552,7 @@ warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
   if (!length(off)) return(invisible(character(0)))
 
   cat("\n┌─── TURAS WARNING ─────────────────────────────────────┐\n")
-  cat("│ Context: config 'Settings' sheet — case mismatch\n")
+  cat("│ Context: config 'Settings' sheet. Case mismatch\n")
   cat("│ These settings are spelled differently from the name the\n")
   cat("│ loader looks up, so their values are being IGNORED and the\n")
   cat("│ defaults are used instead:\n")
@@ -1556,7 +1563,7 @@ warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
   }
   cat("│ How to fix: rename the Setting cell to the lower-case name.\n")
   if (any(canonical[off] %in% labels)) {
-    cat("│ Rows marked [duplicate] already have a correctly named twin —\n")
+    cat("│ Rows marked [duplicate] already have a correctly named twin, \n")
     cat("│ DELETE those rows rather than renaming them, or the sheet will\n")
     cat("│ hold the same setting twice and the run will refuse.\n")
   }
@@ -1565,7 +1572,7 @@ warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
 }
 
 
-# Settings that no longer do anything — either because the feature they drove was
+# Settings that no longer do anything. Either because the feature they drove was
 # retired, or because they were never read in the first place. A name here is NOT
 # a typo, so it must not be reported as one: the operator wrote it deliberately
 # and is entitled to know that the run ignored it, and why. Each entry is the
@@ -1576,12 +1583,12 @@ warn_case_mismatched_settings <- function(config, known = TABS_KNOWN_SETTINGS) {
 # setting" warning. Retired 2026-08 (remove after the next release).
 #
 # A dead name must NOT stay on TABS_KNOWN_SETTINGS. While it does, it silently
-# blesses itself and defeats the typo warning for its whole neighbourhood — an
+# blesses itself and defeats the typo warning for its whole neighbourhood. An
 # operator who wrote `output_folder` meaning `output_subfolder` was told nothing
 # and found the workbook in the default folder (production review 2026-08, I11).
 TABS_RETIRED_SETTINGS <- c(
   html_report = paste(
-    "the classic HTML report is retired — the interactive report",
+    "the classic HTML report is retired. The interactive report",
     "(html_report_v2) is the deliverable. No HTML file is written for this",
     "setting. Delete the row from the Settings sheet."
   ),
@@ -1688,7 +1695,7 @@ TABS_KNOWN_SETTINGS <- c(
   # Weighting
   "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n",
   "show_weighted_base", "weight_label",
-  # Display — frequencies and percentages
+  # Display. Frequencies and percentages
   "decimal_separator", "show_frequency", "show_percent_column", "show_percent_row",
   "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
   "decimal_places", "decimal_places_percent", "decimal_places_ratings",
@@ -1707,7 +1714,7 @@ TABS_KNOWN_SETTINGS <- c(
   # warned at for settings that work, and the merged-row/case diagnostics were
   # blind to them)
   "show_dashboard", "show_patterns", "show_differences", "show_tracking",
-  "show_qualitative", "patterns_headline", "patterns_exclude_banners",
+  "show_qualitative", "show_save_copy", "patterns_headline", "patterns_exclude_banners",
   "patterns_banner", "sampling_note", "insight_exclude_categories",
   # Checkpointing
   "enable_checkpointing",
@@ -1720,7 +1727,7 @@ TABS_KNOWN_SETTINGS <- c(
   "index_summary_show_composites", "index_summary_decimal_places",
   # Stats pack
   "generate_stats_pack",
-  # HTML report (html_report itself is retired — see TABS_RETIRED_SETTINGS)
+  # HTML report (html_report itself is retired, see TABS_RETIRED_SETTINGS)
   "html_report_v2", "html_report_v2_tracking",
   "html_report_v2_microdata", "html_report_v2_cover",
   "html_report_v2_cover_findings",
@@ -1781,11 +1788,11 @@ load_crosstabs_config <- function(config_file) {
   # vocabulary to "Not specified".
   validate_config_settings(config_obj, settings$config)
 
-  # A setting that used to work and no longer does gets named, not ignored —
+  # A setting that used to work and no longer does gets named, not ignored,
   # live configs (CCPB among them) still carry html_report = True.
   announce_retired_settings(settings$config)
 
-  # Check for unrecognised settings — typos are silently ignored otherwise.
+  # Check for unrecognised settings. Typos are silently ignored otherwise.
   # Retired names are deliberate, not typos, so they are excluded here; they
   # rejoin this list when their retirement entry is removed.
   .KNOWN_SETTINGS <- TABS_KNOWN_SETTINGS
@@ -1800,7 +1807,7 @@ load_crosstabs_config <- function(config_file) {
     cat("  These settings will be ignored. Check spelling against the template.\n\n")
   }
 
-  # A setting that never arrives is invisible to the check above — it isn't an
+  # A setting that never arrives is invisible to the check above. It isn't an
   # unknown name, it simply isn't in the list. The commonest cause is a row
   # merged into section-header shape, which leaves no Value cell to read.
   warn_merged_setting_rows(config_file)
@@ -1821,11 +1828,11 @@ load_crosstabs_config <- function(config_file) {
   # Load optional AddedSlides sheet (V10.8.0, renamed from Qualitative)
   config_obj$qualitative_slides <- load_qualitative_sheet(config_file)
 
-  # Load optional ReportText sheet — per-project overrides for the v2 report's
+  # Load optional ReportText sheet. Per-project overrides for the v2 report's
   # authored text (the platform wording lives in the callout registry).
   config_obj$report_text_overrides <- load_report_text_sheet(config_file)
 
-  # Load optional Population sheet (finite population correction) — per-subgroup
+  # Load optional Population sheet (finite population correction): per-subgroup
   # universe sizes; the study total lives in the population_size setting.
   config_obj$population_frame <- load_population_sheet(config_file)
 
@@ -1865,7 +1872,7 @@ load_crosstabs_config <- function(config_file) {
     config_obj$logo_path, "Logo")
 
   # Resolve the tabs-tracker question mapping: an explicit path (absolute, or
-  # relative to the project root / config dir), else auto-detected — a
+  # relative to the project root / config dir), else auto-detected. A
   # *Question_Mapping*.xlsx in waves_source, the project root, or the config dir.
   config_obj$question_mapping <- resolve_question_mapping(
     config_obj$question_mapping, config_obj$waves_source, project_root, config_file)

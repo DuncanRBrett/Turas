@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE WORKBOOK READER TESTS
+# TABS MODULE. QUALITATIVE WORKBOOK READER TESTS
 # ==============================================================================
 #
 # Known-answer tests for the pure column-classification + normalisation logic in
 # qual_workbook_reader.R. Fixtures are synthetic but encode the real quirks seen in
-# the four coded workbooks (SACS / SACAP Student / CCPB / Helderberg) — see
+# the four coded workbooks (SACS / SACAP Student / CCPB / Helderberg): see
 # modules/tabs/docs/QUALITATIVE_TAB_BUILD_NOTES.md §A.
 #
 # Every expected value below is hand-verifiable from the fixture rows.
@@ -58,7 +58,7 @@ find_record <- function(question, id) {
 }
 
 # ==============================================================================
-# HELPERS — direct unit tests
+# HELPERS. Direct unit tests
 # ==============================================================================
 
 test_that("qual_norm_cells trims, stringifies numbers, and blanks NA", {
@@ -90,7 +90,7 @@ test_that("qual_noteworthy_tier maps markers to tiers (0 other / 1 note / 2 must
   expect_equal(qual_noteworthy_tier("p"), 3L)        # priority code (lead-with)
   expect_equal(qual_noteworthy_tier("P"), 3L)
   expect_equal(qual_noteworthy_tier(" Priority "), 3L)   # word alias, case/space-insensitive
-  # A hide marker is a suppression, never noteworthy — tier 0, not tier 1.
+  # A hide marker is a suppression, never noteworthy. Tier 0, not tier 1.
   expect_equal(qual_noteworthy_tier("hide"), 0L)
   expect_equal(qual_noteworthy_tier("Hidden"), 0L)
   expect_equal(qual_noteworthy_tier(" HIDE "), 0L)
@@ -106,7 +106,7 @@ test_that("qual_verbatim_hidden detects hide/hidden markers, case- and space-ins
 })
 
 # ==============================================================================
-# FIXTURE A — SACS-like: themed, no demographics, floating header, stray code
+# FIXTURE A. SACS-like: themed, no demographics, floating header, stray code
 # ==============================================================================
 
 sacs_sheet <- make_sheet(
@@ -133,7 +133,7 @@ test_that("SACS-like: header detection, themed type, title from verbatim header"
   expect_equal(q$code, "QUAL_CULTURE")
 })
 
-test_that("SACS-like: roles — verbatim by length, sentiment by name+density, no demos", {
+test_that("SACS-like: roles. Verbatim by length, sentiment by name+density, no demos", {
   q <- qual_classify_sheet(sacs_sheet, "Culture")
   expect_equal(q$roles$id, 1L)
   expect_equal(q$roles$noteworthy, 2L)
@@ -162,7 +162,7 @@ test_that("SACS-like: stray code quarantined, not coerced; records honest", {
 })
 
 # ==============================================================================
-# FIXTURE B — SACAP Student NPS-like: demographics, "Theme"=sentiment drift, "x" marker
+# FIXTURE B. SACAP Student NPS-like: demographics, "Theme"=sentiment drift, "x" marker
 # ==============================================================================
 
 student_sheet <- make_sheet(
@@ -198,7 +198,7 @@ test_that("Student-like: 'x' marker counts as noteworthy; demographics captured"
 })
 
 # ==============================================================================
-# FIXTURE C — CCPB-themed-like: NO overall-sentiment column, themes after noteworthy
+# FIXTURE C. CCPB-themed-like: NO overall-sentiment column, themes after noteworthy
 # ==============================================================================
 
 ccpb_sheet <- make_sheet(
@@ -226,7 +226,7 @@ test_that("CCPB-like: no sentiment column; valence rides theme cells", {
 })
 
 # ==============================================================================
-# FIXTURE D — Helderberg-raw-like: no Noteworthy column, "-" missing, numeric Rating
+# FIXTURE D. Helderberg-raw-like: no Noteworthy column, "-" missing, numeric Rating
 # ==============================================================================
 
 helderberg_sheet <- make_sheet(
@@ -255,7 +255,7 @@ test_that("Helderberg-like: all-raw type, absent noteworthy, '-' -> NA, numeric 
 })
 
 # ==============================================================================
-# SKIP MARKERS — metadata sheets and headerless sheets are skipped, never crash
+# SKIP MARKERS. Metadata sheets and headerless sheets are skipped, never crash
 # ==============================================================================
 
 test_that("Contents and headerless sheets are skipped with a typed reason", {
@@ -269,7 +269,7 @@ test_that("Contents and headerless sheets are skipped with a typed reason", {
 })
 
 # ==============================================================================
-# REPEATED HEADER — some sheets (CCPB "Fountains") stack sub-tables; a repeated
+# REPEATED HEADER. Some sheets (CCPB "Fountains") stack sub-tables; a repeated
 # header row inside the data must not be read as a respondent.
 # ==============================================================================
 
@@ -289,7 +289,7 @@ test_that("a repeated header row inside the data is skipped, not read as a respo
 
 
 # ==============================================================================
-# Production review 2026-08 — I17/I18/I19 hardening
+# Production review 2026-08. I17/I18/I19 hardening
 # ==============================================================================
 
 test_that("verbatim fallback refuses to guess between two prose columns (I17)", {
@@ -306,7 +306,7 @@ test_that("verbatim fallback refuses to guess between two prose columns (I17)", 
   expect_gte(length(q$ambiguous_columns), 2)
 })
 
-test_that("a named Comment column beats the length fallback — notes column is a cut, not the verbatim", {
+test_that("a named Comment column beats the length fallback. Notes column is a cut, not the verbatim", {
   named_sheet <- make_sheet(
     c("ID", "Noteworthy", "Comment", "Analyst working notes"),
     c("1", "", "Engaging sessions", "A much longer analyst-only note that would win on mean length"),

@@ -3,12 +3,12 @@
 The data-centric report v2 is a single, self-contained, offline HTML report the
 tabs module emits **alongside** the Excel workbook. Rather than pre-rendering
 tables, it embeds the data as JSON "islands" plus a small renderer that
-recomputes views in the browser — so the reader can filter the audience, build
+recomputes views in the browser, so the reader can filter the audience, build
 custom banners, and (for trackers) explore wave history, all without leaving the
 file or contacting a server.
 
-This is the report Turas ships. (An earlier pre-rendered HTML report — the
-"classic" report — was retired in August 2026 and its code deleted; a config
+This is the report Turas ships. (An earlier pre-rendered HTML report, the
+"classic" report. Was retired in August 2026 and its code deleted; a config
 that still sets `html_report` is told so on load.) The report is written
 whenever the GUI runs; a config can force it on or off with `html_report_v2`,
 and the Excel workbook is byte-for-byte the same either way.
@@ -31,7 +31,7 @@ assembled from each wave's own microdata.
 
 ---
 
-## Two trackers — do not conflate them
+## Two trackers. Do not conflate them
 
 There are two completely separate tracking systems. **The classic tracker module
 is untouched by any of this.**
@@ -53,12 +53,12 @@ does **not** replace the classic tracker. Pick whichever fits the engagement.
 
 The v2 renderer carries three JSON islands:
 
-- **`data-agg`** — the published aggregates (the report of record). The default
+- **`data-agg`**. The published aggregates (the report of record). The default
   view renders these verbatim.
-- **`data-micro`** (`TR.MICRO`) — anonymised per-respondent **microdata**. When a
+- **`data-micro`** (`TR.MICRO`): anonymised per-respondent **microdata**. When a
   filter or a custom banner is active, the stats engine recomputes the whole
   table from this. Absent → the report is published-only (no live filter/banner).
-- **`data-prev`** (`TR.PREV`) — the **tracking** island (wave history). Present →
+- **`data-prev`** (`TR.PREV`): the **tracking** island (wave history). Present →
   the Tracking tab appears.
 
 Published figures are always the record; recomputed (filtered / custom-banner /
@@ -67,21 +67,21 @@ historical) figures are badged as computed.
 ### Which statistic a question reports (`stat`)
 
 Each `data-agg` question puts ONE quantity in its rows' `pct` array. Normally
-that is the **column percentage** — but a config with `show_percent_column = N`
+that is the **column percentage**, but a config with `show_percent_column = N`
 puts row percentages or raw frequencies there instead, and a single row that has
 no column percentage substitutes another statistic of its own.
 
-- `question.stat` — `"Column %"` | `"Row %"` | `"Frequency"` | `"Average"`.
-- `row.stat` — set only when that row differs from its question's.
+- `question.stat`, `"Column %"` | `"Row %"` | `"Frequency"` | `"Average"`.
+- `row.stat`. Set only when that row differs from its question's.
 
 Both are **emitted only when they are not `"Column %"`**, so an ordinary report's
 island is byte-identical and a reader that finds neither treats the values as
 column percentages (which every report built before this field did carry).
 
 `TR.fmt.statOf / isPctStat / isColPctStat / statName / value` are the single
-vocabulary. Anything that assumes a column proportion — the "%" suffix, Wilson
+vocabulary. Anything that assumes a column proportion. The "%" suffix, Wilson
 intervals, data bars, the heat tint, wave trending, the Differences pp gaps, the
-Patterns/KeyShare share scans and the confidence explainer's worked example —
+Patterns/KeyShare share scans and the confidence explainer's worked example,
 must gate on it. A filtered/custom-banner recompute always produces column
 percentages, so its model reports `stat: "Column %"` plus `statWas` naming what
 the question published, and the table says so rather than silently changing unit.
@@ -100,7 +100,7 @@ the question published, and the table says so rather than silently changing unit
   },
   "weights": [1, 1, 1, ...],                  // per-respondent weight (length n; all 1 = unweighted)
   "scores": {                                 // per-respondent mean score (rating value / Likert weight /
-    "Q015": [4, 7, null, 9, ...]              //   NPS ±100), length n. The robust mean-recompute source —
+    "Q015": [4, 7, null, 9, ...]              //   NPS ±100), length n. The robust mean-recompute source,
   },                                          //   works even when a rating publishes only its Mean.
   "boxes": {                                  // per-respondent box-category membership: the data-layer row
     "Q015": [1, 0, null, 2, ...]              //   index of the respondent's box NET (e.g. "Good (9-10)"),
@@ -112,7 +112,7 @@ Correctness contract: a respondent's answer is mapped to its display-row index
 with the **same** exact-string match the crosstab processors use, so a (weighted)
 recompute reproduces the **published** figures. Weighted figures use the weighted
 counts / weighted base for values and **Kish effective n** = (Σw)²/Σw² for
-significance — mirroring `weighting.R`'s `weighted_z_test_proportions`.
+significance. Mirroring `weighting.R`'s `weighted_z_test_proportions`.
 
 Indices are zero-based positions into each question's `rows[]` array
 (`d2.catRows`). `index_scores` (display label → numeric score) is carried on each
@@ -123,21 +123,21 @@ for hidden-category questions and is preferred when present.
 
 The Tracking tab has its own **Significance** control (in the pulse bar:
 off / 95% / 95% + 80%) that sets the same report-wide `d2.state.sigMode` the
-Crosstabs tab uses — change it on either tab and both follow. With **95% + 80%**
+Crosstabs tab uses. Change it on either tab and both follow. With **95% + 80%**
 chosen, every wave-on-wave comparison carries two flags instead of one:
 `sig_prev`/`sig_base` (significant at 95%, the solid ▲▼ marker) and
 `soft_prev`/`soft_base` (significant at **80% but not 95%**, the hollow △▽ marker
 + a "nearly significant" pulse tally). `cellsFor(points, canSig, mode)` reads the
 mode directly: `off` suppresses all flags, `95` is strong-only, `dual` adds the
 soft band. Soft flags are only populated in dual mode, so the default 95%-only
-report is unchanged. This catches real-but-noisy moves — e.g. an NPS that, at
+report is unchanged. This catches real-but-noisy moves, e.g. an NPS that, at
 n≈60, has a ±28-point 95% margin, so a 25-point drop reads as nearly-significant
 rather than vanishing into "stable". The 80% level is the same one the crosstab
 tab marks with lowercase letters; thresholds are `stats.Z95` / `stats.Z80`.
 
 #### Narrative pulled from the config (Comments sheet → report)
 
-The report fills its narrative from the config's **Comments sheet** — nothing
+The report fills its narrative from the config's **Comments sheet**. Nothing
 is hand-retyped:
 
 - **Per-question insights**: each question's comment is carried in
@@ -147,7 +147,7 @@ is hand-retyped:
 - **Background & method** and **Executive summary**: the reserved `_BACKGROUND`
   and `_EXECUTIVE_SUMMARY` rows ride in `project.report_meta.background` /
   `.exec_summary` and pre-fill those (editable) Report-tab sections.
-- **About this report** is **read-only** — analyst, contact and disclaimers come
+- **About this report** is **read-only**. Analyst, contact and disclaimers come
   straight from the config (`report_meta`) and are displayed, not edited.
 
 All of this is omitted from the data layer when not configured, so a report
@@ -156,8 +156,8 @@ without a Comments sheet is byte-identical to before.
 #### Question & category order (Selection sheet)
 
 The data layer emits `questions[]` grouped by category in the Selection sheet's
-order — categories by `CategoryOrder` (then first-appearance), questions in
-their within-category order, uncategorised last — exactly like the crosstab
+order. Categories by `CategoryOrder` (then first-appearance), questions in
+their within-category order, uncategorised last. Exactly like the crosstab
 workbook (`workbook_builder.R`). So the report opens on, and groups by, the
 same sections as the workbook (e.g. an "Overall metrics" category with
 `CategoryOrder = 1` leads, and `state.activeQ` defaults to its first question).
@@ -188,7 +188,7 @@ that sets no `CategoryOrder` keeps first-appearance order (still grouped).
 
 The renderer recomputes each wave's value + dispersion from its `scores` (no
 pre-baked numbers); waves are matched to the current questions by `match_key`.
-The `year` key is a unique x-axis order key — give twice-yearly waves a decimal
+The `year` key is a unique x-axis order key. Give twice-yearly waves a decimal
 (e.g. `2025` and `2025.5`) so two same-calendar-year waves never collide.
 
 ---
@@ -201,17 +201,17 @@ GUI tick-box for option 2):
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
-| `html_report_v2_microdata` | `Y` | Embed the anonymised per-respondent microdata island. `N` = the **confidentiality ship**: an aggregates-only file for insider populations (see Anonymisation & governance) — the live filter, custom banners and COMPUTED views switch off for that build. **The Tracking tab survives**: the current wave is built from the published figures instead of from records (`published_wave_contribution()`), and that build writes no `*_wave.json`. Only an explicit `N`/`FALSE` disables; blank keeps the island. |
+| `html_report_v2_microdata` | `Y` | Embed the anonymised per-respondent microdata island. `N` = the **confidentiality ship**: an aggregates-only file for insider populations (see Anonymisation & governance): the live filter, custom banners and COMPUTED views switch off for that build. **The Tracking tab survives**: the current wave is built from the published figures instead of from records (`published_wave_contribution()`), and that build writes no `*_wave.json`. Only an explicit `N`/`FALSE` disables; blank keeps the island. |
 | `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. Weighted studies are supported (the wave trend is weighted to match the crosstab). |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
-| `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…) — robust to renames — and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
+| `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…), robust to renames, and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
 | `wave` | *(blank)* | Wave label shown in the header and used as the trend label. |
 | `wave_order` | *(blank)* | Numeric x-axis order key for this wave (e.g. `2025.5`). Blank → a 4-digit year is parsed from the `wave` label. |
 | `researcher_logo_path` / `client_logo_path` | *(blank)* | Logos embedded (base64) into the v2 header. |
 | `sampling_method` | `Not_Specified` | Drives honest CI vocabulary (probability → CI/MOE; otherwise stability/PE). |
 
 Outputs land next to the Excel file: `<project>_report.html` (the interactive
-report — built by default from the GUI), `<project>_data.json`, and (tracking
+report. Built by default from the GUI), `<project>_data.json`, and (tracking
 on) `<project>_wave.json`.
 
 ### Forward path for trackers
@@ -228,7 +228,7 @@ onward; a back-catalogue can be produced by running each historical wave once.)
 ## Anonymisation & governance
 
 - The microdata and tracking islands carry **only** zero-based row/column indices
-  and per-respondent weights/scores — **never** an identifier, raw answer string,
+  and per-respondent weights/scores, **never** an identifier, raw answer string,
   free text, or question title-as-data. The indices are meaningless without the
   report they ship inside.
 - The whole report is a single offline file with **no external URLs** (enforced
@@ -244,7 +244,7 @@ onward; a back-catalogue can be produced by running each historical wave once.)
   vector. The display k-gate (`min_reporting_base`) governs what *renders*, not
   what ships in the page source. For those ships set
   `html_report_v2_microdata = N`: the file then carries published aggregates
-  only — the same confidentiality as a printed report. Costs: no live filter,
+  only. The same confidentiality as a printed report. Costs: no live filter,
   custom banners or COMPUTED views. The **Tracking tab is not a cost**: with no
   scores to draw on, the current wave is built from the published figures
   (`published_wave_contribution()`, same metrics and same cross-wave keys as the
@@ -253,10 +253,10 @@ onward; a back-catalogue can be produced by running each historical wave once.)
   distribution. The one honest degrade: a question that publishes only its mean
   (every category hidden) has no distribution to take a spread from, so it plots
   untested where the microdata build would have tested it. That build writes no
-  `_wave.json` — keep the one from your full build, it is this wave's
+  `_wave.json`. Keep the one from your full build, it is this wave's
   contribution to the history.
-  Recommended workflow: **two configs** — your own working copy with microdata
-  ON, the client copy with it OFF — and pair the client copy with the qual
+  Recommended workflow: **two configs**. Your own working copy with microdata
+  ON, the client copy with it OFF, and pair the client copy with the qual
   dials (`qual_confidentiality_mode` hidden, `qual_demographic_cuts = block`)
   for a fully source-safe ship.
 
@@ -265,37 +265,37 @@ onward; a back-catalogue can be produced by running each historical wave once.)
 ## Current scope & known limitations
 
 Read these before enabling the v2 report for a live client deliverable. None
-produce a *wrong* number — each is an honest degrade or a guard.
+produce a *wrong* number. Each is an honest degrade or a guard.
 
 - **Box-category NETs recompute under a live filter / custom banner** (e.g.
   "Top-2-Box", "Good (9-10)", and the "NET POSITIVE (top − bottom)" difference).
   The microdata carries each respondent's **box membership** (`TR.MICRO.boxes`)
-  plus `net_diffs`, so these rows re-sum for a filtered audience — and it works
+  plus `net_diffs`, so these rows re-sum for a filtered audience, and it works
   whether the underlying scale is shown (SACAP shows 0–10) or hidden (CCS shows
   only the boxes). Verified on real CCS data. *(Arbitrary one-off NETs that are
   not box-categories still fall back to the published value unfiltered.)*
 - **Cross-wave matching is by question title unless a `question_mapping` is set.**
   Title-matching is fragile to rewording ("…in 2025" vs "…in 2026" won't link).
   Point `question_mapping` at the classic tracker's `Question_Mapping.xlsx` and
-  waves link by the canonical `Track_NN` key instead — robust to renames, and the
+  waves link by the canonical `Track_NN` key instead. Robust to renames, and the
   same curated config drives both the classic tracker and this Tracking tab. (The
   current wave's column in the mapping is auto-detected by matching codes.)
 - **Numeric (binned) means** also show "–" under a filter (the mean is over raw
-  values, not bins) — honest degrade.
+  values, not bins): honest degrade.
 - **Data-derived multi-select categories** whose published label is a *semantic*
   recode of the raw value (e.g. `DK` → `Don't know`) with **no** structure option
   to bridge them may under-count under a custom filter. Fix data-side by defining
   the option in `Survey_Structure`.
 
-Everything else — values, weighted recompute, significance (effective n),
-means / NPS — recomputes correctly and matches the published figures.
+Everything else. Values, weighted recompute, significance (effective n),
+means / NPS. Recomputes correctly and matches the published figures.
 
 ---
 
 ## Where the report's words come from
 
-The interpretive prose in a v2 report — the explainers, legends, method notes
-and the About card's construction note — is **authored, not coded**. It lives in
+The interpretive prose in a v2 report. The explainers, legends, method notes
+and the About card's construction note. Is **authored, not coded**. It lives in
 the shared callout registry (`modules/shared/lib/callouts/callouts.json`, module
 `tabs`) and is edited in the **Callout Editor**, launched from `launch_turas()`.
 The renderer holds no fallback wording: if a sentence is not in the registry, it
@@ -319,12 +319,12 @@ starts a new paragraph, a **single newline** starts a new bullet. So the whole
 and "Reading this table" is one entry of five bullets.
 
 Text is only split across entries when the code has to choose between the
-pieces — a sentence that renders only on a weighted report, a clause that
+pieces. A sentence that renders only on a weighted report, a clause that
 appears only at the 80% level, two forms of the same sentence for reports with
 and without a base. Where a conditional sentence sits *inside* an otherwise
 continuous block, it arrives as a placeholder instead (`{waves_note}` in the
 Report construction note), so the author still edits one entry and decides where
-that sentence goes — or deletes the placeholder to never say it.
+that sentence goes, or deletes the placeholder to never say it.
 
 ### Adding a new authored block
 
@@ -333,13 +333,13 @@ that sentence goes — or deletes the placeholder to never say it.
 2. Declare it in `text_manifest.json` with its `page`, `context` and `tokens`.
 3. Write the text in the Callout Editor, under module `tabs`.
 
-Miss step 2 or 3 and the next build **refuses and names the key** — the renderer
+Miss step 2 or 3 and the next build **refuses and names the key**. The renderer
 is scanned for its own `TR.txt(...)` calls, so nothing can silently render blank.
 A build also refuses on a `{placeholder}` the key does not declare, on markup
 outside the inline whitelist (`strong em b i br p ul ol li h3 h4 span code sup sub`,
 all balanced, no attributes), and on a key deleted from the registry.
 
-**Blank text is legitimate** and means "do not show this block on any report" —
+**Blank text is legitimate** and means "do not show this block on any report",
 that is how an author switches a paragraph off without a code change. Deleting
 the entry is a different act, and refuses.
 
@@ -378,7 +378,7 @@ at its next generation. When ONE study has to say something differently, put the
 key and its replacement in the config's **ReportText** sheet.
 
 The sheet ships empty and should usually stay that way. A missing row or a blank
-`Text` cell means "use the platform wording" — so a config can never quietly
+`Text` cell means "use the platform wording", so a config can never quietly
 carry a stale copy of text that has been improved since. A `Key` that matches
 nothing refuses the build and names it, because a typo there looks exactly like
 an override that is working. Overrides are validated like any other authored
@@ -391,7 +391,7 @@ report's standing explanatory furniture.
 
 ### Editing operationally
 
-Text applies at the **next report generation** — an editor save changes nothing
+Text applies at the **next report generation**. An editor save changes nothing
 in an HTML file that already exists. `callouts.json` is repo content: commit it
 like code. The editor writes it atomically and keeps its last ten saves under
 `modules/shared/lib/callouts/backups/`.
@@ -415,7 +415,7 @@ like code. The editor writes it atomically and keeps its last ten saves under
 The renderer under `modules/tabs/lib/html_report_v2/assets/` **is** the
 source of truth. It began as a vendored copy of
 `prototypes/report-redesign/fable/v2/`, and that line used to say the two must
-stay in sync — but the prototype has carried no `assets/js` for some time, so
+stay in sync, but the prototype has carried no `assets/js` for some time, so
 there is nothing there to sync with. What remains under `prototypes/` is design
 history: read it for how the v2 report came to be shaped this way, not for code.
 (Retired 2026-08-17, with the authored-text work, which changed the vendored

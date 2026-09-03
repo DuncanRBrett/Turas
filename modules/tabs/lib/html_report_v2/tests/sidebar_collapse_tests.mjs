@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Crosstabs sidebar — collapse/expand all question groups.
+ * Crosstabs sidebar. Collapse/expand all question groups.
  *
  * What this gates:
  *  1. Group collapse is STATE, not just a DOM class: the sidebar renders from
@@ -8,7 +8,7 @@
  *     the Crosstabs tab (it used to reset silently on every re-render).
  *  2. The one all-groups button: its label says what the next click does, so a
  *     part-collapsed sidebar collapses the rest rather than guessing.
- *  3. The active question opens its own group — a collapsed group hides its
+ *  3. The active question opens its own group. A collapsed group hides its
  *     links outright, so the .on marking and scrollIntoView did nothing when
  *     prev/next stepped into one.
  *  4. Search shows matches inside collapsed groups (CSS override) without
@@ -53,7 +53,7 @@ function sandbox(questions) {
     charts: { clip: (s) => s }
   };
   vm.createContext(cv);
-  load(cv, "01_format.js");     // real escapeHtml — attribute escaping is under test
+  load(cv, "01_format.js");     // real escapeHtml. Attribute escaping is under test
   load(cv, "20_data.js");       // real state + categories()
   load(cv, "25_cards.js");
   return cv;
@@ -65,7 +65,7 @@ const QS = [
   { code: "Q3", title: "Satisfaction", category: "Experience" }
 ];
 
-console.log("Sidebar collapse/expand — suite:");
+console.log("Sidebar collapse/expand. Suite:");
 
 /* ---------- 1. state-driven rendering ---------- */
 

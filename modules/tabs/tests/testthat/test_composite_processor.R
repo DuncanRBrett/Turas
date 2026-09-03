@@ -3,11 +3,11 @@
 # ==============================================================================
 #
 # Tests for composite metric processing:
-#   1. validate_composite_definitions() — input validation
-#   2. calculate_composite_values() — Mean, Sum, WeightedMean
-#   3. process_composite_question() — single composite processing
-#   4. process_all_composites() — batch composite processing
-#   5. test_composite_significance() — significance testing
+#   1. validate_composite_definitions(): input validation
+#   2. calculate_composite_values(): Mean, Sum, WeightedMean
+#   3. process_composite_question(): single composite processing
+#   4. process_all_composites(): batch composite processing
+#   5. test_composite_significance(): significance testing
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_composite_processor.R")
@@ -772,7 +772,7 @@ test_that("every yes token loads as the canonical Y", {
   }
 })
 
-test_that("every no token — and a blank cell — loads as the canonical N", {
+test_that("every no token, and a blank cell, loads as the canonical N", {
   for (token in c("N", "n", "No", "FALSE", "F", "0", "", NA_character_)) {
     path <- .write_composite_structure(token)
     defs <- load_composite_definitions(path)
@@ -808,8 +808,8 @@ test_that("a sheet with no ExcludeFromSummary column is unaffected", {
 # Production review 2026-08, M-K. The Index_Summary's disclosure gate used to
 # borrow the FIRST source question's bases, which is a different set of people
 # whenever the sources are routed differently. The composite now publishes the
-# base its own significance path already computed — respondents in the column
-# with a scoreable composite value — so the gate and the finite population
+# base its own significance path already computed. Respondents in the column
+# with a scoreable composite value, so the gate and the finite population
 # correction read one definition.
 
 context("composite_processor: the composite's own bases (M-K)")
@@ -847,7 +847,7 @@ test_that("the base counts respondents with a scoreable composite value", {
 
 test_that("a respondent with no scoreable source does not count toward the base", {
   # Blank every source for the first two respondents: the composite cannot be
-  # computed for them, so they leave its base — which is exactly the difference
+  # computed for them, so they leave its base, which is exactly the difference
   # between the composite's own base and a source question's.
   data <- make_composite_test_data()
   srcs <- c("Q_Sat1", "Q_Sat2", "Q_Sat3")
@@ -861,7 +861,7 @@ test_that("a respondent with no scoreable source does not count toward the base"
 })
 
 # ==============================================================================
-# PROVENANCE — a composite states its own, and the Selection sheet overrides it
+# PROVENANCE. A composite states its own, and the Selection sheet overrides it
 # ==============================================================================
 
 test_that("composite_provenance reads the definition Turas already has", {
@@ -889,7 +889,7 @@ test_that("composite_provenance reads the definition Turas already has", {
 test_that("composite_provenance never describes a calculation it cannot verify", {
   defs <- make_composite_defs()
 
-  # A weight list that does not match the source questions is not reported —
+  # A weight list that does not match the source questions is not reported,
   # naming weights the engine did not use would be worse than naming none.
   bad <- defs[2, , drop = FALSE]
   bad$Weights <- "0.5,0.3"

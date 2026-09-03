@@ -1,4 +1,4 @@
-// Qualitative tab — pure-helper known-answer suite (node, no DOM).
+// Qualitative tab. Pure-helper known-answer suite (node, no DOM).
 // Loads 27q_qualitative.js with a TR.fmt stub and checks the prevalence,
 // tier-filter and theme-record helpers against hand-computable answers.
 import fs from "node:fs";
@@ -42,7 +42,7 @@ const q = {
   ]
 };
 
-console.log("Qualitative tab — pure helpers:");
+console.log("Qualitative tab. Pure helpers:");
 
 const prev = qual.prevalence(q.records, q.themes);
 assert(prev[0].label === "Price" && prev[0].n === 2 && prev[0].pct === 50,
@@ -58,7 +58,7 @@ assert(qual.tierFilter(q.records, "must_read").length === 1, "tierFilter must-re
 assert(qual.tierFilter(q.records, "priority").length === 0, "tierFilter priority -> 0 (no tier>=3 here)");
 
 // byTierDesc: highest tier leads (Priority 3 > Must-read 2 > Noteworthy 1 > rest 0),
-// stable within a tier — so comments lead P,M,N and never by record id.
+// stable within a tier, so comments lead P,M,N and never by record id.
 var tierMix = [{ idx: 0, tier: 1 }, { idx: 1, tier: 0 }, { idx: 2, tier: 3 },
                { idx: 3, tier: 2 }, { idx: 4, tier: 0 }, { idx: 5, tier: 1 }];
 assert(qual.byTierDesc(tierMix).map(function (r) { return r.idx; }).join(",") === "2,3,0,5,1,4",
@@ -68,7 +68,7 @@ assert(qual.tierFilter(tierMix, "priority").length === 1, "tierFilter priority -
 assert(qual.recordsForTheme(q.records, 0).length === 2, "recordsForTheme Price -> 2");
 
 // Prevalence recomputes over whatever audience it is given (here: the 2 Cape Town
-// records, 1 Price + 1 Service) — the audience now comes from the global cut mask,
+// records, 1 Price + 1 Service): the audience now comes from the global cut mask,
 // not a per-tab facet row, so prevalence is just handed the filtered pool.
 const capeTown = q.records.filter((r) => r.demos && r.demos.Campus === "Cape Town");
 const cpt = qual.prevalence(capeTown, q.themes);
@@ -103,10 +103,10 @@ assert(qual.poolBeforeSentiment(scopeQ, scSt, scopeQ.records).length === 1,
 // ---- theme x banner crosstab (column base = commenters; salience + valence + sig) ----
 console.log("\nQualitative theme x banner crosstab:");
 const xrecs = [
-  { idx: 0, themeVals: { "0": 1 } },   // theme A, positive — in ColX
-  { idx: 1, themeVals: { "0": 3 } },   // theme A, negative — in ColX
-  { idx: 2, themeVals: { "0": 1 } },   // theme A, positive — outside ColX
-  { idx: 3, themeVals: {} }            // commented, no theme — outside ColX
+  { idx: 0, themeVals: { "0": 1 } },   // theme A, positive, in ColX
+  { idx: 1, themeVals: { "0": 3 } },   // theme A, negative, in ColX
+  { idx: 2, themeVals: { "0": 1 } },   // theme A, positive. Outside ColX
+  { idx: 3, themeVals: {} }            // commented, no theme. Outside ColX
 ];
 const xthemes = [{ id: 0, label: "A" }];
 const xcols = [{ label: "Total", member: null }, { label: "ColX", member: [1, 1, 0, 0] }];
@@ -128,7 +128,7 @@ const sup = qual.themeCrosstab(xrecs, xthemes, xcols, { minBase: 3 });
 assert(sup.columns[1].suppressed === true && sup.columns[0].suppressed === false,
   "a column below the disclosure threshold is flagged suppressed (Total never is)");
 
-// C-round: a 3-way even split (1 pos / 1 mix / 1 neg) must reconcile —
+// C-round: a 3-way even split (1 pos / 1 mix / 1 neg) must reconcile,
 // independently rounding each to 33 would sum to 99, not the 100 salience.
 const drecs = [
   { idx: 0, themeVals: { "0": 1 } }, { idx: 1, themeVals: { "0": 2 } }, { idx: 2, themeVals: { "0": 3 } }
@@ -200,7 +200,7 @@ assert(rows[1][3] === "Must-read" && rows[1][4] === "Positive", "exportRows labe
 assert(rows[2][6] === "[hidden]", "exportRows: hidden verbatim exports as [hidden] (confidentiality honoured)");
 // Disclosure control: a too-small audience (safeDemos=false) exports the demographic
 // columns AND the verbatim as [hidden], so a small cut can't be exported with any
-// identifying detail — the text is just as identifying as the tags on a named sub-k cut.
+// identifying detail. The text is just as identifying as the tags on a named sub-k cut.
 const exposed = qual.exportRows(island, q, [
   { idx: 5, demos: { Campus: "Cape Town", NPS: "Promoter" }, tier: 2, sentiment: 1, themeVals: {}, text: "great value" }
 ], false);
@@ -285,7 +285,7 @@ assert(colByKey["Q2#1"].question.title === "Anything else?", "collectPool: each 
 assert(qual.splitMark("Q1#0").qcode === "Q1" && qual.splitMark("Q1#0").idx === 0, "splitMark parses qcode + idx");
 assert(qual.splitMark("bad") === null, "splitMark is null on a malformed key");
 
-// A comment filed ONLY in a hub (not shortlisted/highlighted) is still pooled — so
+// A comment filed ONLY in a hub (not shortlisted/highlighted) is still pooled, so
 // "add to a hub" is itself a way to save a comment (shortlist + hub in one).
 const poolH = qual.collectPool(colIsland, {}, {}, { "Q2#1": 1 });
 assert(poolH.items.length === 1 && poolH.items[0].qcode === "Q2" && poolH.items[0].idx === 1,
@@ -316,7 +316,7 @@ assert(poolS.items.length === 1 && poolS.items[0].idx === 1,
   "collectPool: an unpublished verbatim is not pooled; the published one is");
 assert(poolS.withheld === 1, "collectPool: the unpublished mark is counted as withheld");
 assert(poolS.orphans === 0,
-  "collectPool: withheld is NOT an orphan — the record exists, only its text is unpublished");
+  "collectPool: withheld is NOT an orphan. The record exists, only its text is unpublished");
 const poolNone = qual.collectPool(colIsland, { "Q1#0": 1 }, {}, {});
 assert(poolNone.withheld === 0, "collectPool: nothing withheld when every marked verbatim is published");
 
@@ -330,7 +330,7 @@ const cardOn = qual._collectionCard(colItem, {});
 assert(cardOn.indexOf('data-qual-unmark="Q1#0"') !== -1,
   "collection card: carries an explicit Remove control, not a clickable star");
 assert(cardOn.indexOf("✕ Remove") !== -1, "collection card: the control is labelled, not a glyph");
-// a comment kept in the collection ONLY by a highlight must be removable too — the
+// a comment kept in the collection ONLY by a highlight must be removable too. The
 // old star-only control left it sitting there looking as though nothing happened
 const cardHl = qual._collectionCard(
   Object.assign({}, colItem, { saved: false, highlighted: true }), {});
@@ -356,7 +356,7 @@ assert(qual.getHighlights("QX", 3).length === 0, "clearMarks: highlighted passag
 assert(!qual.hubMarksUnion()["QX#3"], "clearMarks: hub membership is cleared");
 qual.clearMarks("QX", 99);   // never marked
 assert(!qual.isSaved("QX", 99), "clearMarks on an unmarked comment is a safe no-op");
-qual.hubDelete(hubId);   // the hub store is shared across this file — leave it as found
+qual.hubDelete(hubId);   // the hub store is shared across this file. Leave it as found
 
 const gq = qual.groupCollection(colIsland, pool.items, "question");
 assert(gq.length === 2 && gq[0].key === "Q1" && gq[1].key === "Q2", "groupCollection question: groups in island order");
@@ -393,7 +393,7 @@ assert(qual.hubList().length === 2 && qual.hubList()[0].id === h1, "hubList is i
 assert(qual.hubToggleMark(h1, "Q1", 0) === true && qual.hubHasMark(h1, "Q1", 0) === true, "hubToggleMark adds a mark");
 assert(qual.hubList()[0].count === 1, "hubList count reflects membership");
 assert(qual.hubToggleMark(h1, "Q1", 0) === false && qual.hubHasMark(h1, "Q1", 0) === false,
-  "hubToggleMark removes it (the mark itself is untouched — hub is only a reference)");
+  "hubToggleMark removes it (the mark itself is untouched, hub is only a reference)");
 qual.hubToggleMark(h1, "Q1", 0); qual.hubToggleMark(h2, "Q1", 0);   // same comment in two hubs
 assert(qual.hubsForMark("Q1", 0).length === 2, "hubsForMark lists every hub the mark is in (overlap)");
 assert(qual.hubRename(h1, "  Master's  ") === true && qual.hubGet(h1).name === "Master's", "hubRename trims");
@@ -404,7 +404,7 @@ assert(qual.hubGet(h1) === null && qual.hubList().length === 1, "hubDelete remov
 assert(qual.hubsForMark("Q1", 0).length === 1 && qual.hubsForMark("Q1", 0)[0].id === h2,
   "after delete, the same mark's membership of OTHER hubs survives (mark never touched)");
 const h3 = qual.hubCreate("Third");
-assert(h3 !== h1 && parseInt(h3, 10) > parseInt(h2, 10), "hub ids are monotonic — a deleted id is never reissued");
+assert(h3 !== h1 && parseInt(h3, 10) > parseInt(h2, 10), "hub ids are monotonic. A deleted id is never reissued");
 
 // hub insight + distinct-respondent gate + Story exhibit (step 3)
 assert(qual.hubSetInsight(h2, "Masters want faster support") === true, "hubSetInsight true on a real hub");
@@ -431,7 +431,7 @@ for (let i = 0; i < 11; i++) many.push({ qcode: "Q1", record: { idx: i, text: "c
 assert(qual.hubExhibit({ name: "Big", insight: "" }, many, { cap: 8 }).html.indexOf("+ 3 more comments in this hub") >= 0,
   "hubExhibit caps quotes at `cap` and notes the remainder");
 
-// WP4: structured quotes payload for the editable deck's quote slide — carries the
+// WP4: structured quotes payload for the editable deck's quote slide. Carries the
 // SAME disclosure gates as html/lines (hidden text absent, below-k tags dropped).
 assert(Array.isArray(ex.quotes) && ex.quotes.length === 2, "hubExhibit: structured quotes payload present");
 assert(ex.quotes[0].text === "great value" && ex.quotes[0].q === "Why recommend?" &&
@@ -450,7 +450,7 @@ assert(qual.hubExhibit({ name: "Big", insight: "" }, many, { cap: 8 }).moreN ===
 
 // ---- disclosure leaks (audit 2026-07-02) -------------------------------------
 // 1. the 💬 affordance counts within the ACTIVE cut (and shows no number below k);
-// 2. exportXlsx refuses below k (the drawer withholds the list — so must the export);
+// 2. exportXlsx refuses below k (the drawer withholds the list, so must the export);
 // 3. the controls row hides live counts + the export button below k (render-level).
 console.log("\nQualitative disclosure leaks:");
 
@@ -468,12 +468,12 @@ const gatedAff = qual.affordanceHtml("Q28");
 assert(gatedAff.indexOf("💬 comments") >= 0 && !/💬 \d/.test(gatedAff),
   "below k the affordance shows NO number (the count itself would leak)");
 
-// exportXlsx: below k the drawer withholds the whole list — the export must too.
+// exportXlsx: below k the drawer withholds the whole list. The export must too.
 let dl = null;
 TR.xlsx = { download: (name, sheet, rows, opts) => { dl = { name, sheet, rows, opts }; } };
 TR.disclosure = { audienceTooSmall: () => true };
 qual.exportXlsx(island, q, q.records);
-assert(dl === null, "exportXlsx below k refuses — no file, not even row-level metadata");
+assert(dl === null, "exportXlsx below k refuses. No file, not even row-level metadata");
 TR.disclosure = { audienceTooSmall: () => false };
 qual.exportXlsx(island, q, q.records.slice(0, 1));
 assert(dl !== null && dl.rows.length === 2 && dl.rows[1][1] === "Cape Town",
@@ -481,7 +481,7 @@ assert(dl !== null && dl.rows.length === 2 && dl.rows[1][1] === "Cape Town",
 
 // controls row + header, via qual.render on an inert host (no DOM needed: wire()
 // finds no elements). Question: 4 answered, cut mask keeps idx 0 + 2 (2 shown),
-// sentiment-coded 2 pos / 0 mixed / 1 neg over the cut? — counts are over the FULL
+// sentiment-coded 2 pos / 0 mixed / 1 neg over the cut? , counts are over the FULL
 // pool passed (audience = the 2 masked records: idx 0 pos, idx 2 pos -> 2 pos).
 TR.QUAL = {
   textMode: "full", noteworthyDefault: "all", demographicCuts: "safe",
@@ -553,11 +553,11 @@ assert(insHtml.indexOf("Service is the story.") >= 0,
 assert(insHtml.indexOf('placeholder="Insight for QS') >= 0,
   "the placeholder prints the exact code to put in the Comments sheet");
 assert(insHtml.indexOf(">Key themes<") >= 0 || insHtml.indexOf(">Key themes<span") >= 0,
-  "the box is labelled Key themes — the client asked for a note on the key theme");
+  "the box is labelled Key themes. The client asked for a note on the key theme");
 assert(insightSeen.some((c) => c[0] === "QS" && c[1] === undefined),
   "the question insight is fetched banner-agnostically (no banner argument)");
 assert(insHtml.indexOf('id="insight-box"') < 0,
-  "it never reuses the crosstab box's id — that handler writes to the crosstab active question");
+  "it never reuses the crosstab box's id. That handler writes to the crosstab active question");
 assert(insHtml.indexOf('<section class="ql-qcard" data-snap-card>') >= 0,
   "header + insight + board form one pinnable snapshot card");
 assert(insHtml.indexOf('data-qinsight="QS"') < insHtml.indexOf("ql-controls"),
@@ -638,7 +638,7 @@ console.log("\nRail scroll position:");
   assert(scrolled.rail.scrollTop === 184,
     "the rebuilt rail keeps the position the reader had scrolled to: " + scrolled.rail.scrollTop);
   assert(scrolled.rail._cur.nudged === true,
-    "the selected item is nudged into view — 'nearest', so a no-op when already on screen");
+    "the selected item is nudged into view, 'nearest', so a no-op when already on screen");
 
   // first render: no rail on screen yet, so nothing to carry and nothing to throw on
   const fresh = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
@@ -697,10 +697,10 @@ TR.story2 = realStory;
 TR.shell = realShell;
 TR.disclosure = null;   // leave no gate behind for anything after
 
-// ---- Reader bundle C1 — curated-first split ----------------------------------
+// ---- Reader bundle C1. Curated-first split ----------------------------------
 // Module store state at this point: Q1#2 is shortlisted (from the shortlist
 // section above); no Q1 highlights. A fresh highlight also curates.
-console.log("\nReader C1 — curated-first:");
+console.log("\nReader C1. Curated-first:");
 const c1a = qual.curatedSplit(q.records, "Q1");
 assert(c1a.curated.length === 1 && c1a.curated[0].idx === 2, "curatedSplit: the shortlisted comment is curated");
 assert(c1a.rest.length === 3 && c1a.rest[0].idx === 0 && c1a.rest[2].idx === 3,
@@ -710,8 +710,8 @@ const c1b = qual.curatedSplit(q.records, "Q1");
 assert(c1b.curated.length === 2 && c1b.curated[0].idx === 1 && c1b.curated[1].idx === 2,
   "curatedSplit: a highlighted comment is curated too, order preserved");
 
-// ---- Reader C2 — declared closed<->open links + the closed-stat chip ---------
-console.log("\nReader C2 — declared links + closed-stat chip:");
+// ---- Reader C2. Declared closed<->open links + the closed-stat chip ---------
+console.log("\nReader C2. Declared links + closed-stat chip:");
 TR.AGG = { project: {}, questions: [
   { code: "Q28", title: "Overall satisfaction rating", short_label: "Overall rating", linked_open: "QO",
     rows: [{ kind: "mean", label: "Mean", pct: [78.34, 70.1] }], bases: [{ n: 106 }, { n: 50 }] },
@@ -738,7 +738,7 @@ assert(qual.headlineFor({ code: "QO" }) === "Agg headline", "headlineFor falls b
 assert(qual.headlineFor({ code: "ZZ" }) === "", "headlineFor is empty when no headline anywhere");
 
 // championed quotes (fix #1): the analyst shortlist leads, then a BALANCED
-// spread — one positive + one negative — so the inline pair shows the theme's
+// spread, one positive + one negative, so the inline pair shows the theme's
 // range, not just its loudest side. Hidden text never champions.
 const champRecs = [
   { idx: 0, tier: 0, sentiment: 1, themeVals: { "0": 1 }, text: "ok" },      // pos
@@ -749,7 +749,7 @@ const champRecs = [
 // no shortlist: a balanced pair, one positive + one negative, hidden text excluded
 const balanced = qual.championQuotes(champRecs, 0, "CHQX", 2);
 assert(balanced.length === 2 && balanced.some((r) => r.sentiment === 1) && balanced.some((r) => r.sentiment === 3),
-  "championQuotes default: a balanced spread — one positive, one negative");
+  "championQuotes default: a balanced spread. One positive, one negative");
 assert(balanced.every((r) => r.text != null), "championQuotes never champions a hidden-text record");
 
 // one-sided theme (only positives) falls back to the dominant sentiment, best tier first
@@ -762,22 +762,22 @@ const oneSided = qual.championQuotes(posOnly, 0, "CHQP", 2);
 assert(oneSided.length === 2 && oneSided[0].idx === 1 && oneSided[1].idx === 2,
   "championQuotes one-sided: fills from the dominant sentiment, highest tier first");
 
-// the analyst shortlist always overrides the balance heuristic — even two positives win
+// the analyst shortlist always overrides the balance heuristic, even two positives win
 qual.toggleSave("CHQ", 0);
 qual.toggleSave("CHQ", 2);
 const champs = qual.championQuotes(champRecs, 0, "CHQ", 2);
 assert(champs.length === 2 && champs.every((r) => qual.isSaved("CHQ", r.idx)),
   "championQuotes: two shortlisted picks win outright, over the balance heuristic");
 
-// a SINGLE shortlisted pick still yields a balanced pair — the fill prefers the
+// a SINGLE shortlisted pick still yields a balanced pair. The fill prefers the
 // opposite polarity so the reader sees both sides
 qual.toggleSave("CHQB", 0);
 const mixed = qual.championQuotes(champRecs, 0, "CHQB", 2);
 assert(mixed.length === 2 && mixed[0].idx === 0 && mixed[1].sentiment === 3,
   "championQuotes: one shortlisted positive is paired with a negative for balance");
 
-// ---- Reader C3 — everything else + coverage ----------------------------------
-console.log("\nReader C3 — everything else + coverage:");
+// ---- Reader C3. Everything else + coverage ----------------------------------
+console.log("\nReader C3. Everything else + coverage:");
 assert(qual.unthemed(q.records).length === 1 && qual.unthemed(q.records)[0].idx === 3,
   "unthemed finds the record with no coded theme");
 assert(qual.recordsForTheme(q.records, qual.OTHER_THEME).length === 1 &&
@@ -787,8 +787,8 @@ const cov = qual.coverage(q.records);
 assert(cov.themed === 3 && cov.total === 4 && cov.pct === 75, "coverage: 3 of 4 comments themed = 75%");
 assert(qual.coverage([]).pct === 0, "coverage of an empty pool is 0, never NaN");
 
-// ---- Reader C4 — focus reading mode (pure core) -------------------------------
-console.log("\nReader C4 — focus mode:");
+// ---- Reader C4. Focus reading mode (pure core) -------------------------------
+console.log("\nReader C4. Focus mode:");
 assert(qual.focusNav(0, "j", 3).pos === 1 && qual.focusNav(1, "ArrowDown", 3).pos === 2,
   "focusNav: j / ArrowDown move forward");
 assert(qual.focusNav(2, "j", 3).pos === 2, "focusNav clamps at the last quote");
@@ -813,10 +813,10 @@ assert(qual.focusHtml(fents, 0, { dropTags: true }).indexOf("Cape Town") < 0,
 assert(fhtml.indexOf("data-focus-close") >= 0 && fhtml.indexOf("Esc to close") >= 0,
   "focusHtml carries the close control + the key hints");
 
-// ---- Reader bundle C — themed question render ---------------------------------
+// ---- Reader bundle C. Themed question render ---------------------------------
 // The whole reader layer through qual.render on the inert host: headline,
 // coverage bar, closed-stat chip, everything-else card, champions, curated-first.
-console.log("\nReader bundle C — themed render:");
+console.log("\nReader bundle C. Themed render:");
 TR.AGG = { project: {}, questions: [
   { code: "Q28", title: "Overall satisfaction rating", linked_open: "QT",
     rows: [{ kind: "mean", pct: [78.34] }], bases: [{ n: 106 }] }
@@ -849,7 +849,7 @@ assert(ch.indexOf("Rated 78.3 · n=106") >= 0 && ch.indexOf('data-qual-return="Q
   "the closed-stat chip renders in the header and links back to Q28");
 assert(ch.indexOf("Everything else") >= 0 && ch.indexOf('data-theme="__else__"') >= 0,
   "unthemed comments get a first-class Everything else card");
-// fix #3: inline comments are OFF by default — a clean chart overview, no champions
+// fix #3: inline comments are OFF by default. A clean chart overview, no champions
 assert(ch.indexOf("ql-champq") < 0, "inline example comments are off by default (no champions until toggled)");
 assert(ch.indexOf("data-champtoggle") >= 0, "fix #3: the Show-example-comments toggle renders on the board");
 // fix #4: a jump-to-comments button up top + a clearly separated, anchored comments section
@@ -892,7 +892,7 @@ qual.render(host);
 assert(host.innerHTML.indexOf("ql-statchip") < 0, "no closed-stat chip when the question is unlinked");
 
 // below k the whole reader layer stays gated exactly as before: no board, no
-// champions, no curated rubric, no focus entry — and the coverage bar reads
+// champions, no curated rubric, no focus entry, and the coverage bar reads
 // the UNFILTERED records so nothing cut-derived leaks.
 TR.MICRO = { n: 4 };
 TR.d2.state.filters = [{ q: "Q1", rows: [1] }];
@@ -903,7 +903,7 @@ qual.render(host);
 ch = host.innerHTML;
 assert(ch.indexOf("ql-champq") < 0, "below k no championed quotes render (the board is withheld)");
 assert(ch.indexOf("Analyst’s selection") < 0 && ch.indexOf("data-qual-focus") < 0,
-  "below k the drawer stays withheld — no curated rubric, no focus entry point");
+  "below k the drawer stays withheld. No curated rubric, no focus entry point");
 assert(ch.indexOf("Withheld to protect confidentiality.") >= 0,
   "below k the standard disclosure note still renders");
 assert(ch.indexOf("75% of comments themed") >= 0,
@@ -931,7 +931,7 @@ assert(pHtml.indexOf('class="ql-star priority" title="priority"') >= 0, "render:
 assert(pHtml.indexOf('class="ql-star must" title="must-read"') >= 0, "render: a tier-2 comment shows the Must-read star");
 
 // ---- scope chip: the header notation of which comments are shown ----------------
-// scopeChip is a pure helper — assert its three states directly.
+// scopeChip is a pure helper. Assert its three states directly.
 const chipQmixed = { records: [
   { idx: 0, tier: 1, suppressed: false }, { idx: 1, tier: 0, suppressed: true }] };
 const chipQclean = { records: [{ idx: 0, tier: 1, suppressed: false }] };
@@ -1077,7 +1077,7 @@ assert(hostT.innerHTML.indexOf("Centre: Worcester DC") >= 0, "tags: per-field hi
 assert(hostT.innerHTML.indexOf("Channel: Presell") < 0, "tags: per-field hide removes only that field");
 
 // Subtractive invariant: a field the analyst suppressed (absent from r.demos) never renders,
-// even though the reader has not hidden it — the toggle can only take away, never reveal.
+// even though the reader has not hidden it. The toggle can only take away, never reveal.
 qual._state = null;
 TR.QUAL.questions[0].records[0].demos = { Centre: "Worcester DC" };   // Channel gated away in R
 hostT.innerHTML = ""; qual.render(hostT);
@@ -1152,7 +1152,7 @@ TR.d2 = { state: { filters: [], qualQ: null, qualFrom: null },
   questionByCode: () => null, filterDescription: () => "" };
 TR.AGG = { banner_groups: [{ id: "b1", name: "Department" }], columns: [] };
 // The stats engine is fully present (an earlier block stubbed TR.stats without
-// columnsFor) — only the microdata island distinguishes the two ships here.
+// columnsFor), only the microdata island distinguishes the two ships here.
 TR.stats = { columnsFor: () => ({ columns: [{ label: "Total", letter: "", member: null }] }),
   mask: () => null, maskCount: () => 0, propZ: () => null };
 TR.disclosure = null;
@@ -1174,7 +1174,7 @@ qual._state = null;
 hostX.innerHTML = ""; qual.render(hostX);
 assert(hostX.innerHTML.indexOf('data-themeview="crosstab"') >= 0,
   "with microdata: the Crosstab by banner toggle renders");
-// the toggle is the fourth name in PIN_DROP_SEL — a live control that does
+// the toggle is the fourth name in PIN_DROP_SEL. A live control that does
 // nothing once a card is frozen into the Story, so a pin must strip it
 assert(hostX.innerHTML.indexOf("ql-viewtog") >= 0,
   "PIN_DROP_SEL still names the view toggle: ql-viewtog");
@@ -1261,7 +1261,7 @@ assert(nps.length === 3, "priorityQuotes: every band's priority comment comes ba
 assert(nps[0].text === "Codes keep changing",
   "priorityQuotes: the detractor leads, not the data order");
 
-// The band is NOT a demographic tag — it mirrors a reported closed question, so
+// The band is NOT a demographic tag. It mirrors a reported closed question, so
 // the k-gate and the block dial must never strip it.
 TR.AGG.project.min_reporting_base = 500;                    // base 90 < k
 new Function(fs.readFileSync(path.join(jsDir, "21d_disclosure.js"), "utf8"))();
@@ -1276,7 +1276,7 @@ assert(npsBlock.indexOf("<cite>Why that score? · Detractor</cite>") >= 0,
 assert(npsBlock.indexOf("Why that score? · Promoter · Paarl") >= 0,
   "priorityBlockHtml: band then demographic tags");
 
-// One group per band, in arrival order — the deck turns each into its own slide.
+// One group per band, in arrival order. The deck turns each into its own slide.
 const grouped = qual.groupQuotesByBand(qual.priorityQuotes("Q79"));
 assert(grouped.map((g) => g.band).join(",") === "Detractor,Passive,Promoter",
   "groupQuotesByBand: one group per band, in the order the quotes arrive");
@@ -1292,7 +1292,7 @@ assert(qual.priorityBlockHtml(qual.priorityQuotes("Q28")).indexOf("si-qband") < 
   "priorityBlockHtml: a single-band question keeps its flat list");
 
 
-// ---- I20: textPublished — the Story tab's stale-pin gate ----------------------
+// ---- I20: textPublished. The Story tab's stale-pin gate ----------------------
 TR.QUAL = colIsland;
 assert(qual.textPublished("great value") === true,
   "textPublished: a record's text currently in the island is published");

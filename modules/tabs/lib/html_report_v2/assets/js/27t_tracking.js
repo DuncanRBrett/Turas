@@ -1,17 +1,17 @@
 /**
- * v2 Tracking workspace — tracker-module parity over the wave history.
+ * v2 Tracking workspace. Tracker-module parity over the wave history.
  * This file: the sub-tab shell (Summary | Explorer | Visualise) and the
  * shared tracking helpers (TR.trk). The Summary lives in 27u_summary.js;
  * the Explorer heatmap + Visualise live in 27v_visualise.js.
  *
- * KEY METRICS are evaluative only — questions carrying an Index / NPS /
+ * KEY METRICS are evaluative only. Questions carrying an Index / NPS /
  * Mean row contribute exactly that mean row plus their top-box NET (the
  * NET whose members sit highest on the scale), one heatmap row per
  * question, mirroring the tracker module's configured tracking specs.
  * Profile questions (campus, age, intake…) appear under "all tracked
  * rows" only.
  *
- * Tracking views always show PUBLISHED figures — current wave included —
+ * Tracking views always show PUBLISHED figures. Current wave included,
  * so segment columns and history stay comparable; report-level filters
  * deliberately do not apply here (noted in the UI when active).
  *
@@ -25,7 +25,7 @@
   var views = TR.views;
   var trk = TR.trk = {};
 
-  /** Workspace state — survives tab switches (module scope, not DOM). */
+  /** Workspace state. Survives tab switches (module scope, not DOM). */
   trk.state = {
     sub: "summary",
     explorerMode: "qfs",    // qfs = questions for segment, sfq = segments for question
@@ -44,7 +44,7 @@
 
   trk.fmtVal = function (v, isMean, q) {
     if (v === null || v === undefined) return "–";
-    // ONE display rule, from the config's DECIMAL PLACES block — the same
+    // ONE display rule, from the config's DECIMAL PLACES block. The same
     // places the crosstab rounds to, so a tracking figure always reconciles
     // with the published table. Pass the question where you have it: an NPS is
     // a mean-kind row on a 0-100 scale and takes the PERCENT places (79, not
@@ -85,7 +85,7 @@
   var pubCache = {};
   /** Published, unfiltered model for a question under a banner group. */
   trk.publishedModel = function (code, group) {
-    // Total-only reports have no banner groups — fall back to the Total column
+    // Total-only reports have no banner groups. Fall back to the Total column
     // ("") rather than assuming a first group exists.
     var grp = group ||
       (TR.AGG.banner_groups.length ? TR.AGG.banner_groups[0].id : "");
@@ -120,7 +120,7 @@
 
   var metricCache = {};
   /**
-   * Tracked metrics. scope "key": evaluative questions only — the mean
+   * Tracked metrics. scope "key": evaluative questions only. The mean
    * row (Index/NPS/Mean) plus the top-box NET, in question order.
    * scope "all": every row with history on every tracked question.
    */
@@ -132,7 +132,7 @@
       if (!model || !model.prevWave) return;
       if (scope === "key") {
         var hasMean = model.rows.some(function (r) { return r.kind === "mean"; });
-        if (!hasMean) return;   // profile question — not a key metric
+        if (!hasMean) return;   // profile question, not a key metric
         model.rows.forEach(function (row, ri) {
           if (row.kind === "mean" && row.waves && row.waves.length) {
             out.push(metricEntry(q, model, row, ri));
@@ -237,7 +237,7 @@
       return hit
         ? TR.waves.sdAtWave(metric.q, metric.row, hit.q, segNorm || null) : null;
     }
-    // Current wave: prefer microdata (Total) — its SD powers the latest-wave
+    // Current wave: prefer microdata (Total): its SD powers the latest-wave
     // significance even when the published distribution is absent.
     if (!segNorm) {
       var curScores = TR.waves.currentScores(metric.q);
@@ -262,7 +262,7 @@
     Object.keys(scores).forEach(function (ri) {
       var srow = model.rows[ri];
       // The SD comes out of the category DISTRIBUTION, which only holds as
-      // column percentages (C1) — a counts row would inflate it wildly.
+      // column percentages (C1): a counts row would inflate it wildly.
       if (srow && !TR.fmt.isColPctStat(srow.stat)) return;
       var cell = srow && srow.cells[ci];
       if (cell && cell.pct !== null && cell.pct !== undefined) {
@@ -275,7 +275,7 @@
   /**
    * Full tracker-shaped point list for a metric in a segment (or Total):
    * history series + the current wave, each with change/sig vs previous
-   * point and vs the first point — pooled z for proportions, Welch on
+   * point and vs the first point. Pooled z for proportions, Welch on
    * distribution-derived SDs for means/indexes/NPS. [] when no history.
    */
   trk.points = function (metric, segNorm) {
@@ -295,7 +295,8 @@
     }
     // honour the report's significance setting (off / 95% / 95%+80%): "dual"
     // adds soft_prev/soft_base, "off" suppresses all sig flags.
-    return TR.waves.cellsFor(points, canSig, TR.d2.state.sigMode,
+    return TR.waves.cellsFor(points, canSig,
+      TR.stats.dualMode() ? "dual" : TR.d2.state.sigMode,
       fmt.decimalsForQ(metric.q, metric.isMean));
   };
 
@@ -356,7 +357,7 @@
           '" data-sub="' + s[0] + '">' + s[1] + "</button>";
       }).join("") + "</nav>" +
       (TR.d2.filtersActive()
-        ? '<span class="trkfilternote">⚠ report filters do not apply here — ' +
+        ? '<span class="trkfilternote">⚠ report filters do not apply here, ' +
           "tracking always compares published figures</span>" : "") +
       "</div><div id='trkhost'></div>" +
       TR.conf.calloutHtml() + "</div>";

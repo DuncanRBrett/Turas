@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS — SCORING & NET-STRUCTURE HELPERS (data-centric report v2)
+# TABS. SCORING & NET-STRUCTURE HELPERS (data-centric report v2)
 # ==============================================================================
 # Shared helpers for the v2 data layer + microdata writers: numeric scoring
 # (index_scores / per-respondent mean scores) and NET-structure derivation
@@ -68,7 +68,7 @@ nps_bucket_score <- function(v) {
 #' needs no new statistics.
 #'
 #' EVERY row in \code{data} gets a score, including respondents who did not
-#' answer (NA) and those in an unboxed middle category — both score 0. That is
+#' answer (NA) and those in an unboxed middle category. Both score 0. That is
 #' deliberate: the published row divides top and bottom counts by the column's
 #' BASE (banner bases are the base-filtered column, not the answered base), so
 #' the score must share that denominator or the tested quantity would not be
@@ -110,7 +110,7 @@ net_positive_scores <- function(data, question_info, question_options,
 }
 
 
-#' Mean option score per BoxCategory — the favourability score
+#' Mean option score per BoxCategory. The favourability score
 #'
 #' Each box's mean option score, using the SAME signal as the Index
 #' (`option_numeric_value`: OptionValue when present, else OptionText). Lets NET
@@ -146,7 +146,7 @@ box_category_scores <- function(opt_df) {
 #' score) is "plus" and the unfavourable (lowest) is "minus", so the difference
 #' is correct regardless of display direction. Without scores it falls back to
 #' ROW order (first box = minus, last non-DK box = plus), the historical
-#' behaviour — derived by order, never by parsing the (dash-containing) label.
+#' behaviour. Derived by order, never by parsing the (dash-containing) label.
 #'
 #' @param rows The built rows[] list of a data-layer question
 #' @param box_scores Optional BoxCategory -> score (from box_category_scores)

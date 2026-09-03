@@ -1,5 +1,5 @@
 /**
- * v2 view model — ONE interface the whole UI renders from. For the default
+ * v2 view model. ONE interface the whole UI renders from. For the default
  * view (built-in banner, no filter) it returns the PUBLISHED numbers
  * verbatim; with a filter or custom banner it recomputes everything from
  * microdata and marks the model "computed". Wave history (trend series +
@@ -36,7 +36,7 @@
    * recomputes; when either cannot be computed for this audience the row goes
    * BLANK rather than falling back to the mean, because a plausible wrong
    * number in a labelled row is the failure this whole path is fixing.
-   * A mode is not recomputed at all — no recompute exists for it.
+   * A mode is not recomputed at all. No recompute exists for it.
    */
   function statValues(stat, q, row, means, columns, mask) {
     var blank = columns.map(function () { return null; });
@@ -54,7 +54,7 @@
   }
   model._statValues = statValues;
 
-  // What a question's (or one row's) `pct` values ACTUALLY are — the vocabulary
+  // What a question's (or one row's) `pct` values ACTUALLY are. The vocabulary
   // lives in TR.fmt (review 2026-08, C1) because every display and scan layer
   // needs it, not just the model.
   var COL_PCT = TR.fmt.COL_PCT;
@@ -70,7 +70,7 @@
    * Build a proportion significance cell {x, base} from a published count + column base.
    * Weighted designs: the published count is WEIGHTED but the base row is UNWEIGHTED, so
    * form the proportion on the weighted base and carry the variance on the Kish EFFECTIVE
-   * base — passed as x = p*effN over base = effN, which is exactly the weighted z-test the
+   * base. Passed as x = p*effN over base = effN, which is exactly the weighted z-test the
    * R engine runs (p from weighted counts, SE ~ p(1-p)/effN). Unweighted designs pass the
    * exact counts through unchanged, so those reports are byte-identical.
    */
@@ -88,6 +88,10 @@
    *  (sig2 minus sig) and appended to the published 95% letters; islands built
    *  before sig2 carriage fall back to recomputing them from published counts. */
   function publishedModel(q, bannerId, dual) {
+    // Belt and braces: a study that switched the secondary level off has no
+    // sig2 letters, and the fallback below would happily INVENT some from the
+    // published counts. Every caller gates already; this makes it impossible.
+    dual = dual && TR.stats.hasSecondary();
     var cols = [0].concat(TR.d2.groupCols(bannerId));
     var threshold = lowThreshold();
     var columns = cols.map(function (ci) {
@@ -113,7 +117,7 @@
         entry.population = N;
         entry.coverage = TR.conf.coverage(base, N);
         // fpcBase's nEff argument is the Kish effective base on weighted designs
-        // (its own contract) — the sampling fraction still uses the raw count.
+        // (its own contract): the sampling fraction still uses the raw count.
         entry.ciBase = TR.conf.fpcBase(entry.baseEff != null ? entry.baseEff : base, base, N);
         entry.low = entry.ciBase < threshold;
       }
@@ -125,7 +129,7 @@
       // 80% letters are CARRIED from R's Sig.2 row, like the 95% letters above them.
       // Excel's Sig.2 is a superset (every 95% letter is also an 80% letter), so the
       // lowercase set is sig2 minus sig. Recomputing them here instead used the
-      // published Frequency row, which format_output_value rounds to 0dp — enough to
+      // published Frequency row, which format_output_value rounds to 0dp. Enough to
       // flip a marginal p~=0.20 call, so the workbook and the report disagreed on the
       // same pair. Mean rows carry sig2 too, so they get their 80% letters here for
       // the first time.
@@ -138,7 +142,7 @@
         });
       } else if (dual && (r.kind === "category" || r.kind === "net")) {
         // Fallback for islands built before sig2 carriage (no sig2 key): recompute
-        // from the published counts for proportion rows — categories AND NET/box rows
+        // from the published counts for proportion rows. Categories AND NET/box rows
         // (a NET POSITIVE diff carries a null count, so its cell is 0/0 and earns no
         // letter, matching R). Means are not recomputed here (no per-column SD in the
         // model), which is why they had no 80% letters at all on this path.
@@ -171,10 +175,10 @@
 
   /**
    * True when the question carries per-respondent data we can re-tabulate
-   * under a filter / custom banner — raw answers, box membership or scores.
+   * under a filter / custom banner. Raw answers, box membership or scores.
    * Ranking and other derived-metric questions carry none (answers all null,
    * no boxes, no scores), so a filtered recompute can only honestly report
-   * "not available" — never a base of 0 against real published figures.
+   * "not available", never a base of 0 against real published figures.
    */
   function recomputable(q) {
     if (TR.MICRO.boxes && TR.MICRO.boxes[q.code]) return true;
@@ -189,6 +193,7 @@
 
   /** Computed view from microdata for any banner/filter combination. */
   function computedModel(q, bannerId, filters, dual) {
+    dual = dual && TR.stats.hasSecondary();   // see publishedModel
     var spec = TR.stats.columnsFor(bannerId);
     var mask = TR.stats.mask(filters);
     var tabs = TR.stats.tabulate(q, spec.columns, mask);
@@ -220,7 +225,7 @@
         // WHICH statistic this row reports decides what gets recomputed. This
         // used to recognise "Standard Deviation" by its label and treat every
         // other mean-kind row as the mean itself, so a filtered view printed
-        // the recomputed MEAN in the Median row — on VAS electricity, R563.68
+        // the recomputed MEAN in the Median row, on VAS electricity, R563.68
         // under a Male filter in a row whose real value is R300. mstat comes
         // from the row TYPE in R; the label test stays as the fallback for
         // reports built before mstat existed.
@@ -271,7 +276,7 @@
     return TR.stats.indexMeans(q, columns, mask);
   }
 
-  // Every computed value is a COLUMN percentage — TR.stats.tabulate divides each
+  // Every computed value is a COLUMN percentage. TR.stats.tabulate divides each
   // row's (weighted) count by the column's own base. So a question published as
   // row percentages or as raw counts changes units the moment a filter or custom
   // banner is applied; the stat travels with the value and the renderer relabels
@@ -296,7 +301,7 @@
 
   function netRow(q, r, ri, columns, mask, tabs, letters, threshold, dual) {
     // Box-category membership (TR.MICRO.boxes) recomputes box NETs directly from
-    // each respondent's box — works whether the underlying scale is shown
+    // each respondent's box. Works whether the underlying scale is shown
     // (SACAP) or hidden (CCS shows only the boxes). Falls back to net_members.
     var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
     var diff = q.net_diffs && q.net_diffs[String(ri)];
@@ -311,7 +316,7 @@
       var minusCells = boxes ? TR.stats.boxCounts(q.code, diff.minus, columns, mask)
         : netOrRowCounts(q, q.rows[diff.minus], diff.minus, columns, mask, tabs);
       // Letters on a NET POSITIVE row test the PRINTED net, via the mean of the
-      // per-respondent +-100 score (review 2026-08, I5) — matching what the R
+      // per-respondent +-100 score (review 2026-08, I5): matching what the R
       // engine writes into the published view, so a filtered recompute and the
       // published table do not letter the same row differently. Only available
       // when box membership is carried; the net_members fallback has no
@@ -374,10 +379,10 @@
 
   /**
    * Attach 95% interval bounds to every cell (cell.ci = {lo, hi}).
-   * ADDITIVE display only — values never change. Proportions: Wilson on
+   * ADDITIVE display only. Values never change. Proportions: Wilson on
    * the exact count when published, the displayed pct otherwise. Means:
    * z·SD/√n with the SD derived from the column's own category
-   * distribution via TR.waves.scoreMap + sdFromPairs — the same single
+   * distribution via TR.waves.scoreMap + sdFromPairs. The same single
    * SD source the significance tests use (guardrail: never fork it).
    * Must run BEFORE row ops so mean rows still align with q.rows.
    */
@@ -404,7 +409,7 @@
           });
           var sd = TR.waves.sdFromPairs(pairs);
           var col = viewModel.columns[ci];
-          // Variance scales with the Kish effective base on weighted designs —
+          // Variance scales with the Kish effective base on weighted designs,
           // the raw n would claim precision the design effect took away.
           var base = col ? (col.baseEff != null ? col.baseEff : col.base) : null;
           // ciBase carries the finite-population-corrected effective base when a
@@ -418,7 +423,7 @@
       }
       // A Wilson interval is an interval around a COLUMN proportion. Attaching
       // one to a raw count or a row percentage (whose denominator is the row,
-      // not this column's base) states a precision that was never computed —
+      // not this column's base) states a precision that was never computed,
       // it printed "80 (71.1–86.7)" beside a count of 80 (C1).
       if (!TR.fmt.isColPctStat(row.stat)) return;
       row.cells.forEach(function (cell, ci) {
@@ -428,7 +433,7 @@
         if (!base) return;
         // Use THIS column's own weighted + effective base, already aligned to the
         // column in the model. NOT q.bases[ci]: that is indexed by the full column
-        // list, whereas ci is the position within the current banner view — so on
+        // list, whereas ci is the position within the current banner view, so on
         // any banner past the first, every column would borrow a different column's
         // base and the interval detaches from the shown % (e.g. 73% -> 12–18pp).
         var weighted = !!(col.baseW > 0 && col.baseEff > 0);
@@ -448,7 +453,7 @@
   }
 
   /** Arrow for a z-score vs the rest, at the project's configured primary /
-   *  secondary levels (single planned test per column — no Bonferroni). */
+   *  secondary levels (single planned test per column, no Bonferroni). */
   function compositeArrow(z, dual) {
     if (z === null) return "";
     var zHi = TR.stats.zPrimary(1), zLo = TR.stats.zSecondary(1);
@@ -465,15 +470,15 @@
    *
    * Pairwise column-vs-column letters are deliberately NOT produced. A
    * composite's columns can overlap (a respondent can be in two of them), which
-   * breaks the disjoint-samples assumption behind the two-proportion z-test —
+   * breaks the disjoint-samples assumption behind the two-proportion z-test,
    * running it would print plausible-but-wrong letters. Column-vs-rest is
    * disjoint by construction (column and not-column never share a respondent),
    * so it is always valid, and it is the natural read for a profile banner:
-   * "does this group stand out from everyone else?". Bidirectional — ▲ above the
+   * "does this group stand out from everyone else?". Bidirectional, ▲ above the
    * rest, ▼ below; dual mode adds the 80% level as hollow ▵ / ▿.
    *
    * The "rest" recompute mirrors the Differences view (27d_diffs restPct) so the
-   * test and its denominators reconcile with that view — notably a box-scored
+   * test and its denominators reconcile with that view. Notably a box-scored
    * NET takes its numerator from box membership but its denominator from the
    * full answered base, so a no-box respondent (e.g. Neutral on a shown scale)
    * still counts in the base. Runs on the computed model while rows are still
@@ -519,7 +524,7 @@
       row.cells.forEach(function (cell, ci) {
         cell.sig = "";                       // clears any (empty) pairwise letters
         if (ci === 0 || skip) return;
-        // Disclosure suppression (which ran first) blanked this cell — an arrow
+        // Disclosure suppression (which ran first) blanked this cell. An arrow
         // on a blank would resurrect exactly what was withheld.
         if (cell.suppressed || (viewModel.columns[ci] && viewModel.columns[ci].suppressed)) return;
         var z = null;
@@ -538,7 +543,7 @@
               rc.wbase ? rc.n / rc.wbase : null, rc.effBase);
           } else if (boxes) {
             // box-scored NET: numerator from box membership, denominator from the
-            // FULL answered base (colTab / restTab) — matches restPct.
+            // FULL answered base (colTab / restTab): matches restPct.
             var cb = TR.stats.boxCounts(q.code, ri, [cols[ci]], mask)[0];
             var rb = TR.stats.boxCounts(q.code, ri, [rests[ci]], mask)[0];
             var cFull = colTab[ci], rFull = restTab[ci];
@@ -665,7 +670,7 @@
   /**
    * The model the UI renders.
    * @param {object} [opts] - {hiddenCols, hiddenRows, rowScope, sort, dual,
-   *   intervals} — intervals=true attaches 95% bounds to every cell.
+   *   intervals}. Intervals=true attaches 95% bounds to every cell.
    */
   model.forQuestion = function (code, bannerId, filters, opts) {
     opts = opts || {};
@@ -683,7 +688,7 @@
         custom || composite ? TR.d2.firstBanner() : bannerId, opts.dual);
     }
     // Finite population correction applies to the DEFAULT (published) view of a
-    // population report — never under a filter / custom banner, where a
+    // population report, never under a filter / custom banner, where a
     // sub-population's universe is unknown. The published numbers stay verbatim
     // and FPC narrows the intervals (attachIntervals reads each column's
     // ciBase). Significance is not touched here: it arrives already corrected
@@ -693,7 +698,7 @@
     viewModel.title = q.title;
     // analyst ShortLabel for space-tight surfaces (null on older data layers)
     viewModel.short_label = TR.d2.shortLabel(q) !== q.title ? TR.d2.shortLabel(q) : null;
-    // Who was asked this question (Selection FilterLabel / BaseFilter) — null
+    // Who was asked this question (Selection FilterLabel / BaseFilter): null
     // when everyone was. Travels on the model so the card AND every export of
     // it state the audience beside the base.
     viewModel.audience = TR.d2.audienceNote(q) || null;
@@ -704,7 +709,7 @@
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();
     // An audience filter makes the current wave a subgroup, but prior waves are
-    // published full-sample Totals with no microdata to filter — so a wave-on-
+    // published full-sample Totals with no microdata to filter, so a wave-on-
     // wave delta would compare filtered-now against unfiltered-prior. Flag the
     // model so attachDeltas suppresses the (misleading) trend under a filter.
     viewModel.filtered = !!(filters && filters.length > 0) && TR.d2.hasMicrodata();
@@ -714,16 +719,16 @@
     TR.waves.attachDeltas(q, viewModel);
     // NO FPC re-lettering here. R applies the finite population correction
     // inside its own tests now, so the published letters this view carries are
-    // already FPC-corrected — at both alphas, on weighted designs too, and from
+    // already FPC-corrected, at both alphas, on weighted designs too, and from
     // the unrounded counts. Recomputing them here from the DISPLAY-rounded %s
     // was a second, worse computation of the same thing, and it was gated off
     // for weighted reports, so a weighted census silently kept uncorrected
     // letters. FPC still reaches this view through ciBase: intervals narrow,
     // the low-base flag is coverage-aware, and the census framing stands.
-    // Computed views (filter / custom banner) keep standard significance — a
+    // Computed views (filter / custom banner) keep standard significance. A
     // sub-population's universe is unknown.
     // Composite (profile) banners replace pairwise letters with vs-the-rest
-    // arrows — only meaningful on the microdata recompute (its columns carry the
+    // arrows, only meaningful on the microdata recompute (its columns carry the
     // membership the test needs); a no-microdata fallback rendered the first
     // real banner instead, so guard on the computed source.
     if (composite && viewModel.source === "computed") {

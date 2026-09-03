@@ -26,7 +26,7 @@ SCRIPT_VERSION <- "10.8.1"
 
 # The engine's version, immune to the sourcing that follows. shared_functions.R,
 # validation.R, weighting.R and ranking.R each assign their OWN SCRIPT_VERSION
-# at the top level, and they are sourced into this same environment below — so
+# at the top level, and they are sourced into this same environment below, so
 # by the time anything stamps a deliverable, SCRIPT_VERSION has been overwritten
 # with whichever file was sourced last ("10.1"). Every workbook, stats pack,
 # diagnostics payload and start banner carried that stale number, which is a
@@ -62,7 +62,7 @@ source(file.path(script_dir, "00_guard.R"))
 
   # Order matters: turas_save_workbook_atomic and turas_excel_escape must load
   # BEFORE stats_pack_writer, which uses both (import_all.R keeps the same
-  # order). The atomic saver reconciles a workbook's parts before writing it —
+  # order). The atomic saver reconciles a workbook's parts before writing it,
   # without it openxlsx leaves relationships pointing at drawing parts it never
   # writes, Excel offers to repair the file, and repairing strips the dropdowns.
   # It was missing from this list, so every tabs run fell through to the plain
@@ -199,7 +199,7 @@ tabs_source("crosstabs", "data_setup.R")
 tabs_source("crosstabs", "analysis_runner.R")
 tabs_source("crosstabs", "workbook_builder.R")
 
-# Shared report helpers (row/banner shape + chart palette) — the data-layer
+# Shared report helpers (row/banner shape + chart palette): the data-layer
 # writer below classifies rows through these, so they load before it.
 source(file.path(script_dir, "report_shared.R"))
 
@@ -352,7 +352,7 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
       }
 
       # Secondary significance: re-use p_value, compare against alpha2_adj.
-      # No second test call needed — the expensive computation is already done.
+      # No second test call needed. The expensive computation is already done.
       if (dual && test_result$higher && !is.na(test_result$p_value) &&
           test_result$p_value < alpha2_adj) {
         col_letter <- banner_structure$letters[
@@ -392,7 +392,7 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
 #'   is calculated and appended. Default NULL (feature disabled).
 #' @param fpc_muls Named numeric vector of finite population correction
 #'   multipliers by internal key, from \code{build_fpc_multipliers()}
-#'   (report_shared.R). NULL — the default — means no correction anywhere, which
+#'   (report_shared.R). NULL, the default, means no correction anywhere, which
 #'   is what a report with no Population configuration gets.
 #' @return Data frame with one sig row (primary only) or two rows (primary +
 #'   secondary), or NULL if fewer than two columns in test_data.
@@ -583,15 +583,15 @@ write_question_table_fast <- function(wb, sheet, data_table, banner_info,
 #' @param decimal_places_numeric Integer
 #' @return Formatted numeric or NA_real_
 #' @export
-# DUPLICATE DEFINITION — this copy is the one that runs.
+# DUPLICATE DEFINITION. This copy is the one that runs.
 #
 # excel_utils.R defines format_output_value() too (sourced via
 # shared_functions.R, above), and this later definition overwrites it. The two
 # have drifted: that one handles a length-0 or multi-element value (warns, takes
 # the first) and rounds an UNKNOWN type to 0 decimals; this one errors on a
 # multi-element value (is.na() on a vector) and rounds an unknown type to 2.
-# Nothing ships wrong today — every call site in the module passes a scalar and
-# one of the five known types, so the divergent branches are unreachable — but
+# Nothing ships wrong today. Every call site in the module passes a scalar and
+# one of the five known types, so the divergent branches are unreachable, but
 # tests that source only excel_utils.R exercise the OTHER function, so a change
 # made in one place can pass its tests and never reach production
 # (review 2026-08-21, M-18).
@@ -599,7 +599,7 @@ write_question_table_fast <- function(wb, sheet, data_table, banner_info,
 # Not merged yet because test_e2e_integration.R text-extracts this definition
 # out of this file by regex (`^format_output_value <- function`), so deleting it
 # breaks that harness. Collapse the two when the harness stops parsing source
-# text — see the engine-as-function refactor in the growth path.
+# text. See the engine-as-function refactor in the growth path.
 format_output_value <- function(value, type = "frequency",
                                 decimal_places_percent = 0,
                                 decimal_places_ratings = 1,
@@ -664,7 +664,7 @@ format_output_value <- function(value, type = "frequency",
 #'
 #' The conjoint module writes `{output}_cj_island.json` when it runs. A tabs run
 #' embeds it when `conjoint_island` names it, so the two modules meet through
-#' one file and neither has to know how the other works — the same arrangement
+#' one file and neither has to know how the other works. The same arrangement
 #' the tracker uses for wave contributions.
 #'
 #' Returns NULL for every ordinary tabs run, which is the point: nothing about
@@ -747,7 +747,7 @@ if (is.list(config_result) && identical(config_result$status, "REFUSED")) {
 
 # Attach the config file path so downstream path resolution can find the project
 # root. Needed by the qualitative workbook resolver (qual_resolve_workbook_path),
-# the data layer, and AI-sidecar detection — for EVERY report type. Previously
+# the data layer, and AI-sidecar detection, for EVERY report type. Previously
 # this was set only inside the classic-HTML block, so a V2-only run (the default)
 # left it NULL and a relative qual_workbook path resolved against the run CWD
 # (tabs/lib) instead of the project, silently dropping the Qualitative tab.
@@ -819,11 +819,11 @@ if (isTRUE(analysis_result$checkpoint_enabled) &&
 # ==============================================================================
 # Emits a *_data.json island AND a self-contained *_report.html (renderer + data
 # inlined) alongside the Excel. This is the deliverable; the Excel workbook
-# written above is byte-identical whether this runs or not — this block only
+# written above is byte-identical whether this runs or not. This block only
 # ever WRITES NEW FILES, never modifies the workbook.
 
 # Enabled by the config Settings sheet (html_report_v2) OR the GUI (which builds
-# it by default — TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
+# it by default. TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
 # An EXPLICIT config value wins in both directions (a confidentiality-driven
 # html_report_v2 = FALSE must not be overridden, I16); when the config is
 # silent, the GUI's default-ON flag applies.
@@ -837,13 +837,13 @@ config_result$config_obj$html_report_v2 <- .html_report_v2_on   # reflect actual
 
 # Reader report (narrative summary, separate file). Enabled by the config Settings
 # sheet (generate_reader_report) OR the GUI (TURAS_GENERATE_READER_REPORT, which
-# overrides). It rides on the v2 build below — it reuses that data layer — so it
+# overrides). It rides on the v2 build below, it reuses that data layer, so it
 # can only run when the v2 report runs. Reflect the actual decision in the summary.
 .reader_report_on <- (isTRUE(config_result$config_obj$generate_reader_report) ||
   isTRUE(get0("TURAS_GENERATE_READER_REPORT", ifnotfound = FALSE))) && .html_report_v2_on
 config_result$config_obj$generate_reader_report <- .reader_report_on
 
-# Reader AI prose (opt-in narrative drafting) — config Settings OR the GUI global
+# Reader AI prose (opt-in narrative drafting): config Settings OR the GUI global
 # (which turns it on). Aggregates only leave the machine; the report is flagged.
 if (isTRUE(get0("TURAS_READER_AI_PROSE", ifnotfound = FALSE))) {
   config_result$config_obj$reader_ai_prose <- TRUE
@@ -906,7 +906,7 @@ if (.html_report_v2_on) {
       # Statistical diagnostics (V13): the interactive twin of the Excel stats
       # pack. Always attached (independent of Generate_Stats_Pack) so every v2
       # report is self-documenting and the diagnostics ride inside saved copies.
-      # Curated subset — raw config echo stays in the Excel deliverable. Never
+      # Curated subset. Raw config echo stays in the Excel deliverable. Never
       # allowed to break the report: a failure just drops the panel.
       dl$project$diagnostics <- tryCatch(
         diagnostics_for_island(build_tabs_diagnostics(
@@ -924,7 +924,7 @@ if (.html_report_v2_on) {
 
       # Patterns config echo (V13): every Patterns lever (patterns_exclude_banners,
       # patterns_headline, KeyShare, AreaSummary) validated against what the data
-      # layer actually contains — a misspelt banner or option label is reported in
+      # layer actually contains. A misspelt banner or option label is reported in
       # the console and on the Report tab's diagnostics panel instead of silently
       # doing nothing. Inactive configs pass through untouched; never breaks the
       # report.
@@ -954,11 +954,11 @@ if (.html_report_v2_on) {
       .mrb <- suppressWarnings(as.numeric(config_result$config_obj$min_reporting_base))
       .mrb_set <- length(.mrb) == 1L && !is.na(.mrb) && .mrb > 1
       if (!.micro_wanted) {
-        # Deliberate omission — record the confidentiality trade in the console
+        # Deliberate omission. Record the confidentiality trade in the console
         # so the operator can see exactly what this ship does and doesn't carry.
         cat("\n  Microdata island: OMITTED by config (html_report_v2_microdata = FALSE).\n")
         cat("    Confidentiality ship: the report file carries no per-respondent records.\n")
-        cat("    Published figures only — live filter, custom banners and COMPUTED views are off.\n")
+        cat("    Published figures only. Live filter, custom banners and COMPUTED views are off.\n")
         if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
           cat("    Tracking tab: built from PUBLISHED figures (the trend survives; the records do not).\n")
           cat("    No *_wave.json is written by this build - keep the one from your microdata run.\n")
@@ -969,8 +969,8 @@ if (.html_report_v2_on) {
         cat("\n")
       } else if (is.null(micro) && .mrb_set) {
         # Disclosure needs the microdata base to gate sub-k cuts. If the operator asked
-        # for a threshold but micro didn't build (UNEXPECTEDLY — the deliberate omission
-        # above speaks for itself), the renderer fails CLOSED (all detail hidden) — warn
+        # for a threshold but micro didn't build (UNEXPECTEDLY, the deliberate omission
+        # above speaks for itself), the renderer fails CLOSED (all detail hidden): warn
         # loudly so the operator knows the filtered views are gone by design.
         cat("\n[WARNING] Disclosure threshold (min_reporting_base =", .mrb,
             ") is set but the microdata island is unavailable.\n")
@@ -994,14 +994,14 @@ if (.html_report_v2_on) {
       }
 
       # Tabs-integrated tracker (OFF by default): emit this wave's contribution,
-      # then — when enabled and a waves_source resolves — assemble the tracking
+      # then, when enabled and a waves_source resolves, assemble the tracking
       # island from the prior waves' contributions plus this one.
       prev_json <- NULL
       tracking_on <- FALSE
       if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
         tracking_on <- tryCatch({
           # The classic tracker's Question_Mapping (when configured) links waves
-          # by a canonical key — robust to renames + curates which metrics track.
+          # by a canonical key. Robust to renames + curates which metrics track.
           mapping <- load_question_mapping(config_result$config_obj$question_mapping)
           wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
           if (!.micro_wanted) {
@@ -1057,7 +1057,7 @@ if (.html_report_v2_on) {
       if (.qual_wb_set) qual_warn_source_disclosure(config_result$config_obj)
       if (.qual_wb_set) {
         # Band-split open-ends (e.g. an NPS "why?" routed into Detractor/Passive/Promoter
-        # sheets) are reassembled into one question — parse the union specs from Selection.
+        # sheets) are reassembled into one question. Parse the union specs from Selection.
         .qual_unions <- tryCatch(qual_selection_unions(data_result$selection_df),
                                  error = function(e) list())
         qj <- tryCatch(
@@ -1103,21 +1103,21 @@ if (.html_report_v2_on) {
           }
           if (!is.null(linkres) && length(linkres$unresolved)) {
             cat(sprintf(paste0("  [WARNING] CommentSheet value(s) not found in the comment ",
-                               "workbook: %s — the jump for these open-ends is inactive.\n"),
+                               "workbook: %s. The jump for these open-ends is inactive.\n"),
                         paste(linkres$unresolved, collapse = ", ")))
           }
           if (!is.null(linkres) && length(linkres$unlinked_targets)) {
             .msgs <- vapply(linkres$unlinked_targets, function(u)
               sprintf("'%s' (open-end %s)", u$target, u$openEnd), character(1))
             cat(sprintf(paste0("  [WARNING] CommentLink target(s) match no question or composite: ",
-                               "%s — the comments are still in the Qualitative tab, but no jump ",
+                               "%s. The comments are still in the Qualitative tab, but no jump ",
                                "affordance will appear on a card. Check the code spelling against ",
                                "Survey_Structure (e.g. a composite's CompositeCode).\n"),
                         paste(.msgs, collapse = ", ")))
           }
         } else if (!is.null(qj) && identical(qj$status, "NO_MATCHES")) {
           cat(sprintf(paste0("\n[WARNING] Qualitative join found id column '%s' but matched ",
-                             "0 of %d commenters — check the ResponseID alignment (or set ",
+                             "0 of %d commenters. Check the ResponseID alignment (or set ",
                              "qual_join_id_column). Falling back to a standalone comment report.\n\n"),
                       qj$id_column, qj$total))
         } else if (!is.null(qj) && identical(qj$status, "NO_ID_COLUMN")) {
@@ -1163,7 +1163,7 @@ if (.html_report_v2_on) {
       turas_prepare_deliverable(report_v2_result$output_file)
     }
 
-    # Reader report (narrative summary) — a SEPARATE file beside the crosstab that
+    # Reader report (narrative summary): a SEPARATE file beside the crosstab that
     # deep-links back into it. Opt-in; deterministic unless reader_ai_prose is on.
     # Reuses the dl / prev_json / qual_json_main already built above (no recompute),
     # so it only runs when the crosstab itself built. Wrapped so any Reader failure
@@ -1196,7 +1196,7 @@ if (.html_report_v2_on) {
     }
   }
 
-  # Qualitative comment report (V12) — STANDALONE FALLBACK. The Phase-2 default joins
+  # Qualitative comment report (V12): STANDALONE FALLBACK. The Phase-2 default joins
   # the comments into the main report above; this separate self-contained
   # *_qual_report.html is only emitted when that join did not integrate (no host id
   # column, no matches, or the main report did not build). Wrapped so a qual failure
@@ -1367,7 +1367,7 @@ cat("  Output:", workbook_result$output_path, "\n")
 cat("  Duration:", format_seconds(as.numeric(elapsed)), "\n")
 
 # Qualitative status in the CLOSING summary: a configured comment workbook that
-# failed to join must never end a run looking clean — the refusal box further
+# failed to join must never end a run looking clean. The refusal box further
 # up scrolls out of sight (this is exactly how a missing tab shipped unnoticed).
 if (exists(".qual_wb_set") && isTRUE(.qual_wb_set)) {
   if (isTRUE(.qual_integrated)) {

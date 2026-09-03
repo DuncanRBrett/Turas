@@ -1,5 +1,5 @@
 /**
- * Minimal XLSX writer — a real Excel workbook (zip of OOXML parts via
+ * Minimal XLSX writer. A real Excel workbook (zip of OOXML parts via
  * TR.zip), one sheet, inline strings + native numbers. Enough for
  * exporting any matrix/heatmap; no dependencies, ~1 KB of parts.
  */
@@ -11,7 +11,7 @@
 
   /** escapeXml + strip characters XML 1.0 forbids even when entity-escaped:
    *  C0 controls other than \t \n \r, U+FFFE/U+FFFF and unpaired surrogates
-   *  (valid pairs — emoji — survive). A stray \x0B in a verbatim otherwise
+   *  (valid pairs, emoji, survive). A stray \x0B in a verbatim otherwise
    *  yields an invalid worksheet/slide part that Excel and PowerPoint refuse.
    *  Shared with the PPTX text runs in 29_export.js. */
   xlsx.escape = function (value) {
@@ -46,7 +46,7 @@
   }
 
   /** Cell XML: numbers stay numeric, everything else is an inline string.
-   *  keepText forces a string cell even for numeric-looking text — for columns
+   *  keepText forces a string cell even for numeric-looking text, for columns
    *  that are prose / identifiers (verbatims, IDs, phone or account numbers)
    *  where coercion would mangle the value. A numeric-matrix export leaves it
    *  off, so a display "45%" still lands as the number 45. */

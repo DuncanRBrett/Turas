@@ -1,8 +1,8 @@
 # ==============================================================================
-# TABS — AUTHORED REPORT TEXT (v2)
+# TABS. AUTHORED REPORT TEXT (v2)
 # ==============================================================================
-# The v2 report's interpretive prose — the explainers, legends and method
-# notes a client reads — is authored in the shared callout registry
+# The v2 report's interpretive prose. The explainers, legends and method
+# notes a client reads. Is authored in the shared callout registry
 # (modules/shared/lib/callouts/callouts.json, module "tabs") and edited in the
 # Callout Editor. It is NOT written in the renderer.
 #
@@ -46,7 +46,7 @@ if (!exists("%||%", mode = "function")) {
 .REPORT_TEXT_TAGS <- c("strong", "em", "b", "i", "br", "p", "ul", "ol", "li",
                        "h3", "h4", "span", "code", "sup", "sub")
 
-# Tags with no closing partner — excluded from the balance check.
+# Tags with no closing partner. Excluded from the balance check.
 .REPORT_TEXT_VOID_TAGS <- c("br")
 
 # What counts as a placeholder: {lower_snake_case}. Anything else between
@@ -69,7 +69,7 @@ report_text_manifest_path <- function(assets_dir = report_v2_assets_dir()) {
 #'
 #' The manifest is the renderer's declaration of what text it needs: one entry
 #' per key, naming the placeholders that key may use and where it appears. It
-#' lives beside the JS because it belongs to the renderer — the registry holds
+#' lives beside the JS because it belongs to the renderer. The registry holds
 #' the words, the manifest holds the contract.
 #'
 #' @param path Path to text_manifest.json
@@ -89,9 +89,9 @@ load_report_text_manifest <- function(path = report_text_manifest_path()) {
 .REPORT_TEXT_CALL_RE <- "TR\\.txt(?:\\.block)?\\(\\s*[\"']([^\"']+)[\"']"
 
 # Any quoted dotted lower-case key ANYWHERE in the bundle. The renderer reaches
-# its text three ways — directly, through a local one-line wrapper
+# its text three ways. Directly, through a local one-line wrapper
 # (li("cards.reading.heatmap")), and through a ternary inside the call
-# (TR.txt(cond ? "a.b" : "c.d")) — and only the first is a call-position match.
+# (TR.txt(cond ? "a.b" : "c.d")), and only the first is a call-position match.
 # Since this is intersected with the manifest before use, a key named in a
 # comment counts as referenced, which is the right answer for a check whose only
 # job is to notice text nobody renders.
@@ -112,7 +112,7 @@ load_report_text_manifest <- function(path = report_text_manifest_path()) {
 #' is a build refusal, not a blank space in a client's report.
 #'
 #' Note it scans the bundle as text, so a call inside a comment counts. That is
-#' intentional — a commented-out key is either coming back (keep it declared) or
+#' intentional. A commented-out key is either coming back (keep it declared) or
 #' it is dead (delete both).
 #'
 #' @param js_bundle The concatenated renderer JS
@@ -126,13 +126,13 @@ report_text_keys_used <- function(js_bundle) {
 #' Manifest keys the renderer references at all, including through a wrapper
 #'
 #' Several renderers alias TR.txt.block behind a one-line local helper so a
-#' block of markup reads cleanly — li("cards.reading.heatmap") rather than the
+#' block of markup reads cleanly. Li("cards.reading.heatmap") rather than the
 #' full call with its options object. Those are real uses, and counting only
 #' direct calls reported two thirds of the catalogue as unused.
 #'
 #' This deliberately only ever CONFIRMS keys the manifest already declares, so a
-#' coincidental dotted string can never invent a refusal. The one gap it leaves —
-#' a wrapper call to a key nobody declared — renders empty and is reported by the
+#' coincidental dotted string can never invent a refusal. The one gap it leaves,
+#' a wrapper call to a key nobody declared. Renders empty and is reported by the
 #' in-browser selftest (TR.txt.misses, 31_selftest.js) during development.
 #'
 #' @param js_bundle The concatenated renderer JS
@@ -175,7 +175,7 @@ report_text_keys_referenced <- function(js_bundle, manifest) {
       next
     }
     if (!closing && nzchar(trimws(attrs))) {
-      problems <- c(problems, sprintf("tag <%s> carries attributes (%s) — authored text may not style or script; ask for a renderer change instead",
+      problems <- c(problems, sprintf("tag <%s> carries attributes (%s): authored text may not style or script; ask for a renderer change instead",
                                       name, trimws(attrs)))
     }
     if (name %in% .REPORT_TEXT_VOID_TAGS) next
@@ -202,9 +202,9 @@ report_text_keys_referenced <- function(js_bundle, manifest) {
 #'
 #' @param manifest Named list from load_report_text_manifest()
 #' @param entries Named list of registry entries for the "tabs" module
-#' @param keys_used Character vector from report_text_keys_used() — DIRECT calls,
+#' @param keys_used Character vector from report_text_keys_used(): DIRECT calls,
 #'   checked against the manifest
-#' @param referenced Character vector from report_text_keys_referenced() — every
+#' @param referenced Character vector from report_text_keys_referenced(): every
 #'   key the renderer touches, used only for the "authored but never rendered"
 #'   note. Defaults to keys_used.
 #' @return list(errors = character, warnings = character)
@@ -221,15 +221,15 @@ validate_report_text <- function(manifest, entries, keys_used = character(0),
       "the renderer calls TR.txt(\"%s\") but the key is not in text_manifest.json", undeclared))
   }
 
-  # 2. Every declared key must be authored. Empty text is legitimate — it means
-  #    "do not show this block on any report" — but the key must be present, so
+  # 2. Every declared key must be authored. Empty text is legitimate. It means
+  #    "do not show this block on any report", but the key must be present, so
   #    that deleting an entry in the editor is a loud act rather than a silent
   #    hole in the page.
   for (key in names(manifest)) {
     entry <- entries[[key]]
     if (is.null(entry)) {
       errors <- c(errors, sprintf(
-        "no text authored for \"%s\" — add it in the Callout Editor under module 'tabs' (page: %s)",
+        "no text authored for \"%s\". Add it in the Callout Editor under module 'tabs' (page: %s)",
         key, manifest[[key]]$page %||% "?"))
       next
     }
@@ -249,7 +249,7 @@ validate_report_text <- function(manifest, entries, keys_used = character(0),
         key, unknown,
         if (length(declared)) paste0("{", declared, "}", collapse = " ") else "none"))
     }
-    # A declared token the author chose not to use is their call, not an error —
+    # A declared token the author chose not to use is their call, not an error,
     # but say so, because it is also what a mistyped sentence looks like.
     unused <- setdiff(declared, used)
     if (length(unused)) {
@@ -262,8 +262,8 @@ validate_report_text <- function(manifest, entries, keys_used = character(0),
     }
   }
 
-  # 5. Text nobody renders. Not fatal — a key may be declared ahead of the code
-  #    that uses it — but it is how the registry silted up before. `referenced`
+  # 5. Text nobody renders. Not fatal. A key may be declared ahead of the code
+  #    that uses it, but it is how the registry silted up before. `referenced`
   #    is the wider list (wrapper calls included) so this stays quiet about text
   #    that IS rendered; leave it NULL to skip the check entirely.
   if (length(referenced)) {
@@ -281,7 +281,7 @@ validate_report_text <- function(manifest, entries, keys_used = character(0),
 #' Build the authored-text island for a v2 report
 #'
 #' Reads the registry, validates it against the manifest, and returns the JSON
-#' to inline. Refuses — loudly, naming the key — rather than shipping a report
+#' to inline. Refuses, loudly, naming the key, rather than shipping a report
 #' with a hole in it.
 #'
 #' @param assets_dir The vendored v2 assets directory
@@ -302,7 +302,7 @@ build_report_text_json <- function(assets_dir = report_v2_assets_dir(),
 
   if (is.null(entries)) {
     if (!exists("turas_callout_module", mode = "function")) {
-      stop("[IO_REPORT_TEXT_REGISTRY] callout_registry.R is not loaded — the v2 report cannot read its authored text.")
+      stop("[IO_REPORT_TEXT_REGISTRY] callout_registry.R is not loaded. The v2 report cannot read its authored text.")
     }
     entries <- turas_callout_module("tabs")
   }

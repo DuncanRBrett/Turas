@@ -14,7 +14,7 @@
  *   6. boxCounts uses the FULL answered base as denominator (no-box answers
  *      like Neutral stay in the base).
  *   7. FPC on the published view: intervals narrow on the FPC-corrected base,
- *      and significance is NOT recomputed here — R applies the correction in
+ *      and significance is NOT recomputed here. R applies the correction in
  *      its own tests and the letters are carried. Disclosure-suppressed
  *      columns still neither earn nor grant a letter.
  *   8. Mean confidence intervals size on the Kish effective base.
@@ -63,7 +63,7 @@ function setProject(project) {
   if (TR.d2) TR.d2._qIndex = null;
 }
 
-console.log("Audit stats regressions — suite:");
+console.log("Audit stats regressions. Suite:");
 
 /* ---------------- 1. critical z from the configured alpha ---------------- */
 
@@ -85,11 +85,11 @@ run("zPrimary/zSecondary read the project's alpha, with 0.05/0.20 defaults", () 
 
 /* ---------------- 2. sigLetters honours the Bonferroni divisor ---------------- */
 
-// Total + 3 columns: 50% vs 42% on n=400 gives z ≈ 2.270 — significant at the
+// Total + 3 columns: 50% vs 42% on n=400 gives z ≈ 2.270. Significant at the
 // plain 95% level (1.96) but NOT at the Bonferroni-adjusted 0.05/3 (z 2.394).
 function pairCells() {
   return [
-    { x: null, base: null },                 // Total — never tested
+    { x: null, base: null },                 // Total, never tested
     { x: 200, base: 400 },                   // 50%
     { x: 168, base: 400 },                   // 42%
     { x: 168, base: 400 }                    // 42%
@@ -178,7 +178,7 @@ run("netScoreMeans scores +-100 off box membership and means to the printed net"
   setProject({});
   // 6 respondents: 3 in the favourable box (row 1), 2 in the unfavourable box
   // (row 0), 1 answered into NO box. Printed net = (3 - 2)/6 * 100 = 16.6667,
-  // and the score mean must equal it — that equality is the whole method
+  // and the score mean must equal it. That equality is the whole method
   // (review 2026-08, I5).
   TR.MICRO = {
     n: 6,
@@ -244,7 +244,7 @@ function loadPopulationFixture(overrides) {
         ],
         rows: [
           // sig[] is what R published. The census column (HQ) carries none and
-          // is named by none — R excludes a full census from pairing.
+          // is named by none. R excludes a full census from pairing.
           { kind: "category", label: "Yes", pct: [47, 40, 50, 42], n: [400, 20, 200, 168], sig: ["", "", "D", ""] },
           { kind: "category", label: "No",  pct: [53, 60, 50, 58], n: [450, 30, 200, 232], sig: ["", "", "", "C"] }
         ] }
@@ -256,7 +256,7 @@ function loadPopulationFixture(overrides) {
 // The published view USED to re-letter a population report here, from the
 // display-rounded %s and each column's FPC ciBase. That overlay is retired: R
 // applies the FPC inside its own tests, so the carried letters are already
-// corrected — at both alphas, on weighted designs too, and from the unrounded
+// corrected, at both alphas, on weighted designs too, and from the unrounded
 // counts. This pins that the view now passes them through untouched.
 run("FPC: the published view carries R's letters and does not re-letter", () => {
   loadPopulationFixture();
@@ -264,7 +264,7 @@ run("FPC: the published view carries R's letters and does not re-letter", () => 
   const yes = model.rows[0], no = model.rows[1];
   eq(yes.cells[2].sig, "D", "C keeps exactly the letter R published");
   eq(no.cells[3].sig, "C", "and so does D on the No row");
-  // The census column neither earns nor grants a letter — R excluded it.
+  // The census column neither earns nor grants a letter. R excluded it.
   eq(yes.cells[1].sig, "", "census column has no letters");
   assert(yes.cells[2].sig.indexOf("B") === -1, "no letter references the census column");
 });
@@ -274,7 +274,7 @@ run("FPC: the census column still gets an infinite ciBase for its interval", () 
   const model = TR.model.forQuestion("Q1", "Site", [], { intervals: true });
   // HQ: base 50 of a universe of 50 -> nothing left to be uncertain about.
   eq(model.columns[1].ciBase, Infinity, "census ciBase is Infinity");
-  // North: 400 of 10000 is 4% coverage — below FPC_MIN_COVERAGE (5%), so the
+  // North: 400 of 10000 is 4% coverage. Below FPC_MIN_COVERAGE (5%), so the
   // correction does not engage and the interval base is the raw base.
   eq(model.columns[2].ciBase, 400, "a below-floor column keeps its raw base");
 });
@@ -373,7 +373,7 @@ run("SIGNIFICANCE still reads the RAW values, never the rounded ones", () => {
     sd: 0.5, effBase: 4000, current: !!cur });
   // 9.14 -> 9.16 rounds to 9.1 -> 9.2, i.e. a SHOWN change of +0.1, while the
   // real move is 0.02. On a large base the raw Welch test must judge the real
-  // move — the displayed rounding must not manufacture significance.
+  // move. The displayed rounding must not manufacture significance.
   const c = TR.waves.cellsFor([pt(9.14), pt(9.16, true)], false, "95", 1);
   eq(c[1].change_prev, 0.1, "the SHOWN change is 0.1");
   assert(c[1].sig_prev === false,
@@ -393,7 +393,7 @@ run("an NPS takes PERCENT places, not ratings places (it is mean-KIND, 0-100)", 
 });
 
 
-run("crosstab tableHtml honours DECIMAL PLACES — no fake NPS decimal (I13)", () => {
+run("crosstab tableHtml honours DECIMAL PLACES. No fake NPS decimal (I13)", () => {
   // The island stores what the engine published: NPS 79 (percent places, 0dp),
   // rating mean 4.3 (rating places, 1dp). The crosstab tab hard-coded
   // toFixed(1), re-adding a digit the published table never had ("79.0").
@@ -517,7 +517,7 @@ run("attachDeltas tests a WEIGHTED proportion's raw share, not the rounded cell 
   const row = model.rows[0];
   assert(row.delta, "the Yes row carries a wave delta");
   assert(!row.delta.sig,
-    "raw 55.5% vs 50% is not significant — the rounded 56% must not flip it (got sig=" +
+    "raw 55.5% vs 50% is not significant. The rounded 56% must not flip it (got sig=" +
     JSON.stringify(row.delta.sig) + ")");
   // the DISPLAYED delta still reconciles with the published figures
   eq(row.delta.diff, 6, "displayed delta subtracts the published cells (56 - 50)");
@@ -525,8 +525,8 @@ run("attachDeltas tests a WEIGHTED proportion's raw share, not the rounded cell 
 
 /* ---- heatmap_colour: a documented setting that read nothing (I11) ---------
  * The crosstab heat tint took TR.charts.brandOf() unconditionally, so
- * `heatmap_colour` — whitelisted, shipped in the template and documented as
- * "set explicitly to override without changing other colours" — was a silent
+ * `heatmap_colour`. Whitelisted, shipped in the template and documented as
+ * "set explicitly to override without changing other colours". Was a silent
  * no-op. The island now carries the field ONLY when the config sets it, so an
  * unset report must tint exactly as before.
  */

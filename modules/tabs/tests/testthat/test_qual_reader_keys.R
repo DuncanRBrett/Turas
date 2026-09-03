@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — READER-KEY (rid) TESTS
+# TABS MODULE. READER-KEY (rid) TESTS
 # ==============================================================================
 #
 # Gates the I20 fix: reader marks key on an opaque per-respondent token instead of
@@ -182,7 +182,7 @@ test_that("records carry the rid from the map, stable across questions", {
   expect_equal(qa[[1]]$idx, 0L)                        # idx itself is unchanged
 })
 
-test_that("rid is absent without a map — the pre-I20 island shape (regression)", {
+test_that("rid is absent without a map. The pre-I20 island shape (regression)", {
   island <- qual_build_data_qual(
     list(question_of("QA", list(mk_rec("1", "alpha")))), master2, list(text_mode = "full"))
   r <- island$questions[[1]]$records[[1]]
@@ -200,7 +200,7 @@ test_that("an id the sidecar has never seen simply gets no rid", {
   expect_false("rid" %in% names(recs[[2]]))
 })
 
-test_that("rid ships under every privacy dial — it discloses nothing", {
+test_that("rid ships under every privacy dial. It discloses nothing", {
   for (mode in c("hidden", "redacted", "full")) {
     for (cuts in c("block", "safe", "allow")) {
       island <- qual_build_data_qual(
@@ -213,7 +213,7 @@ test_that("rid ships under every privacy dial — it discloses nothing", {
 })
 
 # ==============================================================================
-# 6. NO_PATH — no config path, no rids, said out loud
+# 6. NO_PATH. No config path, no rids, said out loud
 # ==============================================================================
 
 test_that("a missing config path refuses to key, warns, and builds the legacy island", {
@@ -235,7 +235,7 @@ test_that("a blank config path is treated as no path", {
 })
 
 # ==============================================================================
-# 7. CORRUPT — never re-mint over a sidecar we cannot read
+# 7. CORRUPT, never re-mint over a sidecar we cannot read
 # ==============================================================================
 
 test_that("a corrupt sidecar is never overwritten and no rids ship", {

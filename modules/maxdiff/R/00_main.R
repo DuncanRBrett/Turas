@@ -878,6 +878,10 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
     "HB Chains"            = if (has_hb) as.character(config$output_settings$HB_Chains %||% config$project_settings$HB_Chains %||% "4") else "N/A",
     "Seed"                 = seed_val,
     "TURF Analysis"        = if (turf_flag) "Enabled" else "Disabled",
+    "Tasks excluded from models" = sprintf(
+      "%s of %s lacked exactly one best and one worst (kept in count denominators)",
+      results$study_summary$n_tasks_dropped_from_models %||% "0",
+      results$study_summary$n_tasks_total %||% "?"),
     "TRS Status"           = run_result$status %||% "PASS",
     "TRS Events"           = trs_summary
   )
@@ -1054,7 +1058,8 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
     })
     if (!is.null(hb_results) && !is.null(count_scores)) {
       count_scores <- merge(count_scores,
-        hb_results$population_utilities[, c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")],
+        hb_results$population_utilities[, intersect(c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"),
+                                                    names(hb_results$population_utilities))],
         by = "Item_ID", all.x = TRUE)
     }
   }
@@ -1214,6 +1219,16 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
     NULL
   }
 
+  # Events raised AFTER this point (simulator, HTML report) used to reach
+  # only the warnings vector, never trs_state, so the closing banner said
+  # '[TRS PASS] COMPLETED SUCCESSFULLY' over a missing report (review F2).
+  # note_late() records them for the fold-in at the end of this function.
+  late_warnings <- character()
+  note_late <- function(msg) {
+    late_warnings <<- c(late_warnings, msg)
+    add_warning(msg)
+  }
+
   # Step 11: Excel output
   if (verbose) cat("\nSTEP 11: Generating Excel output...\n")
 
@@ -1309,7 +1324,7 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
-      add_warning(sprintf("Simulator: %s", conditionMessage(e)))
+      note_late(sprintf("Simulator: %s", conditionMessage(e)))
     })
   }
 
@@ -1337,7 +1352,13 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
             turas_prepare_deliverable(html_report_path)
           }
         } else {
-          cat(sprintf("  HTML report failed: %s\n", html_result$message %||% "unknown"))
+          # A refused report is an EVENT (review F2): without add_warning the
+          # run ended '[TRS PASS] COMPLETED SUCCESSFULLY' with no report on
+          # disk, and the GUI's status check then showed the green toast.
+          .html_msg <- html_result$message %||% "unknown"
+          cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_REFUSED: HTML report not produced: %s\n", .html_msg))
+          message(sprintf("[TRS PARTIAL] MAXD_HTML_REFUSED: HTML report not produced: %s", .html_msg))
+          note_late(sprintf("HTML report not produced: %s", .html_msg))
         }
       } else {
         cat("\n[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found at any path\n")
@@ -1347,8 +1368,23 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s\n", conditionMessage(e)))
       cat(sprintf("  Traceback: %s\n", paste(capture.output(traceback()), collapse = "\n  ")))
       message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
-      add_warning(sprintf("HTML report: %s", conditionMessage(e)))
+      note_late(sprintf("HTML report: %s", conditionMessage(e)))
     })
+  }
+
+  # Fold the late events into the run state so the banner, the GUI and the
+  # returned run_result all tell the truth (review F2). The Run_Status sheet
+  # was written before these steps and is not rewritten.
+  if (length(late_warnings) > 0) {
+    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+      for (warn in late_warnings) {
+        turas_run_state_partial(trs_state, "MAXD_WARNING", "Analysis warning", problem = warn)
+      }
+      if (exists("turas_run_state_result", mode = "function")) {
+        results$run_result <- turas_run_state_result(trs_state)
+      }
+    }
+    results$warnings <- c(results$warnings, late_warnings)
   }
 
   results

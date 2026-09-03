@@ -24,7 +24,7 @@
 #'
 #' Why this exists (review 2026-08-21, finding C-1): checkpoints used to carry
 #' only results + a timestamp, and the file name is a constant per output
-#' folder. Two ways that shipped wrong numbers silently — (a) a run dies, the
+#' folder. Two ways that shipped wrong numbers silently, (a) a run dies, the
 #' operator edits the config or re-exports the data, re-runs, and the resume
 #' seeds results computed under the OLD inputs while skipping those questions;
 #' (b) two configs sharing one output folder (the GUI batches configs from a
@@ -134,7 +134,7 @@ save_checkpoint <- function(checkpoint_file, all_results, processed_questions,
 #' @param checkpoint_file Character, path to checkpoint file
 #' @param fingerprint List, the current run's fingerprint. When supplied, a
 #'   checkpoint whose fingerprint differs is DISCARDED (with a console box
-#'   naming what changed) rather than resumed — see build_checkpoint_fingerprint().
+#'   naming what changed) rather than resumed. See build_checkpoint_fingerprint().
 #' @return List with results and processed questions, or NULL
 #' @export
 load_checkpoint <- function(checkpoint_file, fingerprint = NULL) {
@@ -164,7 +164,7 @@ load_checkpoint <- function(checkpoint_file, fingerprint = NULL) {
       cat("│ from different inputs, so resuming it would mix results from\n")
       cat("│ two different runs into one workbook.\n")
       cat("│ Changed since that checkpoint:", paste(diffs, collapse = ", "), "\n")
-      cat("│ Action: starting fresh. Nothing is wrong — this is the guard\n")
+      cat("│ Action: starting fresh. Nothing is wrong. This is the guard\n")
       cat("│ working. All questions will be recomputed.\n")
       cat("└────────────────────────────────────────────────────────────┘\n\n")
       return(NULL)

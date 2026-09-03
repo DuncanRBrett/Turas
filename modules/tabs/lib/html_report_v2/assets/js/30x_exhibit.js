@@ -1,5 +1,5 @@
 /**
- * Exhibit engine — the two-panel trend exhibit (this-wave distribution
+ * Exhibit engine. The two-panel trend exhibit (this-wave distribution
  * chart + line-over-waves chart below) and its cross-section composite
  * generalisation: any questions, any mix of distribution / trend / table.
  * One item kind ("exhibit") powers the story card, present mode and the
@@ -7,7 +7,7 @@
  *
  * Single-question exhibits chart the real view model; multi-question
  * exhibits scorecard each question's HEADLINE tracked metric (Index/NPS mean
- * first, then top NET, then NET POSITIVE) — one row per metric.
+ * first, then top NET, then NET POSITIVE): one row per metric.
  *
  * SIZE-EXCEPTION: one cohesive exhibit engine (data + 3 render targets +
  * composite scorecard); splitting would scatter the shared model helpers.
@@ -46,16 +46,16 @@
     if (item.segments && models.length === 1) {
       // round-5 pins without an explicit title
       return models[0].code + " · " + TR.charts.clip(label(models[0]), 56) +
-        " — " + TR.charts.clip(item.metricLabel || "", 26) + " · by segment";
+        ": " + TR.charts.clip(item.metricLabel || "", 26) + " · by segment";
     }
-    if (models.length === 1) return models[0].code + " — " + label(models[0]);
-    return "Composite — " + models.length + " tracked metrics";
+    if (models.length === 1) return models[0].code + ": " + label(models[0]);
+    return "Composite, " + models.length + " tracked metrics";
   };
 
   /* ---------- series exhibits (pinned tracking Visualise views) ---------- */
 
   /** Explicit series list of a pinned view: [{code, ri, label, seg}].
-   *  Round-5 pins stored {segments, metricRi, metricLabel} — normalise. */
+   *  Round-5 pins stored {segments, metricRi, metricLabel}. Normalise. */
   function seriesList(item, models) {
     if (item.series) return item.series;
     if (item.segments) {
@@ -152,7 +152,7 @@
   };
 
   /** A composite = an exhibit spanning 2+ DISTINCT questions; it scorecards.
-   *  A single question across several segments is NOT a composite — it keeps the
+   *  A single question across several segments is NOT a composite. It keeps the
    *  multi-segment trend chart (the segments share one question name). */
   exhibit.isComposite = function (item, models) {
     var rows = exhibit.scorecardRows(item, models);
@@ -168,7 +168,7 @@
     var rows = exhibit.scorecardRows(item, models);
     if (!rows.length) return "";
     // Two-line rows: the (long) question name owns line 1 with the value to its
-    // right; the code, sparkline and delta sit on line 2 — so names never
+    // right; the code, sparkline and delta sit on line 2, so names never
     // collide with the sparkline however long they run.
     var S = TR.svg, W = width || 660, rowH = 50, padX = 6;
     var H = rows.length * rowH + 6;
@@ -214,7 +214,7 @@
   };
 
   function shortLabel(model, row) {
-    // question TEXT first — codes are meaningless on a chart; generous
+    // question TEXT first. Codes are meaningless on a chart; generous
     // clips only (chart labels and legends wrap, table cells wrap)
     return TR.charts.clip(model.title, 120) + " · " +
       TR.charts.clip(row.label, 40);
@@ -224,7 +224,7 @@
    * Composite metrics share one chart axis only within a scale family:
    * 0–10 means vs everything else (%/Index/NPS on 0–100). The dominant
    * family plots; the rest are named in a note under the chart and stay
-   * in the table. The trend chart applies the same rule internally —
+   * in the table. The trend chart applies the same rule internally,
    * this keeps the two exhibit panels consistent.
    */
   function dominantScale(entries, maxOf, isMeanOf) {
@@ -245,7 +245,7 @@
   }
 
   /** Distribution panel model: real for one question, headline bars for
-   *  many — restricted to the dominant scale family (model._dropped names
+   *  many. Restricted to the dominant scale family (model._dropped names
    *  what the chart cannot carry; the table keeps everything). */
   exhibit.distModel = function (item, models) {
     if (isSeriesItem(item)) {
@@ -281,7 +281,7 @@
       function (e) { return waveMax(e.row.waves, curOf(e.row)); },
       function (e) { return e.row.kind === "mean"; });
     // When the charted family is all means (e.g. a set of 0–10 rating
-    // questions), the bars are RATINGS, not percentages — flag it so the SVG
+    // questions), the bars are RATINGS, not percentages. Flag it so the SVG
     // and native-PPTX renderers label them "7.6" on a rating axis, not "8%".
     var keptMean = compSplit.keep.length > 0 &&
       compSplit.keep.every(function (e) { return e.row.kind === "mean"; });
@@ -404,7 +404,7 @@
     if (!models.length) return "";
     var flags = item.flags || {};
     var out = [];
-    // A composite (2+ metrics) is one scorecard — it carries the latest value
+    // A composite (2+ metrics) is one scorecard. It carries the latest value
     // (was the dist chart) AND the trajectory (was the trend lines) per metric,
     // so it replaces both, with the detailed table underneath.
     if (exhibit.isComposite(item, models)) {
@@ -422,7 +422,7 @@
       out.push('<div class="chart ex-chart">' +
         TR.render.chartBy(type, dist, item.chartCols || [0]) + "</div>");
       if (dist._dropped && dist._dropped.length) {
-        out.push('<p class="trknote">Different scale — not on this chart, ' +
+        out.push('<p class="trknote">Different scale, not on this chart, ' +
           "see the table: " +
           fmt.escapeHtml(dist._dropped.join(" · ")) + "</p>");
       }
@@ -442,7 +442,7 @@
   };
 
   /** Interval kind of a pinned series list: the bands use Wilson for
-   *  proportion metrics but z·SD/√n for mean/Index/NPS — the context
+   *  proportion metrics but z·SD/√n for mean/Index/NPS. The context
    *  line must name the method that actually drew them. */
   function seriesIntervalKind(item, models) {
     var means = 0, props = 0;
@@ -500,7 +500,7 @@
   }
 
   /** WP5 CI footer note for a pinned Visualise view drawn with interval
-   *  bands — names the method that actually drew them (footer-mid). */
+   *  bands. Names the method that actually drew them (footer-mid). */
   function slideCiNotes(item, models) {
     if (!item.ci) return null;
     return { notes: [TR.conf.methodNote(seriesIntervalKind(item, models)) +

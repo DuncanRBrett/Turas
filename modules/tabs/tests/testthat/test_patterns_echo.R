@@ -90,7 +90,7 @@ test_that("headline codes: found+rated ✓, unknown code ⚠, non-rated ⚠", {
   audit <- audit_patterns_config(dl)
   vals <- vapply(Filter(function(r) r[1] == "Headline KPI", audit$rows),
                  function(r) r[2], character(1))
-  expect_true(grepl("^✓ Q78 — Overall performance", vals[1]))
+  expect_true(grepl("^✓ Q78: Overall performance", vals[1]))
   expect_true(grepl("^⚠ 'Q99' matches no question code", vals[2]))
   expect_true(grepl("^⚠ Q29 is not a rated question", vals[3]))
 })
@@ -116,8 +116,8 @@ test_that("KeyShare: score-difference NETs never bind; rated + classification fl
   dl <- mk_dl(list(diffnet, rated, classed))
   audit <- audit_patterns_config(dl)
   expect_true(grepl("^⚠ 'Net positive' matches no option", val_of(audit, "KeyShare Q14")))
-  expect_true(grepl("^⚠ ignored — rated question", val_of(audit, "KeyShare Q15")))
-  expect_true(grepl("^⚠ ignored — classification category 'Demographics'",
+  expect_true(grepl("^⚠ ignored: rated question", val_of(audit, "KeyShare Q15")))
+  expect_true(grepl("^⚠ ignored: classification category 'Demographics'",
                     val_of(audit, "KeyShare Q16")))
 })
 

@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE HOST-SOURCED TAG TESTS (Feature 2)
+# TABS MODULE. QUALITATIVE HOST-SOURCED TAG TESTS (Feature 2)
 # ==============================================================================
 #
 # Known-answer tests for host-survey demographic tagging: parsing qual_tag_dimensions,
-# attaching a host column's value to each comment via the join, and — the disclosure
-# crux — band-aware k-anonymisation (a tag safe overall but unique within a small band
+# attaching a host column's value to each comment via the join, and. The disclosure
+# crux. Band-aware k-anonymisation (a tag safe overall but unique within a small band
 # is suppressed within that band).
 #
 # Run with:

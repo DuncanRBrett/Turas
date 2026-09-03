@@ -1,10 +1,10 @@
 # ==============================================================================
-# TABS MODULE — READER-MARK STABLE KEYS (the `rid` token + its sidecar)
+# TABS MODULE. READER-MARK STABLE KEYS (the `rid` token + its sidecar)
 # ==============================================================================
 #
 # Reader marks (shortlist, highlighted passages, hub memberships) live in the
 # reader's browser, keyed per comment. Until I20 that key was `qcode#idx`, and
-# `idx` is POSITIONAL — the respondent's place in the sorted id list (Phase 1) or
+# `idx` is POSITIONAL. The respondent's place in the sorted id list (Phase 1) or
 # the host survey's row index (Phase 2). Re-export the data and every mark
 # silently re-attaches to a different respondent's comment.
 #
@@ -15,15 +15,15 @@
 # WHY A RANDOM TOKEN AND NOT THE RESPONDENT ID: the island is readable in
 # View-Source. A shipped ResponseID would let anyone holding the raw export join
 # an "anonymous" comment back to a named respondent. A uniform-random token
-# carries zero bits of the id, so it discloses nothing under any privacy dial —
+# carries zero bits of the id, so it discloses nothing under any privacy dial,
 # there is nothing to brute-force toward. (A content hash collides on duplicate
 # verbatims and dies on a typo fix; a keyed hash of the id is only as good as a
-# secret salt over a small guessable id space. Both were rejected — see
+# secret salt over a small guessable id space. Both were rejected. See
 # docs/tabs_production_review_2026-08/I20_READER_MARK_REKEYING_DESIGN.md §2.)
 #
 # APPEND-ONLY, NEVER DELETE: an id that drops out of one export keeps its sidecar
 # entry, so a respondent who returns in the next export re-attaches to their old
-# marks. A corrupt sidecar is NEVER re-minted over — silent re-minting would
+# marks. A corrupt sidecar is NEVER re-minted over. Silent re-minting would
 # orphan every mark the reader has made.
 #
 # Depends on: jsonlite. Run the tests with:
@@ -74,8 +74,8 @@ qual_mint_rid <- function(taken = character(0)) {
 #' Read the reader-key sidecar.
 #'
 #' @param path The sidecar path.
-#' @return list(status, map). `status` is "ABSENT" (no file — mint fresh),
-#'   "PASS" (map read) or "CORRUPT" (unreadable/unparseable — the caller must
+#' @return list(status, map). `status` is "ABSENT" (no file, mint fresh),
+#'   "PASS" (map read) or "CORRUPT" (unreadable/unparseable, the caller must
 #'   NOT re-mint, or every existing mark is orphaned).
 qual_read_reader_keys <- function(path) {
   if (is.na(path) || !file.exists(path)) return(list(status = "ABSENT", map = character(0)))
@@ -130,7 +130,7 @@ qual_reader_keys_warn <- function(title, lines) {
 #' export and returns in the next re-attaches to their old marks). The file is
 #' rewritten only when something was minted.
 #'
-#' `ids` must be the SAME id universe the island keys records by — i.e.
+#' `ids` must be the SAME id universe the island keys records by, i.e.
 #' `names(master$id_to_idx)`, which is the normalised workbook id in Phase 1 and
 #' the normalised host ResponseID in Phase 2. Ids pass through untouched so a
 #' token lookup matches a record's `id` exactly.
@@ -139,8 +139,8 @@ qual_reader_keys_warn <- function(title, lines) {
 #' @param config_obj The tabs config object (needs `config_file_path`).
 #' @return A list with structure:
 #'   \item{status}{"PASS" (map usable, sidecar current), "WRITE_FAILED" (map
-#'     usable but not persisted), "NO_PATH" (no config path — no rids) or
-#'     "CORRUPT" (unreadable sidecar — no rids, file left untouched)}
+#'     usable but not persisted), "NO_PATH" (no config path, no rids) or
+#'     "CORRUPT" (unreadable sidecar, no rids, file left untouched)}
 #'   \item{map}{Named character vector, id -> token; NULL when no rids apply}
 #'   \item{path}{The sidecar path, or NA_character_}
 #'   \item{minted}{How many tokens this call created}
@@ -155,7 +155,7 @@ qual_reader_keys <- function(ids, config_obj = list()) {
   path <- qual_reader_keys_path(config_obj$config_file_path)
   if (is.na(path)) {
     qual_reader_keys_warn(
-      "No config file path — reader marks cannot be given stable keys.",
+      "No config file path. Reader marks cannot be given stable keys.",
       c("Reader marks stay keyed by position, so a re-export can silently",
         "re-attach a mark to a different respondent's comment.",
         "Fix: run from a saved config so the reader-key sidecar has a home."))
@@ -166,7 +166,7 @@ qual_reader_keys <- function(ids, config_obj = list()) {
   if (identical(existing$status, "CORRUPT")) {
     qual_reader_keys_warn(
       sprintf("Reader-key sidecar unreadable: %s", basename(path)),
-      c("It was NOT rewritten — re-minting would orphan every reader mark.",
+      c("It was NOT rewritten. Re-minting would orphan every reader mark.",
         "This report ships without stable comment keys, so existing marks are",
         "temporarily invisible (they are not deleted).",
         "Fix: restore the file from a backup, or delete it to start fresh."))
@@ -207,7 +207,7 @@ qual_reader_keys <- function(ids, config_obj = list()) {
     qual_reader_keys_warn(
       sprintf("Could not write the reader-key sidecar: %s", basename(path)),
       c("This report's comment keys are correct, but the tokens minted now are",
-        "not saved — the NEXT rebuild will mint different ones and marks made",
+        "not saved. The NEXT rebuild will mint different ones and marks made",
         "against this build will not carry over.",
         "Fix: check the folder is writable, then rebuild."))
     return(list(status = "WRITE_FAILED", map = map, path = path, minted = length(fresh)))

@@ -1,9 +1,9 @@
 /**
- * Trend visuals over wave history — the inline sparkline used by tracking
+ * Trend visuals over wave history. The inline sparkline used by tracking
  * rows and wave strips, and the full "line over waves" chart (chart type
  * "line"). Series points are published wave Totals (row.waves from
  * TR.waves.attachDeltas) plus the current wave's Total cell; banner
- * columns are deliberately ignored — history has no banner cuts.
+ * columns are deliberately ignored. History has no banner cuts.
  */
 (function (global) {
   "use strict";
@@ -15,7 +15,7 @@
 
   /** Current wave's order key for the trend axis. Prefers config wave_order
    *  (e.g. 2025.5, so a twice-yearly H2 point never collides with the H1
-   *  same-year wave — the published history keys both off wave_order); falls
+   *  same-year wave. The published history keys both off wave_order); falls
    *  back to the 4-digit year parsed from project.wave for annual trackers. */
   render.currentYear = function () {
     var p = (TR.AGG && TR.AGG.project) || {};
@@ -28,7 +28,7 @@
   };
 
   /** Chronological in-place sort for wave order keys. Numeric when every key
-   *  parses ([9, 10, 11] — Array.prototype.sort's default string compare gives
+   *  parses ([9, 10, 11]: Array.prototype.sort's default string compare gives
    *  [10, 11, 9]); lexicographic only when a key is non-numeric. Shared with
    *  the native PPTX trend chart so both axes agree. */
   render.waveKeySort = function (years) {
@@ -43,7 +43,7 @@
 
   /** Full point list for a model row: history + the current Total value.
    *  Rows whose .waves already embed the current point (Visualise pseudo
-   *  rows) keep it — nothing is appended when the cells carry no value. */
+   *  rows) keep it. Nothing is appended when the cells carry no value. */
   render.wavePoints = function (row) {
     var points = (row.waves || []).map(function (w) {
       return { year: w.year, value: w.value, base: w.base,
@@ -139,7 +139,7 @@
     });
     // The current wave's base is the same quantity the crosstab's base row
     // prints one table below, so it carries the same disclosure marker when
-    // that column is withheld (C2) — otherwise masking the table alone would
+    // that column is withheld (C2): otherwise masking the table alone would
     // be undone by the strip above it.
     var curMark = render.baseMarker(model.columns[0]);
     out.push('<td class="wv cur">' +
@@ -196,7 +196,7 @@
   }
   render._fmtDelta = fmtDelta;   // exposed for the delta node suite
 
-  /** Nice symmetric half-range for a delta axis. niceMax floors at 5 —
+  /** Nice symmetric half-range for a delta axis. niceMax floors at 5,
    *  right for absolute percentages, 16× too coarse for ±0.3 mean-point
    *  changes, which it squashed into a flat line at zero. */
   function niceDeltaMax(value) {
@@ -226,7 +226,7 @@
   render._olsFit = olsFit;   // exposed for the trendline node suite
 
   /** Clip the segment (x0,v0)→(x1,v1) to lo ≤ v ≤ hi exactly, in data
-   *  space — clamping the endpoints instead would bend the fitted slope.
+   *  space. Clamping the endpoints instead would bend the fitted slope.
    *  Returns [{x, v}, {x, v}] or null when fully outside the range. */
   function clipSeg(x0, v0, x1, v1, lo, hi) {
     var dv = v1 - v0;
@@ -246,15 +246,15 @@
   /**
    * Wave trend line chart for a question model (chart type "line").
    * One series per row with history; up to 6 series. Mean-scale rows
-   * (0-10 means) and percentage/index rows never share an axis — the
+   * (0-10 means) and percentage/index rows never share an axis. The
    * dominant group wins and the rest are dropped with a note.
    * @param {object} [opts] - Visualise overrides: {yMin, yMax,
    *   labels: "auto"|"all"|"last"|"none", ci: (row, point) => halfwidth,
    *   note: axis note override, annotations: [{year, label}] (dashed
    *   markers), clickable: data-year attrs on points for tagging,
    *   trendline: dashed least-squares fit line per series (Visualise
-   *   toggle — passed only in Absolute mode),
-   *   delta: change-mode chart (vs Previous / vs Baseline) — symmetric
+   *   toggle. Passed only in Absolute mode),
+   *   delta: change-mode chart (vs Previous / vs Baseline): symmetric
    *   zero-centred axis sized to the changes, signed unit-true labels
    *   ("+0.2" mean points, "+3pp"), the zero gridline emphasised}.
    */
@@ -296,7 +296,7 @@
     var delta = !!opts.delta;
     var axisMax, axisMin;
     if (delta) {
-      // change chart: symmetric about zero, sized to the changes — the
+      // change chart: symmetric about zero, sized to the changes. The
       // 5-floor of niceMax squashed ±0.3 mean-point moves into a flat line
       axisMax = niceDeltaMax(Math.max(Math.abs(lo), Math.abs(hi)));
       axisMin = -axisMax;
@@ -355,12 +355,12 @@
     };
     var labelMode = opts.labels || "auto";
     var endLabels = [];
-    var pointLabels = [];   // per-point value labels — repelled per wave column
+    var pointLabels = [];   // per-point value labels. Repelled per wave column
     var trendsDrawn = 0;    // fitted lines actually on the chart (note suffix)
     series.forEach(function (s, k) {
       var colour = palette[k % palette.length];
       // optional 95% interval band behind the line (Visualise toggle).
-      // opts.ci returns absolute {lo, hi} bounds — Wilson intervals are
+      // opts.ci returns absolute {lo, hi} bounds. Wilson intervals are
       // asymmetric around the value, so the band is NOT value ± half.
       if (opts.ci) {
         var banded = [];
@@ -382,8 +382,8 @@
         }
       }
       // optional dashed least-squares trendline (Visualise toggle). Fitted
-      // on the plotted wave positions — waves sit equally spaced on this
-      // axis even when the calendar gaps — and clipped exactly to the axis
+      // on the plotted wave positions. Waves sit equally spaced on this
+      // axis even when the calendar gaps, and clipped exactly to the axis
       // range so a tight user y-window crops the line, never bends it.
       // Painted above the interval band, below the data line and points.
       if (opts.trendline && years.length > 1) {
@@ -445,7 +445,7 @@
         }
       });
       var last = s.points[s.points.length - 1];
-      // end labels carry the VALUE only — series names live in the
+      // end labels carry the VALUE only. Series names live in the
       // bottom legend where there is room for the full question text
       endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
         text: labelMode === "none" ? ""
@@ -485,14 +485,14 @@
     var legend = null, height = H;
     if (series.length > 1) {
       legend = S.legend(series.map(function (s, k) {
-        // full text — the legend wraps long labels; clip only the extreme
+        // full text. The legend wraps long labels; clip only the extreme
         return { label: TR.charts.clip(s.label, 300),
           colour: palette[k % palette.length] };
       }), padL, H + 4, W - padL - 10);
       body.push(legend.body);
       height = H + legend.height + 8;
     }
-    return S.root(W, height, model.code + " — trend over waves", body.join(""));
+    return S.root(W, height, model.code + ", trend over waves", body.join(""));
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

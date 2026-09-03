@@ -1,7 +1,7 @@
-# Comment Hubs — feature plan
+# Comment Hubs. Feature plan
 
-**Status:** DELIVERED (verified 2026-08-21) — hubs are live in the v2 renderer (see `qual.hubs` in `html_report_v2/assets/js/27q_qualitative.js`). This document is the design record, not an open plan. Original planning session Duncan + Claude, 2026-07-01.
-**Type:** software feature — tabs v2 Qualitative tab.
+**Status:** DELIVERED (verified 2026-08-21): hubs are live in the v2 renderer (see `qual.hubs` in `html_report_v2/assets/js/27q_qualitative.js`). This document is the design record, not an open plan. Original planning session Duncan + Claude, 2026-07-01.
+**Type:** software feature. Tabs v2 Qualitative tab.
 **Regen/verify:** Duncan via `launch_turas` (never `preview_start`).
 
 ---
@@ -10,8 +10,8 @@
 
 A reader can already highlight excerpts and shortlist (★) comments while reading the
 Qualitative tab, but there's no way to see those marks in one place or organise them.
-Duncan wants **named collections** — "Masters students", "Psychology", "1st years",
-"account issues" — that gather the relevant highlights/comments, labelled with question
+Duncan wants **named collections**, "Masters students", "Psychology", "1st years",
+"account issues". That gather the relevant highlights/comments, labelled with question
 and theme, so he (or the client) can examine one audience's or one issue's voice across
 the whole survey.
 
@@ -20,23 +20,23 @@ A hub is a named collection drawn from the pool of marks. A hub that carries a o
 analyst finding on top and is promoted into the report *is* the qual story. So the feature
 is: **comment hubs, some of which you elevate into the narrative.**
 
-## 2. Two-layer model — this is what guarantees "nothing is lost"
+## 2. Two-layer model. This is what guarantees "nothing is lost"
 
-- **The pool** — every highlight and every shortlisted comment. The durable base. It
+- **The pool**. Every highlight and every shortlisted comment. The durable base. It
   already persists (localStorage + saved-copy slices) and survives Save-copy. Nothing
   above it may ever mutate it.
-- **Hubs** — named lenses over the pool. A hub is a **view, not a container**: adding a
+- **Hubs**. Named lenses over the pool. A hub is a **view, not a container**: adding a
   comment to a hub, or deleting a hub, never touches the underlying mark. The same mark
   can sit in several hubs. Deleting a hub frees only the hub definition.
 
 This is the core requirement behind Duncan's "highlights and shortlist must not be lost."
 
-## 3. Two hub origins — this is "all readers can use, both me and the client"
+## 3. Two hub origins. This is "all readers can use, both me and the client"
 
 - **Authored hubs** (Duncan's) ride inside the delivered report as a saved-copy island
   slice, like the Story pins. Privacy-cleared **once, at the moment Duncan saves the
   copy**. Clients see them read-only (browse, clone, but not overwrite).
-- **Reader hubs** — any reader (Duncan or client) builds their own in their browser
+- **Reader hubs**. Any reader (Duncan or client) builds their own in their browser
   (localStorage, scoped per report via `d2.storeKey`), exactly like highlights/shortlist
   today. Gated **live** as they build. Never shipped unless that reader saves their own
   copy (then cleared at that save, same rule).
@@ -44,7 +44,7 @@ This is the core requirement behind Duncan's "highlights and shortlist must not 
 The UI stacks both: a "Curated · travels with the report" group above the reader's
 "Your hubs".
 
-## 4. Privacy rules — reuse the disclosure control, no new model
+## 4. Privacy rules. Reuse the disclosure control, no new model
 
 Everything inherits `TR.disclosure` / `min_reporting_base` / `qual_demographic_cuts` /
 `qual_confidentiality_mode`. The precise behaviour agreed:
@@ -73,19 +73,19 @@ Placement: hubs live in the **Qualitative tab**. A "Promote to story" action bri
 hub into the **Story tab** (reuse the existing pin-to-story path).
 
 The view:
-- **Hub selector** — Curated group (flagged, travels with report) + Your hubs group (+ New).
-- **Selected hub** — name + "curated" badge + an optional one-line **analyst headline**
-  (the finding — reuse the insight-note pattern) + a **coverage line** ("illustrating 8 of
+- **Hub selector**. Curated group (flagged, travels with report) + Your hubs group (+ New).
+- **Selected hub**. Name + "curated" badge + an optional one-line **analyst headline**
+  (the finding, reuse the insight-note pattern) + a **coverage line** ("illustrating 8 of
   47 Master's students · 6 highlights, 2 shortlisted") + a **group-by [Question | Theme]**
   toggle + **Promote to story**.
-- **Quote cards** — a **sentiment cue** (pos/mixed/neg dot, from existing valence), the
+- **Quote cards**. A **sentiment cue** (pos/mixed/neg dot, from existing valence), the
   excerpt (highlighted span shown) or a shortlisted marker, a **theme chip** if any, a
   compact **demographic tag** (gated), an "also in [hub]" **overlap** line, and an
   **add-to-hub (+)** control.
 - Below-threshold demographic hub: the **withheld note**.
 
 Design decisions grounded in research (landscape pass):
-- Hub-as-insight — a claim + its evidence, not a bucket (Dovetail).
+- Hub-as-insight. A claim + its evidence, not a bucket (Dovetail).
 - Sentiment cue + quote-as-hero for scannability (~84% of readers scan) (Toptal).
 - Group-by theme as well as question (Reframer affinity grouping).
 - Honest coverage line to avoid the cherry-pick pitfall (verbatim-in-reports best
@@ -93,17 +93,17 @@ Design decisions grounded in research (landscape pass):
 
 ## 6. Existing infrastructure to reuse
 
-- **Highlights** — per-comment, localStorage `qualHighlights` + saved-copy slice. *Keyed
-  per `qcode#idx` today — see Risk 1: must move to a stable ResponseID key.*
-- **Shortlist (★)** — `qualSaved` island slice.
-- **Composite audience filter** — the audience definition for an audience-scoped hub
+- **Highlights**. Per-comment, localStorage `qualHighlights` + saved-copy slice. *Keyed
+  per `qcode#idx` today. See Risk 1: must move to a stable ResponseID key.*
+- **Shortlist (★)**, `qualSaved` island slice.
+- **Composite audience filter**. The audience definition for an audience-scoped hub
   (`TR.stats.mask`; ANDs across / ORs within).
-- **Disclosure control** — `21d_disclosure.js` (`TR.disclosure`, `audienceTooSmall`,
+- **Disclosure control**, `21d_disclosure.js` (`TR.disclosure`, `audienceTooSmall`,
   `minBase`); config `min_reporting_base` + `qual_demographic_cuts` +
   `qual_confidentiality_mode`.
-- **Pin-to-story** — `24_shell` `snapshotCard`/`snapshotLines` → `32_report`; the promote
+- **Pin-to-story**, `24_shell` `snapshotCard`/`snapshotLines` → `32_report`; the promote
   path reuses it.
-- **Qual island** — `DATA_QUAL` records (`demos`, `themeVals`, `text`) keyed by anon idx,
+- **Qual island**, `DATA_QUAL` records (`demos`, `themeVals`, `text`) keyed by anon idx,
   joined to the host by ResponseID.
 
 ## 7. Growth path
@@ -138,7 +138,7 @@ Design decisions grounded in research (landscape pass):
 
 ## 10. Build order (first cut)
 
-1. **Collection view in the Qual tab** — aggregate the pool, group by question (+ theme
+1. **Collection view in the Qual tab**. Aggregate the pool, group by question (+ theme
    toggle), honour the global filter, tags gated by disclosure, reader hubs in localStorage,
    add-to-hub. → delivers "all my highlights in one place" AND "Master's reactions across
    questions" (just apply the filter).

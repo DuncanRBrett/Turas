@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — QUALITATIVE SELF-CONTAINED ASSEMBLY (respondent master + banner)
+# TABS MODULE. QUALITATIVE SELF-CONTAINED ASSEMBLY (respondent master + banner)
 # ==============================================================================
 #
 # Builds the self-contained respondent master from a coded workbook's classified
@@ -8,7 +8,7 @@
 #
 # THIS IS THE JOIN SEAM. In Phase 1 the banner + respondent index come from the
 # workbook itself (here). In Phase 2 the same downstream code instead receives the
-# index + banner from the host survey's microdata — only this file is swapped, the
+# index + banner from the host survey's microdata, only this file is swapped, the
 # DATA_QUAL schema and the AGG/MICRO serialisation are identical. Keep the seam here.
 #
 # Banner curation: a demographic becomes a banner cut only if it appears in at least
@@ -41,7 +41,7 @@ qual_sort_ids <- function(values) {
 
 #' Collect the distinct respondent IDs across all questions and assign a 0-based index.
 #' @param questions List of classified questions (each with `$records`).
-#' @return list(ids, id_to_idx, n) — `id_to_idx` maps id -> 0-based index.
+#' @return list(ids, id_to_idx, n): `id_to_idx` maps id -> 0-based index.
 qual_collect_ids <- function(questions) {
   per_q <- lapply(questions, function(q) vapply(q$records, function(r) r$id, character(1)))
   all_ids <- unlist(per_q, use.names = FALSE)
@@ -138,12 +138,12 @@ qual_build_respondent_master <- function(questions) {
 # = the full deliverable). The comment respondents join to the host survey by their
 # ResponseID, so a comment and a closed answer from the same person share the
 # anonymous MICRO row index (length nrow(survey_data)) and therefore the main banner
-# and the live-filter masks — that is what lets the closed<->open jump filter the
+# and the live-filter masks. That is what lets the closed<->open jump filter the
 # comments to "the people in this cell" (stats.mask of the active cut).
 #
 # Only the index changes: the workbook's embedded demographics are kept for the
 # in-tab facet filter (so a Student workbook keeps Campus/Course/NPS facets), and a
-# SACS workbook with no embedded demos simply yields no facets — the closed->open
+# SACS workbook with no embedded demos simply yields no facets. The closed->open
 # jump supplies the cut instead. Commenters with no matching host respondent are
 # dropped (their id resolves to NA, which the island builder already skips).
 
@@ -168,7 +168,7 @@ qual_find_host_id_column <- function(survey_data, id_col = NULL) {
   anchor <- grepl(QUAL_HOST_ID_PATTERN, nms, ignore.case = TRUE)
   if (any(anchor)) {
     hits <- nms[which(anchor)]
-    # More than one column answers to "ID" — the first one WINS, silently, and a
+    # More than one column answers to "ID". The first one WINS, silently, and a
     # row-counter called "ID" sorts before the real "ResponseID" in plenty of
     # exports (production review 2026-08, M-I). If the two happen to share
     # values the comments join to the WRONG respondents while every diagnostic
@@ -213,7 +213,7 @@ qual_host_id_to_idx <- function(survey_data, id_col) {
   # First occurrence wins, but say so. A duplicated ResponseID in the HOST survey
   # is a merge artefact that does happen in real exports, and every comment from
   # that respondent then silently takes the FIRST row's banner values, filter
-  # masks and NPS band — a verbatim read against the wrong demographics. The
+  # masks and NPS band. A verbatim read against the wrong demographics. The
   # workbook side and the union side both refuse loudly on duplicates; this side
   # was the quiet one (review 2026-08-21, I-14).
   if (any(dup)) {
@@ -276,14 +276,14 @@ qual_resolve_against_survey <- function(questions, survey_data, id_col = NULL) {
 }
 
 # ==============================================================================
-# HOST-SOURCED DEMOGRAPHIC TAGS (Feature 2) — tag comments with banner variables
+# HOST-SOURCED DEMOGRAPHIC TAGS (Feature 2): tag comments with banner variables
 # ==============================================================================
 #
 # The comment workbook may carry no demographics (e.g. CCPB), but the ResponseID join
 # makes every host banner variable reachable per comment. These helpers stamp a chosen
 # host column's value onto each comment record and register the dimension on the master
 # banner, so host tags flow through the SAME demographic_cuts / k-anonymisation / island
-# machinery as an embedded workbook demographic — no separate disclosure path.
+# machinery as an embedded workbook demographic. No separate disclosure path.
 
 #' Parse the `qual_tag_dimensions` config into host-column -> tag-label pairs.
 #'
@@ -333,7 +333,7 @@ qual_host_tag_labels <- function(col, colvals, label, survey_structure) {
   unmapped <- unique(keys[!hit & !is.na(keys) & nzchar(keys) & keys != "NA"])
   if (length(unmapped)) {
     cat(sprintf(paste0("  [WARNING] qual_tag_dimensions: '%s' (%s) has %d data value(s) with no",
-                       " option in Survey_Structure — tagged raw: %s\n"),
+                       " option in Survey_Structure. Tagged raw: %s\n"),
                 label, col, length(unmapped),
                 paste(utils::head(unmapped, 5L), collapse = ", ")))
   }
@@ -345,8 +345,8 @@ qual_host_tag_labels <- function(col, colvals, label, survey_structure) {
 #' For each configured dimension (a host column + a display label) this stamps the
 #' respondent's value onto the record's `demos` bag and registers the dimension on the
 #' master banner, so it is k-anonymised and gated exactly like an embedded demographic.
-#' A dimension whose column is absent — or whose label duplicates an existing banner
-#' dimension — is skipped with a console warning (Shiny-visible).
+#' A dimension whose column is absent, or whose label duplicates an existing banner
+#' dimension. Is skipped with a console warning (Shiny-visible).
 #'
 #' Values are resolved to their Survey_Structure display labels when the structure is
 #' supplied, so a coded host column tags readably (see `qual_host_tag_labels()`).
@@ -369,12 +369,12 @@ qual_attach_host_tags <- function(questions, master, tag_dims, survey_data,
   for (td in tag_dims) {
     col <- td$col; label <- td$label
     if (!(col %in% names(survey_data))) {
-      cat(sprintf("  [WARNING] qual_tag_dimensions: host column '%s' not found — skipped.\n", col))
+      cat(sprintf("  [WARNING] qual_tag_dimensions: host column '%s' not found. Skipped.\n", col))
       next
     }
     taken <- c(existing, vapply(added, function(d) d$label, character(1)))
     if (label %in% taken) {
-      cat(sprintf("  [WARNING] qual_tag_dimensions: label '%s' already a banner dimension — skipped.\n", label))
+      cat(sprintf("  [WARNING] qual_tag_dimensions: label '%s' already a banner dimension. Skipped.\n", label))
       next
     }
     colvals <- qual_host_tag_labels(col, as.character(survey_data[[col]]),

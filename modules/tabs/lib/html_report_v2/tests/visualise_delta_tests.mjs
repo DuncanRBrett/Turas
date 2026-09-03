@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * vs Previous / vs Baseline delta rendering — regression suite for the
+ * vs Previous / vs Baseline delta rendering. Regression suite for the
  * flat-zero bug: niceMax's 5-floor squashed ±0.3 mean-point changes onto
  * a −5..+5 axis, and the forced kind:"net" pseudo rows rounded every
  * label to a whole percentage ("0%"), so change modes showed a flat line
@@ -61,7 +61,7 @@ function tickTexts(svg) {
   return [...svg.matchAll(/text-anchor="end"[^>]*>([^<]+)</g)].map((m) => m[1]);
 }
 
-console.log("Visualise delta rendering — suite:");
+console.log("Visualise delta rendering. Suite:");
 
 /* ---------------- 1. the helpers ---------------- */
 run("_niceDeltaMax scales below niceMax's 5-floor (the flat-line cause)", () => {
@@ -83,7 +83,7 @@ run("_fmtDelta signs values in the metric's own units", () => {
 });
 
 /* ---------------- 2. mean-metric changes (the reported bug) ---------------- */
-run("±0.3 mean-point changes fill a ±0.5 axis — no more −5..+5 flat line", () => {
+run("±0.3 mean-point changes fill a ±0.5 axis. No more −5..+5 flat line", () => {
   const svg = TR.render.trendChart(deltaModel([
     meanDeltas("Total", [-0.2, 0.1, -0.1, 0.2, 0, 0.3, 0.2])
   ]), { delta: true, labels: "last" });

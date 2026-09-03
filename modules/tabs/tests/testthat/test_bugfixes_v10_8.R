@@ -3,13 +3,13 @@
 # ==============================================================================
 #
 # Tests for 7 bugs found and fixed during systematic code review (2026-03-15):
-#   1. weighting.R — Floating-point tolerance in weighted_z_test_proportions
-#   2. numeric_processor.R — Bessel-corrected weighted SD
-#   3. standard_processor.R — Bessel-corrected weighted SD
-#   4. ranking_crosstabs.R — tryCatch closure scoping fix
-#   5. composite_processor.R — sig_letters key-to-letter lookup
-#   6. ranking_metrics.R — Tie-breaking in compare_mean_ranks
-#   7. 01_data_transformer.R — BannerLabel priority over QuestionText
+#   1. weighting.R. Floating-point tolerance in weighted_z_test_proportions
+#   2. numeric_processor.R. Bessel-corrected weighted SD
+#   3. standard_processor.R. Bessel-corrected weighted SD
+#   4. ranking_crosstabs.R. TryCatch closure scoping fix
+#   5. composite_processor.R. Sig_letters key-to-letter lookup
+#   6. ranking_metrics.R. Tie-breaking in compare_mean_ranks
+#   7. 01_data_transformer.R. BannerLabel priority over QuestionText
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_bugfixes_v10_8.R")
@@ -58,10 +58,10 @@ source(file.path(turas_root, "modules/tabs/lib/path_utils.R"))
 
 
 # ==============================================================================
-# 1. weighting.R — Floating-point tolerance (count ≈ base)
+# 1. weighting.R. Floating-point tolerance (count ≈ base)
 # ==============================================================================
 
-context("Bug Fix #1: weighted_z_test — floating-point tolerance")
+context("Bug Fix #1: weighted_z_test. Floating-point tolerance")
 
 test_that("does NOT warn when count equals base exactly (100% cell)", {
   # 100% cells are legitimate: everyone in the subgroup chose this option
@@ -87,7 +87,7 @@ test_that("does NOT warn when count exceeds base by tiny FP epsilon", {
 })
 
 test_that("DOES skip when count genuinely exceeds base (data error)", {
-  # count exceeds base by > 0.01 — genuine data error
+  # count exceeds base by > 0.01. Genuine data error
   result <- weighted_z_test_proportions(
     count1 = 55, base1 = 50,
     count2 = 30, base2 = 100,
@@ -98,7 +98,7 @@ test_that("DOES skip when count genuinely exceeds base (data error)", {
 })
 
 test_that("clamped proportion never exceeds 1.0", {
-  # count slightly exceeds base (within tolerance) — should clamp, not crash
+  # count slightly exceeds base (within tolerance): should clamp, not crash
   result <- weighted_z_test_proportions(
     count1 = 50.005, base1 = 50,
     count2 = 30, base2 = 100,
@@ -156,10 +156,10 @@ test_that("weighted SD uses sample (Bessel) correction, not population", {
 
   mean_val <- sum(values * weights) / sum(weights)  # = (20+20+30)/4 = 17.5
 
-  # Population variance (WRONG — old code)
+  # Population variance (WRONG, old code)
   pop_var <- sum(weights * (values - mean_val)^2) / sum(weights)
 
-  # Sample variance (CORRECT — new code)
+  # Sample variance (CORRECT, new code)
   sample_var <- sum(weights * (values - mean_val)^2) / (sum(weights) - 1)
 
   # Sample variance should be larger than population variance
@@ -193,10 +193,10 @@ test_that("total weight of 1 returns SD = 0 (denom = 0)", {
 
 
 # ==============================================================================
-# 4. ranking_crosstabs.R — tryCatch closure scoping
+# 4. ranking_crosstabs.R. TryCatch closure scoping
 # ==============================================================================
 
-context("Bug Fix #4: ranking_crosstabs — tryCatch return value pattern")
+context("Bug Fix #4: ranking_crosstabs. TryCatch return value pattern")
 
 # Source ranking dependencies
 source(file.path(turas_root, "modules/tabs/lib/ranking/ranking_metrics.R"))
@@ -239,7 +239,7 @@ test_that("create_ranking_rows_for_item returns valid rows for normal input", {
   expect_true(grepl("Mean Rank", result[[2]]$RowLabel))
   expect_true(grepl("Top 2", result[[3]]$RowLabel))
 
-  # Values should be numeric (not NA — closure scoping bug would have left them NA)
+  # Values should be numeric (not NA, closure scoping bug would have left them NA)
   expect_false(is.na(result[[1]][["TOTAL::Total"]]))
   expect_false(is.na(result[[2]][["TOTAL::Total"]]))
   expect_false(is.na(result[[3]][["TOTAL::Total"]]))
@@ -307,10 +307,10 @@ test_that("create_ranking_rows_for_item validates inputs with TRS", {
 
 
 # ==============================================================================
-# 5. composite_processor.R — key_to_letter lookup
+# 5. composite_processor.R. Key_to_letter lookup
 # ==============================================================================
 
-context("Bug Fix #5: composite sig_letters — key_to_letter lookup")
+context("Bug Fix #5: composite sig_letters. Key_to_letter lookup")
 
 test_that("key_to_letter lookup produces correct mapping from parallel vectors", {
   # This reproduces the fix: banner_info$sig_letters doesn't exist,
@@ -337,10 +337,10 @@ test_that("key_to_letter returns NA for unknown keys (safe fallback)", {
 
 
 # ==============================================================================
-# 6. ranking_metrics.R — Tie-breaking in compare_mean_ranks
+# 6. ranking_metrics.R. Tie-breaking in compare_mean_ranks
 # ==============================================================================
 
-context("Bug Fix #6: ranking tie-breaking — equal means return NA")
+context("Bug Fix #6: ranking tie-breaking. Equal means return NA")
 
 test_that("better_group is 1 when mean1 < mean2 (lower = better for ranks)", {
   mean1 <- 1.5
@@ -388,7 +388,7 @@ test_that("compare_mean_ranks returns NA_integer_ for tied groups", {
 
 
 # ==============================================================================
-# 7. 01_data_transformer.R — BannerLabel priority
+# 7. 01_data_transformer.R. BannerLabel priority
 # ==============================================================================
 
 context("Bug Fix #7: BannerLabel takes priority over QuestionText")
@@ -498,10 +498,10 @@ test_that("build_banner_groups falls back to code when no label at all", {
 
 
 # ==============================================================================
-# WEIGHTED Z-TEST — Additional edge cases
+# WEIGHTED Z-TEST. Additional edge cases
 # ==============================================================================
 
-context("weighted_z_test_proportions — parameter validation")
+context("weighted_z_test_proportions. Parameter validation")
 
 test_that("rejects invalid alpha values", {
   expect_error(

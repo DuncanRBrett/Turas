@@ -1,5 +1,5 @@
 /**
- * v2 data layer — access to the extracted aggregates (TR.AGG), synthetic
+ * v2 data layer. Access to the extracted aggregates (TR.AGG), synthetic
  * microdata (TR.MICRO) and prior wave (TR.PREV), plus report state and
  * URL-hash (de)serialisation. Pure except for the state singleton.
  */
@@ -13,7 +13,7 @@
   d2.state = {
     tab: "takeout",         // Pattern recognition is the landing tab (id stays "takeout")
     banner: null,           // banner group id ("Q002") or "custom:<qcode>"
-    customBanner: null,     // the live (unsaved) custom banner id — kept as a tab
+    customBanner: null,     // the live (unsaved) custom banner id. Kept as a tab
                             // across navigation so it is not lost when you look at
                             // another banner (★ save promotes it to savedBanners)
     filters: [],            // [{q: "Q006", rows: [9, 10]}]
@@ -22,7 +22,7 @@
     // Provenance notes under the question title. ON by default, deliberately:
     // the DERIVED badge raises a question ("derived how?") that a reader should
     // not have to find a checkbox to answer, and the note has to be on screen
-    // to travel into a pinned card or a PPTX slide — which is where a derived
+    // to travel into a pinned card or a PPTX slide, which is where a derived
     // figure is most likely to be misread, with nobody there to explain it.
     // A report whose config declares no provenance shows nothing either way.
     showSources: true,
@@ -39,14 +39,14 @@
     colMenuOpen: false,     // columns panel visibility survives re-renders
     movedScope: null,       // "key" | "all" (null = use project config)
     hiddenCols: {},         // {bannerSelection: [column labels]}
-    hiddenRows: {},         // {qcode: [row labels]} — hidden from the table
-    hiddenChartRows: {},    // {qcode: [row labels]} — excluded from the chart
+    hiddenRows: {},         // {qcode: [row labels]}. Hidden from the table
+    hiddenChartRows: {},    // {qcode: [row labels]}. Excluded from the chart
     sorts: {},              // {qcode: {col, dir}}
     activeQ: null,
     // Question groups the reader has collapsed in the crosstabs sidebar, keyed
     // by category title. Session state (not hashed, not saved): a collapse used
     // to live only in the DOM, so it silently reset every time the tab was
-    // re-entered. Null-prototype for the same reason categories() is — a
+    // re-entered. Null-prototype for the same reason categories() is. A
     // Selection Category named "constructor" is a name the analyst may type.
     collapsedCats: Object.create(null),
     qualQ: null,            // focused open-end in the Qualitative tab (hash round-trips it)
@@ -91,13 +91,13 @@
     if (banner && banner.indexOf("composite:") === 0) {
       var comp = TR.compositeBanners && TR.compositeBanners.get(banner);
       var nc = comp && comp.columns ? comp.columns.length : 0;
-      return "Composite banner — " + (comp ? comp.name : banner) +
+      return "Composite banner, " + (comp ? comp.name : banner) +
         " (" + nc + " group" + (nc === 1 ? "" : "s") + " vs the rest)";
     }
     if (banner && banner.indexOf("custom:") === 0) {
       var bits = banner.split(":");
       var q = d2.questionByCode(bits[1]);
-      return "Custom banner — " + (q ? q.code + " " + q.title : bits[1]) +
+      return "Custom banner, " + (q ? q.code + " " + q.title : bits[1]) +
         (bits[2] === "net" ? " (summary groupings)" : " (detail categories)");
     }
     var group = (TR.AGG.banner_groups || []).filter(function (g) {
@@ -195,7 +195,7 @@
   d2.categories = function () {
     // Null-prototype: a Selection Category named "constructor" / "toString" /
     // "valueOf" hit the inherited property on a plain {}, so the group was
-    // never created and the next line pushed into undefined — the v2 boot
+    // never created and the next line pushed into undefined. The v2 boot
     // crashed on a category name the analyst was entitled to type (M11).
     var seen = Object.create(null), order = [];
     TR.AGG.questions.forEach(function (q) {
@@ -217,7 +217,7 @@
     return out;
   };
 
-  /** Box-category NET rows of a hidden-scale question — groupings that exist
+  /** Box-category NET rows of a hidden-scale question. Groupings that exist
    *  only as per-respondent box membership (TR.MICRO.boxes), with no shown
    *  category rows to decompose into. These back box filters and the box
    *  custom-banner. The box index equals the row index (mirrors the box
@@ -243,7 +243,7 @@
   /**
    * Per-report localStorage namespace. localStorage is shared across every page
    * on a browser origin, so two report files opened from the same origin would
-   * otherwise read and write the SAME keys — a composite or saved banner built in
+   * otherwise read and write the SAME keys. A composite or saved banner built in
    * one survey's report would leak into another. Scoping each store key to this
    * project (name + wave) keeps every report's banners / annotations discrete.
    * The saved-copy island stays the durable source of truth; this only isolates
@@ -251,7 +251,16 @@
    */
   d2.storeKey = function (base) {
     var p = (TR.AGG && TR.AGG.project) || {};
-    return base + ":" + TR.fmt.slug((p.name || "report") + " " + (p.wave || ""));
+    var key = base + ":" + TR.fmt.slug((p.name || "report") + " " + (p.wave || ""));
+    // A saved copy carries its own id (report.saveCopy mints a fresh one on every
+    // save), which extends the namespace further. Project+wave alone is not enough
+    // when the reader wants SEVERAL copies of the SAME survey open side by side,
+    // four differently-pinned copies of one report would otherwise read and write
+    // one store, and merely opening the Story tab of the first writes its pins over
+    // the second's (30_story.js load()). Copies saved before this shipped carry no
+    // id and keep the project-level key, so nothing already annotated moves.
+    var copy = TR.userState && TR.userState.copyId;
+    return (typeof copy === "string" && copy) ? key + ":" + copy : key;
   };
 
   d2.filtersActive = function () {
@@ -259,7 +268,7 @@
   };
 
   /** Space-tight label for a question: the analyst-authored ShortLabel when the
-   *  pipeline supplies one, else the full title. DEFENSIVE — reports built
+   *  pipeline supplies one, else the full title. DEFENSIVE. Reports built
    *  before the ShortLabel column simply carry no short_label field. */
   d2.shortLabel = function (q) {
     if (!q) return "";
@@ -267,11 +276,11 @@
       ? q.short_label : (q.title || "");
   };
 
-  /** The question's OWN audience — who was asked it (Selection sheet
+  /** The question's OWN audience, who was asked it (Selection sheet
    *  FilterLabel, else the raw BaseFilter expression). "" when the question
    *  went to everyone. This is not the reader's live filter: it is baked into
    *  the published figures, so a routed question's smaller base is explained
-   *  rather than left looking like a shortfall. DEFENSIVE — reports built
+   *  rather than left looking like a shortfall. DEFENSIVE. Reports built
    *  before this shipped carry neither field. */
   d2.audienceNote = function (q) {
     if (!q) return "";
@@ -331,7 +340,7 @@
           if (!f.q || !f.rows.length) return false;
           // a typo'd or crafted hash must not silently zero every base: the
           // question must exist and every row index must be a real filterable
-          // value — a category row, or a box NET row for box filters (boot
+          // value. A category row, or a box NET row for box filters (boot
           // decodes after the islands parse).
           if (!TR.AGG) return true;
           var q = d2.questionByCode(f.q);

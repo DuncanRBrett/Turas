@@ -3,14 +3,14 @@
 # ==============================================================================
 #
 # Tests for Excel workbook creation and formatting:
-#   1. create_excel_styles() — style object creation
-#   2. get_row_style() — row type to style mapping
-#   3. write_banner_headers() — banner header output
-#   4. write_base_rows() — base size row output
-#   5. write_question_table() — question table output
-#   6. create_summary_sheet() — summary sheet creation
-#   7. write_error_log_sheet() — error log sheet
-#   8. create_guide_sheet() — guide/legend sheet
+#   1. create_excel_styles(): style object creation
+#   2. get_row_style(): row type to style mapping
+#   3. write_banner_headers(): banner header output
+#   4. write_base_rows(): base size row output
+#   5. write_question_table(): question table output
+#   6. create_summary_sheet(): summary sheet creation
+#   7. write_error_log_sheet(): error log sheet
+#   8. create_guide_sheet(): guide/legend sheet
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_excel_output.R")
@@ -220,7 +220,7 @@ test_that("returns base style for unknown row types", {
 
 
 # ==============================================================================
-# 3. write_banner_headers — live workbook test
+# 3. write_banner_headers. Live workbook test
 # ==============================================================================
 
 context("write_banner_headers")
@@ -253,7 +253,7 @@ test_that("handles banner with no banner_headers field", {
 
 
 # ==============================================================================
-# 4. write_base_rows — unweighted
+# 4. write_base_rows. Unweighted
 # ==============================================================================
 
 context("write_base_rows")
@@ -541,7 +541,7 @@ test_that("guide sheet omits the letters legend for a Total-only banner", {
 # 9. End-to-end: write to file and verify
 # ==============================================================================
 
-context("Excel output — end-to-end file write")
+context("Excel output. End-to-end file write")
 
 test_that("creates valid Excel file with all sheets", {
   tmp <- tempfile(fileext = ".xlsx")
@@ -618,12 +618,12 @@ test_that("Crosstabs sheet contains expected data", {
 })
 
 # ==============================================================================
-# GUIDE SHEET — the legend must describe the workbook that ships (M-C)
+# GUIDE SHEET. The legend must describe the workbook that ships (M-C)
 # ==============================================================================
 #
 # Production review 2026-08, M-C. The Guide documented "*" and "**" as small-base
 # markers. No writer has ever produced either. Meanwhile "**" DOES appear in the
-# workbook — appended to a chi-square row to mean SIGNIFICANT — so the Guide
+# workbook, appended to a chi-square row to mean SIGNIFICANT, so the Guide
 # defined the one marker a reader might actually meet as the opposite of its real
 # meaning. A reader seeing "** " beside a chi-square would have concluded the
 # result rested on a very small base.
@@ -670,7 +670,7 @@ test_that("** is documented as the chi-square marker, only when chi-square is on
   expect_true(grepl("Chi-square (**)", on_txt, fixed = TRUE))
   expect_true(grepl("not a base-size warning", on_txt, fixed = TRUE))
 
-  # A report that cannot contain the marker must not document it — the same
+  # A report that cannot contain the marker must not document it. The same
   # defect class, one step removed.
   config$enable_chi_square <- FALSE
   expect_false(grepl("Chi-square (**)", guide_text(config), fixed = TRUE))

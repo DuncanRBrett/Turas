@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS MODULE — STATS DIAGNOSTICS TESTS
+# TABS MODULE. STATS DIAGNOSTICS TESTS
 # ==============================================================================
 #
 # Pins the diagnostic payload assembly and the curated island shaper that feed
@@ -32,7 +32,7 @@ turas_root <- detect_turas_root()
 # stats_diagnostics.R is standalone function defs; it uses %||% at call time only.
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 # type_utils supplies safe_logical(), which the Declaration's chi-square note
-# reads the enable_chi_square toggle through — the same reader the engine uses.
+# reads the enable_chi_square toggle through. The same reader the engine uses.
 source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/stats_diagnostics.R"))
 
@@ -62,7 +62,7 @@ test_that("build_tabs_diagnostics assembles a complete payload", {
   expect_equal(p$data_receipt$n_cols, 2L)
   expect_equal(p$data_used$questions_analysed, 40L)
   expect_equal(p$data_used$questions_skipped, 2L)
-  expect_equal(p$assumptions[["Weighting"]], "Yes — w_final")
+  expect_equal(p$assumptions[["Weighting"]], "Yes, w_final")
   expect_equal(p$assumptions[["Significance Testing"]], "Enabled")
   expect_equal(p$assumptions[["Effective N"]], "1,217")
   expect_equal(p$status, "PASS")
@@ -78,7 +78,7 @@ mk_payload <- function(status = "PASS", events = list()) {
     data_receipt = list(file_name = "sacap.xlsx", n_rows = 1363, n_cols = 240),
     data_used = list(n_respondents = 1363, n_excluded = 0L, questions_analysed = 40,
                      questions_skipped = 2, questions_partial = 1),
-    assumptions = list("Weighting" = "Yes — w_final", "Alpha (p-value threshold)" = "0.050"),
+    assumptions = list("Weighting" = "Yes, w_final", "Alpha (p-value threshold)" = "0.050"),
     run_result = list(status = status, events = events), packages = c("openxlsx", "readxl"))
 }
 
@@ -88,7 +88,7 @@ test_that("diagnostics_for_island shapes the curated sections (no config echo)",
   titles <- vapply(isl$sections, function(s) s$title, "")
   expect_equal(titles, c("Declaration", "Data received & used",
                          "Assumptions & parameters", "Reproducibility"))
-  expect_false("Configuration" %in% titles)   # curated — config echo stays in Excel
+  expect_false("Configuration" %in% titles)   # curated. Config echo stays in Excel
 
   # rows are ordered [label, value] pairs
   decl <- isl$sections[[1]]$rows
@@ -100,7 +100,7 @@ test_that("diagnostics_for_island shapes the curated sections (no config echo)",
                                           grepl("1,363", r[[2]], fixed = TRUE), logical(1))))
 
   # assumptions passed through, display-ready, in order
-  expect_equal(isl$sections[[3]]$rows[[1]], c("Weighting", "Yes — w_final"))
+  expect_equal(isl$sections[[3]]$rows[[1]], c("Weighting", "Yes, w_final"))
 })
 
 test_that("diagnostics_for_island summarises TRS warnings", {
@@ -123,11 +123,11 @@ test_that("diagnostics_for_island guards a NULL / non-list payload", {
   expect_null(diagnostics_for_island("nope"))
 })
 
-test_that("diagnostics_for_island renders missing values as an em dash, never NA", {
+test_that("diagnostics_for_island renders missing values as a dash, never NA", {
   bare <- diagnostics_for_island(list(module = "TABS", status = "PASS"))
   decl <- bare$sections[[1]]$rows
   proj <- Filter(function(r) r[[1]] == "Project", decl)[[1]]
-  expect_equal(proj[[2]], "—")   # em dash placeholder, not NA/empty
+  expect_equal(proj[[2]], "–")   # an en dash placeholder, not NA/empty
 })
 
 
@@ -135,7 +135,7 @@ test_that("diagnostics_for_island renders missing values as an em dash, never NA
 #
 # When a universe is configured the pack has to SAY the correction was applied,
 # because a reader comparing this report to an uncorrected one otherwise has no
-# way to know why the letters differ. Read from the real config keys — the
+# way to know why the letters differ. Read from the real config keys. The
 # lesson of review finding I4, where a contractual Declaration line printed a
 # hard-coded value instead of the configured one.
 

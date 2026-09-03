@@ -27,8 +27,8 @@
 SUPPORTED_DATA_FORMATS <- c("xlsx", "xls", "csv", "sav")
 SUPPORTED_CONFIG_FORMATS <- c("xlsx", "xls")
 
-# Leading UTF-8 byte-order mark (U+FEFF). UTF-8 CSV/Excel exports — notably
-# Alchemer — can prefix the first column header with a BOM. It is invisible but
+# Leading UTF-8 byte-order mark (U+FEFF). UTF-8 CSV/Excel exports. Notably
+# Alchemer. Can prefix the first column header with a BOM. It is invisible but
 # breaks exact and anchored ("^...") column-name matching downstream: e.g. the
 # qualitative-comment ResponseID join and question-code lookups against the
 # Survey_Structure. Built with intToUtf8() so no invisible BOM sits in source.
@@ -43,7 +43,7 @@ UTF8_BOM_CHAR <- intToUtf8(65279L)
 #'
 #' UTF-8 exports (notably Alchemer CSV->Excel) can prefix the first column
 #' header with an invisible BOM (U+FEFF). The BOM is not part of the intended
-#' column name but breaks exact and anchored string matching downstream — the
+#' column name but breaks exact and anchored string matching downstream. The
 #' qualitative-comment ResponseID join anchors its id-column pattern with "^",
 #' and question-code lookups compare names exactly, so a BOM-prefixed
 #' "Response ID" silently matches nothing. Removing it at the load boundary
@@ -363,7 +363,7 @@ load_survey_data <- function(data_file_path, project_root = NULL,
 
   # Strip any leading BOM from column names (a UTF-8 export artifact, e.g.
   # Alchemer). It is invisible but breaks anchored column-name matching
-  # downstream — the qualitative ResponseID join and question-code lookup.
+  # downstream. The qualitative ResponseID join and question-code lookup.
   # No-op (names byte-identical) when no BOM is present.
   names(survey_data) <- strip_leading_bom(names(survey_data))
 
@@ -415,7 +415,7 @@ load_survey_data <- function(data_file_path, project_root = NULL,
 #' WHY RDS (not CSV): a CSV round-trip re-infers column types on reload, so a
 #' text option code like "01" came back as integer 1 and silently counted zero
 #' against OptionText "01" on every cached run. readRDS returns exactly the
-#' object saveRDS wrote — cached and uncached runs are identical.
+#' object saveRDS wrote. Cached and uncached runs are identical.
 #'
 #' @param data_file_path Character, path to data file
 #' @param project_root Character, optional project root
@@ -453,7 +453,7 @@ load_survey_data_smart <- function(data_file_path, project_root = NULL,
       rds_cache_path <- sub("\\.(xlsx|xls)$", "_cache.rds", data_file_path)
 
       # Pre-V11 CSV caches re-inferred column types on reload (text codes like
-      # "01" became integer 1 and counted zero) — never read one; tell the
+      # "01" became integer 1 and counted zero), never read one; tell the
       # operator it is superseded.
       legacy_csv_cache <- sub("\\.(xlsx|xls)$", "_cache.csv", data_file_path)
       if (file.exists(legacy_csv_cache)) {
@@ -485,7 +485,7 @@ load_survey_data_smart <- function(data_file_path, project_root = NULL,
       cat(sprintf("Large Excel file (%.1f MB) detected. Creating RDS cache...\n", file_size_mb))
       # Read through the standard loader, NOT readxl directly. Reading directly
       # skipped strip_leading_bom() plus the empty-file, zero-column and
-      # not-a-data-frame refusals — so a >50MB Alchemer export re-broke the
+      # not-a-data-frame refusals, so a >50MB Alchemer export re-broke the
       # qualitative ResponseID join exactly the way the BOM fix was written to
       # prevent, and then froze the corrupted names into the RDS cache so every
       # later run inherited them (review 2026-08-21, I-19).

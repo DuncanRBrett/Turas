@@ -1,18 +1,18 @@
 # ==============================================================================
-# TABS — DATA-CENTRIC REPORT v2 BUNDLER (V11)
+# TABS. DATA-CENTRIC REPORT v2 BUNDLER (V11)
 # ==============================================================================
 # Inlines the vendored renderer (CSS + 29 JS modules + template) and a
-# data-agg JSON island into a single self-contained *_report_v2.html — the
+# data-agg JSON island into a single self-contained *_report_v2.html. The
 # productionised port of prototypes/report-redesign/fable/v2/build.R.
 #
 # This first cut bundles the aggregates island only; microdata, prior-wave
 # and verification islands are inlined as `null` (the renderer's parseIsland
-# tolerates this and degrades gracefully — no live filtering, no Tracking
+# tolerates this and degrades gracefully. No live filtering, no Tracking
 # tab). Those islands arrive with the microdata + tracking-config sessions.
 #
 # Assets live under modules/tabs/lib/html_report_v2/assets/ (vendored from the
 # prototype; see assets/README.md). Nothing here touches the classic
-# Excel/HTML writers — this writes a separate new file only.
+# Excel/HTML writers. This writes a separate new file only.
 # ==============================================================================
 
 # Shared v1 engine modules load first (00_namespace defines the TR namespace);
@@ -62,13 +62,13 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
   bundle <- paste(vapply(file.path(js_dir, ordered), read_text, character(1)),
                   collapse = "\n\n")
   if (grepl("</script", bundle, fixed = TRUE)) {
-    stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '</script' — cannot inline safely.")
+    stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '</script'. Cannot inline safely.")
   }
   # "<!--" in inline script text opens the HTML double-escaped state (the same
-  # hole escape_island closes for the data islands) — refuse rather than ship
+  # hole escape_island closes for the data islands): refuse rather than ship
   # a bundle whose parsing depends on what follows.
   if (grepl("<!--", bundle, fixed = TRUE)) {
-    stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '<!--' — cannot inline safely.")
+    stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '<!--'. Cannot inline safely.")
   }
   bundle
 }
@@ -117,7 +117,7 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
 }
 
 
-#' Build the self-contained v2 report HTML (pure — no file I/O)
+#' Build the self-contained v2 report HTML (pure, no file I/O)
 #'
 #' @param data_json The serialised data-agg JSON string (from serialize_data_layer)
 #' @param config_obj The tabs config object (for the title)
@@ -142,7 +142,7 @@ build_report_v2_html <- function(data_json, config_obj,
   # embedded JSON. "</" alone is not enough: per the HTML parser, "<!--"
   # followed by "<script" enters the script double-escaped state, after which
   # the island's own closing tag no longer closes it and the NEXT island (or
-  # the {{JS}} bundle) is swallowed — a respondent pasting an HTML email
+  # the {{JS}} bundle) is swallowed. A respondent pasting an HTML email
   # template into an open-end was sufficient for a blank report (review
   # 2026-08, I14). Escaping every "<" as the JSON unicode escape u003c
   # (identical after JSON.parse) makes "</", "<!--" and "<script" unformable.
@@ -196,7 +196,7 @@ build_report_v2_html <- function(data_json, config_obj,
   } else "null"
   # A conjoint contribution, when the project has one. Absent by default, so a
   # tabs run without conjoint renders exactly as it did before this island
-  # existed — the Conjoint tab only appears when TR.CJ has content.
+  # existed. The Conjoint tab only appears when TR.CJ has content.
   cj_inlined <- if (!is.null(cj_json) && nzchar(cj_json) && cj_json != "null") {
     escape_island(cj_json)
   } else "null"
@@ -210,7 +210,7 @@ build_report_v2_html <- function(data_json, config_obj,
   js_bundle <- bundle_report_v2_js(assets_dir)
 
   # The report's authored prose (explainers, legends, method notes). Read from
-  # the shared callout registry and checked against the renderer's manifest —
+  # the shared callout registry and checked against the renderer's manifest,
   # see report_text.R for why a mismatch refuses the build instead of falling
   # back to wording the author never wrote.
   text_result <- build_report_text_json(

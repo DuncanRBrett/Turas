@@ -1,5 +1,5 @@
 /**
- * PPTX package scaffolding — the fixed OOXML parts (content types, rels,
+ * PPTX package scaffolding. The fixed OOXML parts (content types, rels,
  * master, layout, theme) and the packager that zips parts + slides into a
  * valid .pptx. Slide content builders live in 15_pptx_slides.js. Pure.
  *
@@ -14,7 +14,7 @@
   var pptx = TR.pptx = TR.pptx || {};
 
   /**
-   * Boardroom style constants (PPTX_BOARDROOM_SPEC.md §2.1) — one face, one
+   * Boardroom style constants (PPTX_BOARDROOM_SPEC.md §2.1): one face, one
    * type scale, one grid. Every slide archetype in 29_export.js consumes
    * these; no ad-hoc font sizes or colours live in the slide builders.
    * Geometry in inches on the 13.333 × 7.5 canvas.
@@ -87,7 +87,7 @@
       '<Default Extension="png" ContentType="image/png"/>' +
       // Config-authored study slides carry the original file, which may be a
       // JPEG or a GIF. Declaring the extensions costs nothing when unused and
-      // keeps the package valid when they are — renaming a JPEG to .png and
+      // keeps the package valid when they are. Renaming a JPEG to .png and
       // hoping PowerPoint sniffs it is not a contract worth relying on.
       '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
       '<Default Extension="gif" ContentType="image/gif"/>' +
@@ -172,7 +172,7 @@
       '<a:hlink><a:srgbClr val="0563C1"/></a:hlink>' +
       '<a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme>' +
       '<a:fontScheme name="Turas">' +
-      // STYLE.FONT for both faces — the mixed Calibri-text/Arial-chart look is
+      // STYLE.FONT for both faces. The mixed Calibri-text/Arial-chart look is
       // exactly what the boardroom spec retires
       '<a:majorFont><a:latin typeface="' + pptx.STYLE.FONT + '"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
       '<a:minorFont><a:latin typeface="' + pptx.STYLE.FONT + '"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>' +
@@ -233,7 +233,7 @@
       var imgBase = 2 + (slide.charts ? slide.charts.length : 0);
       (slide.images || []).forEach(function (img, k) {
         imageIndex++;
-        // ext defaults to png — every rasterised card is one, and an older
+        // ext defaults to png. Every rasterised card is one, and an older
         // caller that passes no ext behaves exactly as before.
         var ext = img.ext === "jpeg" || img.ext === "gif" ? img.ext : "png";
         slideRels.push(["rId" + (imgBase + k), "image",

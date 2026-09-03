@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Native-export fidelity gate — regressions where the downloaded deck/workbook
+ * Native-export fidelity gate. Regressions where the downloaded deck/workbook
  * silently disagreed with the on-screen report:
  *   - wave axis keys sorted lexicographically ([10, 11, 9]) on both the
  *     on-screen trend chart and the PPTX trend chart;
@@ -87,7 +87,7 @@ function wideModel() {
   };
 }
 
-console.log("Native export fidelity — suite:");
+console.log("Native export fidelity. Suite:");
 
 /* ---------------- 1. wave keys sort numerically (screen + PPTX) ---------------- */
 run("waveKeySort orders numeric keys chronologically, not lexicographically", () => {
@@ -231,7 +231,7 @@ run("weighted base rows land in TSV and carry '–' for a column missing baseW",
 
 /* ---------------- 6. WP3–WP5 deck spine: cover, order, quotes, appendix -------- */
 // Real exporter + real story assembler (30_story) and exhibit engine (30x)
-// over minimal state stubs — the asserts run against genuine slide XML.
+// over minimal state stubs. The asserts run against genuine slide XML.
 
 vm.runInContext(readFileSync(path.join(JS_DIR, "30_story.js"), "utf8"), sandbox,
   { filename: "30_story.js" });
@@ -252,7 +252,7 @@ function storyDeckSetup() {
     s === "exec" ? "Overall service holds up.\nSecond paragraph." : "" };
   TR.conf = { methodNote: () => "Wilson 95%" };
   // I20 gate: a qualitative pin only renders while its quotes are still
-  // published — this fixture's island publishes everything.
+  // published. This fixture's island publishes everything.
   TR.qual = { textPublished: () => true };
 }
 
@@ -301,7 +301,7 @@ run("deck spine: cover leads, quote slide, divider 01, old-pin table, Detail 02"
 });
 
 // A crosstab pin carrying the analyst's priority comments: the numbers keep
-// their slide and the evidence follows on its own, in quote typography — three
+// their slide and the evidence follows on its own, in quote typography. Three
 // verbatims squeezed under a crosstab is the layout this avoids.
 run("priority comments: a question pin emits a companion quote slide", () => {
   storyDeckSetup();
@@ -362,14 +362,14 @@ run("priority comments: a trend exhibit gets the same companion slide", () => {
   assert(xmlOf(slides[2]).indexOf("Sometimes they provide us with paper invoices") !== -1,
     "the verbatim lands on the companion slide");
 
-  // a COMPOSITE exhibit spans several questions — no one open-end behind it
+  // a COMPOSITE exhibit spans several questions. No one open-end behind it
   const multi = Object.assign({}, item, { qs: ["Q28", "Q29"] });
   eq(TR.story2._quotesFor(multi).length, 0,
     "a multi-question exhibit carries no comments");
   delete TR.qual;
 });
 
-// A band-split open-end (NPS) tells its story one band at a time — and six
+// A band-split open-end (NPS) tells its story one band at a time, and six
 // priority marks across three bands would otherwise breach the slide's cap of 4.
 run("priority comments: a band-split question gets one quote slide per band", () => {
   storyDeckSetup();
@@ -393,11 +393,11 @@ run("priority comments: a band-split question gets one quote slide per band", ()
   const slides = TR.story2._slidesFor([pin]);
   eq(slides.length, 4, "cover + the numbers + one slide per band (2 bands)");
   const det = xmlOf(slides[2]), pro = xmlOf(slides[3]);
-  assert(det.indexOf("Recommend CCPB — Detractor") !== -1, "band names its own slide");
+  assert(det.indexOf("Recommend CCPB: Detractor") !== -1, "band names its own slide");
   assert(det.indexOf("Codes keep changing") !== -1 && det.indexOf("Paper invoices") !== -1,
     "both detractor quotes on the detractor slide");
   assert(det.indexOf("Never let us down") === -1, "the promoter quote is not on it");
-  assert(pro.indexOf("Recommend CCPB — Promoter") !== -1 &&
+  assert(pro.indexOf("Recommend CCPB: Promoter") !== -1 &&
     pro.indexOf("Never let us down") !== -1, "the promoter band gets its own slide");
   assert(det.indexOf("more in the report") === -1,
     "splitting by band keeps each slide clear of the 4-quote cap");
@@ -425,7 +425,7 @@ run("appendix flag: marked pins move behind an Appendix divider, APPENDIX kicker
     "analyst-marked decks are never re-sorted");
 });
 
-run("an all-tables deck keeps its order — no Detail divider inserted", () => {
+run("an all-tables deck keeps its order. No Detail divider inserted", () => {
   storyDeckSetup();
   const slides = TR.story2._slidesFor([
     Object.assign({}, heatPin), Object.assign({}, heatPin)]);

@@ -1,7 +1,7 @@
 /**
- * Pattern recognition — shared render atoms for the Read view, so a row, a chip
+ * Pattern recognition. Shared render atoms for the Read view, so a row, a chip
  * or an editable line is defined once. All user-editable text is stored raw and
- * ESCAPED HERE on render (fmt.escapeHtml) — user content is never written as raw
+ * ESCAPED HERE on render (fmt.escapeHtml): user content is never written as raw
  * HTML.
  */
 (function (global) {
@@ -23,7 +23,7 @@
   };
   ui.patternMeta = function (id) {
     // Portraits carry a per-group id ("portrait:Campus::Cape Town"); they share one
-    // neutral tag — the lean shows in the card's balanced lows/highs, not the tag,
+    // neutral tag. The lean shows in the card's balanced lows/highs, not the tag,
     // so the tab no longer leads negative.
     if (typeof id === "string" && id.indexOf("portrait:") === 0) {
       return { tag: "In focus", cls: "focus" };
@@ -47,11 +47,11 @@
   };
 
   /** One member row inside an AREA card: the question label on its own line (full,
-   *  always wraps — never truncated), then a scale bar + value beneath, plus a
+   *  always wraps, never truncated), then a scale bar + value beneath, plus a
    *  move chip when it shifted. cls colours the bar by pattern kind. */
 
   /** One row inside the GROUP card: the question label on its own line (full,
-   *  always wraps), then the column's standing vs the rest beneath — its bar in
+   *  always wraps), then the column's standing vs the rest beneath. Its bar in
    *  the pattern colour, the rest shown faintly in the value. */
   ui.groupRow = function (e, cls) {
     var max = e.isMean ? (e.scaleMax || 5) : 100;
@@ -68,13 +68,13 @@
   /** Capitalise the first letter (for a stitched-together sentence). */
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-  /** One row inside a PORTRAIT card — a low or a high. Question label on its own
+  /** One row inside a PORTRAIT card. A low or a high. Question label on its own
    *  line (full, always wraps), then the group's value vs the overall beneath, the
    *  bar coloured by direction (strain = below, strong = above). A peer note marks
    *  where the group is the highest / lowest of its banner siblings ("highest of 3
-   *  campuses"). Both value and baseline are real cells — no synthetic aggregate. */
+   *  campuses"). Both value and baseline are real cells. No synthetic aggregate. */
   /** A portrait cell in its own units: "62%" for a KeyShare row, "4.2" for an
-   *  index — the same real-cell values the crosstab shows. */
+   *  index. The same real-cell values the crosstab shows. */
   function portraitCell(row, v) {
     return row.isPct ? Math.round(v) + "%" : Number(v).toFixed(1);
   }
@@ -82,7 +82,7 @@
   ui.portraitRow = function (e, dir) {
     var max = e.scaleMax || 5;
     var w = Math.min(100, Math.max(0, (e.value || 0) / max * 100)).toFixed(1);
-    // "highest of N" needs N >= 3 to mean anything — in a two-group field one
+    // "highest of N" needs N >= 3 to mean anything, in a two-group field one
     // of them is always highest, so the chip would be empty praise (it appears
     // on filtered questions where only 2 groups clear the reporting floor).
     var peer = "";
@@ -98,13 +98,13 @@
       '<span class="tko-rest"> / ' + portraitCell(e, e.rest) + "</span></span></div></div>";
   };
 
-  /** The editable takeaway seed for a portrait — the tension in one sentence:
+  /** The editable takeaway seed for a portrait. The tension in one sentence:
    *  the group's lean and, against it, its sharpest counter-spike (or its dip when
    *  thriving). Quotes the real question; cites the two real cells. */
   ui.portraitTension = function (p) {
     // Lean word from the SAME raw tally the card prints, not from p.lean.
     // p.lean weighs materiality-filtered gaps, which can disagree with the plain
-    // count sitting beside it — CCPB's Country South came out "under strain"
+    // count sitting beside it. CCPB's Country South came out "under strain"
     // while carrying the study's highest overall rating and 17 of 28 above.
     // p.lean still drives ranking; this only governs the words.
     var t = p.tally || {}, rated = t.rated || {}, share = t.share || {};
@@ -114,26 +114,26 @@
     var hi = p.highs && p.highs[0], lo = p.lows && p.lows[0];
     // The count lives on the synopsis strip above; repeating it here would say
     // the same thing twice on a card whose whole point is that it says one
-    // thing. The sentence carries what the strip cannot — the named example.
+    // thing. The sentence carries what the strip cannot. The named example.
     var lead = p.subject + (strained ? " is under strain" : " is the strong group");
     if (strained && hi) {
       // An index counter-spike reads as a rating; a KeyShare one as a lead on
       // the share. Both quote the two real cells.
       // Peer phrasing needs a field of >= 3 (in a two-group field someone is
-      // always first — same floor as the "highest of N" chip).
+      // always first. Same floor as the "highest of N" chip).
       if (hi.isPct) {
-        return lead + " — yet " +
+        return lead + ", yet " +
           (hi.peerTop && hi.peerCount > 2 ? "leads every " + p.group.toLowerCase() + " on “"
             : "leads on “") + hi.label + "” (" + portraitCell(hi, hi.value) + " vs " +
           portraitCell(hi, hi.rest) + " overall).";
       }
-      return lead + " — yet rates “" + hi.label + "” highest" +
+      return lead + ", yet rates “" + hi.label + "” highest" +
         (hi.peerTop && hi.peerCount > 2 ? " of any " + p.group.toLowerCase() : "") +
         " (" + portraitCell(hi, hi.value) + " vs " + portraitCell(hi, hi.rest) +
         " overall).";
     }
     if (!strained && lo) {
-      return lead + " — yet dips on “" + lo.label + "” (" + portraitCell(lo, lo.value) +
+      return lead + ", yet dips on “" + lo.label + "” (" + portraitCell(lo, lo.value) +
         " vs " + portraitCell(lo, lo.rest) + " overall). The one to watch.";
     }
     return lead + (strained && lo ? ", most on “" + lo.label + "”." : ".");
@@ -162,7 +162,7 @@
       ' <span class="tko-bundle-tie">↔</span> ' + fmt.escapeHtml(bundle.anchor.b) +
       '</span><span class="tko-bundle-size">' + bundle.size + " move together</span></div>";
     var cohesion = '<div class="tko-cap">Average correlation ' + bundle.meanRaw.toFixed(2) +
-      " — above the survey's " + floor.toFixed(2) + " baseline (they cohere beyond the " +
+      ", above the survey's " + floor.toFixed(2) + " baseline (they cohere beyond the " +
       "general tendency to agree).</div>";
     var members = '<ul class="tko-bundle-list">' + bundle.members.map(function (m) {
       return "<li>" + fmt.escapeHtml(m.title) + "</li>";
@@ -225,11 +225,11 @@
   /** The synopsis strip: where this group actually stands, before any story
    *  about it. Two parts, both plain counts.
    *
-   *  ANCHOR — the declared headline questions (patterns_headline) as absolute
+   *  ANCHOR. The declared headline questions (patterns_headline) as absolute
    *  values with the overall beside them, so the card opens on "9.2 against
    *  9.2" rather than on a relative claim.
    *
-   *  TALLY — ahead / level / behind, RAW (no materiality floor), with rated
+   *  TALLY. Ahead / level / behind, RAW (no materiality floor), with rated
    *  indexes and KeyShare rows counted apart. A group can be unremarkable on
    *  how it is rated and well ahead on what gets done; one pooled count cannot
    *  say that. Rendered only for the side that has questions.
@@ -266,7 +266,7 @@
   };
 
   /** The roll-up: which way this group falls, over everything it was scored on.
-   *  Ties are kept in the denominator — "29 of 31" counts every area compared,
+   *  Ties are kept in the denominator, "29 of 31" counts every area compared,
    *  not just the ones that moved, so the reader can see how much did not. No
    *  test is claimed: the crosstabs carry significance question by question,
    *  and this line is here to show the shape, not to prove it. */
@@ -299,32 +299,32 @@
   /** Templated takeaway for a pattern (the one editable line per card). */
   ui.patternSeed = function (p) {
     if (p.kind === "portrait" && p.mixed) {
-      // The mixed card claims only its counts — no lean, no "steady", no
+      // The mixed card claims only its counts. No lean, no "steady", no
       // manufactured story. The tension sentence would invent one.
       var mt = p.tally || {}, mr = mt.rated || {}, ms = mt.share || {};
       var mUp = (mr.ahead || 0) + (ms.ahead || 0);
       var mDown = (mr.behind || 0) + (ms.behind || 0);
       var mN = (mr.n || 0) + (ms.n || 0);
-      return p.subject + " is a mixed picture — ahead on " + mUp + " and behind on " +
+      return p.subject + " is a mixed picture. Ahead on " + mUp + " and behind on " +
         mDown + " of " + mN + " compared areas, with no consistent one-way story.";
     }
     if (p.kind === "portrait") return ui.portraitTension(p);
     if (p.kind === "steady") {
-      // The claim is steadiness, proven by the group's own spread — never a lean.
-      return p.subject + " is the steady one — close to the overall almost everywhere (" +
+      // The claim is steadiness, proven by the group's own spread, never a lean.
+      return p.subject + " is the steady one. Close to the overall almost everywhere (" +
         p.below + " question" + (p.below === 1 ? "" : "s") + " a touch below, " +
         p.above + " a touch above, none consistently). What works elsewhere should " +
         "work here; it is nobody's problem child.";
     }
     if (p.id === "group") {
       return p.subject + " scores below the overall on " + p.hits + " of the " + p.total +
-        " questions scored — the group most under strain.";
+        " questions scored. The group most under strain.";
     }
     if (p.id === "split") {
-      // Navigation pointer — no synthetic average. (sigGaps = directionally-
+      // Navigation pointer. No synthetic average. (sigGaps = directionally-
       // consistent groups under this cut, when the FDR family is present.)
       return "Differences run most by " + p.subject +
-        (p.sigGaps ? " — " + p.sigGaps + " group" + (p.sigGaps === 1 ? "" : "s") +
+        (p.sigGaps ? ", " + p.sigGaps + " group" + (p.sigGaps === 1 ? "" : "s") +
           " stand clearly apart" : "") + ". Read this study through " +
         p.subject.toLowerCase() + " first.";
     }
@@ -332,26 +332,26 @@
       var b0 = (p.bundles && p.bundles[0]) || null;
       var more = p.bundleCount > 1 ? " (" + p.bundleCount + " such groups found)" : "";
       if (!b0) return "Some questions move together as a set" + more + ".";
-      return b0.size + " questions move together as one — " + b0.anchor.a + " and " +
+      return b0.size + " questions move together as one, " + b0.anchor.a + " and " +
         b0.anchor.b + " anchor them" + more + ". Treat the shared driver once, not " +
         "question by question.";
     }
     if (p.id === "odd") {
-      if (p.nullResult) return "No group breaks its own pattern — every exception is too small to matter " +
+      if (p.nullResult) return "No group breaks its own pattern. Every exception is too small to matter " +
         "or sits on a base too thin to trust.";
       var f = p.flip, low = p.direction === "low-but-high";
-      return p.column + " runs " + (low ? "below" : "above") + " the overall almost everywhere — yet on " +
+      return p.column + " runs " + (low ? "below" : "above") + " the overall almost everywhere, yet on " +
         "“" + f.qtitle + "” it is unexpectedly " + (low ? "higher" : "lower") + " (" +
         Number(f.value).toFixed(1) + " vs " + Number(f.total).toFixed(1) + ", against its usual " +
         (f.meanGap >= 0 ? "+" : "−") + Math.abs(f.meanGap).toFixed(2) + ").";
     }
     if (p.id === "bimodal") {
-      if (p.nullResult) return "No hidden disagreement — every question's average reflects a single camp, not two.";
+      if (p.nullResult) return "No hidden disagreement. Every question's average reflects a single camp, not two.";
       return p.flaggedCount + (p.flaggedCount === 1 ? " question splits" : " questions split") +
-        " the room into two camps the average hides — read the distribution, not the mean.";
+        " the room into two camps the average hides. Read the distribution, not the mean.";
     }
     if (p.id === "moved") {
-      if (p.stable) return "Broadly stable — nothing shifted materially since the last wave.";
+      if (p.stable) return "Broadly stable. Nothing shifted materially since the last wave.";
       var ph = function (x) { return x.subject + " " + (x.diff >= 0 ? "up " : "down ") + Math.abs(x.diff).toFixed(1); };
       var when = p.year ? " since " + p.year : "";
       if (p.up && p.down) return ph(p.down) + ", " + ph(p.up) + when + ".";
@@ -365,17 +365,17 @@
    *  reads), then the strongest / weakest areas when a study is tagged. */
   ui.answerSeed = function (patterns) {
     var list = patterns || [];
-    // never seed the big-picture line from a MIXED card — it has no lean to claim
+    // never seed the big-picture line from a MIXED card. It has no lean to claim
     var port = list.filter(function (p) { return p.kind === "portrait" && !p.mixed; })[0];
     var split = list.filter(function (p) { return p.kind === "split"; })[0];
     var bits = [];
     if (port) {
       var strained = port.lean === "strained";
       var hi = port.highs && port.highs[0], lo = port.lows && port.lows[0];
-      if (strained && hi) bits.push(port.subject + " carries a tension — strained overall but strongest on “" + hi.label + "”");
+      if (strained && hi) bits.push(port.subject + " carries a tension. Strained overall but strongest on “" + hi.label + "”");
       else if (!strained && lo) bits.push(port.subject + " is strong overall but dips on “" + lo.label + "”");
-      else if (strained) bits.push(port.subject + " is under strain almost everywhere — below the overall on " + port.hits + " of " + port.total);
-      else bits.push(port.subject + " leads almost everywhere — above the overall on " + port.gains + " of " + port.total);
+      else if (strained) bits.push(port.subject + " is under strain almost everywhere. Below the overall on " + port.hits + " of " + port.total);
+      else bits.push(port.subject + " leads almost everywhere. Above the overall on " + port.gains + " of " + port.total);
     }
     if (split) bits.push("differences run most by " + split.subject);
     return bits.length ? cap(bits.join("; ")) + "."
@@ -391,7 +391,7 @@
     return '<div class="tko-ed ' + cls + '" data-edit="' + fmt.escapeHtml(id + "::" + field) +
       '" data-seed="' + fmt.escapeHtml(s) +
       '" contenteditable="plaintext-only" role="textbox" aria-multiline="false" spellcheck="false" ' +
-      'aria-label="' + fmt.escapeHtml(label) + '" title="Click to edit — your wording is saved">' +
+      'aria-label="' + fmt.escapeHtml(label) + '" title="Click to edit. Your wording is saved">' +
       fmt.escapeHtml(text) + "</div>";
   };
 
@@ -400,7 +400,7 @@
   ui.reliabilityRibbon = function (rel) {
     if (!rel || !rel.n) return "";
     // The lead word is the DECLARED design ("Stratified sample"), never inferred
-    // from the FPC; and the universe line only reads "response" on a census —
+    // from the FPC; and the universe line only reads "response" on a census,
     // on a sample 753 of 14 563 is coverage, not a response rate.
     var design = rel.census ? "Census"
       : rel.design ? cap(rel.design.replace(/_/g, " ")) + " sample" : "Sample";

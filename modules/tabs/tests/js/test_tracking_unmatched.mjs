@@ -2,7 +2,7 @@
 /**
  * Gate: the Tracking Summary must never render an UNMATCHED tracker as zeros.
  *
- * The cross-wave key changes shape with the R-side config — the canonical
+ * The cross-wave key changes shape with the R-side config. The canonical
  * question code when a Question_Mapping is loaded, the normalised title when
  * one is not (tracking_island.R: tracking_metrics). History built under one
  * regime and a wave built under the other can never pair, and every metric then
@@ -11,8 +11,8 @@
  * "nothing moved this wave" when the truth is "nothing was compared". That is
  * the CCPB W2026 failure, and it is the one this gate reproduces.
  *
- * Runs against the SHIPPED module JS (modules/tabs/lib/html_report_v2/assets/js)
- * — not the prototype copy, which has drifted behind it.
+ * Runs against the SHIPPED module JS (modules/tabs/lib/html_report_v2/assets/js),
+ * not the prototype copy, which has drifted behind it.
  *
  * Run with:  node modules/tabs/tests/js/test_tracking_unmatched.mjs
  */
@@ -41,7 +41,7 @@ function makeEl() {
   };
 }
 
-/** A fresh sandbox per scenario — TR caches metric lists and wave indexes. */
+/** A fresh sandbox per scenario. TR caches metric lists and wave indexes. */
 function load(prev) {
   const sandbox = {
     console, TextEncoder, URL,
@@ -54,7 +54,7 @@ function load(prev) {
   }
   // The card's explanatory prose is AUTHORED text, inlined into a real report
   // from the callout registry at build time. Booting the module JS alone leaves
-  // TR.txt with an empty catalogue, so every authored block renders as nothing —
+  // TR.txt with an empty catalogue, so every authored block renders as nothing,
   // which is not what a reader sees, and made this suite assert against a card
   // stripped of the two sentences that give it its point.
   installText(sandbox);
@@ -107,7 +107,7 @@ ok(info && info.priors === broken.waves.filter((w) => !w.current).length,
 ok(/Tracking could not be compared/.test(hBad), "unmatched history: says it could not compare");
 ok(!/significant increases/.test(hBad), "unmatched history: the 0/0/0 pulse bar is NOT rendered");
 ok(!/Key metric scorecard/.test(hBad), "unmatched history: the empty scorecard is NOT rendered");
-// The two sentences that carry the card's point — one saying this is a
+// The two sentences that carry the card's point. One saying this is a
 // configuration problem rather than a finding, one naming the setting that
 // fixes it. The author owns those words (see _text.mjs), so the test compares
 // the rendered block against the catalogue rather than against a phrase: it

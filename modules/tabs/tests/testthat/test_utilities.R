@@ -3,13 +3,13 @@
 # ==============================================================================
 #
 # Tests for utility functions across the tabs module:
-#   1. type_utils.R — safe_logical, safe_numeric, safe_equal
-#   2. config_utils.R — get_config_value, load_config_sheet
-#   3. path_utils.R — resolve_path, tabs_lib_path
-#   4. filter_utils.R — apply_base_filter, check_filter_security
-#   5. validation_utils.R — validate_numeric_param, validate_data_frame
-#   6. logging_utils.R — format_seconds
-#   7. excel_utils.R — excel_column_letter
+#   1. type_utils.R. Safe_logical, safe_numeric, safe_equal
+#   2. config_utils.R. Get_config_value, load_config_sheet
+#   3. path_utils.R. Resolve_path, tabs_lib_path
+#   4. filter_utils.R. Apply_base_filter, check_filter_security
+#   5. validation_utils.R. Validate_numeric_param, validate_data_frame
+#   6. logging_utils.R. Format_seconds
+#   7. excel_utils.R. Excel_column_letter
 #
 # Run with:
 #   testthat::test_file("modules/tabs/tests/testthat/test_utilities.R")
@@ -61,7 +61,7 @@ source(file.path(turas_root, "modules/tabs/lib/filter_utils.R"))
 
 
 # ==============================================================================
-# 1. type_utils.R — safe_logical
+# 1. type_utils.R. Safe_logical
 # ==============================================================================
 
 context("safe_logical")
@@ -108,7 +108,7 @@ test_that("handles whitespace in input", {
 
 
 # ==============================================================================
-# 2. type_utils.R — safe_numeric
+# 2. type_utils.R. Safe_numeric
 # ==============================================================================
 
 context("safe_numeric")
@@ -133,7 +133,7 @@ test_that("returns default for non-numeric input", {
 
 
 # ==============================================================================
-# 3. type_utils.R — safe_equal
+# 3. type_utils.R. Safe_equal
 # ==============================================================================
 
 context("safe_equal")
@@ -149,14 +149,14 @@ test_that("compares unequal values correctly", {
   expect_false(safe_equal(1, 2))
 })
 
-test_that("handles NA values — both NA means both missing, so TRUE", {
+test_that("handles NA values. Both NA means both missing, so TRUE", {
   # Design decision: both-NA = TRUE (both values are missing = match)
   expect_true(safe_equal(NA, NA))
   expect_false(safe_equal(NA, "hello"))
   expect_false(safe_equal("hello", NA))
 })
 
-test_that("handles NULL values — zero-length input yields zero-length output", {
+test_that("handles NULL values. Zero-length input yields zero-length output", {
   # NULL has length 0, so safe_equal returns logical(0)
   expect_length(safe_equal(NULL, NULL), 0)
   expect_length(safe_equal(NULL, "hello"), 0)
@@ -170,7 +170,7 @@ test_that("trims whitespace when comparing strings", {
 
 
 # ==============================================================================
-# 4. config_utils.R — get_config_value
+# 4. config_utils.R. Get_config_value
 # ==============================================================================
 
 context("get_config_value")
@@ -203,7 +203,7 @@ test_that("required missing value produces TRS refusal", {
 
 
 # ==============================================================================
-# 5. path_utils.R — resolve_path
+# 5. path_utils.R. Resolve_path
 # ==============================================================================
 
 context("resolve_path")
@@ -228,7 +228,7 @@ test_that("strips ./ prefix from relative paths", {
 
 
 # ==============================================================================
-# 6. filter_utils.R — check_filter_security
+# 6. filter_utils.R. Check_filter_security
 # ==============================================================================
 
 context("check_filter_security")
@@ -269,7 +269,7 @@ test_that("blocks eval/parse", {
 
 
 # ==============================================================================
-# 7. filter_utils.R — apply_base_filter
+# 7. filter_utils.R. Apply_base_filter
 # ==============================================================================
 
 context("apply_base_filter")
@@ -291,8 +291,8 @@ test_that("returns all rows for empty or NA filter", {
   expect_equal(nrow(apply_base_filter(data, NULL)), 5)
 })
 
-# Production review 2026-08, M-J. NAs becoming FALSE is the right rule — R's own
-# subset() does the same, an unknown answer is not a match — but it was silent,
+# Production review 2026-08, M-J. NAs becoming FALSE is the right rule. R's own
+# subset() does the same, an unknown answer is not a match, but it was silent,
 # so a filter on a routed question quietly excluded everyone who never saw it and
 # the shrunken base looked like the filter's doing. Duncan's call on the other
 # half (2026-08-06): a 0-row filter WARNS rather than refusing, because a
@@ -328,7 +328,7 @@ test_that("handles numeric comparisons", {
 
 
 # ==============================================================================
-# 8. validation_utils.R — validate_data_frame
+# 8. validation_utils.R. Validate_data_frame
 # ==============================================================================
 
 context("validate_data_frame")
@@ -363,7 +363,7 @@ test_that("rejects too few rows", {
 
 
 # ==============================================================================
-# 9. logging_utils.R — format_seconds
+# 9. logging_utils.R. Format_seconds
 # ==============================================================================
 
 context("format_seconds")
@@ -387,7 +387,7 @@ test_that("formats hours as decimal", {
 
 
 # ==============================================================================
-# 10. excel_utils.R — excel_column_letter
+# 10. excel_utils.R. Excel_column_letter
 # ==============================================================================
 
 context("excel_column_letter")
@@ -410,7 +410,7 @@ test_that("converts triple-letter columns correctly", {
 
 
 # ==============================================================================
-# 11. validate_numeric_param — NULL guard
+# 11. validate_numeric_param. NULL guard
 # ==============================================================================
 
 context("validate_numeric_param")

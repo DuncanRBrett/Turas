@@ -393,7 +393,8 @@ write_summary_sheet <- function(wb, results, config, styles) {
         "Weighting: counts",
         "Weighting: logit",
         "Weighting: HB",
-        "Weighting: TURF"
+        "Weighting: TURF",
+        "Tasks excluded from logit/HB (no single best + worst)"
       ),
       Value = c(
         results$study_summary$n_respondents,
@@ -409,7 +410,11 @@ write_summary_sheet <- function(wb, results, config, styles) {
         results$study_summary$weighting_by_engine$counts %||% "unweighted",
         results$study_summary$weighting_by_engine$logit %||% "unweighted",
         results$study_summary$weighting_by_engine$hb %||% "unweighted",
-        results$study_summary$weighting_by_engine$turf %||% "unweighted"
+        results$study_summary$weighting_by_engine$turf %||% "unweighted",
+        # M2 disclosure (review F11): counts keep these tasks in Times_Shown.
+        sprintf("%s of %s (they remain in the count denominators)",
+                results$study_summary$n_tasks_dropped_from_models %||% "0",
+                results$study_summary$n_tasks_total %||% "?")
       ),
       stringsAsFactors = FALSE
     )
@@ -459,16 +464,22 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
   # Start with count scores
   item_scores <- results$count_scores
 
-  # Add logit utilities if available
-  if (!is.null(results$logit_results)) {
+  # Add logit / HB utilities ONLY if the orchestrator has not merged them
+  # already (review F4): 00_main.R merges the same four columns into
+  # count_scores, so a second merge here produced Logit_Utility.x/.y and the
+  # column pick below found neither. ITEM_SCORES shipped without a single
+  # utility column, and Rescaled_Score and Rank fell back to Net_Score.
+  if (!is.null(results$logit_results) &&
+      !"Logit_Utility" %in% names(item_scores)) {
     logit_utils <- results$logit_results$utilities[, c("Item_ID", "Logit_Utility", "Logit_SE")]
     item_scores <- merge(item_scores, logit_utils, by = "Item_ID", all.x = TRUE)
   }
 
-  # Add HB utilities if available
-  if (!is.null(results$hb_results)) {
+  if (!is.null(results$hb_results) &&
+      !"HB_Utility_Mean" %in% names(item_scores)) {
     hb_utils <- results$hb_results$population_utilities[,
-                  c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")]
+                  intersect(c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"),
+                            names(results$hb_results$population_utilities))]
     item_scores <- merge(item_scores, hb_utils, by = "Item_ID", all.x = TRUE)
   }
 
@@ -517,7 +528,7 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
   }
 
   if ("HB_Utility_Mean" %in% names(item_scores)) {
-    output_cols <- c(output_cols, "HB_Utility_Mean", "HB_Utility_SD")
+    output_cols <- c(output_cols, "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE")
   }
 
   output_cols <- c(output_cols, "Rescaled_Score", "Rank")
@@ -553,7 +564,7 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
 
   # Utility columns (0.000 format)
   util_cols <- which(names(output_df) %in%
-                      c("Logit_Utility", "Logit_SE", "HB_Utility_Mean", "HB_Utility_SD"))
+                      c("Logit_Utility", "Logit_SE", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"))
   for (col in util_cols) {
     openxlsx::addStyle(wb, "ITEM_SCORES", styles$score_3dp,
                       rows = 2:(n_rows + 1), cols = col, gridExpand = TRUE)

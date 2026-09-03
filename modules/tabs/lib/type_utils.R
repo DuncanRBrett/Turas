@@ -99,7 +99,7 @@ safe_numeric <- function(x, na_value = NA_real_) {
 
 
 # The module's single yes/no vocabulary. Every gate column (Selection sheet's
-# Include/UseBanner/..., Options sheet's ShowInOutput/ExcludeFromIndex — see
+# Include/UseBanner/..., Options sheet's ShowInOutput/ExcludeFromIndex. See
 # normalise_flag_column in crosstabs/data_setup.R), every Y/N Settings cell and
 # safe_logical() below all read the same words, so the same token means the same
 # thing in every corner of the module (production review 2026-08, C3).

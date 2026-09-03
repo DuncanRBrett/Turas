@@ -37,10 +37,10 @@
 # places (data_setup.R, banner.R, standard_processor.R, cell_calculator.R,
 # score_utils.R, composite_processor.R, microdata_writer.R) while several
 # preflight validators read `toupper(...) == "Y"`. A lowercase "y" therefore
-# passed validation and was then dropped in silence — one cell, one table quietly
-# missing from a client workbook. Each sheet is read in exactly one place —
+# passed validation and was then dropped in silence. One cell, one table quietly
+# missing from a client workbook. Each sheet is read in exactly one place,
 # load_question_selection() for Selection, prepare_options_columns() for
-# Options — so normalising there closes the gap for every reader at once.
+# Options, so normalising there closes the gap for every reader at once.
 #
 # The vocabulary matches what workbook_builder.R (create_index_summary) and
 # excel_writer.R already accept, so the same word means the same thing in every
@@ -59,7 +59,7 @@
 #' @param values Raw column, any type
 #' @param column Character, column name (for the refusal)
 #' @param sheet Character, sheet the column lives on (for the refusal)
-#' @param default Character, "Y" or "N" — the meaning of a blank cell
+#' @param default Character, "Y" or "N". The meaning of a blank cell
 #' @param row_codes Optional character vector of QuestionCodes, same length as
 #'   \code{values}, used to name the offending rows in the refusal
 #' @return Character vector of "Y" / "N", same length as \code{values}
@@ -329,9 +329,9 @@ load_question_selection <- function(config_file) {
   # Ensure optional columns exist and are character type. CommentSheet/CommentLink
   # are the V12 qualitative jump columns on the open-end rows (CommentSheet = the
   # comment-workbook sheet that codes this open-end; CommentLink = the closed
-  # question/composite it explains) — see qual_build_links().
+  # question/composite it explains): see qual_build_links().
   # Source/Formula are the provenance pair: where a question's numbers came from,
-  # and — when it is not simply asked — how it was worked out. A study whose data
+  # and, when it is not simply asked, how it was worked out. A study whose data
   # is built before the config ever sees it (derived columns, composites) has no
   # other way to say so, because the engine only ever meets the finished column.
   for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder", "Theme", "KeyShare", "AreaSummary", "ExcludeFromInsights", "Source", "Formula", "CommentSheet", "CommentLink")) {
@@ -343,7 +343,7 @@ load_question_selection <- function(config_file) {
   }
 
   # Canonicalise the gate columns to "Y"/"N" and apply defaults. Every downstream
-  # reader — the engine's exact `== "Y"` tests and preflight's `toupper()` ones —
+  # reader. The engine's exact `== "Y"` tests and preflight's `toupper()` ones,
   # then sees the same value, so a lowercase "y" can no longer pass validation
   # and be dropped by the engine.
   # ExcludeFromInsights joins them: it is a Y/N gate like the others, and a

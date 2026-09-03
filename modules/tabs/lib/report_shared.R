@@ -1,5 +1,5 @@
 # ==============================================================================
-# TABS — SHARED REPORT HELPERS
+# TABS. SHARED REPORT HELPERS
 # ==============================================================================
 # Row/banner shape helpers and the chart colour palette, shared by the JSON
 # data-layer writer (the v2 interactive report) and, historically, the classic
@@ -10,7 +10,7 @@
 # (2026-08). They are the only part of that module the v2 pipeline ever used,
 # so they were lifted out unchanged rather than deleted with it. Anything that
 # needs to classify a question table's rows, name a banner group, or resolve a
-# palette preset sources this file — not a report builder.
+# palette preset sources this file, not a report builder.
 # ==============================================================================
 
 #' Build Banner Groups Structure
@@ -62,7 +62,7 @@ build_banner_groups <- function(banner_info) {
     # Previously this block unconditionally overwrote the BannerLabel.
     # Use a flag (not string comparison) because BannerLabel may equal the code.
     if (!found_banner_label) {
-      # No BannerLabel found from banner_headers — try QuestionText
+      # No BannerLabel found from banner_headers. Try QuestionText
       if (!is.null(bq$question) && !is.null(bq$question$QuestionText)) {
         qt <- as.character(bq$question$QuestionText)
         if (length(qt) > 0 && !is.na(qt[1]) && nzchar(qt[1])) {
@@ -260,7 +260,7 @@ normalize_question_table <- function(table) {
     }
   }
 
-  # Forward-fill RowSource: same logic as RowLabel — sub-rows (Column %, Sig.)
+  # Forward-fill RowSource: same logic as RowLabel. Sub-rows (Column %, Sig.)
   # inherit the source type from their parent frequency row.
   if ("RowSource" %in% names(table)) {
     last_source <- ""
@@ -300,7 +300,7 @@ normalize_question_table <- function(table) {
 get_palette_colours <- function(preset = "warm", overrides = NULL) {
 
   palettes <- list(
-    # Warm earth tones — dusty rose through sage/teal
+    # Warm earth tones. Dusty rose through sage/teal
     warm = list(
       negative     = "#b85450",
       mod_negative = "#d4918e",
@@ -310,7 +310,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
       dk_na        = "#d1cdc7",
       other        = "#c5c0b8"
     ),
-    # Cool professional — muted burgundy through deep teal
+    # Cool professional. Muted burgundy through deep teal
     cool = list(
       negative     = "#a65461",
       mod_negative = "#c78f93",
@@ -320,7 +320,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
       dk_na        = "#d1cdc7",
       other        = "#c5c0b8"
     ),
-    # Purple-green diverging — research/academic standard (colorblind-safe)
+    # Purple-green diverging. Research/academic standard (colorblind-safe)
     research = list(
       negative     = "#8e4585",
       mod_negative = "#b891b5",
@@ -330,7 +330,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
       dk_na        = "#d1cdc7",
       other        = "#c5c0b8"
     ),
-    # Monochromatic teal — light-to-dark single-hue gradient, muted
+    # Monochromatic teal. Light-to-dark single-hue gradient, muted
     teal = list(
       negative     = "#d4edea",
       mod_negative = "#a3d5cf",
@@ -340,7 +340,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
       dk_na        = "#d1cdc7",
       other        = "#c5c0b8"
     ),
-    # Monochromatic red — Coca-Cola-inspired, muted (hue ~4°, sat 45%)
+    # Monochromatic red. Coca-Cola-inspired, muted (hue ~4°, sat 45%)
     red = list(
       negative     = "#e8cbcb",
       mod_negative = "#cfa0a0",
@@ -471,7 +471,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
 # ==============================================================================
 # One resolver, two callers. The data-layer writer uses it to stamp each column
 # with its universe N; the significance engine uses it to size that column's
-# tests on the FPC-corrected base. They MUST agree — a column whose interval
+# tests on the FPC-corrected base. They MUST agree. A column whose interval
 # narrows but whose letters do not (or the reverse) is worse than no correction.
 
 #' Resolve a banner column's known population from the Population frame
@@ -502,7 +502,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
   }
   unscoped <- is.na(cand$banner)
   if (any(unscoped)) return(cand$population[which(unscoped)[1]])
-  # A scoped row for a different banner only — not a match for this column.
+  # A scoped row for a different banner only, not a match for this column.
   NULL
 }
 
@@ -514,7 +514,7 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
 #' sheet match. Returns \code{NA_real_} for a column with no usable universe, so
 #' callers treat it as "no correction" without a special case.
 #'
-#' Both consumers of a column's universe go through here — the data-layer writer
+#' Both consumers of a column's universe go through here. The data-layer writer
 #' (which stamps \code{population} on each column so intervals narrow) and the
 #' significance engine (which sizes that column's tests on the FPC-corrected
 #' base). A second implementation is how a report ends up with narrower
@@ -571,7 +571,7 @@ resolve_column_populations <- function(banner_info, config_obj = NULL) {
 #' \code{apply_fpc(1, n_actual, N)}, i.e. \code{(N - 1) / (N - n_actual)} when the
 #' correction engages. 1 when the universe is unknown or coverage is below
 #' \code{FPC_MIN_COVERAGE}; \code{Inf} at a full census, which the tests read as
-#' "no sampling error left — exclude this column from pairing".
+#' "no sampling error left. Exclude this column from pairing".
 #'
 #' n_actual is the column's UNWEIGHTED base FOR THIS QUESTION: a routed question
 #' covers less of the same universe than an all-respondent one, so its columns
@@ -596,7 +596,7 @@ build_fpc_multipliers <- function(question_bases, col_populations, keys = NULL) 
       suppressWarnings(as.numeric(base_info$unweighted[1]))
     } else NA_real_
     if (is.na(n_actual)) next
-    # apply_fpc(1, ...) IS the multiplier — deriving it here instead would be a
+    # apply_fpc(1, ...) IS the multiplier. Deriving it here instead would be a
     # second implementation of the floor and the census rule.
     out[i] <- apply_fpc(1, n_actual, N)
   }

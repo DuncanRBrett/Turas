@@ -1,8 +1,8 @@
-/* Turas Reader report — island-driven renderer. Reads #data-reader and builds
+/* Turas Reader report. Island-driven renderer. Reads #data-reader and builds
    the narrative into #rr-app. Two reading layers (Plain / Practitioner), a
    priority-matrix map, and every figure deep-links into the sibling crosstab
    (model.crosstab) via #tab=…&q=…&banner=…, decoded live on hashchange. No
-   external requests; no computation — display only. */
+   external requests; no computation. Display only. */
 (function () {
   "use strict";
   var app = document.getElementById("rr-app");
@@ -70,7 +70,7 @@
     var reason = M.disclosure.fallback_reason ? " (" + esc(M.disclosure.fallback_reason) + ")" : "";
     push('<div class="rr-degraded" role="status">' +
       "<b>AI narrative was requested but unavailable" + reason +
-      "</b> — showing the on-device narrative. Every figure is still computed by Turas from the survey data.</div>");
+      "</b>: showing the on-device narrative. Every figure is still computed by Turas from the survey data.</div>");
   }
 
   /* ---- hero ---- */
@@ -85,7 +85,7 @@
     (metaBits.length ? '<div class="meta">' + metaBits.join("") + "</div>" : "") +
     '<div class="pledge"><b>Every number wears its base.</b> A solid underline means the ' +
     '<button class="term" data-t="Base (n)">base</button> is sound; a dotted one means the group is ' +
-    '<button class="term" data-t="Directional">directional</button> — a lead to weigh, not proof. ' +
+    '<button class="term" data-t="Directional">directional</button>. A lead to weigh, not proof. ' +
     "Figures marked ↗ open the matching table in the crosstab; dotted words carry a definition.</div>" +
     "</div></div>");
 
@@ -143,7 +143,7 @@
     /* ---- priority-matrix map (score x change) ---- */
     push('<div class="wrap-wide"><div class="mapbox">' + buildMap(withDelta) + "</div>" +
       '<div class="wrap"><p class="dcap">Every point is a link: click one to open its table. ' +
-      "Bottom-left — low and falling — is where attention is owed.</p></div></div>");
+      "Bottom-left, low and falling, is where attention is owed.</p></div></div>");
   }
 
   function buildMap(items) {
@@ -214,9 +214,9 @@
       return '<span class="fig' + (lo.low ? " dir" : "") + '">' + fmt2(m.value) +
         '<span class="pv">' + esc(m.name.length > 22 ? m.name.slice(0, 21) + "…" : m.name) + "</span></span>";
     }).join(" · ");
-    var body = "<p>Within " + esc(M.people.groupName) + ", <b>" + esc(lo.label) + "</b> sits lowest across the headline measures — " +
+    var body = "<p>Within " + esc(M.people.groupName) + ", <b>" + esc(lo.label) + "</b> sits lowest across the headline measures, " +
       figs + (lo.low ? ' <span class="fig dir">n=' + esc(lo.base) + "</span>" : " (n=" + esc(lo.base) + ")") +
-      " — against <b>" + esc(an.label) + "</b> at " + fmt2(an.avg) + " (n=" + esc(an.base) + "). " +
+      ", against <b>" + esc(an.label) + "</b> at " + fmt2(an.avg) + " (n=" + esc(an.base) + "). " +
       "The bases are small, so read the consistency, not any single figure.</p>";
     push(section("The people", "A soft spot, held at arm's length", body, "people"));
   }

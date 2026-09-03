@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Reader polish gate (READER_EXPERIENCE_PLAN bundle A) — five contracts:
+ * Reader polish gate (READER_EXPERIENCE_PLAN bundle A): five contracts:
  *
- * A1 Fixed card anatomy: every dashboard gauge renders fixed slots — score
+ * A1 Fixed card anatomy: every dashboard gauge renders fixed slots. Score
  *    top-left / code top-right as FLEX SIBLINGS (nothing absolutely positioned
  *    over the score), band bar, 2-line-clamped title, ONE meta row holding the
  *    Δ chip + 💬 pill + 📌 pin (pin last).
  * A2 ShortLabel: q.short_label is consumed defensively (fallback to q.title)
  *    on cards, tracking metric names and default pin titles.
- * A3 Audience strip: the shell renders one aria-live strip on EVERY tab —
+ * A3 Audience strip: the shell renders one aria-live strip on EVERY tab,
  *    cut + base n (+ weighted/effective when weighted) + wave; the Patterns
  *    and Tracking tabs state that they read the full published sample.
  * A4 One "How to read this" panel: the legend contains all five explains
@@ -40,7 +40,7 @@ function eq(actual, expected, msg) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
   if (a !== e) throw new Error(msg + ": expected " + e + ", got " + a);
 }
-/** indexOf that refuses -1 — asserts presence AND returns the position. */
+/** indexOf that refuses -1. Asserts presence AND returns the position. */
 function at(hay, needle, msg) {
   const i = hay.indexOf(needle);
   if (i === -1) throw new Error(msg + ": missing " + JSON.stringify(needle));
@@ -57,6 +57,7 @@ function viewsSandbox() {
   installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
+  load(sb, "21_stats.js");                    // real level wording (95%/80%)
   load(sb, "20_data.js");                     // real d2.shortLabel
   const TR = sb.TR;
   TR.charts = { clip: (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s)) };
@@ -100,9 +101,9 @@ function gaugeFixture(overrides) {
   return { q, model };
 }
 
-console.log("Reader polish (bundle A) — suite:");
+console.log("Reader polish (bundle A): suite:");
 
-run("A1: gauge card renders the fixed slots in order — ghead(score,code) · bar · title · meta", () => {
+run("A1: gauge card renders the fixed slots in order. Ghead(score,code) · bar · title · meta", () => {
   const sb = viewsSandbox();
   const { q, model } = gaugeFixture({ short_label: "Registration experience" });
   const html = sb.TR.views._gaugeCardHtml(q, model);
@@ -111,7 +112,7 @@ run("A1: gauge card renders the fixed slots in order — ghead(score,code) · ba
   const title = at(html, '<span class="gt">', "title slot");
   const meta = at(html, '<span class="gmeta">', "meta row slot");
   assert(head < bar && bar < title && title < meta, "slots out of order");
-  // score and code are flex SIBLINGS inside the head — nothing can overlap
+  // score and code are flex SIBLINGS inside the head. Nothing can overlap
   assert(html.indexOf('<span class="ghead"><span class="gv">') !== -1,
     "score is the first child of the head");
   const gv = at(html, '<span class="gv">', "score");
@@ -127,7 +128,7 @@ run("A1: ONE meta row carries Δ chip + 📌 pin, pin last; no 💬 pill", () =>
   const chip = at(metaRow, 'class="delta', "Δ chip in meta row");
   const pin = at(metaRow, "snap-pin", "📌 pin in meta row");
   assert(chip < pin, "meta row order must be Δ · 📌");
-  // the dashboard no longer carries the comments pill — a gauge card is a
+  // the dashboard no longer carries the comments pill. A gauge card is a
   // number, and the jump belongs on the crosstab question card where the
   // verbatims are the point. It must not come back by accident.
   assert(html.indexOf("ql-jumpbtn") === -1, "no 💬 pill on a dashboard gauge card");
@@ -160,7 +161,7 @@ run("the band legend states the thresholds the cards are ACTUALLY coloured on", 
     .indexOf("set for each metric") !== -1, "mixed thresholds claim no single band");
 });
 
-run("the analyst insight on a gauge card WRAPS — never one ellipsised line", () => {
+run("the analyst insight on a gauge card WRAPS, never one ellipsised line", () => {
   const gi = CSS.match(/\.gauge \.gi\s*\{[^}]*\}/);
   assert(gi, ".gauge .gi rule exists");
   assert(gi[0].indexOf("white-space: nowrap") === -1,
@@ -201,12 +202,12 @@ run("A1: gauge meta row carries the base (n=), amber below the reporting thresho
 });
 
 // CSS: the base token is muted grey, amber when low
-run("A1: base token style — muted grey by default, amber .low", () => {
+run("A1: base token style. Muted grey by default, amber .low", () => {
   assert(/\.gmeta \.gn\s*\{[^}]*var\(--faint\)/.test(CSS), "n is muted grey");
   assert(/\.gmeta \.gn\.low\s*\{[^}]*#a8842c/.test(CSS), "low base turns amber");
 });
 
-run("A2: shortLabel fallback chain — analyst label wins, title otherwise", () => {
+run("A2: shortLabel fallback chain. Analyst label wins, title otherwise", () => {
   const sb = viewsSandbox();
   const d2 = sb.TR.d2;
   eq(d2.shortLabel({ short_label: "Short", title: "Long" }), "Short", "short wins");
@@ -221,7 +222,7 @@ run("A2: gauge card + pin title use short_label, tooltip keeps the full question
   const html = sb.TR.views._gaugeCardHtml(withShort.q, withShort.model);
   assert(html.indexOf('<span class="gt">Registration experience</span>') !== -1,
     "card title is the short label");
-  assert(html.indexOf('data-snap-title="Q8 — Registration experience"') !== -1,
+  assert(html.indexOf('data-snap-title="Q8: Registration experience"') !== -1,
     "default pin title is the short label");
   assert(html.indexOf('title="' + Q_LONG_TITLE) !== -1, "tooltip keeps the full title");
   const noShort = gaugeFixture();
@@ -234,13 +235,13 @@ run("A2: exhibit default pin titles prefer the model's short_label", () => {
   load(sb, "30x_exhibit.js");
   const ex = sb.TR.exhibit;
   eq(ex.titleFor({}, [{ code: "Q8", title: "Long", short_label: "Short" }]),
-    "Q8 — Short", "short label wins");
-  eq(ex.titleFor({}, [{ code: "Q8", title: "Long" }]), "Q8 — Long", "fallback to title");
+    "Q8: Short", "short label wins");
+  eq(ex.titleFor({}, [{ code: "Q8", title: "Long" }]), "Q8: Long", "fallback to title");
   eq(ex.titleFor({ title: "Analyst title" }, [{ code: "Q8", title: "Long" }]),
     "Analyst title", "explicit titles always win");
 });
 
-run("A5: one mean/index format — fmt.score shared by dashboard and tracking", () => {
+run("A5: one mean/index format. Fmt.score shared by dashboard and tracking", () => {
   const sb = viewsSandbox();
   eq(sb.TR.fmt.score(8.2), "8.2", "1 decimal");
   eq(sb.TR.fmt.score(8), "8.0", "whole means keep the decimal");
@@ -252,7 +253,7 @@ run("A5: one mean/index format — fmt.score shared by dashboard and tracking", 
     "gauge score uses fmt.score");
 });
 
-run("A4: dashboard PE box — full sentence first, removed once seen (header ⓘ covers it)", () => {
+run("A4: dashboard PE box. Full sentence first, removed once seen (header ⓘ covers it)", () => {
   const sb = viewsSandbox();
   const qs = [{ code: "Q8" }];
   const heatModels = { Q8: { columns: [{ label: "Total", base: 400 },
@@ -263,7 +264,7 @@ run("A4: dashboard PE box — full sentence first, removed once seen (header ⓘ
   assert(full.indexOf("Durban") !== -1, "names the smallest cut");
   sb.__peCollapsed = true;
   const collapsed = sb.TR.views._moeChipHtml(qs, heatModels);
-  assert(collapsed === "", "dashboard PE box drops away once seen — no duplicate ⓘ (the header covers it)");
+  assert(collapsed === "", "dashboard PE box drops away once seen. No duplicate ⓘ (the header covers it)");
 });
 
 /* ---------------- sandbox B: reader (strip + legend + persistence) ---------------- */
@@ -283,6 +284,7 @@ function readerSandbox(opts) {
   installText(sb);
   load(sb, "00_namespace.js");
   load(sb, "01_format.js");
+  load(sb, "21_stats.js");                    // real level wording (95%/80%)
   const TR = sb.TR;
   TR.charts = { clip: (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s)) };
   TR.AGG = { project: opts.project || { wave: "Wave 2 - Jun 2026" },
@@ -291,14 +293,15 @@ function readerSandbox(opts) {
   TR.d2 = {
     state: { tab: "dashboard", banner: "", filters: opts.filters || [] },
     filterDescription: () => "Q6: Female",
-    bannerDescription: () => "Composite banner — Leaders (2 groups vs the rest)",
+    bannerDescription: () => "Composite banner. Leaders (2 groups vs the rest)",
     hasMicrodata: () => !!(TR.MICRO && TR.MICRO.answers),
     storeKey: (base) => base + ":proj"
   };
-  TR.stats = {
-    mask: () => opts.mask || [1, 1, 0, 0],
-    maskCount: (m) => m.reduce((a, b) => a + b, 0)
-  };
+  // Stub the microdata helpers ONTO the real stats module. Replacing it would
+  // take the level wording (levelPrimary/levelVars) with it, which the legend
+  // and the reader sentences now read from.
+  TR.stats.mask = () => opts.mask || [1, 1, 0, 0];
+  TR.stats.maskCount = (m) => m.reduce((a, b) => a + b, 0);
   TR.disclosure = { audienceBase: () => (TR.d2.state.filters.length
     ? TR.stats.maskCount(TR.stats.mask()) : (TR.MICRO ? TR.MICRO.n : null)) };
   TR.conf = { labels: () => ({ moe_name: "Precision Estimate", moe_abbrev: "PE" }),
@@ -308,7 +311,7 @@ function readerSandbox(opts) {
   return sb;
 }
 
-run("A3: strip under a filter — cut + live n + wave", () => {
+run("A3: strip under a filter. Cut + live n + wave", () => {
   const sb = readerSandbox({ filters: [{ q: "Q6", rows: [1] }] });
   const html = sb.TR.reader.audienceStripHtml("dashboard");
   assert(html.indexOf("Q6: Female") !== -1, "names the cut");
@@ -316,7 +319,7 @@ run("A3: strip under a filter — cut + live n + wave", () => {
   assert(html.indexOf("Wave 2 - Jun 2026") !== -1, "wave label present");
 });
 
-run("A3: strip with no filter — Everyone + full n", () => {
+run("A3: strip with no filter. Everyone + full n", () => {
   const html = readerSandbox({}).TR.reader.audienceStripHtml("crosstabs");
   assert(html.indexOf("Everyone") !== -1, "unfiltered cut is Everyone");
   assert(html.indexOf("n=4") !== -1, "full sample base");
@@ -333,7 +336,7 @@ run("A3: Patterns tab states the full published sample even when a filter is liv
   assert(trk.indexOf("full published sample") !== -1, "tracking states it too");
 });
 
-run("A3: weighted report — strip adds weighted + effective bases for the cut", () => {
+run("A3: weighted report. Strip adds weighted + effective bases for the cut", () => {
   const sb = readerSandbox({
     project: { weighted: true, wave: "W2" },
     micro: { n: 4, answers: {}, weights: [2, 2, 1, 1] },
@@ -362,7 +365,7 @@ run("A4: legend panel contains all five explains", () => {
   assert(html.indexOf('data-txt-key="reader.legend.sig_letters"') !== -1,
     "1: sig letters incl. 80%");
   assert(html.split('data-txt-key="reader.legend.arrows"').length - 1 === 2,
-    "2: ▲▵ arrows — both bullets of the one authored entry");
+    "2: ▲▵ arrows. Both bullets of the one authored entry");
   assert(html.indexOf("strong ≥75%") !== -1 && html.indexOf("moderate 50–74%") !== -1 &&
     html.indexOf("weak") !== -1, "3: bands");
   assert(html.indexOf("Precision Estimate") !== -1 &&
@@ -393,7 +396,7 @@ run("A4: the band legend renders symbols, not raw entities", () => {
     "and the less-than is still escaped exactly once, so it renders as <");
 });
 
-run("A4: PE collapse persists per report — expanded all first session, ⓘ after", () => {
+run("A4: PE collapse persists per report. Expanded all first session, ⓘ after", () => {
   const storage = {};
   const first = readerSandbox({ storage });
   eq(first.TR.reader.peCollapsed(), false, "first ever view stays expanded");

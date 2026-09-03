@@ -652,7 +652,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES",
       "YES",
       "YES",
-      "NO",
+      "YES",
       "",
       "NO",
       "MDSHARE",

@@ -120,7 +120,7 @@ check_single_column <- function(question, survey_data, numeric_types, error_log)
   question_code <- trimws(question$QuestionCode)
   var_type <- question$Variable_Type
 
-  # Skip multi-column types — they have their own column-expansion check functions
+  # Skip multi-column types. They have their own column-expansion check functions
   if (var_type %in% c("Ranking", "Allocation")) {
     return(error_log)
   }
@@ -360,7 +360,7 @@ check_numeric_min_max <- function(question_code, question_info, survey_data, err
 
 #' Does this options table define numeric bins at all?
 #'
-#' A Numeric question can have Options rows without being binned — the rows are
+#' A Numeric question can have Options rows without being binned. The rows are
 #' display labels, and the Options sheet carries no Min/Max columns. Bin
 #' validation only applies when both columns are present.
 #'
@@ -417,7 +417,7 @@ check_bin_overlaps <- function(question_code, option_info, error_log) {
 
   # Without Min and Max columns there are no bins to overlap. Reading
   # option_info$Min when the column is absent gives NULL, and as.numeric(NULL)
-  # is numeric(0) — which makes is.na() return logical(0) and the || below
+  # is numeric(0), which makes is.na() return logical(0) and the || below
   # evaluate to NA, so the `if` failed with "missing value where TRUE/FALSE
   # needed" and took the whole validation down. check_bin_structure() has always
   # guarded this; this function never did.
@@ -528,7 +528,7 @@ validate_numeric_question <- function(question_info, option_info, survey_data, e
   #
   # Having Options rows is not the same as being binned. A Numeric question can
   # carry display labels on a structure whose Options sheet has no Min/Max
-  # columns at all — that is a question with no bins, not a question with broken
+  # columns at all. That is a question with no bins, not a question with broken
   # bins, and there is nothing here to check. Gating on the rows alone sent
   # every such question into the bin checks, where check_bin_structure() logged
   # a "Missing Bin Columns" Error per question and check_bin_overlaps() crashed

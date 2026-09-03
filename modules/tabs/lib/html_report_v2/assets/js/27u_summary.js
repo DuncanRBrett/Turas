@@ -1,12 +1,12 @@
 /**
- * Tracking Summary view — the tracker module's summary surface rebuilt on
+ * Tracking Summary view. The tracker module's summary surface rebuilt on
  * the published wave history: KPI hero cards (threshold-banded, sparkline,
  * change vs previous wave), the wave pulse bar (significant ups / downs /
  * stable), significant-changes cards across Total AND banner segments with
  * a segment filter, and the metric × segment significance matrix.
  *
  * Key metrics are evaluative only (one mean row + one top-box NET per
- * question — see 27t). Significance: proportions via pooled z; means,
+ * question. See 27t). Significance: proportions via pooled z; means,
  * indexes and NPS via a Welch test on the spread derived from each
  * wave's published category distribution. The matrix shows the top-box
  * NETs (one row per question).
@@ -26,13 +26,13 @@
   }
 
   /**
-   * Prior waves that this wave pairs with nothing from — {priors, waveLabels}
+   * Prior waves that this wave pairs with nothing from, {priors, waveLabels}
    * when history loaded but no question matched it, else null.
    *
    * The cross-wave key changes shape with the R-side config: the canonical
    * question code when a Question_Mapping is loaded, the normalised title when
    * one is not. History built under one and a wave built under the other can
-   * never meet, and every metric then has no previous value — which the pulse
+   * never meet, and every metric then has no previous value, which the pulse
    * would otherwise render as "0 significant increases · 0 decreases · 0
    * stable". That reads as "nothing moved this wave" when the truth is
    * "nothing was compared", so the render says the latter instead.
@@ -95,21 +95,22 @@
       '<span class="kpi-chg ' + (change >= 0 ? "up" : "down") + '">' +
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? trk.yLabel(card.cells[card.cells.length - 2].year) : "") +
-      (last.sig_prev ? " · sig" : last.soft_prev ? " · sig 80%" : "") + "</span>";
+      (last.sig_prev ? " · sig"
+        : last.soft_prev ? " · sig " + TR.stats.levelSecondary() : "") + "</span>";
     // interval in the tooltip: same SD source as the sig test (trk.sdAt)
     var sd = trk.sdAt(m, null, TR.render.currentYear());
     var bounds = sd === null || !last.base ? null
       : TR.conf.meanCI(last.value, sd, last.base);
     var intervalTip = bounds
-      ? " — 95% " + TR.conf.labels().interval_abbrev + " " +
+      ? ", 95% " + TR.conf.labels().interval_abbrev + " " +
         TR.conf.fmtRange(bounds.lo, bounds.hi, true) +
         " (n=" + fmt.base(last.base) + ")"
       : "";
     return '<button class="kpi band-' + card.band + '" data-vis="' + m.key +
       '" title="' + fmt.escapeHtml(m.title) + intervalTip +
-      ' — click to visualise">' +
+      ', click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
-      fmt.escapeHtml(m.short || m.title) + "</span>" +   // full question text — wraps, never ellipsed
+      fmt.escapeHtml(m.short || m.title) + "</span>" +   // full question text. Wraps, never ellipsed
       '<span class="kpi-value">' + trk.fmtVal(last.value, m.isMean, m.q) +
       '<span class="kpi-type">' + card.type + "</span></span>" +
       chip + '<span class="kpi-spark">' + TR.render.sparkline(
@@ -176,11 +177,12 @@
       '<span class="sig-dir">' + arrow + " " +
       trk.changeText(c.change, c.metric.isMean) + " · " +
       fmt.escapeHtml(c.segment) +
-      (soft ? ' <span class="sig-badge">80%</span>' : "") + "</span>" +
+      (soft ? ' <span class="sig-badge">' + TR.stats.levelSecondary() +
+        "</span>" : "") + "</span>" +
       '<span class="sig-title">' +
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
-      fmt.escapeHtml(c.metric.label) + " — " +
+      fmt.escapeHtml(c.metric.label) + ": " +
       trk.fmtVal(c.prev.value, c.metric.isMean, c.metric.q) + " in " + trk.yLabel(c.prev.year) +
       " → <strong>" + trk.fmtVal(c.cur.value, c.metric.isMean, c.metric.q) +
       "</strong> in " + trk.yLabel(c.cur.year) + "</span></button>";
@@ -202,12 +204,14 @@
         return '<option value="' + g.id + '"' + (group === g.id ? " selected" : "") +
           ">" + fmt.escapeHtml(g.name) + "</option>";
       }).join("") + "</select></div>" +
-      // The 80% clause is spliced in only when that level is on, so it is its
-      // own authored phrase rather than a branch inside the sentence.
-      TR.txt.block("tracking.heatmap.legend", {
-        soft_clause: { html: TR.d2.state.sigMode === "dual"
-          ? TR.txt("tracking.heatmap.soft_clause") : "" }
-      }, { cls: "trknote" }) +
+      // The secondary-level clause is spliced in only when that level is on, so
+      // it is its own authored phrase rather than a branch inside the sentence.
+      // Both entries name the levels, so both get the level vars.
+      TR.txt.block("tracking.heatmap.legend",
+        Object.assign(TR.stats.levelVars(), {
+          soft_clause: { html: TR.stats.dualMode()
+            ? TR.txt("tracking.heatmap.soft_clause", TR.stats.levelVars()) : "" }
+        }), { cls: "trknote" }) +
       '<div class="trkwrap"><table class="moved trk hm"><thead><tr><th>Metric</th>' +
       "<th class='wv'>Total</th>" + segs.map(function (s) {
         return "<th class='wv'>" + fmt.escapeHtml(TR.charts.clip(s.label, 16)) + "</th>";
@@ -219,16 +223,18 @@
         if (!last || last.change_prev === null) return '<td class="wv none">–</td>';
         var prev = cells[cells.length - 2];
         var dir = last.change_prev >= 0;
-        // strong (95%) = filled triangle + full colour; soft (80%, dual mode
-        // only) = hollow triangle + lighter "soft" tint; else direction-only.
+        // strong (primary level) = filled triangle + full colour; soft
+        // (secondary level, dual mode only) = hollow triangle + lighter "soft"
+        // tint; else direction-only.
         var cls = last.sig_prev ? (dir ? "hm-up" : "hm-down")
           : last.soft_prev ? (dir ? "hm-up soft" : "hm-down soft") : "hm-flat";
         var mark = last.sig_prev ? (dir ? "▲" : "▼")
           : last.soft_prev ? (dir ? "△" : "▽") : "";
-        // "not significant" is a claim a TEST made — an untestable pair (no
+        // "not significant" is a claim a TEST made. An untestable pair (no
         // base/spread on one side) must say so instead (review 2026-08, I23).
-        var lvlTip = last.sig_prev ? " · significant at 95%"
-          : last.soft_prev ? " · significant at 80% (not 95%)"
+        var lvlTip = last.sig_prev ? " · significant at " + TR.stats.levelPrimary()
+          : last.soft_prev ? " · significant at " + TR.stats.levelSecondary() +
+            " (not " + TR.stats.levelPrimary() + ")"
           : last.tested_prev ? " · not significant"
           : " · not testable (this wave pair lacks the base or spread a test needs)";
         return '<td class="wv ' + cls + '" title="' +
@@ -238,7 +244,7 @@
           trk.changeText(last.change_prev, false).replace("pp", "") + "</td>";
       }).join("");
       html.push('<tr><td class="lab"><button class="linklike" data-seg-metric="' +
-        m.key + '" title="' + fmt.escapeHtml(m.title + " — " + m.label) + '">' +
+        m.key + '" title="' + fmt.escapeHtml(m.title + ": " + m.label) + '">' +
         m.code + " · " + fmt.escapeHtml(TR.charts.clip(m.title, 36)) +
         '</button><div class="idxd">' +
         fmt.escapeHtml(TR.charts.clip(m.label, 32)) + "</div></td>" +
@@ -254,7 +260,7 @@
     var trk = TR.trk;
     // Nothing paired: say so plainly rather than rendering zeros that read as
     // findings. The explainers below are the scorecard's method notes, which
-    // describe a comparison that did not happen — they stay off too.
+    // describe a comparison that did not happen. They stay off too.
     var unmatched = summary.unmatchedHistory();
     if (unmatched) {
       host.innerHTML = unmatchedHtml(unmatched);
@@ -263,7 +269,7 @@
     var cards = kpiCards();
     var changes = sigChanges();
     // "Stable" is a TESTED verdict: a metric whose wave pair could not be
-    // tested (no base/spread in the history) must not be counted as stable —
+    // tested (no base/spread in the history) must not be counted as stable,
     // it gets its own "not testable" tally (review 2026-08, I23).
     var keyMetrics = trk.metricList("key").filter(function (m) {
       return !m.diff;
@@ -272,7 +278,7 @@
     keyMetrics.forEach(function (m) {
       var last = lastCell(trk.points(m, null));
       if (!last || last.change_prev === null || last.change_prev === undefined) {
-        return;   // no comparison at all (new metric) — in no tally
+        return;   // no comparison at all (new metric), in no tally
       }
       if (last.tested_prev) tested++; else notTestable++;
     });
@@ -282,11 +288,11 @@
     var totalDown = changes.filter(function (c) {
       return c.segment === "Total" && c.change < 0;
     }).length;
-    // dual mode only: Total metrics that moved enough for 80% but not 95% —
+    // dual mode only: Total metrics that moved enough for 80% but not 95%,
     // surfaced as a separate "nearly significant" tally so they no longer hide
     // inside "stable" (soft_prev is false whenever sig_prev is true, so a
     // strong move is never also counted here).
-    var totalSoft = TR.d2.state.sigMode === "dual"
+    var totalSoft = TR.stats.dualMode()
       ? keyMetrics.filter(function (m) {
             var last = lastCell(trk.points(m, null));
             return last && last.soft_prev;
@@ -306,7 +312,7 @@
       '<span class="pulse-chip up">▲ ' + totalUp + " significant increases</span>" +
       '<span class="pulse-chip down">▼ ' + totalDown + " significant decreases</span>" +
       (totalSoft ? '<span class="pulse-chip soft">≈ ' + totalSoft +
-        " nearly significant (80%)</span>" : "") +
+        " nearly significant (" + TR.stats.levelSecondary() + ")</span>" : "") +
       '<span class="pulse-chip">→ ' +
       Math.max(tested - totalUp - totalDown - totalSoft, 0) +
       " stable</span>" +
@@ -317,9 +323,13 @@
       fmt.escapeHtml(TR.txt("tracking.pulse.sigmode_tip")) + '">Significance ' +
       '<select data-trk-sigmode>' +
       '<option value="off"' + (sm === "off" ? " selected" : "") + ">off</option>" +
-      '<option value="95"' + (sm === "95" ? " selected" : "") + ">95%</option>" +
-      '<option value="dual"' + (sm === "dual" ? " selected" : "") +
-      ">95% + 80%</option></select></label>" +
+      '<option value="95"' + (sm === "95" ? " selected" : "") + ">" +
+      TR.stats.levelPrimary() + "</option>" +
+      (TR.stats.hasSecondary()
+        ? '<option value="dual"' + (sm === "dual" ? " selected" : "") + ">" +
+          TR.stats.levelPrimary() + " + " + TR.stats.levelSecondary() + "</option>"
+        : "") +
+      "</select></label>" +
       '<span class="trknote">Total only · all key metrics · latest wave vs ' +
       "previous</span></div></div>");
 
@@ -342,11 +352,11 @@
 
     // The 80% "nearly significant" moves as their own cards, so the pulse's
     // "≈ N nearly significant" count is something you can actually inspect.
-    var softCards = TR.d2.state.sigMode === "dual" ? softChanges() : [];
+    var softCards = TR.stats.dualMode() ? softChanges() : [];
     if (softCards.length) {
       html.push('<div class="card"><div class="heathead"><h3>Nearly significant ' +
-        "· 80% level · latest wave</h3></div>" +
-        TR.txt.block("tracking.soft.intro", null, { cls: "trknote" }) +
+        "· " + TR.stats.levelSecondary() + " level · latest wave</h3></div>" +
+        TR.txt.block("tracking.soft.intro", TR.stats.levelVars(), { cls: "trknote" }) +
         '<div class="sigcards">' +
         softCards.map(function (c) { return sigCardHtml(c, true); }).join("") +
         "</div></div>");
@@ -354,7 +364,7 @@
 
     html.push(matrixHtml());
     // How-tested detail lives in a small collapsed callout at the foot of the
-    // scorecard — off the headline, but one click away for anyone who wants the
+    // scorecard. Off the headline, but one click away for anyone who wants the
     // method behind the wave-on-wave chips.
     html.push('<div class="callout collapsed footer-callout">' +
       '<button class="callout-head" data-callout>' +
@@ -418,7 +428,7 @@
         trk.rerender();
       });
     }
-    // significance level — shared global setting (also drives the Crosstabs tab)
+    // significance level. Shared global setting (also drives the Crosstabs tab)
     var sigModeSel = host.querySelector("[data-trk-sigmode]");
     if (sigModeSel) {
       sigModeSel.addEventListener("change", function () {

@@ -1,13 +1,13 @@
 # ==============================================================================
-# TABS — AI INSIGHTS STEP (sidecar refresh)
+# TABS. AI INSIGHTS STEP (sidecar refresh)
 # ==============================================================================
 # Refreshes the AI insights sidecar (<config>_ai_insights.json) that the v2
 # report's data layer reads (build_dl_ai in data_layer_writer.R): the per-question
 # callouts the model flagged as noteworthy, plus the executive summary.
 #
 # This ran inside the classic HTML report's orchestrator until that report was
-# retired (2026-08). It is a pipeline step in its own right — the insights are
-# read by the interactive report, not by any HTML the classic writer produced —
+# retired (2026-08). It is a pipeline step in its own right. The insights are
+# read by the interactive report, not by any HTML the classic writer produced,
 # so it now runs from run_crosstabs.R, gated only on enable_ai_insights.
 #
 # The AI modules are sourced lazily (here, not at load) so a run with AI off
@@ -20,7 +20,7 @@
 #' Does nothing unless \code{enable_ai_insights} is TRUE and the config's own
 #' path is known (the sidecar name is derived from it). Creates a default
 #' sidecar on first use, then asks the configured model for insights. Every
-#' failure degrades to a console warning — AI is additive, and neither the
+#' failure degrades to a console warning. AI is additive, and neither the
 #' Excel workbook nor the interactive report depends on it.
 #'
 #' @param all_results List of question results
@@ -30,7 +30,7 @@
 #'
 #' @return The insights list from \code{generate_all_insights()}, or NULL when
 #'   AI is off, the sidecar path cannot be derived, or generation failed. The
-#'   sidecar file on disk is the actual product — the v2 data layer reads it.
+#'   sidecar file on disk is the actual product. The v2 data layer reads it.
 #'
 #' @examples
 #' \dontrun{
@@ -55,7 +55,7 @@ generate_ai_insights_sidecar <- function(all_results, banner_info, config_obj) {
   }
 
   if (is.null(ai_sidecar_path)) {
-    cat("    [WARNING] Config file path unknown — cannot locate the AI sidecar.\n")
+    cat("    [WARNING] Config file path unknown. Cannot locate the AI sidecar.\n")
     cat("    Continuing without AI insights.\n")
     return(NULL)
   }

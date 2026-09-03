@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Question audience gate — the Selection sheet's FilterLabel / BaseFilter has
+ * Question audience gate. The Selection sheet's FilterLabel / BaseFilter has
  * to reach the v2 report. A routed question ("asked only of shops that allow
  * signwriting") publishes a base smaller than the sample; without the label
  * the reader sees the shortfall and never the reason.
  *
  * A1 d2.audienceNote: FilterLabel wins, raw BaseFilter is the fallback, ""
- *    when neither is set — and defensive on reports built before the fields
+ *    when neither is set, and defensive on reports built before the fields
  *    existed.
  * A2 cards2._audienceHtml: renders "Base: <label>", escaped; "" when there
- *    is no audience — and the crosstab card actually calls it, between the
+ *    is no audience, and the crosstab card actually calls it, between the
  *    title and the live-filter context strip.
  * A3 The model carries it (viewModel.audience), so every surface reading a
  *    model sees the audience without re-reading the question.
@@ -57,7 +57,7 @@ function dataSandbox() {
   return sb;
 }
 
-console.log("Question audience (Selection FilterLabel / BaseFilter) — suite:");
+console.log("Question audience (Selection FilterLabel / BaseFilter): suite:");
 
 /* ---------------- A1: the fallback chain ---------------- */
 
@@ -84,7 +84,7 @@ run("A1: routing-only questions (label, no BaseFilter) still carry it", () => {
     "Filter = Allows signwriting in your shop", "label with no BaseFilter");
 });
 
-run("A1: defensive — null question, blank strings, pre-feature data layers", () => {
+run("A1: defensive. Null question, blank strings, pre-feature data layers", () => {
   const { TR } = dataSandbox();
   eq(TR.d2.audienceNote(null), "", "null-safe");
   eq(TR.d2.audienceNote({ code: "Q1", filter_label: "   ", base_filter: "  " }), "",

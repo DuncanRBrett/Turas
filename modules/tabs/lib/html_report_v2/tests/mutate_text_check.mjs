@@ -5,8 +5,8 @@
 // would go red on their next edit and, worse, would read as a code failure.
 //
 // This check makes that rule enforceable rather than aspirational: it reruns
-// the whole node suite against a MUTATED catalogue — every authored value
-// replaced with a marker string — and requires it to pass exactly as it does
+// the whole node suite against a MUTATED catalogue. Every authored value
+// replaced with a marker string, and requires it to pass exactly as it does
 // against the real one. Anything still pinned to real wording fails here.
 //
 // Run it after every stage of the text extraction:
@@ -52,4 +52,4 @@ if (failedFiles.length) {
   console.log("Assert on TXT(key) from _text.mjs, or on the data-txt-key attribute, instead.");
   process.exit(1);
 }
-console.log("MUTATION CHECK PASSED — no test depends on authored wording.");
+console.log("MUTATION CHECK PASSED. No test depends on authored wording.");
