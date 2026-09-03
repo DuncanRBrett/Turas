@@ -44,10 +44,13 @@ the two tabs link to them.
 
 ## What to look for
 
-- The MaxDiff tab and the MaxDiff simulator both say the utilities are the
-  empirical-Bayes fallback, because cmdstanr is not installed. The MDSHARE
-  QuestionText in the crosstabs carries the same stamp. With cmdstanr
-  installed the same script fits the Stan model and the stamp disappears.
+- The MaxDiff tab and the MaxDiff simulator name the estimator that actually
+  ran. With cmdstanr and CmdStan installed the script fits the Stan model and
+  nothing is stamped. Without them the run falls back to empirical Bayes, and
+  the tab, the simulator and the MDSHARE QuestionText in the crosstabs all
+  carry the approximate stamp. The MaxDiff tab's Spread (SD) column is the
+  variation across respondents on either path; a Mean SE column appears only
+  when a posterior produced one, so only under Stan.
 - The Conjoint tab shows importance and part-worths with honest intervals
   (posterior standard errors, heterogeneity shown separately).
 - In the crosstabs, MDSHARE by customer segment should show Budget high on
