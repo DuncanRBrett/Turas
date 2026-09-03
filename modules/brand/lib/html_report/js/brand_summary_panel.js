@@ -795,6 +795,7 @@
     var selected = text.substring(start, end);
     var replacement = before + (selected || 'text') + after;
     editor.value = text.substring(0, start) + replacement + text.substring(end);
+    if (window._brSyncCommentary) window._brSyncCommentary(editor);
     editor.focus();
     var newPos = start + before.length + (selected || 'text').length;
     editor.setSelectionRange(newPos, newPos);

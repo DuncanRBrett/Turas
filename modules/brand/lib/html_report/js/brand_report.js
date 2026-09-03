@@ -178,8 +178,39 @@
     });
   }
 
+  // --- Commentary persistence: one mechanism for every textarea ---
+  // A textarea's .value is live state that outerHTML never sees. Its text
+  // content is what a saved file carries and what a browser loads back as
+  // the initial value. Mirroring value into text content on every input
+  // event (and once more just before Save serialises the page) makes every
+  // commentary box in the report survive Save and reopen: the generic
+  // .br-insight-editor, the funnel and cat-buying .fn-insight-textarea, the
+  // MA / WoM / Branded Reach / Ad Hoc / Audience Lens .ma-insight-box-text
+  // and the Summary .brsum-insight-editor. The MA and Audience Lens boxes
+  // used sessionStorage / localStorage before, which a saved file never
+  // carried and which two clients' reports sharing a category code
+  // overwrote in one browser; both are retired (review 2026-07-12, C2 + H3).
+  // Mirrors TurasPins, whose textContent store already survives Save.
+  window._brSyncCommentary = function(ta) {
+    if (!ta || !ta.tagName || ta.tagName !== "TEXTAREA") return;
+    if (ta.textContent !== ta.value) ta.textContent = ta.value;
+  };
+  window._brSyncAllCommentary = function() {
+    document.querySelectorAll("textarea").forEach(window._brSyncCommentary);
+  };
+  function initCommentaryPersistence() {
+    ["input", "change"].forEach(function(evt) {
+      document.addEventListener(evt, function(ev) {
+        window._brSyncCommentary(ev.target);
+      }, true);
+    });
+  }
+
   // --- Save report ---
   window._brSaveReport = function() {
+    // Belt and braces: mirror every textarea once more before serialising,
+    // in case a panel wrote .value programmatically without an input event.
+    window._brSyncAllCommentary();
     var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
     var blob = new Blob([html], { type: "text/html" });
     var meta = document.querySelector('meta[name="turas-source-filename"]');
@@ -257,6 +288,7 @@
   // --- Init ---
   function init() {
     initTableSort();
+    initCommentaryPersistence();
   }
 
   if (document.readyState === "loading") {

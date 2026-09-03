@@ -20,7 +20,8 @@
    - Column sort
    - Client-side .xls export
    - Pin dropdown → window.TurasPin.pin()
-   - Full-width editable insight box (persists in sessionStorage)
+   - Full-width editable insight box (persists in the saved HTML via the
+     report-wide textarea mirror in brand_report.js)
    ========================================================================== */
 
 (function () {
@@ -1976,31 +1977,18 @@
   }
 
   // -------------------------------------------------------------- insight box
-  function insightKey(panel, stim) {
-    var pd = panel.__maData;
-    var cat = pd && pd.meta && pd.meta.category_label;
-    return 'turas.ma.insight:' + (cat || '') + ':' + stim;
-  }
-
+  // Persistence is the report-wide textarea mirror in brand_report.js
+  // (window._brSyncCommentary): the box's text content IS the store, so
+  // Save carries it and reopening restores it. The sessionStorage copy
+  // that lived here was invisible to Save and vanished with the tab.
   function bindInsightBoxPersistence(panel) {
-    panel.querySelectorAll('.ma-insight-box-text').forEach(function (ta) {
-      var stim = ta.getAttribute('data-ma-stim');
-      var key = insightKey(panel, stim);
-      try {
-        var saved = sessionStorage.getItem(key);
-        if (saved) ta.value = saved;
-      } catch (e) { /* ignore */ }
-      ta.addEventListener('input', function () {
-        try { sessionStorage.setItem(key, ta.value); } catch (e) {}
-      });
-    });
     panel.querySelectorAll('.ma-insight-box-clear').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var stim = btn.getAttribute('data-ma-stim');
         var ta = panel.querySelector('.ma-insight-box-text[data-ma-stim="' + stim + '"]');
         if (ta) {
           ta.value = '';
-          try { sessionStorage.removeItem(insightKey(panel, stim)); } catch (e) {}
+          if (window._brSyncCommentary) window._brSyncCommentary(ta);
         }
       });
     });

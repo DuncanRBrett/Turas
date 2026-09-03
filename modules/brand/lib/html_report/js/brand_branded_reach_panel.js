@@ -39,7 +39,7 @@
     if (clearBtn) {
       clearBtn.addEventListener("click", function () {
         var ta = panel.querySelector(".br-reach-insight-box .ma-insight-box-text");
-        if (ta) { ta.value = ""; ta.focus(); }
+        if (ta) { ta.value = ""; if (window._brSyncCommentary) window._brSyncCommentary(ta); ta.focus(); }
       });
     }
   }
