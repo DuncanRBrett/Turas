@@ -1,0 +1,9 @@
+{"compact":true,"simplify":true,
+ "stringArray":true,"stringArrayThreshold":1,"stringArrayEncoding":["base64"],"stringArrayShuffle":true,"stringArrayRotate":true,"stringArrayIndexShift":true,
+ "stringArrayWrappersCount":2,"stringArrayWrappersType":"function","stringArrayWrappersChainedCalls":true,
+ "stringArrayCallsTransform":true,"stringArrayCallsTransformThreshold":0.5,
+ "splitStrings":true,"splitStringsChunkLength":12,
+ "transformObjectKeys":true,
+ "identifierNamesGenerator":"mangled-shuffled",
+ "controlFlowFlattening":false,"deadCodeInjection":false,
+ "renameGlobals":false,"renameProperties":false,"selfDefending":false,"disableConsoleOutput":false,"log":false}
