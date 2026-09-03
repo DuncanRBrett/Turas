@@ -61,6 +61,16 @@ keeps `digits = 8`.
 VAS 2026 is on OneDrive and was **not** measured this session. D6's estimate
 for it (about 448 KB, 7.6%) stands unverified.
 
+## 4b. Blindspot 7, the weighted half
+
+The handover warns that every Allocation study so far has been unweighted, so
+weighted and unweighted took the same path and the weighted arithmetic had never
+run. Two things now exercise it. `parity_island_weighted.json` carries Q6 and
+pins R's weighted letters. On the reader side, `allocation_series_tests.mjs` has
+a four-respondent weighted fixture where the weighted mean is 20 and the
+unweighted would be 25, so a path that dropped the weights is visible, and the
+effective base comes back as the Kish 3.0 rather than the raw 4.
+
 ## 5. The rendered-report proof (step 4)
 
 The demo's tabs config was copied to the scratchpad and run there. The report
@@ -129,7 +139,7 @@ Allocation has one per item. It now mirrors `mean_sig_for()` in
 | | baseline (`3f85abb3`) | after |
 |---|---|---|
 | Tabs R suite | 5,294 pass / 0 fail / 1 skip / 0 error | **5,369 / 0 / 1 / 0** |
-| Node gate | 39 files, 1,003 passed, 0 failed | **40 files, 1,026 passed, 0 failed** |
+| Node gate | 39 files, 1,003 passed, 0 failed | **40 files, 1,027 passed, 0 failed** |
 
 Both baselines were run this session before the first edit, not taken from a
 note. Both halves of the cross-engine parity gate are green
@@ -141,7 +151,7 @@ Every new test was run against the code as found first:
 - `test_microdata_numeric.R`: 17 pass / 5 fail / 7 error on the original
   writer, 47 / 0 / 0 with it.
 - `allocation_series_tests.mjs`: 6 passed / 8 failed on the original reader,
-  14 / 0 with it.
+  15 / 0 with it.
 - `diffs_tests.mjs` test 39 fails without the guard.
 
 Three of the four D7 exclusion tests (`takeout_tests.mjs`, `composite_tests.mjs`

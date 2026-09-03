@@ -310,6 +310,37 @@ run("a question code of 'constructor' does not read back the inherited function"
     "a missing code must return null, not Object.prototype.constructor");
 });
 
+/* ---------------- 6b. weighted designs ---------------- */
+// Every allocation study so far (VAS 2026, the Karoo demo) has been unweighted,
+// so TR.MICRO.weights was all 1s and the weighted and unweighted paths were the
+// same path. This is the only place the JS side's weighted allocation arithmetic
+// is exercised at all; the R side's is pinned by parity_island_weighted.json.
+
+run("a weighted design weights the series, and sizes it on the Kish base", () => {
+  // Four respondents, weights 3/1/1/1, one item worth 10/20/30/40.
+  //   weighted mean = (3*10 + 20 + 30 + 40) / 6 = 120/6 = 20
+  //   unweighted mean would be 25, so a path that ignored the weights is visible
+  //   effective base = (Sw)^2 / Sw^2 = 36/12 = 3, below the raw n of 4
+  const micro = {
+    n: 4, answers: { WALLET: [-2, -2, -2, -2] },
+    series: { WALLET: { "0": [10, 20, 30, 40] } },
+    banner_vars: { Sex: [1, 1, 2, 2] }, weights: [3, 1, 1, 1]
+  };
+  sandbox.TR.PREV = null;
+  sandbox.TR.userState = null;
+  sandbox.TR.MICRO = micro;
+  sandbox.TR.AGG = {
+    project: { name: "Weighted allocation", low_base_threshold: 1, weighted: true },
+    banner_groups: [], columns: [{ label: "Total", letter: "", group: null }],
+    questions: []
+  };
+  assert(TR.stats.isWeighted(), "the fixture is a weighted report");
+  const got = TR.stats.seriesMeans({ code: "WALLET" }, 0,
+    [{ member: null }], new Uint8Array(4).fill(1));
+  near(got[0].mean, 20, "weighted mean (25 would mean the weights were ignored)");
+  near(got[0].k, 3, "Kish effective base, not the raw n of 4");
+});
+
 /* ---------------- 7. the Excel export of the computed view ---------------- */
 
 run("the Excel export carries the recomputed means, not the published ones", () => {
