@@ -349,15 +349,39 @@ check_numeric_data_types <- function(questions_df, survey_data, selection_df,
 }
 
 
+#' Message for a Rating question flagged by the CreateIndex check
+#'
+#' Rating questions get their summary row from calculate_rating_mean(), which
+#' scores each response from OptionValue (falling back to a numeric OptionText)
+#' and never reads Index_Weight. The warning therefore points at the columns
+#' that actually decide whether a mean row appears.
+#'
+#' @param q_code Character, the question code
+#' @return Character, the warning message
+#' @keywords internal
+rating_index_message <- function(q_code) {
+  sprintf(
+    "Question '%s' (Variable_Type=Rating) has CreateIndex=Y. Rating means are scored from OptionValue (or a numeric OptionText), not Index_Weight, so the missing Index_Weight does not affect this question. If its options carry no numeric OptionValue or OptionText, no mean row will be produced and the question will be missing from the crosstab, from the report, and from the Patterns scan of rated questions.",
+    q_code
+  )
+}
+
+
 #' Check CreateIndex without Index_Weight
 #'
 #' Warns if CreateIndex=Y but no Index_Weight is specified in the Options sheet
 #' of the Survey Structure. Index_Weight belongs with options because each option
 #' within a question can have a different weight for index calculation.
 #'
+#' Ranking and NPS questions are skipped (Index_Weight does not apply to them),
+#' and Rating questions get a message naming OptionValue/OptionText, because
+#' their mean is scored from those columns rather than from Index_Weight.
+#'
 #' @param selection_df Data frame, Selection sheet (has CreateIndex flag)
 #' @param options_df Data frame, Options sheet from Survey Structure (has Index_Weight)
 #' @param error_log Data frame, error log
+#' @param questions_df Data frame, Questions sheet (supplies Variable_Type); when
+#'   NULL every flagged question gets the Likert/index wording
 #' @return Updated error_log
 #' @keywords internal
 check_create_index_config <- function(selection_df, options_df, error_log,
@@ -374,18 +398,28 @@ check_create_index_config <- function(selection_df, options_df, error_log,
     q_code <- index_questions$QuestionCode[i]
 
     # Skip question types where Index_Weight doesn't apply
+    var_type <- NA_character_
     if (!is.null(questions_df)) {
       q_row <- questions_df[questions_df$QuestionCode == q_code, ]
-      if (nrow(q_row) > 0 && q_row$Variable_Type[1] %in% c("Ranking", "NPS")) {
-        next
+      if (nrow(q_row) > 0) {
+        var_type <- as.character(q_row$Variable_Type[1])
+        if (!is.na(var_type) && var_type %in% c("Ranking", "NPS")) {
+          next
+        }
       }
     }
+
+    # Rating questions score their summary row from OptionValue (falling back
+    # to a numeric OptionText). calculate_rating_mean() never reads
+    # Index_Weight, so name the columns that actually drive the mean.
+    is_rating <- !is.na(var_type) && var_type == "Rating"
 
     if (!has_weight_col) {
       error_log <- log_issue(
         error_log, "Preflight", "Missing Index Weight",
-        sprintf("Question '%s' has CreateIndex=Y but Options sheet has no Index_Weight column. Index will use equal weights.",
-                q_code),
+        if (is_rating) rating_index_message(q_code) else
+          sprintf("Question '%s' has CreateIndex=Y but Options sheet has no Index_Weight column. No index row will be produced for this question: it will be missing from the crosstab, from the report, and from the Patterns scan of rated questions. Add an Index_Weight column to the Options sheet and give each option a weight.",
+                  q_code),
         q_code,
         "Warning"
       )
@@ -405,8 +439,9 @@ check_create_index_config <- function(selection_df, options_df, error_log,
         all(trimws(as.character(q_options$Index_Weight)) == "")) {
       error_log <- log_issue(
         error_log, "Preflight", "Missing Index Weight",
-        sprintf("Question '%s' has CreateIndex=Y but no Index_Weight specified in Options. Index will use equal weights.",
-                q_code),
+        if (is_rating) rating_index_message(q_code) else
+          sprintf("Question '%s' has CreateIndex=Y but no Index_Weight specified in Options. No index row will be produced for this question: it will be missing from the crosstab, from the report, and from the Patterns scan of rated questions. Give each option in the Options sheet an Index_Weight.",
+                  q_code),
         q_code,
         "Warning"
       )

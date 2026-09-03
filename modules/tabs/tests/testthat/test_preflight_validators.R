@@ -594,3 +594,138 @@ test_that("a question with no usable option coding is skipped, not crashed on", 
   )
   expect_equal(nrow(result), 0)
 })
+
+
+# ==============================================================================
+# check_create_index_config: the warning must describe what actually happens
+# ==============================================================================
+# calculate_likert_index() (cell_calculator.R) drops options with no
+# Index_Weight and returns NULL when none are left, so the index row is never
+# written. The engine has no equal-weight fallback. calculate_rating_mean()
+# scores from OptionValue / numeric OptionText and never reads Index_Weight.
+
+index_selection_df <- function(codes = "Q1") {
+  make_selection_df(codes = codes, create_index = "Y")
+}
+
+test_that("a Likert question with no Index_Weight column is told no index row is produced", {
+  skip_if(!exists("check_create_index_config", mode = "function"),
+          "check_create_index_config not available")
+
+  options_df <- data.frame(
+    QuestionCode = c("Q1", "Q1"),
+    OptionText = c("Agree", "Disagree"),
+    stringsAsFactors = FALSE
+  )
+  questions_df <- make_questions_df(codes = "Q1", types = "Likert", columns = 1)
+
+  result <- check_create_index_config(index_selection_df(), options_df,
+                                      new_error_log(), questions_df = questions_df)
+
+  expect_equal(nrow(result), 1)
+  expect_equal(result$Severity[1], "Warning")
+  expect_equal(result$Issue_Type[1], "Missing Index Weight")
+  expect_true(grepl("No index row will be produced", result$Description[1], fixed = TRUE))
+  expect_false(grepl("equal weights", result$Description[1], fixed = TRUE))
+})
+
+test_that("a Likert question with an empty Index_Weight column is told the same", {
+  skip_if(!exists("check_create_index_config", mode = "function"),
+          "check_create_index_config not available")
+
+  options_df <- data.frame(
+    QuestionCode = c("Q1", "Q1"),
+    OptionText = c("Agree", "Disagree"),
+    Index_Weight = c(NA_real_, NA_real_),
+    stringsAsFactors = FALSE
+  )
+  questions_df <- make_questions_df(codes = "Q1", types = "Likert", columns = 1)
+
+  result <- check_create_index_config(index_selection_df(), options_df,
+                                      new_error_log(), questions_df = questions_df)
+
+  expect_equal(nrow(result), 1)
+  expect_true(grepl("No index row will be produced", result$Description[1], fixed = TRUE))
+  expect_false(grepl("equal weights", result$Description[1], fixed = TRUE))
+})
+
+test_that("a Likert question with Index_Weight values raises nothing", {
+  skip_if(!exists("check_create_index_config", mode = "function"),
+          "check_create_index_config not available")
+
+  options_df <- data.frame(
+    QuestionCode = c("Q1", "Q1"),
+    OptionText = c("Agree", "Disagree"),
+    Index_Weight = c(100, 0),
+    stringsAsFactors = FALSE
+  )
+  questions_df <- make_questions_df(codes = "Q1", types = "Likert", columns = 1)
+
+  result <- check_create_index_config(index_selection_df(), options_df,
+                                      new_error_log(), questions_df = questions_df)
+
+  expect_equal(nrow(result), 0)
+})
+
+test_that("a Rating question is pointed at OptionValue, not Index_Weight", {
+  skip_if(!exists("check_create_index_config", mode = "function"),
+          "check_create_index_config not available")
+
+  options_df <- data.frame(
+    QuestionCode = c("Q1", "Q1"),
+    OptionText = c("Very good", "Poor"),
+    OptionValue = c(5, 1),
+    stringsAsFactors = FALSE
+  )
+  questions_df <- make_questions_df(codes = "Q1", types = "Rating", columns = 1)
+
+  result <- check_create_index_config(index_selection_df(), options_df,
+                                      new_error_log(), questions_df = questions_df)
+
+  expect_equal(nrow(result), 1)
+  expect_equal(result$Severity[1], "Warning")
+  description <- result$Description[1]
+  expect_true(grepl("OptionValue", description, fixed = TRUE))
+  expect_true(grepl("OptionText", description, fixed = TRUE))
+  expect_false(grepl("equal weights", description, fixed = TRUE))
+  # Rating does not read Index_Weight, so the message must not claim the
+  # missing column is what removes the row.
+  expect_true(grepl("does not affect this question", description, fixed = TRUE))
+})
+
+test_that("Ranking and NPS questions are still skipped by the index check", {
+  skip_if(!exists("check_create_index_config", mode = "function"),
+          "check_create_index_config not available")
+
+  options_df <- data.frame(
+    QuestionCode = c("Q1", "Q2"),
+    OptionText = c("First", "Score"),
+    stringsAsFactors = FALSE
+  )
+  questions_df <- make_questions_df(codes = c("Q1", "Q2"),
+                                    types = c("Ranking", "NPS"),
+                                    columns = c(1, 1))
+
+  result <- check_create_index_config(index_selection_df(codes = c("Q1", "Q2")),
+                                      options_df, new_error_log(),
+                                      questions_df = questions_df)
+
+  expect_equal(nrow(result), 0)
+})
+
+test_that("without a Questions sheet the index wording is used", {
+  skip_if(!exists("check_create_index_config", mode = "function"),
+          "check_create_index_config not available")
+
+  options_df <- data.frame(
+    QuestionCode = c("Q1", "Q1"),
+    OptionText = c("Agree", "Disagree"),
+    stringsAsFactors = FALSE
+  )
+
+  result <- check_create_index_config(index_selection_df(), options_df,
+                                      new_error_log())
+
+  expect_equal(nrow(result), 1)
+  expect_true(grepl("No index row will be produced", result$Description[1], fixed = TRUE))
+})

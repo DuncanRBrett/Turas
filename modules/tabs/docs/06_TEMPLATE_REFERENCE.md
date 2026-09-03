@@ -1876,17 +1876,44 @@ responses that shouldn't be included in average calculations.
 
 **What it does:** Specifies the numeric weight for index calculations.
 
-**Required:** Only if CreateIndex = Y for this question in Selection
-sheet
+**Required:** Only for Likert questions with CreateIndex = Y in the
+Selection sheet
 
 **What to enter:** A number (can be negative or positive, typically -100
 to 100).
 
-**For Rating questions:** Usually the scale value (1, 2, 3, 4, 5).
-
 **For Likert questions:** Custom weights for calculating an index.
 Example: - Strongly Disagree = -100 - Disagree = -50 - Neutral = 0 -
 Agree = 50 - Strongly Agree = 100
+
+Every option needs a weight. Options left blank are dropped from the
+index, and if no option carries a weight, no index row is produced at
+all. The question goes missing from the crosstab, the report and the
+Patterns scan of rated questions.
+
+**For Rating questions:** Not used. A Rating question's mean is scored
+from OptionValue, falling back to a numeric OptionText. See Column:
+OptionValue below. Leaving Index_Weight blank on a Rating question does
+not affect its mean.
+
+### Column: OptionValue
+
+**What it does:** Gives an option a numeric value for calculations,
+used instead of OptionText when present.
+
+**Required:** No
+
+**What to enter:** A number, usually the scale point (1, 2, 3, 4, 5).
+
+**When to use it:** When the value in your data isn't the number you
+want to score. If OptionText is already the numeric scale point ("1",
+"2", "3"), Tabs uses that and you can leave OptionValue blank; if
+OptionText is wording like "Very satisfied", give it an OptionValue.
+
+**What reads it:** Rating means, and the scoring that orders box
+categories and NET rows. Options marked ExcludeFromIndex = Y are left
+out of the mean. If no option on a Rating question carries a numeric
+OptionValue or OptionText, no mean row is produced.
 
 ### Column: BoxCategory
 
@@ -2068,8 +2095,10 @@ Variable_Type is one of the valid values - All required columns are
 present - Multi-mention questions have matching column counts
 
 **Options Sheet:** - Every QuestionCode exists in the Questions sheet -
-OptionText is not empty - For Rating/Likert with CreateIndex:
-Index_Weight is present
+OptionText is not empty - For Likert with CreateIndex: Index_Weight is
+present, since without it no index row is produced. Rating questions are
+warned about too, but their means come from OptionValue (or a numeric
+OptionText), not Index_Weight
 
 **Composite_Metrics Sheet:** - All SourceQuestions exist in Questions
 sheet - Weights count matches SourceQuestions count (if WeightedMean) -
@@ -2103,12 +2132,26 @@ suffix. The Columns field tells Tabs how many columns to look for.
 **Fix:** OptionText must exactly match values in your data. If your data
 has "1" for Male, use "1" as OptionText, not "Male".
 
-### Missing Index_Weight for Rating
+### A Rating question has no mean row
 
-**Symptom:** Mean calculation shows NA or incorrect values
+**Symptom:** The mean is missing, or shows NA, for a Rating question
+with CreateIndex = Y
 
-**Fix:** For Rating questions where CreateIndex = Y, each option needs
-an Index_Weight value matching the numeric scale (1, 2, 3, 4, 5).
+**Fix:** Rating means are scored from OptionValue, falling back to a
+numeric OptionText, not from Index_Weight. Give each option a numeric
+OptionValue (or make OptionText itself the scale point), and check that
+ExcludeFromIndex = Y isn't excluding every option. If no option carries
+a numeric value, no mean row is produced at all.
+
+### A Likert question has no index row
+
+**Symptom:** The index is missing for a Likert question with
+CreateIndex = Y
+
+**Fix:** Give every option an Index_Weight in the Options sheet. Options
+with no weight are dropped from the index, and if none has one, the
+index row is not written. The question also drops out of the report and
+the Patterns scan of rated questions.
 
 ### Composite SourceQuestions don't exist
 
