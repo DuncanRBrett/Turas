@@ -99,8 +99,12 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
+  # turas_save_workbook_atomic.R is on this list because nothing else on the
+  # module's load path (headless recipe or run_maxdiff_gui.R) sourced it, so
+  # every save went through bare openxlsx::saveWorkbook(): the documented
+  # broken-workbook path, and a failed save was never detected (review F5).
   trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
-                 "stats_pack_writer.R")
+                 "stats_pack_writer.R", "turas_save_workbook_atomic.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -1254,10 +1258,22 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
     run_result = run_result
   )
 
+  # A workbook that could not be written is an EVENT (review F5 of the v2
+  # branch): before this, a blocked path printed "Output saved" and the run
+  # closed [TRS PASS] with no workbook on disk. Both a refusal from the
+  # writer and a plain error land in the fold-in with the path named.
   output_path <- tryCatch({
     generate_maxdiff_output(results, config, verbose, run_result)
+  }, turas_refusal = function(e) {
+    cat(conditionMessage(e))
+    note_late(sprintf("Excel output not written: %s", e$code %||% "refused"),
+              code = e$code %||% "MAXD_OUTPUT_FAILED", title = "Excel output not written")
+    NULL
   }, error = function(e) {
+    cat(sprintf("\n[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s\n", conditionMessage(e)))
     message(sprintf("[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s", conditionMessage(e)))
+    note_late(sprintf("Excel output not written: %s", conditionMessage(e)),
+              code = "MAXD_OUTPUT_FAILED", title = "Excel output not written")
     NULL
   })
   results$output_path <- output_path
@@ -1326,10 +1342,22 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
         } else {
           sim_path <- sub("\\.xlsx$", "_simulator.html", output_path)
           sim_result <- generate_maxdiff_html_simulator(results, config, sim_path)
-          results$simulator_path <- sim_result$output_file
+          # A refused simulator is an EVENT (review F4 of the v2 branch): the
+          # status was never read, so a run with no simulator on disk closed
+          # [TRS PASS].
+          if (identical(sim_result$status, "REFUSED")) {
+            .sim_msg <- sim_result$message %||% "refused"
+            cat(sprintf("\n[TRS PARTIAL] MAXD_SIM_REFUSED: Simulator not produced: %s\n", .sim_msg))
+            note_late(sprintf("Simulator not produced: %s", .sim_msg),
+                      code = "MAXD_SIM_REFUSED", title = "Simulator not produced")
+          } else {
+            results$simulator_path <- sim_result$output_file
+          }
         }
       } else {
         message("[TRS PARTIAL] MAXD_SIM_NOT_FOUND: Simulator module not found")
+        note_late("Simulator module not found (lib/html_simulator/99_simulator_main.R)",
+                  code = "MAXD_SIM_NOT_FOUND", title = "Simulator module not found")
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
@@ -1372,6 +1400,8 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       } else {
         cat("\n[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found at any path\n")
         message("[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found")
+        note_late("HTML report module not found (lib/html_report/99_html_report_main.R)",
+                  code = "MAXD_HTML_NOT_FOUND", title = "HTML report module not found")
       }
     }, error = function(e) {
       cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s\n", conditionMessage(e)))

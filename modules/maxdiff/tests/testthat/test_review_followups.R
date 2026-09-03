@@ -417,6 +417,96 @@ test_that("F2: a refused tabs export changes the verdict, it is not just a warni
 })
 
 # ------------------------------------------------------------------------------
+# v2 review F4 and F5: two more late deliverables that used to leave the run
+# at PASS. A refused simulator (its status was never read) and a workbook
+# that could not be written (saveWorkbook() only warns; "Output saved" was
+# logged over nothing).
+# ------------------------------------------------------------------------------
+
+.review_gate_project <- function(W, output_settings) {
+  ids <- sprintf("ITEM_%02d", 1:4); set.seed(11); K <- 3; nT <- 4
+  des <- do.call(rbind, lapply(seq_len(nT), function(t) {
+    sh <- c(ids[((t - 1) %% 4) + 1], sample(setdiff(ids, ids[((t - 1) %% 4) + 1]), K - 1))
+    data.frame(Version = 1L, Task_Number = t, Item1_ID = sh[1], Item2_ID = sh[2],
+               Item3_ID = sh[3], stringsAsFactors = FALSE) }))
+  openxlsx::write.xlsx(list(DESIGN = des), file.path(W, "design.xlsx"))
+  nR <- 20
+  dat <- data.frame(RespID = 10000 + seq_len(nR), Version = 1L)
+  for (t in seq_len(nT)) {
+    dat[[sprintf("MD_T%d_Best", t)]] <- sample(K, nR, replace = TRUE)
+    dat[[sprintf("MD_T%d_Worst", t)]] <- sample(K, nR, replace = TRUE)
+  }
+  for (t in seq_len(nT)) {
+    bad <- dat[[sprintf("MD_T%d_Best", t)]] == dat[[sprintf("MD_T%d_Worst", t)]]
+    dat[[sprintf("MD_T%d_Worst", t)]][bad] <- (dat[[sprintf("MD_T%d_Best", t)]][bad] %% K) + 1
+  }
+  write.csv(dat, file.path(W, "data.csv"), row.names = FALSE)
+  ps <- data.frame(
+    Setting_Name = c("Project_Name", "Mode", "Raw_Data_File", "Design_File", "Output_Folder",
+                     "Respondent_ID_Variable", "Choice_Value_Type", "Seed"),
+    Value = c("GATE", "ANALYSIS", file.path(W, "data.csv"), file.path(W, "design.xlsx"),
+              file.path(W, "output"), "RespID", "ITEM_POSITION", "1"),
+    stringsAsFactors = FALSE)
+  items <- data.frame(Item_ID = ids, Item_Label = paste("Item", 1:4), Include = 1L,
+                      Anchor_Item = 0L, Display_Order = 1:4, stringsAsFactors = FALSE)
+  mapping <- data.frame(
+    Field_Type = c("VERSION", rep(c("BEST_CHOICE", "WORST_CHOICE"), nT)),
+    Field_Name = c("Version", as.vector(rbind(sprintf("MD_T%d_Best", 1:nT),
+                                              sprintf("MD_T%d_Worst", 1:nT)))),
+    Task_Number = c(NA, rep(1:nT, each = 2)), stringsAsFactors = FALSE)
+  os <- data.frame(Setting_Name = names(output_settings), Value = unname(output_settings),
+                   stringsAsFactors = FALSE)
+  cfgp <- file.path(W, "config.xlsx")
+  openxlsx::write.xlsx(list(PROJECT_SETTINGS = ps, ITEMS = items, SURVEY_MAPPING = mapping,
+                            OUTPUT_SETTINGS = os), cfgp)
+  cfgp
+}
+
+test_that("F4: a refused simulator changes the verdict, it is not an INFO line", {
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  skip_if(!file.exists(main))
+  source(main, local = FALSE)
+  W <- tempfile("md_simgate_"); dir.create(W); on.exit(unlink(W, recursive = TRUE), add = TRUE)
+  # No HB and no logit: the simulator has nothing to run on and refuses.
+  cfgp <- .review_gate_project(W, c(
+    Generate_Aggregate_Logit = "NO", Generate_HB_Model = "NO", Generate_HTML_Report = "NO",
+    Generate_Simulator = "YES", Generate_TURF = "NO", Generate_Charts = "NO",
+    Generate_Stats_Pack = "NO", Generate_Tabs_Export = "NO", Generate_Segment_Tables = "NO"))
+  out <- capture.output(res <- suppressMessages(run_maxdiff(cfgp, verbose = FALSE)), type = "output")
+  expect_false(inherits(res, "turas_refusal_result"))
+  expect_true(file.exists(file.path(W, "output", "GATE_MaxDiff_Results.xlsx")))
+  expect_false(file.exists(file.path(W, "output", "GATE_MaxDiff_Results_simulator.html")))
+  expect_true(any(grepl("Simulator not produced", unlist(res$warnings))))
+  expect_true(any(grepl("MAXD_SIM_REFUSED", out)))
+  expect_false(identical(res$run_result$status, "PASS"))
+})
+
+test_that("F5: a workbook that cannot be written changes the verdict and is not called saved", {
+  main <- file.path(TURAS_ROOT, "modules", "maxdiff", "R", "00_main.R")
+  skip_if(!file.exists(main))
+  source(main, local = FALSE)
+  # Sourcing the entry point now loads the atomic saver, so a failed save is
+  # detected on the same path the GUI and the README recipe use.
+  expect_true(exists("turas_save_workbook_atomic", mode = "function"))
+  W <- tempfile("md_savegate_"); dir.create(W); on.exit(unlink(W, recursive = TRUE), add = TRUE)
+  cfgp <- .review_gate_project(W, c(
+    Generate_Aggregate_Logit = "YES", Generate_HB_Model = "NO", Generate_HTML_Report = "NO",
+    Generate_Simulator = "NO", Generate_TURF = "NO", Generate_Charts = "NO",
+    Generate_Stats_Pack = "NO", Generate_Tabs_Export = "NO", Generate_Segment_Tables = "NO"))
+  # A directory where the workbook must go: what a locked or unwritable file
+  # looks like to saveWorkbook(), which only warns.
+  dir.create(file.path(W, "output", "GATE_MaxDiff_Results.xlsx"), recursive = TRUE)
+  out <- capture.output(res <- suppressWarnings(suppressMessages(run_maxdiff(cfgp, verbose = TRUE))),
+                        type = "output")
+  expect_false(inherits(res, "turas_refusal_result"))
+  expect_false(any(grepl("Output saved", out, fixed = TRUE)))
+  expect_true(any(grepl("IO_EXCEL_SAVE_FAILED", out, fixed = TRUE)))
+  expect_true(any(grepl("Excel output not written", unlist(res$warnings))))
+  expect_null(res$output_path)
+  expect_false(identical(res$run_result$status, "PASS"))
+})
+
+# ------------------------------------------------------------------------------
 # The integrated demo loads conjoint and maxdiff into the same global
 # environment. A name defined by both is owned by whichever was sourced last.
 # Found by running the demo with cmdstanr installed: maxdiff's Stan extraction

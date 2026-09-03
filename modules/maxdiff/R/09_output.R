@@ -242,6 +242,23 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result 
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
+  # saveWorkbook() raises only an R warning when the path cannot be written,
+  # so "Output saved" used to be logged over a file that was not there
+  # (review F5 of the v2 branch). The file on disk is the evidence.
+  if (!file.exists(output_path) || dir.exists(output_path)) {
+    maxdiff_refuse(
+      code = "IO_EXCEL_SAVE_FAILED",
+      title = "Excel File Was Not Written",
+      problem = sprintf("No workbook exists at %s after the save.", output_path),
+      why_it_matters = "The main deliverable is missing; every later output would describe results nobody can open.",
+      how_to_fix = c(
+        "Check that the output folder has write permissions",
+        "Ensure the output file is not open in Excel and that nothing else sits at that path",
+        "Verify sufficient disk space is available"
+      )
+    )
+  }
+
   if (verbose) {
     log_message(sprintf("Output saved: %s", output_path), "INFO", verbose)
   }
