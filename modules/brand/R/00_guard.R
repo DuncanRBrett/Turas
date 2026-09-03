@@ -305,6 +305,22 @@ guard_validate_brand_config <- function(config) {
     )
   }
 
+  # Validate portfolio_extension_baseline. The template once offered
+  # "buyers", which the engine never read: it fell through to "all"
+  # silently. Only the two values the engine implements are accepted.
+  ext_base <- trimws(as.character(config$portfolio_extension_baseline %||% "all"))
+  if (!ext_base %in% c("all", "non_buyers")) {
+    brand_refuse(
+      code = "CFG_INVALID_EXTENSION_BASELINE",
+      title = "Invalid portfolio_extension_baseline",
+      problem = sprintf("portfolio_extension_baseline = '%s' is not valid", ext_base),
+      why_it_matters = "Selects the comparison base for the Portfolio Extension table; an unknown value used to be treated as 'all' without warning",
+      how_to_fix = "Set portfolio_extension_baseline to 'all' or 'non_buyers' (or leave it blank for 'all')",
+      expected = "all or non_buyers",
+      observed = ext_base
+    )
+  }
+
   # Validate timeframe months
   t_tgt  <- config$target_timeframe_months %||% 3L
   t_long <- config$longer_timeframe_months %||% 12L
