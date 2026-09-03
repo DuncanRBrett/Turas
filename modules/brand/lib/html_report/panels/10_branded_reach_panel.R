@@ -85,7 +85,8 @@ build_branded_reach_panel_html <- function(panel_data,
   cards <- paste(vapply(pd$ads, function(ad) {
     .br_reach_overview_card(ad, focal_colour,
                              pd$config$decimal_places %||% 0L,
-                             cat_code = cat_code)
+                             cat_code = cat_code,
+                             weighted = isTRUE(pd$meta$weighted))
   }, character(1)), collapse = "")
 
   sprintf(
@@ -97,7 +98,8 @@ build_branded_reach_panel_html <- function(panel_data,
 }
 
 
-.br_reach_overview_card <- function(ad, focal_colour, dp, cat_code) {
+.br_reach_overview_card <- function(ad, focal_colour, dp, cat_code,
+                                    weighted = FALSE) {
   reach_pct        <- .br_reach_pct(ad$reach_pct, dp)
   branded_pct      <- .br_reach_pct(ad$branded_reach_pct, dp)
   branding_pct     <- .br_reach_pct(ad$branding_pct, dp)
@@ -105,7 +107,7 @@ build_branded_reach_panel_html <- function(panel_data,
   n_seen_lbl       <- .br_reach_int(ad$n_seen)
 
   img_html <- .br_reach_image_block(ad)
-  base_lbl <- sprintf("n eligible = %s; n saw it = %s",
+  base_lbl <- sprintf(if (weighted) "weighted n eligible = %s; weighted n saw it = %s (percentages are of these weighted bases)" else "n eligible = %s; n saw it = %s",
                       n_eligible_lbl, n_seen_lbl)
   section_id <- .br_reach_card_section_id(cat_code, ad$asset_code, "overview")
 

@@ -312,9 +312,13 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo_panel_header <- function(pd) {
   scope_lbl <- pd$meta$scope_label %||% "Total sample"
   n_total   <- pd$meta$n_total
+  # The header n is the full sample; every percentage in the tables is
+  # taken within its own demographic option's known base (weighted), which
+  # is smaller. Say so, and point at the count toggle that reveals it.
   base_lbl  <- if (!is.null(n_total) && !is.na(n_total))
-    sprintf("Base: n = %s", format(n_total, big.mark = ","))
-  else "Base: full respondent set"
+    sprintf("Sample: n = %s respondents. Percentages are weighted, within each option's known base (toggle Show counts for the per-cell n).",
+            format(n_total, big.mark = ","))
+  else "Sample: full respondent set. Percentages are weighted, within each option's known base (toggle Show counts for the per-cell n)."
   sprintf(
     '<header class="demo-panel-header">
        <div class="demo-panel-header-title">Demographics &mdash; %s</div>

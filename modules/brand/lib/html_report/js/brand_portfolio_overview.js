@@ -132,6 +132,8 @@
       name: c.cat_name,
       depth: c.analysis_depth || 'awareness_only',
       cat_usage: c.cat_usage_pct,
+      n_buyers_uw: c.n_buyers_uw,
+      total_n_uw: c.total_n_uw,
       avg_brands_aware: avgBrandsAware,
       focal: focal,
       rank: rank, n_brands: vals.length, gap: gap,
@@ -157,12 +159,12 @@
     var head = '<thead><tr>' +
       '<th class="pfo-th-cat">Category</th>' +
       '<th class="pfo-th-depth">Type</th>' +
-      '<th class="pfo-th-num">Cat. usage</th>' +
+      '<th class="pfo-th-num" title="Category usage: weighted % of ALL respondents whose screener says they bought in this category in the recall window. Hover a cell for the unweighted count.">Cat. usage<br><span class="pfo-th-sub">% of all respondents</span></th>' +
       '<th class="pfo-th-num">Avg brands aware</th>' +
       '<th class="pfo-th-num">Focal awareness</th>' +
       '<th class="pfo-th-num">Rank</th>' +
       '<th class="pfo-th-num">Gap to leader</th>' +
-      '<th class="pfo-th-num">Penetration</th>' +
+      '<th class="pfo-th-num" title="Unweighted % of the deep-dive sample who bought the focal brand, from the raw purchase question. A different base and definition from Cat. usage, so the two are not comparable.">% who bought<br><span class="pfo-th-sub">% of deep-dive sample, unweighted</span></th>' +
       '<th class="pfo-th-num">SCR</th>' +
       '<th class="pfo-th-num">Vol share</th>' +
       '<th class="pfo-th-num" title="Mean number of times the focal brand was purchased per brand buyer in the recall window">Avg purchases</th></tr></thead>';
@@ -182,7 +184,11 @@
       return '<tr>' +
         '<td class="pfo-td-cat">' + esc(r.name) + '</td>' +
         '<td>' + pill + '</td>' +
-        '<td class="pfo-td-num">' + fmtPct(r.cat_usage) + '</td>' +
+        '<td class="pfo-td-num"><span title="' +
+          ((r.n_buyers_uw != null && r.total_n_uw != null)
+            ? 'unweighted n = ' + r.n_buyers_uw + ' of ' + r.total_n_uw + ' respondents'
+            : 'unweighted n not available') +
+          '">' + fmtPct(r.cat_usage) + '</span></td>' +
         tdNum(r.avg_brands_aware, function (v) { return fmtNum(v, 1); }) +
         '<td class="pfo-td-num pfo-td-focal">' + fmtPct(r.focal) + '</td>' +
         '<td class="pfo-td-num">' + rankTxt + '</td>' +

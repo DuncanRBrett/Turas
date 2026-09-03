@@ -140,6 +140,11 @@ build_portfolio_overview_subtab_styles <- function(focal_colour = "#1A5276") {
 .pfo-table thead th.pfo-th-depth {
   text-align: left;
 }
+/* Second line under a numeric header naming the base (review M7) */
+.pfo-th-sub {
+  display: block; font-size: 9px; font-weight: 400; color: #94a3b8;
+  text-transform: none; letter-spacing: 0; margin-top: 2px;
+}
 /* Pill labels in the body cells (Deep-dive / Awareness) — keep them
    lowercase too so the table reads consistently. */
 .pfo-pill { text-transform: lowercase; }

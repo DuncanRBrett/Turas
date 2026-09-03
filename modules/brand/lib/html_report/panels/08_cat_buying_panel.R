@@ -1615,9 +1615,13 @@ render_cat_buying_panel <- function(panel_data) {
   pct_b <- if (!is.null(cbf) && !identical(cbf$status, "REFUSED") &&
                 !is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
     sprintf("%.0f%%", cbf$pct_buyers) else "\u2014"
+  n_asked <- if (!is.null(cbf) && is.finite(as.numeric(cbf$n_respondents %||% NA)))
+    as.integer(cbf$n_respondents) else NA_integer_
   chips <- c(chips, sprintf(
-    '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">%% Category buyers</div></div>',
-    pct_b))
+    '<div class="cb-kpi-chip" title="%s"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">%% Category buyers%s</div></div>',
+    "Weighted % of respondents asked the category frequency question whose answer is anything but never. Not the same base as the Loyalty table (% of category buyers) or the norms table (% of all category respondents).",
+    pct_b,
+    if (is.na(n_asked)) "" else sprintf(" <span class=\"cb-kpi-base\">of %s asked</span>", format(n_asked, big.mark = ","))))
 
   if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
       !is.null(dn$category_metrics$mean_purchases)) {

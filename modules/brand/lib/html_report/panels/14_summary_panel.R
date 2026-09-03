@@ -232,6 +232,21 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   color: #047857; opacity: 1;
 }
 .brsum-card-body { flex: 1 1 auto; min-height: 56px; }
+.brsum-pen-notes {
+  margin: 14px 0 0; padding: 12px 16px;
+  border: 1px solid #e2e8f0; border-left: 4px solid #94a3b8; border-radius: 8px;
+  background: #f8fafc; font-size: 12px; color: #334155;
+}
+.brsum-pen-notes-title { font-weight: 600; font-size: 13px; margin: 0 0 4px; color: #1e293b; }
+.brsum-pen-notes-intro { margin: 0 0 8px; color: #64748b; }
+.brsum-pen-notes table { border-collapse: collapse; width: 100%; }
+.brsum-pen-notes th, .brsum-pen-notes td {
+  text-align: left; vertical-align: top; padding: 4px 8px 4px 0;
+  border-bottom: 1px solid #eef2f7; font-size: 12px;
+}
+.brsum-pen-notes th { color: #64748b; font-weight: 600; }
+.brsum-pen-notes td.brsum-pen-val { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.brsum-pen-notes td.brsum-pen-def { color: #475569; }
 .brsum-card-empty {
   font-size: 12px; color: #94a3b8; font-style: italic;
   padding: 8px 0;
@@ -627,6 +642,73 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # INTERNAL: PAYLOAD CONSTRUCTION
 # ==============================================================================
 
+# The report shows several different "penetration" numbers for one
+# category, computed on different bases (production review 2026-07-12,
+# section 6). This block lists them side by side with their definition and
+# base so a reader can tell which is which. Numbers come from the engine
+# results already in the payload; nothing is recomputed here.
+.brsum_penetration_notes <- function(cr, results, cat_name, config = list()) {
+  tm <- as.integer(config$target_timeframe_months %||% 3L)
+  fmt_pct <- function(x) if (is.null(x) || !is.finite(x)) NA_real_ else round(as.numeric(x), 1)
+  fmt_n   <- function(x) if (is.null(x) || !is.finite(as.numeric(x))) NA_integer_ else as.integer(round(as.numeric(x)))
+  notes <- list()
+
+  # 1. Category usage (Portfolio overview): screener pick, all respondents
+  cat_code <- NULL
+  brands_df <- results$structure$brands
+  if (!is.null(brands_df) && all(c("Category", "CategoryCode") %in% names(brands_df))) {
+    hits <- brands_df$CategoryCode[brands_df$Category == cat_name]
+    if (length(hits) > 0) cat_code <- as.character(hits[1])
+  }
+  pov <- results$results$portfolio_overview
+  if (!is.null(cat_code) && !is.null(pov$categories[[cat_code]])) {
+    pc <- pov$categories[[cat_code]]
+    notes[[length(notes) + 1]] <- list(
+      key   = "cat_usage",
+      label = "Category usage (Portfolio overview)",
+      value = fmt_pct(pc$cat_usage_pct),
+      n     = fmt_n(pc$n_buyers_uw),
+      base_n = fmt_n(pc$total_n_uw),
+      base  = "all respondents",
+      definition = "Screener question: respondents who say they bought in this category in the recall window. Weighted.")
+  }
+
+  # 2. % category buyers (Category Buying chip): frequency scale, asked base
+  cb <- cr$cat_buying_frequency
+  if (!is.null(cb) && !identical(cb$status, "REFUSED") && is.finite(as.numeric(cb$pct_buyers %||% NA))) {
+    notes[[length(notes) + 1]] <- list(
+      key   = "cat_buyers_freq",
+      label = "% category buyers (Category Buying chip)",
+      value = fmt_pct(cb$pct_buyers),
+      n     = fmt_n(cb$n_buyers),
+      base_n = fmt_n(cb$n_respondents),
+      base  = "respondents asked the category frequency question",
+      definition = "Frequency question: any answer other than never. Weighted.")
+  }
+
+  # 3. Category penetration behind the norms table: reconciled any-brand purchase
+  dn <- cr$dirichlet_norms
+  if (!is.null(dn) && !identical(dn$status, "REFUSED") && !is.null(dn$category_metrics)) {
+    cm <- dn$category_metrics
+    notes[[length(notes) + 1]] <- list(
+      key   = "cat_pen_purchase",
+      label = sprintf("Category penetration (norms table, P%dM)", tm),
+      value = fmt_pct(as.numeric(cm$penetration) * 100),
+      n     = fmt_n(cm$n_buyers),
+      base_n = fmt_n(cm$n_respondents),
+      base  = "all category respondents",
+      definition = sprintf("Per-brand purchase questions, reconciled: bought at least one brand in the last %d months. Weighted. Brand penetration in the norms table uses this same base; the Loyalty table's %% category buyers uses the %s buyers as its base instead.", tm, if (is.na(fmt_n(cm$n_buyers))) "category" else format(fmt_n(cm$n_buyers), big.mark = ",")))
+  }
+
+  if (length(notes) == 0) return(NULL)
+  list(
+    title = "Which penetration is which",
+    intro = "These figures describe different things and are not expected to agree. Each row names its question, its base and whether it is weighted.",
+    notes = notes
+  )
+}
+
+
 # Filter to "core" / deep-dive categories (those with funnel + MA data).
 # Awareness-only categories are excluded from the dashboard's primary view.
 .brsum_deep_cats <- function(cats) {
@@ -692,10 +774,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
                                                label_col = "AttrText",
                                                code_col  = "AttrCode")
 
+    penetration_notes <- .brsum_penetration_notes(cr, results, cn, config)
+
     out$categories[[cn]] <- list(
       label = cn,
       n_brands = length(brand_codes),
       context = context,
+      penetration_notes = penetration_notes,
       brand_codes = brand_codes,
       brand_labels = unname(vapply(brand_codes,
                                     function(b) label_map[[b]] %||% b,
@@ -1957,6 +2042,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       card("conversation", "Word of mouth"),
       card("repertoire",   "Repertoire ties &mdash; who focal buyers also buy"),
     '</div>',
+    '<aside class="brsum-pen-notes" data-brsum-pen-notes hidden aria-live="polite"></aside>',
     sep = "\n"
   )
 }
