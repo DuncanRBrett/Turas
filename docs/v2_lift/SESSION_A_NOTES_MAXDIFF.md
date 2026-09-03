@@ -70,6 +70,23 @@ stashed old code and failed there (counts per commit message).
 
 Next: **Fable independent pre-merge review** (fresh session, briefed
 independent, reads this file as the branch artifact), then Duncan merges.
+
+---
+
+## Correction and follow-up, 2026-09-03 (independent review session)
+
+The suite figure above did not hold at the branch tip. At `6d3e0165` the
+suite had 902 passing expectations, 0 failed, 0 skipped and **4 tests
+erroring** before any assertion (test bugs in the A8 stubs-to-assertions
+work, one of them the C3 non-zero-counts test). The review verdict was
+FAILED as committed; the engine fixes verified in both directions. See
+`REVIEW_FINDINGS_MAXDIFF_SESSION_A_2026-09-03.md`. Six further commits
+(`7ddb716b`..`9f12a31e`) land the test corrections and the review's F2
+to F12: report refusals now count as events, the numeric-ID phantom item
+is gone from the report and simulator layer, ITEM_SCORES carries the
+utility columns (a pre-existing loss), and the smaller decode, weight,
+label and doc gaps are closed. Suite after: **945 / 0 fail / 0 skip / 0
+error**, from the repo root.
 Sessions B (report fixes + tabs exporter) and C (v2 island — note the
 conjoint precedent: row kinds were superseded by a frozen island + view)
 follow.
