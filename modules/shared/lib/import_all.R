@@ -28,6 +28,7 @@
 #   15. turas_excel_escape.R   (TRS v1.0 - formula-injection protection)
 #   16. turas_minify_verify.R  (minification verification)
 #   17. turas_minify_watermark.R (watermark encode/decode)
+#   17b. turas_release_audit.R (what the finished file contains)
 #   18. turas_minify.R         (report minification pipeline)
 #   19. stats_pack_writer.R    (diagnostic stats pack workbook)
 # ==============================================================================
@@ -120,7 +121,11 @@ source(file.path(.shared_lib_path, "turas_minify_verify.R"), local = FALSE)
 # 17. Watermark encode/decode helpers (independent)
 source(file.path(.shared_lib_path, "turas_minify_watermark.R"), local = FALSE)
 
-# 18. Report minification pipeline (depends on trs_refusal, watermark, verify)
+# 17b. Release audit: what is in the finished file (depends on trs_refusal)
+source(file.path(.shared_lib_path, "turas_release_audit.R"), local = FALSE)
+
+# 18. Report minification pipeline (depends on trs_refusal, watermark, verify,
+#     release audit)
 source(file.path(.shared_lib_path, "turas_minify.R"), local = FALSE)
 
 # 19. Stats pack writer (depends on turas_save_workbook_atomic, turas_excel_escape)

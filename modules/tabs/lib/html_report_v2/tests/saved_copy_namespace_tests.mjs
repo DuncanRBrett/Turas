@@ -156,5 +156,66 @@ ok(donor.d2.storeKey("turas_v2_story") === ORIG_KEY,
 ok(openReport(savedA).d2.storeKey("turas_v2_story") !== openReport(savedB).d2.storeKey("turas_v2_story"),
   "opening those two copies gives two different store keys");
 
+
+/* ---- what the copy actually contains ---------------------------------------
+ * saveCopy clones the whole document, so a copy of a report that carries the
+ * per-respondent island carries it too. That is right for a copy and wrong to
+ * leave unsaid: the button exists to make the file portable, and the analyst
+ * clicking it is usually about to email it on. The old toast read "Single file,
+ * send it to anyone", which was the last thing they saw.
+ * -------------------------------------------------------------------------- */
+
+/** Drive saveCopy with a stubbed confirm/toast and report what each one saw. */
+function saveCopyWith(TR, micro, confirmAnswer) {
+  const island = { textContent: "" };
+  const clone = {
+    querySelector: (sel) => (sel === "#user-state" ? island
+      : sel === "#app" ? { innerHTML: "x" } : null),
+    outerHTML: "<html></html>",
+  };
+  const link = { href: "", download: "", click() {} };
+  const sandbox = TR._gateWindow;
+  sandbox.document = {
+    documentElement: { cloneNode: () => clone },
+    createElement: () => link,
+    body: { appendChild() {}, removeChild() {} },
+  };
+  sandbox.Blob = function () {};
+  sandbox.URL = { createObjectURL: () => "blob:x", revokeObjectURL() {} };
+  let asked = null, toast = null;
+  sandbox.confirm = function (msg) { asked = msg; return confirmAnswer; };
+  TR.shell = TR.shell || {};
+  TR.shell.toast = function (m) { toast = m; };
+  const before = TR.MICRO;
+  TR.MICRO = micro;
+  TR.report.saveCopy();
+  TR.MICRO = before;
+  return { asked, toast, wrote: island.textContent };
+}
+
+const MICRO = { n: 600, answers: { Q1: [0] }, weights: [1] };
+
+const carrying = saveCopyWith(donor, MICRO, true);
+ok(carrying.asked !== null, "a copy carrying respondent records asks before it writes");
+ok(/600 records/.test(carrying.asked || ""),
+  "…and the question names how many records are in it");
+ok(/rebuild a respondent-by-question dataset/.test(carrying.asked || ""),
+  "…and says plainly what someone can do with the file, not just that data is present");
+ok(/no names, IDs or raw text/.test(carrying.asked || ""),
+  "…while still stating the real mitigation, so the warning is accurate both ways");
+ok(carrying.wrote.length > 0, "…and saying yes still writes the copy");
+ok(/respondent-level data/.test(carrying.toast || ""),
+  "…and the toast no longer invites the analyst to send it to anyone");
+
+const declined = saveCopyWith(donor, MICRO, false);
+ok(declined.wrote === "", "saying no writes nothing at all");
+ok(/cancelled/i.test(declined.toast || ""), "…and says so");
+
+const clean = saveCopyWith(donor, null, false);
+ok(clean.asked === null,
+  "a confidentiality ship (no island) saves straight through, unchanged");
+ok(clean.wrote.length > 0 && /no respondent data/.test(clean.toast || ""),
+  "…and its toast can honestly promise a portable file");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

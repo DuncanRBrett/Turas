@@ -58,18 +58,41 @@ assert(disc.cellOk(1) === false && disc.cellOk(9) === false, "cellOk: 1..k-1 is 
 TR.AGG.project.min_reporting_base = 1;
 assert(disc.cellOk(2) === true, "cellOk: control off -> any count shows");
 
-// Fail CLOSED: disclosure engaged but microdata absent (build degraded to published-only)
-// must NOT reveal identifying detail just because the base can't be computed.
+// Fail CLOSED: disclosure engaged and the base cannot be established AT ALL (an island
+// with no published bases) must NOT reveal identifying detail.
 const savedMicro = TR.MICRO;
 TR.AGG.project.min_reporting_base = 10;
 TR.MICRO = null;
-assert(disc.audienceBase() === null, "no microdata -> audience base is unknown (null), not Infinity");
-assert(disc.audienceTooSmall() === true, "disclosure on + no microdata -> fail closed (too small)");
+assert(disc.audienceBase() === null, "no microdata AND no published bases -> unknown (null)");
+assert(disc.audienceTooSmall() === true, "unknown base -> fail closed (too small)");
 assert(disc.note() === TXT("disclosure.note_unverified", { k: 10 }),
   "note explains the base is unverifiable");
-// ...but with the control off, missing microdata gates nothing (existing reports unaffected).
+// ...but with the control off, an unknown base gates nothing (existing reports unaffected).
 TR.AGG.project.min_reporting_base = 1;
-assert(disc.audienceTooSmall() === false, "control off + no microdata -> nothing gated");
+assert(disc.audienceTooSmall() === false, "control off + unknown base -> nothing gated");
+
+/* The confidentiality ship (html_report_v2_microdata = FALSE). No microdata, so no
+ * filter bar, so the audience IS the published full sample. Before this, audienceBase()
+ * returned null here and the whole report's comment detail failed closed, which pushed
+ * the operator into clearing min_reporting_base and losing the COLUMN suppression that
+ * protects a three-person department. Both must now hold at once. */
+TR.AGG.questions = [
+  { code: "Q1", bases: [{ n: 229 }, { n: 3 }] },
+  { code: "Q2", bases: [{ n: 180 }, { n: 3 }] }   // a routed question: smaller base
+];
+TR.AGG.project.min_reporting_base = 10;
+assert(disc.audienceBase() === 229, "no microdata -> audience base = largest published Total base");
+assert(disc.audienceTooSmall() === false, "k=10 on a 229-person sample -> comment detail SHOWS");
+assert(disc.cellOk(3) === false && disc.cellOk(229) === true,
+  "…while cell/column suppression still bites at k=10");
+// A genuinely tiny sample still gates, with no microdata to tell us so.
+TR.AGG.questions = [{ code: "Q1", bases: [{ n: 4 }] }];
+assert(disc.audienceBase() === 4, "tiny published sample is reported as itself");
+assert(disc.audienceTooSmall() === true, "…and a 4-person report still fails the k=10 gate");
+// A question with no bases block at all must not throw or poison the maximum.
+TR.AGG.questions = [{ code: "Q1" }, { code: "Q2", bases: [{ n: 50 }] }];
+assert(disc.audienceBase() === 50, "a question with no bases is skipped, not fatal");
+delete TR.AGG.questions;
 TR.MICRO = savedMicro;
 
 /* ==========================================================================

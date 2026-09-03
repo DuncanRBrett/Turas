@@ -322,9 +322,21 @@ run_tabs_gui <- function() {
             # input$client_name; until now there was no such input, so every
             # deliverable went out unwatermarked.
             conditionalPanel("input.prepare_deliverable == true",
-              div(style = "max-width: 420px; margin: 0 auto 8px;",
+              div(style = "max-width: 520px; margin: 0 auto 8px; text-align: left;",
                 textInput("client_name", NULL, value = "",
-                          placeholder = "Client name for the deliverable watermark (optional)")
+                          placeholder = "Client name for the deliverable watermark (optional)"),
+                # NO preselection. The whole point is that the mode is chosen,
+                # not inherited. A deliverable used to be produced without anyone
+                # saying what kind it was, and the answer was always "whatever the
+                # config happened to do".
+                radioButtons("delivery_mode", "Who is this file for?",
+                  choiceNames = list(
+                    HTML("<strong>Full report.</strong> Carries respondent-level records, so live filters and custom banners work. Anyone who opens the page source can rebuild a respondent-by-question dataset."),
+                    HTML("<strong>Client safe.</strong> No respondent-level records in the file. Needs html_report_v2_microdata = FALSE in the config; the build refuses if the records are still there.")
+                  ),
+                  choiceValues = list("full", "client_safe"),
+                  selected = character(0)
+                )
               )
             ),
             checkboxInput("generate_reader_report",
@@ -380,6 +392,23 @@ run_tabs_gui <- function() {
         return()
       }
 
+      # A deliverable with no declared audience does not get built. This is the
+      # only blocking check added here: everything else about delivery is a
+      # report, not a gate.
+      # length() rather than is.null(): an unselected radioButtons group arrives
+      # as character(0), and !nzchar(character(0)) is logical(0), which is an
+      # error inside || on R 4.3 and later, not FALSE.
+      .mode_missing <- length(input$delivery_mode) != 1L ||
+        !nzchar(as.character(input$delivery_mode))
+      if (isTRUE(input$prepare_deliverable) && .mode_missing) {
+        msg <- "Choose who the client deliverable is for before running: full report, or client safe."
+        showNotification(msg, type = "error", duration = NULL)
+        console_output(paste0(console_output(), "\n\nSTOPPED: ", msg))
+        cat("\n[TURAS] Run stopped: 'Prepare client deliverable' is ticked but no delivery mode was chosen.\n\n")
+        is_running(FALSE)
+        return()
+      }
+
       # Track overall results
       results_summary <- list()
       overall_start <- Sys.time()
@@ -424,6 +453,12 @@ run_tabs_gui <- function() {
         # Draft the Reader narrative with AI (opt-in; aggregates only, flagged).
         assign("TURAS_READER_AI_PROSE",
                isTRUE(input$reader_ai_prose), envir = .GlobalEnv)
+        # The declaration the release audit enforces (turas_release_audit.R).
+        assign("TURAS_DELIVERY_CLIENT_SAFE",
+               isTRUE(input$prepare_deliverable) &&
+                 identical(input$delivery_mode, "client_safe"),
+               envir = .GlobalEnv)
+
         if (isTRUE(input$prepare_deliverable)) {
           .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
             input$client_name
@@ -589,7 +624,7 @@ run_tabs_gui <- function() {
         # a previous run ticked it (review 2026-08-21, I-21/M-9).
         for (gvar in c("config_file", "TURAS_PREPARE_DELIVERABLE", "TURAS_CLIENT_NAME",
                        "TURAS_HTML_REPORT_V2", "TURAS_GENERATE_READER_REPORT",
-                       "TURAS_READER_AI_PROSE")) {
+                       "TURAS_READER_AI_PROSE", "TURAS_DELIVERY_CLIENT_SAFE")) {
           if (exists(gvar, envir = .GlobalEnv)) {
             rm(list = gvar, envir = .GlobalEnv)
           }

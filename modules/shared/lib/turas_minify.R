@@ -666,6 +666,11 @@
   cat(sprintf("Warnings:      %d\n", length(result$warnings)))
   cat(strrep("\u2500", 50), "\n")
 
+  if (!is.null(result$release_audit)) {
+    cat(paste0(result$release_audit$lines, collapse = "\n"), "\n")
+    cat(strrep("\u2500", 50), "\n")
+  }
+
   if (result$verification_passed) {
     cat("Verification:  ALL CHECKS PASSED\n")
   } else {
@@ -708,6 +713,10 @@
 #'   encoding after minification. Requires javascript-obfuscator.
 #' @param watermark Character or NULL. Client name to embed as an invisible
 #'   watermark. NULL or empty string skips watermarking.
+#' @param client_safe Logical. TRUE when the operator has declared that this
+#'   build carries no respondent-level data. The release audit then REFUSES if
+#'   the microdata island is still present, because a declaration that cannot
+#'   fail protects nobody. Default FALSE, which audits and reports only.
 #' @param verbose Logical. If TRUE, print progress and size comparison.
 #'
 #' @return A named list with:
@@ -750,6 +759,7 @@ turas_minify <- function(input_path,
                          minify_html = TRUE,
                          obfuscate_js = TRUE,
                          watermark = NULL,
+                         client_safe = FALSE,
                          verbose = FALSE) {
 
   warnings_acc <- character(0)
@@ -1058,6 +1068,15 @@ turas_minify <- function(input_path,
     }
   }
 
+  # -- Step 10b: Release audit ------------------------------------------------
+  # What the delivered file actually contains. Runs on the MINIFIED html, which
+  # is the thing that leaves. Refuses when the caller declared client_safe and
+  # the respondent island is still there: a declaration that cannot fail is not
+  # a declaration. Everything else is reported, never fatal.
+  release <- if (exists("turas_release_audit", mode = "function")) {
+    turas_release_audit(html, client_safe = isTRUE(client_safe), refuse = TRUE)
+  } else NULL
+
   # -- Step 11: Build result --------------------------------------------------
   reduction_pct <- if (input_size > 0) {
     (1 - output_size / input_size) * 100
@@ -1082,6 +1101,8 @@ turas_minify <- function(input_path,
     watermark_client = watermark_client,
     verification_passed = verification$all_passed,
     verification_summary = verification$summary,
+    client_safe = isTRUE(client_safe),
+    release_audit = release,
     warnings = warnings_acc
   )
 
@@ -1138,7 +1159,13 @@ turas_prepare_deliverable <- function(html_path) {
     client_name <- NULL
   }
 
-  minify_result <- turas_minify(dev_path, verbose = TRUE, watermark = client_name)
+  # The delivery mode the operator chose in the GUI. FALSE (audit and report)
+  # unless they positively declared the build client-safe, in which case a
+  # surviving microdata island refuses rather than ships.
+  client_safe <- isTRUE(get0("TURAS_DELIVERY_CLIENT_SAFE", envir = .GlobalEnv))
+
+  minify_result <- turas_minify(dev_path, verbose = TRUE, watermark = client_name,
+                                client_safe = client_safe)
 
   if (minify_result$status %in% c("PASS", "PARTIAL")) {
     cat(sprintf("  Client deliverable: %s (%.1f%% smaller)\n",

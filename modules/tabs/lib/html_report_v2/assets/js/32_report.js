@@ -498,7 +498,37 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
+  /** Whether a saved copy would carry the per-respondent island.
+   *  saveCopy clones the whole document, so whatever the open report contains,
+   *  the copy contains. That is correct behaviour for a copy, and it is exactly
+   *  why it has to be said out loud: the button's whole promise is that the file
+   *  is portable, and the person clicking it is usually about to email it on. */
+  report._copyCarriesMicrodata = function () {
+    return !!(TR.MICRO && TR.MICRO.answers);
+  };
+
+  /** The wording shown before a copy that carries respondent records is written.
+   *  Exported so the node gate can hold the text to what the file actually does. */
+  report._copyWarningText = function () {
+    var n = (TR.MICRO && TR.MICRO.n) || 0;
+    return "This copy will contain the respondent-level data that powers live " +
+      "filtering: " + n + " records of coded answers and weights.\n\n" +
+      "There are no names, IDs or raw text in it, but anyone who opens the file's " +
+      "source can rebuild a respondent-by-question dataset from it.\n\n" +
+      "Fine for your own working copy or a recipient who has been told. Not for a " +
+      "file that may be forwarded on.\n\n" +
+      "Save it anyway?";
+  };
+
   report.saveCopy = function () {
+    // Ask once, and only on the builds that need asking. A confidentiality ship
+    // (html_report_v2_microdata = FALSE) carries no records, so it saves straight
+    // through exactly as before.
+    if (report._copyCarriesMicrodata() && typeof confirm !== "undefined" &&
+        !confirm(report._copyWarningText())) {
+      TR.shell.toast("Save cancelled");
+      return;
+    }
     var state = {
       saved: true,
       copyId: newCopyId(),
@@ -545,7 +575,12 @@
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-    TR.shell.toast("Annotated copy saved. Single file, send it to anyone");
+    // The old wording was "Single file, send it to anyone". True of the format,
+    // untrue of the contents on a build that carries respondent records, and it
+    // was the last thing an analyst read before emailing the file.
+    TR.shell.toast(report._copyCarriesMicrodata()
+      ? "Annotated copy saved. Contains respondent-level data"
+      : "Annotated copy saved. Single file, no respondent data in it");
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

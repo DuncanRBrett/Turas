@@ -28,19 +28,44 @@
   /** Whether disclosure control is engaged for this report at all. */
   disc.active = function () { return disc.minBase() > 1; };
 
+  /** The largest published Total-column base in the report. The confidentiality ship
+   *  (html_report_v2_microdata = FALSE) has no per-respondent records, so it also has no
+   *  live filter: the audience is ALWAYS the full sample, and the full sample is a
+   *  published figure. Mirrors reader._publishedTotalBase (24a_reader.js); column 0 is
+   *  the Total column. Null only when no question publishes a base at all. */
+  function publishedTotalBase() {
+    var best = null;
+    ((TR.AGG && TR.AGG.questions) || []).forEach(function (q) {
+      var b = q.bases && q.bases[0] ? q.bases[0].n : null;
+      if (b != null && (best === null || b > best)) best = b;
+    });
+    return best;
+  }
+  disc._publishedTotalBase = publishedTotalBase;
+
   /** Respondents matching the live global filter (= the whole sample when unfiltered).
-   *  Returns null when the base cannot be computed (no microdata island): the caller
-   *  MUST treat that as "unknown", never as "large" (see audienceTooSmall: fail closed). */
+   *
+   *  Without microdata this returns the PUBLISHED full sample rather than null. Until
+   *  now it returned null, audienceTooSmall() failed closed on that, and a confidential
+   *  ship therefore hid every comment, tag and quote in the report. That forced the
+   *  operator to clear min_reporting_base to get a readable report, which also switched
+   *  off the column suppression in applyDisclosureSuppression() (22_model.js) that reads
+   *  the PUBLISHED bases and works perfectly well with no microdata. So the one setting
+   *  that protects a three-person department was being turned off to make the comments
+   *  visible. Nothing is being assumed safe here: with no microdata there is no filter
+   *  bar, so the audience genuinely is the whole sample.
+   *
+   *  Still returns null when the base cannot be established at all (an island with no
+   *  published bases), and the caller MUST keep treating that as "unknown". */
   disc.audienceBase = function () {
-    if (!TR.MICRO) return null;
+    if (!TR.MICRO) return publishedTotalBase();
     var f = TR.d2 && TR.d2.state && TR.d2.state.filters;
     return (f && f.length && TR.stats) ? TR.stats.maskCount(TR.stats.mask(f)) : TR.MICRO.n;
   };
 
   /** True when the live audience is too small to show identifying detail (tags, quotes).
-   *  Fails CLOSED: if disclosure is engaged but the base can't be verified (microdata
-   *  absent, e.g. the build degraded to published-only), withhold detail rather than
-   *  assume the audience is safe. */
+   *  Fails CLOSED: if disclosure is engaged but the base can't be established at all,
+   *  withhold detail rather than assume the audience is safe. */
   disc.audienceTooSmall = function () {
     if (!disc.active()) return false;
     var base = disc.audienceBase();
