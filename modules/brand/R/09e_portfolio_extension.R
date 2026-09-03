@@ -183,7 +183,7 @@ compute_extension_table <- function(data, role_map, categories, structure,
     if (!is.null(base$status)) next
     if (base$n_uw == 0L) { suppressed <- c(suppressed, cat_code); next }
 
-    low_base_flag <- base$n_uw < min_base
+    low_base_flag <- !.brand_meets_min_base(base$n_uw, min_base)
     if (low_base_flag) suppressed <- c(suppressed, cat_code)
 
     aw_root <- .portfolio_aware_root(role_map, cat_code)

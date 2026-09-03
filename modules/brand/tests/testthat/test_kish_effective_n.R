@@ -130,3 +130,11 @@ test_that("portfolio extension p-value rises under dispersed weights", {
   expect_gt(pv(out_disp), pv(out_flat))
   expect_gt(pv(out_disp), 0.05)
 })
+
+test_that(".brand_meets_min_base is the shared disclosure predicate; NA never passes", {
+  expect_equal(.brand_meets_min_base(c(29, 30, 31)), c(FALSE, TRUE, TRUE))
+  expect_false(.brand_meets_min_base(NA))
+  expect_false(.brand_meets_min_base(NaN, 10))
+  expect_true(.brand_meets_min_base(0, 0))        # suppress_base = 0 never suppresses
+  expect_true(exists("meets_min_base", mode = "function"))
+})

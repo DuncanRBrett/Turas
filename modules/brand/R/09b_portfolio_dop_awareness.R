@@ -211,7 +211,7 @@ compute_dop_awareness_per_cat <- function(data, role_map, categories,
   if (base$n_uw == 0L) {
     return(list(suppressed = list(cat = cat_code, reason = "no qualifiers")))
   }
-  if (base$n_uw < min_base) {
+  if (!.brand_meets_min_base(base$n_uw, min_base)) {
     return(list(suppressed = list(
       cat = cat_code,
       reason = sprintf("low base (n=%d < %d)", base$n_uw, min_base))))
@@ -298,7 +298,9 @@ compute_dop_awareness_per_cat <- function(data, role_map, categories,
   exp_mat <- .doa_expected_matrix(D, aware_pcts, brand_codes)
   dev_mat <- .doa_deviation_matrix(obs_mat, exp_mat, brand_codes)
 
-  low_base_brands <- brand_codes[n_aware_w < DOA_ROW_LOW_BASE]
+  # Row gate on the unweighted aware count (the same basis every other
+  # portfolio gate uses), through the shared disclosure predicate.
+  low_base_brands <- brand_codes[!.brand_meets_min_base(n_aware_uw, DOA_ROW_LOW_BASE)]
 
   list(
     status         = "PASS",

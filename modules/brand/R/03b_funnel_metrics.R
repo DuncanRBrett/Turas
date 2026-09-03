@@ -474,9 +474,11 @@ run_significance_tests <- function(stage_metrics, focal_brand,
     base_w[all_na_cols] <- NA_real_
     base_u[all_na_cols] <- NA_real_
   }
+  # Both thresholds go through the shared disclosure predicate (OPUS-0):
+  # suppress_base = 0 means never suppress, and an NA base is "no_data".
   flag <- ifelse(is.na(base_u), "no_data",
-          ifelse(base_u < suppress_base, "suppress",
-                 ifelse(base_u < warn_base, "warn", "none")))
+          ifelse(!.brand_meets_min_base(base_u, suppress_base), "suppress",
+                 ifelse(!.brand_meets_min_base(base_u, warn_base), "warn", "none")))
   data.frame(brand_code = brands,
              stage_key = rep(stage$key, length(brands)),
              pct_weighted = unname(pct_w),

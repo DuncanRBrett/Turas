@@ -114,7 +114,7 @@ compute_clutter_data <- function(data, role_map, categories, structure,
     if (base$n_uw == 0L) {
       suppressed <- c(suppressed, cat_code); next
     }
-    if (base$n_uw < min_base) {
+    if (!.brand_meets_min_base(base$n_uw, min_base)) {
       suppressed <- c(suppressed, cat_code); next
     }
 

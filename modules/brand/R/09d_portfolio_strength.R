@@ -64,7 +64,7 @@ compute_strength_map <- function(data, role_map, categories, structure,
     base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) next
     if (base$n_uw == 0L) { suppressed <- c(suppressed, cat_code); next }
-    if (base$n_uw < min_base) { suppressed <- c(suppressed, cat_code); next }
+    if (!.brand_meets_min_base(base$n_uw, min_base)) { suppressed <- c(suppressed, cat_code); next }
 
     cat_name_map[[cat_code]] <- cat_name
 

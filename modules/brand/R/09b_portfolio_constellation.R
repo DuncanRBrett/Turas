@@ -298,7 +298,7 @@ compute_constellation <- function(data, role_map, categories, structure,
   for (cc in unique(as.character(brands_active$CategoryCode))) {
     base <- build_portfolio_base(data, cc, timeframe, weights)
     if (!is.null(base$status)) next
-    if (base$n_uw == 0L || base$n_uw < min_base) {
+    if (!.brand_meets_min_base(base$n_uw, min_base)) {
       suppressed <- c(suppressed, cc)
     }
   }
@@ -471,7 +471,7 @@ compute_constellations_per_cat <- function(data, role_map, categories,
       suppressed[[length(suppressed) + 1L]] <- list(
         cat = cat_code, reason = "no qualifiers"); next
     }
-    if (base$n_uw < min_base) {
+    if (!.brand_meets_min_base(base$n_uw, min_base)) {
       suppressed[[length(suppressed) + 1L]] <- list(
         cat = cat_code,
         reason = sprintf("low base (n=%d < %d)", base$n_uw, min_base))
