@@ -212,9 +212,11 @@ respondent_id | price | purchase_intent | weight
 | Setting | Required | Description | Example |
 |---------|----------|-------------|---------|
 | data_format | YES | `wide` or `long` | `wide` |
-| price_sequence | YES | Prices tested | `25,30,35,40,45,50` |
+| price_sequence | YES | Prices tested, in presentation order; commas or semicolons | `25;30;35;40;45;50` |
 | response_columns | YES (wide) | Purchase intent columns | `gg_25,gg_30,gg_35,gg_40,gg_45,gg_50` |
-| response_type | YES | `binary`, `scale`, `auto` | `binary` |
+| response_type | YES | `binary` or `scale` (auto-detection was removed: the coding must be declared so it can be stamped) | `binary` |
+| binary_coding | NO | `ZERO_ONE` (1 = buy, 0 = not) or `ONE_TWO` (1 = buy, 2 = not) | `ONE_TWO` |
+| smoothing_method | NO | `isotonic` (default), `loess`, `cummax`, `none` | `isotonic` |
 | revenue_optimization | YES | Find optimal price | `TRUE` |
 
 ### 4.4 Results Interpretation
@@ -332,9 +334,11 @@ Profit-Maximizing Price: $48.00 (if unit_cost = $15)
 ### 6.2 Monotonicity Handling
 
 **Van Westendorp** (`vw_monotonicity_behavior`):
-- `flag_only`: Report violations, keep all data (recommended)
-- `drop`: Remove respondents with violations
-- `fix`: Automatically sort prices (risky)
+- `drop` (default): exclude respondents whose four answers are not strictly increasing (too cheap < cheap < expensive < too expensive, the pricesensitivitymeter rule; a tie counts as a violation). The analysed base is reported.
+- `flag_only`: keep them in the curves and disclose the count. The curves then include illogical answers.
+- `fix`: re-sort each violator's four answers into increasing order. A strong transformation: an answer given as "cheap" can become that respondent's "too expensive". Disclosed as a warning.
+
+**Stop-early Gabor-Granger ladders** (`GG_Stop_Early_Imputation` on the Settings sheet): when respondents were not asked the prices above their first No, the rungs have different bases and the run refuses. Set `NO_AFTER_STOP` to code every unanswered rung above a respondent's first No as No; the stats pack records it.
 
 **Gabor-Granger** (`gg_monotonicity_behavior`):
 - `smooth`: Apply isotonic regression (recommended)
@@ -345,9 +349,8 @@ Profit-Maximizing Price: $48.00 (if unit_cost = $15)
 
 Configure data quality checks:
 - `min_completeness`: Minimum % of questions answered (e.g., `0.75`)
-- `min_price` / `max_price`: Valid price range
-- `flag_outliers`: Enable outlier detection
-- `outlier_method`: `iqr`, `zscore`, or `percentile`
+- `min_sample`: fewer valid respondents than this refuses the run (default 30)
+- `price_min` / `price_max`: valid price range; answers outside it are excluded
 
 ---
 

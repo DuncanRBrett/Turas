@@ -24,7 +24,7 @@ vw_config <- list(
   currency_symbol = "$",
 
   # Data Configuration
-  data_file = "modules/pricing/test_data_vw.csv",
+  data_file = "examples/pricing/Karoo_Pricing_Data.xlsx",
   id_var = "respondent_id",
 
   # Van Westendorp Column Mapping
@@ -56,8 +56,8 @@ vw_config <- list(
   validation = list(
     min_completeness = 0.80,                     # Require 80% of price questions answered
     check_ranges = TRUE,
-    min_price = 0,
-    max_price = 200
+    price_min = 0,
+    price_max = 200
   ),
 
   # Output Settings
@@ -93,7 +93,7 @@ gg_config <- list(
   currency_symbol = "$",
 
   # Data Configuration
-  data_file = "modules/pricing/test_data_gg.csv",
+  data_file = "examples/pricing/Karoo_Pricing_Data.xlsx",
   id_var = "respondent_id",
 
   # Gabor-Granger Settings
@@ -113,7 +113,7 @@ gg_config <- list(
 
   # PHASE 1: Data Quality
   dk_codes = c(98, 99),
-  gg_monotonicity_behavior = "smooth",           # Options: "smooth", "flag_only", "none"
+  gg_monotonicity_behavior = "smooth",           # Options: "smooth", "diagnostic_only"
 
   # PHASE 1: Segmentation
   segment_vars = c("age_group"),
@@ -130,8 +130,8 @@ gg_config <- list(
   validation = list(
     min_completeness = 0.70,
     check_ranges = TRUE,
-    min_price = 0,
-    max_price = 100
+    price_min = 0,
+    price_max = 100
   ),
 
   # Output Settings
@@ -208,8 +208,8 @@ dual_config <- list(
   validation = list(
     min_completeness = 0.75,
     check_ranges = TRUE,
-    min_price = 0,
-    max_price = 150
+    price_min = 0,
+    price_max = 150
   ),
 
   # Output
@@ -272,13 +272,13 @@ minimal_config <- list(
 
 # Example 1: Run Van Westendorp with full features
 # source("modules/pricing/R/00_main.R")
-# vw_results <- run_pricing_analysis(vw_config)
+# vw_results <- run_pricing_analysis_from_config(apply_pricing_defaults(vw_config))
 
 # Example 2: Run Gabor-Granger with profit optimization
-# gg_results <- run_pricing_analysis(gg_config)
+# gg_results <- run_pricing_analysis_from_config(apply_pricing_defaults(gg_config))
 
 # Example 3: Run both methods
-# dual_results <- run_pricing_analysis(dual_config)
+# dual_results <- run_pricing_analysis_from_config(apply_pricing_defaults(dual_config))
 
 # Example 4: Extract WTP distribution (Phase 3)
 # source("modules/pricing/R/07_wtp_distribution.R")

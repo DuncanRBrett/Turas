@@ -57,16 +57,52 @@ run_gabor_granger <- function(data, config) {
     }
   }
 
+  # Stop-early ladders (review C2). A respondent who said No at R80 was never
+  # asked R100, so the R100 rung is NA for them; dropping NAs per rung
+  # computed demand among the survivors only and pushed the optimum to the
+  # top price. Per-rung bases are compared; when they differ the run refuses
+  # unless the config opts into imputing No after the first No.
+  imputation <- toupper(config$gg_stop_early_imputation %||% "NONE")
+  rung_bases <- gg_rung_bases(gg_data)
+  if (identical(imputation, "NO_AFTER_STOP")) {
+    if (gg$data_format != "wide" && !.gg_order_derivable(gg_data)) {
+      pricing_refuse(
+        code = "CFG_GG_IMPUTATION_ORDER",
+        title = "Stop-Early Imputation Needs A Known Presentation Order",
+        problem = "GG_Stop_Early_Imputation = NO_AFTER_STOP is set on long-format data whose rung order cannot be derived.",
+        why_it_matters = "Imputing No after the first No depends on which rung came first.",
+        how_to_fix = "Supply the data in wide format with Price_Sequence in ascending presentation order, or remove the setting."
+      )
+    }
+    gg_data <- impute_gg_no_after_stop(gg_data)
+    rung_bases_after <- gg_rung_bases(gg_data)
+    cat(sprintf("   Stop-early imputation: NA rungs after a respondent's first No coded as No (%d cells)\n",
+                sum(rung_bases_after$n_answered) - sum(rung_bases$n_answered)))
+    rung_bases <- rung_bases_after
+  } else {
+    check_gg_rung_bases(rung_bases)
+  }
+
   # Calculate demand curve
   demand_curve <- calculate_demand_curve(gg_data)
 
-  # Apply monotone smoothing if configured
-  if (config$gg_monotonicity_behavior == "smooth") {
-    # Enforce monotone decreasing demand: as price increases, demand should not increase
-    # Simple approach: cummax from high price to low price
-    demand_curve <- demand_curve[order(demand_curve$price, decreasing = TRUE), ]
-    demand_curve$purchase_intent <- cummax(demand_curve$purchase_intent)
-    demand_curve <- demand_curve[order(demand_curve$price), ]  # Back to ascending order
+  # Apply monotone smoothing if configured. Pool-adjacent-violators (isotonic)
+  # by default: the old inline cummax could only raise demand values, which
+  # biased revenue upward at every fix point (review M1).
+  smoothing <- "none"
+  if (identical(config$gg_monotonicity_behavior, "smooth")) {
+    smoothing <- tolower(gg$smoothing_method %||% "isotonic")
+    if (!smoothing %in% c("isotonic", "pava", "cummax", "loess", "none")) {
+      pricing_refuse(
+        code = "CFG_GG_SMOOTHING_METHOD",
+        title = "Smoothing_Method Has An Unknown Value",
+        problem = sprintf("Smoothing_Method reads '%s'.", smoothing),
+        why_it_matters = "It decides how a demand curve that rises with price is corrected before revenue is computed.",
+        how_to_fix = "Use isotonic (default), loess, cummax or none."
+      )
+    }
+    if (smoothing == "pava") smoothing <- "isotonic"
+    demand_curve <- smooth_demand_curve(demand_curve, method = smoothing)
   }
 
   # Calculate revenue curve (and profit if unit_cost specified)
@@ -89,15 +125,19 @@ run_gabor_granger <- function(data, config) {
     elasticity <- calculate_price_elasticity(demand_curve)
   }
 
-  # Calculate confidence intervals
+  # Calculate confidence intervals around the published (smoothed) curve
   confidence_intervals <- NULL
   if (isTRUE(gg$confidence_intervals)) {
     confidence_intervals <- bootstrap_gg_confidence(
       gg_data,
       iterations = gg$bootstrap_iterations %||% 1000,
-      level = gg$confidence_level %||% 0.95
+      level = gg$confidence_level %||% 0.95,
+      smoothing = smoothing
     )
   }
+
+  weighted <- !is.na(config$weight_var %||% NA) && any(gg_data$weight != 1)
+  coding_note <- gg_response_coding_note(gg)
 
   # Return results
   list(
@@ -107,15 +147,114 @@ run_gabor_granger <- function(data, config) {
     optimal_price_profit = optimal_price_profit,
     elasticity = elasticity,
     confidence_intervals = confidence_intervals,
+    rung_bases = rung_bases,
     diagnostics = list(
       n_respondents = n_respondents,
       n_price_points = n_prices,
       monotonicity_check = monotonicity_check,
       price_range = range(gg_data$price),
       method = "gabor_granger",
-      has_profit = "profit_index" %in% names(revenue_curve)
+      has_profit = "profit_index" %in% names(revenue_curve),
+      weighted = weighted,
+      response_coding = coding_note,
+      imputation = if (identical(imputation, "NO_AFTER_STOP")) "NO_AFTER_STOP: unanswered rungs after a respondent's first No coded as No" else "none",
+      smoothing = smoothing
     )
   )
+}
+
+
+#' Per-Rung Answered Bases
+#'
+#' @param gg_data Long-format Gabor-Granger data.
+#' @return Data frame: price, n_answered, n_missing.
+#' @keywords internal
+gg_rung_bases <- function(gg_data) {
+  prices <- sort(unique(gg_data$price))
+  n_answered <- vapply(prices, function(p) sum(gg_data$price == p & !is.na(gg_data$response)), integer(1))
+  n_missing <- vapply(prices, function(p) sum(gg_data$price == p & is.na(gg_data$response)), integer(1))
+  data.frame(price = prices, n_answered = n_answered, n_missing = n_missing,
+             stringsAsFactors = FALSE)
+}
+
+
+#' Refuse When Rung Bases Differ Beyond A Token Amount
+#'
+#' @param rung_bases From `gg_rung_bases()`.
+#' @param tolerance Relative difference allowed between the largest and the
+#'   smallest base (default 2%), with an absolute floor of three respondents.
+#' @return Invisibly TRUE.
+#' @keywords internal
+check_gg_rung_bases <- function(rung_bases, tolerance = 0.02) {
+  n <- rung_bases$n_answered
+  if (length(n) < 2) return(invisible(TRUE))
+  spread <- max(n) - min(n)
+  allowed <- max(3, ceiling(tolerance * max(n)))
+  if (spread <= allowed) return(invisible(TRUE))
+  pricing_refuse(
+    code = "DATA_GG_UNEQUAL_BASES",
+    title = "Gabor-Granger Rungs Have Different Bases",
+    problem = sprintf("Answered base per rung: %s (prices %s).",
+                      paste(n, collapse = " / "),
+                      paste(rung_bases$price, collapse = " / ")),
+    why_it_matters = paste0(
+      "This is the pattern of a stop-early ladder: respondents who said No were not asked ",
+      "the higher prices. Computing demand among whoever answered each rung counts only the ",
+      "survivors, so demand barely falls and the revenue optimum lands at the top price."),
+    how_to_fix = c(
+      "If the ladder stopped after the first No, set GG_Stop_Early_Imputation = NO_AFTER_STOP on the Settings sheet. Unanswered rungs above a respondent's first No are then coded No, and the run says so.",
+      "If every respondent was asked every rung, check the response columns for accidental blanks."
+    )
+  )
+}
+
+
+#' Can A Rung Order Be Derived From Long-Format Data?
+#' @keywords internal
+.gg_order_derivable <- function(gg_data) {
+  # Prices are numeric, so ascending price is a presentation order; the
+  # refusal above is for the case where prices are not comparable.
+  is.numeric(gg_data$price) && !any(is.na(gg_data$price))
+}
+
+
+#' Impute No After A Respondent's First No
+#'
+#' Ascending price order per respondent: every NA rung above the first
+#' rung answered No becomes No. NA rungs below the first No, or with no No at
+#' all, stay NA (the respondent was not asked, or skipped, for a reason the
+#' data does not tell).
+#'
+#' @param gg_data Long-format data with respondent_id, price, response.
+#' @return The same frame with the imputed responses.
+#' @keywords internal
+impute_gg_no_after_stop <- function(gg_data) {
+  ord <- order(gg_data$respondent_id, gg_data$price)
+  d <- gg_data[ord, , drop = FALSE]
+  ids <- d$respondent_id
+  resp <- d$response
+  first_no_price <- tapply(ifelse(!is.na(resp) & resp == 0, d$price, NA_real_), ids,
+                           function(p) if (all(is.na(p))) NA_real_ else min(p, na.rm = TRUE))
+  cut <- as.numeric(first_no_price[as.character(ids)])
+  fill <- is.na(resp) & !is.na(cut) & d$price > cut
+  d$response[fill] <- 0
+  d[order(ord), , drop = FALSE]
+}
+
+
+#' One Sentence Saying How Responses Were Coded
+#' @keywords internal
+gg_response_coding_note <- function(gg) {
+  rt <- tolower(gg$response_type %||% "binary")
+  if (rt == "binary") {
+    coding <- toupper(gg$binary_coding %||% "ZERO_ONE")
+    if (coding == "ONE_TWO") return("binary, 1 = would buy, 2 = would not (Binary_Coding = ONE_TWO)")
+    return("binary, 1 = would buy, 0 = would not")
+  }
+  if (rt == "scale") {
+    return(sprintf("scale, values >= %s count as would buy", as.character(gg$scale_threshold %||% 3)))
+  }
+  rt
 }
 
 
@@ -151,11 +290,15 @@ prepare_gg_wide_data <- function(data, gg_config, main_config) {
     )
   }
 
-  # Create respondent IDs if not present
-  if (is.null(gg_config$respondent_column) || is.na(gg_config$respondent_column)) {
+  # Respondent ids: the GG sheet's column, else the study's ID_Variable, else
+  # row order (which is fine for the curve and useless for any export, so
+  # the export refuses without an id).
+  id_col <- gg_config$respondent_column
+  if (is.null(id_col) || is.na(id_col) || !nzchar(id_col)) id_col <- main_config$id_var %||% NA
+  if (is.null(id_col) || is.na(id_col) || !id_col %in% names(data)) {
     data$respondent_id <- seq_len(nrow(data))
   } else {
-    data$respondent_id <- data[[gg_config$respondent_column]]
+    data$respondent_id <- data[[id_col]]
   }
 
   # Extract weights (if specified)
@@ -233,21 +376,39 @@ prepare_gg_long_data <- function(data, gg_config, main_config) {
 #' @keywords internal
 code_gg_response <- function(response, config) {
 
-  response_type <- config$response_type %||% "binary"
+  response_type <- tolower(config$response_type %||% "binary")
 
   if (response_type == "binary") {
-    # Already binary or convert common values
+    coding <- toupper(config$binary_coding %||% "ZERO_ONE")
+
     if (is.logical(response)) {
       return(as.numeric(response))
     }
 
     if (is.numeric(response)) {
-      return(as.numeric(response > 0))
+      # Exact values only. "any positive number is a purchase" read 1 = Yes /
+      # 2 = No as 100% intent everywhere (review H5); the domain check in
+      # validation refuses anything outside the declared coding, so what
+      # arrives here is 0/1 (or 1/2 under ONE_TWO) and NA.
+      if (coding == "ONE_TWO") {
+        out <- rep(NA_real_, length(response))
+        out[!is.na(response) & response == 1] <- 1
+        out[!is.na(response) & response == 2] <- 0
+        return(out)
+      }
+      out <- rep(NA_real_, length(response))
+      out[!is.na(response) & response == 1] <- 1
+      out[!is.na(response) & response == 0] <- 0
+      return(out)
     }
 
-    # Handle text responses
-    positive_values <- c("1", "yes", "y", "true", "Yes", "YES", "Y", "TRUE")
-    return(as.numeric(tolower(as.character(response)) %in% tolower(positive_values)))
+    # Text: yes/no in the usual spellings; anything else stays missing rather
+    # than silently becoming No.
+    txt <- tolower(trimws(as.character(response)))
+    out <- rep(NA_real_, length(txt))
+    out[txt %in% c("1", "yes", "y", "true")] <- 1
+    out[txt %in% c("0", "no", "n", "false")] <- 0
+    return(out)
 
   } else if (response_type == "scale") {
     # Top-box coding for scale responses
@@ -255,20 +416,16 @@ code_gg_response <- function(response, config) {
     return(as.numeric(as.numeric(response) >= threshold))
 
   } else {
-    # Auto-detect
-    if (is.numeric(response)) {
-      max_val <- max(response, na.rm = TRUE)
-      if (max_val <= 1) {
-        return(as.numeric(response))
-      } else {
-        # Assume scale - use top 2 boxes on 5-point scale
-        threshold <- ceiling(max_val * 0.6)
-        return(as.numeric(response >= threshold))
-      }
-    } else {
-      return(as.numeric(tolower(as.character(response)) %in%
-                          c("1", "yes", "y", "true")))
-    }
+    # "auto" inferred the scale from the observed maximum, so a wave with no
+    # 5s moved the threshold and no export could say what a 1 meant (review
+    # M5). Refused for anything that feeds a deliverable.
+    pricing_refuse(
+      code = "CFG_GG_RESPONSE_TYPE",
+      title = "Response_Type Must Be Declared",
+      problem = sprintf("Response_Type reads '%s'.", response_type),
+      why_it_matters = "Guessing the coding from the data moves the demand curve between waves and cannot be stamped on an export.",
+      how_to_fix = "Set Response_Type = binary (0/1, or Binary_Coding = ONE_TWO) or scale with a Scale_Threshold."
+    )
   }
 }
 
@@ -909,57 +1066,82 @@ calculate_price_elasticity <- function(demand_curve) {
 
 #' Bootstrap Confidence Intervals for Gabor-Granger
 #'
-#' Calculates confidence intervals for demand curve using bootstrap resampling.
+#' Percentile bootstrap band around the published demand curve.
 #'
-#' @param gg_data Long format Gabor-Granger data
-#' @param iterations Number of bootstrap iterations
-#' @param level Confidence level
+#' Policy (one policy, shared with the Van Westendorp bootstrap, review C3
+#' and M14): respondents are resampled with equal probability, each carrying
+#' its own weight; each replicate's demand is the weighted mean per rung,
+#' then smoothed the way the published curve was, so the band brackets the
+#' curve the reader sees (review M1).
 #'
-#' @return Data frame with price and confidence intervals for purchase intent
+#' @param gg_data Long format Gabor-Granger data (respondent_id, price,
+#'   response, weight).
+#' @param iterations Number of bootstrap iterations.
+#' @param level Confidence level.
+#' @param smoothing "none", "isotonic", "cummax" or "loess": the published
+#'   curve's smoothing.
+#'
+#' @return Data frame with price, mean, se, ci_lower, ci_upper; attribute
+#'   `policy` describes the resampling.
 #'
 #' @keywords internal
-bootstrap_gg_confidence <- function(gg_data, iterations = 1000, level = 0.95) {
+bootstrap_gg_confidence <- function(gg_data, iterations = 1000, level = 0.95,
+                                    smoothing = "none") {
 
   alpha <- 1 - level
   prices <- sort(unique(gg_data$price))
   respondents <- unique(gg_data$respondent_id)
   n_resp <- length(respondents)
+  n_prices <- length(prices)
 
-  # Storage for bootstrap results
-  boot_results <- matrix(NA, nrow = iterations, ncol = length(prices))
+  # Wide matrices once, so a replicate is an index into rows rather than a
+  # rebind of the long frame (the old loop rebuilt the frame respondent by
+  # respondent, iterations times).
+  resp_mat <- matrix(NA_real_, nrow = n_resp, ncol = n_prices)
+  w_vec <- rep(1, n_resp)
+  ri <- match(gg_data$respondent_id, respondents)
+  pj <- match(gg_data$price, prices)
+  resp_mat[cbind(ri, pj)] <- gg_data$response
+  if ("weight" %in% names(gg_data)) {
+    w_vec[ri] <- gg_data$weight
+  }
+  w_vec[is.na(w_vec)] <- 1
+
+  boot_results <- matrix(NA_real_, nrow = iterations, ncol = n_prices)
 
   for (i in seq_len(iterations)) {
-    # Resample respondents
-    boot_respondents <- sample(respondents, n_resp, replace = TRUE)
-
-    # Get data for resampled respondents (includes weights)
-    boot_data <- do.call(rbind, lapply(boot_respondents, function(r) {
-      gg_data[gg_data$respondent_id == r, ]
-    }))
-
-    # Calculate weighted demand at each price
-    for (j in seq_along(prices)) {
-      p <- prices[j]
-      subset_data <- boot_data[boot_data$price == p & !is.na(boot_data$response), ]
-      if (nrow(subset_data) > 0 && "weight" %in% names(subset_data)) {
-        # Weighted mean
-        boot_results[i, j] <- sum(subset_data$weight * subset_data$response) / sum(subset_data$weight)
-      } else {
-        # Fallback to unweighted if no weights
-        boot_results[i, j] <- mean(subset_data$response)
+    idx <- sample.int(n_resp, n_resp, replace = TRUE)
+    r <- resp_mat[idx, , drop = FALSE]
+    w <- w_vec[idx]
+    answered <- !is.na(r)
+    num <- colSums(w * ifelse(answered, r, 0))
+    den <- colSums(w * answered)
+    intent <- ifelse(den > 0, num / den, NA_real_)
+    if (smoothing != "none") {
+      ok <- !is.na(intent)
+      if (sum(ok) >= 2) {
+        intent[ok] <- switch(smoothing,
+          "cummax" = smooth_cummax(prices[ok], intent[ok]),
+          "loess" = smooth_loess_monotone(prices[ok], intent[ok]),
+          smooth_isotonic(prices[ok], intent[ok])
+        )
       }
     }
+    boot_results[i, ] <- intent
   }
 
-  # Calculate confidence intervals
   ci <- data.frame(
     price = prices,
     mean = colMeans(boot_results, na.rm = TRUE),
     se = apply(boot_results, 2, sd, na.rm = TRUE),
-    ci_lower = apply(boot_results, 2, quantile, probs = alpha/2, na.rm = TRUE),
-    ci_upper = apply(boot_results, 2, quantile, probs = 1 - alpha/2, na.rm = TRUE),
+    ci_lower = apply(boot_results, 2, quantile, probs = alpha / 2, na.rm = TRUE),
+    ci_upper = apply(boot_results, 2, quantile, probs = 1 - alpha / 2, na.rm = TRUE),
     stringsAsFactors = FALSE
   )
-
-  return(ci)
+  rownames(ci) <- NULL
+  attr(ci, "policy") <- paste0(
+    "Respondents resampled with equal probability carrying their weights; ",
+    "weighted mean per rung; smoothing inside each replicate: ", smoothing
+  )
+  ci
 }

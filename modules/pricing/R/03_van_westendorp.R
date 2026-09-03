@@ -512,26 +512,32 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
   # ============================================================================
   # STEP 3: Run pricesensitivitymeter analysis
   # ============================================================================
-
-  psm_args <- list(
-    toocheap = too_cheap,
-    cheap = cheap,
-    expensive = expensive,
-    tooexpensive = too_expensive,
-    validate = TRUE,
-    interpolate = TRUE,
-    interpolation_steps = 0.1
-  )
-
-  # Add NMS parameters if available
-  if (has_nms) {
-    psm_args$pi_cheap <- pi_cheap
-    if (!is.null(pi_expensive)) {
-      psm_args$pi_expensive <- pi_expensive
-    }
+  # Weights (review C1). When the config names a weight variable, the price
+  # points come from psm_analysis_weighted() on a survey design; before this
+  # the headline points were unweighted while the stats pack said "Weighting
+  # applied: Yes". A failure on the weighted path refuses; it never falls
+  # back to the unweighted estimator.
+  weight_var <- config$weight_var
+  vw_weights <- NULL
+  if (!is.null(weight_var) && !is.na(weight_var) && weight_var %in% names(data)) {
+    vw_weights <- as.numeric(data[[weight_var]])
   }
 
-  psm_result <- do.call(pricesensitivitymeter::psm_analysis, psm_args)
+  # Monotonicity semantics (review H3). "flag_only" keeps intransitive
+  # respondents in the curves (validate = FALSE, disclosed); "drop" and "fix"
+  # run validate = TRUE, which is what every run silently did before.
+  behavior <- config$vw_monotonicity_behavior %||% "drop"
+  validate_flag <- !identical(behavior, "flag_only")
+
+  psm_fit <- fit_vw_psm(
+    too_cheap, cheap, expensive, too_expensive,
+    weights = vw_weights, validate = validate_flag,
+    pi_cheap = if (has_nms) pi_cheap else NULL,
+    pi_expensive = if (has_nms) pi_expensive else NULL,
+    pi_scale = vw$pi_scale
+  )
+  psm_result <- psm_fit$psm
+  estimator <- psm_fit$estimator
 
   # ============================================================================
   # STEP 4: Extract and restructure results
@@ -624,14 +630,30 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
                cheap[complete_cases] <= expensive[complete_cases] &
                expensive[complete_cases] <= too_expensive[complete_cases]
   n_violations <- sum(!monotonic)
-  violation_rate <- n_violations / n_valid
+  violation_rate <- if (n_valid > 0) n_violations / n_valid else 0
+
+  # The analysed base is psm's own: the complete cases it received minus the
+  # cases it set aside as invalid (review H3: the old n_valid counted
+  # respondents the curves had excluded).
+  # psm counts the intransitive cases whether or not validate excluded them;
+  # under validate = FALSE they stay in the curves, so the analysed base is
+  # the whole complete-case sample.
+  n_invalid_psm <- as.integer(psm_result$invalid_cases %||% 0L)
+  n_analysed <- as.integer(psm_result$total_sample %||% n_valid) -
+    (if (validate_flag) n_invalid_psm else 0L)
 
   diagnostics <- list(
     n_total = n_total,
     n_valid = n_valid,
     n_excluded = n_total - n_valid,
+    n_analysed = n_analysed,
+    n_invalid_psm = n_invalid_psm,
     n_violations = n_violations,
     violation_rate = violation_rate,
+    monotonicity_behavior = behavior,
+    validate_flag = validate_flag,
+    weighted = !is.null(vw_weights),
+    estimator = estimator,
     price_range = range(c(too_cheap, cheap, expensive, too_expensive), na.rm = TRUE),
     has_nms = has_nms,
     method = "van_westendorp"
@@ -651,16 +673,14 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
 
   confidence_intervals <- NULL
   if (isTRUE(vw$calculate_confidence)) {
-    # Extract weights if available in config
-    vw_weights <- NULL
-    weight_var <- config$weight_var
-    if (!is.null(weight_var) && !is.na(weight_var) && weight_var %in% names(data)) {
-      vw_weights <- as.numeric(data[[weight_var]])
-    }
-
+    # The bootstrap brackets the estimator that was reported: same validate
+    # flag, same weighting, and the table's estimate column is the headline
+    # point (review C3).
     confidence_intervals <- bootstrap_vw_confidence(
       too_cheap, cheap, expensive, too_expensive,
       weights = vw_weights,
+      validate = validate_flag,
+      point_estimates = unlist(price_points[c("PMC", "OPP", "IDP", "PME")]),
       iterations = vw$bootstrap_iterations %||% 1000,
       level = vw$confidence_level %||% 0.95
     )
@@ -685,45 +705,143 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
 }
 
 
+#' Fit The Price Sensitivity Meter, Weighted Or Not
+#'
+#' One place that decides which pricesensitivitymeter estimator runs. With
+#' weights it builds a `survey::svydesign` and calls `psm_analysis_weighted()`;
+#' without, `psm_analysis()`. The headline run and every bootstrap replicate
+#' go through here, so they cannot disagree on the estimator (review C1, C3).
+#'
+#' @param too_cheap,cheap,expensive,too_expensive Numeric vectors.
+#' @param weights Numeric vector of case weights, or NULL for unweighted.
+#' @param validate Logical, exclude intransitive respondents inside psm.
+#' @param pi_cheap,pi_expensive Optional NMS purchase-intent vectors.
+#' @param pi_scale Optional NMS scale (5 or 100).
+#' @param interpolate Logical, interpolate the curves.
+#' @return A list with `psm` (the psm object) and `estimator` (a sentence).
+#' @keywords internal
+fit_vw_psm <- function(too_cheap, cheap, expensive, too_expensive,
+                       weights = NULL, validate = TRUE,
+                       pi_cheap = NULL, pi_expensive = NULL, pi_scale = NULL,
+                       interpolate = TRUE) {
+
+  nms_args <- list()
+  if (!is.null(pi_cheap)) {
+    nms_args$pi_cheap <- pi_cheap
+    if (!is.null(pi_expensive)) nms_args$pi_expensive <- pi_expensive
+    if (!is.null(pi_scale) && !is.na(pi_scale)) nms_args$pi_scale <- as.numeric(pi_scale)
+  }
+
+  if (is.null(weights)) {
+    psm <- do.call(pricesensitivitymeter::psm_analysis, c(list(
+      toocheap = too_cheap, cheap = cheap, expensive = expensive,
+      tooexpensive = too_expensive, validate = validate,
+      interpolate = interpolate, interpolation_steps = 0.1
+    ), nms_args))
+    return(list(psm = psm, estimator = "psm_analysis (unweighted)"))
+  }
+
+  if (!requireNamespace("survey", quietly = TRUE)) {
+    pricing_refuse(
+      code = "PKG_SURVEY_MISSING",
+      title = "Package survey Is Not Installed",
+      problem = "A weight variable is configured, and weighted Van Westendorp needs the survey package.",
+      why_it_matters = "Without it the price points could only be computed unweighted, which is not what the config asked for.",
+      how_to_fix = "Install it: renv::install('survey'), or remove Weight_Variable to run unweighted."
+    )
+  }
+
+  bad_w <- is.na(weights) | !is.finite(weights) | weights <= 0
+  if (any(bad_w)) {
+    pricing_refuse(
+      code = "DATA_VW_WEIGHTS_INVALID",
+      title = "Weights Reaching The Van Westendorp Estimator Are Not Usable",
+      problem = sprintf("%d weight(s) are missing, non-finite or not positive.", sum(bad_w)),
+      why_it_matters = "The survey design cannot carry them and the price points would be computed on a different base than the one declared.",
+      how_to_fix = "Exclude those respondents upstream or repair the weight column."
+    )
+  }
+
+  df <- data.frame(tc = too_cheap, ch = cheap, ex = expensive, te = too_expensive,
+                   w = weights)
+  pi_names <- list()
+  if (!is.null(pi_cheap)) {
+    df$pic <- pi_cheap
+    pi_names$pi_cheap <- "pic"
+    if (!is.null(pi_expensive)) {
+      df$pie <- pi_expensive
+      pi_names$pi_expensive <- "pie"
+    }
+    if (!is.null(pi_scale) && !is.na(pi_scale)) pi_names$pi_scale <- as.numeric(pi_scale)
+  }
+
+  psm <- tryCatch({
+    design <- survey::svydesign(ids = ~1, weights = ~w, data = df)
+    do.call(pricesensitivitymeter::psm_analysis_weighted, c(list(
+      toocheap = "tc", cheap = "ch", expensive = "ex", tooexpensive = "te",
+      design = design, validate = validate,
+      interpolate = interpolate, interpolation_steps = 0.1
+    ), pi_names))
+  }, error = function(e) {
+    pricing_refuse(
+      code = "MODEL_VW_WEIGHTED_FAILED",
+      title = "Weighted Van Westendorp Estimation Failed",
+      problem = sprintf("psm_analysis_weighted() stopped with: %s", conditionMessage(e)),
+      why_it_matters = "The config asks for weighted price points. Falling back to unweighted ones would ship numbers on a different population under a weighted label.",
+      how_to_fix = c(
+        "Check the weight column for extreme or zero values.",
+        "Check that the four price columns are numeric and mostly complete.",
+        "Remove Weight_Variable to run unweighted, and say so in the report."
+      )
+    )
+  })
+
+  list(psm = psm, estimator = "psm_analysis_weighted (survey design)")
+}
+
+
 #' Bootstrap Confidence Intervals for Van Westendorp
 #'
-#' Calculates confidence intervals for price points using bootstrap resampling.
+#' Percentile bootstrap intervals for the four price points, around the
+#' estimator that was reported.
 #'
-#' @param too_cheap Vector of "too cheap" prices
-#' @param cheap Vector of "bargain" prices
-#' @param expensive Vector of "expensive" prices
-#' @param too_expensive Vector of "too expensive" prices
-#' @param weights Vector of case weights (defaults to equal weights if NULL)
-#' @param iterations Number of bootstrap iterations
-#' @param level Confidence level (e.g., 0.95 for 95% CI)
+#' Policy (one policy, shared with the Gabor-Granger bootstrap, review C3 and
+#' M14): respondents are resampled with equal probability, each carrying its
+#' own weight, and every replicate is estimated by the same routine as the
+#' headline, with the same `validate` flag and the same weighting. The
+#' `estimate` column is the headline point, not the bootstrap mean; the
+#' bootstrap mean has its own column.
 #'
-#' @return Data frame with price point estimates and confidence intervals
+#' @param too_cheap,cheap,expensive,too_expensive Numeric vectors.
+#' @param weights Numeric vector of case weights, or NULL.
+#' @param validate Logical, the headline's validate flag.
+#' @param point_estimates Named numeric (PMC, OPP, IDP, PME): the headline
+#'   points. When NULL the bootstrap mean fills the column and says so.
+#' @param iterations Number of bootstrap iterations.
+#' @param level Confidence level (e.g. 0.95).
+#'
+#' @return Data frame with metric, estimate, boot_mean, se, ci_lower,
+#'   ci_upper; attribute `policy` describes the resampling. NULL when fewer
+#'   than ten replicates succeeded.
 #'
 #' @keywords internal
 bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
-                                    weights = NULL,
+                                    weights = NULL, validate = TRUE,
+                                    point_estimates = NULL,
                                     iterations = 1000, level = 0.95) {
 
-  n <- length(too_cheap)
   alpha <- 1 - level
 
-  # Remove NA cases for bootstrap
+  # Complete cases only; psm receives the same base as the headline.
   complete_idx <- !is.na(too_cheap) & !is.na(cheap) &
                   !is.na(expensive) & !is.na(too_expensive)
+  if (!is.null(weights)) complete_idx <- complete_idx & !is.na(weights) & weights > 0
 
   too_cheap_c <- too_cheap[complete_idx]
   cheap_c <- cheap[complete_idx]
   expensive_c <- expensive[complete_idx]
   too_expensive_c <- too_expensive[complete_idx]
-
-  # Align weights with complete cases
-  weights_c <- if (!is.null(weights)) {
-    w <- weights[complete_idx]
-    # Normalise to sum to n for proper resampling probability
-    w / sum(w, na.rm = TRUE) * length(w)
-  } else {
-    NULL
-  }
+  weights_c <- if (!is.null(weights)) as.numeric(weights[complete_idx]) else NULL
 
   n_c <- length(too_cheap_c)
 
@@ -734,76 +852,70 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
     )
   }
 
-  # Storage for bootstrap results
-  boot_results <- matrix(NA, nrow = iterations, ncol = 4)
+  boot_results <- matrix(NA_real_, nrow = iterations, ncol = 4)
   colnames(boot_results) <- c("PMC", "OPP", "IDP", "PME")
 
-  # Run bootstrap using pricesensitivitymeter
-  # Use weighted resampling when weights are provided
-  resample_prob <- if (!is.null(weights_c)) weights_c / sum(weights_c) else NULL
-
   successful <- 0L
-
   for (i in seq_len(iterations)) {
-    # Resample respondents with replacement (weighted if applicable)
-    idx <- sample(n_c, n_c, replace = TRUE, prob = resample_prob)
-
-    boot_too_cheap <- too_cheap_c[idx]
-    boot_cheap <- cheap_c[idx]
-    boot_expensive <- expensive_c[idx]
-    boot_too_expensive <- too_expensive_c[idx]
-
-    # Run analysis
-    tryCatch({
-      psm_boot <- pricesensitivitymeter::psm_analysis(
-        toocheap = boot_too_cheap,
-        cheap = boot_cheap,
-        expensive = boot_expensive,
-        tooexpensive = boot_too_expensive,
-        validate = FALSE,
-        interpolate = TRUE
-      )
-
-      boot_results[i, ] <- c(
-        psm_boot$pricerange_lower,
-        psm_boot$opp,
-        psm_boot$idp,
-        psm_boot$pricerange_upper
-      )
-      successful <- successful + 1L
-    }, error = function(e) {
-      # Skip failed iterations
-    })
+    idx <- sample.int(n_c, n_c, replace = TRUE)
+    fit <- tryCatch(
+      fit_vw_psm(too_cheap_c[idx], cheap_c[idx], expensive_c[idx], too_expensive_c[idx],
+                 weights = if (!is.null(weights_c)) weights_c[idx] else NULL,
+                 validate = validate, interpolate = TRUE),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) next
+    psm_boot <- fit$psm
+    boot_results[i, ] <- c(psm_boot$pricerange_lower, psm_boot$opp,
+                           psm_boot$idp, psm_boot$pricerange_upper)
+    successful <- successful + 1L
   }
 
-  # Check success rate (matching monadic bootstrap pattern)
   if (successful < iterations * 0.5) {
     pricing_console_warning(
-      sprintf("VW bootstrap: only %d/%d iterations succeeded — CIs may be unreliable", successful, iterations),
+      sprintf("VW bootstrap: only %d/%d iterations succeeded, so the intervals may be unreliable",
+              successful, iterations),
       context = "VW Bootstrap CI"
     )
   }
 
   if (successful < 10L) {
     pricing_console_warning(
-      sprintf("VW bootstrap: only %d successful iterations — returning NULL CIs", successful),
+      sprintf("VW bootstrap: only %d successful iterations, returning no intervals", successful),
       context = "VW Bootstrap CI"
     )
     return(NULL)
   }
 
-  # Calculate percentile confidence intervals
-  ci_lower <- apply(boot_results, 2, quantile, probs = alpha/2, na.rm = TRUE)
-  ci_upper <- apply(boot_results, 2, quantile, probs = 1 - alpha/2, na.rm = TRUE)
-  ci_mean <- colMeans(boot_results, na.rm = TRUE)
-  ci_se <- apply(boot_results, 2, sd, na.rm = TRUE)
+  ci_lower <- apply(boot_results, 2, quantile, probs = alpha / 2, na.rm = TRUE)
+  ci_upper <- apply(boot_results, 2, quantile, probs = 1 - alpha / 2, na.rm = TRUE)
+  boot_mean <- colMeans(boot_results, na.rm = TRUE)
+  boot_se <- apply(boot_results, 2, sd, na.rm = TRUE)
 
-  data.frame(
-    metric = c("PMC", "OPP", "IDP", "PME"),
-    estimate = ci_mean,
-    se = ci_se,
-    ci_lower = ci_lower,
-    ci_upper = ci_upper,
+  metrics <- c("PMC", "OPP", "IDP", "PME")
+  estimate <- if (!is.null(point_estimates)) {
+    as.numeric(point_estimates[metrics])
+  } else {
+    boot_mean
+  }
+
+  out <- data.frame(
+    metric = metrics,
+    estimate = estimate,
+    boot_mean = as.numeric(boot_mean),
+    se = as.numeric(boot_se),
+    ci_lower = as.numeric(ci_lower),
+    ci_upper = as.numeric(ci_upper),
+    n_successful = successful,
     stringsAsFactors = FALSE
   )
+  rownames(out) <- NULL
+  attr(out, "policy") <- paste0(
+    "Respondents resampled with equal probability carrying their weights; ",
+    "each replicate estimated by ", if (is.null(weights_c)) "psm_analysis" else "psm_analysis_weighted",
+    " with validate = ", if (validate) "TRUE" else "FALSE",
+    "; estimate column is the headline point",
+    if (is.null(point_estimates)) " (bootstrap mean, no headline supplied)" else ""
+  )
+  out
 }

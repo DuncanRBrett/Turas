@@ -187,7 +187,7 @@ run_pricing_gui <- function() {
         div(class = "turas-card",
           checkboxInput("generate_stats_pack",
                         "Generate stats pack (diagnostic workbook for advanced review)",
-                        value = FALSE),
+                        value = TRUE),
           actionButton("run_analysis", "Run Pricing Analysis",
                        class = "btn turas-btn-run",
                        icon = icon("play")),
@@ -481,24 +481,39 @@ run_pricing_gui <- function() {
           # Propagate stats pack flag
           options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
-          # Capture analysis output
-          captured <- capture.output({
+          # Capture analysis output into a connection that survives a crash:
+          # with capture.output() the text captured before an error was
+          # discarded, so a plain R error reached the user as one bare line
+          # with no context (review M12). The message stream (TRS PARTIAL
+          # lines) is captured too.
+          captured_con <- textConnection("captured_text", "w", local = TRUE)
+          sink(captured_con, type = "output")
+          sink(captured_con, type = "message")
+          tryCatch({
             rv$results <- run_pricing_analysis(files$config_file)
+          }, finally = {
+            sink(type = "message")
+            sink(type = "output")
+            close(captured_con)
           })
 
           incProgress(0.80, detail = "Finalising results...")
 
-          output_text <- paste0(output_text, paste(captured, collapse = "\n"))
+          output_text <- paste0(output_text, paste(captured_text, collapse = "\n"))
           output_text <- paste0(output_text, "\n\nAnalysis complete!")
 
           incProgress(0.05, detail = "Done!")
 
         })  # End withProgress
       }, error = function(e) {
+        # Whatever was captured before the failure is kept.
+        if (exists("captured_text") && length(captured_text) > 0) {
+          output_text <<- paste0(output_text, paste(captured_text, collapse = "\n"))
+        }
         cat("\n=== TURAS ERROR ===\n")
         cat("Message:", conditionMessage(e), "\n")
         cat("==================\n\n")
-        output_text <<- paste0(output_text, "\n\nError: ", e$message)
+        output_text <<- paste0(output_text, "\n\nError: ", conditionMessage(e))
         showNotification(paste("Error:", conditionMessage(e)), type = "error", duration = 10)
       })
 

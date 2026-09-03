@@ -163,7 +163,8 @@ run_segmented_analysis <- function(data, config, method) {
 
   insights <- generate_segment_insights(
     comparison_table = comparison_table,
-    method = method
+    method = method,
+    currency = config$currency_symbol %||% "$"
   )
 
   # ============================================================================
@@ -245,7 +246,7 @@ build_segment_comparison <- function(total_results, segment_results,
 
       data.frame(
         segment = label,
-        n = res$diagnostics$n_valid,
+        n = res$diagnostics$n_analysed %||% res$diagnostics$n_valid,
         PMC = round(res$price_points$PMC, 2),
         OPP = round(res$price_points$OPP, 2),
         IDP = round(res$price_points$IDP, 2),
@@ -308,7 +309,7 @@ build_segment_comparison <- function(total_results, segment_results,
 #' @param method Analysis method
 #' @return Character vector of insight statements
 #' @keywords internal
-generate_segment_insights <- function(comparison_table, method) {
+generate_segment_insights <- function(comparison_table, method, currency = "$") {
 
   insights <- character(0)
 
@@ -353,8 +354,8 @@ generate_segment_insights <- function(comparison_table, method) {
 
       if (max_opp > min_opp * 1.2) {  # >20% difference
         insights <- c(insights, sprintf(
-          "%s supports %.0f%% higher pricing than %s ($%.2f vs $%.2f optimal).",
-          max_seg, (max_opp / min_opp - 1) * 100, min_seg, max_opp, min_opp
+          "%s supports %.0f%% higher pricing than %s (%s%.2f vs %s%.2f optimal).",
+          max_seg, (max_opp / min_opp - 1) * 100, min_seg, currency, max_opp, currency, min_opp
         ))
       }
     }
@@ -406,8 +407,8 @@ generate_segment_insights <- function(comparison_table, method) {
 
       if (max_price > min_price * 1.15) {  # >15% difference
         insights <- c(insights, sprintf(
-          "Optimal price for %s ($%.2f) is %.0f%% higher than %s ($%.2f).",
-          max_seg, max_price, (max_price / min_price - 1) * 100, min_seg, min_price
+          "Optimal price for %s (%s%.2f) is %.0f%% higher than %s (%s%.2f).",
+          max_seg, currency, max_price, (max_price / min_price - 1) * 100, min_seg, currency, min_price
         ))
       }
     }

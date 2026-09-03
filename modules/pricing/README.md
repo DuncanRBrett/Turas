@@ -192,7 +192,7 @@ The module generates:
 4. **Stats Pack Workbook** (if `Generate_Stats_Pack = Y`):
    - `{output}_stats_pack.xlsx` — full audit trail for advanced partners and research statisticians
    - Declaration sheet: project name, analyst, research house, and sign-off details
-   - Data Receipt sheet: column inventory, missing values, outlier flags, and exclusion log
+   - Data Receipt sheet: column inventory, missing values, and exclusion log
    - Methods sheet: methodology choices, assumptions, and parameter settings used
    - Reproducibility sheet: software versions, random seeds, and re-run instructions
 
@@ -226,9 +226,9 @@ modules/pricing/
 │   ├── 04_gabor_granger.R      # Gabor-Granger analysis
 │   ├── 05_visualization.R      # Plot generation
 │   ├── 06_output.R             # Excel output
-│   ├── 07_wtp_distribution.R   # Willingness-to-pay analysis
-│   ├── 08_competitive_scenarios.R  # Competitive analysis
-│   ├── 09_price_volume_optimisation.R  # Optimization
+│   ├── 07_wtp_distribution.R   # Willingness-to-pay (direct API only, not in the pipeline)
+│   ├── 08_competitive_scenarios.R  # Competitive analysis (direct API only, not in the pipeline)
+│   ├── 09_price_volume_optimisation.R  # Optimisation (direct API only, not in the pipeline)
 │   ├── 10_segmentation.R       # Segment analysis
 │   ├── 11_price_ladder.R       # Tier generation
 │   ├── 12_recommendation_synthesis.R  # Synthesis
@@ -287,7 +287,7 @@ This module includes comprehensive documentation:
 
 1. **Sample Size**: Minimum 100 respondents recommended, 300+ for segment analysis
 2. **Price Range**: Ensure tested prices span expected acceptable range
-3. **Data Quality**: Use validation settings to catch outliers and inconsistencies
+3. **Data Quality**: Use validation settings (completeness, Min_Sample, price range) to catch inconsistencies
 4. **Method Selection**:
    - Van Westendorp for exploring acceptable ranges
    - Gabor-Granger for finding specific optimal price from discrete price points

@@ -22,9 +22,40 @@ PRICING_VERSION <- "12.0"
   if (exists("script_dir_override", envir = globalenv())) {
     return(get("script_dir_override", envir = globalenv()))
   }
+  # The directory this file was sourced from, remembered at source time: the
+  # frame walk below only works while the source() call is on the stack, and
+  # step 3 of the pipeline used to look the module up again at run time and
+  # fail with BUG_MONADIC_NOT_FOUND from anywhere but the GUI.
+  if (exists(".PRICING_MODULE_DIR", envir = globalenv()) &&
+      file.exists(file.path(get(".PRICING_MODULE_DIR", envir = globalenv()), "00_guard.R"))) {
+    return(get(".PRICING_MODULE_DIR", envir = globalenv()))
+  }
+  # This file is normally reached by source("modules/pricing/R/00_main.R")
+  # from a script or a console somewhere else. The frame that sourced it
+  # knows where it is; the Rscript --file argument (below) knows only where
+  # the CALLER is, and a guard looked up there is silently never loaded, so
+  # the first refusal dies with "could not find function pricing_refuse".
+  # Same walk as maxdiff's 00_main.R.
+  for (i in seq_len(sys.nframe())) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (is.character(ofile) && length(ofile) == 1 && grepl("00_main\\.R$", ofile)) {
+      return(dirname(normalizePath(ofile, mustWork = FALSE)))
+    }
+    srcfile <- tryCatch(sys.frame(i)$srcfile, error = function(e) NULL)
+    if (is.list(srcfile) && is.character(srcfile$filename) &&
+        grepl("00_main\\.R$", srcfile$filename)) {
+      return(dirname(normalizePath(srcfile$filename, mustWork = FALSE)))
+    }
+  }
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- grep("^--file=", args, value = TRUE)
-  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  if (length(file_arg) > 0) {
+    d <- dirname(sub("^--file=", "", file_arg))
+    if (file.exists(file.path(d, "00_guard.R"))) return(d)
+  }
+  if (file.exists(file.path(getwd(), "modules", "pricing", "R", "00_guard.R"))) {
+    return(file.path(getwd(), "modules", "pricing", "R"))
+  }
   return(getwd())
 }
 
@@ -34,7 +65,27 @@ if (!file.exists(.guard_path)) {
 }
 if (file.exists(.guard_path)) {
   source(.guard_path)
+  assign(".PRICING_MODULE_DIR", dirname(normalizePath(.guard_path, mustWork = FALSE)),
+         envir = globalenv())
 }
+
+# The module's other files. Sourcing 00_main.R alone used to give a function
+# that could not find load_pricing_config(); the GUI sourced the siblings
+# itself and nothing else could run the module. Now this file loads them, so
+# source("modules/pricing/R/00_main.R") is enough, as it is for maxdiff.
+.source_pricing_module_files <- function() {
+  base_dir <- .get_script_dir_for_guard()
+  files <- c("01_config.R", "02_validation.R", "03_van_westendorp.R",
+             "04_gabor_granger.R", "05_visualization.R", "06_output.R",
+             "07_wtp_distribution.R", "08_competitive_scenarios.R",
+             "09_price_volume_optimisation.R", "10_segmentation.R",
+             "11_price_ladder.R", "12_recommendation_synthesis.R", "13_monadic.R")
+  for (f in files) {
+    p <- file.path(base_dir, f)
+    if (file.exists(p)) source(p)
+  }
+}
+.source_pricing_module_files()
 
 # ==============================================================================
 # TRS INFRASTRUCTURE (TRS v1.0)
@@ -52,8 +103,11 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
+  # effective_n.R is the platform's one Kish effective sample size (OPUS-0
+  # W1); the stats pack's "Effective N" row comes from it, never from a local
+  # copy.
   trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
-                 "stats_pack_writer.R")
+                 "stats_pack_writer.R", "effective_n.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -288,12 +342,15 @@ run_pricing_analysis_from_config <- function(config) {
   } else if (analysis_method == "monadic") {
     cat("\n3. Running Monadic Price Testing analysis...\n")
 
-    # Source monadic module
+    # The monadic engine is loaded with the module; look it up only if a
+    # caller sourced this file some other way.
     monadic_path <- file.path(.get_script_dir_for_guard(), "13_monadic.R")
     if (!file.exists(monadic_path)) {
       monadic_path <- file.path(getwd(), "modules", "pricing", "R", "13_monadic.R")
     }
-    if (file.exists(monadic_path)) {
+    if (exists("run_monadic_analysis", mode = "function")) {
+      # already loaded
+    } else if (file.exists(monadic_path)) {
       source(monadic_path)
     } else {
       pricing_refuse(
@@ -559,9 +616,17 @@ run_pricing_analysis_from_config <- function(config) {
   # --------------------------------------------------------------------------
   # STEP 10: Generate Stats Pack (Optional)
   # --------------------------------------------------------------------------
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
-  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+  # The loaded config IS the flat settings list (there is no $settings
+  # element), so the old read of config$settings$Generate_Stats_Pack was
+  # always NULL, defaulted to "Y", and the OR with the GUI option meant the
+  # stats pack could never be switched off (review H8). The GUI checkbox, when
+  # the GUI set the option, is authoritative; otherwise the config decides.
+  gui_flag <- getOption("turas.generate_stats_pack", NULL)
+  generate_stats_pack_flag <- if (!is.null(gui_flag)) {
+    isTRUE(gui_flag)
+  } else {
+    toupper(substr(as.character(config$generate_stats_pack %||% "Y"), 1, 1)) %in% c("Y", "T")
+  }
 
   if (generate_stats_pack_flag) {
     cat("\n10. Generating stats pack...\n")
@@ -690,7 +755,7 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
   n_partials <- sum(vapply(run_result$events %||% list(),
                            function(e) identical(e$level, "PARTIAL"), logical(1)))
   trs_summary <- if (n_events == 0) {
-    "No events — ran cleanly"
+    "No events, ran cleanly"
   } else {
     parts <- character(0)
     if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
@@ -704,57 +769,84 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
   method_results <- list()
 
   if (!is.null(vw_results)) {
-    method_results[["VW — PMC"]]  <- sprintf("%.2f", vw_results$price_points$PMC)
-    method_results[["VW — OPP"]]  <- sprintf("%.2f", vw_results$price_points$OPP)
-    method_results[["VW — IDP"]]  <- sprintf("%.2f", vw_results$price_points$IDP)
-    method_results[["VW — PME"]]  <- sprintf("%.2f", vw_results$price_points$PME)
-    method_results[["VW — n_valid"]] <- as.character(vw_results$diagnostics$n_valid)
-    method_results[["VW — violation_rate"]] <- sprintf("%.1f%%", vw_results$diagnostics$violation_rate * 100)
+    method_results[["VW: PMC"]]  <- sprintf("%.2f", vw_results$price_points$PMC)
+    method_results[["VW: OPP"]]  <- sprintf("%.2f", vw_results$price_points$OPP)
+    method_results[["VW: IDP"]]  <- sprintf("%.2f", vw_results$price_points$IDP)
+    method_results[["VW: PME"]]  <- sprintf("%.2f", vw_results$price_points$PME)
+    method_results[["VW: n_analysed"]] <- as.character(vw_results$diagnostics$n_analysed %||%
+                                                          vw_results$diagnostics$n_valid)
+    method_results[["VW: n_complete"]] <- as.character(vw_results$diagnostics$n_valid)
+    method_results[["VW: violation_rate"]] <- sprintf("%.1f%%", vw_results$diagnostics$violation_rate * 100)
+    method_results[["VW: intransitive_handling"]] <- vw_results$diagnostics$monotonicity_behavior %||% "unknown"
+    method_results[["VW: estimator"]] <- vw_results$diagnostics$estimator %||% "psm_analysis (unweighted)"
     if (!is.null(vw_results$nms_results)) {
-      method_results[["VW — NMS_revenue_optimal"]] <- sprintf("%.2f", vw_results$nms_results$revenue_optimal)
+      method_results[["VW: NMS_revenue_optimal"]] <- sprintf("%.2f", vw_results$nms_results$revenue_optimal)
     }
     if (!is.null(vw_results$confidence_intervals)) {
-      method_results[["VW — bootstrap_iterations"]] <- as.character(config$van_westendorp$bootstrap_iterations %||% 1000)
-      method_results[["VW — confidence_level"]] <- as.character(config$van_westendorp$confidence_level %||% 0.95)
+      method_results[["VW: bootstrap_iterations"]] <- as.character(config$van_westendorp$bootstrap_iterations %||% 1000)
+      method_results[["VW: confidence_level"]] <- as.character(config$van_westendorp$confidence_level %||% 0.95)
+      method_results[["VW: bootstrap_policy"]] <- attr(vw_results$confidence_intervals, "policy") %||%
+        "same validate flag and weighting as the headline"
     }
   }
 
   if (!is.null(gg_results)) {
-    method_results[["GG — optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price$price)
-    method_results[["GG — purchase_intent"]] <- sprintf("%.1f%%", gg_results$optimal_price$purchase_intent * 100)
-    method_results[["GG — revenue_index"]] <- sprintf("%.4f", gg_results$optimal_price$revenue_index)
-    method_results[["GG — n_respondents"]] <- as.character(gg_results$diagnostics$n_respondents)
-    method_results[["GG — n_price_points"]] <- as.character(gg_results$diagnostics$n_price_points)
+    method_results[["GG: optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price$price)
+    method_results[["GG: purchase_intent"]] <- sprintf("%.1f%%", gg_results$optimal_price$purchase_intent * 100)
+    method_results[["GG: revenue_index"]] <- sprintf("%.4f", gg_results$optimal_price$revenue_index)
+    method_results[["GG: n_respondents"]] <- as.character(gg_results$diagnostics$n_respondents)
+    method_results[["GG: n_price_points"]] <- as.character(gg_results$diagnostics$n_price_points)
+    method_results[["GG: per_rung_bases"]] <- paste(gg_results$demand_curve$n_respondents, collapse = " / ")
+    method_results[["GG: response_coding"]] <- gg_results$diagnostics$response_coding %||% "unknown"
+    method_results[["GG: stop_early_imputation"]] <- gg_results$diagnostics$imputation %||% "none"
+    method_results[["GG: smoothing"]] <- gg_results$diagnostics$smoothing %||% "none"
     if (!is.null(gg_results$optimal_price_profit)) {
-      method_results[["GG — profit_optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price_profit$price)
+      method_results[["GG: profit_optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price_profit$price)
     }
   }
 
   if (!is.null(monadic_results)) {
-    method_results[["Mon — optimal_price"]] <- sprintf("%.2f", monadic_results$optimal_price$price)
-    method_results[["Mon — predicted_intent"]] <- sprintf("%.1f%%", monadic_results$optimal_price$predicted_intent * 100)
-    method_results[["Mon — model_type"]] <- monadic_results$model_summary$model_type
-    method_results[["Mon — pseudo_R2"]] <- sprintf("%.4f", monadic_results$model_summary$pseudo_r2)
-    method_results[["Mon — AIC"]] <- sprintf("%.1f", monadic_results$model_summary$aic)
-    method_results[["Mon — price_coef_p"]] <- sprintf("%.6f", monadic_results$model_summary$price_coefficient_p)
-    method_results[["Mon — n_valid"]] <- as.character(monadic_results$diagnostics$n_valid)
-    method_results[["Mon — n_cells"]] <- as.character(monadic_results$diagnostics$n_cells)
-    method_results[["Mon — min_cell_n"]] <- as.character(monadic_results$diagnostics$min_cell_n)
+    method_results[["Mon: optimal_price"]] <- sprintf("%.2f", monadic_results$optimal_price$price)
+    method_results[["Mon: predicted_intent"]] <- sprintf("%.1f%%", monadic_results$optimal_price$predicted_intent * 100)
+    method_results[["Mon: model_type"]] <- monadic_results$model_summary$model_type
+    method_results[["Mon: pseudo_R2"]] <- sprintf("%.4f", monadic_results$model_summary$pseudo_r2)
+    method_results[["Mon: AIC"]] <- sprintf("%.1f", monadic_results$model_summary$aic)
+    method_results[["Mon: price_coef_p"]] <- sprintf("%.6f", monadic_results$model_summary$price_coefficient_p)
+    if (!is.null(monadic_results$model_summary$p_value_caveat)) {
+      method_results[["Mon: price_coef_p_caveat"]] <- monadic_results$model_summary$p_value_caveat
+    }
+    method_results[["Mon: n_valid"]] <- as.character(monadic_results$diagnostics$n_valid)
+    method_results[["Mon: n_cells"]] <- as.character(monadic_results$diagnostics$n_cells)
+    method_results[["Mon: min_cell_n"]] <- as.character(monadic_results$diagnostics$min_cell_n)
     if (!is.null(monadic_results$confidence_intervals)) {
-      method_results[["Mon — bootstrap_iterations"]] <- as.character(config$monadic$bootstrap_iterations %||% 1000)
-      method_results[["Mon — bootstrap_success_rate"]] <- sprintf("%.0f%%",
+      method_results[["Mon: bootstrap_iterations"]] <- as.character(config$monadic$bootstrap_iterations %||% 1000)
+      method_results[["Mon: bootstrap_success_rate"]] <- sprintf("%.0f%%",
         monadic_results$confidence_intervals$n_successful / monadic_results$confidence_intervals$n_attempted * 100)
     }
   }
 
   # --- Weight diagnostics ---
+  # "Effective N" is the Kish effective sample size from the shared helper
+  # (review H7: the old row printed the count of valid weights under that
+  # label). "Valid N" is its own row.
   weight_info <- list()
   if (!is.null(validation$weight_summary)) {
     ws <- validation$weight_summary
     weight_info[["Weighting applied"]] <- "Yes"
-    weight_info[["Effective N"]] <- sprintf("%.1f", ws$n_valid)
-    weight_info[["Weight range"]] <- sprintf("%.2f – %.2f", ws$min, ws$max)
+    weight_info[["Valid N"]] <- as.character(ws$n_valid)
+    eff_n <- if (exists("calculate_effective_n", mode = "function") &&
+                 !is.null(validation$clean_data) && !is.na(config$weight_var) &&
+                 config$weight_var %in% names(validation$clean_data)) {
+      calculate_effective_n(as.numeric(validation$clean_data[[config$weight_var]]))
+    } else NA_real_
+    weight_info[["Effective N (Kish)"]] <- if (is.finite(eff_n)) sprintf("%.1f", eff_n) else "not computed"
+    weight_info[["Weight range"]] <- sprintf("%.2f to %.2f", ws$min, ws$max)
     weight_info[["Weight mean (SD)"]] <- sprintf("%.2f (%.2f)", ws$mean, ws$sd)
+    weight_info[["Weighted estimates"]] <- paste(c(
+      if (!is.null(vw_results)) "VW price points (survey design)",
+      if (!is.null(gg_results)) "GG demand (weighted means)",
+      if (!is.null(monadic_results)) "Monadic cell means and glm (weights normalised to mean 1)"
+    ), collapse = "; ")
   } else {
     weight_info[["Weighting applied"]] <- "No"
   }
@@ -770,9 +862,9 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     "Monadic"               = if (!is.null(monadic_results))
                                 sprintf("Logistic regression (%s, base R glm())", monadic_results$model_summary$model_type)
                               else "Not used",
-    "Price Points tested"   = if (n_price_points > 0L) as.character(n_price_points) else "\u2014",
+    "Price Points tested"   = if (n_price_points > 0L) as.character(n_price_points) else "not applicable",
     "Segmentation"          = if (seg_enabled) {
-                                sprintf("Enabled \u2014 %d segment(s)", n_segments)
+                                sprintf("Enabled: %d segment(s)", n_segments)
                               } else "Disabled",
     "Multiple comparisons"  = "No family-wise correction applied across segment comparisons",
     "TRS Status"            = run_result$status %||% "PASS",
@@ -830,7 +922,11 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
       n_respondents = validation$n_valid %||% nrow(raw_data),
       n_excluded    = validation$n_excluded %||% 0L,
       n_variables   = n_price_points,
-      method        = analysis_method
+      method        = analysis_method,
+      # The shared writer's Declaration reads these; without them a weighted
+      # run was declared "unweighted analysis".
+      weighted      = !is.null(validation$weight_summary),
+      weight_variable = if (!is.null(validation$weight_summary)) config$weight_var else ""
     ),
     assumptions      = assumptions,
     run_result       = run_result,
