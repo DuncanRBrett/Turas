@@ -679,3 +679,69 @@ test_that("IPK Wave 1: every portfolio v2 sub-analysis runs end-to-end", {
   expect_gt(length(ov$categories), 0L)
   expect_true("IPK" %in% ov$brands$brand_code)
 })
+
+
+# ------------------------------------------------------------------------------
+# H1 (production review 2026-07-12): category penetration is weighted
+# wherever weights exist. With r1 weighted 100 and everyone else 1:
+#   total weight       = 107
+#   DSS qualifiers     = r1..r5 -> weighted 104, unweighted 5 of 8
+#   POS qualifiers     = r1,r4,r6,r8 -> weighted 103, unweighted 4 of 8
+# The weighted share (104/107 = 97.2%) and the unweighted share (62.5%)
+# are far apart by design, so a regression to n_uw / n_total fails loudly.
+# ------------------------------------------------------------------------------
+
+test_that("compute_clutter_data: cat_penetration is weighted when weights are supplied", {
+  w <- c(100, 1, 1, 1, 1, 1, 1, 1)
+  out <- compute_clutter_data(mk_pf_v2_data(), role_map = NULL,
+                              mk_pf_v2_categories(), mk_pf_v2_structure(),
+                              mk_pf_v2_config(focal = "A", min_base = 1L),
+                              weights = w)
+  expect_equal(out$status, "PASS")
+  cl <- out$clutter_df
+  expect_equal(cl$cat_penetration[cl$cat == "DSS"], 104 / 107, tolerance = 1e-9)
+  expect_equal(cl$cat_penetration[cl$cat == "POS"], 103 / 107, tolerance = 1e-9)
+  # Unweighted call still gives the count share
+  out_uw <- compute_clutter_data(mk_pf_v2_data(), role_map = NULL,
+                                 mk_pf_v2_categories(), mk_pf_v2_structure(),
+                                 mk_pf_v2_config(focal = "A", min_base = 1L))
+  expect_equal(out_uw$clutter_df$cat_penetration[out_uw$clutter_df$cat == "DSS"], 5 / 8)
+})
+
+test_that("compute_strength_map: cat_pen is weighted when weights are supplied", {
+  w <- c(100, 1, 1, 1, 1, 1, 1, 1)
+  out <- compute_strength_map(mk_pf_v2_data(), role_map = NULL,
+                              mk_pf_v2_categories(), mk_pf_v2_structure(),
+                              mk_pf_v2_config(min_base = 1L), weights = w)
+  expect_equal(out$status, "PASS")
+  a <- out$per_brand[["A"]]
+  expect_equal(a$cat_pen[a$cat == "DSS"], 104 / 107, tolerance = 1e-9)
+  expect_equal(a$cat_pen[a$cat == "POS"], 103 / 107, tolerance = 1e-9)
+  # Weighted awareness and weighted penetration now share one basis:
+  # aware_n_w for A in DSS is 104 (every DSS qualifier is aware of A)
+  expect_equal(a$aware_n_w[a$cat == "DSS"], 104)
+})
+
+test_that("compute_portfolio_overview_data: cat_usage_pct is weighted; counts stay unweighted", {
+  w <- c(100, 1, 1, 1, 1, 1, 1, 1)
+  out <- compute_portfolio_overview_data(mk_pf_v2_data(), role_map = NULL,
+                                         mk_pf_v2_categories(),
+                                         mk_pf_v2_structure(),
+                                         mk_pf_v2_config(focal = "A"),
+                                         weights = w)
+  expect_equal(out$status, "PASS")
+  dss <- out$categories[["DSS"]]
+  expect_equal(dss$cat_usage_pct, 104 / 107 * 100, tolerance = 1e-9)
+  expect_equal(dss$n_buyers_uw, 5L)
+  expect_equal(dss$total_n_uw, 8L)
+  expect_equal(dss$n_buyers_w, 104)
+  # And the same basis as the Dirichlet-style weighted penetration of the
+  # awareness cells that sit beside it: A is 100% aware among 104 weight.
+  expect_equal(as.numeric(dss$awareness_pct[["A"]]), 100)
+
+  out_uw <- compute_portfolio_overview_data(mk_pf_v2_data(), role_map = NULL,
+                                            mk_pf_v2_categories(),
+                                            mk_pf_v2_structure(),
+                                            mk_pf_v2_config(focal = "A"))
+  expect_equal(out_uw$categories[["DSS"]]$cat_usage_pct, 5 / 8 * 100)
+})

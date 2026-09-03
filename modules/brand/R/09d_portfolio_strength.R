@@ -35,6 +35,8 @@ compute_strength_map <- function(data, role_map, categories, structure,
   min_base  <- config$portfolio_min_base  %||% 30L
   n_total   <- nrow(data)
   w         <- if (!is.null(weights)) weights else rep(1.0, n_total)
+  # Weighted denominator for category penetration (review 2026-07-12, H1)
+  total_w   <- sum(w, na.rm = TRUE)
 
   if (!"CategoryCode" %in% names(categories)) {
     return(list(status = "REFUSED",
@@ -78,7 +80,7 @@ compute_strength_map <- function(data, role_map, categories, structure,
                                             brand_codes)
     awareness <- .compute_brand_awareness_pct(aware_mat, base$idx,
                                                  weights)
-    cat_pen   <- base$n_uw / n_total
+    cat_pen   <- if (total_w > 0) base$n_w / total_w else NA_real_
 
     for (bc in brand_codes) {
       aw_val <- awareness[[bc]]
