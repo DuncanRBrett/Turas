@@ -1,5 +1,9 @@
 # Brief: make an Allocation question recomputable under a v2 filter
 
+> Section 3 is answered. The shape decision and the Opus build brief are in
+> `HANDOVER_ALLOCATION_LIVE_RECOMPUTE_FOR_OPUS.md` (2026-09-03). Read this
+> brief for the why, that handover for the what.
+
 Written 2026-09-03. The design half is for one short Fable session; the build
 half is for Opus 5 at high effort against whatever that session decides. Read
 section 3 before proposing anything: the shape question there is the whole
