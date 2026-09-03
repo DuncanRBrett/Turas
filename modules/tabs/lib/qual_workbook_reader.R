@@ -97,11 +97,32 @@ QUAL_RATING_NUMERIC_MIN <- 0.8
 #' @return `x` without NA elements.
 qual_drop_na <- function(x) x[!is.na(x)]
 
+#' Strip the artefacts openxlsx leaves on inline-string cells.
+#'
+#' openpyxl 3.1+ (the Comment Appendix builder) writes every string as an inline
+#' string. openxlsx 4.2.x reads those without unescaping XML entities and without
+#' handling the xml:space attribute, so "a & b" arrives as "a &amp; b" and
+#' " padded " as 'xml:space="preserve"> padded '. A padded header such as
+#' " Overall Sentiment " then fails the sentiment-column name match and the whole
+#' sheet loses its sentiment. Excel-saved workbooks (shared strings) are unaffected,
+#' and this cleanup is a no-op on them. Verified 3 Sep 2026 with a probe workbook.
+#' @param x A character vector (NA preserved).
+#' @return `x` with the attribute artefact removed and the five XML entities unescaped.
+qual_clean_inline_artefacts <- function(x) {
+  x <- sub('^.*?xml:space="preserve">', "", x, perl = TRUE)
+  x <- gsub("&lt;", "<", x, fixed = TRUE)
+  x <- gsub("&gt;", ">", x, fixed = TRUE)
+  x <- gsub("&quot;", "\"", x, fixed = TRUE)
+  x <- gsub("&apos;", "'", x, fixed = TRUE)
+  gsub("&amp;", "&", x, fixed = TRUE)   # last, so "&amp;lt;" becomes the literal "&lt;"
+}
+
 #' Normalise raw cell values to trimmed character, with "" for blank/NA.
+#' Inline-string artefacts are cleaned first (see qual_clean_inline_artefacts).
 #' @param x A vector of raw cell values (character, numeric, factor, ...).
 #' @return A character vector, trimmed, NA/blank collapsed to "".
 qual_norm_cells <- function(x) {
-  out <- trimws(as.character(x))
+  out <- trimws(qual_clean_inline_artefacts(as.character(x)))
   out[is.na(out)] <- ""
   out
 }
