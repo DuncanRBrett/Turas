@@ -7,10 +7,12 @@ session fails twice at the same item, escalate one tier with what it tried.
 
 ## 1. Where things stand
 
-- `main` is at `0d964827`, pushed to origin on 2026-09-03. It carries the whole
+- `main` is at `963d66bd`, pushed to origin on 2026-09-03. It carries the whole
   maxdiff v2 branch (B2 tabs export, C island, MaxDiff tab, Karoo example,
-  integrated demo, the merge, and the review's F1 to F5 fixes). The worktree
-  `.claude/worktrees/maxdiff-v2-report` is at the same commit and can be removed.
+  integrated demo, the merge, and the review's F1 to F5 fixes) at `0d964827`,
+  plus a qual-reader merge and one recovered tabs preflight commit since. The
+  worktree `.claude/worktrees/maxdiff-v2-report` has been removed and its branch
+  deleted; there are no worktrees left.
 - Duncan eyeballed on this code through `launch_turas()`: the Karoo config, the
   integrated demo and the tabs run with `maxdiff_island` all behaved. One open
   observation from that eyeball is item 9 below.
@@ -94,9 +96,11 @@ a binary Duncan hand-edited in Excel: edit the one cell in Excel or openpyxl, ne
 7. **M4, optional.** The tabs export returns `status = "PARTIAL"` when respondents
    with all-NA utilities are dropped; `00_main.R` step 11b never reads it. Fold
    into `note_late()` only if Duncan wants an excluded respondent to be an event.
-8. **Run the conjoint suite once** on this tree. The demo exercised the module
-   and passed, but nobody has run `modules/conjoint/tests` since the branch's
-   conjoint example rework landed on main. Quote the counts.
+8. **DONE 2026-09-03.** Conjoint suite run from the repo root on main at
+   `963d66bd`: **986 pass, 0 fail, 0 skip, 2 warnings**, 28.9 s. Both warnings are
+   `survival::coxph` "ran out of iterations and did not converge" from
+   `test_utilities.R:265` and `:398`, the second of which is the deliberate
+   "Handle perfect separation case" fixture. Neither is a regression. No action.
 9. **Stats pack checkbox vs config.** `run_maxdiff_gui.R:286-288` defaults the
    "Generate stats pack" checkbox to unticked and `00_main.R` treats the option
    the GUI sets as the toggle, so a config saying `Generate_Stats_Pack = YES`
@@ -118,8 +122,9 @@ a binary Duncan hand-edited in Excel: edit the one cell in Excel or openpyxl, ne
   segment. About a day across both modules.
 - `safe_numeric()` defined by maxdiff, conjoint and tabs. Benign today (every
   call site passes a config scalar); platform decision.
-- The classic maxdiff HTML report: retirement-bound per the conjoint precedent;
-  the shipped Karoo config still turns it on.
+- ~~The classic maxdiff HTML report: retirement-bound per the conjoint
+  precedent.~~ **Duncan ruled otherwise on 2026-09-03: bring it up to tabs v2
+  rather than retire it.** See section 6.
 
 ## 5. Verification bar
 
@@ -130,3 +135,34 @@ ten minutes; the review's runner was a copy of the config with absolute paths an
 `Output_Folder` in the scratchpad) and read the METHOD sheet and the island back.
 Nothing is written into `examples/*/Output` or OneDrive. Duncan regenerates through
 `launch_turas()`; a session does not.
+
+
+## 6. The classic maxdiff report goes to v2, not to retirement
+
+Duncan's decision, 2026-09-03. Conjoint retired its standalone report and kept
+only the simulator. MaxDiff does not follow that precedent. The classic report
+is to be brought up to the tabs v2 standard instead.
+
+**What exists today.** The classic report is
+`modules/maxdiff/lib/html_report/`, 6,615 lines: five R files (data transformer
+1,249, table builder 751, page builder 1,900, chart builder 767, main 716) plus
+`js/md_report.js` (696) and `js/md_pins.js` (536). It is switched on by
+`Generate_HTML_Report`, read at `modules/maxdiff/R/00_main.R:1331`, and the
+shipped Karoo config still sets it to YES.
+
+**The gap to close.** The classic report has seven panels: overview,
+preferences, items, head to head, TURF, segments, diagnostics. The v2 MaxDiff
+tab (`modules/tabs/lib/html_report_v2/assets/js/27y_maxdiff.js`, 281 lines) has
+four: item scores, TURF, must-haves, discrimination, plus a provenance line.
+`13_v2_island.R` says in its own header comment that HB diagnostics, the
+per-respondent utilities and the per-segment tables deliberately stay in the
+Excel. So the work is roughly: head to head, segments, diagnostics and the
+charts, plus whatever the overview and preferences panels say that the v2 tab
+does not.
+
+**Open question for Duncan before a session starts.** Once the v2 tab carries
+those panels, does the standalone classic report get retired (the tab becomes
+the only HTML deliverable, matching conjoint's end state), or does maxdiff keep
+a standalone v2-styled report of its own alongside the tab? The first is
+markedly less work and leaves one place to maintain. The second is a new
+deliverable. Nothing should be built until this is answered.
