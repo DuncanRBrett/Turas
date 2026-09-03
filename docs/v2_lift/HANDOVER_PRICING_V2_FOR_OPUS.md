@@ -80,10 +80,13 @@ Verified on main at `3f85abb3` on 3 Sep 2026:
     the crosstab's job via the tabs export.
 11. Live recompute of VW under the audience filter is NOT in scope for either
     session. See section 5.
-12. Session split: Session A = correctness plus the Karoo example
-    (`feature/pricing-correctness`); Session B = the v2 lift
-    (`feature/pricing-v2-report`, off Session A's tip). Duncan merges after
-    the Fable review of A and his eyeball of B.
+12. Session split: Session A = correctness plus the Karoo example; Session B
+    = the v2 lift (`feature/pricing-v2-report`, off main). **Session A is
+    built and merged to local main (`299355dc`, 3 Sep 2026); Duncan ran the
+    Karoo example from the launcher and it completed.** Its independent
+    review (`REVIEW_BRIEF_PRICING_SESSION_A.md`) is owed and can run in
+    parallel with Session B; anything the review finds lands as a small
+    branch off main. Duncan merges B after his eyeball.
 
 ## 2. Ground rules
 
@@ -173,6 +176,17 @@ passing with the opt-in), suite green with the new tests in, every review ID
 fixed with a test or logged as deferred, notes written, nothing merged.
 
 ## 4. Session B. The v2 lift (`feature/pricing-v2-report`)
+
+Branch off main at or after `299355dc`. Session A's notes
+(`SESSION_A_NOTES_PRICING.md`) record the result-object fields Session A added
+(`diagnostics$estimator`, `n_analysed`, `monotonicity_behavior`, `validate_flag`,
+`weighted`; GG `rung_bases`, `diagnostics$response_coding`, `imputation`,
+`smoothing`, `purchase_intent_raw`; monadic `weighted_n`, `p_value_caveat`; the
+`policy` attribute on both bootstrap tables). The island's `meta` and
+`estimationNote` come from those, not from new computation. The three settings
+`Generate_Tabs_Export`, `Tabs_Question_Code` and `Export_WTP` are already in
+the template and refuse on Y (`FEATURE_TABS_EXPORT_PENDING` in
+`apply_pricing_defaults()`); B3 removes that refusal when the exporter lands.
 
 ### B1. Island writer, `modules/pricing/R/14_v2_island.R`
 
