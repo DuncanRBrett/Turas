@@ -58,6 +58,58 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
   rm(.turas_saver_rel, .turas_saver_dir, .turas_saver_path)
 }
 
+#' Parse A Delimited List Setting
+#'
+#' One parser for every comma- or semicolon-separated list in a pricing
+#' config. The template said semicolons for Gabor-Granger prices, the sheet
+#' loader split on commas, the Settings fallback split on semicolons and the
+#' price ladder on semicolons again (review H2): following the template's own
+#' instruction produced an all-NA price sequence. Both separators are accepted
+#' everywhere now.
+#'
+#' @param x A single string, or NULL/NA.
+#' @param numeric Logical, coerce the items to numeric.
+#' @return A character or numeric vector, zero-length when there is nothing.
+#' @keywords internal
+.pricing_parse_list <- function(x, numeric = FALSE) {
+  if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) {
+    return(if (numeric) numeric(0) else character(0))
+  }
+  if (length(x) > 1) {
+    items <- as.character(x)
+  } else {
+    items <- trimws(strsplit(as.character(x), "[,;]")[[1]])
+  }
+  items <- items[nzchar(items)]
+  if (numeric) suppressWarnings(as.numeric(items)) else items
+}
+
+
+#' Map Template-Style Names Onto Internal Names
+#'
+#' The template writes `Col_Too_Cheap`; the engine reads `col_too_cheap`. The
+#' Monadic and Validation loaders had a map like this; the Van Westendorp and
+#' Gabor-Granger loaders did not, so a config saved from the shipped template
+#' crashed in validation with a message about get1index (review H1). Applies
+#' the explicit map first, then a generic lowercase fallback so a Title_Case
+#' name with no entry still lands on its lowercase twin.
+#'
+#' @param settings Named list read from a sheet.
+#' @param name_map Named character vector, template name to internal name.
+#' @return The list with the internal names present.
+#' @keywords internal
+.pricing_apply_name_map <- function(settings, name_map) {
+  nms <- names(settings)
+  for (i in seq_along(nms)) {
+    internal <- if (nms[i] %in% names(name_map)) unname(name_map[nms[i]]) else tolower(nms[i])
+    if (!identical(internal, nms[i]) && !internal %in% names(settings)) {
+      settings[[internal]] <- settings[[nms[i]]]
+    }
+  }
+  settings
+}
+
+
 read_settings_sheet <- function(config_file, sheet_name,
                                 required_cols = c("Setting", "Value")) {
 
@@ -133,10 +185,15 @@ read_settings_sheet <- function(config_file, sheet_name,
   # Remove section header rows (from old-style configs with # prefix)
   section_rows <- grepl("^#\\s", first_col)
 
-  # Remove template section headers (setting name in col 1, NA in col 2,
-  # typically ALL CAPS — these are merged section dividers from the template)
+  # Remove template section headers: a name in col 1, nothing in col 2, and
+  # the name is a divider (all caps, or all caps with a parenthetical note
+  # such as "WIDE FORMAT SETTINGS (use if Data_Format = wide)", which the old
+  # all-caps-only pattern let through as a bogus setting; review M6).
+  # A real setting with a blank value keeps its underscore-joined Title_Case
+  # name, which the divider pattern (no underscore, no lowercase) never
+  # matches.
   section_dividers <- !is.na(first_col) & is.na(second_col) &
-    grepl("^[A-Z &/()]+$", first_col, perl = TRUE)
+    grepl("^[A-Z][A-Z0-9 &/]*( \\(.*\\))?$", first_col, perl = TRUE)
 
   # Remove completely empty rows
   all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
@@ -209,6 +266,11 @@ load_pricing_config <- function(config_file) {
 
   # Read Settings sheet with autodetect heading
   settings_raw <- read_settings_sheet(config_file, "Settings")
+
+  # Duplicates refuse (first-value-wins used to hide a second row silently),
+  # retired names are answered by name, unknown names warn. Same contract as
+  # tabs' config_utils (review M6).
+  .pricing_check_setting_names(settings_raw$Setting, "Settings")
 
   # Convert to named list (case-insensitive setting name matching)
   settings <- setNames(
@@ -365,20 +427,138 @@ load_pricing_config <- function(config_file) {
     "Max_Gap_Pct" = "max_gap_pct",
     "Round_To" = "round_to",
     "Price_Floor" = "price_floor",
-    "Price_Ceiling" = "price_ceiling"
+    "Price_Ceiling" = "price_ceiling",
+    "Generate_Stats_Pack" = "generate_stats_pack",
+    "Generate_Tabs_Export" = "generate_tabs_export",
+    "Tabs_Question_Code" = "tabs_question_code",
+    "Export_WTP" = "export_wtp",
+    "GG_Stop_Early_Imputation" = "gg_stop_early_imputation",
+    "Analyst_Name" = "analyst_name",
+    "Research_House" = "research_house",
+    "Segment_Vars" = "segment_vars",
+    "Anchor" = "anchor",
+    "Verbose" = "verbose"
   )
 
-  nms <- names(settings)
-  for (i in seq_along(nms)) {
-    if (nms[i] %in% names(name_map)) {
-      # Only add the normalized name if the internal name doesn't already exist
-      internal <- name_map[nms[i]]
-      if (!internal %in% nms) {
-        settings[[internal]] <- settings[[nms[i]]]
-      }
-    }
+  .pricing_apply_name_map(settings, name_map)
+}
+
+
+# ==============================================================================
+# SETTING NAME REGISTRY (review M6)
+# ==============================================================================
+
+#' Settings the pricing module reads, by sheet. Template names; matching is
+#' case-insensitive and tolerant of the lowercase internal spelling.
+PRICING_KNOWN_SETTINGS <- list(
+  Settings = c(
+    "Project_Name", "Analysis_Method", "Data_File", "Output_File", "ID_Variable",
+    "Weight_Variable", "Currency_Symbol", "Unit_Cost", "DK_Codes",
+    "Generate_HTML_Report", "Generate_Simulator", "Brand_Colour",
+    "Generate_Stats_Pack", "Generate_Tabs_Export", "Tabs_Question_Code",
+    "Export_WTP", "VW_Monotonicity_Behavior", "GG_Monotonicity_Behavior",
+    "GG_Stop_Early_Imputation", "Segment_Column", "Min_Segment_N", "Include_Total",
+    "N_Tiers", "Tier_Names", "Min_Gap_Pct", "Max_Gap_Pct", "Round_To", "Anchor",
+    "Price_Floor", "Price_Ceiling", "Analyst_Name", "Research_House",
+    "Segment_Vars", "Verbose",
+    # Flat-Settings fallbacks for a config without method sheets.
+    "vw_col_too_cheap", "vw_col_cheap", "vw_col_expensive", "vw_col_too_expensive",
+    "vw_col_pi_cheap", "vw_col_pi_expensive", "vw_validate_monotonicity",
+    "vw_exclude_violations", "vw_violation_threshold", "vw_calculate_confidence",
+    "vw_confidence_level", "vw_bootstrap_iterations", "vw_price_decimals",
+    "gg_data_format", "gg_price_sequence", "gg_response_columns", "gg_price_column",
+    "gg_response_column", "gg_respondent_column", "gg_response_type",
+    "gg_scale_threshold", "gg_binary_coding", "gg_smoothing_method",
+    "gg_check_monotonicity", "gg_calculate_elasticity", "gg_revenue_optimization",
+    "gg_confidence_intervals", "gg_bootstrap_iterations", "gg_confidence_level",
+    "gg_run_simulation", "gg_market_size", "gg_unit_cost"
+  ),
+  VanWestendorp = c(
+    "Col_Too_Cheap", "Col_Cheap", "Col_Expensive", "Col_Too_Expensive",
+    "Col_PI_Cheap", "Col_PI_Expensive", "PI_Scale", "Calculate_Confidence",
+    "Confidence_Level", "Bootstrap_Iterations", "Validate_Monotonicity",
+    "Exclude_Violations", "Violation_Threshold", "Price_Decimals"
+  ),
+  GaborGranger = c(
+    "Data_Format", "Price_Sequence", "Response_Columns", "Price_Column",
+    "Response_Column", "Respondent_Column", "Response_Type", "Scale_Threshold",
+    "Binary_Coding", "Smoothing_Method", "Calculate_Elasticity",
+    "Revenue_Optimization", "Confidence_Intervals", "Bootstrap_Iterations",
+    "Confidence_Level", "Check_Monotonicity", "Run_Simulation", "Market_Size",
+    "Unit_Cost"
+  ),
+  Monadic = c(
+    "Price_Column", "Intent_Column", "Intent_Type", "Scale_Threshold",
+    "Model_Type", "Min_Cell_Size", "Prediction_Points", "Confidence_Intervals",
+    "Bootstrap_Iterations", "Confidence_Level"
+  ),
+  Validation = c("Min_Completeness", "Min_Sample", "Price_Min", "Price_Max")
+)
+
+#' Settings the module no longer reads, each with the sentence a config that
+#' still carries it is answered with. Follows the tabs and conjoint pattern:
+#' a retired name is refused by name, never mistaken for a typo.
+PRICING_RETIRED_SETTINGS <- c(
+  "Interpolation_Method" = paste0(
+    "Interpolation_Method was never read: pricesensitivitymeter interpolates ",
+    "the curves linearly and offers nothing else. Remove the row."),
+  "Flag_Outliers" = paste0(
+    "Flag_Outliers had no implementation behind it; nothing was ever flagged. ",
+    "Remove the row."),
+  "Outlier_Method" = "Outlier_Method had no implementation behind it. Remove the row.",
+  "Outlier_Threshold" = "Outlier_Threshold had no implementation behind it. Remove the row."
+)
+names(PRICING_RETIRED_SETTINGS) <- tolower(names(PRICING_RETIRED_SETTINGS))
+
+#' Check A Sheet's Setting Names
+#'
+#' Refuses on a duplicated name (the second row used to be silently ignored),
+#' refuses on a retired name with its own sentence, and prints a warning for
+#' a name the module does not read so a typo cannot pass as a setting.
+#'
+#' @param setting_names Character vector of names as read from the sheet.
+#' @param sheet The sheet name, for the message and the known list.
+#' @return Invisibly TRUE.
+#' @keywords internal
+.pricing_check_setting_names <- function(setting_names, sheet) {
+  nms <- trimws(as.character(setting_names))
+  nms <- nms[!is.na(nms) & nzchar(nms)]
+  lower <- tolower(nms)
+
+  dup <- unique(nms[duplicated(lower)])
+  if (length(dup) > 0) {
+    pricing_refuse(
+      code = "CFG_DUPLICATE_SETTING",
+      title = "A Setting Appears More Than Once",
+      problem = sprintf("The %s sheet lists %s more than once.", sheet,
+                        paste(dup, collapse = ", ")),
+      why_it_matters = paste0("Only one row can win, and the run would use whichever came ",
+                              "first without saying so."),
+      how_to_fix = "Keep one row per setting and delete the duplicates."
+    )
   }
-  settings
+
+  retired <- lower[lower %in% names(PRICING_RETIRED_SETTINGS)]
+  if (length(retired) > 0) {
+    pricing_refuse(
+      code = "CFG_RETIRED_SETTING",
+      title = "A Retired Setting Is Still In The Config",
+      problem = paste(unname(PRICING_RETIRED_SETTINGS[retired]), collapse = " "),
+      why_it_matters = "The setting does nothing, and leaving it in suggests it does.",
+      how_to_fix = sprintf("Remove the row(s) from the %s sheet: %s.", sheet,
+                           paste(nms[lower %in% names(PRICING_RETIRED_SETTINGS)],
+                                 collapse = ", "))
+    )
+  }
+
+  known <- tolower(PRICING_KNOWN_SETTINGS[[sheet]] %||% character(0))
+  unknown <- nms[!lower %in% known]
+  if (length(unknown) > 0) {
+    cat(sprintf(paste0("  [WARNING] %s sheet: %d setting name(s) the pricing module does ",
+                       "not read and will ignore: %s\n"),
+                sheet, length(unknown), paste(unknown, collapse = ", ")))
+  }
+  invisible(TRUE)
 }
 
 
@@ -438,11 +618,36 @@ validate_required_settings <- function(settings) {
 load_van_westendorp_config <- function(config_file) {
 
   vw_raw <- read_settings_sheet(config_file, "VanWestendorp")
+  .pricing_check_setting_names(vw_raw$Setting, "VanWestendorp")
   vw <- setNames(as.list(vw_raw$Value), vw_raw$Setting)
+
+  # Template names onto the internal names the engine reads (review H1).
+  vw <- .pricing_apply_name_map(vw, c(
+    "Col_Too_Cheap" = "col_too_cheap",
+    "Col_Cheap" = "col_cheap",
+    "Col_Expensive" = "col_expensive",
+    "Col_Too_Expensive" = "col_too_expensive",
+    "Col_PI_Cheap" = "col_pi_cheap",
+    "Col_PI_Expensive" = "col_pi_expensive",
+    "PI_Scale" = "pi_scale",
+    "Calculate_Confidence" = "calculate_confidence",
+    "Confidence_Level" = "confidence_level",
+    "Bootstrap_Iterations" = "bootstrap_iterations",
+    "Validate_Monotonicity" = "validate_monotonicity",
+    "Exclude_Violations" = "exclude_violations",
+    "Violation_Threshold" = "violation_threshold",
+    "Price_Decimals" = "price_decimals"
+  ))
+  # A blank optional column is no column.
+  for (field in c("col_pi_cheap", "col_pi_expensive")) {
+    if (!is.null(vw[[field]]) && (is.na(vw[[field]]) || !nzchar(trimws(vw[[field]])))) {
+      vw[[field]] <- NA_character_
+    }
+  }
 
   # Convert numeric fields
   numeric_fields <- c("violation_threshold", "confidence_level", "bootstrap_iterations",
-                      "price_decimals")
+                      "price_decimals", "pi_scale")
   for (field in numeric_fields) {
     if (field %in% names(vw) && !is.na(vw[[field]])) {
       vw[[field]] <- as.numeric(vw[[field]])
@@ -469,16 +674,52 @@ load_van_westendorp_config <- function(config_file) {
 load_gabor_granger_config <- function(config_file) {
 
   gg_raw <- read_settings_sheet(config_file, "GaborGranger")
+  .pricing_check_setting_names(gg_raw$Setting, "GaborGranger")
   gg <- setNames(as.list(gg_raw$Value), gg_raw$Setting)
 
-  # Parse price sequence if present
-  if (!is.null(gg$price_sequence) && !is.na(gg$price_sequence)) {
-    gg$price_sequence <- as.numeric(strsplit(as.character(gg$price_sequence), ",")[[1]])
+  # Template names onto the internal names the engine reads (review H1).
+  gg <- .pricing_apply_name_map(gg, c(
+    "Data_Format" = "data_format",
+    "Price_Sequence" = "price_sequence",
+    "Response_Columns" = "response_columns",
+    "Price_Column" = "price_column",
+    "Response_Column" = "response_column",
+    "Respondent_Column" = "respondent_column",
+    "Response_Type" = "response_type",
+    "Scale_Threshold" = "scale_threshold",
+    "Binary_Coding" = "binary_coding",
+    "Smoothing_Method" = "smoothing_method",
+    "Calculate_Elasticity" = "calculate_elasticity",
+    "Revenue_Optimization" = "revenue_optimization",
+    "Confidence_Intervals" = "confidence_intervals",
+    "Bootstrap_Iterations" = "bootstrap_iterations",
+    "Confidence_Level" = "confidence_level",
+    "Check_Monotonicity" = "check_monotonicity",
+    "Run_Simulation" = "run_simulation",
+    "Market_Size" = "market_size",
+    "Unit_Cost" = "unit_cost"
+  ))
+  gg$data_format <- tolower(trimws(as.character(gg$data_format %||% "wide")))
+  for (field in c("price_column", "response_column", "respondent_column")) {
+    if (!is.null(gg[[field]]) && (is.na(gg[[field]]) || !nzchar(trimws(gg[[field]])))) {
+      gg[[field]] <- NA_character_
+    }
   }
 
-  # Parse response columns if present
-  if (!is.null(gg$response_columns) && !is.na(gg$response_columns)) {
-    gg$response_columns <- trimws(strsplit(as.character(gg$response_columns), ",")[[1]])
+  # Lists accept commas or semicolons (review H2).
+  gg$price_sequence <- .pricing_parse_list(gg$price_sequence, numeric = TRUE)
+  gg$response_columns <- .pricing_parse_list(gg$response_columns)
+  if (length(gg$price_sequence) == 0) gg$price_sequence <- NULL
+  if (length(gg$response_columns) == 0) gg$response_columns <- NULL
+  if (!is.null(gg$price_sequence) && any(is.na(gg$price_sequence))) {
+    pricing_refuse(
+      code = "CFG_GG_PRICE_SEQUENCE",
+      title = "Price_Sequence Is Not A List Of Numbers",
+      problem = sprintf("Price_Sequence on the GaborGranger sheet reads '%s'.",
+                        as.character(gg_raw$Value[tolower(gg_raw$Setting) == "price_sequence"][1])),
+      why_it_matters = "Every rung of the ladder needs a price the demand curve can be plotted against.",
+      how_to_fix = "Write the prices as numbers separated by commas or semicolons, e.g. 60; 80; 100."
+    )
   }
 
   # Convert numeric fields
@@ -542,13 +783,11 @@ extract_gg_settings <- function(settings) {
   # Data format
   gg$data_format <- settings$gg_data_format %||% "wide"
 
-  # Wide format settings
-  if (!is.null(settings$gg_price_sequence) && !is.na(settings$gg_price_sequence)) {
-    gg$price_sequence <- as.numeric(strsplit(as.character(settings$gg_price_sequence), ";")[[1]])
-  }
-  if (!is.null(settings$gg_response_columns) && !is.na(settings$gg_response_columns)) {
-    gg$response_columns <- trimws(strsplit(as.character(settings$gg_response_columns), ";")[[1]])
-  }
+  # Wide format settings; lists accept commas or semicolons (review H2).
+  ps <- .pricing_parse_list(settings$gg_price_sequence, numeric = TRUE)
+  if (length(ps) > 0) gg$price_sequence <- ps
+  rc <- .pricing_parse_list(settings$gg_response_columns)
+  if (length(rc) > 0) gg$response_columns <- rc
 
   # Long format settings
   gg$price_column <- settings$gg_price_column
@@ -558,6 +797,8 @@ extract_gg_settings <- function(settings) {
   # Response coding
   gg$response_type <- settings$gg_response_type %||% "binary"
   gg$scale_threshold <- as.numeric(settings$gg_scale_threshold %||% 3)
+  gg$binary_coding <- settings$gg_binary_coding %||% "ZERO_ONE"
+  gg$smoothing_method <- settings$gg_smoothing_method %||% "isotonic"
 
   # Analysis options
   gg$check_monotonicity <- as.logical(settings$gg_check_monotonicity %||% TRUE)
@@ -583,21 +824,19 @@ extract_gg_settings <- function(settings) {
 #' @keywords internal
 load_validation_config <- function(config_file) {
   val_raw <- read_settings_sheet(config_file, "Validation")
+  .pricing_check_setting_names(val_raw$Setting, "Validation")
   settings <- setNames(as.list(val_raw$Value), val_raw$Setting)
-  # Normalize template names
-  name_map <- c(
+  # Normalize template names. The outlier settings are retired (review M7):
+  # nothing ever read them.
+  settings <- .pricing_apply_name_map(settings, c(
     "Min_Completeness" = "min_completeness",
     "Min_Sample" = "min_sample",
     "Price_Min" = "price_min",
-    "Price_Max" = "price_max",
-    "Flag_Outliers" = "flag_outliers",
-    "Outlier_Method" = "outlier_method",
-    "Outlier_Threshold" = "outlier_threshold"
-  )
-  nms <- names(settings)
-  for (i in seq_along(nms)) {
-    if (nms[i] %in% names(name_map) && !name_map[nms[i]] %in% nms) {
-      settings[[name_map[nms[i]]]] <- settings[[nms[i]]]
+    "Price_Max" = "price_max"
+  ))
+  for (field in c("min_completeness", "min_sample", "price_min", "price_max")) {
+    if (!is.null(settings[[field]]) && !is.na(settings[[field]])) {
+      settings[[field]] <- suppressWarnings(as.numeric(settings[[field]]))
     }
   }
   settings
@@ -622,6 +861,7 @@ load_visualization_config <- function(config_file) {
 #' @keywords internal
 load_monadic_config <- function(config_file) {
   mon_raw <- read_settings_sheet(config_file, "Monadic")
+  .pricing_check_setting_names(mon_raw$Setting, "Monadic")
   mon <- setNames(as.list(mon_raw$Value), mon_raw$Setting)
 
   # Normalize template names to internal names
@@ -716,9 +956,11 @@ load_simulator_config <- function(config_file) {
 
   if (!required_col %in% names(raw)) return(list())
 
-  # Filter out help rows and empty rows
+  # Filter out help rows, the template's own example rows and empty rows.
+  # The example scenarios used to load as real presets from an unedited
+  # template (review M11); they are now titled "[Example] ..." and skipped.
   first_col <- as.character(raw[[1]])
-  help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]", first_col, ignore.case = TRUE)
+  help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]|^\\[Example\\]", first_col, ignore.case = TRUE)
   all_na <- apply(raw, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
   raw <- raw[!help_rows & !all_na, , drop = FALSE]
 
@@ -741,13 +983,13 @@ load_simulator_config <- function(config_file) {
 #' @return Default validation configuration
 #' @keywords internal
 get_default_validation <- function() {
+  # One definition, shared with 02_validation.R (the outlier settings are
+  # retired; nothing ever read them, review M7).
   list(
     min_completeness = 0.8,
+    min_sample = 30,
     price_min = 0,
-    price_max = 10000,
-    flag_outliers = TRUE,
-    outlier_method = "iqr",
-    outlier_threshold = 3
+    price_max = 10000
   )
 }
 
@@ -788,6 +1030,25 @@ apply_pricing_defaults <- function(settings) {
   settings$generate_html_report <- as.logical(settings$generate_html_report %||% TRUE)
   settings$generate_simulator <- as.logical(settings$generate_simulator %||% FALSE)
   settings$brand_colour <- settings$brand_colour %||% "#323367"
+  settings$generate_stats_pack <- settings$generate_stats_pack %||% "Y"
+  settings$generate_tabs_export <- toupper(substr(as.character(
+    settings$generate_tabs_export %||% "N"), 1, 1)) %in% c("Y", "T")
+  settings$tabs_question_code <- settings$tabs_question_code %||% "GGACC"
+  settings$export_wtp <- toupper(substr(as.character(settings$export_wtp %||% "N"), 1, 1)) %in% c("Y", "T")
+
+  # Stop-early Gabor-Granger ladders (review C2): refuse by default when the
+  # per-rung bases differ; NO_AFTER_STOP is the explicit opt-in.
+  settings$gg_stop_early_imputation <- toupper(trimws(as.character(
+    settings$gg_stop_early_imputation %||% "NONE")))
+  if (!settings$gg_stop_early_imputation %in% c("NONE", "NO_AFTER_STOP")) {
+    pricing_refuse(
+      code = "CFG_GG_STOP_EARLY_IMPUTATION",
+      title = "GG_Stop_Early_Imputation Has An Unknown Value",
+      problem = sprintf("GG_Stop_Early_Imputation reads '%s'.", settings$gg_stop_early_imputation),
+      why_it_matters = "It decides whether unanswered rungs after a No count as No, which moves the demand curve.",
+      how_to_fix = "Use NONE (default, refuse when rung bases differ) or NO_AFTER_STOP."
+    )
+  }
 
   # Weighting and segmentation
   settings$weight_var <- settings$weight_var %||% NA_character_
@@ -795,13 +1056,8 @@ apply_pricing_defaults <- function(settings) {
     settings$weight_var <- NA_character_
   }
 
-  # Segment variables (comma-separated list)
-  if (!is.null(settings$segment_vars) && !is.na(settings$segment_vars)) {
-    settings$segment_vars <- trimws(strsplit(as.character(settings$segment_vars), ",")[[1]])
-    settings$segment_vars <- settings$segment_vars[settings$segment_vars != ""]
-  } else {
-    settings$segment_vars <- character(0)
-  }
+  # Segment variables (comma- or semicolon-separated list)
+  settings$segment_vars <- .pricing_parse_list(settings$segment_vars)
 
   # Cost for profit calculations
   settings$unit_cost <- if (!is.null(settings$unit_cost) && !is.na(settings$unit_cost)) {
@@ -810,13 +1066,21 @@ apply_pricing_defaults <- function(settings) {
     NA_real_
   }
 
-  # Monotonicity behavior
-  settings$vw_monotonicity_behavior <- settings$vw_monotonicity_behavior %||% "flag_only"
+  # Monotonicity behavior. Default is "drop" (review H3, handover ruling R1):
+  # the honest name for what the module always did, since psm_analysis ran
+  # with validate = TRUE whatever the setting said. "flag_only" now really
+  # keeps the intransitive respondents in the curves.
+  settings$vw_monotonicity_behavior <- tolower(trimws(as.character(
+    settings$vw_monotonicity_behavior %||% "drop")))
   valid_vw_mono <- c("drop", "fix", "flag_only")
   if (!settings$vw_monotonicity_behavior %in% valid_vw_mono) {
-    warning(sprintf("Invalid vw_monotonicity_behavior: '%s'. Using 'flag_only'.",
-                    settings$vw_monotonicity_behavior))
-    settings$vw_monotonicity_behavior <- "flag_only"
+    pricing_refuse(
+      code = "CFG_VW_MONOTONICITY_BEHAVIOR",
+      title = "VW_Monotonicity_Behavior Has An Unknown Value",
+      problem = sprintf("VW_Monotonicity_Behavior reads '%s'.", settings$vw_monotonicity_behavior),
+      why_it_matters = "It decides whether respondents with illogical price answers are excluded, kept or re-sorted, which moves the price points.",
+      how_to_fix = "Use drop (exclude them, the default), flag_only (keep them, disclosed) or fix (re-sort their four answers, a strong transformation)."
+    )
   }
 
   settings$gg_monotonicity_behavior <- settings$gg_monotonicity_behavior %||% "smooth"
@@ -827,14 +1091,9 @@ apply_pricing_defaults <- function(settings) {
     settings$gg_monotonicity_behavior <- "smooth"
   }
 
-  # Don't know codes (comma-separated list of numeric codes)
-  if (!is.null(settings$dk_codes) && !is.na(settings$dk_codes)) {
-    dk_vals <- trimws(strsplit(as.character(settings$dk_codes), ",")[[1]])
-    settings$dk_codes <- as.numeric(dk_vals)
-    settings$dk_codes <- settings$dk_codes[!is.na(settings$dk_codes)]
-  } else {
-    settings$dk_codes <- numeric(0)
-  }
+  # Don't know codes (comma- or semicolon-separated list of numeric codes)
+  settings$dk_codes <- .pricing_parse_list(settings$dk_codes, numeric = TRUE)
+  settings$dk_codes <- settings$dk_codes[!is.na(settings$dk_codes)]
 
   # ID variable for respondent-level operations
   settings$id_var <- settings$id_var %||% NA_character_
@@ -877,6 +1136,8 @@ apply_pricing_defaults <- function(settings) {
   # --------------------------------------------------------------------------
   settings$price_ladder <- list(
     n_tiers = as.integer(settings$n_tiers %||% 3),
+    # Kept as one string for the ladder's own parser, which now accepts
+    # commas as well as semicolons (review H2).
     tier_names = settings$tier_names %||% "Value;Standard;Premium",
     min_gap_pct = as.numeric(settings$min_gap_pct %||% 15),
     max_gap_pct = as.numeric(settings$max_gap_pct %||% 50),
@@ -999,8 +1260,10 @@ load_added_slides <- function(config_file) {
     return(NULL)
   }
 
-  # Filter valid rows
+  # Filter valid rows. A title starting with [Example] is the template's own
+  # illustration and never becomes a client-facing slide (review M11).
   df <- df[!is.na(df$slide_title) & nzchar(trimws(as.character(df$slide_title))), , drop = FALSE]
+  df <- df[!grepl("^\\[Example\\]", trimws(as.character(df$slide_title)), ignore.case = TRUE), , drop = FALSE]
   if (nrow(df) == 0) return(NULL)
 
   # Add display_order if not present

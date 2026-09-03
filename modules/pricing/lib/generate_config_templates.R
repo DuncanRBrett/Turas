@@ -58,7 +58,7 @@ if (!exists("turas_saveWorkbook", mode = "function")) {
     np <- tryCatch(normalizePath(p, mustWork = TRUE), error = function(e) NULL)
     if (!is.null(np)) return(np)
   }
-  msg <- "[PRICING] Cannot locate modules/shared/template_styles.R — template generation requires shared infrastructure"
+  msg <- "[PRICING] Cannot locate modules/shared/template_styles.R, template generation requires shared infrastructure"
   cat("\n", msg, "\n")
   stop(msg, call. = FALSE)
 }
@@ -183,11 +183,37 @@ build_settings_def <- function() {
           name = "Generate_Stats_Pack",
           required = FALSE,
           default = "Y",
-          description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
+          description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility, for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),
           numeric_range = NULL,
           integer_range = NULL
+        ),
+        list(
+          name = "Generate_Tabs_Export",
+          required = FALSE,
+          default = "N",
+          description = "Write {output}_tabs_pricing.xlsx: the Gabor-Granger acceptance grid as 0/1 columns a tabs (crosstab) project can read as a Multi_Mention question, with a QuestionMap snippet and a METHOD sheet. Needs ID_Variable.",
+          valid_values_text = "Y or N",
+          dropdown = c("Y", "N"),
+          numeric_range = NULL, integer_range = NULL
+        ),
+        list(
+          name = "Tabs_Question_Code",
+          required = FALSE,
+          default = "GGACC",
+          description = "QuestionCode for the exported acceptance grid ({code}_1 .. {code}_k).",
+          valid_values_text = "Letters, digits and underscores",
+          dropdown = NULL, numeric_range = NULL, integer_range = NULL
+        ),
+        list(
+          name = "Export_WTP",
+          required = FALSE,
+          default = "N",
+          description = "Also export a per-respondent willingness-to-pay column (midpoint of the Van Westendorp cheap and expensive answers), stamped as derived on the METHOD sheet.",
+          valid_values_text = "Y or N",
+          dropdown = c("Y", "N"),
+          numeric_range = NULL, integer_range = NULL
         )
       )
     ),
@@ -197,8 +223,8 @@ build_settings_def <- function() {
         list(
           name = "VW_Monotonicity_Behavior",
           required = FALSE,
-          default = "flag_only",
-          description = "How to handle VW price ordering violations. 'drop' = exclude, 'fix' = sort, 'flag_only' = warn.",
+          default = "drop",
+          description = "Respondents whose four answers are not strictly increasing (too cheap < cheap < expensive < too expensive). 'drop' = exclude them (default; the analysed base is reported), 'flag_only' = keep them in the curves and disclose the count, 'fix' = re-sort their answers (a strong transformation).",
           valid_values_text = "drop, fix, flag_only",
           dropdown = c("drop", "fix", "flag_only"),
           numeric_range = NULL, integer_range = NULL
@@ -207,9 +233,18 @@ build_settings_def <- function() {
           name = "GG_Monotonicity_Behavior",
           required = FALSE,
           default = "smooth",
-          description = "How to handle non-monotonic GG demand curves. 'smooth' = enforce, 'diagnostic_only' = warn.",
+          description = "How to handle non-monotonic GG demand curves. 'smooth' = enforce with Smoothing_Method (GaborGranger sheet), 'diagnostic_only' = warn.",
           valid_values_text = "smooth, diagnostic_only",
           dropdown = c("smooth", "diagnostic_only"),
+          numeric_range = NULL, integer_range = NULL
+        ),
+        list(
+          name = "GG_Stop_Early_Imputation",
+          required = FALSE,
+          default = "NONE",
+          description = "For a ladder that stopped after a respondent's first No. NONE (default): the run refuses when the rungs have different bases. NO_AFTER_STOP: unanswered rungs above a respondent's first No are coded No, and the stats pack says so.",
+          valid_values_text = "NONE or NO_AFTER_STOP",
+          dropdown = c("NONE", "NO_AFTER_STOP"),
           numeric_range = NULL, integer_range = NULL
         )
       )
@@ -319,7 +354,7 @@ build_settings_def <- function() {
           name = "Analyst_Name",
           required = FALSE,
           default = "",
-          description = "Analyst name — appears in the stats pack Declaration sheet.",
+          description = "Analyst name, shown in the stats pack Declaration sheet.",
           valid_values_text = "Free text",
           dropdown = NULL,
           numeric_range = NULL,
@@ -329,7 +364,7 @@ build_settings_def <- function() {
           name = "Research_House",
           required = FALSE,
           default = "",
-          description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
+          description = "Research organisation name, shown in the stats pack Declaration sheet. Use your company or white-label partner name.",
           valid_values_text = "Free text",
           dropdown = NULL,
           numeric_range = NULL,
@@ -442,15 +477,6 @@ build_vw_settings_def <- function() {
           description = "Number of bootstrap resamples. Higher = more precise CIs but slower.",
           valid_values_text = "500 to 10000",
           dropdown = NULL, numeric_range = NULL, integer_range = c(500, 10000)
-        ),
-        list(
-          name = "Interpolation_Method",
-          required = FALSE,
-          default = "linear",
-          description = "Interpolation method for ECDF curve intersections.",
-          valid_values_text = "linear or spline",
-          dropdown = c("linear", "spline"),
-          numeric_range = NULL, integer_range = NULL
         )
       )
     )
@@ -485,16 +511,16 @@ build_gg_settings_def <- function() {
           name = "Price_Sequence",
           required = FALSE,
           default = "",
-          description = "Price points tested, semicolon-separated. Must match order of Response_Columns.",
-          valid_values_text = "Semicolon-separated numbers (e.g., 4.99;6.99;8.99)",
+          description = "Price points tested, in the order they were presented, separated by semicolons or commas. Must match the order of Response_Columns.",
+          valid_values_text = "Numbers separated by ; or , (e.g. 60; 80; 100)",
           dropdown = NULL, numeric_range = NULL, integer_range = NULL
         ),
         list(
           name = "Response_Columns",
           required = FALSE,
           default = "",
-          description = "Column names for purchase intent at each price, semicolon-separated.",
-          valid_values_text = "Semicolon-separated column names",
+          description = "Column names for purchase intent at each price, one per rung, separated by semicolons or commas.",
+          valid_values_text = "Column names separated by ; or ,",
           dropdown = NULL, numeric_range = NULL, integer_range = NULL
         )
       )
@@ -535,9 +561,9 @@ build_gg_settings_def <- function() {
           name = "Response_Type",
           required = FALSE,
           default = "binary",
-          description = "How purchase intent is coded. Binary: yes/no. Scale: top-box from Likert. Auto: detect from data.",
-          valid_values_text = "binary, scale, or auto",
-          dropdown = c("binary", "scale", "auto"),
+          description = "How purchase intent is coded. Binary: 0/1 or yes/no (see Binary_Coding for 1/2 data). Scale: top-box from a Likert scale.",
+          valid_values_text = "binary or scale",
+          dropdown = c("binary", "scale"),
           numeric_range = NULL, integer_range = NULL
         ),
         list(
@@ -547,6 +573,15 @@ build_gg_settings_def <- function() {
           description = "Top-box threshold if Response_Type = scale. Values >= this count as 'would buy'.",
           valid_values_text = "Integer (e.g., 3 on a 5-point scale)",
           dropdown = NULL, numeric_range = NULL, integer_range = c(1, 10)
+        ),
+        list(
+          name = "Binary_Coding",
+          required = FALSE,
+          default = "ZERO_ONE",
+          description = "For Response_Type = binary: ZERO_ONE means 1 = would buy, 0 = would not. ONE_TWO means 1 = would buy, 2 = would not (the usual survey export). Any other value refuses.",
+          valid_values_text = "ZERO_ONE or ONE_TWO",
+          dropdown = c("ZERO_ONE", "ONE_TWO"),
+          numeric_range = NULL, integer_range = NULL
         )
       )
     ),
@@ -557,7 +592,7 @@ build_gg_settings_def <- function() {
           name = "Smoothing_Method",
           required = FALSE,
           default = "isotonic",
-          description = "Method to enforce monotone decreasing demand if violations found.",
+          description = "How a demand curve that rises with price is corrected before revenue is computed (applies when GG_Monotonicity_Behavior = smooth). Isotonic pools adjacent violators; cummax only raises values.",
           valid_values_text = "isotonic, cummax, loess, none",
           dropdown = c("isotonic", "cummax", "loess", "none"),
           numeric_range = NULL, integer_range = NULL
@@ -805,37 +840,6 @@ build_validation_settings_def <- function() {
           dropdown = NULL, numeric_range = c(0, 999999), integer_range = NULL
         )
       )
-    ),
-    list(
-      section_name = "OUTLIER DETECTION",
-      fields = list(
-        list(
-          name = "Flag_Outliers",
-          required = FALSE,
-          default = "TRUE",
-          description = "Detect and flag statistical outliers in price responses.",
-          valid_values_text = "TRUE or FALSE",
-          dropdown = c("TRUE", "FALSE"),
-          numeric_range = NULL, integer_range = NULL
-        ),
-        list(
-          name = "Outlier_Method",
-          required = FALSE,
-          default = "iqr",
-          description = "Statistical method for outlier detection.",
-          valid_values_text = "iqr, zscore, or percentile",
-          dropdown = c("iqr", "zscore", "percentile"),
-          numeric_range = NULL, integer_range = NULL
-        ),
-        list(
-          name = "Outlier_Threshold",
-          required = FALSE,
-          default = "3",
-          description = "Threshold multiplier for outlier detection. Higher = more permissive.",
-          valid_values_text = "1.5 to 5 (IQR); 2 to 4 (zscore)",
-          dropdown = NULL, numeric_range = c(1, 10), integer_range = NULL
-        )
-      )
     )
   )
 }
@@ -922,13 +926,13 @@ generate_pricing_config_template <- function(output_path,
     cat("  [5/7] Simulator sheet...\n")
     sim_cols <- build_simulator_columns_def()
     example_scenarios <- list(
-      list(Scenario_Name = "Budget Launcher", Product_Price = 9.99,
+      list(Scenario_Name = "[Example] Budget Launcher", Product_Price = 9.99,
            Competitor_1_Price = 12.99, Competitor_2_Price = 14.99,
            Competitor_3_Price = "", Description = "Aggressive entry-level pricing"),
-      list(Scenario_Name = "Market Match", Product_Price = 12.99,
+      list(Scenario_Name = "[Example] Market Match", Product_Price = 12.99,
            Competitor_1_Price = 12.99, Competitor_2_Price = 14.99,
            Competitor_3_Price = "", Description = "Price parity with main competitor"),
-      list(Scenario_Name = "Premium Pro", Product_Price = 16.99,
+      list(Scenario_Name = "[Example] Premium Pro", Product_Price = 16.99,
            Competitor_1_Price = 12.99, Competitor_2_Price = 14.99,
            Competitor_3_Price = "", Description = "Premium positioning with value story")
     )
@@ -948,7 +952,7 @@ generate_pricing_config_template <- function(output_path,
   val_def <- build_validation_settings_def()
   write_settings_sheet(wb, "Validation", val_def,
                        title = "Data Quality & Validation Settings",
-                       subtitle = "Configure thresholds for data quality checks, outlier detection, and sample size requirements.")
+                       subtitle = "Configure thresholds for data quality checks and the minimum sample size.")
 
   # --------------------------------------------------------------------------
   # Sheet 7: Reference (read-only)
@@ -1038,8 +1042,8 @@ generate_pricing_config_template <- function(output_path,
   addWorksheet(wb, "AddedSlides", gridLines = FALSE)
 
   slides_data <- data.frame(
-    slide_title = c("Example Slide", ""),
-    content = c("Replace with your narrative content. Supports **bold**, *italic*, ## headings, - bullets, > quotes.", ""),
+    slide_title = c("[Example] Slide", ""),
+    content = c("Rows whose title starts with [Example] are never loaded. Replace the title and this text with your narrative. Supports **bold**, *italic*, ## headings, - bullets, > quotes.", ""),
     image_path = c("", ""),
     display_order = c(1, 2),
     stringsAsFactors = FALSE

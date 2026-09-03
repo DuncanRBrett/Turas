@@ -352,6 +352,7 @@ validate_pricing_data <- function(data, config) {
     }
 
     # Check monotonicity with configurable behavior
+    monotonicity_violations <- NULL
     if (isTRUE(vw$validate_monotonicity %||% TRUE)) {
       violations <- check_vw_monotonicity(
         data[[vw$col_too_cheap]],
@@ -401,12 +402,20 @@ validate_pricing_data <- function(data, config) {
             violations$count, violation_rate * 100
           )
         } else {  # "flag_only"
-          # Just report, don't modify
+          # Kept in the curves: run_van_westendorp() passes validate = FALSE
+          # for this behaviour (review H3), so "retained" is now true.
           warnings_list[[length(warnings_list) + 1]] <- sprintf(
-            "VW monotonicity: %d cases (%.1f%%) flagged but retained (behavior: flag_only)",
+            "VW monotonicity: %d cases (%.1f%%) retained in the curves, disclosed (behavior: flag_only)",
             violations$count, violation_rate * 100
           )
         }
+
+        monotonicity_violations <- list(
+          n_violations = violations$count,
+          violation_rate = violation_rate,
+          behavior = behavior,
+          violation_indices = violations$violation_indices
+        )
 
         # Additional warning if rate exceeds threshold
         if (violation_rate > (vw$violation_threshold %||% 0.1)) {
@@ -433,6 +442,10 @@ validate_pricing_data <- function(data, config) {
           )
         }
       }
+      # A declared-binary column must be 0/1 (or 1/2 under Binary_Coding =
+      # ONE_TWO). Any positive number used to count as a purchase, so 1 = Yes
+      # / 2 = No data read as 100% intent at every rung (review H5).
+      validate_gg_binary_domain(data, gg)
     }
   }
 
@@ -458,6 +471,23 @@ validate_pricing_data <- function(data, config) {
 
   clean_data <- data[!exclusions, , drop = FALSE]
 
+  # Min_Sample (review M8): the template promised a refusal below it and
+  # nothing enforced it.
+  min_sample <- suppressWarnings(as.numeric(validation_config$min_sample %||% NA))
+  if (is.finite(min_sample) && nrow(clean_data) < min_sample) {
+    pricing_refuse(
+      code = "DATA_MIN_SAMPLE",
+      title = "Too Few Valid Respondents To Analyse",
+      problem = sprintf("%d respondents remain after validation; Min_Sample is %d.",
+                        nrow(clean_data), as.integer(min_sample)),
+      why_it_matters = "Price points from a handful of respondents are not a finding.",
+      how_to_fix = c(
+        "Check the exclusion reasons in the console above and the Validation sheet.",
+        "Lower Min_Sample on the Validation sheet only if a small base is acceptable and will be disclosed."
+      )
+    )
+  }
+
   # --------------------------------------------------------------------------
   # Return Results
   # --------------------------------------------------------------------------
@@ -471,8 +501,63 @@ validate_pricing_data <- function(data, config) {
     exclusion_reasons = exclusion_reasons,
     warnings = warnings_list,
     n_warnings = length(warnings_list),
-    weight_summary = weight_summary
+    weight_summary = weight_summary,
+    monotonicity_violations = if (exists("monotonicity_violations", inherits = FALSE)) monotonicity_violations else NULL
   )
+}
+
+
+#' Validate The Domain Of Declared-Binary Gabor-Granger Columns
+#'
+#' Refuses when a column declared `Response_Type = binary` holds values
+#' outside {0, 1}, unless `Binary_Coding = ONE_TWO` and the values are within
+#' {1, 2}. Missing values are allowed here; the ladder's own base check deals
+#' with them. Logical and Yes/No text columns pass.
+#'
+#' @param data The data frame.
+#' @param gg The Gabor-Granger config list.
+#' @return Invisibly TRUE.
+#' @keywords internal
+validate_gg_binary_domain <- function(data, gg) {
+  response_type <- tolower(gg$response_type %||% "binary")
+  if (!identical(response_type, "binary")) return(invisible(TRUE))
+  coding <- toupper(gg$binary_coding %||% "ZERO_ONE")
+  allowed <- if (identical(coding, "ONE_TWO")) c(1, 2) else c(0, 1)
+
+  for (col in gg$response_columns) {
+    x <- data[[col]]
+    if (is.logical(x)) next
+    if (is.character(x) || is.factor(x)) {
+      vals <- unique(tolower(trimws(as.character(x))))
+      vals <- vals[!is.na(vals) & nzchar(vals)]
+      if (all(vals %in% c("0", "1", "yes", "no", "y", "n", "true", "false"))) next
+      pricing_refuse(
+        code = "DATA_GG_NOT_BINARY",
+        title = "A Gabor-Granger Column Is Not Yes/No",
+        problem = sprintf("Column '%s' holds text values other than yes/no: %s", col,
+                          paste(head(vals, 6), collapse = ", ")),
+        why_it_matters = "Every value that is not recognised would be read as No.",
+        how_to_fix = "Recode the column to 0/1, or set Response_Type = scale with a Scale_Threshold."
+      )
+    }
+    v <- suppressWarnings(as.numeric(x))
+    off <- unique(v[!is.na(v) & !v %in% allowed])
+    if (length(off) == 0) next
+    is_one_two <- all(unique(v[!is.na(v)]) %in% c(1, 2)) && !identical(coding, "ONE_TWO")
+    pricing_refuse(
+      code = "DATA_GG_NOT_BINARY",
+      title = "A Gabor-Granger Column Is Not Coded 0/1",
+      problem = sprintf("Column '%s' is declared binary but holds %s.", col,
+                        paste(head(sort(off), 6), collapse = ", ")),
+      why_it_matters = paste0("Any positive number used to count as a purchase, so 1 = Yes / 2 = No ",
+                              "data read as 100% intent at every rung and the optimum landed on the top price."),
+      how_to_fix = c(
+        if (is_one_two) "The values are 1 and 2: set Binary_Coding = ONE_TWO on the GaborGranger sheet (1 = would buy, 2 = would not).",
+        "Otherwise recode the column to 0/1, or declare Response_Type = scale with a Scale_Threshold."
+      )
+    )
+  }
+  invisible(TRUE)
 }
 
 
@@ -496,14 +581,13 @@ check_vw_monotonicity <- function(too_cheap, cheap, expensive, too_expensive) {
   # Check logical sequence
   violations <- rep(FALSE, n)
 
-  # Check: too_cheap <= cheap
-  violations <- violations | (!is.na(too_cheap) & !is.na(cheap) & too_cheap > cheap)
-
-  # Check: cheap <= expensive
-  violations <- violations | (!is.na(cheap) & !is.na(expensive) & cheap > expensive)
-
-  # Check: expensive <= too_expensive
-  violations <- violations | (!is.na(expensive) & !is.na(too_expensive) & expensive > too_expensive)
+  # The rule is pricesensitivitymeter's own, strictly increasing:
+  # too_cheap < cheap < expensive < too_expensive. Its validate step sets a
+  # tie aside as invalid, so a check that allowed ties reported a larger
+  # analysed base than the curves actually used (review H3).
+  violations <- violations | (!is.na(too_cheap) & !is.na(cheap) & too_cheap >= cheap)
+  violations <- violations | (!is.na(cheap) & !is.na(expensive) & cheap >= expensive)
+  violations <- violations | (!is.na(expensive) & !is.na(too_expensive) & expensive >= too_expensive)
 
   # Ignore cases with missing values
   all_present <- !is.na(too_cheap) & !is.na(cheap) & !is.na(expensive) & !is.na(too_expensive)
@@ -525,12 +609,11 @@ check_vw_monotonicity <- function(too_cheap, cheap, expensive, too_expensive) {
 #' @return Default validation configuration
 #' @keywords internal
 get_default_validation <- function() {
+  # No outlier settings: they never had an implementation (review M7).
   list(
     min_completeness = 0.8,
+    min_sample = 30,
     price_min = 0,
-    price_max = 10000,
-    flag_outliers = TRUE,
-    outlier_method = "iqr",
-    outlier_threshold = 3
+    price_max = 10000
   )
 }

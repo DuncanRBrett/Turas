@@ -62,7 +62,11 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
     "3" = "Value;Standard;Premium",
     "4" = "Economy;Value;Standard;Premium"
   )
-  tier_names <- trimws(strsplit(tier_names_raw, ";")[[1]])
+  tier_names <- if (exists(".pricing_parse_list", mode = "function")) {
+    .pricing_parse_list(tier_names_raw)
+  } else {
+    trimws(strsplit(as.character(tier_names_raw), "[,;]")[[1]])
+  }
 
   if (length(tier_names) != n_tiers) {
     pricing_refuse(
