@@ -206,6 +206,23 @@ run("every price point shows its own interval", () => {
   has(h, "300 replicates", "and how many replicates");
 });
 
+run("marker labels that would collide step down a line instead", () => {
+  // OPP and IDP sit R4 apart on the Karoo example, which put one label on top
+  // of the other. Labels within 34px of the one before step down.
+  const h = render(ISLAND);
+  const svg = h.slice(h.indexOf("Van Westendorp price sensitivity curves"));
+  const ys = [...svg.matchAll(/<text x="([\d.]+)" y="(\d+)" font-size="10"[^>]*>(PMC|OPP|IDP|PME)</g)]
+    .map((m) => ({ x: +m[1], y: +m[2], label: m[3] }));
+  assert(ys.length === 4, "four marker labels: " + ys.length);
+  const opp = ys.find((p) => p.label === "OPP");
+  const idp = ys.find((p) => p.label === "IDP");
+  assert(idp.x - opp.x < 34, "the two really are close: " + (idp.x - opp.x));
+  assert(idp.y > opp.y, "so IDP sits on a lower line: " + opp.y + " vs " + idp.y);
+  // PME is far from IDP, so it goes back to the top line.
+  const pme = ys.find((p) => p.label === "PME");
+  assert(pme.y === ys.find((p) => p.label === "PMC").y, "a distant label starts a new run");
+});
+
 run("the VW chart draws four curves and marks the four points", () => {
   const h = render(ISLAND);
   const svg = h.slice(h.indexOf("Van Westendorp price sensitivity curves"));

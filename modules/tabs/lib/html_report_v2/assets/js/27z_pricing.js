@@ -158,14 +158,24 @@
       }
     }
 
-    // Vertical markers (the price points, the optimum).
-    (spec.markers || []).forEach(function (m) {
-      var x = sx(m.x);
-      if (x === null) return;
+    // Vertical markers (the price points, the optimum). Two price points can
+    // sit a few rand apart, which puts their labels on top of each other, so a
+    // label that would land within LABEL_GAP of the one before it steps down a
+    // line instead.
+    var LABEL_GAP = 34;
+    var lastLabelX = -Infinity, labelRow = 0;
+    var placed = (spec.markers || []).map(function (m) {
+      return { m: m, x: sx(m.x) };
+    }).filter(function (p) { return p.x !== null; });
+    placed.sort(function (a, b) { return a.x - b.x; });
+    placed.forEach(function (p) {
+      var m = p.m, x = p.x;
+      labelRow = (x - lastLabelX < LABEL_GAP) ? labelRow + 1 : 0;
+      lastLabelX = x;
       out.push('<line x1="' + x.toFixed(1) + '" y1="' + PAD.top + '" x2="' + x.toFixed(1) +
         '" y2="' + (CHART_H - PAD.bottom) + '" stroke="' + (m.colour || "#666") +
         '" stroke-width="1" stroke-dasharray="3 3"/>');
-      out.push('<text x="' + (x + 3).toFixed(1) + '" y="' + (PAD.top + 10) +
+      out.push('<text x="' + (x + 3).toFixed(1) + '" y="' + (PAD.top + 10 + labelRow * 11) +
         '" font-size="10" fill="' + (m.colour || "#666") + '">' + esc(m.label) + "</text>");
     });
 
