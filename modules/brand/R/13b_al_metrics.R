@@ -126,9 +126,19 @@ audience_lens_metric_catalog <- function() .AL_METRIC_GROUPS
   n_unw <- sum(base_idx)
   if (n_unw == 0) return(.al_na_metric("No eligible respondents in subset"))
   list(value = sum(weights[reached & keep_idx]) / sum(weights[base_idx]),
-       n_base = n_unw, n_buyer_base = FALSE, note = NULL)
+       n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = FALSE, note = NULL)
 }
 
+
+#' Kish effective n of a metric's base (review 2026-07-12, H2)
+#'
+#' n_base stays the unweighted count for display and the zero-base guard;
+#' n_eff is what the significance test in 13c uses.
+#' @keywords internal
+.al_base_n <- function(weights, idx) {
+  if (is.null(weights)) return(as.numeric(sum(idx)))
+  .brand_effective_n(weights[idx])
+}
 
 .al_first_col <- function(data, candidates) {
   hit <- intersect(candidates, names(data))
@@ -305,7 +315,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   n_unw <- sum(base_idx)
   if (n_unw == 0) return(.al_na_metric("Empty subset for this metric"))
   list(value = sum(weights[hit]) / sum(weights[base_idx]),
-       n_base = n_unw, n_buyer_base = FALSE, note = NULL)
+       n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = FALSE, note = NULL)
 }
 
 
@@ -322,7 +332,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   if (n_unw == 0) return(.al_na_metric("Empty subset for this metric"))
   hit <- base_idx & att_vec %in% codes
   list(value = sum(weights[hit]) / sum(weights[base_idx]),
-       n_base = n_unw, n_buyer_base = FALSE, note = NULL)
+       n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = FALSE, note = NULL)
 }
 
 
@@ -391,7 +401,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   som_val <- if (w_total > 0 && n_cep > 0)
     total_links_focal / (w_total * n_cep) else NA_real_
 
-  metric_ok <- function(v) list(value = v, n_base = n_unw,
+  metric_ok <- function(v) list(value = v, n_base = n_unw, n_eff = .al_base_n(weights, base_idx),
                                  n_buyer_base = FALSE, note = NULL)
   list(mpen = metric_ok(mpen_val), network_size = metric_ok(ns_val),
        mms = metric_ok(mms_val),  som = metric_ok(som_val))
@@ -419,7 +429,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
     pos_w <- sum(weights[base_idx & pos_ind])
     neg_w <- sum(weights[base_idx & neg_ind])
     list(value = (pos_w - neg_w) / w_total,
-         n_base = n_unw, n_buyer_base = FALSE, note = NULL)
+         n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = FALSE, note = NULL)
   }
 
   list(
@@ -450,7 +460,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   num <- sum(weights[base_idx] * focal_freq[base_idx])
   den <- sum(weights[base_idx] * total_freq[base_idx])
   list(value = if (den > 0) num / den else NA_real_,
-       n_base = n_unw, n_buyer_base = TRUE, note = NULL)
+       n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = TRUE, note = NULL)
 }
 
 
@@ -469,7 +479,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   }
   list(value = sum(weights[base_idx] * focal_freq[base_idx]) /
                 sum(weights[base_idx]),
-       n_base = n_unw, n_buyer_base = TRUE, note = NULL)
+       n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = TRUE, note = NULL)
 }
 
 
@@ -501,7 +511,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
     headline <- max(dist)
   }
   list(value = headline,
-       n_base = n_unw, n_buyer_base = TRUE,
+       n_base = n_unw, n_eff = .al_base_n(weights, base_idx), n_buyer_base = TRUE,
        note = NULL,
        distribution = dist)
 }

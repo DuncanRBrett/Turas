@@ -4,6 +4,7 @@
 # ==============================================================================
 library(testthat)
 
+source(file.path("..", "..", "R", "00_guard.R"))
 source(file.path("..", "..", "R", "11_demographics.R"))
 source(file.path("..", "..", "R", "11a_demographics_panel_data.R"))
 source(file.path("..", "..", "lib", "html_report", "panels",

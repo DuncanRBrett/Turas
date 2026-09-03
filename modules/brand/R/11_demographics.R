@@ -409,8 +409,11 @@ run_demographic_question <- function(values,
     100 * sum(w[mask & !is.na(values) & as.character(values) == cd]) / base_w
   }, numeric(1L))
 
+  # Wilson interval on the Kish effective n of the base, not the raw count
+  # (review 2026-07-12, H2). Unweighted data gives n_eff = base_n exactly.
+  base_eff <- .brand_effective_n(w[mask & !is.na(values)])
   ci_pairs <- lapply(seq_along(codes), function(i) {
-    .demo_wilson_ci(pcts[i] / 100, base_n, conf_level)
+    .demo_wilson_ci(pcts[i] / 100, base_eff, conf_level)
   })
 
   data.frame(
@@ -430,7 +433,7 @@ run_demographic_question <- function(values,
 # Wilson score interval. Returns NA pair when n is zero or p is NA.
 # Reference: Wilson EB (1927); Brown, Cai & DasGupta (2001).
 .demo_wilson_ci <- function(p, n, conf_level = 0.95) {
-  if (is.na(p) || n <= 0L) return(list(lower = NA_real_, upper = NA_real_))
+  if (is.na(p) || !is.finite(n) || n <= 0) return(list(lower = NA_real_, upper = NA_real_))
   z   <- stats::qnorm(1 - (1 - conf_level) / 2)
   z2  <- z * z
   den <- 1 + z2 / n

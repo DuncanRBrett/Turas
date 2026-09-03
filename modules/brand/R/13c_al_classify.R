@@ -172,8 +172,10 @@ classify_chip <- function(metric_a, metric_b, metric_total,
 #'
 #' @keywords internal
 .al_sig_two_props <- function(ma, mb, alpha = 0.10) {
-  pa <- ma$value; na <- ma$n_base
-  pb <- mb$value; nb <- mb$n_base
+  # Test on the Kish effective n when the metric carries one (H2); the
+  # unweighted count is the legacy fallback.
+  pa <- ma$value; na <- ma$n_eff %||% ma$n_base
+  pb <- mb$value; nb <- mb$n_eff %||% mb$n_base
   if (is.na(pa) || is.na(pb) || na <= 0 || nb <= 0) {
     return(list(p_value = NA_real_, sig = FALSE, test = "none"))
   }

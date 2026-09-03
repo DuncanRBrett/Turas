@@ -109,6 +109,74 @@ brand_with_refusal_handler <- function(expr) {
 }
 
 
+#' Source one file from modules/shared/lib, wherever the Turas root is
+#'
+#' Walks up from TURAS_ROOT / TURAS_HOME / the working directory, the same
+#' way tabs, confidence and maxdiff find the shared library. Refuses loudly
+#' when the file cannot be found: a silent local fallback is exactly the
+#' divergence OPUS-0 removed.
+#' @keywords internal
+.brand_source_shared <- function(file_name) {
+  rel   <- file.path("modules", "shared", "lib", file_name)
+  roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+  roots <- roots[nzchar(roots)]
+  d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  for (i in 1:10) {
+    roots <- c(roots, d)
+    parent <- dirname(d)
+    if (identical(parent, d)) break
+    d <- parent
+  }
+  hits <- file.path(roots, rel)
+  hits <- hits[file.exists(hits)]
+  if (length(hits) == 0) {
+    cat(sprintf("\n=== TURAS BRAND ERROR ===\n[PKG_SHARED_LIB_MISSING] Cannot find %s from %s\nHow to fix: run from the Turas root or set TURAS_ROOT.\n=========================\n\n",
+                rel, getwd()))
+    stop(sprintf("[BRAND PKG_SHARED_LIB_MISSING] %s not found", rel), call. = FALSE)
+  }
+  source(hits[[1L]], local = FALSE)
+  invisible(hits[[1L]])
+}
+
+
+#' Kish effective sample size, one definition for the platform
+#'
+#' Thin access to \code{calculate_effective_n()} in
+#' \code{modules/shared/lib/effective_n.R} (OPUS-0). Every significance test
+#' and confidence interval in the brand module tests a weighted estimate on
+#' this base, never on the raw weighted total (production review
+#' 2026-07-12, H2). Unweighted input returns the plain count.
+#'
+#' @param weights Numeric vector of weights for the respondents in the base
+#'   (NULL means unweighted).
+#' @param n Integer. Number of respondents in the base; used when
+#'   \code{weights} is NULL.
+#' @return Numeric effective n (fractional by design).
+#' @keywords internal
+.brand_effective_n <- function(weights, n = length(weights)) {
+  if (is.null(weights)) return(as.numeric(n))
+  if (!exists("calculate_effective_n", mode = "function"))
+    .brand_source_shared("effective_n.R")
+  calculate_effective_n(as.numeric(weights))
+}
+
+
+#' Minimum-base disclosure predicate, one definition for the platform
+#'
+#' Thin access to \code{meets_min_base()} in
+#' \code{modules/shared/lib/disclosure_gate.R} (OPUS-0). NA and non-finite
+#' bases never pass.
+#' @param base Numeric vector of bases.
+#' @param min_base Single number, default 30.
+#' @return Logical vector.
+#' @keywords internal
+.brand_meets_min_base <- function(base, min_base = 30L) {
+  if (!exists("meets_min_base", mode = "function"))
+    .brand_source_shared("disclosure_gate.R")
+  meets_min_base(base, min_base = min_base)
+}
+
+
 #' Normalise any refusal-shaped object to the module's list contract
 #'
 #' \code{with_refusal_handler()} returns a \code{turas_refusal_result} with

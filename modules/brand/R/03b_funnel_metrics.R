@@ -422,6 +422,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   data.frame(brand_code = character(0), stage_key = character(0),
              pct_weighted = numeric(0), pct_unweighted = numeric(0),
              base_weighted = numeric(0), base_unweighted = numeric(0),
+             n_effective = numeric(0),
              warning_flag = character(0),
              stringsAsFactors = FALSE)
 }
@@ -460,6 +461,13 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # mismatch) shows "—" in the consideration column instead of a misleading
   # 0% and a false nesting violation downstream.
   all_na_cols <- colSums(!is.na(m)) == 0
+  # Kish effective n of the respondents this column is measured on (the
+  # non-NA rows), the base every significance test uses (review H2).
+  n_eff <- vapply(seq_len(ncol(m)), function(j) {
+    rows <- !is.na(m[, j])
+    if (!any(rows)) return(NA_real_)
+    .brand_effective_n(w[rows])
+  }, numeric(1))
   if (any(all_na_cols)) {
     pct_w[all_na_cols] <- NA_real_
     pct_u[all_na_cols] <- NA_real_
@@ -475,6 +483,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
              pct_unweighted = unname(pct_u),
              base_weighted = unname(base_w),
              base_unweighted = unname(base_u),
+             n_effective = unname(n_eff),
              warning_flag = flag,
              stringsAsFactors = FALSE)
 }
@@ -595,14 +604,26 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 }
 
 
+# Significance inputs are the weighted proportion applied to the Kish
+# effective n of its base, never the raw weighted total: with dispersed
+# weights the raw total overstates the information in the sample and the
+# markers over-fire (review 2026-07-12, H2). Rows without an effective n
+# (all-NA columns, legacy callers) fall back to the implied weighted total.
+.sig_inputs <- function(row) {
+  n <- row$n_effective %||% NA_real_
+  if (!is.finite(n) || n <= 0) {
+    n <- row$base_weighted / ifelse(row$pct_weighted > 0,
+                                    row$pct_weighted, NA_real_)
+  }
+  list(x = row$pct_weighted * n, n = n)
+}
+
 .sig_row <- function(focal_row, comp_row, stage_key, focal, comp,
                      comparison, sig_tester, alpha) {
-  x1 <- focal_row$base_weighted
-  n1 <- focal_row$base_weighted / ifelse(focal_row$pct_weighted > 0,
-                                         focal_row$pct_weighted, NA_real_)
-  x2 <- comp_row$base_weighted
-  n2 <- comp_row$base_weighted / ifelse(comp_row$pct_weighted > 0,
-                                        comp_row$pct_weighted, NA_real_)
+  f <- .sig_inputs(focal_row)
+  c <- .sig_inputs(comp_row)
+  x1 <- f$x; n1 <- f$n
+  x2 <- c$x; n2 <- c$n
   res <- tryCatch(sig_tester(x1, n1, x2, n2, alpha),
                   error = function(e) list(p_value = NA_real_,
                                            significant = FALSE,
@@ -620,9 +641,8 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 .sig_row_against_summary <- function(focal_row, summary_row, stage_key,
                                      focal, label, comparison,
                                      sig_tester, alpha) {
-  x1 <- focal_row$base_weighted
-  n1 <- focal_row$base_weighted / ifelse(focal_row$pct_weighted > 0,
-                                         focal_row$pct_weighted, NA_real_)
+  f <- .sig_inputs(focal_row)
+  x1 <- f$x; n1 <- f$n
   x2 <- summary_row$base
   n2 <- summary_row$total_n
   res <- tryCatch(sig_tester(x1, n1, x2, n2, alpha),
@@ -643,8 +663,8 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 #' vs-average comparison and for every brand's own vs-average test.
 #'
 #' pct is the simple mean of per-brand percentages (not a pooled proportion).
-#' total_n is the mean per-brand eligible base, used as the denominator in
-#' the two-proportion sig test. Summing eligible N across brands inflates by
+#' total_n is the mean per-brand effective base (Kish n_eff), used as the
+#' denominator in the two-proportion sig test. Summing eligible N across brands inflates by
 #' k (the number of brands) because every respondent is counted once per brand;
 #' using the mean keeps the sig test at a single-brand-equivalent base.
 #' @keywords internal
@@ -652,9 +672,13 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   other <- stage_rows[stage_rows$brand_code != excluded_brand, , drop = FALSE]
   if (nrow(other) == 0) return(NULL)
 
+  # Per-brand effective n where available (review H2), else the implied
+  # weighted total the legacy rows carried.
   implied_n <- ifelse(other$pct_weighted > 0,
                       other$base_weighted / other$pct_weighted, NA_real_)
-  avg_n <- mean(implied_n, na.rm = TRUE)
+  n_eff <- other$n_effective %||% rep(NA_real_, nrow(other))
+  n_eff <- ifelse(is.finite(n_eff) & n_eff > 0, n_eff, implied_n)
+  avg_n <- mean(n_eff, na.rm = TRUE)
   if (!is.finite(avg_n) || avg_n <= 0) return(NULL)
 
   avg_pct <- mean(other$pct_weighted, na.rm = TRUE)

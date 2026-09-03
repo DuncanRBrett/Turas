@@ -67,6 +67,8 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   focal   <- pd$meta$focal_brand_code %||% character(0)
   brands  <- cd$brands
   n_total <- as.numeric(pd$meta$n_weighted %||% pd$meta$n_unweighted %||% NA_real_)
+  # CIs are computed on the Kish effective n, not the weighted total (H2)
+  n_effective <- as.numeric(pd$meta$n_effective %||% NA_real_)
 
   # Fallback: derive n_total from funnel stage-1 base when meta values are absent.
   if (!is.finite(n_total) && !is.null(pd$table$cells) && length(pd$table$cells) > 0) {
@@ -108,7 +110,8 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     sprintf('<section class="fn-section fn-rel-chart-section"%s>',
             if (is.finite(n_total)) sprintf(' data-fn-rel-ntotal="%.0f"', n_total) else ""),
     .fn_rel_controls(ordered, focal, chip_default),
-    .fn_rel_table(ordered, focal, focal_colour, n_total),
+    .fn_rel_table(ordered, focal, focal_colour, n_total,
+                  n_effective = if (is.finite(n_effective)) n_effective else n_total),
     '<div class="fn-rel-headline" data-fn-rel-headline style="display:none;margin-top:14px;"></div>',
     '<div class="fn-rel-chart-area" data-fn-rel-chart-area>',
     '<div class="fn-rel-chart-controls col-chip-bar">',
@@ -197,7 +200,8 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # INTERNAL: RELATIONSHIP TABLE v2 — BRANDS AS ROWS, ATTITUDES AS COLUMNS
 # ==============================================================================
 
-.fn_rel_table <- function(ordered, focal, focal_colour, n_total) {
+.fn_rel_table <- function(ordered, focal, focal_colour, n_total,
+                          n_effective = n_total) {
   if (length(ordered) == 0) return("")
 
   # 6-level scale (IPK 2026). Adds Price (between Ambivalent and Avoid) and
@@ -323,7 +327,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     if (!is.finite(pct_aw))
       return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">&mdash;</td>')
     pt_total <- cat_avg_total[[role]]
-    n_eff <- max(1, n_total)
+    n_eff <- max(1, n_effective)
     ci_aw_lo <- max(0, pct_aw - 1.96 * sqrt(max(0, pct_aw * (1 - pct_aw)) / n_eff))
     ci_aw_hi <- min(1, pct_aw + 1.96 * sqrt(max(0, pct_aw * (1 - pct_aw)) / n_eff))
     total_attrs <- if (is.finite(pt_total)) {
