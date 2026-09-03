@@ -86,7 +86,6 @@ This module includes comprehensive documentation:
 1. **[User Manual](USER_MANUAL.md)** - Complete setup, usage guide, study design, troubleshooting
 2. **[Technical Reference](TECHNICAL_REFERENCE.md)** - Statistical methods, API reference, architecture
 3. **[Configuration Template](../templates/maxdiff_config_template.xlsx)** - Excel configuration template
-4. **[Demo Showcase](../../examples/maxdiff/demo_showcase/)** - Full working example with all features
 
 ## Configuration
 
@@ -125,10 +124,7 @@ Create an Excel workbook (.xlsx) with the following sheets:
 5. **SEGMENT_SETTINGS**: Segment definitions for subgroup analysis
 6. **OUTPUT_SETTINGS**: Output format preferences
    - `Generate_Stats_Pack`: `YES` or `NO` — generate a diagnostic stats pack workbook alongside main output (named `{Project_Name}_stats_pack.xlsx`)
-7. **STUDY_IDENTIFICATION**: Project metadata for the stats pack Declaration sheet
-   - `Project_Name`: Project name for sign-off
-   - `Analyst_Name`: Analyst name
-   - `Research_House`: Research organisation or white-label partner name
+7. Stats pack identification lives in **PROJECT_SETTINGS**: `Analyst_Name` and `Research_House` (the former STUDY_IDENTIFICATION sheet was removed; `Project_Name` is already there)
 
 ## Output
 
@@ -202,7 +198,6 @@ modules/maxdiff/
 │   └── maxdiff_config_template.xlsx # Excel config template
 ├── tests/
 │   ├── testthat/          # 13 test files
-│   ├── test_maxdiff.R     # Standalone test runner
 │   └── run_full_tests.R   # Integration test suite
 ├── examples/
 │   └── basic/             # Built-in example
@@ -214,7 +209,6 @@ modules/maxdiff/
 For detailed information:
 - **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
 - **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
-- **Demo**: See [Demo Showcase](../../examples/maxdiff/demo_showcase/) for a working example
 
 For issues or questions, consult the documentation or contact the development team.
 
@@ -225,4 +219,4 @@ For issues or questions, consult the documentation or contact the development te
 ### v11.2 (2026-03-21)
 
 - Added `Generate_Stats_Pack` to `OUTPUT_SETTINGS` — generates a diagnostic stats pack workbook (`{Project_Name}_stats_pack.xlsx`) alongside main output, providing a full audit trail of data received, methods used, assumptions, and reproducibility for advanced partners and research statisticians.
-- Added `STUDY_IDENTIFICATION` sheet to config template (`Project_Name`, `Analyst_Name`, `Research_House`) for stats pack Declaration sheet sign-off.
+- Added `Analyst_Name` and `Research_House` for the stats pack Declaration sheet sign-off (originally on a separate STUDY_IDENTIFICATION sheet, moved into PROJECT_SETTINGS in v11.3 because nothing read the sheet).

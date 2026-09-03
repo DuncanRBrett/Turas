@@ -320,10 +320,35 @@ estimate_d_efficiency <- function(design, item_cols, items) {
 #' @return List with validation results
 #'
 #' @export
-validate_survey_data <- function(data, survey_mapping, design, items, verbose = TRUE) {
+validate_survey_data <- function(data, survey_mapping, design, items, verbose = TRUE,
+                                 choice_value_type = "ITEM_ID",
+                                 weight_variable = NULL,
+                                 respondent_id_variable = NULL) {
 
   issues <- character()
   warnings_list <- character()
+
+  # A configured column that is absent from the data must REFUSE, not
+  # degrade: a typo'd Weight_Variable silently became weight = 1 while
+  # every output still said "weighted" (H2); a wrong Respondent_ID_Variable
+  # breaks every downstream join.
+  if (!is.null(respondent_id_variable) && nzchar(respondent_id_variable) &&
+      !respondent_id_variable %in% names(data)) {
+    issues <- c(issues, sprintf(
+      "Respondent_ID_Variable '%s' is not a column of the survey data. Fix the PROJECT_SETTINGS value or the export.",
+      respondent_id_variable))
+  }
+  if (!is.null(weight_variable) && nzchar(weight_variable)) {
+    if (!weight_variable %in% names(data)) {
+      issues <- c(issues, sprintf(
+        "Weight_Variable '%s' is not a column of the survey data. The run would have silently used weight = 1 for everyone while reporting the results as weighted.",
+        weight_variable))
+    } else {
+      wv <- validate_maxdiff_weights(data[[weight_variable]], verbose = FALSE)
+      issues <- c(issues, wv$issues)
+      warnings_list <- c(warnings_list, wv$warnings)
+    }
+  }
 
   # ============================================================================
   # CHECK REQUIRED COLUMNS
@@ -385,6 +410,42 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
   }
 
   # ============================================================================
+  # DESIGN vs ITEMS ALIGNMENT (M4)
+  # ============================================================================
+  # An item that is in the fielded design but set Include = 0 gets an
+  # all-zero indicator in estimation - statistically a second anchor that
+  # biases every coefficient; on the Stan path it produced NAs and a silent
+  # EB fallback. Excluding an item after fielding requires refitting intent,
+  # so it refuses rather than degrades.
+  design_item_cols <- grep("^Item\\d+_ID$", names(design), value = TRUE)
+  if (length(design_item_cols) > 0) {
+    design_items <- unique(as.character(unlist(design[, design_item_cols])))
+    design_items <- design_items[!is.na(design_items) & nzchar(design_items)]
+    excluded_in_design <- intersect(design_items,
+                                    items$Item_ID[items$Include != 1])
+    if (length(excluded_in_design) > 0) {
+      issues <- c(issues, sprintf(
+        "Item(s) %s are set Include = 0 but appear in the fielded design. An excluded item that respondents actually saw biases every estimate; set Include = 1, or re-field without it.",
+        paste(excluded_in_design, collapse = ", ")))
+    }
+    unknown_in_design <- setdiff(design_items, items$Item_ID)
+    if (length(unknown_in_design) > 0) {
+      issues <- c(issues, sprintf(
+        "Design contains item IDs not in the ITEMS sheet: %s",
+        paste(unknown_in_design, collapse = ", ")))
+    }
+    # The other direction (review F10): an included item no design row
+    # shows gets NA counts, and the report then dropped its counts table
+    # and diverging chart with a one-line console notice.
+    never_fielded <- setdiff(items$Item_ID[items$Include == 1], design_items)
+    if (length(never_fielded) > 0) {
+      issues <- c(issues, sprintf(
+        "Item(s) %s are set Include = 1 but appear in no design row, so they were never shown to anyone. Set Include = 0 for them, or fix the DESIGN file.",
+        paste(never_fielded, collapse = ", ")))
+    }
+  }
+
+  # ============================================================================
   # CHOICE VALIDATION
   # ============================================================================
 
@@ -399,19 +460,41 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
   items_per_task <- length(grep("^Item\\d+_ID$", names(design)))
   valid_positions <- as.character(seq_len(max(items_per_task, 1)))
 
-  # Check each choice column - accept either Item_IDs or position numbers
+  # Check each choice column against the coding the config DECLARES (C3).
+  # Accepting either family here is what let position-coded data through
+  # under ITEM_ID — it then matched no Item_ID downstream and every score
+  # shipped as zero.
+  choice_value_type <- toupper(choice_value_type %||% "ITEM_ID")
+  valid_choice_values <- if (choice_value_type == "ITEM_POSITION") {
+    valid_positions
+  } else {
+    valid_item_ids
+  }
+
   for (col in c(best_cols, worst_cols)) {
     if (col %in% names(data)) {
       col_values <- data[[col]]
       col_values <- col_values[!is.na(col_values)]
 
       invalid_values <- setdiff(unique(as.character(col_values)),
-                                c(valid_item_ids, valid_positions))
+                                valid_choice_values)
       if (length(invalid_values) > 0) {
-        issues <- c(issues, sprintf(
-          "Column '%s' contains invalid values: %s (expected Item_IDs or positions 1-%d)",
-          col, paste(invalid_values, collapse = ", "), items_per_task
-        ))
+        looks_positional <- choice_value_type == "ITEM_ID" &&
+          all(invalid_values %in% valid_positions)
+        if (looks_positional) {
+          issues <- c(issues, sprintf(
+            "Column '%s' contains values that look like task positions (%s), but Choice_Value_Type is ITEM_ID. If the export codes choices by position, set Choice_Value_Type = ITEM_POSITION in PROJECT_SETTINGS.",
+            col, paste(invalid_values, collapse = ", ")
+          ))
+        } else {
+          issues <- c(issues, sprintf(
+            "Column '%s' contains invalid values: %s (Choice_Value_Type = %s expects %s)",
+            col, paste(invalid_values, collapse = ", "), choice_value_type,
+            if (choice_value_type == "ITEM_POSITION") {
+              sprintf("positions 1-%d", items_per_task)
+            } else "Item_IDs"
+          ))
+        }
       }
     }
   }
@@ -559,6 +642,15 @@ validate_maxdiff_weights <- function(weights, verbose = TRUE) {
 
   if (is.null(weights)) {
     return(list(valid = TRUE, issues = issues, warnings = warnings_list))
+  }
+
+  # A non-numeric column (a "1,2" locale export, text) must refuse with the
+  # column named, not crash in the comparison below (review F8).
+  if (!is.numeric(weights)) {
+    issues <- c(issues, sprintf(
+      "Weights column is %s, not numeric (e.g. '%s'). Export weights as plain numbers with a decimal point.",
+      class(weights)[1], paste(utils::head(unique(as.character(weights)), 3), collapse = "', '")))
+    return(list(valid = FALSE, issues = issues, warnings = warnings_list))
   }
 
   # Check for NAs

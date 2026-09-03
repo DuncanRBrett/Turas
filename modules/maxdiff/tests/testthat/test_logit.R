@@ -237,7 +237,8 @@ test_that("fit_aggregate_logit uses last item as anchor when none specified", {
     items_shown <- as.character(unlist(row[shown_cols]))
 
     for (pos in seq_along(items_shown)) {
-      item_id <- items_shown[pos]
+      # generate_test_data stores item NUMBERS in Shown_*; the ids are I{n}.
+      item_id <- paste0("I", items_shown[pos])
       long_rows[[length(long_rows) + 1]] <- data.frame(
         resp_id = row$Respondent_ID,
         version = row$Version,
@@ -257,18 +258,14 @@ test_that("fit_aggregate_logit uses last item as anchor when none specified", {
   items_no_anchor <- td$items
   items_no_anchor$Anchor_Item <- 0
 
-  # Act
-  result <- tryCatch(
-    fit_aggregate_logit(long_data, items_no_anchor, weighted = FALSE,
-                        anchor_item = NULL, verbose = FALSE),
-    error = function(e) NULL
-  )
+  # Act - no tryCatch swallow: a failure here must FAIL, not silently pass
+  # an empty test (review S5).
+  result <- fit_aggregate_logit(long_data, items_no_anchor, weighted = FALSE,
+                                anchor_item = NULL, verbose = FALSE)
 
-  # Assert: if it ran successfully, anchor should be last included item
-  if (!is.null(result)) {
-    included <- items_no_anchor$Item_ID[items_no_anchor$Include == 1]
-    expect_equal(result$anchor_item, included[length(included)])
-  }
+  included <- items_no_anchor$Item_ID[items_no_anchor$Include == 1]
+  expect_equal(result$anchor_item, included[length(included)])
+  expect_true(is.data.frame(result$utilities))
 })
 
 test_that("fit_aggregate_logit uses designated anchor item", {
@@ -285,7 +282,8 @@ test_that("fit_aggregate_logit uses designated anchor item", {
     items_shown <- as.character(unlist(row[shown_cols]))
 
     for (pos in seq_along(items_shown)) {
-      item_id <- items_shown[pos]
+      # generate_test_data stores item NUMBERS in Shown_*; the ids are I{n}.
+      item_id <- paste0("I", items_shown[pos])
       long_rows[[length(long_rows) + 1]] <- data.frame(
         resp_id = row$Respondent_ID,
         version = row$Version,
@@ -305,19 +303,14 @@ test_that("fit_aggregate_logit uses designated anchor item", {
   items_with_anchor <- td$items
   items_with_anchor$Anchor_Item <- c(1, 0, 0)
 
-  # Act
-  result <- tryCatch(
-    fit_aggregate_logit(long_data, items_with_anchor, weighted = FALSE,
-                        anchor_item = NULL, verbose = FALSE),
-    error = function(e) NULL
-  )
+  # Act - assert unconditionally (review S5: this was a silent-pass stub)
+  result <- fit_aggregate_logit(long_data, items_with_anchor, weighted = FALSE,
+                                anchor_item = NULL, verbose = FALSE)
 
-  if (!is.null(result)) {
-    expect_equal(result$anchor_item, "I1")
-    # Anchor item should have utility of 0
-    anchor_row <- result$utilities[result$utilities$Item_ID == "I1", ]
-    expect_equal(anchor_row$Logit_Utility, 0)
-  }
+  expect_equal(result$anchor_item, "I1")
+  # Anchor item should have utility of 0
+  anchor_row <- result$utilities[result$utilities$Item_ID == "I1", ]
+  expect_equal(anchor_row$Logit_Utility, 0)
 })
 
 # ==============================================================================

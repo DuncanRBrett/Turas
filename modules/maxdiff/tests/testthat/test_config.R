@@ -243,3 +243,58 @@ test_that("validate_file_path refuses wrong extension", {
 
   unlink(tmp)
 })
+
+
+# ==============================================================================
+# A6 (H6): the shipped template loads through the real loader
+# ==============================================================================
+
+test_that("H6: the generated template round-trips through load_maxdiff_config", {
+  tpl_script <- file.path(TURAS_ROOT, "modules", "maxdiff", "templates",
+                          "create_maxdiff_template.R")
+  skip_if(!file.exists(tpl_script), "template generator not present")
+
+  out <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(out), add = TRUE)
+
+  # Generate without triggering the run-if-executed block
+  env <- new.env()
+  assign("TURAS_LAUNCHER_ACTIVE", TRUE, envir = env)
+  sys.source(tpl_script, envir = env)
+  capture.output(env$create_maxdiff_template(out))
+
+  # The old template refused in three separate ways (pattern-schema
+  # SURVEY_MAPPING, per-level SEGMENT_SETTINGS, sheet="1"): it could not
+  # complete a run at all. The regenerated one must load clean.
+  cfg <- load_maxdiff_config(out)
+
+  expect_equal(cfg$mode, "DESIGN")
+  expect_true(is.integer(cfg$project_settings$Data_File_Sheet))
+  expect_equal(cfg$project_settings$Choice_Value_Type, "ITEM_ID")
+  expect_true(all(c("Field_Type", "Field_Name", "Task_Number") %in%
+                    names(cfg$survey_mapping)))
+  expect_true(all(cfg$survey_mapping$Field_Type %in%
+                    c("VERSION", "BEST_CHOICE", "WORST_CHOICE")))
+  expect_equal(nrow(cfg$segment_settings), 3)
+  expect_true(all(c("Segment_ID", "Segment_Label", "Variable_Name") %in%
+                    names(cfg$segment_settings)))
+  expect_true(isTRUE(cfg$output_settings$Generate_HTML_Report))
+  # Score_Rescale_Method reaches the engine (the old Utility_Scale row was
+  # silently dropped).
+  expect_equal(cfg$output_settings$Score_Rescale_Method, "0_100")
+})
+
+test_that("M10: a duplicate setting row refuses; an unknown one warns", {
+  df_dup <- data.frame(Setting_Name = c("Project_Name", "Mode", "Seed", "Seed"),
+                       Value = c("X", "DESIGN", "1", "2"),
+                       stringsAsFactors = FALSE)
+  expect_error(parse_project_settings(df_dup, project_root = "."),
+               "CFG_DUPLICATE_SETTING|more than once")
+
+  df_unknown <- data.frame(Setting_Name = c("Project_Name", "Mode", "Porject_Nmae"),
+                           Value = c("X", "DESIGN", "oops"),
+                           stringsAsFactors = FALSE)
+  out <- capture.output(res <- parse_project_settings(df_unknown, project_root = "."))
+  expect_true(any(grepl("MAXD_UNKNOWN_SETTINGS", out)))
+  expect_true(any(grepl("Porject_Nmae", out)))
+})

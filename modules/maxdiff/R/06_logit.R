@@ -200,6 +200,7 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
   # Build choice sets for best and worst
   choice_sets <- list()
   set_id <- 1
+  n_tasks_dropped <- 0L
 
   for (task_key in unique_tasks) {
     task_data <- long_data[long_data$resp_task == task_key, ]
@@ -214,8 +215,13 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
     # Get weight (same for all items in task)
     weight <- task_data$weight[1]
 
-    # Skip if no valid choices
-    if (length(best_item) != 1 || length(worst_item) != 1) next
+    # Skip if no valid choices - but COUNT the skip (M2): these tasks stay
+    # in the counts denominators, so counts and logit run on different
+    # effective data, and nobody was told.
+    if (length(best_item) != 1 || length(worst_item) != 1) {
+      n_tasks_dropped <- n_tasks_dropped + 1L
+      next
+    }
 
     # BEST choice set
     for (item in items_shown) {
@@ -251,6 +257,12 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
       weight = numeric(0), sign = numeric(0),
       stringsAsFactors = FALSE
     ))
+  }
+
+  if (n_tasks_dropped > 0) {
+    cat(sprintf(
+      "[TRS INFO] MAXD_TASKS_DROPPED: %d of %d tasks lack exactly one best and one worst choice and were excluded from logit estimation. Counts still include them in Times_Shown, so the two tables run on different effective data.\n",
+      n_tasks_dropped, length(unique_tasks)))
   }
 
   logit_data <- do.call(rbind, choice_sets)

@@ -436,6 +436,38 @@ parse_project_settings <- function(df, project_root) {
   settings <- as.list(df$Value)
   names(settings) <- df$Setting_Name
 
+  # Section separators and blank rows are furniture, not settings.
+  keep <- !is.na(names(settings)) & nzchar(trimws(names(settings))) &
+    !grepl("^---", names(settings))
+  settings <- settings[keep]
+
+  # Duplicates refuse; unknown names warn (M10). A typo'd setting used to
+  # be carried along silently while the real one kept its default.
+  dup <- unique(names(settings)[duplicated(names(settings))])
+  if (length(dup) > 0) {
+    maxdiff_refuse(
+      code = "CFG_DUPLICATE_SETTING",
+      title = "Duplicate Setting Rows",
+      problem = sprintf("PROJECT_SETTINGS defines these settings more than once: %s",
+                        paste(dup, collapse = ", ")),
+      why_it_matters = "Which of the duplicate values wins is arbitrary; the run must not guess.",
+      how_to_fix = "Delete the duplicate rows so each setting appears once."
+    )
+  }
+  .known_project_settings <- c(
+    "Project_Name", "Mode", "Raw_Data_File", "Design_File", "Output_Folder",
+    "Output_File", "Data_File_Sheet", "Respondent_ID_Variable",
+    "Weight_Variable", "Filter_Expression", "Choice_Value_Type", "Seed",
+    "Brand_Colour", "Accent_Colour", "Module_Version", "Generate_Stats_Pack",
+    "Analyst_Name", "Research_House", "HB_Iterations", "HB_Warmup", "HB_Chains"
+  )
+  .unknown <- setdiff(names(settings), .known_project_settings)
+  if (length(.unknown) > 0) {
+    cat(sprintf(
+      "[TRS WARNING] MAXD_UNKNOWN_SETTINGS: PROJECT_SETTINGS rows not recognised and ignored: %s. Check for typos - a misspelled setting keeps its default silently.\n",
+      paste(.unknown, collapse = ", ")))
+  }
+
   # Required settings
   required <- c("Project_Name", "Mode")
   missing <- setdiff(required, names(settings))
@@ -517,17 +549,45 @@ parse_project_settings <- function(df, project_root) {
     settings$Seed <- safe_integer(settings$Seed[1], 12345)
   }
 
-  # Parse Data_File_Sheet
+  # Parse Data_File_Sheet. An all-digit string coerces to integer: the
+  # template default was the STRING "1", and openxlsx::read.xlsx errors on
+  # sheet = "1" while sheet = 1 works (H6, verified empirically) - the
+  # shipped template could not complete a run because of this cell.
   if (is_missing(settings$Data_File_Sheet)) {
     settings$Data_File_Sheet <- 1  # Default to first sheet
   } else {
-    settings$Data_File_Sheet <- settings$Data_File_Sheet[1]
+    v <- settings$Data_File_Sheet[1]
+    settings$Data_File_Sheet <- if (grepl("^\\s*\\d+\\s*$", as.character(v))) {
+      as.integer(trimws(as.character(v)))
+    } else {
+      v
+    }
   }
 
   # Parse optional settings
   settings$Weight_Variable <- get_scalar(settings$Weight_Variable, NULL)
   settings$Respondent_ID_Variable <- get_scalar(settings$Respondent_ID_Variable, "RespID")
   settings$Filter_Expression <- get_scalar(settings$Filter_Expression, NULL)
+
+  # How the BEST_CHOICE / WORST_CHOICE columns are coded (C3). ITEM_ID means
+  # the cells carry Item_ID strings; ITEM_POSITION means they carry the
+  # 1-based position of the chosen item within that task's design row —
+  # which is how Sawtooth and Alchemer typically export. Before this
+  # setting existed, position-coded data validated cleanly and scored as
+  # all zeros, because nothing translated positions to items.
+  settings$Choice_Value_Type <- toupper(get_scalar(settings$Choice_Value_Type, "ITEM_ID"))
+  if (!settings$Choice_Value_Type %in% c("ITEM_ID", "ITEM_POSITION")) {
+    maxdiff_refuse(
+      code = "CFG_INVALID_OPTION",
+      title = "Invalid Choice_Value_Type",
+      problem = sprintf("Choice_Value_Type = '%s' is not a recognised coding",
+                        settings$Choice_Value_Type),
+      why_it_matters = "The engine must know whether choice columns carry Item_IDs or task positions; guessing wrong scores everything as zero.",
+      how_to_fix = "Set Choice_Value_Type to ITEM_ID (cells carry Item_ID strings) or ITEM_POSITION (cells carry the 1-based position within the task).",
+      expected = "ITEM_ID or ITEM_POSITION",
+      observed = settings$Choice_Value_Type
+    )
+  }
 
   return(settings)
 }
@@ -544,6 +604,17 @@ parse_project_settings <- function(df, project_root) {
 #' @return Data frame of validated items
 #' @keywords internal
 parse_items_sheet <- function(df) {
+
+  # The template writes an instruction block below the item table; those
+  # rows read back with a blank/NA Include and no real item. Only rows with
+  # a non-blank Item_ID AND a parseable Include count as items.
+  if ("Item_ID" %in% names(df)) {
+    df <- df[!is.na(df$Item_ID) & nzchar(trimws(as.character(df$Item_ID))), , drop = FALSE]
+  }
+  if ("Include" %in% names(df)) {
+    inc <- suppressWarnings(as.integer(df$Include))
+    df <- df[!is.na(inc), , drop = FALSE]
+  }
 
   # Required columns
   required_cols <- c("Item_ID", "Item_Label")
@@ -798,6 +869,12 @@ parse_design_settings <- function(df, n_items) {
 #' @keywords internal
 parse_survey_mapping <- function(df) {
 
+  # Rows with no Field_Type are sheet furniture, not mappings.
+  if ("Field_Type" %in% names(df)) {
+    df <- df[!is.na(df$Field_Type) & nzchar(trimws(as.character(df$Field_Type))), ,
+             drop = FALSE]
+  }
+
   # Required columns
   required_cols <- c("Field_Type", "Field_Name")
   missing_cols <- setdiff(required_cols, names(df))
@@ -875,9 +952,17 @@ parse_survey_mapping <- function(df) {
   for (i in seq_len(nrow(df))) {
     if (df$Field_Type[i] %in% c("BEST_CHOICE", "WORST_CHOICE", "SHOWN_ITEMS")) {
       if (is.na(df$Task_Number[i])) {
-        # Try to extract from field name
-        task_match <- regmatches(df$Field_Name[i],
-                                 regexec("(\\d+)$", df$Field_Name[i]))[[1]]
+        # Extract from the field name: a T1 / Task1 / task_1 infix anywhere
+        # (the template's own MaxDiff_T1_Best naming ends in "Best", so the
+        # old trailing-digits match yielded NA and the rows paired
+        # positionally - M13). Trailing digits stay as the fallback.
+        fname <- df$Field_Name[i]
+        task_match <- regmatches(fname,
+                                 regexec("[Tt](?:ask)?[_ ]?(\\d+)", fname,
+                                         perl = TRUE))[[1]]
+        if (length(task_match) < 2) {
+          task_match <- regmatches(fname, regexec("(\\d+)$", fname))[[1]]
+        }
         if (length(task_match) > 1) {
           df$Task_Number[i] <- as.integer(task_match[2])
         }
@@ -908,6 +993,14 @@ parse_segment_settings <- function(df) {
 
   if (nrow(df) == 0) {
     return(NULL)
+  }
+
+  # Rows with no Segment_ID are sheet furniture (side notes, spacing), not
+  # segment definitions.
+  if ("Segment_ID" %in% names(df)) {
+    df <- df[!is.na(df$Segment_ID) & nzchar(trimws(as.character(df$Segment_ID))), ,
+             drop = FALSE]
+    if (nrow(df) == 0) return(NULL)
   }
 
   # Required columns
@@ -997,6 +1090,29 @@ parse_output_settings <- function(df) {
   settings <- as.list(df[[value_col]])
   names(settings) <- df[[name_col]]
 
+  # Drop separators/blanks, refuse duplicates, warn on unknown names (M10).
+  keep <- !is.na(names(settings)) & nzchar(trimws(names(settings))) &
+    !grepl("^---", names(settings))
+  settings <- settings[keep]
+  dup <- unique(names(settings)[duplicated(names(settings))])
+  if (length(dup) > 0) {
+    maxdiff_refuse(
+      code = "CFG_DUPLICATE_SETTING",
+      title = "Duplicate Output Setting Rows",
+      problem = sprintf("OUTPUT_SETTINGS defines these settings more than once: %s",
+                        paste(dup, collapse = ", ")),
+      why_it_matters = "Which of the duplicate values wins is arbitrary; the run must not guess.",
+      how_to_fix = "Delete the duplicate rows so each setting appears once."
+    )
+  }
+  .unknown <- setdiff(names(settings), names(get_default_output_settings()))
+  if (length(.unknown) > 0) {
+    cat(sprintf(
+      "[TRS WARNING] MAXD_UNKNOWN_SETTINGS: OUTPUT_SETTINGS rows not recognised and ignored: %s. Check for typos - a misspelled setting keeps its default silently.\n",
+      paste(.unknown, collapse = ", ")))
+    settings <- settings[setdiff(names(settings), .unknown)]
+  }
+
   # Parse with defaults
   result <- get_default_output_settings()
 
@@ -1011,6 +1127,7 @@ parse_output_settings <- function(df) {
                       "Generate_Segment_Tables", "Generate_Charts",
                       "Export_Individual_Utils", "Generate_HTML_Report",
                       "Generate_Simulator", "Generate_TURF",
+                      "Generate_Stats_Pack",
                       "Has_Anchor_Question")) {
         result[[name]] <- parse_yes_no(val, result[[name]])
       }
@@ -1074,9 +1191,14 @@ get_default_output_settings <- function() {
     Min_Respondents_Per_Segment = 50,
     Output_Item_Sort_Order = "UTILITY_DESC",
     Export_Individual_Utils = TRUE,
-    Generate_HTML_Report = FALSE,
+    # The report defaults ON (M12): the manual always said it did, and a run
+    # whose only outputs are Excel sheets is rarely what was wanted.
+    Generate_HTML_Report = TRUE,
     Generate_Simulator = FALSE,
     Generate_TURF = FALSE,
+    # Read from OUTPUT_SETTINGS, where the template puts it (M11) - it used
+    # to be silently dropped here and read from PROJECT_SETTINGS instead.
+    Generate_Stats_Pack = TRUE,
     TURF_Max_Items = 10,
     TURF_Threshold = "ABOVE_MEAN",
     Has_Anchor_Question = FALSE,

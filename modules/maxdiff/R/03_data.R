@@ -433,6 +433,10 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   weight_var <- config$project_settings$Weight_Variable
   version_col <- survey_mapping$Field_Name[survey_mapping$Field_Type == "VERSION"][1]
 
+  # How the choice cells are coded (C3): Item_ID strings, or the 1-based
+  # position of the chosen item within the task's design row.
+  choice_value_type <- toupper(config$project_settings$Choice_Value_Type %||% "ITEM_ID")
+
   # Get task columns
   best_mapping <- survey_mapping[survey_mapping$Field_Type == "BEST_CHOICE", ]
   worst_mapping <- survey_mapping[survey_mapping$Field_Type == "WORST_CHOICE", ]
@@ -464,6 +468,9 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   # Initialize list to collect long format rows
   long_data_list <- vector("list", nrow(data) * n_tasks * items_per_task)
   idx <- 1
+  unmatched_tasks <- 0L
+  unmatched_examples <- character(0)
+  n_na_version <- 0L
 
   # Process each respondent
   for (r in seq_len(nrow(data))) {
@@ -475,8 +482,12 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
       1
     }
 
-    # Skip if version is NA
-    if (is.na(version)) next
+    # Skip if version is NA - but count it (M9): these respondents used to
+    # vanish without a trace.
+    if (is.na(version)) {
+      n_na_version <- n_na_version + 1L
+      next
+    }
 
     # Get design rows for this version
     version_design <- design[design$Version == version, ]
@@ -494,16 +505,52 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
       # Get items shown in this task
       design_row <- version_design[version_design$Task_Number == task_num, ]
 
+      # No positional fallback (H3): guessing design_row[t, ] when the
+      # Task_Number lookup fails can attribute a choice to items the
+      # respondent never saw, silently. Count it and refuse after the loop.
       if (nrow(design_row) == 0) {
-        # Try matching by row index if task numbers don't match
-        if (t <= nrow(version_design)) {
-          design_row <- version_design[t, ]
-        } else {
-          next
-        }
+        unmatched_tasks <- unmatched_tasks + 1L
+        unmatched_examples <- c(unmatched_examples,
+                                sprintf("resp %s / version %s / task %s",
+                                        resp_id, version, task_num))
+        next
       }
 
       items_shown <- as.character(unlist(design_row[1, item_cols]))
+
+      # Position-coded data: translate the 1-based position into that
+      # task's item before matching (C3). Out-of-range or non-integer
+      # positions refuse with context — silently skipping them is how the
+      # all-zero scores shipped.
+      if (choice_value_type == "ITEM_POSITION") {
+        decode_position <- function(v, which_choice) {
+          if (is.na(v)) return(NA_character_)
+          p_num <- suppressWarnings(as.numeric(v))
+          # A fractional value is a corrupt export, not a position (review
+          # F7): as.integer("2.7") silently gave 2 before.
+          p <- if (!is.na(p_num) && p_num == round(p_num)) as.integer(p_num) else NA_integer_
+          # A position that lands on an empty design slot decodes to nothing
+          # (review F6): the range check must count real items, not columns.
+          n_real <- sum(!is.na(items_shown) & nzchar(items_shown))
+          if (is.na(p) || p < 1 || p > n_real || is.na(items_shown[p]) || !nzchar(items_shown[p])) {
+            maxdiff_refuse(
+              code = "DATA_CHOICE_POSITION_INVALID",
+              title = "Choice Position Out Of Range",
+              problem = sprintf(
+                "Respondent %s, task %s: %s choice '%s' is not a whole-number position between 1 and %d (the items this task actually shows)",
+                resp_id, task_num, which_choice, v, n_real),
+              why_it_matters = "Choice_Value_Type = ITEM_POSITION says these cells carry task positions; a value outside the task cannot be decoded, and guessing would credit the wrong item.",
+              how_to_fix = c(
+                "Check the export: positions must be 1-based within each task.",
+                "If the cells actually carry Item_IDs, set Choice_Value_Type = ITEM_ID."
+              )
+            )
+          }
+          items_shown[p]
+        }
+        best_choice <- decode_position(best_choice, "best")
+        worst_choice <- decode_position(worst_choice, "worst")
+      }
 
       # Create long format rows for each item shown
       for (pos in seq_along(items_shown)) {
@@ -528,6 +575,28 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
     if (verbose && r %% 100 == 0) {
       log_progress(r, nrow(data), "Reshaping respondents", verbose)
     }
+  }
+
+  if (n_na_version > 0) {
+    cat(sprintf(
+      "[TRS WARNING] MAXD_NA_VERSION: %d respondent(s) have no design version and were excluded from the analysis.\n",
+      n_na_version))
+  }
+
+  if (unmatched_tasks > 0) {
+    maxdiff_refuse(
+      code = "DATA_DESIGN_TASK_MISMATCH",
+      title = "Tasks Without A Matching Design Row",
+      problem = sprintf(
+        "%d task(s) had no design row for their (Version, Task_Number) - e.g. %s",
+        unmatched_tasks,
+        paste(utils::head(unique(unmatched_examples), 3), collapse = "; ")),
+      why_it_matters = "The engine used to guess the design row by position here, which can attribute choices to items the respondent never saw. There is no safe guess.",
+      how_to_fix = c(
+        "Check that the DESIGN sheet's Version and Task_Number values match the data's version column and the SURVEY_MAPPING Task_Numbers.",
+        "Check the Task_Number extraction from field names (a T1/T2 infix is recognised; other conventions need an explicit Task_Number column in SURVEY_MAPPING)."
+      )
+    )
   }
 
   # Combine all rows
@@ -650,7 +719,19 @@ compute_study_summary <- function(long_data, config, verbose = TRUE) {
   resp_versions <- unique(long_data[, c("resp_id", "version")])
   version_dist <- table(resp_versions$version)
 
+  # Tasks the models cannot use (M2, review F11): a task without exactly one
+  # best and one worst stays in the counts denominators but is dropped by
+  # logit and HB. The count is computed here, once, so SUMMARY and the
+  # stats pack can disclose it whether or not either model ran.
+  task_key <- paste(long_data$resp_id, long_data$version, long_data$task, sep = "_")
+  best_per_task <- tapply(long_data$is_best, task_key, function(x) sum(x, na.rm = TRUE))
+  worst_per_task <- tapply(long_data$is_worst, task_key, function(x) sum(x, na.rm = TRUE))
+  n_tasks_total <- length(best_per_task)
+  n_tasks_dropped <- sum(best_per_task != 1 | worst_per_task != 1)
+
   summary_stats <- list(
+    n_tasks_total = n_tasks_total,
+    n_tasks_dropped_from_models = n_tasks_dropped,
     n_respondents = n_respondents,
     n_tasks = n_tasks,
     n_items = n_items,
@@ -659,7 +740,19 @@ compute_study_summary <- function(long_data, config, verbose = TRUE) {
     effective_n = eff_n,
     design_effect = deff,
     weight_sum = weight_sum,
-    version_distribution = version_dist
+    version_distribution = version_dist,
+    # Per-engine weighting status (M7): one weighted study used to mix
+    # weighted (counts, logit) and unweighted (HB) numbers with a single
+    # global "weighted" flag and no disclosure.
+    weighting_by_engine = if (has_weights) list(
+      counts = "weighted",
+      logit = "weighted (frequency-weight approximation; see manual on SEs)",
+      hb = "UNWEIGHTED - neither the Stan model nor the EB fallback has a weight term",
+      turf = "weighted (respondent weights passed to the reach engine)"
+    ) else list(
+      counts = "unweighted", logit = "unweighted",
+      hb = "unweighted", turf = "unweighted"
+    )
   )
 
   if (verbose) {

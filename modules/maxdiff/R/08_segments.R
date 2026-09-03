@@ -200,7 +200,8 @@ safe_eval_expression <- function(expr_text, data, context = "expression") {
 #'
 #' @export
 compute_segment_scores <- function(long_data, raw_data, segment_settings, items,
-                                   output_settings, verbose = TRUE) {
+                                   output_settings, verbose = TRUE,
+                                   resp_id_var = NULL) {
 
   if (is.null(segment_settings) || nrow(segment_settings) == 0) {
     if (verbose) log_message("No segments defined, skipping segment analysis", "INFO", verbose)
@@ -214,8 +215,24 @@ compute_segment_scores <- function(long_data, raw_data, segment_settings, items,
   # Get unique respondent data
   resp_data <- unique(long_data[, c("resp_id", "weight")])
 
-  # Get respondent ID variable
-  resp_id_var <- names(raw_data)[1]  # Assume first column or need to get from config
+  # The configured respondent ID, NOT the data's first column: Alchemer
+  # exports rarely lead with the ID, and merging on the wrong column
+  # silently mis-assigned (or NA'd) every segment (H1).
+  if (is.null(resp_id_var) || !nzchar(resp_id_var)) {
+    resp_id_var <- names(raw_data)[1]
+    log_message(sprintf(
+      "No Respondent_ID_Variable supplied to segment scoring; falling back to first column '%s'",
+      resp_id_var), "WARN", verbose)
+  }
+  if (!resp_id_var %in% names(raw_data)) {
+    maxdiff_refuse(
+      code = "DATA_SEGMENT_ID_MISSING",
+      title = "Respondent ID Column Not In Data",
+      problem = sprintf("Respondent_ID_Variable '%s' is not a column of the survey data", resp_id_var),
+      why_it_matters = "Segments are joined to respondents on this column; without it every segment assignment would be wrong or missing.",
+      how_to_fix = "Set Respondent_ID_Variable in PROJECT_SETTINGS to the data's respondent ID column."
+    )
+  }
 
   # Match respondent IDs
   if (resp_id_var %in% names(raw_data)) {

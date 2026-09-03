@@ -86,7 +86,7 @@ maxdiff_refuse <- function(code,
                            missing = NULL,
                            details = NULL) {
 
-  if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
+  if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_|CALC_)", code)) {
     code <- paste0("CFG_", code)
   }
 

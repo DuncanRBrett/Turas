@@ -778,6 +778,78 @@ source("modules/tabs/00_main.R")
 
 ---
 
+## Turas Development Gotchas (verified against the code, 2 Sep 2026)
+
+These are the traps that have cost real time or shipped broken files. Each one
+was verified against the repo on the date above; re-check a line number before
+quoting it.
+
+### Excel I/O
+- **Never call `openxlsx::saveWorkbook()` directly.** Every save writes
+  relationships to drawing parts it never creates, and Excel repairs the file
+  by stripping every dropdown. Use `turas_saveWorkbook()` (drop-in) or
+  `turas_save_workbook_atomic()` from
+  `modules/shared/lib/turas_save_workbook_atomic.R`. Full write-up:
+  `docs/HANDOVER_openxlsx_broken_workbooks.md`.
+- **Never patch a config or appendix workbook with `loadWorkbook()` + save.**
+  The round trip collapses each sheet's declared dimension to A1. R still reads
+  it; openpyxl tools (`scripts/build_comment_appendix.py`) then fail. Edit
+  those workbooks in Excel or openpyxl.
+- **`read.xlsx(..., skipEmptyRows = FALSE)` always.** The default compacts
+  blank rows and shifts every row index.
+- **Python readers of survey data pass `keep_default_na=False, na_values=[""]`.**
+  pandas otherwise turns the real answer "None" into missing.
+
+### Whitelists that silently drop new code
+- **tabs Settings keys**: `build_config_object()` in
+  `modules/tabs/lib/crosstabs/crosstabs_config.R` assembles `config_obj` field
+  by field. A new key read downstream is NULL until registered there. Test at
+  that layer, not with a hand-built list.
+- **brand analytical files**: `.source_brand_module()` in
+  `modules/brand/R/00_main.R` sources an explicit `module_files` list. A new
+  `modules/brand/R/*.R` file is never loaded in production until added.
+  testthat sources files directly, so tests pass while the feature is absent.
+- **VAS engine files**: `VAS_LIBRARY_FILES` in `modules/vas/vas_pipeline.R`.
+
+### Report rendering
+- **TurasPins capture inliner skips default-looking values** (`none`,
+  `normal`, `auto`, `0px`, ...) in `TurasPins._inlineCaptureStyles`
+  (`modules/shared/js/turas_pins_utils.js`). A panel-scoped override that
+  resolves to one of those looks right live and wrong in a pin or PNG. Use a
+  portable selector with no panel-class ancestor, plus `!important`.
+- **Banner DisplayOrder sorts as text** (`modules/tabs/lib/banner.R`, the
+  `order()` call near line 64). Keep banner DisplayOrder single-digit.
+- **R `sprintf` with CSS**: inner `"` breaks the string, the format string is
+  capped at about 8192 characters, and a literal `%` in a CSS comment is parsed
+  as a spec. Use a `gsub("%TOKEN%", ...)` template for any CSS bundle over a
+  few hundred lines.
+
+### Verification boundaries
+- **Duncan regenerates reports through `launch_turas()`.** A session fixes
+  code and runs the suites (R testthat plus the v2 JS gate suite). It does not
+  headless-run the pipeline on a real config and never writes into
+  `OneDrive*/TurasProjects` output folders.
+- **Brand reports are generated HTML files on disk.** Verification is
+  regenerate, open in a browser, grep the generated HTML for the change.
+  Never `preview_start` for brand work. R-source changes need a re-source
+  before regeneration; JS-only changes do not.
+- **Nothing is "fixed" until something was executed to show it.** Reasoning
+  from the diff is not verification.
+
+### Sessions
+- **Check the branch, and whether the directory is a worktree, before the
+  first edit.** A worktree on a stale branch has cost a whole session.
+- **Two sessions in one checkout sweep each other's edits into one commit.**
+  `git status --short` and file mtimes before editing; snapshot any committed
+  binary (templates, fixtures) before regenerating it.
+
+### Wording
+- **No em dashes in any string that reaches Duncan or a client**: UI labels,
+  report text, templates, commit messages. Use a full stop, comma or colon.
+  Existing em dashes in the codebase are not licence to add more.
+
+---
+
 ## Contact & Support
 
 **Project Owner:** Duncan Brett (The Research LampPost Pty Ltd)

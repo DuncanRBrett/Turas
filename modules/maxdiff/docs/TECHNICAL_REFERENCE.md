@@ -97,7 +97,7 @@ modules/maxdiff/
 ├── stan/
 │   └── maxdiff_hb.stan    # Stan model for HB estimation
 ├── tests/
-│   └── test_maxdiff.R     # Unit tests
+│   └── testthat/          # Unit tests (testthat::test_dir)
 ├── examples/
 │   └── basic/
 │       └── create_example_files.R

@@ -495,6 +495,11 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
   n <- nrow(hb_pop)
   means <- hb_pop$HB_Utility_Mean
   sds <- hb_pop$HB_Utility_SD
+  # HB_Utility_SD is the spread of utilities ACROSS respondents on both HB
+  # paths (review F5 ruling), which is the heterogeneity this quadrant is
+  # built to show. The precision of the mean lives in HB_Mean_SE.
+  y_label <- "Spread across respondents (SD)"
+  title_stat <- "Spread Across Respondents"
   labels <- hb_pop$Item_Label %||% hb_pop$Item_ID
 
   chart_width <- 720
@@ -572,7 +577,7 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
   # Axis labels
   axis_labels <- paste0(
     sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500">Mean Utility</text>', ml + cw / 2, mt + ch + 40),
-    sprintf('<text x="%d" y="%g" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500" transform="rotate(-90, %d, %g)">Standard Deviation</text>', ml - 50, mt + ch / 2, ml - 50, mt + ch / 2)
+    sprintf('<text x="%d" y="%g" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500" transform="rotate(-90, %d, %g)">%s</text>', ml - 50, mt + ch / 2, ml - 50, mt + ch / 2, y_label)
   )
 
   # Dots + labels
@@ -593,7 +598,7 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
                     ml, mt, cw, ch)
 
   svg_wrap(paste(quadrants, grid_svg, med_lines, q_labels, border, axis_labels, dots, sep = "\n"),
-           chart_width, chart_height, "Item Strategy Quadrant: Mean Utility vs Standard Deviation")
+           chart_width, chart_height, paste0("Item Strategy Quadrant: Mean Utility vs ", title_stat))
 }
 
 

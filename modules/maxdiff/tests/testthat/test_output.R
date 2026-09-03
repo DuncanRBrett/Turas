@@ -130,9 +130,13 @@ test_that("generate_maxdiff_output creates output file on disk", {
   config <- list(
     project_settings = list(
       Project_Name = "FileTest",
+      Mode = "ANALYSIS",
+      Module_Version = "v11.1",
+      Seed = 12345,
       Output_Folder = tmp_dir
     ),
     project_root = tmp_dir,
+    mode = "ANALYSIS",
     items = data.frame(
       Item_ID = c("I1", "I2", "I3"),
       Item_Label = c("Alpha", "Beta", "Gamma"),
@@ -141,7 +145,7 @@ test_that("generate_maxdiff_output creates output file on disk", {
       Display_Order = 1:3,
       stringsAsFactors = FALSE
     ),
-    output_settings = list()
+    output_settings = get_default_output_settings()
   )
 
   results <- list(
@@ -152,6 +156,7 @@ test_that("generate_maxdiff_output creates output file on disk", {
       Worst_Count = c(10, 25, 40),
       Best_Pct = c(33, 20, 13),
       Worst_Pct = c(7, 17, 27),
+      Net_Score = c(26, 3, -14),
       BW_Score = c(0.5, 0.1, -0.4),
       Rescaled_Score = c(100, 55, 0),
       Rank = c(1, 2, 3),
@@ -171,16 +176,12 @@ test_that("generate_maxdiff_output creates output file on disk", {
     )
   )
 
-  result <- tryCatch(
-    generate_maxdiff_output(results, config, verbose = FALSE),
-    error = function(e) NULL
-  )
+  # No tryCatch swallow: this was a permanently "empty test" that skipped
+  # itself whenever the writer errored (review S5).
+  result <- generate_maxdiff_output(results, config, verbose = FALSE)
 
-  # If output was generated, check the file exists
-  if (!is.null(result)) {
-    expect_true(file.exists(result))
-    expect_true(grepl("\\.xlsx$", result))
-  }
+  expect_true(file.exists(result))
+  expect_true(grepl("\\.xlsx$", result))
 
   unlink(tmp_dir, recursive = TRUE)
 })

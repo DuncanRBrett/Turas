@@ -412,9 +412,19 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
   # ==========================================================================
 
   if (config$mode == "ANALYSIS") {
-    generate_stats_pack_flag <- isTRUE(
-      toupper(config$project_settings$Generate_Stats_Pack %||% "Y") == "Y"
-    ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+    # The GUI sets this option every run (TRUE or FALSE), so when it is
+    # set it IS the toggle - the old '|| option' could only ever turn the
+    # pack on, never off (M11). Headless runs read the config: the
+    # OUTPUT_SETTINGS value (where the template puts it) wins over the
+    # legacy PROJECT_SETTINGS spelling.
+    .sp_opt <- getOption("turas.generate_stats_pack", NULL)
+    generate_stats_pack_flag <- if (!is.null(.sp_opt)) {
+      isTRUE(.sp_opt)
+    } else if (!is.null(config$output_settings$Generate_Stats_Pack)) {
+      isTRUE(config$output_settings$Generate_Stats_Pack)
+    } else {
+      isTRUE(toupper(config$project_settings$Generate_Stats_Pack %||% "Y") == "Y")
+    }
 
     if (generate_stats_pack_flag) {
       if (verbose) cat("\nGenerating stats pack...\n")
@@ -632,7 +642,10 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     survey_mapping = config$survey_mapping,
     design = design,
     items = config$items,
-    verbose = verbose
+    verbose = verbose,
+    choice_value_type = config$project_settings$Choice_Value_Type %||% "ITEM_ID",
+    weight_variable = config$project_settings$Weight_Variable,
+    respondent_id_variable = config$project_settings$Respondent_ID_Variable
   )
 
   if (!data_validation$valid) {
@@ -772,15 +785,24 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
 
   # Design info
   design_df      <- results$design %||% data.frame()
-  tasks_per_resp <- if (nrow(design_df) > 0 && "Task" %in% names(design_df)) {
-    max(design_df$Task, na.rm = TRUE)
+  # The design sheet's column is Task_Number ('Task' never existed - M6),
+  # so this always printed the em-dash before.
+  .task_col <- intersect(c("Task_Number", "Task"), names(design_df))[1]
+  tasks_per_resp <- if (nrow(design_df) > 0 && !is.na(.task_col)) {
+    max(design_df[[.task_col]], na.rm = TRUE)
   } else NA
 
-  # Model settings
+  # Model settings - the string reflects the estimator that actually ran
+  # (M6): the old text credited a choice-modelling package this module has
+  # never used, and said 'HB' even when the run had silently fallen back
+  # to empirical Bayes.
   has_hb      <- !is.null(results$hb_results)
   has_logit   <- !is.null(results$logit_results)
-  method_str  <- if (has_hb) {
-    "HB (ChoiceModelR package)"
+  hb_method   <- results$hb_results$model_fit$method %||% ""
+  method_str  <- if (has_hb && identical(hb_method, "cmdstanr")) {
+    "Stan HB (cmdstanr)"
+  } else if (has_hb) {
+    "Empirical Bayes shrinkage (count-based approximation - not Bayesian posterior utilities)"
   } else if (has_logit) {
     "Aggregate logit"
   } else {
@@ -832,6 +854,10 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
     "HB Chains"            = if (has_hb) as.character(config$output_settings$HB_Chains %||% config$project_settings$HB_Chains %||% "4") else "N/A",
     "Seed"                 = seed_val,
     "TURF Analysis"        = if (turf_flag) "Enabled" else "Disabled",
+    "Tasks excluded from models" = sprintf(
+      "%s of %s lacked exactly one best and one worst (kept in count denominators)",
+      results$study_summary$n_tasks_dropped_from_models %||% "0",
+      results$study_summary$n_tasks_total %||% "?"),
     "TRS Status"           = run_result$status %||% "PASS",
     "TRS Events"           = trs_summary
   )
@@ -871,7 +897,9 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
     data_used        = data_used,
     assumptions      = assumptions,
     run_result       = run_result,
-    packages         = c("openxlsx", "survival", "ChoiceModelR"),
+    packages         = c("openxlsx",
+                          if (has_logit) "survival",
+                          if (has_hb && identical(hb_method, "cmdstanr")) "cmdstanr"),
     config_echo      = list(
       project_settings = config$project_settings,
       output_settings  = config$output_settings
@@ -1006,7 +1034,8 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
     })
     if (!is.null(hb_results) && !is.null(count_scores)) {
       count_scores <- merge(count_scores,
-        hb_results$population_utilities[, c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")],
+        hb_results$population_utilities[, intersect(c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"),
+                                                    names(hb_results$population_utilities))],
         by = "Item_ID", all.x = TRUE)
     }
   }
@@ -1022,7 +1051,8 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
                              segment_settings = config$segment_settings,
                              items = config$items,
                              output_settings = config$output_settings,
-                             verbose = verbose)
+                             verbose = verbose,
+                             resp_id_var = config$project_settings$Respondent_ID_Variable)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SEGMENT_FAILED: Segment analysis failed: %s", conditionMessage(e)))
       add_warning(sprintf("Segments: %s", conditionMessage(e)))
@@ -1056,9 +1086,21 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
     turf_results <- tryCatch({
       turf_max <- safe_integer(config$output_settings$TURF_Max_Items %||% 10, default = 10L)
       turf_method <- config$output_settings$TURF_Threshold %||% "ABOVE_MEAN"
-      run_turf_analysis(individual_utils = hb_results$individual_utilities,
+      # Respondent weights, aligned to the utilities rows by resp_id (M7):
+      # the shared engine always supported them and the caller never passed
+      # them, so weighted studies got unweighted reach.
+      turf_weights <- NULL
+      iu <- hb_results$individual_utilities
+      if (!is.null(config$project_settings$Weight_Variable) &&
+          is.data.frame(iu) && "resp_id" %in% names(iu)) {
+        rw <- unique(long_data[, c("resp_id", "weight")])
+        turf_weights <- rw$weight[match(iu$resp_id, rw$resp_id)]
+        if (anyNA(turf_weights)) turf_weights <- NULL
+      }
+      run_turf_analysis(individual_utils = iu,
                         items = config$items, max_items = turf_max,
-                        threshold_method = turf_method, verbose = verbose)
+                        threshold_method = turf_method,
+                        weights = turf_weights, verbose = verbose)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_TURF_FAILED: TURF analysis failed: %s", conditionMessage(e)))
       add_warning(sprintf("TURF: %s", conditionMessage(e)))
@@ -1153,6 +1195,16 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
     NULL
   }
 
+  # Events raised AFTER this point (simulator, HTML report) used to reach
+  # only the warnings vector, never trs_state, so the closing banner said
+  # '[TRS PASS] COMPLETED SUCCESSFULLY' over a missing report (review F2).
+  # note_late() records them for the fold-in at the end of this function.
+  late_warnings <- character()
+  note_late <- function(msg) {
+    late_warnings <<- c(late_warnings, msg)
+    add_warning(msg)
+  }
+
   # Step 11: Excel output
   if (verbose) cat("\nSTEP 11: Generating Excel output...\n")
 
@@ -1205,7 +1257,7 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
-      add_warning(sprintf("Simulator: %s", conditionMessage(e)))
+      note_late(sprintf("Simulator: %s", conditionMessage(e)))
     })
   }
 
@@ -1233,7 +1285,13 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
             turas_prepare_deliverable(html_report_path)
           }
         } else {
-          cat(sprintf("  HTML report failed: %s\n", html_result$message %||% "unknown"))
+          # A refused report is an EVENT (review F2): without add_warning the
+          # run ended '[TRS PASS] COMPLETED SUCCESSFULLY' with no report on
+          # disk, and the GUI's status check then showed the green toast.
+          .html_msg <- html_result$message %||% "unknown"
+          cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_REFUSED: HTML report not produced: %s\n", .html_msg))
+          message(sprintf("[TRS PARTIAL] MAXD_HTML_REFUSED: HTML report not produced: %s", .html_msg))
+          note_late(sprintf("HTML report not produced: %s", .html_msg))
         }
       } else {
         cat("\n[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found at any path\n")
@@ -1243,8 +1301,23 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
       cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s\n", conditionMessage(e)))
       cat(sprintf("  Traceback: %s\n", paste(capture.output(traceback()), collapse = "\n  ")))
       message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
-      add_warning(sprintf("HTML report: %s", conditionMessage(e)))
+      note_late(sprintf("HTML report: %s", conditionMessage(e)))
     })
+  }
+
+  # Fold the late events into the run state so the banner, the GUI and the
+  # returned run_result all tell the truth (review F2). The Run_Status sheet
+  # was written before these steps and is not rewritten.
+  if (length(late_warnings) > 0) {
+    if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+      for (warn in late_warnings) {
+        turas_run_state_partial(trs_state, "MAXD_WARNING", "Analysis warning", problem = warn)
+      }
+      if (exists("turas_run_state_result", mode = "function")) {
+        results$run_result <- turas_run_state_result(trs_state)
+      }
+    }
+    results$warnings <- c(results$warnings, late_warnings)
   }
 
   results
