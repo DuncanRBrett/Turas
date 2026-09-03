@@ -415,3 +415,38 @@ test_that("F2: a refused tabs export changes the verdict, it is not just a warni
   # And it reached the verdict the banner, the GUI and the caller read.
   expect_false(identical(res$run_result$status, "PASS"))
 })
+
+# ------------------------------------------------------------------------------
+# The integrated demo loads conjoint and maxdiff into the same global
+# environment. A name defined by both is owned by whichever was sourced last.
+# Found by running the demo with cmdstanr installed: maxdiff's Stan extraction
+# called conjoint's extract_hb_results() and died on a missing `thin`.
+# ------------------------------------------------------------------------------
+
+test_that("maxdiff and conjoint do not define the same top-level function name", {
+  md_dirs <- file.path(TURAS_ROOT, "modules", "maxdiff", c("R", "lib"))
+  cj_dirs <- file.path(TURAS_ROOT, "modules", "conjoint", c("R", "lib"))
+  skip_if(!any(dir.exists(md_dirs)) || !any(dir.exists(cj_dirs)))
+
+  top_level_functions <- function(dirs) {
+    out <- character()
+    for (d in dirs[dir.exists(dirs)]) {
+      for (f in list.files(d, pattern = "\\.R$", full.names = TRUE, recursive = TRUE)) {
+        txt <- readLines(f, warn = FALSE)
+        hits <- regmatches(txt, regexpr("^[A-Za-z_.][A-Za-z0-9_.]*\\s*<-\\s*function", txt))
+        if (length(hits)) out <- c(out, sub("\\s*<-\\s*function$", "", hits))
+      }
+    }
+    unique(out)
+  }
+
+  # Known and left alone, deliberately:
+  #   safe_numeric      maxdiff, conjoint AND tabs all define it, long before
+  #                     this branch. Which one wins is a platform decision.
+  #   build_insight_area conjoint's is a no-op stub, `function(...) ""`, so
+  #                     either ordering is harmless.
+  known <- c("safe_numeric", "build_insight_area")
+  clash <- setdiff(intersect(top_level_functions(md_dirs), top_level_functions(cj_dirs)), known)
+  expect_equal(clash, character(0),
+               info = paste("new cross-module name collision:", paste(clash, collapse = ", ")))
+})

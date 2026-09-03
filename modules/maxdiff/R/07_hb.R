@@ -166,7 +166,7 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
   }
 
   # Extract results
-  results <- extract_hb_results(fit, stan_data, items, verbose)
+  results <- maxdiff_extract_hb_results(fit, stan_data, items, verbose)
 
   if (verbose) {
     log_message("HB model estimation complete", "INFO", verbose)
@@ -396,7 +396,12 @@ get_stan_model_path <- function() {
 # RESULTS EXTRACTION
 # ==============================================================================
 
-#' Extract results from fitted HB model
+#' Extract results from a fitted MaxDiff HB model
+#'
+#' Named for the module: the conjoint module defines its own
+#' `extract_hb_results()` with a different signature in the same global
+#' environment, and a session that has loaded both would call whichever was
+#' sourced last.
 #'
 #' @param fit CmdStanMCMC object
 #' @param stan_data Stan data list
@@ -405,7 +410,7 @@ get_stan_model_path <- function() {
 #'
 #' @return List with population and individual utilities
 #' @keywords internal
-extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
+maxdiff_extract_hb_results <- function(fit, stan_data, items, verbose = TRUE) {
 
   if (verbose) log_message("Extracting HB results...", "INFO", verbose)
 

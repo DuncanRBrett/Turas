@@ -88,7 +88,7 @@ if (file.exists(.guard_path)) {
 # ==============================================================================
 
 # Source TRS run state management
-.source_trs_infrastructure <- function() {
+.maxdiff_source_trs_infrastructure <- function() {
   base_dir <- .get_script_dir_for_guard()
 
   # Try multiple paths to find shared/lib
@@ -116,7 +116,7 @@ if (file.exists(.guard_path)) {
 }
 
 tryCatch({
-  .source_trs_infrastructure()
+  .maxdiff_source_trs_infrastructure()
 }, error = function(e) {
   message(sprintf("[TRS INFO] MAXD_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
 })
