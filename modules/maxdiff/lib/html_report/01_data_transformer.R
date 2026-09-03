@@ -260,18 +260,19 @@ transform_preferences_section <- function(results, config) {
 
   if (has_hb) {
     pop <- results$hb_results$population_utilities
-    # Under the EB fallback HB_Utility_SD is the population spread of
-    # shrunken count scores, not a posterior SE - rendering it as "SE"
-    # overstated precision (M5). Name the column for what it is.
-    .is_eb <- !identical(results$hb_results$model_fit$method %||% "", "cmdstanr")
+    # HB_Utility_SD is the spread across respondents on BOTH HB paths (M5,
+    # review F5 ruling), so it is always rendered as Spread (SD). A
+    # precision of the mean exists only when a posterior does (Stan,
+    # HB_Mean_SE); the table builder shows the SE column only when it is
+    # not all NA.
     scores <- data.frame(
       Item_ID = pop$Item_ID,
       Item_Label = pop$Item_Label %||% pop$Item_ID,
       Utility = round(pop$HB_Utility_Mean, 3),
-      SE = round(pop$HB_Utility_SD, 3),
+      Spread_SD = round(pop$HB_Utility_SD, 3),
+      SE = round(if (!is.null(pop$HB_Mean_SE)) pop$HB_Mean_SE else rep(NA_real_, nrow(pop)), 3),
       stringsAsFactors = FALSE
     )
-    if (.is_eb) names(scores)[names(scores) == "SE"] <- "Spread_SD"
 
     # Compute preference shares from individual utilities
     if (!is.null(results$hb_results$individual_utilities)) {

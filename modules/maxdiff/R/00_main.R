@@ -1034,7 +1034,8 @@ run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
     })
     if (!is.null(hb_results) && !is.null(count_scores)) {
       count_scores <- merge(count_scores,
-        hb_results$population_utilities[, c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")],
+        hb_results$population_utilities[, intersect(c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"),
+                                                    names(hb_results$population_utilities))],
         by = "Item_ID", all.x = TRUE)
     }
   }

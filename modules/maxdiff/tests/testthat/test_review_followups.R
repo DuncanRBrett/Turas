@@ -149,6 +149,18 @@ test_that("F10: an included item that no design row shows fails validation", {
   expect_true(any(grepl("ELDER", v$issues) & grepl("no design row", v$issues)))
 })
 
+.rf_long_for_eb <- function() {
+  set.seed(4); items <- c("A", "B", "C"); rows <- list()
+  for (r in 1:12) for (t in 1:3) {
+    best <- sample(items, 1); worst <- sample(setdiff(items, best), 1)
+    for (pos in seq_along(items)) rows[[length(rows) + 1]] <- data.frame(
+      resp_id = paste0("R", r), version = 1L, task = t, item_id = items[pos], position = pos,
+      is_best = as.integer(items[pos] == best), is_worst = as.integer(items[pos] == worst),
+      weight = 1, stringsAsFactors = FALSE)
+  }
+  out <- do.call(rbind, rows); out$obs_id <- seq_len(nrow(out)); out
+}
+
 # ------------------------------------------------------------------------------
 # F11
 # ------------------------------------------------------------------------------
@@ -251,4 +263,49 @@ test_that("integration: a numeric-ID, weighted, position-coded run ships every d
   expect_true(all(is.finite(scores$Best_Pct)))
   summ <- openxlsx::read.xlsx(xl, "SUMMARY", skipEmptyRows = FALSE)
   expect_true(any(grepl("Tasks excluded from logit/HB", summ[[1]])))   # F11
+})
+
+# ------------------------------------------------------------------------------
+# F5 ruling: HB_Utility_SD is the spread across respondents on both paths
+# ------------------------------------------------------------------------------
+
+test_that("F5: hb_spread_across_respondents returns the SD and percentiles of the respondents' utilities", {
+  skip_if(!exists("hb_spread_across_respondents", mode = "function"))
+  iu <- data.frame(resp_id = c("r1", "r2", "r3", "r4"),
+                   A = c(1, 2, 3, 4), B = c(0, 0, 0, 0), stringsAsFactors = FALSE)
+  sp <- hb_spread_across_respondents(iu, c("A", "B", "ZZ"))
+  expect_equal(sp$sd, c(sd(1:4), 0, NA_real_))
+  expect_equal(sp$q5, c(unname(quantile(1:4, 0.05)), 0, NA_real_))
+  expect_equal(sp$q95, c(unname(quantile(1:4, 0.95)), 0, NA_real_))
+})
+
+test_that("F5: the EB path carries an NA HB_Mean_SE, so both paths share one schema", {
+  long <- .rf_long_for_eb()
+  res <- fit_approximate_hb(long, .rf_items(), list(), verbose = FALSE)
+  pop <- res$population_utilities
+  expect_true(all(c("HB_Mean_SE", "HB_Mean_Q5", "HB_Mean_Q95") %in% names(pop)))
+  expect_true(all(is.na(pop$HB_Mean_SE)))
+  # And the SD really is the spread of the shrunken individual scores.
+  iu <- res$individual_utilities
+  expect_equal(pop$HB_Utility_SD[pop$Item_ID == "A"], sd(iu$A), tolerance = 1e-8)
+})
+
+test_that("F5: the report labels the column as spread, and shows SE only when a posterior exists", {
+  skip_if(!exists("transform_preferences_section", mode = "function"))
+  hb <- .rf_hb(.rf_numeric_id_utils())
+  hb$population_utilities$HB_Mean_SE <- NA_real_
+  cfg <- list(items = .rf_items(), project_settings = list(Project_Name = "P"), output_settings = list())
+  pref <- transform_preferences_section(list(hb_results = hb), cfg)
+  expect_true("Spread_SD" %in% names(pref$scores))
+  expect_true(!"SE" %in% names(pref$scores) || all(is.na(pref$scores$SE)))
+  html <- build_preference_scores_table(pref$scores)
+  expect_true(grepl("Spread (SD)", html, fixed = TRUE))
+  expect_false(grepl(">SE<", html, fixed = TRUE))
+
+  hb$population_utilities$HB_Mean_SE <- 0.05
+  hb$population_utilities$Estimation_Method <- "Stan HB (cmdstanr posterior)"
+  pref2 <- transform_preferences_section(list(hb_results = hb), cfg)
+  html2 <- build_preference_scores_table(pref2$scores)
+  expect_true(grepl("Spread (SD)", html2, fixed = TRUE))
+  expect_true(grepl(">SE<", html2, fixed = TRUE))
 })

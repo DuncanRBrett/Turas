@@ -495,13 +495,11 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
   n <- nrow(hb_pop)
   means <- hb_pop$HB_Utility_Mean
   sds <- hb_pop$HB_Utility_SD
-  # HB_Utility_SD means two things (review F5): under the EB fallback it is
-  # the spread of shrunken scores ACROSS respondents (a heterogeneity, which
-  # is what this quadrant is built to show); under Stan it is the posterior
-  # SD of the population mean, a precision. Label the axis for what it is.
-  .is_eb <- !any(grepl("Stan", hb_pop$Estimation_Method %||% "Empirical Bayes"))
-  y_label <- if (.is_eb) "Spread across respondents (SD)" else "Posterior SD of the mean (precision, not heterogeneity)"
-  title_stat <- if (.is_eb) "Spread Across Respondents" else "Posterior SD of the Mean"
+  # HB_Utility_SD is the spread of utilities ACROSS respondents on both HB
+  # paths (review F5 ruling), which is the heterogeneity this quadrant is
+  # built to show. The precision of the mean lives in HB_Mean_SE.
+  y_label <- "Spread across respondents (SD)"
+  title_stat <- "Spread Across Respondents"
   labels <- hb_pop$Item_Label %||% hb_pop$Item_ID
 
   chart_width <- 720

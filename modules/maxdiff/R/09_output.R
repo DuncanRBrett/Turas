@@ -478,7 +478,8 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
   if (!is.null(results$hb_results) &&
       !"HB_Utility_Mean" %in% names(item_scores)) {
     hb_utils <- results$hb_results$population_utilities[,
-                  c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")]
+                  intersect(c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"),
+                            names(results$hb_results$population_utilities))]
     item_scores <- merge(item_scores, hb_utils, by = "Item_ID", all.x = TRUE)
   }
 
@@ -527,7 +528,7 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
   }
 
   if ("HB_Utility_Mean" %in% names(item_scores)) {
-    output_cols <- c(output_cols, "HB_Utility_Mean", "HB_Utility_SD")
+    output_cols <- c(output_cols, "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE")
   }
 
   output_cols <- c(output_cols, "Rescaled_Score", "Rank")
@@ -563,7 +564,7 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
 
   # Utility columns (0.000 format)
   util_cols <- which(names(output_df) %in%
-                      c("Logit_Utility", "Logit_SE", "HB_Utility_Mean", "HB_Utility_SD"))
+                      c("Logit_Utility", "Logit_SE", "HB_Utility_Mean", "HB_Utility_SD", "HB_Mean_SE"))
   for (col in util_cols) {
     openxlsx::addStyle(wb, "ITEM_SCORES", styles$score_3dp,
                       rows = 2:(n_rows + 1), cols = col, gridExpand = TRUE)
