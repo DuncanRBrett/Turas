@@ -141,6 +141,11 @@ run_gabor_granger <- function(data, config) {
 
   # Return results
   list(
+    # The coded long data the curve was computed from, AFTER any stop-early
+    # imputation. The tabs export writes this per respondent, so it must be
+    # what was analysed rather than a second preparation of the same columns
+    # (15_tabs_export.R).
+    gg_data = gg_data,
     demand_curve = demand_curve,
     revenue_curve = revenue_curve,
     optimal_price = optimal_price,

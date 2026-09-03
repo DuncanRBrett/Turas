@@ -17,7 +17,7 @@ All methods work seamlessly together to provide complete pricing insights from a
 
 - **Three Methodologies**: Run Van Westendorp, Gabor-Granger, Monadic, or any combination
 - **Excel Configuration**: User-friendly spreadsheet-based setup requiring no coding
-- **Interactive HTML Report**: Self-contained HTML report with SVG charts, tabbed navigation, and brand-colour theming
+- **A Pricing tab in the interactive report**: the run writes `{output}_pr_island.json`; name it in a tabs config's `pricing_island` setting and the client's own report gains a Pricing tab
 - **Interactive Simulator Dashboard**: Self-contained HTML dashboard with price sliders, scenario cards, battle mode, and PNG export for client presentations
 - **Advanced Analysis**:
   - NMS Extension (Newton-Miller-Smith) for Van Westendorp purchase intent calibration
@@ -25,7 +25,7 @@ All methods work seamlessly together to provide complete pricing insights from a
   - Price Ladder Builder (Good/Better/Best tier generation)
   - Recommendation Synthesis with confidence assessment
 - **Profit Optimization**: Revenue vs. profit-maximizing price identification
-- **Professional Outputs**: Publication-ready HTML reports, interactive simulators, and comprehensive Excel reports
+- **Professional Outputs**: a Pricing tab in the interactive report, a standalone simulator, a crosstab export and a comprehensive Excel workbook
 - **Bootstrap Confidence Intervals**: Statistical rigor with configurable confidence levels
 - **Price Elasticity**: Calculate and interpret demand elasticity
 - **Data Validation**: Comprehensive quality checks with TRS-compliant error messages
@@ -175,7 +175,7 @@ The module generates:
    - Validation results
    - Configuration used
 
-2. **Interactive HTML Report** (if `generate_html_report = TRUE`):
+2. **Interactive-report contribution** (every run, as `{output}_pr_island.json`; the module's own tabbed HTML report is retired):
    - Self-contained single HTML file with embedded SVG charts
    - Tabbed navigation: Summary | Van Westendorp | Gabor-Granger | Monadic | Segments | Recommendation
    - Brand-colour theming via `brand_colour` config setting
@@ -227,7 +227,7 @@ modules/pricing/
 │   ├── 12_recommendation_synthesis.R  # Synthesis
 │   └── 13_monadic.R            # Monadic price testing
 ├── lib/
-│   ├── html_report/            # HTML report generation (4-layer)
+│   ├── html_simulator/         # The standalone price simulator
 │   │   ├── 01_data_transformer.R   # Results → HTML-optimised structure
 │   │   ├── 02_table_builder.R      # HTML table generation
 │   │   ├── 03_page_builder.R       # Full page assembly
@@ -242,7 +242,6 @@ modules/pricing/
 │           └── export_png.js           # Canvas-based PNG export
 ├── docs/
 │   ├── README.md                     # This file
-│   ├── MARKETING.md                  # Client-facing overview
 │   ├── AUTHORITATIVE_GUIDE.md        # Deep methodology guide
 │   ├── USER_MANUAL.md                # Complete user guide
 │   ├── TECHNICAL_REFERENCE.md        # Developer documentation
@@ -269,7 +268,6 @@ modules/pricing/
 
 This module includes comprehensive documentation:
 
-1. **[Marketing Guide](MARKETING.md)** - Client-facing overview of pricing capabilities
 2. **[Authoritative Guide](AUTHORITATIVE_GUIDE.md)** - Deep dive into pricing research methodology
 3. **[User Manual](USER_MANUAL.md)** - Complete setup and usage guide
 4. **[Template Guide](Pricing_Config_Template.xlsx)** - Excel configuration template
@@ -293,8 +291,7 @@ This module includes comprehensive documentation:
 For detailed information:
 - **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
 - **Survey Design**: See [Questionnaire Design Guide](QUESTIONNAIRE_DESIGN_GUIDE.md) for question wording, sample sizes, and common mistakes
-- **Method Selection**: See [Methodology Comparison](METHODOLOGY_COMPARISON.md) for strengths, weaknesses, and when to use each method
-- **Clients**: See [Marketing Guide](MARKETING.md) for capabilities overview
+- **Method Selection**: See the TECHNIQUE_GUIDE for when to use each method
 - **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
 - **Examples**: See [Example Workflows](EXAMPLE_WORKFLOWS.md) for practical use cases
 

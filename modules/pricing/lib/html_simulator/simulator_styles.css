@@ -1,0 +1,324 @@
+/* ===========================================================================
+   TURAS PRICING - Standalone simulator stylesheet
+   Carved out of the retired pricing HTML report's build_pricing_css(), which
+   scoped every rule under #panel-simulator. The standalone page keeps that id
+   on its one panel, so the rules did not have to be rewritten.
+   BRAND_TOKEN and ACCENT_TOKEN are replaced at build time.
+   =========================================================================== */
+:root {
+  --sim-brand: BRAND_TOKEN;
+  --sim-accent: ACCENT_TOKEN;
+  --sim-text: #1e293b;
+  --sim-text-muted: #64748b;
+  --sim-bg: #f8fafc;
+  --sim-surface: #ffffff;
+  --sim-border: #e2e8f0;
+  --sim-red: #e74c3c;
+  --sim-green: #27ae60;
+  --sim-amber: #f39c12;
+}
+
+/* ══ SIMULATOR (embedded tab) ══ */
+#panel-simulator .sim-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+#panel-simulator .sim-controls {
+  background: var(--sim-surface);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--sim-border);
+}
+#panel-simulator .sim-controls h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sim-text-muted);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sim-border);
+  border-left: none;
+}
+#panel-simulator .sim-control-group { margin-bottom: 18px; }
+#panel-simulator .sim-control-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sim-text);
+  margin-bottom: 6px;
+}
+#panel-simulator .sim-control-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sim-brand);
+  font-variant-numeric: tabular-nums;
+}
+#panel-simulator input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--sim-border);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+#panel-simulator input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--sim-brand);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+#panel-simulator input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--sim-brand);
+  cursor: pointer;
+  border: 2px solid white;
+}
+#panel-simulator .sim-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--sim-text-muted);
+  margin-top: 2px;
+}
+#panel-simulator .sim-price-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+#panel-simulator .sim-price-input-row input[type="number"] {
+  width: 90px;
+  padding: 4px 8px;
+  border: 1px solid var(--sim-border);
+  border-radius: 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+#panel-simulator .sim-results {
+  background: var(--sim-surface);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--sim-border);
+}
+#panel-simulator .sim-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+#panel-simulator .sim-metric {
+  background: var(--sim-bg);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+#panel-simulator .sim-metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sim-brand);
+  font-variant-numeric: tabular-nums;
+}
+#panel-simulator .sim-metric-label {
+  font-size: 11px;
+  color: var(--sim-text-muted);
+  margin-top: 2px;
+}
+#panel-simulator .sim-metric-delta {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+#panel-simulator .sim-metric-delta.positive { color: var(--sim-green); }
+#panel-simulator .sim-metric-delta.negative { color: var(--sim-red); }
+#panel-simulator .sim-chart-area {
+  margin: 16px 0;
+  background: var(--sim-bg);
+  border-radius: 8px;
+  padding: 16px;
+}
+#panel-simulator .sim-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sim-text-muted);
+  margin-bottom: 8px;
+}
+#panel-simulator .sim-scenarios { margin-top: 16px; }
+#panel-simulator .sim-scenario-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#panel-simulator .sim-scenario-card {
+  flex: 1;
+  min-width: 140px;
+  background: var(--sim-surface);
+  border: 2px solid var(--sim-border);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: center;
+}
+#panel-simulator .sim-scenario-card:hover {
+  border-color: var(--sim-brand);
+  box-shadow: 0 2px 8px rgba(30,58,95,0.1);
+}
+#panel-simulator .sim-scenario-card.active {
+  border-color: var(--sim-brand);
+  background: #eff6ff;
+}
+#panel-simulator .sim-scenario-name { font-size: 13px; font-weight: 600; color: var(--sim-brand); }
+#panel-simulator .sim-scenario-price { font-size: 18px; font-weight: 700; color: var(--sim-text); margin: 4px 0; }
+#panel-simulator .sim-scenario-desc { font-size: 11px; color: var(--sim-text-muted); }
+/* ── Scenario Comparison Table ── */
+#panel-simulator .sim-compare { margin-top: 24px; }
+#panel-simulator .sim-compare-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+#panel-simulator .sim-compare-header h3 { font-size: 15px; font-weight: 600; color: var(--sim-text); margin: 0; }
+#panel-simulator .sim-compare-note {
+  font-size: 12px; color: var(--sim-text-muted); line-height: 1.5; margin-bottom: 12px;
+}
+#panel-simulator .sim-btn-outline {
+  background: var(--sim-surface); border: 1px solid var(--sim-brand); color: var(--sim-brand);
+}
+#panel-simulator .sim-btn-outline:hover { background: var(--sim-bg); }
+#panel-simulator .sim-compare-table-wrap {
+  overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  -webkit-overflow-scrolling: touch;
+}
+#panel-simulator .sim-compare-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+#panel-simulator .sim-compare-table th {
+  padding: 12px 16px; text-align: right; font-weight: 600; font-size: 11px;
+  letter-spacing: 0.5px; color: #e2e8f0;
+  background: #1a2744; border-bottom: none;
+  white-space: nowrap; vertical-align: bottom;
+}
+#panel-simulator .sim-compare-table th:first-child { text-align: left; }
+#panel-simulator .sim-compare-table th .sim-remove-scenario {
+  cursor: pointer; color: rgba(255,255,255,0.5); font-size: 14px; margin-left: 6px;
+  border: none; background: none; padding: 0 2px; vertical-align: middle;
+}
+#panel-simulator .sim-compare-table th .sim-remove-scenario:hover { color: #fca5a5; }
+#panel-simulator .sim-compare-table td {
+  padding: 10px 16px; text-align: right; border-bottom: 1px solid #f0f1f3;
+  font-variant-numeric: tabular-nums; color: #334155;
+  transition: background-color 0.15s ease;
+}
+#panel-simulator .sim-compare-table td:first-child {
+  text-align: left; font-weight: 500; color: #1e293b; white-space: nowrap;
+  position: sticky; left: 0; z-index: 1; background: inherit;
+  min-width: 140px; border-right: 1px solid #e5e7eb;
+}
+#panel-simulator .sim-compare-table th + th { border-left: 1px solid rgba(255,255,255,0.15); }
+#panel-simulator .sim-compare-table td + td { border-left: 1px solid #e5e7eb; }
+#panel-simulator .sim-compare-table tbody tr:nth-child(even) { background: #f9fafb; }
+#panel-simulator .sim-compare-table tbody tr:hover { background: #eef2f7; }
+#panel-simulator .sim-compare-table .sim-best { color: #059669; font-weight: 600; }
+#panel-simulator .sim-compare-table .sim-worst { color: #dc2626; }
+#panel-simulator .sim-compare-table .sim-at-opt { color: #059669; font-size: 10px; }
+#panel-simulator .sim-compare-table input[type="number"] {
+  width: 80px; padding: 4px 6px; border: 1px solid #e2e8f0;
+  border-radius: 4px; font-size: 13px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#panel-simulator .sim-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--sim-border);
+  border-radius: 6px;
+  background: var(--sim-surface);
+  color: var(--sim-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+#panel-simulator .sim-btn:hover { background: var(--sim-bg); border-color: var(--sim-brand); }
+#panel-simulator .sim-btn-primary {
+  background: var(--sim-brand);
+  color: white;
+  border-color: var(--sim-brand);
+}
+#panel-simulator .sim-btn-primary:hover { opacity: 0.9; }
+#panel-simulator .sim-segment-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--sim-border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+#panel-simulator .sim-segment-btn {
+  padding: 6px 12px;
+  border: none;
+  background: var(--sim-surface);
+  color: var(--sim-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  border-right: 1px solid var(--sim-border);
+}
+#panel-simulator .sim-segment-btn:last-child { border-right: none; }
+#panel-simulator .sim-segment-btn.active {
+  background: var(--sim-brand);
+  color: white;
+  font-weight: 600;
+}
+#panel-simulator .sim-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+@media print {
+  #panel-simulator .sim-btn,
+  #panel-simulator .sim-actions,
+  #panel-simulator input[type="range"],
+  #panel-simulator .sim-price-input-row { display: none !important; }
+  #panel-simulator .sim-compare-actions { display: none !important; }
+  #panel-simulator .sim-compare-table input { display: none !important; }
+  #panel-simulator .sim-remove-scenario { display: none !important; }
+  #panel-simulator .sim-control-value { font-size: 18px !important; }
+  #panel-simulator .sim-chart-area { break-inside: avoid; }
+  #panel-simulator .sim-compare { break-inside: avoid; }
+}
+
+/* The simulator stands alone here: no report shell around it. */
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--sim-bg); color: var(--sim-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.sim-header {
+  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+  border-bottom: 3px solid var(--sim-brand);
+  color: white; padding: 20px 32px;
+}
+.sim-header h1 { margin: 0; font-size: 21px; font-weight: 600; }
+.sim-header .sim-sub { opacity: .85; font-size: 13px; margin-top: 4px; }
+.sim-main { padding: 22px 32px 60px; max-width: 1240px; margin: 0 auto; }
+.sim-standalone-note { font-size: 13px; color: var(--sim-text-muted); margin: 0 0 16px; }
+#panel-simulator h2 { font-size: 17px; margin: 0 0 10px; color: var(--sim-text); }
+#panel-simulator .sim-callouts { display: grid; gap: 8px; margin-bottom: 16px; }
+#panel-simulator .sim-callout {
+  background: var(--sim-surface); border: 1px solid var(--sim-border);
+  border-left: 3px solid var(--sim-brand); border-radius: 4px;
+  padding: 8px 12px; font-size: 12px; color: var(--sim-text-muted); line-height: 1.5;
+}
+#panel-simulator .sim-callout strong { color: var(--sim-text); }
+@media (max-width: 860px) {
+  #panel-simulator .sim-grid { grid-template-columns: 1fr; }
+  .sim-main { padding: 18px 16px 50px; }
+}

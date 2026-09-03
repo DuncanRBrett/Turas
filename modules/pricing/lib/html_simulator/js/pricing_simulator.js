@@ -1,7 +1,21 @@
 /* ===========================================================================
-   TURAS PRICING REPORT - Simulator Engine
-   Demand interpolation, revenue/profit calculation, interactive UI
-   Adapted from simulator_core.js for consolidated report
+   TURAS PRICING - Simulator Engine
+   Demand interpolation, revenue and profit calculation, interactive UI.
+
+   This is the live engine, moved out of the retired pricing HTML report
+   (lib/html_report/js/pricing_simulator.js) into the standalone simulator.
+   The tool is a tool, not report content: the v2 Pricing tab links to it
+   rather than embedding it (programme decision D2).
+
+   Two defects were fixed on the way across:
+     P1c - the chart took prices from the total sample and intents from the
+           selected segment, so a segment whose grid differed was drawn
+           against the wrong price axis.
+     P3a - "Revenue Index" named three different scales in one tool. It now
+           means one thing everywhere: price times purchase intent, on the
+           study's own currency scale. The chart's fitted line says it is
+           scaled to fit, and the comparison table shows "% of optimum" as
+           its own separately labelled row.
    =========================================================================== */
 
 var PricingSimulator = (function() {
@@ -198,15 +212,19 @@ var PricingSimulator = (function() {
     // Check container has dimensions (avoids zero-size SVG when hidden)
     if (container.offsetWidth === 0) return;
 
-    var prices = data.price_range;
-    var intents = (segment !== "total" && data.segments && data.segments[segment])
-      ? data.segments[segment].demand_curve
-      : data.demand_curve;
+    // P1c: prices and intents must come from the SAME object. Reading the
+    // grid from the total sample and the curve from a segment plotted the
+    // segment against the wrong price axis whenever the two grids differed.
+    var series = (segment !== "total" && data.segments && data.segments[segment])
+      ? data.segments[segment]
+      : data;
+    var prices = series.price_range;
+    var intents = series.demand_curve;
 
-    if (!prices || !intents) return;
+    if (!prices || !intents || prices.length !== intents.length) return;
 
     var w = 700, h = 280;
-    var ml = 50, mr = 120, mt = 20, mb = 35;
+    var ml = 50, mr = 158, mt = 20, mb = 35;   // right margin holds the legend text
     var cw = w - ml - mr, ch = h - mt - mb;
 
     var xMin = prices[0], xMax = prices[prices.length - 1];
@@ -261,7 +279,10 @@ var PricingSimulator = (function() {
     svg.push('<line x1="'+(w-mr+10)+'" y1="'+mt+'" x2="'+(w-mr+30)+'" y2="'+mt+'" stroke="'+config.brand_colour+'" stroke-width="2.5"/>');
     svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+4)+'" fill="#64748b" font-size="10">Purchase Intent</text>');
     svg.push('<line x1="'+(w-mr+10)+'" y1="'+(mt+16)+'" x2="'+(w-mr+30)+'" y2="'+(mt+16)+'" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="5,3"/>');
-    svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+20)+'" fill="#64748b" font-size="10">Revenue Index</text>');
+    // P3a: this line is the revenue index divided by its own maximum so it
+    // fits the same 0 to 100% axis as demand. It is not the Revenue Index
+    // figure shown in the cards and the table, so it does not borrow its name.
+    svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+20)+'" fill="#64748b" font-size="10">Revenue (scaled to fit)</text>');
 
     container.innerHTML = '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:auto;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">' + svg.join("") + '</svg>';
   }
@@ -425,12 +446,14 @@ var PricingSimulator = (function() {
       var p = scenarios[i].price;
       var intent = interpolateIntent(p, seg);
       var rev = calcRevenue(p, seg);
-      var revIdx = optRevenue > 0 ? (rev / optRevenue * 100) : 0;
       var profit = hasProfit ? calcProfit(p, seg) : 0;
-      var profIdx = optProfit > 0 ? (profit / optProfit * 100) : 0;
+      // P3a: revenue and profit are the raw indices (price times intent, and
+      // margin times intent). How they compare with the optimum is a separate
+      // number with its own row, so one name does not carry two scales.
       metrics.push({
-        price: p, intent: intent, revenue: rev,
-        revenueIndex: revIdx, profit: profit, profitIndex: profIdx
+        price: p, intent: intent,
+        revenue: rev, revenuePctOfOpt: optRevenue > 0 ? (rev / optRevenue * 100) : null,
+        profit: profit, profitPctOfOpt: optProfit > 0 ? (profit / optProfit * 100) : null
       });
     }
 
@@ -438,11 +461,11 @@ var PricingSimulator = (function() {
     var bestProf = -Infinity, worstProf = Infinity;
     if (metrics.length > 1) {
       for (var j = 0; j < metrics.length; j++) {
-        if (metrics[j].revenueIndex > bestRev) bestRev = metrics[j].revenueIndex;
-        if (metrics[j].revenueIndex < worstRev) worstRev = metrics[j].revenueIndex;
+        if (metrics[j].revenue > bestRev) bestRev = metrics[j].revenue;
+        if (metrics[j].revenue < worstRev) worstRev = metrics[j].revenue;
         if (hasProfit) {
-          if (metrics[j].profitIndex > bestProf) bestProf = metrics[j].profitIndex;
-          if (metrics[j].profitIndex < worstProf) worstProf = metrics[j].profitIndex;
+          if (metrics[j].profit > bestProf) bestProf = metrics[j].profit;
+          if (metrics[j].profit < worstProf) worstProf = metrics[j].profit;
         }
       }
     }
@@ -485,19 +508,32 @@ var PricingSimulator = (function() {
     }
     rows += "</tr>";
 
-    // Revenue Index
+    // Revenue Index: price times purchase intent, the same figure the metric
+    // card shows.
     rows += "<tr><td>Revenue Index</td>";
     for (var b = 0; b < metrics.length; b++) {
       var rCls = "";
       if (metrics.length > 1) {
-        if (metrics[b].revenueIndex === bestRev) rCls = ' class="sim-best"';
-        else if (metrics[b].revenueIndex === worstRev) rCls = ' class="sim-worst"';
+        if (metrics[b].revenue === bestRev) rCls = ' class="sim-best"';
+        else if (metrics[b].revenue === worstRev) rCls = ' class="sim-worst"';
       }
-      var rLabel = metrics[b].revenueIndex.toFixed(0);
-      if (Math.abs(metrics[b].revenueIndex - 100) < 0.5) rLabel += ' <span class="sim-at-opt">(peak)</span>';
-      rows += "<td" + rCls + ">" + rLabel + "</td>";
+      rows += "<td" + rCls + ">" + formatNum(metrics[b].revenue) + "</td>";
     }
     rows += "</tr>";
+
+    // ...and how that compares with the revenue-maximising price, on its own
+    // row so the two scales never share a name (P3a).
+    if (optPrice > 0) {
+      rows += "<tr><td>Revenue, % of optimum</td>";
+      for (var bp = 0; bp < metrics.length; bp++) {
+        var pct = metrics[bp].revenuePctOfOpt;
+        if (pct === null) { rows += '<td style="color:#94a3b8;">N/A</td>'; continue; }
+        var pctLabel = pct.toFixed(0) + "%";
+        if (Math.abs(pct - 100) < 0.5) pctLabel += ' <span class="sim-at-opt">(peak)</span>';
+        rows += "<td>" + pctLabel + "</td>";
+      }
+      rows += "</tr>";
+    }
 
     // Profit Index (N/A if no unit cost)
     rows += "<tr><td>Profit Index</td>";
@@ -505,12 +541,10 @@ var PricingSimulator = (function() {
       for (var c = 0; c < metrics.length; c++) {
         var pCls = "";
         if (metrics.length > 1) {
-          if (metrics[c].profitIndex === bestProf) pCls = ' class="sim-best"';
-          else if (metrics[c].profitIndex === worstProf) pCls = ' class="sim-worst"';
+          if (metrics[c].profit === bestProf) pCls = ' class="sim-best"';
+          else if (metrics[c].profit === worstProf) pCls = ' class="sim-worst"';
         }
-        var pLabel = metrics[c].profitIndex.toFixed(0);
-        if (Math.abs(metrics[c].profitIndex - 100) < 0.5) pLabel += ' <span class="sim-at-opt">(peak)</span>';
-        rows += "<td" + pCls + ">" + pLabel + "</td>";
+        rows += "<td" + pCls + ">" + formatNum(metrics[c].profit) + "</td>";
       }
     } else {
       for (var c2 = 0; c2 < metrics.length; c2++) {
@@ -519,19 +553,29 @@ var PricingSimulator = (function() {
     }
     rows += "</tr>";
 
+    if (hasProfit && optPrice > 0) {
+      rows += "<tr><td>Profit, % of optimum</td>";
+      for (var cp = 0; cp < metrics.length; cp++) {
+        var ppct = metrics[cp].profitPctOfOpt;
+        if (ppct === null) { rows += '<td style="color:#94a3b8;">N/A</td>'; continue; }
+        rows += "<td>" + ppct.toFixed(0) + "%</td>";
+      }
+      rows += "</tr>";
+    }
+
     // vs Optimal
     if (optPrice > 0) {
       rows += "<tr><td>vs Optimal (" + escHTML(config.currency) + formatNum(optPrice) + ")</td>";
       for (var d = 0; d < metrics.length; d++) {
-        var revDiff = metrics[d].revenueIndex - 100;
+        var revDiff = (metrics[d].revenuePctOfOpt === null ? 100 : metrics[d].revenuePctOfOpt) - 100;
         var label;
         if (Math.abs(revDiff) < 0.5) {
           label = '<span class="sim-best">at optimum</span>';
         } else {
           var sign = revDiff > 0 ? "+" : "";
           label = sign + revDiff.toFixed(0) + "% revenue";
-          if (hasProfit) {
-            var profDiff = metrics[d].profitIndex - 100;
+          if (hasProfit && metrics[d].profitPctOfOpt !== null) {
+            var profDiff = metrics[d].profitPctOfOpt - 100;
             label += ", " + (profDiff > 0 ? "+" : "") + profDiff.toFixed(0) + "% profit";
           }
         }
@@ -619,8 +663,11 @@ var PricingSimulator = (function() {
     return ticks;
   }
 
-  // Public API
+  // Public API. `init` is what the standalone page calls once its islands are
+  // parsed; `lazyInit` is kept under its old name because the engine used to
+  // be woken by a tab click and a caller may still use it.
   return {
+    init: lazyInit,
     lazyInit: lazyInit,
     exportPNG: exportPNG,
     getState: function() { return state; },

@@ -268,6 +268,7 @@ synthesize_recommendation <- function(vw_results = NULL,
       confidence = confidence$level,
       confidence_score = confidence$score
     ),
+    method_price_cv = confidence$method_price_cv,
     acceptable_range = acceptable_range,
     optimal_zone = optimal_zone,
     evidence_table = evidence_table,
@@ -462,6 +463,11 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
   list(
     score = round(overall_score, 2),
     level = level,
+    # The spread across the methods' own recommended prices, as a coefficient
+    # of variation. The factor sentence above describes it in words; the v2
+    # island wants the number, and one place must own it or the two drift
+    # (14_v2_island.R).
+    method_price_cv = cv,
     factors = factors
   )
 }

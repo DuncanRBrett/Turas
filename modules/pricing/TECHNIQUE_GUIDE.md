@@ -91,7 +91,7 @@ VW requires exactly four open-ended price questions. The standard wording:
 
 **Logical ordering violations.** A respondent who says "too cheap" > "too expensive" has misunderstood the questions or responded carelessly. Turas reports the violation rate. If it exceeds 10%, revisit the question wording. Rates of 5-8% are typical and acceptable.
 
-**NMS extension.** If you also ask purchase probability at the "cheap" and "expensive" prices (e.g., "If this product were priced at [their cheap price], how likely would you be to buy? Definitely / Probably / Probably not / Definitely not"), the module can calculate Newton-Miller-Smith revenue-calibrated price points.
+**NMS extension.** Do not use it in this version. Asking purchase probability at the "cheap" and "expensive" prices is meant to give Newton-Miller-Smith revenue-calibrated price points, but the 2026-09-03 review of the engine found the implementation broken on both the weighted and the unweighted path, with nothing in the suite exercising it (finding F3). Its numbers do not reach the Pricing tab or the simulator, and a refusal by name is owed on the review follow-up branch.
 
 ### Gabor-Granger question design
 
@@ -134,7 +134,7 @@ In a monadic design, each respondent is randomly assigned to exactly one price c
 
 **What if OPP > IDP?** This can happen when price curves cross in an unusual pattern. It means there is no "sweet spot" where resistance is minimised in both directions. This is a signal that respondents have inconsistent price perceptions -- review the data quality.
 
-**NMS results.** If purchase probability data is available, the NMS extension produces a revenue-calibrated optimal price. This is more actionable than the base VW metrics because it accounts for purchase likelihood, not just price perception.
+**NMS results.** Do not use them in this version (see above). For a revenue-calibrated optimal price, run Gabor-Granger alongside Van Westendorp: the ladder measures acceptance at each price directly, and its revenue optimum is on the Pricing tab.
 
 ### Gabor-Granger demand and revenue curves
 

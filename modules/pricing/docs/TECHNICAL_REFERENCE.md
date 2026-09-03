@@ -8,7 +8,7 @@
 4. [Mathematical Methods](#4-mathematical-methods)
 5. [Data Flow](#5-data-flow)
 6. [Configuration System](#6-configuration-system)
-7. [HTML Report Architecture](#7-html-report-architecture)
+7. [Interactive-report contribution](#7-interactive-report-architecture)
 8. [Simulator Architecture](#8-simulator-architecture)
 9. [Extension Points](#9-extension-points)
 10. [Performance Considerations](#10-performance-considerations)
@@ -62,14 +62,14 @@ modules/pricing/
 │   ├── 12_recommendation_synthesis.R  # Multi-method synthesis
 │   └── 13_monadic.R            # Monadic price testing (logistic regression)
 ├── lib/
-│   ├── html_report/            # HTML report generation (4-layer architecture)
+│   ├── html_simulator/         # The standalone price simulator
 │   │   ├── 01_data_transformer.R   # Results → HTML-optimised data structure
 │   │   ├── 02_table_builder.R      # HTML table generation
 │   │   ├── 03_page_builder.R       # Full page assembly with meta tags
 │   │   └── 04_chart_builder.R      # SVG chart generation
-│   ├── simulator/              # Interactive simulator dashboard
-│   │   ├── simulator_builder.R     # R builder (assembles self-contained HTML)
-│   │   ├── css/simulator_styles.css
+│   │   ├── 01_simulator_parts.R    # Demand extraction, islands, panel markup
+│   │   ├── 99_simulator_main.R     # generate_pricing_simulator()
+│   │   ├── simulator_styles.css
 │   │   └── js/                     # Client-side JavaScript
 │   │       ├── simulator_core.js       # Demand interpolation, sliders
 │   │       ├── scenario_manager.js     # Preset/battle mode
@@ -447,11 +447,11 @@ Raw Data
     ↓
 Monadic Results Object
     ↓
-[lib/html_report/] transform_pricing_for_html() → build_pricing_report()
+[R/14_v2_island.R] serialize_pricing_layer() → write_pricing_island()
     ↓
-Self-contained HTML Report
+{output}_pr_island.json, read by the tabs v2 report
     ↓
-[lib/simulator/] build_pricing_simulator()
+[lib/html_simulator/] generate_pricing_simulator()
     ↓
 Interactive Simulator Dashboard (HTML)
 ```
@@ -488,79 +488,90 @@ Configuration values are coerced to appropriate types:
 
 ---
 
-## 7. HTML Report Architecture
+## 7. Interactive-report contribution
 
-The HTML report follows a 4-layer architecture pattern consistent with other Turas modules (confidence, tabs).
+The module's own tabbed HTML report was retired with the v2 lift. Pricing
+results reach the client through the tabs v2 report instead, as a Pricing tab.
 
-### 7.1 Layer 1: Data Transformer (`01_data_transformer.R`)
+### 7.1 The island (`R/14_v2_island.R`)
 
-Converts analysis results into an HTML-optimised structure. Each method's results are normalised into a common format with:
-- Chart data (arrays suitable for SVG rendering)
-- Table data (pre-formatted for HTML table generation)
-- Callout text (plain-English interpretations)
-- Meta information (method used, sample size, confidence level)
+`serialize_pricing_layer(results, config)` builds the contribution and
+`write_pricing_island()` writes `{output}_pr_island.json` on every run, with
+`meta.kind = "pricing"` and schema 1. Blocks: `meta`, `vw`, `gg`, `monadic`,
+`recommendation`. A block the run did not produce is ABSENT rather than empty,
+because jsonlite writes a NULL element as `{}` and that is truthy in
+JavaScript. Per-row vectors are wrapped in `I()` so a one-rung ladder still
+arrives as an array.
 
-**Entry point**: `transform_pricing_for_html(pricing_results, config)`
+Everything in `meta` comes from what the engines recorded on the run
+(`diagnostics$estimator`, `n_analysed`, `response_coding`, `imputation`,
+`smoothing`, the monadic weight caveat). The island recomputes nothing.
 
-### 7.2 Layer 2: Table Builder (`02_table_builder.R`)
+### 7.2 The tabs side
 
-Generates styled HTML tables for:
-- VW price points (with CIs if available)
-- GG demand curve
-- Monadic model summary and demand curve
-- Segment comparison
-- Recommendation summary
+`modules/tabs/lib/html_report_v2/assets/js/27z_pricing.js` renders it;
+`24_shell.js` shows the tab only when `TR.PR` has content and hides the filter
+bar while it is open. A tabs config points at the file through its
+`pricing_island` setting, which is whitelisted in two places in
+`crosstabs_config.R` (`build_config_object` and `TABS_KNOWN_SETTINGS`); a key
+missing from either is dead.
 
-### 7.3 Layer 3: Page Builder (`03_page_builder.R`)
+### 7.3 The crosstab export (`R/15_tabs_export.R`)
 
-Assembles the complete HTML page:
-- Meta tags for Report Hub integration (`<meta name="turas-report-type" content="pricing">`)
-- Embedded CSS with brand colour token replacement
-- Tab navigation JavaScript
-- Self-contained (no external dependencies)
-
-### 7.4 Layer 4: Chart Builder (`04_chart_builder.R`)
-
-Generates pure SVG charts:
-- VW cumulative distribution curves (4 lines + intersection markers)
-- GG demand curve with revenue overlay
-- Monadic logistic curve with CI band
-- Segment comparison forest plot
-- Price ladder tier visualisation
+`export_pricing_for_tabs()` writes `{output}_tabs_pricing.xlsx` when
+`Generate_Tabs_Export = Y`. The Gabor-Granger ladder becomes a Multi_Mention
+question. Note the cell contract: a cell holds the rung's own LABEL where the
+respondent would buy, not a 1, because tabs counts a mention by comparing the
+cell to the option's OptionText (`calculate_row_counts()` in
+`modules/tabs/lib/cell_calculator.R`). A grid of 0/1 flags reports zero at
+every price.
 
 ---
 
 ## 8. Simulator Architecture
 
-The simulator is a self-contained HTML dashboard built by `lib/simulator/simulator_builder.R`.
+The simulator is a self-contained HTML file built by
+`lib/html_simulator/99_simulator_main.R`. It is a tool, not report content: the
+Pricing tab links to it by file name rather than embedding it.
 
-### 8.1 Build Process
+### 8.1 Build process
 
-The R builder function:
-1. Reads CSS from `css/simulator_styles.css`
-2. Reads JS from `js/*.js` (4 files)
-3. Serialises demand curves, segments, and preset scenarios to JSON
-4. Embeds everything into a single HTML file with `<script>` and `<style>` tags
+`generate_pricing_simulator(results, output_path, config)`:
+1. Pulls the demand curve off the run (`extract_demand_data()`), refusing when
+   the method produced none: a Van Westendorp study on its own measures price
+   perceptions, not demand at a price.
+2. Reads `simulator_styles.css` and `js/pricing_simulator.js`, and refuses if
+   either could close the tag it is inlined into.
+3. Serialises the curves and the config as two JSON islands, escaping every
+   "<" as `\u003c` the way every Turas island does.
+4. Writes one HTML file with the panel, the CSS and the JS inline.
 
-### 8.2 JavaScript Modules
+### 8.2 The engine (`js/pricing_simulator.js`)
 
-- **simulator_core.js**: Demand curve interpolation (monotone-preserving cubic), slider event handling, real-time metric calculations
-- **scenario_manager.js**: Save/load/delete scenarios, preset card rendering, battle mode comparison logic
-- **chart_renderer.js**: SVG-based interactive charts with draggable price markers
-- **export_png.js**: Canvas-based PNG capture with brand watermark
+Linear interpolation between the prices that were tested, the metric cards, the
+SVG chart, preset scenario cards, the segment toggle, the scenario comparison
+table and PNG export. `PricingSimulator.init()` is called once the page has
+parsed its islands.
 
-### 8.3 Data Embedding
+Two contracts worth knowing:
+- Prices and intents are read from the SAME object, so a segment is drawn on
+  its own price axis (defect P1c).
+- "Revenue Index" means one thing everywhere: price times purchase intent. How
+  a scenario compares with the revenue-maximising price is a separate row
+  labelled "% of optimum", and the chart's fitted line says it is scaled to fit
+  (defect P3a).
 
-Analysis results are embedded as a `PRICING_DATA` JSON constant:
+### 8.3 Data embedding
+
+Two islands, parsed on load and assigned to `PRICING_DATA` and
+`PRICING_CONFIG`:
 ```javascript
-const PRICING_DATA = {
-  demand_curve: [...],        // price, predicted_intent, revenue_index
-  segments: { ... },          // segment-level demand curves
-  preset_scenarios: [...],    // from config Simulator sheet
-  optimal_prices: { ... },    // revenue and profit optima
-  currency: "$",
-  brand_colour: "#1e3a5f"
-};
+// id="pricing-simulator-data"
+{ price_range: [...], demand_curve: [...], revenue_curve: [...],
+  optimal_price: 80, segments: { Premium: { price_range, demand_curve, revenue_curve } } }
+// id="pricing-simulator-config"
+{ currency: "R", brand_colour: "#323367", unit_cost: 0,
+  project_name: "...", scenarios: [...] }
 ```
 
 ---

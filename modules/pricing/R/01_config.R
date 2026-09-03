@@ -510,6 +510,52 @@ PRICING_RETIRED_SETTINGS <- c(
 )
 names(PRICING_RETIRED_SETTINGS) <- tolower(names(PRICING_RETIRED_SETTINGS))
 
+#' Settings The Module Has Withdrawn, As Opposed To Never Having Read
+#'
+#' The difference matters and decides the response. A RETIRED setting never did
+#' anything, so a config carrying it was always wrong and is refused. A
+#' WITHDRAWN setting used to work and has been taken out, so every config in
+#' the field still carries it correctly; refusing them all would stop the
+#' analyst working over a deliverable that moved. These are announced by name,
+#' loudly, with what replaced them, and the run continues. The conjoint module
+#' answers its own retirement the same way.
+PRICING_WITHDRAWN_SETTINGS <- c(
+  "Generate_HTML_Report" = paste0(
+    "the pricing module's own HTML report is retired. Pricing results now ",
+    "appear in the client's own interactive report as a Pricing tab: point ",
+    "the tabs config's pricing_island setting at the *_pr_island.json this ",
+    "run writes. The simulator is now a standalone file of its own: set ",
+    "Generate_Simulator = TRUE. Delete this row.")
+)
+names(PRICING_WITHDRAWN_SETTINGS) <- tolower(names(PRICING_WITHDRAWN_SETTINGS))
+
+
+#' Announce Settings That Have Been Withdrawn
+#'
+#' One boxed notice naming every withdrawn setting present, and what replaced
+#' it. The run continues.
+#'
+#' @param setting_names Character vector of names as read from a sheet.
+#' @param sheet The sheet name, for the message.
+#' @return Invisibly, the withdrawn names that were present.
+#' @keywords internal
+.pricing_announce_withdrawn <- function(setting_names, sheet) {
+  nms <- trimws(as.character(setting_names))
+  nms <- nms[!is.na(nms) & nzchar(nms)]
+  present <- unique(tolower(nms)[tolower(nms) %in% names(PRICING_WITHDRAWN_SETTINGS)])
+  if (length(present) == 0) return(invisible(character(0)))
+
+  cat("\n+--- SETTING WITHDRAWN ----------------------------------+\n")
+  for (nm in present) {
+    cat(sprintf("| %s sheet: %s\n", sheet,
+                paste(nms[tolower(nms) == nm][1], PRICING_WITHDRAWN_SETTINGS[[nm]],
+                      sep = ": ")))
+  }
+  cat("| The run continues; the setting no longer does anything.\n")
+  cat("+--------------------------------------------------------+\n\n")
+  invisible(present)
+}
+
 #' Check A Sheet's Setting Names
 #'
 #' Refuses on a duplicated name (the second row used to be silently ignored),
@@ -551,8 +597,12 @@ names(PRICING_RETIRED_SETTINGS) <- tolower(names(PRICING_RETIRED_SETTINGS))
     )
   }
 
+  # Withdrawn names are answered by name and the run continues, so they must
+  # not also be offered as unknown.
+  .pricing_announce_withdrawn(nms, sheet)
+
   known <- tolower(PRICING_KNOWN_SETTINGS[[sheet]] %||% character(0))
-  unknown <- nms[!lower %in% known]
+  unknown <- nms[!lower %in% known & !lower %in% names(PRICING_WITHDRAWN_SETTINGS)]
   if (length(unknown) > 0) {
     cat(sprintf(paste0("  [WARNING] %s sheet: %d setting name(s) the pricing module does ",
                        "not read and will ignore: %s\n"),
@@ -1028,7 +1078,10 @@ apply_pricing_defaults <- function(settings) {
   settings$verbose <- as.logical(settings$verbose %||% TRUE)
 
   # Output options
-  settings$generate_html_report <- as.logical(settings$generate_html_report %||% TRUE)
+  # Read but no longer acted on: the module's own HTML report is retired and
+  # .pricing_announce_withdrawn() says so by name. Kept as FALSE so nothing
+  # downstream reads a TRUE and believes a report exists.
+  settings$generate_html_report <- FALSE
   settings$generate_simulator <- as.logical(settings$generate_simulator %||% FALSE)
   settings$brand_colour <- settings$brand_colour %||% "#323367"
   settings$generate_stats_pack <- settings$generate_stats_pack %||% "Y"
@@ -1036,16 +1089,20 @@ apply_pricing_defaults <- function(settings) {
     settings$generate_tabs_export %||% "N"), 1, 1)) %in% c("Y", "T")
   settings$tabs_question_code <- settings$tabs_question_code %||% "GGACC"
   settings$export_wtp <- toupper(substr(as.character(settings$export_wtp %||% "N"), 1, 1)) %in% c("Y", "T")
-  # The exporter is the v2 session's work (handover section 4, B3). Until it
-  # lands a Y must not pass in silence: that is the Flag_Outliers defect
-  # again. Refuse by name.
-  if (isTRUE(settings$generate_tabs_export) || isTRUE(settings$export_wtp)) {
+  # The exporter landed with the v2 session (15_tabs_export.R), so these two
+  # settings now do what they say. Both need an id to join on, and the
+  # exporter refuses without one rather than falling back to row order.
+  if ((isTRUE(settings$generate_tabs_export) || isTRUE(settings$export_wtp)) &&
+      (is.na(settings$id_var %||% NA) || !nzchar(as.character(settings$id_var %||% "")))) {
     pricing_refuse(
-      code = "FEATURE_TABS_EXPORT_PENDING",
-      title = "The Tabs Export Is Not Built Yet",
-      problem = "Generate_Tabs_Export or Export_WTP is Y, and this version of the pricing module has no exporter behind those settings.",
-      why_it_matters = "A setting that is accepted and does nothing looks like a setting that worked.",
-      how_to_fix = "Set both to N for now. The export (the Gabor-Granger acceptance grid as a crosstab question) arrives with the pricing v2 session."
+      code = "CFG_TABS_EXPORT_NO_ID",
+      title = "The Tabs Export Needs An ID Variable",
+      problem = "Generate_Tabs_Export or Export_WTP is Y, and ID_Variable is blank.",
+      why_it_matters = paste0(
+        "Tabs joins the export to the survey file by respondent id. Without one ",
+        "the only match available is row order, which lines answers up against ",
+        "whichever respondent happens to sit in the same row."),
+      how_to_fix = "Set ID_Variable on the Settings sheet to the respondent id column in the data file."
     )
   }
 
@@ -1401,8 +1458,8 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
     openxlsx::addWorksheet(wb, "Settings")
     settings_data <- data.frame(
       Setting = c("Project_Name", "Analysis_Method", "Data_File", "Output_File",
-                  "Currency_Symbol", "Generate_HTML_Report"),
-      Value = c("My Pricing Study", method, "", "pricing_results.xlsx", "$", "TRUE"),
+                  "Currency_Symbol", "Generate_Simulator"),
+      Value = c("My Pricing Study", method, "", "pricing_results.xlsx", "$", "FALSE"),
       stringsAsFactors = FALSE
     )
     openxlsx::writeData(wb, "Settings", settings_data, headerStyle = header_style)

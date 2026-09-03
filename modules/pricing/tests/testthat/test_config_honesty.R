@@ -186,11 +186,18 @@ test_that("GG_Stop_Early_Imputation accepts NONE and NO_AFTER_STOP only (C2)", {
                "CFG_GG_STOP_EARLY_IMPUTATION")
 })
 
-test_that("the tabs export settings refuse until the exporter exists", {
+test_that("the tabs export settings are accepted, and still need an id to join on", {
+  # Session B built the exporter (15_tabs_export.R), so these settings now do
+  # what they say. What they will not do is join on row order: without
+  # ID_Variable the config refuses before any file is written.
   expect_error(apply_pricing_defaults(list(analysis_method = "gabor_granger", generate_tabs_export = "Y")),
-               "FEATURE_TABS_EXPORT_PENDING")
+               "CFG_TABS_EXPORT_NO_ID")
   expect_error(apply_pricing_defaults(list(analysis_method = "gabor_granger", export_wtp = "Y")),
-               "FEATURE_TABS_EXPORT_PENDING")
+               "CFG_TABS_EXPORT_NO_ID")
+  on <- apply_pricing_defaults(list(analysis_method = "gabor_granger",
+                                    generate_tabs_export = "Y", id_var = "RespID"))
+  expect_true(on$generate_tabs_export)
+  expect_equal(on$tabs_question_code, "GGACC")
   expect_false(apply_pricing_defaults(list(analysis_method = "gabor_granger"))$generate_tabs_export)
 })
 

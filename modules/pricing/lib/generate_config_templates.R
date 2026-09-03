@@ -154,19 +154,10 @@ build_settings_def <- function() {
       section_name = "OUTPUT OPTIONS",
       fields = list(
         list(
-          name = "Generate_HTML_Report",
-          required = FALSE,
-          default = "TRUE",
-          description = "Generate an interactive HTML report alongside Excel output.",
-          valid_values_text = "TRUE or FALSE",
-          dropdown = c("TRUE", "FALSE"),
-          numeric_range = NULL, integer_range = NULL
-        ),
-        list(
           name = "Generate_Simulator",
           required = FALSE,
           default = "FALSE",
-          description = "Generate a standalone HTML pricing simulator dashboard for clients.",
+          description = "Write {output}_simulator.html: a standalone price simulator, one self-contained file the client can open and share. The Pricing tab of the interactive report links to it by name, so keep the two together.",
           valid_values_text = "TRUE or FALSE",
           dropdown = c("TRUE", "FALSE"),
           numeric_range = NULL, integer_range = NULL
@@ -175,7 +166,7 @@ build_settings_def <- function() {
           name = "Brand_Colour",
           required = FALSE,
           default = "#323367",
-          description = "Primary brand colour for HTML reports and simulator (hex code).",
+          description = "Primary brand colour for the simulator (hex code).",
           valid_values_text = "Hex colour code (e.g., #323367)",
           dropdown = NULL, numeric_range = NULL, integer_range = NULL
         ),
@@ -193,7 +184,7 @@ build_settings_def <- function() {
           name = "Generate_Tabs_Export",
           required = FALSE,
           default = "N",
-          description = "Write {output}_tabs_pricing.xlsx: the Gabor-Granger acceptance grid as 0/1 columns a tabs (crosstab) project can read as a Multi_Mention question, with a QuestionMap snippet and a METHOD sheet. Needs ID_Variable. Not built yet: Y refuses until the pricing v2 session lands.",
+          description = "Write {output}_tabs_pricing.xlsx: the Gabor-Granger acceptance ladder as a Multi_Mention question a tabs (crosstab) project can read, with a pricing_valid flag, a QuestionMap snippet and a METHOD sheet. Needs ID_Variable.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),
           numeric_range = NULL, integer_range = NULL

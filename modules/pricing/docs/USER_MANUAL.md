@@ -14,9 +14,8 @@
 5. [Monadic Price Testing](#5-monadic-price-testing)
 6. [Configuration Reference](#6-configuration-reference)
 7. [Understanding Output](#7-understanding-output)
-8. [HTML Report](#8-html-report)
-9. [Interactive Simulator](#9-interactive-simulator)
-10. [Added Slides & Images](#10-added-slides--images)
+8. [The Pricing tab in the interactive report](#8-the-pricing-tab-in-the-interactive-report)
+9. [The standalone simulator, and the crosstab export](#9-the-standalone-simulator-and-the-crosstab-export)
 11. [Advanced Features](#11-advanced-features)
 12. [Troubleshooting](#12-troubleshooting)
 13. [Best Practices](#13-best-practices)
@@ -327,9 +326,11 @@ Profit-Maximizing Price: $48.00 (if unit_cost = $15)
 | weight_var | NO | Weight column | Column name or blank | `weight` |
 | dk_codes | NO | "Don't Know" codes | Comma-separated | `98,99` |
 | unit_cost | NO | Cost per unit | Number | `18.50` |
-| brand_colour | NO | Brand colour for HTML report | Hex colour | `#1e3a5f` |
-| generate_html_report | NO | Generate HTML report | `TRUE`/`FALSE` | `TRUE` |
-| generate_simulator | NO | Generate simulator dashboard | `TRUE`/`FALSE` | `TRUE` |
+| brand_colour | NO | Brand colour for the simulator | Hex colour | `#1e3a5f` |
+| generate_simulator | NO | Write the standalone simulator | `TRUE`/`FALSE` | `FALSE` |
+| generate_tabs_export | NO | Write the crosstab export | `Y`/`N` | `N` |
+| tabs_question_code | NO | QuestionCode for the exported ladder | Text | `GGACC` |
+| export_wtp | NO | Add a willingness-to-pay column to the export | `Y`/`N` | `N` |
 
 ### 6.2 Monotonicity Handling
 
@@ -435,116 +436,93 @@ $65.00 | 35.1%           | $22.82        | $17.55
 
 ---
 
-## 8. HTML Report
+## 8. The Pricing tab in the interactive report
 
-When `generate_html_report = TRUE` in the Settings sheet, the module generates a self-contained HTML report alongside the Excel output.
+Every run writes `{output}_pr_island.json` beside the workbook. It is the
+pricing module's contribution to the tabs v2 report: name it in a tabs config's
+`pricing_island` setting and that report gains a Pricing tab.
 
-### 8.1 Report Features
+### 8.1 What is on the tab
 
-- **Self-contained**: Single HTML file with embedded CSS, SVG charts, and JavaScript
-- **Tabbed navigation**: Summary | Van Westendorp | Gabor-Granger | Monadic | Segments | Recommendation | Simulator | Added Slides | Pinned | About
-- **Brand theming**: Set `brand_colour` in config to customise the colour scheme
-- **SVG charts**: Vector-based charts that scale to any resolution
-- **Report hub integration**: Meta tags enable automatic discovery by the Turas Report Hub
+- **Provenance first**: which methods ran, on how many respondents, whether the
+  estimates are weighted and what the weights reached, and which estimator
+  produced the price points.
+- **Van Westendorp**: the four price points, each with the bootstrap interval
+  that brackets it, the acceptable and optimal ranges, and the four curves with
+  the points marked.
+- **Gabor-Granger**: one row per rung with its base, the acceptance observed,
+  the published curve, the interval and the arc elasticity, plus a demand and
+  revenue chart with the revenue optimum marked.
+- **Monadic**: the measured cells and the curve fitted through them, kept
+  visibly apart, with the weighted p-value caveat stamped where it applies.
+- **The recommended price**, with the spread across the methods' own prices.
 
-### 8.2 Chart Types
+### 8.2 What is not on it, and why
 
-- **VW Cumulative Distribution Curves**: Four lines with intersection points marked
-- **GG Demand Curve with Revenue Overlay**: Dual-axis chart showing intent and revenue
-- **Monadic Logistic Curve with CI Band**: Demand curve with bootstrap confidence band
-- **Segment Comparison**: Forest-plot style comparison across segments
-- **Price Ladder Tiers**: Visual tier breakdown
+The tab is frozen: the price points were estimated once, on the whole sample,
+so they cannot be recomputed under the report's audience filter. The filter bar
+is hidden while the tab is open and the tab says so. To break acceptance by
+audience, use the crosstab export (section 9.3), where the ladder becomes a
+question the reader can filter.
 
-### 8.3 Sharing
+The generated recommendation prose, the price ladder tiers and the module's own
+segmentation stay in the Excel workbook. So does everything the tab does not
+show; nothing is lost, it is curated.
 
-The HTML file can be opened in any modern browser. No Turas installation is required. Attach it to emails or share via file transfer.
+### 8.3 The classic pricing HTML report
+
+Retired. The module used to write its own tabbed HTML report; pricing results
+now appear in the client's own report as the Pricing tab. A config still
+carrying `Generate_HTML_Report` gets a notice naming the replacement, and the
+run continues.
 
 ---
 
-## 9. Interactive Simulator
+## 9. The standalone simulator, and the crosstab export
 
-When `generate_simulator = TRUE` in the Settings sheet, the module generates an interactive pricing simulator dashboard as a standalone HTML file.
+### 9.1 The simulator
 
-### 9.1 Features
+With `Generate_Simulator = TRUE` the run writes `{output}_simulator.html`: one
+self-contained file, no Turas needed.
 
-- **Price Sliders**: Drag to adjust price and see demand, revenue, and profit update in real-time
-- **Preset Scenario Cards**: Named configurations (e.g., "Budget Launcher", "Premium Pro") configured via the Simulator sheet in the config
-- **Battle Mode**: Side-by-side comparison of 2-3 scenarios across all metrics
-- **Segment Toggle**: Switch between total sample and segment-specific views
-- **PNG Export**: One-click capture of the current view for presentations
+- A price slider, with purchase intent, revenue index, volume and profit
+  updating as it moves
+- Preset scenario cards from the Simulator sheet
+- A scenario comparison table: the raw Revenue and Profit indices, and each as a
+  percentage of the revenue-maximising price on its own row
+- A segment toggle, where each segment is drawn on its own prices
+- PNG export
 
-### 9.2 Simulator Configuration (Simulator Sheet)
+Between the prices that were actually tested, intent is interpolated, so the
+tool shows the shape of demand rather than a forecast.
 
-Define preset scenarios in the config:
+The Pricing tab links to the simulator by file name, so keep the two files
+beside each other when you send them.
+
+### 9.2 Simulator configuration (Simulator sheet)
 
 | Setting | Description | Example |
 |---------|-------------|---------|
 | scenario_name | Scenario identifier | `Budget Launcher` |
 | scenario_price | Price for this scenario | `29.99` |
-| competitor_prices | Competitor prices (semicolon-separated) | `35;42;50` |
 | cost_assumption | Unit cost for profit calculation | `15` |
 
-### 9.3 Sharing with Clients
+### 9.3 The crosstab export
 
-The simulator is a single HTML file. Clients can:
-1. Open it in any browser (Chrome, Firefox, Safari, Edge)
-2. Adjust sliders and explore scenarios
-3. Export PNG snapshots for internal presentations
-4. No Turas installation, R, or technical knowledge required
+With `Generate_Tabs_Export = Y` the run writes `{output}_tabs_pricing.xlsx`:
 
----
+- **DATA**: the respondent id, the Gabor-Granger acceptance ladder as
+  `{QCode}_1 .. {QCode}_k`, a `pricing_valid` flag reproducing the module's
+  analysed base, and optionally willingness to pay (`Export_WTP = Y`)
+- **QUESTIONMAP_SNIPPET**: the rows to paste into a tabs config, including
+  documentation rows for the Van Westendorp and monadic questions, which tabs
+  reads straight from the survey file
+- **METHOD**: what each column is, how it was coded, and where a tabs base will
+  differ from the pricing report's
 
-## 10. Added Slides & Images
-
-The pricing HTML report includes an "Added Slides" tab for embedding narrative content, quotes, findings, and images directly into the report.
-
-### 10.1 Config-Driven Slides
-
-Add an **AddedSlides** sheet to your config Excel with these columns:
-
-| Column | Required | Description |
-|--------|----------|-------------|
-| `slide_title` | YES | Title displayed at the top of the slide card |
-| `content` | YES | Markdown-formatted text content |
-| `image_path` | NO | Path to an image file (relative to config file or absolute) |
-| `display_order` | NO | Numeric sort order (auto-sequenced if omitted) |
-
-**Example AddedSlides Sheet:**
-
-| slide_title | content | image_path | display_order |
-|-------------|---------|------------|---------------|
-| Key Finding | Our target segment shows **high price sensitivity** below $30 | chart_export.png | 1 |
-| Customer Quote | > "I would pay up to $45 for this quality level" - Focus Group Participant | | 2 |
-| Market Context | ## Competitive Landscape\n- Competitor A: $35\n- Competitor B: $42 | | 3 |
-
-### 10.2 Markdown Formatting
-
-Slide content supports lightweight markdown:
-
-| Syntax | Renders As |
-|--------|------------|
-| `**bold text**` | **bold text** |
-| `*italic text*` | *italic text* |
-| `## Heading` | Large heading |
-| `- bullet point` | Bulleted list item |
-| `> quoted text` | Blockquote (indented, styled) |
-
-### 10.3 Interactive Slides in HTML Report
-
-The "Added Slides" tab in the HTML report supports interactive editing:
-
-- **Add Slide**: Click the "+ Add Slide" button to create new slides at runtime
-- **Edit Content**: Double-click any slide's rendered content to switch to the markdown editor
-- **Upload Images**: Click the image icon on any slide to upload a photo or chart (max 5MB, auto-resized to 800px)
-- **Reorder**: Use the up/down arrows to rearrange slides
-- **Pin to Curated**: Click the pin icon to add a slide to the Pinned Views tab for export
-- **Remove**: Click the X to delete a slide (with confirmation)
-
-### 10.4 Image Handling
-
-- **Config images**: Paths in the `image_path` column are resolved relative to the config file directory. Images are embedded as base64 data URIs, making the HTML report fully self-contained.
-- **Interactive uploads**: Images uploaded in the HTML report are client-side only (resized to max 800px, compressed to JPEG 70% quality). They are preserved when using the Save button.
-- **Supported formats**: PNG, JPEG, GIF, WebP, SVG
+`ID_Variable` is required when either setting is on. Without an id the only
+join available is row order, which would line answers up against the wrong
+respondents, so the config refuses instead.
 
 ---
 
@@ -1016,6 +994,6 @@ The pricing module has been tested with the following R package versions. Earlie
 
 *For survey design guidance, see [Questionnaire Design Guide](QUESTIONNAIRE_DESIGN_GUIDE.md).*
 
-*For method selection and comparison, see [Methodology Comparison](METHODOLOGY_COMPARISON.md).*
+*For method selection and comparison, see the module's TECHNIQUE_GUIDE.md.*
 
 *For developer documentation, see [Technical Reference](TECHNICAL_REFERENCE.md).*

@@ -188,11 +188,11 @@ test_that("Monadic -> Synthesis pipeline works", {
   expect_true(synth$recommendation$price > 0)
 })
 
-test_that("HTML data transformer handles monadic results", {
-  skip_if(!exists("transform_pricing_for_html", mode = "function"),
-          "transform_pricing_for_html not available")
-  skip_if(!exists("run_monadic_analysis", mode = "function"),
-          "run_monadic_analysis not available")
+test_that("the island carries a monadic run end to end", {
+  # Replaces the HTML data transformer test: that layer is retired, and the
+  # equivalent question now is whether a monadic run reaches the Pricing tab.
+  skip_if(!exists("serialize_pricing_layer", mode = "function"), "island writer not available")
+  skip_if(!exists("run_monadic_analysis", mode = "function"), "monadic engine not available")
 
   data <- generate_monadic_data(n = 200)
   config <- list(
@@ -203,22 +203,23 @@ test_that("HTML data transformer handles monadic results", {
       model_type = "logistic"
     ),
     currency_symbol = "$",
+    project_name = "Monadic integration",
     brand_colour = "#1e3a5f"
   )
 
-  monadic_result <- run_monadic_analysis(data, config)
+  invisible(capture.output(monadic_result <- run_monadic_analysis(data, config)))
+  invisible(capture.output(
+    island <- serialize_pricing_layer(
+      list(method = "monadic", monadic = monadic_result,
+           validation = list(n_total = nrow(data), n_valid = nrow(data))),
+      config, verbose = FALSE)))
 
-  pricing_results <- list(
-    method = "monadic",
-    results = monadic_result,
-    config = config
-  )
-
-  html_data <- transform_pricing_for_html(pricing_results, config)
-
-  expect_true(!is.null(html_data$meta))
-  expect_true(!is.null(html_data$monadic))
-  expect_equal(html_data$meta$method, "monadic")
+  expect_equal(island$meta$kind, "pricing")
+  expect_equal(as.character(island$meta$methods), "monadic")
+  expect_false("vw" %in% names(island))
+  expect_true(length(island$monadic$cellPrice) > 1)
+  expect_equal(length(island$monadic$cellPrice), length(island$monadic$cellIntentPct))
+  expect_true(is.numeric(island$monadic$pseudoR2))
 })
 
 test_that("Simulator data extraction works for monadic", {

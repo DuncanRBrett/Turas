@@ -43,18 +43,16 @@ if (dir.exists(pricing_r_dir)) {
   }
 }
 
-# Source HTML report modules
-html_report_dir <- file.path(TURAS_ROOT, "modules", "pricing", "lib", "html_report")
-if (dir.exists(html_report_dir)) {
-  for (f in list.files(html_report_dir, pattern = "[.]R$", full.names = TRUE)) {
-    tryCatch(source(f), error = function(e) NULL)
+# Source the standalone simulator. The pricing HTML report and the dead
+# simulator fork it was carved out of were retired with the v2 lift; this is
+# the one copy of the demand extractors and the page builder.
+sim_dir <- file.path(TURAS_ROOT, "modules", "pricing", "lib", "html_simulator")
+if (dir.exists(sim_dir)) {
+  for (f in sort(list.files(sim_dir, pattern = "[.]R$", full.names = TRUE))) {
+    tryCatch(source(f), error = function(e) {
+      message(sprintf("Could not source %s: %s", basename(f), e$message))
+    })
   }
-}
-
-# Source simulator builder
-sim_builder <- file.path(TURAS_ROOT, "modules", "pricing", "lib", "simulator", "simulator_builder.R")
-if (file.exists(sim_builder)) {
-  tryCatch(source(sim_builder), error = function(e) NULL)
 }
 
 # Null-coalescing operator

@@ -17,15 +17,14 @@ All methods work seamlessly together to provide complete pricing insights from a
 
 - **Three Methodologies**: Run Van Westendorp, Gabor-Granger, Monadic, or any combination
 - **Excel Configuration**: User-friendly spreadsheet-based setup requiring no coding
-- **Interactive HTML Report**: Self-contained HTML report with SVG charts, tabbed navigation, and brand-colour theming
-- **Interactive Simulator Dashboard**: Self-contained HTML dashboard with price sliders, scenario cards, battle mode, and PNG export for client presentations
+- **A Pricing tab in the interactive report**: the run writes `{output}_pr_island.json`; a tabs run for the same project names it in `pricing_island` and the client's own report gains a Pricing tab with the price points, the demand curve and the recommended price
+- **Standalone price simulator**: a self-contained HTML file with a price slider, scenario comparison and PNG export, linked from that tab
 - **Advanced Analysis**:
-  - NMS Extension (Newton-Miller-Smith) for Van Westendorp purchase intent calibration
   - Segment Analysis across customer groups
   - Price Ladder Builder (Good/Better/Best tier generation)
   - Recommendation Synthesis with confidence assessment
 - **Profit Optimization**: Revenue vs. profit-maximizing price identification
-- **Professional Outputs**: Publication-ready HTML reports, interactive simulators, and comprehensive Excel reports
+- **Professional Outputs**: a Pricing tab in the interactive report, a standalone simulator, a crosstab export and a comprehensive Excel workbook
 - **Bootstrap Confidence Intervals**: Statistical rigor with configurable confidence levels
 - **Price Elasticity**: Calculate and interpret demand elasticity
 - **Data Validation**: Comprehensive quality checks with TRS-compliant error messages
@@ -117,10 +116,13 @@ The gold standard for unbiased price sensitivity measurement:
 
 ### NMS Extension (Newton-Miller-Smith)
 
-Enhances Van Westendorp with behavioral calibration:
-- Adds purchase intent questions at bargain and expensive price points
-- Provides revenue-optimal price recommendation
-- More accurate for actual purchase prediction
+**Do not use it in this version.** The extension adds purchase-intent questions
+at the bargain and expensive price points to give a revenue-optimal price. The
+2026-09-03 review of the pricing engine found it broken on both the weighted and
+the unweighted path, with nothing in the suite exercising it (finding F3). Its
+numbers do not reach the Pricing tab or the standalone simulator, and a refusal
+by name is owed on the review follow-up branch. For a revenue-calibrated optimal
+price, run Gabor-Granger: the ladder measures acceptance at each price directly.
 
 ## Configuration
 
@@ -168,26 +170,36 @@ The module generates:
    - Van Westendorp price points and curves
    - Gabor-Granger demand and revenue curves
    - Monadic model summary and demand curve
-   - NMS results (if applicable)
    - Segment comparisons
    - Price ladder tiers
    - Recommendation synthesis
    - Validation results
    - Configuration used
 
-2. **Interactive HTML Report** (if `generate_html_report = TRUE`):
-   - Self-contained single HTML file with embedded SVG charts
-   - Tabbed navigation: Summary | Van Westendorp | Gabor-Granger | Monadic | Segments | Recommendation
-   - Brand-colour theming via `brand_colour` config setting
-   - Report hub integration via meta tags
+2. **Interactive-report contribution** (every run):
+   - `{output}_pr_island.json`, the frozen results the tabs v2 report reads
+   - Point a tabs config's `pricing_island` setting at it and the report gains
+     a Pricing tab: the four Van Westendorp price points with their intervals,
+     the Gabor-Granger demand and revenue curves, the monadic cells against
+     the fitted curve, and the recommended price
+   - The tab is frozen and says so: the results were estimated once on the
+     whole sample, so the audience filter is hidden while it is open
 
-3. **Interactive Simulator Dashboard** (if `generate_simulator = TRUE`):
-   - Self-contained HTML file — no Turas installation needed
-   - Price sliders with real-time demand/revenue/profit updates
-   - Preset scenario cards (configured via Simulator sheet)
-   - Battle mode for side-by-side scenario comparison
-   - Segment toggle for total vs segment-specific views
+3. **Standalone price simulator** (if `Generate_Simulator = TRUE`):
+   - `{output}_simulator.html`, a self-contained file, no Turas needed
+   - Price slider with live purchase intent, revenue and profit
+   - Preset scenario cards (configured via the Simulator sheet)
+   - Scenario comparison table
+   - Segment toggle, each segment drawn on its own prices
    - PNG export for presentations
+   - The Pricing tab links to it by name
+
+3b. **Crosstab export** (if `Generate_Tabs_Export = Y`):
+   - `{output}_tabs_pricing.xlsx`: the Gabor-Granger acceptance ladder as a
+     respondent-level Multi_Mention question, plus a `pricing_valid` flag and
+     optionally willingness to pay
+   - Paste the QUESTIONMAP_SNIPPET rows into a tabs config and the ladder can
+     be read by any banner. `ID_Variable` is required
 
 4. **Stats Pack Workbook** (if `Generate_Stats_Pack = Y`):
    - `{output}_stats_pack.xlsx` — full audit trail for advanced partners and research statisticians
@@ -234,22 +246,13 @@ modules/pricing/
 │   ├── 12_recommendation_synthesis.R  # Synthesis
 │   └── 13_monadic.R            # Monadic price testing
 ├── lib/
-│   ├── html_report/            # HTML report generation (4-layer)
-│   │   ├── 01_data_transformer.R   # Results → HTML-optimised structure
-│   │   ├── 02_table_builder.R      # HTML table generation
-│   │   ├── 03_page_builder.R       # Full page assembly
-│   │   └── 04_chart_builder.R      # SVG chart generation
-│   └── simulator/              # Interactive simulator dashboard
-│       ├── simulator_builder.R     # R builder (assembles HTML)
-│       ├── css/simulator_styles.css
-│       └── js/
-│           ├── simulator_core.js       # Demand interpolation & sliders
-│           ├── scenario_manager.js     # Preset/battle mode logic
-│           ├── chart_renderer.js       # Interactive SVG charts
-│           └── export_png.js           # Canvas-based PNG export
+│   └── html_simulator/         # The standalone price simulator
+│       ├── 01_simulator_parts.R    # Demand extraction, islands, panel markup
+│       ├── 99_simulator_main.R     # generate_pricing_simulator()
+│       ├── simulator_styles.css
+│       └── js/pricing_simulator.js # Demand interpolation, charts, scenarios
 ├── docs/
 │   ├── README.md                     # This file
-│   ├── MARKETING.md                  # Client-facing overview
 │   ├── AUTHORITATIVE_GUIDE.md        # Deep methodology guide
 │   ├── USER_MANUAL.md                # Complete user guide
 │   ├── TECHNICAL_REFERENCE.md        # Developer documentation
@@ -276,7 +279,6 @@ modules/pricing/
 
 This module includes comprehensive documentation:
 
-1. **[Marketing Guide](MARKETING.md)** - Client-facing overview of pricing capabilities
 2. **[Authoritative Guide](AUTHORITATIVE_GUIDE.md)** - Deep dive into pricing research methodology
 3. **[User Manual](USER_MANUAL.md)** - Complete setup and usage guide
 4. **[Template Guide](Pricing_Config_Template.xlsx)** - Excel configuration template
@@ -300,8 +302,7 @@ This module includes comprehensive documentation:
 For detailed information:
 - **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
 - **Survey Design**: See [Questionnaire Design Guide](QUESTIONNAIRE_DESIGN_GUIDE.md) for question wording, sample sizes, and common mistakes
-- **Method Selection**: See [Methodology Comparison](METHODOLOGY_COMPARISON.md) for strengths, weaknesses, and when to use each method
-- **Clients**: See [Marketing Guide](MARKETING.md) for capabilities overview
+- **Method Selection**: See the TECHNIQUE_GUIDE for when to use each method
 - **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
 - **Examples**: See [Example Workflows](EXAMPLE_WORKFLOWS.md) for practical use cases
 

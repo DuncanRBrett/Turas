@@ -218,7 +218,7 @@ simulate_pricing_responses <- function(respondents, seed = 2026,
 #' @param gg_prefix "GG" for the full ladder, "GGS" for the stop-early copy.
 #' @param stop_early_imputation NULL, or "NO_AFTER_STOP" to opt in.
 #' @param weighted Use the Weight column.
-#' @param html_report,simulator,stats_pack Output switches.
+#' @param simulator,stats_pack Output switches.
 write_pricing_config <- function(path, method = "both",
                                  data_file = "Karoo_Pricing_Data.xlsx",
                                  output_file = "Output/Karoo_Pricing_Results.xlsx",
@@ -227,7 +227,7 @@ write_pricing_config <- function(path, method = "both",
                                  stop_early_imputation = NULL,
                                  weighted = TRUE,
                                  segment_column = "Segment",
-                                 html_report = FALSE, simulator = FALSE,
+                                 simulator = FALSE,
                                  stats_pack = TRUE,
                                  tabs_export = FALSE, question_code = "GGACC",
                                  vw_monotonicity = "drop",
@@ -246,7 +246,6 @@ write_pricing_config <- function(path, method = "both",
     Currency_Symbol = truth$currency,
     Unit_Cost = as.character(truth$unit_cost),
     DK_Codes = "",
-    Generate_HTML_Report = yn(html_report),
     Generate_Simulator = yn(simulator),
     Generate_Stats_Pack = if (isTRUE(stats_pack)) "Y" else "N",
     Generate_Tabs_Export = yn(tabs_export),

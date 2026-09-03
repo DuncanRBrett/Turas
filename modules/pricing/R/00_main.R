@@ -79,7 +79,8 @@ if (file.exists(.guard_path)) {
              "04_gabor_granger.R", "05_visualization.R", "06_output.R",
              "07_wtp_distribution.R", "08_competitive_scenarios.R",
              "09_price_volume_optimisation.R", "10_segmentation.R",
-             "11_price_ladder.R", "12_recommendation_synthesis.R", "13_monadic.R")
+             "11_price_ladder.R", "12_recommendation_synthesis.R", "13_monadic.R",
+             "14_v2_island.R", "15_tabs_export.R")
   for (f in files) {
     p <- file.path(base_dir, f)
     if (file.exists(p)) source(p)
@@ -208,7 +209,9 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
 #'   - diagnostics: Data quality and validation results
 #'   - config: Processed configuration
 #'   - run_result: TRS run result (if TRS infrastructure available)
-#'   - html_report_path: Path to HTML report (if generated)
+#'   - simulator_path: Path to the standalone simulator (if generated)
+#'   - island_path: Path to the interactive report's contribution file
+#'   - tabs_export_path: Path to the crosstab export (if generated)
 #'
 #' @examples
 #' \dontrun{
@@ -558,58 +561,140 @@ run_pricing_analysis_from_config <- function(config) {
   cat(sprintf("   Results written to: %s\n", output_file))
 
   # --------------------------------------------------------------------------
-  # STEP 9: Generate HTML Report (consolidated with simulator)
+  # STEP 8b: Contribute to the interactive (v2) report
   # --------------------------------------------------------------------------
-  html_report_path <- NULL
-  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_simulator)) {
-    cat("\n9. Generating HTML report (consolidated)...\n")
-
-    html_report_main <- NULL
-    possible_paths <- c(
-      file.path(.get_script_dir_for_guard(), "..", "lib", "html_report", "99_html_report_main.R"),
-      file.path(getwd(), "modules", "pricing", "lib", "html_report", "99_html_report_main.R")
+  # A small JSON island beside the workbook. A later tabs run for the same
+  # project names it (the tabs config's pricing_island setting) and the
+  # report gains a Pricing tab. Written every run: it costs nothing when
+  # nobody reads it, and a missing file is the failure mode that wastes an
+  # afternoon. The same arrangement conjoint and maxdiff use.
+  island_path <- NULL
+  if (exists("write_pricing_island", mode = "function")) {
+    island_note <- function(code, text) {
+      cat(sprintf("   ! Interactive-report contribution not written: %s\n", text))
+      message(sprintf("[TRS PARTIAL] %s: %s", code, text))
+      if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(trs_state, code,
+                                "Interactive-report contribution not produced",
+                                problem = text)
+      }
+      NULL
+    }
+    island_result <- tryCatch(
+      write_pricing_island(
+        results = list(
+          method = analysis_method,
+          van_westendorp = vw_results,
+          gabor_granger = gg_results,
+          monadic = monadic_results,
+          synthesis = synthesis,
+          validation = validation,
+          output_path = output_file
+        ),
+        config = config
+      ),
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        island_note(e$code %||% "PRICE_ISLAND_REFUSED", e$problem %||% "refused")
+      },
+      error = function(e) island_note("PRICE_ISLAND_FAILED", conditionMessage(e))
     )
-    for (p in possible_paths) {
-      if (file.exists(p)) { html_report_main <- p; break }
+    if (!is.null(island_result) && identical(island_result$status, "PASS")) {
+      island_path <- island_result$output_file
+    }
+  }
+
+  # --------------------------------------------------------------------------
+  # STEP 8c: Tabs export (opt-in)
+  # --------------------------------------------------------------------------
+  # The filterable half of the pricing lift: the acceptance grid as a
+  # respondent-level Multi_Mention question, so a tabs report can break it by
+  # any banner. Opt-in, because it only makes sense when the same project is
+  # also being crosstabbed.
+  tabs_export_path <- NULL
+  tabs_export <- NULL
+  if (isTRUE(config$generate_tabs_export) && exists("export_pricing_for_tabs", mode = "function")) {
+    cat("\n8b. Writing the tabs export...\n")
+    export_note <- function(code, text) {
+      cat(sprintf("   ! Tabs export not written: %s\n", text))
+      message(sprintf("[TRS PARTIAL] %s: %s", code, text))
+      if (!is.null(trs_state) && exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(trs_state, code, "Tabs export not produced", problem = text)
+      }
+      NULL
+    }
+    export_result <- tryCatch(
+      export_pricing_for_tabs(
+        results = list(
+          van_westendorp = vw_results,
+          gabor_granger = gg_results,
+          monadic = monadic_results,
+          validation = validation,
+          data = data_result$data,
+          output_path = output_file
+        ),
+        config = config
+      ),
+      turas_refusal = function(e) {
+        cat(conditionMessage(e))
+        export_note(e$code %||% "PRICE_TABS_EXPORT_REFUSED", e$problem %||% "refused")
+      },
+      error = function(e) export_note("PRICE_TABS_EXPORT_FAILED", conditionMessage(e))
+    )
+    if (!is.null(export_result) && identical(export_result$status, "PASS")) {
+      tabs_export_path <- export_result$output_file
+      tabs_export <- export_result
+    }
+  }
+
+  # --------------------------------------------------------------------------
+  # STEP 9: The standalone simulator
+  # --------------------------------------------------------------------------
+  # The module's own tabbed HTML report is retired: pricing results appear in
+  # the client's own report as the Pricing tab (step 8b), which is the
+  # migration rule tabs set on 2026-08-05 and conjoint and maxdiff followed.
+  # The simulator survives the retirement as what it always was, a tool: one
+  # self-contained file the Pricing tab links to (programme decision D2).
+  simulator_path <- NULL
+  if (isTRUE(config$generate_simulator)) {
+    cat("\n9. Building the standalone simulator...\n")
+
+    sim_main <- NULL
+    for (p in c(file.path(.get_script_dir_for_guard(), "..", "lib", "html_simulator",
+                          "99_simulator_main.R"),
+                file.path(getwd(), "modules", "pricing", "lib", "html_simulator",
+                          "99_simulator_main.R"))) {
+      if (file.exists(p)) { sim_main <- p; break }
     }
 
-    if (!is.null(html_report_main)) {
+    if (is.null(sim_main)) {
+      cat("   ! Simulator not found beside the module, skipping\n")
+    } else {
       tryCatch({
-        source(html_report_main)
-
-        html_path <- sub("\\.xlsx$", ".html", output_file, ignore.case = TRUE)
-        if (html_path == output_file) {
-          html_path <- paste0(tools::file_path_sans_ext(output_file), ".html")
+        source(sim_main)
+        sim_path <- sub("[.]xlsx$", "_simulator.html", output_file, ignore.case = TRUE)
+        if (identical(sim_path, output_file)) {
+          sim_path <- paste0(tools::file_path_sans_ext(output_file), "_simulator.html")
         }
-
-        full_results <- list(
-          method = analysis_method,
-          results = analysis_results,
-          segment_results = segment_results,
-          ladder_results = ladder_results,
-          synthesis = synthesis,
-          diagnostics = validation
-        )
-
-        # Pass resolved report_dir so child doesn't need sys.frame()
-        resolved_report_dir <- dirname(html_report_main)
-        html_result <- generate_pricing_html_report(full_results, html_path, config,
-                                                     report_dir = resolved_report_dir)
-        if (html_result$status == "PASS") {
-          html_report_path <- html_result$output_file
-          cat(sprintf("   HTML report: %s\n", basename(html_report_path)))
-
-          # Minify for client delivery (if requested via Shiny checkbox)
+        sim_result <- generate_pricing_simulator(
+          results = list(method = analysis_method, results = analysis_results,
+                         segment_results = segment_results),
+          output_path = sim_path, config = config)
+        if (identical(sim_result$status, "PASS")) {
+          simulator_path <- sim_result$output_file
           if (exists("turas_prepare_deliverable", mode = "function")) {
-            turas_prepare_deliverable(html_path)
+            turas_prepare_deliverable(simulator_path)
           }
+        } else {
+          cat(sprintf("   ! Simulator not written: %s\n", sim_result$message))
+          message(sprintf("[TRS PARTIAL] %s: %s",
+                          sim_result$code %||% "PRICE_SIMULATOR_REFUSED",
+                          sim_result$message %||% "refused"))
         }
       }, error = function(e) {
-        message(sprintf("[TRS PARTIAL] PRICE_HTML_FAILED: HTML report generation failed: %s", e$message))
-        cat(sprintf("   ! HTML report failed: %s\n", e$message))
+        message(sprintf("[TRS PARTIAL] PRICE_SIMULATOR_FAILED: %s", conditionMessage(e)))
+        cat(sprintf("   ! Simulator failed: %s\n", conditionMessage(e)))
       })
-    } else {
-      cat("   ! HTML report module not found, skipping\n")
     }
   }
 
@@ -673,7 +758,13 @@ run_pricing_analysis_from_config <- function(config) {
     diagnostics = validation,
     config = config,
     run_result = run_result,
-    html_report_path = html_report_path
+    simulator_path = simulator_path,
+    island_path = island_path,
+    tabs_export_path = tabs_export_path,
+    # The QuestionMap and Options rows the export wrote, so a caller that
+    # builds a tabs config (the integrated demo) does not have to parse them
+    # back out of the workbook.
+    tabs_export = tabs_export
   ))
 }
 
