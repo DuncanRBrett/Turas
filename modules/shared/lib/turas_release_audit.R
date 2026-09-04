@@ -155,7 +155,15 @@ release_audit_cube <- function(body) {
 #' @return The island body as a trimmed string, or NA_character_ when absent.
 #' @keywords internal
 release_island_body <- function(html, island_id) {
-  pat <- paste0("<script[^>]*id=\"", island_id, "\"[^>]*>(.*?)</script>")
+  # (?s) so "." matches a NEWLINE. Without it this matched only an island whose
+  # whole body sat on one line, which is true of the hand-built strings in the
+  # gate and false of every report the template writes: template.html puts a
+  # newline after the opening tag and before the closing one. So the audit read
+  # NO island at all from a real deliverable, reported "Respondent-level island:
+  # absent" on a file carrying every respondent, and passed a client-safe
+  # declaration it should have refused. Found 4 September 2026 while building
+  # the adversary gate against a real report rather than a fixture.
+  pat <- paste0("(?s)<script[^>]*id=\"", island_id, "\"[^>]*>(.*?)</script>")
   m <- regmatches(html, regexpr(pat, html, perl = TRUE))
   if (length(m) == 0L) return(NA_character_)
   body <- sub(paste0("^<script[^>]*id=\"", island_id, "\"[^>]*>"), "", m[1], perl = TRUE)
