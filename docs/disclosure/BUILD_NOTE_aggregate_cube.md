@@ -391,6 +391,36 @@ Islands themselves are safe under minification: `turas_minify` protects every
 
 ---
 
+## The GUI, corrected 4 September after the hardening session
+
+The delivery radio offered two choices while there were three things the file
+could be, and the mode the client-safe path exists for could only be reached by
+declining client safe. Measured before the fix, on a config like SACS's:
+
+| Ticked | What was actually built |
+|---|---|
+| Full report | CUBE, under a label saying the file carries respondent records |
+| Client safe | The cube config thrown away, frozen tables shipped instead |
+
+Both labels were wrong, in opposite directions. The cause was two decisions that
+were each defensible alone: the cube handover said not to touch the GUI, and
+`run_crosstabs` forced the strictest mode whenever the GUI declared client safe.
+
+The rule now lives in one function, `tabs_delivery_interactivity()`. A GUI
+choice sets a FLOOR of protection and can never lower the config's own, ordered
+records, cube, none. "Full report" is a permission rather than an instruction,
+so a project configured to ship aggregates keeps doing so.
+`TURAS_DELIVERY_CLIENT_SAFE` is true for both client-safe choices, because what
+the audit tests is that no respondent island is present and the cube satisfies
+that as fully as the frozen build does.
+
+Proved by building one project five times and reading which island landed:
+records/full to RECORDS, records/interactive to CUBE, records/frozen to NONE,
+cube/full to CUBE, and records with no threshold under interactive to NONE with
+a console box naming `min_reporting_base`.
+
+---
+
 ## Open, for Duncan
 
 1. DONE, 4 September. The comments follow the filter, on Duncan's instruction.
