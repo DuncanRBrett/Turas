@@ -779,6 +779,12 @@
       "context": "Shown wherever the disclosure control speaks",
       "page": "Crosstabs"
     },
+    "qual.cut_unplaceable": {
+      "title": "Some comments cannot be placed in this cut",
+      "text": "{n} comment(s) for this question are not shown in this cut. Their group was too small to name without identifying someone, so this report does not record which cut they belong to. They are still in the unfiltered list.",
+      "context": "Aggregate build. Shown when the k-anonymiser dropped a comment's cut membership",
+      "page": "Qualitative"
+    },
     "qual.cut_withheld": {
       "title": "Comments are not narrowed by this filter",
       "text": "The audience filter does not apply to the comments in this report, because it carries no per-respondent records. Every comment for this question is listed below, for the whole sample. Clear the filter to read them without this notice.",

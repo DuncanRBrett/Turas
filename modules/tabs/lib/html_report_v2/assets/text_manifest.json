@@ -835,5 +835,15 @@
     "page": "Qualitative",
     "context": "A live audience filter cannot be applied to the comments, because this build carries no per-respondent records. Shown on the question card so the comment list is never read as the filtered audience.",
     "tokens": []
+  },
+  "qual.cut_unplaceable": {
+    "page": "Qualitative",
+    "context": "Aggregate build with a live filter. Some comments could not be placed in the cut, because keeping their group would have named a group below the confidentiality threshold.",
+    "tokens": [
+      "n"
+    ],
+    "token_help": {
+      "n": "how many comments could not be placed"
+    }
   }
 }

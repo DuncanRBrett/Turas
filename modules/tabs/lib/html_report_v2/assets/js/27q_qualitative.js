@@ -215,17 +215,49 @@
    * from the one the crosstabs show, under the same filter chip. A wrong
    * audience is worse than no audience.
    */
-  qual.cutServable = function () {
-    // The respondent island being PRESENT is exactly the question: a cube build
-    // sets TR.MICRO to null, and an aggregates-only build never had one. This
-    // is the same test the guard here has always made, named and given a
-    // reason rather than repeated inline in three places.
-    return !!TR.MICRO;
+  qual.cutServable = function (filters) {
+    // The respondent island answers this outright: every comment carries the
+    // index of the person who wrote it, and the cut is a mask over indices.
+    if (TR.MICRO) return true;
+    // Otherwise the comments carry their own cut: which level of each DECLARED
+    // variable the author falls in, k-anonymised at build time. It serves a
+    // filter only when EVERY variable in that filter is one the comments were
+    // tagged with. A filter naming anything else cannot be applied, and a
+    // partly applied filter would be a different audience wearing the same
+    // chip.
+    var vars = (TR.QUAL && TR.QUAL.cutVars) || null;
+    if (!vars || !vars.length) return false;
+    if (!filters || !filters.length) return true;
+    for (var i = 0; i < filters.length; i++) {
+      if (filters[i].box) return false;            // no box variables in the cube
+      if (vars.indexOf(filters[i].q) === -1) return false;
+    }
+    return true;
   };
 
   /** True when a cut is live but cannot be applied to the comments. */
   qual.cutWithheld = function (filters) {
-    return !!(filters && filters.length) && !qual.cutServable();
+    return !!(filters && filters.length) && !qual.cutServable(filters);
+  };
+
+  /**
+   * Records the cut CANNOT place: they carry no level for a variable the filter
+   * names, because the k-anonymiser dropped it to keep the comment's group above
+   * the threshold. They are not in the filtered list, and the tab says how many
+   * there were, because a count that silently shrinks is a count nobody can
+   * reconcile.
+   */
+  qual.unplaceable = function (records, filters) {
+    if (TR.MICRO || !filters || !filters.length) return 0;
+    if (!qual.cutServable(filters)) return 0;
+    var n = 0;
+    (records || []).forEach(function (r) {
+      var cut = r.cut || null;
+      for (var i = 0; i < filters.length; i++) {
+        if (!cut || cut[filters[i].q] === undefined) { n++; return; }
+      }
+    });
+    return n;
   };
 
   /**
@@ -247,10 +279,29 @@
    * the R-side dials already let through. Visible, and never mislabelled.
    */
   qual.maskFilter = function (records, filters) {
-    if (!filters || !filters.length || !TR.stats) return records || [];
-    if (!qual.cutServable()) return records || [];
-    var mask = TR.stats.mask(filters);
-    return (records || []).filter(function (r) { return mask[r.idx] === 1; });
+    if (!filters || !filters.length) return records || [];
+    if (!qual.cutServable(filters)) return records || [];
+    if (TR.MICRO && TR.stats) {
+      var mask = TR.stats.mask(filters);
+      return (records || []).filter(function (r) { return mask[r.idx] === 1; });
+    }
+    // The comments' own cut. A record with no level for a filtered variable is
+    // NOT in the cut: it cannot be placed, and placing it anyway would put a
+    // comment in a group the build already decided was too small to name.
+    var want = filters.map(function (f) {
+      var set = {};
+      (f.rows || []).forEach(function (ri) { set[Number(ri)] = true; });
+      return { q: f.q, set: set };
+    });
+    return (records || []).filter(function (r) {
+      var cut = r.cut;
+      if (!cut) return false;
+      for (var i = 0; i < want.length; i++) {
+        var lv = cut[want[i].q];
+        if (lv === undefined || lv === null || !want[i].set[Number(lv)]) return false;
+      }
+      return true;
+    });
   };
 
   /** The closed<->open jump link for a closed/composite code, or null. The
@@ -1638,10 +1689,22 @@
     // Demographic filtering is the global audience bar's job (composite filters), so there
     // is no per-tab facet row here. Themed questions get an Overview / Crosstab switch. The
     // crosstab supplements the prevalence board, it does not replace it (Overview is default).
-    var withheld = qual.cutWithheld(
-      (TR.d2 && TR.d2.state && TR.d2.state.filters) || null)
-      ? '<p class="ql-cut-withheld" role="status">' + TR.txt("qual.cut_withheld") + "</p>"
-      : "";
+    var liveFilters = (TR.d2 && TR.d2.state && TR.d2.state.filters) || null;
+    var withheld = "";
+    if (qual.cutWithheld(liveFilters)) {
+      withheld = '<p class="ql-cut-withheld" role="status">' +
+        TR.txt("qual.cut_withheld") + "</p>";
+    } else {
+      // The cut IS applied, but the k-anonymiser dropped some comments' group to
+      // keep it above the threshold, so those cannot be placed and are not in
+      // the list. Said out loud: a count that silently shrinks is a count
+      // nobody can reconcile against the table beside it.
+      var lost = qual.unplaceable(q.records, liveFilters);
+      if (lost > 0) {
+        withheld = '<p class="ql-cut-withheld" role="status">' +
+          TR.txt("qual.cut_unplaceable", { n: lost }) + "</p>";
+      }
+    }
     var chart = "";
     if (q.type === "themed") {
       chart = viewToggleHtml(st) +
@@ -2251,10 +2314,14 @@
   // the cards so the select-to-highlight wiring works here too.
 
   function filterItems(items, filters) {
-    if (!filters || !filters.length || !TR.stats) return items;
-    if (!qual.cutServable()) return items;     // unfiltered, and said so, as maskFilter is
-    var mask = TR.stats.mask(filters);
-    return items.filter(function (it) { return mask[it.record.idx] === 1; });
+    if (!filters || !filters.length) return items;
+    if (!qual.cutServable(filters)) return items;   // unfiltered, and said so
+    if (TR.MICRO && TR.stats) {
+      var mask = TR.stats.mask(filters);
+      return items.filter(function (it) { return mask[it.record.idx] === 1; });
+    }
+    var recs = qual.maskFilter(items.map(function (it) { return it.record; }), filters);
+    return items.filter(function (it) { return recs.indexOf(it.record) !== -1; });
   }
 
   // The hub selector bar: "All marks" + a chip per hub (name + pool-resolved count),

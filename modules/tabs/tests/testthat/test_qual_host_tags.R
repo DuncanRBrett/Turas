@@ -217,3 +217,77 @@ test_that("qual_build_data_qual (safe) suppresses a small-band tag end to end", 
   expect_equal(demo_of("Promoter"), "Worcester") # large band -> tag shown
   expect_equal(island$questions[[1]]$split$dim, "NPS band")
 })
+
+# ---- The CUT: a live filter reaching the comments on an aggregate build ------
+# Each comment carries which level of each DECLARED variable its author falls
+# in, using the aggregate cube's own level indices, so nothing has to be matched
+# by label. It is demographic information about a person, so it obeys the same
+# dial and the same k-anonymiser the tags do.
+
+mk_cut_case <- function(cuts, k = 5, n_big = 8, n_small = 2) {
+  mk <- function(id) {
+    list(id = id, text = "x", noteworthy = FALSE, noteworthy_tier = 0L,
+         noteworthy_marker = "", sentiment = NA_integer_, rating = NA_real_,
+         themeVals = list(), demos = list())
+  }
+  ids <- c(paste0("b", seq_len(n_big)), paste0("s", seq_len(n_small)))
+  recs <- lapply(ids, mk)
+  q <- list(code = "QUAL_Q1", title = "Why", type = "raw", sheet = "QUAL_Q1",
+            roles = list(themes = list()), records = recs,
+            meta = list(dropped_codes = 0L, n_records = length(recs)))
+  master <- list(n = length(ids),
+                 id_to_idx = stats::setNames(seq_along(ids) - 1L, ids),
+                 banner_dims = list())
+  # Region: everyone on level 1. Segment: the big group on 1, a group of two on 9.
+  cut_levels <- list(
+    Region = rep(1L, length(ids)),
+    Segment = c(rep(1L, n_big), rep(9L, n_small))
+  )
+  island <- qual_build_data_qual(list(q), master,
+    list(text_mode = "full", demographic_cuts = cuts, min_reporting_base = k),
+    cut_levels = cut_levels)
+  list(island = island, records = island$questions[[1]]$records, ids = ids)
+}
+
+test_that("every comment carries the cut its author falls in", {
+  case <- mk_cut_case("allow")
+  expect_equal(unlist(case$island$cutVars), c("Region", "Segment"))
+  for (r in case$records) {
+    expect_equal(r$cut$Region, 1L)
+    expect_true(r$cut$Segment %in% c(1L, 9L))
+  }
+})
+
+test_that("safe mode drops a cut that would name a group below k", {
+  case <- mk_cut_case("safe", k = 5)
+  segs <- vapply(case$records, function(r) {
+    v <- r$cut$Segment
+    if (is.null(v)) NA_integer_ else as.integer(v)
+  }, integer(1))
+  # The eight in Segment 1 keep it; the two in Segment 9 do not, because naming
+  # that group would name two people. Region survives for everyone: ten share it.
+  expect_equal(sum(segs == 1L, na.rm = TRUE), 8)
+  expect_equal(sum(is.na(segs)), 2)
+  for (r in case$records) expect_equal(r$cut$Region, 1L)
+})
+
+test_that("block ships no cut at all, so the comments follow no filter", {
+  case <- mk_cut_case("block")
+  expect_null(case$island$cutVars)
+  for (r in case$records) expect_null(r$cut)
+})
+
+test_that("no cut levels supplied leaves the island exactly as it was", {
+  mk <- function(id) list(id = id, text = "x", noteworthy = FALSE, noteworthy_tier = 0L,
+                          noteworthy_marker = "", sentiment = NA_integer_, rating = NA_real_,
+                          themeVals = list(), demos = list())
+  recs <- lapply(c("a", "b"), mk)
+  q <- list(code = "QUAL_Q1", title = "Why", type = "raw", sheet = "QUAL_Q1",
+            roles = list(themes = list()), records = recs,
+            meta = list(dropped_codes = 0L, n_records = 2L))
+  master <- list(n = 2, id_to_idx = stats::setNames(0:1, c("a", "b")), banner_dims = list())
+  island <- qual_build_data_qual(list(q), master,
+    list(text_mode = "full", demographic_cuts = "allow", min_reporting_base = 5))
+  expect_null(island$cutVars)
+  for (r in island$questions[[1]]$records) expect_null(r$cut)
+})

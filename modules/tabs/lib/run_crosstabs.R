@@ -1003,6 +1003,7 @@ if (.html_report_v2_on) {
           NULL
         })
       cube <- NULL
+      .cut_levels <- NULL
       if (identical(.interactivity, "cube")) {
         cube <- tryCatch(
           build_cube(micro, dl, config_result$config_obj),
@@ -1021,6 +1022,12 @@ if (.html_report_v2_on) {
           cat("└───────────────────────────────────────────────────────┘\n\n")
           cube <- NULL
         }
+        # Each respondent's level on each declared variable, kept BEFORE the
+        # records go, so the qualitative island can tag every comment with the
+        # cut its author falls in and a live filter can reach the comments. It
+        # is not one value per respondent in the delivered file: it is
+        # k-anonymised per comment on the way in (qual_build_data_qual).
+        .cut_levels <- if (!is.null(cube)) cube$respondent_levels else NULL
         # The respondent list is discarded HERE, whether or not the cube built.
         # A cube run that fell back to the records it was configured to replace
         # would be the exact failure this mode exists to prevent.
@@ -1151,7 +1158,8 @@ if (.html_report_v2_on) {
         qj <- tryCatch(
           build_integrated_qual_island(.qual_wb, config_result$config_obj,
                                         data_result$survey_data, unions = .qual_unions,
-                                        survey_structure = data_result$survey_structure),
+                                        survey_structure = data_result$survey_structure,
+                                        cut_levels = .cut_levels),
           turas_refusal = function(e) {
             # A refused comment workbook must be UNMISSABLE, not a message that
             # scrolls past while the tab silently vanishes from the deliverable.

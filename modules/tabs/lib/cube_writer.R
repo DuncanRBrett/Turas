@@ -605,7 +605,14 @@ build_cube <- function(micro, data_layer, config_obj) {
                      slices_refused = slices_refused),
        blocks_shipped = shipped, blocks_refused = refused,
        slices_shipped = slices_shipped, slices_refused = slices_refused,
-       rejected_vars = rejected_vars)
+       rejected_vars = rejected_vars,
+       # Each respondent's level on each declared variable, NA where they have
+       # none. NOT serialised (serialize_cube strips it): it is one value per
+       # respondent and is exactly what this island exists not to carry. It is
+       # returned so the QUALITATIVE island can tag each comment with the cut
+       # its author falls in, k-anonymised, which is what lets a live filter
+       # reach the comments on a build with no respondent records.
+       respondent_levels = levels_by_var)
 }
 
 
@@ -960,6 +967,7 @@ serialize_cube <- function(cube) {
   out$slices_shipped <- NULL
   out$slices_refused <- NULL
   out$rejected_vars <- NULL
+  out$respondent_levels <- NULL
   jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", null = "null",
                    digits = 8, pretty = FALSE)
 }

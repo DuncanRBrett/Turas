@@ -113,7 +113,7 @@ qual_verbatim_shows <- function(rec, scope) {
 #'   to the pre-I20 shape and the JS stays on legacy idx keying.
 #' @return list(record, redactions).
 qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_labels,
-                                      scope = "all", rid = NULL) {
+                                      scope = "all", rid = NULL, cut = NULL) {
   shows <- qual_verbatim_shows(rec, scope)
   # A withheld verbatim never enters the island as text (build-time confidentiality /
   # curation): no text mode, no PII scrub needed, nothing readable in the page source.
@@ -148,6 +148,22 @@ qual_build_record_island <- function(rec, idx, theme_id_map, text_mode, demo_lab
       demos[[label]] <- if (is.null(value) || is.na(value)) NA_character_ else as.character(value)
     }
     record$demos <- demos
+  }
+  # The CUT: which level of each declared variable this comment's author falls
+  # in, as the same level indices the aggregate cube keys its cells by. It is
+  # what lets a live audience filter reach the comments on a build that carries
+  # no respondent records. Only entries that survived the same k-anonymisation
+  # the demographic tags get are here; a variable this comment cannot be placed
+  # on is ABSENT, and the renderer leaves that comment out of a cut on it rather
+  # than guessing. Omitted entirely when the question does not carry one, so a
+  # records build's island is byte-identical to one built before this existed.
+  if (!is.null(cut) && length(cut)) {
+    kept <- list()
+    for (nm in names(cut)) {
+      v <- cut[[nm]]
+      if (!is.null(v) && length(v) == 1L && !is.na(v)) kept[[nm]] <- as.integer(v)
+    }
+    if (length(kept)) record$cut <- kept
   }
   list(record = record, redactions = applied$redactions)
 }
@@ -246,7 +262,8 @@ qual_kanon_tags_by_group <- function(rows, ids, bands, labels, k) {
 #'   `qual_reader_keys()`. NULL (the default) builds the pre-I20 island shape.
 #' @return The per-question island list (code, title, type, base, themes, records, meta).
 qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labels = character(0),
-                                       demo_map = NULL, scope = "all", rid_map = NULL) {
+                                       demo_map = NULL, scope = "all", rid_map = NULL,
+                                       cut_map = NULL) {
   themes <- question$roles$themes
   theme_list <- lapply(seq_along(themes),
                        function(i) list(id = i - 1L, label = themes[[i]]$label))
@@ -263,7 +280,9 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
     # Same single-bracket lookup discipline as id_to_idx: an id the sidecar has never
     # seen yields NA, which the record builder drops (that record simply keeps idx keying).
     rid <- if (is.null(rid_map)) NULL else unname(rid_map[as.character(rec$id)])
-    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels, scope, rid)
+    cut <- if (is.null(cut_map)) NULL else cut_map[[as.character(rec$id)]]
+    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels, scope,
+                                      rid, cut)
     records[[length(records) + 1L]] <- built$record
     redactions <- redactions + built$redactions
   }
@@ -294,7 +313,8 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
 #'   island <- qual_build_data_qual(res$questions, master,
 #'                                  list(text_mode = "hidden", demographic_cuts = "allow"))
 #' }
-qual_build_data_qual <- function(questions, master, config = list(), rid_map = NULL) {
+qual_build_data_qual <- function(questions, master, config = list(), rid_map = NULL,
+                                 cut_levels = NULL) {
   text_mode <- qual_validate_text_mode(qual_cfg(config, "text_mode", "hidden"))
   raw_cuts <- qual_cfg(config, "demographic_cuts", "allow")
   cuts <- if (identical(raw_cuts, "block")) "block" else
@@ -355,13 +375,64 @@ qual_build_data_qual <- function(questions, master, config = list(), rid_map = N
       demo_map <- qual_kanon_tags_by_group(rows, ids, bands, demo_labels, k)
     }
   }
+  # THE CUT. Which level of each declared variable each comment's author falls
+  # in, so a live audience filter can reach the comments on a build that carries
+  # no respondent records. The levels are the aggregate cube's own, so there is
+  # no label matching between the two: a filter names a variable and some level
+  # indices, and a comment either carries that variable's level or it does not.
+  #
+  # It is DEMOGRAPHIC information about the person who wrote a comment, so it
+  # obeys the same dial the tags do. "block" ships none, and the comments then
+  # do not follow a filter at all, which is the trade that dial already makes.
+  # "safe" runs it through the SAME k-anonymiser, within band, so a comment
+  # carries a variable only while the combination it belongs to still covers at
+  # least k people. Anything finer is dropped, and a comment that cannot be
+  # placed is left out of the cut rather than guessed at.
+  cut_map <- NULL
+  if (!is.null(cut_levels) && length(cut_levels) && !identical(cuts, "block")) {
+    cut_vars <- names(cut_levels)
+    ids <- character(0); bands <- character(0); rows <- list()
+    band_of <- new.env(parent = emptyenv())
+    for (q in questions) for (rec in q$records) {
+      id <- as.character(rec$id)
+      b <- if (is.null(rec$band) || is.na(rec$band)) "" else as.character(rec$band)
+      if (!exists(id, envir = band_of, inherits = FALSE)) {
+        assign(id, b, envir = band_of)
+        slot <- unname(master$id_to_idx[id])
+        row <- stats::setNames(vector("list", length(cut_vars)), cut_vars)
+        if (length(slot) == 1L && !is.na(slot)) {
+          for (v in cut_vars) {
+            lv <- cut_levels[[v]][slot + 1L]
+            row[[v]] <- if (is.na(lv)) NA_character_ else as.character(lv)
+          }
+        } else {
+          for (v in cut_vars) row[[v]] <- NA_character_
+        }
+        ids <- c(ids, id); rows[[length(rows) + 1L]] <- row
+      } else if (nzchar(b) && !nzchar(get(id, envir = band_of, inherits = FALSE))) {
+        assign(id, b, envir = band_of)
+      }
+    }
+    if (length(ids)) {
+      bands <- vapply(ids, function(id) get(id, envir = band_of, inherits = FALSE), character(1))
+      k_cut <- suppressWarnings(as.numeric(qual_cfg(config, "min_reporting_base", 1)))
+      safe <- identical(cuts, "safe") && length(k_cut) == 1L && !is.na(k_cut) && k_cut > 1
+      kept <- if (safe) qual_kanon_tags_by_group(rows, ids, bands, cut_vars, k_cut)
+              else stats::setNames(rows, ids)
+      cut_map <- kept
+    }
+  }
   islands <- lapply(questions,
                     function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels,
-                                                           demo_map, scope, rid_map))
+                                                           demo_map, scope, rid_map, cut_map))
   out <- list(textMode = text_mode, demographicCuts = cuts, noteworthyDefault = default_tier,
               verbatimScope = scope, n = master$n, questions = islands)
   if (length(demo_labels)) {
     out$demographics <- lapply(banner_dims, function(d) list(label = d$label, values = d$values))
   }
+  # Which variables a filter may narrow the comments by. Absent on a records
+  # build, where the respondent island answers the same question and this
+  # machinery is not used at all.
+  if (!is.null(cut_map)) out$cutVars <- as.list(names(cut_levels))
   out
 }

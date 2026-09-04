@@ -195,6 +195,54 @@ assert(qual.maskFilter(recs, [{ q: "Q1", rows: [1] }]).length === 2, "maskFilter
     "and with the island back the number returns, so the check above is not vacuous");
   TR.d2 = savedD2;
 }
+
+// ---- the comments carry their OWN cut, so a filter reaches them -------------
+// On an aggregate build each comment records which level of each DECLARED
+// variable its author falls in, using the cube's own level indices, so there is
+// no label matching between the two. A comment whose group was dropped by the
+// k-anonymiser carries no level for that variable, is left OUT of the cut, and
+// is counted, because a count that silently shrinks is one nobody can reconcile.
+{
+  const savedMicro = TR.MICRO, savedQual = TR.QUAL, savedD2 = TR.d2;
+  const recs2 = [
+    { idx: 0, cut: { Q008: 0, Region: 1 } },
+    { idx: 1, cut: { Q008: 1, Region: 1 } },
+    { idx: 2, cut: { Q008: 0, Region: 2 } },
+    { idx: 3, cut: { Region: 2 } }            // Q008 dropped by the anonymiser
+  ];
+  TR.MICRO = null;
+  TR.QUAL = { cutVars: ["Region", "Q008"],
+    questions: [{ code: "QUAL_SAT", records: recs2 }] };
+  const onQ008 = [{ q: "Q008", rows: [0] }];
+  TR.d2 = { state: { filters: onQ008 } };
+
+  assert(qual.cutServable(onQ008) === true, "a declared variable can be served");
+  assert(qual.cutWithheld(onQ008) === false, "so nothing is withheld");
+  assert(qual.maskFilter(recs2, onQ008).length === 2,
+    "the cut keeps only the two comments on level 0 of Q008");
+  assert(qual.unplaceable(recs2, onQ008) === 1,
+    "and reports the one comment whose Q008 level was anonymised away");
+
+  const both = [{ q: "Q008", rows: [0] }, { q: "Region", rows: [1] }];
+  assert(qual.maskFilter(recs2, both).length === 1, "two variables intersect");
+
+  // A variable the comments were NOT tagged with cannot be served, and a partly
+  // applied filter would be a different audience wearing the same chip.
+  const undeclared = [{ q: "Q055", rows: [0] }];
+  assert(qual.cutServable(undeclared) === false, "an untagged variable is not servable");
+  assert(qual.cutWithheld(undeclared) === true, "so the cut is withheld, not half-applied");
+  assert(qual.maskFilter(recs2, undeclared).length === 4,
+    "and every comment still shows, unfiltered, with the notice");
+  const mixed = [{ q: "Q008", rows: [0] }, { q: "Q055", rows: [0] }];
+  assert(qual.cutServable(mixed) === false,
+    "one untagged variable withholds the WHOLE cut, never a partial one");
+
+  // No cut tags at all: an aggregates-only build, or demographic_cuts = block.
+  TR.QUAL = { questions: [{ code: "QUAL_SAT", records: [{ idx: 0 }] }] };
+  assert(qual.cutServable(onQ008) === false, "no cutVars -> nothing servable");
+
+  TR.MICRO = savedMicro; TR.QUAL = savedQual; TR.d2 = savedD2;
+}
 assert(qual.maskFilter(recs, []).length === 4, "maskFilter with no cut keeps all");
 
 const aff = qual.affordanceHtml("Q28");

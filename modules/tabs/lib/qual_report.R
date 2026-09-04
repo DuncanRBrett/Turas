@@ -82,7 +82,8 @@ qual_refuse_no_themes <- function(qual_workbook, module) {
 #'   The caller falls back to the standalone *_qual_report.html on a non-PASS status.
 #' @export
 build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data, module = "TABS",
-                                         unions = list(), survey_structure = NULL) {
+                                         unions = list(), survey_structure = NULL,
+                                         cut_levels = NULL) {
   qual_path <- qual_resolve_workbook_path(qual_workbook, config_obj)
   read_result <- qual_read_workbook(qual_path, module)          # TRS-refuses on a bad file
   # Reassemble any band-split open-ends (e.g. NPS Detractor/Passive/Promoter sheets) into
@@ -120,7 +121,11 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
     noteworthy_default = config_obj$qual_noteworthy_default,
     verbatim_scope = config_obj$qual_verbatim_scope,
     min_reporting_base = config_obj$min_reporting_base),   # k for "safe" tag anonymisation
-    rid_map = reader_keys$map)
+    rid_map = reader_keys$map,
+    # Per-respondent level on each DECLARED variable, from the aggregate cube's
+    # own definitions. Supplied only on a cube build; NULL everywhere else, so a
+    # records build's qual island is unchanged.
+    cut_levels = cut_levels)
   list(status = "PASS", json = serialize_data_qual(island), island = island,
        matched = joined$matched, total = joined$total, id_column = joined$id_column)
 }
