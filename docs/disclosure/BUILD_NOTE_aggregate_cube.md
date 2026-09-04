@@ -106,6 +106,34 @@ three declared variables on 200 respondents.
 
 ---
 
+## A records build renders identically, before and after
+
+Duncan's question, answered by measurement rather than by reading the diff.
+
+The same data layer and the same respondent island were rendered twice: once
+through `main` at 9acd7b1b, once through this branch. Nineteen URL states,
+every tab, filters, a custom category banner, a custom NET banner and all three
+module tabs. Every one identical, the Report tab included, which is where a
+CUBE build differs and a records build must not.
+
+The comparison is not accidentally a file against itself: `main` reports its
+computed source as "?" because `stats.source()` is a function this branch adds,
+and the branch reports "micro".
+
+Reproduce with `RECORDS=<main build> CUBE=<branch build> python3
+docs/disclosure/experiments/cube_render_compare.py <fragments...>`.
+
+The R side is gated rather than compared, and the gates are one-line reads:
+`dl_suppress_subk_columns` returns unchanged unless the mode is `cube` or
+`none`; the cube branch in `run_crosstabs.R` is inside
+`identical(.interactivity, "cube")`; `build_report_v2_html` inlines `null` when
+no cube is passed. The one thing that DOES change on a records build is the
+release audit, which now sees the island it could never see before. A records
+build declared client-safe used to pass silently and now refuses, which is the
+fix working.
+
+---
+
 ## Deviations from the design
 
 Each of these is a place where the design left something open or where
