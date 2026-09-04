@@ -646,7 +646,11 @@ test_that("full pipeline verbose mode produces output", {
   )
 
   expect_true(any(grepl("Minification Summary", output, fixed = TRUE)))
-  expect_true(any(grepl("Reduction", output, fixed = TRUE)))
+  # "Size", not "Reduction": a hardened deliverable is larger than the
+  # development build, and "Reduction: 115.2% larger" is not a sentence.
+  expect_true(any(grepl("Size:", output, fixed = TRUE)))
+  expect_true(any(grepl("smaller", output, fixed = TRUE) |
+                  grepl("larger", output, fixed = TRUE)))
 })
 
 test_that("full pipeline is idempotent (re-minify does not corrupt)", {

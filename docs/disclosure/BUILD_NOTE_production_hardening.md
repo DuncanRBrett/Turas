@@ -260,7 +260,7 @@ dev copy.
 
 | suite | before | after |
 |---|---|---|
-| `test_turas_minify.R` | 234 passed, 0 failed | 277 passed, 0 failed |
+| `test_turas_minify.R` | 234 passed, 0 failed | 278 passed, 0 failed |
 | tabs testthat | 5,468 (quoted from `29b5e158`, not measured here) | 5,700 passed, 0 failed, 1 skipped |
 | node gate suite | 1,091 passed, 42 files | 1,145 passed, 45 files |
 | `test_minify_render_gate.R` | did not exist | 116 passed, 0 failed, 0 skipped |
