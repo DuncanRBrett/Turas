@@ -221,14 +221,85 @@ test_that("cube_block_ok admits an empty cell and refuses a sub-k one", {
   expect_true(cube_block_ok(c(0, 1, 2), 1))       # k = 1 is off
 })
 
-test_that("a refused block is written as null, not as a thinned block", {
-  # k = 4 with three respondents per banner column: every Grp block fails.
+test_that("a published banner margin suppresses the CELL, not the whole cut", {
+  # The banner is what the workbook already prints column by column, base by
+  # base, with the sub-k columns blanked. So a small column withholds its own
+  # answers and every other column still reports. The whole-block rule there
+  # cost a whole cut for one small group.
+  cube <- build_cube(fixture_micro(), fixture_layer(), fixture_config(k = 3))
+  grp <- cube$slices[["Grp"]]
+  expect_false(is.null(grp))
+  # Q2's answered base is 3 in column A (r1, r2, r3) and 2 in column B (r4, r5),
+  # so column B is under k and column A is not.
+  q2 <- grp$q$Q2
+  expect_false(is.null(q2))
+  expect_null(q2[["1"]]$sup)                    # 3 answered, ships in full
+  expect_false(is.null(q2[["1"]]$r))
+  expect_true(isTRUE(q2[["2"]]$sup))            # 2 answered, base only
+  expect_equal(q2[["2"]]$b[1], 2)
+  for (key in c("r", "n", "x", "s", "m", "sr", "rt", "d", "nb")) {
+    expect_null(q2[["2"]][[key]], info = key)
+  }
+  # The headcount of a banner column is the workbook's own base row, so it is
+  # never withheld.
+  expect_equal(grp$cells[["2"]]$a[1], 3)
+})
+
+test_that("a suppressed banner cell survives the round trip as base only", {
+  cube <- build_cube(fixture_micro(), fixture_layer(), fixture_config(k = 3))
+  back <- jsonlite::fromJSON(serialize_cube(cube), simplifyVector = FALSE)
+  cell <- back$slices$Grp$q$Q2[["2"]]
+  expect_true(isTRUE(cell$sup))
+  expect_equal(length(cell$b), 3)
+  expect_setequal(names(cell), c("b", "sup"))
+})
+
+test_that("a block with nothing above k is still refused outright", {
+  # k = 4: no Grp column reaches 4 answered on Q2, so there is nothing to show
+  # and the block is null rather than a table of blanks.
   cube <- build_cube(fixture_micro(), fixture_layer(), fixture_config(k = 4))
-  expect_true(is.null(cube$slices[["Grp"]]))
-  json <- serialize_cube(cube)
-  back <- jsonlite::fromJSON(json, simplifyVector = FALSE)
-  expect_true("Grp" %in% names(back$slices))
-  expect_null(back$slices$Grp)
+  grp <- cube$slices[["Grp"]]
+  expect_false(is.null(grp))                    # the headcounts still ship
+  expect_true("Q2" %in% names(grp$q))
+  expect_null(grp$q$Q2)
+  back <- jsonlite::fromJSON(serialize_cube(cube), simplifyVector = FALSE)
+  expect_true("Q2" %in% names(back$slices$Grp$q))
+  expect_null(back$slices$Grp$q$Q2)
+})
+
+test_that("a CROSSING keeps the whole-block rule, because nobody published it", {
+  # Grp x Q1 is a cut the workbook never printed. A cell withheld on its own
+  # there is recovered by subtraction from a margin the cube itself shipped, so
+  # the block goes whole or not at all.
+  layer <- fixture_layer()
+  cfg <- fixture_config(k = 3, filter_vars = "Q1")
+  cube <- build_cube(fixture_micro(), layer, cfg)
+  cross <- cube$slices[["Grp*Q1"]]
+  if (!is.null(cross) && !is.null(cross$q$Q2)) {
+    for (cell in cross$q$Q2) {
+      expect_null(cell$sup)                     # never per-cell on a crossing
+      expect_gte(cell$b[1], 3)
+    }
+  } else {
+    expect_true(is.null(cross) || is.null(cross$q$Q2))
+  }
+})
+
+test_that("a declared QUESTION variable is not a published margin", {
+  # Q1 is a declared filter variable, not a banner. Q1 by anything is a cut the
+  # workbook never printed, so its own order-1 slice keeps the whole-block rule.
+  layer <- fixture_layer()
+  cfg <- fixture_config(k = 3, filter_vars = "Q1")
+  cube <- build_cube(fixture_micro(), layer, cfg)
+  sl <- cube$slices[["Q1"]]
+  if (!is.null(sl)) {
+    for (code in names(sl$q)) {
+      blk <- sl$q[[code]]
+      if (is.null(blk)) next
+      for (cell in blk) expect_null(cell$sup)
+    }
+  }
+  expect_true(TRUE)
 })
 
 test_that("the whole sample still ships when a finer slice does not", {

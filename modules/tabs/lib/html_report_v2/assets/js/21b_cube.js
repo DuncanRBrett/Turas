@@ -166,7 +166,8 @@
       var whole = records(code, mask, null, source);
       var part = records(code, mask, col.of, source);
       if (!whole || !part) return null;
-      return { add: whole.add, sub: part.add };
+      return { add: whole.add, sub: part.add,
+        withheld: whole.withheld || part.withheld };
     }
     var vars = requiredVars(mask, col);
     if (vars.length > TR.CUBE.order) return null;
@@ -179,15 +180,26 @@
     var selVars = Object.keys(sel);
     var cs = colSel(col);
     var out = [];
+    var withheld = false;
     cellIndex(key).forEach(function (c) {
       for (var i = 0; i < selVars.length; i++) {
         if (sel[selVars[i]].indexOf(c.lv[selVars[i]]) === -1) return;
       }
       if (cs && cs.levels.indexOf(c.lv[cs.var]) === -1) return;
       var rec = block[c.key];
-      if (rec) out.push(rec);
+      if (rec) {
+        // A cell that ships its base and no answers. Its group is under k on a
+        // published banner margin, exactly as that column is blanked in the
+        // workbook. The BASE still counts, so the column reports who is in it;
+        // the figures do not, and the caller blanks them rather than reading
+        // absent answers as zeros. That matters most when a selection mixes a
+        // shipped cell with a withheld one: the base would clear k and the
+        // percentages would silently be computed off part of the group.
+        if (rec.sup) withheld = true;
+        out.push(rec);
+      }
     });
-    return { add: out, sub: [] };
+    return { add: out, sub: [], withheld: withheld };
   }
   cube._records = records;
 
@@ -458,8 +470,14 @@
         counts[cat.index] = rs ? sumMap(rs, "r", cat.index) : 0;
       });
       var b = sumTuple(rs, "b", 3);
-      return { base: b[0], counts: counts, wbase: b[1],
+      var out = { base: b[0], counts: counts, wbase: b[1],
         effBase: effectiveBase(b[1], b[2]) };
+      // computedModel calls tabulate for every column before anything else, so
+      // this is where the withheld flag reaches the view. The column then
+      // blanks whole, through the disclosure pass that already blanks a
+      // below-threshold column.
+      if (rs && rs.withheld) out.withheld = true;
+      return out;
     });
   };
 

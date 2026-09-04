@@ -245,6 +245,9 @@
         // the renderer only shows them on a weighted report.
         baseW: canRecompute ? tabs[i].wbase : null,
         baseEff: canRecompute ? tabs[i].effBase : null,
+        // The source shipped this column's BASE and withheld its answers. Its
+        // figures must not be computed from what is left.
+        withheld: !!tabs[i].withheld,
         low: canRecompute && tabs[i].base < threshold };
     });
 
@@ -695,7 +698,10 @@
     var gone = [];
     viewModel.columns.forEach(function (col, ci) {
       var base = col.base;
-      if (base == null || base === 0 || base >= minBase) return;
+      // A column the SOURCE withheld is blanked whatever its base says. A
+      // selection that mixes a withheld cell with a reported one can clear the
+      // threshold on headcount while carrying only part of the answers.
+      if (!col.withheld && (base == null || base === 0 || base >= minBase)) return;
       col.suppressed = true;
       if (col.letter) gone.push(col.letter);
       viewModel.rows.forEach(function (row) {

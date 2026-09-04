@@ -526,6 +526,7 @@ build_cube <- function(micro, data_layer, config_obj) {
   refused <- 0L
   slices_shipped <- 0L
   slices_refused <- 0L
+  cells_suppressed <- 0L
   # A block ships only when every projection of it ships. Computed in increasing
   # order so the projections are already decided; that makes "every projection
   # of a shipped block is shipped" an invariant of the file, not an assertion
@@ -537,6 +538,23 @@ build_cube <- function(micro, data_layer, config_obj) {
     key <- cube_slice_key(vars)
     projections <- if (length(vars) <= 1) list()
       else lapply(seq_along(vars), function(i) cube_slice_key(vars[-i]))
+    # A one-variable slice on a BANNER variable IS that banner, and the
+    # published crosstab already prints it column by column, base by base, with
+    # the sub-k columns blanked. So withholding its small cells one at a time
+    # exposes nothing the workbook does not already expose, and the whole-block
+    # rule there costs a whole cut for one small group: a department of one
+    # takes every other department with it.
+    #
+    # Every OTHER slice is a crossing nobody published. There the whole-block
+    # rule stands, because a cell withheld on its own is recovered exactly by
+    # subtraction from a margin the cube itself shipped, which was measured on
+    # the demo and reproduced the withheld distribution.
+    #
+    # The two rules cannot contradict each other. If a banner cell is under k,
+    # every finer cell inside it is smaller still, so no order-2 block
+    # containing it can pass the whole-block rule and be summed back up.
+    published_margin <- length(vars) == 1L &&
+      identical(defs[[vars[1]]]$kind, "banner")
 
     cell_of <- cube_cell_ids(vars, levels_by_var, n)
     if (is.null(cell_of$ids)) {
@@ -551,7 +569,9 @@ build_cube <- function(micro, data_layer, config_obj) {
 
     # Audience: everyone in the cell, no question condition.
     aud <- cube_aggregate(cbind(n = 1, sw = w, sw2 = w * w), ids, length(keys), present)
-    aud_ok <- cube_block_ok(aud[, "n"], k) &&
+    # A banner column's headcount is the published base row. Gating it would
+    # withhold a number the workbook prints.
+    aud_ok <- (published_margin || cube_block_ok(aud[, "n"], k)) &&
       all(vapply(projections, function(p) isTRUE(ok_audience[[p]]), logical(1)))
     ok_audience[[key]] <- aud_ok
     if (!aud_ok) {
@@ -577,7 +597,18 @@ build_cube <- function(micro, data_layer, config_obj) {
       f <- fields[[code]]
       agg <- cube_aggregate(f$mat, ids, length(keys), present)
       bases <- agg[, "b.n"]
-      block_ok <- cube_block_ok(bases, k) &&
+      # On a published margin the cells are suppressed one at a time; the block
+      # still has to carry SOMETHING, so it is refused only when nothing in it
+      # clears the threshold.
+      suppress <- if (published_margin) (bases > 0 & bases < k) else rep(FALSE, length(bases))
+      # An EMPTY block (nobody anywhere answered this question) ships as it
+      # always did: the published table prints those columns with a base of 0
+      # and dashes, and calling that "withheld" would claim a protection that is
+      # really just an unanswered question. A margin is refused only when it
+      # HAS data and none of it clears the threshold.
+      block_ok <- if (published_margin) (!any(bases > 0) || any(bases >= k))
+                  else cube_block_ok(bases, k)
+      block_ok <- block_ok &&
         all(vapply(projections, function(p) {
           isTRUE(ok_block[[paste0(p, "//", code)]])
         }, logical(1)))
@@ -588,7 +619,9 @@ build_cube <- function(micro, data_layer, config_obj) {
         next
       }
       shipped <- shipped + 1L
-      qblocks[[code]] <- cube_block_cells(agg, keys, f, k, weighted, ids, present)
+      if (any(suppress)) cells_suppressed <- cells_suppressed + sum(suppress)
+      qblocks[[code]] <- cube_block_cells(agg, keys, f, k, weighted, ids, present,
+                                          suppress)
     }
     slices[[key]] <- list(cells = cells, q = qblocks)
   }
@@ -602,10 +635,12 @@ build_cube <- function(micro, data_layer, config_obj) {
        slices = slices,
        blocks = list(shipped = shipped, refused = refused,
                      slices_shipped = slices_shipped,
-                     slices_refused = slices_refused),
+                     slices_refused = slices_refused,
+                     cells_suppressed = cells_suppressed),
        blocks_shipped = shipped, blocks_refused = refused,
        slices_shipped = slices_shipped, slices_refused = slices_refused,
        rejected_vars = rejected_vars,
+       cells_suppressed = cells_suppressed,
        # Each respondent's level on each declared variable, NA where they have
        # none. NOT serialised (serialize_cube strips it): it is one value per
        # respondent and is exactly what this island exists not to carry. It is
@@ -662,8 +697,15 @@ cube_aggregate <- function(mat, ids, ncell, present) {
 #' Every optional record type is present for EVERY cell of the block or absent
 #' from the whole block, gated on its own count by the same k. A mixed block
 #' would let the missing cells be recovered from the margin.
+#'
+#' `suppress` marks cells that ship their BASE and nothing else. Only a
+#' published banner margin sets it: there the base is the workbook's own base
+#' row, and withholding the answers is what the workbook does with a column
+#' under k. The record carries `sup` so the renderer blanks the column outright
+#' rather than reading absent answers as zeros.
 #' @keywords internal
-cube_block_cells <- function(agg, keys, f, k, weighted, ids, present) {
+cube_block_cells <- function(agg, keys, f, k, weighted, ids, present,
+                             suppress = NULL) {
   cn <- colnames(agg)
   pick <- function(prefix) cn[startsWith(cn, prefix)]
 
@@ -697,6 +739,12 @@ cube_block_cells <- function(agg, keys, f, k, weighted, ids, present) {
   for (ci in seq_along(keys)) {
     if (!occupied[ci]) next
     rec <- list(b = cube_round(c(agg[ci, "b.n"], agg[ci, "b.sw"], agg[ci, "b.sw2"])))
+    if (!is.null(suppress) && isTRUE(suppress[ci])) {
+      # Base only. The answers of a group this small do not enter the file.
+      rec$sup <- TRUE
+      out[[keys[ci]]] <- rec
+      next
+    }
     if (nb_ok) {
       rec$nb <- cube_round(c(agg[ci, "nb.n"], agg[ci, "nb.sw"], agg[ci, "nb.sw2"]))
     }
@@ -968,6 +1016,7 @@ serialize_cube <- function(cube) {
   out$slices_refused <- NULL
   out$rejected_vars <- NULL
   out$respondent_levels <- NULL
+  out$cells_suppressed <- NULL
   jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", null = "null",
                    digits = 8, pretty = FALSE)
 }

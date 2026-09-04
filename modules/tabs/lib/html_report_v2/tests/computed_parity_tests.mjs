@@ -533,6 +533,108 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
   });
 }
 
+/* ---------------------------------------------------------------------------
+   CP-5. A WITHHELD cell blanks its column, and takes nothing else with it.
+
+   On a published banner margin the cube suppresses the CELL, not the cut: a
+   department of one withholds its own answers and every other department still
+   reports, which is exactly what the workbook does with a column under k.
+
+   The cell ships its BASE and no answers. Two things have to follow. The
+   column must blank rather than read the absent answers as zeros. And a
+   selection that MIXES a withheld cell with a reported one must blank too,
+   because its headcount can clear the threshold while its figures would be
+   computed off only part of the group.
+--------------------------------------------------------------------------- */
+console.log("\nComputed parity. CP-5: a withheld cell blanks its column:");
+
+function withheldFixture() {
+  const TR = makeEngine();
+  const agg = {
+    schema_version: 2,
+    project: { name: "T", low_base_threshold: 1, min_reporting_base: 5,
+      alpha: 0.05, format: {} },
+    columns: [
+      { label: "Total", group: "total", letter: "" },
+      { label: "Big", group: "Dept", letter: "A" },
+      { label: "Small", group: "Dept", letter: "B" }
+    ],
+    banner_groups: [{ id: "Dept", name: "Department" }],
+    categories: [],
+    questions: [{
+      code: "Q1", title: "Q1", category: "", type: "single",
+      bases: [{ n: 21 }, { n: 20 }, { n: 1 }],
+      rows: [
+        { kind: "category", label: "Yes", pct: [50, 50, 100], n: [11, 10, 1], sig: ["", "", ""] },
+        { kind: "category", label: "No", pct: [50, 50, 0], n: [10, 10, 0], sig: ["", "", ""] }
+      ]
+    }]
+  };
+  const cube = {
+    schema_version: 1, n: 21, k: 5, order: 2, weighted: false,
+    vars: { Dept: { kind: "banner", levels: [1, 2] } },
+    questions: { Q1: { has: ["answers"] } },
+    slices: {
+      "*": { cells: { "*": { a: [21, 21, 21] } },
+        q: { Q1: { "*": { b: [21, 21, 21], r: { "0": 11, "1": 10 } } } } },
+      Dept: {
+        cells: { "1": { a: [20, 20, 20] }, "2": { a: [1, 1, 1] } },
+        q: { Q1: {
+          "1": { b: [20, 20, 20], r: { "0": 10, "1": 10 } },
+          "2": { b: [1, 1, 1], sup: true }      // the department of one
+        } }
+      }
+    },
+    blocks: { shipped: 2, refused: 0 }
+  };
+  install(TR, agg, null, cube);
+  return TR;
+}
+
+run("the small column blanks; the big one reports", () => {
+  const TR = withheldFixture();
+  const q = TR.d2.questionByCode("Q1");
+  // The COMPUTED path, which is what a filter or a custom banner takes. The
+  // default unfiltered banner view reads the published table instead, where the
+  // same column is already blanked before serialisation on a cube build.
+  const m = TR.model._computedModel(q, "Dept", [], false);
+  TR.model._applyDisclosureSuppression(m);
+  eq(m.source, "computed", "the cube serves the view");
+  eq(m.columns.length, 3, "Total plus both departments");
+  // The base of a banner column is the workbook's own base row, so it is shown.
+  eq(m.columns[2].base, 1, "the small column still states its headcount");
+  eq(m.columns[2].suppressed, true, "and is blanked");
+  const yes = m.rows.filter((r) => r.label === "Yes")[0];
+  eq(yes.cells[2].pct, null, "no percentage for the withheld column");
+  eq(yes.cells[2].n, null, "and no count");
+  // The whole point: the other department is unaffected.
+  eq(m.columns[1].base, 20, "the big column reports its base");
+  assert(!m.columns[1].suppressed, "and is not blanked");
+  eq(Math.round(yes.cells[1].pct), 50, "and reports its figure");
+  eq(Math.round(yes.cells[0].pct), 52, "as does Total");
+});
+
+run("a selection mixing a withheld cell with a reported one blanks too", () => {
+  const TR = withheldFixture();
+  const q = TR.d2.questionByCode("Q1");
+  // One custom column over BOTH departments. Headcount 21, well over k, but the
+  // answers of one of them are not in the file.
+  const spec = TR.stats.columnsFor("Dept");
+  const both = { label: "Both", letter: "", sel: { "var": "Dept", levels: [1, 2] } };
+  const tab = TR.stats.tabulate(q, [both], TR.stats.mask([]))[0];
+  eq(tab.base, 21, "the headcount is the whole banner");
+  eq(tab.withheld, true, "and the lookup says its answers are incomplete");
+  assert(tab.base >= 5, "so the threshold alone would NOT have caught this");
+});
+
+run("a filter onto the withheld group is refused, not answered from nothing", () => {
+  const TR = withheldFixture();
+  const q = TR.d2.questionByCode("Q1");
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Dept", rows: [2] }], {});
+  const yes = m.rows.filter((r) => r.label === "Yes")[0];
+  eq(yes.cells[0].pct, null, "the Total column carries no figure for a group of one");
+});
+
 runCubeConfiguration("unweighted", "parity_island.json", "parity_micro.json",
   "parity_cube.json");
 runCubeConfiguration("weighted", "parity_island_weighted.json",

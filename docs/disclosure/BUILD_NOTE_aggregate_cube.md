@@ -155,12 +155,46 @@ design's question record carries `robust_range` only. `meanFindings` in
 `27d_diffs.js` also derives `scaleMin` and `scaleMax` from the full score
 vector, and the median needs the distinct score values. All three added.
 
-**4. The audience block is gated by the same rule as a question block, and a
-refused audience refuses the whole slice.** The design gates question blocks
-and is silent on the audience record. The filter bar, `disclosure.audienceBase`
-and the Reader all count those cells, so shipping them while withholding the
-questions would still say how many people sit in a cut of three. On the demo
-this costs nothing: every order-2 audience cell clears k.
+**4. The whole-block rule applies to CROSSINGS. A published banner margin
+suppresses the cell.** Revised 4 September after Duncan pushed back, and he was
+right.
+
+The design makes every block ship whole or not at all, on the subtraction
+argument: a cell withheld on its own is recovered exactly from the margin that
+remains. That argument holds for a CROSSING of two variables, which nobody
+published. It does not hold for a banner on its own, because the workbook
+already prints that banner column by column, with its base row, and blanks the
+columns under k. Withholding one of those cells gives away nothing the
+deliverable does not already give away.
+
+Measured on SACS 2026: under the whole-block rule a department of one person
+took every other department with it, and 209 of 286 blocks were refused. Under
+the revised rule every single-variable cut works on all 26 questions, 130 blocks
+ship, and 225 individual cells are withheld. Confirmed on the published table
+too: Total minus the columns with a base of 5 or more already yields the
+withheld columns' combined figure, so the workbook has always allowed it.
+
+So: a one-variable slice on a BANNER variable ships per cell. A cell under k
+ships its BASE and nothing else, marked `sup`, and the renderer blanks that
+column outright rather than reading absent answers as zeros. Everything else,
+every crossing and every one-variable slice on a declared filter QUESTION that
+is not a banner, keeps the whole-block rule.
+
+The two rules cannot contradict each other. If a banner cell is under k, every
+finer cell inside it is smaller still, so no crossing containing it can pass the
+whole-block rule and be summed back up.
+
+Three consequences, each gated. A selection that MIXES a withheld cell with a
+reported one blanks too, because its headcount can clear the threshold while its
+figures would come from only part of the group. An EMPTY block still ships, so
+an unanswered question reads as dashes rather than as a withholding that never
+happened. And the audience headcounts of a banner margin are never gated, being
+the workbook's own base row.
+
+The residual is stated plainly: on a banner margin the cube is exactly as
+exposed as the crosstab beside it, no more and no less. Closing the workbook's
+own subtraction residual (suppressing a complement) is the separate increment
+`22_model.js` has flagged since before this work.
 
 **5. Monotonicity is enforced, not asserted.** The design states "every
 projection of a shipped block is shipped" as a property to test. It is not
