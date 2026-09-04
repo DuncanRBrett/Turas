@@ -134,18 +134,31 @@
   function openPicker(asBanner) {
     var holder = document.getElementById("fpicker");
     var onCube = !!(TR.cube && TR.cube.active());
+    var offer = filterBar.pickableQuestions();
     holder.hidden = false;
+    // An aggregate build with no DECLARED filter variables can cut by nothing,
+    // and an empty list would read as a bug. Say what the report was built to
+    // do, and what would have to change, rather than showing a search box over
+    // nothing.
+    if (onCube && !offer.length) {
+      holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
+        (asBanner ? "Cross every table by…" : "Filter the whole report by…") +
+        '<button data-close aria-label="Close">✕</button></div>' +
+        '<p class="fpick-empty">' + TR.txt("cube.picker.none") + "</p></div>";
+      holder.querySelector("[data-close]").addEventListener("click", function () {
+        holder.hidden = true;
+      });
+      return;
+    }
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      (asBanner
-        ? (onCube ? "Cross every table by…" : "Cross every table by…")
-        : "Filter the whole report by…") +
+      (asBanner ? "Cross every table by…" : "Filter the whole report by…") +
       '<button data-close aria-label="Close">✕</button></div>' +
       (onCube
         ? '<p class="fpick-note">This report carries aggregate figures only, ' +
           'so the cuts below are the ones it was built to answer.</p>'
         : "") +
       '<input type="search" id="fpick-search" placeholder="Search questions…">' +
-      '<div class="fpick-list">' + filterBar.pickableQuestions().map(function (q) {
+      '<div class="fpick-list">' + offer.map(function (q) {
         return '<button class="fpick-q" data-code="' + q.code + '" data-search="' +
           fmt.escapeHtml((q.code + " " + q.title).toLowerCase()) + '">' +
           '<span class="qc">' + q.code + "</span> " + fmt.escapeHtml(q.title) +

@@ -825,5 +825,10 @@
     "token_help": {
       "k": "the confidentiality threshold"
     }
+  },
+  "cube.picker.none": {
+    "page": "Crosstabs",
+    "context": "Aggregate build with no declared filter variables. Shown when the reader opens the filter or banner picker and the report was not built to cut by anything.",
+    "tokens": []
   }
 }

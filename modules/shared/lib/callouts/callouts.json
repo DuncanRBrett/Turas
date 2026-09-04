@@ -779,6 +779,12 @@
       "context": "Shown wherever the disclosure control speaks",
       "page": "Crosstabs"
     },
+    "cube.picker.none": {
+      "title": "No cuts available in this report",
+      "text": "This report carries aggregate figures only, and it was not built to cut by any question. The tables and every banner still work. To add cuts, name the questions on the Settings sheet under html_report_v2_filter_vars and rebuild.",
+      "context": "Aggregate build. Shown when the filter or banner picker has nothing to offer",
+      "page": "Crosstabs"
+    },
     "cube.refuse.order": {
       "title": "Cut not available: too many variables",
       "text": "This cut is not available in this report. Filters combine up to {order} variables, on the declared variables only.",
