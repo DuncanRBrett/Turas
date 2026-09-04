@@ -164,6 +164,62 @@ test_that("no-micro ship (html_report_v2_microdata = FALSE): null island, NO res
   expect_true(grepl("\"weights\"", html_on, fixed = TRUE))
 })
 
+test_that("cube and none builds blank sub-k published columns BEFORE serialisation", {
+  # A build with no respondent records holds the PUBLISHED table to the same
+  # rule as the cube beside it. Otherwise the cube withholds a block the moment
+  # one cell falls under k, while the margin next to it still carries the same
+  # column's figures in the page source.
+  q <- make_dl_q_single()
+  q$bases[["Gender::Female"]] <- list(unweighted = 3, weighted = 3, effective = 3)
+
+  female_pct <- function(dl) {
+    rows <- dl$questions[[1]]$rows
+    yes <- Filter(function(r) identical(r$label, "Yes"), rows)[[1]]
+    yes$pct[[3]]
+  }
+  female_n <- function(dl) {
+    rows <- dl$questions[[1]]$rows
+    yes <- Filter(function(r) identical(r$label, "Yes"), rows)[[1]]
+    yes$n[[3]]
+  }
+
+  # records (the default): the figures stay, exactly as they always have.
+  keep <- build_data_layer(list(Q1 = q), make_dl_banner_info(),
+                           make_dl_config(min_reporting_base = 10))
+  expect_false(is.na(female_pct(keep)))
+  expect_equal(keep$questions[[1]]$bases[[3]]$n, 3)
+
+  for (mode in c("cube", "none")) {
+    dl <- build_data_layer(list(Q1 = q), make_dl_banner_info(),
+                           make_dl_config(min_reporting_base = 10,
+                                          html_report_v2_interactivity = mode))
+    expect_true(is.na(female_pct(dl)), info = mode)
+    expect_true(is.na(female_n(dl)), info = mode)
+    # The BASE survives: the renderer reads it to label the column withheld,
+    # and a reader is entitled to know the group exists and is too small.
+    expect_equal(dl$questions[[1]]$bases[[3]]$n, 3, info = mode)
+    # The columns that DO clear k are untouched.
+    expect_false(is.na(dl$questions[[1]]$rows[[1]]$pct[[2]]), info = mode)
+    # And it is gone from the SERIALISED island, which is what actually ships.
+    back <- jsonlite::fromJSON(serialize_data_layer(dl), simplifyVector = FALSE)
+    yes_row <- Filter(function(r) identical(r$label, "Yes"), back$questions[[1]]$rows)[[1]]
+    expect_null(yes_row$pct[[3]], info = mode)
+    expect_null(yes_row$n[[3]], info = mode)
+    expect_false(is.null(yes_row$pct[[2]]), info = mode)
+    expect_equal(back$questions[[1]]$bases[[3]]$n, 3, info = mode)
+  }
+})
+
+test_that("blanking is off with no threshold, so an unprotected build is unchanged", {
+  q <- make_dl_q_single()
+  q$bases[["Gender::Female"]] <- list(unweighted = 3, weighted = 3, effective = 3)
+  dl <- build_data_layer(list(Q1 = q), make_dl_banner_info(),
+                         make_dl_config(html_report_v2_interactivity = "none"))
+  rows <- dl$questions[[1]]$rows
+  yes <- Filter(function(r) identical(r$label, "Yes"), rows)[[1]]
+  expect_false(is.na(yes$pct[[3]]))
+})
+
 test_that("escapes </ inside the embedded JSON so it cannot break the script", {
   q <- make_dl_q_single()
   q$question_text <- "Closing tag </script> attempt"

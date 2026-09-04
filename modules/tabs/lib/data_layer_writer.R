@@ -1275,6 +1275,79 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   # AI callouts + executive summary (read from the AI sidecar by the caller and
   # passed in). Omitted entirely when AI insights are off or nothing surfaced.
   if (!is.null(ai)) dl$ai <- ai
+  dl <- dl_suppress_subk_columns(dl, config_obj)
+  dl
+}
+
+
+#' Blank sub-k published columns before the layer is serialised
+#'
+#' On a records build, `applyDisclosureSuppression` (22_model.js) blanks a
+#' below-threshold column at RENDER time, and the figures stay in `data-agg`
+#' where anyone reading the page source can see them. That is a viewing
+#' convenience, and it was always honest about being one: the delivery manifest
+#' says so in as many words.
+#'
+#' On a build that carries no respondent records it stops being enough. The
+#' aggregate cube withholds a whole block the moment one of its cells falls
+#' below k, so if the published table beside it still carried the same column's
+#' figures, the cube would be held to a stricter rule than the margin next to
+#' it, and the margin would leak exactly what the cube withheld.
+#'
+#' So on `cube` and `none` builds the figures go before serialisation. The BASE
+#' stays, because the renderer's existing suppression reads it to label the
+#' column as withheld, and because a base is what tells a reader the group
+#' exists and is too small to report on. A base of 0 is left alone: it is
+#' already no value, and it discloses nothing.
+#'
+#' Tracking is unaffected. `published_wave_contribution()` (tracking_island.R)
+#' writes `tracking_total_base()`, which is the TOTAL column, and no per-segment
+#' figures at all; `attachDeltas` in 22w_waves.js reads `row.cells[0]` and
+#' `columns[0]`, the Total column again. Verified this session before anything
+#' was nulled.
+#'
+#' @param dl The built data layer
+#' @param config_obj The built config object
+#' @return The data layer, with sub-k column figures nulled on cube/none builds
+#' @keywords internal
+dl_suppress_subk_columns <- function(dl, config_obj) {
+  mode <- tolower(trimws(as.character(
+    config_obj$html_report_v2_interactivity %||% "records")[1]))
+  if (!(mode %in% c("cube", "none"))) return(dl)
+  k <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
+  if (length(k) != 1L || is.na(k) || k <= 1) return(dl)
+
+  blanked <- 0L
+  for (qi in seq_along(dl$questions)) {
+    q <- dl$questions[[qi]]
+    if (is.null(q$bases) || is.null(q$rows)) next
+    gone <- integer(0)
+    for (ci in seq_along(q$bases)) {
+      bn <- suppressWarnings(as.numeric(q$bases[[ci]]$n))
+      if (!is.na(bn) && bn > 0 && bn < k) gone <- c(gone, ci)
+    }
+    if (!length(gone)) next
+    blanked <- blanked + length(gone)
+    for (ri in seq_along(q$rows)) {
+      r <- q$rows[[ri]]
+      for (ci in gone) {
+        # pct carries the MEAN on a mean-kind row (the renderer moves it), so
+        # nulling it covers both.
+        if (!is.null(r$pct) && length(r$pct) >= ci) r$pct[[ci]] <- NA
+        if (!is.null(r$n) && length(r$n) >= ci) r$n[[ci]] <- NA
+        if (!is.null(r$sig) && length(r$sig) >= ci) r$sig[[ci]] <- ""
+        if (!is.null(r$sig2) && length(r$sig2) >= ci) r$sig2[[ci]] <- ""
+      }
+      q$rows[[ri]] <- r
+    }
+    dl$questions[[qi]] <- q
+  }
+  if (blanked > 0L) {
+    cat(sprintf(paste0(
+      "  Disclosure: %d published column(s) below min_reporting_base = %s ",
+      "blanked BEFORE serialisation.\n"), blanked, format(k)))
+    cat("    On this build the withheld numbers are not in the page source either.\n")
+  }
   dl
 }
 
