@@ -76,7 +76,8 @@ tabs_microdata_wanted <- function(config_obj,
 #'
 #' @keywords internal
 tabs_delivery_manifest <- function(micro, qual_json, config_obj,
-                                   output_file = NULL, cube = NULL) {
+                                   output_file = NULL, cube = NULL,
+                                   excluded_renderers = character(0)) {
   cfg <- config_obj %||% list()
   has_micro <- !is.null(micro)
   n <- if (has_micro) suppressWarnings(as.integer(micro$n %||% NA_integer_)) else NA_integer_
@@ -177,12 +178,36 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
     }
   }
 
+  # What the client deliverable step will do to this file. The manifest is
+  # printed at write time, before turas_minify() runs, so this says what is
+  # about to happen rather than what happened.
+  deliverable <- isTRUE(get0("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv))
+  lines <- c(lines,
+    "│",
+    paste0("│ ", pad("Client deliverable step"), ": ",
+           if (deliverable) "YES, a minified copy will be written" else
+             "NO, this is a development build"),
+    paste0("│ ", pad("Data islands in the copy"), ": ",
+           if (deliverable) "encoded" else "plain JSON"))
+  if (deliverable) {
+    lines <- c(lines,
+      "│ Encoding stops reading and grepping. It does not stop a developer.",
+      "│ Any downstream tool that reads the islands must use the _dev copy.")
+  }
+  lines <- c(lines,
+    paste0("│ ", pad("Analysis renderers dropped"), ": ",
+           if (length(excluded_renderers))
+             paste(sub("^[0-9]+[a-z]?_", "", sub("\\.js$", "", excluded_renderers)),
+                   collapse = ", ")
+           else "none"))
+
   lines <- c(lines,
              "└──────────────────────────────────────────────────────────────┘")
 
   list(lines = lines, microdata = has_micro, n = n, restricted = has_micro,
        cube = has_cube, cube_k = cube_k, cube_order = cube_order,
-       cube_blocks_shipped = cube_shipped, cube_blocks_refused = cube_refused)
+       cube_blocks_shipped = cube_shipped, cube_blocks_refused = cube_refused,
+       deliverable = deliverable, excluded_renderers = excluded_renderers)
 }
 
 
@@ -195,8 +220,10 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
 #' @return The manifest list, invisibly.
 #' @keywords internal
 tabs_print_delivery_manifest <- function(micro, qual_json, config_obj,
-                                         output_file = NULL, cube = NULL) {
-  m <- tabs_delivery_manifest(micro, qual_json, config_obj, output_file, cube)
+                                         output_file = NULL, cube = NULL,
+                                         excluded_renderers = character(0)) {
+  m <- tabs_delivery_manifest(micro, qual_json, config_obj, output_file, cube,
+                              excluded_renderers)
   cat("\n")
   cat(paste0(m$lines, collapse = "\n"))
   cat("\n\n")

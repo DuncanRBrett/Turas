@@ -16,6 +16,9 @@
 #   records   respondent island present, live filters recompute from it
 #   cube      respondent island absent, the aggregate cube answers filters
 #   plain     neither, the published tables only
+#   contrib   every contribution island present (conjoint, maxdiff, pricing,
+#             qualitative), which is what exercises renderer inclusion. The
+#             other three carry none, so they exercise stripping.
 #
 # Usage:
 #   source("modules/tabs/tests/fixtures/parity_project/build_gate_reports.R")
@@ -63,6 +66,18 @@ build_gate_reports <- function(out_dir,
   micro <- read_island("parity_micro.json")
   cube <- read_island("parity_cube.json")
 
+  # The contribution islands, lifted from the synthetic Karoo demo so the gate
+  # has a report that needs the conjoint, maxdiff, pricing and qualitative
+  # renderers. Without one, module stripping would only ever be tested in the
+  # direction that removes things.
+  contrib <- jsonlite::fromJSON(
+    file.path(fixture_dir, "contribution_islands.json"), simplifyVector = TRUE)
+  qual_path <- file.path(turas_root, "modules", "tabs", "tests", "fixtures",
+                         "qual_island", "qual_island.json")
+  qual <- if (file.exists(qual_path)) {
+    paste(readLines(qual_path, warn = FALSE), collapse = "\n")
+  } else NULL
+
   config_obj <- list(
     project_title = "Render gate fixture",
     client_name = "Gate", wave = "Wave 1",
@@ -91,5 +106,8 @@ build_gate_reports <- function(out_dir,
 
   c(records = build_one("gate_records.html", micro_json = micro),
     cube    = build_one("gate_cube.html", cube_json = cube),
-    plain   = build_one("gate_plain.html"))
+    plain   = build_one("gate_plain.html"),
+    contrib = build_one("gate_contrib.html", micro_json = micro,
+                        cj_json = contrib$cj, md_json = contrib$md,
+                        pr_json = contrib$pr, qual_json = qual))
 }

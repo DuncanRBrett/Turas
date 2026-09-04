@@ -200,7 +200,7 @@ test_that("a report without pricing is identical whether or not pr_json is named
   expect_identical(a, b)
   # The island tag is there but empty, so no Pricing tab can appear.
   expect_true(grepl('id="data-pr"', a, fixed = TRUE))
-  expect_true(grepl('id="data-pr">\nnull', a, fixed = TRUE))
+  expect_true(grepl('id="data-pr"[^>]*>\\s*null', a))
 })
 
 test_that("a pricing island is inlined and escaped into the built report", {

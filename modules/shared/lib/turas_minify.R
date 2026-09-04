@@ -49,22 +49,85 @@
 # now a refusal rather than a quietly unobfuscated file.
 .MINIFY_TOOL_TIMEOUT_SECS <- 180L
 
-# javascript-obfuscator config — written to a temp JSON file per invocation.
-# renameGlobals=false: 676+ inline onclick handlers reference top-level functions.
-# renameProperties=false: window.TurasPins.move() in dynamic onclick strings.
-# stringArray + base64: primary IP protection — extracts all string literals
-# into an encoded array, making casual reading impossible.
+# javascript-obfuscator config, written to a temp JSON file per invocation and
+# mirrored for the node gates in minify_profile.json.
+#
+# What survived the previous settings was property names and the one string in
+# five that stringArrayThreshold 0.8 left alone. Raising the threshold to 1.0
+# with rotation, index shift and wrappers, plus calls transform, split strings,
+# transformObjectKeys, simplify and mangled-shuffled names, takes every measured
+# readable identifier to zero. Measured 4 September 2026 on the Karoo demo:
+# renderTab 4 to 0, encodeHash 2 to 0, coverFindings 1 to 0, zPrimary 1 to 0,
+# activeQ 8 to 1. Cost is size, which Duncan has said is not a concern, and
+# tens of milliseconds of boot.
+#
+# What is deliberately still false, and why:
+#   renameGlobals       the legacy reports carry inline onclick handlers that
+#                       reference top-level functions by name. 829 in the v1
+#                       tabs demo, 59 in pricing. Renaming them is a dead button.
+#   renameProperties    the renderer reads island keys straight off the JSON
+#                       (q.code, col.base). A renamed accessor against an
+#                       unrenamed key is a silent null, not an error.
+#   controlFlowFlattening, deadCodeInjection
+#                       measured: neither reduced any survivor count, because
+#                       the settings above already reach zero. Flattening is the
+#                       transform most likely to surface an edge case in a
+#                       statistics engine years from now.
+#   selfDefending, debugProtection, domainLock
+#                       this file must still open, offline, in 2029.
+#   numbersToExpressions
+#                       it rewrites the constants in a statistics engine for no
+#                       readability gain.
+#   identifierNamesGenerator: "mangled-shuffled"
+#                       measured to break the Conjoint simulator: under the
+#                       seed below it produced "Uncaught TypeError: Cannot read
+#                       properties of undefined (reading 'charAt')" on every
+#                       build, and removing the setting cleared it on every
+#                       build. Its only effect is what the already-mangled local
+#                       names look like, so it buys no measured readability: the
+#                       survivor counts are identical with and without it. A
+#                       setting whose safety depends on which seed you picked
+#                       does not belong in a file a client opens.
+#   transformObjectKeys measured to break the MaxDiff simulator. It rewrites an
+#                       object literal into staged computed-key assignments, and
+#                       the simulator's donut arc came out as
+#                       "A 50 50 0 0 1 NaN NaN" in 3 of 20 builds, so the chart
+#                       did not draw. Removing it: 0 of 34 builds. It was the
+#                       only one of the five settings that changed anything.
+#                       Bisected 4 September 2026 by a build-then-render loop,
+#                       because at a 15 percent rate a single sample says
+#                       nothing.
+#
+# seed is fixed on purpose. stringArrayShuffle and mangled-shuffled names
+# otherwise make every build different, which is why the bisect above needed 14
+# builds per variant to say anything, and which would make any future "the gate
+# failed" report unreproducible. With a fixed seed the gate tests the bytes that
+# ship, and a failure can be reproduced exactly.
+#
+# Changing any of this moves every module's deliverable at once. The gates are
+# production_bundle_tests.mjs and test_minify_render_gate.R; run both.
 .MINIFY_OBFUSCATOR_CONFIG_JSON <- '{
   "compact": true,
+  "simplify": true,
   "stringArray": true,
-  "stringArrayThreshold": 0.8,
+  "stringArrayThreshold": 1,
   "stringArrayEncoding": ["base64"],
   "stringArrayShuffle": true,
+  "stringArrayRotate": true,
+  "stringArrayIndexShift": true,
+  "stringArrayWrappersCount": 2,
+  "stringArrayWrappersType": "function",
+  "stringArrayWrappersChainedCalls": true,
+  "stringArrayCallsTransform": true,
+  "stringArrayCallsTransformThreshold": 0.5,
+  "splitStrings": true,
+  "splitStringsChunkLength": 12,
+  "seed": 20260904,
   "controlFlowFlattening": false,
+  "deadCodeInjection": false,
   "renameGlobals": false,
   "renameProperties": false,
   "selfDefending": false,
-  "deadCodeInjection": false,
   "disableConsoleOutput": false,
   "log": false
 }'
@@ -503,6 +566,107 @@
   }
 
   list(content = minified, success = TRUE)
+}
+
+
+# -- Data island encoding -----------------------------------------------------
+
+#' Keystream for the island encoder
+#'
+#' A linear congruential generator, seeded per build. Every step is a multiply,
+#' an add and a modulo, and 1664525 * (2^32 - 1) + 1013904223 is about 7.1e15,
+#' comfortably under 2^53. That is the whole reason for this generator: R and
+#' JavaScript agree on the bytes without either side needing bit operations on
+#' values a double cannot hold.
+#'
+#' One stream is generated per build and sliced per island, because every island
+#' restarts from the same seed. The JavaScript half is decodeIsland() in
+#' modules/tabs/lib/html_report_v2/assets/js/24_shell.js.
+#'
+#' @param seed Integer seed, 1 to 2^31 - 1.
+#' @param n Length in bytes.
+#' @return Integer vector of n bytes, each 0 to 255.
+#' @keywords internal
+.minify_keystream <- function(seed, n) {
+  if (n <= 0L) return(integer(0))
+  out <- integer(n)
+  x <- as.numeric(seed)
+  for (i in seq_len(n)) {
+    x <- (1664525 * x + 1013904223) %% 4294967296
+    out[i] <- x %/% 16777216
+  }
+  out
+}
+
+#' Encode one island body
+#'
+#' UTF-8 bytes, XORed against the keystream, base64. Not encryption: the key is
+#' in the file. It stops the report being read, grepped, or pasted into a tool
+#' that expects JSON. It does not stop a developer.
+#'
+#' @param text The island body, exactly as it sits in the HTML.
+#' @param keystream Integer vector from .minify_keystream(), at least nchar long.
+#' @return Base64 character string.
+#' @keywords internal
+.minify_encode_island <- function(text, keystream) {
+  bytes <- as.integer(charToRaw(enc2utf8(text)))
+  n <- length(bytes)
+  if (n == 0L) return("")
+  if (length(keystream) < n) {
+    stop("[CALC_MINIFY_KEYSTREAM_SHORT] keystream shorter than the island")
+  }
+  jsonlite::base64_enc(as.raw(bitwXor(bytes, keystream[seq_len(n)])))
+}
+
+#' Decode one island body, for the round-trip test
+#'
+#' @param b64 Base64 string from .minify_encode_island().
+#' @param keystream The same keystream.
+#' @return The original text.
+#' @keywords internal
+.minify_decode_island <- function(b64, keystream) {
+  if (!nzchar(b64)) return("")
+  bytes <- as.integer(jsonlite::base64_dec(b64))
+  rawToChar(as.raw(bitwXor(bytes, keystream[seq_along(bytes)])))
+}
+
+#' Encode every marked island in a finished HTML string
+#'
+#' Marked means the open tag carries data-island="v2". user-state is not marked:
+#' saveCopy() writes it in the browser, from JavaScript that has no encoder.
+#' Islands whose body is "null" are left alone, and so is any island that
+#' already carries a data-k, so that re-minifying a file, or minifying a hub
+#' built from finished reports, cannot encode the same bytes twice.
+#'
+#' @param html The finished HTML.
+#' @param seed Integer seed for this build.
+#' @return List with html, count, and seed.
+#' @keywords internal
+.minify_encode_islands <- function(html, seed) {
+  blocks <- .minify_extract_blocks(html, "script")
+  targets <- Filter(function(b) {
+    identical(b$type, "application/json") &&
+      grepl("data-island\\s*=\\s*[\"\']v2[\"\']", b$open_tag, perl = TRUE) &&
+      !grepl("data-k\\s*=", b$open_tag, perl = TRUE) &&
+      nzchar(trimws(b$content)) &&
+      !identical(trimws(b$content), "null")
+  }, blocks)
+  if (length(targets) == 0L) return(list(html = html, count = 0L, seed = seed))
+
+  longest <- max(vapply(targets, function(b) nchar(b$content, type = "bytes"),
+                        integer(1)))
+  keystream <- .minify_keystream(seed, longest)
+
+  # Back to front, so an earlier block's positions stay valid.
+  ord <- order(vapply(targets, function(b) b$start, numeric(1)), decreasing = TRUE)
+  for (b in targets[ord]) {
+    encoded <- .minify_encode_island(b$content, keystream)
+    open_tag <- sub(">$", sprintf(" data-k=\"%d\">", seed), b$open_tag)
+    replacement <- paste0(open_tag, encoded, "</script>")
+    html <- paste0(substr(html, 1L, b$start - 1L), replacement,
+                   substr(html, b$end + 1L, nchar(html)))
+  }
+  list(html = html, count = length(targets), seed = seed)
 }
 
 
@@ -976,7 +1140,7 @@ turas_minify <- function(input_path,
   if (minify_css && length(css_blocks) > 0L) {
     for (i in seq_along(css_blocks)) {
       if (!nzchar(css_blocks[[i]]$content)) {
-        css_minified_contents[[i]] <- NULL
+        # Not `<- NULL`. See the note in the JS minify loop below.
         next
       }
       result <- .minify_css_block(css_blocks[[i]]$content, tools$cleancss)
@@ -984,7 +1148,7 @@ turas_minify <- function(input_path,
         css_minified_contents[[i]] <- result$content
         css_processed <- css_processed + 1L
       } else {
-        css_minified_contents[[i]] <- NULL
+        # Not `<- NULL`. See the note in the JS minify loop below.
         add_warning(sprintf("CSS block %d failed to minify, kept original", i))
       }
     }
@@ -1008,12 +1172,24 @@ turas_minify <- function(input_path,
 
       # Skip non-JS blocks
       if (block$type %in% c("application/json", "text/plain")) {
-        js_minified_contents[[i]] <- NULL
+      # Leave the preallocated NULL in place rather than assigning NULL, which
+      # DELETES the element and shortens the list, so every later index no
+      # longer lines up with `blocks`. Real reports survived only because their
+      # last script block is the JS one, and the final real assignment extended
+      # the list back to length. A document whose last script block is a JSON
+      # island errored in .minify_replace_blocks() with a subscript out of
+      # bounds (found 4 September 2026 by the island encoding fixture).
         next
       }
 
       if (!nzchar(block$content)) {
-        js_minified_contents[[i]] <- NULL
+      # Leave the preallocated NULL in place rather than assigning NULL, which
+      # DELETES the element and shortens the list, so every later index no
+      # longer lines up with `blocks`. Real reports survived only because their
+      # last script block is the JS one, and the final real assignment extended
+      # the list back to length. A document whose last script block is a JSON
+      # island errored in .minify_replace_blocks() with a subscript out of
+      # bounds (found 4 September 2026 by the island encoding fixture).
         next
       }
 
@@ -1023,7 +1199,9 @@ turas_minify <- function(input_path,
         js_minified_contents[[i]] <- result$content
         js_processed <- js_processed + 1L
       } else {
-        js_minified_contents[[i]] <- NULL
+        # Not `<- NULL`, which would delete the element and shift every later
+        # index. The slot is already NULL, which .minify_replace_blocks() reads
+        # as "leave this block alone".
         add_warning(sprintf("JS block %d failed to minify, kept original", i))
       }
     }
@@ -1055,11 +1233,23 @@ turas_minify <- function(input_path,
 
       # Skip non-JS blocks
       if (block$type %in% c("application/json", "text/plain")) {
-        obf_contents[[i]] <- NULL
+      # Leave the preallocated NULL in place rather than assigning NULL, which
+      # DELETES the element and shortens the list, so every later index no
+      # longer lines up with `blocks`. Real reports survived only because their
+      # last script block is the JS one, and the final real assignment extended
+      # the list back to length. A document whose last script block is a JSON
+      # island errored in .minify_replace_blocks() with a subscript out of
+      # bounds (found 4 September 2026 by the island encoding fixture).
         next
       }
       if (!nzchar(block$content)) {
-        obf_contents[[i]] <- NULL
+      # Leave the preallocated NULL in place rather than assigning NULL, which
+      # DELETES the element and shortens the list, so every later index no
+      # longer lines up with `blocks`. Real reports survived only because their
+      # last script block is the JS one, and the final real assignment extended
+      # the list back to length. A document whose last script block is a JSON
+      # island errored in .minify_replace_blocks() with a subscript out of
+      # bounds (found 4 September 2026 by the island encoding fixture).
         next
       }
 
@@ -1089,7 +1279,7 @@ turas_minify <- function(input_path,
               "Or clear the client deliverable checkbox to keep a development build."))
         }
       } else {
-        obf_contents[[i]] <- NULL
+        # Not `<- NULL`. See the note in the minify loop above.
         add_warning(sprintf("JS block %d failed to obfuscate, kept minified version", i))
       }
     }
@@ -1152,6 +1342,48 @@ turas_minify <- function(input_path,
   release <- if (exists("turas_release_audit", mode = "function")) {
     turas_release_audit(html, client_safe = isTRUE(client_safe), refuse = TRUE)
   } else NULL
+
+  # -- Step 8c: Encode the data islands ---------------------------------------
+  # After the audit, not before. The audit reads "n": out of the respondent
+  # island to say what the delivered file contains, and once the island is
+  # encoded it can no longer see it, so an audit run afterwards would report the
+  # island absent, which is the wrong answer. Nothing after this point disturbs
+  # base64: the build tag is a separate element and html-minifier-terser has
+  # already run.
+  islands_encoded <- 0L
+  island_seed <- NA_integer_
+  if (isTRUE(deliverable) && requireNamespace("jsonlite", quietly = TRUE)) {
+    island_seed <- sample.int(2147483647L, 1L)
+    enc <- tryCatch(.minify_encode_islands(html, island_seed), error = function(e) e)
+    if (inherits(enc, "error")) {
+      cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+      cat("| Context:    Minify, step 8c, client deliverable build\n")
+      cat("| Code:       CALC_MINIFY_ISLAND_ENCODE_FAILED\n")
+      cat("| Message:   ", conditionMessage(enc), "\n")
+      cat("+-------------------------------------------------------------+\n\n")
+      turas_refuse(
+        code = "CALC_MINIFY_ISLAND_ENCODE_FAILED",
+        title = "The data islands could not be encoded",
+        problem = paste("Island encoding failed:", conditionMessage(enc)),
+        why_it_matters = paste(
+          "The islands carry the tables, and in a records build the respondent",
+          "rows. Writing them in plain sight was what this build was meant to",
+          "stop, so it refuses rather than shipping them readable."),
+        how_to_fix = c(
+          "Report the message above, it names the island that failed",
+          "Or clear the client deliverable checkbox to keep a development build."),
+        module = "MINIFY"
+      )
+    }
+    html <- enc$html
+    islands_encoded <- enc$count
+    if (verbose && islands_encoded > 0L) {
+      cat(sprintf("  Islands encoded: %d\n", islands_encoded))
+    }
+  }
+  if (is.list(release)) {
+    release$islands_encoded <- islands_encoded > 0L
+  }
 
   # -- Step 9: Write output ---------------------------------------------------
   output_dir <- dirname(output_path)
@@ -1228,6 +1460,8 @@ turas_minify <- function(input_path,
     verification_summary = verification$summary,
     client_safe = isTRUE(client_safe),
     deliverable = isTRUE(deliverable),
+    islands_encoded = islands_encoded,
+    island_seed = island_seed,
     release_audit = release,
     warnings = warnings_acc
   )

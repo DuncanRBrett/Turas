@@ -45,13 +45,20 @@ report_v2_assets_dir <- function() {
 #' @param assets_dir The vendored assets directory
 #' @return A single JS string
 #' @export
-bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
+bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir(),
+                                exclude = character(0)) {
   js_dir <- file.path(assets_dir, "js")
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
   all_js <- sort(basename(list.files(js_dir, pattern = "\\.js$")))
   v2_js <- setdiff(all_js, .REPORT_V2_ENGINE_MODULES)
   ordered <- c(.REPORT_V2_ENGINE_MODULES, v2_js)
+  # A renderer whose island the build did not produce is dead weight in the
+  # file and a readable description of an analysis the client did not buy.
+  # build_report_v2_html() decides what to exclude, and asserts on both sides
+  # that no island is left without its renderer, because the failure mode
+  # otherwise is a silently dead tab.
+  if (length(exclude)) ordered <- setdiff(ordered, exclude)
 
   missing <- ordered[!file.exists(file.path(js_dir, ordered))]
   if (length(missing) > 0) {
@@ -218,7 +225,36 @@ build_report_v2_html <- function(data_json, config_obj,
   } else "null"
 
   .report_v2_load_text_layer(assets_dir)
-  js_bundle <- bundle_report_v2_js(assets_dir)
+
+  # Which renderers this report actually needs. An island that is the string
+  # "null" was not produced, so its renderer has nothing to draw.
+  has_island <- function(inlined) !identical(inlined, "null")
+  renderer_for <- list(
+    "27x_conjoint.js"    = has_island(cj_inlined),
+    "27y_maxdiff.js"     = has_island(md_inlined),
+    "27z_pricing.js"     = has_island(pr_inlined),
+    "27q_qualitative.js" = has_island(qual_inlined)
+  )
+  exclude <- names(renderer_for)[!vapply(renderer_for, isTRUE, logical(1))]
+  # The self test is a development aid. It never runs for a client and it
+  # describes the engine's internals in plain text.
+  deliverable_build <- isTRUE(get0("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv))
+  if (deliverable_build) exclude <- c(exclude, "31_selftest.js")
+
+  # The assertion that makes stripping safe on the R side. The JavaScript half
+  # is in shell.boot(): a non-null island whose renderer is absent calls
+  # fatal(IO_RENDERER_MISSING) rather than showing an empty tab.
+  js_dir <- file.path(assets_dir, "js")
+  for (mod in names(renderer_for)) {
+    if (isTRUE(renderer_for[[mod]]) && !file.exists(file.path(js_dir, mod))) {
+      stop(sprintf(
+        "[CFG_REPORT_V2_RENDERER_MISSING] the report carries the island %s needs, but %s is not in %s",
+        mod, mod, js_dir))
+    }
+  }
+
+  js_bundle <- bundle_report_v2_js(assets_dir, exclude = exclude)
+  attr(js_bundle, "excluded") <- exclude
 
   # The report's authored prose (explainers, legends, method notes). Read from
   # the shared callout registry and checked against the renderer's manifest,
@@ -312,5 +348,6 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
 
   size_mb <- file.info(output_path)$size / 1024 / 1024
   cat(sprintf("  Report v2: %s (%.2f MB)\n", basename(output_path), size_mb))
-  list(status = "PASS", output_file = output_path, file_size_mb = size_mb)
+  list(status = "PASS", output_file = output_path, file_size_mb = size_mb,
+       excluded_renderers = attr(html, "excluded") %||% character(0))
 }

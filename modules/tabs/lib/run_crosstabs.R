@@ -1263,7 +1263,8 @@ if (.html_report_v2_on) {
     if (!is.null(report_v2_result) && identical(report_v2_result$status, "PASS")) {
       .manifest <- tabs_print_delivery_manifest(
         micro, qual_json_main, config_result$config_obj,
-        report_v2_result$output_file, cube = cube)
+        report_v2_result$output_file, cube = cube,
+        excluded_renderers = report_v2_result$excluded_renderers %||% character(0))
       assign("TURAS_LAST_DELIVERY_MANIFEST", .manifest, envir = .GlobalEnv)
     }
 

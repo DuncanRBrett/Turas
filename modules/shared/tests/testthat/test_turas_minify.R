@@ -1442,3 +1442,128 @@ test_that("the maxdiff example report obfuscates every real block with no warnin
   expect_equal(res$js_blocks_obfuscated, res$js_blocks_processed)
   expect_equal(sum(grepl("failed to obfuscate", res$warnings)), 0L)
 })
+
+
+# ==============================================================================
+# 20. DATA ISLAND ENCODING
+# ==============================================================================
+# A client deliverable encodes each marked island so the report cannot be read,
+# grepped, or pasted into a tool that expects JSON. It is not encryption: the
+# key is in the file. The JavaScript half is decodeIsland() in 24_shell.js and
+# the two are pinned against each other by
+# modules/tabs/lib/html_report_v2/tests/island_encoding_tests.mjs.
+
+.island_html <- function(k_attr = "") {
+  paste0(
+    '<html><body>\n',
+    '<script type="application/json" id="data-agg" data-island="v2">',
+    '{"questions":[{"code":"Q001"}]}</script>\n',
+    '<script type="application/json" id="data-micro" data-island="v2"', k_attr, '>',
+    '{"n":3,"weights":[1,1,1]}</script>\n',
+    '<script type="application/json" id="data-qual" data-island="v2">null</script>\n',
+    '<script type="application/json" id="user-state">null</script>\n',
+    '<script type="application/json" id="sim-data">{"unmarked":true}</script>\n',
+    '</body></html>'
+  )
+}
+
+test_that("the keystream is deterministic and byte-valued", {
+  a <- .minify_keystream(42L, 64L)
+  b <- .minify_keystream(42L, 64L)
+  expect_identical(a, b)
+  expect_length(a, 64L)
+  expect_true(all(a >= 0L & a <= 255L))
+  expect_false(identical(a, .minify_keystream(43L, 64L)))
+})
+
+test_that("an island survives encode then decode, ASCII and UTF-8 alike", {
+  cases <- c(
+    ascii   = '{"a":1,"b":"plain"}',
+    utf8    = '{"v":"an em dash \u2014, an emoji \U0001F600, and \u00e9"}',
+    escaped = '{"html":"\\u003c/script\\u003e then \\u003c!-- comment"}'
+  )
+  ks <- .minify_keystream(99L, max(nchar(cases, type = "bytes")))
+  for (nm in names(cases)) {
+    enc <- .minify_encode_island(cases[[nm]], ks)
+    expect_identical(.minify_decode_island(enc, ks), enc2utf8(cases[[nm]]),
+                     info = nm)
+    expect_error(jsonlite::fromJSON(enc), info = nm)
+  }
+})
+
+test_that("only marked, non-null islands are encoded", {
+  res <- .minify_encode_islands(.island_html(), 12345L)
+  expect_equal(res$count, 2L)                       # data-agg and data-micro
+  expect_true(grepl('id="data-agg" data-island="v2" data-k="12345"', res$html,
+                    fixed = TRUE))
+  # null bodies, unmarked islands and user-state are left exactly as they were
+  expect_true(grepl('id="data-qual" data-island="v2">null<', res$html, fixed = TRUE))
+  expect_true(grepl('id="user-state">null<', res$html, fixed = TRUE))
+  expect_true(grepl('id="sim-data">{"unmarked":true}<', res$html, fixed = TRUE))
+})
+
+test_that("an island that already carries data-k is not encoded twice", {
+  # report_hub minifies a hub built from finished reports, and re-minifying a
+  # file is an existing supported case. Encoding twice would leave the browser
+  # decoding one layer and finding base64.
+  once <- .minify_encode_islands(.island_html(), 777L)
+  twice <- .minify_encode_islands(once$html, 888L)
+  expect_equal(twice$count, 0L)
+  expect_identical(twice$html, once$html)
+})
+
+test_that("a development build leaves every island readable", {
+  skip_if_not(.has_terser(), "terser not available")
+  tmp <- tempfile(pattern = "turas_islands_dev", fileext = ".html")
+  writeLines(.island_html(), tmp, useBytes = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(c(tmp, out)), add = TRUE)
+
+  res <- suppressWarnings(turas_minify(tmp, verbose = FALSE, deliverable = FALSE,
+                                       obfuscate_js = FALSE))
+  expect_equal(res$islands_encoded, 0L)
+  html <- paste(readLines(out, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  expect_false(grepl("data-k=", html, fixed = TRUE))
+})
+
+test_that("the R encoder and the shipped fixture agree", {
+  # The fixture the node suite reads. If the R side changes and the fixture is
+  # not regenerated, this fails here rather than silently in a browser.
+  root <- dirname(dirname(dirname(normalizePath(shared_lib, mustWork = FALSE))))
+  fx_path <- file.path(root, "modules", "tabs", "lib", "html_report_v2", "tests",
+                       "fixtures", "island_encoding.json")
+  skip_if_not(file.exists(fx_path), "island encoding fixture not present")
+  fx <- jsonlite::fromJSON(fx_path, simplifyDataFrame = FALSE)
+  longest <- max(vapply(fx$cases, function(c) nchar(c$plain, type = "bytes"),
+                        integer(1)))
+  ks <- .minify_keystream(as.integer(fx$seed), longest)
+  for (c in fx$cases) {
+    expect_identical(.minify_encode_island(c$plain, ks), c$encoded, info = c$name)
+  }
+})
+
+
+test_that("a document whose last script block is a JSON island still minifies", {
+  # `contents[[i]] <- NULL` deletes the element and shortens the list, so the
+  # indices stop matching `blocks`. Real reports survived only because their
+  # last script block is the JS one. This is the shape that did not.
+  skip_if_not(.has_terser(), "terser not available")
+  html <- paste0('<html><body>\n',
+                 '<script>function real() { return 1; }</script>\n',
+                 '<script type="application/json" id="data-agg" data-island="v2">',
+                 '{"a":1}</script>\n',
+                 '<script type="application/json" id="user-state">null</script>\n',
+                 '</body></html>')
+  tmp <- tempfile(pattern = "turas_tail_json", fileext = ".html")
+  writeLines(html, tmp, useBytes = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(c(tmp, out)), add = TRUE)
+
+  res <- suppressWarnings(turas_minify(tmp, verbose = FALSE, deliverable = FALSE,
+                                       obfuscate_js = FALSE))
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
+  expect_true(file.exists(out))
+  written <- paste(readLines(out, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  expect_true(grepl('id="data-agg"', written, fixed = TRUE))
+  expect_true(grepl('id="user-state"', written, fixed = TRUE))
+})

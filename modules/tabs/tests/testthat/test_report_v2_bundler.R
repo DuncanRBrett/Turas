@@ -136,7 +136,7 @@ test_that("fills every token and embeds the data island", {
   expect_true(grepl("data-agg", html, fixed = TRUE))     # island present
   expect_true(grepl("\"schema_version\":2", html, fixed = TRUE))
   # empty islands inlined as null
-  expect_true(grepl('id="data-micro">\nnull', html) || grepl("null", html, fixed = TRUE))
+  expect_true(grepl('id="data-micro"[^>]*>\\s*null', html) || grepl("null", html, fixed = TRUE))
   # self-contained. No external resources
   expect_false(grepl('(src|href)="https?://', html))
 })

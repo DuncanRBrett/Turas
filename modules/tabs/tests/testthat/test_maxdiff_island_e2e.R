@@ -64,8 +64,8 @@ make_md_island <- function(label = "Free delivery") {
 test_that("a report without a MaxDiff contribution carries a null island and no tab", {
   html <- build_probe()
   expect_true(grepl('id="data-md"', html, fixed = TRUE))
-  expect_true(grepl('id="data-md">\nnull', html, fixed = TRUE) ||
-                grepl('id="data-md">null', html, fixed = TRUE))
+  # The open tag carries data-island="v2" as well as the id.
+  expect_true(grepl('id="data-md"[^>]*>\\s*null', html))
   expect_false(grepl('"kind":"maxdiff"', html, fixed = TRUE))
 })
 
@@ -93,9 +93,9 @@ test_that("a hostile item label cannot break the island open", {
   nasty <- 'Loyalty </script><script>alert(1)</script> <!-- <script>'
   html <- build_probe(md_json = as.character(make_md_island(nasty)))
 
-  m <- regmatches(html, regexpr('id="data-md">.*?</script>', html))
+  m <- regmatches(html, regexpr('id="data-md"[^>]*>.*?</script>', html))
   expect_length(m, 1)
-  body <- sub('^id="data-md">', "", m)
+  body <- sub('^id="data-md"[^>]*>', "", m)
   body <- sub("</script>$", "", body)
   expect_false(grepl("<", body, fixed = TRUE))
 

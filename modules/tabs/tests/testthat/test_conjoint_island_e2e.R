@@ -81,8 +81,9 @@ test_that("a report without a conjoint contribution carries a null island and no
 
   expect_true(grepl('id="data-cj"', html, fixed = TRUE))
   # The island is present but empty. The shell then leaves the tab off.
-  expect_true(grepl('id="data-cj">\nnull', html, fixed = TRUE) ||
-                grepl('id="data-cj">null', html, fixed = TRUE))
+  # The open tag carries data-island="v2" as well as the id, so match on the
+  # id and let anything follow it up to the ">".
+  expect_true(grepl('id="data-cj"[^>]*>\\s*null', html))
   expect_false(grepl('"kind":"conjoint"', html, fixed = TRUE))
 })
 
@@ -103,9 +104,9 @@ test_that("a hostile attribute name cannot break the island open", {
   html <- build_probe(as.character(make_cj_island(nasty)))
 
   # Extract the island and confirm it contains no raw "<" at all.
-  m <- regmatches(html, regexpr('id="data-cj">.*?</script>', html))
+  m <- regmatches(html, regexpr('id="data-cj"[^>]*>.*?</script>', html))
   expect_length(m, 1)
-  body <- sub('^id="data-cj">', "", m)
+  body <- sub('^id="data-cj"[^>]*>', "", m)
   body <- sub("</script>$", "", body)
   expect_false(grepl("<", body, fixed = TRUE))
 

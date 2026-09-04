@@ -98,7 +98,7 @@ test_that("build_qual_report_v2 writes a report carrying a non-null DATA_QUAL is
   expect_equal(r$result$status, "PASS")
   expect_true(file.exists(r$out))
   # The data-qual island exists and is not the null placeholder
-  expect_match(r$html, '<script type="application/json" id="data-qual">', fixed = TRUE)
+  expect_match(r$html, '<script type="application/json" id="data-qual"[^>]*>')
   expect_match(r$html, '"textMode":"full"')
   expect_match(r$html, "Price")                     # the theme made it into the islands
 })
@@ -111,7 +111,7 @@ test_that("build_qual_report_v2 writes a report carrying a non-null DATA_QUAL is
 # ==============================================================================
 
 extract_micro_island <- function(html) {
-  micro <- sub('.*<script type="application/json" id="data-micro">', "", html)
+  micro <- sub('.*<script type="application/json" id="data-micro"[^>]*>', "", html)
   trimws(sub("</script>.*", "", micro))
 }
 

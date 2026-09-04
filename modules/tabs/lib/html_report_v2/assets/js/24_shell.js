@@ -81,6 +81,22 @@
     var check = TR.d2.validate(agg, micro, prev, TR.CUBE);
     if (!check.ok) { fatal(check.errors); return; }
 
+    // A client deliverable ships only the renderers its islands need, so a
+    // conjoint report carries no maxdiff code and no report carries the self
+    // test. The failure mode if that logic is ever wrong is a tab that renders
+    // nothing and says nothing, which is the worst kind: it looks like an empty
+    // finding. So an island without its renderer is a refusal on the face of
+    // the report. The R half is in build_report_v2_html().
+    var missing = shell._missingRenderers();
+    if (missing.length) {
+      fatal(missing.map(function (name) {
+        return { code: "IO_RENDERER_MISSING",
+                 message: "this report carries " + name +
+                          " results but not the code that draws them" };
+      }));
+      return;
+    }
+
     var d2 = TR.d2;
     var wantSelftest = location.hash.indexOf("selftest") >= 0;
     // A report with no banner groups (Total-only survey) has no default
@@ -211,10 +227,67 @@
     return landable.length ? landable[0] : ids[0];
   };
 
+  /**
+   * Undo the client-deliverable island encoding.
+   *
+   * A deliverable build encodes each marked island: UTF-8 bytes, XORed against
+   * a keystream from a linear congruential generator seeded by a per-build
+   * integer carried in data-k, then base64. A development build carries plain
+   * JSON and no data-k, so it takes the early return and nothing changes.
+   *
+   * The generator uses only multiply, add and modulo below 2^53, so R and
+   * JavaScript produce identical bytes with no bit operations. The R half is
+   * .minify_encode_island() in modules/shared/lib/turas_minify.R and the two
+   * are pinned against each other by a cross-language fixture test.
+   *
+   * What this defeats: reading, grepping, and pasting the file into a tool that
+   * expects JSON. What it does not defeat: a developer, who reads this function
+   * and undoes it. That is the stated goal, copying made expensive rather than
+   * impossible.
+   *
+   * @param {string} text The island body.
+   * @param {string|null} seed The data-k attribute, or null when plain.
+   * @returns {string} Decoded JSON text.
+   */
+  function decodeIsland(text, seed) {
+    if (!seed) return text;
+    var bin = atob(String(text).trim());
+    var n = bin.length, out = new Uint8Array(n), x = parseInt(seed, 10);
+    for (var i = 0; i < n; i++) {
+      x = (1664525 * x + 1013904223) % 4294967296;
+      out[i] = bin.charCodeAt(i) ^ (x >>> 24);
+    }
+    return new TextDecoder("utf-8").decode(out);
+  }
+  shell._decodeIsland = decodeIsland;   // exposed for the node gate
+
+  /**
+   * Islands that arrived without the code that draws them.
+   *
+   * A client deliverable ships only the renderers its islands need, so a
+   * conjoint report carries no maxdiff code. If that logic is ever wrong the
+   * symptom is a tab that renders nothing and says nothing, which reads as an
+   * empty finding rather than a broken file. boot() turns this into a refusal
+   * on the face of the report.
+   *
+   * @returns {string[]} Names of analyses whose island has no renderer.
+   */
+  shell._missingRenderers = function () {
+    return [
+      ["conjoint",    TR.CJ,   TR.conjoint],
+      ["maxdiff",     TR.MD,   TR.maxdiff],
+      ["pricing",     TR.PR,   TR.pricing],
+      ["qualitative", TR.QUAL, TR.qual]
+    ].filter(function (r) { return r[1] && !r[2]; })
+     .map(function (r) { return r[0]; });
+  };
+
   function parseIsland(id) {
     var el = document.getElementById(id);
     if (!el) return null;
-    try { return JSON.parse(el.textContent); } catch (e) { return null; }
+    try {
+      return JSON.parse(decodeIsland(el.textContent, el.getAttribute("data-k")));
+    } catch (e) { return null; }
   }
 
   function fatal(errors) {

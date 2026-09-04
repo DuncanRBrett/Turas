@@ -10,7 +10,8 @@
 # Two things are gated here.
 #
 #   1. The v2 tabs report, in all three delivery modes (respondent records,
-#      aggregate cube, published tables only). Development build and client
+#      aggregate cube, published tables only) plus one carrying every
+#      contribution island. Development build and client
 #      deliverable are each rendered in headless Chrome, and the gate asserts:
 #      no fatal panel, no console errors, the same island contents loaded, and
 #      the rendered table cells identical text for text. The fixture comes from
@@ -96,6 +97,17 @@ CHROME <- "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     'o.agg=(window.TR&&TR.AGG)?Object.keys(TR.AGG).length:null;',
     'o.cube=(window.TR&&TR.CUBE)?Object.keys(TR.CUBE).length:null;',
     'o.bad=', handlers, '.filter(function(n){return typeof window[n]!=="function"});',
+    # What saveCopy() writes. It clones documentElement and rewrites only
+    # user-state, so every other island should leave with its encoding and its
+    # data-k intact, and should still decode. Checked here, in a real browser on
+    # a real deliverable, rather than against a stubbed DOM.
+    'o.clone=(function(){var c=document.documentElement.cloneNode(true);',
+    'var u=c.querySelector("#user-state");if(u){u.textContent="{}"}',
+    'var a=c.querySelector("#data-agg");if(!a){return "no-agg"}',
+    'var k=a.getAttribute("data-k"),body=a.textContent,plain=true;',
+    'try{JSON.parse(body)}catch(e){plain=false}',
+    'var dec=false;try{JSON.parse(TR.shell._decodeIsland(body,k));dec=true}catch(e){}',
+    'return{k:k||null,bodyIsJson:plain,decodes:dec}})();',
     '}catch(e){o.probeError=String(e)}',
     'var p=document.createElement("pre");p.id="turas-probe";',
     'p.textContent=JSON.stringify(o);document.body.appendChild(p)},2500)})</script>'
@@ -237,6 +249,33 @@ test_that("the v2 report renders identically before and after a deliverable buil
     expect_true(length(d$cells) > 0L, info = sprintf("%s: no cells rendered", mode))
     expect_identical(p$cells, d$cells,
                      info = sprintf("%s: rendered cell text differs", mode))
+
+    # The islands are encoded in the deliverable and plain in the development
+    # build, and a saved copy of the deliverable carries the encoding forward.
+    expect_true(res$islands_encoded >= 1L,
+                info = sprintf("%s: no islands were encoded", mode))
+    expect_null(d$clone$k, info = sprintf("%s: development build carries data-k", mode))
+    expect_true(isTRUE(d$clone$bodyIsJson),
+                info = sprintf("%s: development island is not plain JSON", mode))
+    expect_false(is.null(p$clone$k),
+                 info = sprintf("%s: deliverable island has no data-k", mode))
+    expect_false(isTRUE(p$clone$bodyIsJson),
+                 info = sprintf("%s: deliverable island still parses as JSON", mode))
+    expect_true(isTRUE(p$clone$decodes),
+                info = sprintf("%s: a saved copy's island no longer decodes", mode))
+
+    # Module stripping, both directions. The three reports built without
+    # contribution islands must not carry their renderers; gate_contrib carries
+    # all four islands and must carry all four renderers, or shell.boot()
+    # refuses and the fatal check above would already have failed.
+    dev_html <- paste(readLines(dev_path, warn = FALSE, encoding = "UTF-8"),
+                      collapse = "\n")
+    wanted <- identical(mode, "contrib")
+    for (marker in c("TR.conjoint = {}", "TR.maxdiff = {}", "TR.pricing = {}",
+                     "TR.qual || {}")) {
+      expect_equal(grepl(marker, dev_html, fixed = TRUE), wanted,
+                   info = sprintf("%s: renderer %s presence is wrong", mode, marker))
+    }
   }
 })
 
