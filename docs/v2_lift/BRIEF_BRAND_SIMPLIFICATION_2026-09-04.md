@@ -20,11 +20,11 @@ Recommendation: yes, take it forward, as a **report-layer information-architectu
 | Category Buying opens six more | Yes: context, brands, loyalty, dist, heaviness, dop |
 | Three competing summaries | Yes: the Summary tab, Category Buying's Brand Summary, and the MA headline cards |
 | Methodology dominates | 69 insight textareas, 2,324 "significant" mentions, 40 pin, 69 PNG and 42 Excel buttons in one 6.9 MB file |
-| The funnel is not nested | Yes, in every category. Focal brand, absolute % of all respondents: Baking aware 34 / prefer 48; Pasta 40 / 65; Pour Over 50 / 66; Dry Seasoning 42 / 59. The stage definition text says "Aware respondents who actively prefer the brand", which the absolute numbers contradict, because the attitude question is answered by more people than the aided-awareness pick. The panel already has a "% of aware" mode (Baking: 100 / 67 / 55 / 37) and a "% of previous stage" mode; the default is the absolute view. |
+| The funnel is not nested | Yes, in every category. Focal brand, absolute % of all respondents: Baking aware 34 / prefer 48; Pasta 40 / 65; Pour Over 50 / 66; Dry Seasoning 42 / 59. The stage definition text says "Aware respondents who actively prefer the brand", which the absolute numbers contradict, because the attitude question is answered by more people than the aided-awareness pick. The panel already has a "% of aware" mode (Baking: 100 / 67 / 55 / 37) and a "% of previous stage" mode; the default is the absolute view. The payload also already carries the cumulative chain count per stage (`base_chain_filtered`), and dividing it by the base gives a genuinely nested funnel as % of all respondents with no engine change: Baking 34 / 23 / 15 / 12. |
 
 Two things the brief could not know:
 
-- The order it saw (Funnel, MA Metrics, Category Buying, WoM first, then the rest) is the June Slice 1 tiering. Today's main renders the older order (Funnel, Attitude, Attributes, CEPs, Advantage, MA Metrics, Buying, WoM, ...). Either way the count is nine.
+- The order it saw (Funnel, MA Metrics, Category Buying, WoM first, then the rest) is the June Slice 1 tiering: the file is dated 17 June 2026 and carries Slice 1's `br-subtab-sep` and `br-subtab-btn--appendix` markers (26 of them). Today's main renders the older order (Funnel, Attitude, Attributes, CEPs, Advantage, MA Metrics, Buying, WoM, ...). Either way the count is nine.
 - The Summary tab already generates a verdict sentence from the numbers (rank by Mental Market Share plus a mental-versus-physical availability clause) and a closing strip. The Overview the brief asks for is an extension of that panel, not a new one.
 
 ## 3. What Timelaps actually is, for the benchmark
@@ -42,6 +42,8 @@ The lift branch changes engine outputs and the report's honesty; the simplificat
 ### Stage 1: impact map and a static mockup (before any code)
 
 June's lesson: Slice 1 (a tiered sub-tab bar) did not convince, because it was an increment on the existing shape. This time the first deliverable is a picture Duncan can react to: one HTML mockup per destination, built from the real IPK payload, showing the five destinations, the Overview, and one worked Advanced drawer. Plus a one-page impact map: every existing panel, its section id and pin anchor, its new home, and the Section_Insights anchors that must keep resolving. Fable reviews the mockup against the brief's acceptance criteria before the build starts.
+
+Reuse from June: the Slice 1 commits (394852ad, f72410e6, ebd4ea5a) are held by the local tag `rescue/review-brand-report-v2-upgrade-2026-06`. They carry `modules/brand/docs/PHASE1_CLARITY_IMPLEMENTATION_PLAN.md` (the seam description is the start of the impact map), the pure helper `build_br_subtab_nav()` with `.BR_PRIMARY_SUBTABS` as its single source of truth, and `test_subtab_nav_tiers.R` (36 assertions). The helper's tiering idea becomes the destination grouping in Stage 2.
 
 ### Stage 2: the five-destination shell, rehoming only
 
@@ -78,7 +80,7 @@ The category tabs stay as the first choice (as today), and the five destinations
 
 ## 5. Decisions for Duncan, with a recommendation each
 
-1. **The funnel.** Three options. (a) Make "% of aware" the default display and keep the absolute view as a toggle: no engine change, the term funnel becomes honest, the numbers shown change (Baking prefer reads 67 instead of 48). (b) Change the engine so consideration is intersected with awareness, which makes the definition text true and the absolute view nested: an engine change that moves numbers in every client deliverable. (c) Rename to Brand relationship and show parallel indicators. Recommend (a): the nested computation already exists, is tested, and the absolute view remains one click away for the analyst. Decide before Stage 2.
+1. **The funnel.** Four options. (d) Default the visual to the nested chain as % of all respondents, which the payload already carries (`base_chain_filtered` over the base): Baking reads aware 34, prefer 23, bought 15, recent 12; awareness still compares brands, the shape narrows, the term funnel becomes honest, and no engine number changes. (a) Default to "% of aware": also nested, but it pins every brand's awareness at 100 and so loses the brand comparison at the top (Baking 100 / 67 / 55 / 37). (b) Change the engine so consideration is intersected with awareness: makes the definition text true but moves numbers in every client deliverable. (c) Rename to Brand relationship and show parallel indicators. Recommend (d), with today's absolute view and (a) kept as the analyst's toggles and the stage definition text corrected to say what each view shows. Decide before Stage 2.
 2. **Mockup gate.** Approve a static mockup before the build starts. Recommend yes; it is the cheapest point to change direction and the June increment did not convince.
 3. **Destination names.** The brief's five. Recommend accepting them, with one change: "Brand and Buying" rather than an ampersand, and "Audience" only if Audience Lens is folded into it.
 4. **Category level.** Keep category tabs plus a persistent switcher on each destination (recommended), or category as a picker inside destinations.
@@ -87,7 +89,7 @@ The category tabs stay as the first choice (as today), and the five destinations
 
 ## 6. What not to do (the brief's list, plus two)
 
-The brief's list stands: no deleting analyses, no copying Timelaps styling, no new statistical methods, no burying bases in tooltips, no second navigation system, no scattering evidence. Two additions: do not rebuild the summary hero from scratch, and do not touch the lift branch's engine changes; if the funnel ruling is (b), that is the only engine change in scope.
+The brief's list stands: no deleting analyses, no copying Timelaps styling, no new statistical methods, no burying bases in tooltips, no second navigation system, no scattering evidence. Two additions: do not rebuild the summary hero from scratch, and do not touch the lift branch's engine changes; only funnel ruling (b) would put an engine change in scope, and (d) is recommended instead.
 
 ## 7. Effort and risk
 
