@@ -325,7 +325,8 @@ test_that("legacy reports still resolve every inline handler after a deliverable
     "examples/maxdiff/Output/Karoo_MaxDiff_Results.html",
     "examples/tabs/demo_survey/Output/Demo_CX_Crosstabs.html",
     "examples/integrated_demo/Output/tabs/report/Karoo_Conjoint_Results_simulator.html",
-    "examples/integrated_demo/Output/tabs/report/Karoo_MaxDiff_Results_simulator.html"
+    "examples/integrated_demo/Output/tabs/report/Karoo_MaxDiff_Results_simulator.html",
+    "examples/integrated_demo/Output/tabs/report/Karoo_Pricing_Results_simulator.html"
   )
   present <- legacy[file.exists(file.path(turas_root, legacy))]
   if (length(present) == 0L) {

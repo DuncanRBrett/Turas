@@ -561,9 +561,9 @@ run_report_hub_gui <- function() {
               } else if (minify_result$status %in% c("PASS", "PARTIAL")) {
                 console_text(paste0(
                   console_text(),
-                  sprintf("\nClient deliverable: %s (%.1f%% smaller)\n",
+                  sprintf("\nClient deliverable: %s (%s)\n",
                           basename(minify_result$output_path),
-                          minify_result$reduction_pct),
+                          .minify_size_phrase(minify_result$reduction_pct)),
                   sprintf("Dev copy kept: %s\n", basename(dev_path))
                 ))
                 # Update output path to the minified version for auto_open

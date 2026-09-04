@@ -880,7 +880,7 @@
   cat(strrep("\u2500", 50), "\n")
   cat(sprintf("Input:     %s KB  (%s)\n", input_kb, basename(result$input_path)))
   cat(sprintf("Output:    %s KB  (%s)\n", output_kb, basename(result$output_path)))
-  cat(sprintf("Reduction: %.1f%%\n", result$reduction_pct))
+  cat(sprintf("Size:      %s\n", .minify_size_phrase(result$reduction_pct)))
   cat(strrep("\u2500", 50), "\n")
   cat(sprintf("JS blocks:     %d minified\n", result$js_blocks_processed))
   cat(sprintf("JS blocks:     %d obfuscated\n", result$js_blocks_obfuscated))
@@ -1472,6 +1472,21 @@ turas_minify <- function(input_path,
 }
 
 
+#' Say plainly whether a deliverable got smaller or larger
+#'
+#' The obfuscator's string array and its long generated names make a hardened
+#' deliverable roughly twice the size of the development build. The old wording
+#' printed that as "-115.2%% smaller", which is not a sentence anyone should
+#' read on a client build.
+#'
+#' @param pct The reduction percentage, negative when the file grew.
+#' @return A short phrase for the console.
+#' @keywords internal
+.minify_size_phrase <- function(pct) {
+  if (!is.finite(pct)) return("size unchanged")
+  if (pct >= 0) sprintf("%.1f%% smaller", pct) else sprintf("%.1f%% larger", -pct)
+}
+
 #' Prepare Client Deliverable from HTML Report
 #'
 #' Convenience wrapper for Shiny GUI integration. Checks the
@@ -1549,8 +1564,9 @@ turas_prepare_deliverable <- function(html_path) {
   }
 
   if (minify_result$status %in% c("PASS", "PARTIAL")) {
-    cat(sprintf("  Client deliverable: %s (%.1f%% smaller)\n",
-        basename(minify_result$output_path), minify_result$reduction_pct))
+    cat(sprintf("  Client deliverable: %s (%s)\n",
+        basename(minify_result$output_path),
+        .minify_size_phrase(minify_result$reduction_pct)))
     cat(sprintf("  Dev copy kept: %s\n", basename(dev_path)))
   } else {
     file.rename(dev_path, html_path)

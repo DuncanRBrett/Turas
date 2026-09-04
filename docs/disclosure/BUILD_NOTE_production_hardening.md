@@ -67,6 +67,26 @@ deliverable:
 `fable` and `prototype` were on the list because the design's prototype left
 them in a template comment. The R pipeline removes them, as it was expected to.
 
+That demo file cannot demonstrate island encoding: it was built at 09:03 on
+4 September, before `8393a7b0` added the markers to the template, so it carries
+none and nothing in it is encoded. The encoding numbers above come from reports
+built by the gate fixture on the current template.
+
+### The wrapper Duncan actually uses
+
+`turas_prepare_deliverable()` was run end to end on a records-mode report, with
+`TURAS_PREPARE_DELIVERABLE` and `TURAS_CLIENT_NAME` set as the GUI sets them:
+
+    Client deliverable: Karoo_Client_Report.html (115.2% larger)
+    Dev copy kept: Karoo_Client_Report_dev.html
+
+The development copy is renamed to `_dev` and kept, the deliverable takes the
+clean name, the release audit and the verification box print, the watermark is
+applied, `31_selftest.js` is absent from the built file, and `data-micro` no
+longer parses as JSON. The old wording printed that size line as
+"-115.2% smaller", which is not a sentence anyone should read on a client build;
+it now says larger or smaller as the case may be.
+
 ### Size
 
 The demo goes from 1,228 KB to 2,761 KB. The old profile produced 1,139 KB, so
@@ -106,6 +126,30 @@ renderer is reported rather than drawn as an empty tab.
 The profile and terser arguments the node gates use come from
 `modules/shared/lib/minify_profile.json`, a generated mirror of the R constants
 with a test binding the two, so the gate cannot drift from what ships.
+
+### Which report runtimes were actually rendered under the new profile
+
+The profile is shared by every module, and it broke two of the six runtimes that
+were tested. So this list is the useful part.
+
+Rendered, development build against deliverable, and clean:
+the tabs v2 report in all four modes, the v1 tabs report (`Demo_CX_Crosstabs`),
+the pricing report, the maxdiff report, and the conjoint, maxdiff and pricing
+simulators. `build_qual_report_v2()` inlines through the same v2 template, so the
+comment report is covered by the contrib mode.
+
+NOT rendered under the new profile, and each one is a `turas_prepare_deliverable()`
+caller: the Reader report, which has its own runtime under
+`modules/tabs/lib/reader_report/`, and the brand, segment, tracker, keydriver,
+catdriver and confidence reports. No `report_hub` build was made either. There is
+no committed example output for any of them, which is why they are not in the
+gate; the way to add one is to build an example and add two lines to the gate's
+list. Until then they are Duncan's eyeball.
+
+The `report_hub` change (pass `deliverable = TRUE`, catch the refusal) parses but
+was never executed, because it lives inside a Shiny observer. The `data-k`
+double-encoding guard it depends on is unit tested; a hub built from a hardened
+child is Duncan's build.
 
 ### Skips
 
@@ -217,20 +261,30 @@ dev copy.
 | suite | before | after |
 |---|---|---|
 | `test_turas_minify.R` | 234 passed, 0 failed | 277 passed, 0 failed |
-| tabs testthat | 5,468 passed, 0 failed, 1 skipped | 5,700 passed, 0 failed, 1 skipped |
+| tabs testthat | 5,468 (quoted from `29b5e158`, not measured here) | 5,700 passed, 0 failed, 1 skipped |
 | node gate suite | 1,091 passed, 42 files | 1,145 passed, 45 files |
-| `test_minify_render_gate.R` | did not exist | 112 passed, 0 failed, 0 skipped |
+| `test_minify_render_gate.R` | did not exist | 116 passed, 0 failed, 0 skipped |
+
+The tabs "before" figure is quoted from the commit message of `29b5e158`, which
+is what the previous session measured. Five cube commits landed after it and this
+session did not run the suite before editing, so treat it as context rather than
+a baseline. The "after" figure was measured here.
 
 The tabs suite needed five test files updated: they matched the island open tag
 as `id="data-cj">` and it now carries `data-island="v2"`.
+
+The render gate covers six legacy reports; a seventh and eighth example output
+are byte-identical copies of runtimes already in the list.
 
 ---
 
 ## 8. What Duncan does next
 
-1. Run a report through `launch_turas()` with the deliverable checkbox on, which
-   is now its default, and open the result. This session never ran the pipeline
-   on a real config and never wrote to a project folder.
+1. Run a project through `launch_turas()` with the deliverable checkbox on, which
+   is now its default, and open four things: the crosstabs deliverable, the
+   Reader deliverable, the comment report, and one `report_hub` build. The Reader
+   has its own runtime and no gate; the hub path was never executed. This session
+   never ran the pipeline on a real config and never wrote to a project folder.
 2. Decide whether 2.2 times the size is acceptable, or whether `splitStrings`
    comes out.
 3. Point `Run VAS Integrated Report.command` at the `_dev` copy before the next
