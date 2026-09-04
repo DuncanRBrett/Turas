@@ -1560,6 +1560,33 @@ test_that("an embedded simulator is hardened and still a working document", {
   expect_true(grepl("TurasPins", inner, fixed = TRUE))
 })
 
+test_that("an embedded document that cannot be obfuscated refuses the build", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(nzchar(.minify_find_tool("javascript-obfuscator")),
+              "javascript-obfuscator not available")
+
+  # This is the reason the step lives here rather than in maxdiff. Hardening
+  # the simulator before the report was written meant a failure kept the
+  # readable simulator and let the outer build succeed, which shipped a
+  # hardened report with a readable simulator inside it. Here the refusal
+  # reaches turas_prepare_deliverable() and no deliverable is written.
+  broken <- "<html><body><script>function ( {</script></body></html>"
+  html <- paste0('<html><body><iframe srcdoc="',
+                 .minify_srcdoc_escape(broken), '"></iframe></body></html>')
+  work <- tempfile(pattern = "srcdoc_refuse"); dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+  dev_path <- file.path(work, "report_dev.html")
+  out_path <- file.path(work, "report.html")
+  writeLines(html, dev_path, useBytes = TRUE)
+
+  expect_error(
+    suppressWarnings(turas_minify(dev_path, output_path = out_path,
+                                  verbose = FALSE, deliverable = TRUE)),
+    class = "turas_refusal")
+  expect_false(file.exists(out_path),
+               info = "a file under the deliverable name is a file someone will send")
+})
+
 test_that("a development build leaves the embedded document readable", {
   skip_if_not(.has_terser(), "terser not available")
   html <- paste0('<html><body><iframe srcdoc="',

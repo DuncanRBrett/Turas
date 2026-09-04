@@ -192,6 +192,15 @@ stayed FALSE and verification applied its strict "must be smaller" rule to a
 file obfuscation had just made 18 percent bigger. The verification call now
 also asks whether the embedded document was obfuscated.
 
+The embedded document goes through meta stripping too, so the simulator loses
+its `turas-*` meta tags. Nothing reads them: `grep` over
+`modules/maxdiff/lib/html_simulator/js/` and `turas_pins_js.R` finds no meta
+tag read at all.
+
+An embedded document that cannot be obfuscated refuses the whole build, and no
+file is written under the deliverable name. That is the property the maxdiff
+shape could not give, and it has a test rather than an argument.
+
 ### One thing observed and not fixed
 
 The maxdiff deliverable build warns "HTML whitespace reduction skipped (tool
@@ -205,7 +214,7 @@ only loses whitespace collapsing.
 
 ### What was run
 
-- `test_turas_minify.R`: 299 pass, 0 fail, 2 warnings. On `main` the same file
+- `test_turas_minify.R`: 303 pass, 0 fail, 2 warnings. On `main` the same file
   is 278 pass, 0 fail, and the same 2 warnings, so they are pre-existing.
 - `test_minify_render_gate.R`: 132 pass, 0 fail, 0 skip. Section 3 is new: it
   builds the wrapper the way the page builder does, runs the deliverable
