@@ -58,6 +58,92 @@ tabs_microdata_wanted <- function(config_obj,
 }
 
 
+#' Resolve the interactivity mode one run actually builds
+#'
+#' Two places have an opinion. The CONFIG says what the project normally ships
+#' (`html_report_v2_interactivity`: records, cube or none). The GUI says who
+#' this particular file is for.
+#'
+#' The rule is that the GUI sets a FLOOR of protection and can never lower one.
+#' Ordered least to most protected: records, cube, none. A GUI choice raises the
+#' config's mode to its floor and otherwise leaves it alone.
+#'
+#'   full                     no floor. The config's mode stands.
+#'   client_safe_interactive  floor `cube`. A records config becomes a cube; a
+#'                            config already on `none` stays there, being
+#'                            stricter.
+#'   client_safe_frozen       floor `none`. Published tables, whatever the
+#'                            config said.
+#'
+#' Why a floor and not an override. "Full report" is a permission, not an
+#' instruction: a project deliberately configured to ship aggregates must not
+#' start shipping respondent records because someone picked the top radio
+#' button. And before this, "Client safe" collapsed a `cube` config all the way
+#' to `none`, silently throwing away the interactivity the mode was built to
+#' keep, while "Full report" was the only way to get a cube built. Both labels
+#' were wrong, in opposite directions.
+#'
+#' `cube` needs a threshold to protect anything. When one is asked for and
+#' `min_reporting_base` is not above 1 the mode drops to `none`, which is
+#' strictly safer and still honours the client-safe choice. The caller says so
+#' on the console; it is not a silent downgrade.
+#'
+#' @param config_obj The built config object.
+#' @param gui_mode The GUI's delivery mode: "full", "client_safe_interactive",
+#'   "client_safe_frozen", or NA when no deliverable was asked for. Defaults to
+#'   the global the tabs GUI sets.
+#'
+#' @return A list with structure:
+#'   \item{mode}{"records", "cube" or "none": what this run builds}
+#'   \item{config_mode}{What the config alone asked for}
+#'   \item{reason}{"config", "gui" or "needs_k": what decided it}
+#'   \item{client_safe}{TRUE when the file must carry no respondent records}
+#'
+#' @keywords internal
+TABS_INTERACTIVITY_RANK <- c(records = 1L, cube = 2L, none = 3L)
+
+tabs_delivery_interactivity <- function(config_obj,
+                                        gui_mode = get0("TURAS_DELIVERY_MODE",
+                                                        envir = .GlobalEnv,
+                                                        ifnotfound = NA_character_)) {
+  cfg <- config_obj %||% list()
+  config_mode <- tolower(trimws(as.character(
+    cfg$html_report_v2_interactivity %||% "records")[1]))
+  if (!config_mode %in% names(TABS_INTERACTIVITY_RANK)) config_mode <- "records"
+  # The retired switch still wins where it is explicitly off, exactly as it did.
+  if (isFALSE(cfg$html_report_v2_microdata)) config_mode <- "none"
+
+  gui <- tolower(trimws(as.character(gui_mode %||% NA_character_)[1]))
+  floor_mode <- switch(gui,
+    client_safe_interactive = "cube",
+    client_safe_frozen      = "none",
+    # "client_safe" is the two-option GUI's old value. Treated as the FROZEN
+    # choice, which is what it used to do, so an older caller cannot silently
+    # start shipping something different.
+    client_safe             = "none",
+    NULL)
+
+  mode <- config_mode
+  reason <- "config"
+  if (!is.null(floor_mode) &&
+      TABS_INTERACTIVITY_RANK[[floor_mode]] > TABS_INTERACTIVITY_RANK[[mode]]) {
+    mode <- floor_mode
+    reason <- "gui"
+  }
+
+  if (identical(mode, "cube")) {
+    k <- suppressWarnings(as.numeric(cfg$min_reporting_base))
+    if (!(length(k) == 1L && !is.na(k) && k > 1)) {
+      mode <- "none"
+      reason <- "needs_k"
+    }
+  }
+
+  list(mode = mode, config_mode = config_mode, reason = reason,
+       client_safe = !identical(mode, "records"))
+}
+
+
 #' Describe what a finished v2 build contains, as manifest lines
 #'
 #' @param micro The microdata island list from build_microdata(), or NULL.

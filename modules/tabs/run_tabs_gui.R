@@ -333,12 +333,25 @@ run_tabs_gui <- function() {
                 # not inherited. A deliverable used to be produced without anyone
                 # saying what kind it was, and the answer was always "whatever the
                 # config happened to do".
+                # THREE options, because there are three things the file can
+                # be. Two of them were being made to do the work of three: the
+                # aggregate build could only be reached by choosing "Full
+                # report", whose label said the opposite of what that file
+                # contained, and choosing "Client safe" threw the aggregate
+                # build away and shipped frozen tables instead.
+                #
+                # A choice here sets a FLOOR of protection and never lowers the
+                # config's own (tabs_delivery_interactivity). So a project
+                # configured to ship aggregates cannot be turned back into a
+                # respondent-level file from this screen.
                 radioButtons("delivery_mode", "Who is this file for?",
                   choiceNames = list(
-                    HTML("<strong>Full report.</strong> Carries respondent-level records, so live filters and custom banners work. Anyone who opens the page source can rebuild a respondent-by-question dataset."),
-                    HTML("<strong>Client safe.</strong> No respondent-level records in the file. The build drops them whatever the config says, and the file is audited before it is written. Live filters and custom banners are off in this file.")
+                    HTML("<strong>Full report.</strong> Carries respondent-level records, so everything works. Anyone who opens the page source can rebuild a respondent-by-question dataset. For you, or for a client who has been told."),
+                    HTML("<strong>Client safe, interactive.</strong> No respondent-level records. Live filters, custom banners, Differences and Patterns still work, on the declared variables, and comments follow the filter. Any cut where a group falls below the minimum reporting base is withheld. Needs min_reporting_base set."),
+                    HTML("<strong>Client safe, frozen.</strong> No respondent-level records and no live filtering. Published tables, dashboard, tracking and comments only. The simplest thing to explain, and nothing in it can be recomputed.")
                   ),
-                  choiceValues = list("full", "client_safe"),
+                  choiceValues = list("full", "client_safe_interactive",
+                                      "client_safe_frozen"),
                   selected = character(0)
                 )
               )
@@ -405,7 +418,8 @@ run_tabs_gui <- function() {
       .mode_missing <- length(input$delivery_mode) != 1L ||
         !nzchar(as.character(input$delivery_mode))
       if (isTRUE(input$prepare_deliverable) && .mode_missing) {
-        msg <- "Choose who the client deliverable is for before running: full report, or client safe."
+        msg <- paste("Choose who the client deliverable is for before running:",
+                     "full report, client safe interactive, or client safe frozen.")
         showNotification(msg, type = "error", duration = NULL)
         console_output(paste0(console_output(), "\n\nSTOPPED: ", msg))
         cat("\n[TURAS] Run stopped: 'Prepare client deliverable' is ticked but no delivery mode was chosen.\n\n")
@@ -457,10 +471,22 @@ run_tabs_gui <- function() {
         # Draft the Reader narrative with AI (opt-in; aggregates only, flagged).
         assign("TURAS_READER_AI_PROSE",
                isTRUE(input$reader_ai_prose), envir = .GlobalEnv)
-        # The declaration the release audit enforces (turas_release_audit.R).
+        # The chosen mode, which run_crosstabs resolves against the config
+        # (tabs_delivery_interactivity). NA when no deliverable was asked for,
+        # so the config alone decides.
+        assign("TURAS_DELIVERY_MODE",
+               if (isTRUE(input$prepare_deliverable) && !.mode_missing) {
+                 as.character(input$delivery_mode)
+               } else NA_character_,
+               envir = .GlobalEnv)
+        # The declaration the release audit enforces (turas_release_audit.R):
+        # TRUE for BOTH client-safe choices, because what the audit tests is
+        # that no respondent island is in the file, and the aggregate build
+        # satisfies that as fully as the frozen one does.
         assign("TURAS_DELIVERY_CLIENT_SAFE",
-               isTRUE(input$prepare_deliverable) &&
-                 identical(input$delivery_mode, "client_safe"),
+               isTRUE(input$prepare_deliverable) && !.mode_missing &&
+                 as.character(input$delivery_mode) %in%
+                   c("client_safe_interactive", "client_safe_frozen"),
                envir = .GlobalEnv)
 
         if (isTRUE(input$prepare_deliverable)) {
@@ -628,7 +654,8 @@ run_tabs_gui <- function() {
         # a previous run ticked it (review 2026-08-21, I-21/M-9).
         for (gvar in c("config_file", "TURAS_PREPARE_DELIVERABLE", "TURAS_CLIENT_NAME",
                        "TURAS_HTML_REPORT_V2", "TURAS_GENERATE_READER_REPORT",
-                       "TURAS_READER_AI_PROSE", "TURAS_DELIVERY_CLIENT_SAFE")) {
+                       "TURAS_READER_AI_PROSE", "TURAS_DELIVERY_CLIENT_SAFE",
+                       "TURAS_DELIVERY_MODE")) {
           if (exists(gvar, envir = .GlobalEnv)) {
             rm(list = gvar, envir = .GlobalEnv)
           }

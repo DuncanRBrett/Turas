@@ -170,3 +170,118 @@ test_that("the default client_safe argument reads the GUI global and is FALSE wh
   on.exit(rm("TURAS_DELIVERY_CLIENT_SAFE", envir = .GlobalEnv), add = TRUE)
   expect_false(tabs_microdata_wanted(list(html_report_v2_microdata = TRUE))$wanted)
 })
+
+# ---- The GUI's delivery mode against the config's own -------------------------
+# Two places have an opinion about what a run builds. The rule is that the GUI
+# sets a FLOOR of protection and can never lower one, so "Full report" cannot
+# turn an aggregates project back into a respondent-level file, and a
+# client-safe choice can no longer throw an aggregate build away.
+
+test_that("no GUI choice leaves the config's mode exactly as it is", {
+  for (m in c("records", "cube", "none")) {
+    r <- tabs_delivery_interactivity(
+      list(html_report_v2_interactivity = m, min_reporting_base = 5), NA_character_)
+    expect_equal(r$mode, m, info = m)
+    expect_equal(r$reason, "config", info = m)
+  }
+})
+
+test_that("Full report is a permission, not an instruction", {
+  # The failure this prevents: a project deliberately configured to ship
+  # aggregates starts shipping respondent records because someone picked the
+  # top radio button.
+  r <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "cube", min_reporting_base = 5), "full")
+  expect_equal(r$mode, "cube")
+  expect_true(r$client_safe)
+  r2 <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "records", min_reporting_base = 5), "full")
+  expect_equal(r2$mode, "records")
+  expect_false(r2$client_safe)
+})
+
+test_that("client safe interactive raises records to cube and keeps a cube", {
+  r <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "records", min_reporting_base = 5),
+    "client_safe_interactive")
+  expect_equal(r$mode, "cube")
+  expect_equal(r$reason, "gui")
+  expect_true(r$client_safe)
+  # The bug this replaces: a cube config collapsed all the way to `none`.
+  r2 <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "cube", min_reporting_base = 5),
+    "client_safe_interactive")
+  expect_equal(r2$mode, "cube")
+  expect_true(r2$client_safe)
+})
+
+test_that("client safe frozen is always published tables", {
+  for (m in c("records", "cube", "none")) {
+    r <- tabs_delivery_interactivity(
+      list(html_report_v2_interactivity = m, min_reporting_base = 5),
+      "client_safe_frozen")
+    expect_equal(r$mode, "none", info = m)
+    expect_true(r$client_safe, info = m)
+  }
+})
+
+test_that("a stricter config is never loosened by a GUI choice", {
+  r <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "none", min_reporting_base = 5),
+    "client_safe_interactive")
+  expect_equal(r$mode, "none")
+  expect_equal(r$reason, "config")
+})
+
+test_that("an interactive client-safe build with no threshold drops to frozen", {
+  # A cube with no k protects nothing, so it must not be built under a name
+  # that reads as protected. `none` is strictly safer and still honours the
+  # choice; the caller says so on the console.
+  r <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "records"), "client_safe_interactive")
+  expect_equal(r$mode, "none")
+  expect_equal(r$reason, "needs_k")
+  expect_true(r$client_safe)
+  r2 <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "records", min_reporting_base = 1),
+    "client_safe_interactive")
+  expect_equal(r2$mode, "none")
+  expect_equal(r2$reason, "needs_k")
+})
+
+test_that("the retired microdata switch still wins where it is explicitly off", {
+  r <- tabs_delivery_interactivity(
+    list(html_report_v2_microdata = FALSE,
+         html_report_v2_interactivity = "records", min_reporting_base = 5), "full")
+  expect_equal(r$mode, "none")
+  expect_true(r$client_safe)
+})
+
+test_that("the two-option GUI's old value still means frozen", {
+  # An older caller passing "client_safe" must not silently start shipping
+  # something different from what it shipped before.
+  r <- tabs_delivery_interactivity(
+    list(html_report_v2_interactivity = "cube", min_reporting_base = 5), "client_safe")
+  expect_equal(r$mode, "none")
+})
+
+test_that("every mode the resolver returns is one the build knows how to make", {
+  modes <- character(0)
+  for (cm in c("records", "cube", "none")) {
+    for (g in c(NA_character_, "full", "client_safe_interactive",
+                "client_safe_frozen", "client_safe")) {
+      modes <- c(modes, tabs_delivery_interactivity(
+        list(html_report_v2_interactivity = cm, min_reporting_base = 5), g)$mode)
+    }
+  }
+  expect_true(all(modes %in% c("records", "cube", "none")))
+  # And client_safe is true for exactly the non-records modes.
+  for (cm in c("records", "cube", "none")) {
+    for (g in c(NA_character_, "full", "client_safe_interactive", "client_safe_frozen")) {
+      r <- tabs_delivery_interactivity(
+        list(html_report_v2_interactivity = cm, min_reporting_base = 5), g)
+      expect_equal(r$client_safe, !identical(r$mode, "records"),
+                   info = paste(cm, g))
+    }
+  }
+})

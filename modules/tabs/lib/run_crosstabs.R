@@ -984,15 +984,30 @@ if (.html_report_v2_on) {
       # file) for insider populations where coded records could re-identify.
       # The GUI's "Client safe" delivery mode turns the island off too, see
       # tabs_microdata_wanted() in delivery_manifest.R.
-      .micro_decision <- tabs_microdata_wanted(config_result$config_obj)
-      .micro_wanted <- isTRUE(.micro_decision$wanted)
-      # V14 interactivity mode. `cube` builds the microdata list, turns it into
-      # the aggregate cube, and DISCARDS it: the list never reaches
-      # write_html_report_v2, so a cube build cannot ship records by accident.
-      # The GUI's Client safe mode still wins, and forces `none`.
-      .interactivity <- tolower(trimws(as.character(
-        config_result$config_obj$html_report_v2_interactivity %||% "records")[1]))
-      if (!.micro_wanted) .interactivity <- "none"
+      # What this RUN builds, from the config and the GUI's delivery mode
+      # together. The GUI sets a floor of protection and can never lower one, so
+      # "Full report" cannot turn an aggregates project back into a records one,
+      # and "Client safe, interactive" no longer collapses a cube all the way to
+      # published tables. See tabs_delivery_interactivity().
+      .delivery <- tabs_delivery_interactivity(config_result$config_obj)
+      .interactivity <- .delivery$mode
+      .micro_wanted <- identical(.interactivity, "records")
+      if (identical(.delivery$reason, "gui") &&
+          !identical(.delivery$mode, .delivery$config_mode)) {
+        cat(sprintf(paste0("\n  Delivery mode: the GUI choice raises this build from '%s' to '%s'.\n",
+                           "    The config's setting is not lowered by the GUI, only raised.\n"),
+                    .delivery$config_mode, .delivery$mode))
+      }
+      if (identical(.delivery$reason, "needs_k")) {
+        cat("\n┌─── TURAS DISCLOSURE WARNING ───────────────────────────────┐\n")
+        cat("│ You chose a client-safe INTERACTIVE build, which needs a\n")
+        cat("│ confidentiality threshold to protect anything, and\n")
+        cat("│ min_reporting_base is not set above 1.\n")
+        cat("│ This build is PUBLISHED TABLES ONLY instead, which is safer,\n")
+        cat("│ but it has no live filters.\n")
+        cat("│ Fix: set min_reporting_base (e.g. 5 or 10) and run again.\n")
+        cat("└────────────────────────────────────────────────────────────┘\n\n")
+      }
       micro <- if (identical(.interactivity, "none")) NULL else tryCatch(
         build_microdata(dl, data_result$survey_data, data_result$survey_structure,
                         analysis_result$banner_info, config_result$config_obj,
@@ -1050,7 +1065,7 @@ if (.html_report_v2_on) {
       if (identical(.interactivity, "none")) {
         # Deliberate omission. Record the confidentiality trade in the console
         # so the operator can see exactly what this ship does and doesn't carry.
-        if (!.micro_wanted && identical(.micro_decision$reason, "gui")) {
+        if (identical(.delivery$reason, "gui") || identical(.delivery$reason, "needs_k")) {
           cat("\n  Microdata island: OMITTED by the delivery mode chosen in the GUI (Client safe).\n")
         } else {
           cat("\n  Microdata island: OMITTED by config (interactivity = none).\n")
