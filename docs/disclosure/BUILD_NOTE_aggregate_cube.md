@@ -273,7 +273,8 @@ than a fixture, which is how it was found.
 
 ## Two things a cube build does NOT do, checked in the source
 
-**Filtered qualitative views, and a second pre-existing bug fixed here.**
+**The comments now follow the filter, and a second pre-existing bug was fixed
+on the way.**
 
 The Qualitative TAB is unaffected by any of this. `d2.qualitative()` gates it on
 the qual island having questions, never on microdata, so comments, themes and
@@ -305,14 +306,34 @@ Gated in `qual_tests.mjs`, which now runs the whole contract with the island
 removed and then restores it and asserts the number comes back, so the check
 cannot pass by construction. 321 assertions, all green.
 
-There is no cube path to add here later. A cut over aggregates would have to be
-applied to each COMMENT, and the only thing that could carry it is the comment's
-own demographic tags, which are k-anonymised at build time: some are dropped, so
-filtering on them would show a DIFFERENT subset from the one the crosstabs show,
-under the same filter chip. A wrong audience is worse than no audience. If
-filtered comments are wanted on a cube build, the qual island has to carry each
-comment's declared-variable level, and that is a decision about what the qual
-island contains.
+Then Duncan asked for the comments to follow the filter, so they now do.
+
+Each comment carries which LEVEL of each declared variable its author falls in,
+using the cube's own level indices, so nothing is matched by label between the
+two. It is demographic information about a person, so it obeys the dial the tags
+already obey: `block` ships none and the comments follow no filter, `safe` runs
+it through the SAME k-anonymiser, within band, and `allow` ships it raw. A
+comment carries a variable only while the group it belongs to still covers at
+least k people.
+
+A comment whose level was dropped cannot be placed. It is left out of the cut,
+never guessed at, and the tab says how many there were, because a count that
+silently shrinks is one nobody can reconcile against the table beside it. A
+filter naming any variable the comments were not tagged with withholds the WHOLE
+cut rather than applying part of it, because a partly applied filter is a
+different audience wearing the same chip.
+
+Proved end to end, not only in unit tests.
+`docs/disclosure/experiments/cube_qual_cut_e2e.R` builds a cube report carrying
+60 comments and renders it. Unfiltered it shows 60. Under `Q1:0` it shows 44,
+which is exactly the number computed independently from the microdata. Under
+`Q3:0` it shows 34 and states that 16 could not be placed, which reconciles: Q3
+was only asked of the Q1 = Yes respondents, so its groups are smaller and the
+anonymiser dropped 16 of them. Every rendered number matches the island.
+
+The theme-by-banner crosstab inside the qual tab is still hidden on a cube
+build. It needs a per-respondent banner membership for every commenter at once,
+which is a different shape from the per-comment cut, and it was not asked for.
 
 **The VAS integrated report.** `build_vas_integrated_report.py` reads `micro.n`
 and `micro.banner_vars` for its reconciliation checks, and its shared-audience
@@ -338,12 +359,8 @@ Islands themselves are safe under minification: `turas_minify` protects every
 
 ## Open, for Duncan
 
-1. Should a cube build be able to filter the COMMENT list to the live audience,
-   and show the theme-by-banner crosstab? It can, if the qual island carries
-   each comment's declared-variable level, under the same k-anonymisation the
-   demographic tags already get. That is a decision about what the qual island
-   contains, not a bug fix, and it is the only route: see the qualitative
-   section above for why the existing tags cannot be used.
+1. DONE, 4 September. The comments follow the filter, on Duncan's instruction.
+   See the qualitative section above for the rule and the proof.
 2. The weighted standard deviation divergence between R and the renderer,
    above. Neither engine is wrong; they Bessel-correct on different
    denominators, and the workbook and the report can print different SDs for
