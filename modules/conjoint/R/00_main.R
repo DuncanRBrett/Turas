@@ -758,6 +758,17 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
         }
       )
 
+      # The simulator is this module's only HTML deliverable now that the
+      # report is retired, so it is where the "Prepare client deliverable"
+      # checkbox has to land. The call site went with the report in fc27160a
+      # and was never re-pointed, so the box has been ticked and doing nothing
+      # since 27 August 2026 (found 4 September 2026).
+      if (!is.null(simulator_result) &&
+          identical(simulator_result$status, "PASS") &&
+          exists("turas_prepare_deliverable", mode = "function")) {
+        turas_prepare_deliverable(simulator_result$output_path)
+      }
+
       if (!is.null(simulator_result) && identical(simulator_result$status, "REFUSED")) {
         cat("\n\u250c\u2500\u2500\u2500 TURAS: SIMULATOR NOT PRODUCED \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
         cat("\u2502 Code:", simulator_result$code, "\n")

@@ -339,6 +339,16 @@ run_brand_gui <- function() {
             progress$set(value = 0.7, detail = "Generating HTML report...")
             html_result <- generate_brand_html_report(res, out_html, config = cfg)
 
+            # This is where the "Prepare client deliverable" checkbox lands.
+            # The flag was set and the minifier sourced above, but nothing in
+            # the module ever called this, so a ticked box produced a readable
+            # report (found 4 September 2026). The report is generated only
+            # here, so this is the only place the call can go.
+            if (identical(html_result$status, "PASS") &&
+                exists("turas_prepare_deliverable", mode = "function")) {
+              turas_prepare_deliverable(out_html)
+            }
+
             progress$set(value = 0.85, detail = "Generating Excel report...")
             xlsx_result <- generate_brand_excel(res, out_xlsx, config = cfg)
 

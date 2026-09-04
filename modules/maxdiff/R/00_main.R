@@ -1352,6 +1352,12 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
                       code = "MAXD_SIM_REFUSED", title = "Simulator not produced")
           } else {
             results$simulator_path <- sim_result$output_file
+            # When the HTML report is off, this file IS the deliverable, so the
+            # "Prepare client deliverable" checkbox has to reach it. It never
+            # did: only the report path called this (found 4 September 2026).
+            if (exists("turas_prepare_deliverable", mode = "function")) {
+              turas_prepare_deliverable(sim_result$output_file)
+            }
           }
         }
       } else {
