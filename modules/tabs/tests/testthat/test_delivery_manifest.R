@@ -131,3 +131,42 @@ test_that("the printer emits the lines and returns the manifest invisibly", {
   expect_true(any(grepl("YES \\(12 respondents\\)", out)))
   expect_true(res$microdata)
 })
+
+
+# -- tabs_microdata_wanted(): the GUI's client-safe choice decides the build ---
+
+test_that("microdata is wanted by default, with no reason recorded", {
+  d <- tabs_microdata_wanted(list(html_report_v2_microdata = TRUE), client_safe = FALSE)
+  expect_true(d$wanted)
+  expect_true(is.na(d$reason))
+  d <- tabs_microdata_wanted(list(), client_safe = FALSE)
+  expect_true(d$wanted)
+})
+
+test_that("the config switch turns the island off and says so", {
+  d <- tabs_microdata_wanted(list(html_report_v2_microdata = FALSE), client_safe = FALSE)
+  expect_false(d$wanted)
+  expect_identical(d$reason, "config")
+})
+
+test_that("the GUI client-safe choice turns the island off even when the config says TRUE", {
+  d <- tabs_microdata_wanted(list(html_report_v2_microdata = TRUE), client_safe = TRUE)
+  expect_false(d$wanted)
+  expect_identical(d$reason, "gui")
+})
+
+test_that("both switches off reports the config, the earlier decision", {
+  d <- tabs_microdata_wanted(list(html_report_v2_microdata = FALSE), client_safe = TRUE)
+  expect_false(d$wanted)
+  expect_identical(d$reason, "config")
+})
+
+test_that("the default client_safe argument reads the GUI global and is FALSE when unset", {
+  if (exists("TURAS_DELIVERY_CLIENT_SAFE", envir = .GlobalEnv)) {
+    rm("TURAS_DELIVERY_CLIENT_SAFE", envir = .GlobalEnv)
+  }
+  expect_true(tabs_microdata_wanted(list(html_report_v2_microdata = TRUE))$wanted)
+  assign("TURAS_DELIVERY_CLIENT_SAFE", TRUE, envir = .GlobalEnv)
+  on.exit(rm("TURAS_DELIVERY_CLIENT_SAFE", envir = .GlobalEnv), add = TRUE)
+  expect_false(tabs_microdata_wanted(list(html_report_v2_microdata = TRUE))$wanted)
+})

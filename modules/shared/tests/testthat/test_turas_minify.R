@@ -43,6 +43,7 @@ shared_lib <- shared_lib[1]
 
 source(file.path(shared_lib, "turas_minify_verify.R"), local = FALSE)
 source(file.path(shared_lib, "turas_minify_watermark.R"), local = FALSE)
+source(file.path(shared_lib, "turas_release_audit.R"), local = FALSE)
 source(file.path(shared_lib, "turas_minify.R"), local = FALSE)
 
 # Try to source TRS refusal (optional for tests)
@@ -1223,4 +1224,76 @@ test_that("verification skips js_function_count when obfuscated", {
 
   # File size should pass with obfuscation tolerance
   expect_true(verification$checks$file_size$pass)
+})
+
+
+# ==============================================================================
+# 18. Client-safe refusal writes nothing (audit runs before the write)
+# ==============================================================================
+
+.build_micro_html <- function() {
+  paste0(
+    '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"/>\n',
+    '<title>Client safe test</title>\n<style>body{margin:0}</style>\n</head>\n<body>\n',
+    '<div id="app"></div>\n',
+    '<script type="application/json" id="data-agg">{"questions":[]}</script>\n',
+    '<script type="application/json" id="data-micro">',
+    '{"n":3,"answers":{"Q1":[0,1,2]},"weights":[1,1,1]}</script>\n',
+    '<script>\nfunction boot() { return 1; }\nboot();\n</script>\n',
+    '</body>\n</html>\n'
+  )
+}
+
+test_that("a client-safe build that still carries data-micro refuses and leaves no output file", {
+  skip_if_not(exists("turas_release_audit", mode = "function"),
+              "turas_release_audit.R not loaded")
+  skip_if_not(exists("turas_refuse", mode = "function"), "trs_refusal.R not loaded")
+  tmp <- tempfile(pattern = "turas_cs_dev", fileext = ".html")
+  writeLines(.build_micro_html(), tmp, useBytes = TRUE)
+  on.exit(unlink(tmp), add = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(out), add = TRUE)
+
+  expect_error(
+    suppressWarnings(turas_minify(tmp, verbose = FALSE, client_safe = TRUE)),
+    class = "turas_refusal"
+  )
+  expect_false(file.exists(out))
+  expect_true(file.exists(tmp))
+})
+
+test_that("the same file passes when client-safe is not declared, and the audit result rides along", {
+  skip_if_not(exists("turas_release_audit", mode = "function"),
+              "turas_release_audit.R not loaded")
+  tmp <- tempfile(pattern = "turas_cs_dev", fileext = ".html")
+  writeLines(.build_micro_html(), tmp, useBytes = TRUE)
+  on.exit(unlink(tmp), add = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(out), add = TRUE)
+
+  r <- suppressWarnings(turas_minify(tmp, verbose = FALSE, client_safe = FALSE))
+  expect_true(r$status %in% c("PASS", "PARTIAL"))
+  expect_true(file.exists(out))
+  expect_true(r$release_audit$microdata$present)
+  expect_equal(r$release_audit$microdata$n, 3L)
+})
+
+test_that("turas_prepare_deliverable survives a client-safe refusal and keeps the dev copy", {
+  skip_if_not(exists("turas_release_audit", mode = "function"),
+              "turas_release_audit.R not loaded")
+  skip_if_not(exists("turas_refuse", mode = "function"), "trs_refusal.R not loaded")
+  dir <- tempfile(pattern = "turas_cs_dir"); dir.create(dir)
+  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+  report <- file.path(dir, "Report.html")
+  writeLines(.build_micro_html(), report, useBytes = TRUE)
+
+  assign("TURAS_PREPARE_DELIVERABLE", TRUE, envir = .GlobalEnv)
+  assign("TURAS_DELIVERY_CLIENT_SAFE", TRUE, envir = .GlobalEnv)
+  on.exit(rm(list = c("TURAS_PREPARE_DELIVERABLE", "TURAS_DELIVERY_CLIENT_SAFE"),
+             envir = .GlobalEnv), add = TRUE)
+
+  out <- capture.output(suppressWarnings(turas_prepare_deliverable(report)))
+  expect_true(any(grepl("No client deliverable was written", out, fixed = TRUE)))
+  expect_false(file.exists(report))
+  expect_true(file.exists(file.path(dir, "Report_dev.html")))
 })

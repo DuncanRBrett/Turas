@@ -332,7 +332,7 @@ run_tabs_gui <- function() {
                 radioButtons("delivery_mode", "Who is this file for?",
                   choiceNames = list(
                     HTML("<strong>Full report.</strong> Carries respondent-level records, so live filters and custom banners work. Anyone who opens the page source can rebuild a respondent-by-question dataset."),
-                    HTML("<strong>Client safe.</strong> No respondent-level records in the file. Needs html_report_v2_microdata = FALSE in the config; the build refuses if the records are still there.")
+                    HTML("<strong>Client safe.</strong> No respondent-level records in the file. The build drops them whatever the config says, and the file is audited before it is written. Live filters and custom banners are off in this file.")
                   ),
                   choiceValues = list("full", "client_safe"),
                   selected = character(0)

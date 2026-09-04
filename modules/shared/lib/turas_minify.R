@@ -1019,6 +1019,17 @@ turas_minify <- function(input_path,
   # -- Step 8: Inject build tag -----------------------------------------------
   html <- .minify_inject_build_tag(html)
 
+  # -- Step 8b: Release audit, BEFORE anything is written ---------------------
+  # What the delivered file actually contains. Runs on the final html string,
+  # which is the thing that leaves. Refuses when the caller declared client_safe
+  # and the respondent island is still there: a declaration that cannot fail is
+  # not a declaration. It sits before the write on purpose: an audit that ran
+  # after the write left a respondent-level file on disk under the clean
+  # deliverable name and then said no (found by Duncan, 4 Sep 2026).
+  release <- if (exists("turas_release_audit", mode = "function")) {
+    turas_release_audit(html, client_safe = isTRUE(client_safe), refuse = TRUE)
+  } else NULL
+
   # -- Step 9: Write output ---------------------------------------------------
   output_dir <- dirname(output_path)
   if (!dir.exists(output_dir)) {
@@ -1067,15 +1078,6 @@ turas_minify <- function(input_path,
       add_warning(paste("Verification:", msg))
     }
   }
-
-  # -- Step 10b: Release audit ------------------------------------------------
-  # What the delivered file actually contains. Runs on the MINIFIED html, which
-  # is the thing that leaves. Refuses when the caller declared client_safe and
-  # the respondent island is still there: a declaration that cannot fail is not
-  # a declaration. Everything else is reported, never fatal.
-  release <- if (exists("turas_release_audit", mode = "function")) {
-    turas_release_audit(html, client_safe = isTRUE(client_safe), refuse = TRUE)
-  } else NULL
 
   # -- Step 11: Build result --------------------------------------------------
   reduction_pct <- if (input_size > 0) {
@@ -1164,8 +1166,29 @@ turas_prepare_deliverable <- function(html_path) {
   # surviving microdata island refuses rather than ships.
   client_safe <- isTRUE(get0("TURAS_DELIVERY_CLIENT_SAFE", envir = .GlobalEnv))
 
-  minify_result <- turas_minify(dev_path, verbose = TRUE, watermark = client_name,
-                                client_safe = client_safe)
+  # A refusal (the client-safe audit) must not abort the rest of the run: the
+  # Reader and qualitative reports still follow this call. Catch it, say plainly
+  # that no deliverable was written, and leave the dev copy under its _dev name
+  # so nothing on disk is mistaken for a client file.
+  minify_result <- tryCatch(
+    turas_minify(dev_path, verbose = TRUE, watermark = client_name,
+                 client_safe = client_safe),
+    turas_refusal = function(e) {
+      # The refusal text carries the code, the problem and the fix. Turas runs
+      # in Shiny, so it has to reach the console here or it reaches nobody.
+      cat(conditionMessage(e), "\n")
+      cat("\n  [REFUSED] No client deliverable was written.\n")
+      cat(sprintf("  The report is kept as %s (dev copy, not for delivery).\n",
+                  basename(dev_path)))
+      list(status = "REFUSED", output_path = NA_character_, reduction_pct = NA_real_)
+    }
+  )
+
+  if (identical(minify_result$status, "REFUSED")) {
+    # Deliberately NOT renamed back: a file under the clean deliverable name
+    # is a file someone will send.
+    return(invisible(NULL))
+  }
 
   if (minify_result$status %in% c("PASS", "PARTIAL")) {
     cat(sprintf("  Client deliverable: %s (%.1f%% smaller)\n",

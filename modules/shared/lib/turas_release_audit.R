@@ -175,7 +175,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
           "This one can be turned back into a respondent-by-question dataset",
           "from the page source."),
         how_to_fix = c(
-          "Set html_report_v2_microdata = FALSE on the Settings sheet and re-run.",
+          "Choose 'Client safe' in the tabs GUI before running: the build then drops the island itself.",
+          "Running outside the GUI: set html_report_v2_microdata = FALSE on the Settings sheet.",
           "The island is decided when the report is built, so it cannot be removed afterwards.",
           "Or build without declaring client-safe, if respondent data is acceptable for this recipient."),
         module = "RELEASE AUDIT"

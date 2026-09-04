@@ -981,7 +981,10 @@ if (.html_report_v2_on) {
       # html_report_v2_microdata = FALSE omits the island DELIBERATELY: the
       # aggregates-only confidentiality ship (no per-respondent records in the
       # file) for insider populations where coded records could re-identify.
-      .micro_wanted <- !isFALSE(config_result$config_obj$html_report_v2_microdata)
+      # The GUI's "Client safe" delivery mode turns the island off too, see
+      # tabs_microdata_wanted() in delivery_manifest.R.
+      .micro_decision <- tabs_microdata_wanted(config_result$config_obj)
+      .micro_wanted <- isTRUE(.micro_decision$wanted)
       micro <- if (!.micro_wanted) NULL else tryCatch(
         build_microdata(dl, data_result$survey_data, data_result$survey_structure,
                         analysis_result$banner_info, config_result$config_obj,
@@ -997,7 +1000,11 @@ if (.html_report_v2_on) {
       if (!.micro_wanted) {
         # Deliberate omission. Record the confidentiality trade in the console
         # so the operator can see exactly what this ship does and doesn't carry.
-        cat("\n  Microdata island: OMITTED by config (html_report_v2_microdata = FALSE).\n")
+        if (identical(.micro_decision$reason, "gui")) {
+          cat("\n  Microdata island: OMITTED by the delivery mode chosen in the GUI (Client safe).\n")
+        } else {
+          cat("\n  Microdata island: OMITTED by config (html_report_v2_microdata = FALSE).\n")
+        }
         cat("    Confidentiality ship: the report file carries no per-respondent records.\n")
         cat("    Published figures only. Live filter, custom banners and COMPUTED views are off.\n")
         if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {

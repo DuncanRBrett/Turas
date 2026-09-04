@@ -26,6 +26,38 @@ if (!exists("%||%", mode = "function")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
 
+#' Decide whether this build carries the microdata island
+#'
+#' Two switches, either of which turns the island off: the config's
+#' `html_report_v2_microdata = FALSE`, and the GUI's "Client safe" delivery
+#' mode (`TURAS_DELIVERY_CLIENT_SAFE`). The GUI choice used to be a declaration
+#' only, enforced by an audit after the file was built; choosing it while the
+#' config still said TRUE produced a full respondent-level file and then a
+#' refusal. A client-safe choice now decides the build.
+#'
+#' @param config_obj The built config object.
+#' @param client_safe Logical. The GUI delivery mode; defaults to the global
+#'   the tabs GUI sets, FALSE when unset.
+#'
+#' @return A list with structure:
+#'   \item{wanted}{TRUE when the island should be built}
+#'   \item{reason}{Why it is off: "config", "gui", or NA when it is on}
+#'
+#' @keywords internal
+tabs_microdata_wanted <- function(config_obj,
+                                  client_safe = isTRUE(get0("TURAS_DELIVERY_CLIENT_SAFE",
+                                                            envir = .GlobalEnv))) {
+  cfg <- config_obj %||% list()
+  if (isFALSE(cfg$html_report_v2_microdata)) {
+    return(list(wanted = FALSE, reason = "config"))
+  }
+  if (isTRUE(client_safe)) {
+    return(list(wanted = FALSE, reason = "gui"))
+  }
+  list(wanted = TRUE, reason = NA_character_)
+}
+
+
 #' Describe what a finished v2 build contains, as manifest lines
 #'
 #' @param micro The microdata island list from build_microdata(), or NULL.
