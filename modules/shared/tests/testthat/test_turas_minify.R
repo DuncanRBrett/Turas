@@ -1449,6 +1449,140 @@ test_that("the maxdiff example report obfuscates every real block with no warnin
 
 
 # ==============================================================================
+# 19b. HARDENING THE DOCUMENT INSIDE A SRCDOC ATTRIBUTE
+# ==============================================================================
+# Skipping those blocks stopped the warnings but left about 1.2 MB of the
+# maxdiff simulator readable inside an otherwise hardened file. Step 2b takes
+# the embedded document out, puts it through this same function, and puts it
+# back. Deliverable only, so the dev copy still opens readable.
+
+test_that("the srcdoc escape round trip is exact", {
+  # Includes the two characters that make order matter: a literal ampersand and
+  # a literal quote, plus an &quot; that was already in the source.
+  doc <- paste0('<html><body><script>var s = "a &amp; b";',
+                'var t = &quot;already escaped&quot;;',
+                'if (a && b) { f("x") }</script></body></html>')
+  esc <- .minify_srcdoc_escape(doc)
+  expect_false(grepl('"', esc, fixed = TRUE),
+               info = "an unescaped quote would terminate the attribute")
+  expect_identical(.minify_srcdoc_unescape(esc), doc)
+})
+
+test_that("a document with no srcdoc is left byte-identical", {
+  html <- paste0('<html><body><script>var x = 1;</script></body></html>')
+  out <- .minify_harden_srcdoc(html, opts = list(), verbose = FALSE)
+  expect_identical(out$html, html)
+  expect_equal(out$count, 0L)
+})
+
+test_that("a srcdoc carrying no script is left alone", {
+  html <- '<html><body><iframe srcdoc="&lt;p&gt;hello&lt;/p&gt;"></iframe></body></html>'
+  out <- .minify_harden_srcdoc(html, opts = list(), verbose = FALSE)
+  expect_identical(out$html, html)
+  expect_equal(out$count, 0L)
+})
+
+test_that("a srcdoc that is not a whole document is left alone", {
+  # The range regex is a text match. A JavaScript string that happens to
+  # contain srcdoc=" must not have a minified document spliced over it.
+  html <- paste0('<html><body><script>var t = \'srcdoc="<script>x()</script>"\';',
+                 '</script></body></html>')
+  out <- .minify_harden_srcdoc(html, opts = list(), verbose = FALSE)
+  expect_identical(out$html, html)
+  expect_equal(out$count, 0L)
+})
+
+test_that("the extractor and the hardener agree on where the srcdoc is", {
+  # One definition, two callers. If they ever drifted, a block would be both
+  # skipped by the extractor and left unprotected by the hardener.
+  html <- paste0('<html><body><iframe srcdoc="&lt;html&gt;',
+                 '<script>var a=1</script>&lt;/html&gt;"></iframe>',
+                 '<script>var real=2</script></body></html>')
+  ranges <- .minify_srcdoc_ranges(html)
+  expect_equal(nrow(ranges), 1L)
+  blocks <- .minify_extract_blocks(html, "script")
+  expect_equal(length(blocks), 1L)
+  expect_true(grepl("var real", blocks[[1]]$content, fixed = TRUE))
+})
+
+test_that("an embedded simulator is hardened and still a working document", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(nzchar(.minify_find_tool("javascript-obfuscator")),
+              "javascript-obfuscator not available")
+  root <- dirname(dirname(dirname(normalizePath(shared_lib, mustWork = FALSE))))
+  sim <- file.path(root, "examples", "integrated_demo", "Output", "tabs",
+                   "report", "Karoo_MaxDiff_Results_simulator.html")
+  skip_if_not(file.exists(sim), "maxdiff simulator not built")
+
+  body <- paste(readLines(sim, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  page <- sprintf('<html><body><iframe srcdoc="%s"></iframe></body></html>',
+                  .minify_srcdoc_escape(body))
+
+  work <- tempfile(pattern = "srcdoc_harden"); dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+  dev_path <- file.path(work, "report_dev.html")
+  writeLines(page, dev_path, useBytes = TRUE)
+
+  res <- suppressWarnings(turas_minify(dev_path,
+                                       output_path = file.path(work, "out.html"),
+                                       verbose = FALSE, deliverable = TRUE))
+  # PARTIAL is fine here and says nothing about the hardening: this wrapper is
+  # one attribute and almost no markup, so html-minifier-terser has nothing to
+  # collapse and its result is not smaller, which the step records as skipped.
+  # What must hold is that verification passed and the document was hardened.
+  expect_true(res$status %in% c("PASS", "PARTIAL"), info = res$status)
+  expect_true(res$verification_passed)
+  expect_equal(res$srcdoc_documents_hardened, 1L)
+
+  out <- paste(readLines(file.path(work, "out.html"), warn = FALSE,
+                         encoding = "UTF-8"), collapse = "\n")
+  inner <- .minify_srcdoc_unescape(
+    substr(out, regexpr('srcdoc="', out, fixed = TRUE) + 8L, nchar(out)))
+
+  # The builder splices its tab-hiding injection in with a fixed sub() on
+  # </head>, so that tag has to survive or the injection is lost.
+  expect_true(grepl("</head>", inner, fixed = TRUE))
+  expect_true(grepl("</body>", inner, fixed = TRUE))
+
+  # The simulator's runtime has no island decoder, so its islands must come
+  # back plain. Carrying no data-island="v2" marker is what keeps the encoder
+  # off them.
+  for (id in c("sim-data", "pinned-views-data")) {
+    expect_true(grepl(sprintf('id="%s"', id), inner, fixed = TRUE),
+                info = sprintf("island %s went missing", id))
+  }
+  expect_false(grepl('data-island="v2"', inner, fixed = TRUE),
+               info = "an encoded island would boot the simulator blank")
+
+  # Internals go. Public object properties stay, because the pin buttons are
+  # built at runtime carrying onclick="TurasPins.move(...)".
+  expect_false(grepl("buildH2HSVG", out, fixed = TRUE))
+  expect_true(grepl("TurasPins", inner, fixed = TRUE))
+})
+
+test_that("a development build leaves the embedded document readable", {
+  skip_if_not(.has_terser(), "terser not available")
+  html <- paste0('<html><body><iframe srcdoc="',
+                 .minify_srcdoc_escape(
+                   '<html><body><script>function keepMeReadable(){return 1}</script></body></html>'),
+                 '"></iframe><script>var outer = 1;</script></body></html>')
+  work <- tempfile(pattern = "srcdoc_dev"); dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+  dev_path <- file.path(work, "report_dev.html")
+  writeLines(html, dev_path, useBytes = TRUE)
+
+  res <- suppressWarnings(turas_minify(dev_path,
+                                       output_path = file.path(work, "out.html"),
+                                       verbose = FALSE, deliverable = FALSE))
+  out <- paste(readLines(file.path(work, "out.html"), warn = FALSE,
+                         encoding = "UTF-8"), collapse = "\n")
+  expect_true(grepl("keepMeReadable", out, fixed = TRUE),
+              info = "the dev copy is the file you open when the report misbehaves")
+  expect_equal(res$srcdoc_documents_hardened, 0L)
+})
+
+
+# ==============================================================================
 # 20. DATA ISLAND ENCODING
 # ==============================================================================
 # A client deliverable encodes each marked island so the report cannot be read,

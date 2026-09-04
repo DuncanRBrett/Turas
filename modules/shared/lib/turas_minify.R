@@ -245,7 +245,201 @@
 }
 
 
+# -- Embedded documents -------------------------------------------------------
+
+#' Unescape one srcdoc attribute value back into a document
+#'
+#' Exactly reverses the escaping the maxdiff page builder applies
+#' (`modules/maxdiff/lib/html_report/03_page_builder.R`): `&quot;` first, then
+#' `&amp;`. Order matters and this direction is exact. An `&quot;` that was in
+#' the source document is `&amp;quot;` in the attribute, which contains no
+#' `&quot;` substring, so the first pass cannot touch it and the second returns
+#' it intact. Verified byte for byte on the real report before this shipped.
+#'
+#' @keywords internal
+.minify_srcdoc_unescape <- function(value) {
+  value <- gsub("&quot;", '"', value, fixed = TRUE)
+  gsub("&amp;", "&", value, fixed = TRUE)
+}
+
+#' Escape a document back into a srcdoc attribute value
+#' @keywords internal
+.minify_srcdoc_escape <- function(doc) {
+  doc <- gsub("&", "&amp;", doc, fixed = TRUE)
+  gsub('"', "&quot;", doc, fixed = TRUE)
+}
+
+#' Minify and obfuscate any document embedded in an iframe srcdoc attribute
+#'
+#' The maxdiff report embeds its whole simulator this way, about 1.2 MB of it.
+#' Escaped into an attribute the simulator is text, not markup, so every step
+#' below runs straight past it: .minify_extract_blocks() skips those script
+#' tags on purpose, because handing attribute text to terser only produced
+#' warnings. The consequence was that the one module whose simulator is the
+#' interesting part shipped it readable inside an otherwise hardened file.
+#'
+#' The document is taken out, put through this same function, and put back. The
+#' recursion terminates on its own: an embedded document contains no srcdoc of
+#' its own, so the step is a no-op one level down. No depth guard is needed and
+#' adding one would only hide a document that really did nest.
+#'
+#' Ranges are rewritten last to first so the earlier offsets stay valid.
+#'
+#' Runs on the deliverable path only. A development build keeps its readable
+#' embedded document, which is the whole point of the dev copy: it is the file
+#' someone opens when the report misbehaves.
+#'
+#' @param html Character. The whole document.
+#' @param opts Named list of the arguments to pass down to the recursive call.
+#' @param verbose Logical.
+#' @return list(html, count, obfuscated). `count` is the number of embedded
+#'   documents hardened; `obfuscated` says whether any of them actually had
+#'   JavaScript obfuscated, which verification needs to know because a report
+#'   whose only JavaScript lives inside a srcdoc has no block of its own.
+#' @keywords internal
+.minify_harden_srcdoc <- function(html, opts, verbose = FALSE) {
+  ranges <- .minify_srcdoc_ranges(html)
+  if (is.null(ranges) || nrow(ranges) == 0L) {
+    return(list(html = html, count = 0L, obfuscated = FALSE))
+  }
+
+  prefix <- 'srcdoc="'
+  hardened <- 0L
+  obfuscated <- FALSE
+
+  for (i in rev(seq_len(nrow(ranges)))) {
+    start <- ranges$start[i]
+    end <- ranges$end[i]
+    value <- substr(html, start + nchar(prefix), end - 1L)
+    if (!nzchar(value)) next
+
+    inner <- .minify_srcdoc_unescape(value)
+    # Only a whole document with script in it is worth the round trip, and only
+    # a whole document is safe to attempt. The range regex is a text match, so
+    # in principle a JavaScript string literal containing srcdoc=" could be
+    # caught by it; requiring <html and <script means such a fragment is left
+    # exactly as it was rather than being replaced by a minified version of
+    # itself. A srcdoc carrying markup with no script has nothing to protect.
+    if (!grepl("<html", inner, fixed = TRUE)) next
+    if (!grepl("<script", inner, fixed = TRUE)) next
+
+    work <- tempfile(pattern = "turas_srcdoc_", fileext = ".html")
+    out <- tempfile(pattern = "turas_srcdoc_min_", fileext = ".html")
+    on.exit(unlink(c(work, out)), add = TRUE)
+    writeLines(inner, work, useBytes = TRUE)
+
+    res <- tryCatch(
+      turas_minify(work, output_path = out,
+                   strip_meta = opts$strip_meta, minify_js = opts$minify_js,
+                   minify_css = opts$minify_css, minify_html = opts$minify_html,
+                   obfuscate_js = opts$obfuscate_js, watermark = opts$watermark,
+                   client_safe = opts$client_safe, deliverable = opts$deliverable,
+                   verbose = FALSE),
+      # A refusal from the embedded document is a refusal of this build. It
+      # already carries its own code, message and fix, so it passes through
+      # rather than being re-wrapped into something less specific.
+      turas_refusal = function(e) stop(e),
+      error = function(e) e
+    )
+
+    if (inherits(res, "error")) {
+      cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+      cat("| Context:    Minify, embedded srcdoc document\n")
+      cat("| Code:       CALC_MINIFY_SRCDOC_FAILED\n")
+      cat("| Message:   ", conditionMessage(res), "\n")
+      cat("+-------------------------------------------------------------+\n\n")
+      turas_refuse(
+        code = "CALC_MINIFY_SRCDOC_FAILED",
+        title = "An embedded document could not be minified",
+        problem = paste("The document inside an iframe srcdoc attribute could",
+                        "not be processed:", conditionMessage(res)),
+        why_it_matters = paste(
+          "The maxdiff report carries its whole simulator in that attribute.",
+          "Left unprocessed it ships readable inside a file that is otherwise",
+          "hardened, which is the thing this build exists to stop."),
+        how_to_fix = c(
+          "The message above names the cause",
+          "Or clear the client deliverable checkbox to keep a development build."),
+        module = "MINIFY"
+      )
+    }
+
+    # PASS and PARTIAL both write the file: PARTIAL only means the inner build
+    # raised a warning, and any warning at all produces it. Requiring PASS here
+    # would drop the hardening silently and ship the document readable, which
+    # is the failure this step exists to prevent.
+    if (!res$status %in% c("PASS", "PARTIAL") || !file.exists(out)) {
+      cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+      cat("| Context:    Minify, embedded srcdoc document\n")
+      cat("| Code:       CALC_MINIFY_SRCDOC_FAILED\n")
+      cat("| Message:    The embedded document came back as", res$status, "\n")
+      cat("|             with no file written.\n")
+      cat("+-------------------------------------------------------------+\n\n")
+      turas_refuse(
+        code = "CALC_MINIFY_SRCDOC_FAILED",
+        title = "An embedded document could not be minified",
+        problem = sprintf("The document inside an iframe srcdoc attribute returned %s and wrote no file.",
+                          res$status),
+        why_it_matters = paste(
+          "The maxdiff report carries its whole simulator in that attribute.",
+          "Left unprocessed it ships readable inside a file that is otherwise",
+          "hardened, which is the thing this build exists to stop."),
+        how_to_fix = c(
+          "The messages above name the cause",
+          "Or clear the client deliverable checkbox to keep a development build."),
+        module = "MINIFY"
+      )
+    }
+    if (length(res$warnings)) {
+      for (w in res$warnings) {
+        cat(sprintf("  [note] embedded document: %s\n", w))
+      }
+    }
+
+    new_value <- .minify_srcdoc_escape(
+      paste(readLines(out, warn = FALSE, encoding = "UTF-8"), collapse = "\n"))
+    html <- paste0(substr(html, 1L, start - 1L),
+                   prefix, new_value, '"',
+                   substr(html, end + 1L, nchar(html)))
+    hardened <- hardened + 1L
+    obfuscated <- obfuscated || (res$js_blocks_obfuscated > 0L)
+    if (verbose) {
+      cat(sprintf("  Embedded document hardened: %d/%d JS blocks obfuscated\n",
+                  res$js_blocks_obfuscated, res$js_blocks_processed))
+    }
+  }
+
+  list(html = html, count = hardened, obfuscated = obfuscated)
+}
+
+
 # -- Block extraction ---------------------------------------------------------
+
+#' Where every iframe srcdoc attribute value sits in an HTML string
+#'
+#' One definition, used by two callers that must agree: the block extractor,
+#' which skips script tags inside these ranges because they are attribute text
+#' rather than markup, and .minify_harden_srcdoc(), which hardens what is
+#' inside them. If the two ever disagreed, a block would be both skipped and
+#' left unprotected, which is the bug this whole step exists to close.
+#'
+#' The attribute's own quotes are safe to match on: the builder escapes every
+#' inner quote to &quot; before embedding, so [^"]* reaches the real closing
+#' quote.
+#'
+#' @param html Character. The whole document.
+#' @return A data frame of start/end character positions covering the entire
+#'   `srcdoc="..."` match, or NULL when the document has none.
+#' @keywords internal
+.minify_srcdoc_ranges <- function(html) {
+  dm <- gregexpr('srcdoc="[^"]*"', html, perl = TRUE)[[1]]
+  if (dm[1] == -1L) return(NULL)
+  data.frame(
+    start = as.integer(dm),
+    end   = as.integer(dm) + attr(dm, "match.length") - 1L
+  )
+}
+
 
 #' Extract Tagged Blocks from HTML
 #'
@@ -279,16 +473,7 @@
   # were being handed to terser, failing, and warning on every build. The
   # attribute's own quotes are safe to match on: the builder escapes every inner
   # quote to &quot; before embedding, so [^"]* reaches the real closing quote.
-  srcdoc_ranges <- NULL
-  if (tag == "script") {
-    dm <- gregexpr('srcdoc="[^"]*"', html, perl = TRUE)[[1]]
-    if (dm[1] != -1L) {
-      srcdoc_ranges <- data.frame(
-        start = as.integer(dm),
-        end   = as.integer(dm) + attr(dm, "match.length") - 1L
-      )
-    }
-  }
+  srcdoc_ranges <- if (tag == "script") .minify_srcdoc_ranges(html) else NULL
 
   script_ranges <- NULL
   if (tag == "style") {
@@ -1117,6 +1302,30 @@ turas_minify <- function(input_path,
                 collapse = "\n")
   original_html <- html
 
+  # -- Step 2b: Harden any embedded srcdoc document ---------------------------
+  # Before everything else, so the rest of the pipeline and the verification
+  # step see the final attribute. Deliverable only: the dev copy keeps its
+  # readable simulator. See .minify_harden_srcdoc().
+  srcdoc_hardened <- 0L
+  # A report whose only JavaScript lives inside a srcdoc has no block of its
+  # own to obfuscate, so obfuscation_applied would stay FALSE and the size
+  # check would apply its strict "must be smaller" rule to a file that
+  # obfuscation had just made bigger. Verification needs to know the embedded
+  # document was obfuscated.
+  srcdoc_obfuscated <- FALSE
+  if (isTRUE(deliverable)) {
+    sd <- .minify_harden_srcdoc(
+      html,
+      opts = list(strip_meta = strip_meta, minify_js = minify_js,
+                  minify_css = minify_css, minify_html = minify_html,
+                  obfuscate_js = obfuscate_js, watermark = watermark,
+                  client_safe = client_safe, deliverable = deliverable),
+      verbose = verbose)
+    html <- sd$html
+    srcdoc_hardened <- sd$count
+    srcdoc_obfuscated <- isTRUE(sd$obfuscated)
+  }
+
   # -- Step 3: Strip meta tags ------------------------------------------------
   meta_result <- list(count = 0L)
   if (strip_meta) {
@@ -1427,7 +1636,7 @@ turas_minify <- function(input_path,
     minified_js = minified_js_combined,
     input_size_bytes = input_size,
     output_size_bytes = output_size,
-    obfuscated = obfuscation_applied,
+    obfuscated = obfuscation_applied || srcdoc_obfuscated,
     watermark_client = if (nzchar(watermark_client)) watermark_client else NULL
   )
 
@@ -1464,6 +1673,7 @@ turas_minify <- function(input_path,
     verification_summary = verification$summary,
     client_safe = isTRUE(client_safe),
     deliverable = isTRUE(deliverable),
+    srcdoc_documents_hardened = srcdoc_hardened,
     islands_encoded = islands_encoded,
     island_seed = island_seed,
     release_audit = release,

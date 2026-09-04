@@ -1,5 +1,15 @@
 # Handover: the MaxDiff simulator ships readable inside its iframe
 
+> **Done, 4 September 2026, but not the way this handover plans it.** Read
+> `FINDINGS_simulator_minify_coverage.md` instead. Two claims below are wrong:
+> this is not the only piece the profile does not reach (the conjoint and
+> standalone maxdiff simulators and the brand report shipped readable too, for
+> a different reason), and the job is not a refactor of `turas_minify()`. The
+> shape that shipped hardens the embedded document before it is ever escaped,
+> from inside `turas_minify()` as step 2b. What follows is kept as the record
+> of what was known on the morning of 4 September.
+
+
 Written 4 September 2026 by the build-hardening session, from what that session
 measured. Read `BUILD_NOTE_production_hardening.md` first; this is the one piece
 of work it deliberately did not do.

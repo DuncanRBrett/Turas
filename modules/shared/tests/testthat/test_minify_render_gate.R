@@ -114,13 +114,56 @@ CHROME <- "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   )
 }
 
+# -- The srcdoc probe ----------------------------------------------------------
+# The maxdiff report embeds its whole simulator in an iframe srcdoc attribute.
+# A srcdoc document reports its origin as null, so the worry was that nothing
+# could check it. It can: the top document reaches iframe.contentDocument and
+# contentWindow fine (measured 4 September 2026). This probe walks in and
+# reports what the simulator actually loaded, which is the only way a change to
+# the embedded simulator can be gated at all.
+
+.iframe_probe_js <- function() {
+  paste0(
+    '<script>window.addEventListener("load",function(){setTimeout(function(){',
+    'var o={};try{',
+    'var f=document.querySelector("#panel-simulator iframe")||document.querySelector("iframe[srcdoc]");',
+    'o.frame=!!f;',
+    'var d=f?f.contentDocument:null;var w=f?f.contentWindow:null;',
+    'o.reachable=!!d;',
+    'o.innerScripts=d?d.querySelectorAll("script").length:null;',
+    'o.innerBodyEls=d?d.querySelectorAll("body *").length:null;',
+    'o.innerTitle=d?(d.title||""):null;',
+    # The simulator's public surface. Obfuscation keeps object property names,
+    # and it has to: the pin buttons are built at runtime carrying
+    # onclick="TurasPins.move(...)", so those names are load-bearing.
+    'o.globals=["SimEngine","SimUI","SimCharts","SimExport","TurasPins"].filter(',
+    'function(n){return w&&typeof w[n]!=="undefined"});',
+    'o.pinMethods=["move","copyToClipboard","exportCard","exportSinglePptx"].filter(',
+    'function(n){return w&&w.TurasPins&&typeof w.TurasPins[n]==="function"});',
+    'o.engineKeys=(w&&w.SimEngine)?Object.keys(w.SimEngine).sort():null;',
+    # The simulator carries its own islands and has no decoder, so they must
+    # come back as plain JSON or it boots blank.
+    'o.islandsPlain=(function(){if(!d){return null}',
+    'var ids=["sim-data","pinned-views-data"],ok=[];',
+    'for(var i=0;i<ids.length;i++){var el=d.getElementById(ids[i]);',
+    'if(el){try{JSON.parse(el.textContent);ok.push(ids[i])}catch(e){}}}',
+    'return ok})();',
+    '}catch(e){o.probeError=String(e)}',
+    'var p=document.createElement("pre");p.id="turas-probe";',
+    'p.textContent=JSON.stringify(o);document.body.appendChild(p)},3000)})</script>'
+  )
+}
+
 #' Render one HTML file in headless Chrome and read the probe back
 #'
 #' @param path HTML file to render. Not modified: a probed copy is rendered.
 #' @param fragment URL fragment, e.g. "#tab=crosstabs&q=Q001".
 #' @param handler_names Inline handler names to check resolve to functions.
+#' @param probe The script to splice in. Defaults to the top-document probe;
+#'   the srcdoc gate passes .iframe_probe_js() to read the simulator instead.
 #' @return List with the probe fields plus console_errors.
-.render_probe <- function(path, fragment = "", handler_names = character(0)) {
+.render_probe <- function(path, fragment = "", handler_names = character(0),
+                          probe = NULL) {
   html <- paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
   # Before the LAST </body>, not the first. The maxdiff report embeds its
   # simulator in an iframe srcdoc attribute, so the first </body> in the file is
@@ -129,7 +172,8 @@ CHROME <- "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   ends <- gregexpr("</body>", html, fixed = TRUE)[[1]]
   if (ends[1] == -1L) stop("no </body> in ", path)
   at <- ends[length(ends)]
-  probed <- paste0(substr(html, 1L, at - 1L), .probe_js(handler_names),
+  probe_script <- if (is.null(probe)) .probe_js(handler_names) else probe
+  probed <- paste0(substr(html, 1L, at - 1L), probe_script,
                    substr(html, at, nchar(html)))
   tmp_html <- file.path(dirname(path),
                         paste0("probe_", basename(tempfile()), ".html"))
@@ -376,4 +420,113 @@ test_that("legacy reports still resolve every inline handler after a deliverable
                 basename(src), length(handlers),
                 length(.normalise_console(d$console_errors))))
   }
+})
+
+# ==============================================================================
+# 3. The maxdiff simulator inside its srcdoc iframe
+# ==============================================================================
+#
+# The simulator is embedded as escaped attribute text, so every step of
+# turas_minify() ran straight past it and it shipped readable. Step 2b now
+# takes the embedded document out, puts it through the same pipeline, and puts
+# it back. Nothing else in the suite can see inside that iframe, so this is the
+# only check that the hardened simulator still boots.
+#
+# The fixture is built the way the report builds it: the standalone simulator,
+# the tab-hiding injection, the builder's own two gsub() calls, embedded in a
+# panel. Then the whole thing goes through turas_minify(deliverable = TRUE),
+# which is the shipping path.
+
+test_that("the simulator still boots after the deliverable hardens its srcdoc", {
+  reason <- .gate_skip_reason()
+  if (!identical(reason, "ready")) {
+    cat("\n  [RENDER GATE SKIPPED]", reason, "\n")
+    skip(reason)
+  }
+
+  sim_src <- file.path(
+    turas_root,
+    "examples/integrated_demo/Output/tabs/report/Karoo_MaxDiff_Results_simulator.html")
+  if (!file.exists(sim_src)) {
+    cat("\n  [RENDER GATE SKIPPED] no maxdiff simulator on disk.",
+        "Build examples/integrated_demo to run this check.\n")
+    skip("no maxdiff simulator on disk")
+  }
+
+  sim <- paste(readLines(sim_src, warn = FALSE, encoding = "UTF-8"),
+               collapse = "\n")
+
+  # modules/maxdiff/lib/html_report/03_page_builder.R, in miniature.
+  inject <- '<style>[data-tab="overview"]{display:none!important}</style>'
+  body <- sub("</head>", paste0(inject, "</head>"), sim, fixed = TRUE)
+  esc <- gsub("&", "&amp;", body, fixed = TRUE)
+  esc <- gsub('"', "&quot;", esc, fixed = TRUE)
+  page <- sprintf(paste0(
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>gate</title>',
+    '</head><body><div id="panel-simulator">',
+    '<iframe srcdoc="%s" style="width:100%%;height:80vh;"></iframe>',
+    '</div></body></html>'), esc)
+
+  work <- tempfile(pattern = "srcdoc_gate"); dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+  dev_path <- file.path(work, "report_dev.html")
+  prod_path <- file.path(work, "report.html")
+  writeLines(page, dev_path, useBytes = TRUE)
+
+  res <- suppressWarnings(turas_minify(dev_path, output_path = prod_path,
+                                       verbose = FALSE, deliverable = TRUE))
+  # PARTIAL only ever means html-minifier-terser found nothing to collapse in a
+  # page that is one big attribute. Verification is what must pass.
+  expect_true(res$status %in% c("PASS", "PARTIAL"), info = res$status)
+  expect_true(res$verification_passed)
+  expect_equal(res$srcdoc_documents_hardened, 1L,
+               info = "the embedded simulator was not hardened")
+
+  # The internals must be gone from the delivered file. These are function
+  # names from the simulator's own JavaScript, present in the readable build.
+  delivered <- paste(readLines(prod_path, warn = FALSE, encoding = "UTF-8"),
+                     collapse = "\n")
+  for (nm in c("updateShares", "buildH2HSVG", "buildSharesSnapshot")) {
+    if (grepl(nm, page, fixed = TRUE)) {
+      expect_false(grepl(nm, delivered, fixed = TRUE),
+                   info = sprintf("%s still readable in the deliverable", nm))
+    }
+  }
+
+  d <- .render_probe(dev_path, probe = .iframe_probe_js())
+  p <- .render_probe(prod_path, probe = .iframe_probe_js())
+
+  expect_true(d$found, info = "the development build produced no probe")
+  expect_true(p$found, info = "the deliverable produced no probe")
+  expect_true(isTRUE(p$reachable), info = "could not reach into the iframe")
+
+  # Everything the simulator needs, read from inside the iframe and compared
+  # against the development build rather than against a hard-coded list.
+  expect_equal(p$innerScripts, d$innerScripts,
+               info = "the hardened simulator loaded a different number of scripts")
+  expect_equal(p$innerBodyEls, d$innerBodyEls,
+               info = "the hardened simulator rendered a different element count")
+  expect_equal(p$innerTitle, d$innerTitle)
+  expect_equal(sort(p$globals), sort(d$globals),
+               info = sprintf("globals lost: %s",
+                              paste(setdiff(d$globals, p$globals), collapse = ", ")))
+  expect_equal(sort(p$pinMethods), sort(d$pinMethods),
+               info = "a TurasPins method the pin buttons call did not survive")
+  expect_equal(p$engineKeys, d$engineKeys,
+               info = "the simulator engine's public surface changed")
+  expect_equal(sort(p$islandsPlain), sort(d$islandsPlain),
+               info = "an island stopped parsing as JSON, so the simulator boots blank")
+
+  introduced <- setdiff(.normalise_console(p$console_errors),
+                        .normalise_console(d$console_errors))
+  expect_equal(length(introduced), 0L,
+               info = sprintf("console errors the deliverable introduced: %s",
+                              paste(utils::head(introduced, 3), collapse = " | ")))
+
+  cat(sprintf("  srcdoc simulator: %d scripts, %d elements, %d globals, %d pin methods, islands %s\n",
+              p$innerScripts, p$innerBodyEls, length(p$globals),
+              length(p$pinMethods), paste(p$islandsPlain, collapse = "+")))
+  cat(sprintf("  report carrying it: %s -> %s bytes\n",
+              format(file.info(dev_path)$size, big.mark = ","),
+              format(file.info(prod_path)$size, big.mark = ",")))
 })
