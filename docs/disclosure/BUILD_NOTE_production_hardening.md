@@ -45,6 +45,10 @@ islands. Every one of them renders identically to its development build.
 | plain (published only) | 1,057 KB | 2,312 KB | 2 | 0 of 4 |
 | contrib (all four islands) | 1,281 KB | 2,884 KB | 7 | 4 of 4 |
 
+Those deliverable sizes were measured before `splitStrings` came out; they are
+now about 385 KB lower each. The dev column, the encoding and the renderer
+counts are unchanged.
+
 Readable identifiers on the Karoo integrated demo, development build against
 deliverable:
 
@@ -89,13 +93,16 @@ it now says larger or smaller as the case may be.
 
 ### Size
 
-The demo goes from 1,228 KB to 2,761 KB. The old profile produced 1,139 KB, so
-this is the one number that moved the wrong way, and it moved a long way. The
-driver is the default `hexadecimal` name generator, which had to replace the
-design's `mangled-shuffled` (section 4). Dropping `splitStrings` would recover
-385 KB with identical survivor counts, if size ever matters more than the last
-increment of protection. Duncan has said it does not; the measurement is here so
-that stays a decision rather than an assumption.
+The demo goes from 1,228 KB to 2,375 KB. The old profile produced 1,139 KB, so
+this is the one number that moved the wrong way. The driver is the default
+`hexadecimal` name generator, which had to replace the design's
+`mangled-shuffled` (section 4).
+
+`splitStrings` was dropped on Duncan's instruction on 4 September, which took
+this from 2,761 KB to 2,375 KB. It cost 385 KB and changed no survivor count:
+with the threshold at 1.0 and base64 encoding, every literal is already hidden
+in the string array, so splitting them first added depth nobody could measure.
+Both simulators render clean without it.
 
 ---
 
@@ -238,21 +245,43 @@ decisions, and nothing here could verify it: the legacy handler probe evaluates
 `typeof window[name]` in the top document, and the simulator's handlers live in
 the iframe's window. Recommend it as its own piece of work.
 
-**The VAS integrated report needs the development copy.**
-`build_vas_integrated_report.py` on OneDrive anchors on the literal string
-`shell.tabGroups = tabGroups` and does `json.loads` on `data-micro` and
-`data-agg`. Minification destroys the first: measured this session, present in
-the development build and absent from the deliverable. So that pipeline already
-required a development build before any of this work, and island encoding adds a
-second reason. What changes is that the deliverable checkbox now defaults on, so
-the clean filename holds the minified file and `Run VAS Integrated Report.command`
-will pick up the wrong one. It fails loudly, with "the crosstab report is not the
-shape this build expects", not silently. The fix is one line in that Python file,
-pointing it at `_dev.html`, and it is Duncan's file to change. The delivery
-manifest now says on every deliverable build that downstream tools must read the
-dev copy.
+**The VAS integrated report: FIXED, it now takes either build.**
+`build_vas_integrated_report.py` on OneDrive anchored on the literal string
+`shell.tabGroups = tabGroups` and did `json.loads` on `data-micro` and
+`data-agg`. Minification destroys the first, so that pipeline already required a
+development build before any of this work; island encoding would have added a
+second reason. Duncan asked for it to work on both, so it now does.
 
-**The deliverable is 2.2 times the size of the development build.** Section 2.
+Three changes, snapshot first at
+`Archive/build_vas_integrated_report.py.before-minified-support-20260904`:
+
+- An island reader that decodes the deliverable's encoding, the same generator
+  as the R and JavaScript halves, and returns plain JSON either way.
+- The build is detected by the `<!-- Turas Build v -->` tag, which
+  `turas_minify()` injects after the whitespace pass and which therefore
+  survives. That is a better detector than `data-k`, because a report built
+  before the island markers existed and then minified has no `data-k` but is
+  still minified.
+- The anchor list gained `data-agg`, the app container and the end of document,
+  all of which survive minification. The shell source anchor is still checked on
+  a working build, where a Turas engine change gets noticed first, and is not
+  asked for on a deliverable.
+
+Nothing else needed changing: the patch it injects works entirely through the
+rendered DOM and the public `TR.*` runtime API, and the profile renames neither
+globals nor properties.
+
+Verified end to end, in a scratch copy of the reporting folder, writing nothing
+to OneDrive but the script and its snapshot. The real VAS crosstab report, and a
+minified copy of it, each produced a full integrated report: 1,100 respondents,
+7 banner variables, 40 of 40 sections, 18 pages. Both rendered in headless
+Chrome with no fatal panel, no console errors, the Sections tab injected, Group
+overview removed, and the crosstab cell text identical between the two. The
+island reader was unit tested on four shapes, including a current-template
+deliverable whose islands are actually encoded.
+
+**The deliverable is about 1.9 times the size of the development build.**
+Section 2.
 
 ---
 
@@ -285,8 +314,7 @@ are byte-identical copies of runtimes already in the list.
    Reader deliverable, the comment report, and one `report_hub` build. The Reader
    has its own runtime and no gate; the hub path was never executed. This session
    never ran the pipeline on a real config and never wrote to a project folder.
-2. Decide whether 2.2 times the size is acceptable, or whether `splitStrings`
-   comes out.
-3. Point `Run VAS Integrated Report.command` at the `_dev` copy before the next
-   VAS build.
-4. Say whether the MaxDiff simulator srcdoc becomes its own piece of work.
+2. Say whether the MaxDiff simulator srcdoc becomes its own piece of work.
+3. The next VAS integrated build needs no change from you. It reads whichever
+   crosstab report is under the plain filename, minified or not. Worth one run
+   to see it for yourself.

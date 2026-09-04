@@ -14,8 +14,6 @@
   "stringArrayWrappersChainedCalls": true,
   "stringArrayCallsTransform": true,
   "stringArrayCallsTransformThreshold": 0.5,
-  "splitStrings": true,
-  "splitStringsChunkLength": 12,
   "seed": 20260904,
   "controlFlowFlattening": false,
   "deadCodeInjection": false,

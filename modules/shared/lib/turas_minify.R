@@ -88,6 +88,12 @@
 #                       survivor counts are identical with and without it. A
 #                       setting whose safety depends on which seed you picked
 #                       does not belong in a file a client opens.
+#   splitStrings        dropped on Duncan's instruction, 4 September 2026, to
+#                       get the size back. It cost 385 KB on the Karoo demo and
+#                       changed no survivor count: with stringArrayThreshold 1.0
+#                       and base64 encoding every literal is already hidden in
+#                       the array, so splitting them first added depth nobody
+#                       could measure. Both simulators render clean without it.
 #   transformObjectKeys measured to break the MaxDiff simulator. It rewrites an
 #                       object literal into staged computed-key assignments, and
 #                       the simulator's donut arc came out as
@@ -120,8 +126,6 @@
   "stringArrayWrappersChainedCalls": true,
   "stringArrayCallsTransform": true,
   "stringArrayCallsTransformThreshold": 0.5,
-  "splitStrings": true,
-  "splitStringsChunkLength": 12,
   "seed": 20260904,
   "controlFlowFlattening": false,
   "deadCodeInjection": false,
