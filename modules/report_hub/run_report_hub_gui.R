@@ -431,9 +431,13 @@ run_report_hub_gui <- function() {
           div(style = "margin-top: 12px;",
             checkboxInput("auto_open", "Open result in browser when done",
                          value = TRUE),
+            # On by default when the tools that make a deliverable possible are
+            # installed. It shipped off, and an off-by-default protection is why a
+            # development build reached a third-party AI tool. The development copy
+            # is kept beside the deliverable either way.
             checkboxInput("prepare_deliverable",
-                         "Prepare client deliverable (minify for delivery)",
-                         value = FALSE)
+                         "Prepare client deliverable (minify for delivery, dev copy kept)",
+                         value = turas_deliverable_default())
           )
         )
       )
@@ -532,9 +536,29 @@ run_report_hub_gui <- function() {
             dev_path <- sub("\\.html$", "_dev.html", hub_path)
 
             if (file.rename(hub_path, dev_path)) {
-              minify_result <- turas_minify(dev_path, verbose = TRUE)
+              # deliverable = TRUE makes a failed obfuscation a refusal rather
+              # than a quietly readable hub. The refusal is a condition, so it
+              # is caught here: an uncaught one would leave the hub on disk
+              # under its _dev name with nothing said in the UI.
+              minify_result <- tryCatch(
+                turas_minify(dev_path, verbose = TRUE, deliverable = TRUE),
+                turas_refusal = function(e) {
+                  cat(conditionMessage(e), "\n")
+                  list(status = "REFUSED", output_path = NA_character_,
+                       reduction_pct = NA_real_)
+                }
+              )
 
-              if (minify_result$status %in% c("PASS", "PARTIAL")) {
+              if (identical(minify_result$status, "REFUSED")) {
+                # Deliberately not renamed back: a file under the clean hub name
+                # is a file someone will send.
+                console_text(paste0(
+                  console_text(),
+                  "\n[REFUSED] No client deliverable was written.\n",
+                  sprintf("The hub is kept as %s (dev copy, not for delivery).\n",
+                          basename(dev_path))
+                ))
+              } else if (minify_result$status %in% c("PASS", "PARTIAL")) {
                 console_text(paste0(
                   console_text(),
                   sprintf("\nClient deliverable: %s (%.1f%% smaller)\n",

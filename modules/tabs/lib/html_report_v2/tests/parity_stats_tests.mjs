@@ -35,6 +35,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { PARITY_ENGINE_MODULES } from "./parity_engine_modules.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const JS_DIR = path.join(HERE, "..", "assets", "js");
@@ -44,10 +45,16 @@ const sandbox = { console };
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-for (const file of ["00_namespace.js", "01_format.js", "03_svg.js", "20_data.js",
-  "21_stats.js", "21c_confidence.js", "21d_disclosure.js", "22w_waves.js", "22_model.js",
-  "23_render.js", "26_filter.js"]) {
-  vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
+// TURAS_BUNDLE points this same suite at one already-built file instead of the
+// source modules, which is how production_bundle_tests.mjs runs these exact
+// assertions against terser + obfuscator output. Unset, nothing changes.
+if (process.env.TURAS_BUNDLE) {
+  vm.runInContext(readFileSync(process.env.TURAS_BUNDLE, "utf8"), sandbox,
+    { filename: "production-bundle" });
+} else {
+  for (const file of PARITY_ENGINE_MODULES) {
+    vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
+  }
 }
 const TR = sandbox.TR;
 

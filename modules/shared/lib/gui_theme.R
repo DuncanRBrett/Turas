@@ -231,3 +231,31 @@ turas_hide_recents <- function() {
   }
   FALSE
 }
+
+
+#' Should the client-deliverable checkbox start ticked?
+#'
+#' TRUE when javascript-obfuscator is installed, which is the tool that makes a
+#' deliverable build possible at all. The checkbox shipped defaulting to FALSE,
+#' and an off-by-default protection is why a development report, respondent
+#' island and readable renderer included, reached a third-party AI tool. The
+#' development copy is kept beside the deliverable either way, so the cost of
+#' the default being wrong is a rebuild, not a lost file.
+#'
+#' It lives here rather than in turas_minify.R because every module GUI sources
+#' this file before it builds its UI and none of them has loaded the minifier by
+#' then. When the minifier IS loaded its own search is used, so there is one
+#' answer rather than two.
+#'
+#' @return Logical, TRUE when the obfuscator was found.
+#' @export
+turas_deliverable_default <- function() {
+  if (exists(".minify_find_tool", mode = "function")) {
+    return(isTRUE(nzchar(.minify_find_tool("javascript-obfuscator"))))
+  }
+  found <- Sys.which("javascript-obfuscator")
+  if (nzchar(found)) return(TRUE)
+  search_paths <- c("/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
+                    "/usr/lib/node_modules/.bin")
+  any(file.exists(file.path(search_paths, "javascript-obfuscator")))
+}

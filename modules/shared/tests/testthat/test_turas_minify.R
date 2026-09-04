@@ -1297,3 +1297,148 @@ test_that("turas_prepare_deliverable survives a client-safe refusal and keeps th
   expect_false(file.exists(report))
   expect_true(file.exists(file.path(dir, "Report_dev.html")))
 })
+
+
+# ==============================================================================
+# 18. DELIVERABLE BUILDS: the silent fallbacks are refusals
+# ==============================================================================
+# Until 4 September 2026 a failed or missing obfuscator kept the plain minified
+# JavaScript, recorded a warning, and wrote the file anyway under the clean
+# deliverable name. The reason the deliverable path exists is that the readable
+# renderer must not leave the building, so in a deliverable build that is a
+# refusal. A development build keeps the old forgiving behaviour.
+
+#' Put a stub javascript-obfuscator that always fails at the front of PATH
+#'
+#' .minify_find_tool() tries Sys.which() first, so this is enough to make the
+#' pipeline believe the real tool is this one.
+.with_failing_obfuscator <- function(code) {
+  dir <- tempfile(pattern = "turas_stub_bin"); dir.create(dir)
+  stub <- file.path(dir, "javascript-obfuscator")
+  writeLines(c("#!/bin/sh", "echo 'stub obfuscator failure' >&2", "exit 1"), stub)
+  Sys.chmod(stub, "0755")
+  old_path <- Sys.getenv("PATH")
+  Sys.setenv(PATH = paste(dir, old_path, sep = .Platform$path.sep))
+  on.exit({ Sys.setenv(PATH = old_path); unlink(dir, recursive = TRUE) }, add = TRUE)
+  force(code)
+}
+
+test_that("a deliverable build refuses when obfuscation fails", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(exists("turas_refuse", mode = "function"), "trs_refusal.R not loaded")
+  tmp <- tempfile(pattern = "turas_deliv_dev", fileext = ".html")
+  writeLines(.build_micro_html(), tmp, useBytes = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(c(tmp, out)), add = TRUE)
+
+  .with_failing_obfuscator({
+    expect_error(
+      suppressWarnings(capture.output(
+        turas_minify(tmp, verbose = FALSE, deliverable = TRUE))),
+      class = "turas_refusal"
+    )
+  })
+  expect_false(file.exists(out))
+})
+
+test_that("the same failure in a development build warns and still writes", {
+  skip_if_not(.has_terser(), "terser not available")
+  tmp <- tempfile(pattern = "turas_devbuild", fileext = ".html")
+  writeLines(.build_micro_html(), tmp, useBytes = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(c(tmp, out)), add = TRUE)
+
+  res <- .with_failing_obfuscator({
+    suppressWarnings(turas_minify(tmp, verbose = FALSE, deliverable = FALSE))
+  })
+  expect_equal(res$status, "PARTIAL")
+  expect_true(file.exists(out))
+  expect_equal(res$js_blocks_obfuscated, 0L)
+})
+
+test_that("a deliverable build refuses when the obfuscator is not installed", {
+  skip_if_not(exists("turas_refuse", mode = "function"), "trs_refusal.R not loaded")
+  tmp <- tempfile(pattern = "turas_notool_dev", fileext = ".html")
+  writeLines(.build_micro_html(), tmp, useBytes = TRUE)
+  out <- .minify_derive_output_path(tmp)
+  on.exit(unlink(c(tmp, out)), add = TRUE)
+
+  real_check <- .minify_check_tools
+  assign(".minify_check_tools", function() {
+    t <- real_check(); t$obfuscator <- ""; t
+  }, envir = .GlobalEnv)
+  on.exit(assign(".minify_check_tools", real_check, envir = .GlobalEnv), add = TRUE)
+
+  expect_error(
+    suppressWarnings(capture.output(
+      turas_minify(tmp, verbose = FALSE, deliverable = TRUE))),
+    class = "turas_refusal"
+  )
+  expect_false(file.exists(out))
+})
+
+test_that("the committed node profile mirror matches the R constants", {
+  path <- file.path(shared_lib, "minify_profile.json")
+  skip_if_not(file.exists(path), "minify_profile.json not present")
+  on_disk <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  expected <- .minify_profile_json_text()
+  expect_equal(trimws(on_disk), trimws(expected))
+})
+
+
+# ==============================================================================
+# 19. SCRIPT TAGS INSIDE AN IFRAME SRCDOC ATTRIBUTE
+# ==============================================================================
+# The maxdiff report embeds its whole simulator in an iframe srcdoc attribute,
+# HTML-escaped. Those escaped <script> tags are attribute text, not script
+# elements, and their bodies are not valid JavaScript. Handing them to terser
+# produced eight warnings on every maxdiff build, and once a deliverable build
+# refuses on a failed obfuscation it would have refused on every one.
+
+test_that("script tags inside a srcdoc attribute are not extracted as blocks", {
+  html <- paste0(
+    '<html><body>\n',
+    '<iframe srcdoc="&lt;html&gt;&lt;body&gt;',
+    '<script>window.addEventListener(&quot;load&quot;,function(){});</script>',
+    '&lt;/body&gt;&lt;/html&gt;"></iframe>\n',
+    '<script>function real() { return 1; }</script>\n',
+    '</body></html>'
+  )
+  blocks <- .minify_extract_blocks(html, "script")
+  expect_equal(length(blocks), 1L)
+  expect_true(grepl("function real", blocks[[1]]$content, fixed = TRUE))
+})
+
+test_that("a document with no srcdoc still extracts every script block", {
+  html <- paste0('<html><body>',
+                 '<script type="application/json" id="data-agg">{"a":1}</script>',
+                 '<script>var x = 1;</script>',
+                 '</body></html>')
+  blocks <- .minify_extract_blocks(html, "script")
+  expect_equal(length(blocks), 2L)
+  expect_equal(blocks[[1]]$type, "application/json")
+})
+
+test_that("the maxdiff example report obfuscates every real block with no warning", {
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(nzchar(.minify_find_tool("javascript-obfuscator")),
+              "javascript-obfuscator not available")
+  # turas_root is the working directory, which testthat moves to the test
+  # folder. shared_lib was resolved by search, so walk back up from it.
+  root <- dirname(dirname(dirname(normalizePath(shared_lib, mustWork = FALSE))))
+  src <- file.path(root, "examples", "maxdiff", "Output",
+                   "Karoo_MaxDiff_Results.html")
+  skip_if_not(file.exists(src), "maxdiff example report not built")
+
+  work <- tempfile(pattern = "md_srcdoc"); dir.create(work)
+  on.exit(unlink(work, recursive = TRUE), add = TRUE)
+  dev_path <- file.path(work, basename(src))
+  file.copy(src, dev_path)
+
+  res <- suppressWarnings(turas_minify(dev_path,
+                                       output_path = file.path(work, "out.html"),
+                                       verbose = FALSE, deliverable = TRUE))
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
+  expect_equal(res$js_blocks_obfuscated, res$js_blocks_processed)
+  expect_equal(sum(grepl("failed to obfuscate", res$warnings)), 0L)
+})

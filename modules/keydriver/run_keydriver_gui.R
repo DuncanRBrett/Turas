@@ -193,9 +193,13 @@ run_keydriver_gui <- function() {
                       class = "btn turas-btn-run",
                       icon = icon("play")),
           div(style = "margin-top: 12px;",
+            # On by default when the tools that make a deliverable possible are
+            # installed. It shipped off, and an off-by-default protection is why a
+            # development build reached a third-party AI tool. The development copy
+            # is kept beside the deliverable either way.
             checkboxInput("prepare_deliverable",
-                         "Prepare client deliverable (minify for delivery)",
-                         value = FALSE)
+                         "Prepare client deliverable (minify for delivery, dev copy kept)",
+                         value = turas_deliverable_default())
           )
         )
       ),

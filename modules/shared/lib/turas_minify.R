@@ -44,7 +44,10 @@
   "--remove-comments"
 )
 
-.MINIFY_TOOL_TIMEOUT_SECS <- 60L
+# 180, not 60. A report with a large qualitative island takes longer to
+# obfuscate than the demo's 3 seconds, and in a deliverable build a timeout is
+# now a refusal rather than a quietly unobfuscated file.
+.MINIFY_TOOL_TIMEOUT_SECS <- 180L
 
 # javascript-obfuscator config — written to a temp JSON file per invocation.
 # renameGlobals=false: 676+ inline onclick handlers reference top-level functions.
@@ -65,6 +68,40 @@
   "disableConsoleOutput": false,
   "log": false
 }'
+
+#' The build profile as the node gates read it
+#'
+#' The terser arguments and the obfuscator profile above are the single source
+#' of truth. modules/shared/lib/minify_profile.json is a generated mirror of
+#' them, so the node gate under
+#' modules/tabs/lib/html_report_v2/tests/production_bundle_tests.mjs builds its
+#' bundle with the settings the pipeline actually ships rather than a copy that
+#' can drift. The obfuscator profile is spliced in as raw text, not re-encoded
+#' through a list, because auto_unbox would collapse the one-element
+#' stringArrayEncoding array into a string.
+#'
+#' Regenerate after changing either constant:
+#'   Rscript -e 'source("modules/shared/lib/turas_minify.R"); .minify_write_profile_json()'
+#'
+#' @return Character, the exact JSON text of the generated mirror.
+#' @keywords internal
+.minify_profile_json_text <- function() {
+  args_json <- as.character(jsonlite::toJSON(.MINIFY_TERSER_ARGS))
+  paste0("{\n  \"terser_args\": ", args_json, ",\n  \"obfuscator\": ",
+         .MINIFY_OBFUSCATOR_CONFIG_JSON, "\n}\n")
+}
+
+#' Write the generated profile mirror
+#'
+#' @param path Where to write. Defaults to the committed location.
+#' @return Invisibly the path written.
+#' @keywords internal
+.minify_write_profile_json <- function(path = file.path("modules", "shared", "lib",
+                                                        "minify_profile.json")) {
+  cat(.minify_profile_json_text(), file = path)
+  invisible(path)
+}
+
 
 .MINIFY_NODE_SEARCH_PATHS <- c(
   "/opt/homebrew/bin",       # macOS Homebrew (Apple Silicon)
@@ -168,6 +205,24 @@
   # When extracting <style> blocks, filter out any that fall inside a <script>
   # block. JS string literals can contain "<style>...</style>" (e.g., the
   # dashboard styles wrapper function).
+  # Script tags that live inside an iframe's srcdoc attribute are not script
+  # elements: they are escaped text in an attribute value, and their bodies are
+  # not valid JavaScript. The maxdiff report embeds its whole simulator that way
+  # (modules/maxdiff/lib/html_report/03_page_builder.R), so eight blocks of it
+  # were being handed to terser, failing, and warning on every build. The
+  # attribute's own quotes are safe to match on: the builder escapes every inner
+  # quote to &quot; before embedding, so [^"]* reaches the real closing quote.
+  srcdoc_ranges <- NULL
+  if (tag == "script") {
+    dm <- gregexpr('srcdoc="[^"]*"', html, perl = TRUE)[[1]]
+    if (dm[1] != -1L) {
+      srcdoc_ranges <- data.frame(
+        start = as.integer(dm),
+        end   = as.integer(dm) + attr(dm, "match.length") - 1L
+      )
+    }
+  }
+
   script_ranges <- NULL
   if (tag == "style") {
     sp <- paste0("(<script(?=[\\s>])[^>]*>)([\\s\\S]*?)(</script>)")
@@ -186,6 +241,14 @@
   for (i in seq_along(matches)) {
     start_pos <- matches[i]
     end_pos <- start_pos + match_lengths[i] - 1L
+
+    # Skip script tags that fall inside a srcdoc attribute value
+    if (!is.null(srcdoc_ranges)) {
+      inside_srcdoc <- any(
+        start_pos >= srcdoc_ranges$start & start_pos <= srcdoc_ranges$end
+      )
+      if (inside_srcdoc) next
+    }
 
     # Skip style blocks that fall inside a script block
     if (!is.null(script_ranges)) {
@@ -717,6 +780,12 @@
 #'   build carries no respondent-level data. The release audit then REFUSES if
 #'   the microdata island is still present, because a declaration that cannot
 #'   fail protects nobody. Default FALSE, which audits and reports only.
+#' @param deliverable Logical. TRUE when this build is a client deliverable
+#'   rather than a working copy. It turns the pipeline's silent fallbacks into
+#'   refusals: obfuscation that did not happen refuses instead of writing a
+#'   readable file under the deliverable name. Passed explicitly rather than
+#'   read from TURAS_PREPARE_DELIVERABLE, because tests and report_hub call
+#'   this function directly.
 #' @param verbose Logical. If TRUE, print progress and size comparison.
 #'
 #' @return A named list with:
@@ -760,12 +829,38 @@ turas_minify <- function(input_path,
                          obfuscate_js = TRUE,
                          watermark = NULL,
                          client_safe = FALSE,
+                         deliverable = FALSE,
                          verbose = FALSE) {
 
   warnings_acc <- character(0)
   add_warning <- function(msg) {
     warnings_acc <<- c(warnings_acc, msg)
     warning(msg, call. = FALSE)
+  }
+
+  # In a deliverable build, obfuscation that did not happen is not a warning.
+  # The old behaviour kept the plain minified JS, returned PARTIAL and wrote the
+  # file anyway, so an obfuscator that was missing or timed out shipped readable
+  # source under the clean client deliverable name. Turas runs in Shiny, so the
+  # reason has to reach the console or it reaches nobody.
+  refuse_obfuscation <- function(problem, how_to_fix) {
+    cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+    cat("| Context:    Minify, client deliverable build\n")
+    cat("| Code:       CALC_MINIFY_OBFUSCATE_FAILED\n")
+    cat("| Message:   ", problem, "\n")
+    for (fx in how_to_fix) cat("| How to fix:", fx, "\n")
+    cat("+-------------------------------------------------------------+\n\n")
+    turas_refuse(
+      code = "CALC_MINIFY_OBFUSCATE_FAILED",
+      title = "JavaScript obfuscation failed on a client deliverable",
+      problem = problem,
+      why_it_matters = paste(
+        "A deliverable that is not obfuscated ships the readable Turas renderer.",
+        "That is the whole reason the deliverable path exists, so it refuses",
+        "rather than writing a file someone will send to a client."),
+      how_to_fix = how_to_fix,
+      module = "MINIFY"
+    )
   }
 
   # -- Step 0: Validate input -------------------------------------------------
@@ -838,6 +933,13 @@ turas_minify <- function(input_path,
   }
 
   if (obfuscate_js && !nzchar(tools$obfuscator)) {
+    if (isTRUE(deliverable)) {
+      refuse_obfuscation(
+        "javascript-obfuscator was not found, so no JavaScript could be obfuscated.",
+        c("Install it: npm install -g javascript-obfuscator",
+          paste("Searched:", paste(.MINIFY_NODE_SEARCH_PATHS, collapse = ", ")),
+          "Or clear the client deliverable checkbox to keep a development build."))
+    }
     add_warning("javascript-obfuscator not found. JS obfuscation skipped. Install: npm install -g javascript-obfuscator")
     obfuscate_js <- FALSE
   }
@@ -965,6 +1067,27 @@ turas_minify <- function(input_path,
       if (result$success) {
         obf_contents[[i]] <- result$content
         js_obfuscated <- js_obfuscated + 1L
+      } else if (isTRUE(deliverable)) {
+        # Tell the two failures apart. A block terser also rejects was never
+        # valid JavaScript, so the report itself is at fault and no obfuscator
+        # setting will help. Only run on the failure path.
+        parseable <- isTRUE(suppressWarnings(
+          .minify_js_block(block$content, tools$terser))$success)
+        if (parseable) {
+          refuse_obfuscation(
+            sprintf("JS block %d could not be obfuscated (tool error or timeout at %d seconds).",
+                    i, .MINIFY_TOOL_TIMEOUT_SECS),
+            c("Run javascript-obfuscator on the report by hand to see its error",
+              "A very large report may need .MINIFY_TOOL_TIMEOUT_SECS raised",
+              "Or clear the client deliverable checkbox to keep a development build."))
+        } else {
+          refuse_obfuscation(
+            sprintf("JS block %d is not valid JavaScript, so it could not be protected.",
+                    i),
+            c("The report generator wrote a script block the parser rejects",
+              "Save the report, open that script block and check it parses",
+              "Or clear the client deliverable checkbox to keep a development build."))
+        }
       } else {
         obf_contents[[i]] <- NULL
         add_warning(sprintf("JS block %d failed to obfuscate, kept minified version", i))
@@ -1104,6 +1227,7 @@ turas_minify <- function(input_path,
     verification_passed = verification$all_passed,
     verification_summary = verification$summary,
     client_safe = isTRUE(client_safe),
+    deliverable = isTRUE(deliverable),
     release_audit = release,
     warnings = warnings_acc
   )
@@ -1172,7 +1296,7 @@ turas_prepare_deliverable <- function(html_path) {
   # so nothing on disk is mistaken for a client file.
   minify_result <- tryCatch(
     turas_minify(dev_path, verbose = TRUE, watermark = client_name,
-                 client_safe = client_safe),
+                 client_safe = client_safe, deliverable = TRUE),
     turas_refusal = function(e) {
       # The refusal text carries the code, the problem and the fix. Turas runs
       # in Shiny, so it has to reach the console here or it reaches nobody.
