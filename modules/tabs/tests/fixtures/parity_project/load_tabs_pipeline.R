@@ -162,3 +162,12 @@ source(file.path(turas_root, "modules/tabs/lib/report_shared.R"))
 source(file.path(lib_dir, "score_utils.R"))
 source(file.path(lib_dir, "allocation_processor.R"))
 source(file.path(lib_dir, "data_layer_writer.R"))
+
+# --- 12. Microdata + cube writers. The computed-path parity gate
+#     (computed_parity_tests.mjs) needs the SAME run's respondent island and
+#     aggregate cube, so the JS engine's two computed sources are compared
+#     against each other and against R's published layer. ---
+source(file.path(lib_dir, "microdata_writer.R"))
+if (file.exists(file.path(lib_dir, "cube_writer.R"))) {
+  source(file.path(lib_dir, "cube_writer.R"))
+}
