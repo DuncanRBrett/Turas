@@ -1,11 +1,21 @@
 /**
- * v2 stats engine. Recomputes any table from the embedded respondent-level
- * microdata: filter masks, column memberships (built-in or custom banners),
- * weighted column %, NETs (sums, unions, differences), index means, and
- * two-proportion z-tests / Welch t-tests for significance letters.
+ * v2 stats engine. Recomputes any table from an embedded COMPUTED SOURCE:
+ * filter masks, column memberships (built-in or custom banners), weighted
+ * column %, NETs (sums, unions, differences), index means, and two-proportion
+ * z-tests / Welch t-tests for significance letters.
  *
- * Everything here is pure given (TR.AGG, TR.MICRO); unit-tested in node
- * including a golden parity test against the published tables.
+ * There are two computed sources and this file is the seam between them.
+ * TR.MICRO carries one array position per respondent. TR.CUBE carries
+ * precomputed sufficient statistics per (variable combination, question, cell)
+ * and no respondents at all; its accumulation lives in 21b_cube.js. Every
+ * function below that walks respondents delegates to the cube when a cube is
+ * installed and a respondent island is not, and RETURNS THE SAME SHAPE either
+ * way, so nothing above this seam has to know which source it is reading.
+ *
+ * Everything here is pure given (TR.AGG, TR.MICRO, TR.CUBE); unit-tested in
+ * node including a golden parity test against the published tables and a
+ * cube-versus-microdata comparison over an enumerated view set
+ * (computed_parity_tests.mjs).
  */
 (function (global) {
   "use strict";
@@ -14,6 +24,30 @@
   var stats = TR.stats = {};
 
   var ANSWERED_UNSHOWN = -2;    // answered, category not displayed
+
+  /** Is the aggregate cube the source? True only when a cube is installed and
+   *  no respondent island is. A build carrying both keeps the records. */
+  function onCube() { return !!(TR.cube && TR.cube.active()); }
+
+  /** Which computed source is installed: "micro", "cube" or null. */
+  stats.source = function () {
+    if (TR.MICRO && TR.MICRO.answers) return "micro";
+    if (onCube()) return "cube";
+    return null;
+  };
+
+  /** Respondents in the study, from whichever source is installed. */
+  stats.studyN = function () {
+    if (TR.MICRO && TR.MICRO.n != null) return TR.MICRO.n;
+    if (onCube()) return TR.CUBE.n;
+    return null;
+  };
+
+  /** Why this cut cannot be served, or null. Only the cube ever refuses: the
+   *  respondent island can compute every cut it is asked for. */
+  stats.refusalFor = function (code, columns, mask) {
+    return onCube() ? TR.cube.refusalFor(code, columns, mask) : null;
+  };
 
   /** Inverse standard-normal CDF (Acklam's rational approximation, |ε|<1.2e-9). */
   function qnorm(p) {
@@ -158,6 +192,11 @@
   var weightedFlag = null;
   stats.isWeighted = function () {
     if (weightedFlag !== null) return weightedFlag;
+    if (onCube()) {
+      // The cube carries the verdict rather than the weights it was built from.
+      weightedFlag = !!TR.CUBE.weighted;
+      return weightedFlag;
+    }
     var w = TR.MICRO && TR.MICRO.weights;
     weightedFlag = false;
     if (w) {
@@ -167,6 +206,9 @@
     }
     return weightedFlag;
   };
+  /** Forget the cached verdict. Only a harness that installs a second island
+   *  into one engine needs this; a page installs exactly one. */
+  stats._resetWeighted = function () { weightedFlag = null; };
 
   /** Kish effective base from running Σw and Σw². 0 when no weight mass. */
   function effectiveBase(sumW, sumW2) {
@@ -175,6 +217,7 @@
 
   /** Respondent inclusion mask for a filter list. Returns Uint8Array. */
   stats.mask = function (filters) {
+    if (onCube()) return TR.cube.mask(filters);
     var n = TR.MICRO.n;
     var mask = new Uint8Array(n);
     mask.fill(1);
@@ -210,6 +253,7 @@
   };
 
   stats.maskCount = function (mask) {
+    if (mask && mask.cube) return TR.cube.maskCount(mask);
     var c = 0;
     for (var i = 0; i < mask.length; i++) c += mask[i];
     return c;
@@ -250,6 +294,7 @@
   }
 
   stats.columnsFor = function (banner) {
+    if (onCube()) return TR.cube.columnsFor(banner);
     var n = TR.MICRO.n;
     var columns = [{ label: "Total", letter: "", member: null }];
     if (banner && banner.indexOf("composite:") === 0) {
@@ -338,6 +383,7 @@
    * Returns per column: base, counts per row, pct per row, mean per mean-row.
    */
   stats.tabulate = function (q, columns, mask) {
+    if (onCube()) return TR.cube.tabulate(q, columns, mask);
     var answers = TR.MICRO.answers[q.code];
     var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
     var catRows = TR.d2.catRows(q);
@@ -388,6 +434,7 @@
 
   /** NET value (sum of members for singles, union for multis), weighted. */
   stats.netCounts = function (q, members, columns, mask) {
+    if (onCube()) return TR.cube.netCounts(q, members, columns, mask);
     var answers = TR.MICRO.answers[q.code];
     var wanted = {};
     members.forEach(function (ri) { wanted[ri] = true; });
@@ -421,6 +468,7 @@
    * Returns the same {base, n, wbase, effBase} shape as netCounts.
    */
   stats.boxCounts = function (qcode, boxRi, columns, mask) {
+    if (onCube()) return TR.cube.boxCounts(qcode, boxRi, columns, mask);
     var boxes = TR.MICRO.boxes[qcode];
     var answers = TR.MICRO.answers && TR.MICRO.answers[qcode];
     return columns.map(function (col) {
@@ -480,6 +528,7 @@
    * SACAP fixture / shown-category path). null when neither is available.
    */
   stats.indexMeans = function (q, columns, mask) {
+    if (onCube()) return TR.cube.indexMeans(q, columns, mask);
     var scores = TR.MICRO.scores && TR.MICRO.scores[q.code];
     if (scores) {
       return columns.map(function (col) {
@@ -515,6 +564,7 @@
    * has chosen here. null renders as no value, never as a wrong one.
    */
   stats.medians = function (q, columns, mask) {
+    if (onCube()) return TR.cube.medians(q, columns, mask);
     var scores = TR.MICRO.scores && TR.MICRO.scores[q.code];
     if (!scores) return null;
     if (stats.isWeighted && stats.isWeighted()) {
@@ -552,6 +602,7 @@
    * neighbouring item's number.
    */
   stats.seriesMeans = function (q, rowIndex, columns, mask) {
+    if (onCube()) return TR.cube.seriesMeans(q, rowIndex, columns, mask);
     var all = TR.MICRO.series;
     if (!all || !Object.prototype.hasOwnProperty.call(all, q.code)) return null;
     var byRow = all[q.code];
@@ -576,7 +627,8 @@
    * Mirrors calculate_ratio_of_totals() in numeric_processor.R exactly, so the
    * unfiltered recompute reproduces the published figure.
    */
-  stats.ratioOfTotals = function (ratio, columns, mask) {
+  stats.ratioOfTotals = function (ratio, columns, mask, qcode) {
+    if (onCube()) return TR.cube.ratioOfTotals(ratio, columns, mask, qcode);
     var scores = TR.MICRO.scores || {};
     var num = ratio && scores[ratio.num], den = ratio && scores[ratio.den];
     if (!num || !den) return null;
@@ -612,6 +664,7 @@
    * denominator. Returns the {mean, sd, k} shape sigLetters(isMean) expects.
    */
   stats.netScoreMeans = function (qcode, plusRi, minusRi, columns, mask) {
+    if (onCube()) return TR.cube.netScoreMeans(qcode, plusRi, minusRi, columns, mask);
     var boxes = TR.MICRO.boxes[qcode];
     var answers = TR.MICRO.answers && TR.MICRO.answers[qcode];
     return columns.map(function (col) {
@@ -624,6 +677,93 @@
         return 0;
       }, mask, col);
     });
+  };
+
+  /**
+   * "The rest", everyone in the audience except this column, as a column spec.
+   * Nothing outside this file may build one: on the respondent island it is a
+   * complement membership array, on the cube it is an exact subtraction, and
+   * the two callers that used to build the array themselves would have had to
+   * learn both.
+   */
+  stats.restOf = function (col) {
+    if (onCube()) return TR.cube.restOf(col);
+    var n = TR.MICRO.n;
+    if (!col || !col.member) return { member: null };
+    var rest = new Uint8Array(n);
+    for (var r = 0; r < n; r++) rest[r] = col.member[r] ? 0 : 1;
+    return { member: rest };
+  };
+
+  /**
+   * Everyone in ANY column of a banner group. NOT the same as Total: a
+   * respondent in no column of the group is excluded. That is the arm the
+   * Executive Takeout's cell family compares each group against, so its overall
+   * mean is the sum of the group's columns rather than the whole sample.
+   */
+  stats.groupColumn = function (bannerId) {
+    if (onCube()) return TR.cube.groupColumn(bannerId);
+    var vars = TR.MICRO && TR.MICRO.banner_vars && TR.MICRO.banner_vars[bannerId];
+    if (!vars) return null;
+    var member = new Uint8Array(TR.MICRO.n);
+    for (var r = 0; r < member.length; r++) {
+      var cd = vars[r];
+      if (cd !== null && cd !== undefined && cd >= 0) member[r] = 1;
+    }
+    return { label: "All", letter: "", member: member };
+  };
+
+  /**
+   * {n, sw, sw2, swx, swx2} for one column's per-respondent scores. The Welch
+   * test in 27da only ever used these moments of its two arrays, so this is the
+   * whole of what the cell family needs and the only shape the cube can serve.
+   */
+  stats.momentsOf = function (qcode, col, mask) {
+    if (onCube()) return TR.cube.momentsOf(qcode, col, mask);
+    var scores = TR.MICRO.scores && TR.MICRO.scores[qcode];
+    if (!scores) return { n: 0, sw: 0, sw2: 0, swx: 0, swx2: 0 };
+    return momentsFromVector(scores, col, mask);
+  };
+
+  /** The same moments for a KeyShare row's 0/100 encoding. */
+  stats.shareMomentsOf = function (q, ri, col, mask) {
+    if (onCube()) return TR.cube.shareMomentsOf(q, ri, col, mask);
+    var vec = TR.takeout && TR.takeout._shares
+      ? TR.takeout._shares.scoreVector({ q: q, ri: ri }, TR.MICRO, TR.MICRO.n) : null;
+    if (!vec) return { n: 0, sw: 0, sw2: 0, swx: 0, swx2: 0 };
+    return momentsFromVector(vec, col, mask);
+  };
+
+  function momentsFromVector(vec, col, mask) {
+    var n = TR.MICRO.n, cnt = 0, sw = 0, sw2 = 0, swx = 0, swx2 = 0;
+    for (var r = 0; r < n; r++) {
+      if (mask && !mask[r]) continue;
+      if (col && col.member && !col.member[r]) continue;
+      var v = vec[r];
+      if (v === null || v === undefined) continue;
+      var w = weightAt(r);
+      cnt++; sw += w; sw2 += w * w; swx += w * v; swx2 += w * v * v;
+    }
+    return { n: cnt, sw: sw, sw2: sw2, swx: swx, swx2: swx2 };
+  }
+
+  /** Does this question carry a per-respondent score in the installed source? */
+  stats.hasScores = function (qcode) {
+    if (onCube()) return TR.cube.has(qcode, "scores");
+    return !!(TR.MICRO && TR.MICRO.scores && TR.MICRO.scores[qcode]);
+  };
+
+  /** Does it carry box-category membership? Decides whether a NET row
+   *  recomputes from boxes or from its declared members. */
+  stats.hasBoxes = function (qcode) {
+    if (onCube()) return TR.cube.has(qcode, "boxes");
+    return !!(TR.MICRO && TR.MICRO.boxes && TR.MICRO.boxes[qcode]);
+  };
+
+  /** Does it carry an Allocation item series? */
+  stats.hasSeries = function (qcode) {
+    if (onCube()) return TR.cube.has(qcode, "series");
+    return !!(TR.MICRO && TR.MICRO.series && TR.MICRO.series[qcode]);
   };
 
   /* ---------- significance ---------- */

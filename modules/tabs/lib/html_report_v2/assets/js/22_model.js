@@ -46,7 +46,8 @@
       return med ? med.map(function (m) { return m.mean; }) : blank;
     }
     if (stat === "ratio") {
-      var rat = q.ratio ? TR.stats.ratioOfTotals(q.ratio, columns, mask) : null;
+      var rat = q.ratio
+        ? TR.stats.ratioOfTotals(q.ratio, columns, mask, q.code) : null;
       return rat ? rat.map(function (m) { return m.mean; }) : blank;
     }
     if (stat === "mode" || stat === "chi") return blank;
@@ -181,6 +182,14 @@
    * "not available", never a base of 0 against real published figures.
    */
   function recomputable(q) {
+    if (TR.cube && TR.cube.active()) {
+      // The cube states per question what it carries, so the "is there a single
+      // non-null answer" scan below has an answer without a respondent loop.
+      var f = TR.cube.questionFacts(q.code);
+      if (!f || !f.has || !f.has.length) return false;
+      return f.has.indexOf("answers") !== -1 || f.has.indexOf("scores") !== -1 ||
+        f.has.indexOf("boxes") !== -1 || f.has.indexOf("series") !== -1;
+    }
     if (TR.MICRO.boxes && TR.MICRO.boxes[q.code]) return true;
     if (TR.MICRO.scores && TR.MICRO.scores[q.code]) return true;
     // An Allocation question carries one series per item row instead of one
@@ -200,6 +209,26 @@
     dual = dual && TR.stats.hasSecondary();   // see publishedModel
     var spec = TR.stats.columnsFor(bannerId);
     var mask = TR.stats.mask(filters);
+    // A source that cannot serve this cut says so ONCE, before any
+    // accumulation. Otherwise every base computes to 0 against real published
+    // figures, which is the failure mode a refusal exists to prevent.
+    var refusal = TR.stats.refusalFor(q.code, spec.columns, mask);
+    if (refusal) {
+      return { source: "computed", refused: true, refusedReason: refusal.reason,
+        refusedVar: refusal["var"] || null, refusedQ: refusal.q || null,
+        columns: spec.columns.map(function (c) {
+          return { label: c.label, letter: c.letter, base: null, baseW: null,
+            baseEff: null, low: false };
+        }),
+        rows: q.rows.map(function (r) {
+          return rowModel(r, spec.columns.map(function () {
+            return { pct: null, n: null, mean: null, sig: "" };
+          }));
+        }),
+        stat: COL_PCT, notRecomputable: true, maskCount: null,
+        custom: !!spec.custom, composite: !!spec.composite,
+        customSource: spec.source ? spec.source.code : null };
+    }
     var tabs = TR.stats.tabulate(q, spec.columns, mask);
     var letters = spec.columns.map(function (c) { return c.letter; });
     var threshold = lowThreshold();
@@ -325,7 +354,7 @@
     // Box-category membership (TR.MICRO.boxes) recomputes box NETs directly from
     // each respondent's box. Works whether the underlying scale is shown
     // (SACAP) or hidden (CCS shows only the boxes). Falls back to net_members.
-    var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
+    var boxes = TR.stats.hasBoxes(q.code);
     var diff = q.net_diffs && q.net_diffs[String(ri)];
     if (diff !== undefined) {
       var diffRow = function (cells) {
@@ -512,23 +541,20 @@
     var cols = spec.columns;
     var mask = TR.stats.mask(filters);
     var threshold = viewModel.lowBaseThreshold;
-    var n = TR.MICRO.n;
     // Each column's disjoint complement ("the rest"), built once and reused for
-    // every row; index 0 (Total) has no complement and is never tested.
-    var rests = cols.map(function (c, i) {
-      if (i === 0 || !c.member) return null;
-      var rest = new Uint8Array(n);
-      for (var r = 0; r < n; r++) rest[r] = c.member[r] ? 0 : 1;
-      return { member: rest };
+    // every row; index 0 (Total) has no complement and is never tested. Built
+    // by the stats seam so it is a complement mask on the respondent island and
+    // an exact subtraction on the cube, without this file knowing which.
+    var restCols = cols.map(function (c, i) {
+      return i === 0 ? { member: null, sel: null } : TR.stats.restOf(c);
     });
-    var restCols = cols.map(function (c, i) { return i === 0 ? { member: null } : rests[i]; });
     // One tabulation pass for the columns and one for their complements covers
     // every category row + base; means and NETs recompute per row below.
     var colTab = TR.stats.tabulate(q, cols, mask);
     var restTab = TR.stats.tabulate(q, restCols, mask);
     var colMeans = TR.stats.indexMeans(q, cols, mask);
     var restMeans = colMeans ? TR.stats.indexMeans(q, restCols, mask) : null;
-    var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
+    var boxes = TR.stats.hasBoxes(q.code);
 
     // Two-proportion z of a column vs its rest, gated by the low-base threshold
     // and the test's own preconditions (propZ returns null when either fails).
@@ -703,7 +729,7 @@
     var filtered = filters && filters.length > 0;
     var needCompute = custom || composite || filtered;
     var viewModel;
-    if (needCompute && TR.d2.hasMicrodata()) {
+    if (needCompute && TR.d2.hasComputedSource()) {
       viewModel = computedModel(q, bannerId, filters, opts.dual);
     } else {
       viewModel = publishedModel(q,
@@ -734,7 +760,7 @@
     // published full-sample Totals with no microdata to filter, so a wave-on-
     // wave delta would compare filtered-now against unfiltered-prior. Flag the
     // model so attachDeltas suppresses the (misleading) trend under a filter.
-    viewModel.filtered = !!(filters && filters.length > 0) && TR.d2.hasMicrodata();
+    viewModel.filtered = !!(filters && filters.length > 0) && TR.d2.hasComputedSource();
     // Blank sub-threshold columns BEFORE deltas/significance/intervals, so none of them
     // compute (or leak) anything for a cut too small to report.
     applyDisclosureSuppression(viewModel);

@@ -256,6 +256,29 @@
   };
 
   /**
+   * Is there ANY source a computed view can be built from? True for the
+   * respondent island and for the aggregate cube alike.
+   *
+   * Every caller that used to ask hasMicrodata() to decide whether a view takes
+   * the computed path asks this instead. Leaving one behind would render the
+   * PUBLISHED table under an active filter, with no sign that the filter had
+   * been ignored, which is the worst failure this feature could have.
+   * hasMicrodata() survives for the one caller that genuinely needs respondent
+   * records: the qualitative tab's filtered view, which has no cube equivalent
+   * and fails closed without one.
+   */
+  d2.hasComputedSource = function () {
+    return d2.hasMicrodata() || !!(TR.cube && TR.cube.active());
+  };
+
+  /** Respondents in the study, from whichever source is installed. */
+  d2.studyN = function () {
+    if (TR.MICRO && TR.MICRO.n != null) return TR.MICRO.n;
+    if (TR.cube && TR.cube.active()) return TR.CUBE.n;
+    return null;
+  };
+
+  /**
    * Per-report localStorage namespace. localStorage is shared across every page
    * on a browser origin, so two report files opened from the same origin would
    * otherwise read and write the SAME keys. A composite or saved banner built in
@@ -361,11 +384,18 @@
           var q = d2.questionByCode(f.q);
           if (!q) return false;
           if (f.box) {
+            // Box groupings need per-respondent box membership. The cube has no
+            // box variable in this version, so a crafted #filter=Qx:b5 is
+            // dropped rather than silently filtering on something else.
             return !!(TR.MICRO && TR.MICRO.boxes && TR.MICRO.boxes[f.q]) &&
               f.rows.every(function (ri) {
                 return q.rows[ri] && q.rows[ri].kind === "net";
               });
           }
+          // On a cube build the variable must also be DECLARED: an undeclared
+          // question has no slice to read, and a hash is the one route into a
+          // filter that never went through the picker.
+          if (TR.cube && TR.cube.active() && !TR.cube.isDeclared(f.q)) return false;
           return f.rows.every(function (ri) {
             return q.rows[ri] && q.rows[ri].kind === "category";
           });

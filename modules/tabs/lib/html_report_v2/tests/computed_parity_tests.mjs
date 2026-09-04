@@ -49,8 +49,8 @@ const JS_DIR = path.join(HERE, "..", "assets", "js");
 const FIXTURE_DIR = path.join(HERE, "..", "..", "..", "tests", "fixtures", "parity_project");
 
 const MODULES = ["00_namespace.js", "01_format.js", "03_svg.js", "20_data.js",
-  "21_stats.js", "21c_confidence.js", "21d_disclosure.js", "22w_waves.js",
-  "22_model.js", "23_render.js", "26_filter.js"];
+  "21_stats.js", "21b_cube.js", "21c_confidence.js", "21d_disclosure.js",
+  "22w_waves.js", "22_model.js", "23_render.js", "26_filter.js"];
 
 /**
  * A FRESH engine per configuration. stats.isWeighted() caches its answer in a
@@ -347,6 +347,84 @@ runConfiguration("weighted", "parity_island_weighted.json",
    no band: a difference is an accumulation bug in the cube.
 --------------------------------------------------------------------------- */
 
+/**
+ * Cube against respondent island, cell by cell. Both sides are THIS engine, so
+ * the claim here is stronger than displayed precision: the two must agree on
+ * the NUMBER. The tolerance is 1e-8 relative, which is the precision the cube's
+ * own sums are written at (cube_round, digits = 8) and far tighter than any
+ * accumulated floating-point difference between summing 200 doubles in a
+ * different order. It is NOT a tolerance on the figure: anything a reader could
+ * see would be many orders of magnitude larger.
+ */
+function sameNumber(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined) {
+    return (a === null || a === undefined) && (b === null || b === undefined);
+  }
+  var scale = Math.max(1, Math.abs(a), Math.abs(b));
+  // 1e-8 relative is the precision the cube's own sums are written at
+  // (cube_round, digits = 8). The 1e-5 absolute floor is for the standard
+  // deviation: the engine forms a variance as (sum wx squared / sum w) minus
+  // (mean squared), which cancels catastrophically when the true variance is
+  // zero, so a cell where everyone gave the same answer computes as 1.4e-6 on
+  // one source and exactly 0 on the other. Both are zero. The floor is five
+  // orders of magnitude below the last digit any of these figures displays,
+  // so it can never absorb a difference a reader could see.
+  return Math.abs(a - b) <= 1e-8 * scale + 1e-5;
+}
+
+function compareSources(TR, q, micro, cube, label, boundary) {
+  let cells = 0;
+  const pctDp = TR.fmt.decimalsFor(false);
+  const meanDp = TR.fmt.decimalsForQ(q, true);
+  const same = (a, b, where, dp) => {
+    if (!sameNumber(a, b)) {
+      throw new Error(where + ": micro " + JSON.stringify(b) + ", cube " + JSON.stringify(a));
+    }
+    if (dp != null && a != null && b != null &&
+        Number(a).toFixed(dp) !== Number(b).toFixed(dp)) {
+      // The two sources agree on the NUMBER (checked above, to 1e-8 relative)
+      // and disagree only on which side of a rounding boundary it lands. The
+      // cube sums each cell in R and adds the cells here; the respondent island
+      // accumulates every respondent in one pass. On a weighted design those
+      // two orders of addition put a value that is exactly x.5 a fraction of an
+      // ulp either side of it. Counted with the view that produced it, never
+      // failed as a figure difference and never widened into a tolerance.
+      if (boundary) {
+        boundary.count++;
+        boundary.notes.push(where + " sits on a rounding boundary: micro " +
+          Number(b).toFixed(dp) + " (" + b + "), cube " + Number(a).toFixed(dp) +
+          " (" + a + ")");
+        return;
+      }
+      throw new Error(where + " prints differently: micro " + Number(b).toFixed(dp) +
+        ", cube " + Number(a).toFixed(dp));
+    }
+  };
+  eq(cube.columns.length, micro.columns.length, label + " column count");
+  cube.columns.forEach((cc, ci) => {
+    const mc = micro.columns[ci];
+    eq(cc.label, mc.label, label + " col " + ci + " label");
+    same(cc.base, mc.base, label + " col " + ci + " base", 0);
+    same(cc.baseW, mc.baseW, label + " col " + ci + " baseW", 0);
+    same(cc.baseEff, mc.baseEff, label + " col " + ci + " baseEff", 0);
+    eq(!!cc.low, !!mc.low, label + " col " + ci + " low-base flag");
+  });
+  eq(cube.rows.length, micro.rows.length, label + " row count");
+  cube.rows.forEach((cr, ri) => {
+    const mr = micro.rows[ri];
+    eq(cr.label, mr.label, label + " row " + ri + " label");
+    cr.cells.forEach((cc, ci) => {
+      const mc = mr.cells[ci];
+      const where = label + " / " + cr.label + " / col " + ci;
+      same(cc.pct, mc.pct, where + " pct", pctDp);
+      same(cc.mean, mc.mean, where + " mean", meanDp);
+      same(cc.n, mc.n, where + " n", 0);
+      cells++;
+    });
+  });
+  return cells;
+}
+
 /** Every (banner, filters) view the enumeration covers, for one cube. */
 function enumerateViews(TR, island, cube) {
   const banners = (island.banner_groups || []).map((b) => b.id);
@@ -401,6 +479,7 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
 
   const views = enumerateViews(microTR, island, cube);
   let served = 0, refused = 0, cells = 0;
+  const boundary = { count: 0, notes: [] };
 
   run(name + ": every enumerated view matches the respondent island exactly", () => {
     views.forEach((v) => {
@@ -419,7 +498,7 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
         return;
       }
       served++;
-      cells += compareModels(cubeTR, qc, mm, cm, label, true, null, false);
+      cells += compareSources(cubeTR, qc, mm, cm, label, boundary);
       // Letters: both sides are this engine, so exact.
       cm.rows.forEach((cr, ri) => {
         cr.cells.forEach((cc, ci) => {
@@ -430,7 +509,13 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
     });
   });
   console.log("    " + views.length + " views enumerated, " + served +
-    " served, " + refused + " refused, " + cells + " cells compared");
+    " served, " + refused + " refused, " + cells + " cells compared, " +
+    boundary.count + " on a rounding boundary");
+  boundary.notes.slice(0, 6).forEach((nt) => notes.push(nt));
+  if (boundary.notes.length > 6) {
+    notes.push("... and " + (boundary.notes.length - 6) +
+      " more rounding-boundary cells in " + name);
+  }
 
   run(name + ": every view the block rule permits is actually served", () => {
     // A cube that refused everything would pass the comparison above by doing
