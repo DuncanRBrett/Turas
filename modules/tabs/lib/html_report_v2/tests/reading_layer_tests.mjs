@@ -216,7 +216,8 @@ function readerSandbox(opts) {
   const TR = sb.TR;
   TR.AGG = { project: opts.project || {}, questions: [], banner_groups: [] };
   TR.userState = opts.userState !== undefined ? opts.userState : null;
-  TR.d2 = { storeKey: (b) => b + ":proj", state: { tab: "dashboard", banner: "", filters: [] } };
+  TR.d2 = { storeKey: (b) => b + ":proj", state: { tab: "dashboard", banner: "", filters: [] },
+    hasMicrodata: () => false, hasComputedSource: () => false, studyN: () => null };
   TR.conf = { labels: () => ({ moe_name: "Precision Estimate", moe_abbrev: "PE" }),
     maxMoePct: (n) => 98 / Math.sqrt(n) };
   load(sb, "24a_reader.js");

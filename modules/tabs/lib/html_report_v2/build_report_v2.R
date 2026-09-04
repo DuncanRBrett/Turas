@@ -129,7 +129,8 @@ build_report_v2_html <- function(data_json, config_obj,
                                   assets_dir = report_v2_assets_dir(),
                                   generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z"),
                                   prev_json = NULL, micro_json = NULL, qual_json = NULL,
-                                  cj_json = NULL, md_json = NULL, pr_json = NULL) {
+                                  cj_json = NULL, md_json = NULL, pr_json = NULL,
+                                  cube_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
   template_path <- file.path(assets_dir, "template.html")
@@ -190,6 +191,11 @@ build_report_v2_html <- function(data_json, config_obj,
   micro_inlined <- if (!is.null(micro_json) && nzchar(micro_json) && micro_json != "null") {
     escape_island(micro_json)
   } else "null"
+  # The aggregate cube. Present only on an interactivity = cube build, where it
+  # replaces the respondent island as the computed source.
+  cube_inlined <- if (!is.null(cube_json) && nzchar(cube_json) && cube_json != "null") {
+    escape_island(cube_json)
+  } else "null"
   prev_inlined <- if (!is.null(prev_json) && nzchar(prev_json)) escape_island(prev_json) else "null"
   qual_inlined <- if (!is.null(qual_json) && nzchar(qual_json) && qual_json != "null") {
     escape_island(qual_json)
@@ -229,6 +235,7 @@ build_report_v2_html <- function(data_json, config_obj,
     "{{CSS}}"         = read_text(css_path),
     "{{DATA_AGG}}"    = escape_island(data_json),
     "{{DATA_MICRO}}"  = micro_inlined,
+    "{{DATA_CUBE}}"   = cube_inlined,
     "{{DATA_PREV}}"   = prev_inlined,
     "{{DATA_VERIFY}}" = "null",
     "{{DATA_QUAL}}"   = qual_inlined,
@@ -267,7 +274,8 @@ build_report_v2_html <- function(data_json, config_obj,
 write_html_report_v2 <- function(data_json, config_obj, output_path,
                                  assets_dir = report_v2_assets_dir(),
                                  prev_json = NULL, micro_json = NULL, qual_json = NULL,
-                                 cj_json = NULL, md_json = NULL, pr_json = NULL) {
+                                 cj_json = NULL, md_json = NULL, pr_json = NULL,
+                                 cube_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code:", code, "\n")
@@ -287,7 +295,8 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
     build_report_v2_html(data_json, config_obj, assets_dir,
                          prev_json = prev_json, micro_json = micro_json,
                          qual_json = qual_json, cj_json = cj_json,
-                         md_json = md_json, pr_json = pr_json),
+                         md_json = md_json, pr_json = pr_json,
+                         cube_json = cube_json),
     error = function(e) e)
   if (inherits(html, "error")) {
     return(refuse("REPORT_V2_BUILD_FAILED", conditionMessage(html),

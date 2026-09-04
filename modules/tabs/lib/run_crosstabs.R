@@ -210,6 +210,7 @@ source(file.path(script_dir, "data_layer_writer.R"))
 source(file.path(script_dir, "stats_diagnostics.R"))
 source(file.path(script_dir, "patterns_echo.R"))
 source(file.path(script_dir, "microdata_writer.R"))
+source(file.path(script_dir, "cube_writer.R"))
 source(file.path(script_dir, "delivery_manifest.R"))
 source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
@@ -985,7 +986,14 @@ if (.html_report_v2_on) {
       # tabs_microdata_wanted() in delivery_manifest.R.
       .micro_decision <- tabs_microdata_wanted(config_result$config_obj)
       .micro_wanted <- isTRUE(.micro_decision$wanted)
-      micro <- if (!.micro_wanted) NULL else tryCatch(
+      # V14 interactivity mode. `cube` builds the microdata list, turns it into
+      # the aggregate cube, and DISCARDS it: the list never reaches
+      # write_html_report_v2, so a cube build cannot ship records by accident.
+      # The GUI's Client safe mode still wins, and forces `none`.
+      .interactivity <- tolower(trimws(as.character(
+        config_result$config_obj$html_report_v2_interactivity %||% "records")[1]))
+      if (!.micro_wanted) .interactivity <- "none"
+      micro <- if (identical(.interactivity, "none")) NULL else tryCatch(
         build_microdata(dl, data_result$survey_data, data_result$survey_structure,
                         analysis_result$banner_info, config_result$config_obj,
                         composite_defs = data_result$composite_defs),
@@ -994,16 +1002,51 @@ if (.html_report_v2_on) {
           cat("  The v2 report still builds (published figures only).\n\n")
           NULL
         })
+      cube <- NULL
+      if (identical(.interactivity, "cube")) {
+        cube <- tryCatch(
+          build_cube(micro, dl, config_result$config_obj),
+          error = function(e) {
+            cat("\n[WARNING] Aggregate cube generation failed:", conditionMessage(e), "\n")
+            cat("  The v2 report still builds (published figures only).\n\n")
+            NULL
+          })
+        .cube_check <- cube_validate_filter_vars(cube, dl, config_result$config_obj)
+        if (!is.null(.cube_check)) {
+          cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+          cat("│ Context: Tabs Module: aggregate cube\n")
+          cat("│ Code:", .cube_check$code, "\n")
+          cat("│ Message:", .cube_check$message, "\n")
+          cat("│ How to fix:", .cube_check$how_to_fix, "\n")
+          cat("└───────────────────────────────────────────────────────┘\n\n")
+          cube <- NULL
+        }
+        # The respondent list is discarded HERE, whether or not the cube built.
+        # A cube run that fell back to the records it was configured to replace
+        # would be the exact failure this mode exists to prevent.
+        micro <- NULL
+        if (is.null(cube)) {
+          cat("\n  Interactivity: cube requested but not built. Published figures only.\n")
+          cat("    The report file carries no per-respondent records and no cube.\n\n")
+        } else {
+          cat(sprintf(paste0("\n  Interactivity: AGGREGATE CUBE. k = %s, combinations up to %s, ",
+                             "%d of %d blocks shipped, %d refused.\n"),
+                      format(cube$k), cube$order, cube$blocks_shipped,
+                      cube$blocks_shipped + cube$blocks_refused, cube$blocks_refused))
+          cat(sprintf("    Declared variables: %s\n", paste(names(cube$vars), collapse = ", ")))
+          cat("    The report file carries no per-respondent records.\n\n")
+        }
+      }
 
       .mrb <- suppressWarnings(as.numeric(config_result$config_obj$min_reporting_base))
       .mrb_set <- length(.mrb) == 1L && !is.na(.mrb) && .mrb > 1
-      if (!.micro_wanted) {
+      if (identical(.interactivity, "none")) {
         # Deliberate omission. Record the confidentiality trade in the console
         # so the operator can see exactly what this ship does and doesn't carry.
-        if (identical(.micro_decision$reason, "gui")) {
+        if (!.micro_wanted && identical(.micro_decision$reason, "gui")) {
           cat("\n  Microdata island: OMITTED by the delivery mode chosen in the GUI (Client safe).\n")
         } else {
-          cat("\n  Microdata island: OMITTED by config (html_report_v2_microdata = FALSE).\n")
+          cat("\n  Microdata island: OMITTED by config (interactivity = none).\n")
         }
         cat("    Confidentiality ship: the report file carries no per-respondent records.\n")
         cat("    Published figures only. Live filter, custom banners and COMPUTED views are off.\n")
@@ -1020,6 +1063,9 @@ if (.html_report_v2_on) {
           cat("    Disclosure: sub-k columns still suppress; comment detail is gated on the full sample.\n")
         }
         cat("\n")
+      } else if (identical(.interactivity, "cube")) {
+        # A cube build's console lines are printed where the cube is built, with
+        # the block counts. Nothing to add here.
       } else if (is.null(micro) && .mrb_set) {
         # Disclosure needs the microdata base to gate sub-k cuts. If the operator asked
         # for a threshold but micro didn't build (UNEXPECTEDLY, the deliberate omission
@@ -1046,7 +1092,7 @@ if (.html_report_v2_on) {
           # by a canonical key. Robust to renames + curates which metrics track.
           mapping <- load_question_mapping(config_result$config_obj$question_mapping)
           wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
-          if (!.micro_wanted) {
+          if (is.null(micro)) {
             # The confidentiality ship (html_report_v2_microdata = FALSE) has no
             # per-respondent records to build the live wave from. Anonymity and a
             # trend line are not in competition: the current wave is built from
@@ -1056,12 +1102,12 @@ if (.html_report_v2_on) {
             # future wave could plot, and it would overwrite the real one from
             # this project's microdata build.
             #
-            # Gated on the CONFIG FLAG, not on `micro` being NULL. A normal
-            # project whose microdata island failed to build unexpectedly keeps
-            # its old behaviour exactly - no contribution, no Tracking tab, and
-            # the [WARNING] above saying the island failed. Substituting
-            # published figures there would paper over a real failure with a
-            # tab that looks fine.
+            # Gated on there being no respondent island to build the wave from,
+            # which now covers three cases: microdata = FALSE, the GUI's Client
+            # safe mode, and an interactivity = cube build, which discards the
+            # records on purpose. A records build whose island failed to build
+            # unexpectedly also lands here rather than losing its Tracking tab,
+            # and the [WARNING] above still names the failure.
             contrib <- published_wave_contribution(dl, config_result$config_obj, mapping)
             if (!is.null(contrib)) {
               cat(sprintf(paste0("  Tracking: current wave built from published figures ",
@@ -1193,6 +1239,7 @@ if (.html_report_v2_on) {
                            sub("\\.xlsx$", "_report.html", v2_out),
                            prev_json = prev_json,
                            micro_json = serialize_microdata(micro),
+                           cube_json = serialize_cube(cube),
                            qual_json = qual_json_main,
                            cj_json = cj_json_main,
                            md_json = md_json_main,
@@ -1208,7 +1255,7 @@ if (.html_report_v2_on) {
     if (!is.null(report_v2_result) && identical(report_v2_result$status, "PASS")) {
       .manifest <- tabs_print_delivery_manifest(
         micro, qual_json_main, config_result$config_obj,
-        report_v2_result$output_file)
+        report_v2_result$output_file, cube = cube)
       assign("TURAS_LAST_DELIVERY_MANIFEST", .manifest, envir = .GlobalEnv)
     }
 

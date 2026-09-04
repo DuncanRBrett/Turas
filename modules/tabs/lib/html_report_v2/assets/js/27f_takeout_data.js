@@ -397,13 +397,26 @@
    *    them out of the scans that assume one row per measured thing.
    *
    * @param q A data-layer question
-   * @param micro The TR.MICRO payload
+   * @param source Optional explicit source to ask instead of the installed one.
+   *   Used by the node gate to pin the contract on a payload it hands in.
    * @return {boolean}
    */
-  function familyEligible(q, micro) {
-    if (!micro || !micro.scores) return false;
-    var sc = micro.scores[q.code];
-    if (!sc || !sc.length) return false;
+  /**
+   * Is there a source carrying per-respondent scores to build the family from?
+   * The respondent island's scores, or the aggregate cube's score accumulators.
+   * Deliberately independent of report state: this scan reads the full published
+   * sample and has never needed d2.
+   */
+  function haveScoreSource() {
+    if (TR.cube && TR.cube.active()) return true;
+    return !!(TR.MICRO && TR.MICRO.scores);
+  }
+
+  function familyEligible(q, source) {
+    var has = source
+      ? !!(source.scores && source.scores[q.code] && source.scores[q.code].length)
+      : (TR.stats && TR.stats.hasScores && TR.stats.hasScores(q.code));
+    if (!has) return false;
     if (q.type === "nps" || q.composite) return false;
     return touchpointMax(q) <= 10;
   }
@@ -421,9 +434,7 @@
    *   questionCount } or null when microdata is absent.
    */
   function gatherCellFamily(views) {
-    var micro = TR.MICRO;
-    if (!micro || !micro.scores || !micro.banner_vars) return null;
-    var weights = micro.weights || null;
+    if (!haveScoreSource()) return null;
     var proj = (TR.AGG && TR.AGG.project) || {};
     // Per-arm floor: shared with the strain scan. The census floor only near
     // full coverage (a subgroup is then most of its own population); a true
@@ -437,9 +448,9 @@
     // a fabricated "odd one out", and its ±100 gaps would swamp the mean-gap
     // baseline. Strain/thrive keep NPS: they normalise each gap by scaleMax; this
     // family does not.
-    var qs = views.indexQuestions().filter(function (q) { return familyEligible(q, micro); });
+    var qs = views.indexQuestions().filter(function (q) { return familyEligible(q); });
     var shareList = takeout._shares ? takeout._shares.list(views) : [];
-    var nResp = micro.n || (qs.length ? micro.scores[qs[0].code].length : 0);
+    var nResp = TR.stats.studyN();
     if (!nResp) return null;
     // One family, two sources: rated questions test their per-respondent index
     // scores; KeyShare questions test a 0/100 in-the-share encoding (a Welch t
@@ -448,54 +459,58 @@
     // the odd-one-out finder skips them (its gap floors are scale-point tuned)
     // but the per-cell BH pass and the per-group sign test read them in full,
     // so share-heavy studies get the same never-cry-wolf gate as rated ones.
-    var famQs = qs.map(function (q) {
-      return { q: q, sc: micro.scores[q.code], isPct: false };
-    });
-    shareList.forEach(function (s) {
-      var sc = takeout._shares.scoreVector(s, micro, nResp);
-      if (sc) famQs.push({ q: s.q, sc: sc, isPct: true });
+    var famQs = qs.map(function (q) { return { q: q, isPct: false }; });
+    shareList.forEach(function (sh) {
+      if (takeout._shares.servable && !takeout._shares.servable(sh)) return;
+      famQs.push({ q: sh.q, ri: sh.ri, isPct: true });
     });
     if (!famQs.length) return null;
     var groups = scanBannerGroups();
     var cells = [], groupAgg = {}, order = [];
+    // The family reads the FULL published sample: Patterns deliberately ignores
+    // the live filter, and the audience strip says so on that tab.
+    var mask = TR.stats.mask([]);
+    // The arms are read through the stats seam rather than from respondent
+    // arrays, because the Welch test only ever used their moments. That is what
+    // lets this run on a report carrying aggregates and no respondents.
+    var momentsFor = function (f, col) {
+      return f.isPct ? TR.stats.shareMomentsOf(f.q, f.ri, col, mask)
+        : TR.stats.momentsOf(f.q.code, col, mask);
+    };
     groups.forEach(function (g) {
-      var bv = micro.banner_vars[g.id];
-      if (!bv) return;
-      var codeSet = {};
-      for (var r = 0; r < nResp; r++) { var cd = bv[r]; if (cd !== null && cd !== undefined && cd >= 0) codeSet[cd] = true; }
-      var codes = Object.keys(codeSet).map(Number).sort(function (a, b) { return a - b; });
-      var model;
-      try { model = publishedModel(views, famQs[0].q.code, g.id); } catch (e) { return; }
-      var cols = (model.columns || []).slice(1);                 // non-Total columns
-      if (codes.length !== cols.length) return;                  // label/order mismatch -> skip banner, never mislabel
-      codes.forEach(function (code, ci) {
-        var label = cols[ci].label;
+      var spec = TR.stats.columnsFor(g.id);
+      var cols = (spec.columns || []).slice(1);        // non-Total columns
+      if (!cols.length) return;
+      // The "overall" arm is everyone in ANY column of this banner, NOT the
+      // whole sample: a respondent in no column of the group was skipped by the
+      // respondent loop this replaced, and including them would drift the
+      // overall mean every group is measured against.
+      var allCol = TR.stats.groupColumn(g.id);
+      if (!allCol) return;
+      cols.forEach(function (col) {
+        var label = col.label;
         famQs.forEach(function (f) {
-          var q = f.q, sc = f.sc, vfloor = Math.pow(scaleSpan(q) * 0.1, 2);
-          var gx = [], gw = [], rx = [], rw = [], all = [], allw = [];
-          for (var r = 0; r < nResp; r++) {
-            var v = sc[r]; if (v === null || v === undefined) continue;
-            var cd = bv[r]; if (cd === null || cd === undefined || cd < 0) continue;
-            var w = weights ? weights[r] : 1;
-            all.push(v); allw.push(w);
-            if (cd === code) { gx.push(v); gw.push(w); } else { rx.push(v); rw.push(w); }
-          }
-          if (gx.length < floor || rx.length < floor) return;    // both arms must clear the floor
-          var wt = takeout._welchTest(gx, gw, rx, rw, vfloor);
-          var gMean = wMean(gx, gw), oMean = wMean(all, allw);
-          var gap = gMean - oMean;                                // vs the overall (for the strain/flip read)
+          var q = f.q, vfloor = Math.pow(scaleSpan(q) * 0.1, 2);
+          var gm = momentsFor(f, col);
+          var am = momentsFor(f, allCol);
+          var rm = TR.stats.subtractMoments(am, gm);
+          if (gm.n < floor || rm.n < floor) return;   // both arms clear the floor
+          var wt = takeout._welchFromMoments(gm, rm, vfloor);
+          var gMean = gm.sw ? gm.swx / gm.sw : 0;
+          var oMean = am.sw ? am.swx / am.sw : 0;
+          var gap = gMean - oMean;                    // vs the overall
           var gkey = g.name + "::" + label;
           var ga = groupAgg[gkey] || (groupAgg[gkey] = { banner: g.name, group: label,
             base: 0, below: 0, above: 0, qn: 0, qnRated: 0, gapSum: 0 });
           if (!ga.qn) order.push(gkey);
-          if (gx.length > ga.base) ga.base = gx.length;
+          if (gm.n > ga.base) ga.base = gm.n;
           // qn / below / above feed the per-group sign test. Every cell counts.
           // gapSum stays RATED-ONLY (scale points): it becomes meanGap, the
           // odd-one-out baseline, and pp gaps would corrupt its units.
           ga.qn++;
           if (!f.isPct) { ga.qnRated++; ga.gapSum += gap; }
           if (wt.diff < 0) ga.below++; else if (wt.diff > 0) ga.above++;
-          cells.push({ banner: g.name, group: label, q: q.code, qtitle: q.title, nIn: gx.length,
+          cells.push({ banner: g.name, group: label, q: q.code, qtitle: q.title, nIn: gm.n,
             gap: gap, value: gMean, total: oMean, scaleMax: touchpointMax(q),
             isPct: f.isPct,
             welchDiff: wt.diff, welchP: wt.p, flooredG: wt.flooredG, gkey: gkey });
@@ -522,27 +537,40 @@
    * so the base is the full answered n. Null when microdata is absent.
    */
   function gatherBimodality(views) {
-    var micro = TR.MICRO;
-    if (!micro || !micro.scores) return null;
-    var weights = micro.weights || null;
+    if (!haveScoreSource()) return null;
     // Same eligibility as the odd-one-out cell family: rated small-range scales
     // only. NPS microdata is bucketed −100/0/+100 (score_utils.R): the binning
     // below dropped the −100 camp and the remaining two lumps read as a
     // fabricated "two camps" split; a 0–100 composite's 101-bin histogram makes
     // the camp gate meaningless. Both stay out (production review 2026-08, C4).
-    var qs = views.indexQuestions().filter(function (q) { return familyEligible(q, micro); });
+    var qs = views.indexQuestions().filter(function (q) { return familyEligible(q); });
     if (!qs.length) return null;
-    var nResp = micro.n || micro.scores[qs[0].code].length;
-    var out = qs.map(function (q) {
+    var micro = TR.MICRO;
+    var nResp = TR.stats.studyN();
+    var weights = (micro && micro.weights) || null;
+    var out = [];
+    qs.forEach(function (q) {
+      // An aggregate build carries this histogram precomputed, by the same rule
+      // in R (cube_histogram in cube_writer.R). The bimodality test runs only on
+      // the OVERALL distribution, never a subgroup cut, so one record per
+      // question is the whole of what it needs.
+      var pre = TR.stats.scoreHistogram(q.code);
+      if (pre) {
+        out.push({ code: q.code, title: q.title, counts: pre.counts,
+          scaleMax: pre.scale_max });
+        return;
+      }
+      if (!micro || !micro.scores) return;
       var K = touchpointMax(q), sc = micro.scores[q.code];
+      if (!sc) return;
       // Detect a 0-based scale (NPS 0–10 / raw recommend). "round(v) - 1" assumed
       // 1..K, so v=0 mapped to idx -1 and the detractor camp was dropped. A real
       // two-camp 0–10 split then read as unimodal. Keep 1..K exactly as before;
       // for a 0-based scale bin from 0 (K+1 bins) so the bottom camp is counted.
       var lo = Infinity;
       for (var i = 0; i < nResp; i++) {
-        var s = sc[i]; if (s === null || s === undefined) continue;
-        var sv = Math.round(s); if (sv < lo) lo = sv;
+        var s0 = sc[i]; if (s0 === null || s0 === undefined) continue;
+        var sv = Math.round(s0); if (sv < lo) lo = sv;
       }
       var zeroBased = isFinite(lo) && lo <= 0;
       var bins = zeroBased ? K + 1 : K, shift = zeroBased ? 0 : 1;
@@ -552,8 +580,9 @@
         var idx = Math.round(v) - shift;
         if (idx >= 0 && idx < bins) counts[idx] += weights ? weights[r] : 1;
       }
-      return { code: q.code, title: q.title, counts: counts, scaleMax: bins };
+      out.push({ code: q.code, title: q.title, counts: counts, scaleMax: bins });
     });
+    if (!out.length) return null;
     return { questions: out };
   }
 

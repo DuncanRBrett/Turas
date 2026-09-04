@@ -779,6 +779,24 @@
       "context": "Shown wherever the disclosure control speaks",
       "page": "Crosstabs"
     },
+    "cube.refuse.order": {
+      "title": "Cut not available: too many variables",
+      "text": "This cut is not available in this report. Filters combine up to {order} variables, on the declared variables only.",
+      "context": "Aggregate build. Shown in the filter bar and on the card when a cut combines more variables than the report carries",
+      "page": "Crosstabs"
+    },
+    "cube.refuse.undeclared": {
+      "title": "Cut not available: variable not declared",
+      "text": "This cut is not available in this report. Live filters work on the declared variables only.",
+      "context": "Aggregate build. Shown when a saved or shared link asks for a cut by a question this report was not built to cut by",
+      "page": "Crosstabs"
+    },
+    "cube.refuse.block": {
+      "title": "Cut not available at this base",
+      "text": "Not available for this question at this base (fewer than {k} people in one of the groups).",
+      "context": "Aggregate build. Shown when a question's figures were withheld for this cut to protect a small group",
+      "page": "Crosstabs"
+    },
     "render.base.withheld_tip": {
       "title": "Base cell: withheld tooltip",
       "text": "Withheld: this column's base is below the confidentiality threshold, so its exact size is not disclosed",

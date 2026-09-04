@@ -68,6 +68,24 @@
     return !!(f && f.has && f.has.indexOf(what) !== -1);
   };
 
+  /**
+   * One authored sentence for a cut this report cannot serve.
+   *
+   * A refusal has to READ as a refusal. The alternative the engine would
+   * otherwise fall into is a table of dashes over a base of 0, which looks
+   * exactly like "nobody in this group answered" and is a different, false
+   * statement. Keyed like every other sentence in the report, so the author can
+   * edit it.
+   */
+  cube.refusalText = function (refusal) {
+    if (!refusal || !TR.txt) return "";
+    if (refusal.reason === "order") {
+      return TR.txt("cube.refuse.order", { order: (TR.CUBE && TR.CUBE.order) || 2 });
+    }
+    if (refusal.reason === "undeclared") return TR.txt("cube.refuse.undeclared");
+    return TR.txt("cube.refuse.block", { k: (TR.CUBE && TR.CUBE.k) || 0 });
+  };
+
   /* ---------------------------------------------------------------------------
      Slices and cells
   --------------------------------------------------------------------------- */

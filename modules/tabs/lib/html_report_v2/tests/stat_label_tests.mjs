@@ -298,7 +298,7 @@ function diffsSandbox() {
 /** One question, one row where "Male" beats both siblings at 95% (letters BC),
  *  reported in `stat`. No microdata, so "the rest" falls back to the counts. */
 function diffsFixture(D, stat) {
-  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => false };
+  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => false, hasComputedSource: () => false };
   D.AGG = { project: { low_base_threshold: 30 },
     questions: [{ code: "Q1", title: "Are you aware?", category: "Awareness",
       type: "single", rows: [{ kind: "category", label: "Yes" }] }] };

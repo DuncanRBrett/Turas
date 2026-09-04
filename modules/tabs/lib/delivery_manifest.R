@@ -64,6 +64,9 @@ tabs_microdata_wanted <- function(config_obj,
 #' @param qual_json The serialised qualitative island (character), or NULL.
 #' @param config_obj The built config object.
 #' @param output_file Path of the report the manifest describes, or NULL.
+#' @param cube The aggregate cube from build_cube(), or NULL. Present only on an
+#'   interactivity = cube build, where it is the computed source instead of the
+#'   respondent island.
 #'
 #' @return A list with structure:
 #'   \item{lines}{Character vector, the manifest as printable lines}
@@ -73,7 +76,7 @@ tabs_microdata_wanted <- function(config_obj,
 #'
 #' @keywords internal
 tabs_delivery_manifest <- function(micro, qual_json, config_obj,
-                                   output_file = NULL) {
+                                   output_file = NULL, cube = NULL) {
   cfg <- config_obj %||% list()
   has_micro <- !is.null(micro)
   n <- if (has_micro) suppressWarnings(as.integer(micro$n %||% NA_integer_)) else NA_integer_
@@ -82,6 +85,14 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
   k_raw <- suppressWarnings(as.numeric(cfg$min_reporting_base))
   k_set <- length(k_raw) == 1L && !is.na(k_raw) && k_raw > 1
   k_txt <- if (k_set) format(k_raw) else "not set"
+
+  has_cube <- !is.null(cube)
+  cube_k <- if (has_cube) suppressWarnings(as.numeric(cube$k %||% NA_real_)) else NA_real_
+  cube_order <- if (has_cube) as.integer(cube$order %||% NA_integer_) else NA_integer_
+  cube_vars <- if (has_cube) length(cube$vars) else 0L
+  cube_var_list <- if (has_cube) paste(names(cube$vars), collapse = ", ") else ""
+  cube_shipped <- if (has_cube) as.integer(cube$blocks$shipped %||% 0L) else 0L
+  cube_refused <- if (has_cube) as.integer(cube$blocks$refused %||% 0L) else 0L
 
   has_qual <- !is.null(qual_json) && nzchar(as.character(qual_json)) &&
     !identical(trimws(as.character(qual_json)), "null")
@@ -117,8 +128,28 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
     paste0("│ ", pad("Comment demographic tags"), ": ", tags_txt),
     paste0("│ ", pad("Minimum reporting base"), ": ", k_txt),
     paste0("│ ", pad("Live filters, custom banners"), ": ",
-           if (has_micro) "ON" else "off (published figures only)")
+           if (has_micro) "ON"
+           else if (has_cube) sprintf("ON, from aggregates (up to %s of %s declared variables)",
+                                      cube_order, cube_vars)
+           else "off (published figures only)")
   )
+
+  if (has_cube) {
+    lines <- c(lines,
+      "│",
+      sprintf("│ Interactivity: aggregate cube, k = %s, combinations up to %s,",
+              format(cube_k), cube_order),
+      sprintf("│ %s of %s blocks shipped. No respondent-level records.",
+              format(cube_shipped), format(cube_shipped + cube_refused)),
+      sprintf("│ Declared variables: %s", cube_var_list),
+      "│",
+      "│ A cut in which any group falls below k is withheld WHOLE, so it cannot",
+      "│ be recovered by subtraction from the margins that remain. The residual",
+      "│ is the one every published crosstab has: a group of exactly k in which",
+      "│ everyone answered the same way discloses that answer for the group.",
+      "│ This file is no more disclosive than a published table with base k."
+    )
+  }
 
   if (has_micro) {
     lines <- c(lines,
@@ -149,7 +180,9 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
   lines <- c(lines,
              "└──────────────────────────────────────────────────────────────┘")
 
-  list(lines = lines, microdata = has_micro, n = n, restricted = has_micro)
+  list(lines = lines, microdata = has_micro, n = n, restricted = has_micro,
+       cube = has_cube, cube_k = cube_k, cube_order = cube_order,
+       cube_blocks_shipped = cube_shipped, cube_blocks_refused = cube_refused)
 }
 
 
@@ -162,8 +195,8 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
 #' @return The manifest list, invisibly.
 #' @keywords internal
 tabs_print_delivery_manifest <- function(micro, qual_json, config_obj,
-                                         output_file = NULL) {
-  m <- tabs_delivery_manifest(micro, qual_json, config_obj, output_file)
+                                         output_file = NULL, cube = NULL) {
+  m <- tabs_delivery_manifest(micro, qual_json, config_obj, output_file, cube)
   cat("\n")
   cat(paste0(m$lines, collapse = "\n"))
   cat("\n\n")

@@ -100,6 +100,25 @@
    * base, never the numerator. Returns null when the microdata carries nothing
    * for this question.
    */
+  /**
+   * Can this share row be encoded as a 0/100 score at all?
+   *
+   * Category and member-decomposable NET shares need raw answers; a box-scored
+   * NET needs box membership. Asked of the stats seam so it holds for the
+   * respondent island and the aggregate cube alike; scoreVector below answers
+   * the same question by returning null, but only the island can be asked that
+   * way, because only the island has a vector to build.
+   */
+  shares.servable = function (share) {
+    var q = share.q, ri = share.ri, row = (q.rows || [])[ri] || {};
+    if (row.kind === "net") {
+      var members = q.net_members && q.net_members[String(ri)];
+      if (members && members.length) return TR.stats.hasAnswers(q.code);
+      return TR.stats.hasBoxes(q.code);
+    }
+    return TR.stats.hasAnswers(q.code);
+  };
+
   shares.scoreVector = function (share, micro, nResp) {
     var q = share.q, ri = share.ri, row = (q.rows || [])[ri] || {};
     var answers = micro.answers && micro.answers[q.code];

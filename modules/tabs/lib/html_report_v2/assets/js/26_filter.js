@@ -55,7 +55,7 @@
     var holder = document.getElementById("filterbar");
     if (!holder) return;
     var d2 = TR.d2, s = d2.state;
-    if (!d2.hasMicrodata()) { holder.innerHTML = ""; return; }
+    if (!d2.hasComputedSource()) { holder.innerHTML = ""; return; }
     var chips = s.filters.map(function (f, i) {
       var q = d2.questionByCode(f.q);
       var labels = f.rows.map(function (ri) {
@@ -65,7 +65,10 @@
         fmt.escapeHtml(TR.charts.clip(labels.join(" / "), 48)) +
         '<button data-fremove="' + i + '" aria-label="Remove filter">✕</button></span>';
     }).join("");
-    var n = s.filters.length ? TR.stats.maskCount(TR.stats.mask(s.filters)) : TR.MICRO.n;
+    var studyN = d2.studyN();
+    var liveMask = s.filters.length ? TR.stats.mask(s.filters) : null;
+    var cutRefused = !!(liveMask && liveMask.cube && liveMask.refused);
+    var n = liveMask ? TR.stats.maskCount(liveMask) : studyN;
     // Disclosure control: warn (report-wide) when a composite filter narrows the audience
     // below the confidentiality threshold. The views then withhold identifying detail.
     var discWarn = (TR.disclosure && TR.disclosure.audienceTooSmall())
@@ -76,12 +79,15 @@
       '<button class="fb-add" data-fact="add">+ Add filter</button>' +
       (s.filters.length
         ? '<button class="fb-clear" data-fact="clear">Clear</button>' +
-          '<span class="fb-n">n=' + fmt.base(n) + " of " + fmt.base(TR.MICRO.n) +
-          ' · live recompute · ' + filterBar.weightingTag() +
-          (TR.d2.tracking().enabled
-            ? ' · wave trends hidden while filtered (prior waves are full-sample totals)'
-            : "") + "</span>"
-        : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) + ") · " +
+          (cutRefused
+            ? '<span class="fb-n fb-refused" role="status">' +
+              TR.cube.refusalText(liveMask.refused) + "</span>"
+            : '<span class="fb-n">n=' + fmt.base(n) + " of " + fmt.base(studyN) +
+              ' · live recompute · ' + filterBar.weightingTag() +
+              (TR.d2.tracking().enabled
+                ? ' · wave trends hidden while filtered (prior waves are full-sample totals)'
+                : "") + "</span>")
+        : '<span class="fb-n">everyone (n=' + fmt.base(studyN) + ") · " +
           filterBar.weightingTag() +
           " · add a filter to recompute tables and dashboard with your " +
           "area of interest.</span>") +
@@ -108,15 +114,38 @@
     });
   };
 
+  /**
+   * The questions a picker may offer.
+   *
+   * On a respondent island that is every question in the study, because every
+   * question carries a per-respondent answer. On an aggregate cube it is the
+   * DECLARED variables only: the cube holds a slice for those and for nothing
+   * else, and offering a question it cannot cut by would put a refusal behind
+   * every second click. This is the honest version of "cross every table by
+   * anything", and the reason the wording below changes with the source.
+   */
+  filterBar.pickableQuestions = function () {
+    var all = TR.AGG.questions || [];
+    if (!(TR.cube && TR.cube.active())) return all;
+    return all.filter(function (q) { return TR.cube.isDeclared(q.code); });
+  };
+
   /** Question/value picker; asBanner=true picks a custom banner instead. */
   function openPicker(asBanner) {
     var holder = document.getElementById("fpicker");
+    var onCube = !!(TR.cube && TR.cube.active());
     holder.hidden = false;
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      (asBanner ? "Cross every table by…" : "Filter the whole report by…") +
+      (asBanner
+        ? (onCube ? "Cross every table by…" : "Cross every table by…")
+        : "Filter the whole report by…") +
       '<button data-close aria-label="Close">✕</button></div>' +
+      (onCube
+        ? '<p class="fpick-note">This report carries aggregate figures only, ' +
+          'so the cuts below are the ones it was built to answer.</p>'
+        : "") +
       '<input type="search" id="fpick-search" placeholder="Search questions…">' +
-      '<div class="fpick-list">' + TR.AGG.questions.map(function (q) {
+      '<div class="fpick-list">' + filterBar.pickableQuestions().map(function (q) {
         return '<button class="fpick-q" data-code="' + q.code + '" data-search="' +
           fmt.escapeHtml((q.code + " " + q.title).toLowerCase()) + '">' +
           '<span class="qc">' + q.code + "</span> " + fmt.escapeHtml(q.title) +
@@ -197,6 +226,10 @@
    *  answer (hidden / unshown option, multi-mention): the box is then not
    *  decomposable into answer space. */
   function boxCatRows(q, boxIdxs) {
+    // Per-respondent box membership. The aggregate cube has none, so a box
+    // grouping ticked alongside plain values fails closed with the message
+    // below rather than resolving to something else.
+    if (!TR.MICRO) return null;
     var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
     var answers = TR.MICRO.answers && TR.MICRO.answers[q.code];
     if (!boxes || !answers) return null;

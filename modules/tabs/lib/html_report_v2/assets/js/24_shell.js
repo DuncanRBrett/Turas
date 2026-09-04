@@ -66,6 +66,10 @@
         prev = parseIsland("data-prev"), verify = parseIsland("data-verify");
     if (!agg) { fatal([{ code: "IO_DATA_PARSE", message: "aggregate data island failed to parse" }]); return; }
     TR.AGG = agg; TR.MICRO = micro; TR.PREV = prev; TR.VERIFY = verify;
+    // The aggregate cube: the computed source of a build that carries no
+    // per-respondent records. null on every other build, and ignored when a
+    // respondent island is present, so an ordinary report is unchanged.
+    TR.CUBE = parseIsland("data-cube");
     TR.QUAL = parseIsland("data-qual");          // qualitative verbatims (null when absent)
     TR.CJ = parseIsland("data-cj");              // conjoint contribution (null when absent)
     TR.MD = parseIsland("data-md");              // maxdiff contribution (null when absent)
@@ -74,7 +78,7 @@
     // The report's authored prose, keyed. Installed before anything renders,
     // because every explainer on every tab reads from it (see 02_text.js).
     TR.txt.load(parseIsland("data-text"));
-    var check = TR.d2.validate(agg, micro, prev);
+    var check = TR.d2.validate(agg, micro, prev, TR.CUBE);
     if (!check.ok) { fatal(check.errors); return; }
 
     var d2 = TR.d2;

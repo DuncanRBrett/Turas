@@ -115,7 +115,8 @@ function catFixture(D, opts) {
                    { label: "Female", letter: "B", base: 50 },
                    { label: "Other", letter: "C", base: 50 }];
   D.d2 = { state: { sigMode: opts.sigMode || "95", filters: [] },
-           hasMicrodata: () => false, firstBanner: () => "Gender" };
+           hasMicrodata: () => false, hasComputedSource: () => false,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null), firstBanner: () => "Gender" };
   D.AGG = { project: Object.assign({ low_base_threshold: 30 }, opts.project || {}),
             columns: columns,
             banner_groups: [{ id: "Gender", name: "Gender" }],
@@ -303,7 +304,8 @@ function meanFixture(D, opts) {
             banner_groups: [{ id: "Gender", name: "Gender" }],
             questions: [q] };
   D.d2 = { state: { sigMode: opts.sigMode || "95", filters: [] },
-           hasMicrodata: () => true, firstBanner: () => "Gender",
+           hasMicrodata: () => true, hasComputedSource: () => true,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null), firstBanner: () => "Gender",
            groupCols: () => [0, 1],
            catRows: () => [{ label: "Any", index: 0 }],
            questionByCode: (c) => (c === "Q2" ? q : null) };
@@ -638,7 +640,8 @@ function catFixture2(D, opts) {
                    { label: "Male", letter: "A", base: 100 },
                    { label: "Female", letter: "B", base: 100 }];
   D.d2 = { state: { sigMode: opts.sigMode || "95", filters: [] },
-           hasMicrodata: () => false, firstBanner: () => "Gender" };
+           hasMicrodata: () => false, hasComputedSource: () => false,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null), firstBanner: () => "Gender" };
   D.AGG = { project: { low_base_threshold: 30 },
             columns: columns,
             banner_groups: [{ id: "Gender", name: "Gender" }],
@@ -749,7 +752,8 @@ run("35. an outlier-carrying spend measure scores on the robust range END TO END
             columns: [{ label: "Male", letter: "A" }, { label: "Female", letter: "B" }],
             banner_groups: [{ id: "Gender", name: "Gender" }],
             questions: [q] };
-  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => true,
+  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => true, hasComputedSource: () => true,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null),
            firstBanner: () => "Gender", groupCols: () => [0, 1],
            questionByCode: (c) => (c === "Q9" ? q : null) };
   D.model = { forQuestion: () => ({
@@ -788,7 +792,8 @@ run("36. the balanced sort reorders where the legacy sort over-ranks certainty",
             columns: [{ label: "Male", letter: "A" }, { label: "Female", letter: "B" }],
             banner_groups: [{ id: "Gender", name: "Gender" }],
             questions: qs };
-  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => true,
+  D.d2 = { state: { sigMode: "95", filters: [] }, hasMicrodata: () => true, hasComputedSource: () => true,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null),
            firstBanner: () => "Gender", groupCols: () => [0, 1],
            questionByCode: (c) => qs.filter((q) => q.code === c)[0] || null };
   D.model = { forQuestion: () => ({
@@ -855,7 +860,8 @@ function allocFixture(D) {
             banner_groups: [{ id: "Gender", name: "Gender" }],
             questions: [q] };
   D.d2 = { state: { sigMode: "95", filters: [] },
-           hasMicrodata: () => true, firstBanner: () => "Gender",
+           hasMicrodata: () => true, hasComputedSource: () => true,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null), firstBanner: () => "Gender",
            groupCols: () => [0, 1],
            catRows: () => [],
            questionByCode: (c) => (c === "QA" ? q : null) };

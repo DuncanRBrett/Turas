@@ -506,7 +506,7 @@
         '<span class="btab-x" data-banner-dismiss="' + live +
         '" role="button" aria-label="Dismiss this custom banner">✕</span></button>');
     }
-    if (TR.d2.hasMicrodata()) {
+    if (TR.d2.hasComputedSource()) {
       out.push('<button class="btab add" data-act="custom-banner" ' +
         'title="Cross this question by any other question">+ Custom…</button>');
       out.push('<button class="btab add" data-act="composite-banner" ' +
@@ -681,6 +681,19 @@
     var model = cards2.activeModel();
     if (!model) { holder.innerHTML = ""; return; }
 
+    // A cut the source cannot serve is a SENTENCE on the card, not a badge over
+    // a table of dashes. It replaces the whole source badge, because "computed"
+    // would be a claim about figures this view does not have.
+    if (model.refused) {
+      var reason = { reason: model.refusedReason, "var": model.refusedVar,
+        q: model.refusedQ };
+      var sentence = TR.cube && TR.cube.refusalText
+        ? TR.cube.refusalText(reason) : "";
+      holder.innerHTML = '<div class="qcard"><div class="qcard-head">' +
+        '<h2>' + fmt.escapeHtml(model.title || model.code) + "</h2></div>" +
+        '<p class="card-refused" role="status">' + sentence + "</p></div>";
+      return;
+    }
     var sourceBadge = model.notRecomputable
       ? '<span class="badge-computed na" title="' +
         fmt.escapeHtml("Derived ranking / score with no per-respondent data. It " +

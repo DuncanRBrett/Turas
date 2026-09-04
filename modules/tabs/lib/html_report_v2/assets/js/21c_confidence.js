@@ -231,12 +231,14 @@
     return any;
   };
 
-  /** Overall response/coverage rate from the study total (TR.MICRO.n / N), or
-   *  null when no total universe is configured. Shown in the design note. */
+  /** Overall response/coverage rate from the study total (n / N), or null when
+   *  no total universe is configured. Shown in the design note. n comes from
+   *  whichever computed source is installed: the respondent island states it,
+   *  and so does the aggregate cube. */
   conf.responseRate = function () {
     var agg = TR.AGG;
     var N = agg && agg.project && agg.project.population_size;
-    var n = TR.MICRO && TR.MICRO.n;
+    var n = TR.d2 && TR.d2.studyN ? TR.d2.studyN() : (TR.MICRO && TR.MICRO.n);
     if (!(N > 1) || !(n > 0)) return null;
     return { n: n, N: N, rate: Math.min(n / N, 1) };
   };

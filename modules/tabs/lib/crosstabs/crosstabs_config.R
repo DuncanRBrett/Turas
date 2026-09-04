@@ -250,6 +250,55 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # validate_config_settings rather than defaulting the island back ON (I3).
     html_report_v2_microdata = safe_logical(
       get_config_value(config, "html_report_v2_microdata", TRUE), default = TRUE),
+    # V14 interactivity mode. WHAT POWERS the live views:
+    #   records  the per-respondent DATA_MICRO island. Today's behaviour, and
+    #            the default, so no existing config changes what it ships.
+    #   cube     the aggregate DATA_CUBE island: precomputed group statistics,
+    #            the same figures, no respondent-level records in the file.
+    #   none     published tables only. What html_report_v2_microdata = N has
+    #            always meant, now sayable in the same vocabulary.
+    # Blank inherits from html_report_v2_microdata, so a config written before
+    # this setting existed keeps its exact behaviour. Setting BOTH, and
+    # disagreeing, is a refusal rather than a silent precedence
+    # (CFG_INTERACTIVITY_CONFLICT in validate_config_settings).
+    html_report_v2_interactivity = {
+      raw <- get_config_value(config, "html_report_v2_interactivity", NULL)
+      micro_on <- safe_logical(
+        get_config_value(config, "html_report_v2_microdata", TRUE), default = TRUE)
+      if (is_blank_setting(raw)) {
+        if (isTRUE(micro_on)) "records" else "none"
+      } else {
+        normalise_enum_setting(raw, .TABS_INTERACTIVITY_MODES, "records")
+      }
+    },
+    # Was html_report_v2_interactivity actually written in the workbook? The
+    # conflict check needs to tell "the operator asked for cube" apart from
+    # "the default resolved to records".
+    html_report_v2_interactivity_explicit =
+      !is_blank_setting(get_config_value(config, "html_report_v2_interactivity", NULL)),
+    # Extra DECLARED filter variables for a cube build, beyond the banner
+    # groups. Comma separated question codes. Each must be a single-response
+    # question with category rows: a multi-mention answer is a set, not a
+    # partition, and there is no honest way to cut by one in version 1
+    # (CFG_CUBE_FILTER_VAR, raised where the questions are known).
+    html_report_v2_filter_vars = {
+      raw <- get_config_value(config, "html_report_v2_filter_vars", NULL)
+      if (is_blank_setting(raw)) {
+        character(0)
+      } else {
+        v <- trimws(unlist(strsplit(as.character(raw)[1], ",", fixed = TRUE)))
+        unique(v[nzchar(v)])
+      }
+    },
+    # Highest combination order the cube precomputes. A view with one filter and
+    # a banner reads a two-variable slice, so 2 is what "filter and still see
+    # every banner" costs. 3 is allowed and 1 is allowed; higher is refused,
+    # because the file grows combinatorially and the picker stops being honest
+    # about what it can serve.
+    html_report_v2_cube_order = {
+      raw <- get_config_value(config, "html_report_v2_cube_order", NULL)
+      if (is_blank_setting(raw)) 2L else suppressWarnings(as.integer(as.character(raw)[1]))
+    },
     # V11 tabs-integrated tracker (OFF by default). When TRUE AND a waves_source
     # resolves, the v2 report gains a Tracking tab built from anonymised per-wave
     # microdata. Independent of the standalone tracker module, which is untouched.
@@ -729,6 +778,113 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
     )
   }
 
+  # V14 interactivity. Three ways this can be wrong, and all three matter,
+  # because every one of them decides what leaves the building.
+  mode <- as.character(config_obj$html_report_v2_interactivity %||% "records")[1]
+  if (!(mode %in% .TABS_INTERACTIVITY_MODES)) {
+    tabs_refuse(
+      code = "CFG_INVALID_SETTING",
+      title = "Unrecognised html_report_v2_interactivity",
+      problem = sprintf("Setting 'html_report_v2_interactivity' is '%s', which is not one of its allowed values.", mode),
+      why_it_matters = paste0(
+        "This setting decides what the delivered file CONTAINS. An unrecognised ",
+        "value would fall through to the default, which carries per-respondent ",
+        "records, in a report that was configured not to."
+      ),
+      how_to_fix = c(
+        sprintf("Set 'html_report_v2_interactivity' to one of: %s",
+                paste(.TABS_INTERACTIVITY_MODES, collapse = ", ")),
+        "Case does not matter - the value is read case-insensitively",
+        "Leave the cell blank to inherit from html_report_v2_microdata"
+      ),
+      expected = paste(.TABS_INTERACTIVITY_MODES, collapse = ", "),
+      observed = mode
+    )
+  }
+  # Both set and disagreeing. Silent precedence here would mean one of the two
+  # cells the operator wrote did nothing, on the pair of settings that decide
+  # whether respondent records ship.
+  if (isTRUE(config_obj$html_report_v2_interactivity_explicit) &&
+      identical(config_obj$html_report_v2_microdata, FALSE) &&
+      !identical(mode, "none")) {
+    tabs_refuse(
+      code = "CFG_INTERACTIVITY_CONFLICT",
+      title = "html_report_v2_microdata and html_report_v2_interactivity disagree",
+      problem = sprintf(paste0(
+        "html_report_v2_microdata is N, which means no live views at all, while ",
+        "html_report_v2_interactivity is '%s', which asks for them."), mode),
+      why_it_matters = paste0(
+        "One of the two cells would have to lose, and whichever lost would ",
+        "change what the delivered file carries with nothing in the report ",
+        "saying which setting won."
+      ),
+      how_to_fix = c(
+        "Keep html_report_v2_interactivity and clear html_report_v2_microdata, which is the newer setting and says more",
+        "Or set html_report_v2_interactivity to 'none', which is what html_report_v2_microdata = N means"
+      ),
+      expected = "one setting, or two that agree",
+      observed = sprintf("microdata = N, interactivity = %s", mode)
+    )
+  }
+  # A cube with no threshold protects nothing. Refusing is the point: a build
+  # that ships aggregates under a safe-sounding name while every cell of one is
+  # a single person is worse than one that does not build.
+  if (identical(mode, "cube")) {
+    k <- suppressWarnings(as.numeric(config_obj$min_reporting_base))
+    if (length(k) != 1L || is.na(k) || k <= 1) {
+      tabs_refuse(
+        code = "CFG_CUBE_NEEDS_K",
+        title = "An aggregate build needs a confidentiality threshold",
+        problem = paste0(
+          "html_report_v2_interactivity is 'cube', but min_reporting_base is ",
+          "not set above 1."),
+        why_it_matters = paste0(
+          "The cube's whole protection is that it withholds any cut in which a ",
+          "group falls below the threshold. With no threshold it withholds ",
+          "nothing, and would ship a group of one under a name that reads as ",
+          "protected."
+        ),
+        how_to_fix = c(
+          "Set min_reporting_base to the smallest group you are willing to report on, commonly 5 or 10",
+          "Or set html_report_v2_interactivity to 'none' for published tables with no live views"
+        ),
+        expected = "min_reporting_base above 1",
+        observed = if (length(k) == 1L && !is.na(k)) as.character(k) else "not set"
+      )
+    }
+    ord <- suppressWarnings(as.integer(config_obj$html_report_v2_cube_order))
+    if (length(ord) != 1L || is.na(ord) || ord < 1L || ord > 3L) {
+      tabs_refuse(
+        code = "CFG_INVALID_SETTING",
+        title = "html_report_v2_cube_order is out of range",
+        problem = sprintf("html_report_v2_cube_order is '%s'; it must be 1, 2 or 3.",
+                          as.character(config_obj$html_report_v2_cube_order %||% "")[1]),
+        why_it_matters = paste0(
+          "The order decides how many variables a live filter may combine. Above ",
+          "3 the file grows combinatorially and the picker stops being honest ",
+          "about what it can serve."
+        ),
+        how_to_fix = c("Set html_report_v2_cube_order to 1, 2 or 3",
+                       "Leave the cell blank to accept the default of 2"),
+        expected = "1, 2 or 3",
+        observed = as.character(config_obj$html_report_v2_cube_order %||% "")[1]
+      )
+    }
+    bad <- grep("[*]", config_obj$html_report_v2_filter_vars %||% character(0), value = TRUE)
+    if (length(bad) > 0) {
+      tabs_refuse(
+        code = "CFG_CUBE_FILTER_VAR",
+        title = "A declared filter variable contains a reserved character",
+        problem = sprintf("html_report_v2_filter_vars names %s, and '*' separates variables in the cube's own keys.",
+                          paste(sprintf("'%s'", bad), collapse = ", ")),
+        why_it_matters = "The cube would read one variable's name as two, and every cut on it would resolve to the wrong slice.",
+        how_to_fix = "Use the question code exactly as it appears on the Selection sheet, with no '*' in it",
+        expected = "question codes without '*'",
+        observed = paste(bad, collapse = ", ")
+      )
+    }
+  }
+
   # The qualitative confidentiality dials (I4). Every consumer compares with
   # identical(), so an unrecognised token fell through to the PERMISSIVE branch:
   # "Block" meant allow, "Noteworthy" meant show every verbatim. A dial set to
@@ -810,7 +966,7 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
   "decimal_places_numeric", "decimal_places", "index_summary_decimal_places",
   "ranking_tie_threshold_pct", "ranking_gap_threshold_pct",
   "ranking_completeness_threshold_pct", "ranking_min_base",
-  "population_size", "wave_order"
+  "population_size", "wave_order", "html_report_v2_cube_order"
 )
 
 # EVERY Settings cell read through safe_logical() (I3). safe_logical prints a
@@ -846,6 +1002,10 @@ validate_config_settings <- function(config_obj, raw_settings = NULL) {
 # MUST match QUAL_TEXT_MODES / QUAL_VERBATIM_SCOPES / QUAL_NOTEWORTHY_DEFAULTS
 # in qual_island_builder.R and the template dropdowns. Test_config_contract.R
 # reads both files and fails on drift.
+# What powers the v2 report's live views. MUST match the modes
+# run_crosstabs.R branches on and the template dropdown.
+.TABS_INTERACTIVITY_MODES <- c("records", "cube", "none")
+
 .TABS_QUAL_ENUMS <- list(
   qual_confidentiality_mode = c("hidden", "redacted", "full"),
   qual_demographic_cuts     = c("allow", "safe", "block"),
@@ -1734,6 +1894,8 @@ TABS_KNOWN_SETTINGS <- c(
   "html_report_v2", "html_report_v2_tracking",
   "html_report_v2_microdata", "html_report_v2_cover",
   "html_report_v2_cover_findings",
+  "html_report_v2_interactivity", "html_report_v2_filter_vars",
+  "html_report_v2_cube_order",
   "waves_source", "question_mapping", "wave_order", "sampling_method",
   "population_size", "wave",
   # Reader report (narrative summary, rides on html_report_v2)

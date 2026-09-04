@@ -295,6 +295,8 @@ function readerSandbox(opts) {
     filterDescription: () => "Q6: Female",
     bannerDescription: () => "Composite banner. Leaders (2 groups vs the rest)",
     hasMicrodata: () => !!(TR.MICRO && TR.MICRO.answers),
+    hasComputedSource: () => !!(TR.MICRO && TR.MICRO.answers),
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null),
     storeKey: (base) => base + ":proj"
   };
   // Stub the microdata helpers ONTO the real stats module. Replacing it would

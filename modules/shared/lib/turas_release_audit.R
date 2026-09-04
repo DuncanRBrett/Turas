@@ -53,6 +53,100 @@ if (!exists("%||%", mode = "function")) {
 # skipped audit is the same as no audit.
 .RELEASE_RESPONDENT_ISLANDS <- c("data-micro", "data-qual")
 
+# Islands that hold AGGREGATES, never records. data-cube is the interesting one:
+# it exists to be the computed source of a file that carries no respondents, so
+# it is audited on its OWN terms (every cell at or above k, no partial block, no
+# array as long as the study) rather than treated as a respondent island.
+.RELEASE_AGGREGATE_ISLANDS <- c("data-agg", "data-cube")
+
+
+#' Audit an aggregate cube island against its own promises
+#'
+#' Three checks, each a thing the cube claims about itself:
+#'   1. No array anywhere in it is as long as the study. An array of n values is
+#'      respondent-level data whatever the island is called.
+#'   2. No cell base is between 1 and k - 1. A cell nobody answered is 0 and
+#'      discloses nothing; a cell of one to four people is the whole point of k.
+#'   3. No slice ships a partial block. A block ships whole or not at all,
+#'      because a cell withheld on its own is recovered by subtraction from the
+#'      margin that remains.
+#'
+#' @param body The data-cube island body, already extracted.
+#' @return list(present, k, n, order, blocks, violations) where violations is a
+#'   character vector, empty when the cube keeps its promises.
+#' @keywords internal
+release_audit_cube <- function(body) {
+  out <- list(present = FALSE, k = NA_real_, n = NA_integer_, order = NA_integer_,
+              cells = 0L, violations = character(0))
+  if (is.na(body) || !nzchar(body) || identical(body, "null")) return(out)
+  out$present <- TRUE
+  cube <- tryCatch(jsonlite::fromJSON(body, simplifyVector = FALSE),
+                   error = function(e) NULL)
+  if (is.null(cube)) {
+    out$violations <- "the data-cube island did not parse"
+    return(out)
+  }
+  out$k <- suppressWarnings(as.numeric(cube$k %||% NA_real_))
+  out$n <- suppressWarnings(as.integer(cube$n %||% NA_integer_))
+  out$order <- suppressWarnings(as.integer(cube$order %||% NA_integer_))
+  k <- out$k
+  if (is.na(k) || k <= 1) {
+    out$violations <- c(out$violations,
+      "the cube states no confidentiality threshold, so it protects nothing")
+  }
+
+  # 1. respondent-shaped arrays
+  n <- out$n
+  long <- FALSE
+  scan_arrays <- function(node, depth) {
+    if (long || depth > 8 || is.null(node)) return(invisible(NULL))
+    if (is.list(node)) {
+      if (is.null(names(node)) && length(node) == n && !is.na(n) && n > 5) {
+        long <<- TRUE; return(invisible(NULL))
+      }
+      for (child in node) scan_arrays(child, depth + 1)
+    }
+    invisible(NULL)
+  }
+  scan_arrays(cube$slices, 0)
+  if (long) {
+    out$violations <- c(out$violations, sprintf(
+      "the cube carries an array of %s values, which is one per respondent", format(n)))
+  }
+
+  # 2 and 3. cell bases, and whole blocks
+  sub_k <- 0L
+  cells <- 0L
+  for (skey in names(cube$slices %||% list())) {
+    slice <- cube$slices[[skey]]
+    if (is.null(slice)) next
+    for (rec in (slice$cells %||% list())) {
+      a <- rec$a
+      if (is.null(a)) next
+      cells <- cells + 1L
+      v <- suppressWarnings(as.numeric(a[[1]]))
+      if (!is.na(v) && v > 0 && !is.na(k) && v < k) sub_k <- sub_k + 1L
+    }
+    for (qcode in names(slice$q %||% list())) {
+      block <- slice$q[[qcode]]
+      if (is.null(block)) next               # refused whole, which is the rule
+      for (rec in block) {
+        b <- rec$b
+        if (is.null(b)) next
+        cells <- cells + 1L
+        v <- suppressWarnings(as.numeric(b[[1]]))
+        if (!is.na(v) && v > 0 && !is.na(k) && v < k) sub_k <- sub_k + 1L
+      }
+    }
+  }
+  out$cells <- cells
+  if (sub_k > 0L) {
+    out$violations <- c(out$violations, sprintf(
+      "%d cell base(s) sit between 1 and k - 1, which the block rule forbids", sub_k))
+  }
+  out
+}
+
 
 #' Extract one JSON island's body from a finished report
 #'
@@ -91,6 +185,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
     stop("turas_release_audit: html must be a single string", call. = FALSE)
   }
 
+  cube_audit <- release_audit_cube(release_island_body(html, "data-cube"))
+
   micro_body <- release_island_body(html, "data-micro")
   micro_present <- !is.na(micro_body) && nzchar(micro_body) &&
     !identical(micro_body, "null")
@@ -123,7 +219,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
   }, integer(1))
   ip_hits <- ip_hits[ip_hits > 0L]
 
-  violation <- isTRUE(client_safe) && micro_present
+  cube_violation <- isTRUE(client_safe) && length(cube_audit$violations) > 0
+  violation <- isTRUE(client_safe) && (micro_present || cube_violation)
 
   pad <- function(x) formatC(x, width = 32, flag = "-")
   lines <- c(
@@ -136,8 +233,17 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
            else "absent"),
     paste0("│ ", pad("Row-level weights"), ": ", if (micro_weights) "present" else "absent"),
     paste0("│ ", pad("Direct-identifier fields"), ": ",
-           if (length(identifiers)) paste(identifiers, collapse = ", ") else "none found")
+           if (length(identifiers)) paste(identifiers, collapse = ", ") else "none found"),
+    paste0("│ ", pad("Aggregate cube"), ": ",
+           if (!cube_audit$present) "absent"
+           else sprintf("present (k = %s, up to %s variables, %s cells)",
+                        format(cube_audit$k), cube_audit$order, format(cube_audit$cells)))
   )
+
+  if (length(cube_audit$violations)) {
+    lines <- c(lines, "│", "│ The cube does not keep its own promises:")
+    for (v in cube_audit$violations) lines <- c(lines, paste0("│   ", v))
+  }
 
   if (length(ip_hits)) {
     lines <- c(lines, "│", "│ Engineering detail still readable in this file:")
@@ -154,8 +260,10 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
   lines <- c(lines, "└──────────────────────────────────────────────────────────────┘")
 
   out <- list(
-    status = if (!micro_present && !length(identifiers) && !length(ip_hits)) "PASS" else "FLAGGED",
+    status = if (!micro_present && !length(identifiers) && !length(ip_hits) &&
+                 !length(cube_audit$violations)) "PASS" else "FLAGGED",
     microdata = list(present = micro_present, n = micro_n, weights = micro_weights),
+    cube = cube_audit,
     identifiers = identifiers,
     ip = ip_hits,
     lines = lines,
@@ -166,19 +274,27 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
     if (exists("turas_refuse", mode = "function")) {
       turas_refuse(
         code = "CFG_CLIENT_SAFE_VIOLATED",
-        title = "Client-safe build still contains respondent-level data",
-        problem = sprintf(
+        title = if (micro_present) "Client-safe build still contains respondent-level data"
+                else "Client-safe build carries an aggregate cube that breaks its own rule",
+        problem = if (micro_present) sprintf(
           "This build was declared client-safe, but the file carries a populated data-micro island (%s respondents).",
-          if (is.na(micro_n)) "count unreadable" else micro_n),
+          if (is.na(micro_n)) "count unreadable" else micro_n)
+        else paste0(
+          "This build was declared client-safe, and its aggregate cube does not keep ",
+          "its own promises: ", paste(cube_audit$violations, collapse = "; "), "."),
         why_it_matters = paste(
           "A client-safe file is one that stays safe if it is forwarded on.",
           "This one can be turned back into a respondent-by-question dataset",
           "from the page source."),
-        how_to_fix = c(
+        how_to_fix = if (micro_present) c(
           "Choose 'Client safe' in the tabs GUI before running: the build then drops the island itself.",
-          "Running outside the GUI: set html_report_v2_microdata = FALSE on the Settings sheet.",
+          "Running outside the GUI: set html_report_v2_interactivity = none on the Settings sheet.",
           "The island is decided when the report is built, so it cannot be removed afterwards.",
-          "Or build without declaring client-safe, if respondent data is acceptable for this recipient."),
+          "Or build without declaring client-safe, if respondent data is acceptable for this recipient.")
+        else c(
+          "Raise min_reporting_base and rebuild: the cube then withholds the cuts that are too small.",
+          "Or set html_report_v2_interactivity = none for published tables with no live views.",
+          "The cube is decided when the report is built, so it cannot be repaired afterwards."),
         module = "RELEASE AUDIT"
       )
     } else {

@@ -33,8 +33,10 @@ TR.AGG.project.min_reporting_base = 10;
 assert(disc.minBase() === 10 && disc.active() === true, "k=10 -> active");
 
 // Audience base: the whole sample when unfiltered, the mask count when filtered.
-TR.MICRO = { n: 200 };
-TR.d2 = { state: { filters: [] } };
+TR.MICRO = { n: 200, answers: {} };
+TR.d2 = { state: { filters: [] },
+  hasComputedSource: function () { return !!(TR.MICRO && TR.MICRO.answers); },
+  studyN: function () { return TR.MICRO ? TR.MICRO.n : null; } };
 assert(disc.audienceBase() === 200, "unfiltered audience base = N");
 TR.stats = { mask: function (f) { return f; }, maskCount: function () { return 3; } };
 TR.d2.state.filters = [{ q: "X", rows: [0] }];

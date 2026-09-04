@@ -800,5 +800,30 @@
     "token_help": {
       "bands": "the study's own banding, read off its questions, e.g. 'strong ≥8.6, moderate 8.0–8.5, weak <8.0'"
     }
+  },
+  "cube.refuse.order": {
+    "page": "Crosstabs",
+    "context": "Aggregate build. The reader combined more variables than the report precomputed.",
+    "tokens": [
+      "order"
+    ],
+    "token_help": {
+      "order": "how many variables a filter may combine"
+    }
+  },
+  "cube.refuse.undeclared": {
+    "page": "Crosstabs",
+    "context": "Aggregate build. The reader asked for a cut by a question the report was not built to cut by.",
+    "tokens": []
+  },
+  "cube.refuse.block": {
+    "page": "Crosstabs",
+    "context": "Aggregate build. This question's figures were withheld for this cut because a group in it is below the confidentiality threshold.",
+    "tokens": [
+      "k"
+    ],
+    "token_help": {
+      "k": "the confidentiality threshold"
+    }
   }
 }

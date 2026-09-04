@@ -134,13 +134,50 @@
   };
 
   /** Validate the three payloads enough to boot safely. */
-  d2.validate = function (agg, micro, prev) {
+  d2.validate = function (agg, micro, prev, cube) {
     var errors = [];
     if (!agg || !Array.isArray(agg.questions) || !agg.questions.length) {
       errors.push({ code: "DATA_NO_QUESTIONS", message: "aggregates payload empty" });
     }
     if (!agg || !Array.isArray(agg.columns) || !agg.columns.length) {
       errors.push({ code: "DATA_NO_COLUMNS", message: "banner columns missing" });
+    }
+    if (cube) {
+      if (cube.schema_version !== 1) {
+        errors.push({ code: "DATA_CUBE_SCHEMA",
+          message: "aggregate cube schema_version " + cube.schema_version +
+            " is not readable by this renderer" });
+      }
+      if (!(cube.n > 0)) {
+        errors.push({ code: "DATA_CUBE_N", message: "aggregate cube states no study size" });
+      }
+      if (!(cube.k > 1)) {
+        errors.push({ code: "DATA_CUBE_K",
+          message: "aggregate cube carries no confidentiality threshold" });
+      }
+      if (!cube.vars || !Object.keys(cube.vars).length) {
+        errors.push({ code: "DATA_CUBE_VARS",
+          message: "aggregate cube declares no variables" });
+      }
+      // The one shape check that matters for what this island is FOR: a cube
+      // carries sums per cell, never a value per respondent. An array as long
+      // as the study would be respondent-level data wearing an aggregate name.
+      var respondentShaped = false;
+      var scan = function (node, depth) {
+        if (respondentShaped || depth > 6 || !node || typeof node !== "object") return;
+        if (Array.isArray(node)) {
+          if (node.length === cube.n && cube.n > 5) { respondentShaped = true; return; }
+          for (var i = 0; i < node.length; i++) scan(node[i], depth + 1);
+          return;
+        }
+        Object.keys(node).forEach(function (k) { scan(node[k], depth + 1); });
+      };
+      scan(cube.slices, 0);
+      if (respondentShaped) {
+        errors.push({ code: "DATA_CUBE_SHAPE",
+          message: "aggregate cube carries an array as long as the study, which " +
+            "is respondent-level data, not a cell statistic" });
+      }
     }
     if (prev && !Array.isArray(prev.waves)) {
       errors.push({ code: "DATA_WAVES_SHAPE",

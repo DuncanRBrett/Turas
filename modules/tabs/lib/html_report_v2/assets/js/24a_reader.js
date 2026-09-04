@@ -26,20 +26,21 @@
   reader._publishedTotalBase = publishedTotalBase;
 
   /** Weighted (Σw) + Kish effective base of the live audience. Null when the
-   *  report is unweighted or carries no per-respondent weights. Mirrors the
-   *  accumulation in 21_stats.js (weightAt/effectiveBase are module-private). */
+   *  report is unweighted or carries no computed source. The accumulation lives
+   *  behind the stats seam (stats.audienceMoments), so it reads the respondent
+   *  island's weights or the aggregate cube's audience cells without this file
+   *  knowing which is installed. */
   function weightedAudience(fullSample) {
     var p = (TR.AGG && TR.AGG.project) || {};
-    var w = TR.MICRO && TR.MICRO.weights;
-    if (!p.weighted || !w) return null;
+    if (!p.weighted || !TR.stats || !TR.stats.audienceMoments) return null;
+    if (!TR.d2.hasComputedSource()) return null;
     var f = fullSample ? null : TR.d2.state.filters;
-    var mask = (f && f.length && TR.stats) ? TR.stats.mask(f) : null;
-    var sw = 0, sw2 = 0;
-    for (var r = 0; r < TR.MICRO.n; r++) {
-      if (mask && !mask[r]) continue;
-      sw += w[r]; sw2 += w[r] * w[r];
-    }
-    return { w: sw, eff: sw2 > 0 ? (sw * sw) / sw2 : 0 };
+    // null means "no filter", which both sources read as the whole sample.
+    var mask = (f && f.length) ? TR.stats.mask(f) : null;
+    if (mask && mask.cube && mask.refused) return null;
+    var m = TR.stats.audienceMoments(mask);
+    if (!m) return null;
+    return { w: m.sw, eff: m.sw2 > 0 ? (m.sw * m.sw) / m.sw2 : 0 };
   }
   reader._weightedAudience = weightedAudience;
 
@@ -67,7 +68,7 @@
         (tab === "takeout" ? "Group overview reads" : "Tracking shows") +
         ' the <strong>full published sample</strong>, the audience filter does ' +
         "not apply on this tab</span>");
-      var pub = TR.d2.hasMicrodata() ? TR.MICRO.n : publishedTotalBase();
+      var pub = TR.d2.hasComputedSource() ? TR.d2.studyN() : publishedTotalBase();
       var pubPart = basePart(pub, true);
       if (pubPart) bits.push('<span class="aud-n">' + pubPart + "</span>");
     } else {
@@ -527,7 +528,7 @@
     // Two whole sentences rather than one spliced around a conditional: the
     // author edits the version their report actually shows, and neither reads
     // as a fragment in the editor.
-    var pub = publishedTotalBase() || (TR.MICRO && TR.MICRO.n);
+    var pub = publishedTotalBase() || TR.d2.studyN();
     sections.push("<h3>" + fmt.escapeHtml(labels.moe_name) + " (" +
       fmt.escapeHtml(labels.moe_abbrev) + ")</h3><ul>" +
       (pub

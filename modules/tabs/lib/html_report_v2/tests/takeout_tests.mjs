@@ -35,11 +35,30 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 installText(sandbox);
 const takeoutFiles = readdirSync(JS_DIR).filter((f) => /takeout.*\.js$/.test(f)).sort();
-for (const file of ["00_namespace.js", "01_format.js"].concat(takeoutFiles)) {
+// The cell family reads its arms through the stats seam (stats.columnsFor,
+// stats.momentsOf, stats.groupColumn), so the real data + stats modules load
+// here rather than being stubbed. That also makes the banner stubs below
+// production-shaped: banner_vars carries the COLUMN index a respondent falls
+// in, never a 0-based group code, and column 0 is always Total.
+for (const file of ["00_namespace.js", "01_format.js", "20_data.js",
+  "21_stats.js", "21b_cube.js"].concat(takeoutFiles)) {
   vm.runInContext(readFileSync(path.join(JS_DIR, file), "utf8"), sandbox, { filename: file });
 }
 const TR = sandbox.TR;
 const takeout = TR.takeout;
+
+// Several cases below replace TR.d2 wholesale with a two-field stub. The cell
+// family now resolves its banner columns through the real d2 (groupCols), so
+// those cases have to hand it back. Mutating the module's OWN object, never a
+// copy: 20_data.js closes over it, so a copy would leave the module reading a
+// stale state.
+const REAL_D2 = TR.d2;
+function useRealD2(state) {
+  TR.d2 = REAL_D2;
+  REAL_D2.state = state;
+  REAL_D2.storeKey = function (k) { return k; };
+  return REAL_D2;
+}
 const C = takeout.CONST;
 
 let passed = 0, failed = 0;
@@ -379,12 +398,17 @@ run("ODD-ONE-OUT family excludes NPS/score scales (F1: no cross-scale fabricatio
   const N = 40, bv = [], rate = [], nps = [];
   for (let i = 0; i < N; i++) {
     const g0 = i < 20;
-    bv.push(g0 ? 0 : 1);
+    // banner_vars carries the COLUMN index, and column 0 is Total.
+    bv.push(g0 ? 1 : 2);
     rate.push(g0 ? (i % 2 ? 5 : 4) : (i % 2 ? 4 : 3));    // 1–5 scale
     nps.push(g0 ? (i % 2 ? 80 : 60) : (i % 2 ? 20 : 40));  // 0–100 NPS index (big gaps)
   }
   TR.conf = { fpcActiveReport: () => false };
-  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Banner" }] };
+  useRealD2({ banner: "B", filters: [] });
+  TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Banner" }],
+    columns: [{ label: "Total", group: "total", letter: "" },
+      { label: "G0", group: "B", letter: "A" },
+      { label: "G1", group: "B", letter: "B" }] };
   TR.MICRO = { n: N, weights: null, banner_vars: { B: bv }, scores: { Q_RATE: rate, Q_NPS: nps } };
   TR.views = {
     indexQuestions: () => ([
@@ -951,13 +975,16 @@ run("KeyShare cells join the trust-gate family; odd-one-out never reads them (kn
   const N = 80, bv = [], rate = [], ans = [];
   for (let i = 0; i < N; i++) {
     const a = i < 40;
-    bv.push(a ? 0 : 1);
+    bv.push(a ? 1 : 2);        // COLUMN index; column 0 is Total
     rate.push(a ? (i % 2 ? 3 : 4) : (i % 2 ? 4 : 5));          // A mean 3.5, B mean 4.5
     ans.push(a ? (i % 5 < 4 ? 0 : 1) : (i % 10 < 3 ? 0 : 1));  // A 32/40=80%, B 12/40=30%
   }
   TR.conf = { fpcActiveReport: () => false };
-  TR.d2 = { state: { banner: "B", filters: [] }, storeKey: (k) => k };
+  useRealD2({ banner: "B", filters: [] });
   TR.AGG = { project: { low_base_threshold: 5 }, banner_groups: [{ id: "B", name: "Depot" }],
+    columns: [{ label: "Total", group: "total", letter: "" },
+      { label: "A", group: "B", letter: "A" },
+      { label: "B2", group: "B", letter: "B" }],
     questions: [{ code: "Q_SHARE", title: "Correct delivery day", key_share: "Always",
       rows: [{ kind: "category", label: "Always" }, { kind: "category", label: "Never" }] }] };
   TR.MICRO = { n: N, weights: null, banner_vars: { B: bv },

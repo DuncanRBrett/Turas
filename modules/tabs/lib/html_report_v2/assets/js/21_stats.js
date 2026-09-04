@@ -747,10 +747,73 @@
     return { n: cnt, sw: sw, sw2: sw2, swx: swx, swx2: swx2 };
   }
 
+  /**
+   * {n, sw, sw2} for the live audience: everyone matching the filters, with no
+   * question condition. What the filter bar, the disclosure gate and the
+   * Reader's audience strip count. null when no computed source is installed.
+   */
+  stats.audienceMoments = function (mask) {
+    if (onCube()) return TR.cube.audienceMoments(mask, null);
+    if (!TR.MICRO) return null;
+    var n = TR.MICRO.n, cnt = 0, sw = 0, sw2 = 0;
+    for (var r = 0; r < n; r++) {
+      if (mask && !mask[r]) continue;
+      var w = weightAt(r);
+      cnt++; sw += w; sw2 += w * w;
+    }
+    return { n: cnt, sw: sw, sw2: sw2 };
+  };
+
   /** Does this question carry a per-respondent score in the installed source? */
   stats.hasScores = function (qcode) {
     if (onCube()) return TR.cube.has(qcode, "scores");
     return !!(TR.MICRO && TR.MICRO.scores && TR.MICRO.scores[qcode]);
+  };
+
+  /**
+   * The observed range of a question's per-respondent scores over the FULL
+   * unfiltered sample, or null when the source carries no score for it. The
+   * Differences scan uses it as the denominator that scales a mean gap into a
+   * comparable finding score.
+   */
+  stats.scoreRange = function (qcode) {
+    if (onCube()) {
+      var f = TR.cube.questionFacts(qcode);
+      if (!f || f.score_lo === undefined || f.score_lo === null) return null;
+      return { lo: f.score_lo, hi: f.score_hi };
+    }
+    var sc = TR.MICRO && TR.MICRO.scores && TR.MICRO.scores[qcode];
+    if (!sc) return null;
+    var lo = 0, hi = 0, any = false;
+    for (var i = 0; i < sc.length; i++) {
+      var v = sc[i];
+      if (v === null || v === undefined) continue;
+      if (!any) { lo = hi = v; any = true; }
+      else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    }
+    return any ? { lo: lo, hi: hi } : null;
+  };
+
+  /**
+   * The robust scoring range WIDTH: p5 to p95 on an unbounded observed scale,
+   * the full range on a designed one. A fact about the full unfiltered vector,
+   * so the cube states it and the respondent island computes it, by the same
+   * rule (robustRange in 27d_diffs.js, cube_robust_range in cube_writer.R).
+   */
+  stats.robustRange = function (qcode, fullRange) {
+    if (onCube()) {
+      var f = TR.cube.questionFacts(qcode);
+      return (f && f.robust_range) ? f.robust_range : null;
+    }
+    var sc = TR.MICRO && TR.MICRO.scores && TR.MICRO.scores[qcode];
+    if (!sc) return null;
+    var vals = [];
+    for (var i = 0; i < sc.length; i++) {
+      if (sc[i] === null || sc[i] === undefined) continue;
+      vals.push(sc[i]);
+    }
+    return TR.views && TR.views._robustRange
+      ? TR.views._robustRange(vals, fullRange) : null;
   };
 
   /** Does it carry box-category membership? Decides whether a NET row
@@ -758,6 +821,32 @@
   stats.hasBoxes = function (qcode) {
     if (onCube()) return TR.cube.has(qcode, "boxes");
     return !!(TR.MICRO && TR.MICRO.boxes && TR.MICRO.boxes[qcode]);
+  };
+
+  /** Does it carry raw category answers? */
+  stats.hasAnswers = function (qcode) {
+    if (onCube()) return TR.cube.has(qcode, "answers");
+    var a = TR.MICRO && TR.MICRO.answers && TR.MICRO.answers[qcode];
+    if (!a) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] !== null && a[i] !== undefined) return true;
+    }
+    return false;
+  };
+
+  /** The precomputed full-sample score histogram, or null when the source has
+   *  none and the caller has to bin the vector itself. */
+  stats.scoreHistogram = function (qcode) {
+    if (!onCube()) return null;
+    var f = TR.cube.questionFacts(qcode);
+    return (f && f.histogram) ? f.histogram : null;
+  };
+
+  /** Componentwise a minus b on two moment records. The arm a group is
+   *  compared against is always "this set minus that set". */
+  stats.subtractMoments = function (a, b) {
+    return { n: a.n - b.n, sw: a.sw - b.sw, sw2: a.sw2 - b.sw2,
+      swx: a.swx - b.swx, swx2: a.swx2 - b.swx2 };
   };
 
   /** Does it carry an Allocation item series? */

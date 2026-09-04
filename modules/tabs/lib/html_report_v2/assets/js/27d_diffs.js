@@ -55,12 +55,10 @@
    * microdata. Returns null when the row has no single base (score-difference
    * NETs) or the rest is empty.
    */
-  function restPct(q, ri, groupMember, mask, groupCell, totalCell, groupBase, totalBase) {
+  function restPct(q, ri, groupCol, mask, groupCell, totalCell, groupBase, totalBase) {
     if (q.net_diffs && q.net_diffs[String(ri)] !== undefined) return null;
-    if (groupMember && mask) {
-      var n = TR.MICRO.n, rest = new Uint8Array(n);
-      for (var r = 0; r < n; r++) rest[r] = groupMember[r] ? 0 : 1;
-      var col = [{ member: rest }];
+    if (groupCol && mask) {
+      var col = [TR.stats.restOf(groupCol)];
       if (q.rows[ri].kind === "net") {
         // A NET that decomposes into shown categories recomputes from those
         // members over the full answered base (netCounts): correct.
@@ -77,8 +75,7 @@
         // 61%, flipping a group from ahead to behind). Hidden-scale box-only
         // questions are unaffected (there every answered respondent has a box, so
         // the two bases are identical).
-        var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
-        if (boxes) {
+        if (TR.stats.hasBoxes(q.code)) {
           var hits = TR.stats.boxCounts(q.code, ri, col, mask)[0];
           var full = TR.stats.tabulate(q, col, mask)[0];
           return full && full.wbase ? hits.n / full.wbase * 100 : null;
@@ -182,18 +179,14 @@
     // null for it (no scores, and no category rows to hang index_scores on), so
     // this is explicit rather than incidental, and stays right if indexMeans
     // ever learns to read series. Row-aware findings are a follow-up.
-    if (TR.MICRO.series && TR.MICRO.series[q.code] &&
-        !(TR.MICRO.scores && TR.MICRO.scores[q.code])) return out;
+    if (TR.stats.hasSeries(q.code) && !TR.stats.hasScores(q.code)) return out;
     var means = TR.stats.indexMeans(q, spec.columns, mask);
     if (!means) return out;                       // ranking / no-score question
-    var scores = TR.MICRO.scores && TR.MICRO.scores[q.code];
+    var scores = TR.stats.hasScores(q.code);
     var lo = 0, hi = 0, any = false, vals = [];   // response-scale range
-    if (scores) {
-      scores.forEach(function (v) {
-        if (v === null || v === undefined) return;
-        vals.push(v);
-        if (!any) { lo = hi = v; any = true; } else { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-      });
+    var carried = TR.stats.scoreRange(q.code);
+    if (carried) {
+      lo = carried.lo; hi = carried.hi; any = true;
     } else if (q.index_scores) {
       // indexMeans fell back to q.index_scores, so the scale range must too,
       // a collapsed 0..0 range inflates the finding's score ~10x and breaks
@@ -209,9 +202,12 @@
     // Balanced-score denominator only. The q.index_scores fallback path is a
     // designed scale by definition (declared label scores), so it keeps the
     // full range without the distinct-value scan.
-    var scoreRange = scores ? robustRange(vals, range) : range;
+    // The robust range is a fact about the FULL unfiltered score vector, so it
+    // is precomputed once by whichever source is installed rather than derived
+    // here: the respondent island still runs robustRange over its own vector,
+    // the aggregate cube states the same number, computed by the same rule in R.
+    var scoreRange = scores ? (TR.stats.robustRange(q.code, range) || range) : range;
     var decimals = /nps/i.test(row.label) ? 0 : 1;
-    var n = TR.MICRO.n;
     // The disclosure k-gate blanks below-k columns in the crosstab; a recomputed
     // mean must not resurrect them here (means[i].k is the Kish effective base,
     // <= the raw count, so this gate is never looser than the crosstab's).
@@ -220,9 +216,7 @@
     var floor = Math.max(threshold, kMin);
     spec.columns.forEach(function (col, i) {
       if (i === 0 || means[i].mean === null || !means[i].k || means[i].k < floor) return;
-      var rest = new Uint8Array(n);
-      for (var r = 0; r < n; r++) rest[r] = col.member[r] ? 0 : 1;
-      var rm = TR.stats.indexMeans(q, [{ member: rest }], mask)[0];
+      var rm = TR.stats.indexMeans(q, [TR.stats.restOf(col)], mask)[0];
       if (!rm || rm.mean === null || !rm.k || rm.k < floor) return;
       var z = TR.stats.meanZ(means[i].mean, means[i].sd, means[i].k, rm.mean, rm.sd, rm.k);
       if (z === null) return;
@@ -252,7 +246,7 @@
    *  rest,overall,gap,beaten[],score}. Pure given the models + microdata. */
   function collectFindings(banner) {
     var bannerSource = banner.replace("custom:", "").split(":")[0];
-    var micro = TR.d2.hasMicrodata();
+    var micro = TR.d2.hasComputedSource();
     // Banner-column memberships (respondent -> column) are question-independent;
     // build them once and reuse to recompute "the rest" for every finding.
     var spec = micro ? TR.stats.columnsFor(banner) : null;
@@ -315,7 +309,7 @@
           if (!is95 && !is80) return;
           var overall = row.cells[0].pct;
           if (cell.pct === null || overall === null) return;
-          var rest = restPct(q, ri, spec ? spec.columns[i].member : null, mask,
+          var rest = restPct(q, ri, spec ? spec.columns[i] : null, mask,
             cell, row.cells[0], model.columns[i].base, model.columns[0].base);
           // An answer no one outside the group gives (rest 0%), or that
           // everyone but this group gives (rest 100%): is a defining trait of
@@ -361,7 +355,7 @@
    * findings are recomputed and so nothing can be a reciprocal pair.
    */
   function bannerLevels(banner) {
-    if (!TR.d2.hasMicrodata()) return 0;
+    if (!TR.d2.hasComputedSource()) return 0;
     var cols = TR.d2.groupCols(banner);
     return cols ? cols.length : 0;
   }

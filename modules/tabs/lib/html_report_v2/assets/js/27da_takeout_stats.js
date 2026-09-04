@@ -121,6 +121,42 @@
    *  scale-aware variance floor so a homogeneous census cell cannot collapse the
    *  SE to a spurious giant t. NO finite-population correction (it belongs in the
    *  reliability layer, not the test). Kish n_eff handles weights. */
+  /**
+   * The same test from SUFFICIENT STATISTICS rather than from the two arrays.
+   *
+   * welchTest() only ever used the moments of its inputs, so this is not an
+   * approximation of it: the centred sum of squares is (sum wx squared) minus
+   * (sum wx) squared over (sum w), which is the identity the array loop below
+   * computes the long way. Splitting it out is what lets the Executive
+   * Takeout's cell family run on a report that carries aggregates and no
+   * respondents.
+   *
+   * @param g {n, sw, sw2, swx, swx2} for the group arm
+   * @param r the same for the arm it is compared against
+   * @param vfloor scale-aware variance floor
+   */
+  function welchFromMoments(g, r, vfloor) {
+    var shape = function (m) {
+      var mean = m.sw ? m.swx / m.sw : 0;
+      var ss = m.sw ? m.swx2 - (m.swx * m.swx) / m.sw : 0;
+      var neff = m.sw2 ? (m.sw * m.sw) / m.sw2 : 0;
+      var variance = (neff > 1 && m.sw) ? (ss / m.sw) * (neff / (neff - 1)) : 0;
+      return { mean: mean, variance: Math.max(variance, 0), neff: neff, n: m.n };
+    };
+    return welchFromShapes(shape(g), shape(r), vfloor);
+  }
+  takeout._welchFromMoments = welchFromMoments;
+
+  function welchFromShapes(g, r, vfloor) {
+    var vg = Math.max(g.variance, vfloor), vr = Math.max(r.variance, vfloor);
+    var seg = vg / g.neff, ser = vr / r.neff, se = Math.sqrt(seg + ser);
+    var diff = g.mean - r.mean, t = se > 0 ? diff / se : (diff === 0 ? 0 : Infinity);
+    var df = (seg + ser) * (seg + ser) /
+      ((seg * seg) / (g.neff - 1) + (ser * ser) / (r.neff - 1));
+    return { diff: diff, t: t, df: df, p: studentT(t, df), nG: g.n, nR: r.n,
+      flooredG: g.variance < vfloor };
+  }
+
   function welchTest(gx, gw, rx, rw, vfloor) {
     function moments(x, w) {
       var sw = 0, sw2 = 0, sx = 0;
@@ -131,14 +167,7 @@
       var variance = (neff > 1 && sw) ? (ss / sw) * (neff / (neff - 1)) : 0;
       return { mean: mean, variance: variance, neff: neff, n: x.length };
     }
-    var g = moments(gx, gw), r = moments(rx, rw);
-    var vg = Math.max(g.variance, vfloor), vr = Math.max(r.variance, vfloor);
-    var seg = vg / g.neff, ser = vr / r.neff, se = Math.sqrt(seg + ser);
-    var diff = g.mean - r.mean, t = se > 0 ? diff / se : (diff === 0 ? 0 : Infinity);
-    var df = (seg + ser) * (seg + ser) /
-      ((seg * seg) / (g.neff - 1) + (ser * ser) / (r.neff - 1));
-    return { diff: diff, t: t, df: df, p: studentT(t, df), nG: g.n, nR: r.n,
-      flooredG: g.variance < vfloor };
+    return welchFromShapes(moments(gx, gw), moments(rx, rw), vfloor);
   }
   takeout._welchTest = welchTest;
 

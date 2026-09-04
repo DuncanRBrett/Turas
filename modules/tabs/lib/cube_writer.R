@@ -142,14 +142,30 @@ cube_var_defs <- function(micro, data_layer, filter_vars = character(0)) {
   qs <- data_layer$questions
   by_code <- list()
   for (q in qs) by_code[[q$code]] <- q
+  rejected <- character(0)
   for (code in filter_vars) {
-    if (is.null(by_code[[code]])) next
-    if (!is.null(defs[[code]])) next
+    if (!is.null(defs[[code]])) next          # already a banner variable
+    if (is.null(by_code[[code]])) {
+      rejected[code] <- "no such question in this report"
+      next
+    }
     levels <- cube_row_indices(by_code[[code]], "category")
-    if (length(levels) == 0) next
+    if (length(levels) == 0) {
+      rejected[code] <- "no category rows to cut by (a mean-only or derived question)"
+      next
+    }
+    if (is.list(micro$answers[[code]])) {
+      # A multi-mention answer is a SET, not a partition: "filter to option 3"
+      # and "filter to option 4" overlap, so their cells cannot be summed and
+      # every figure under such a filter would double-count. Refused rather
+      # than half-supported; inclusion and exclusion terms are a version 2 item.
+      rejected[code] <- "a multi-mention question, which is a set rather than a partition"
+      next
+    }
     defs[[code]] <- list(name = code, kind = "question", source = code,
                          levels = as.integer(levels))
   }
+  attr(defs, "rejected") <- rejected
   defs
 }
 
@@ -469,6 +485,7 @@ build_cube <- function(micro, data_layer, config_obj) {
   weighted <- any(w != 1)
 
   defs <- cube_var_defs(micro, data_layer, filter_vars)
+  rejected_vars <- attr(defs, "rejected") %||% character(0)
   if (length(defs) == 0) return(NULL)
   var_names <- names(defs)
   levels_by_var <- lapply(defs, cube_var_levels, micro = micro)
@@ -583,7 +600,8 @@ build_cube <- function(micro, data_layer, config_obj) {
                      slices_shipped = slices_shipped,
                      slices_refused = slices_refused),
        blocks_shipped = shipped, blocks_refused = refused,
-       slices_shipped = slices_shipped, slices_refused = slices_refused)
+       slices_shipped = slices_shipped, slices_refused = slices_refused,
+       rejected_vars = rejected_vars)
 }
 
 
@@ -849,6 +867,78 @@ cube_touchpoint_max <- function(dl_q) {
 }
 
 
+#' Check the declared filter variables against the questions that exist
+#'
+#' The config layer validates the SHAPE of html_report_v2_filter_vars, because
+#' that is all it can see. Whether a named question is a single-response
+#' question with category rows is a fact about the data layer, so it is checked
+#' here, where the questions are known.
+#'
+#' A multi-mention question is refused rather than half-supported: its answer is
+#' a SET, not a partition, so "filter to option 3" and "filter to option 4" are
+#' overlapping cuts whose cells cannot be summed. Supporting it needs inclusion
+#' and exclusion terms, which is a version 2 item.
+#'
+#' @param cube The built cube (or NULL)
+#' @param data_layer The built data layer
+#' @param config_obj The built config object
+#'
+#' @return NULL when every declared variable is usable, else a TRS refusal list:
+#'   \item{status}{"REFUSED"}
+#'   \item{code}{"CFG_CUBE_FILTER_VAR"}
+#'   \item{message}{Which variables were rejected, and why}
+#'   \item{how_to_fix}{What to change in the Settings sheet}
+#'
+#' @export
+cube_validate_filter_vars <- function(cube, data_layer, config_obj) {
+  declared <- config_obj$html_report_v2_filter_vars
+  if (is.null(declared) || length(declared) == 0) return(NULL)
+  by_code <- list()
+  for (q in (data_layer$questions %||% list())) by_code[[q$code]] <- q
+  banner_ids <- if (is.null(data_layer$banner_groups)) character(0)
+    else vapply(data_layer$banner_groups, function(g) as.character(g$id), character(1))
+  rejected <- if (!is.null(cube)) (cube$rejected_vars %||% character(0)) else character(0)
+  bad <- character(0)
+  why <- character(0)
+  for (code in declared) {
+    if (code %in% banner_ids) next          # already a declared banner variable
+    if (code %in% names(rejected)) {
+      bad <- c(bad, code); why <- c(why, unname(rejected[code]))
+      next
+    }
+    q <- by_code[[code]]
+    if (is.null(q)) {
+      bad <- c(bad, code); why <- c(why, "no such question in this report")
+      next
+    }
+    if (length(cube_row_indices(q, "category")) == 0) {
+      bad <- c(bad, code)
+      why <- c(why, "no category rows to cut by (a mean-only or derived question)")
+      next
+    }
+    if (!is.null(cube) && is.null(cube$vars[[code]])) {
+      bad <- c(bad, code)
+      why <- c(why, "could not be resolved to a partition of the sample")
+    }
+  }
+  if (length(bad) == 0) return(NULL)
+  msg <- paste(sprintf("'%s' (%s)", bad, why), collapse = "; ")
+  list(
+    status = "REFUSED",
+    code = "CFG_CUBE_FILTER_VAR",
+    message = paste0(
+      "html_report_v2_filter_vars names variables the cube cannot cut by: ", msg, "."),
+    how_to_fix = paste0(
+      "Declare only single-response questions that publish category rows. ",
+      "A multi-mention question is a set rather than a partition and is not ",
+      "supported in this version. Remove the named codes from ",
+      "html_report_v2_filter_vars, or switch html_report_v2_interactivity to ",
+      "'records' if the client needs to cut by them."),
+    context = list(declared = declared, rejected = bad)
+  )
+}
+
+
 #' Serialise a cube to the JSON island string
 #'
 #' Sums at digits = 8, the same precision the microdata island writes. NA
@@ -865,6 +955,7 @@ serialize_cube <- function(cube) {
   out$blocks_refused <- NULL
   out$slices_shipped <- NULL
   out$slices_refused <- NULL
+  out$rejected_vars <- NULL
   jsonlite::toJSON(out, auto_unbox = TRUE, na = "null", null = "null",
                    digits = 8, pretty = FALSE)
 }

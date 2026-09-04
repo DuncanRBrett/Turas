@@ -383,6 +383,22 @@
         (ok.mean_abs_err_pp !== undefined ? ok.mean_abs_err_pp.toFixed(1) : "≈2") +
         "pp on healthy bases). A production build embeds real anonymised data.</p>";
     }
+    // An AGGREGATE build. What the file carries, and what that costs the
+    // reader, said on the page rather than only in the delivery manifest the
+    // analyst saw. A reader who cannot get a cut needs to know it was withheld
+    // on purpose, and on what rule.
+    if (TR.cube && TR.cube.active()) {
+      var declared = TR.cube.varNames();
+      notes += "<p><strong>Aggregate report.</strong> This file carries no " +
+        "respondent-level records. Every live figure is computed from " +
+        "precomputed group statistics, so the tables, the filter, the custom " +
+        "banners, Differences and Pattern Recognition all read the same numbers " +
+        "as the published tables. Filters combine up to " +
+        fmt.escapeHtml(String(TR.CUBE.order)) + " of the " + declared.length +
+        " declared variables (" + fmt.escapeHtml(declared.join(", ")) + "), and " +
+        "a cut in which any group falls below " + fmt.escapeHtml(String(TR.CUBE.k)) +
+        " people is withheld rather than shown.</p>";
+    }
     if (p.weighted) {
       notes += "<p><strong>Weighting.</strong> Figures are weighted" +
         (p.weight_variable ? " using ‘" + fmt.escapeHtml(p.weight_variable) + "’" : "") +

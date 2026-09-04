@@ -231,7 +231,8 @@ function surfaces(project) {
              heatmap: "bars" },
     rowScope: () => "all",
     storeKey: (b) => b + ":proj",
-    hasMicrodata: () => false,
+    hasMicrodata: () => false, hasComputedSource: () => false,
+    studyN: () => (TR.MICRO ? TR.MICRO.n : null),
     filterDescription: () => "",
     bannerDescription: () => ""
   };

@@ -58,9 +58,18 @@
    *  Still returns null when the base cannot be established at all (an island with no
    *  published bases), and the caller MUST keep treating that as "unknown". */
   disc.audienceBase = function () {
-    if (!TR.MICRO) return publishedTotalBase();
+    var computed = TR.d2 && TR.d2.hasComputedSource && TR.d2.hasComputedSource();
+    if (!computed) return publishedTotalBase();
     var f = TR.d2 && TR.d2.state && TR.d2.state.filters;
-    return (f && f.length && TR.stats) ? TR.stats.maskCount(TR.stats.mask(f)) : TR.MICRO.n;
+    if (f && f.length && TR.stats) {
+      var mask = TR.stats.mask(f);
+      // A cut the aggregate cube cannot serve has NO base, not a base of zero.
+      // null keeps this function's fail-closed contract: detail is withheld
+      // rather than shown against an audience nobody established.
+      if (mask && mask.cube && mask.refused) return null;
+      return TR.stats.maskCount(mask);
+    }
+    return TR.d2.studyN();
   };
 
   /** True when the live audience is too small to show identifying detail (tags, quotes).
