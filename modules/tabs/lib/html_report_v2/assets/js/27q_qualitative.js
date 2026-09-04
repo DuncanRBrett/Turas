@@ -201,12 +201,54 @@
   };
 
   /**
+   * CAN the live cut be applied to the comments at all?
+   *
+   * Only with a per-respondent membership: every comment carries the index of
+   * the person who wrote it, and the cut is a mask over those indices. The
+   * aggregate cube has no such mask, by design, and neither has a build that
+   * ships no computed source at all.
+   *
+   * There is no cube path to add here. A cut over aggregates would have to be
+   * applied to each COMMENT, and the only thing that could carry it is the
+   * comment's own demographic tags, which are k-anonymised at build time: some
+   * are dropped, so filtering on them would silently show a DIFFERENT subset
+   * from the one the crosstabs show, under the same filter chip. A wrong
+   * audience is worse than no audience.
+   */
+  qual.cutServable = function () {
+    // The respondent island being PRESENT is exactly the question: a cube build
+    // sets TR.MICRO to null, and an aggregates-only build never had one. This
+    // is the same test the guard here has always made, named and given a
+    // reason rather than repeated inline in three places.
+    return !!TR.MICRO;
+  };
+
+  /** True when a cut is live but cannot be applied to the comments. */
+  qual.cutWithheld = function (filters) {
+    return !!(filters && filters.length) && !qual.cutServable();
+  };
+
+  /**
    * Records whose respondent index passes the cut mask. The cut is the live global
    * filter (d2.state.filters): the closed->open jump shows "the comments from the
-   * people in the active cut". A no-op when there is no cut or no microdata island.
+   * people in the active cut". A no-op when there is no cut.
+   *
+   * When a cut IS live and cannot be applied, the records come back UNFILTERED
+   * and the tab says so on its face (qual.cutWithheld -> the qual.cut_withheld
+   * sentence in mainHtml, and the jump affordance drops its number). Silently
+   * returning them was the bug: every comment in the study listed under an
+   * active filter chip, beside crosstabs that had recomputed to the cut.
+   * Reachable through a shared #filter link on an aggregates-only build before
+   * the cube existed, and reachable from the filter bar itself once a cube
+   * build made live filters work without records.
+   *
+   * Hiding them instead would be honest and wrong: a confidentiality ship is
+   * exactly where the curated comments matter most, and they carry no more than
+   * the R-side dials already let through. Visible, and never mislabelled.
    */
   qual.maskFilter = function (records, filters) {
-    if (!filters || !filters.length || !TR.stats || !TR.MICRO) return records || [];
+    if (!filters || !filters.length || !TR.stats) return records || [];
+    if (!qual.cutServable()) return records || [];
     var mask = TR.stats.mask(filters);
     return (records || []).filter(function (r) { return mask[r.idx] === 1; });
   };
@@ -338,7 +380,13 @@
       ? TR.d2.state.filters : null;
     var n = qual.commentCount(link.qcode, filters);
     if (!n) return "";
-    var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());
+    // No NUMBER when it would be read as the cut's count and is not: below the
+    // disclosure threshold even the count leaks, and on a build that cannot
+    // apply the cut to comments the count is the whole sample's. Same
+    // affordance, same reason: the button must not assert a number it does not
+    // mean.
+    var gated = !!(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall()) ||
+      qual.cutWithheld(filters);
     return '<button class="ql-jumpbtn" data-qual-jump="' + esc(code) +
       '" title="Read the ' + esc(link.title) + ' open-end comments behind this finding">' +
       (gated ? "💬 comments" : "💬 " + n + " comment" + (n === 1 ? "" : "s")) + "</button>";
@@ -1590,6 +1638,10 @@
     // Demographic filtering is the global audience bar's job (composite filters), so there
     // is no per-tab facet row here. Themed questions get an Overview / Crosstab switch. The
     // crosstab supplements the prevalence board, it does not replace it (Overview is default).
+    var withheld = qual.cutWithheld(
+      (TR.d2 && TR.d2.state && TR.d2.state.filters) || null)
+      ? '<p class="ql-cut-withheld" role="status">' + TR.txt("qual.cut_withheld") + "</p>"
+      : "";
     var chart = "";
     if (q.type === "themed") {
       chart = viewToggleHtml(st) +
@@ -1609,7 +1661,7 @@
     // pin: priority quotes already reach a deck through the hubs and through
     // the crosstab pin box.
     return '<section class="ql-qcard" data-snap-card>' +
-        headerHtml(island, q, audience) + insightHtml(q) +
+        headerHtml(island, q, audience) + withheld + insightHtml(q) +
         (chart ? '<div data-pinpart="board">' + chart + "</div>" : "") +
       "</section>" + divider +
       controlsHtml(q, st, audience, island) +
@@ -2199,7 +2251,8 @@
   // the cards so the select-to-highlight wiring works here too.
 
   function filterItems(items, filters) {
-    if (!filters || !filters.length || !TR.stats || !TR.MICRO) return items;
+    if (!filters || !filters.length || !TR.stats) return items;
+    if (!qual.cutServable()) return items;     // unfiltered, and said so, as maskFilter is
     var mask = TR.stats.mask(filters);
     return items.filter(function (it) { return mask[it.record.idx] === 1; });
   }

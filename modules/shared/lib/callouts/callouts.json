@@ -779,6 +779,12 @@
       "context": "Shown wherever the disclosure control speaks",
       "page": "Crosstabs"
     },
+    "qual.cut_withheld": {
+      "title": "Comments are not narrowed by this filter",
+      "text": "The audience filter does not apply to the comments in this report, because it carries no per-respondent records. Every comment for this question is listed below, for the whole sample. Clear the filter to read them without this notice.",
+      "context": "Aggregates-only or aggregate-cube build. Shown on the Qualitative tab while a filter is live",
+      "page": "Qualitative"
+    },
     "cube.picker.none": {
       "title": "No cuts available in this report",
       "text": "This report carries aggregate figures only, and it was not built to cut by any question. The tables and every banner still work. To add cuts, name the questions on the Settings sheet under html_report_v2_filter_vars and rebuild.",

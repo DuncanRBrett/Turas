@@ -162,6 +162,39 @@ assert(qual.commentCount("NOPE") === 0, "commentCount for a missing question = 0
 
 const recs = TR.QUAL.questions[0].records;
 assert(qual.maskFilter(recs, [{ q: "Q1", rows: [1] }]).length === 2, "maskFilter keeps masked respondents (idx 0,2)");
+
+// ---- a build with NO respondent island: the cut cannot reach the comments ----
+// An aggregates-only ship, and now an aggregate-cube ship, has no per-respondent
+// membership to apply a cut with. Before this, maskFilter returned every record
+// SILENTLY, so the whole study's comments listed under an active filter chip
+// beside crosstabs that had recomputed to the cut. Two different audiences, one
+// screen, nothing saying so. The records still show, because a confidentiality
+// ship is exactly where curated comments matter most, but the tab says on its
+// face that the filter does not apply and the jump button drops its number.
+{
+  const savedMicro = TR.MICRO;
+  const savedD2 = TR.d2;
+  const cut = [{ q: "Q1", rows: [1] }];
+  // affordanceHtml reads the LIVE cut off report state, not an argument.
+  TR.d2 = { state: { filters: cut } };
+  TR.MICRO = null;                                   // the aggregates-only ship
+  assert(qual.cutServable() === false, "no island -> the cut cannot be served");
+  assert(qual.cutWithheld(cut) === true, "a live cut with no island is withheld");
+  assert(qual.cutWithheld(null) === false, "no cut -> nothing withheld");
+  assert(qual.maskFilter(recs, cut).length === 4,
+    "the comments still show, all of them, rather than vanishing");
+  assert(qual.commentCount("QUAL_SAT", cut) === 4,
+    "and the count is the honest whole-sample count of what the jump reveals");
+  const html = qual.affordanceHtml("Q28");
+  assert(html.indexOf("💬 comments") !== -1,
+    "the jump button carries NO number, so it cannot be read as the cut's count");
+  assert(/💬 \d/.test(html) === false, "no digit in the affordance while the cut is withheld");
+  TR.MICRO = savedMicro;
+  assert(qual.cutServable() === true, "island restored -> the cut is servable again");
+  assert(/💬 2 comments/.test(qual.affordanceHtml("Q28")) === true,
+    "and with the island back the number returns, so the check above is not vacuous");
+  TR.d2 = savedD2;
+}
 assert(qual.maskFilter(recs, []).length === 4, "maskFilter with no cut keeps all");
 
 const aff = qual.affordanceHtml("Q28");

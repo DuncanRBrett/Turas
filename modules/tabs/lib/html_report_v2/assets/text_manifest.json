@@ -830,5 +830,10 @@
     "page": "Crosstabs",
     "context": "Aggregate build with no declared filter variables. Shown when the reader opens the filter or banner picker and the report was not built to cut by anything.",
     "tokens": []
+  },
+  "qual.cut_withheld": {
+    "page": "Qualitative",
+    "context": "A live audience filter cannot be applied to the comments, because this build carries no per-respondent records. Shown on the question card so the comment list is never read as the filtered audience.",
+    "tokens": []
   }
 }

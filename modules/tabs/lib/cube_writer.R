@@ -94,7 +94,7 @@ cube_var_levels <- function(vdef, micro) {
   n <- micro$n
   if (identical(vdef$kind, "banner")) {
     v <- as.integer(micro$banner_vars[[vdef$source]])
-    v[is.na(v) | v < 0L] <- NA_integer_
+    v[is.na(v) | v == CUBE_NO_COLUMN | v < 0L] <- NA_integer_
     return(v)
   }
   a <- micro$answers[[vdef$source]]
@@ -105,7 +105,11 @@ cube_var_levels <- function(vdef, micro) {
     return(rep(NA_integer_, n))
   }
   v <- as.integer(a)
-  ok <- !is.na(v) & v >= 0L & v %in% vdef$levels
+  # The two sentinels are excluded by name rather than by "v >= 0", so the rule
+  # reads as the thing it is: answered-but-not-displayed puts a respondent in no
+  # category, and no-column-of-this-group puts them in no cell.
+  ok <- !is.na(v) & v != CUBE_ANSWERED_UNSHOWN & v != CUBE_NO_COLUMN &
+    v %in% vdef$levels
   out <- rep(NA_integer_, n)
   out[ok] <- v[ok]
   out

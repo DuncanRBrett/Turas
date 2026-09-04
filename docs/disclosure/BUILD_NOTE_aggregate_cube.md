@@ -79,15 +79,23 @@ Built into the scratchpad, never into `examples/` and never under
 `OneDrive*/TurasProjects`. 600 respondents, four banner groups, twelve
 questions, k = 5, order 2, `html_report_v2_filter_vars = Q008,Q009`.
 
-| | records | cube |
-|---|---|---|
-| report file | 1,447,004 bytes | 1,813,000 bytes |
-| computed island | 142,351 bytes (`data-micro`) | 208,433 bytes (`data-cube`) at four declared variables |
-| `data-micro` | 600 respondents | `null` |
+Two cube builds were made, because the second answers a question the first
+raised. Read the columns as three separate builds of one project.
 
-Blocks: with the four banner groups only, 132 of 132 shipped, none refused.
-With Q008 and Q009 declared as well, 263 of 264 shipped and 1 refused, so the
-block rule bites on real data rather than only in a fixture.
+| | records | cube, 4 declared | cube, 6 declared |
+|---|---|---|---|
+| declared variables | n/a | the 4 banner groups | the 4 banner groups plus Q008, Q009 |
+| report file | 1,447,004 bytes | 1,513,109 bytes | 1,813,000 bytes |
+| computed island | 142,351 (`data-micro`) | 208,433 (`data-cube`) | larger, not separately measured |
+| `data-micro` | 600 respondents | `null` | `null` |
+| blocks | n/a | 132 of 132 shipped, 0 refused | 263 of 264 shipped, 1 refused |
+
+The second build is the one that matters, and the reason for it is deviation 9
+below: with the banner groups alone the picker had nothing to offer, because
+this project's banner groups are not question codes.
+
+The 1 refused block is worth noting on its own. The block rule bites on real
+data at k = 5, not only in a fixture built to make it bite.
 
 Cells: 1,274 cell bases on the four-variable cube, none between 1 and 4, the
 smallest non-zero base 6. The longest array anywhere inside `slices` is 5, the
@@ -147,11 +155,18 @@ blanks otherwise. Never a plausible wrong number.
 
 **7. No box partition variables in version 1.** The design allows box-category
 banners as declared variables. A box grouping would be a second variable per
-question, and the value is small: a hidden-scale question cannot be a declared
-filter variable anyway. So a box filter is dropped in hash validation, the
-picker does not offer one (`d2.boxRows` already returns empty with no
-microdata), `boxCatRows` returns null, and `custom:CODE:net` on a question that
-carries boxes shows Total only. All fail closed.
+question, and the value is small. So a box filter is dropped in hash
+validation, the picker does not offer one (`d2.boxRows` already returns empty
+with no microdata), `boxCatRows` returns null, and `custom:CODE:net` on a
+question that carries boxes shows Total only. All fail closed.
+
+The shape of what this costs, precisely. A banner group that is ITSELF
+box-derived, a hidden-scale question whose banner columns are Top-2 and
+Bottom-2, still works: it reaches `micro$banner_vars` as ordinary column
+indices and becomes a declared variable like any other. The only loss is
+building an ad-hoc custom banner from the box groupings of a hidden-scale
+question that is not already a banner, which shows Total only. Declare it as a
+banner group and it works.
 
 **8. `CFG_CUBE_FILTER_VAR` is raised where the questions are known.** The
 handover puts it in `build_config_object`. That function cannot see the
@@ -159,6 +174,11 @@ questions, so it validates the shape there and the substance in
 `cube_validate_filter_vars()`, called from `run_crosstabs.R` with the data
 layer in hand. A rejected variable prints the TRS console box and the cube is
 dropped rather than shipped half-declared.
+
+**9a. A `none` build gains one console line.** `dl_suppress_subk_columns`
+prints how many published columns it blanked, and on what threshold, whenever
+it blanks any. SACS runs `none`, so that line is new output on every SACS run.
+It says what the build did, which is the point, but it will look new.
 
 **9. An empty picker says so.** Not in the design, and found by rendering the
 demo. A cube build's picker offers the DECLARED variables only. The demo's
@@ -225,13 +245,46 @@ than a fixture, which is how it was found.
 
 ## Two things a cube build does NOT do, checked in the source
 
-**Filtered qualitative views.** `qual.maskFilter` needs a per-respondent
-membership and there is none. It fails closed, exactly as a `microdata = N`
-build already does. The Qualitative TAB itself is unaffected: `d2.qualitative()`
-gates it on the qual island having questions, never on microdata, so comments,
-themes and sentiment all ship and are readable, with the R-side confidentiality
-dials applied at build time. The theme-by-banner crosstab inside that tab also
-needs per-respondent banner membership and is hidden, again as today.
+**Filtered qualitative views, and a second pre-existing bug fixed here.**
+
+The Qualitative TAB is unaffected by any of this. `d2.qualitative()` gates it on
+the qual island having questions, never on microdata, so comments, themes and
+sentiment all ship and are readable on a `none` build and on a `cube` build,
+with the R-side confidentiality dials applied at build time. The theme-by-banner
+crosstab inside that tab needs per-respondent banner membership and is hidden,
+as it already is today.
+
+What could not be applied was the live audience CUT. `qual.maskFilter` guarded
+on `!TR.MICRO` and, finding none, returned every record UNFILTERED. So with a
+filter live and no respondent island, the tab listed the whole study's comments
+under an active filter chip, beside crosstabs that had recomputed to the cut.
+Two different audiences on one screen, with nothing saying so. That was already
+reachable before the cube, through a shared `#filter=` link on an
+aggregates-only build: `decodeHash` populates `d2.state.filters` without needing
+microdata, and the filter BAR is hidden, so the chip appears inside the qual tab
+alone. A cube build makes it reachable from the filter bar itself.
+
+Fixed, but not by hiding the comments. Duncan's constraint is that client-safe
+cannot mean no qual, and a confidentiality ship is exactly where curated
+comments matter most. So the records still show, all of them, and the report
+says so on its face: the question card carries an authored sentence stating that
+the filter does not apply to the comments and that these are the whole sample,
+and the "N comments" jump button drops its NUMBER, using the same affordance
+that already exists for a count withheld under the disclosure threshold. The
+number is what would be misread; the comments are not.
+
+Gated in `qual_tests.mjs`, which now runs the whole contract with the island
+removed and then restores it and asserts the number comes back, so the check
+cannot pass by construction. 321 assertions, all green.
+
+There is no cube path to add here later. A cut over aggregates would have to be
+applied to each COMMENT, and the only thing that could carry it is the comment's
+own demographic tags, which are k-anonymised at build time: some are dropped, so
+filtering on them would show a DIFFERENT subset from the one the crosstabs show,
+under the same filter chip. A wrong audience is worse than no audience. If
+filtered comments are wanted on a cube build, the qual island has to carry each
+comment's declared-variable level, and that is a decision about what the qual
+island contains.
 
 **The VAS integrated report.** `build_vas_integrated_report.py` reads `micro.n`
 and `micro.banner_vars` for its reconciliation checks, and its shared-audience
@@ -259,12 +312,19 @@ Islands themselves are safe under minification: `turas_minify` protects every
 
 1. Should a cube build be able to filter the COMMENT list to the live audience,
    and show the theme-by-banner crosstab? It can, if the qual island carries
-   each comment's banner column index for the declared variables, under the
-   same k-anonymisation the demographic tags already get. That is a design
-   decision about what the qual island carries, not a bug fix.
+   each comment's declared-variable level, under the same k-anonymisation the
+   demographic tags already get. That is a decision about what the qual island
+   contains, not a bug fix, and it is the only route: see the qualitative
+   section above for why the existing tags cannot be used.
 2. The weighted standard deviation divergence between R and the renderer,
    above. Neither engine is wrong; they Bessel-correct on different
    denominators, and the workbook and the report can print different SDs for
-   the same weighted column.
+   the same weighted column. **Recommendation: change the renderer to match the
+   workbook**, `sum(w*(v-m)^2) / (sum(w) - 1)`, for the SPREAD row only. The
+   workbook is the deliverable clients have had for longer, the textbook
+   weighted sample variance is what an SD row means, and the effective base
+   belongs where it earns its keep, sizing the tests, which is untouched by
+   this. It is a small change in `weightedMeanColumn` and it moves a published
+   figure, so it is yours to call, not mine.
 3. Flipping the default to `cube` stays out of scope, per design section 7,
    decision 1.
