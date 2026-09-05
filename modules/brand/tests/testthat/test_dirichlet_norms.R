@@ -409,3 +409,109 @@ test_that("an object without the package closures is refused, not NA under PASS"
     Penetration_Pct_Exp = 30, BuyRate_Exp = 2, SCR_Pct_Exp = 40,
     Pct100Loyal_Exp = 12)), 0L)
 })
+
+
+# ==============================================================================
+# nstar convergence (independent review 2026-09-05). NBDdirichlet::dirichlet()
+# truncates the NBD purchase-count distribution at nstar and sets error = 1
+# when the kept mass is under 0.99 or the truncated mean drifts from M. The
+# engine used to ignore that flag, so a heavy category shipped expected values
+# from a distribution the package itself declared invalid: on the IPK fixture
+# expected SCR was off by up to 2 points and two of fifteen DJ flags flipped.
+# ==============================================================================
+
+.mk_heavy_category <- function(seed = 19, n = 400, nb = 8, share_nonbuyer = 0.12) {
+  set.seed(seed)
+  brands <- LETTERS[1:nb]
+  pen_mat <- matrix(0L, n, nb, dimnames = list(NULL, brands))
+  x_mat   <- matrix(0, n, nb, dimnames = list(NULL, brands))
+  buyers  <- seq_len(n) > round(n * share_nonbuyer)
+  pop <- c(0.55, 0.30, 0.25, 0.20, 0.18, 0.15, 0.12, 0.08)
+  for (i in which(buyers)) {
+    picks <- which(runif(nb) < pop)
+    if (length(picks) == 0) picks <- 1L
+    pen_mat[i, picks] <- 1L
+    x_mat[i, picks] <- sample(2:8, length(picks), replace = TRUE)
+  }
+  list(pen_mat = pen_mat, x_mat = x_mat, m_vec = rowSums(x_mat), brands = brands)
+}
+
+test_that("a heavy category is fitted at an nstar where the purchase distribution converges", {
+  skip_if_not_installed("NBDdirichlet")
+  f <- .mk_heavy_category()
+  buyers <- f$m_vec > 0
+  cat_pen  <- mean(buyers)
+  cat_mean <- mean(f$m_vec[buyers])
+  obs_pen  <- colMeans(f$pen_mat)
+  shares   <- colSums(f$x_mat) / sum(f$x_mat)
+
+  # Precondition: these inputs really do trip the package at its default.
+  d50 <- NULL
+  utils::capture.output(d50 <- suppressWarnings(NBDdirichlet::dirichlet(
+    cat.pen = cat_pen, cat.buyrate = cat_mean, brand.share = shares,
+    brand.pen.obs = obs_pen, nstar = 50)))
+  expect_equal(d50$error, 1)
+
+  res <- run_dirichlet_norms(f$pen_mat, f$x_mat, f$m_vec, f$brands,
+                             focal_brand = "A", target_months = 3L)
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
+  expect_true(is.numeric(res$nstar_used))
+  expect_gt(res$nstar_used, 50)
+
+  # Converged reference straight from the package at nstar = 400
+  d400 <- NULL
+  utils::capture.output(d400 <- suppressWarnings(NBDdirichlet::dirichlet(
+    cat.pen = cat_pen, cat.buyrate = cat_mean, brand.share = shares,
+    brand.pen.obs = obs_pen, nstar = 400)))
+  expect_equal(d400$error, 0)
+  nb  <- length(f$brands)
+  pen <- vapply(1:nb, d400$brand.pen, numeric(1))
+  br  <- vapply(1:nb, d400$brand.buyrate, numeric(1))
+  wp  <- vapply(1:nb, d400$wp, numeric(1))
+  expect_lt(max(abs(res$expected$Penetration_Pct_Exp - pen * 100)), 5e-5)
+  expect_lt(max(abs(res$expected$BuyRate_Exp - br)), 5e-5)
+  expect_lt(max(abs(res$expected$SCR_Pct_Exp - br / wp * 100)), 5e-5)
+  # and the truncated fit is measurably different, so this test bites
+  e50 <- .dn_extract_expected(d50, f$brands)
+  expect_gt(max(abs(e50$SCR_Pct_Exp - res$expected$SCR_Pct_Exp)), 0.5)
+})
+
+test_that("the ladder's tail paths: package-rejected fit refuses, package-accepted short fit warns", {
+  skip_if_not_installed("NBDdirichlet")
+  f <- .mk_heavy_category()
+  buyers <- f$m_vec > 0
+  args <- list(cat_pen = mean(buyers), cat_mean_purch = mean(f$m_vec[buyers]),
+               brand_shares = colSums(f$x_mat) / sum(f$x_mat),
+               brand_pen_obs = colMeans(f$pen_mat), brand_codes = f$brands)
+  # nstar = 50 only: the package sets error = 1, so the engine must refuse
+  out <- utils::capture.output(r50 <- do.call(.dn_call_dirichlet, c(args, list(nstar_ladder = 50L))))
+  expect_equal(r50$status, "REFUSED")
+  expect_equal(r50$code, "CALC_DIRICHLET_NSTAR")
+  expect_match(r50$message, "nstar = 50")
+  expect_false(any(grepl("nstar is too small", out)))   # the package's cat() is captured
+  # nstar = 100 only: the package accepts (error = 0) but the kept mass is
+  # short of the tighter check, so the fit is used with a warning
+  r100 <- do.call(.dn_call_dirichlet, c(args, list(nstar_ladder = 100L)))
+  expect_equal(r100$status, "PASS")
+  expect_equal(r100$nstar_used, 100L)
+  expect_length(r100$warnings, 1L)
+  expect_match(r100$warnings, "nstar = 100")
+  # and through run_dirichlet_norms that warning makes the element PARTIAL
+  res <- run_dirichlet_norms(f$pen_mat, f$x_mat, f$m_vec, f$brands,
+                             focal_brand = "A", target_months = 3L)
+  expect_equal(res$status, "PASS")          # full ladder converges: no warning
+  expect_length(res$warnings, 0L)
+})
+
+test_that(".dn_nstar_ok accepts only a converged fit and names the kept mass", {
+  mk_obj <- function(err, masses) {
+    list(error = err, nstar = length(masses) - 1L,
+         Pn = function(k) masses[k + 1])
+  }
+  ok <- .dn_nstar_ok(mk_obj(0, c(0.5, 0.3, 0.15, 0.05)))
+  expect_true(ok$ok); expect_equal(ok$mass, 1); expect_equal(ok$nstar, 3L)
+  short <- .dn_nstar_ok(mk_obj(0, c(0.5, 0.3, 0.15, 0.04999)))
+  expect_false(short$ok); expect_equal(short$mass, 0.99999)
+  flagged <- .dn_nstar_ok(mk_obj(1, c(0.5, 0.3, 0.15, 0.05)))
+  expect_false(flagged$ok)
+})
