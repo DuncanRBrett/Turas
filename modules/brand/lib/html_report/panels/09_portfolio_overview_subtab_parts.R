@@ -41,7 +41,7 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     '<thead><tr>',
     '<th class="pfo-th-cat">Category</th>',
     '<th class="pfo-th-depth">Type</th>',
-    '<th class="pfo-th-num" title="Category usage: weighted % of ALL respondents whose screener says they bought in this category in the recall window. Hover a cell for the unweighted count.">Cat. usage<br><span class="pfo-th-sub">% of all respondents</span></th>',
+    '<th class="pfo-th-num" title="Category usage: weighted % of ALL respondents whose screener says they bought in this category in the recall window. The unweighted count is shown under each value.">Cat. usage<br><span class="pfo-th-sub">% of all respondents</span></th>',
     '<th class="pfo-th-num" title="Mean number of brands the average category buyer is aware of">Avg brands aware</th>',
     '<th class="pfo-th-num" title="% of category buyers aware of the focal brand">Focal awareness</th>',
     '<th class="pfo-th-num" title="Focal brand\u2019s awareness rank within the category">Rank</th>',
@@ -147,11 +147,14 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
            '<td class="pfo-td-num%s">%s</td>',
            '<td class="pfo-td-num%s">%s</td></tr>'),
     .pf_esc(r$cat_name), depth_pill,
-    sprintf('<span title="%s">%s</span>',
-            if (is.finite(as.numeric(r$n_buyers_uw %||% NA)) && is.finite(as.numeric(r$total_n_uw %||% NA)))
-              sprintf("unweighted n = %d of %d respondents", as.integer(r$n_buyers_uw), as.integer(r$total_n_uw))
-            else "unweighted n not available",
-            fmt_pct(r$cat_usage_pct)),
+    # The unweighted count sits under the percentage (a hover title was too
+    # easy to miss for a base that belongs on the face of the table).
+    paste0(fmt_pct(r$cat_usage_pct),
+           if (is.finite(as.numeric(r$n_buyers_uw %||% NA)) && is.finite(as.numeric(r$total_n_uw %||% NA)))
+             sprintf('<span class="pfo-td-sub">n %s of %s</span>',
+                     format(as.integer(r$n_buyers_uw), big.mark = ","),
+                     format(as.integer(r$total_n_uw), big.mark = ","))
+           else ""),
     na_cls(r$avg_brands_aware), fmt_num(r$avg_brands_aware, 1),
     fmt_pct(r$focal_aware),
     fmt_rank(r), fmt_gap(r$gap),

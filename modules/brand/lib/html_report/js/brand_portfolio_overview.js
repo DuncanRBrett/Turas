@@ -159,7 +159,7 @@
     var head = '<thead><tr>' +
       '<th class="pfo-th-cat">Category</th>' +
       '<th class="pfo-th-depth">Type</th>' +
-      '<th class="pfo-th-num" title="Category usage: weighted % of ALL respondents whose screener says they bought in this category in the recall window. Hover a cell for the unweighted count.">Cat. usage<br><span class="pfo-th-sub">% of all respondents</span></th>' +
+      '<th class="pfo-th-num" title="Category usage: weighted % of ALL respondents whose screener says they bought in this category in the recall window. The unweighted count is shown under each value.">Cat. usage<br><span class="pfo-th-sub">% of all respondents</span></th>' +
       '<th class="pfo-th-num">Avg brands aware</th>' +
       '<th class="pfo-th-num">Focal awareness</th>' +
       '<th class="pfo-th-num">Rank</th>' +
@@ -184,11 +184,10 @@
       return '<tr>' +
         '<td class="pfo-td-cat">' + esc(r.name) + '</td>' +
         '<td>' + pill + '</td>' +
-        '<td class="pfo-td-num"><span title="' +
+        '<td class="pfo-td-num">' + fmtPct(r.cat_usage) +
           ((r.n_buyers_uw != null && r.total_n_uw != null)
-            ? 'unweighted n = ' + r.n_buyers_uw + ' of ' + r.total_n_uw + ' respondents'
-            : 'unweighted n not available') +
-          '">' + fmtPct(r.cat_usage) + '</span></td>' +
+            ? '<span class="pfo-td-sub">n ' + Number(r.n_buyers_uw).toLocaleString() + ' of ' + Number(r.total_n_uw).toLocaleString() + '</span>'
+            : '') + '</td>' +
         tdNum(r.avg_brands_aware, function (v) { return fmtNum(v, 1); }) +
         '<td class="pfo-td-num pfo-td-focal">' + fmtPct(r.focal) + '</td>' +
         '<td class="pfo-td-num">' + rankTxt + '</td>' +

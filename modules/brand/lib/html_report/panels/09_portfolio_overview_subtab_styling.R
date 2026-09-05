@@ -141,6 +141,10 @@ build_portfolio_overview_subtab_styles <- function(focal_colour = "#1A5276") {
   text-align: left;
 }
 /* Second line under a numeric header naming the base (review M7) */
+.pfo-td-sub {
+  display: block; font-size: 9px; color: #94a3b8; font-weight: 400;
+  margin-top: 1px; white-space: nowrap;
+}
 .pfo-th-sub {
   display: block; font-size: 9px; font-weight: 400; color: #94a3b8;
   text-transform: none; letter-spacing: 0; margin-top: 2px;

@@ -683,7 +683,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       n     = fmt_n(cb$n_buyers),
       base_n = fmt_n(cb$n_respondents),
       base  = "respondents asked the category frequency question",
-      definition = "Frequency question: any answer other than never. Weighted.")
+      definition = "Frequency question: any answer other than never. Weighted. In a study that screens respondents into the category this reads 100% by design.")
   }
 
   # 3. Category penetration behind the norms table: reconciled any-brand purchase
