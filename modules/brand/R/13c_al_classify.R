@@ -191,7 +191,12 @@ classify_chip <- function(metric_a, metric_b, metric_total,
     p_pool <- (xa + xb) / (na + nb)
     e <- min(na * p_pool, na * (1 - p_pool), nb * p_pool, nb * (1 - p_pool))
     if (e < 5) {
-      m <- matrix(c(xa, na - xa, xb, nb - xb), nrow = 2)
+      # Fisher needs whole counts; n_eff is fractional by design (H2), so
+      # the bases are rounded here. The z branch below keeps them as is.
+      na_i <- max(1L, as.integer(round(na))); nb_i <- max(1L, as.integer(round(nb)))
+      xa_i <- min(na_i, as.integer(round(pa * na_i)))
+      xb_i <- min(nb_i, as.integer(round(pb * nb_i)))
+      m <- matrix(c(xa_i, na_i - xa_i, xb_i, nb_i - xb_i), nrow = 2)
       pv <- tryCatch(stats::fisher.test(m)$p.value, error = function(e) NA_real_)
       return(list(p_value = pv, sig = !is.na(pv) && pv < alpha,
                   test = "fisher"))

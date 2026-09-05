@@ -691,6 +691,15 @@ test_that("IPK Wave 1: every portfolio v2 sub-analysis runs end-to-end", {
 # are far apart by design, so a regression to n_uw / n_total fails loudly.
 # ------------------------------------------------------------------------------
 
+test_that("compute_constellation: a category with no qualifiers is suppressed even at min_base = 0", {
+  # BAK has no SQ2 picks in the fixture. The shared gate passes a base of 0
+  # against a threshold of 0, so the explicit zero check must stay.
+  out <- compute_constellation(mk_pf_v2_data(), role_map = NULL,
+                               mk_pf_v2_categories(), mk_pf_v2_structure(),
+                               mk_pf_v2_config(min_base = 0L))
+  expect_true("BAK" %in% unlist(out$suppressed))
+})
+
 test_that("compute_clutter_data: cat_penetration is weighted when weights are supplied", {
   w <- c(100, 1, 1, 1, 1, 1, 1, 1)
   out <- compute_clutter_data(mk_pf_v2_data(), role_map = NULL,

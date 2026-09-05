@@ -449,3 +449,12 @@ test_that("IPK Wave 1: run_audience_lens returns PASS with no audiences", {
   expect_equal(out$meta$engine, "v2")
   expect_equal(out$meta$n_audiences, 0L)
 })
+
+
+test_that(".al_sig_two_props runs Fisher on whole counts when n_eff is fractional (no rounding warning)", {
+  ma <- list(value = 0.9, n_base = 100L, n_eff = 7.067)
+  mb <- list(value = 0.5, n_base = 100L, n_eff = 6.21)
+  expect_no_warning(r <- .al_sig_two_props(ma, mb, alpha = 0.10))
+  expect_equal(r$test, "fisher")
+  expect_true(is.finite(r$p_value))
+})

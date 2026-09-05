@@ -452,7 +452,7 @@
     var pn = cat && cat.penetration_notes;
     if (!pn || !pn.notes || !pn.notes.length) { box.hidden = true; box.innerHTML = ''; return; }
     var rows = pn.notes.map(function (n) {
-      var val = (n.value == null || isNaN(n.value)) ? '\u2014' : (Math.round(n.value * 10) / 10) + '%';
+      var val = (n.value == null || isNaN(n.value)) ? 'n/a' : (Math.round(n.value * 10) / 10) + '%';
       var base = escHtml(n.base || '');
       if (n.n != null && n.base_n != null) base += ' (n = ' + n.n + ' of ' + n.base_n + ', unweighted)';
       else if (n.base_n != null) base += ' (n = ' + n.base_n + ', unweighted)';

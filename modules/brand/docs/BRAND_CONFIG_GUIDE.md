@@ -227,11 +227,11 @@ to the Settings sheet if needed.
 | `funnel_conversion_metric` | `ratio` | How funnel conversion rates are calculated. |
 | `funnel_warn_base` | 75 | Funnel base-size warning threshold. |
 | `funnel_suppress_base` | 0 | Funnel base-size suppression threshold (0 = never suppress). |
-| `funnel_tenure_threshold` | *(blank)* | Attitude-scale code that marks the boundary between "non-user" and "rejector" in the funnel, typically the code for "I would refuse to buy this brand". Blank derives it from the OptionMap `attitude_scale` rows, which is the normal setting. |
+| `funnel_tenure_threshold` | *(blank)* | Numeric cut-off applied to the funnel tenure question (role `funnel.durable.tenure` or `funnel.service.tenure`): respondents whose value is at or above it count as long-tenured for that stage. Blank drops the tenure stage, which is the normal setting for a transactional category. |
 | `portfolio_min_base` | 30 | Minimum unweighted number of category buyers for a category's portfolio cells (footprint, clutter, strength, DoP awareness) to be reported. Smaller categories are listed as low base. |
-| `portfolio_cooccur_min_pairs` | 20 | Minimum number of respondents who buy in both of two categories before a co-occurrence link is drawn on the portfolio constellation chart. |
+| `portfolio_cooccur_min_pairs` | 20 | Minimum unweighted number of category buyers aware of both of two brands before a co-occurrence link is drawn between them on the portfolio constellation chart. |
 | `portfolio_extension_baseline` | `all` | Baseline that each category's focal-brand awareness is compared against in the Portfolio Extension table. `all` compares against every respondent; `non_buyers` compares against respondents who do not buy the focal brand's home category (needs `focal_home_category`). Any other value is refused. |
-| `audience_lens_max` | 6 | Maximum number of audiences shown side by side in the Audience Lens panel (2 to 8). Audiences beyond this are dropped in AudienceLens sheet order. |
+| `audience_lens_max` | 6 | Maximum number of audiences a category may declare for the Audience Lens panel (a pair counts as one). A category declaring more is refused with `CFG_AUDIENCE_CEILING_EXCEEDED`; the template limits the value to 2 to 8. |
 | `decimal_places` | 0 | Decimal places in report output. |
 
 ------------------------------------------------------------------------

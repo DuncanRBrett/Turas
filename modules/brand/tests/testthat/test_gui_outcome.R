@@ -65,6 +65,18 @@ test_that("a PASS generator whose file is missing is still a problem", {
   expect_length(out$warnings, 2L)
 })
 
+test_that("a PASS generator that dropped a layer is reported, not announced as success", {
+  h <- .write_tmp(".html"); x <- .write_tmp(".xlsx")
+  html_ok_with_note <- list(status = "PASS",
+                            warnings = "chart layer dropped, transform failed: missing value where TRUE/FALSE needed")
+  out <- brand_gui_outcome(list(status = "PASS", warnings = character(0)),
+                           html_ok_with_note, .ok_gen, h, x)
+  expect_equal(out$level, "partial")
+  expect_equal(out$html_path, h)                 # the file was written ...
+  expect_true(any(grepl("chart layer dropped", out$warnings)))   # ... but the reader is told
+  expect_false(grepl("successfully", out$headline))
+})
+
 test_that("an engine refusal is an error verdict", {
   out <- brand_gui_outcome(list(status = "REFUSED", message = "CFG bad"))
   expect_equal(out$level, "error")
@@ -75,7 +87,9 @@ test_that("an engine refusal is an error verdict", {
 test_that(".brand_coerce_weights coerces text numbers and refuses junk", {
   ok <- .brand_coerce_weights(c("1.5", "2", NA, ""), "WT")
   expect_null(ok$status)
-  expect_equal(ok$weights, c(1.5, 2, NA, NA))
+  expect_equal(ok$weights, c(1.5, 2, 0, 0))     # blanks become weight 0 ...
+  expect_equal(ok$n_blank, 2L)                   # ... and are counted for the run warning
+  expect_equal(ok$blank_rows, c(3L, 4L))
   num <- .brand_coerce_weights(c(0.8, 1.2), "WT")
   expect_equal(num$weights, c(0.8, 1.2))
   bad <- .brand_coerce_weights(c("1", "n/a", "two"), "WT")

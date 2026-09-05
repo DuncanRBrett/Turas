@@ -207,11 +207,16 @@ brand_with_refusal_handler <- function(expr) {
 #' stray "n/a", a thousands separator) used to error somewhere downstream
 #' with a message about arithmetic on non-numeric arguments. Now: numeric-
 #' looking text is coerced, anything else is a DATA_WEIGHT_NOT_NUMERIC
-#' refusal naming the offending values (review 2026-07-12, M8).
+#' refusal naming the offending values (review 2026-07-12, M8). Blank or
+#' NA cells become weight 0, which is what every element that uses
+#' \code{na.rm} already did; Mental Availability sums weights without it
+#' and returned NA for every brand on an NA weight, so the zero is applied
+#' here once and \code{run_brand()} carries a warning naming the rows.
 #'
 #' @param w Vector from the data frame.
 #' @param weight_col Column name, for the message.
-#' @return list(weights = numeric) or a refusal list.
+#' @return list(weights = numeric, n_blank = integer, blank_rows = integer)
+#'   or a refusal list.
 #' @keywords internal
 .brand_coerce_weights <- function(w, weight_col) {
   w_num <- suppressWarnings(as.numeric(as.character(w)))
@@ -233,7 +238,9 @@ brand_with_refusal_handler <- function(expr) {
         "Make every cell in '%s' numeric, or point weight_variable at a numeric column.",
         weight_col)))
   }
-  list(weights = w_num)
+  blank_rows <- which(is.na(w_num))
+  w_num[blank_rows] <- 0
+  list(weights = w_num, n_blank = length(blank_rows), blank_rows = blank_rows)
 }
 
 
@@ -263,18 +270,24 @@ brand_gui_outcome <- function(res, html_result = NULL, xlsx_result = NULL,
   gen_check <- function(gen, path, label) {
     ok <- !is.null(gen) && identical(gen$status, "PASS") &&
           !is.null(path) && file.exists(path)
-    if (ok) return(list(path = path, problem = NULL))
+    notes <- as.character(gen$warnings %||% character(0))
+    notes <- if (length(notes) > 0) paste0(label, ": ", notes) else character(0)
+    if (ok) return(list(path = path, problem = NULL, notes = notes))
     reason <- gen$message %||% gen$code %||%
       if (is.null(gen)) "generator did not run" else "generator did not return PASS"
     list(path = NULL,
          problem = sprintf("%s was not written: %s", label,
-                           paste(reason, collapse = " ")))
+                           paste(reason, collapse = " ")),
+         notes = notes)
   }
   html <- gen_check(html_result, out_html, "HTML report")
   xlsx <- gen_check(xlsx_result, out_xlsx, "Excel report")
 
   gen_problems <- c(html$problem, xlsx$problem)
-  run_warnings <- as.character(res$warnings %||% character(0))
+  # A generator that returned PASS but dropped a layer (for example the
+  # chart transform) reports that in $warnings; it is a warning here too.
+  gen_notes    <- c(html$notes, xlsx$notes)
+  run_warnings <- c(gen_notes, as.character(res$warnings %||% character(0)))
   all_warnings <- c(gen_problems, run_warnings)
 
   level <- if (length(all_warnings) > 0 || identical(res$status, "PARTIAL"))

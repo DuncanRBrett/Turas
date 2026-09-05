@@ -122,10 +122,16 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   }
 
   # --- Layer 1: Transform data ---
+  # A transform failure used to be a console line and nothing else: the
+  # generator still returned PASS and the GUI announced success. It is now
+  # also returned in $warnings so brand_gui_outcome() can show it.
+  gen_warnings <- character(0)
   charts <- tryCatch(
     transform_brand_charts(results, config),
     error = function(e) {
       message(sprintf("[BRAND HTML] Chart transform failed: %s", e$message))
+      gen_warnings <<- c(gen_warnings,
+        sprintf("chart layer dropped, transform failed: %s", e$message))
       list()
     }
   )
@@ -313,6 +319,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     status = "PASS",
     output_path = output_path,
     file_size_bytes = file_size,
-    message = sprintf("HTML report generated at %s", output_path)
+    message = sprintf("HTML report generated at %s", output_path),
+    warnings = gen_warnings
   )
 }

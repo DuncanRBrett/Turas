@@ -649,6 +649,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # results already in the payload; nothing is recomputed here.
 .brsum_penetration_notes <- function(cr, results, cat_name, config = list()) {
   tm <- as.integer(config$target_timeframe_months %||% 3L)
+  wv <- config$weight_variable
+  weighted <- !is.null(wv) && !is.na(wv[1]) && nzchar(trimws(as.character(wv[1])))
+  wt <- if (weighted) "Weighted." else "Unweighted."
   fmt_pct <- function(x) if (is.null(x) || !is.finite(x)) NA_real_ else round(as.numeric(x), 1)
   fmt_n   <- function(x) if (is.null(x) || !is.finite(as.numeric(x))) NA_integer_ else as.integer(round(as.numeric(x)))
   notes <- list()
@@ -670,7 +673,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       n     = fmt_n(pc$n_buyers_uw),
       base_n = fmt_n(pc$total_n_uw),
       base  = "all respondents",
-      definition = "Screener question: respondents who say they bought in this category in the recall window. Weighted.")
+      definition = paste("Screener question: respondents who say they bought in this category in the recall window.", wt))
   }
 
   # 2. % category buyers (Category Buying chip): frequency scale, asked base
@@ -683,7 +686,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       n     = fmt_n(cb$n_buyers),
       base_n = fmt_n(cb$n_respondents),
       base  = "respondents asked the category frequency question",
-      definition = "Frequency question: any answer other than never. Weighted. In a study that screens respondents into the category this reads 100% by design.")
+      definition = paste("Frequency question: any answer other than never.", wt, "In a study that screens respondents into the category this reads 100% by design."))
   }
 
   # 3. Category penetration behind the norms table: reconciled any-brand purchase
@@ -697,7 +700,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       n     = fmt_n(cm$n_buyers),
       base_n = fmt_n(cm$n_respondents),
       base  = "all category respondents",
-      definition = sprintf("Per-brand purchase questions, reconciled: bought at least one brand in the last %d months. Weighted. Brand penetration in the norms table uses this same base; the Loyalty table's %% category buyers uses the %s buyers as its base instead.", tm, if (is.na(fmt_n(cm$n_buyers))) "category" else format(fmt_n(cm$n_buyers), big.mark = ",")))
+      definition = sprintf("Per-brand purchase questions, reconciled: bought at least one brand in the last %d months. %s Brand penetration in the norms table uses this same base; the Loyalty table's %% category buyers uses the %s buyers as its base instead.", tm, wt, if (is.na(fmt_n(cm$n_buyers))) "category" else format(fmt_n(cm$n_buyers), big.mark = ",")))
   }
 
   if (length(notes) == 0) return(NULL)

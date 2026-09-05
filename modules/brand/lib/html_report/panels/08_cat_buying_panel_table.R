@@ -542,7 +542,7 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     sprintf(paste0(
       '<p class="cb-table-base-note">Penetration = weighted %% of all %s category ',
       'respondents (%s of them are P%dM category buyers) who bought the brand in the ',
-      'last %d months. Buy rate, volume share and SCR are among each brand\u2019s buyers. ',
+      'last %d months. Buy rate and SCR are among each brand\u2019s buyers; volume share is the brand\u2019s share of all category purchase volume. ',
       'The Loyalty table\u2019s %% cat buyers uses the %s category buyers as its base, ',
       'so it reads higher than penetration for the same brand.</p>'),
       format(n_resp_cm, big.mark = ","),
