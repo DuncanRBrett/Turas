@@ -346,7 +346,7 @@ run_tabs_gui <- function() {
                 # respondent-level file from this screen.
                 radioButtons("delivery_mode", "Who is this file for?",
                   choiceNames = list(
-                    HTML("<strong>Full report.</strong> Carries respondent-level records, so everything works. Anyone who opens the page source can rebuild a respondent-by-question dataset. For you, or for a client who has been told."),
+                    HTML("<strong>Full report.</strong> Carries de-identified respondent-level records, coded answers and weights, readable in the page source, so every view works. For you, or for a client who has been told."),
                     HTML("<strong>Client safe, interactive.</strong> No respondent-level records. Live filters, custom banners, Differences and Patterns still work, on the declared variables, and comments follow the filter. Any cut where a group falls below the minimum reporting base is withheld. Needs min_reporting_base set."),
                     HTML("<strong>Client safe, frozen.</strong> No respondent-level records and no live filtering. Published tables, dashboard, tracking and comments only. The simplest thing to explain, and nothing in it can be recomputed.")
                   ),
