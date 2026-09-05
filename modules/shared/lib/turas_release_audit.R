@@ -285,15 +285,15 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
         title = if (micro_present) "Client-safe build still contains respondent-level data"
                 else "Client-safe build carries an aggregate cube that breaks its own rule",
         problem = if (micro_present) sprintf(
-          "This build was declared client-safe, but the file carries a populated data-micro island (%s respondents).",
+          "This build was declared client-safe, but the file carries a populated data-micro island (%s de-identified records).",
           if (is.na(micro_n)) "count unreadable" else micro_n)
         else paste0(
           "This build was declared client-safe, and its aggregate cube does not keep ",
           "its own promises: ", paste(cube_audit$violations, collapse = "; "), "."),
         why_it_matters = paste(
-          "A client-safe file is one that stays safe if it is forwarded on.",
-          "This one can be turned back into a respondent-by-question dataset",
-          "from the page source."),
+          "A client-safe file carries no respondent-level records, and any",
+          "aggregates in it keep their own k rule. This build does not match",
+          "the mode it was declared under."),
         how_to_fix = if (micro_present) c(
           "Choose 'Client safe' in the tabs GUI before running: the build then drops the island itself.",
           "Running outside the GUI: set html_report_v2_interactivity = none on the Settings sheet.",

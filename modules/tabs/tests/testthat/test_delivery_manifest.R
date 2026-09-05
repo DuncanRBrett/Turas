@@ -23,9 +23,9 @@ test_that("a build carrying microdata says so, with the count", {
   expect_true(m$microdata)
   expect_true(m$restricted)
   expect_equal(m$n, 600L)
-  expect_match(joined(m), "Respondent-level records\\s*: YES \\(600 respondents\\)")
+  expect_match(joined(m), "Respondent-level records\\s*: YES \\(600 de-identified records\\)")
   expect_match(joined(m), "Row-level weights\\s*: YES")
-  expect_match(joined(m), "turned back into a respondent-level dataset")
+  expect_match(joined(m), "coded answers and weights")
   expect_match(joined(m), "html_report_v2_microdata = FALSE")
 })
 
@@ -38,8 +38,8 @@ test_that("the confidentiality ship says so, and makes no restricted claim", {
   expect_match(joined(m), "Respondent-level records\\s*: NO")
   expect_match(joined(m), "Row-level weights\\s*: NO")
   expect_match(joined(m), "published figures only")
-  # The warning paragraph belongs only to a build that earns it.
-  expect_false(grepl("turned back into a respondent-level dataset", joined(m)))
+  # The records paragraph belongs only to a build that earns it.
+  expect_false(grepl("coded answers and weights", joined(m)))
 })
 
 
@@ -128,7 +128,7 @@ test_that("a NULL config and a missing n do not break the manifest", {
 test_that("the printer emits the lines and returns the manifest invisibly", {
   out <- capture.output(res <- tabs_print_delivery_manifest(micro_fixture(12), NULL, list()))
   expect_true(any(grepl("TURAS DELIVERY MANIFEST", out)))
-  expect_true(any(grepl("YES \\(12 respondents\\)", out)))
+  expect_true(any(grepl("YES \\(12 de-identified records\\)", out)))
   expect_true(res$microdata)
 })
 
