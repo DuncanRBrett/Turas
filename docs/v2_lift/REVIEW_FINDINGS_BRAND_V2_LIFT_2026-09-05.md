@@ -5,7 +5,7 @@
 **Reviewed:** worktree `/Users/duncan/Dev/Turas-brand-v2-lift`, branch tip at the start `7c7a13ae` (18 commits on merge base `3f85abb3`). Local main has since moved to `ca27c506`, so `git diff main..HEAD` shows tabs files that are not this branch's; every scope statement below is against the merge base.
 **Brief:** `docs/v2_lift/REVIEW_BRIEF_BRAND_V2_LIFT.md`.
 **Method:** verdict by execution. Every CRITICAL and HIGH claim was run both ways where the old code could be sourced (fails or gives the wrong number on `3f85abb3`, passes on the branch). Three verification tracks ran as subagents briefed as independent (browser, engine, config/GUI/wording); every finding of theirs that changes a row below was re-verified by me against the code or by rerunning the probe, and rows that rest on a track's evidence alone say so. "Read" in a How-verified cell means read-level evidence only.
-**Fixes committed on the branch by this review:** `e8dac4d3` (Dirichlet nstar convergence) and `e9cd638d` (eight follow-ups). Not merged, not pushed.
+**Fixes committed on the branch by this review:** `e8dac4d3` (Dirichlet nstar convergence) and `e9cd638d` (eight follow-ups); this document `db923575`. Not merged, not pushed.
 
 ## 0. Verdict
 
