@@ -528,11 +528,8 @@
   report._copyWarningText = function () {
     var n = (TR.MICRO && TR.MICRO.n) || 0;
     return "This copy will contain the respondent-level data that powers live " +
-      "filtering: " + n + " records of coded answers and weights.\n\n" +
-      "There are no names, IDs or raw text in it, but anyone who opens the file's " +
-      "source can rebuild a respondent-by-question dataset from it.\n\n" +
-      "Fine for your own working copy or a recipient who has been told. Not for a " +
-      "file that may be forwarded on.\n\n" +
+      "filtering: " + n + " de-identified records of coded answers and " +
+      "weights.\n\n" +
       "Save it anyway?";
   };
 

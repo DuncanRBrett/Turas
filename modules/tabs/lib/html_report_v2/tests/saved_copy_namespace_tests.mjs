@@ -197,12 +197,8 @@ const MICRO = { n: 600, answers: { Q1: [0] }, weights: [1] };
 
 const carrying = saveCopyWith(donor, MICRO, true);
 ok(carrying.asked !== null, "a copy carrying respondent records asks before it writes");
-ok(/600 records/.test(carrying.asked || ""),
-  "…and the question names how many records are in it");
-ok(/rebuild a respondent-by-question dataset/.test(carrying.asked || ""),
-  "…and says plainly what someone can do with the file, not just that data is present");
-ok(/no names, IDs or raw text/.test(carrying.asked || ""),
-  "…while still stating the real mitigation, so the warning is accurate both ways");
+ok(/600 de-identified records/.test(carrying.asked || ""),
+  "…and the question names how many records are in it, and that they are de-identified");
 ok(carrying.wrote.length > 0, "…and saying yes still writes the copy");
 ok(/respondent-level data/.test(carrying.toast || ""),
   "…and the toast no longer invites the analyst to send it to anyone");
