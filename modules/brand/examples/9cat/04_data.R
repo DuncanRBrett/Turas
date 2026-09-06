@@ -552,7 +552,7 @@ generate_9cat_data <- function(output_path, n = NULL, seed = 42, overwrite = TRU
                        gridExpand = TRUE)
 
     openxlsx::setColWidths(wb, "Data", cols = seq_along(full_df), widths = "auto")
-    openxlsx::saveWorkbook(wb, output_path, overwrite = overwrite)
+    turas_saveWorkbook(wb, output_path, overwrite = overwrite)
 
   } else {
     data.table::fwrite(full_df, output_path)

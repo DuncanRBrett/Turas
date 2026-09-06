@@ -514,7 +514,7 @@ generate_1brand_structure <- function(output_path, overwrite = TRUE) {
     num_blank_rows = 0
   )
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = overwrite)
+  turas_saveWorkbook(wb, output_path, overwrite = overwrite)
   cat(sprintf("  + Survey_Structure.xlsx -> %s\n", output_path))
   invisible(output_path)
 }

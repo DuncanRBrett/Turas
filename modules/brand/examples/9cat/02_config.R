@@ -260,7 +260,7 @@ generate_9cat_config <- function(output_path, overwrite = TRUE) {
     example_rows   = .build_9cat_dba_assets_rows(),
     num_blank_rows = 0)
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = overwrite)
+  turas_saveWorkbook(wb, output_path, overwrite = overwrite)
   cat(sprintf("  + Brand_Config.xlsx -> %s\n", output_path))
   invisible(output_path)
 }

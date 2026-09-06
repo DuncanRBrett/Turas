@@ -47,6 +47,25 @@
   turas_root <- Sys.getenv("TURAS_ROOT", "")
   if (!nzchar(turas_root)) turas_root <- getwd()
 
+  # Atomic, relationship-reconciled workbook save. openxlsx::saveWorkbook()
+  # writes a relationship to a drawing part it never creates, and Excel repairs
+  # the file by stripping every dropdown, so every save below goes through
+  # turas_saveWorkbook() instead.
+  save_path <- file.path(turas_root, "modules", "shared", "lib",
+                         "turas_save_workbook_atomic.R")
+  if (!file.exists(save_path)) {
+    save_path <- file.path("modules", "shared", "lib",
+                           "turas_save_workbook_atomic.R")
+  }
+  if (!file.exists(save_path)) {
+    cat("\n=== TURAS BRAND EXAMPLE ERROR ===\n")
+    cat("[IO_FILE_NOT_FOUND] Cannot find turas_save_workbook_atomic.R\n")
+    cat("How to fix: run from the Turas project root, or set TURAS_ROOT.\n")
+    cat("=================================\n\n")
+    return(invisible(FALSE))
+  }
+  source(save_path, local = FALSE)
+
   styles_path <- file.path(turas_root, "modules", "shared", "template_styles.R")
   if (!file.exists(styles_path))
     styles_path <- file.path("modules", "shared", "template_styles.R")
