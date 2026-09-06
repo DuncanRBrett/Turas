@@ -10,7 +10,7 @@
 # confidence intervals were dropped to keep the read uncluttered.
 #
 # Global controls (panel header):
-#   - Focal-brand picker (<select> dropdown — picks col 2)
+#   - Focal-brand picker (<select> dropdown: picks col 2)
 #   - Show counts checkbox
 #   - Heatmap checkbox
 # Brand visibility: colour-coded chip strip; click to hide / show that brand's
@@ -83,7 +83,7 @@ build_demographics_panel_html <- function(panel_data,
 
 
 # ==============================================================================
-# CSS — public helper, returned as a string for the orchestrator to wrap in
+# CSS: public helper, returned as a string for the orchestrator to wrap in
 # <style> tags (mirrors the WOM / branded-reach panel pattern).
 # ==============================================================================
 
@@ -122,7 +122,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-q-chip:hover { background: #f1f5f9; }
 .demo-q-chip.active { background: __FOCAL__; color: #fff; border-color: __FOCAL__; }
 .demo-q-chip:not(.active) { opacity: 0.55; text-decoration: line-through; }
-/* Brand swatch — still used in matrix table headers (legacy class name kept) */
+/* Brand swatch: still used in matrix table headers (legacy class name kept) */
 .demo-brand-chip-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
 .demo-focal-row { align-items: center; }
@@ -159,7 +159,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-card-tool.active { background: __FOCAL__; border-color: __FOCAL__; color: #fff; }
 .demo-card-tool.pin-flash { background: __FOCAL__; border-color: __FOCAL__; color: #fff; }
 
-/* Matrix table — matches the brand-panel convention used by Cat Buying,
+/* Matrix table: matches the brand-panel convention used by Cat Buying,
    Funnel and the MA focal view: dark navy header, white text, tabular
    numerics, left-aligned label column. */
 .demo-matrix-wrap { overflow-x: auto; }
@@ -212,7 +212,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .demo-matrix tbody tr.demo-row-nonbuyer td .demo-cell-n { font-style: normal; }
 
-/* Option label cell — option name (primary) + role chip (buyer/non-buyer).
+/* Option label cell: option name (primary) + role chip (buyer/non-buyer).
  * Both pieces are always shown so each row is self-identifying when the
  * other row type is toggled off. */
 .demo-opt-label .demo-opt-name {
@@ -229,7 +229,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .demo-cell-blank { background: transparent !important; }
 
-/* Strip the prior zebra striping — alternating colour at half-option
+/* Strip the prior zebra striping: alternating colour at half-option
  * boundaries was visually confusing. Subtle borders group the two rows of
  * each option instead. */
 .demo-matrix tbody tr:nth-child(even) td { background: inherit; }
@@ -260,7 +260,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-chart-role-nonbuyer { color: #94a3b8; font-style: italic; }
 .demo-chart-bar { background: #f1f5f9; border-radius: 4px; height: 18px; position: relative; overflow: visible; }
 .demo-chart-bar-fill { height: 100%; background: __FOCAL__; opacity: 0.85; }
-/* Primary marker — typical brand pen in this option (varies row by row). */
+/* Primary marker: typical brand pen in this option (varies row by row). */
 .demo-chart-bar-marker { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #475569; z-index: 2; }
 /* Visible value label sitting just above the primary marker. */
 .demo-chart-bar-marker-value {
@@ -270,7 +270,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   white-space: nowrap; line-height: 1;
   z-index: 3;
 }
-/* Secondary marker — focal's cat-wide overall pen. Same X on every row, so
+/* Secondary marker: focal's cat-wide overall pen. Same X on every row, so
  * we style it as a dashed faded line to distinguish from the primary. */
 .demo-chart-bar-marker-overall {
   position: absolute; top: -2px; bottom: -2px; width: 0; z-index: 1;
@@ -322,7 +322,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   else sprintf("Sample: full respondent set. Percentages are %s, within each option's known base (toggle Show counts for the per-cell n).", wt_word)
   sprintf(
     '<header class="demo-panel-header">
-       <div class="demo-panel-header-title">Demographics &mdash; %s</div>
+       <div class="demo-panel-header-title">Demographics: %s</div>
        <div class="demo-panel-header-sub">%s &middot; %d question%s</div>
      </header>',
     .demo_esc(scope_lbl), .demo_esc(base_lbl),
@@ -338,14 +338,14 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     '<label class="demo-control-check" title="% of respondents in this demographic option who buy this brand. Cells sum to 100% (buyer + non-buyer) within each option. Best for finding where a brand over- or under-performs."><input type="radio" name="demo-metric" data-demo-metric="penetration" checked> % who buy</label>',
     '<label class="demo-control-check" title="% of this brand’s buyers who fall in this option. Brand column sums to 100%. Best for describing what a brand’s buyer audience looks like demographically."><input type="radio" name="demo-metric" data-demo-metric="share"> % of buyers</label>',
     '<span class="demo-control-sep"></span>',
-    # Baseline radios — toggled to disabled-look in Penetration mode (their
+    # Baseline radios: toggled to disabled-look in Penetration mode (their
     # only effect is on Share-of-buyers; in Pen mode the cat-avg column reads
     # from option_avg_penetration regardless). brand_demographics_panel.js
     # updates the wrap class + input disabled attribute when the metric
     # radio flips.
     '<span class="demo-baseline-wrap" data-demo-baseline-group>',
     '<span class="demo-control-label">Baseline:</span>',
-    '<label class="demo-control-check" title="Compare focal brand against the CATEGORY-BUYER average for this question. Best for spotting what is distinctive about this brand within its category — the academic default (Romaniuk / Ehrenberg-Bass)."><input type="radio" name="demo-baseline" data-demo-baseline="cat" checked> Cat avg</label>',
+    '<label class="demo-control-check" title="Compare focal brand against the CATEGORY-BUYER average for this question. Best for spotting what is distinctive about this brand within its category, the academic default (Romaniuk / Ehrenberg-Bass)."><input type="radio" name="demo-baseline" data-demo-baseline="cat" checked> Cat avg</label>',
     '<label class="demo-control-check" title="Compare focal brand against the WHOLE SCREENED SAMPLE for this question. Best for cross-category reads (same denominator across all categories) and for population-relative skews."><input type="radio" name="demo-baseline" data-demo-baseline="study"> Total sample</label>',
     '</span>',
     '<span class="demo-control-sep"></span>',
@@ -363,7 +363,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 
 
-# Focal-brand picker + brand-visibility dropdown — sit on a single toolbar
+# Focal-brand picker + brand-visibility dropdown: sit on a single toolbar
 # row. The <select> picks which brand fills column 2 ("Focal") of every
 # per-question matrix; the BrandSelector trigger to its right opens the
 # checkbox popover that hides / shows brand columns across the whole panel.
@@ -429,7 +429,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   dp <- pd$config$decimal_places %||% 0L
   focal <- pd$meta$focal_brand %||% ""
 
-  # Initial paint uses the default metric ("penetration") — matches the
+  # Initial paint uses the default metric ("penetration"). Matches the
   # default state of the cell-metric radio at the top of the panel. The JS
   # rebuilds both views when the user switches mode.
   table_html <- build_demographics_matrix_table(q, focal, brand_cols, pd, dp)
@@ -512,7 +512,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 
 
 .demo_int <- function(v) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("&mdash;")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
   format(as.integer(round(v)), big.mark = ",")
 }
 

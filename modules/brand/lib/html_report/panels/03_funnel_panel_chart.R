@@ -132,7 +132,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .fn_rel_controls <- function(ordered, focal, chip_default = "focal_only") {
-  # BrandSelector trigger — replaces the legacy chip strip + Hide-all toggle.
+  # BrandSelector trigger: replaces the legacy chip strip + Hide-all toggle.
   # Cat avg stays as a standalone chip (Decision 2) right next to the trigger.
   selector_trigger <- if (length(ordered) > 0L) {
     build_brand_selector_trigger(
@@ -178,7 +178,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
 .fn_rel_emphasis_chips <- function() {
   # 6-level scale (IPK 2026): adds Price + renames Reject -> Avoid. Old
-  # 5-level surveys still work — Reject canonicalises to Avoid via the
+  # 5-level surveys still work, Reject canonicalises to Avoid via the
   # role alias and the Price column just has zero values.
   seg_labels <- c(All = "all",
                   Love              = "attitude.love",
@@ -197,7 +197,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
 
 # ==============================================================================
-# INTERNAL: RELATIONSHIP TABLE v2 — BRANDS AS ROWS, ATTITUDES AS COLUMNS
+# INTERNAL: RELATIONSHIP TABLE v2, BRANDS AS ROWS, ATTITUDES AS COLUMNS
 # ==============================================================================
 
 .fn_rel_table <- function(ordered, focal, focal_colour, n_total,
@@ -206,7 +206,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
   # 6-level scale (IPK 2026). Adds Price (between Ambivalent and Avoid) and
   # renames Reject -> Avoid. Both old 5-level and new 6-level data flow
-  # through the same code — on 5-level data, attitude.price counts as 0%
+  # through the same code, on 5-level data, attitude.price counts as 0%
   # and the column just shows zeros.
   att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
                   "attitude.price", "attitude.avoid", "attitude.no_opinion")
@@ -215,7 +215,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   # the brand to express any of these); "no opinion" is the survey's
   # catch-all and contains BOTH aware-but-no-opinion AND every unaware
   # respondent. In % aware mode we therefore can't just rescale
-  # segments[no_opinion] — that would count unaware respondents in the
+  # segments[no_opinion]. That would count unaware respondents in the
   # numerator (the 110%/185% Cat avg bug). Instead no_opinion is the
   # residual:
   #   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,Price,Avoid])
@@ -227,7 +227,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
   # After session-3 fix: brand$segments[[role]] = count / total_w = % of ALL respondents.
   # "% total" base = segments[[role]] directly.
-  # "% aware" base = segments[[role]] * (n_total / aware_n) — scaled up to aware denominator.
+  # "% aware" base = segments[[role]] * (n_total / aware_n), scaled up to aware denominator.
   brands_all <- ordered
 
   # Category avg: % of aware base (default display).
@@ -236,7 +236,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   # fractions. The unweighted approach is fragile: any brand with a very
   # low aware_base gets a huge rescale factor (n_total / aware_base),
   # inflating its contribution and pushing the cross-brand mean far above
-  # 100% (the bug seen on the Cat avg row of this table — "No opinion"
+  # 100% (the bug seen on the Cat avg row of this table, "No opinion"
   # rendered as 110%, full row summed to 185%).
   #
   # Pooled formula: sum(segment_count) / sum(aware_base), where
@@ -325,7 +325,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   avg_cells <- paste(vapply(att_roles, function(role) {
     pct_aw <- cat_avg_aware[[role]]
     if (!is.finite(pct_aw))
-      return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">&mdash;</td>')
+      return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">n/a</td>')
     pt_total <- cat_avg_total[[role]]
     n_eff <- max(1, n_effective)
     ci_aw_lo <- max(0, pct_aw - 1.96 * sqrt(max(0, pct_aw * (1 - pct_aw)) / n_eff))
@@ -356,7 +356,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   avg_row <- paste0(
     '<tr class="ct-row fn-row-avg-all fn-rel-row">',
     '<td class="ct-td ct-label-col"><em>Category avg</em></td>',
-    '<td class="ct-td ct-data-col fn-rel-td-avg"><span style="color:#94a3b8;font-size:11px;">\u2014</span></td>',
+    '<td class="ct-td ct-data-col fn-rel-td-avg"><span style="color:#94a3b8;font-size:11px;">n/a</span></td>',
     avg_cells,
     '</tr>'
   )
@@ -436,7 +436,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   } else {
     sprintf(paste0(
       '<td class="ct-td ct-data-col fn-rel-base-cell%s"%s>',
-      '<span class="ct-na fn-rel-base-num">&mdash;</span></td>'),
+      '<span class="ct-na fn-rel-base-num">n/a</span></td>'),
       focal_cls, total_attr)
   }
 
@@ -444,10 +444,10 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     # segments[[role]] = % of all category respondents (total base) after session-3 fix
     pct_total <- as.numeric(brand$segments[[role]] %||% NA_real_)
     if (!is.finite(pct_total))
-      return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
+      return(sprintf('<td class="ct-td ct-data-col%s ct-na">n/a</td>', focal_cls))
 
     # Prefer the per-segment pct_aware computed at the metric layer
-    # (count_aware / aware_w — proper subset, can't exceed 100%). Falls
+    # (count_aware / aware_w. Proper subset, can't exceed 100%). Falls
     # back to the legacy rescale when segments_aware isn't present
     # (older payloads / legacy adapter path). For "no_opinion" the
     # residual derivation is still preferred when the metric layer

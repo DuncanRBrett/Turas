@@ -1,5 +1,5 @@
 // =============================================================================
-// BRAND FUNNEL PANEL — INTERACTIVE BEHAVIOUR (FUNNEL_SPEC_v2 §6)
+// BRAND FUNNEL PANEL: INTERACTIVE BEHAVIOUR (FUNNEL_SPEC_v2 §6)
 // =============================================================================
 // SIZE-EXCEPTION: vanilla JS (no bundler), single IIFE encapsulating
 // table render + slope chart + view-mode toggle + competitor chip bar +
@@ -67,7 +67,7 @@
     // Default chip state respects the chip_default config:
     //   focal_only: only focal + cat-avg active; other brand chips greyed off.
     //   all       : all brand chips active and cat-avg active.
-    // Read DOM (col-chip-off / .active) — R has rendered the right initial state.
+    // Read DOM (col-chip-off / .active): R has rendered the right initial state.
     var chipDefault = panel.getAttribute('data-chip-default') || 'focal_only';
     var focalCode = (payload.meta && payload.meta.focal_brand_code) || null;
     var allBrands = (payload.table && payload.table.brand_codes) || [];
@@ -119,10 +119,10 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Table shading — three modes:
-  //   "heatmap" — per-column blue intensity (original behaviour)
-  //   "ci"      — amber/green/red vs category average 95% CI
-  //   "off"     — no cell shading
+  // Table shading, three modes:
+  //   "heatmap": per-column blue intensity (original behaviour)
+  //   "ci": amber/green/red vs category average 95% CI
+  //   "off": no cell shading
   // ---------------------------------------------------------------------------
   function applyTableShading(panel, mode) {
     panel.__fnState.tableShading = mode;
@@ -142,7 +142,7 @@
 
     if (mode === "heatmap") {
       /* Per-column blue intensity proportional to each brand's value
-         RELATIVE to the column max — recomputed against the active
+         RELATIVE to the column max, recomputed against the active
          base toggle so the colours line up with the values on screen.
          Static data-heatmap attribute is kept as a fallback for the
          relationship table (which has its own heatmap helper) and any
@@ -233,7 +233,7 @@
         if (!row || row.classList.contains("fn-row-base") ||
             row.classList.contains("fn-row-avg-all")) return;
         if (td.classList.contains("fn-rel-td-avg")) return;
-        // Skip relationship-table cells — those have their own heatmap helper
+        // Skip relationship-table cells: those have their own heatmap helper
         if (td.hasAttribute("data-fn-att")) return;
         var sk  = td.getAttribute("data-fn-stage");
         var bnds = sk && ciBounds[sk];
@@ -276,7 +276,7 @@
 
     bindFunnelBrandSelector(panel);
 
-    // Cat Avg chip — standalone toggle in the chart-header (kept as a chip
+    // Cat Avg chip: standalone toggle in the chart-header (kept as a chip
     // per Decision 2; the brand list lives in the BrandSelector dropdown).
     panel.querySelectorAll('button[data-fn-action="toggle-avg"]').forEach(function (chip) {
       chip.addEventListener("click", function () {
@@ -287,7 +287,7 @@
       });
     });
 
-    // Add Insight toggle — shows/hides inline textarea in the insight strip
+    // Add Insight toggle: shows/hides inline textarea in the insight strip
     panel.querySelectorAll('button[data-fn-action="add-insight"]').forEach(function(btn) {
       btn.addEventListener("click", function() {
         var strip = btn.closest(".fn-insight-strip");
@@ -304,7 +304,7 @@
       });
     });
 
-    // Base (% of total / previous / aware) — tabs segmented-button style
+    // Base (% of total / previous / aware), tabs segmented-button style
     panel.querySelectorAll('button[data-fn-action="pctmode"]').forEach(function(btn){
       btn.addEventListener("click", function(){
         var mode = btn.getAttribute("data-fn-pctmode");
@@ -317,18 +317,18 @@
         applyPctMode(panel);
         buildMiniFunnels(panel);   // mini funnels must reflect the new % base
         drawSlopeSvg(panel);       // slope chart re-renders with new base
-        // Sig arrows + heatmap (both modes) are base-dependent — re-render
+        // Sig arrows + heatmap (both modes) are base-dependent, re-render
         // so they line up with the values now displayed in each cell.
         applyTableSigMarkers(panel);
         var activeShading = (panel.__fnState && panel.__fnState.tableShading) || "off";
         if (activeShading !== "off") applyTableShading(panel, activeShading);
         // Recompute the cat-avg row's range bar (the bar fill, mean tick,
         // and lo/hi labels) at the active base. Without this the bar
-        // stayed pinned to its % total bounds — misleading the reader
+        // stayed pinned to its % total bounds, misleading the reader
         // about brand spread at the new base.
         updateAvgRowRangeBars(panel);
         // Re-apply the active sort so the brand row order reflects the
-        // new base — without this, sorting by a stage and then toggling
+        // new base, without this, sorting by a stage and then toggling
         // base left the rows in their old order even though setSort
         // picks the per-mode attribute on the next click. The brand-name
         // sort doesn't depend on base; skip the re-sort in that case to
@@ -344,7 +344,7 @@
       applyTableShading(panel, showCI.checked ? "ci" : "off");
     });
 
-    // Show count — tabs uses .show-freq parent class to reveal .ct-freq
+    // Show count: tabs uses .show-freq parent class to reveal .ct-freq
     var counts = panel.querySelector('[data-fn-action="showcounts"]');
     if (counts) counts.addEventListener("change", function(){
       panel.__fnState.showCounts = counts.checked;
@@ -559,7 +559,7 @@
     rebuildRelationshipCards(panel, code);
     updateTitleSub(panel, code);
     /* applyChartVisibility() repaints whichever view the user is in
-       (slope or bar) — buildBarChart re-sorts focal-first, drawSlopeSvg
+       (slope or bar), buildBarChart re-sorts focal-first, drawSlopeSvg
        re-emits all lines, and the function also calls buildMiniFunnels
        so we don't need to invoke it again. Previously only the slope
        view was redrawn, leaving Bar-view users on the old focal. */
@@ -589,10 +589,10 @@
         ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
         : null;
       var pctEl = card.querySelector(".tk-hero-value");
-      if (pctEl) pctEl.textContent = focalPct == null ? "—"
+      if (pctEl) pctEl.textContent = focalPct == null ? "n/a"
                    : Math.round(focalPct * 100) + "%";
       var cmpEl = card.querySelector(".fn-card-compare strong");
-      if (cmpEl) cmpEl.textContent = cavg == null ? "—"
+      if (cmpEl) cmpEl.textContent = cavg == null ? "n/a"
                    : Math.round(cavg * 100) + "%";
       var baseEl = card.querySelector(".fn-card-base");
       if (baseEl) baseEl.textContent = focalBaseU == null ? ""
@@ -635,10 +635,10 @@
         ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
         : null;
       var pctEl = card.querySelector(".tk-hero-value");
-      if (pctEl) pctEl.textContent = focalPct == null ? "—"
+      if (pctEl) pctEl.textContent = focalPct == null ? "n/a"
                    : Math.round(focalPct * 100) + "%";
       var cmpEl = card.querySelector(".fn-card-compare strong");
-      if (cmpEl) cmpEl.textContent = cavg == null ? "—"
+      if (cmpEl) cmpEl.textContent = cavg == null ? "n/a"
                    : Math.round(cavg * 100) + "%";
     });
   }
@@ -655,10 +655,10 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Chip toggles — scope = "table" or "chart"
+  // Chip toggles: scope = "table" or "chart"
   // ---------------------------------------------------------------------------
   // BrandSelector dropdown for the Brand Attitude (relationship) sub-tab.
-  // Unified mode — the relationship view doesn't split table/chart selection.
+  // Unified mode: the relationship view doesn't split table/chart selection.
   function bindFunnelAttitudeBrandSelector(panel) {
     if (typeof window.BrandSelector === "undefined") return;
     var trigger = panel.querySelector('.bs-trigger[data-bs-panel="fn-attitude"]');
@@ -679,7 +679,7 @@
     });
     var initialHidden = Array.from(panel.__fnState.relHiddenBrands).filter(
       function (c) { return c !== "__avg__"; });
-    // panelId MUST be unique per panel instance — REGISTRY is keyed by panelId,
+    // panelId MUST be unique per panel instance. REGISTRY is keyed by panelId,
     // and a duplicate key from a sibling category panel would overwrite this
     // state and make closeAll() unable to find the open popover. The panel's
     // own DOM id (e.g. "fn-dss") is the natural unique anchor.
@@ -759,7 +759,7 @@
         // Sync to Brand Attitude (relationship) view. The focus-bar picker
         // is visible across all funnel sub-tabs, so its table selection
         // should also drive the relationship table + chart (the relationship
-        // view is unified — no separate chart-only selection). Without this
+        // view is unified, no separate chart-only selection). Without this
         // sync, adding a brand here updates the relationship table rows via
         // applyTableVisibility's tr[data-fn-brand] sweep, but the chart
         // reads relHiddenBrands and stays at focal-only.
@@ -794,14 +794,14 @@
   }
 
   // ---------------------------------------------------------------------------
-  // % mode — rewrite cell text, base row n=, and cell count spans.
+  // % mode: rewrite cell text, base row n=, and cell count spans.
   //
   // All three toggles read pre-computed values from data-* attributes set by
   // the R template (.fn_cell_html in 03_funnel_panel_table.R):
   //   "total"    → data-fn-pct-abs (pct_weighted)
   //   "previous" → data-fn-pct-nes (pct_nested_filtered, cumulative chain)
   //   "aware"    → data-fn-pct-aw  (pct_aware_filtered, independent
-  //                                  intersection with aware — see
+  //                                  intersection with aware, see
   //                                  calculate_stage_metrics)
   //
   // Cell count format (Show count on): n=<stage_count> (<mode_denom>)
@@ -908,7 +908,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Chart visibility — routes to slope or stacked depending on state
+  // Chart visibility: routes to slope or stacked depending on state
   // ---------------------------------------------------------------------------
   function applyChartVisibility(panel) {
     if (panel.__fnState.chartView === "bar") {
@@ -918,7 +918,7 @@
     }
     /* Mini funnels live below the chart and follow the top "SHOW BRANDS"
        chip bar (tableBrands), not the chart's own chip bar. They must
-       refresh on EVERY visibility change — including in bar view, where
+       refresh on EVERY visibility change, including in bar view, where
        previously buildMiniFunnels was never called and the cards stayed
        stuck on whatever brands were last rendered in slope view. */
     buildMiniFunnels(panel);
@@ -957,7 +957,7 @@
       pd.table.avg_all_brands.forEach(function(r) { avgMap[r.stage_key] = r; });
     }
 
-    /* Base-mode resolution — reads the engine-computed pct fields directly
+    /* Base-mode resolution: reads the engine-computed pct fields directly
        so the mini-funnel, table, and chart agree on every cell.
          "total"    -> pct_absolute (pct_weighted)
          "previous" -> pct_nested   (pct_nested_filtered, cumulative chain)
@@ -981,7 +981,7 @@
     var html = "";
 
     /* Category-average card stays governed by the chart-chip "__avg__"
-       toggle (the top chip bar has no Cat Avg chip — it's per-brand only). */
+       toggle (the top chip bar has no Cat Avg chip. It's per-brand only). */
     if (chartBrands["__avg__"] !== false) {
       var avgColor = "#64748b";
       html += '<div class="fn-mini-funnel fn-mf-avg" style="border-left-color:' + avgColor + '">';
@@ -992,7 +992,7 @@
         var r = avgMap[k];
         var pct = pickMiniPct(r, null, si);
         var barW = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
-        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2014";
+        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "n/a";
         html += '<div class="fn-mf-stage">';
         html += '<div class="fn-mf-bar-bg"><div class="fn-mf-bar" style="width:' + barW + '%;background:' + avgColor + ';"></div></div>';
         html += '<div class="fn-mf-label">' + escapeAttr(stageLabels[si] || k) + ' <span class="fn-mf-pct">' + pctStr + '</span></div>';
@@ -1013,7 +1013,7 @@
         var idx = brandCodes.indexOf(code);
         if (idx >= 0) orderedIdx.push(idx);
       });
-      // Append any brand codes the table hasn't rendered (defensive —
+      // Append any brand codes the table hasn't rendered (defensive.
       // every brand normally has a row, but if not we still want it).
       brandCodes.forEach(function (_, i) {
         if (orderedIdx.indexOf(i) < 0) orderedIdx.push(i);
@@ -1054,7 +1054,7 @@
         var cell  = cellMap[code] && cellMap[code][k];
         var pct   = pickMiniPct(cell, code, si);
         var barW  = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
-        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2014";
+        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "n/a";
 
         html += '<div class="fn-mf-stage">';
         html += '<div class="fn-mf-bar-bg">';
@@ -1069,7 +1069,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Slope chart — full JS redraw (colors, legend, data points, y-axis scale)
+  // Slope chart: full JS redraw (colors, legend, data points, y-axis scale)
   // ---------------------------------------------------------------------------
 
   // Intentionally uses the ORIGINAL focal (from pd.meta.focal_brand_code), not
@@ -1302,9 +1302,9 @@
     var allComp      = sc.competitor_series || [];
 
     // Pick the right values array based on current base mode:
-    //   "total"    — absolute % of all respondents
-    //   "previous" — each stage as % of the previous stage
-    //   "aware"    — each stage as % of awareness (awareness pinned to 100%)
+    //   "total": absolute % of all respondents
+    //   "previous", each stage as % of the previous stage
+    //   "aware", each stage as % of awareness (awareness pinned to 100%)
     var pctMode = state.pctMode || "total";
     function pickPcts(series) {
       if (!series) return null;
@@ -1334,11 +1334,11 @@
       }
     }
 
-    // SVG layout — mr=60 ensures rightmost stage label never clips the viewBox
+    // SVG layout: mr=60 ensures rightmost stage label never clips the viewBox
     var w = 760, h = 380, ml = 60, mr = 60, mt = 40, mb = 80;
     var pw = w - ml - mr, ph = h - mt - mb;
 
-    // Y scale — driven by Min/Max inputs (% values, null = use full 0–100%)
+    // Y scale: driven by Min/Max inputs (% values, null = use full 0–100%)
     var yMin = (state.yMinInput != null) ? Math.max(0,   state.yMinInput / 100) : 0;
     var yMax = (state.yMaxInput != null) ? Math.min(1,   state.yMaxInput / 100) : 1;
     if (yMax <= yMin) { yMin = 0; yMax = 1; }
@@ -1411,7 +1411,7 @@
       });
     }
 
-    // Shading band — range (min-max envelope), ci (±1.96 SE around avg), or none
+    // Shading band: range (min-max envelope), ci (±1.96 SE around avg), or none
     if (shading === "range") {
       var env = sc.envelope;
       if (env && env.min_values && env.max_values && env.min_values.length === n) {
@@ -1564,7 +1564,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Export table — builds an Excel-compatible HTML table and triggers download.
+  // Export table: builds an Excel-compatible HTML table and triggers download.
   // Respects current pct mode (% of total / % of previous / % of aware) and
   // includes a Base (n=) row and optional count rows when Show count is on.
   // ---------------------------------------------------------------------------
@@ -1593,7 +1593,7 @@
     var nTotal = pd.meta ? Math.round(pd.meta.n_weighted || 0) : 0;
     var awareStageKey = stageKeys[0];
 
-    // Pick the correct pct value for the current mode — reads engine-computed
+    // Pick the correct pct value for the current mode. Reads engine-computed
     // pct fields directly from the cell payload.
     function pickPct(obj, brandCode, stageIdx) {
       if (!obj) return null;
@@ -1606,7 +1606,7 @@
       return obj.pct_absolute;
     }
 
-    // Helper: base row n= — n=300 (varies by brand) for non-total modes ≥ stage 2.
+    // Helper: base row n=, n=300 (varies by brand) for non-total modes ≥ stage 2.
     function baseRowN(stageIdx) {
       if (pctMode === "total" || pctMode === "absolute" || stageIdx === 0) {
         return nTotal ? "n=" + nTotal : "";
@@ -1618,7 +1618,7 @@
       return (v == null || isNaN(v)) ? null : Math.round(v);
     }
 
-    // Helper: cell count — n=<num> (<denom>) per brand at the active mode.
+    // Helper: cell count, n=<num> (<denom>) per brand at the active mode.
     function cellCountStr(code, sk, stageIdx) {
       var c = cellMap[code] && cellMap[code][sk];
       if (!c) return "";
@@ -1665,7 +1665,7 @@
     stageLabels.forEach(function(lbl) { html += '<th>' + lbl + '</th>'; });
     html += '</tr>';
 
-    // Base (n=) row — category-average denominator, total in brackets for non-total modes
+    // Base (n=) row: category-average denominator, total in brackets for non-total modes
     html += '<tr><td class="base">Base (n=)</td>';
     stageKeys.forEach(function(sk, i) {
       html += '<td class="base">' + baseRowN(i) + '</td>';
@@ -1684,7 +1684,7 @@
         html += '<td' + cls + '>' + (pct != null ? Math.round(pct * 100) + '%' : '') + '</td>';
       });
       html += '</tr>';
-      // Count row: n=<stage_count> (<mode_denom>) — only when Show count is on
+      // Count row: n=<stage_count> (<mode_denom>). Only when Show count is on
       if (showCounts) {
         html += '<tr><td class="count">' + name + ' (n=)</td>';
         stageKeys.forEach(function(sk, si) {
@@ -1694,7 +1694,7 @@
       }
     });
 
-    // Category Average row — pass null brandCode so pickPct uses avgAwarePct
+    // Category Average row: pass null brandCode so pickPct uses avgAwarePct
     html += '<tr><td class="avg">Category average</td>';
     stageKeys.forEach(function(sk, si) {
       var r = avgMap[sk];
@@ -1718,7 +1718,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Sort — Focal + Category Average rows are LOCKED to positions 2+3 (Base
+  // Sort: Focal + Category Average rows are LOCKED to positions 2+3 (Base
   // row stays at 1). Only competitor rows reorder. Sort state is tracked
   // on panel.__fnState.sort = { col: "brand"|<stage_key>, dir: "asc"|"desc" }.
   // ---------------------------------------------------------------------------
@@ -1798,7 +1798,7 @@
      analyst has applied. Returns brand_codes in DOM order, focal
      pinned to position 0 (since the focal row is rendered separately
      above the competitor rows). Falls back to null if the table isn't
-     rendered yet — caller can default to data order in that case. */
+     rendered yet. Caller can default to data order in that case. */
   function readFunnelTableOrder(panel) {
     var tbl = panel.querySelector("table.fn-table tbody");
     if (!tbl) return null;
@@ -1817,7 +1817,7 @@
   }
 
   /* Same idea but for the Brand Relationship table on the relationship
-     sub-tab. Returns competitor brand codes in DOM order — the focal
+     sub-tab. Returns competitor brand codes in DOM order, the focal
      row is pinned separately by buildRelChart. Returns null when the
      rel table hasn't rendered yet. */
   function readRelTableOrder(panel) {
@@ -1833,7 +1833,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Help popovers — floated next to the header ? trigger; click outside or
+  // Help popovers: floated next to the header ? trigger; click outside or
   // on another ? dismisses. Content comes from the hidden <template> blocks
   // emitted by the renderer (one per stage).
   // ---------------------------------------------------------------------------
@@ -1855,7 +1855,7 @@
     pop.innerHTML = '<div class="fn-help-popover-title">' +
       escapeAttr(label) + '</div>';
     pop.appendChild(body);
-    // Position it — place relative to the panel using the button rect
+    // Position it: place relative to the panel using the button rect
     var bRect = btn.getBoundingClientRect();
     var pRect = panel.getBoundingClientRect();
     pop.style.left = (bRect.left - pRect.left) + "px";
@@ -1870,7 +1870,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Table significance markers — permanent ↑↓ arrows on cells that fall
+  // Table significance markers: permanent ↑↓ arrows on cells that fall
   // outside the 95% CI of the category average (computed across all brands).
   // Applied once on init; independent of the shading mode.
   // ---------------------------------------------------------------------------
@@ -1907,7 +1907,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Table significance markers \u2014 permanent \u2191/\u2193 arrows on cells that fall
+  // Table significance markers: permanent \u2191/\u2193 arrows on cells that fall
   // outside the 95% CI of the category average for the stage.
   //
   // IMPORTANT: the values, the CI bounds, and the avg are all computed at
@@ -1954,7 +1954,7 @@
       var row = td.closest("tr");
       if (!row || row.classList.contains("fn-row-base") || row.classList.contains("fn-row-avg-all")) return;
       if (td.classList.contains("fn-rel-td-avg")) return;
-      // Skip relationship-table cells \u2014 those use applyRelTableSigMarkers
+      // Skip relationship-table cells: those use applyRelTableSigMarkers
       if (td.hasAttribute("data-fn-att")) return;
       var sk   = td.getAttribute("data-fn-stage");
       var bnds = sk && ciBounds[sk];
@@ -1990,7 +1990,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Category-average row range bar \u2014 recompute the per-stage min/max range
+  // Category-average row range bar: recompute the per-stage min/max range
   // bar, mean tick, and lo/hi labels at the active base toggle.
   //
   // The cat-avg row is rendered server-side with a static CI bar built from
@@ -2017,7 +2017,7 @@
 
     // For each stage, gather brand values at the active base and compute
     // mean + 95% CI (mean \u00b1 1.96\u00b7SE). col_max is the max brand value at
-    // the active base \u2014 used as the bar's horizontal scale.
+    // the active base, used as the bar's horizontal scale.
     stageKeys.forEach(function(sk) {
       var vals = [];
       cells.forEach(function(c) {
@@ -2034,7 +2034,7 @@
       var limits = td.querySelector(".ma-ci-limits");
       if (!wrap || !range || !tick || !limits) return;
       if (vals.length < 2) {
-        // Not enough brand variability to draw a CI band \u2014 hide the
+        // Not enough brand variability to draw a CI band, hide the
         // bar elements instead of leaving stale numbers visible.
         wrap.style.visibility = "hidden";
         limits.style.visibility = "hidden";
@@ -2100,7 +2100,7 @@
       ".avg{font-style:italic;background:#f5f6f8;}" +
       "</style></head><body><table>";
 
-    // Column headers — strip sort-indicator button text
+    // Column headers: strip sort-indicator button text
     var ths = Array.from(table.querySelectorAll("thead th"));
     var colCount = ths.length;
     var headers = ths.map(function(th) {
@@ -2132,7 +2132,7 @@
           var pct = parseFloat(td.getAttribute(pctAttr));
           html += "<td" + cls + ">" + (isNaN(pct) ? "" : Math.round(pct * 100) + "%") + "</td>";
         } else {
-          // Label or Base column — strip FOCAL badge / CI bar markup
+          // Label or Base column: strip FOCAL badge / CI bar markup
           var clone = td.cloneNode(true);
           var badge = clone.querySelector(".fn-focal-badge");
           if (badge) clone.removeChild(badge);
@@ -2143,7 +2143,7 @@
       });
       html += "</tr>";
 
-      // n= row — skip for avg row (no per-brand counts there)
+      // n= row: skip for avg row (no per-brand counts there)
       if (!isAvg) {
         var labelTd = tds[0];
         var labelClone = labelTd ? labelTd.cloneNode(true) : null;
@@ -2184,7 +2184,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Pin dropdown — lists individually pinnable sections; calls TurasPin if
+  // Pin dropdown: lists individually pinnable sections; calls TurasPin if
   // available, otherwise toggles a .fn-pinned outline as visual feedback.
   // ---------------------------------------------------------------------------
   function bindPinDropdown(panel) {
@@ -2280,7 +2280,7 @@
           if (!el) return;
 
           if (/insight/i.test(label)) {
-            // Read textarea value — do NOT capture the DOM element itself.
+            // Read textarea value: do NOT capture the DOM element itself.
             // v1.1: prefer the Section_Insights editor (.br-insight-editor)
             // in the surrounding section over the panel-internal session
             // textarea (.fn-insight-textarea). The Section_Insights editor
@@ -2344,7 +2344,7 @@
           tableHtml = window.brStripInteractive(tableHtml);
         }
 
-        // Active "Base:" toggle — captured from the panel so the pin/PNG
+        // Active "Base:" toggle, captured from the panel so the pin/PNG
         // records which percentage base the user was looking at.
         var baseLabel = (typeof window.brReadBaseLabel === "function")
           ? window.brReadBaseLabel(panel) : "";
@@ -2366,7 +2366,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Relationship chart — horizontal stacked bars (brands = rows)
+  // Relationship chart: horizontal stacked bars (brands = rows)
   // ---------------------------------------------------------------------------
   var REL_SEG_ROLES = [
     "attitude.love","attitude.prefer","attitude.ambivalent",
@@ -2392,7 +2392,7 @@
   function initRelChart(panel) {
     if (!panel.querySelector("[data-fn-rel-chart]")) return;
     panel.__fnState.relEmphasisSet  = new Set();
-    /* Default to % of total — matches the funnel table's "% of total"
+    /* Default to % of total: matches the funnel table's "% of total"
        default so analysts read the two pages on the same denominator
        before drilling into the conversion-from-aware view. */
     panel.__fnState.relBase         = "total";
@@ -2418,7 +2418,7 @@
       });
     }
 
-    // BrandSelector dropdown — replaces the relationship-tab chip strip.
+    // BrandSelector dropdown: replaces the relationship-tab chip strip.
     // Wires onChange to applyRelBrandVis + buildRelChart.
     bindFunnelAttitudeBrandSelector(panel);
 
@@ -2442,7 +2442,7 @@
       if (col) btn.style.setProperty("--seg-chip-color", col);
     });
 
-    // Emphasis chips — multi-select; "All" chip clears set
+    // Emphasis chips: multi-select; "All" chip clears set
     panel.querySelectorAll("[data-fn-rel-emphasis]").forEach(function(btn) {
       btn.addEventListener("click", function() {
         var role = btn.getAttribute("data-fn-rel-emphasis");
@@ -2511,7 +2511,7 @@
       }
     });
 
-    // Show count checkbox — show-freq class reveals .ct-freq spans
+    // Show count checkbox: show-freq class reveals .ct-freq spans
     var relShowCounts = panel.querySelector('[data-fn-rel-showcounts]');
     if (relShowCounts) relShowCounts.addEventListener("change", function() {
       panel.__fnState.relShowCount = relShowCounts.checked;
@@ -2571,7 +2571,7 @@
     // includes attitudes expressed by respondents who never picked the
     // brand in BRANDAWARE. The R metric layer emits a separate
     // count_aware (aware AND attitude-matched) so the chart can show
-    // the proper aware-subset proportion — same value the table reads
+    // the proper aware-subset proportion. Same value the table reads
     // from data-fn-rel-pct-aware.
     //
     // For no_opinion in the legacy-fallback path we still use the
@@ -2587,7 +2587,7 @@
       return Number(brand.segments_aware[role]);
     }
 
-    // Legacy fallback — only fires when segments_aware is absent
+    // Legacy fallback: only fires when segments_aware is absent
     // (older panel data payloads pre-2026-05).
     if (nTotal && brand.aware_base && brand.aware_base > 0) {
       if (role === "attitude.no_opinion") {
@@ -2632,7 +2632,7 @@
     /* Order: follow the relationship table's current row order so the
        chart bars stack in the same sequence as the table rows. The
        column header click handler sorts the table first, then calls
-       buildRelChart — at that point the DOM is the source of truth.
+       buildRelChart, at that point the DOM is the source of truth.
        Falls back to the relSort state when the table isn't rendered
        yet (initial paint before sortRelTable runs). */
     var sortedComps;
@@ -2686,7 +2686,7 @@
         /* Pool across brands: sum counts_aware then divide by total
            aware. counts_aware[role] is the count of respondents who
            both picked the brand in BRANDAWARE AND expressed the role
-           attitude — the proper aware-subset numerator. Falls back to
+           attitude, the proper aware-subset numerator. Falls back to
            the legacy seg * nTotal approximation (= count_total) when
            counts_aware is absent on older payloads; this is the same
            value relPct() falls back to, so the fallback stays consistent
@@ -2711,14 +2711,14 @@
         }, 0);
         avgSegments["attitude.no_opinion"] = Math.max(0, 1 - sumLPAR_avg);
       } else {
-        // % total — unweighted mean across brands.
+        // % total: unweighted mean across brands.
         REL_SEG_ROLES.forEach(function (role) {
           var vals = allBrands.map(function (b) { return relPct(b, role, base, nTotal); });
           avgSegments[role] = vals.reduce(function (s, v) { return s + v; }, 0) / vals.length;
         });
       }
       // Safety clamp: if the pooled values still exceed 100% in total
-      // (data anomaly — e.g. segment definitions overlap), normalise so
+      // (data anomaly, e.g. segment definitions overlap), normalise so
       // the bar stays sensible. Keeps the relative shape, prevents the
       // 185% nonsense from reaching the user.
       var avgTotal = 0;
@@ -2858,7 +2858,7 @@
 
     var suffix = " at <strong>" + topStr + "</strong>";
     suffix += (ratio != null && ratio >= 1.5)
-      ? " \u2014 " + ratio.toFixed(1) + "\u00D7 the category average (" + avgStr + ")"
+      ? ": " + ratio.toFixed(1) + "\u00D7 the category average (" + avgStr + ")"
       : " (category avg: " + avgStr + ")";
 
     hdEl.innerHTML = '<div class="fn-rel-headline-text">' + prefix + suffix + '</div>';
@@ -2937,7 +2937,7 @@
     var cntAttr = base === "total" ? "data-fn-rel-count-total" : "data-fn-rel-count-aware";
     var denomAttr = base === "total" ? "data-fn-rel-denom-total" : "data-fn-rel-denom-aware";
 
-    /* Per-brand Base column — carries both bases as data attrs; show the
+    /* Per-brand Base column: carries both bases as data attrs; show the
        one that matches the active toggle. In % aware mode each brand has
        its own aware-count; in % total mode every brand reads the same
        total respondent count (constant denominator). The low-base ⚠
@@ -2950,7 +2950,7 @@
       var span = td.querySelector(".fn-rel-base-num");
       if (!span) return;
       if (!isFinite(n) || n <= 0) {
-        span.textContent = "—";
+        span.textContent = "n/a";
         span.classList.remove("ct-low-base", "ct-base-n");
         span.classList.add("ct-na");
         return;
@@ -3066,7 +3066,7 @@
   // toggle (% total or % aware). Earlier versions hard-coded the aware-base
   // attributes regardless of the toggle, which made the displayed value
   // (% total) and the arrow direction (computed at % aware) feel
-  // disconnected \u2014 e.g. IPK Love = 22% of total but green-\u2191 because at
+  // disconnected, e.g. IPK Love = 22% of total but green-\u2191 because at
   // aware base it was 56.5% vs cat avg 34%. Now the arrows reflect what
   // the table is actually showing.
   function applyRelTableSigMarkers(panel) {
@@ -3160,7 +3160,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Bar chart — one horizontal bar per brand for the selected funnel stage.
+  // Bar chart, one horizontal bar per brand for the selected funnel stage.
   // Bars use brand colours; focal brand is thicker. Category avg shown as a
   // dashed reference line. Brands sorted focal-first then descending by value.
   // ---------------------------------------------------------------------------
@@ -3256,7 +3256,7 @@
     var parts = [];
 
     // Stage title
-    parts.push('<text x="' + (labelW + barAreaW / 2) + '" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="#64748b">' + escSvg(stageLabel) + ' \u2014 % of total respondents</text>');
+    parts.push('<text x="' + (labelW + barAreaW / 2) + '" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="#64748b">' + escSvg(stageLabel) + ': % of total respondents</text>');
 
     // Category average dashed reference line
     if (catAvgVal != null) {

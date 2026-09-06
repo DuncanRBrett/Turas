@@ -3,10 +3,10 @@
 # ==============================================================================
 # Generates a complete, self-contained interactive HTML report using
 # the 4-layer pipeline:
-#   Layer 1: 01_data_transformer.R  — transform results to chart/table data
-#   Layer 2: 02_table_builder.R     — build styled HTML tables
-#   Layer 3: 04_chart_builder.R     — build inline SVG charts
-#   Layer 4: 03_page_builder.R      — assemble full HTML page
+#   Layer 1: 01_data_transformer.R, transform results to chart/table data
+#   Layer 2: 02_table_builder.R, build styled HTML tables
+#   Layer 3: 04_chart_builder.R, build inline SVG charts
+#   Layer 4: 03_page_builder.R, assemble full HTML page
 #
 # VERSION: 2.0
 # ==============================================================================
@@ -111,7 +111,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     }
   }
 
-  # Load shared TurasPins JS — source the loader if not already available
+  # Load shared TurasPins JS: source the loader if not already available
   pins_js <- ""
   if (!exists("turas_pins_js", mode = "function")) {
     pins_loader <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Brand Mental Availability Panel — interactivity
+   Brand Mental Availability Panel: interactivity
    ==========================================================================
    SIZE-EXCEPTION: single IIFE driving three MA sub-tabs (Attributes,
    CEPs, Metrics) plus the cross-panel focal-brand sync. Sub-tabs
@@ -13,7 +13,7 @@
    - Brand chips (toggle visibility), chip colouring from brand palette
    - Heatmap modes: CI bands (default) / diverging vs cat avg / off
    - Base mode: % total / % aware (both stim tabs)
-   - Row grey-out toggle (checkbox on row label) — greyed rows dim in table
+   - Row grey-out toggle (checkbox on row label), greyed rows dim in table
      and drop out of the bar chart
    - Show chart toggle + inline SVG bar chart (one bar per visible brand,
      grouped per active attribute/CEP, bars coloured to match chips)
@@ -223,7 +223,7 @@
     applyColumnVisibility(panel, 'attributes');
     applyColumnVisibility(panel, 'ceps');
     // Metrics row visibility is seeded by bindMABrandSelector(panel,'metrics')
-    // when the dropdown is created — initialHidden hides non-focal rows when
+    // when the dropdown is created, initialHidden hides non-focal rows when
     // chip_default = focal_only.
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
@@ -275,7 +275,7 @@
 
   // ONE panel-level BrandSelector controls visibility across all four MA
   // sub-tabs (Attributes, CEPs, Mental Advantage, Metrics) in lock-step.
-  // Split mode + Sync table+chart toggle (default ON) — applies the same
+  // Split mode + Sync table+chart toggle (default ON). Applies the same
   // table/chart split across every sub-tab so analysts can desync once and
   // see the effect everywhere.
   function bindMaPanelBrandSelector(panel) {
@@ -319,13 +319,13 @@
       });
     }
 
-    // panelId MUST be unique per panel instance — REGISTRY is keyed by
+    // panelId MUST be unique per panel instance. REGISTRY is keyed by
     // panelId and a duplicate from a sibling category panel would orphan
     // this state so the close-on-outside-click handler couldn't find the
     // open popover. Same bug class fixed earlier on the funnel and
     // demographics panels. The MA panel covers four sub-tabs (Mental
     // Advantage, MA Metrics, Brand Attributes, Category Entry Points) and
-    // they all share this one selector — clicking off any of those tabs
+    // they all share this one selector, clicking off any of those tabs
     // needs to close the popover. panel.id is "ma-<catcode>" e.g. "ma-bak".
     panel.__maSelector = window.BrandSelector.create({
       panelId:            panel.id || 'ma',
@@ -634,7 +634,7 @@
     var mode = panel.__maState.basemode[stim] || 'total';
     var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
     if (!sec) return;
-    // Update base row cells — always show n=aware (total)
+    // Update base row cells: always show n=aware (total)
     /* Base row: show the n that matches the active base. In "% total"
        mode that's the total-respondent base; in "% aware" mode it's
        the aware-of-brand base. The previous "n=78 (78)" format was
@@ -650,11 +650,11 @@
       if (pick) {
         span.textContent = 'n=' + pick;
       } else {
-        span.textContent = '\u2014';
+        span.textContent = 'n/a';
       }
     });
     /* Cells: data-ma-n-total and data-ma-n-aware always carry the SAME
-       value — both are the count of respondents who linked the brand
+       value. Both are the count of respondents who linked the brand
        to the stim (the numerator stays constant; only the denominator
        changes between % total and % aware). The cell count is therefore
        a single integer; the parenthetical was always redundant. */
@@ -667,7 +667,7 @@
       if (!span) return;
       var val = pctTotal;
       if (mode === 'aware' && !isNaN(pctAware)) { val = pctAware; }
-      if (isNaN(val)) { span.textContent = '—'; return; }
+      if (isNaN(val)) { span.textContent = 'n/a'; return; }
       span.textContent = Math.round(val) + '%';
       if (nSpan) {
         nSpan.textContent = nTotal ? ('n=' + nTotal) : '';
@@ -724,7 +724,7 @@
       var avgCell = row.querySelector('td.ma-td-catavg');
       if (!avgCell) return;
 
-      // Not enough variability (1 brand only, or all NA) — hide the bar.
+      // Not enough variability (1 brand only, or all NA), hide the bar.
       if (vals.length < 2) {
         var w = avgCell.querySelector('.ma-ci-bar-wrap');
         var L = avgCell.querySelector('.ma-ci-limits');
@@ -788,7 +788,7 @@
       // mean. The CSS rules paint the CI background green/amber/red
       // based on the ma-ci-* classes; the diff heatmap (Heatmap mode =
       // "diff" toggle) reads data-ma-heatmap as its background colour
-      // — both were anchored to the % total band/mean at render time,
+      //. Both were anchored to the % total band/mean at render time,
       // so both need to be refreshed when the user toggles base.
       row.querySelectorAll('td.ma-heatmap-cell').forEach(function (cellTd) {
         var v = parseFloat(cellTd.getAttribute(cellAttr));
@@ -806,7 +806,7 @@
         cellTd.classList.add('ma-ci-' + band);
         cellTd.setAttribute('data-ma-ci-band', band);
 
-        // Diff heatmap colour — diff_vs_avg at the active base.
+        // Diff heatmap colour: diff_vs_avg at the active base.
         var diffAtBase = v - mean;
         cellTd.setAttribute('data-ma-heatmap',
                             maDiffHeatmapRgba(diffAtBase, MA_DIFF_HEATMAP_MAX_ABS));
@@ -824,7 +824,7 @@
 
   // Per-row diff cap for the diverging blue/red heatmap. Mirrors the
   // hardcoded `40` in .ma_diff_heatmap()'s call site at
-  // 02_ma_panel_table.R:241. Keep these in lockstep — if you change one
+  // 02_ma_panel_table.R:241. Keep these in lockstep, if you change one
   // change the other.
   var MA_DIFF_HEATMAP_MAX_ABS = 40;
 
@@ -1042,7 +1042,7 @@
 
     // Update section heading
     var titleEl = panel.querySelector('.ma-metrics-hero-title');
-    if (titleEl) titleEl.textContent = focalName + ' \u2014 Headline Metrics';
+    if (titleEl) titleEl.textContent = focalName + ': Headline Metrics';
 
     // Find overall leader for a metric key
     function findLeader(key) {
@@ -1056,7 +1056,7 @@
 
     var dp = (pd.config && pd.config.decimal_places != null) ? pd.config.decimal_places : 0;
     function fmtVal(val, unit) {
-      if (val == null || isNaN(Number(val))) return '\u2014';
+      if (val == null || isNaN(Number(val))) return 'n/a';
       return unit === 'pct' ? Number(val).toFixed(dp) + '%' : Number(val).toFixed(2);
     }
 
@@ -1079,7 +1079,7 @@
       }
       card.style.borderLeftColor = focalColour;
 
-      // Category avg (static — doesn't change with focal)
+      // Category avg (static: doesn't change with focal)
       var avgEl = card.querySelector('.ma-hero-compare strong');
       if (avgEl) avgEl.textContent = fmtVal(catAvg[def.key], def.unit);
 
@@ -1314,7 +1314,7 @@
     svg.setAttribute('height', height);
     svg.style.height = height + 'px';
 
-    // X/Y axis ranges — user-set via the rangebar inputs, else auto.
+    // X/Y axis ranges: user-set via the rangebar inputs, else auto.
     // X: MPen is always a 0-100% scale unless overridden.
     // Y: NS auto = ceil to next 0.25 + 0.5 padding so labels don't clip.
     var xRange = panel.__maMetricsXRange || {};
@@ -1366,7 +1366,7 @@
                  '" text-anchor="end" dominant-baseline="middle" font-size="9" fill="#94a3b8">' + yv.toFixed(1) + '</text>');
     }
 
-    // Cat avg reference lines — only drawn if the avg falls inside the
+    // Cat avg reference lines: only drawn if the avg falls inside the
     // active range so a custom zoom doesn't paint phantom edge lines.
     if (catAvg.mpen != null && catAvg.mpen >= xMin && catAvg.mpen <= xMax) {
       var ax = toX(catAvg.mpen);
@@ -1383,7 +1383,7 @@
                  '" font-size="9" fill="#94a3b8" font-weight="600">avg NS</text>');
     }
 
-    // OLS double-jeopardy trend line — fitted from all points then
+    // OLS double-jeopardy trend line: fitted from all points then
     // clipped to the visible [xMin, xMax] x [yMin, yMax] window.
     if (points.length >= 3) {
       var n = points.length;
@@ -1420,7 +1420,7 @@
     parts.push('<text x="' + (mL + pW / 2) + '" y="' + (height - 4) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">Mental Penetration (%)</text>');
     parts.push('<text transform="rotate(-90 ' + (mL - 40) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 40) + '" y="' + (mT + pH / 2) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">Network Size</text>');
 
-    // Bubbles — focal on top, out-of-range points dropped so a custom
+    // Bubbles: focal on top, out-of-range points dropped so a custom
     // zoom doesn't render half-bubbles on the plot edge.
     var visiblePoints = points.filter(function (p) {
       return p.mpen >= xMin && p.mpen <= xMax && p.ns >= yMin && p.ns <= yMax;
@@ -1446,7 +1446,7 @@
                           isFocal: !!p.isFocal, colour: col });
     });
 
-    // Smart label placement — port of the Portfolio scatter algorithm
+    // Smart label placement: port of the Portfolio scatter algorithm
     // (mirrors maPlaceScatterLabels on the MA Advantage tab). 8-direction
     // candidate scoring + leader lines for far-flung labels.
     var placements = maMetricsPlaceLabels(bubbleSpecs, mL, mL + pW, mT, mT + pH, 10, 4);
@@ -1859,7 +1859,7 @@
     for (var g = 0; g <= gridSteps; g++) {
       var gv = maxVal * g / gridSteps;
       var gx = xZero + xScale * g / gridSteps;
-      /* Inline SVG presentation attrs as fallback for pin/PNG capture —
+      /* Inline SVG presentation attrs as fallback for pin/PNG capture.
          html2canvas drops CSS-class-only fills/strokes, so without these
          attributes the chart renders blank or with default black strokes. */
       parts.push('<line class="ma-bar-gridline" stroke="#f1f5f9" stroke-width="1" x1="' + gx + '" y1="' + marginTop +
@@ -2038,7 +2038,7 @@
       + '.base-row{background:#f0f4f8;font-style:italic;}'
       + '</style></head><body><table>';
 
-    // Header row — strip sort buttons
+    // Header row: strip sort buttons
     var ths = Array.from(tbl.querySelectorAll('thead th'));
     var colCount = ths.length;
     var headers = ths.map(function (th) {
@@ -2046,7 +2046,7 @@
       clone.querySelectorAll('button, input').forEach(function (el) { el.remove(); });
       return clone.textContent.trim();
     });
-    html += '<tr><td class="mode" colspan="' + colCount + '">Base: ' + baseLabel + ' \u2014 ' + escHtml(cat) + '</td></tr>';
+    html += '<tr><td class="mode" colspan="' + colCount + '">Base: ' + baseLabel + ', ' + escHtml(cat) + '</td></tr>';
     html += '<tr>' + headers.map(function (h) { return '<th>' + escHtml(h) + '</th>'; }).join('') + '</tr>';
 
     // Body rows
@@ -2054,14 +2054,14 @@
       if (tr.style.display === 'none') return;
       var tds = Array.from(tr.querySelectorAll('td'));
 
-      // Base row — show n= per brand
+      // Base row: show n= per brand
       if (tr.classList.contains('ma-row-base')) {
         html += '<tr>';
         tds.forEach(function (td) {
           var brand = td.getAttribute('data-ma-brand');
           if (brand && brand !== '__avg__') {
             var n = td.getAttribute(nAttr);
-            html += '<td class="base-row">' + (n ? 'n=' + n : '\u2014') + '</td>';
+            html += '<td class="base-row">' + (n ? 'n=' + n : 'n/a') + '</td>';
           } else {
             html += '<td class="base-row">' + td.textContent.trim() + '</td>';
           }
@@ -2084,18 +2084,18 @@
           var ciLo = td.getAttribute('data-ma-ci-lower');
           var ciHi = td.getAttribute('data-ma-ci-upper');
           var ciStr = (ciLo && ciHi) ? ' (' + Math.round(parseFloat(ciLo)) + '\u2013' + Math.round(parseFloat(ciHi)) + '%)' : '';
-          html += '<td>' + (isNaN(pct) ? '\u2014' : Math.round(pct) + '%' + ciStr) + '</td>';
+          html += '<td>' + (isNaN(pct) ? 'n/a' : Math.round(pct) + '%' + ciStr) + '</td>';
         } else {
-          if (vis[brand] === false) { html += '<td>\u2014</td>'; return; }
+          if (vis[brand] === false) { html += '<td>n/a</td>'; return; }
           var isFocal = (brand === focal);
           var cls = isFocal ? ' class="focal"' : '';
           var pct = parseFloat(td.getAttribute(pctAttr));
-          html += '<td' + cls + '>' + (isNaN(pct) ? '\u2014' : Math.round(pct) + '%') + '</td>';
+          html += '<td' + cls + '>' + (isNaN(pct) ? 'n/a' : Math.round(pct) + '%') + '</td>';
         }
       });
       html += '</tr>';
 
-      // n= row — skip for avg column
+      // n= row: skip for avg column
       html += '<tr>';
       tds.forEach(function (td) {
         var brand = td.getAttribute('data-ma-brand');
@@ -2104,11 +2104,11 @@
           clone.querySelectorAll('button, input').forEach(function (el) { el.remove(); });
           html += '<td class="count">' + escHtml(clone.textContent.trim()) + ' (n=)</td>';
         } else if (brand === '__avg__') {
-          html += '<td class="count">\u2014</td>';
+          html += '<td class="count">n/a</td>';
         } else {
-          if (vis[brand] === false) { html += '<td class="count">\u2014</td>'; return; }
+          if (vis[brand] === false) { html += '<td class="count">n/a</td>'; return; }
           var n = td.getAttribute(nAttr);
-          html += '<td class="count">' + (n ? 'n=' + n : '\u2014') + '</td>';
+          html += '<td class="count">' + (n ? 'n=' + n : 'n/a') + '</td>';
         }
       });
       html += '</tr>';
@@ -2230,7 +2230,7 @@
     var pd = panel.__maData || {};
     var cat = (pd.meta && pd.meta.category_label) || 'Category';
     var focal = (pd.meta && pd.meta.focal_brand_name) || '';
-    var baseTitle = 'Mental Availability \u2014 ' + cat;
+    var baseTitle = 'Mental Availability: ' + cat;
 
     if (activeKey === 'attributes' || activeKey === 'ceps') {
       // Combine all selected sections into ONE pin card
@@ -2246,7 +2246,7 @@
       }
       if (optKeys.indexOf('insight') >= 0) {
         // v1.1: prefer the Section_Insights editor (.br-insight-editor)
-        // in the surrounding section — the section's currently-visible
+        // in the surrounding section, the section's currently-visible
         // .br-insight-wrap carries the active sub-tab's editor. Falls
         // back to the panel-internal session-storage textarea.
         var maSection = panel.closest('.br-element-section');
@@ -2274,7 +2274,7 @@
         ? window.brReadBaseLabel(maSubtab) : '';
       TurasPins.add({
         sectionKey: 'ma-' + activeKey + '-' + Date.now(),
-        title: baseTitle + ' \u2014 ' + subLabel,
+        title: baseTitle + ': ' + subLabel,
         subtitle: maBaseLabel ? 'Base: ' + maBaseLabel : '',
         baseText: maBaseLabel,
         chartSvg: chartSvg, chartHtml: '',
@@ -2284,12 +2284,12 @@
       });
 
     } else if (activeKey === 'metrics') {
-      // Metrics: each section is a distinct content type — pin separately
+      // Metrics: each section is a distinct content type, pin separately
       // Insight is captured only when its checkbox is ticked, so unticked
       // metrics never get the insight surreptitiously attached to ranking.
       var metricsInsight = '';
       if (optKeys.indexOf('insight') >= 0) {
-        // v1.1: prefer Section_Insights editor — same logic as the
+        // v1.1: prefer Section_Insights editor, same logic as the
         // matrix branch above. See the comment block there.
         var metricsSection = panel.closest('.br-element-section');
         if (metricsSection) {
@@ -2326,11 +2326,11 @@
         var el = panel.querySelector(def.sel); if (!el) return;
         var svg = captureSvg(el);
         var tbl = captureTable(el);
-        // hero and ranking are div-based \u2014 no SVG, no table. Fall back to full HTML.
+        // hero and ranking are div-based, no SVG, no table. Fall back to full HTML.
         var htm = (!svg && !tbl) ? captureHtml(el) : '';
         TurasPins.add({
           sectionKey: 'ma-metrics-' + key + '-' + Date.now(),
-          title: baseTitle + ' \u2014 ' + def.label,
+          title: baseTitle + ': ' + def.label,
           chartSvg: svg, chartHtml: '',
           tableHtml: tbl || htm,
           insightText: (pinIndex === 0) ? metricsInsight : '',
@@ -2340,11 +2340,11 @@
         });
         pinIndex++;
       });
-      // Insight ticked alone (no other element) — emit a standalone insight pin
+      // Insight ticked alone (no other element): emit a standalone insight pin
       if (pinIndex === 0 && metricsInsight) {
         TurasPins.add({
           sectionKey: 'ma-metrics-insight-' + Date.now(),
-          title: baseTitle + ' — Insight',
+          title: baseTitle + ': Insight',
           chartSvg: '', chartHtml: '',
           tableHtml: '',
           insightText: metricsInsight,
@@ -2360,7 +2360,7 @@
       var advSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
       var advFocalName = (pd.meta && pd.meta.focal_brand_name) || focal || 'Focal';
       var advBaseLabel = 'total respondents';
-      var advTitleSuffix = ' — Mental Advantage — ' + advFocalName + ' — Base: ' + advBaseLabel;
+      var advTitleSuffix = ': Mental Advantage, ' + advFocalName + ', Base: ' + advBaseLabel;
       var advInsight = '';
       if (optKeys.indexOf('insight') >= 0) {
         var taA = panel.querySelector('.ma-insight-box-text[data-ma-stim="advantage"]');
@@ -2383,7 +2383,7 @@
         var htm = (!svg && !tbl) ? captureHtml(el) : '';
         TurasPins.add({
           sectionKey: 'ma-advantage-' + key + '-' + Date.now(),
-          title: cat + advTitleSuffix + ' — ' + def.label,
+          title: cat + advTitleSuffix + ', ' + def.label,
           subtitle: 'Focal: ' + advFocalName + ' · Base: ' + advBaseLabel,
           baseText: advBaseLabel,
           chartSvg: svg, chartHtml: '',
@@ -2398,7 +2398,7 @@
       if (advPinIndex === 0 && advInsight) {
         TurasPins.add({
           sectionKey: 'ma-advantage-insight-' + Date.now(),
-          title: cat + advTitleSuffix + ' — Insight',
+          title: cat + advTitleSuffix + ', Insight',
           subtitle: 'Focal: ' + advFocalName + ' · Base: ' + advBaseLabel,
           chartSvg: '', chartHtml: '', tableHtml: '',
           insightText: advInsight,

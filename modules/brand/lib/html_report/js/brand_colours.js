@@ -1,5 +1,5 @@
 // =============================================================================
-// TURAS BRAND COLOURS — Canonical colour resolution module
+// TURAS BRAND COLOURS: Canonical colour resolution module
 //
 // Single source of truth for brand chip and chart colours across all panels.
 // Every panel JS file calls TurasColours.getBrandColour(pd, brandCode) instead
@@ -27,7 +27,7 @@ var TurasColours = (function () {
   // ---------------------------------------------------------------------------
 
   // Tableau-10: 10 perceptually distinct, colour-blind-safe colours.
-  // Index order is part of the public contract — do not reorder. Brand codes
+  // Index order is part of the public contract. Do not reorder. Brand codes
   // are hashed to an index, so a reorder would change every brand's fallback
   // colour across all existing reports.
   var PALETTE = [
@@ -52,7 +52,7 @@ var TurasColours = (function () {
   // ---------------------------------------------------------------------------
 
   // djb2 hash variant. Produces a stable non-negative integer for any string.
-  // This is the ONE implementation — all brand colour hash lookups use it.
+  // This is the ONE implementation, all brand colour hash lookups use it.
   function _djb2(str) {
     var h = 5381;
     for (var i = 0; i < str.length; i++) {
@@ -88,7 +88,7 @@ var TurasColours = (function () {
              '#1A5276';
     }
 
-    // 3. Stable Tableau-10 hash — identical result for a given code string
+    // 3. Stable Tableau-10 hash: identical result for a given code string
     //    regardless of how many brands are shown or their display order.
     return PALETTE[_djb2(code) % PALETTE.length];
   }

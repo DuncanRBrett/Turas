@@ -7,7 +7,7 @@
 #   - Coloured chip row (show/hide individual brands)
 #   - Sortable column headers (click to sort by any category)
 #   - Heat-coloured cells (awareness % drives background intensity)
-#   - All categories shown — low-base columns are flagged but not dropped
+#   - All categories shown. Low-base columns are flagged but not dropped
 #   - Lowercase row + column header labels per Duncan's spec
 #
 # Rendered by .pf_footprint_subtab() in 09_portfolio_panel.R.
@@ -32,7 +32,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
     return(as.character(brand_colours[[bc]]))
   if (!is.null(focal_code) && bc == focal_code && nzchar(focal_colour %||% ""))
     return(as.character(focal_colour))
-  # DJB2-on-doubles, mod 2^31 — matches the JS-side implementation in
+  # DJB2-on-doubles, mod 2^31. Matches the JS-side implementation in
   # WoM/Funnel so chip colours line up across tabs without coordination.
   h <- 5381.0
   for (b in utf8ToInt(bc)) h <- (h * 33.0 + b) %% 2147483648.0
@@ -92,9 +92,9 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
     return('<p style="color:#94a3b8;padding:24px 0;">Footprint data not available.</p>')
   }
 
-  # Resolve display labels — fall back to the code when the lookup is
+  # Resolve display labels: fall back to the code when the lookup is
   # absent or doesn't contain the key. Robust to: NULL map, length-0 map,
-  # named character vector, named list — any of which can show up
+  # named character vector, named list. Any of which can show up
   # depending on whether `compute_footprint_matrix` had any brands to
   # populate.
   .nm <- function(map, code) {
@@ -123,7 +123,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   } else setNames(integer(0), character(0))
 
   # Per-brand presence across categories. Used by the popover to filter
-  # itself when categories are toggled off — a brand that only has data
+  # itself when categories are toggled off. A brand that only has data
   # in hidden categories disappears from the popover automatically.
   brand_cats_map <- lapply(brand_codes, function(bc) {
     row_idx <- match(bc, fp$Brand)
@@ -147,7 +147,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
 
 
 # ==============================================================================
-# CONTROLS BAR — focal <select> + colour-coded chips
+# CONTROLS BAR: focal <select> + colour-coded chips
 # ==============================================================================
 
 .pf_fp_controls_bar <- function(brand_codes, brand_label,
@@ -165,7 +165,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
 
   # Brand-popover items (one row per brand, all visible by default).
   # Each item carries data-pf-fp-cats with the comma-separated list of
-  # category codes the brand has data in — JS uses this to hide popover
+  # category codes the brand has data in. JS uses this to hide popover
   # rows whose categories are all currently toggled off.
   brand_items <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
@@ -182,7 +182,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
     )
   }, character(1))
 
-  # Category chips — small set (~9), simple chip row matches MA / Funnel.
+  # Category chips: small set (~9), simple chip row matches MA / Funnel.
   cat_chips <- vapply(seq_along(cat_codes), function(j) {
     cc  <- cat_codes[j]
     lbl <- tolower(cat_label[j])
@@ -204,7 +204,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   # Order: Focal brand · Categories · Display · Brands.
   # Brands is LAST because its popover opens absolute-below the trigger;
   # putting it at the end means the popover only ever covers empty space
-  # or the table (which is below) — not the Categories or Display
+  # or the table (which is below), not the Categories or Display
   # controls that sit on the same row.
   paste0(
     '<div class="pf-fp-controls">',
@@ -278,7 +278,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   }, integer(1))
   total_cats <- length(cat_codes)
 
-  # Header cells — lowercase + sortable + base subtitle (n + cat
+  # Header cells: lowercase + sortable + base subtitle (n + cat
   # penetration as % of all respondents). The <th> itself is the click
   # target (no inner <button>) so the header strip renders as a
   # continuous solid bar without per-cell native-button artefacts.
@@ -301,7 +301,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   # Trailing "categories" column header (sort by presence count).
   cats_th <- '<th class="pf-fp-th pf-fp-th-sort pf-fp-th-cats" data-pf-fp-sort="__cats__" scope="col" tabindex="0" role="button"><span class="pf-fp-th-inner"><span class="pf-fp-th-label">categories</span><span class="pf-fp-th-base">in portfolio</span><span class="pf-fp-sort-ind" aria-hidden="true">&#x2195;</span></span></th>'
 
-  # Body rows — brand name first column + awareness cells.
+  # Body rows: brand name first column + awareness cells.
   rows <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
     nm  <- brand_label[i]
@@ -319,7 +319,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
       n_str <- if (!is.na(n_cell)) sprintf("n=%d", n_cell) else ""
 
       if (is.null(v) || is.na(v) || !is.finite(v)) {
-        sprintf('<td class="pf-fp-td pf-fp-td-na" data-pf-fp-val="" data-pf-fp-col="%s">&mdash;</td>',
+        sprintf('<td class="pf-fp-td pf-fp-td-na" data-pf-fp-val="" data-pf-fp-col="%s">n/a</td>',
                 .pf_esc(cc))
       } else {
         # Heat colours are inlined as CSS custom properties so the JS-driven
@@ -351,7 +351,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   # Brand-column sort header (sort by brand name).
   brand_th <- '<th class="pf-fp-th pf-fp-th-brand pf-fp-th-sort" data-pf-fp-sort="__brand__" scope="col" tabindex="0" role="button"><span class="pf-fp-th-inner"><span class="pf-fp-th-label">brand</span><span class="pf-fp-sort-ind" aria-hidden="true">&#x2195;</span></span></th>'
 
-  # Default state: heatmap on, counts off — matches MA matrix.
+  # Default state: heatmap on, counts off. Matches MA matrix.
   # Column order: brand label | categories-count | per-category cells.
   paste0(
     '<div class="pf-fp-table-wrap pf-fp-heatmap-on">',

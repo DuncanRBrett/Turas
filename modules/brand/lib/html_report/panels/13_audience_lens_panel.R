@@ -1,12 +1,12 @@
 # ==============================================================================
 # BRAND MODULE - AUDIENCE LENS PANEL HTML RENDERER
-# SIZE-EXCEPTION: sequential HTML assembly pipeline — three sub-tabs (Banner,
+# SIZE-EXCEPTION: sequential HTML assembly pipeline, three sub-tabs (Banner,
 # Pair Cards, Heatmap) each requiring their own builder and JS payload.
 # ==============================================================================
 # Renders the per-category Audience Lens tab. Three internal sub-tabs:
-#   1) Banner       — total + every audience side-by-side, all 14 metrics
-#   2) Audiences    — per-audience deck-ready cards (single-audience scorecards)
-#   3) Pairs        — pair audience side-by-side cards with GROW/FIX/DEFEND
+#   1) Banner: total + every audience side-by-side, all 14 metrics
+#   2) Audiences, per-audience deck-ready cards (single-audience scorecards)
+#   3) Pairs: pair audience side-by-side cards with GROW/FIX/DEFEND
 #
 # Each card carries a per-card pin + PNG button (brand_pins.js shared toolbar).
 # All CSS uses portable selectors with !important on layout-critical rules so
@@ -99,7 +99,7 @@ build_audience_lens_panel_html <- function(panel_data,
         cls <- .al_banner_cell_class(cell, au)
         sprintf('<td class="al-banner-cell %s" title="n=%s">%s</td>',
                 cls,
-                if (cell$buyer_base_na) "—" else
+                if (cell$buyer_base_na) "n/a" else
                   format(cell$n_base, big.mark = ","),
                 .al_esc(cell$formatted))
       }, character(1))
@@ -125,7 +125,7 @@ build_audience_lens_panel_html <- function(panel_data,
        </header>
        <article class="al-banner-card al-card-section" id="section-%s" data-section="%s">
          <div class="al-banner-card-titlebar">
-           <h3 class="al-banner-card-title al-card-title">Audience banner — %s</h3>
+           <h3 class="al-banner-card-title al-card-title">Audience banner: %s</h3>
            %s
          </div>
          <div class="al-banner-table-wrap" data-pin-as-table>
@@ -256,7 +256,7 @@ build_audience_lens_panel_html <- function(panel_data,
   rows <- paste(vapply(card$rows, function(r) {
     if (isTRUE(r$buyer_base_na)) {
       sprintf(
-        '<tr class="al-audrow al-audrow-na"><td class="al-audrow-label">%s</td><td class="al-audrow-val">N/A †</td><td class="al-audrow-delta">—</td></tr>',
+        '<tr class="al-audrow al-audrow-na"><td class="al-audrow-label">%s</td><td class="al-audrow-val">N/A †</td><td class="al-audrow-delta">n/a</td></tr>',
         .al_esc(r$metric_label))
     } else {
       sprintf(
@@ -357,7 +357,7 @@ build_audience_lens_panel_html <- function(panel_data,
     '<article class="al-pair-card al-card-section" id="section-%s" data-section="%s" data-pair-id="%s">
        <header class="al-card-header">
          <div class="al-card-titlebar">
-           <h3 class="al-card-title">%s vs %s — %s</h3>
+           <h3 class="al-card-title">%s vs %s: %s</h3>
            %s
          </div>
          <div class="al-card-sub">%s</div>
@@ -389,7 +389,7 @@ build_audience_lens_panel_html <- function(panel_data,
 
 .al_render_chip <- function(chip, reason) {
   if (is.na(chip) || !nzchar(chip) || identical(toupper(chip), "NONE")) {
-    return('<span class="al-chip al-chip-none">—</span>')
+    return('<span class="al-chip al-chip-none">n/a</span>')
   }
   cls <- paste0("al-chip al-chip-", tolower(chip))
   sprintf('<span class="%s" title="%s">%s</span>',
@@ -429,7 +429,7 @@ build_audience_lens_panel_html <- function(panel_data,
 
 
 # ==============================================================================
-# CSS — portable selectors with !important on layout-critical rules so the
+# CSS: portable selectors with !important on layout-critical rules so the
 # TurasPins inliner can reproduce cards in pin / PNG output.
 # ==============================================================================
 

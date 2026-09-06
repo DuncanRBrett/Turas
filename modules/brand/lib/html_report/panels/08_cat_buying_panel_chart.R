@@ -7,7 +7,7 @@
 #   3. Buy-rate profile horizontal bars
 #   4. DoP deviation heatmap
 #
-# SIZE-EXCEPTION: SVG rendering pipeline — each builder is a sequential series
+# SIZE-EXCEPTION: SVG rendering pipeline. Each builder is a sequential series
 # of coordinate computations and string concatenations; decomposing further
 # would require passing many intermediate coordinate lists, harming readability.
 #
@@ -398,7 +398,7 @@ cb_buyrate_bars_svg <- function(brand_heaviness,
 
 #' Render DoP heatmap as an HTML table (colour-coded cells)
 #'
-#' @param dev_matrix Data frame. Primary matrix to render — deviation values or
+#' @param dev_matrix Data frame. Primary matrix to render, deviation values or
 #'   observed crossover percentages when \code{observed = TRUE}.
 #' @param obs_matrix Data frame or NULL. Optional overlay shown in tooltip.
 #' @param focal_brand Character or NULL.
@@ -423,14 +423,14 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
   # Column averages & SDs across the non-diagonal cells in each column.
   col_vals <- lapply(brands, function(col_b) {
     v <- tryCatch(as.numeric(dev_matrix[, col_b]), error = function(e) rep(NA_real_, n))
-    # exclude diagonal (i == j) — brand vs. itself
+    # exclude diagonal (i == j): brand vs. itself
     diag_idx <- which(brands == col_b)
     if (length(diag_idx) == 1) v[diag_idx] <- NA_real_
     v
   })
   col_avgs <- vapply(col_vals, function(v) mean(v, na.rm = TRUE), numeric(1))
   col_sds  <- vapply(col_vals, function(v) sd(v,   na.rm = TRUE), numeric(1))
-  # Per-column display max for CI mini-bar scaling — make sure it covers both
+  # Per-column display max for CI mini-bar scaling: make sure it covers both
   # the largest observed value and the upper CI bound, with a small margin.
   col_max  <- vapply(seq_along(brands), function(j) {
     cv <- col_vals[[j]]
@@ -463,7 +463,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     v
   }
   fmt_n <- function(n) {
-    if (!is.finite(n)) return("\u2014")
+    if (!is.finite(n)) return("n/a")
     if (n >= 1000) format(round(n), big.mark = ",", scientific = FALSE)
     else sprintf("%d", as.integer(round(n)))
   }
@@ -505,14 +505,14 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
   lines <- c(lines, '<div class="cb-heatmap-wrap">')
   lines <- c(lines, '<table class="cb-heatmap-table cb-dop-table" data-cb-heatmap="on">')
 
-  # Column-group header label above — "% of buyers who also bought brand"
+  # Column-group header label above: "% of buyers who also bought brand"
   lines <- c(lines, '<thead>')
   lines <- c(lines, sprintf(paste0(
     '<tr class="cb-dop-grouphdr"><th class="cb-dop-row-hdr"></th>',
     '<th class="cb-dop-group-lbl" colspan="%d">%% of buyers who also bought brand</th></tr>'),
     n))
 
-  # Header row — Brand column sortable A-Z/Z-A (col 0); columns sort numerically.
+  # Header row: Brand column sortable A-Z/Z-A (col 0); columns sort numerically.
   lines <- c(lines, paste0(
     '<tr><th class="cb-dop-row-hdr cb-sortable" ',
     'data-cb-sort-col="0" data-cb-sort-dir="none" title="Click to sort A-Z">',
@@ -544,7 +544,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     cells <- character(0)
     for (j in seq_along(brands)) {
       if (i == j) {
-        cells <- c(cells, '<td class="cb-dop-diag" style="text-align:center;">\u2014</td>')
+        cells <- c(cells, '<td class="cb-dop-diag" style="text-align:center;">n/a</td>')
         next
       }
       val <- tryCatch(as.numeric(dev_matrix[i, brands[j]]), error = function(e) NA)
@@ -562,7 +562,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
       } else {
         dev_val <- val
       }
-      val_txt <- if (is.na(val)) "\u2014" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
+      val_txt <- if (is.na(val)) "n/a" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
       attrs <- cell_attrs(val, j, obs, exp_val, dev_val)
       data_v_attr <- if (!is.na(val)) sprintf(' data-v="%.4f"', val) else ' data-v=""'
       # Show-counts companion: n = pct * row_buyers / 100 (hidden by default).
@@ -579,12 +579,12 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     paste0(out, paste(cells, collapse = ""), '</tr>')
   }
 
-  # Category average row — value + CI mini-bar (avg \u00b1 1 SD), funnel format
+  # Category average row: value + CI mini-bar (avg \u00b1 1 SD), funnel format
   avg_cells <- vapply(seq_along(brands), function(j) {
     v    <- col_avgs[j]
     sdv  <- col_sds[j]
     if (!is.finite(v)) {
-      return('<td class="cb-dop-avg-cell" data-v="" style="text-align:center;">\u2014</td>')
+      return('<td class="cb-dop-avg-cell" data-v="" style="text-align:center;">n/a</td>')
     }
     txt  <- sprintf("%.0f%%", v)
     data_v_attr <- sprintf(' data-v="%.4f"', v)
@@ -946,7 +946,7 @@ cb_freq_dist_svg <- function(freq_dist,
   total_h <- pad_t + n * (bar_h + gap) + pad_b
   bw      <- W - pad_l - pad_r
 
-  # Blue shades — lightest = 1×, darkest = 6+×
+  # Blue shades: lightest = 1×, darkest = 6+×
   cols <- c("#bfdbfe", "#60a5fa", "#2563eb", "#1e3a8a")
 
   lines <- character(0)
@@ -1132,7 +1132,7 @@ cb_purchase_dist_html <- function(freq_dist,
 
 
 # ==============================================================================
-# DUPLICATION OF PURCHASE — PARTITION CARD
+# DUPLICATION OF PURCHASE: PARTITION CARD
 # ==============================================================================
 # Reads the focal brand's row in the observed crossover matrix, compares each
 # column to that column's cross-brand average (the same expectation used for
@@ -1239,7 +1239,7 @@ cb_dop_partition_card_html <- function(obs_matrix,
   weak_msg <- if (is.finite(max_abs) && max_abs < weak_threshold) {
     signed_max <- max_abs * sign(devs[which.max(abs(devs))])
     sprintf(paste0(
-      '<div class="cb-dop-pc-weak">Weak partition signal — this focal ',
+      '<div class="cb-dop-pc-weak">Weak partition signal: this focal ',
       'duplicates roughly in line with category averages (largest ',
       'deviation %s).</div>'),
       fmt_dev(signed_max))
@@ -1262,13 +1262,13 @@ cb_dop_partition_card_html <- function(obs_matrix,
     '<div class="cb-dop-pc-grid">',
     '<div class="cb-dop-pc-col cb-dop-pc-partners">',
     '<div class="cb-dop-pc-coltitle">Partition partners',
-    '<span class="cb-dop-pc-hint">duplicate above category avg — likely share shoppers/occasions</span>',
+    '<span class="cb-dop-pc-hint">duplicate above category avg: likely share shoppers/occasions</span>',
     '</div>',
     '<ul class="cb-dop-pc-list">', partners_html, '</ul>',
     '</div>',
     '<div class="cb-dop-pc-col cb-dop-pc-rivals">',
     '<div class="cb-dop-pc-coltitle">Partition rivals',
-    '<span class="cb-dop-pc-hint">duplicate below category avg — likely substitution or distinct partition</span>',
+    '<span class="cb-dop-pc-hint">duplicate below category avg: likely substitution or distinct partition</span>',
     '</div>',
     '<ul class="cb-dop-pc-list">', rivals_html, '</ul>',
     '</div>',
@@ -1278,7 +1278,7 @@ cb_dop_partition_card_html <- function(obs_matrix,
 
 
 # ==============================================================================
-# DUPLICATION OF PURCHASE — PARTITION CLUSTER MAP (DENDROGRAM)
+# DUPLICATION OF PURCHASE: PARTITION CLUSTER MAP (DENDROGRAM)
 # ==============================================================================
 # Hierarchical clustering on the symmetric mean-deviation matrix:
 #
@@ -1404,11 +1404,11 @@ cb_dop_cluster_map_html <- function(obs_matrix,
   fit_caveat <- switch(fit_band,
     strong   = "Partitions are reliable.",
     moderate = "Broad partitions are real; some noise inside groups.",
-    weak     = "Treat partitions as exploratory — limited structure.",
-    poor     = "No clear partition structure — interpret with caution.",
+    weak     = "Treat partitions as exploratory: limited structure.",
+    poor     = "No clear partition structure: interpret with caution.",
     na       = "Could not compute reliability.")
-  coph_disp <- if (is.finite(coph_corr)) sprintf("%.2f", coph_corr) else "—"
-  sil_disp  <- if (is.finite(avg_sil))   sprintf("%.2f", avg_sil)   else "—"
+  coph_disp <- if (is.finite(coph_corr)) sprintf("%.2f", coph_corr) else "n/a"
+  sil_disp  <- if (is.finite(avg_sil))   sprintf("%.2f", avg_sil)   else "n/a"
   # Multi-line tooltip via CSS popover (the native title attribute was
   # unreliable for newline-formatted content across browsers).
   fit_aria <- sprintf(
@@ -1426,7 +1426,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
              '<span class="cb-cm-fit-tip-row">',
                '<span class="cb-cm-fit-tip-k">Silhouette (k=%d)</span>',
                '<span class="cb-cm-fit-tip-v">%s</span></span>',
-             '<span class="cb-cm-fit-tip-foot">%s — %s</span>',
+             '<span class="cb-cm-fit-tip-foot">%s: %s</span>',
            '</span>',
          '</span>'),
     fit_band, .cb_esc(fit_aria), fit_label, coph_disp,
@@ -1470,7 +1470,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
     TREE_BOTTOM - (dy / max_h) * (TREE_BOTTOM - TREE_TOP)
   }
 
-  # Soft, distinct cluster palette — pastel fill, mid stroke, deep edge.
+  # Soft, distinct cluster palette, pastel fill, mid stroke, deep edge.
   band_fill   <- c("#e0ecff", "#dcfce7", "#fef3c7", "#fce7f3", "#ede9fe", "#fee2e2")
   band_stroke <- c("#7da9ff", "#6ee7b7", "#fcd34d", "#f0a3c7", "#a99cf6", "#fca5a5")
   band_edge   <- c("#1e4fbb", "#047857", "#b45309", "#9d174d", "#5b21b6", "#991b1b")
@@ -1503,7 +1503,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
     i <- j + 1L
   }
 
-  # Tree edges — within-cluster merges get the cluster colour, between-
+  # Tree edges: within-cluster merges get the cluster colour, between-
   # cluster merges stay neutral grey.
   GREY <- "#94a3b8"
   edge_lines <- character(0)
@@ -1540,7 +1540,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
       sx_a, sy_p, sx_b, sy_p, stroke, sw, op))
   }
 
-  # Leaf dots — cluster-coloured circles where the tree lands inside the
+  # Leaf dots: cluster-coloured circles where the tree lands inside the
   # band; gives a clear visual anchor for each brand. data-brand attr lets
   # JS find dots by code on focal-switch.
   dot_lines <- character(0)
@@ -1556,7 +1556,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
       .cb_esc(bc), sx, sx, DOT_Y, DOT_R, band_edge[ix]))
   }
 
-  # Leaf labels (rotated 35° — fits more breathing room than 45°).
+  # Leaf labels (rotated 35°: fits more breathing room than 45°).
   label_lines <- character(0)
   for (i in seq_len(n)) {
     bc  <- brands[hc$order[i]]
@@ -1570,7 +1570,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
       .cb_esc(bc), sx, LABEL_TOP + 14, sx, LABEL_TOP + 14, .cb_esc(lbl)))
   }
 
-  # Focal halo + top-N partner badges — surfaces the apparent contradiction
+  # Focal halo + top-N partner badges: surfaces the apparent contradiction
   # when the focal's strongest partners (asymmetric, focal-row) sit in
   # different partitions from the focal's own cluster (a "bridge brand").
   annotations <- character(0)
@@ -1592,7 +1592,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
              'fill="%s" letter-spacing="0.8">FOCAL</text>'),
       fx, DOT_Y - 14, focal_colour))
 
-    # Compute focal's top-N partners (asymmetric — same logic as the card).
+    # Compute focal's top-N partners (asymmetric: same logic as the card).
     focal_idx <- which(brands == focal_brand)
     rec <- lapply(seq_along(brands), function(j) {
       if (j == focal_idx) return(NULL)
@@ -1647,12 +1647,12 @@ cb_dop_cluster_map_html <- function(obs_matrix,
   legend_html <- paste0(
     '<div class="cb-dop-cluster-legend">',
     '<p style="margin:0 0 6px;"><strong>How to read:</strong> brands grouped ',
-    'together share more buyers than the DJ Law would predict — they may ',
+    'together share more buyers than the DJ Law would predict. They may ',
     'serve a common partition or usage occasion. Brands in different groups ',
     'duplicate <em>less</em> than expected.</p>',
     '<p style="margin:0;"><strong>Bridge brands:</strong> if the focal’s ',
     'top partners (shown in the card above) sit in <em>different</em> ',
-    'partitions, the focal is acting as a <em>bridge</em> — its shoppers ',
+    'partitions, the focal is acting as a <em>bridge</em>, its shoppers ',
     'cross occasions rather than concentrating in one segment. The blue ring ',
     'marks the focal here; the small green ',
     '<span class="cb-cm-legend-plus">+</span> badges mark its top ',
@@ -1667,7 +1667,7 @@ cb_dop_cluster_map_html <- function(obs_matrix,
     'style="--cb-cm-focal:', .cb_esc(focal_colour), ';">',
     '<div class="cb-dop-cluster-title">',
     '<div class="cb-dop-cluster-title-text">Partition cluster map ',
-    '<span class="cb-dop-cluster-sub">— ', as.integer(k),
+    '<span class="cb-dop-cluster-sub">', as.integer(k),
     ' groups, hierarchical clustering on symmetric DJ-Law deviation</span>',
     '</div>',
     fit_badge_html,

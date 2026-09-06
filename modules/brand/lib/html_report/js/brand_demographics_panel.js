@@ -1,7 +1,7 @@
 /* ==============================================================================
  * BRAND MODULE - DEMOGRAPHICS PANEL JS (matrix layout v2)
  * ==============================================================================
- * SIZE-EXCEPTION: single panel controller — table + chart + focal picker +
+ * SIZE-EXCEPTION: single panel controller, table + chart + focal picker +
  * three toggle behaviours share state on a single panel root element. Splitting
  * across files would force a JS module loader and scoped imports the rest of
  * the brand-module client code intentionally avoids. ~325 active lines.
@@ -14,7 +14,7 @@
  *   - Per-card view toggle: table ↔ chart
  *
  * State lives on the panel root element (panel.__state). Mutating any input
- * re-applies the relevant DOM attributes — we do not re-render full HTML
+ * re-applies the relevant DOM attributes. We do not re-render full HTML
  * because the matrix is already laid out by the R renderer; we just toggle
  * visibility and inline-style cells.
  *
@@ -41,7 +41,7 @@
       showBuyer:     true,
       showNonbuyer:  true,
       cellMetric:    "penetration", // "penetration" | "share"
-      baseline:      "cat",         // "cat" | "study" — affects Share mode only
+      baseline:      "cat",         // "cat" | "study", affects Share mode only
       viewByCard:    {} // sectionId -> "table" | "chart"
     };
 
@@ -79,7 +79,7 @@
   // shading + chart marker between the cat-buyer distribution (r.pct)
   // and the total-study-sample distribution (q.total_study_sample.rows[i].pct).
   // Penetration mode is unaffected because its baseline is per-option
-  // mean brand pen (option_avg_penetration), not a sample distribution —
+  // mean brand pen (option_avg_penetration), not a sample distribution.
   // the baseline radios are visually disabled in Pen mode (see
   // applyBaselineEnabledState below) so the reader doesn't perceive a
   // broken control.
@@ -143,7 +143,7 @@
   }
 
   // Show / hide the .demo-cell-n spans across the panel. R renderer
-  // emits them with hidden — JS just toggles the attribute.
+  // emits them with hidden, JS just toggles the attribute.
   function applyCellExtras(panel) {
     const showN = panel.__state.showCounts;
     panel.querySelectorAll(".demo-cell-n").forEach(el => {
@@ -162,7 +162,7 @@
   }
 
   // ---- focal-brand picker ----
-  // <select> dropdown — picks which brand sits in column 2 ("Focal").
+  // <select> dropdown: picks which brand sits in column 2 ("Focal").
   // Replaces the earlier chip strip; full per-cohort exploration is the
   // tabs module's job, this stays a quick comparison.
   function bindFocalPicker(panel) {
@@ -175,7 +175,7 @@
   }
 
   // Re-render every visible card's matrix table AND chart by rebuilding
-  // both in JS. (Matches the R rendering shape exactly — same data
+  // both in JS. (Matches the R rendering shape exactly, same data
   // attributes so brand-visibility / heatmap / counts toggles continue
   // to work.) Called whenever the focal-brand dropdown changes.
   function rerenderAllTables(panel) {
@@ -207,7 +207,7 @@
 
   // ---- brand-visibility selector (dropdown) ----
   // Replaces the legacy chip strip. State (hiddenBrands Set) and the visibility
-  // application (applyBrandVisibility) are unchanged — only the UI changed.
+  // application (applyBrandVisibility) are unchanged, only the UI changed.
   function bindBrandSelector(panel) {
     const trigger = panel.querySelector('.bs-trigger[data-bs-panel="demographics"]');
     if (!trigger || typeof window.BrandSelector === "undefined") return;
@@ -225,7 +225,7 @@
 
     // panelId MUST be unique per panel instance. BrandSelector's REGISTRY is
     // keyed by panelId, so a hardcoded "demographics" string makes every
-    // category panel overwrite the previous one's state — closeAll() then
+    // category panel overwrite the previous one's state, closeAll() then
     // can't find the actually-open popover and clicking outside doesn't
     // close it. Use the panel's DOM id as the natural anchor.
     window.BrandSelector.create({
@@ -372,7 +372,7 @@
     const focalLabel = (fi >= 0 ? (labels[fi] || focal) : focal) || "Focal";
     const brandTh = order.map(i => {
       const bc = brands[i], bl = labels[i] || bc;
-      // order excludes focal — every entry here is a non-focal brand.
+      // order excludes focal: every entry here is a non-focal brand.
       return `<th class="" data-demo-col="brand" data-demo-brand="${esc(bc)}">
         <span class="demo-brand-chip-swatch" style="background:${esc(palette[bc] || "#94a3b8")}"></span> ${esc(bl)}
       </th>`;
@@ -388,7 +388,7 @@
 
   // Dispatch on the current cell-metric mode. Same row structure (two rows
   // per option, focal pinned in column 2, per-brand block to the right) but
-  // different cell semantics and shading baseline per mode — see penTableBody
+  // different cell semantics and shading baseline per mode, see penTableBody
   // and shareTableBody for the details.
   function tableBody(rows, q, brands, order, focal, dp, metric, baseline) {
     if (metric === "share") {
@@ -475,7 +475,7 @@
     return entry.pct;
   }
 
-  // Cat-avg cell for penetration mode — shows the per-option mean brand pen
+  // Cat-avg cell for penetration mode: shows the per-option mean brand pen
   // (the typical brand's pen rate in this demographic).
   function catAvgPenCell(catPct, dp) {
     return `<td class="demo-col-catavg" data-demo-col="catavg">${pctStr(catPct, dp)}</td>`;
@@ -518,7 +518,7 @@
   // option" (audience-share). The buyer row sums to 100% down a brand column;
   // the non-buyer row is a SEPARATE distribution (% of brand's non-buyers in
   // this option) and also sums to 100% down its column. Heat colour is the
-  // gap vs Cat avg (% of cat respondents in this option) — the audience-share
+  // gap vs Cat avg (% of cat respondents in this option), the audience-share
   // baseline, restored from v1.
   function shareTableBody(rows, q, brands, order, focal, dp, baseline) {
     const buyerBy    = indexByBrand(q.brand_cut);
@@ -547,7 +547,7 @@
     return `<tbody>${trs}</tbody>`;
   }
 
-  // Cat-avg cell for Share mode — displays the baseline pct chosen by the
+  // Cat-avg cell for Share mode: displays the baseline pct chosen by the
   // user (cat-buyer distribution OR total-study-sample distribution).
   function catAvgCellBaseline(catPct, r, dp, baseline) {
     return `<td class="demo-col-catavg" data-demo-col="catavg">${pctStr(catPct, dp)}</td>`;
@@ -590,7 +590,7 @@
 
   function naCell(extraClass, colcode, brandCode) {
     return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}">
-      <span class="demo-na">&mdash;</span>
+      <span class="demo-na">n/a</span>
     </td>`;
   }
 
@@ -603,7 +603,7 @@
   }
 
   function pctStr(v, dp) {
-    if (v == null || !isFinite(v)) return '<span class="demo-na">&mdash;</span>';
+    if (v == null || !isFinite(v)) return '<span class="demo-na">n/a</span>';
     return v.toFixed(dp) + "%";
   }
   function countSpan(n) {
@@ -618,7 +618,7 @@
 
   // ============================================================================
   // CHART RENDERER (mirrors build_demographics_matrix_chart in R, so the
-  // chart re-renders client-side when focal changes — same colour, same
+  // chart re-renders client-side when focal changes, same colour, same
   // bar width math). The R-side renderer still produces the initial HTML
   // that ships in the report.
   // ============================================================================
@@ -632,7 +632,7 @@
     const ctx = chartModeCtx(q, focalBrand, metric, baseline);
     const scaleMax = chartScaleMax(rows, ctx);
 
-    // One row per option — buyer view only. Detail buyer-vs-non-buyer is
+    // One row per option: buyer view only. Detail buyer-vs-non-buyer is
     // in the table; the chart's job is the at-a-glance bar comparison
     // which is purely a buyer-row read.
     const bars = rows.map(r => chartRow(r, ctx, scaleMax, focalColour, dp)).join("");

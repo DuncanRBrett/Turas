@@ -1,13 +1,13 @@
 # ==============================================================================
-# BRAND MODULE — SHOPPER CONTEXT + FOCAL ENGAGEMENT SECTIONS
+# BRAND MODULE: SHOPPER CONTEXT + FOCAL ENGAGEMENT SECTIONS
 # ==============================================================================
 # Sample-wide additions to the Summary tab. Two stacked sections appended below
 # the existing dashboard:
 #
-#   1. Shopper context — Grocery chains used + Media channels consumed + Recipe
+#   1. Shopper context: Grocery chains used + Media channels consumed + Recipe
 #      use (5-pt). Sample-wide; doesn't follow the category / focal dropdowns.
 #
-#   2. Focal-brand engagement — IPK web visit, recipe-book purchase, IPK
+#   2. Focal-brand engagement: IPK web visit, recipe-book purchase, IPK
 #      recipes tried. KPIs computed against the focal brand (defaults to IPK).
 #
 # Both sections short-circuit to empty when the source data isn't present
@@ -35,7 +35,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 # Render a horizontal-bar chart row: label + bar (width = pct) + percentage
 # text. Bars share a common max so the eye can compare rows. Hides options
 # the analyst marked as "None of the above" by drawing them with a muted
-# style instead of removing them — small N is still informative context.
+# style instead of removing them. Small N is still informative context.
 .brss_bar_row <- function(label, pct, max_pct, focal_colour, is_filler = FALSE) {
   width_pct <- if (max_pct > 0) max(2, min(100, pct / max_pct * 100)) else 0
   bar_colour <- if (is_filler) "#cbd5e1" else focal_colour
@@ -72,7 +72,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   if (!isTRUE(max_pct > 0)) max_pct <- 1
 
   bars <- paste(vapply(rows, function(r) {
-    label <- r$label %||% r$value %||% "—"
+    label <- r$label %||% r$value %||% "n/a"
     is_filler <- grepl("^none", label, ignore.case = TRUE)
     .brss_bar_row(label, r$pct_weighted %||% 0, max_pct, focal_colour, is_filler)
   }, character(1)), collapse = "")
@@ -87,7 +87,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   pct <- kpi$pct_yes %||% NA_real_
   n_total <- kpi$n_total %||% 0
   base_note <- kpi$base_note %||% sprintf("Base: %d respondents.", n_total)
-  pct_display <- if (is.na(pct)) "—" else sprintf("%.0f%%", pct)
+  pct_display <- if (is.na(pct)) "n/a" else sprintf("%.0f%%", pct)
   sprintf(
     paste0('<div class="brss-kpi-card">',
            '<div class="brss-kpi-value" style="color:%s">%s</div>',
@@ -152,7 +152,7 @@ build_shopper_summary_sections <- function(results, config) {
   # Section 2: Focal-brand engagement (web / books / recipes-tried)
   eng_html <- ""
   if (!is.null(eng)) {
-    focal_label <- focal_brand  # kept short — the section title carries the name
+    focal_label <- focal_brand  # kept short. The section title carries the name
     kpis <- c(
       .brss_kpi_card(eng$website,
         sprintf("Visited %s website", focal_label), focal_colour),

@@ -15,9 +15,9 @@
 # use the `.ma-*` prefix.
 #
 # Sub-renderers:
-#   02_ma_panel_table.R    — attribute/CEP matrix table (brands-as-columns)
-#   02_ma_panel_chart.R    — MMS/MPen/NS summary charts + CEP ranking bar
-#   02_ma_panel_styling.R  — MA-specific CSS bundle
+#   02_ma_panel_table.R: attribute/CEP matrix table (brands-as-columns)
+#   02_ma_panel_chart.R, MMS/MPen/NS summary charts + CEP ranking bar
+#   02_ma_panel_styling.R, MA-specific CSS bundle
 #
 # Interaction JS: js/brand_ma_panel.js (loaded once per report).
 # VERSION: 1.0
@@ -257,7 +257,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 }
 
 
-#' Dot chart scaffold — chart series visibility now driven by the
+#' Dot chart scaffold: chart series visibility now driven by the
 #' BrandSelector dropdown in the table-controls bar (split mode +
 #' Sync table+chart toggle). The standalone chart-side chip strip has
 #' been removed; the SVG legend below is JS-populated.
@@ -292,7 +292,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 # ==============================================================================
 
 .ma_about_section <- function(pd) {
-  # Metrics-tab callout — definitions for MPen / NS / MMS / SoM, the
+  # Metrics-tab callout: definitions for MPen / NS / MMS / SoM, the
   # CEPs-only basis, and what the show-count denominators mean.
   # Body lives in modules/shared/lib/callouts/callouts.json under
   # brand.mental_availability_metrics; edit via the Callout Editor.

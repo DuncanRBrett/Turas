@@ -5,7 +5,7 @@
 # chart on the Competitive Set sub-tab.
 #
 # View toggle: Observed / Expected (Sharp's D) / Deviation. Switching views
-# is a pure JS swap — the renderer emits all three matrices in a single JSON
+# is a pure JS swap, the renderer emits all three matrices in a single JSON
 # payload and the client-side renderer in brand_portfolio_panel.js
 # (pf-dopa-* hooks) picks the active one and rebuilds the table.
 #
@@ -50,8 +50,8 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
   d_line <- paste0(
     '<div class="pf-dopa-d-line">',
     'Sharp&#39;s duplication coefficient ',
-    '<span class="pf-dopa-d-value" data-pf-dopa-d>&mdash;</span> ',
-    'for <span class="pf-dopa-cat-label" data-pf-dopa-cat-label>&mdash;</span>',
+    '<span class="pf-dopa-d-value" data-pf-dopa-d>n/a</span> ',
+    'for <span class="pf-dopa-cat-label" data-pf-dopa-cat-label>n/a</span>',
     '</div>'
   )
 
@@ -61,7 +61,7 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
     '<div class="pf-dopa-block" id="pf-dopa">',
     '<div class="pf-dopa-header">',
     '<h4 class="pf-dopa-title">Duplication of Awareness</h4>',
-    '<p class="pf-dopa-sub">Within the active category, what % of one brand&#39;s awares are also aware of every other brand &mdash; benchmarked against Sharp&#39;s Duplication Law.</p>',
+    '<p class="pf-dopa-sub">Within the active category, what % of one brand&#39;s awares are also aware of every other brand, benchmarked against Sharp&#39;s Duplication Law.</p>',
     '</div>',
     data_script,
     '<div class="pf-dopa-controls">',
@@ -146,19 +146,19 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
     '<div class="pf-dopa-reading">',
 
     '<p class="pf-dopa-reading-line"><strong>How to read it:</strong> ',
-    'Pick a row (brand A) and a column (brand B). The cell tells you what percentage of the people aware of A are also aware of B &mdash; ',
+    'Pick a row (brand A) and a column (brand B). The cell tells you what percentage of the people aware of A are also aware of B: ',
     'within the currently selected category. Rows always sum out of A&#39;s awares (so the diagonal is 100%). The matrix is asymmetric: ',
     'A&rarr;B will usually differ from B&rarr;A because the two brands have different awareness penetrations.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>What the three views show:</strong> ',
-    '<em>Observed</em> &mdash; what we actually saw in the data. ',
-    '<em>Expected (Sharp&#39;s D)</em> &mdash; what we would expect if brands were mentally co-known in proportion to their overall awareness, with no special competitive ties. ',
+    '<em>Observed</em>: what we actually saw in the data. ',
+    '<em>Expected (Sharp&#39;s D)</em>: what we would expect if brands were mentally co-known in proportion to their overall awareness, with no special competitive ties. ',
     'Sharp&#39;s duplication law says expected[i,j] = D &times; aware%(j), where D is fit from the off-diagonal cells. ',
-    '<em>Deviation</em> &mdash; observed minus expected, in percentage points. This is the diagnostic view.</p>',
+    '<em>Deviation</em>: observed minus expected, in percentage points. This is the diagnostic view.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>What the deviation means:</strong> ',
-    '<strong>Positive cells</strong> = brands that over-share awareness. Their awares are <em>more</em> likely than expected to also know the partner &mdash; these are direct mental-space rivals. ',
-    '<strong>Negative cells</strong> = partition brands. Their awares are <em>less</em> likely than expected to know the partner &mdash; the two brands sit in genuinely different mental spaces. ',
+    '<strong>Positive cells</strong> = brands that over-share awareness. Their awares are <em>more</em> likely than expected to also know the partner. These are direct mental-space rivals. ',
+    '<strong>Negative cells</strong> = partition brands. Their awares are <em>less</em> likely than expected to know the partner, the two brands sit in genuinely different mental spaces. ',
     'A row dominated by negative cells flags a brand whose awares are unusually self-contained. A column dominated by positive cells flags a brand that gets &ldquo;ridden along&rdquo; with other brands&#39; awareness.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>About D:</strong> ',
@@ -167,11 +167,11 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
 
     '<p class="pf-dopa-reading-line"><strong>How to use it alongside the constellation:</strong> ',
     'The constellation visualises which brands cluster in mental space. The deviation table tells you <em>how unusual</em> any given pair is once you account for each brand&#39;s overall awareness level. ',
-    'A big bright edge in the constellation chart that turns out to have a near-zero deviation means the co-awareness is just what you&#39;d expect for two well-known brands &mdash; not a true competitive tie. ',
+    'A big bright edge in the constellation chart that turns out to have a near-zero deviation means the co-awareness is just what you&#39;d expect for two well-known brands, not a true competitive tie. ',
     'A high deviation between two small brands means an unusually strong mental link that the constellation may not visually emphasise.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>How this reconciles with the constellation&rsquo;s Jaccard score:</strong> ',
-    'The constellation&rsquo;s Jaccard score and this table&rsquo;s DoA cells are three views of the same underlying overlap &mdash; they always reconcile if you do the maths. ',
+    'The constellation&rsquo;s Jaccard score and this table&rsquo;s DoA cells are three views of the same underlying overlap, they always reconcile if you do the maths. ',
     'For any two brands A and B: ',
     '<code class="pf-ex-formula">both = aware%(A) &times; DoA(A&rarr;B) = aware%(B) &times; DoA(B&rarr;A)</code> ',
     '<code class="pf-ex-formula">union = aware%(A) + aware%(B) &minus; both</code> ',
@@ -179,8 +179,8 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
     'So if brand A has 45% awareness, brand B has 72% awareness, and the DoA cells are A&rarr;B = 79% and B&rarr;A = 49%, then both = 0.45 &times; 0.79 = 35.5%, union = 45 + 72 &minus; 35.5 = 81.5%, and Jaccard = 35.5 / 81.5 = 44%. All three numbers describe the same pair.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>Why the three numbers still tell you different things:</strong> ',
-    '<em>Jaccard</em> is symmetric &mdash; one number per pair, computed over everyone who knows <em>either</em> brand. ',
-    '<em>DoA cells</em> are asymmetric &mdash; two numbers per pair, computed over the awares of the row brand. ',
+    '<em>Jaccard</em> is symmetric, one number per pair, computed over everyone who knows <em>either</em> brand. ',
+    '<em>DoA cells</em> are asymmetric, two numbers per pair, computed over the awares of the row brand. ',
     'For a small brand competing against a much larger one, the two DoA cells are usually very different: the small brand&rsquo;s awares almost all also know the giant (high A&rarr;B), but the giant&rsquo;s awares only sometimes know the small brand (lower B&rarr;A). ',
     'The Jaccard collapses both into one number and hides that asymmetry. ',
     'Read the constellation when you want a single visual map of which brands cluster; read the DoA table when you need to see <em>which direction</em> the dependency runs and whether it&rsquo;s more or less duplication than Sharp&rsquo;s Law predicts.</p>',

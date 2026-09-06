@@ -15,8 +15,8 @@
 #          placeholder so the nav is complete but non-functional until Phase 4/3.
 #
 # Sub-renderers (to be added in later phases):
-#   09_portfolio_panel_chart.R  — chart wrappers
-#   09_portfolio_panel_table.R  — table wrappers
+#   09_portfolio_panel_chart.R: chart wrappers
+#   09_portfolio_panel_table.R, table wrappers
 # ==============================================================================
 
 PORTFOLIO_PANEL_VERSION <- "1.0"
@@ -110,7 +110,7 @@ build_br_portfolio_panel <- function(results, config) {
                                        brand_colours = pf_brand_colours)
   cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_brand, focal_colour,
                                  brand_colours = pf_brand_colours)
-  # Extension subtab removed for IPK wave 1 — the awareness-lift metric alone
+  # Extension subtab removed for IPK wave 1: the awareness-lift metric alone
   # didn't carry enough strategic signal to justify the real estate (lift > 1
   # is the structural norm for any well-known focal, and the panel encouraged
   # over-reading awareness halo as permission-to-extend). Engine + renderer
@@ -146,7 +146,7 @@ build_br_portfolio_panel <- function(results, config) {
         '<p style="margin:0 0 6px;">',
         '<strong>Portfolio Mapping</strong> reports awareness for each ',
         'category against the <strong>full set of category buyers</strong> in the ',
-        'sample (everyone who said they bought in that category in the %s &mdash; ',
+        'sample (everyone who said they bought in that category in the %s: ',
         'typically 600&ndash;1,000 per category here).',
         '</p>',
         '<p style="margin:0 0 6px;">',
@@ -167,7 +167,7 @@ build_br_portfolio_panel <- function(results, config) {
       timeframe_label, n_label, timeframe_label
     ),
 
-    # NOTE: removed the top hero KPI strip (§5) per Duncan — those four
+    # NOTE: removed the top hero KPI strip (§5) per Duncan, those four
     # "focal category" cards were misleading because the portfolio panel
     # has no single focal category. The four per-focal-brand cards on
     # the Overview sub-tab cover the same information correctly.
@@ -195,7 +195,7 @@ build_br_portfolio_panel <- function(results, config) {
     cl_html,
     '</div>',
 
-    # Extension subtab removed for IPK wave 1 — see note next to ex_html
+    # Extension subtab removed for IPK wave 1, see note next to ex_html
     # above. Restore alongside `ex_html` to re-enable.
 
     '</div>',  # .pf-panel
@@ -213,7 +213,7 @@ build_br_portfolio_panel <- function(results, config) {
 #   1. The brand_names map already computed by compute_footprint_matrix
 #      and threaded through panel_data$footprint.
 #   2. The portfolio_overview cats_list, where each category records its
-#      brand_codes + brand_names — Overview is computed independently and
+#      brand_codes + brand_names. Overview is computed independently and
 #      always available alongside the Portfolio panel.
 #   3. The focal brand code itself, as a last-resort fallback.
 .pf_resolve_focal_name <- function(panel_data, portfolio, focal_brand) {
@@ -257,15 +257,15 @@ build_br_portfolio_panel <- function(results, config) {
     )
   }
 
-  fmt_n <- function(x) if (is.null(x) || is.na(x)) "\u2014" else
+  fmt_n <- function(x) if (is.null(x) || is.na(x)) "n/a" else
     format(round(x, 1), nsmall = 1)
-  fmt_x <- function(x) if (is.null(x) || is.na(x)) "\u2014" else
+  fmt_x <- function(x) if (is.null(x) || is.na(x)) "n/a" else
     sprintf("%.1f\u00d7", x)
 
   n_cats <- supporting$n_cats_total %||% 0L
   breadth <- supporting$focal_footprint_breadth %||% 0L
 
-  # Use the focal brand display name when available \u2014 e.g.
+  # Use the focal brand display name when available, e.g.
   # "Ina Paarman's Kitchen present across categories" rather than
   # "IPK present across categories". Falls back to the code if the
   # name isn't supplied.
@@ -306,7 +306,7 @@ build_br_portfolio_panel <- function(results, config) {
     '<button class="pf-sub-btn" data-pf-subtab="clutter"',
     '  onclick="pfSwitchSubtab(\'clutter\')"',
     '  role="tab" aria-selected="false">Category Context</button>',
-    # Extension sub-tab button removed for IPK wave 1 — re-enable by
+    # Extension sub-tab button removed for IPK wave 1, re-enable by
     # restoring the button + the matching subtab body + ex_html call.
     # '<button class="pf-sub-btn" data-pf-subtab="extension"',
     # '  onclick="pfSwitchSubtab(\'extension\')"',
@@ -442,7 +442,7 @@ build_br_portfolio_panel <- function(results, config) {
 
   # Union of brands that appear in any per-cat network (each carries
   # both code + display label). The focal-brand <select> picks from this
-  # union — every brand the user might want to centre the analysis on.
+  # union. Every brand the user might want to centre the analysis on.
   brand_union <- list()
   for (cc in cat_codes) {
     nd <- per_cat$by_cat[[cc]]$nodes
@@ -468,7 +468,7 @@ build_br_portfolio_panel <- function(results, config) {
             .pf_esc(bc), sel, .pf_esc(nm))
   }, character(1)), collapse = "")
 
-  # Picker chips — one per category with a constellation.
+  # Picker chips, one per category with a constellation.
   chips <- vapply(seq_along(cat_codes), function(i) {
     cc  <- cat_codes[i]
     nm  <- as.character(cat_names[[cc]] %||% cc)
@@ -479,7 +479,7 @@ build_br_portfolio_panel <- function(results, config) {
     )
   }, character(1))
 
-  # JSON payload — one entry per cat, edges + node labels. JS uses this to
+  # JSON payload, one entry per cat, edges + node labels. JS uses this to
   # rebuild the "Closest competitors to <focal>" list whenever the user
   # changes the focal-brand picker, without the round-trip of a re-render.
   panel_data_json <- .pf_cn_to_json(per_cat, focal_colour, brand_colours)
@@ -488,7 +488,7 @@ build_br_portfolio_panel <- function(results, config) {
     .br_json_island(panel_data_json)
   )
 
-  # One <div> per category — only the default starts visible. Each
+  # One <div> per category: only the default starts visible. Each
   # category panel includes the SVG chart and a side panel that JS fills
   # with the closest-competitors list for the active focal.
   panels <- vapply(seq_along(cat_codes), function(i) {
@@ -502,7 +502,7 @@ build_br_portfolio_panel <- function(results, config) {
         layout       = cn$layout,
         focal_colour = focal_colour,
         brand_colours = brand_colours,
-        title        = paste0("Competitive Constellation — ", nm)
+        title        = paste0("Competitive Constellation: ", nm)
       ),
       error = function(e) ""
     )
@@ -518,7 +518,7 @@ build_br_portfolio_panel <- function(results, config) {
            </div>
            <aside class="pf-cn-side">
              <h4 class="pf-cn-side-title">Closest competitors</h4>
-             <p class="pf-cn-side-sub">Brands ranked by co-awareness Jaccard with the focal. Higher = consumers tend to know both brands together — direct mental-space rivals.</p>
+             <p class="pf-cn-side-sub">Brands ranked by co-awareness Jaccard with the focal. Higher = consumers tend to know both brands together, direct mental-space rivals.</p>
              <ol class="pf-cn-rivals" data-pf-cn-rivals="%s"></ol>
            </aside>
          </div>
@@ -539,25 +539,25 @@ build_br_portfolio_panel <- function(results, config) {
   reading_guide <- paste0(
     '<div class="pf-cn-reading">',
     '<p class="pf-cn-reading-line"><strong>How to read it:</strong> ',
-    'Each dot is a brand. The lines that light up in the focal colour connect your focal (highlighted with the dashed ring) to its co-awareness rivals — thicker line = stronger Jaccard, so a thicker line means consumers are more likely to know both brands together. ',
+    'Each dot is a brand. The lines that light up in the focal colour connect your focal (highlighted with the dashed ring) to its co-awareness rivals, thicker line = stronger Jaccard, so a thicker line means consumers are more likely to know both brands together. ',
     'Hover any dot to see its exact Jaccard score with the focal, plus how it ranks against the other brands in this category.</p>',
 
     '<p class="pf-cn-reading-line"><strong>About distance on the chart:</strong> ',
-    'The position of each dot is set by a <em>force-directed layout</em> — every brand is pulled toward all the brands it shares awareness with, not just toward your focal. ',
+    'The position of each dot is set by a <em>force-directed layout</em>. Every brand is pulled toward all the brands it shares awareness with, not just toward your focal. ',
     'That means a brand can sit visually closer to your focal than another even though its Jaccard score is lower (it gets dragged that way by its own ties to other brands). ',
-    'Trust the highlighted lines and the side-panel ranking for the focal-vs-rival comparison; use the dot positions to read the wider <em>shape</em> of the network — clusters of brands that hang together, isolated outliers, and so on.</p>',
+    'Trust the highlighted lines and the side-panel ranking for the focal-vs-rival comparison; use the dot positions to read the wider <em>shape</em> of the network, clusters of brands that hang together, isolated outliers, and so on.</p>',
 
     '<p class="pf-cn-reading-line"><strong>What the Jaccard score means:</strong> ',
-    'The number next to each rival is the <em>Jaccard similarity</em> between that brand and your focal &mdash; a <strong>0&ndash;1 score</strong>, where 0 means no shared awares and 1 means perfect overlap. ',
+    'The number next to each rival is the <em>Jaccard similarity</em> between that brand and your focal. A <strong>0&ndash;1 score</strong>, where 0 means no shared awares and 1 means perfect overlap. ',
     'It is a <em>symmetric overlap measure</em>, not a percentage of any one brand&rsquo;s awares. ',
     'The actual interpretation is: <em>&ldquo;Of all the people in this category who are aware of <strong>either</strong> brand A <strong>or</strong> brand B, what proportion are aware of <strong>both</strong>?&rdquo;</em> ',
-    'So a Jaccard of <strong>0.56</strong> between IPK and Knorr means 56% of everyone who knows either IPK or Knorr knows both &mdash; the same number from either brand&rsquo;s perspective. ',
-    '<strong>0.80</strong> means almost everyone who knows one brand also knows the other &mdash; they share mental space and you compete for the same attention. ',
-    '<strong>0.20</strong> means the two awareness sets barely overlap &mdash; the brands are known by mostly different people, so they aren&rsquo;t really competing for the same minds. ',
-    'A common misreading is &ldquo;0.56 = 56% of IPK awares know Knorr&rdquo; &mdash; that is <em>not</em> what this score is; that conditional number lives on the Duplication of Awareness table below.</p>',
+    'So a Jaccard of <strong>0.56</strong> between IPK and Knorr means 56% of everyone who knows either IPK or Knorr knows both, the same number from either brand&rsquo;s perspective. ',
+    '<strong>0.80</strong> means almost everyone who knows one brand also knows the other, they share mental space and you compete for the same attention. ',
+    '<strong>0.20</strong> means the two awareness sets barely overlap. The brands are known by mostly different people, so they aren&rsquo;t really competing for the same minds. ',
+    'A common misreading is &ldquo;0.56 = 56% of IPK awares know Knorr&rdquo;. That is <em>not</em> what this score is; that conditional number lives on the Duplication of Awareness table below.</p>',
 
     '<p class="pf-cn-reading-line"><strong>What to do with it:</strong> ',
-    'The brands at the top of the side list are the ones to study first — they’re your real rivals in this category. ',
+    'The brands at the top of the side list are the ones to study first, they’re your real rivals in this category. ',
     'If your focal sits alone with no high-Jaccard neighbours, you have distinctive mental space to defend. ',
     'If it sits inside a tight cluster, your differentiation is doing less work than the chart might suggest. ',
     'Use the focal picker to repeat the read for any other brand in this category, or switch categories with the chips above.</p>',
@@ -596,7 +596,7 @@ build_br_portfolio_panel <- function(results, config) {
 
 
 # Compact JSON serialiser for the per-category constellations. The
-# payload is tiny — node code + label + per-pair Jaccard — but enough
+# payload is tiny, node code + label + per-pair Jaccard, but enough
 # for the JS-side competitors-list re-compute on focal change.
 .pf_cn_to_json <- function(per_cat, focal_colour = NULL,
                             brand_colours = NULL) {
@@ -621,7 +621,7 @@ build_br_portfolio_panel <- function(results, config) {
           jac = as.numeric(edges$jaccard[i])
         ))
       } else list(),
-      # All pairs (sorted desc) — sent so the hover tooltip can surface the
+      # All pairs (sorted desc): sent so the hover tooltip can surface the
       # actual Jaccard for any pair, not just the top-N drawn as edges.
       # Falls back to chart edges if the engine didn't populate edges_full.
       all_edges = if (!is.null(edges_full) && nrow(edges_full) > 0) {
@@ -668,7 +668,7 @@ build_br_portfolio_panel <- function(results, config) {
 
   clutter_df <- cl$clutter_df
 
-  # Initial render — uses the configured focal. JS swaps the SVG to a
+  # Initial render: uses the configured focal. JS swaps the SVG to a
   # client-rendered version when the focal picker changes.
   df_plot <- clutter_df
   df_plot$focal_share_pct <- df_plot$focal_share_of_aware * 100
@@ -694,7 +694,7 @@ build_br_portfolio_panel <- function(results, config) {
     error = function(e) ""
   )
 
-  # JSON payload — per-category awareness data + ref_x. JS recomputes
+  # JSON payload: per-category awareness data + ref_x. JS recomputes
   # focal_share_of_aware, fair_share and quadrant on focal change, then
   # rebuilds the SVG without a server round-trip.
   per_cat_full <- panel_data$clutter$per_cat_full %||% cl$per_cat_full %||% list()
@@ -705,7 +705,7 @@ build_br_portfolio_panel <- function(results, config) {
     .br_json_island(payload_json)
   )
 
-  # Brand picker — union of brands across all clutter cats, focal first.
+  # Brand picker: union of brands across all clutter cats, focal first.
   brand_union <- list()
   for (cc in names(per_cat_full)) {
     pcs <- per_cat_full[[cc]]
@@ -731,7 +731,7 @@ build_br_portfolio_panel <- function(results, config) {
             .pf_esc(bc), sel, .pf_esc(nm))
   }, character(1)), collapse = "")
 
-  # Server emits an empty table shell — JS fills it from the JSON
+  # Server emits an empty table shell: JS fills it from the JSON
   # payload so the table re-renders when the focal brand changes.
   table_shell <- '<div id="pf-cl-table-host" class="pf-cl-table-host"></div>'
   coverage_note <- '<p id="pf-cl-coverage" class="pf-cl-coverage"></p>'
@@ -747,26 +747,26 @@ build_br_portfolio_panel <- function(results, config) {
     '<em>Y (vertical)</em> = your focal brand’s <em>share</em> of all brand-awareness mentions in that category. High up = focal owns a big slice of mental availability. Low down = focal is one of many or barely registers.</p>',
 
     '<p class="pf-cl-reading-line"><strong>Why the Y axis differs from the awareness % on the Overview tab:</strong> ',
-    'These are two different metrics — the table below shows both side by side. ',
-    '<em>Focal awareness</em> (on the Overview tab) is the simple "% of category buyers aware of the focal" — e.g. <strong>58%</strong> know All Gold in Pasta Sauces. ',
+    'These are two different metrics. The table below shows both side by side. ',
+    '<em>Focal awareness</em> (on the Overview tab) is the simple "% of category buyers aware of the focal", e.g. <strong>58%</strong> know All Gold in Pasta Sauces. ',
     '<em>Focal share of awareness</em> (this chart’s Y axis) is the focal’s slice of the total awareness pie: focal awareness ÷ sum of every brand’s awareness. ',
     'In a category where buyers each know 4–5 brands on average, those individual awareness scores can sum to 400% or more, so a 58% awareness rate ends up as roughly <strong>14%</strong> share of awareness. ',
     'Awareness % tells you how many people know the brand at all; share of awareness tells you how big a slice of mental space the brand owns once you account for how many other brands are competing for that same head-space.</p>',
 
-    '<p class="pf-cl-reading-line"><strong>The four quadrants</strong> describe the <em>state</em> of the focal brand in each category&rsquo;s mental space &mdash; not what to do about it. The strategic call always depends on the category&rsquo;s commercial role for the brand. ',
-    '<strong>Dominant</strong> (top-left, low clutter / high share) &mdash; few brands compete for awareness here and you own a big slice of it. ',
-    '<strong>Contested</strong> (top-right, high clutter / high share) &mdash; many brands compete and you hold your own; you are winning ground in a busy mental space. ',
-    '<strong>Open space</strong> (bottom-left, low clutter / low share) &mdash; few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in &mdash; read alongside category penetration (the dot size) before drawing conclusions. ',
-    '<strong>Crowded out</strong> (bottom-right, high clutter / low share) &mdash; many brands compete and you have a small share of awareness. You are in this category but not winning the awareness fight. Whether to push harder or accept the position depends on whether this category is a strategic priority &mdash; the chart does not answer that.</p>',
+    '<p class="pf-cl-reading-line"><strong>The four quadrants</strong> describe the <em>state</em> of the focal brand in each category&rsquo;s mental space. Not what to do about it. The strategic call always depends on the category&rsquo;s commercial role for the brand. ',
+    '<strong>Dominant</strong> (top-left, low clutter / high share), few brands compete for awareness here and you own a big slice of it. ',
+    '<strong>Contested</strong> (top-right, high clutter / high share), many brands compete and you hold your own; you are winning ground in a busy mental space. ',
+    '<strong>Open space</strong> (bottom-left, low clutter / low share), few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in, read alongside category penetration (the dot size) before drawing conclusions. ',
+    '<strong>Crowded out</strong> (bottom-right, high clutter / low share), many brands compete and you have a small share of awareness. You are in this category but not winning the awareness fight. Whether to push harder or accept the position depends on whether this category is a strategic priority. The chart does not answer that.</p>',
 
     '<p class="pf-cl-reading-line"><strong>What to do with it:</strong> ',
     'Hover any dot to see the exact set size, focal awareness, share of awareness, category penetration and quadrant. ',
-    'Switch the focal-brand picker to read the same map for any other brand — the chart redraws instantly. ',
+    'Switch the focal-brand picker to read the same map for any other brand, the chart redraws instantly. ',
     'Use the table below for the precise numbers in a sortable form.</p>',
     '</div>'
   )
 
-  # Category show/hide chips — one per category in the data, all on by
+  # Category show/hide chips, one per category in the data, all on by
   # default. Toggling hides the dot from the scatter without recomputing.
   cat_chips <- vapply(names(per_cat_full), function(cc) {
     nm <- as.character(per_cat_full[[cc]]$cat_label %||% cc)
@@ -791,7 +791,7 @@ build_br_portfolio_panel <- function(results, config) {
             paste(cat_chips, collapse = "")),
     '</div>',
     '</div>',
-    # Axis range inputs — auto when blank, user-set otherwise. Mirrors
+    # Axis range inputs: auto when blank, user-set otherwise. Mirrors
     # the MA Advantage / Metrics quadrant pattern.
     '<div class="ma-adv-quadrant-rangebar pf-cl-rangebar">',
     '<span class="ma-ctl-label">X-axis (set size)</span>',
@@ -893,7 +893,7 @@ build_br_portfolio_panel <- function(results, config) {
     ))
   }
 
-  # ---- Brand picker — every brand for which we have an extension result.
+  # ---- Brand picker: every brand for which we have an extension result.
   # Append cat-coverage suffix to each option ("Brand (3 cats)") so the
   # user sees up front which brands have rich cross-cat awareness data
   # versus those measured only in their home category.
@@ -931,7 +931,7 @@ build_br_portfolio_panel <- function(results, config) {
             .pf_esc(bc), sel, .pf_esc(nm), suffix)
   }, character(1)), collapse = "")
 
-  # ---- JSON payload — strength bubbles + extension rows for every brand.
+  # ---- JSON payload: strength bubbles + extension rows for every brand.
   payload_json <- .pf_ex_to_json(strength, ext_per_br, focal_colour,
                                   brand_colours = brand_colours)
   data_script <- sprintf(
@@ -955,7 +955,7 @@ build_br_portfolio_panel <- function(results, config) {
           label_col    = "cat_label",
           size_col     = "aware_n_w",
           brand_colour = focal_colour,
-          title        = sprintf("Portfolio strength — %s",
+          title        = sprintf("Portfolio strength: %s",
                                   brand_labels[match(focal_brand, brand_codes)])
         ),
         error = function(e) ""
@@ -973,42 +973,42 @@ build_br_portfolio_panel <- function(results, config) {
 
     '<p class="pf-ex-reading-line"><strong>What it needs in the data:</strong> ',
     'Both views can only score categories where the questionnaire actually asked buyers of that category whether they’re aware of the focal brand. ',
-    'In your study this is set by the BrandList sheet — every brand × category combination where the brand is listed gets its own "are you aware of this brand" reading in the data. ',
+    'In your study this is set by the BrandList sheet, every brand × category combination where the brand is listed gets its own "are you aware of this brand" reading in the data. ',
     'A brand listed in <em>all</em> categories (typically the study’s focal client) gets a full read. ',
-    'A brand listed in only its home category gets only one row — and the extension half can’t do anything for it until the next wave adds cross-category awareness. ',
+    'A brand listed in only its home category gets only one row, and the extension half can’t do anything for it until the next wave adds cross-category awareness. ',
     'The number after each option in the picker (<em>"Brand (3 cats)"</em>) tells you up front how much data is available for that brand.</p>',
 
     '<p class="pf-ex-reading-line"><strong>How to read the strength map:</strong> ',
-    '<em>X (horizontal)</em> = how many of all respondents are buyers of that category — its market size. ',
-    '<em>Y (vertical)</em> = the focal brand’s awareness <strong>among</strong> those buyers — how big the focal looms in the minds of people who actually shop the category. ',
+    '<em>X (horizontal)</em> = how many of all respondents are buyers of that category, its market size. ',
+    '<em>Y (vertical)</em> = the focal brand’s awareness <strong>among</strong> those buyers, how big the focal looms in the minds of people who actually shop the category. ',
     'Bubble size = the weighted count of aware buyers; big bubbles are categories where lots of real people know the brand. ',
-    '<strong>Top-right</strong> — big category, the focal is well-known: bread-and-butter. ',
-    '<strong>Top-left</strong> — small but you dominate awareness: a defensible niche. ',
-    '<strong>Bottom-right</strong> — big category but the focal is barely known: opportunity or wrong-battle. ',
-    '<strong>Bottom-left</strong> — small and unknown: usually deprioritise.</p>',
+    '<strong>Top-right</strong>: big category, the focal is well-known: bread-and-butter. ',
+    '<strong>Top-left</strong>: small but you dominate awareness: a defensible niche. ',
+    '<strong>Bottom-right</strong>: big category but the focal is barely known: opportunity or wrong-battle. ',
+    '<strong>Bottom-left</strong>: small and unknown: usually deprioritise.</p>',
 
     '<p class="pf-ex-reading-line"><strong>How to read the extension table:</strong> ',
     'For every measured category that <em>isn’t</em> the focal’s home, <em>lift</em> = how much more likely buyers of that category are to be aware of the focal compared with the baseline awareness rate. ',
-    '<strong>Lift &gt; 1</strong> means buyers of that category have an above-average awareness of the focal — there’s a halo to lean on if you launched there. ',
+    '<strong>Lift &gt; 1</strong> means buyers of that category have an above-average awareness of the focal, there’s a halo to lean on if you launched there. ',
     '<strong>Lift ≈ 1</strong> means no halo; entering would be cold-starting awareness. ',
     '<strong>★</strong> = significant after BH correction across all rows; <strong>†</strong> = low category base, interpret cautiously. ',
-    'The home row sits at the top as a reference and is greyed out — it’s not an extension target, it’s where the brand already lives.</p>',
+    'The home row sits at the top as a reference and is greyed out, it’s not an extension target, it’s where the brand already lives.</p>',
 
     '<p class="pf-ex-reading-line"><strong>How lift is actually calculated:</strong> ',
     '<code class="pf-ex-formula">lift(category) = P(aware of focal | bought category) ÷ P(aware of focal | baseline)</code> ',
     'In plain English: the numerator is the share of <em>that category’s buyers</em> who are aware of the focal brand (the "Aware of focal" column in the table). ',
-    'The denominator is the share of <em>the baseline group</em> who are aware of the focal brand <em>in the same awareness column</em> — by default the baseline is <strong>all respondents</strong> in the survey (set by <code>portfolio_extension_baseline</code> in config; the alternative is <em>non-buyers of the home category</em>).</p>',
+    'The denominator is the share of <em>the baseline group</em> who are aware of the focal brand <em>in the same awareness column</em>. By default the baseline is <strong>all respondents</strong> in the survey (set by <code>portfolio_extension_baseline</code> in config; the alternative is <em>non-buyers of the home category</em>).</p>',
 
     '<p class="pf-ex-reading-line"><strong>Worked example:</strong> ',
     'Imagine the focal brand has <strong>70%</strong> awareness among Pasta Sauces buyers (numerator) and <strong>40%</strong> awareness among all 1,200 respondents in the survey (denominator, because not everyone shops Pasta Sauces). ',
     'Lift = 70 ÷ 40 = <strong>1.75×</strong>. ',
-    'Read: Pasta Sauces buyers are 1.75× more likely than the average respondent to be aware of the focal — that’s a meaningful halo, the brand has equity to lean on if it launched a Pasta Sauces line. ',
+    'Read: Pasta Sauces buyers are 1.75× more likely than the average respondent to be aware of the focal, that’s a meaningful halo, the brand has equity to lean on if it launched a Pasta Sauces line. ',
     'Hover any row to see both numbers (numerator + baseline) for the live data.</p>',
 
     '<p class="pf-ex-reading-line"><strong>What to do with it:</strong> ',
     'Hover any bubble or row to see the exact numbers. ',
-    'For a focal brand with rich coverage (the study’s focal client), the extension table is your shortlist of plausible expansion categories — high lift + statistical significance + a meaningfully large category base = a sound target. ',
-    'For a brand the questionnaire only asked about in one category, the strength map will still show that single bubble, but the extension table will explicitly tell you there’s nothing to extend into in this dataset — either accept that limitation, or add cross-category awareness for that brand in the next wave.</p>',
+    'For a focal brand with rich coverage (the study’s focal client), the extension table is your shortlist of plausible expansion categories, high lift + statistical significance + a meaningfully large category base = a sound target. ',
+    'For a brand the questionnaire only asked about in one category, the strength map will still show that single bubble, but the extension table will explicitly tell you there’s nothing to extend into in this dataset, either accept that limitation, or add cross-category awareness for that brand in the next wave.</p>',
     '</div>'
   )
 
@@ -1050,7 +1050,7 @@ build_br_portfolio_panel <- function(results, config) {
 }
 
 
-# Compact JSON for the Extension subtab — strength bubbles + extension
+# Compact JSON for the Extension subtab: strength bubbles + extension
 # rows + cat-name lookup. Iterates the per-brand extension table and
 # normalises numeric columns to plain JS-friendly arrays.
 .pf_ex_to_json <- function(strength, ext_per_br, focal_colour,
@@ -1059,7 +1059,7 @@ build_br_portfolio_panel <- function(results, config) {
   cat_names <- ext_per_br$cat_names %||% list()
   brand_names <- ext_per_br$brand_names %||% list()
 
-  # Strength bubbles per brand — pre-formatted for the JS bubble renderer.
+  # Strength bubbles per brand: pre-formatted for the JS bubble renderer.
   strength_payload <- if (!is.null(strength) && !is.null(strength$per_brand)) {
     lapply(strength$per_brand, function(df) {
       if (is.null(df) || nrow(df) == 0) return(list())
@@ -1129,7 +1129,7 @@ build_br_portfolio_panel <- function(results, config) {
 .pf_lookup_insight <- function(section_id) {
   m <- .pf_section_insights_env$current
   if (is.null(m) || length(m) == 0L) return("")
-  # Use `[` not `[[` — `[[` throws "subscript out of bounds" when the
+  # Use `[` not `[[`: `[[` throws "subscript out of bounds" when the
   # section_id isn't in the names of a named character vector. `[` returns
   # an NA-named element instead, which we then handle below.
   if (!(section_id %in% names(m))) return("")
@@ -1141,7 +1141,7 @@ build_br_portfolio_panel <- function(results, config) {
   prefill_text <- .pf_lookup_insight(section_id)
   has_text <- nzchar(prefill_text)
 
-  # Single % — these strings are substituted via %s in the sprintf call
+  # Single %: these strings are substituted via %s in the sprintf call
   # below, which does not reduce %% → %. See build_br_section_toolbar in
   # 03_page_builder.R for the regression history.
   base_container <- "margin-bottom:16px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"

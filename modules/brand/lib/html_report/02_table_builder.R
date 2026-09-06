@@ -16,7 +16,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 }
 
 .bt_fmt <- function(x, d = 1, pct = FALSE) {
-  if (is.na(x)) return("\u2014")
+  if (is.na(x)) return("n/a")
   if (pct) sprintf("%.*f%%", d, x) else sprintf("%.*f", d, x)
 }
 
@@ -110,7 +110,7 @@ build_ma_tables <- function(ma, focal_brand) {
     parts <- c(parts, build_br_table(
       ma$cep_turf$incremental_table, NULL, NULL,
       pct_cols = c("Reach_Pct", "Incremental_Pct"),
-      title = "CEP TURF \u2014 Optimal Reach Sequence"))
+      title = "CEP TURF: Optimal Reach Sequence"))
   }
 
   paste(parts, collapse = "\n")
@@ -168,7 +168,7 @@ build_repertoire_tables <- function(rep, focal_brand) {
                     rep$mean_repertoire)))
   parts <- c(parts, build_br_table(
     rep$sole_loyalty, "BrandCode", focal_brand, pct_cols = "SoleLoyalty_Pct",
-    title = "Sole Loyalty — % of brand buyers who only buy this brand",
+    title = "Sole Loyalty: % of brand buyers who only buy this brand",
     caption = sprintf("Base: category buyers (n = %d)", rep$n_buyers %||% 0)))
   paste(parts, collapse = "\n")
 }
@@ -203,7 +203,7 @@ build_crossover_grid_table <- function(crossover_matrix, focal_brand = NULL) {
   lines <- character(0)
   lines <- c(lines,
     '<div style="font-size:14px;font-weight:600;color:#334155;margin:16px 0 6px;">',
-    'Duplication of Purchase \u2014 % of row-brand buyers who also buy column brand',
+    'Duplication of Purchase: % of row-brand buyers who also buy column brand',
     '</div>',
     '<p style="font-size:11px;color:#94a3b8;margin:0 0 8px;">',
     'Read across each row: of buyers who bought [row brand], what share also bought each other brand?',
@@ -238,8 +238,8 @@ build_crossover_grid_table <- function(crossover_matrix, focal_brand = NULL) {
 
     for (cb in col_brands) {
       val <- crossover_matrix[[cb]][i]
-      cell_text <- if (is.na(val)) "\u2014"
-                   else if (val >= 100) "\u2014"
+      cell_text <- if (is.na(val)) "n/a"
+                   else if (val >= 100) "n/a"
                    else sprintf("%.0f%%", val)
       cell_style <- .heat_bg(val)
       if (!is.null(focal_brand) && cb == focal_brand) {
@@ -284,7 +284,7 @@ build_brand_repertoire_profile_table <- function(brand_repertoire_profile,
   build_br_table(
     display, "Brand", focal_brand,
     pct_cols = c("Sole loyal %", "Dual-brand %", "Multi-brand %"),
-    title    = "Buyer Loyalty Profile — repertoire depth among each brand\u2019s buyers",
+    title    = "Buyer Loyalty Profile: repertoire depth among each brand\u2019s buyers",
     caption  = "Sole = bought only this brand; Dual = this brand + 1 other; Multi = this brand + 2 or more others")
 }
 

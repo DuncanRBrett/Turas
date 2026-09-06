@@ -22,11 +22,11 @@ build_brand_selector_styles <- function() {
 
 
 #' Raw CSS body for the brand-selector component.
-#' Plain string — no R interpolation needed.
+#' Plain string: no R interpolation needed.
 #' @keywords internal
 .bs_css_body <- function() {
 "
-/* Trigger button — sits inside a panel toolbar */
+/* Trigger button: sits inside a panel toolbar */
 .bs-trigger {
   display: inline-flex;
   align-items: center;
@@ -67,7 +67,7 @@ build_brand_selector_styles <- function() {
   margin-left: 2px;
 }
 
-/* Popover — dynamically inserted, anchored under trigger */
+/* Popover: dynamically inserted, anchored under trigger */
 .bs-popover {
   min-width: 300px;
   max-width: 420px;
@@ -200,7 +200,7 @@ build_brand_selector_styles <- function() {
 }
 .bs-popover-sync-cb { accent-color: #1A5276; }
 
-/* Container — used by R helpers to wrap trigger + adjacent quick-action chips */
+/* Container: used by R helpers to wrap trigger + adjacent quick-action chips */
 .bs-toolbar-row {
   display: flex;
   flex-wrap: wrap;

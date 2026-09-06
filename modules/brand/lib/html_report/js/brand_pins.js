@@ -68,7 +68,7 @@
     var title = root.querySelector(".br-element-title, h2, h3, .pfo-section-title");
     var titleText = title ? title.textContent.trim() : (sectionKey || "");
 
-    // Pick the first *visible* SVG in the subtree — skip SVGs inside <button>
+    // Pick the first *visible* SVG in the subtree, skip SVGs inside <button>
     // elements (toolbar download icons) AND SVGs inside [data-pin-as-table]
     // (decorative card icons in the summary panel; the body is the content).
     // Fallback: any non-button, non-decorative SVG even if not visible.
@@ -166,7 +166,7 @@
     tableHtml = window.brStripInteractive(tableHtml);
     chartHtml = window.brStripInteractive(chartHtml);
 
-    // Active "Base:" toggle label — read from the LIVE root before
+    // Active "Base:" toggle label, read from the LIVE root before
     // controls are stripped from the captured HTML. Stored both as
     // `subtitle` (rendered in the pin card) and `baseText` (rendered
     // by the PNG/PPT exporter as the meta line under the title).
@@ -416,15 +416,15 @@
       var maTitle = (stim === "attributes")       ? "Brand Attributes"
                   : (stim === "ceps")             ? "Category Entry Points"
                   : (stim === "metrics")          ? "Headline Metrics"
-                  : (stim === "advantage_focal")  ? "Mental Advantage — Focal Brand View"
+                  : (stim === "advantage_focal")  ? "Mental Advantage: Focal Brand View"
                   : (stim === "advantage")        ? "Mental Advantage"
                   : stim;
       if (!content.title || content.title === sid) {
-        content.title = maTitle + (catLabel ? " \u2014 " + catLabel : "");
+        content.title = maTitle + (catLabel ? ": " + catLabel : "");
       }
     } else if (scope.classList && scope.classList.contains("fn-subtab")) {
       if (!content.title || content.title === sid) {
-        content.title = "Funnel" + (catLabel ? " \u2014 " + catLabel : "");
+        content.title = "Funnel" + (catLabel ? ": " + catLabel : "");
       }
     }
 

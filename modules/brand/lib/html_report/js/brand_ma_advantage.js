@@ -4,7 +4,7 @@
    composition and the shared state helpers (palette, focal lookup,
    stim/base toggles). Compares favourably to the existing brand_ma_panel.js.
    ==========================================================================
-   Brand Mental Advantage sub-tab — interactivity
+   Brand Mental Advantage sub-tab: interactivity
    ==========================================================================
    Three coordinated views driven from pd.advantage:
      - Strategic quadrant (focal brand): bubble chart, X = stim_penetration,
@@ -96,7 +96,7 @@
     var el = tooltipEl(panel); if (el) el.setAttribute('hidden', '');
   }
   function decisionLabel(d) {
-    return d === 'defend' ? 'Defend' : d === 'build' ? 'Build' : d === 'maintain' ? 'Maintain' : '—';
+    return d === 'defend' ? 'Defend' : d === 'build' ? 'Build' : d === 'maintain' ? 'Maintain' : 'n/a';
   }
   function tooltipHtml(p, base) {
     // p.penLabel is the X-axis row label including the dynamic threshold
@@ -111,7 +111,7 @@
       ['MA',                   fmtScore(p.ma) + 'pp' + (p.isSig ? ' •' : '')],
       [penLabel,               p.pen.toFixed(1) + '%'],
       ['Linkage (' + (base === 'aware' ? '% aware' : '% total') + ')',
-        p.size != null ? p.size.toFixed(1) + '%' : '—']
+        p.size != null ? p.size.toFixed(1) + '%' : 'n/a']
     ];
     var rowHtml = rows.map(function (r) {
       return '<div class="ma-adv-tooltip-row"><span class="ma-adv-tooltip-key">' +
@@ -275,7 +275,7 @@
       if (v <   0) return 'ma-neg-1';
       return 'ma-zero';
     }
-    // Buyer-gap thresholds — wider than MA because gaps move on
+    // Buyer-gap thresholds: wider than MA because gaps move on
     // smaller bases. (5/10/20 pp.)
     if (v >=  20) return 'gap-pos-3';
     if (v >=  10) return 'gap-pos-2';
@@ -287,7 +287,7 @@
   }
 
   function fmtPp(v, suppressed) {
-    if (suppressed || v == null || isNaN(v)) return '&mdash;';
+    if (suppressed || v == null || isNaN(v)) return 'n/a';
     return (v >= 0 ? '+' : '') + (Math.round(v * 10) / 10).toFixed(1);
   }
 
@@ -330,7 +330,7 @@
     }
     section.style.display = '';
 
-    // Update header — show whichever brand the slice is actually for
+    // Update header: show whichever brand the slice is actually for
     // (matches the rendered numbers, even if it's not the focal the
     // user picked because that brand had no slice).
     var brandLabel = (function () {
@@ -365,7 +365,7 @@
       var gapCls  = r.below_min_base ? 'ma-fv-gap-suppressed'
                                       : 'ma-fv-' + focalBucket(r.buyer_gap, 'gap', false);
       var maTxt   = fmtPp(r.ma_score, false) + maStar;
-      var gapTxt  = r.below_min_base ? '&mdash;' : fmtPp(r.buyer_gap, false) + gapStar;
+      var gapTxt  = r.below_min_base ? 'n/a' : fmtPp(r.buyer_gap, false) + gapStar;
       var stimTitle = 'Buyers ' + (r.buyer_pct != null ? r.buyer_pct.toFixed(1) : '–') +
                       '%  ·  Non-buyers ' + (r.nonbuyer_pct != null ? r.nonbuyer_pct.toFixed(1) : '–') + '%';
       return '<tr>' +
@@ -380,7 +380,7 @@
     if (tbody) tbody.innerHTML = html;
   }
 
-  // Pin the focal-brand view as its own card. Table-only — no chart on
+  // Pin the focal-brand view as its own card. Table-only, no chart on
   // this section; no insight box of its own (the advantage sub-tab's
   // Insight box covers the whole section).
   function pinFocalView(panel) {
@@ -410,8 +410,8 @@
 
     TurasPins.add({
       sectionKey: 'ma-advantage-focal-' + Date.now(),
-      title: 'Mental Availability — ' + cat +
-             ' — Focal Brand View — ' + (focalName || '?') +
+      title: 'Mental Availability: ' + cat +
+             ', Focal Brand View, ' + (focalName || '?') +
              ' (' + stimLabel + ')',
       subtitle: baseTxt,
       baseText: 'total respondents (sample); buyer/non-buyer split per brand',
@@ -446,7 +446,7 @@
     // Resolve the X-axis penetration threshold + matching tooltip label
     // up front so each point can carry the row label its tooltip will
     // display. Server emits stim_penetration_threshold as an integer
-    // brand-link count (rounded category grand-mean) — see
+    // brand-link count (rounded category grand-mean), see
     // .ma_stimulus_penetration() in 02b_mental_advantage.R.
     var penThresholdHere = (block && block.stim_penetration_threshold != null &&
                             !isNaN(block.stim_penetration_threshold))
@@ -457,8 +457,8 @@
 
     // Bubble per CEP/attribute for the focal brand. Hidden stims (row
     // checkbox unchecked) drop their bubble from the chart but the row
-    // stays visible — Duncan: "strike and grey out, like brand attribute
-    // tabs so I can put it back." Romaniuk base only — pct_total.
+    // stays visible, Duncan: "strike and grey out, like brand attribute
+    // tabs so I can put it back." Romaniuk base only, pct_total.
     var allPts = block.cells.filter(function (c) { return c.brand_code === focal; })
       .filter(function (c) { return !hidden[c.stim_code]; })
       .map(function (c) {
@@ -521,7 +521,7 @@
        capture: html2canvas only reliably renders SVG fills/strokes when
        they are present as attributes on the element. Live CSS rules still
        win during normal rendering (CSS > attributes), so the chart looks
-       identical on screen — but the captured PNG no longer ends up as a
+       identical on screen, but the captured PNG no longer ends up as a
        solid black box when the stylesheet doesn't survive the export. */
     var BUBBLE_FILL = {
       defend:   'rgba(5, 150, 105, 0.78)',
@@ -550,13 +550,13 @@
       parts.push('<rect class="ma-adv-q-zone-build"  fill="rgba(220, 38, 38, 0.05)" x="' + mL + '" y="' + yNegC + '" width="' + pW + '" height="' + (mT + pH - yNegC) + '"/>');
     }
 
-    // Grid + tick labels (X) — span the [xMin, xMax] range
+    // Grid + tick labels (X): span the [xMin, xMax] range
     for (var xi = 0; xi <= 5; xi++) {
       var xv = xMin + (xMax - xMin) * xi / 5; var gx = toX(xv);
       parts.push('<line class="ma-adv-q-grid" stroke="#eef2f7" stroke-width="1" x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) + '"/>');
       parts.push('<text class="ma-adv-q-tick" fill="#94a3b8" font-size="9" x="' + gx + '" y="' + (mT + pH + 14) + '" text-anchor="middle">' + Math.round(xv) + '%</text>');
     }
-    // Y grid + ticks — five evenly-spaced ticks across the active Y range.
+    // Y grid + ticks, five evenly-spaced ticks across the active Y range.
     for (var yi = 0; yi <= 4; yi++) {
       var yv = yMin + (yMax - yMin) * yi / 4;
       var gy = toY(yv);
@@ -569,7 +569,7 @@
     parts.push('<line class="ma-adv-q-vmid" stroke="#475569" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.65" x1="' + xMeanPx + '" y1="' + mT + '" x2="' + xMeanPx + '" y2="' + (mT + pH) + '"/>');
     parts.push('<text class="ma-adv-q-vmid-label" fill="#475569" font-size="9" font-weight="600" x="' + (xMeanPx + 4) + '" y="' + (mT + pH - 6) + '">avg (' + xMean.toFixed(0) + '%)</text>');
 
-    // Horizontal zero + threshold lines — only drawn when their Y is
+    // Horizontal zero + threshold lines: only drawn when their Y is
     // inside the active Y range (so a custom range that excludes 0 or
     // ±threshold doesn't paint phantom lines along the plot edge).
     if (0 >= yMin && 0 <= yMax) {
@@ -726,7 +726,7 @@
         }
         // Cell formatting MUST NOT change based on significance.
         // Significance is shown via an inline asterisk after the score
-        // (text-only — no class, no extra elements that affect layout).
+        // (text-only, no class, no extra elements that affect layout).
         var bg = maColour(c.ma, threshold);
         var focalCls = b === focal ? ' ma-adv-matrix-focal' : '';
         var counts = '<span class="ma-adv-cell-counts">a=' + Math.round(c.actual) + ' / e=' + Math.round(c.expected) + '</span>';
@@ -877,7 +877,7 @@
                '</style></head><body><table>';
     html += '<tr><td class="mode" colspan="' + (brands.length + 1) + '">Mental Advantage (pp), ' +
             (stim === 'ceps' ? 'Category Entry Points' : 'Brand Attributes') +
-            ' — ' + escHtml(cat) + ' (Defend ≥ +' + threshold + ', Build ≤ −' + threshold + ')</td></tr>';
+            ': ' + escHtml(cat) + ' (Defend ≥ +' + threshold + ', Build ≤ −' + threshold + ')</td></tr>';
     html += '<tr><th>' + (stim === 'ceps' ? 'CEP' : 'Attribute') + '</th>' +
             brands.map(function (b) { return '<th>' + escHtml(nameFor(b)) + '</th>'; }).join('') + '</tr>';
     idx.forEach(function (i) {
@@ -885,7 +885,7 @@
       html += '<tr><td>' + escHtml(lbl) + '</td>';
       brands.forEach(function (b) {
         var c = cellByKey[stimCode + '|' + b];
-        if (!c || c.ma == null) { html += '<td>—</td>'; return; }
+        if (!c || c.ma == null) { html += '<td>n/a</td>'; return; }
         var dec = c.ma >= threshold ? 'defend' : c.ma <= -threshold ? 'build' : 'maintain';
         var cls = dec + (b === focal ? ' focal' : '');
         var sigSfx = c.is_sig ? ' •' : '';
@@ -931,7 +931,7 @@
     });
 
     // Single delegated click handler for the stim toggle, x-range reset
-    // and brand chips. Base toggle is removed (Romaniuk — total only).
+    // and brand chips. Base toggle is removed (Romaniuk, total only).
     subtab.addEventListener('click', function (ev) {
       var stimBtn = ev.target.closest('[data-ma-action="adv-stim"]');
       if (stimBtn && subtab.contains(stimBtn)) {
@@ -1018,7 +1018,7 @@
     // sub-tab just reflects __maAdvHiddenBrands which that selector mutates.
     applyBrandColumnVisibility(panel);
 
-    // Show counts and Show chart checkboxes — direct change listeners
+    // Show counts and Show chart checkboxes, direct change listeners
     // (single elements per panel, no risk of detachment).
     var cntCb = panel.querySelector('input[data-ma-action="adv-show-counts"]');
     if (cntCb) cntCb.addEventListener('change', function () {

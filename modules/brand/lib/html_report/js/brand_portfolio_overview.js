@@ -29,11 +29,11 @@
       .replace(/"/g, '&quot;');
   }
   function fmtPct(v) {
-    if (v === null || v === undefined || isNaN(v)) return '\u2014';
+    if (v === null || v === undefined || isNaN(v)) return 'n/a';
     return Math.round(v) + '%';
   }
   function fmtNum(v, d) {
-    if (v === null || v === undefined || isNaN(v)) return '\u2014';
+    if (v === null || v === undefined || isNaN(v)) return 'n/a';
     return Number(v).toFixed(d == null ? 1 : d);
   }
 
@@ -173,8 +173,8 @@
       var pill = r.depth === 'full'
         ? '<span class="pfo-pill pfo-pill-deep">Deep-dive</span>'
         : '<span class="pfo-pill pfo-pill-aware">Awareness</span>';
-      var rankTxt = r.rank == null ? '\u2014' : '#' + r.rank + ' of ' + r.n_brands;
-      var gapTxt = r.gap == null ? '\u2014'
+      var rankTxt = r.rank == null ? 'n/a' : '#' + r.rank + ' of ' + r.n_brands;
+      var gapTxt = r.gap == null ? 'n/a'
         : (r.gap <= 0.5 ? '<span class="pfo-gap-leader">Leader</span>' :
            '\u2212' + Math.round(r.gap) + ' pp');
       function tdNum(v, fmt) {
@@ -210,7 +210,7 @@
 
   // Deep-dive 4-card strip renderer was removed 2026-05-24. The grid
   // mixed bases (broad awareness vs focal-cat deep-dive sample) inside
-  // one card without a visual signal — the per-category Footprint sub-tab
+  // one card without a visual signal, the per-category Footprint sub-tab
   // already carries the same metrics against a clean base. The
   // deep_dive payload field is preserved because the Category detail
   // table still consumes it.
@@ -263,7 +263,7 @@
   // letting the user tick: Hero KPI cards, Awareness chart, Category
   // detail table, Deep-dive cards, and the section-level Insight note.
   // Each ticked element is captured as portable HTML and concatenated
-  // into the pin's tableHtml — same approach as the cat-buying panel.
+  // into the pin's tableHtml, same approach as the cat-buying panel.
 
   function initPfoPinPng() {
     // The portfolio panel uses a lightweight `.pf_section_toolbar` that
@@ -358,7 +358,7 @@
   function pfoTitle(section) {
     var h = section.querySelector('h2, h3, .pfo-section-title');
     var label = (h && h.textContent.trim()) || 'Portfolio Overview';
-    return 'Portfolio Overview — ' + label;
+    return 'Portfolio Overview: ' + label;
   }
 
   function executePfoPin(section, flags, editor, pinBtn) {

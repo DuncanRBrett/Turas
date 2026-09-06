@@ -27,7 +27,7 @@ build_ma_advantage_styles <- function(focal_colour = "#1A5276") {
   padding: 22px 18px; color: #64748b; background: #f8fafc;
   border: 1px solid #e2e8f0; border-radius: 8px; }
 
-/* Intro panel — laymans overview */
+/* Intro panel: laymans overview */
 .ma-adv-intro { margin: 4px 0 14px; }
 .ma-adv-intro-callout {
   border: 1px solid #dbe7f5; background: #f3f8fd;
@@ -56,7 +56,7 @@ build_ma_advantage_styles <- function(focal_colour = "#1A5276") {
   border: 1px solid #cbd5e1; background: #fff;
   color: #1e293b; cursor: pointer; }
 
-/* Stim/base toggle reuse sig-level-switcher styling — the MA panel CSS
+/* Stim/base toggle reuse sig-level-switcher styling: the MA panel CSS
    already defines those buttons; only spacing adjustments here. */
 .ma-adv-controls { margin-bottom: 14px; }
 .ma-adv-controls .ma-meta-row { gap: 14px; }
@@ -307,7 +307,7 @@ ol.ma-adv-action-list {
    "What is Mental Advantage?" callout at the bottom of its own subtab. */
 .ma-panel.ma-active-advantage .ma-about-availability { display: none !important; }
 
-/* Static "Base:" notation (Romaniuk — total respondents only) replaces
+/* Static "Base:" notation (Romaniuk, total respondents only) replaces
    the previous toggle. Lives in the controls bar. */
 .ma-adv-base-notation {
   display: inline-flex; align-items: center; gap: 6px;
@@ -391,7 +391,7 @@ ol.ma-adv-action-list {
   text-align: left; padding-left: 14px; font-weight: 400; color: #1f2a44;
 }
 
-/* MA score cell ramp — mirrors the matrix palette so the eye recognises
+/* MA score cell ramp: mirrors the matrix palette so the eye recognises
    the same scale as upstairs. Three positive + three negative tints. */
 .ma-fv-ma-pos-3 { background: #6fcf97; color: #053a22; }
 .ma-fv-ma-pos-2 { background: #a8e0bd; color: #1f3d2c; }
@@ -401,7 +401,7 @@ ol.ma-adv-action-list {
 .ma-fv-ma-neg-2 { background: #f5b5b1; color: #5b1d1d; }
 .ma-fv-ma-neg-3 { background: #e88884; color: #fff; }
 
-/* Buyer-gap cell ramp — DELIBERATELY blue, not green. Two columns of
+/* Buyer-gap cell ramp: DELIBERATELY blue, not green. Two columns of
    numbers in the same green-red scale would be unreadable; the blue
    ramp keeps "buyer gap" visually distinct from "MA score". */
 .ma-fv-gap-pos-3 { background: #4f8df9; color: #fff; }
@@ -412,7 +412,7 @@ ol.ma-adv-action-list {
 .ma-fv-gap-neg-2 { background: #e69e9e; color: #fff; }
 .ma-fv-gap-suppressed { color: #94a3b8; font-weight: 400; }
 
-/* Read chips — four labels (locked) plus an INSUFFICIENT-base chip. */
+/* Read chips, four labels (locked) plus an INSUFFICIENT-base chip. */
 .ma-fv-chip {
   display: inline-block; padding: 3px 8px; border-radius: 12px;
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px;

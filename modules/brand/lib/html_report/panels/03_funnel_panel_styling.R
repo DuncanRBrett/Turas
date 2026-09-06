@@ -1,6 +1,6 @@
 # ==============================================================================
 # BRAND MODULE - FUNNEL PANEL CSS BUNDLE
-# SIZE-EXCEPTION: CSS assembly pipeline — the funnel panel has the most
+# SIZE-EXCEPTION: CSS assembly pipeline. The funnel panel has the most
 # complex visual contract (three table types + chart + relationship matrix).
 # All styles are scoped to .fn-* and .ct-* to prevent collisions.
 # ==============================================================================
@@ -103,7 +103,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-pin-save-btn:hover { opacity: 0.88; }
 .fn-pinned { outline: 2px dashed var(--fn-brand); outline-offset: 4px; }
 
-/* Significance markers vs category average CI — always visible, shading-independent */
+/* Significance markers vs category average CI: always visible, shading-independent */
 .fn-sig-avg {
   font-size: 9px; font-weight: 800; margin-left: 2px;
   vertical-align: super; line-height: 1;
@@ -130,7 +130,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-subtab[hidden] { display: none; }
 
 /* -------------------------------------------------------------------------- */
-/* Controls — tabs .toggle-label pill toggles, sig-level-switcher segmented  */
+/* Controls: tabs .toggle-label pill toggles, sig-level-switcher segmented  */
 /* -------------------------------------------------------------------------- */
 .fn-focus-bar {
   display: flex; align-items: center; gap: 10px;
@@ -177,7 +177,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   text-decoration: line-through !important; opacity: 0.55;
 }
 
-/* Tabs .toggle-label — pill with checkbox, checked-state filled */
+/* Tabs .toggle-label: pill with checkbox, checked-state filled */
 .fn-panel .toggle-label {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 12px; color: #64748b;
@@ -212,7 +212,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-panel .sig-btn:hover:not(.sig-btn-active) { background: #e2e8f0; }
 
-/* Tabs .export-btn — icon + dropdown caret */
+/* Tabs .export-btn: icon + dropdown caret */
 .fn-panel .export-btn {
   padding: 5px 12px; font-size: 11px; font-weight: 600;
   background: #fff; color: var(--fn-brand);
@@ -223,7 +223,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel .export-btn:hover { background: var(--fn-brand); color: #fff; }
 
 /* -------------------------------------------------------------------------- */
-/* TABLE — lifted from tabs ct-* classes (03a_page_styling.R)                 */
+/* TABLE: lifted from tabs ct-* classes (03a_page_styling.R)                 */
 /* -------------------------------------------------------------------------- */
 .fn-panel .ct-table {
   width: 100%; border-collapse: collapse;
@@ -233,7 +233,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-table-wrap { overflow-x: auto; }
 
-/* Header: dark, authoritative — matches tabs */
+/* Header: dark, authoritative. Matches tabs */
 .fn-panel .ct-table .ct-th {
   padding: 12px 16px; text-align: center;
   background: #1a2744; color: #fff;
@@ -262,7 +262,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-panel .ct-table tbody tr:last-child td { border-bottom: none; }
 
-/* Base row — understated, structural (tabs pattern) */
+/* Base row: understated, structural (tabs pattern) */
 .fn-panel .ct-row-base { background: #f8f9fa; }
 .fn-panel .ct-row-base .ct-td {
   font-weight: 600; font-size: 12px; color: #475569;
@@ -275,7 +275,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel .ct-base-n { font-variant-numeric: tabular-nums; }
 .fn-panel .ct-na { color: #d1d5db; font-size: 12px; }
 
-/* Focal row — left-border accent on label, persistent tint across ALL data cells */
+/* Focal row: left-border accent on label, persistent tint across ALL data cells */
 .fn-panel .fn-row-focal .ct-td.ct-label-col {
   color: var(--fn-brand); background: rgba(26,82,118,0.06) !important;
   border-left: 3px solid var(--fn-brand); font-weight: 700;
@@ -287,16 +287,16 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   border-radius: 3px; margin-left: 4px; letter-spacing: 0.5px;
 }
 
-/* Category average row — italic, muted band across ALL data cells */
+/* Category average row: italic, muted band across ALL data cells */
 .fn-panel .fn-row-avg-all .ct-td.ct-label-col {
   font-style: italic; color: #475569; background: #eff1f5 !important;
 }
 .fn-panel .fn-row-avg-all .ct-td.ct-data-col { background: #eff1f5 !important; }
-/* CI bar in funnel cat avg cells — reuses .ma-ci-bar-* classes */
+/* CI bar in funnel cat avg cells: reuses .ma-ci-bar-* classes */
 .fn-panel .fn-td-avg-ci { padding-bottom: 5px; vertical-align: top; }
 .fn-panel .fn-td-avg-ci .ct-val { display: block; font-weight: 700; color: #1e293b; }
 
-/* Heatmap — JS applies inline background on competitor cells only (focal/avg skipped).
+/* Heatmap: JS applies inline background on competitor cells only (focal/avg skipped).
    Toggle OFF clears competitor cells via panel class; focal/avg keep their !important tints. */
 .fn-panel .ct-heatmap-cell { transition: background-color 0.15s ease; }
 .fn-panel.fn-heatmap-off .ct-heatmap-cell { background-color: transparent !important; }
@@ -304,17 +304,17 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel.fn-heatmap-off .fn-row-focal .ct-td.ct-data-col { background: rgba(26,82,118,0.06) !important; }
 .fn-panel.fn-heatmap-off .fn-row-avg-all .ct-td.ct-data-col { background: #eff1f5 !important; }
 
-/* Low-base dim — cell pct muted to signal small base */
+/* Low-base dim: cell pct muted to signal small base */
 .fn-panel .ct-low-base-dim .ct-val { opacity: 0.5; color: #c0392b; }
 
-/* Primary value — uniform dark, never overridden by heatmap background */
+/* Primary value: uniform dark, never overridden by heatmap background */
 .fn-panel .ct-val { font-weight: 600; font-size: 13px; color: #0f172a !important; }
 .fn-panel .ct-freq {
   display: none; font-size: 10px; color: #94a3b8; margin-top: 2px;
 }
 .fn-panel.show-freq .ct-freq { display: block; }
 
-/* Sig badges — match tabs .ct-sig */
+/* Sig badges: match tabs .ct-sig */
 .fn-panel .ct-sig {
   display: inline-block; margin-left: 4px;
   font-size: 9px; font-weight: 700; line-height: 1;
@@ -323,7 +323,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel .fn-sig-up   { color: #059669; }
 .fn-panel .fn-sig-down { color: #c0392b; }
 
-/* Sort indicator — matches tabs .ct-sort-indicator */
+/* Sort indicator: matches tabs .ct-sort-indicator */
 .fn-panel .ct-sort-indicator {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; padding: 0;
@@ -332,7 +332,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   margin-left: 2px;
 }
 .fn-panel .ct-sort-indicator:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
-/* Active direction: subtle, no highlight — icon text set by JS */
+/* Active direction: subtle, no highlight, icon text set by JS */
 .fn-panel .ct-sort-indicator[data-fn-sort-dir="asc"],
 .fn-panel .ct-sort-indicator[data-fn-sort-dir="desc"] {
   color: #cbd5e1; background: transparent;
@@ -404,7 +404,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-rel-meta-actions {
   display: flex; align-items: center; gap: 6px; margin-left: auto;
 }
-/* Chart toggle button — standalone rounded */
+/* Chart toggle button: standalone rounded */
 .fn-rel-chart-toggle-btn {
   font-size: 11px; font-weight: 500; padding: 5px 10px;
   border: 1px solid #e2e8f0; border-radius: 4px;
@@ -417,7 +417,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-rel-export-btn {
   white-space: nowrap;
 }
-/* Brand chips — colour-coded via CSS custom property */
+/* Brand chips: colour-coded via CSS custom property */
 .col-chip-bar .fn-rel-brand-chip {
   border-color: var(--brand-chip-color, #e2e8f0) !important;
 }
@@ -427,7 +427,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   color: #fff !important; opacity: 1 !important;
   text-decoration: none !important;
 }
-/* Off state — chip rendered without .active under chip_default = focal_only.
+/* Off state: chip rendered without .active under chip_default = focal_only.
    Greyed + strikethrough so it visually matches col-chip-off panels. */
 .col-chip-bar .fn-rel-brand-chip:not(.active) {
   background: #f8f9fa !important;
@@ -441,7 +441,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   border-color: #64748b !important;
   color: #fff !important;
 }
-/* Emphasis chips — sentiment colour via CSS custom property */
+/* Emphasis chips: sentiment colour via CSS custom property */
 .col-chip-bar .fn-rel-seg-chip {
   border-color: var(--seg-chip-color, #e2e8f0) !important;
 }
@@ -450,7 +450,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   border-color: var(--seg-chip-color, #475569) !important;
   color: #fff !important; opacity: 1 !important;
 }
-/* "All" chip — neutral slate */
+/* "All" chip: neutral slate */
 .col-chip-bar .fn-rel-seg-chip[data-fn-rel-emphasis="all"].active {
   background: #475569 !important;
   border-color: #475569 !important;
@@ -539,12 +539,12 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   transition: background-color 0.18s;
 }
 
-/* Flipped table — brands as rows, attitudes as columns */
+/* Flipped table: brands as rows, attitudes as columns */
 .fn-rel-table-v2 .fn-rel-th-att { font-size: 10px; }
-/* Focal row cells — persistent accent tint */
+/* Focal row cells: persistent accent tint */
 .fn-panel .fn-rel-td-focal { background: rgba(26,82,118,0.06) !important; }
 .fn-panel.fn-heatmap-off .fn-rel-td-focal { background: rgba(26,82,118,0.06) !important; }
-/* Category avg row cells — muted italic */
+/* Category avg row cells: muted italic */
 .fn-panel .fn-rel-td-avg {
   background: #eff1f5 !important; font-style: italic;
 }
@@ -609,7 +609,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel.fn-hide-chart .fn-chart-wrap-outer { display: none; }
 
 /* -------------------------------------------------------------------------- */
-/* Chart header — type switcher + chart brand chips                           */
+/* Chart header: type switcher + chart brand chips                           */
 /* -------------------------------------------------------------------------- */
 .fn-chart-header {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -735,11 +735,11 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-st-pct { font-size: 22px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px; line-height: 1; }
 
 /* -------------------------------------------------------------------------- */
-/* Shading switchers — reuse .sig-level-switcher                              */
+/* Shading switchers: reuse .sig-level-switcher                              */
 /* -------------------------------------------------------------------------- */
 .fn-shading-switcher, .fn-shade-switcher { flex-shrink: 0; }
 
-/* CI band cell colours — higher specificity so they override focal/avg tints */
+/* CI band cell colours: higher specificity so they override focal/avg tints */
 .fn-panel .fn-ci-above  { background-color: rgba(5,150,105,0.22)  !important; }
 .fn-panel .fn-ci-within { background-color: rgba(245,158,11,0.18) !important; }
 .fn-panel .fn-ci-below  { background-color: rgba(192,57,43,0.18)  !important; }
@@ -760,7 +760,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   display: block; font-family: inherit; overflow: visible;
 }
 
-/* Emphasis chips — stage selector row in stacked view */
+/* Emphasis chips: stage selector row in stacked view */
 .fn-stk-emph-row {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 6px 0 2px;

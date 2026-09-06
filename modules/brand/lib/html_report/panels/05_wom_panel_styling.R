@@ -82,13 +82,13 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   opacity: 0.45; pointer-events: none;
 }
 
-/* Hidden base column — shown via Show count checkbox */
+/* Hidden base column. Shown via Show count checkbox */
 .wom-table .wom-col-base[hidden] { display: none !important; }
 
 /* Hidden brand rows */
 .wom-table tr.wom-row-hidden { display: none; }
 
-/* Header: dark navy bar, non-uppercase — matches funnel/brand-attitude style */
+/* Header: dark navy bar, non-uppercase. Matches funnel/brand-attitude style */
 .wom-panel .ct-table .ct-th {
   padding: 12px 14px; text-align: center;
   background: #1a2744; color: #fff;
@@ -101,7 +101,7 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   text-align: left; min-width: 180px; background: #1a2744;
 }
 
-/* Sortable headers: indicator + hover — applies to Brand and every data col */
+/* Sortable headers: indicator + hover. Applies to Brand and every data col */
 .wom-table th.wom-sortable { user-select: none; cursor: pointer; }
 .wom-table th.wom-sortable:hover { background: #243558; }
 .wom-table th.wom-sortable .wom-sort-ind {
@@ -159,7 +159,7 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
 .wom-table tr.wom-row-focal td.wom-hm-below { background: rgba(220, 38, 38, 0.20) !important; }
 .wom-table tr.wom-row-focal td.wom-hm-near  { background: rgba(251, 191, 36, 0.24) !important; }
 
-/* Cat-avg row CI bar — inherit ma-ci-bar-wrap sizing from MA panel CSS.
+/* Cat-avg row CI bar: inherit ma-ci-bar-wrap sizing from MA panel CSS.
    Ensure the CI column reads as a secondary row (same as fn-row-avg-all). */
 .wom-table .wom-row-avg td.ct-label-col em {
   color: #475569; font-weight: 500;
@@ -170,7 +170,7 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   box-shadow: inset 3px 0 0 var(--fn-row-accent, %s);
 }
 
-/* Chart section — shown only when Show chart toggle is on */
+/* Chart section: shown only when Show chart toggle is on */
 .wom-chart-section {
   margin-top: 14px;
   padding: 14px 14px 10px;
@@ -188,10 +188,10 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   background: #f8fafc;
 }
 
-/* Insight box — margin tidy-up when stacked below the table */
+/* Insight box: margin tidy-up when stacked below the table */
 .wom-insight-box { margin-top: 14px; }
 
-/* Relocated section toolbar: sits inline in meta-row — no extra margin */
+/* Relocated section toolbar: sits inline in meta-row, no extra margin */
 .wom-meta-row .wom-toolbar-relocated {
   margin: 0; padding: 0; background: none; border: none;
   display: flex; gap: 6px; align-items: center;

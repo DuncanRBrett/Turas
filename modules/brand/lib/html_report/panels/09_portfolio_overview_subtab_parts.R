@@ -47,13 +47,13 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     '<th class="pfo-th-num" title="Focal brand\u2019s awareness rank within the category">Rank</th>',
     '<th class="pfo-th-num" title="Awareness pp gap from the category leader">Gap to leader</th>',
     '<th class="pfo-th-num" title="Unweighted % of the deep-dive sample (respondents asked the per-brand purchase battery) who bought the focal brand, from the raw purchase question. A different base and definition from Cat. usage, so the two are not comparable.">% who bought<br><span class="pfo-th-sub">% of deep-dive sample, unweighted</span></th>',
-    '<th class="pfo-th-num" title="Share of category requirements \u2014 % of the focal brand buyer\u2019s category purchases that go to the focal brand (deep-dive cats only)">Loyalty (SCR)</th>',
+    '<th class="pfo-th-num" title="Share of category requirements: % of the focal brand buyer\u2019s category purchases that go to the focal brand (deep-dive cats only)">Loyalty (SCR)</th>',
     '<th class="pfo-th-num" title="Focal brand\u2019s share of total category volume in the deep-dive sample (deep-dive cats only)">Volume share</th>',
     '<th class="pfo-th-num" title="Mean number of times the focal brand was purchased per focal-brand buyer in the recall window">Avg purchases</th>',
     '</tr></thead><tbody>', body, '</tbody></table></div>',
     '<p class="pfo-table-note">',
     '<strong>Awareness columns</strong> (Avg brands aware / Focal awareness / Rank / Gap) use the ',
-    '<em>category-buyer base</em> for each row \u2014 every respondent who said they bought in that category. ',
+    '<em>category-buyer base</em> for each row: every respondent who said they bought in that category. ',
     '<strong>Behaviour columns</strong> (% who bought / Loyalty (SCR) / Volume share / Avg purchases) only populate for ',
     '<em>deep-dive categories</em>, and use the smaller focal-cat sample. ',
     'See the &ldquo;Why awareness here can differ from the per-category deep-dive numbers&rdquo; note at the top of this panel ',
@@ -118,16 +118,16 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     '<span class="pfo-pill pfo-pill-deep">Deep-dive</span>' else
     '<span class="pfo-pill pfo-pill-aware">Awareness</span>'
 
-  fmt_pct <- function(v) if (is.null(v) || is.na(v)) "\u2014" else
+  fmt_pct <- function(v) if (is.null(v) || is.na(v)) "n/a" else
     sprintf("%.0f%%", v)
-  fmt_num <- function(v, d = 1) if (is.null(v) || is.na(v)) "\u2014" else
+  fmt_num <- function(v, d = 1) if (is.null(v) || is.na(v)) "n/a" else
     sprintf(paste0("%.", d, "f"), v)
   fmt_rank <- function(r) {
-    if (is.null(r$rank) || is.na(r$rank)) return("\u2014")
+    if (is.null(r$rank) || is.na(r$rank)) return("n/a")
     sprintf("#%d of %d", r$rank, r$n_brands)
   }
   fmt_gap <- function(v) {
-    if (is.null(v) || is.na(v)) return("\u2014")
+    if (is.null(v) || is.na(v)) return("n/a")
     if (v <= 0.5) return('<span class="pfo-gap-leader">Leader</span>')
     sprintf("\u2212%.0f pp", v)
   }

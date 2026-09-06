@@ -78,7 +78,7 @@ br_svg_wrap <- function(inner, width, height, aria_label) {
 }
 
 .br_fmt <- function(x, digits = 1, pct = FALSE) {
-  if (is.na(x)) return("\u2014")
+  if (is.na(x)) return("n/a")
   if (pct) sprintf("%.*f%%", digits, x) else sprintf("%.*f", digits, x)
 }
 
@@ -195,11 +195,11 @@ build_dot_plot <- function(df, focal_label = NULL,
 #' Categories with similar metrics genuinely sit at the same coordinates
 #' (e.g. on the IPK Wave 1 clutter chart, Salad Dressings, Stock Powder and
 #' Cook-in Sauces all sit around 7.4 brands known / 13% focal share). The
-#' bubbles are deliberately precise — only the labels move, never the points.
+#' bubbles are deliberately precise, only the labels move, never the points.
 #'
 #' @param points List of named lists, each with: \code{svgx}, \code{svgy},
 #'   \code{r} (bubble radius), \code{label} (display text), \code{is_focal}
-#'   (logical). Order does not matter — placement order is determined by
+#'   (logical). Order does not matter. Placement order is determined by
 #'   focal-first then label length.
 #' @param plot_left,plot_right,plot_top,plot_bot Numeric. Plot-area edges
 #'   in SVG pixels.
@@ -208,7 +208,7 @@ build_dot_plot <- function(df, focal_label = NULL,
 #' @return List the same length as \code{points}, each element a list with
 #'   \code{cx} / \code{cy} (label anchor coords), \code{anchor}
 #'   (\code{"start"} / \code{"middle"} / \code{"end"}), and \code{leader}
-#'   (logical — TRUE when the label is far enough from the bubble that a
+#'   (logical. TRUE when the label is far enough from the bubble that a
 #'   thin leader line should be drawn).
 #' @keywords internal
 .place_scatter_labels <- function(points, plot_left, plot_right,
@@ -466,7 +466,7 @@ build_scatter <- function(df, x_col, y_col, label_col,
 
 
 # ==============================================================================
-# 2b. BUBBLE SCATTER (portfolio strength map — §4.4)
+# 2b. BUBBLE SCATTER (portfolio strength map: §4.4)
 # ==============================================================================
 
 #' Build portfolio strength bubble scatter
@@ -567,7 +567,7 @@ build_heat_strip <- function(matrix_df, focal_brand = NULL,
       if (is_absent) {
         bg      <- "#f1f5f9"
         txt_col <- "#94a3b8"
-        cell_label <- "\u2014"
+        cell_label <- "n/a"
       } else {
         intensity  <- min(1, val / max_val)
         bg         <- sprintf("rgba(26,82,118,%.2f)", 0.08 + intensity * 0.45)
@@ -1087,9 +1087,9 @@ build_loyalty_profile_chart <- function(brand_repertoire_profile,
 #' immediately legible:
 #'   * Focal brand: \code{focal_colour}, dashed halo, larger radius.
 #'   * Top-N closest competitors (by Jaccard with focal): \code{rival_colour}
-#'     — a lightened shade of \code{focal_colour} by default, derived via
+#', a lightened shade of \code{focal_colour} by default, derived via
 #'     \code{.lighten_hex()} so it stays brand-consistent.
-#'   * All other brands: \code{comp_colour} — recessive grey.
+#'   * All other brands: \code{comp_colour}, recessive grey.
 #' Node sizes scale with total aware respondents. Edges incident on the
 #' focal are highlighted in \code{focal_colour}; the rest stay grey.
 #'
@@ -1209,13 +1209,13 @@ build_network <- function(nodes, edges, layout,
   # Each node, label and (when focal) halo carries a `data-pf-cn-*`
   # attribute keyed by brand code so the JS-side focal switcher can
   # re-style the chart in place when the user picks a different focal
-  # from the dropdown — no full re-render required.
+  # from the dropdown, no full re-render required.
   has_lbl <- "brand_lbl" %in% names(nodes)
   for (i in seq_len(nrow(nodes))) {
     nd <- nodes[i, ]
     is_focal <- isTRUE(nd$is_focal)
     is_rival <- !is_focal && (nd$brand %in% rival_brands)
-    # Per-brand colour from the portfolio-wide map when supplied — keeps
+    # Per-brand colour from the portfolio-wide map when supplied. Keeps
     # constellation node colours consistent with the rest of the brand
     # module (Cat Buying / DSS chips). Falls back to the legacy
     # focal/rival/comp single-colour scheme when no map is passed.
@@ -1249,7 +1249,7 @@ build_network <- function(nodes, edges, layout,
     }
     label_y <- if (on_top) nd$svgy + radius + 14 else nd$svgy - radius - 2
 
-    # Hover tooltip is delivered by JS (instant, reliable) — the brand
+    # Hover tooltip is delivered by JS (instant, reliable), the brand
     # display label rides on the circle as a data attribute so the
     # tooltip handler can read it without a DOM walk.
     node_cls <- if (is_focal) " pf-cn-node-focal"

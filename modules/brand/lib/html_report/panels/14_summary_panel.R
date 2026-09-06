@@ -6,27 +6,27 @@
 # widgets), (b) panel skeleton HTML, and (c) per-category / per-brand
 # payload-building helpers that share state and partial-result types.
 # Decomposing across files would fragment a single data-shape contract
-# and force the renderer to recompose it at the call site — net loss of
+# and force the renderer to recompose it at the call site, net loss of
 # readability. The CSS template alone is past the size limit by design.
 #
 # Per-category executive summary with two dropdowns (Category + Brand) at
 # the top. Renders a 6-card narrative dashboard:
-#   1. Hero        — auto-generated verdict + 4 anchor numbers (MMS /
+#   1. Hero: auto-generated verdict + 4 anchor numbers (MMS /
 #                    MPen / % bought / SCR) + MMS rank badge
-#   2. Mental availability — MMS / SoM / Network Size vs leader
-#   3. Physical conversion — collapsed Aware -> Prefer -> Bought funnel
-#   4. What's working      — top-3 CEPs + top-3 attributes (over-index)
-#   5. Where weakest       — bottom-3 CEPs + bottom-3 attributes
-#   6. Conversation & DoP  — WOM (heard / said) + top-2 partners + rivals
+#   2. Mental availability, MMS / SoM / Network Size vs leader
+#   3. Physical conversion, collapsed Aware -> Prefer -> Bought funnel
+#   4. What's working, top-3 CEPs + top-3 attributes (over-index)
+#   5. Where weakest, bottom-3 CEPs + bottom-3 attributes
+#   6. Conversation & DoP, WOM (heard / said) + top-2 partners + rivals
 # Plus an analyst commentary editor, a closing all-cats strip, and a
 # collapsible educational callout.
 #
 # Data flow: pre-compute a per-(cat, brand) payload in R, embed as JSON, JS
 # reads dropdown values + payload to render the cards. No re-render of
-# heavy chart elements — just card values + chip labels.
+# heavy chart elements, just card values + chip labels.
 #
 # JS: js/brand_summary_panel.js
-# CSS: build_summary_panel_styles(brand_colour) — injected via panel_styles
+# CSS: build_summary_panel_styles(brand_colour), injected via panel_styles
 # ==============================================================================
 
 BRAND_SUMMARY_PANEL_VERSION <- "1.0"
@@ -68,7 +68,7 @@ build_brand_summary_panel <- function(results, config) {
   closing_strip_html <- .brsum_closing_strip(deep_cats, payload, focal_brand)
 
   # Sample-wide shopper context + focal-brand engagement sections. Both are
-  # NULL-safe — render returns "" when the corresponding engine wasn't run or
+  # NULL-safe. Render returns "" when the corresponding engine wasn't run or
   # found no source columns (e.g. a project without IPK_*/GroceryChains).
   shopper_summary_html <- if (exists("build_shopper_summary_sections",
                                       mode = "function")) {
@@ -152,7 +152,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 [data-brsum-fade] { transition: opacity 200ms ease; }
 [data-brsum-fade].brsum-fading { opacity: 0; }
 
-/* ---- Strip wrappers (legacy — Analyst commentary + closing strip still use the title style) ---- */
+/* ---- Strip wrappers (legacy: Analyst commentary + closing strip still use the title style) ---- */
 .brsum-strip { margin: 0 0 36px; }
 .brsum-strip-title { font-size: 11px; font-weight: 700; color: #475569;
   text-transform: uppercase; letter-spacing: 1px; margin: 0 0 14px;
@@ -252,7 +252,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   padding: 8px 0;
 }
 
-/* ---- Hero card (1st card — auto-generated verdict + 4 anchor numbers) ---- */
+/* ---- Hero card (1st card: auto-generated verdict + 4 anchor numbers) ---- */
 .brsum-hero { display: flex; flex-direction: column; gap: 12px; }
 .brsum-hero-rank {
   display: inline-block; align-self: flex-start;
@@ -806,12 +806,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # MINI-FUNNEL DATA HELPERS
 # ==============================================================================
 # Each helper returns a list with:
-#   stage_keys / seg_codes  — character vector of segment IDs in display order
-#   stage_labels / seg_labels — display labels
-#   seg_colours              — fill colours per segment (only for stacked bars)
-#   base_label               — what the percentages are computed against
-#   cat_avg                  — numeric vector, one per segment, in 0..1
-#   brands                   — named list (brand_code -> numeric vector,
+#   stage_keys / seg_codes: character vector of segment IDs in display order
+#   stage_labels / seg_labels, display labels
+#   seg_colours: fill colours per segment (only for stacked bars)
+#   base_label. What the percentages are computed against
+#   cat_avg, numeric vector, one per segment, in 0..1
+#   brands, named list (brand_code -> numeric vector,
 #                              same length as seg_codes, in 0..1)
 # JS reads these and renders two stacked rows (focal + cat avg).
 
@@ -831,7 +831,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   # Synthesise the string-label keys the stage-label resolver expects
   # from the numeric *_timeframe_months keys that the brand config
   # always carries. Without this the resolver falls back to the
-  # canonical "Long Period" / "Target Period" defaults — the funnel
+  # canonical "Long Period" / "Target Period" defaults, the funnel
   # deep-dive tab reads its labels from the per-category Brand
   # Categories sheet which DOES carry Timeframe_Long / Timeframe_Target
   # strings, but the summary-panel call site doesn't see that sheet.
@@ -878,9 +878,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   )
 }
 
-# Brand attitude: 6 segments (IPK 2026 scale) — Love / Prefer / Ambivalent /
+# Brand attitude: 6 segments (IPK 2026 scale), Love / Prefer / Ambivalent /
 # Price / Avoid / No opinion. Reads from cr$funnel$attitude_decomposition (long
-# data frame with brand_code, attitude_role, pct columns) — pct is already a
+# data frame with brand_code, attitude_role, pct columns). Pct is already a
 # fraction of total respondents in the engine. Legacy 5-level surveys are
 # auto-canonicalised: their "reject" rolls into "avoid", and the price column
 # carries zero values.
@@ -932,7 +932,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   )
 }
 
-# Loyalty seg: 4 segments — Sole / Primary / Secondary / Not bought.
+# Loyalty seg: 4 segments, Sole / Primary / Secondary / Not bought.
 # Source values are % of category buyers; each brand's row sums to 100%
 # of cat buyers. Cat avg is the unweighted mean per segment across brands.
 .brsum_loyalty_minif <- function(cr, brand_codes, label_map, config = list()) {
@@ -982,7 +982,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   )
 }
 
-# Purchase distribution: 4 segments — Light / Moderate / Regular / Frequent.
+# Purchase distribution: 4 segments, Light / Moderate / Regular / Frequent.
 # Source values are % of brand buyers; each brand's row sums to 100% of
 # its own buyers. Cat avg is the unweighted mean per segment across brands.
 .brsum_purchase_minif <- function(cr, brand_codes, label_map,
@@ -1013,7 +1013,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     }
   }
 
-  # Per-brand base label — purchase distribution is "% of THIS brand's
+  # Per-brand base label: purchase distribution is "% of THIS brand's
   # buyers", so the n changes with the brand picker. The JS reads
   # base_by_brand[brandCode] when rendering.
   base_by_brand <- list()
@@ -1047,7 +1047,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   )
 }
 
-# Mental Advantage dot plot data — shared between the CEP and the Brand
+# Mental Advantage dot plot data: shared between the CEP and the Brand
 # attributes cards. Reads the matrix returned by
 # calculate_mental_advantage() (advantage / actual / decision matrices)
 # and exposes per-stim:
@@ -1205,10 +1205,10 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # back to the code itself when no label is available.
 #
 # Source priority:
-#  1. `results$structure$brands` (Category + BrandCode + BrandLabel) — the
+#  1. `results$structure$brands` (Category + BrandCode + BrandLabel): the
 #     canonical label table on the Survey_Structure sheet.
 #  2. `results$results$portfolio_overview$categories[[cat_code]]$brand_names`
-#     — a named list (BrandCode -> BrandName) keyed by category code, not
+#, a named list (BrandCode -> BrandName) keyed by category code, not
 #     category name.
 .brsum_brand_label_map <- function(cr, results, cat_name) {
   out <- list()
@@ -1327,7 +1327,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 # Per-category context: eight category-level metrics.
 # Brand-count metrics (avg # of brands at each funnel stage) sum the
-# weighted per-brand penetrations — pct_weighted is in 0..1 so the sum
+# weighted per-brand penetrations. Pct_weighted is in 0..1 so the sum
 # is directly the average count of brands per respondent at that stage.
 # Avg CEPs per respondent sums cep_penetration percentages and divides
 # by 100. Returns NULL fields when the upstream engine didn't run.
@@ -1411,7 +1411,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
 
   # ---- Top channel (always emit a slot so the row is visible in the
-  #      card; missing data renders as "—" rather than disappearing)
+  #      card; missing data renders as "n/a" rather than disappearing)
   loc <- cr$shopper_location
   if (!is.null(loc) && !identical(loc$status, "REFUSED") &&
       !is.null(loc$top$label) && !is.na(loc$top$label) &&
@@ -1463,7 +1463,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
   # ---- Silent-zero masks (see PRODUCTION_REVIEW_BRAND.md §C1) -----------------
   # The MA / repertoire / WOM engines return 0 (not NA) for brands without
-  # data — a config edge case (brand declared in awareness but absent from a
+  # data: a config edge case (brand declared in awareness but absent from a
   # specific element battery) silently pulls cat-avgs toward zero. The May
   # 2026 WOM incident was the same class of bug. These masks identify
   # "data-active" brands per engine so cat-avgs reflect the honest mean
@@ -1500,9 +1500,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
   # Masked-mean helper: NA-safe mean restricted to rows whose BrandCode is in
   # `active`. Returns NA_real_ when no active rows remain (so the chip
-  # renders "—" rather than 0). Empty `active` means "no brand has data for
-  # this engine in this category" — also NA, not a silent zero (this is
-  # the C1 invariant — see test_summary_cat_avg_masks.R).
+  # renders "n/a" rather than 0). Empty `active` means "no brand has data for
+  # this engine in this category", also NA, not a silent zero (this is
+  # the C1 invariant, see test_summary_cat_avg_masks.R).
   .masked_mean <- function(df, col, active) {
     if (is.null(df) || nrow(df) == 0L || !col %in% names(df))
       return(NA_real_)
@@ -1539,7 +1539,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
   # ---- Funnel: bought_target ----
   # Funnel engine already NAs missing rows (03b_funnel_metrics.R:348-359), so
-  # mean(..., na.rm = TRUE) is already honest — no additional mask needed.
+  # mean(..., na.rm = TRUE) is already honest, no additional mask needed.
   bt_value <- NA_real_
   bt_cat_avg <- NA_real_
   if (!is.null(fn$stages) && nrow(fn$stages) > 0) {
@@ -1780,7 +1780,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       mean(as.numeric(df[[col]][keep]), na.rm = TRUE)
     }
     fmt_pct1 <- function(x) {
-      if (!is.finite(x)) "—" else sprintf("%.0f%%", x)
+      if (!is.finite(x)) "n/a" else sprintf("%.0f%%", x)
     }
 
     n_total_wom <- as.numeric(cr$funnel$meta$n_unweighted %||%
@@ -1972,12 +1972,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 
 # ==============================================================================
-# DASHBOARD SKELETON (v2 — card grid)
+# DASHBOARD SKELETON (v2: card grid)
 # ==============================================================================
 # Layout (top → bottom):
-#   1. Focal context strip — the chosen focal brand + category, displayed
+#   1. Focal context strip: the chosen focal brand + category, displayed
 #      once at the top so per-card headers don't have to repeat them.
-#   2. Card grid — 11 cards, two per row, with the two dot-plots (CEP and
+#   2. Card grid: 11 cards, two per row, with the two dot-plots (CEP and
 #      Brand attributes) spanning full width because they need horizontal
 #      room. Card content is rendered by JS reading the JSON payload; this
 #      function only emits empty containers + section labels.
@@ -1986,9 +1986,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   paste(
     '<div class="brsum-focal-context" data-brsum-focal-context>',
       '<span class="brsum-fc-eyebrow">FOCAL</span>',
-      '<span class="brsum-fc-brand" data-brsum-fc-brand>&mdash;</span>',
+      '<span class="brsum-fc-brand" data-brsum-fc-brand>n/a</span>',
       '<span class="brsum-fc-divider">&middot;</span>',
-      '<span class="brsum-fc-cat" data-brsum-fc-cat>&mdash;</span>',
+      '<span class="brsum-fc-cat" data-brsum-fc-cat>n/a</span>',
     '</div>',
     sep = "\n"
   )
@@ -1997,23 +1997,23 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 .brsum_card_grid_skeleton <- function() {
   # 6-card narrative layout. Each card is independently pinnable via the
-  # standard brand_pins.js workflow — section data-section="brsum-{key}"
+  # standard brand_pins.js workflow, section data-section="brsum-{key}"
   # is what brTogglePin looks up; data-pin-as-table tells captureFromRoot
   # to grab the rendered card content (no <table> or <svg> required).
   #
   # Card story arc (top -> bottom):
-  #   1. Hero          — single-sentence verdict + 4 anchor numbers (MMS /
+  #   1. Hero: single-sentence verdict + 4 anchor numbers (MMS /
   #                      MPen / % bought / SCR). Full-width.
-  #   2. Mental        — MMS / SoM / Network Size vs leader. The mental-
+  #   2. Mental: MMS / SoM / Network Size vs leader. The mental-
   #                      availability story.
-  #   3. Funnel        — Aware -> Prefer -> Bought funnel (claimed
+  #   3. Funnel: Aware -> Prefer -> Bought funnel (claimed
   #                      buying behaviour, not physical distribution).
-  #   4. Working       — Top 3 CEPs + top 3 attributes the focal over-
+  #   4. Working: Top 3 CEPs + top 3 attributes the focal over-
   #                      indexes on. Wide for the side-by-side columns.
-  #   5. Weak          — Bottom 3 CEPs + bottom 3 attributes the focal
+  #   5. Weak: Bottom 3 CEPs + bottom 3 attributes the focal
   #                      under-indexes on. Wide for the same reason.
-  #   6. Conversation  — Word of mouth (heard + said + occasions).
-  #   7. Repertoire    — Top 2 DoP partners + top 2 rivals (who focal's
+  #   6. Conversation: Word of mouth (heard + said + occasions).
+  #   7. Repertoire: Top 2 DoP partners + top 2 rivals (who focal's
   #                      buyers cohabit with above / below the column
   #                      average; complements the funnel + WOM view).
   card <- function(key, title, wide = FALSE) {
@@ -2040,10 +2040,10 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       card("hero",         "Brand at a glance",                                  wide = TRUE),
       card("mental",       "Mental availability"),
       card("funnel",       "Buying funnel"),
-      card("working",      "What’s working &mdash; over-indexers",               wide = TRUE),
-      card("weak",         "Where the brand is weakest &mdash; under-indexers",  wide = TRUE),
+      card("working",      "What’s working: over-indexers",               wide = TRUE),
+      card("weak",         "Where the brand is weakest, under-indexers",  wide = TRUE),
       card("conversation", "Word of mouth"),
-      card("repertoire",   "Repertoire ties &mdash; who focal buyers also buy"),
+      card("repertoire",   "Repertoire ties, who focal buyers also buy"),
     '</div>',
     '<aside class="brsum-pen-notes" data-brsum-pen-notes hidden aria-live="polite"></aside>',
     sep = "\n"
@@ -2110,22 +2110,22 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 .brsum_closing_strip <- function(deep_cats, payload, focal_brand) {
   # Only show the "across all categories" strip when there are 2+ deep-dive
   # categories. Single-category reports (the common case) don't benefit from
-  # this view — it just adds noise.
+  # this view. It just adds noise.
   if (length(deep_cats) < 2 || !nzchar(focal_brand)) return("")
   # v1.1: emit a skeleton with one card per deep-dive category. JS
   # (brand_summary_panel.js::renderClosingStrip) fills the title + numbers
   # from payload$categories[[cat]]$brands[[active_brand]] every time the
   # brand picker changes, so the strip tracks the dropdown rather than the
   # config-time focal brand. Spelled-out metric names (Mental Market Share /
-  # Mental Penetration / Bought past 3 months) — Duncan's polish request.
+  # Mental Penetration / Bought past 3 months), Duncan's polish request.
   cards <- character(0)
   for (cn in deep_cats) {
     cards <- c(cards, sprintf(
       '<div class="brsum-mini-card" data-brsum-mini-cat="%s" onclick="brsumSwitchCat(\'%s\')">
          <div class="brsum-mini-cat">%s</div>
-         <div class="brsum-mini-row"><span>Mental Market Share</span><span class="brsum-mini-num" data-brsum-mini-metric="mms">&mdash;</span></div>
-         <div class="brsum-mini-row"><span>Mental Penetration</span><span class="brsum-mini-num" data-brsum-mini-metric="mpen">&mdash;</span></div>
-         <div class="brsum-mini-row"><span>Bought past 3 months</span><span class="brsum-mini-num" data-brsum-mini-metric="bt">&mdash;</span></div>
+         <div class="brsum-mini-row"><span>Mental Market Share</span><span class="brsum-mini-num" data-brsum-mini-metric="mms">n/a</span></div>
+         <div class="brsum-mini-row"><span>Mental Penetration</span><span class="brsum-mini-num" data-brsum-mini-metric="mpen">n/a</span></div>
+         <div class="brsum-mini-row"><span>Bought past 3 months</span><span class="brsum-mini-num" data-brsum-mini-metric="bt">n/a</span></div>
        </div>',
       .brsum_esc(cn), .brsum_esc(cn), .brsum_esc(cn)
     ))
@@ -2193,7 +2193,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 #  - default: value is in 0..1 (e.g. MMS)
 .brsum_pct <- function(x, suffix = "%", scale = 100,
                        already_pct = FALSE) {
-  if (is.null(x) || is.na(x)) return("—")
+  if (is.null(x) || is.na(x)) return("n/a")
   if (already_pct) return(sprintf("%.0f%s", x, suffix))
   sprintf("%.0f%s", x * scale, suffix)
 }
@@ -2201,15 +2201,15 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 # Signed-integer formatter (for net WOM)
 .brsum_signed <- function(x) {
-  if (is.null(x) || is.na(x)) return("—")
+  if (is.null(x) || is.na(x)) return("n/a")
   if (x > 0) sprintf("+%.0f", x)
   else sprintf("%.0f", x)
 }
 
 
-# Plain numeric formatter (for NS, avg purchases — not a percentage)
+# Plain numeric formatter (for NS, avg purchases, not a percentage)
 .brsum_num <- function(x, digits = 1) {
-  if (is.null(x) || is.na(x) || !is.finite(x)) return("—")
+  if (is.null(x) || is.na(x) || !is.finite(x)) return("n/a")
   sprintf(paste0("%.", as.integer(digits), "f"), x)
 }
 

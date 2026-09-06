@@ -108,7 +108,7 @@
     relocateWomToolbar(panel);
 
     // Initial chart reflow so bar order matches the table's initial
-    // (alphabetical) competitor order — chart is built focal-first then
+    // (alphabetical) competitor order. Chart is built focal-first then
     // net DESC, but the table ships alphabetical.
     reflowChart(panel);
   }
@@ -147,7 +147,7 @@
 
     var catCode = panel.getAttribute("data-cat-code") || "";
     TurasPins.add({
-      title:   "Word of Mouth" + (catCode ? " — " + catCode : ""),
+      title:   "Word of Mouth" + (catCode ? ": " + catCode : ""),
       html:    chartSvg + tableHtml,
       insight: insight
     });
@@ -222,7 +222,7 @@
     if (avgRow) tbody.appendChild(avgRow);
     compRows.forEach(function (tr) { tbody.appendChild(tr); });
 
-    // Reset all sort indicators — repin implies alpha order
+    // Reset all sort indicators: repin implies alpha order
     panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (th) {
       th.setAttribute("data-wom-sort-dir", "none");
     });
@@ -457,7 +457,7 @@
     });
   }
 
-  // DJB2-style stable colour fallback — mirrors the R side .stable_col() used
+  // DJB2-style stable colour fallback: mirrors the R side .stable_col() used
   // when the config palette doesn't supply an explicit colour for a brand.
   function stableColour(brandCode, focal, focalColour) {
     var palette = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',

@@ -5,7 +5,7 @@
 #
 #   [Sub-tab nav]: one tab per scope (ALL + each category present)
 #   [Per-scope panel]:
-#     [Question chip strip — show/hide individual questions]
+#     [Question chip strip: show/hide individual questions]
 #     [Per-question card]:
 #       - Question label
 #       - Total horizontal-bar table (with Wilson CI overlay toggle)
@@ -271,12 +271,12 @@ build_adhoc_panel_html <- function(panel_data,
 # ==============================================================================
 
 .adhoc_pct <- function(v, dp) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="demo-na">&mdash;</span>')
+  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="demo-na">n/a</span>')
   sprintf("%.*f%%", as.integer(dp), v)
 }
 
 .adhoc_int <- function(v) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("&mdash;")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
   format(as.integer(round(v)), big.mark = ",")
 }
 
@@ -298,7 +298,7 @@ build_adhoc_panel_html <- function(panel_data,
 
 
 # ==============================================================================
-# CSS (additive — relies on demographics panel CSS for shared classes)
+# CSS (additive: relies on demographics panel CSS for shared classes)
 # ==============================================================================
 
 #' Build ad-hoc panel CSS

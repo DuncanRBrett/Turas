@@ -1,6 +1,6 @@
 # ==============================================================================
 # BRAND MODULE - WORD OF MOUTH PANEL HTML RENDERER
-# SIZE-EXCEPTION: sequential HTML assembly pipeline — WOM panel has four
+# SIZE-EXCEPTION: sequential HTML assembly pipeline. WOM panel has four
 # sub-sections (heard/said charts + per-brand table + insight box). Each
 # section is tightly coupled to its CSS and JS payload.
 # ==============================================================================
@@ -80,7 +80,7 @@ build_wom_panel_html <- function(panel_data,
 
   if (length(brand_codes) == 0) return("")
 
-  # DJB2 hash palette — identical to JS BRAND_PALETTE for cross-panel consistency
+  # DJB2 hash palette: identical to JS BRAND_PALETTE for cross-panel consistency
   palette <- c('#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
                '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac')
   .stable_col <- function(bc) {
@@ -108,7 +108,7 @@ build_wom_panel_html <- function(panel_data,
   chip_default <- pd$config$chip_default %||% "focal_only"
   is_focal_only <- identical(chip_default, "focal_only")
 
-  # Brand-visibility selector — replaces the legacy chip strip + Hide-all
+  # Brand-visibility selector: replaces the legacy chip strip + Hide-all
   # toggle. Brand list / palette / focal-only default are read by JS from
   # the panel data block, so we don't repeat them in attributes here.
   selector_panel_id <- paste0("wom-", category_code)
@@ -209,7 +209,7 @@ build_wom_panel_html <- function(panel_data,
       freq = " wom-th-freq",
       "")
     sprintf(
-      '<th class="ct-th ct-data-col wom-th wom-sortable%s" data-wom-col="%s" data-wom-col-type="%s" data-wom-action="sort" data-wom-sort-col="%s" data-wom-sort-dir="none" title="%s \u2014 click to sort"><span>%s</span><span class="wom-sort-ind"></span></th>',
+      '<th class="ct-th ct-data-col wom-th wom-sortable%s" data-wom-col="%s" data-wom-col-type="%s" data-wom-action="sort" data-wom-sort-col="%s" data-wom-sort-dir="none" title="%s, click to sort"><span>%s</span><span class="wom-sort-ind"></span></th>',
       group_cls,
       .wom_esc(col$key),
       .wom_esc(col$value_type),
@@ -300,7 +300,7 @@ build_wom_panel_html <- function(panel_data,
   paste0(
     '<tr class="ct-row fn-row-avg-all wom-row-avg" data-locked="1">',
     '<td class="ct-td ct-label-col"><em>Category average</em></td>',
-    '<td class="ct-td ct-data-col wom-col-base" hidden><span style="color:#94a3b8;font-size:11px;">\u2014</span></td>',
+    '<td class="ct-td ct-data-col wom-col-base" hidden><span style="color:#94a3b8;font-size:11px;">n/a</span></td>',
     cells,
     '</tr>'
   )
@@ -311,7 +311,7 @@ build_wom_panel_html <- function(panel_data,
 
 .wom_base_cell <- function(n, focal_cls) {
   if (is.null(n) || is.na(n) || !is.finite(n)) {
-    return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
+    return(sprintf('<td class="ct-td ct-data-col%s ct-na">n/a</td>', focal_cls))
   }
   ni <- as.integer(n)
   warn <- ni < 30L
@@ -326,7 +326,7 @@ build_wom_panel_html <- function(panel_data,
 .wom_data_cell <- function(value, col, focal_cls, stats_block,
                             base_n = NA_integer_) {
   if (is.null(value) || is.na(value) || !is.finite(value)) {
-    return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
+    return(sprintf('<td class="ct-td ct-data-col%s ct-na">n/a</td>', focal_cls))
   }
   val_type <- col$value_type
   display  <- .wom_format_value(value, val_type)
@@ -343,7 +343,7 @@ build_wom_panel_html <- function(panel_data,
 
   # In-cell count span (hidden by default; revealed when the panel is
   # toggled to .show-freq via the Show count checkbox). Only emitted for
-  # pct columns \u2014 net and freq metrics are deltas and means, so a count
+  # pct columns. Net and freq metrics are deltas and means, so a count
   # doesn't apply. count = round(pct * base_n / 100).
   count_html <- ""
   if (identical(val_type, "pct") && is.finite(base_n) && base_n > 0) {
@@ -376,7 +376,7 @@ build_wom_panel_html <- function(panel_data,
 .wom_cat_avg_cell <- function(stats_block, col, base_n = NA_real_) {
   if (is.null(stats_block) || is.null(stats_block$mean) ||
       is.na(stats_block$mean)) {
-    return('<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg ct-na">&mdash;</td>')
+    return('<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg ct-na">n/a</td>')
   }
   m      <- stats_block$mean
   lo     <- stats_block$ci_lower

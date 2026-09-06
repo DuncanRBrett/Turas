@@ -121,7 +121,7 @@ build_portfolio_overview_subtab_styles <- function(focal_colour = "#1A5276") {
   font-size: 12px;
   width: 100%%;
 }
-/* Dark navy header strip — matches the Footprint table and the Funnel /
+/* Dark navy header strip: matches the Footprint table and the Funnel /
    MA matrices so every brand-module table reads as part of one report.
    Lowercase by CSS so the R-side header strings can stay sentence-case
    and `text-transform` is the only place to change casing. */
@@ -149,7 +149,7 @@ build_portfolio_overview_subtab_styles <- function(focal_colour = "#1A5276") {
   display: block; font-size: 9px; font-weight: 400; color: #94a3b8;
   text-transform: none; letter-spacing: 0; margin-top: 2px;
 }
-/* Pill labels in the body cells (Deep-dive / Awareness) — keep them
+/* Pill labels in the body cells (Deep-dive / Awareness), keep them
    lowercase too so the table reads consistently. */
 .pfo-pill { text-transform: lowercase; }
 .pfo-table tbody tr:nth-child(odd)  { background: #fcfdfe; }

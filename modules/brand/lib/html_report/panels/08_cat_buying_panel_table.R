@@ -1,6 +1,6 @@
 # ==============================================================================
 # BRAND MODULE - CATEGORY BUYING PANEL TABLE BUILDER
-# SIZE-EXCEPTION: sequential HTML assembly pipeline — one builder per table
+# SIZE-EXCEPTION: sequential HTML assembly pipeline, one builder per table
 # type (Dirichlet norms, DoP deviation, buyer heaviness). Decomposing further
 # would split tightly coupled CSS and markup.
 # ==============================================================================
@@ -60,10 +60,10 @@ cb_norms_table_html <- function(norms_table,
     return('<p class="cb-refused">Norms table not available.</p>')
 
   fmt_pct <- function(x, d = 1) {
-    if (is.na(x)) return("\u2014") else sprintf("%.*f%%", d, x)
+    if (is.na(x)) return("n/a") else sprintf("%.*f%%", d, x)
   }
   fmt_n <- function(x, d = 2) {
-    if (is.na(x)) return("\u2014") else sprintf("%.*f", d, x)
+    if (is.na(x)) return("n/a") else sprintf("%.*f", d, x)
   }
   dev_cls <- function(v) {
     if (is.na(v)) return("")
@@ -225,7 +225,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
     for (i in seq_len(nrow(cat_fd))) {
       lbl_i <- .cb_esc(labels[i])
       pct_i <- if (!is.na(cat_fd$Pct[i])) sprintf("%.1f%%", cat_fd$Pct[i])
-               else "\u2014"
+               else "n/a"
       lines <- c(lines, sprintf('<tr><td>%s</td><td style="text-align:right;">%s</td></tr>',
                                  lbl_i, pct_i))
     }
@@ -252,7 +252,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
       bb_i  <- if ("Brands_Bought" %in% names(rs))
         .cb_esc(as.character(rs$Brands_Bought[i])) else as.character(i)
       pct_i <- if ("Percentage" %in% names(rs) && !is.na(rs$Percentage[i]))
-        sprintf("%.1f%%", rs$Percentage[i]) else "\u2014"
+        sprintf("%.1f%%", rs$Percentage[i]) else "n/a"
       lines <- c(lines, sprintf('<tr><td>%s</td><td style="text-align:right;">%s</td></tr>',
                                  bb_i, pct_i))
     }
@@ -303,9 +303,9 @@ cb_brand_freq_scr_table_html <- function(norms_table,
                          !is.na(category_metrics$mean_purchases))
     as.numeric(category_metrics$mean_purchases) else NA_real_
 
-  fmt_pct  <- function(x) if (is.na(x)) "\u2014" else sprintf("%.0f%%", x)
-  fmt_n    <- function(x) if (is.na(x)) "\u2014" else sprintf("%.1f", x)
-  fmt_int  <- function(x) if (is.na(x) || x == 0L) "\u2014" else
+  fmt_pct  <- function(x) if (is.na(x)) "n/a" else sprintf("%.0f%%", x)
+  fmt_n    <- function(x) if (is.na(x)) "n/a" else sprintf("%.1f", x)
+  fmt_int  <- function(x) if (is.na(x) || x == 0L) "n/a" else
     formatC(as.integer(x), format = "d", big.mark = ",")
 
   vol_share_fn <- function(pen, buy_rate) {
@@ -428,10 +428,10 @@ cb_brand_freq_scr_table_html <- function(norms_table,
            "counts reconciled against the past-%d-month multi-pick. ",
            "Base includes lapsed / zero-purchase respondents who screened ",
            "into the category but reported no purchases in the target window. ",
-           "\u2014 The Loyalty Segmentation tab uses a tighter base (only ",
+           "The Loyalty Segmentation tab uses a tighter base (only ",
            "people who bought at least one brand in the past %d months), so ",
            "its \u201c%% Cat buyers\u201d value for the same brand will be higher. ",
-           "\u2014 May differ from the Brand Funnel by 1\u20133pp: the ",
+           "Penetration may differ from the Brand Funnel by 1\u20133pp: the ",
            "reconciliation pass promotes respondents who reported per-brand ",
            "purchase counts but didn't tick the brand on the past-%d-month ",
            "multi-pick."),
@@ -447,7 +447,7 @@ cb_brand_freq_scr_table_html <- function(norms_table,
   scr_tip <- paste0(
     "Share of Category Requirement (observed): among this brand\u2019s buyers, ",
     "the % of their total category purchases that go to this brand. ",
-    "This is a loyalty metric \u2014 it does NOT sum to 100%% across brands ",
+    "This is a loyalty metric. It does NOT sum to 100%% across brands ",
     "because each brand\u2019s SCR is measured within its own buyer group.")
 
   # --- Header: sort buttons on numeric columns (MA-style indicator) ---
@@ -505,11 +505,11 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     body_rows <- c(body_rows, .row_html(frow, "focal-row", lbl_html))
   }
 
-  # Row 2: category avg — funnel-style CI mini-bar per numeric cell
+  # Row 2: category avg, funnel-style CI mini-bar per numeric cell
   body_rows <- c(body_rows, paste0(
     '<tr class="cbp-avg-row">',
     '<td class="ct-label-col" style="font-style:italic;">Category avg</td>',
-    '<td class="cb-base-td">\u2014</td>',
+    '<td class="cb-base-td">n/a</td>',
     sprintf('<td class="cb-avg-td cb-avg-td-ci" data-v="%s"><span class="cb-val-pct">%s</span>%s</td>',
             formatC(avg_pen, format = "f", digits = 2),
             fmt_pct(avg_pen),

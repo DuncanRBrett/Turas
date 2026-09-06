@@ -1,7 +1,7 @@
 /**
  * Branded Reach panel controller (Phase 1)
  *
- * Sub-tab switching only — clicking [data-br-reach-tab] in the .br-reach-subnav
+ * Sub-tab switching only, clicking [data-br-reach-tab] in the .br-reach-subnav
  * hides every .br-reach-subtab and unhides the matching one. The clicked
  * button is marked .active.
  *
@@ -34,7 +34,7 @@
       });
     });
 
-    // Insight clear button — empties the textarea in this panel only
+    // Insight clear button: empties the textarea in this panel only
     var clearBtn = panel.querySelector('[data-br-reach-action="clear-insight"]');
     if (clearBtn) {
       clearBtn.addEventListener("click", function () {

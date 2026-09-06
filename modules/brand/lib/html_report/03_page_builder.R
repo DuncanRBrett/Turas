@@ -137,13 +137,13 @@ build_br_header <- function(config) {
 build_br_tab_nav <- function(category_names, config, display_map = NULL,
                               code_map = NULL) {
   # Tab order:
-  #   Portfolio (when enabled) — cross-cat lens comes first so the reader
+  #   Portfolio (when enabled): cross-cat lens comes first so the reader
   #     opens on the brand's whole-portfolio picture before drilling in.
-  #   Summary — per-cat snapshot for any picked category.
-  #   Per-category tabs — order driven by the Categories sheet in
+  #   Summary: per-cat snapshot for any picked category.
+  #   Per-category tabs: order driven by the Categories sheet in
   #     Brand_Config.xlsx; reorder rows there to change tab order.
   #   Brand Assets (when enabled).
-  #   Pinned Views, About — always trailing.
+  #   Pinned Views, About, always trailing.
   btns <- character(0)
 
   if (isTRUE(config$element_portfolio))
@@ -192,7 +192,7 @@ build_br_tab_nav <- function(category_names, config, display_map = NULL,
 #'   sub-panel, only the first should be visible at render time; later
 #'   ones are hidden until the matching sub-tab becomes active.
 #' @param omit_chart_buttons Logical. When TRUE, only the "Add / Edit
-#'   Insight" toggle + insight container are emitted — the pin / PNG /
+#'   Insight" toggle + insight container are emitted, the pin / PNG /
 #'   Excel buttons are skipped. Used for Funnel and Mental Availability
 #'   sub-tab toolbars where the panel already renders its own pin /
 #'   PNG / Excel controls and a duplicate would clutter the UI.
@@ -217,7 +217,7 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
   #
   # USE SINGLE % HERE. These strings are substituted into the sprintf
   # format below via %s, which does NOT reduce %% → %. A leftover %% in
-  # the rendered CSS is invalid and the browser silently drops the rule —
+  # the rendered CSS is invalid and the browser silently drops the rule,
   # the v1.1 narrow-textarea regression. See memory:r-sprintf-css-gotchas.
   base_container <- "margin-bottom:16px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
   container_style <- if (has_text) {
@@ -425,14 +425,14 @@ build_br_summary_panel <- function(results, config) {
 
       mms_val <- if (!is.null(ma) && !is.null(ma$metrics_summary$focal_mms)) {
         sprintf("%.1f%%", ma$metrics_summary$focal_mms * 100)
-      } else "\u2014"
+      } else "n/a"
       mpen_val <- if (!is.null(ma) && !is.null(ma$metrics_summary$focal_mpen)) {
         sprintf("%.0f%%", ma$metrics_summary$focal_mpen * 100)
-      } else "\u2014"
+      } else "n/a"
       aware_val <- if (!is.null(funnel) &&
                         !is.null(funnel$metrics_summary$focal_by_stage$aware)) {
         sprintf("%.0f%%", 100 * funnel$metrics_summary$focal_by_stage$aware)
-      } else "\u2014"
+      } else "n/a"
 
       parts <- c(parts, sprintf('
 <div class="br-cat-card" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">
@@ -488,7 +488,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   # Use the human-readable display name for labels; fall back to the key.
   cat_name <- cat_display_name %||% cat_results$category %||% cat_name
 
-  # Local helper — looks up the optional pre-filled insight text from the
+  # Local helper: looks up the optional pre-filled insight text from the
   # config and forwards it to the toolbar builder. Keeps every call site
   # below to a single line.
   toolbar_for <- function(sid) {
@@ -522,7 +522,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   has_audience_lens <- !is.null(cat_results$audience_lens) &&
     !identical(cat_results$audience_lens$status, "REFUSED") &&
     length(cat_results$audience_lens$audiences %||% list()) > 0
-  # Drivers & Barriers HTML tab is retired — the focal-brand view on the
+  # Drivers & Barriers HTML tab is retired, the focal-brand view on the
   # Mental Advantage sub-tab carries the same diagnostic. The engine in
   # 06_drivers_barriers.R still runs; its Importance / IxP / Competitive
   # Advantage / Rejection sheets continue to write to Excel and CSV.
@@ -640,33 +640,33 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     if (!is.null(panels[[chart_key]])) {
       # WOM, branded-reach, repertoire/cat-buying, funnel, and MA panels
       # all get the shared section toolbar prepended. Funnel and MA also
-      # render their own internal pin/PNG controls (different position) \u2014
+      # render their own internal pin/PNG controls (different position).
       # the shared toolbar carries the insight editor which the embedded
       # controls do not.
       if (el == "wom") {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          '<h3 class="br-element-title">Word of Mouth: %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "branded_reach") {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Branded Reach \u2014 %s</h3>',
+          '<h3 class="br-element-title">Branded Reach: %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "demographics") {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Demographics \u2014 %s</h3>',
+          '<h3 class="br-element-title">Demographics: %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "adhoc") {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Ad Hoc Questions \u2014 %s</h3>',
+          '<h3 class="br-element-title">Ad Hoc Questions: %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "audience_lens") {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Audience Lens \u2014 %s</h3>',
+          '<h3 class="br-element-title">Audience Lens: %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "funnel" || el == "ma") {
         # Per-sub-tab insight toolbars. The funnel panel has 2 internal
@@ -676,7 +676,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         # (brand_report.js::switchCategorySubtab) can hide all but the active
         # one. Anchors: <internal-tab>-<cat_id>, e.g. funnel-bak, ceps-pos.
         #
-        # omit_chart_buttons=TRUE — the panel itself emits its own pin /
+        # omit_chart_buttons=TRUE: the panel itself emits its own pin /
         # PNG / Excel toolbar (data-fn-action="pindropdown" /
         # ma-pin-dropdown-btn), so we render only the Add/Edit Insight
         # toggle here to avoid duplicate pin buttons. The panel pin
@@ -723,13 +723,13 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       if (!is.null(panels[[wom_key]])) {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          '<h3 class="br-element-title">Word of Mouth: %s</h3>',
           .br_esc(cat_name)))
         parts <- c(parts, panels[[wom_key]])
       } else {
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          '<h3 class="br-element-title">Word of Mouth: %s</h3>',
           .br_esc(cat_name)))
         parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
           'Percentage of category buyers who received or shared word-of-mouth about each brand ',
@@ -751,7 +751,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       cb_panel_key <- paste0("cat_buying_", cat_id)
 
       if (!is.null(panels[[cb_panel_key]])) {
-        # New Dirichlet panel — self-contained HTML fragment.
+        # New Dirichlet panel: self-contained HTML fragment.
         # Layout overrides (per design request):
         #   - Pin + Export emitted at top with class cb-toolbar-top so JS can
         #     relocate them into the Brand Summary controls bar (right side).
@@ -780,7 +780,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         cb_insight_text <- section_insight_for(config$section_insights,
                                                section_id)
         cb_has <- nzchar(cb_insight_text)
-        # Single % — see note in build_br_section_toolbar above.
+        # Single %, see note in build_br_section_toolbar above.
         cb_base_container <- "margin-top:12px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
         cb_container_style <- if (cb_has)
           paste0("display:block;", cb_base_container)
@@ -824,15 +824,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
         parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
+          '<h3 class="br-element-title">Category Buying: %s</h3>',
           .br_esc(cat_name)))
 
         cbf <- cat_results$cat_buying_frequency
         if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
           pct_b  <- if (!is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
-            sprintf("%.0f%%", cbf$pct_buyers) else "\u2014"
+            sprintf("%.0f%%", cbf$pct_buyers) else "n/a"
           mfreq  <- if (!is.null(cbf$mean_freq) && !is.na(cbf$mean_freq))
-            sprintf("%.1f\u00d7/month", cbf$mean_freq) else "\u2014"
+            sprintf("%.1f\u00d7/month", cbf$mean_freq) else "n/a"
           n_resp <- if (!is.null(cbf$n_respondents) && !is.na(cbf$n_respondents))
             sprintf("n = %d all respondents", cbf$n_respondents) else ""
 
@@ -955,7 +955,7 @@ build_br_portfolio_panel <- function(results, config) {
     section_id, section_id))
   # Legacy portfolio overview uses anchor "portfolio-overview". The new
   # portfolio panel (panels/09_portfolio_panel.R) uses "pf-overview" etc.
-  # Both keys can appear in config$section_insights — the resolver passes
+  # Both keys can appear in config$section_insights, the resolver passes
   # raw anchors through unchanged so each one wires correctly.
   parts <- c(parts, build_br_section_toolbar(
     section_id,
@@ -1013,9 +1013,9 @@ build_br_portfolio_panel <- function(results, config) {
     init_aw   <- aw_map[[active_bc]]
     # both cat_usage_pct and awareness_pct from portfolio_overview are 0-100 scale
     usage_str <- if (!is.null(usage_pct) && is.finite(usage_pct))
-      sprintf("%.0f%%", usage_pct) else "\u2014"
+      sprintf("%.0f%%", usage_pct) else "n/a"
     aware_str <- if (!is.null(init_aw) && is.finite(init_aw))
-      sprintf("%.0f%%", init_aw) else "\u2014"
+      sprintf("%.0f%%", init_aw) else "n/a"
 
     depth_badge <- if (depth == "full")
       sprintf('<span style="background:#EBF5FB;color:%s;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">Full</span>',
@@ -1062,7 +1062,7 @@ build_br_portfolio_panel <- function(results, config) {
       try { map = JSON.parse(row.getAttribute("data-br-port-awareness")); } catch(x) {}
       var val = map[brand];
       var cell = row.querySelector(".br-port-aware-cell");
-      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val) + "%%" : "\u2014";
+      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val) + "%%" : "n/a";
     });
   });
 })();
@@ -1074,7 +1074,7 @@ build_br_portfolio_panel <- function(results, config) {
   # Future sections placeholder
   parts <- c(parts, '
 <div class="br-element-section" style="margin-top:16px;">
-  <h3 class="br-element-title">Portfolio Optimisation \u2014 Coming Soon</h3>
+  <h3 class="br-element-title">Portfolio Optimisation: Coming Soon</h3>
   <ul style="font-size:13px;color:#64748b;line-height:2;padding-left:20px;">
     <li>Category investment prioritisation matrix (market size \u00d7 brand strength)</li>
     <li>Awareness-indexed MMS to compare mental availability efficiency across categories</li>
@@ -1290,12 +1290,12 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   background: rgba(0,0,0,0.4); z-index: 1000;
 }
 .br-help-overlay.open { display: block; }
-/* 2-layer nav: internal panel sub-navbars are hidden — their tabs are
+/* 2-layer nav: internal panel sub-navbars are hidden. Their tabs are
    promoted to the category-level .br-subtab-nav. The internal nav HTML
    is kept in the DOM so JS click-dispatch still works. */
 .fn-subnav, .ma-subnav { display: none !important; }
 
-/* === PINNED CARD (br-pinned-*) — matches conjoint/tabs visual standard === */
+/* === PINNED CARD (br-pinned-*): matches conjoint/tabs visual standard === */
 .br-pinned-card {
   background:#ffffff; border:1px solid #e8e5e0; border-radius:8px;
   padding:20px 24px; margin-bottom:16px; page-break-inside:avoid;
@@ -1428,7 +1428,7 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
     panel_parts <- c(panel_parts, build_br_portfolio_panel(results, config))
 
   # Demographics + Ad Hoc render as per-category sub-tabs inside each
-  # category panel (see build_br_category_panel) — no separate top-level
+  # category panel (see build_br_category_panel), no separate top-level
   # panels.
 
   panel_parts <- c(panel_parts, build_br_pinned_panel())

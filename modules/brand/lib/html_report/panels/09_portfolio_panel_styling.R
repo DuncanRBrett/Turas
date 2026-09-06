@@ -1,6 +1,6 @@
 # ==============================================================================
 # BRAND MODULE - PORTFOLIO PANEL CSS (shell only)
-# SIZE-EXCEPTION: CSS assembly pipeline — scoped portfolio styles across five
+# SIZE-EXCEPTION: CSS assembly pipeline, scoped portfolio styles across five
 # sub-analyses. One block per sub-tab for isolation and grep-ability.
 # ==============================================================================
 # Scoped to .pf-* prefix to avoid collisions with funnel (.fn-*) and MA (.ma-*).
@@ -15,7 +15,7 @@
 #' @return Character. CSS string.
 #' @keywords internal
 build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
-  # Use a `%FOCAL%` template + gsub instead of sprintf — sprintf has an
+  # Use a `%FOCAL%` template + gsub instead of sprintf. Sprintf has an
   # 8192-char format-string limit that this bundle has now outgrown,
   # plus single-character `%` literals (in CSS comments etc.) crash
   # sprintf and silently drop the entire portfolio CSS.
@@ -172,7 +172,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   font-size: 11px; color: #64748b; font-weight: 500;
 }
 
-/* Popover panel — sits below the trigger. The [hidden] override is
+/* Popover panel: sits below the trigger. The [hidden] override is
    essential: `display:flex` here would otherwise win over the browser's
    default [hidden] { display: none }, so toggling pop.hidden in JS would
    leave the panel permanently visible. */
@@ -241,7 +241,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   font-size: 12px; color: #475569; cursor: pointer;
 }
 
-/* ---- Header strip — solid navy, no per-cell breaks. ---- */
+/* ---- Header strip: solid navy, no per-cell breaks. ---- */
 .pf-fp-table-wrap {
   width: 100%; overflow-x: auto;
   border: 1px solid #e2e8f0; border-radius: 8px;
@@ -252,7 +252,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   font-size: 12px; table-layout: auto;
 }
 /* The <th> itself is the click target (no inner <button>) so the
-   thead reads as one continuous navy bar — no native button-face
+   thead reads as one continuous navy bar, no native button-face
    leaking between cells. */
 .pf-fp-table thead { background: #1a2744; }
 .pf-fp-table thead tr { background: #1a2744; }
@@ -322,7 +322,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .pf-fp-td-na { color: #cbd5e1; background: #fafafa; }
 
-/* Categories-per-brand column — sits immediately right of the brand
+/* Categories-per-brand column: sits immediately right of the brand
    label as a portfolio-summary column, visually divided from the
    heatmap cells with a stronger right border. */
 .pf-fp-th-cats {
@@ -338,7 +338,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 .pf-fp-cats-num { font-size: 13px; }
 .pf-fp-cats-of  { font-size: 10px; color: #94a3b8; margin-left: 1px; }
 
-/* Cell content stack — percentage on top, optional count below. */
+/* Cell content stack: percentage on top, optional count below. */
 .pf-fp-pct { display: block; }
 .pf-fp-n   { display: none; font-size: 10px; color: rgba(15,23,42,0.55); margin-top: 2px; }
 .pf-fp-table-wrap.pf-fp-show-counts .pf-fp-n { display: block; }
@@ -409,7 +409,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   margin: 0 0 6px 4px;
 }
 
-/* Side panel — closest competitors list. */
+/* Side panel: closest competitors list. */
 .pf-cn-side {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
   padding: 12px 14px; align-self: start;
@@ -475,7 +475,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 .pf-cn-reading-line:last-child { margin-bottom: 0; }
 
 /* JS-driven hover tooltip for Competitive Set nodes (and Category
-   Context dots — same floating element, reused). Multi-line tooltips
+   Context dots, same floating element, reused). Multi-line tooltips
    need `white-space: pre-line` to honour newlines from JS. */
 .pf-cn-tooltip {
   position: fixed; pointer-events: none;
@@ -521,13 +521,13 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   background: #fff; padding: 12px; margin: 0 0 12px;
 }
 
-/* Coverage note — small, italic, sits above the supporting table. */
+/* Coverage note: small, italic, sits above the supporting table. */
 .pf-cl-coverage {
   font-size: 11px; color: #64748b; font-style: italic;
   margin: 4px 4px 8px;
 }
 
-/* Supporting table — visual contract matches the Overview Category
+/* Supporting table: visual contract matches the Overview Category
    detail table (dark navy header, lowercase, sentence-case body). */
 .pf-cl-table-host { margin: 0 0 12px; }
 .pf-cl-table-scroll { overflow-x: auto; }
@@ -593,7 +593,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   background: #fff; padding: 12px; min-width: 0;
 }
 
-/* Permission-to-extend table — same visual contract as the Overview
+/* Permission-to-extend table: same visual contract as the Overview
    Category detail table (dark navy header, lowercase, sentence-case body). */
 .pf-ex-section-title {
   margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #1e293b;
@@ -636,7 +636,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   padding: 12px 4px;
 }
 
-/* Reading guide — same look as the constellation/clutter guides. */
+/* Reading guide: same look as the constellation/clutter guides. */
 .pf-ex-reading {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
   color: #334155; font-size: 12px; line-height: 1.55;

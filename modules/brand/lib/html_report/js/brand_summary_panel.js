@@ -1,10 +1,10 @@
 /* =============================================================================
- * BRAND MODULE — EXECUTIVE SUMMARY PANEL JS
+ * BRAND MODULE: EXECUTIVE SUMMARY PANEL JS
  * -----------------------------------------------------------------------------
  * SIZE-EXCEPTION: this file is the full set of card renderers for the
  * summary panel. Each renderer is short, but they share helpers (escHtml,
  * cardBody, valueChip, dopRow, womColumn, fmtPctSingle) and a single
- * orchestrator (`render()`) — splitting across files would force the
+ * orchestrator (`render()`): splitting across files would force the
  * orchestrator to import the helpers from another file purely to keep
  * line counts down, with no readability win.
  *
@@ -13,21 +13,21 @@
  * 6-card narrative dashboard when the user changes either dropdown.
  *
  * Card renderers (in render-order):
- *   renderFocalContext       — header strip (focal name + cat label)
- *   renderHeroCard           — auto-headline + 4 anchor numbers
- *   renderMentalCard         — MMS / SoM / Network Size value-chips
- *   renderPhysicalCard       — collapsed funnel (mini-funnel renderer)
+ *   renderFocalContext: header strip (focal name + cat label)
+ *   renderHeroCard, auto-headline + 4 anchor numbers
+ *   renderMentalCard, MMS / SoM / Network Size value-chips
+ *   renderPhysicalCard, collapsed funnel (mini-funnel renderer)
  *   renderWorkingCard / renderWeakCard
- *                            — top/bottom-3 CEPs + attributes by
+ *, top/bottom-3 CEPs + attributes by
  *                              advantage_pp (shared renderAdvantageCard)
- *   renderConversationCard   — WOM (heard/said) + DoP partners/rivals
+ *   renderConversationCard, WOM (heard/said) + DoP partners/rivals
  *
  * Public functions exposed on window:
- *   brsumSwitchCat(catName)     — programmatic category change (used by
+ *   brsumSwitchCat(catName): programmatic category change (used by
  *                                 the closing-strip mini-cards)
- *   brsumInsertMd(before,after) — markdown toolbar handler (insight editor)
- *   brsumRenderInsight()        — re-render markdown preview
- *   brsumToggleEdu(btn)         — collapse/expand educational callout
+ *   brsumInsertMd(before,after), markdown toolbar handler (insight editor)
+ *   brsumRenderInsight(), re-render markdown preview
+ *   brsumToggleEdu(btn), collapse/expand educational callout
  *
  * Markdown renderer: prefers the global `renderMarkdown` (tracker module).
  * When unavailable (brand-only reports), falls back to a tiny inline impl.
@@ -123,7 +123,7 @@
     if (!dashboard) return;
 
     // Resolve brand colour. Priority: brand_colours_map[code] (Brands-sheet
-    // Colour column — single source of truth) → focal_colour iff this brand
+    // Colour column, single source of truth) → focal_colour iff this brand
     // IS the project focal AND has no map entry (legacy fallback) → hash.
     // The user-selected focal does NOT change the colour: every brand keeps
     // its own colour from the map regardless of which brand is being viewed.
@@ -147,7 +147,7 @@
     dashboard.classList.add('brsum-fading');
     setTimeout(function () {
       /* 6-card narrative layout. Each renderer reads the payload and
-         fills its own card body — they're independent so any single
+         fills its own card body. They're independent so any single
          card can degrade to "data not available" without breaking
          the rest. Order matches the visual top-to-bottom flow. */
       renderFocalContext(root, snap, cat, catName);
@@ -170,7 +170,7 @@
 
     /* Closing strip: re-render outside the fade so it updates immediately
        on brand change. Spelled-out metric names + active-brand-specific
-       numbers — Duncan's v1.1 polish. */
+       numbers, Duncan's v1.1 polish. */
     renderClosingStrip(root, brandCode);
   }
 
@@ -209,12 +209,12 @@
       var cn = card.getAttribute('data-brsum-mini-cat');
       var snap = cats[cn] && cats[cn].brands && cats[cn].brands[brandCode];
       var fm = (snap && snap.focal_metrics) ? snap.focal_metrics : null;
-      var mms  = (fm && fm[0]) ? fm[0].value : '—';
-      var mpen = (fm && fm[1]) ? fm[1].value : '—';
-      var bt   = (fm && fm[2]) ? fm[2].value : '—';
+      var mms  = (fm && fm[0]) ? fm[0].value : 'n/a';
+      var mpen = (fm && fm[1]) ? fm[1].value : 'n/a';
+      var bt   = (fm && fm[2]) ? fm[2].value : 'n/a';
       var setVal = function (sel, v) {
         var el = card.querySelector('[data-brsum-mini-metric="' + sel + '"]');
-        if (el) el.innerHTML = (v == null || v === '') ? '—' : escHtml(String(v));
+        if (el) el.innerHTML = (v == null || v === '') ? 'n/a' : escHtml(String(v));
       };
       setVal('mms',  mms);
       setVal('mpen', mpen);
@@ -246,14 +246,14 @@
   function renderPlaceholder(root, key, msg) {
     var body = cardBody(root, key);
     if (!body) return;
-    body.innerHTML = '<div class="brsum-card-empty">' + escHtml(msg || '—') + '</div>';
+    body.innerHTML = '<div class="brsum-card-empty">' + escHtml(msg || 'n/a') + '</div>';
   }
 
   function renderFocalContext(root, snap, cat, catName) {
     var brandEl = root.querySelector('[data-brsum-fc-brand]');
     var catEl   = root.querySelector('[data-brsum-fc-cat]');
-    if (brandEl) brandEl.textContent = (snap && snap.name) ? snap.name : '—';
-    if (catEl)   catEl.textContent   = catName || (cat && cat.label) || '—';
+    if (brandEl) brandEl.textContent = (snap && snap.name) ? snap.name : 'n/a';
+    if (catEl)   catEl.textContent   = catName || (cat && cat.label) || 'n/a';
     /* The header strip uses the focal colour as its background gradient,
        set via the --brsum-brand-colour custom prop on .brsum-root. */
   }
@@ -270,7 +270,7 @@
              '<div class="brsum-vchip-label">' + escHtml(label) + '</div>' +
              '<div class="brsum-vchip-value brsum-focal-value" style="color:' + focalColour + '">' +
                escHtml(value) + '</div>' +
-             (catAvg && catAvg !== '—'
+             (catAvg && catAvg !== 'n/a'
                ? '<div class="brsum-vchip-catavg">cat avg <span>' + escHtml(catAvg) + '</span></div>'
                : '') +
              (leaderHtml || '') +
@@ -278,7 +278,7 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Hero card — the headline. Auto-generated single-sentence verdict
+   * Hero card: the headline. Auto-generated single-sentence verdict
    * + 4 anchor numbers (MMS / MPen / % bought / SCR), all on the focal
    * brand. Sets the story for everything below.
    * --------------------------------------------------------------------- */
@@ -314,21 +314,21 @@
   function heroAnchor(label, value, catAvg, colour) {
     return '<div class="brsum-hero-anchor">' +
              '<div class="brsum-hero-anchor-v brsum-focal-value" style="color:' + colour + '">' +
-               escHtml(value || '—') + '</div>' +
+               escHtml(value || 'n/a') + '</div>' +
              '<div class="brsum-hero-anchor-l">' + escHtml(label) + '</div>' +
-             (catAvg && catAvg !== '—'
+             (catAvg && catAvg !== 'n/a'
                ? '<div class="brsum-hero-anchor-a">cat avg ' + escHtml(catAvg) + '</div>'
                : '') +
            '</div>';
   }
 
   /* Resolve the 4 anchor numbers + rank from the snapshot. Falls back to
-     a "—" string when the source field is missing or NA. */
+     a "n/a" string when the source field is missing or NA. */
   function heroAnchors(snap) {
-    var out = { mms: '—', mms_avg: '—', mms_rank: null,
-                mpen: '—', mpen_avg: '—',
-                pen:  '—', pen_avg:  '—',
-                scr:  '—', scr_avg:  '—' };
+    var out = { mms: 'n/a', mms_avg: 'n/a', mms_rank: null,
+                mpen: 'n/a', mpen_avg: 'n/a',
+                pen:  'n/a', pen_avg:  'n/a',
+                scr:  'n/a', scr_avg:  'n/a' };
     if (snap.ma_metrics && snap.ma_metrics.length) {
       for (var i = 0; i < snap.ma_metrics.length; i++) {
         var m = snap.ma_metrics[i];
@@ -358,7 +358,7 @@
 
   /* Auto-headline. Picks one of a small set of fact-driven templates
      based on MMS rank, MPen-vs-cat-avg, and pen-vs-cat-avg. Never
-     generates flowery prose — every output is a direct fact statement
+     generates flowery prose. Every output is a direct fact statement
      the reader can verify against the anchor numbers above. */
   function heroHeadline(snap, cat, catName, fname, a) {
     var rank   = a.mms_rank ? parseInt(a.mms_rank, 10) : null;
@@ -369,18 +369,18 @@
     if (rank === 1) rankClause = fname + ' is the category leader by Mental Market Share in ' + catName + '.';
     else if (rank === 2 || rank === 3) rankClause = fname + ' ranks #' + rank + ' by MMS in ' + catName + '.';
     else if (rank && nBrands && rank >= Math.ceil(nBrands * 0.75))
-      rankClause = fname + ' sits at #' + rank + ' of ' + nBrands + ' by MMS in ' + catName + ' — bottom-quartile mental position.';
+      rankClause = fname + ' sits at #' + rank + ' of ' + nBrands + ' by MMS in ' + catName + ': bottom-quartile mental position.';
     else if (rank) rankClause = fname + ' ranks #' + rank + (nBrands ? ' of ' + nBrands : '') + ' by MMS in ' + catName + '.';
     else rankClause = fname + ' in ' + catName + '.';
 
-    /* Verdict clause — adds one fact about the brand vs cat avg. */
+    /* Verdict clause: adds one fact about the brand vs cat avg. */
     var verdictClause = '';
     if (mpenCmp === 'above' && penCmp === 'above')
       verdictClause = ' Strong on both mental (MPen) and physical (% bought) availability.';
     else if (mpenCmp === 'above' && penCmp === 'below')
-      verdictClause = ' Mental availability is above the category average, but physical purchase is lagging — a conversion gap.';
+      verdictClause = ' Mental availability is above the category average, but physical purchase is lagging, a conversion gap.';
     else if (mpenCmp === 'below' && penCmp === 'above')
-      verdictClause = ' Punching above its mental availability on physical purchase — but the mental base is the constraint.';
+      verdictClause = ' Punching above its mental availability on physical purchase, but the mental base is the constraint.';
     else if (mpenCmp === 'below' && penCmp === 'below')
       verdictClause = ' Below the category average on both mental and physical availability.';
     else verdictClause = '';
@@ -406,7 +406,7 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Mental availability card — MMS / SoM / Network Size value-chips,
+   * Mental availability card: MMS / SoM / Network Size value-chips,
    * each with cat-avg under and a leader badge / leader name. Same
    * value-chip widget as the old MA card; just narrower scope.
    * --------------------------------------------------------------------- */
@@ -424,7 +424,7 @@
       var leader = '';
       if (m.is_leader) {
         leader = '<div class="brsum-vchip-leader brsum-leader-on">CATEGORY LEADER</div>';
-      } else if (m.leader && m.leader !== '—') {
+      } else if (m.leader && m.leader !== 'n/a') {
         leader = '<div class="brsum-vchip-leader">Leader: ' + escHtml(m.leader) + '</div>';
       }
       html += valueChip(m.label, m.value, m.cat_avg, col, leader);
@@ -433,15 +433,15 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Buying funnel card — collapsed Aware -> Prefer -> Bought funnel.
-   * The label was "Physical conversion" in the first cut — corrected:
+   * Buying funnel card: collapsed Aware -> Prefer -> Bought funnel.
+   * The label was "Physical conversion" in the first cut, corrected:
    * these stages are all CLAIMED BUYING (% who say they're aware, who
    * prefer, who bought in N months). Physical availability (in-store
    * distribution) is not measured in this study. Reuses the mini-funnel
    * renderer (focal + cat-avg side-by-side, stacked stage bars).
    * --------------------------------------------------------------------- */
   /* ---------------------------------------------------------------------
-   * "Which penetration is which" — one table per category listing every
+   * "Which penetration is which", one table per category listing every
    * penetration-like figure the report shows, with its base and definition
    * (production review 2026-07-12, M7). Category-level, so it does not
    * change with the selected brand.
@@ -474,7 +474,7 @@
   }
 
   /* ---------------------------------------------------------------------
-   * What's working card — top-3 CEPs + top-3 attributes the focal brand
+   * What's working card: top-3 CEPs + top-3 attributes the focal brand
    * over-indexes on (by advantage_pp, focal value minus cat avg in pp).
    * Two columns side-by-side. Each item shows label, focal value, cat
    * avg, signed delta.
@@ -502,8 +502,8 @@
       return;
     }
     var blurb = direction === 'top'
-      ? 'CEPs and attributes this brand <strong>over-indexes</strong> on — its link rate is higher than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest positive first.'
-      : 'CEPs and attributes this brand <strong>under-indexes</strong> on — its link rate is lower than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest negative first.';
+      ? 'CEPs and attributes this brand <strong>over-indexes</strong> on: its link rate is higher than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest positive first.'
+      : 'CEPs and attributes this brand <strong>under-indexes</strong> on: its link rate is lower than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest negative first.';
     body.innerHTML =
       '<p class="brsum-card-blurb">' + blurb + '</p>' +
       '<div class="brsum-adv-grid">' +
@@ -522,7 +522,7 @@
     var fps    = brand.focal_pct   || [];
     /* Delta is computed as focal_pct - cat_avg_pct so the displayed +/-pp
        matches the displayed focal and cat-avg values exactly. We do NOT
-       use brand.advantage_pp here — that's the MA engine's own advantage
+       use brand.advantage_pp here. That's the MA engine's own advantage
        metric (focal minus a model-based expected value), which would not
        equal focal-minus-cat-avg and would confuse the reader who reads
        both numbers off the row. The MA decision (Defend / Build /
@@ -540,7 +540,7 @@
       return direction === 'top' ? b.delta - a.delta : a.delta - b.delta;
     });
     /* Drop wrong-sign rows so the "Working" card never lists negatives
-       and "Weak" never lists positives — those don't fit the heading. */
+       and "Weak" never lists positives. Those don't fit the heading. */
     ranked = ranked.filter(function (r) {
       return direction === 'top' ? r.delta > 0 : r.delta < 0;
     });
@@ -575,10 +575,10 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Word of mouth card — Heard + Said columns (positive / negative / net
+   * Word of mouth card: Heard + Said columns (positive / negative / net
    * per side), each row showing focal value + cat avg under. Uses the
    * shared womColumn / womRow helpers. The original cut combined this
-   * with DoP partners/rivals in one card — split per Duncan's review.
+   * with DoP partners/rivals in one card: split per Duncan's review.
    * --------------------------------------------------------------------- */
   function renderWomCard(root, snap) {
     var body = cardBody(root, 'conversation');
@@ -596,7 +596,7 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Repertoire ties card — top 2 DoP partners + top 2 rivals for the
+   * Repertoire ties card: top 2 DoP partners + top 2 rivals for the
    * focal brand. Partners over-index, rivals under-index, both measured
    * vs the column average across other brand rows (the partition-card
    * metric on the DoP sub-tab). Split out from the merged "Conversation
@@ -630,23 +630,23 @@
     body.innerHTML =
       '<p class="brsum-card-blurb">' +
         'Among this brand’s buyers, who else ends up in the basket? ' +
-        '<strong>Partners</strong> show up more than their overall popularity predicts — ' +
-        'natural co-buys. <strong>Rivals</strong> show up less — head-to-head substitutes. ' +
+        '<strong>Partners</strong> show up more than their overall popularity predicts: ' +
+        'natural co-buys. <strong>Rivals</strong> show up less: head-to-head substitutes. ' +
         'Percentage points (pp) compare each brand’s share among focal buyers with its share across the whole category.' +
       '</p>' +
       '<div class="brsum-conv-dop-row">' +
         '<div class="brsum-conv-dop-side">' +
-          '<div class="brsum-conv-dop-side-title">Partners — over-index</div>' +
+          '<div class="brsum-conv-dop-side-title">Partners: over-index</div>' +
           partnersHtml +
         '</div>' +
         '<div class="brsum-conv-dop-side">' +
-          '<div class="brsum-conv-dop-side-title">Rivals — under-index</div>' +
+          '<div class="brsum-conv-dop-side-title">Rivals: under-index</div>' +
           rivalsHtml +
         '</div>' +
       '</div>';
   }
 
-  /* WOM column helpers — shared by renderConversationCard. */
+  /* WOM column helpers: shared by renderConversationCard. */
   function womColumn(title, col) {
     return '<div class="brsum-wom-col">' +
              '<div class="brsum-wom-col-title">' + escHtml(title) + '</div>' +
@@ -665,8 +665,8 @@
     return '<div class="' + cls + '">' +
              '<div class="brsum-wom-label">' + escHtml(row.label) + '</div>' +
              '<div class="brsum-wom-vals">' +
-               '<div class="brsum-wom-val">' + escHtml(row.value || '—') + '</div>' +
-               (row.cat_avg && row.cat_avg !== '—'
+               '<div class="brsum-wom-val">' + escHtml(row.value || 'n/a') + '</div>' +
+               (row.cat_avg && row.cat_avg !== 'n/a'
                  ? '<div class="brsum-wom-catavg">cat avg ' + escHtml(row.cat_avg) + '</div>'
                  : '') +
              '</div>' +
@@ -681,7 +681,7 @@
    * cat-avg SECOND. Each card lists the stages / segments stacked
    * vertically. Each row = one stage with a horizontal bar (% scaled
    * against a shared maximum so the comparison reads visually) and a
-   * "<label> <pct>" caption underneath — same idiom as the brand-funnel
+   * "<label> <pct>" caption underneath, same idiom as the brand-funnel
    * sub-tab's mini-funnels, scoped here under .brsum-mf-*.
    *
    * Block shape (R-side):
@@ -689,7 +689,7 @@
    *   seg_codes  / seg_labels    (Brand attitude / Loyalty / Purchase dist)
    * --------------------------------------------------------------------- */
   function fmtPctSingle(v) {
-    if (v == null || isNaN(v)) return '—';
+    if (v == null || isNaN(v)) return 'n/a';
     return Math.round(v * 100) + '%';
   }
 
@@ -755,7 +755,7 @@
            '</div>';
   }
 
-  /* DoP row helper — shared by renderConversationDop. */
+  /* DoP row helper: shared by renderConversationDop. */
   function dopRow(p, isPartner) {
     var dev = Math.round(p.dev);
     var devTxt = (dev >= 0 ? '+' : '') + dev + 'pp';
@@ -768,7 +768,7 @@
   }
 
   /* -------------------------------------------------------------------------
-   * Public — programmatic category switch (closing strip mini-cards)
+   * Public: programmatic category switch (closing strip mini-cards)
    * ------------------------------------------------------------------------- */
   window.brsumSwitchCat = function (catName) {
     var root = document.querySelector('.brsum-root');

@@ -150,12 +150,12 @@
         const diff = (cell.pct != null && tot != null) ? cell.pct - tot : null;
         const bg = heatColour(diff);
         const cls = "demo-heat-cell" + (b.brand_code === focalBrand ? " focal-col" : "");
-        return `<td class="${cls}" style="background-color:${bg}" title="vs total: ${diff == null ? "—" : (diff>=0?"+":"") + diff.toFixed(dp)}pp">${pctStr(cell.pct, dp)}</td>`;
+        return `<td class="${cls}" style="background-color:${bg}" title="vs total: ${diff == null ? "n/a" : (diff>=0?"+":"") + diff.toFixed(dp)}pp">${pctStr(cell.pct, dp)}</td>`;
       }).join("");
       return `<tr><td class="demo-row-label">${esc(b.brand_label || b.brand_code)}</td>${tds}<td class="demo-row-n">${intStr(b.base_n)}</td></tr>`;
     }).join("");
     const html = `<div class="adhoc-brand-heatmap" style="margin-top:14px;">
-      <div class="demo-heatmap-title" style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">By brand &mdash; % among each brand's buyers</div>
+      <div class="demo-heatmap-title" style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">By brand: % among each brand's buyers</div>
       <div style="overflow-x:auto;"><table class="demo-table">
         <thead><tr><th>Brand</th>${headerCells}<th>n</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
@@ -170,11 +170,11 @@
 
   // ---- formatters / helpers ----
   function pctStr(v, dp) {
-    if (v == null || !isFinite(v)) return '<span class="demo-na">&mdash;</span>';
+    if (v == null || !isFinite(v)) return '<span class="demo-na">n/a</span>';
     return v.toFixed(dp) + "%";
   }
   function intStr(v) {
-    if (v == null || !isFinite(v)) return "&mdash;";
+    if (v == null || !isFinite(v)) return "n/a";
     return Math.round(v).toLocaleString();
   }
   function esc(s) {

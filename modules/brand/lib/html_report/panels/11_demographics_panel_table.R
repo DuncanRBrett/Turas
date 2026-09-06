@@ -6,7 +6,7 @@
 #
 # Layout:
 #   Col 1: option label
-#   Col 2: focal brand (data-demo-col="focal")  — toggleable column
+#   Col 2: focal brand (data-demo-col="focal"), toggleable column
 #   Col 3: cat avg (data-demo-col="catavg")
 #   Col 4..N: per-brand columns (data-demo-col="brand" data-demo-brand="<bc>")
 #
@@ -80,7 +80,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 .demo_table_brand_order <- function(brand_codes, focal_brand) {
   # Focal lives in its own pinned column 2 (rendered separately). The
   # per-brand block excludes the focal so we don't show the same brand
-  # twice — fixed 2026-05-22 after a UX review flagged the duplication.
+  # twice, fixed 2026-05-22 after a UX review flagged the duplication.
   if (length(brand_codes) == 0L) return(integer(0))
   fi <- which(brand_codes == focal_brand)
   setdiff(seq_along(brand_codes), fi)
@@ -127,7 +127,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
 
 # ==============================================================================
-# INTERNAL: BODY (two rows per option — Buyer + Non-buyer)
+# INTERNAL: BODY (two rows per option, Buyer + Non-buyer)
 # ==============================================================================
 
 # Cell semantics: penetration WITHIN the demographic option.
@@ -137,7 +137,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 # buy IPK and 71% don't".
 #
 # Cat-avg column in penetration mode shows the per-option MEAN pen across all
-# brands — the typical brand's pen rate in this demographic. Heatmap shading
+# brands, the typical brand's pen rate in this demographic. Heatmap shading
 # per brand cell is driven by (cell pct − this per-option avg pen), clipped
 # to ±MAX_HEAT_DIFF. Blue = brand over-performs vs the typical brand here;
 # red = under-performs. Non-buyer rows mirror the SAME colour as the matching
@@ -215,7 +215,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
 
 # Look up the per-option avg brand pen from the panel payload. Returns NA
-# when the option isn't represented (defensive — shouldn't happen with a
+# when the option isn't represented (defensive: shouldn't happen with a
 # well-formed engine result).
 .demo_table_option_avg_pct <- function(option_avg, code) {
   if (is.null(option_avg) || length(option_avg) == 0L) return(NA_real_)
@@ -225,7 +225,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 }
 
 
-# Penetration-mode Cat-avg cell. Shows the per-option mean brand pen — i.e.
+# Penetration-mode Cat-avg cell. Shows the per-option mean brand pen, i.e.
 # the typical brand's pen rate in this demographic. Italic / muted styling
 # from the .demo-col-catavg class.
 .demo_table_catavg_pen_cell <- function(r, cat_pct, dp) {
@@ -250,7 +250,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 # cell shows 100 − value (the non-buyer share). Heat colour is always based
 # on the BUYER gap (cell - cat_pct, where cat_pct is the per-option mean
 # brand pen) so buyer + non-buyer rows share the same colour and signal
-# direction — and the colour directly indicates "this brand over/under-
+# direction, and the colour directly indicates "this brand over/under-
 # performs the typical brand in this demographic".
 #
 # Returns an NA cell when no data for this option/brand combination exists.
@@ -313,7 +313,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 .demo_table_na_cell <- function(extra_class, colcode, brand_code) {
   sprintf(
     '<td class="%s" data-demo-col="%s" data-demo-brand="%s">
-       <span class="demo-na">&mdash;</span>
+       <span class="demo-na">n/a</span>
      </td>',
     extra_class, colcode, .demo_table_esc(brand_code %||% ""))
 }
@@ -344,7 +344,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
 .demo_table_pct <- function(v, dp) {
   if (is.null(v) || is.na(v) || !is.finite(v))
-    return('<span class="demo-na">&mdash;</span>')
+    return('<span class="demo-na">n/a</span>')
   sprintf("%.*f%%", as.integer(dp), v)
 }
 

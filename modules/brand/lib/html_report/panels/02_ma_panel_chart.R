@@ -40,7 +40,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     # CEP penetration ranking ("any brand") removed for IPK wave 1.
     # In a well-designed CEP battery every CEP lands with ~98-100% of
     # category buyers, so the chart is a wall of full bars with no
-    # discriminating signal — dead weight in the current report. The
+    # discriminating signal, dead weight in the current report. The
     # engine still computes pd$metrics$cep_penetration so it's available
     # for wave-on-wave tracking and questionnaire-validation use cases
     # in future projects; restore the line below to re-enable.
@@ -65,12 +65,12 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   brand_names <- pd$config$brand_names %||% pd$config$brand_codes
 
   leader_name <- function(code) {
-    # No clear leader case (length-0 / NA / empty string) — happens when a
+    # No clear leader case (length-0 / NA / empty string). Happens when a
     # metric has no non-NA values across brands (very small base, sparse
     # category). Return em-dash placeholder instead of crashing the whole
     # panel transform with "argument is of length zero".
     if (length(code) == 0L || is.na(code[[1L]]) || !nzchar(code[[1L]])) {
-      return("—")
+      return("n/a")
     }
     idx <- match(code, pd$config$brand_codes)
     if (is.na(idx)) code else brand_names[idx]
@@ -79,10 +79,10 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   dp <- as.integer(pd$config$decimal_places %||% 0L)
 
   card <- function(label, focal_val, avg_val, leader_code, unit, metric_key) {
-    focal_disp <- if (is.null(focal_val) || is.na(focal_val)) "\u2014"
+    focal_disp <- if (is.null(focal_val) || is.na(focal_val)) "n/a"
                   else if (unit == "pct") sprintf(paste0("%.", dp, "f%%"), focal_val)
                   else sprintf("%.2f", focal_val)
-    avg_disp <- if (is.null(avg_val) || is.na(avg_val)) "\u2014"
+    avg_disp <- if (is.null(avg_val) || is.na(avg_val)) "n/a"
                 else if (unit == "pct") sprintf(paste0("%.", dp, "f%%"), avg_val)
                 else sprintf("%.2f", avg_val)
     lead_name <- leader_name(leader_code)
@@ -104,7 +104,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   }
 
   paste0(
-    sprintf('<h3 class="ma-section-title ma-metrics-hero-title">%s \u2014 Headline Metrics</h3>',
+    sprintf('<h3 class="ma-section-title ma-metrics-hero-title">%s: Headline Metrics</h3>',
             .ma_esc(focal_name)),
     '<div class="ma-hero-strip tk-hero-strip">',
     card("Mental Penetration (MPen)", hero$mpen, avg$mpen, leader$mpen, "pct", "mpen"),
@@ -154,7 +154,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   }
 
   # Per-metric show-count clarification (visible when "Show count" is on).
-  # Each metric needs its own denominator narrative — a single integer is
+  # Each metric needs its own denominator narrative. A single integer is
   # ambiguous because MMS, MPen and NS use different bases:
   #   - MMS: brand's CEP links / total CEP links across brands
   #   - MPen: respondents linking to >=1 CEP / total respondents (sample)
@@ -167,7 +167,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   }
   fmt_cell <- function(val, band, fmt, n_html = "") {
     if (is.null(val) || is.na(val))
-      return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
+      return('<td class="ct-td ct-data-col ct-na">n/a</td>')
     disp   <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), val) else sprintf("%.2f", val)
     band_s <- as.character(band %||% "within")
     bg     <- ci_bg(band_s)
@@ -179,7 +179,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   # Category-average cell with visual 95% CI range bar
   fmt_avg_ci_cell <- function(avg_val, ci_lo, ci_hi, max_val, fmt) {
     if (is.null(avg_val) || is.na(avg_val))
-      return('<td class="ct-td ct-data-col ma-metrics-cat-avg">&mdash;</td>')
+      return('<td class="ct-td ct-data-col ma-metrics-cat-avg">n/a</td>')
     disp    <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), avg_val) else sprintf("%.2f", avg_val)
     lo_disp <- if (!is.null(ci_lo) && !is.na(ci_lo))
       (if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), ci_lo) else sprintf("%.2f", ci_lo)) else ""
@@ -204,7 +204,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
 
   fmt_base_cell <- function(n) {
     if (is.null(n) || is.na(n))
-      return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
+      return('<td class="ct-td ct-data-col ct-na">n/a</td>')
     sprintf('<td class="ct-td ct-data-col"><span class="ct-val">%s</span></td>',
             format(as.integer(n), big.mark = ","))
   }
@@ -284,7 +284,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   other_html <- paste(vapply(other_rows, function(r) make_brand_row(r), character(1)),
                       collapse = "")
 
-  # Sortable header helper — full metric names
+  # Sortable header helper: full metric names
   th_sort <- function(col_id, label, title_text, default_active = FALSE) {
     dir_init <- if (default_active) "desc" else "none"
     glyph    <- if (default_active) "\u2193" else "\u21C5"
@@ -318,7 +318,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     th_sort("ns",   "Network Size",
             "Average CEPs linked per buyer who links at least one"),
     th_sort("som",  "Share of Mind",
-            "MMS \u00f7 MPen \u00d7 100 \u2014 CEP links as % of all links by buyers with MPen for that brand"),
+            "MMS \u00f7 MPen \u00d7 100: CEP links as % of all links by buyers with MPen for that brand"),
     '</tr></thead>',
     '<tbody>',
     base_html,
@@ -390,7 +390,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '<p class="ma-subsection-note">',
     'Each bubble is a brand. Position shows mental penetration (reach) vs network size ',
     '(depth); bubble size reflects mental market share. The trend line reveals the ',
-    'double-jeopardy pattern \u2014 brands with broader reach also tend to have deeper ',
+    'double-jeopardy pattern: brands with broader reach also tend to have deeper ',
     'associations. Dashed lines mark category averages.',
     '</p></details>',
     '<div class="ma-adv-quadrant-rangebar ma-scatter-rangebar">',
@@ -419,7 +419,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '<summary>About this chart</summary>',
     '<p class="ma-subsection-note">',
     'Mental Market Share (share of all brand-CEP links in the category) vs Share of Mind ',
-    '(MMS \u00f7 MPen \u00d7 100 \u2014 CEP links as % of all links by buyers with MPen for that brand). ',
+    '(MMS \u00f7 MPen \u00d7 100: CEP links as % of all links by buyers with MPen for that brand). ',
     'Dashed lines mark category averages for each metric.',
     '</p></details>',
     '<svg class="ma-bars-svg" data-ma-stim="metrics"',

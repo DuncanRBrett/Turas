@@ -15,7 +15,7 @@
 
 BRAND_DBA_PANEL_QUADRANT_VERSION <- "1.0"
 
-# Drawing constants — kept here, not in the renderer body, so they are
+# Drawing constants: kept here, not in the renderer body, so they are
 # easy to find and tweak.
 .DBA_Q_W       <- 640L      # SVG view width (px in the viewBox)
 .DBA_Q_H       <- 460L      # SVG view height
@@ -54,7 +54,7 @@ build_dba_quadrant_html <- function(panel_data, focal_colour) {
 
   paste0(
     '<div class="dba-quadrant-wrap">',
-    sprintf('<div class="dba-quadrant-chart" role="img" aria-label="DBA Fame by Uniqueness scatter — %d assets">',
+    sprintf('<div class="dba-quadrant-chart" role="img" aria-label="DBA Fame by Uniqueness scatter, %d assets">',
             length(assets)),
     svg,
     '</div>',
@@ -205,7 +205,7 @@ build_dba_quadrant_html <- function(panel_data, focal_colour) {
 
 
 # ==============================================================================
-# Internal: legend (text — what each axis means)
+# Internal: legend (text. What each axis means)
 # ==============================================================================
 
 .dba_quadrant_legend <- function() {

@@ -2,7 +2,7 @@
  *
  * Shared dropdown-style brand selector for the brand HTML report.
  * Replaces the per-panel chip-strip pattern with a compact "Filter brands ▾"
- * trigger that opens a checkbox popover. Live updates on each toggle —
+ * trigger that opens a checkbox popover. Live updates on each toggle,
  * no Apply / Cancel button.
  *
  * Public API
@@ -13,8 +13,8 @@
  *     anchorEl,       // optional: container the popover is positioned within
  *     brands,         // [{code, label, color, isFocal}]
  *     mode,           // "unified" | "split"
- *     initialHidden,  // string[] — brand codes hidden at start (default [])
- *     syncDefault,    // boolean — for split mode; default true
+ *     initialHidden,  // string[]. Brand codes hidden at start (default [])
+ *     syncDefault,    // boolean, for split mode; default true
  *     onChange,       // (hiddenSet, scope) => void
  *                     //   scope === "all" | "table" | "chart"
  *     labels: {       // optional overrides
@@ -44,7 +44,7 @@
   // set is published to every other panel in the same category so the
   // visible-brand selection survives a tab switch.
   //
-  // Stored value is a single canonical Set<string> of hidden brand codes —
+  // Stored value is a single canonical Set<string> of hidden brand codes,
   // split-mode panels apply it to both their table and chart sets. Brands
   // not present in a receiving panel's own brand list are ignored.
   var CATEGORY_STORE = (window._brandSelectorCategoryStore =
@@ -170,7 +170,7 @@
     // Publish to sibling panels in the same category so the visible-brand
     // selection follows the user across tabs. Skip when applying a remote
     // change (the receiving side fires emit() too, which would loop), and
-    // skip "chart"-only changes (table is the canonical cross-panel set —
+    // skip "chart"-only changes (table is the canonical cross-panel set,
     // a split-mode chart-only toggle is treated as panel-local).
     if (state.categoryKey && !state._applyingRemote && scope !== "chart") {
       publishCategoryChange(state);
@@ -203,7 +203,7 @@
     refreshTriggerCount(state);
 
     // Fire the consumer's onChange with scope "all" so the panel re-applies
-    // its visibility — and guard against re-publish so the broadcast loop
+    // its visibility, and guard against re-publish so the broadcast loop
     // terminates here.
     state._applyingRemote = true;
     try {
@@ -408,7 +408,7 @@
         state.brands.forEach(function (b) { b.isFocal = (b.code === focalCode); });
         if (state.popoverEl) rebuildBody(state);
       },
-      // Force a brand visible — removes from BOTH hidden sets (split mode safe)
+      // Force a brand visible: removes from BOTH hidden sets (split mode safe)
       // and refreshes the trigger count + open popover. Used by panels that
       // need to guarantee the focal brand is always shown after a focal-change.
       showBrand: function (code) {

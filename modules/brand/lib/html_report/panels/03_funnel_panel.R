@@ -13,9 +13,9 @@
 # Interaction JS: js/brand_funnel_panel.js (loaded once per report).
 #
 # Sub-renderers:
-#   03_funnel_panel_table.R     — ct-table heatmap
-#   03_funnel_panel_chart.R     — slope chart + consideration detail
-#   03_funnel_panel_styling.R   — CSS bundle
+#   03_funnel_panel_table.R: ct-table heatmap
+#   03_funnel_panel_chart.R, slope chart + consideration detail
+#   03_funnel_panel_styling.R, CSS bundle
 #
 # VERSION: 2.0
 # ==============================================================================
@@ -179,7 +179,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 #' @keywords internal
 .fn_table_controls <- function(pd) {
   # BrandSelector trigger lives in .fn_focus_bar (next to the focal-brand
-  # <select>) — see Demographics / WoM / Cat Buying for the same pattern.
+  # <select>), see Demographics / WoM / Cat Buying for the same pattern.
 
   paste0(
     '<div class="fn-controls controls-bar">',
@@ -203,7 +203,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
 
 # ==============================================================================
-# INTERNAL: CARDS (10 total — 5 funnel + 5 relationship)
+# INTERNAL: CARDS (10 total, 5 funnel + 5 relationship)
 # ==============================================================================
 
 .fn_cards_section <- function(pd, focal_colour) {
@@ -291,12 +291,12 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   stage_keys   <- pd$table$stage_keys   %||% character(0)
   stage_labels <- pd$table$stage_labels %||% list()
 
-  # Cat Avg chip stays as a standalone toggle chip (per Decision 2 — Cat avg
+  # Cat Avg chip stays as a standalone toggle chip (per Decision 2, Cat avg
   # remains a chip; the brand list moves to the BrandSelector dropdown in
   # the table-controls bar). Cat Avg is on by default under all modes.
   chips_html <- '<button type="button" class="col-chip fn-chip-avg" data-fn-action="toggle-avg">Cat Avg</button>'
 
-  # Stage selector chips for bar view — first stage active by default
+  # Stage selector chips for bar view: first stage active by default
   stage_chips <- if (length(stage_keys) > 0)
     paste(vapply(seq_along(stage_keys), function(j) {
       k   <- stage_keys[j]
@@ -309,13 +309,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
   paste0(
     '<div class="fn-chart-header">',
-    # View toggle — always visible
+    # View toggle: always visible
     '<div class="sig-level-switcher fn-view-switcher" role="group" aria-label="View">',
     '<span class="sig-level-label">View:</span>',
     '<button type="button" class="sig-btn sig-btn-active" data-fn-action="chartview" data-fn-view="slope" aria-pressed="true">Slope</button>',
     '<button type="button" class="sig-btn" data-fn-action="chartview" data-fn-view="bar" aria-pressed="false">Bar</button>',
     '</div>',
-    # Brand chips — always visible
+    # Brand chips: always visible
     '<div class="fn-chart-brand-chips col-chip-bar">', chips_html, '</div>',
     # Slope-only controls
     '<div class="sig-level-switcher fn-slope-ctl" role="group" aria-label="Values">',
@@ -399,7 +399,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
 
 .fn_pct_string <- function(pct) {
-  if (is.null(pct) || is.na(pct)) return("&mdash;")
+  if (is.null(pct) || is.na(pct)) return("n/a")
   sprintf("%.0f%%", 100 * pct)
 }
 

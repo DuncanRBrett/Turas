@@ -4,7 +4,7 @@
 # Server-emits the HTML scaffolding for the Mental Advantage sub-tab.
 # All three views (strategic quadrant, diverging matrix heatmap, action
 # list) are populated by brand_ma_advantage.js from the JSON payload
-# embedded by build_ma_panel_html() — same render-on-change pattern used
+# embedded by build_ma_panel_html(): same render-on-change pattern used
 # by the MMSxNS scatter and CEP-ranking bar chart.
 #
 # Romaniuk's Mental Advantage isolates a brand's true competitive
@@ -129,7 +129,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 
 
 # ==============================================================================
-# INTERNAL: VIEW LAYOUT (THREE EMPTY CONTAINERS — JS POPULATES)
+# INTERNAL: VIEW LAYOUT (THREE EMPTY CONTAINERS, JS POPULATES)
 # ==============================================================================
 
 .ma_adv_views_layout <- function(adv) {
@@ -149,7 +149,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<div class="ma-adv-view ma-adv-quadrant-view" data-ma-adv-view="quadrant">',
     '<div class="ma-adv-view-header">',
-    '<h4 class="ma-subsection-title">Strategic Quadrant&nbsp;&mdash; <span class="ma-adv-focal-name" data-ma-adv-focal-name></span></h4>',
+    '<h4 class="ma-subsection-title">Strategic Quadrant:&nbsp;<span class="ma-adv-focal-name" data-ma-adv-focal-name></span></h4>',
     '<details class="ma-chart-callout">',
     '<summary>About this chart</summary>',
     '<p class="ma-subsection-note">',
@@ -209,7 +209,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<div class="ma-adv-view ma-adv-action-list-view" data-ma-adv-view="actions">',
     '<div class="ma-adv-view-header">',
-    '<h4 class="ma-subsection-title">Action List&nbsp;&mdash; <span class="ma-adv-focal-name" data-ma-adv-focal-name></span></h4>',
+    '<h4 class="ma-subsection-title">Action List:&nbsp;<span class="ma-adv-focal-name" data-ma-adv-focal-name></span></h4>',
     '<details class="ma-chart-callout">',
     '<summary>About this chart</summary>',
     '<p class="ma-subsection-note">',
@@ -221,15 +221,15 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '</div>',
     '<div class="ma-adv-action-cols">',
     '<div class="ma-adv-action-col ma-adv-defend" data-ma-decision="defend">',
-    '<div class="ma-adv-col-head"><span class="ma-adv-col-title">Defend</span><span class="ma-adv-col-count" data-ma-decision-count="defend">—</span></div>',
+    '<div class="ma-adv-col-head"><span class="ma-adv-col-title">Defend</span><span class="ma-adv-col-count" data-ma-decision-count="defend">n/a</span></div>',
     '<ol class="ma-adv-action-list" data-ma-adv-list="defend"></ol>',
     '</div>',
     '<div class="ma-adv-action-col ma-adv-build" data-ma-decision="build">',
-    '<div class="ma-adv-col-head"><span class="ma-adv-col-title">Build</span><span class="ma-adv-col-count" data-ma-decision-count="build">—</span></div>',
+    '<div class="ma-adv-col-head"><span class="ma-adv-col-title">Build</span><span class="ma-adv-col-count" data-ma-decision-count="build">n/a</span></div>',
     '<ol class="ma-adv-action-list" data-ma-adv-list="build"></ol>',
     '</div>',
     '<div class="ma-adv-action-col ma-adv-maintain" data-ma-decision="maintain">',
-    '<div class="ma-adv-col-head"><span class="ma-adv-col-title">Maintain</span><span class="ma-adv-col-count" data-ma-decision-count="maintain">—</span></div>',
+    '<div class="ma-adv-col-head"><span class="ma-adv-col-title">Maintain</span><span class="ma-adv-col-count" data-ma-decision-count="maintain">n/a</span></div>',
     '<ol class="ma-adv-action-list" data-ma-adv-list="maintain"></ol>',
     '</div>',
     '</div>',

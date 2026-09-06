@@ -4,8 +4,8 @@
 # Project-level Distinctive Brand Assets panel. Two sub-tabs share the
 # section-root for pin/PNG capture:
 #
-#   - Quadrant view  — Romaniuk Fame x Uniqueness scatter (07_dba_panel_quadrant.R)
-#   - Asset Detail   — per-asset cards with Wilson CIs   (07_dba_panel_detail.R)
+#   - Quadrant view: Romaniuk Fame x Uniqueness scatter (07_dba_panel_quadrant.R)
+#   - Asset Detail, per-asset cards with Wilson CIs   (07_dba_panel_detail.R)
 #
 # When the engine emits a placeholder result (no DBA assets configured),
 # the orchestrator delegates to build_shared_placeholder_card() so all
@@ -102,7 +102,7 @@ build_dba_panel_html <- function(panel_data,
 
 
 # ==============================================================================
-# Section wrappers — actual rendering lives in 07_dba_panel_quadrant.R
+# Section wrappers: actual rendering lives in 07_dba_panel_quadrant.R
 # and 07_dba_panel_detail.R. Wrappers here only manage the show/hide
 # default state.
 # ==============================================================================
@@ -148,7 +148,7 @@ build_dba_panel_html <- function(panel_data,
 
 
 # ==============================================================================
-# JSON payload — the renderer hands this to JS for chart redraw / re-pin
+# JSON payload: the renderer hands this to JS for chart redraw / re-pin
 # ==============================================================================
 
 .dba_panel_json <- function(panel_data, focal_colour) {
@@ -162,7 +162,7 @@ build_dba_panel_html <- function(panel_data,
 
 
 # ==============================================================================
-# Empty / refused states (rare — used when panel_data is malformed)
+# Empty / refused states (rare: used when panel_data is malformed)
 # ==============================================================================
 
 .dba_panel_empty_state <- function(scope_id) {

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Brand Category Buying Panel — interactivity
+   Brand Category Buying Panel: interactivity
    ==========================================================================
    Two modes of interactivity:
 
@@ -210,10 +210,10 @@
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Chip colouring (brand chips — both panel-level and per-tab)             */
+  /* Chip colouring (brand chips: both panel-level and per-tab)             */
   /* ---------------------------------------------------------------------- */
 
-  /* BrandSelector dropdown — replaces colourCbChips + bindCbPanelChips +
+  /* BrandSelector dropdown: replaces colourCbChips + bindCbPanelChips +
      bindCbToggleAll. One unified-mode dropdown drives row visibility across
      the brands / loyalty / dist scopes simultaneously (same lock-step
      behaviour as the legacy panel-level chip strip). Init seeds visibility
@@ -244,7 +244,7 @@
     // visible at the top of the popover, defaults ON. With sync ON, table-
     // row and chart-series visibility move together. With sync OFF, the
     // analyst can hide brands from the chart while keeping them in the
-    // table (or vice versa) — useful when showing the full table for
+    // table (or vice versa), useful when showing the full table for
     // reference but emphasising a smaller subset in the chart.
     panel.__cbSelector = window.BrandSelector.create({
       panelId:            'cb-' + catCode,
@@ -306,7 +306,7 @@
         panel.classList.toggle('cb-on-context', target === 'context');
         /* DoP sub-tab: hide the panel-level brand show/hide chip row.
            Filtering rows here would silently change column averages, the
-           partition card, and the cluster map — confusing rather than
+           partition card, and the cluster map, confusing rather than
            useful. The focal <select> stays visible.                       */
         panel.classList.toggle('cb-on-dop', target === 'dop');
 
@@ -550,7 +550,7 @@
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Loyalty / Dist column sorting — click header to sort rows by data-v     */
+  /* Loyalty / Dist column sorting: click header to sort rows by data-v     */
   /* ---------------------------------------------------------------------- */
 
   function bindCbRelSort(panel) {
@@ -587,7 +587,7 @@
         var focalRow = tbody.querySelector('tr.fn-row-focal[data-cb-brand]');
         var allRows  = Array.prototype.slice.call(
           tbody.querySelectorAll('tr[data-cb-brand]'));
-        /* Focal stays pinned at row 1 — only competitors sort. */
+        /* Focal stays pinned at row 1, only competitors sort. */
         var rows = allRows.filter(function (r) { return r !== focalRow; });
 
         var readVal = function (tr) {
@@ -624,7 +624,7 @@
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Duplication of Purchase column sorting — click header to sort rows by   */
+  /* Duplication of Purchase column sorting: click header to sort rows by   */
   /* column value. Focal row stays pinned row 1; Cat avg row stays row 2.    */
   /* ---------------------------------------------------------------------- */
 
@@ -723,7 +723,7 @@
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Brand Summary chart renderer — single column selected via dropdown       */
+  /* Brand Summary chart renderer: single column selected via dropdown       */
   /* ---------------------------------------------------------------------- */
 
   /* Column key -> { col index in table row, label, suffix } */
@@ -993,7 +993,7 @@
 
     /* Repel out-of-bar labels horizontally so they don't overlap. The
        label is small ("1%"–"3%", ~14px wide on the typical 800–1500px
-       track), so we pick a tight 1.2% half-width — that's ~10px on a
+       track), so we pick a tight 1.2% half-width. That's ~10px on a
        short track and ~18px on a wide one, enough to stop collisions
        without yanking labels far away from their segment. Process
        left-to-right; push right if it would collide with the previous
@@ -1111,7 +1111,7 @@
     if (!focalRow) return;
 
     var lblFor = function (code) {
-      /* Pull display label from the column header — falls back to code. */
+      /* Pull display label from the column header: falls back to code. */
       for (var i = 0; i < colCodes.length; i++) {
         if (colCodes[i] === code) {
           var th = colHeaders[i];
@@ -1181,7 +1181,7 @@
       : '<li class="cb-dop-pc-empty">No brands under-index for this focal.</li>';
 
     var weakHtml = (isFinite(maxAbs) && maxAbs < WEAK)
-      ? '<div class="cb-dop-pc-weak">Weak partition signal — this focal ' +
+      ? '<div class="cb-dop-pc-weak">Weak partition signal: this focal ' +
         'duplicates roughly in line with category averages (largest ' +
         'deviation ' + fmtDev(signedMax) + ').</div>'
       : '';
@@ -1199,14 +1199,14 @@
       '<div class="cb-dop-pc-grid">' +
         '<div class="cb-dop-pc-col cb-dop-pc-partners">' +
           '<div class="cb-dop-pc-coltitle">Partition partners' +
-            '<span class="cb-dop-pc-hint">duplicate above category avg — ' +
+            '<span class="cb-dop-pc-hint">duplicate above category avg: ' +
             'likely share shoppers/occasions</span>' +
           '</div>' +
           '<ul class="cb-dop-pc-list">' + partnersHtml + '</ul>' +
         '</div>' +
         '<div class="cb-dop-pc-col cb-dop-pc-rivals">' +
           '<div class="cb-dop-pc-coltitle">Partition rivals' +
-            '<span class="cb-dop-pc-hint">duplicate below category avg — ' +
+            '<span class="cb-dop-pc-hint">duplicate below category avg: ' +
             'likely substitution or distinct partition</span>' +
           '</div>' +
           '<ul class="cb-dop-pc-list">' + rivalsHtml + '</ul>' +
@@ -1410,7 +1410,7 @@
       }
     });
 
-    /* 3c. Loyalty / Dist / Heaviness tables — match the funnel convention:
+    /* 3c. Loyalty / Dist / Heaviness tables: match the funnel convention:
            new focal pinned at row 1 (above the cat-avg row); demoted focal
            drops below the cat-avg row into the sortable competitor block. */
     panel.querySelectorAll('.cb-rel-section .cb-rel-table').forEach(function (table) {
@@ -1455,13 +1455,13 @@
     cbRenderDopPartitionCard(panel, brandCode);
 
     /* 3f. DoP cluster map: rebuild the focal halo + partner badges layer.
-           The dendrogram tree itself stays — only the highlight overlay
+           The dendrogram tree itself stays, only the highlight overlay
            changes. */
     cbRenderDopClusterAnnotations(panel, brandCode);
 
     /* 3b. Brand Performance Summary: new focal to row 1, demoted focal to
           sortable section (below cat-avg row), FOCAL badge swapped.
-          Uses prevFocal (captured above) — do NOT rely on the focal-row
+          Uses prevFocal (captured above). Do NOT rely on the focal-row
           class here because section 3 already stripped it. */
     panel.querySelectorAll('.cb-brand-freq-table').forEach(function (table) {
       var tbody  = table.querySelector('tbody');
@@ -1533,22 +1533,22 @@
             var valEl  = chip.querySelector('[data-kpi-val]');
             var subEl  = chip.querySelector('[data-kpi-sub]');
             if (kpiKey === 'scr') {
-              if (valEl) valEl.textContent = kd.scr_obs || '\u2014';
+              if (valEl) valEl.textContent = kd.scr_obs || 'n/a';
               if (subEl) subEl.textContent = kd.scr_exp || '';
             } else if (kpiKey === 'loyal') {
-              if (valEl) valEl.textContent = kd.loyal_obs || '\u2014';
+              if (valEl) valEl.textContent = kd.loyal_obs || 'n/a';
               if (subEl) subEl.textContent = kd.loyal_exp || '';
             } else if (kpiKey === 'nmi') {
-              if (valEl) valEl.textContent = (kd.nmi || '\u2014') + (kd.nmi_arrow || '');
+              if (valEl) valEl.textContent = (kd.nmi || 'n/a') + (kd.nmi_arrow || '');
             } else if (kpiKey === 'hv-heavy') {
-              if (valEl) valEl.textContent = kd.hv_heavy || '\u2014';
+              if (valEl) valEl.textContent = kd.hv_heavy || 'n/a';
             } else if (kpiKey === 'hv-wbar') {
-              if (valEl) valEl.textContent = kd.hv_wbar || '\u2014';
+              if (valEl) valEl.textContent = kd.hv_wbar || 'n/a';
               if (subEl) subEl.innerHTML =
-                '(all cat buyers avg ' + (kd.hv_wbar_cat || '\u2014') +
-                ' \u00b7 gap <strong>' + (kd.hv_wbar_gap || '\u2014') + '</strong>)';
+                '(all cat buyers avg ' + (kd.hv_wbar_cat || 'n/a') +
+                ' \u00b7 gap <strong>' + (kd.hv_wbar_gap || 'n/a') + '</strong>)';
             } else if (kpiKey === 'hv-light') {
-              if (valEl) valEl.textContent = kd.hv_idx || '\u2014';
+              if (valEl) valEl.textContent = kd.hv_idx || 'n/a';
               var verdictEl = chip.querySelector('[data-kpi-verdict]');
               if (verdictEl) {
                 verdictEl.textContent = kd.hv_verdict_label || '';
@@ -1630,14 +1630,14 @@
 
   function bindCbPinBtn(panel) {
     /* The toolbar is a SIBLING of .cb-panel inside .br-element-section,
-       not a descendant — panel.querySelector() will never find it.
+       not a descendant. panel.querySelector() will never find it.
        Walk up to the section and search from there. */
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var pinBtn  = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
     if (!pinBtn) return;
 
     /* Remove the generic brTogglePin inline handler, replace with CB-aware one.
-       Do NOT guard on TurasPins here — it may not be loaded yet at init time.
+       Do NOT guard on TurasPins here. It may not be loaded yet at init time.
        Check inside the click handler instead (fires after all JS is parsed). */
     pinBtn.removeAttribute('onclick');
     pinBtn.addEventListener('click', function (ev) {
@@ -1730,7 +1730,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ' — Duplication of Purchase'
+    var title = baseTitle ? baseTitle + ': Duplication of Purchase'
                           : 'Duplication of Purchase';
     var html = cbCaptureDopHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -1767,7 +1767,7 @@
     var editor = section ? section.querySelector('.br-insight-editor') : null;
     var hasInsight = !!(editor && editor.value.trim());
 
-    /* Context tab branch — different element set (cards + 2 tables) */
+    /* Context tab branch: different element set (cards + 2 tables) */
     if (tabKey === 'context') {
       var ctxBoxes = cbDetectContextCheckboxes(activeTab, hasInsight);
       var anchorCtx = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
@@ -1777,7 +1777,7 @@
       return;
     }
 
-    /* Shopper tab branch — up to two independent sections + insight */
+    /* Shopper tab branch: up to two independent sections + insight */
     if (tabKey === 'shopper') {
       var shopBoxes = cbDetectShopperCheckboxes(activeTab, hasInsight);
       var anchorShop = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
@@ -1787,7 +1787,7 @@
       return;
     }
 
-    /* DoP sub-tab — three independent elements (partition card, heatmap,
+    /* DoP sub-tab, three independent elements (partition card, heatmap,
        cluster map) plus optional insight. */
     if (tabKey === 'dop') {
       var dopBoxes = cbDetectDopCheckboxes(activeTab, hasInsight);
@@ -1819,7 +1819,7 @@
     if (hasTable) checkboxes.push({ key: 'table',   label: 'Table',   available: true, checked: true });
     checkboxes.push(          { key: 'insight', label: 'Insight', available: true, checked: hasInsight });
 
-    /* No real content — pin insight directly with no dialog */
+    /* No real content: pin insight directly with no dialog */
     if (!hasChart && !hasTable) {
       cbExecutePin(panel, activeTab, tabKey, { chart: false, table: false, insight: hasInsight }, editor);
       return;
@@ -1837,7 +1837,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ' — Category Context' : 'Category Context';
+    var title = baseTitle ? baseTitle + ': Category Context' : 'Category Context';
 
     var html = cbCaptureContextHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -1862,7 +1862,7 @@
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Shopper Behaviour tab — independently selectable Location + Pack Size  */
+  /* Shopper Behaviour tab: independently selectable Location + Pack Size  */
   /* sections + Insight, shared between Pin and PNG export.                 */
   /* ---------------------------------------------------------------------- */
   function cbDetectShopperCheckboxes(activeTab, hasInsight) {
@@ -1908,7 +1908,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ' — Shopper Behaviour' : 'Shopper Behaviour';
+    var title = baseTitle ? baseTitle + ': Shopper Behaviour' : 'Shopper Behaviour';
 
     var html = cbCaptureShopperHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -1950,12 +1950,12 @@
                      dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
                      context: 'Category Context', shopper: 'Shopper Behaviour' };
     var tabLabel = tabLabels[tabKey] || tabKey;
-    var title = baseTitle ? baseTitle + ' — ' + tabLabel : tabLabel;
+    var title = baseTitle ? baseTitle + ': ' + tabLabel : tabLabel;
 
     var content = { sectionKey: panel.id || tabKey, title: title,
                     chartSvg: '', tableHtml: '', insightText: '' };
 
-    /* All CB charts are HTML div-based (not SVG) — capture the chart
+    /* All CB charts are HTML div-based (not SVG), capture the chart
        container element and merge it before the table HTML in tableHtml. */
     var capturedChartHtml = '';
     if (flags.chart) {
@@ -2001,8 +2001,8 @@
     if (flags.insight && editor) content.insightText = editor.value.trim();
 
     /* CB charts are HTML-based and stored in tableHtml (not chartSvg).
-       pinFlags.table must be true whenever tableHtml has any content —
-       regardless of whether the user's "Table" checkbox was checked —
+       pinFlags.table must be true whenever tableHtml has any content,
+       regardless of whether the user's "Table" checkbox was checked.
        otherwise the chart HTML is captured but never rendered in the pin card. */
     content.pinFlags = {
       chart:   !!flags.chart,
@@ -2025,14 +2025,14 @@
   /* ---------------------------------------------------------------------- */
 
   function bindCbPngBtn(panel) {
-    /* PNG button is a sibling of .cb-panel inside .br-element-section —
+    /* PNG button is a sibling of .cb-panel inside .br-element-section,
        same topology as the pin button; must search from the section root. */
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var pngBtn  = section ? section.querySelector('.cb-toolbar-top .br-png-btn') : null;
     if (!pngBtn) return;
 
     /* Remove generic brExportPng inline handler, replace with CB-aware one.
-       Guard on TurasPins inside the click handler, not here — it may not be
+       Guard on TurasPins inside the click handler, not here. It may not be
        loaded yet when initCbPanel fires. */
     pngBtn.removeAttribute('onclick');
     pngBtn.addEventListener('click', function (ev) {
@@ -2053,7 +2053,7 @@
     var editor  = section ? section.querySelector('.br-insight-editor') : null;
     var hasInsight = !!(editor && editor.value.trim());
 
-    /* Context tab branch — element set differs (cards + 2 tables) */
+    /* Context tab branch: element set differs (cards + 2 tables) */
     if (tabKey === 'context') {
       var ctxBoxes = cbDetectContextCheckboxes(activeTab, hasInsight);
       TurasPins.showCheckboxPopover(pngBtn, ctxBoxes, function (flags) {
@@ -2062,7 +2062,7 @@
       return;
     }
 
-    /* Shopper tab branch — independently selectable Location + Pack Size sections */
+    /* Shopper tab branch: independently selectable Location + Pack Size sections */
     if (tabKey === 'shopper') {
       var shopBoxes = cbDetectShopperCheckboxes(activeTab, hasInsight);
       TurasPins.showCheckboxPopover(pngBtn, shopBoxes, function (flags) {
@@ -2071,7 +2071,7 @@
       return;
     }
 
-    /* DoP sub-tab — partition card + heatmap + cluster map */
+    /* DoP sub-tab: partition card + heatmap + cluster map */
     if (tabKey === 'dop') {
       var dopBoxes = cbDetectDopCheckboxes(activeTab, hasInsight);
       TurasPins.showCheckboxPopover(pngBtn, dopBoxes, function (flags) {
@@ -2080,7 +2080,7 @@
       return;
     }
 
-    /* Detect available content — mirrors cbPinDialog detection */
+    /* Detect available content: mirrors cbPinDialog detection */
     var hasChart = false;
     var hasTable = false;
 
@@ -2119,7 +2119,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ' — Category Context' : 'Category Context';
+    var title = baseTitle ? baseTitle + ': Category Context' : 'Category Context';
 
     var html = cbCaptureContextHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -2144,7 +2144,7 @@
                      dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
                      context: 'Category Context', shopper: 'Shopper Behaviour' };
     var tabLabel = tabLabels[tabKey] || tabKey;
-    var title = baseTitle ? baseTitle + ' — ' + tabLabel : tabLabel;
+    var title = baseTitle ? baseTitle + ': ' + tabLabel : tabLabel;
 
     /* Capture chart HTML (all CB charts are HTML div-based) */
     var capturedChartHtml = '';
@@ -2184,7 +2184,7 @@
     capturedChartHtml = stripPng(capturedChartHtml);
     capturedTableHtml = stripPng(capturedTableHtml);
 
-    /* Chart HTML prepended to table HTML — both rendered by html2canvas in export.
+    /* Chart HTML prepended to table HTML: both rendered by html2canvas in export.
        Same pinFlags.table fix as cbExecutePin: must be true whenever there is any
        HTML content, not just when the user's "Table" checkbox was ticked. */
     TurasPins.exportContentAsPNG({

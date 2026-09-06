@@ -151,7 +151,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-matrix-section[data-ma-heatmap-mode="ci"] .ma-heatmap-cell.ma-ci-within { background: rgba(245, 158, 11, 0.15) !important; }
 .ma-matrix-section[data-ma-heatmap-mode="ci"] .ma-heatmap-cell.ma-ci-below  { background: rgba(220, 38, 38, 0.18) !important; }
 
-/* Brand-count text baseline — visible only when "Show count" is on */
+/* Brand-count text baseline: visible only when "Show count" is on */
 .ma-n-primary { display: none; font-size: 10.5px; color: #64748b;
                 font-variant-numeric: tabular-nums; margin-top: 2px; }
 .ma-matrix-section.ma-show-counts .ma-n-primary { display: block; }
@@ -163,7 +163,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
                 border-right: 2px solid #e2e8f0; }
 .ma-td-catavg .ct-val { font-weight: 700; color: #1e293b; }
 .ma-ci-hint { display: block; font-size: 10px; color: #94a3b8; margin-top: 1px; }
-/* Cat-avg CI mini-bar (funnel-style) on Brand Attitude table — same visual
+/* Cat-avg CI mini-bar (funnel-style) on Brand Attitude table, same visual
    contract as the Metrics tab. Keep cell compact but give the bar breathing room. */
 .ma-td-catavg.ma-td-catavg-ci { padding-bottom: 6px; vertical-align: top; }
 .ma-td-catavg.ma-td-catavg-ci .ct-val { display: block; }
@@ -173,7 +173,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
                         font-style: italic; border-bottom: 1px solid #dde3eb; }
 .ma-row-base td.ct-label-col { font-weight: 600; }
 
-/* Row label — clickable toggle to grey out */
+/* Row label: clickable toggle to grey out */
 .ma-row-label { padding-left: 8px; max-width: 300px; }
 .ma-row-toggle { display: flex; align-items: flex-start; gap: 6px;
                  cursor: pointer; }
@@ -196,7 +196,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 
 /* Chart chip bar + legend */
 .ma-chart-chip-bar { margin-bottom: 6px; }
-/* Chart legend (HTML div hidden — legend now rendered inside SVG) */
+/* Chart legend (HTML div hidden, legend now rendered inside SVG) */
 .ma-chart-legend { display: none; }
 .ma-legend-item { display: inline-flex; align-items: center; gap: 5px;
                   font-size: 11px; color: #334155; }
@@ -269,7 +269,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
                                 stroke-dasharray: 3 3; }
 .ma-bar-chart .ma-bar-legend { font-family: inherit; }
 
-/* Full-width insight box — breaks out of panel padding to span full width */
+/* Full-width insight box: breaks out of panel padding to span full width */
 .ma-insight-box { width: calc(100% + 40px); margin: 12px -20px 0;
                   padding: 10px 20px;
                   background: #f8fafc; border: 1px solid #e2e8f0;
@@ -292,18 +292,18 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-insight-box-text:focus { outline: 2px solid var(--ma-brand);
                               outline-offset: -1px; border-color: var(--ma-brand); }
 
-/* Metrics table — focal row (always above cat avg) */
+/* Metrics table: focal row (always above cat avg) */
 .ma-metrics-focal-row td.ct-label-col {
   font-weight: 700; border-left: 3px solid %FOCAL%; }
 .ma-metrics-focal-row td.ct-label-col .ma-focal-badge {
   background: %FOCAL%; margin-left: 6px; }
 
-/* Metrics table — category average row */
+/* Metrics table: category average row */
 .ma-metrics-cat-avg td.ct-td {
   background: #f1f5f9 !important; font-style: italic; font-weight: 600; }
 .ma-metrics-cat-avg td.ct-label-col { color: #334155; }
 
-/* Metrics table — base row */
+/* Metrics table: base row */
 .ma-metrics-base td.ct-td {
   background: #f0f4f8; font-size: 11px; color: #64748b;
   font-style: italic; border-bottom: 1px solid #dde3eb; }
@@ -323,7 +323,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-metrics-table th.ct-th { min-width: 110px; }
 .ma-metrics-table th.ct-label-col { min-width: 160px; text-align: left; }
 
-/* About drawer — formula dl */
+/* About drawer: formula dl */
 .ma-about-formulas { margin-top: 10px; }
 .ma-formula-dl { margin: 4px 0 0; display: grid;
   grid-template-columns: max-content 1fr; gap: 2px 12px; }
@@ -371,7 +371,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-rank-section { margin-top: 18px; padding-top: 14px; border-top: 1px dashed #e2e8f0; }
 .ma-rank-section[hidden] { display: none !important; }
 
-/* Metrics charts area — stacked full-width */
+/* Metrics charts area: stacked full-width */
 .ma-metrics-charts { display: flex; flex-direction: column; gap: 20px;
                      margin: 18px 0; }
 .ma-scatter-wrap, .ma-bars-wrap {

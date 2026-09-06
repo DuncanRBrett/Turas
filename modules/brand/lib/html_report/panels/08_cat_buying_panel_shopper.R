@@ -5,7 +5,7 @@
 # sections: Purchase Location (channels) and Pack Sizes. Each section
 # reuses the brands-as-rows / options-as-columns table layout from the
 # Loyalty and Distribution tabs (.cb_rel_table_html) so the visual
-# contract — sortable headers, CI-band heatmap, "show counts" toggle —
+# contract, sortable headers, CI-band heatmap, "show counts" toggle.
 # stays consistent across the panel.
 #
 # The tab silently hides any section whose engine returned NULL or
@@ -279,7 +279,7 @@ cb_shopper_context_chips <- function(panel_data) {
 
 #' Render sample-level buying location as a bar chart
 #'
-#' @param result Output of compute_buying_location() — list with rows,
+#' @param result Output of compute_buying_location(), list with rows,
 #'   n_total, cat_code.
 #' @param focal_colour Hex colour for bar fills.
 #' @return Character HTML fragment.
@@ -295,7 +295,7 @@ cb_buying_location_html <- function(result, focal_colour = "#1A5276") {
                          numeric(1)), na.rm = TRUE)
   if (!isTRUE(max_pct > 0)) max_pct <- 1
   bars <- paste(vapply(result$rows, function(r) {
-    label <- r$label %||% r$value %||% "—"
+    label <- r$label %||% r$value %||% "n/a"
     pct   <- r$pct_weighted %||% 0
     width <- max(2, min(100, pct / max_pct * 100))
     sprintf(paste0(

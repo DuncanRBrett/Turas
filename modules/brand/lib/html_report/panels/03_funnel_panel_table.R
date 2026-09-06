@@ -5,7 +5,7 @@
 # looks identical to a tabs crosstab card (dark navy header, red-bold
 # small-base warning, column letters, sort indicators in header).
 #
-# Row order (locked — sort only shuffles competitor rows):
+# Row order (locked: sort only shuffles competitor rows):
 #   1. Base (n=) per stage, with ct-low-base red/bold when < 30
 #   2. Focal brand                  (left-border accent)
 #   3. Category average             (italic, muted band)
@@ -73,7 +73,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
               data-fn-sort-dir="asc">\u21C5</button>',
     '</th>')
 
-  # Stage column headers — sort button only (? definitions moved to About section)
+  # Stage column headers: sort button only (? definitions moved to About section)
   stage_ths <- paste(vapply(seq_along(stage_keys), function(i) {
     key <- .fn_esc(stage_keys[i])
     label <- .fn_esc(stage_labels[i])
@@ -118,7 +118,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   cells_html <- vapply(seq_along(stage_keys), function(i) {
     v <- base_by_stage[i]
     if (!is.finite(v)) {
-      return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
+      return('<td class="ct-td ct-data-col ct-na">n/a</td>')
     }
     warn <- v < .FN_SMALL_BASE
     sprintf('<td class="ct-td ct-data-col"><span class="%s">n=%d%s</span></td>',
@@ -159,10 +159,10 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     vapply(avg_rows, function(r) r$stage_key, character(1)))
   cells <- vapply(stage_keys, function(k) {
     r <- by_key[[k]]
-    if (is.null(r)) return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
+    if (is.null(r)) return('<td class="ct-td ct-data-col ct-na">n/a</td>')
     pct_abs <- r$pct_absolute %||% NA_real_
     if (is.null(pct_abs) || is.na(pct_abs))
-      return('<td class="ct-td ct-data-col ct-na fn-td-avg">&mdash;</td>')
+      return('<td class="ct-td ct-data-col ct-na fn-td-avg">n/a</td>')
     # All three base values are surfaced as data attributes so applyPctMode()
     # in brand_funnel_panel.js can reflow this cell when the user toggles
     # between % total / % previous / % aware. Sentinel brand code "__avg__"
@@ -297,7 +297,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 .fn_cells_html <- function(stage_keys, cells_by_stage_for_brand, col_max) {
   vals <- vapply(stage_keys, function(k) {
     c <- cells_by_stage_for_brand[[k]]
-    if (is.null(c)) return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
+    if (is.null(c)) return('<td class="ct-td ct-data-col ct-na">n/a</td>')
     .fn_cell_html(c$pct_absolute, c$pct_nested, c$pct_aware,
                   c$base_weighted, c$base_unweighted,
                   k, c$brand_code,
@@ -313,7 +313,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
                           stage_key, brand_code, col_max, sig_vs_avg,
                           row_class = "") {
   if (is.null(pct_absolute) || is.na(pct_absolute)) {
-    return(sprintf('<td class="ct-td ct-data-col ct-na %s">&mdash;</td>', row_class))
+    return(sprintf('<td class="ct-td ct-data-col ct-na %s">n/a</td>', row_class))
   }
   heatmap_data <- .fn_per_column_heatmap_data(pct_absolute, col_max)
   abs_display    <- sprintf("%.0f%%", 100 * pct_absolute)
@@ -350,7 +350,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' In-cell ▲/▼ badge — brand sig higher / lower than category average.
+#' In-cell ▲/▼ badge: brand sig higher / lower than category average.
 #' @keywords internal
 .fn_sig_badge <- function(direction) {
   switch(direction,
@@ -360,7 +360,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' Per-column heatmap rgba — wider alpha range (0.08 .. 0.65) so the
+#' Per-column heatmap rgba: wider alpha range (0.08 .. 0.65) so the
 #' gradient reads clearly at desktop size. The JS applies this
 #' data-heatmap value as inline background-color on report load; the
 #' Heatmap toggle blanks it via a parent .fn-heatmap-off class.

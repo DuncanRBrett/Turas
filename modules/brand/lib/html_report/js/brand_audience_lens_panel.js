@@ -1,5 +1,5 @@
 // ==========================================================================
-// BRAND AUDIENCE LENS PANEL — sub-tab switcher + insight box wiring
+// BRAND AUDIENCE LENS PANEL: sub-tab switcher + insight box wiring
 // ==========================================================================
 // Drives the in-panel sub-tabs (Banner table / Per-audience cards / Pair
 // scorecards). Pin + PNG buttons go through brand_pins.js.

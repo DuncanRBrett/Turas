@@ -84,7 +84,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
   for (i in seq_along(brand_codes)) {
     bc <- brand_codes[i]; bn <- brand_names[i]
     if (!is.null(focal) && bc == focal) {
-      # Focal column — leftmost data column, accent colour; FOCAL badge sits above brand name
+      # Focal column: leftmost data column, accent colour; FOCAL badge sits above brand name
       brand_ths <- c(brand_ths, sprintf(
         '<th class="ct-th ct-data-col ma-ct-th-brand ma-ct-th-focal" data-ma-brand="%s" data-sort-col="%s">
            <div class="ct-header-text"><span class="ma-focal-badge">FOCAL</span><span class="ma-brand-name">%s</span></div>
@@ -126,7 +126,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 
 # ==============================================================================
-# INTERNAL: ROWS — one per stimulus
+# INTERNAL: ROWS, one per stimulus
 # ==============================================================================
 
 .ma_table_rows <- function(block, brand_codes, focal, stim, pd) {
@@ -175,7 +175,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     focal_cls <- if (is_focal) " ma-td-focal" else ""
     if (is.null(c)) {
       cells_html <- c(cells_html,
-        sprintf('<td class="ct-td ct-data-col ct-na%s">&mdash;</td>',
+        sprintf('<td class="ct-td ct-data-col ct-na%s">n/a</td>',
                 focal_cls))
     } else {
       cells_html <- c(cells_html, .ma_cell_html(c, focal_cls, stim))
@@ -217,7 +217,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 
 # ------------------------------------------------------------------
-# Per-cell — primary pct + optional count + CI band + sig arrow
+# Per-cell: primary pct + optional count + CI band + sig arrow
 # ------------------------------------------------------------------
 
 .ma_cell_html <- function(cell, focal_cls = "", stim) {
@@ -230,7 +230,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
   sig       <- cell$sig_vs_avg %||% "na"
 
   if (is.null(pct_total) || is.na(pct_total)) {
-    return(sprintf('<td class="ct-td ct-data-col ct-na%s">&mdash;</td>',
+    return(sprintf('<td class="ct-td ct-data-col ct-na%s">n/a</td>',
                    focal_cls))
   }
 
@@ -265,7 +265,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 .ma_catavg_cell_html <- function(avg_pct, ci_lower, ci_upper, base_n) {
   if (is.null(avg_pct) || is.na(avg_pct)) {
-    return('<td class="ct-td ct-data-col ma-td-catavg ct-na" data-ma-brand="__avg__">&mdash;</td>')
+    return('<td class="ct-td ct-data-col ma-td-catavg ct-na" data-ma-brand="__avg__">n/a</td>')
   }
   # Funnel-style CI mini-bar (matches .ma-ci-bar-wrap used on Metrics tab and
   # the Category Buying DoP category-average row). Values are % on a 0-100 scale.
@@ -313,7 +313,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     v <- brand_avg[[b]]
     if (is.na(v)) {
       row_cells <- c(row_cells,
-        sprintf('<td class="ct-td ct-data-col ct-na%s" data-ma-brand="%s">&mdash;</td>',
+        sprintf('<td class="ct-td ct-data-col ct-na%s" data-ma-brand="%s">n/a</td>',
                 focal_cls, .ma_esc(b)))
     } else {
       row_cells <- c(row_cells, sprintf(
@@ -337,7 +337,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 
 # ==============================================================================
-# INTERNAL: BASE ROW — shows base n per brand at top of tbody
+# INTERNAL: BASE ROW. Shows base n per brand at top of tbody
 # ==============================================================================
 
 .ma_base_row <- function(block, brand_codes, focal) {
@@ -350,7 +350,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     round(ap_num * base / 100)
   } else NULL
 
-  n_total_display <- if (is.null(n_total) || is.na(n_total)) "&mdash;"
+  n_total_display <- if (is.null(n_total) || is.na(n_total)) "n/a"
                      else sprintf("n=%d", as.integer(n_total))
 
   cells <- character(0)
@@ -367,7 +367,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
     if (is_focal) {
       cells <- c(cells,
-        '<td class="ct-td ct-data-col ma-td-catavg ma-base-n" data-ma-brand="__avg__">&mdash;</td>')
+        '<td class="ct-td ct-data-col ma-td-catavg ma-base-n" data-ma-brand="__avg__">n/a</td>')
     }
   }
 
@@ -381,7 +381,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 
 # ==============================================================================
-# INTERNAL: HEATMAP (diverging — red/white/blue vs cat avg)
+# INTERNAL: HEATMAP (diverging, red/white/blue vs cat avg)
 # ==============================================================================
 
 .ma_diff_heatmap <- function(diff, max_abs_diff) {

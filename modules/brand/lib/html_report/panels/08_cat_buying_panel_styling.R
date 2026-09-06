@@ -1,6 +1,6 @@
 # ==============================================================================
 # BRAND MODULE - CATEGORY BUYING PANEL CSS
-# SIZE-EXCEPTION: CSS assembly pipeline — large but inseparable inline style block
+# SIZE-EXCEPTION: CSS assembly pipeline, large but inseparable inline style block
 # for a complex multi-tab panel. Decomposing would break the scoping contract.
 # ==============================================================================
 # Returns a <style> block for the Category Buying (Dirichlet) panel.
@@ -111,14 +111,14 @@ paste0(
 .cb-dop-table .cb-dop-diag {
   background: #e2e8f0; color: #94a3b8;
 }
-/* Average row first — italic, subtle backdrop */
+/* Average row first: italic, subtle backdrop */
 .cb-dop-table tr.cb-dop-avg-row .cb-dop-avg-cell {
   background: #eff1f5; color: #475569; font-style: italic; font-weight: 500;
 }
 .cb-dop-table tr.cb-dop-avg-row .cb-dop-row-lbl {
   background: #eff1f5; color: #475569; font-style: italic;
 }
-/* Traffic-light heatmap — CI band (col avg ± 1 SD) */
+/* Traffic-light heatmap: CI band (col avg ± 1 SD) */
 .cb-dop-table td.cb-dop-cell.cb-dop-above {
   background: rgba(5, 150, 105, 0.22); color: #065f46; font-weight: 600;
 }
@@ -133,7 +133,7 @@ paste0(
   border-left: 3px solid var(--cb-focal-colour, #1A5276);
   color: var(--cb-focal-colour, #1A5276); font-weight: 700;
 }
-/* DoP toolbar — reuse generic controls-bar look */
+/* DoP toolbar: reuse generic controls-bar look */
 .cb-dop-section .cb-controls-bar {
   display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
   margin: 4px 0 8px;
@@ -243,7 +243,7 @@ paste0(
 
 /* DoP sub-tab: hide the panel-level Show brands chip bar (the focal select
    stays). Filtering brands here would silently change column averages,
-   partition card, and cluster map — confusing rather than useful. */
+   partition card, and cluster map, confusing rather than useful. */
 .cb-panel.cb-on-dop .cb-brand-picker { display: none; }
 
 /* DoP cluster map (dendrogram) */
@@ -264,7 +264,7 @@ paste0(
 .cb-dop-cluster-sub {
   font-size: 11px; font-weight: 400; color: #94a3b8; font-style: italic;
 }
-/* Fit-quality badge — categorical band based on cophenetic correlation,
+/* Fit-quality badge: categorical band based on cophenetic correlation,
    numeric coph value displayed inside, full breakdown in CSS-styled tooltip
    that pops on hover or focus. */
 .cb-cm-fit-badge {
@@ -382,7 +382,7 @@ paste0(
   display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
 }
 /* Hide the panel-level brand picker while the (category-level) Context tab
-   is active — it has no focal-brand interactions. */
+   is active. It has no focal-brand interactions. */
 .cb-panel.cb-on-context .cb-brand-picker { display: none; }
 /* Title-case variant of the control label (for the brand picker) */
 .cb-ctl-label.cb-ctl-label-title {
@@ -736,7 +736,7 @@ paste0(
 }
 .cb-panel .sig-btn:hover:not(.sig-btn-active) { background: #e2e8f0; }
 
-/* Goodness-of-fit readout (D, MAD) — sits as a sibling of the toggle
+/* Goodness-of-fit readout (D, MAD). Sits as a sibling of the toggle
    so the buttons stay clean. */
 .cb-dop-fit-readout {
   display: inline-flex; align-items: center; gap: 8px;
@@ -784,7 +784,7 @@ paste0(
 }
 .toggle-label input { margin: 0; }
 
-/* col-chip — palette-coloured brand chips */
+/* col-chip: palette-coloured brand chips */
 .col-chip {
   font-size: 11px; padding: 3px 9px; border-radius: 12px;
   border: 1px solid var(--brand-chip-color, #64748b);
@@ -937,7 +937,7 @@ paste0(
   pointer-events: none;
 }
 
-/* Emphasis chips — active state uses the segment colour (set via inline
+/* Emphasis chips: active state uses the segment colour (set via inline
    data-cb-seg-color → CSS custom prop applied in JS). */
 .col-chip.cb-rel-seg-chip[data-cb-seg-color].active {
   background: var(--brand-chip-color) !important;
@@ -980,7 +980,7 @@ paste0(
 .ma-bar-group-label { font-size: 11px; fill: #334155; font-weight: 500; }
 .ma-bar-cat-avg  { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; }
 
-/* === Shopper Behaviour sub-tab — fitting overrides =====================
+/* === Shopper Behaviour sub-tab: fitting overrides =====================
    These rules drop the .cb-panel ancestor on purpose: when sections
    are captured for pin / PNG export the cloned HTML lives outside
    .cb-panel, so any panel-scoped rule stops applying. Selectors here

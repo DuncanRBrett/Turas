@@ -4,16 +4,16 @@
 # Pure HTML / SVG builder for the chart view of a single demographic question.
 # Layout: one row per option, with a horizontal bar showing the focal brand
 # value and a vertical marker showing a reference baseline. Per-brand cells
-# are NOT shown in the chart view to keep it readable — the matrix table is
+# are NOT shown in the chart view to keep it readable. The matrix table is
 # the place to see all brands at once. The chart is for the focal brand vs
 # its reference baseline.
 #
 # Two modes (mirror the matrix table's cell-metric toggle):
-#   "penetration" (default) — bar = % of THIS option who buy focal; marker
+#   "penetration" (default): bar = % of THIS option who buy focal; marker
 #                              = focal's cat-wide penetration. Reading: bar
 #                              longer than marker = focal over-performs in
 #                              this demographic.
-#   "share"                 — bar = % of focal buyers in THIS option (audience
+#   "share": bar = % of focal buyers in THIS option (audience
 #                              share); marker = % of cat respondents in this
 #                              option (cat avg). Reading: bar longer than
 #                              marker = focal's audience over-represented in
@@ -69,7 +69,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
   ctx <- .demo_chart_mode_ctx(q, focal_brand, metric)
   scale_max <- .demo_chart_scale_max(rows, ctx)
 
-  # One row per option — buyer view only. The non-buyer cell value in pen
+  # One row per option: buyer view only. The non-buyer cell value in pen
   # mode is the complement (100 − buyer) and tells you nothing the buyer
   # row doesn't already, while visually crushing the buyer bars. Detail
   # buyer-vs-non-buyer is in the table.
@@ -88,7 +88,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 
 
 # Legend: focal swatch + primary-marker label + optional secondary-marker
-# label (penetration mode only — focal brand's cat-wide overall pen).
+# label (penetration mode only, focal brand's cat-wide overall pen).
 .demo_chart_legend <- function(ctx, focal_brand, focal_colour) {
   primary_marker_html <- sprintf(
     '<span><span class="demo-chart-legend-swatch-line"></span>%s</span>',
@@ -116,13 +116,13 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 
 # Resolve the chart's data source and marker semantics for the requested
 # metric mode. Returns a list with:
-#   focal_entry   — long-list entry whose cells hold the bar values
-#   option_avg    — code -> {code, pct} map for the per-row marker (the
-#                    PER-OPTION baseline — typical brand pen in pen mode,
+#   focal_entry: long-list entry whose cells hold the bar values
+#   option_avg, code -> {code, pct} map for the per-row marker (the
+#                    PER-OPTION baseline, typical brand pen in pen mode,
 #                    demographic size in share mode). Replaces the previous
 #                    global_marker idea so the marker can vary per row.
-#   marker_label  — short legend label
-#   footnote      — optional context string (used for "focal overall: 16%")
+#   marker_label: short legend label
+#   footnote, optional context string (used for "focal overall: 16%")
 .demo_chart_mode_ctx <- function(q, focal_brand, metric) {
   if (identical(metric, "share")) {
     # Share-mode marker = per-row cat-avg (% of cat in option). Non-buyer
@@ -142,7 +142,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
   }
   # default: penetration. Two markers per row:
   #   primary (per-row)  = mean brand pen in that option (the typical brand)
-  #   secondary (global) = focal's cat-wide overall pen — same X every row,
+  #   secondary (global) = focal's cat-wide overall pen, same X every row,
   #                         rendered as a dashed lighter line so the two are
   #                         visually distinct.
   total_pen_focal <- q$brand_total_penetration[[focal_brand]]
@@ -171,7 +171,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 
 # Pull the focal-brand brand_cut entry from the question payload. Returns
 # NULL when the focal brand has no per-brand cells (e.g. focal not in the
-# category brand list — which would be a config error upstream).
+# category brand list, which would be a config error upstream).
 .demo_chart_focal_entry <- function(brand_cut, focal_brand) {
   if (is.null(brand_cut) || length(brand_cut) == 0L) return(NULL)
   for (b in brand_cut) {
@@ -216,7 +216,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 
 
 # Render one chart row for an option. Layout: option name + role chip on
-# the left (role is always "buyer" — the chart is a buyer-only view);
+# the left (role is always "buyer". The chart is a buyer-only view);
 # horizontal bar with primary + optional secondary markers; numeric bar
 # value on the right. The primary marker carries a visible value label
 # above it so the baseline value is legible without hovering.
@@ -282,7 +282,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 # ==============================================================================
 
 .demo_chart_pct <- function(v, dp) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("&mdash;")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
   sprintf("%.*f%%", as.integer(dp), v)
 }
 

@@ -29,7 +29,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 # Drop the "None of the above" pseudo-brand from a brand list. The engine
 # filters this in get_brands_for_category() in 01_config.R, but the HTML
 # transformer reads structure$brands directly so it has to repeat the
-# filter here. Self-contained — does not rely on .drop_none_brands() being
+# filter here. Self-contained. Does not rely on .drop_none_brands() being
 # in scope (the transformer is sourced independently of the module loader
 # in some pipelines, per the comment in .dt_brand_colours below).
 .dt_drop_none_brands <- function(tbl) {
@@ -42,7 +42,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   tbl[!is_none, , drop = FALSE]
 }
 
-# Position-based brand colour assignment. Self-contained — no dependency on
+# Position-based brand colour assignment. Self-contained: no dependency on
 # any other brand module file being in scope (this file is re-sourced at
 # report-generation time independently of the R module loader).
 .dt_brand_colours <- function(brand_list, focal_code = NULL,
@@ -104,7 +104,7 @@ transform_brand_charts <- function(results, config) {
       # (build_ma_panel_data + build_ma_panel_html in transform_brand_panels).
       # Legacy SVG charts are no longer generated.
 
-      # Funnel charts — consumes new role-registry funnel shape and
+      # Funnel charts: consumes new role-registry funnel shape and
       # adapts to the legacy wide data frame expected by the existing
       # SVG builders (build_funnel_chart, build_dot_plot). This adapter
       # stays until the HTML panel migrates to build_funnel_panel_data().
@@ -132,22 +132,22 @@ transform_brand_charts <- function(results, config) {
         if (nrow(legacy_wide) > 0) {
           funnel_charts[[length(funnel_charts) + 1]] <- list(
             svg = build_funnel_chart(legacy_wide, focal, brand_colour,
-                                     title = sprintf("Brand Funnel \u2014 %s", cat_name)),
+                                     title = sprintf("Brand Funnel: %s", cat_name)),
             title = "Brand Funnel"
           )
         }
         if (nrow(legacy_conv) > 0 && !all(is.na(legacy_conv$Aware_to_Positive))) {
           conv_df <- data.frame(
-            Label = paste(legacy_conv$BrandCode, "\u2014 Aware\u2192Consideration"),
+            Label = paste0(legacy_conv$BrandCode, ": Aware\u2192Consideration"),
             Value = legacy_conv$Aware_to_Positive,
             stringsAsFactors = FALSE
           )
           funnel_charts[[length(funnel_charts) + 1]] <- list(
             svg = build_dot_plot(conv_df,
-                                focal_label = paste(focal, "\u2014 Aware\u2192Consideration"),
+                                focal_label = paste0(focal, ": Aware\u2192Consideration"),
                                 brand_colour = brand_colour,
                                 comp_colour = comp_colour,
-                                title = sprintf("Conversion: Aware \u2192 Consideration \u2014 %s", cat_name),
+                                title = sprintf("Aware \u2192 Consideration conversion: %s", cat_name),
                                 value_suffix = "%",
                                 ref_line = median(conv_df$Value, na.rm = TRUE),
                                 ref_label = "Median"),
@@ -175,7 +175,7 @@ transform_brand_charts <- function(results, config) {
           rep_charts[[length(rep_charts) + 1]] <- list(
             svg = build_h_bar(
               dist_ordered, "Label", "Pct", brand_colour,
-              title = sprintf("Category Purchase Frequency \u2014 %s (all respondents)",
+              title = sprintf("Category Purchase Frequency: %s (all respondents)",
                               cat_name),
               value_suffix = "%"),
             title = "Category Purchase Frequency"
@@ -187,7 +187,7 @@ transform_brand_charts <- function(results, config) {
           rep_charts[[length(rep_charts) + 1]] <- list(
             svg = build_h_bar(rep$repertoire_size, "Brands_Bought", "Percentage",
                               brand_colour,
-                              title = sprintf("Repertoire Size \u2014 %s", cat_name),
+                              title = sprintf("Repertoire Size: %s", cat_name),
                               value_suffix = "%"),
             title = "Repertoire Size"
           )
@@ -202,7 +202,7 @@ transform_brand_charts <- function(results, config) {
               rep$brand_repertoire_profile,
               focal_brand  = focal,
               focal_colour = brand_colour,
-              title = sprintf("Buyer Loyalty Profile \u2014 %s", cat_name)),
+              title = sprintf("Buyer Loyalty Profile: %s", cat_name)),
             title = "Buyer Loyalty Profile"
           )
         }
@@ -228,7 +228,7 @@ transform_brand_charts <- function(results, config) {
             svg = build_diverging_bar(wom$wom_metrics, "BrandCode",
                                       "ReceivedPos_Pct", "ReceivedNeg_Pct",
                                       focal, brand_colour,
-                                      title = sprintf("WOM Net Balance \u2014 %s", cat_name)),
+                                      title = sprintf("WOM Net Balance: %s", cat_name)),
             title = "WOM Net Balance"
           )
         )
@@ -237,7 +237,7 @@ transform_brand_charts <- function(results, config) {
   }
 
   # DBA Fame x Uniqueness grid is now rendered by the modern panel
-  # (build_dba_panel_html in transform_brand_panels \u2014 see panels[["dba"]]).
+  # (build_dba_panel_html in transform_brand_panels, see panels[["dba"]]).
   # The legacy chart+table path was removed when the modern panel landed.
 
   charts
@@ -333,7 +333,7 @@ transform_brand_panels <- function(results, config) {
     focal_colour <- .resolve_focal_colour(cat_brands, funnel$meta$focal_brand,
                                           config_focal_colour)
 
-    # Per-category timeframe labels — check by CategoryCode first, then name
+    # Per-category timeframe labels: check by CategoryCode first, then name
     cat_cfg_row <- if (!is.null(config$categories)) {
       cfg_cats <- config$categories
       if (!is.null(cat_code_lc) && "CategoryCode" %in% names(cfg_cats)) {
@@ -562,7 +562,7 @@ transform_brand_panels <- function(results, config) {
                                             config$focal_brand,
                                             config_focal_colour)
 
-      # Timeframe label — prefer category Timeframe_Target, fall back to
+      # Timeframe label: prefer category Timeframe_Target, fall back to
       # the original WOM question wording default.
       cat_cfg_row <- if (!is.null(config$categories)) {
         cfg_cats <- config$categories

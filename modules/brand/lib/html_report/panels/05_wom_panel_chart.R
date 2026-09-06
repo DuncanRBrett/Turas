@@ -2,8 +2,8 @@
 # BRAND MODULE - WOM PANEL CHARTS (SVG)
 # ==============================================================================
 # Two diverging-bar charts for the WOM panel:
-#   1. build_wom_heard_chart() — Heard positive vs Heard negative per brand
-#   2. build_wom_said_chart()  — Said positive vs Said negative, annotated
+#   1. build_wom_heard_chart(): Heard positive vs Heard negative per brand
+#   2. build_wom_said_chart(), Said positive vs Said negative, annotated
 #      with mean number of occasions per sharer
 #
 # Design notes
@@ -172,7 +172,7 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
               xl, grid_top - 26, neg_colour, avg_neg))
   }
 
-  # Bars — one <g class="wom-bar-row" data-wom-brand> per brand so JS can
+  # Bars, one <g class="wom-bar-row" data-wom-brand> per brand so JS can
   # hide / reorder rows in sync with the table.
   step <- bar_h + gap
   for (i in seq_along(order_idx)) {

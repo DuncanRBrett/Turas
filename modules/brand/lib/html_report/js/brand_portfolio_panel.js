@@ -24,7 +24,7 @@
 // setter so the sub-tab views re-render with the new focal.
 //
 // Re-entry guard prevents the case where a setter eventually calls
-// pfBroadcastFocal again — only the outermost call propagates.
+// pfBroadcastFocal again, only the outermost call propagates.
 
 // ------------------------------------------------------------------------------
 // AXIS RANGE INPUT HELPER
@@ -173,7 +173,7 @@ function pfSwitchStrengthBrand(brandCode) {
 }
 
 /**
- * Handle constellation node click — highlight selected node and pin centred_brand.
+ * Handle constellation node click, highlight selected node and pin centred_brand.
  * Re-centres the view by visually emphasising the clicked node.
  * Pin payload: { subtab: 'constellation', centred_brand: brandCode }.
  * @param {Event|null} event - Click event (may be null when called from restore).
@@ -209,7 +209,7 @@ function pfRestorePinState(state) {
 }
 
 // ---------------------------------------------------------------------------
-// FOOTPRINT TABLE — focal switch, chip show/hide, column sorting
+// FOOTPRINT TABLE: focal switch, chip show/hide, column sorting
 // ---------------------------------------------------------------------------
 
 /**
@@ -217,7 +217,7 @@ function pfRestorePinState(state) {
  *   - Focal-brand <select> moves the focal row to row 1 + recolours its label.
  *   - Brand chips toggle row visibility (and stay highlighted).
  *   - Column-header clicks sort rows by that column (focal pinned to row 1).
- * Idempotent — safe to call after re-renders.
+ * Idempotent: safe to call after re-renders.
  */
 function pfInitFootprintTable() {
   var table = document.querySelector('.pf-fp-table');
@@ -249,7 +249,7 @@ function pfInitFootprintTable() {
   pfFpInitCategoryChips(section, table);
 
   // --- Column-header sort ---------------------------------------------------
-  // Click target is the <th> itself (no inner <button>) — keeps the
+  // Click target is the <th> itself (no inner <button>). Keeps the
   // thead rendering as one solid navy bar without native-button gaps.
   table.querySelectorAll('th.pf-fp-th-sort').forEach(function (th) {
     th.addEventListener('click', function () {
@@ -290,7 +290,7 @@ function pfInitFootprintTable() {
 }
 
 // ---------------------------------------------------------------------------
-// FOOTPRINT — brand popover + category chips
+// FOOTPRINT: brand popover + category chips
 // ---------------------------------------------------------------------------
 
 /**
@@ -319,7 +319,7 @@ function pfFpInitBrandPopover(section, table) {
   function toggle() { (pop.hidden) ? open() : close(); }
 
   btn.addEventListener('click', function (ev) { ev.preventDefault(); toggle(); });
-  // Outside-click close — uses closest() so clicks on nested spans inside
+  // Outside-click close: uses closest() so clicks on nested spans inside
   // the trigger button or the popover are correctly attributed. The
   // mousedown phase fires before click, so the popover closes cleanly
   // when the user clicks a category chip or anywhere else.
@@ -578,7 +578,7 @@ function pfFpSortBy(table, key) {
   var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-pf-fp-brand]'));
 
   if (next === 'none') {
-    // Restore data-attribute insertion order — rebuild from server-issued
+    // Restore data-attribute insertion order: rebuild from server-issued
     // order stored in data-pf-fp-orig-idx (set on first sort below).
     if (!table.dataset.pfFpOrigIndexed) {
       rows.forEach(function (tr, i) { tr.dataset.pfFpOrigIdx = String(i); });
@@ -633,11 +633,11 @@ function cssEscape(s) {
 }
 
 // ---------------------------------------------------------------------------
-// COMPETITIVE SET — per-category chart + focal picker + closest-competitors
+// COMPETITIVE SET: per-category chart + focal picker + closest-competitors
 // ---------------------------------------------------------------------------
 
 // Lazy-build a single floating tooltip element. One per document is
-// enough — we move and rewrite it as the cursor moves between nodes.
+// enough, we move and rewrite it as the cursor moves between nodes.
 function pfCnGetTooltip() {
   var t = document.getElementById('pf-cn-tooltip');
   if (t) return t;
@@ -654,10 +654,10 @@ function pfCnFormatTooltip(node, focalCode) {
   var brandLabel = node.getAttribute('data-pf-cn-name') ||
                    pfCnReadNodeLabel(node);
   var code = node.getAttribute('data-pf-cn-node');
-  if (!focalCode || code === focalCode) return brandLabel + ' — focal';
+  if (!focalCode || code === focalCode) return brandLabel + ': focal';
 
   // Build the Jaccard map for the focal brand from the FULL pairwise list
-  // (all_edges) embedded in the JSON payload — not just the top-N edges
+  // (all_edges) embedded in the JSON payload, not just the top-N edges
   // drawn on the SVG. The chart only renders the top-N edges to stay
   // readable, but every brand still has a real Jaccard value with the
   // focal; the tooltip should surface it.
@@ -696,7 +696,7 @@ function pfCnFormatTooltip(node, focalCode) {
   // Rank = position of this brand in the focal's sorted-by-Jaccard list.
   // When the full list is used, the rank is the true category rank
   // (1..N-1); when the fallback is used, it's only ranked among drawn
-  // edges (1..top_n) — same behaviour as the previous implementation.
+  // edges (1..top_n), same behaviour as the previous implementation.
   var ranked = Object.keys(jacByCode)
     .sort(function (a, b) { return jacByCode[b] - jacByCode[a]; });
   var rank   = ranked.indexOf(code) + 1;
@@ -717,18 +717,18 @@ function pfCnFormatTooltip(node, focalCode) {
   if (jac == null) {
     // Only reached when neither all_edges nor the top-N SVG edges contain
     // the pair (e.g. brand wasn't in the awareness battery for this cat).
-    return brandLabel + ' — no co-awareness data with ' + focalLabel +
+    return brandLabel + ': no co-awareness data with ' + focalLabel +
            ' in this category';
   }
 
   // Jaccard is a 0–1 similarity ratio. We deliberately render it as the
-  // raw decimal (e.g. 0.56), NOT a percentage — clients tend to misread
+  // raw decimal (e.g. 0.56), NOT a percentage, clients tend to misread
   // "56%" as "56% of focal awares know this brand", which is the wrong
   // interpretation. See the "About this chart" callout for the symmetric
   // overlap interpretation.
   var jacText  = jac.toFixed(2);
   var rankNote = rank > 0 ? ' · #' + rank + ' closest' : '';
-  return brandLabel + ' — Jaccard ' + jacText + ' with ' + focalLabel + rankNote;
+  return brandLabel + ': Jaccard ' + jacText + ' with ' + focalLabel + rankNote;
 }
 
 function pfCnPositionTooltip(tip, ev) {
@@ -751,7 +751,7 @@ function pfCnPositionTooltip(tip, ev) {
 }
 
 function pfCnBindHoverTooltips(panel) {
-  // Delegate hover events on the constellation panel — works for any
+  // Delegate hover events on the constellation panel: works for any
   // re-rendered SVG too (e.g. if we later swap in a new chart).
   panel.addEventListener('mouseover', function (ev) {
     var node = ev.target.closest && ev.target.closest('.pf-cn-node');
@@ -885,7 +885,7 @@ function pfCnLoadData() {
 }
 
 // The cat-keyed map sits under `.cats`; brand_colours + focal_colour are
-// peers. Older payloads put cats at top level — `data.cats || data` keeps
+// peers. Older payloads put cats at top level. `data.cats || data` keeps
 // pre-rendered reports working until they're regenerated.
 function pfCnLoadCats() {
   var data = pfCnLoadData();
@@ -963,7 +963,7 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
     e.classList.remove('pf-cn-edge-focal');
   });
 
-  // (Tooltip text is now built on hover by pfCnFormatTooltip — no
+  // (Tooltip text is now built on hover by pfCnFormatTooltip, no
   // per-node text to reset on focal change.)
 
   if (!focalCode) return;
@@ -987,7 +987,7 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
     label.setAttribute('font-weight', '700');
   }
 
-  // Halo — dashed ring around the focal node. Insert at the END of the
+  // Halo: dashed ring around the focal node. Insert at the END of the
   // parent <g> (= the node-group wrapping the focal circle) so it draws
   // beneath the circle without disturbing the <title> sibling.
   var ns = 'http://www.w3.org/2000/svg';
@@ -1031,7 +1031,7 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
     e.classList.add('pf-cn-edge-focal');
   });
 
-  // Rival tier — top-N closest competitors by Jaccard. The SVG carries
+  // Rival tier: top-N closest competitors by Jaccard. The SVG carries
   // data-pf-cn-rival-colour (lightened focal hex computed by the server)
   // and data-pf-cn-top-n (count, default 5). When the user changes
   // focal we recompute the top-N here from the live edges so the
@@ -1070,7 +1070,7 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
   // the live edge data, so no pre-population is needed when focal changes.
 }
 
-// Lighten a focal hex toward white by 45% — matches the server-side
+// Lighten a focal hex toward white by 45%. Matches the server-side
 // .lighten_hex() helper so the rival colour stays consistent across
 // the initial render and JS-driven focal switches.
 function pfCnDeriveRivalColour(hex) {
@@ -1092,7 +1092,7 @@ function pfCnDeriveRivalColour(hex) {
   return ('#' + hh(r) + hh(g) + hh(b)).toUpperCase();
 }
 
-// Brand display label for a node — read the matching <text> in the
+// Brand display label for a node: read the matching <text> in the
 // same SVG so the tooltip uses the human-readable name rather than the
 // brand code (which was the <title>'s initial text content).
 function pfCnReadNodeLabel(node) {
@@ -1138,7 +1138,7 @@ function pfCnRenderRivals(panel, catCode, focalCode) {
       ? 'No competitors share enough co-awareness with ' + escapeHtmlMaybe(focalLabel) +
         ' to register in this category. ' +
         'It either dominates mental space here or has too few aware buyers for stable comparisons.'
-      : escapeHtmlMaybe(focalLabel) + ' is not present in this category — pick another focal or a different category.';
+      : escapeHtmlMaybe(focalLabel) + ' is not present in this category, pick another focal or a different category.';
     ol.innerHTML = '<li class="pf-cn-rivals-empty">' + msg + '</li>';
     return;
   }
@@ -1169,7 +1169,7 @@ function escapeHtmlMaybe(s) {
 }
 
 // ---------------------------------------------------------------------------
-// CATEGORY CONTEXT — focal picker, client-side scatter render, hover tooltip
+// CATEGORY CONTEXT: focal picker, client-side scatter render, hover tooltip
 // ---------------------------------------------------------------------------
 
 function pfClLoadData() {
@@ -1185,7 +1185,7 @@ function pfClInit() {
 
   // If the JSON payload didn't render (e.g. older R session, no per-cat
   // data), bail BEFORE doing anything that would replace the chart's
-  // server-rendered SVG. The page still works — just without the
+  // server-rendered SVG. The page still works, just without the
   // dynamic focal switching + tooltips.
   var data = pfClLoadData();
   if (!data || !data.cats || Object.keys(data.cats).length === 0) {
@@ -1199,7 +1199,7 @@ function pfClInit() {
     sel.addEventListener('change', function () { pfBroadcastFocal(sel.value); });
   }
 
-  // Axis range inputs — re-render the scatter on input/change. Reset
+  // Axis range inputs: re-render the scatter on input/change. Reset
   // buttons clear the inputs (auto values). Mirrors the MA Advantage /
   // Metrics pattern.
   pfBindRangeInputs(section, 'pf-cl-xrange',
@@ -1207,7 +1207,7 @@ function pfClInit() {
   pfBindRangeInputs(section, 'pf-cl-yrange',
     function () { pfClRerenderCurrentFocal(); });
 
-  // Category chips — toggle which dots appear on the chart. State is
+  // Category chips: toggle which dots appear on the chart. State is
   // read by pfClSetFocal so it survives focal switches.
   section.querySelectorAll('.pf-cl-cat-chip').forEach(function (chip) {
     chip.addEventListener('click', function () {
@@ -1235,7 +1235,7 @@ function pfClInit() {
   if (initial) pfClSetFocal(initial);
 }
 
-// Read the active set of category codes from the chip row — used to
+// Read the active set of category codes from the chip row, used to
 // filter which dots get drawn. When no chips are off, returns null
 // (meaning "show all"); otherwise returns a Set of active codes.
 function pfClActiveCats() {
@@ -1288,7 +1288,7 @@ function pfClSetFocal(focalCode) {
   }
 }
 
-// Look up the focal brand's display label across the per-cat payload —
+// Look up the focal brand's display label across the per-cat payload,
 // first cat with a label for this code wins.
 function pfClFocalLabel(data, focalCode) {
   if (!data || !data.cats || !focalCode) return focalCode;
@@ -1301,7 +1301,7 @@ function pfClFocalLabel(data, focalCode) {
 }
 
 // Number of categories the focal brand is measured in vs total
-// categories in the data — drives the "N of M" coverage note.
+// categories in the data, drives the "N of M" coverage note.
 function pfClRenderCoverageNote(data, focalCode) {
   var note = document.getElementById('pf-cl-coverage');
   if (!note) return;
@@ -1320,7 +1320,7 @@ function pfClRenderCoverageNote(data, focalCode) {
     ' in the brand list are excluded from the chart and table.';
 }
 
-// Client-side context table — rebuilt on every focal change so the
+// Client-side context table: rebuilt on every focal change so the
 // numbers always match the chart. Style mirrors the Overview Category
 // detail table (dark navy header, lowercase, sortable affordance).
 function pfClRenderTable(rows, focalCode, data) {
@@ -1340,12 +1340,12 @@ function pfClRenderTable(rows, focalCode, data) {
 
   // "Focal awareness" (% of cat buyers aware of focal) is shown next
   // to "Focal share" (focal's slice of the total awareness pie) so the
-  // user sees both metrics side by side — the two numbers can look very
+  // user sees both metrics side by side. The two numbers can look very
   // different, which is the source of the confusion vs the Overview tab.
   var head = '<thead><tr>' +
     '<th class="pf-cl-th-cat">Category</th>' +
     '<th class="pf-cl-th-num" title="Mean number of brands a category buyer is aware of (clutter measure)">Avg brands known</th>' +
-    '<th class="pf-cl-th-num" title="% of category buyers aware of the focal brand — same metric the Overview tab uses">Focal awareness</th>' +
+    '<th class="pf-cl-th-num" title="% of category buyers aware of the focal brand, same metric the Overview tab uses">Focal awareness</th>' +
     '<th class="pf-cl-th-num" title="Focal’s slice of total brand-awareness mentions in the category (= focal awareness ÷ sum of every brand’s awareness)">Focal share of awareness</th>' +
     '<th class="pf-cl-th-num">Cat. penetration</th>' +
     '<th class="pf-cl-th-cat">Quadrant</th>' +
@@ -1355,17 +1355,17 @@ function pfClRenderTable(rows, focalCode, data) {
     return '<tr>' +
       '<td class="pf-cl-td-cat">' + pfClEsc(r.cat_label) + '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.set_size_mean == null ? '—' : Number(r.set_size_mean).toFixed(1)) +
+        (r.set_size_mean == null ? 'n/a' : Number(r.set_size_mean).toFixed(1)) +
         '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.focal_pct == null ? '—' : Math.round(r.focal_pct) + '%') + '</td>' +
+        (r.focal_pct == null ? 'n/a' : Math.round(r.focal_pct) + '%') + '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.focal_share == null ? '—' :
+        (r.focal_share == null ? 'n/a' :
           Math.round(r.focal_share * 100) + '%') + '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.cat_penetration == null ? '—' :
+        (r.cat_penetration == null ? 'n/a' :
           Math.round(r.cat_penetration * 100) + '%') + '</td>' +
-      '<td class="pf-cl-td-cat">' + pfClEsc(r.quadrant || '—') + '</td>' +
+      '<td class="pf-cl-td-cat">' + pfClEsc(r.quadrant || 'n/a') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -1416,7 +1416,7 @@ function pfClBuildRows(data, focalCode) {
   return rows;
 }
 
-// Pure-JS port of build_scatter (R) — generates the same visual
+// Pure-JS port of build_scatter (R): generates the same visual
 // contract: title, quadrant backings, ref lines, axes + ticks, dots
 // sized by category penetration. Each <circle> carries data-pf-cl-cat
 // so the hover handler can look up the row's full metrics.
@@ -1427,7 +1427,7 @@ function pfClBuildRows(data, focalCode) {
 // produce the same anti-overlap layout as the initial render. Tries 8
 // candidate positions per point (E / NE / SE / W / NW / SW / N / S) at
 // progressively wider offsets, scoring each by overlap with other bubbles
-// and already-placed labels. Bubble positions are never moved — only labels.
+// and already-placed labels. Bubble positions are never moved, only labels.
 //
 // points: [{ svgx, svgy, r, label, isFocal }]
 // returns: [{ cx, cy, anchor, leader }] same length, same order
@@ -1573,10 +1573,10 @@ function pfClRenderScatter(rows, refX, focalColour) {
 
   // Title
   parts.push('<text x="' + ml + '" y="28" fill="#1e293b" font-size="14" ' +
-    'font-weight="700">Category context — clutter vs focal brand position</text>');
+    'font-weight="700">Category context: clutter vs focal brand position</text>');
 
   // Reference lines: vertical at ref_x (median set size), horizontal at
-  // median fair share — same convention as the R version.
+  // median fair share, same convention as the R version.
   var refY;
   var fairs = rows.map(function (r) { return r.fair_share; })
     .filter(function (v) { return v != null && isFinite(v); }).sort(function (a, b) { return a - b; });
@@ -1631,7 +1631,7 @@ function pfClRenderScatter(rows, refX, focalColour) {
   parts.push('<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph +
     '" fill="none" stroke="#e2e8f0"/>');
 
-  // Dots — radius scaled by category penetration. Two-pass placement:
+  // Dots: radius scaled by category penetration. Two-pass placement:
   // build bubble specs first, then run collision-aware label placement
   // so categories sharing coordinates don't end up with stacked labels.
   var maxPen = Math.max.apply(null, rows.map(function (r) {
@@ -1689,7 +1689,7 @@ function pfClRenderScatter(rows, refX, focalColour) {
     'aria-label="Category context scatter">' + parts.join('') + '</svg>';
 }
 
-// Round-friendly tick generation — emulates pretty() coarsely.
+// Round-friendly tick generation: emulates pretty() coarsely.
 function pfClPretty(lo, hi, n) {
   var range = hi - lo;
   if (!(range > 0)) return [lo];
@@ -1705,7 +1705,7 @@ function pfClPretty(lo, hi, n) {
 }
 
 function pfClFormatNum(v, d) {
-  if (v == null || !isFinite(v)) return '—';
+  if (v == null || !isFinite(v)) return 'n/a';
   return Number(v).toFixed(d);
 }
 function pfClTrunc(s, n) {
@@ -1719,7 +1719,7 @@ function pfClEsc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Hover tooltip — reuses the same floating <div> pattern as the
+// Hover tooltip: reuses the same floating <div> pattern as the
 // constellation tab, but builds a multi-line message about the cat.
 function pfClBindHoverTooltips(section) {
   section.addEventListener('mouseover', function (ev) {
@@ -1776,7 +1776,7 @@ function pfClFormatTooltip(catCode, focalCode) {
 }
 
 // ---------------------------------------------------------------------------
-// EXTENSION — focal picker, client-side strength bubble + extension table
+// EXTENSION: focal picker, client-side strength bubble + extension table
 // ---------------------------------------------------------------------------
 
 function pfExLoadData() {
@@ -1799,7 +1799,7 @@ function pfExInit() {
     sel.addEventListener('change', function () { pfBroadcastFocal(sel.value); });
   }
 
-  // Axis range inputs — re-render the strength scatter on edit / reset.
+  // Axis range inputs: re-render the strength scatter on edit / reset.
   pfBindRangeInputs(section, 'pf-ex-xrange',
     function () { pfExRerenderCurrentFocal(); });
   pfBindRangeInputs(section, 'pf-ex-yrange',
@@ -1857,7 +1857,7 @@ function pfExBrandLabel(data, code) {
 function pfExRenderStrength(bubbles, focalColour, brandLabel) {
   if (!bubbles || bubbles.length === 0) {
     return '<p class="pf-ex-empty">No strength-map data for ' +
-      pfClEsc(brandLabel) + ' — the brand is not measured in any qualifying category.</p>';
+      pfClEsc(brandLabel) + ': the brand is not measured in any qualifying category.</p>';
   }
 
   var w = 560, h = 460;
@@ -1888,7 +1888,7 @@ function pfExRenderStrength(bubbles, focalColour, brandLabel) {
 
   var parts = [];
   parts.push('<text x="' + ml + '" y="28" fill="#1e293b" font-size="14" font-weight="700">' +
-    'Portfolio strength — ' + pfClEsc(brandLabel) + '</text>');
+    'Portfolio strength: ' + pfClEsc(brandLabel) + '</text>');
 
   // Diagonal "y = x" reference (where awareness == cat penetration).
   parts.push('<line x1="' + sx(0) + '" y1="' + sy(0) + '" x2="' + sx(Math.min(xMax, yMax)) +
@@ -1916,7 +1916,7 @@ function pfExRenderStrength(bubbles, focalColour, brandLabel) {
   parts.push('<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph +
     '" fill="none" stroke="#e2e8f0"/>');
 
-  // Bubbles — collision-aware label placement (same algorithm as the
+  // Bubbles: collision-aware label placement (same algorithm as the
   // clutter scatter). Build bubble specs first, then place labels.
   // Out-of-range bubbles are dropped so custom axis zooms render cleanly.
   var exDots = [];
@@ -1969,7 +1969,7 @@ function pfExRenderTable(ext, brandLabel) {
   if (rows.length === 0) {
     return '<div class="pf-ex-empty">' +
       '<p><strong>No extension lift data for ' + pfClEsc(brandLabel) + '.</strong></p>' +
-      '<p>Permission-to-extend analysis needs cross-category awareness data — ' +
+      '<p>Permission-to-extend analysis needs cross-category awareness data: ' +
       'the questionnaire has to ask whether buyers in <em>other</em> categories are aware of ' +
       pfClEsc(brandLabel) + '. ' +
       'For this brand the questionnaire didn’t collect that data, so there are no extension ' +
@@ -1987,11 +1987,11 @@ function pfExRenderTable(ext, brandLabel) {
   // cross-cat awareness is limited to its home category. Show the home
   // row plus an explanation of why there's nothing to extend INTO.
   if (nonHome.length === 0) {
-    var homeLabel = homeRow ? (homeRow.cat_label || homeRow.cat) : (homeCat || '—');
+    var homeLabel = homeRow ? (homeRow.cat_label || homeRow.cat) : (homeCat || 'n/a');
     return '<div class="pf-ex-empty">' +
       '<p><strong>' + pfClEsc(brandLabel) + ' is only measured in 1 category (' +
       pfClEsc(homeLabel) + ').</strong></p>' +
-      '<p>Permission-to-extend ranks <em>other</em> categories by their awareness lift for the focal brand — ' +
+      '<p>Permission-to-extend ranks <em>other</em> categories by their awareness lift for the focal brand: ' +
       'so it needs at least one non-home category with cross-category awareness data. ' +
       'For ' + pfClEsc(brandLabel) + ', the questionnaire didn’t ask buyers of other categories whether they’re aware of this brand, ' +
       'so there are no extension targets to score.</p>' +
@@ -2015,12 +2015,12 @@ function pfExRenderTable(ext, brandLabel) {
   var body = rendered.map(function (r) {
     var rowCls = r.is_home ? ' class="pf-ex-row-home"' : '';
     var lbl = pfClEsc(r.cat_label || r.cat);
-    var n   = r.n_buyers_uw == null ? '—' :
+    var n   = r.n_buyers_uw == null ? 'n/a' :
                 Number(r.n_buyers_uw).toLocaleString('en-US');
-    var aw  = (r.focal_aware_pct == null || isNaN(r.focal_aware_pct)) ? '—' :
+    var aw  = (r.focal_aware_pct == null || isNaN(r.focal_aware_pct)) ? 'n/a' :
                 (Math.round(r.focal_aware_pct) + '%');
     var lift = r.is_home ? '<span class="pf-ex-home-tag">home</span>' :
-                ((r.lift == null || isNaN(r.lift)) ? '—' :
+                ((r.lift == null || isNaN(r.lift)) ? 'n/a' :
                   (r.low_base_flag ? Number(r.lift).toFixed(2) + ' †' :
                                       Number(r.lift).toFixed(2)));
     var sig = '';
@@ -2035,7 +2035,7 @@ function pfExRenderTable(ext, brandLabel) {
       '<td class="pf-ex-td-num pf-ex-td-sig">' + sig + '</td></tr>';
   }).join('');
 
-  // Baseline + formula caption — repeated above the table so a reader
+  // Baseline + formula caption: repeated above the table so a reader
   // who jumps straight to the numbers sees how lift was computed
   // without scrolling to the reading guide.
   var formulaNote = '<p class="pf-ex-table-note">' +
@@ -2132,15 +2132,15 @@ function pfExFormatTooltip(catCode, focalCode) {
     } else if (r.lift != null && !isNaN(r.lift)) {
       lines.push('Lift vs baseline: ' + Number(r.lift).toFixed(2) + '×');
     }
-    if (r.low_base_flag) lines.push('Low category base — interpret cautiously');
+    if (r.low_base_flag) lines.push('Low category base: interpret cautiously');
   } else if (r && r.is_home) {
-    lines.push('Home category — reference point, not an extension target');
+    lines.push('Home category: reference point, not an extension target');
   }
   return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
-// Duplication of Awareness — table hydrator
+// Duplication of Awareness: table hydrator
 // ---------------------------------------------------------------------------
 // Renders the Sharp / Ehrenberg DoA matrix beneath the constellation chart.
 // View toggle (observed / expected / deviation) and category-chip changes
@@ -2194,7 +2194,7 @@ function pfDopaHeatBg(v, focalColour, view) {
 }
 
 function pfDopaFmt(v, view) {
-  if (v == null || isNaN(v)) return '—';
+  if (v == null || isNaN(v)) return 'n/a';
   if (view === 'deviation') {
     return (v >= 0 ? '+' : '') + v.toFixed(1);
   }
@@ -2250,10 +2250,10 @@ function pfDopaBuildTable(catObj, view, focal, focalColour) {
       var bg = pfDopaHeatBg(v, focalColour, view);
       var isDiag = rRow.code === rCol.code;
       var diagCls = isDiag ? ' pf-dopa-diag' : '';
-      var txt = isDiag && view !== 'deviation' ? '—' : pfDopaFmt(v, view);
+      var txt = isDiag && view !== 'deviation' ? 'n/a' : pfDopaFmt(v, view);
       var suffix = (view === 'deviation' || isDiag) ? '' : '%';
       html.push('<td class="pf-dopa-cell' + diagCls + '" style="background:' + bg + ';">' +
-                txt + (txt === '—' ? '' : suffix) + '</td>');
+                txt + (txt === 'n/a' ? '' : suffix) + '</td>');
     });
     html.push('</tr>');
   });
@@ -2275,9 +2275,9 @@ function pfDopaRenderForCat(catCode) {
   if (!catObj) {
     host.innerHTML = '<p style="color:#94a3b8;padding:12px 0;">No Duplication of Awareness data for this category.</p>';
     var dEmpty = document.querySelector('[data-pf-dopa-d]');
-    if (dEmpty) dEmpty.textContent = '—';
+    if (dEmpty) dEmpty.textContent = 'n/a';
     var catEmpty = document.querySelector('[data-pf-dopa-cat-label]');
-    if (catEmpty) catEmpty.textContent = '—';
+    if (catEmpty) catEmpty.textContent = 'n/a';
     PF_DOPA_STATE.cat = catCode;
     return;
   }
@@ -2288,7 +2288,7 @@ function pfDopaRenderForCat(catCode) {
 
   var dEl = document.querySelector('[data-pf-dopa-d]');
   if (dEl) dEl.textContent = (catObj.D != null && !isNaN(catObj.D))
-    ? Number(catObj.D).toFixed(3) : '—';
+    ? Number(catObj.D).toFixed(3) : 'n/a';
   var catEl = document.querySelector('[data-pf-dopa-cat-label]');
   if (catEl) catEl.textContent = catObj.cat_label || catCode;
 }

@@ -2,9 +2,9 @@
 # BRAND MODULE - BRANDED REACH PANEL HTML RENDERER
 # ==============================================================================
 # Emits the Branded Reach tab's HTML fragment. Three internal sub-tabs:
-#   1) Overview      — per-ad reach / branded reach / branding %
-#   2) Misattribution — per-ad table of brand attribution among seen
-#   3) Media mix     — per-ad table of channel mix among seen
+#   1) Overview: per-ad reach / branded reach / branding %
+#   2) Misattribution, per-ad table of brand attribution among seen
+#   3) Media mix: per-ad table of channel mix among seen
 #
 # Each sub-tab renders a card per ad. Cards include the ad's image
 # (config$image_path resolves relative to the report's directory).
@@ -231,7 +231,7 @@ build_branded_reach_panel_html <- function(panel_data,
 
   sprintf(
     '<section class="br-reach-subtab" data-br-reach-tab="media" hidden>
-       <p class="br-reach-blurb">Of respondents who said they saw each ad, where did they say they saw it? Multi-mention — totals exceed 100%%.</p>
+       <p class="br-reach-blurb">Of respondents who said they saw each ad, where did they say they saw it? Multi-mention, totals exceed 100%%.</p>
        <div class="br-reach-card-grid">%s</div>
      </section>', cards)
 }
@@ -368,12 +368,12 @@ build_branded_reach_panel_html <- function(panel_data,
 # ==============================================================================
 
 .br_reach_pct <- function(v, dp) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="br-reach-na">—</span>')
+  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="br-reach-na">n/a</span>')
   sprintf("%.*f%%", as.integer(dp), 100 * v)
 }
 
 .br_reach_int <- function(v) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("—")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
   sprintf("%d", as.integer(round(v)))
 }
 
@@ -387,7 +387,7 @@ build_branded_reach_panel_html <- function(panel_data,
 
 .br_reach_card_toolbar <- function(section_id) {
   # Per-card pin + PNG buttons. Onclick handlers call the existing
-  # window.brTogglePin / window.brExportPng wired by brand_pins.js — they
+  # window.brTogglePin / window.brExportPng wired by brand_pins.js, they
   # find the section via [data-section] / id="section-<sid>".
   sprintf(
     '<div class="br-reach-card-toolbar" data-section="%s">
@@ -466,7 +466,7 @@ build_branded_reach_panel_styles <- function(focal_colour = "#1A5276") {
 .br-reach-card-title  { font-weight: 600; font-size: 14px; color:#0f172a; margin: 0; line-height: 1.3; }
 .br-reach-card-sub    { font-size: 11px; color:#64748b; margin-top: 4px; }
 
-/* Per-card pin + PNG toolbar — small, top-right, dimmed until card hover */
+/* Per-card pin + PNG toolbar: small, top-right, dimmed until card hover */
 .br-reach-card-toolbar { display: flex; gap: 4px; flex-shrink: 0; opacity: .35; transition: opacity .15s; }
 .br-reach-card:hover .br-reach-card-toolbar,
 .br-reach-card-toolbar:focus-within { opacity: 1; }
@@ -484,7 +484,7 @@ build_branded_reach_panel_styles <- function(focal_colour = "#1A5276") {
 .br-reach-img-placeholder svg { width:80px; height:60px; display:block; }
 .br-reach-img-placeholder-label { font-size:11px; letter-spacing:0.6px; text-transform:uppercase; font-weight:600; color:#9c9587; }
 
-/* Auto-generated insight strip — chips above the sub-tab content */
+/* Auto-generated insight strip: chips above the sub-tab content */
 .br-reach-insight-strip {
   margin: 0 0 16px;
   padding: 12px 14px;
