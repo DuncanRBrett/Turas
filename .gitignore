@@ -71,6 +71,11 @@ test_output/
 !**/tests/**/fixtures/**/*.html
 # Vendored v2 report shell (a source asset, not a generated report)
 !modules/tabs/lib/html_report_v2/assets/template.html
+# The Reader report's shell, the same kind of asset. Missed when the Reader was
+# added, so a fresh clone or a git worktree could not build a Reader report at
+# all: generate_reader_report() refused with IO_READER_ASSET_MISSING and the
+# only copy in existence was the one in the primary checkout.
+!modules/tabs/lib/reader_report/assets/template.html
 
 # Temporary files
 *.tmp
