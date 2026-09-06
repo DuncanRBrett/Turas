@@ -44,8 +44,8 @@ and tracker.
 | File | Committed by | What it is |
 |---|---|---|
 | `Survey_Structure_Brand_Template.xlsx` | `1c6ce548`, 2026-04-30 | A structure workbook from the IPK rebuild. Eight sheets only: `Project`, `Questions`, `Options`, `Brands`, `CEPs`, `Attributes`, `Channels`, `PackSizes`. No `MarketingReach`, `QuestionMap`, `AudienceLens` or `DBA_Assets`, so Branded Reach, Audience Lens and DBA cannot be configured from it. |
-| `Brand_Config.xlsx` | `bef06608`, 2026-04-16 | Pre-rebuild config template. |
-| `Survey_Structure.xlsx` | `bef06608`, 2026-04-16 | Pre-rebuild structure template. It describes the retired column-per-brand data shape, which the module no longer reads. |
+| `Brand_Config.xlsx` | `bef06608`, 2026-04-16 | A config workbook from before the IPK rebuild. Three sheets: `Settings`, `Categories`, `DBA_Assets`. |
+| `Survey_Structure.xlsx` | `bef06608`, 2026-04-16 | A structure workbook from before the IPK rebuild. Seven sheets: `Project`, `Questions`, `Options`, `Brands`, `CEPs`, `Attributes`, `DBA_Assets`. |
 
 Do not start a new project from any of the three. They are kept only
 because nothing has decided to remove them. Their removal is a call for
