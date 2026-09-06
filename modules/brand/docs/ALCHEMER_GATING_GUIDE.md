@@ -41,9 +41,12 @@ Show `BRANDATT1_{CAT}_{BRAND}` only to respondents who selected that brand in
 no scripting.
 
 Asking someone how they feel about a brand they have just told you they do
-not know produces an answer, and the answer is noise. Gating it also removes
-the largest single source of impossible rows: on the IPK 2026 shape, this one
-question accounts for most of them.
+not know produces an answer, and the answer is noise.
+
+It is also the question that breaks the funnel most easily, because it is
+asked once per brand rather than once per category: on a fifteen-brand
+category every respondent answers it fifteen times, and only the brands they
+named are safe.
 
 ### 2. Gate the longer purchase window on awareness
 

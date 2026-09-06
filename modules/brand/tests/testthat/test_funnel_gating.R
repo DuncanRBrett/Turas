@@ -230,7 +230,7 @@ test_that("An ungated instrument reports ungated and names the stages", {
   expect_true(any(c("bought_long", "bought_target") %in% g$breach_stages))
   expect_true(grepl("did not route these questions", g$statement,
                     fixed = TRUE))
-  expect_true(grepl("nested funnel view is not available", g$statement,
+  expect_true(grepl("nested funnel view is not offered", g$statement,
                     fixed = TRUE))
 })
 
@@ -305,6 +305,36 @@ test_that("The statement is on the face of the report in both modes", {
   expect_true(grepl("Separate measures", ungated_html, fixed = TRUE))
   expect_true(grepl("did not route these questions", ungated_html,
                     fixed = TRUE))
+})
+
+
+test_that("The statement describes each kind of breach in its own terms", {
+  st <- .gt_run("ungated")$meta$gating$statement
+  # The ungated fixture breaches all three ways. An awareness breach and a
+  # purchase-window breach are different facts and must not share a phrase.
+  expect_true(grepl(
+    "an answer at the Consider stage for a brand they did not name as known",
+    st, fixed = TRUE))
+  expect_true(grepl(
+    "a purchase in the shorter window without one in the longer window",
+    st, fixed = TRUE))
+  # The stage names read as names, not as lowercased fragments.
+  expect_false(grepl("reached consider", st, fixed = TRUE))
+  expect_false(grepl(" consider for brands", st, fixed = TRUE))
+  # The ratios are behind the base toggle, not printed beside the figures.
+  expect_true(grepl("available through the base toggle above the table", st,
+                    fixed = TRUE))
+  expect_false(grepl("beside them", st, fixed = TRUE))
+})
+
+
+test_that("A lone awareness breach does not mention purchase windows", {
+  data <- .gt_data("gated")
+  data$BRANDATT1_DSS_IPK[5] <- "1"
+  st <- run_funnel(data, .gt_role_map(), .gt_brands(),
+                   .gt_cfg())$meta$gating$statement
+  expect_true(grepl("did not name as known", st, fixed = TRUE))
+  expect_false(grepl("shorter window", st, fixed = TRUE))
 })
 
 

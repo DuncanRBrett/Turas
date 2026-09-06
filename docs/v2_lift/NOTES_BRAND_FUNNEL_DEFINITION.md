@@ -443,7 +443,7 @@ spec now makes the reader choose rather than defaulting them into one.
 
 | Gate | Result |
 |---|---|
-| Brand suite, repo root | FAIL 0, WARN 1, SKIP 2, **PASS 3360** (baseline 3247) |
+| Brand suite, repo root | FAIL 0, WARN 1, SKIP 2, **PASS 3368** (baseline 3247) |
 | Node gate suite | 23, 40 and 116 assertions, 0 failed |
 | `drive_funnel_base.py` | 99 gated, 79 ungated, 0 failed |
 | `drive_overview.py` | 60 gated, 58 ungated, 0 failed |
@@ -477,3 +477,53 @@ The one WARN and the two SKIPs are the baseline's, unchanged.
 
 **Not merged and not pushed.** Branch `fix/brand-funnel-consideration`, four
 commits on top of 088736c9.
+
+---
+
+## Stage 5: two corrections found by reading the rendered page
+
+An independent read of the work caught two things the tests did not, both in
+text that reaches the reader.
+
+**The ungated statement was not English, and it misdescribed two of the three
+breach kinds.** It read "Respondents reached consider for brands they did not
+name as known", from lowercasing the stage label, and it applied the
+awareness wording to every breach including the purchase-window one, where it
+is simply untrue. The sentence is now built from each breach's own pair, so an
+awareness breach reads "an answer at the Consider stage for a brand they did
+not name as known" and a window breach reads "a purchase in the shorter window
+without one in the longer window". The stage names keep their own case, and
+the labels are the built-in ones rather than the project's overrides, because
+the overrides carry the timeframe and the sentence has to stay digit free.
+Two testthat cases now hold the wording, one on a fixture that breaches all
+three ways and one on a fixture that breaches only against awareness. Verified
+by reading `fn-gating-text` out of the regenerated report, not by reading the
+diff.
+
+The same pass corrected "with the conversion ratios beside them", which was
+wrong about where they are: they are behind the base toggle.
+
+**A fabricated figure in the guidance was removed.** Rule 1 of
+ALCHEMER_GATING_GUIDE.md claimed that on the IPK 2026 shape the attitude
+question accounts for most impossible rows. Nothing in this session measured
+that: the real IPK config was never run, and on the scratch fixture attitude
+was the only ungated question by construction. Replaced with the structural
+reason, which is checkable: the attitude question is asked once per brand
+rather than once per category, so it has the most chances to produce an
+impossible row.
+
+Re-verified after the fix: brand suite **FAIL 0, WARN 1, SKIP 2, PASS 3368**;
+node gates 23, 40 and 116, 0 failed; both reports regenerated; the five drive
+scripts unchanged at 99/79, 60/58, 353/353, 15/15, 113/113 with 0 failed; and
+`reachability_check.py` still PASS with islands numerically identical.
+
+## Noted, not fixed
+
+- The Excel metadata sheet does not carry the gating mode. The base line in
+  the Excel export does name the view it was taken in, and the QA gate checks
+  it, but a reader opening the workbook alone cannot see which mode the report
+  was in.
+- FUNNEL_SPEC_v2.md section 2 still lists "**Nested-funnel derivation**: every
+  stage is a subset of the previous" in its v1 scope list. That has been wrong
+  since 2026-05-24 and is untouched here; section 3.4 now describes what
+  actually happens.

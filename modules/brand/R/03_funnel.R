@@ -261,10 +261,35 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
 }
 
 
-#' Stage labels used in the gating sentence, without the report's overrides
+#' Stage labels used in the gating sentence
+#'
+#' The built-in labels in their own case, not the project's overrides. The
+#' overrides carry the timeframe ("Past 12 months") and this sentence has to
+#' stay digit free, because it rides in a JSON island the reachability gate
+#' compares on numeric content.
 #' @keywords internal
 .funnel_plain_stage_label <- function(key) {
-  tolower(.FUNNEL_DEFAULT_LABELS[[key]] %||% key)
+  .FUNNEL_DEFAULT_LABELS[[key]] %||% key
+}
+
+
+#' Describe one kind of gating breach, in the reader's terms
+#'
+#' A breach against awareness and a breach of the shorter purchase window
+#' against the longer one are different facts and cannot share a sentence.
+#' @keywords internal
+.funnel_breach_phrase <- function(stage_key, against_key) {
+  stage <- .funnel_plain_stage_label(stage_key)
+  if (identical(against_key, "aware")) {
+    return(sprintf("an answer at the %s stage for a brand they did not name as known",
+                   stage))
+  }
+  if (identical(stage_key, "bought_target") &&
+      identical(against_key, "bought_long")) {
+    return("a purchase in the shorter window without one in the longer window")
+  }
+  sprintf("the %s stage without the %s stage before it",
+          stage, .funnel_plain_stage_label(against_key))
 }
 
 
@@ -283,17 +308,23 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
       "funnel is drawn as a funnel. No respondent reached a later stage",
       "without the one before it."))
   }
-  stages <- unique(gating$breaches$stage_key)
-  labels <- paste(vapply(stages, .funnel_plain_stage_label, character(1)),
-                  collapse = " and ")
+  b <- gating$breaches
+  pairs <- unique(b[, c("stage_key", "against")])
+  phrases <- vapply(seq_len(nrow(pairs)), function(i) {
+    .funnel_breach_phrase(pairs$stage_key[i], pairs$against[i])
+  }, character(1))
+  phrases <- unique(phrases)
+  listed <- if (length(phrases) == 1) phrases else
+    paste0(paste(phrases[-length(phrases)], collapse = "; "),
+           "; and ", phrases[length(phrases)])
   paste0(
     "The questionnaire did not route these questions: it asked every one of ",
-    "them about every brand. Respondents reached ", labels, " for brands ",
-    "they did not name as known, which routing would have made impossible. ",
-    "So the stages are reported as separate measures, each on its own base, ",
-    "with the conversion ratios beside them. The nested funnel view is not ",
-    "available here, because a nested picture would show an ordering the ",
-    "survey never enforced.")
+    "them about every brand. Respondents gave ", listed,
+    ", which routing would have made impossible. So the stages are reported ",
+    "as separate measures, each on its own base, with the conversion ratios ",
+    "available through the base toggle above the table. The nested funnel ",
+    "view is not offered here, because a nested picture would show an ",
+    "ordering the survey never enforced.")
 }
 
 
