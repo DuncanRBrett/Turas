@@ -78,15 +78,28 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # Stage definitions: shown as clickable ? popovers in the HTML report
 # and exported to the About drawer / Excel metadata sheet. Operator can
 # override per project via config$funnel.stage_definitions.
+#
+# Each definition describes ONE stage's own survey response, because that
+# is the only thing true in every view of the table. The stages are
+# derived independently (see derive_funnel_stages below: the aggregate
+# funnel does not AND a stage into the next), and the base toggle above
+# the table is what decides whether the stages are combined and how. Text
+# that claimed a stage was gated on an earlier one described the nested
+# view only, and contradicted the figures the absolute view puts beside
+# it. Corrected 2026-09-06.
+#
+# Keep these strings free of digits: the reachability gate compares the
+# numeric content of every JSON island, and a definition rides in the
+# funnel payload.
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
-  consideration      = "Aware respondents who actively prefer the brand: Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
-  bought_long        = "Those who prefer the brand and have bought it in the longer timeframe asked on the survey.",
-  bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
-  current_owner_d    = "Those who prefer the brand and currently own it in the category.",
-  long_tenured_d     = "Current owners whose tenure meets or exceeds the configured tenure threshold.",
-  current_customer_s = "Those who prefer the brand and are current customers.",
-  long_tenured_s     = "Current customers whose tenure meets or exceeds the configured tenure threshold."
+  consideration      = "Respondents who actively prefer the brand on the attitude question: Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. The attitude question is asked about every brand, whether or not the respondent named it as known, so this stage is measured on its own and is not gated on awareness. The base toggle above the table sets whether the stages are combined. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
+  bought_long        = "Respondents who say they bought the brand in the longer timeframe asked on the survey. The purchase question is asked about every brand, so this stage is measured on its own and is not gated on awareness or preference. The base toggle above the table sets whether the stages are combined.",
+  bought_target      = "Respondents who say they bought the brand in the target (shorter) timeframe asked on the survey. Measured on its own, and not gated on awareness, on preference, or on the longer timeframe. The base toggle above the table sets whether the stages are combined.",
+  current_owner_d    = "Respondents who name the brand as the one they currently own in the category. Measured on its own, and not gated on awareness or preference. The base toggle above the table sets whether the stages are combined.",
+  long_tenured_d     = "Current owners of the brand whose tenure meets or exceeds the configured tenure threshold. This stage is gated on current ownership of the brand, and not on awareness or preference. The base toggle above the table sets whether the stages are combined.",
+  current_customer_s = "Respondents who name the brand as the one they are currently a customer of. Measured on its own, and not gated on awareness or preference. The base toggle above the table sets whether the stages are combined.",
+  long_tenured_s     = "Current customers of the brand whose tenure meets or exceeds the configured tenure threshold. This stage is gated on being a current customer of the brand, and not on awareness or preference. The base toggle above the table sets whether the stages are combined."
 )
 
 # Positive attitude role set used as the Consider membership gate when the
@@ -106,10 +119,13 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 #' Derive per-respondent × per-brand logical matrices for every funnel stage
 #'
 #' Walks the ordered stage list for the category type, computing a matrix
-#' (rows = respondents, cols = brands) for each stage. Every stage after
-#' the first ANDs the previous stage's matrix, so nesting is guaranteed by
-#' construction. Stages whose required role is absent from the role map
-#' are dropped silently with a warning recorded in the return value.
+#' (rows = respondents, cols = brands) for each stage. Each stage carries
+#' its own survey response and is NOT ANDed into the next: the aggregate
+#' funnel reports non-monotonic answers as recorded (see the comment in the
+#' loop below, and validate_nesting()). The cumulative chain that the
+#' nested views read is computed downstream in calculate_stage_metrics().
+#' Stages whose required role is absent from the role map are dropped
+#' silently with a warning recorded in the return value.
 #'
 #' @param data Data frame. Survey data (one row per respondent).
 #' @param role_map Named list from load_role_map().
@@ -205,18 +221,20 @@ derive_funnel_stages <- function(data, role_map, category_type,
 # PUBLIC: validate_nesting
 # ==============================================================================
 
-#' Validate that every stage is a subset of the previous
+#' Check whether each stage's aggregate count sits inside the previous one
 #'
-#' Refuses loud with CALC_NESTING_VIOLATED on any (brand, stage) cell where
-#' the count exceeds the previous stage's count. The derivation ANDs each
-#' stage into the next by construction, so a violation indicates a logic
-#' bug, never operator error.
+#' The stages are derived independently, so this is a genuine post-hoc
+#' check on the data rather than a tautology: a brand whose count rises
+#' between two stages has non-monotonic survey answers, which is an
+#' operator-visible data fact, not a logic bug. It is reported as a
+#' warning; nothing is clamped and nothing refuses (see the v3 note in the
+#' body).
 #'
 #' @param stages Named list from derive_funnel_stages()$stages.
 #' @param weights Numeric vector of respondent weights, or NULL.
 #'
-#' @return TRUE invisibly when the invariant holds. Otherwise throws a TRS
-#'   refusal.
+#' @return Invisibly, a list with \code{ok} (logical) and \code{warnings}
+#'   (character vector, one line per non-monotonic brand and stage).
 #'
 #' @export
 validate_nesting <- function(stages, weights = NULL) {
