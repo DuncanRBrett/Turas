@@ -389,8 +389,18 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .ma_metrics_charts <- function(pd) {
+  # Chart brands: one control for the two Metrics charts, because they share
+  # one chart-only set. Both read __maSelector.getHiddenChart(), and the
+  # brand metrics table beside them reads the table set, so a brand can be
+  # dropped from the bubbles and the bars while its row stays in the table.
+  # The mount and the note sit above the pair, in the parent both wraps
+  # share, because noteFor() looks for the note beside its mount.
+  # Guarded because the panel tests source this file alone.
+  chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control("metrics") else ""
   paste0(
     '<div class="ma-metrics-charts">',
+    chart_focus,
 
     # --- Scatter: MPen × NS (Double Jeopardy) --------------------------------
     '<div class="ma-scatter-wrap" data-ma-chart-id="scatter">',

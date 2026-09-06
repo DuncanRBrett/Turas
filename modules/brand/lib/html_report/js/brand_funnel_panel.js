@@ -567,7 +567,10 @@
     if (panel.__fnAttitudeSelector) {
       panel.__fnAttitudeSelector.setFocal(code);
       panel.__fnAttitudeSelector.showBrand(code);
+      // Both sets: a chart without the focal brand is a category chart, and
+      // the Chart brands control locks the focal box on for the same reason.
       panel.__fnState.relHiddenBrands.delete(code);
+      relChartHidden(panel).delete(code);
     }
 
     // Rebuild cards against the new focal, update title, repaint chart + mini funnels
@@ -673,8 +676,34 @@
   // ---------------------------------------------------------------------------
   // Chip toggles: scope = "table" or "chart"
   // ---------------------------------------------------------------------------
+  // The relationship view's two hidden-brand sets. The table rows and the
+  // Excel export read relHiddenBrands; the stacked-bar chart and its
+  // headline read relHiddenBrandsChart. Outside a Chart brands deviation the
+  // two hold the same codes, because every published header set writes both.
+  // Before this the view was unified and the chart followed the table, which
+  // is why Brand Attitude was the one narrowing leaf with no split.
+  function relChartHidden(panel) {
+    if (!panel.__fnState.relHiddenBrandsChart) {
+      panel.__fnState.relHiddenBrandsChart =
+        new Set(panel.__fnState.relHiddenBrands || []);
+    }
+    return panel.__fnState.relHiddenBrandsChart;
+  }
+
+  // The category average is a pseudo brand governed by its own Cat avg chip,
+  // not by the brand set, so it is carried across whenever either set is
+  // rewritten.
+  function relSetHidden(panel, which, hiddenSet) {
+    var key = which === "chart" ? "relHiddenBrandsChart" : "relHiddenBrands";
+    var keepAvg = !!(panel.__fnState[key] && panel.__fnState[key].has("__avg__"));
+    var next = new Set(hiddenSet);
+    if (keepAvg) next.add("__avg__");
+    panel.__fnState[key] = next;
+  }
+
   // BrandSelector dropdown for the Brand Attitude (relationship) sub-tab.
-  // Unified mode: the relationship view doesn't split table/chart selection.
+  // Split mode: the chart can show fewer brands than the table beside it,
+  // which is what the Chart brands control drives through setHiddenChart().
   function bindFunnelAttitudeBrandSelector(panel) {
     if (typeof window.BrandSelector === "undefined") return;
     var trigger = panel.querySelector('.bs-trigger[data-bs-panel="fn-attitude"]');
@@ -695,6 +724,8 @@
     });
     var initialHidden = Array.from(panel.__fnState.relHiddenBrands).filter(
       function (c) { return c !== "__avg__"; });
+    var initialHiddenChart = Array.from(relChartHidden(panel)).filter(
+      function (c) { return c !== "__avg__"; });
     // panelId MUST be unique per panel instance. REGISTRY is keyed by panelId,
     // and a duplicate key from a sibling category panel would overwrite this
     // state and make closeAll() unable to find the open popover. The panel's
@@ -704,19 +735,31 @@
       categoryKey:   fnCategoryKey(panel),
       triggerEl:     trigger,
       anchorEl:      trigger.parentElement,
-      brands:        brandList,
-      mode:          "unified",
-      initialHidden: initialHidden,
-      onChange: function (hiddenSet) {
-        var avgState = panel.__fnState.relHiddenBrands.has("__avg__");
-        var newHidden = new Set(hiddenSet);
-        if (avgState) newHidden.add("__avg__");
-        panel.__fnState.relHiddenBrands = newHidden;
-        applyRelBrandVis(panel);
-        buildRelChart(panel);
-        updateRelHeadline(panel);
+      brands:             brandList,
+      mode:               "split",
+      syncDefault:        true,
+      initialHidden:      initialHidden,
+      initialHiddenChart: initialHiddenChart,
+      onChange: function (hiddenSet, scope) {
+        if (scope === "all" || scope === "table") {
+          relSetHidden(panel, "table", hiddenSet);
+          applyRelBrandVis(panel);
+        }
+        if (scope === "all" || scope === "chart") {
+          relSetHidden(panel, "chart", hiddenSet);
+          buildRelChart(panel);
+          updateRelHeadline(panel);
+        }
       }
     });
+    // The "Chart brands" control finds its handle by walking up from its
+    // mount to the first element carrying __brChartSelector. It is put on
+    // the relationship sub-tab div, not on the panel root: when a report is
+    // rendered without the Stage 2 split, one .fn-panel carries both the
+    // funnel and the relationship view, and the panel root already holds the
+    // funnel's own handle. Scoping it here keeps each chart on its own set.
+    var relTab = panel.querySelector('.fn-subtab[data-fn-subtab="relationship"]');
+    if (relTab) relTab.__brChartSelector = panel.__fnAttitudeSelector;
   }
 
   // BrandSelector dropdown (split mode: drives both table-row and chart-series
@@ -781,10 +824,12 @@
         // reads relHiddenBrands and stays at focal-only.
         if (scope === "all" || scope === "table") {
           if (!panel.__fnState.relHiddenBrands) panel.__fnState.relHiddenBrands = new Set();
-          var keepAvgHidden = panel.__fnState.relHiddenBrands.has("__avg__");
-          var newRelHidden = new Set(hiddenSet);
-          if (keepAvgHidden) newRelHidden.add("__avg__");
-          panel.__fnState.relHiddenBrands = newRelHidden;
+          // Both relationship sets, because this is a table-side change
+          // arriving from another control and the relationship chart is not
+          // deviating from it. Its own Chart brands control narrows it
+          // afterwards if the reader asks.
+          relSetHidden(panel, "table", hiddenSet);
+          relSetHidden(panel, "chart", hiddenSet);
           applyRelBrandVis(panel);
           buildRelChart(panel);
           updateRelHeadline(panel);
@@ -2292,6 +2337,12 @@
         var hasChart    = false;
         var hasTable    = false;
         var hasInsight  = false;
+        // The relationship chart is an HTML stacked-bar area, not an SVG, so
+        // it is captured through the table branch below and hasChart stays
+        // false. Tracked separately so the Chart brands clause is added when
+        // the card actually carries that chart, and not when only its table
+        // was picked.
+        var hasRelChart = false;
 
         drop.querySelectorAll(".fn-pin-chk:checked").forEach(function(chk) {
           var label = chk.parentNode.textContent.trim();
@@ -2345,6 +2396,7 @@
             }
           } else {
             // Table, Mini funnels, Relationship table/chart, AI insights
+            if (label === "Relationship chart") hasRelChart = true;
             var tbl = el.querySelector("table");
             if (tbl) {
               tableHtml += TurasPins.capturePortableHtml
@@ -2369,12 +2421,19 @@
         var baseLabel = (typeof window.brReadBaseLabel === "function")
           ? window.brReadBaseLabel(panel) : "";
 
-        // Chart brands: the funnel chart and its table travel together
-        // here, so a deviating chart is named on the card.
+        // Chart brands: a chart and its table travel together on one card
+        // here, so a deviating chart is named on it. The clause is read from
+        // the active sub-tab, not from the whole panel: a report rendered
+        // without the destination split carries the funnel note and the
+        // relationship note in one .fn-panel, and clauseFor returns the
+        // first visible one it finds.
         var fnTitle = title;
         if (typeof window.brTitleWithChartDeviation === "function") {
+          var clauseScope = panel.querySelector(
+            '.fn-subtab[data-fn-subtab="' + activeSubtab + '"]') || panel;
           fnTitle = window.brTitleWithChartDeviation(
-            fnTitle, window.brChartDeviationClause(panel), hasChart);
+            fnTitle, window.brChartDeviationClause(clauseScope),
+            hasChart || hasRelChart);
         }
         TurasPins.add({
           sectionKey:  "fn-" + Date.now(),
@@ -2426,6 +2485,9 @@
     panel.__fnState.relSortCol      = "brand";
     panel.__fnState.relSortDir      = "asc";
     panel.__fnState.relHiddenBrands = new Set();
+    // The chart's own set, which the Chart brands control narrows. Seeded
+    // alongside the table set below, so the two start in step.
+    panel.__fnState.relHiddenBrandsChart = new Set();
     panel.__fnState.relShowChart    = true;
     panel.__fnState.relShowCount    = false;
     panel.__fnState.tableShading    = "off";
@@ -2441,7 +2503,10 @@
       var allBrands = (pd && pd.relationship && pd.relationship.brand_codes)
                   || (pd && pd.table && pd.table.brand_codes) || [];
       allBrands.forEach(function (c) {
-        if (c !== focalCode) panel.__fnState.relHiddenBrands.add(c);
+        if (c !== focalCode) {
+          panel.__fnState.relHiddenBrands.add(c);
+          panel.__fnState.relHiddenBrandsChart.add(c);
+        }
       });
     }
 
@@ -2452,10 +2517,19 @@
     // Cat avg standalone chip (separate from BrandSelector per Decision 2).
     panel.querySelectorAll('button[data-fn-rel-action="toggle-avg"]').forEach(function (chip) {
       chip.addEventListener("click", function () {
+        // The category average is one control over a table row and a chart
+        // series, so it moves in both sets at once. It is not part of the
+        // brand comparison set and the Chart brands control never offers it.
         var hidden = panel.__fnState.relHiddenBrands;
+        var hiddenChart = relChartHidden(panel);
         var on = hidden.has("__avg__");
-        if (on) { hidden.delete("__avg__"); chip.classList.remove("col-chip-off"); }
-        else    { hidden.add("__avg__");    chip.classList.add("col-chip-off"); }
+        if (on) {
+          hidden.delete("__avg__"); hiddenChart.delete("__avg__");
+          chip.classList.remove("col-chip-off");
+        } else {
+          hidden.add("__avg__"); hiddenChart.add("__avg__");
+          chip.classList.add("col-chip-off");
+        }
         applyRelBrandVis(panel);
         buildRelChart(panel);
         updateRelHeadline(panel);
@@ -2637,7 +2711,8 @@
     if (!pd || !pd.consideration_detail) { container.innerHTML = ""; return; }
 
     var allBrands = pd.consideration_detail.brands || [];
-    var hidden    = panel.__fnState.relHiddenBrands || new Set();
+    // The CHART set. The table beside this chart reads relHiddenBrands.
+    var hidden    = relChartHidden(panel);
     var brands    = allBrands.filter(function(b) { return !hidden.has(b.brand_code); });
     var focal     = panel.__fnState.focal;
     var emphSet   = panel.__fnState.relEmphasisSet || new Set();
@@ -2852,7 +2927,10 @@
     var pd = panel.__fnData;
     if (!pd || !pd.consideration_detail) return;
     var allBrands = pd.consideration_detail.brands || [];
-    var hidden    = panel.__fnState.relHiddenBrands || new Set();
+    // The headline sits above the chart and describes the bars, so it reads
+    // the chart set. Reading the table set would let it name a brand the
+    // chart no longer draws.
+    var hidden    = relChartHidden(panel);
     var brands    = allBrands.filter(function(b) { return !hidden.has(b.brand_code); });
     var focal     = panel.__fnState.focal;
     var base      = panel.__fnState.relBase || "aware";

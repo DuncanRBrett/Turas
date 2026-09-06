@@ -28,10 +28,26 @@ test_that("brand_report.js mirrors textarea value into text content on input and
   # delegated listener for both input and change events
   expect_true(grepl('\\["input", "change"\\]', js))
   expect_true(grepl("initCommentaryPersistence();", js, fixed = TRUE))
-  # the save path syncs before it reads outerHTML
-  save_body <- sub(".*window._brSaveReport = function\\(\\) \\{", "", js)
-  save_body <- sub("document.documentElement.outerHTML.*", "", save_body)
-  expect_true(grepl("_brSyncAllCommentary()", save_body, fixed = TRUE))
+  # The save path syncs before it reads outerHTML. The chain gained a link
+  # when the brand controls started surviving Save too: _brSaveReport calls
+  # _brSerialiseReport, which calls _brSyncReportState, which mirrors the
+  # commentary and then the selections. The intent is unchanged and is
+  # asserted through the whole chain rather than at one hop.
+  save_body <- substr(
+    sub(".*window._brSaveReport = function\\(\\) \\{", "", js), 1, 900)
+  expect_true(grepl("_brSerialiseReport()", save_body, fixed = TRUE))
+
+  ser <- substr(
+    sub(".*window._brSerialiseReport = function\\(\\) \\{", "", js), 1, 400)
+  sync_at <- regexpr("_brSyncReportState()", ser, fixed = TRUE)
+  html_at <- regexpr("document.documentElement.outerHTML", ser, fixed = TRUE)
+  expect_gt(sync_at, 0)
+  expect_gt(html_at, 0)
+  expect_lt(sync_at, html_at)
+
+  state <- substr(
+    sub(".*window._brSyncReportState = function\\(\\) \\{", "", js), 1, 400)
+  expect_true(grepl("_brSyncAllCommentary()", state, fixed = TRUE))
 })
 
 test_that("MA and Audience Lens insight boxes no longer use browser storage", {

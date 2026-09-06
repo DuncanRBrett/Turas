@@ -1313,9 +1313,14 @@
 
     var focal = panel.__maState && panel.__maState.focal;
 
-    // Build vis map from BrandSelector hidden set (or from row-display fallback)
+    // The CHART set, not the table set. Outside a Chart brands deviation the
+    // two are identical, because applyRemoteHiddenSet writes hiddenChart
+    // from hiddenTable on every published set, so the header still governs
+    // this chart exactly as before. What changes is that a reader can now
+    // drop a brand from the Mental Space bubbles while its row stays in the
+    // metrics table beside them.
     var hiddenSet = panel.__maSelector
-      ? panel.__maSelector.getHidden() : new Set();
+      ? panel.__maSelector.getHiddenChart() : new Set();
 
     var points = (pd.metrics.table || []).filter(function (r) {
       return !hiddenSet.has(r.brand_code) && r.mpen != null && r.ns != null;
@@ -1587,8 +1592,10 @@
 
     var focal = panel.__maState && panel.__maState.focal;
 
+    // The CHART set. See the note in renderMAScatter: the two Metrics charts
+    // share one chart-only set and one Chart brands control.
     var hiddenSet = panel.__maSelector
-      ? panel.__maSelector.getHidden() : new Set();
+      ? panel.__maSelector.getHiddenChart() : new Set();
 
     // Focal first, then others by MMS desc
     var all = (pd.metrics.table || []).filter(function (r) {
@@ -2349,6 +2356,15 @@
       // to the first pinned card rather than to whichever metric the user
       // happened to tick first in the dropdown.
       var orderedKeys = ['hero', 'brandtbl', 'scatter', 'bars', 'ranking'];
+      // Only these two read the chart-only set, so only these two can be
+      // narrower than the metrics table. The hero strip, the brand metrics
+      // table and the CEP ranking cannot deviate and must not be labelled
+      // as though they could.
+      var METRICS_CHARTS = { scatter: 1, bars: 1 };
+      var metricsSubtab = panel.querySelector(
+        '.ma-subtab[data-ma-subtab="metrics"]') || panel;
+      var metricsClause = (typeof window.brChartDeviationClause === 'function')
+        ? window.brChartDeviationClause(metricsSubtab) : '';
       var pinIndex = 0;
       orderedKeys.forEach(function (key) {
         if (optKeys.indexOf(key) < 0) return;
@@ -2358,9 +2374,15 @@
         var tbl = captureTable(el);
         // hero and ranking are div-based, no SVG, no table. Fall back to full HTML.
         var htm = (!svg && !tbl) ? captureHtml(el) : '';
+        var metricTitle = baseTitle + ', ' + def.label;
+        if (METRICS_CHARTS[key] &&
+            typeof window.brTitleWithChartDeviation === 'function') {
+          metricTitle = window.brTitleWithChartDeviation(
+            metricTitle, metricsClause, !!svg);
+        }
         TurasPins.add({
           sectionKey: 'ma-metrics-' + key + '-' + Date.now(),
-          title: baseTitle + ', ' + def.label,
+          title: metricTitle,
           chartSvg: svg, chartHtml: '',
           tableHtml: tbl || htm,
           insightText: (pinIndex === 0) ? metricsInsight : '',

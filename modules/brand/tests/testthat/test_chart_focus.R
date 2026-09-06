@@ -32,6 +32,7 @@ library(testthat)
 ROOT_CF <- .find_root_cf()
 REPORT_CF <- file.path(ROOT_CF, "modules", "brand", "lib", "html_report")
 PANELS_CF <- file.path(REPORT_CF, "panels")
+JS_CF     <- file.path(REPORT_CF, "js")
 
 source(file.path(PANELS_CF, "00_chart_focus_widget.R"))
 # Sourced after the widget, so the guarded call inside it resolves and the
@@ -147,26 +148,99 @@ test_that("the styles reach the page, from the widget that emits the markup", {
 # --- scope: only where a chart, a table and a chart-only map all exist --------
 
 test_that("the mount is emitted at exactly the sites that can deviate", {
-  # One call per chart that keeps a chart-only visibility map behind it:
-  # the funnel slope and bar chart, the attribute and CEP dot charts, the
-  # Brand Summary bar chart, the three stacked-segment charts, and Word of
-  # Mouth. Eight charts, six call sites, because two builders serve more
-  # than one scope.
+  # Every chart in a category destination that has a table beside it now
+  # carries the control. Ten charts, eight call sites, because two builders
+  # serve more than one scope:
+  #
+  #   03_funnel_panel_chart.R  the funnel slope and bar chart, and the
+  #                            Brand Attitude stacked bars
+  #   02_ma_panel.R            the attribute and CEP dot charts, one
+  #                            placeholder called twice
+  #   02_ma_panel_chart.R      the two Headline Metrics charts, which share
+  #                            one chart-only set and so one control
+  #   05_wom_panel.R           Word of Mouth
+  #   08_cat_buying_panel.R    Brand Summary and the three stacked-segment
+  #                            views
   files <- list.files(PANELS_CF, pattern = "\\.R$", full.names = TRUE)
   sites <- list()
   for (f in files) {
     n <- n_cf(read_cf(f), "build_chart_focus_control(")
     if (n > 0) sites[[basename(f)]] <- n
   }
-  expect_equal(sites[["03_funnel_panel_chart.R"]], 1L)
+  expect_equal(sites[["03_funnel_panel_chart.R"]], 2L)
   expect_equal(sites[["02_ma_panel.R"]], 1L)
+  expect_equal(sites[["02_ma_panel_chart.R"]], 1L)
   expect_equal(sites[["05_wom_panel.R"]], 1L)
   expect_equal(sites[["08_cat_buying_panel.R"]], 3L)
-  # Nothing else. A seventh site would mean a control on a view whose
-  # chart follows the table, which is a control that does nothing.
+  # Nothing else. A further site would mean a control on a view whose chart
+  # follows the table, which is a control that does nothing.
   expect_equal(sort(names(sites)),
-               sort(c("02_ma_panel.R", "03_funnel_panel_chart.R",
+               sort(c("02_ma_panel.R", "02_ma_panel_chart.R",
+                      "03_funnel_panel_chart.R",
                       "05_wom_panel.R", "08_cat_buying_panel.R")))
+})
+
+test_that("Mental Advantage carries no control, and the reason still holds", {
+  # This is the one narrowing leaf that genuinely cannot have the control.
+  # Its chart is the Strategic Quadrant, which plots one bubble per stimulus
+  # for the focal brand alone: renderQuadrant filters the cells to
+  # c.brand_code === focal, so there is no brand-keyed chart to narrow.
+  # __maAdvHiddenBrands governs the Mental Advantage matrix columns, and a
+  # matrix is a table. If that filter ever goes, this test fails and the
+  # exclusion has to be revisited rather than quietly outliving its reason.
+  adv <- read_cf(PANELS_CF, "02_ma_panel_advantage.R")
+  expect_equal(n_cf(adv, "build_chart_focus_control("), 0L)
+  js <- readLines(file.path(JS_CF, "brand_ma_advantage.js"), warn = FALSE)
+  js <- paste(js, collapse = "\n")
+  expect_true(grepl("c.brand_code === focal", js, fixed = TRUE))
+  expect_true(grepl("panel.__maAdvHiddenBrands", js, fixed = TRUE))
+})
+
+test_that("Demographics carries no control, and the reason still holds", {
+  # Each demographics card holds a table view and a chart view behind a
+  # per-card toggle, so a chart is never on screen beside its table. A note
+  # saying the chart shows fewer brands than a table the reader has swapped
+  # away from is the confusion this control exists to prevent.
+  demo <- read_cf(PANELS_CF, "11_demographics_panel.R")
+  expect_equal(n_cf(demo, "build_chart_focus_control("), 0L)
+  js <- readLines(file.path(JS_CF, "brand_demographics_panel.js"), warn = FALSE)
+  js <- paste(js, collapse = "\n")
+  expect_true(grepl(".demo-card-view-chart", js, fixed = TRUE))
+  expect_true(grepl(".demo-card-view-table", js, fixed = TRUE))
+  expect_true(grepl('mode:        "unified"', js, fixed = TRUE))
+})
+
+test_that("Brand Attitude and Headline Metrics read their own chart set", {
+  # Both were left out of the first pass because their charts read the TABLE
+  # hidden set. Both now read the chart set, which is what makes the control
+  # on them a deviation rather than a second copy of the header.
+  fn <- readLines(file.path(JS_CF, "brand_funnel_panel.js"), warn = FALSE)
+  fn <- paste(fn, collapse = "\n")
+  expect_true(grepl("relHiddenBrandsChart", fn, fixed = TRUE))
+  expect_true(grepl('mode:               "split"', fn, fixed = TRUE))
+  # The chart reads the chart set.
+  rel_chart <- sub("^.*function buildRelChart\\(panel\\) \\{", "", fn)
+  rel_chart <- substr(rel_chart, 1, 900)
+  expect_true(grepl("relChartHidden(panel)", rel_chart, fixed = TRUE))
+  # The table and the Excel export read the table set. The exporter walking
+  # the table is what keeps an exported sheet matching the header.
+  rel_vis <- sub("^.*function applyRelBrandVis\\(panel\\) \\{", "", fn)
+  rel_vis <- substr(rel_vis, 1, 600)
+  expect_true(grepl("relHiddenBrands ||", rel_vis, fixed = TRUE))
+  expect_false(grepl("relHiddenBrandsChart", rel_vis, fixed = TRUE))
+  rel_xls <- sub("^.*function exportRelTableExcel\\(panel\\) \\{", "", fn)
+  rel_xls <- substr(rel_xls, 1, 600)
+  expect_true(grepl("relHiddenBrands ||", rel_xls, fixed = TRUE))
+  expect_false(grepl("relHiddenBrandsChart", rel_xls, fixed = TRUE))
+
+  ma <- readLines(file.path(JS_CF, "brand_ma_panel.js"), warn = FALSE)
+  ma <- paste(ma, collapse = "\n")
+  scatter <- sub("^.*function renderMAScatter\\(panel\\) \\{", "", ma)
+  scatter <- substr(scatter, 1, 900)
+  expect_true(grepl("getHiddenChart()", scatter, fixed = TRUE))
+  bars <- sub("^.*function renderMABarChart\\(panel\\) \\{", "", ma)
+  bars <- substr(bars, 1, 900)
+  expect_true(grepl("getHiddenChart()", bars, fixed = TRUE))
 })
 
 test_that("the four views that cannot narrow carry no control", {
@@ -185,11 +259,11 @@ test_that("the four views that cannot narrow carry no control", {
   }
 })
 
-test_that("the MA mount is built for the two matrices and no other sub-tab", {
-  # .ma_chart_placeholder is the only MA site, and it is called twice:
-  # Brand Attributes and Category Entry Points. Mental Advantage and
-  # Headline Metrics read the TABLE hidden set for their charts, so they
-  # have no chart-only set to deviate with.
+test_that("the MA dot-chart mount is built for the two matrices only", {
+  # .ma_chart_placeholder serves Brand Attributes and Category Entry Points.
+  # Headline Metrics has a mount of its own, in 02_ma_panel_chart.R, above
+  # the two charts that share its chart-only set. Mental Advantage has none,
+  # for the reason its own test states.
   ma <- read_cf(PANELS_CF, "02_ma_panel.R")
   expect_equal(n_cf(ma, '.ma_chart_placeholder(stim = "attributes"'), 1L)
   expect_equal(n_cf(ma, '.ma_chart_placeholder(stim = "ceps"'), 1L)
@@ -202,7 +276,8 @@ test_that("the MA mount is built for the two matrices and no other sub-tab", {
 test_that("every emission site is guarded, so a lone-file test still renders", {
   # The panel tests source one panel file at a time. An unguarded call would
   # turn every one of them red the moment this widget moved.
-  for (f in c("03_funnel_panel_chart.R", "02_ma_panel.R", "05_wom_panel.R",
+  for (f in c("03_funnel_panel_chart.R", "02_ma_panel.R",
+              "02_ma_panel_chart.R", "05_wom_panel.R",
               "08_cat_buying_panel.R")) {
     txt <- read_cf(PANELS_CF, f)
     guards <- n_cf(txt, 'exists("build_chart_focus_control", mode = "function")')

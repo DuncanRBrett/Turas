@@ -162,10 +162,15 @@ DRIVER = """
   // Views that cannot narrow at all must carry no Chart brands control:
   // a control that does nothing is what made the old Dirichlet Norms filter
   // read "1 of 11" beside a table of eleven brands.
+  // ma-advantage is the one narrowing leaf that genuinely cannot have the
+  // control: its quadrant SVG plots one bubble per stimulus for the focal
+  // brand alone, so there is no brand-keyed chart to narrow, and
+  // __maAdvHiddenBrands governs matrix columns, which are a table.
+  // Demographics shows a table OR a chart per card behind a view toggle, so
+  // a chart is never beside its table. The other four do not narrow at all.
   var NO_CHART_FOCUS = { 'cb-context': 1, 'cb-norms': 1, 'cb-dop': 1,
                          'cb-shopper': 1, 'demographics': 1,
-                         'ma-advantage': 1, 'ma-metrics': 1,
-                         'fn-relationship': 1 };
+                         'ma-advantage': 1 };
 
   function chartFocusHandle(mount) {
     var el = mount.parentElement;
@@ -176,14 +181,15 @@ DRIVER = """
     return null;
   }
 
-  function codesIn(nodes) {
+  function codesInAttr(nodes, attr) {
     var seen = {};
     Array.prototype.forEach.call(nodes, function (el) {
-      var v = el.getAttribute('data-cb-brand');
-      if (v) seen[v] = true;
+      var v = el.getAttribute(attr);
+      if (v && v !== '__avg__') seen[v] = true;
     });
     return Object.keys(seen).sort();
   }
+  function codesIn(nodes) { return codesInAttr(nodes, 'data-cb-brand'); }
 
   function setToSorted(s) {
     var out = [];
@@ -303,6 +309,17 @@ DRIVER = """
       check(tab + '/' + scope + ': it offers only what the header shows',
             offered === headerShows, offered + ' offered, ' + headerShows + ' shown');
 
+      // The two sites added after the first pass do not key their chart on
+      // data-cb-brand, so they are read apart their own way: the Brand
+      // Attitude bars carry data-fn-brand like their table rows, and the
+      // Mental Space bubbles carry nothing, so they are counted.
+      var relChartBefore = host ? codesInAttr(host.querySelectorAll(
+        '[data-fn-rel-chart] [data-fn-brand]'), 'data-fn-brand') : [];
+      var scatterBefore = host
+        ? host.querySelectorAll('.ma-scatter-svg circle').length : 0;
+      var barsBefore = host
+        ? host.querySelectorAll('.ma-bars-svg rect').length : 0;
+
       var dropped = null;
       Array.prototype.forEach.call(boxes, function (b) {
         if (dropped || b.disabled) return;
@@ -311,6 +328,39 @@ DRIVER = """
         b.dispatchEvent(new Event('change', { bubbles: true }));
       });
       if (!dropped) return;
+
+      if (scope === 'relationship' && relChartBefore.length > 0) {
+        var relChartAfter = codesInAttr(host.querySelectorAll(
+          '[data-fn-rel-chart] [data-fn-brand]'), 'data-fn-brand');
+        var relTableAfter = codesInAttr(Array.prototype.filter.call(
+          host.querySelectorAll('[data-fn-rel-table] tbody tr[data-fn-brand]'),
+          visible), 'data-fn-brand');
+        check(tab + '/' + scope + ': the bars really drop the brand',
+              relChartAfter.indexOf(dropped) < 0, relChartAfter.join(','));
+        check(tab + '/' + scope + ': the table really keeps it',
+              relTableAfter.indexOf(dropped) >= 0, relTableAfter.join(','));
+        check(tab + '/' + scope + ': the chart has exactly one row fewer',
+              relChartAfter.length === relTableAfter.length - 1,
+              relChartAfter.length + ' chart, ' + relTableAfter.length + ' table');
+      }
+      if (scope === 'metrics' && scatterBefore > 0) {
+        var scatterAfter = host.querySelectorAll('.ma-scatter-svg circle').length;
+        var metricRows = Array.prototype.filter.call(
+          host.querySelectorAll('.ma-metrics-table tbody tr.ma-row[data-ma-brand]'),
+          visible).length;
+        check(tab + '/' + scope + ': the Mental Space chart loses one bubble',
+              scatterAfter === scatterBefore - 1,
+              scatterBefore + ' to ' + scatterAfter);
+        check(tab + '/' + scope + ': the metrics table keeps every row',
+              metricRows === scatterBefore,
+              metricRows + ' rows for ' + scatterBefore + ' bubbles before');
+        if (barsBefore > 0) {
+          check(tab + '/' + scope + ': the MMS bar chart loses its bars too',
+                host.querySelectorAll('.ma-bars-svg rect').length
+                  < barsBefore,
+                barsBefore + ' bars before');
+        }
+      }
 
       // The table is untouched. This is the whole point of the control.
       check(tab + '/' + scope + ': the table set is unchanged',

@@ -114,6 +114,15 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     ""
   }
 
+  # Chart brands: the per-chart deviation from the header's comparison set.
+  # The Brand Attitude selector runs in split mode, so the stacked bars read
+  # __fnState.relHiddenBrandsChart while the table above them reads
+  # __fnState.relHiddenBrands. The mount sits inside the chart area, above
+  # the emphasis chips, so the note travels with a capture of that area.
+  # Guarded because the panel tests source this file alone.
+  rel_chart_focus <- if (exists("build_chart_focus_control", mode = "function"))
+    build_chart_focus_control("relationship") else ""
+
   paste0(
     sprintf('<section class="fn-section fn-rel-chart-section"%s>',
             if (is.finite(n_total)) sprintf(' data-fn-rel-ntotal="%.0f"', n_total) else ""),
@@ -122,6 +131,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
                   n_effective = if (is.finite(n_effective)) n_effective else n_total),
     '<div class="fn-rel-headline" data-fn-rel-headline style="display:none;margin-top:14px;"></div>',
     '<div class="fn-rel-chart-area" data-fn-rel-chart-area>',
+    rel_chart_focus,
     '<div class="fn-rel-chart-controls col-chip-bar">',
     '<span class="sig-level-label" style="flex-shrink:0;">Emphasise:</span>',
     .fn_rel_emphasis_chips(),
