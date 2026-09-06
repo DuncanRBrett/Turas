@@ -158,7 +158,7 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
 
     '<p class="pf-dopa-reading-line"><strong>What the deviation means:</strong> ',
     '<strong>Positive cells</strong> = brands that over-share awareness. Their awares are <em>more</em> likely than expected to also know the partner. These are direct mental-space rivals. ',
-    '<strong>Negative cells</strong> = partition brands. Their awares are <em>less</em> likely than expected to know the partner, the two brands sit in genuinely different mental spaces. ',
+    '<strong>Negative cells</strong> = partition brands. Their awares are <em>less</em> likely than expected to know the partner. The two brands sit in genuinely different mental spaces. ',
     'A row dominated by negative cells flags a brand whose awares are unusually self-contained. A column dominated by positive cells flags a brand that gets &ldquo;ridden along&rdquo; with other brands&#39; awareness.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>About D:</strong> ',
@@ -171,7 +171,7 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
     'A high deviation between two small brands means an unusually strong mental link that the constellation may not visually emphasise.</p>',
 
     '<p class="pf-dopa-reading-line"><strong>How this reconciles with the constellation&rsquo;s Jaccard score:</strong> ',
-    'The constellation&rsquo;s Jaccard score and this table&rsquo;s DoA cells are three views of the same underlying overlap, they always reconcile if you do the maths. ',
+    'The constellation&rsquo;s Jaccard score and this table&rsquo;s DoA cells are three views of the same underlying overlap. They always reconcile if you do the maths. ',
     'For any two brands A and B: ',
     '<code class="pf-ex-formula">both = aware%(A) &times; DoA(A&rarr;B) = aware%(B) &times; DoA(B&rarr;A)</code> ',
     '<code class="pf-ex-formula">union = aware%(A) + aware%(B) &minus; both</code> ',

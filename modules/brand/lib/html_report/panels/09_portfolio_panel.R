@@ -552,7 +552,7 @@ build_br_portfolio_panel <- function(results, config) {
     'It is a <em>symmetric overlap measure</em>, not a percentage of any one brand&rsquo;s awares. ',
     'The actual interpretation is: <em>&ldquo;Of all the people in this category who are aware of <strong>either</strong> brand A <strong>or</strong> brand B, what proportion are aware of <strong>both</strong>?&rdquo;</em> ',
     'So a Jaccard of <strong>0.56</strong> between IPK and Knorr means 56% of everyone who knows either IPK or Knorr knows both, the same number from either brand&rsquo;s perspective. ',
-    '<strong>0.80</strong> means almost everyone who knows one brand also knows the other, they share mental space and you compete for the same attention. ',
+    '<strong>0.80</strong> means almost everyone who knows one brand also knows the other. They share mental space and you compete for the same attention. ',
     '<strong>0.20</strong> means the two awareness sets barely overlap. The brands are known by mostly different people, so they aren&rsquo;t really competing for the same minds. ',
     'A common misreading is &ldquo;0.56 = 56% of IPK awares know Knorr&rdquo;. That is <em>not</em> what this score is; that conditional number lives on the Duplication of Awareness table below.</p>',
 
@@ -756,12 +756,12 @@ build_br_portfolio_panel <- function(results, config) {
     '<p class="pf-cl-reading-line"><strong>The four quadrants</strong> describe the <em>state</em> of the focal brand in each category&rsquo;s mental space. Not what to do about it. The strategic call always depends on the category&rsquo;s commercial role for the brand. ',
     '<strong>Dominant</strong> (top-left, low clutter / high share), few brands compete for awareness here and you own a big slice of it. ',
     '<strong>Contested</strong> (top-right, high clutter / high share), many brands compete and you hold your own; you are winning ground in a busy mental space. ',
-    '<strong>Open space</strong> (bottom-left, low clutter / low share), few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in, read alongside category penetration (the dot size) before drawing conclusions. ',
+    '<strong>Open space</strong> (bottom-left, low clutter / low share), few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in. Read alongside category penetration (the dot size) before drawing conclusions. ',
     '<strong>Crowded out</strong> (bottom-right, high clutter / low share), many brands compete and you have a small share of awareness. You are in this category but not winning the awareness fight. Whether to push harder or accept the position depends on whether this category is a strategic priority. The chart does not answer that.</p>',
 
     '<p class="pf-cl-reading-line"><strong>What to do with it:</strong> ',
     'Hover any dot to see the exact set size, focal awareness, share of awareness, category penetration and quadrant. ',
-    'Switch the focal-brand picker to read the same map for any other brand, the chart redraws instantly. ',
+    'Switch the focal-brand picker to read the same map for any other brand. The chart redraws instantly. ',
     'Use the table below for the precise numbers in a sortable form.</p>',
     '</div>'
   )
@@ -973,7 +973,7 @@ build_br_portfolio_panel <- function(results, config) {
 
     '<p class="pf-ex-reading-line"><strong>What it needs in the data:</strong> ',
     'Both views can only score categories where the questionnaire actually asked buyers of that category whether they’re aware of the focal brand. ',
-    'In your study this is set by the BrandList sheet, every brand × category combination where the brand is listed gets its own "are you aware of this brand" reading in the data. ',
+    'In your study this is set by the BrandList sheet. Every brand × category combination where the brand is listed gets its own "are you aware of this brand" reading in the data. ',
     'A brand listed in <em>all</em> categories (typically the study’s focal client) gets a full read. ',
     'A brand listed in only its home category gets only one row, and the extension half can’t do anything for it until the next wave adds cross-category awareness. ',
     'The number after each option in the picker (<em>"Brand (3 cats)"</em>) tells you up front how much data is available for that brand.</p>',
@@ -982,10 +982,10 @@ build_br_portfolio_panel <- function(results, config) {
     '<em>X (horizontal)</em> = how many of all respondents are buyers of that category, its market size. ',
     '<em>Y (vertical)</em> = the focal brand’s awareness <strong>among</strong> those buyers, how big the focal looms in the minds of people who actually shop the category. ',
     'Bubble size = the weighted count of aware buyers; big bubbles are categories where lots of real people know the brand. ',
-    '<strong>Top-right</strong>: big category, the focal is well-known: bread-and-butter. ',
-    '<strong>Top-left</strong>: small but you dominate awareness: a defensible niche. ',
-    '<strong>Bottom-right</strong>: big category but the focal is barely known: opportunity or wrong-battle. ',
-    '<strong>Bottom-left</strong>: small and unknown: usually deprioritise.</p>',
+    '<strong>Top-right</strong>: big category and the focal is well-known, bread-and-butter. ',
+    '<strong>Top-left</strong>: small but you dominate awareness, a defensible niche. ',
+    '<strong>Bottom-right</strong>: big category but the focal is barely known, opportunity or wrong-battle. ',
+    '<strong>Bottom-left</strong>: small and unknown, usually deprioritise.</p>',
 
     '<p class="pf-ex-reading-line"><strong>How to read the extension table:</strong> ',
     'For every measured category that <em>isn’t</em> the focal’s home, <em>lift</em> = how much more likely buyers of that category are to be aware of the focal compared with the baseline awareness rate. ',
@@ -1002,13 +1002,13 @@ build_br_portfolio_panel <- function(results, config) {
     '<p class="pf-ex-reading-line"><strong>Worked example:</strong> ',
     'Imagine the focal brand has <strong>70%</strong> awareness among Pasta Sauces buyers (numerator) and <strong>40%</strong> awareness among all 1,200 respondents in the survey (denominator, because not everyone shops Pasta Sauces). ',
     'Lift = 70 ÷ 40 = <strong>1.75×</strong>. ',
-    'Read: Pasta Sauces buyers are 1.75× more likely than the average respondent to be aware of the focal, that’s a meaningful halo, the brand has equity to lean on if it launched a Pasta Sauces line. ',
+    'Read: Pasta Sauces buyers are 1.75× more likely than the average respondent to be aware of the focal. That is a meaningful halo, so the brand has equity to lean on if it launched a Pasta Sauces line. ',
     'Hover any row to see both numbers (numerator + baseline) for the live data.</p>',
 
     '<p class="pf-ex-reading-line"><strong>What to do with it:</strong> ',
     'Hover any bubble or row to see the exact numbers. ',
-    'For a focal brand with rich coverage (the study’s focal client), the extension table is your shortlist of plausible expansion categories, high lift + statistical significance + a meaningfully large category base = a sound target. ',
-    'For a brand the questionnaire only asked about in one category, the strength map will still show that single bubble, but the extension table will explicitly tell you there’s nothing to extend into in this dataset, either accept that limitation, or add cross-category awareness for that brand in the next wave.</p>',
+    'For a focal brand with rich coverage (the study’s focal client), the extension table is your shortlist of plausible expansion categories: high lift + statistical significance + a meaningfully large category base = a sound target. ',
+    'For a brand the questionnaire only asked about in one category, the strength map will still show that single bubble, but the extension table will explicitly tell you there’s nothing to extend into in this dataset. Either accept that limitation, or add cross-category awareness for that brand in the next wave.</p>',
     '</div>'
   )
 

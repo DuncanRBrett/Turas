@@ -365,7 +365,7 @@ render_cat_buying_panel <- function(panel_data) {
     '<strong>Base:</strong> all screened category respondents (incl. lapsed / zero-purchase). ',
     'Penetration and volume share come from the per-brand purchase counts (reconciled against the past-3-month multi-pick); SCR = share of category requirement (loyalty). ',
     '<em>Note:</em> the Loyalty Segmentation tab uses a narrower base (cat buyers only, ',
-    'i.e. respondents with at least one purchase in the target window), its &ldquo;% Cat buyers&rdquo; ',
+    'i.e. respondents with at least one purchase in the target window). Its &ldquo;% Cat buyers&rdquo; ',
     'reads higher than Pen here for the same brand by exactly the lapsed-rate factor.',
     '</p>')
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")

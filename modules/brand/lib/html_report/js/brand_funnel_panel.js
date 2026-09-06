@@ -1817,7 +1817,7 @@
   }
 
   /* Same idea but for the Brand Relationship table on the relationship
-     sub-tab. Returns competitor brand codes in DOM order, the focal
+     sub-tab. Returns competitor brand codes in DOM order. The focal
      row is pinned separately by buildRelChart. Returns null when the
      rel table hasn't rendered yet. */
   function readRelTableOrder(panel) {
