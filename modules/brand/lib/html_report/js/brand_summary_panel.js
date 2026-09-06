@@ -394,6 +394,13 @@
     var opt  = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
     var catId = opt ? opt.getAttribute('data-cat-id') : null;
     if (!dest || !catId) return;
+    /* Only route to a panel that exists. switchBrandTab() clears the active
+       class from every panel before looking for its target, so calling it
+       with an id nothing answers to leaves the reader on a blank page. A
+       category in the picker without a panel of its own is possible: the
+       picker lists the summary's deep-dive categories and the tabs are
+       built from the config's category list. */
+    if (!document.getElementById('panel-cat-' + catId)) return;
     if (typeof window.switchBrandTab === 'function') {
       window.switchBrandTab('cat-' + catId);
     }

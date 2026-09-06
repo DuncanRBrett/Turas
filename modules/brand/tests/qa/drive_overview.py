@@ -215,6 +215,53 @@ DRIVER = """
       if (sumBtn) sumBtn.click();
     });
 
+    // ---- The route reads the selection, not the first option ----------
+    // The report this runs on has one full-depth category, so the routing
+    // has only ever been driven with one option in the picker. A picker
+    // with one item is a picker that has not been tested. A second option
+    // is inserted here, carrying an id no panel answers to, and the two
+    // cases are driven: with the real category selected the tile must still
+    // land on it, and with the unanswerable one selected the tile must make
+    // no route rather than throwing or landing somewhere arbitrary.
+    //
+    // This does not prove routing across two REAL categories. The second
+    // option carries no data of its own and no panel is built for it. It
+    // closes the "reads options[0]" gap and no more.
+    var sel = root.querySelector('[data-brsum-cat]');
+    if (sel && sel.options.length) {
+      var realValue = sel.value;
+      var fake = document.createElement('option');
+      fake.value = '__qa_no_such_category__';
+      fake.textContent = 'QA, no such category';
+      fake.setAttribute('data-cat-id', 'qa-no-such-category');
+      sel.insertBefore(fake, sel.options[0]);
+
+      // Case 1: the real category is selected, but is no longer first.
+      sel.value = realValue;
+      if (sumBtn) sumBtn.click();
+      var tile1 = $('.brsum-tile[data-brsum-tile="mms"] .brsum-tile-go', root);
+      if (tile1) tile1.click();
+      var p1 = $('.br-panel.active');
+      check('the route reads the selected option, not the first one',
+            !!p1 && p1.id === 'panel-cat-dss', p1 ? p1.id : '');
+
+      // Case 2: an id no panel answers to leaves the reader where they are.
+      if (sumBtn) sumBtn.click();
+      sel.value = fake.value;
+      var before = $('.br-panel.active');
+      var beforeId = before ? before.id : '';
+      var tile2 = $('.brsum-tile[data-brsum-tile="mms"] .brsum-tile-go', root);
+      if (tile2) tile2.click();
+      var after = $('.br-panel.active');
+      check('a category with no panel makes no route and does not throw',
+            !!after && after.id === beforeId,
+            beforeId + ' -> ' + (after ? after.id : ''));
+
+      sel.removeChild(fake);
+      sel.value = realValue;
+      if (sumBtn) sumBtn.click();
+    }
+
     check('no console error or uncaught exception', qa.errors.length === 0,
           qa.errors.slice(0, 3).join(' | '));
     report();

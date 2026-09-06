@@ -263,11 +263,11 @@ differ from. Logged here and in the test's header comment.
 | Brand suite, at the tip | FAIL 0, WARN 1, SKIP 2, PASS 3077 |
 | `node modules/brand/tests/js/test_summary_overview.js` | 101 passed, 0 failed |
 | `reachability_check.py before after` | PASS. data-subpanel 5, data-section 29, section ids 13, all identical; 8 island classes, every one numerically identical |
-| `drive_overview.py after.html` | 53 checks, 0 failed, no console error |
+| `drive_overview.py after.html` | 55 checks, 0 failed, no console error |
 | `drive_destinations.py after.html` | 353 checks, 0 failed |
 | `drive_save_roundtrip.py after.html` | 113 checks, 0 failed |
 | `drive_two_categories.py after.html` | 15 checks, 0 failed |
-| IPK fixture report | PASS, 3,989,491 bytes against 3,962,385 before |
+| IPK fixture report | PASS, 3,989,976 bytes against 3,962,385 before |
 | The pre-fix rank bug | reproduced in node against `git show HEAD:...`: `mms_rank = null`, bare headline |
 
 What `drive_overview.py` asserts in a real browser, on the real bundled
@@ -288,6 +288,34 @@ between the value and the comparison line on the Mental Market Share tile and
 pushed that tile's comparison out of line with the other three. The rank now
 sits below the comparison.
 
+## Adversarial pass, and the one thing it caught
+
+The fixture has one full-depth category, so the tile routing had only ever
+been driven with one option in the category picker. A picker with one item is
+a picker that has not been tested, and reading `options[0]` instead of the
+selection would have passed every check written so far.
+
+`drive_overview.py` now inserts a second option ahead of the real one, carrying
+an id no panel answers to, and drives both cases in the browser.
+
+- **Reading the selection rather than the first option: it already did.** The
+  real category, no longer first, still routes to `panel-cat-dss`.
+- **A category with no panel of its own: it blanked the page.** Clicking a tile
+  called `switchBrandTab('cat-<id>')`, which clears the active class from every
+  panel before looking for its target, so an id nothing answers to left no
+  panel active at all. The reader got a blank page and no error. `brsumGoTo()`
+  now resolves `panel-cat-<id>` first and makes no route when there is none,
+  which keeps the fix inside the Overview rather than changing Stage 2's
+  navigation semantics.
+
+The case is reachable: the picker lists the summary's deep-dive categories,
+which is a different list from the config's category tabs.
+
+This does not prove routing across two real categories. The second option
+carries no data and no panel is built for it, in the same way
+`drive_two_categories.py` says its clone is the same category twice. It closes
+the reads-the-first-option gap and the no-such-panel gap, and no more.
+
 ## Known limits, stated rather than left to be discovered
 
 - **The Overview was exercised on one category and one focal brand.** The IPK
@@ -303,10 +331,12 @@ sits below the comparison.
   only in that indirect sense.
 - **No wave comparison exists.** The tiles carry the slot that will hold one.
   Nothing computes one.
-- **The tile routing needs a category tab to route to.** A report rendered with
-  no category panels, or a category whose id could not be derived, leaves the
-  tile's button inert rather than erroring. Not exercised: no such fixture
-  exists here.
+- **The tile routing needs a category tab to route to.** A category whose id
+  answers to no panel leaves the tile inert; that case is now driven in the
+  browser (see the adversarial pass). A category whose id could not be derived
+  at all gets no `data-cat-id` and its tiles are inert for the same reason;
+  that path is read from the code, not executed, because no fixture produces
+  it.
 - **The example configs were not re-rendered in this stage.** The Overview is
   on the Summary tab, which every brand report carries, and the suite covers
   the skeleton; but `examples/1brand`, `examples/3cat` and `examples/9cat` were
