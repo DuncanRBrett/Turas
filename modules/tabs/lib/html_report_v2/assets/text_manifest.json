@@ -816,6 +816,11 @@
     "context": "Aggregate build. The reader asked for a cut by a question the report was not built to cut by.",
     "tokens": []
   },
+  "cube.refuse.rows": {
+    "page": "Crosstabs",
+    "context": "Aggregate build. The reader asked for a value of a banner question that no published column holds on its own.",
+    "tokens": []
+  },
   "cube.refuse.block": {
     "page": "Crosstabs",
     "context": "Aggregate build. This question's figures were withheld for this cut because a group in it is below the confidentiality threshold.",

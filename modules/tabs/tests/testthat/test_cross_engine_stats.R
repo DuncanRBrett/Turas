@@ -291,7 +291,11 @@ test_that("the fixture produces the shape the parity harness assumes", {
   expect_equal(run$analysis$run_status, "PASS")
   # Q5 carries the NET POSITIVE row (review 2026-08, I5); Q6 is the ALLOCATION
   # question, the only one with k mean rows under a single code (review 2026-09).
-  expect_equal(sort(names(run$results)), c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"))
+  # Cohort is the banner question, reported as well as bannered, which is the
+  # ordinary shape of a demographic and the one that makes a filter on a banner
+  # variable reachable at all (CP-4 enumerates it).
+  expect_equal(sort(names(run$results)),
+               c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6"))
   # Dual alpha is on: 0.05 primary, 0.20 secondary.
   expect_equal(run$config$config_obj$alpha, 0.05)
   expect_equal(run$config$config_obj$alpha_secondary, 0.20)

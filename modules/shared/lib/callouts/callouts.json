@@ -809,6 +809,12 @@
       "context": "Aggregate build. Shown when a saved or shared link asks for a cut by a question this report was not built to cut by",
       "page": "Crosstabs"
     },
+    "cube.refuse.rows": {
+      "title": "Cut not available: value does not match a published column",
+      "text": "This cut is not available in this report. It can filter on a value only where that value matches one of the columns it published.",
+      "context": "Aggregate build. Shown when a filter or a custom banner asks for a value of a banner question that the banner merged with another or left out, so no published column holds exactly that group",
+      "page": "Crosstabs"
+    },
     "cube.refuse.block": {
       "title": "Cut not available at this base",
       "text": "Not available for this question at this base (fewer than {k} people in one of the groups).",

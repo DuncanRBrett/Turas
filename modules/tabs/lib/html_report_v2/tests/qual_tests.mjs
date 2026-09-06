@@ -19,6 +19,10 @@ globalThis.TR = { fmt: {
 new Function(fs.readFileSync(path.join(jsDir, "02_text.js"), "utf8"))();
 globalThis.TR.txt.load(CATALOGUE);
 new Function(fs.readFileSync(path.join(jsDir, "21_stats.js"), "utf8"))();   // TR.stats.propZ for crosstab sig
+// The comments' cut is written in the CUBE's level space, so translating a
+// filter into it is the cube's job (cube.levelsForRows) and the tab needs it
+// loaded to serve a cut at all.
+new Function(fs.readFileSync(path.join(jsDir, "21b_cube.js"), "utf8"))();
 new Function(fs.readFileSync(path.join(jsDir, "27q_qualitative.js"), "utf8"))();
 const qual = globalThis.TR.qual;
 
@@ -210,7 +214,14 @@ assert(qual.maskFilter(recs, [{ q: "Q1", rows: [1] }]).length === 2, "maskFilter
     { idx: 2, cut: { Q008: 0, Region: 2 } },
     { idx: 3, cut: { Region: 2 } }            // Q008 dropped by the anonymiser
   ];
+  const savedCube = TR.CUBE;
   TR.MICRO = null;
+  // Both declared as QUESTION variables, whose level IS the row index the
+  // filter bar sends, so these assertions read in one space. The banner case,
+  // where the two differ, is the block below.
+  TR.CUBE = { vars: { Region: { kind: "question", levels: [1, 2] },
+                      Q008: { kind: "question", levels: [0, 1] } },
+    slices: {}, order: 2 };
   TR.QUAL = { cutVars: ["Region", "Q008"],
     questions: [{ code: "QUAL_SAT", records: recs2 }] };
   const onQ008 = [{ q: "Q008", rows: [0] }];
@@ -241,7 +252,37 @@ assert(qual.maskFilter(recs, [{ q: "Q1", rows: [1] }]).length === 2, "maskFilter
   TR.QUAL = { questions: [{ code: "QUAL_SAT", records: [{ idx: 0 }] }] };
   assert(qual.cutServable(onQ008) === false, "no cutVars -> nothing servable");
 
-  TR.MICRO = savedMicro; TR.QUAL = savedQual; TR.d2 = savedD2;
+  // A BANNER variable. Its level is a column index and the columns begin after
+  // Total, so the row the reader ticked and the level the comment carries are
+  // different numbers. Taken at face value the chip would say one campus and
+  // the list would be another's comments.
+  const campusRecs = [
+    { idx: 0, cut: { Campus: 1 } },      // Alpha, column 1, row 0
+    { idx: 1, cut: { Campus: 2 } },      // Beta,  column 2, row 1
+    { idx: 2, cut: { Campus: 2 } }
+  ];
+  TR.CUBE = { vars: { Campus: { kind: "banner", levels: [1, 2],
+    rowmap: { "0": 1, "1": 2 } } }, slices: {}, order: 2 };
+  TR.QUAL = { cutVars: ["Campus"],
+    questions: [{ code: "QUAL_SAT", records: campusRecs }] };
+  const onBeta = [{ q: "Campus", rows: [1] }];
+  assert(qual.cutServable(onBeta) === true, "a banner variable's cut is servable");
+  const beta = qual.maskFilter(campusRecs, onBeta);
+  assert(beta.length === 2 && beta[0].idx === 1,
+    "and keeps the comments of the campus that was ticked, not the one above it");
+  const onAlpha = [{ q: "Campus", rows: [0] }];
+  assert(qual.maskFilter(campusRecs, onAlpha).length === 1,
+    "the first campus is a real audience, not an empty one");
+
+  // A value the banner merged away or left out has no column of its own, so
+  // there is nothing to match a comment against.
+  TR.CUBE = { vars: { Campus: { kind: "banner", levels: [1, 2],
+    rowmap: { "0": 1 } } }, slices: {}, order: 2 };
+  assert(qual.cutServable(onBeta) === false,
+    "an untranslatable value withholds the cut rather than listing the wrong comments");
+  assert(qual.cutWithheld(onBeta) === true, "and says so on the face of the tab");
+
+  TR.MICRO = savedMicro; TR.QUAL = savedQual; TR.d2 = savedD2; TR.CUBE = savedCube;
 }
 assert(qual.maskFilter(recs, []).length === 4, "maskFilter with no cut keeps all");
 

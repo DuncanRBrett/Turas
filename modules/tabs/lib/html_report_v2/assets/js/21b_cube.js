@@ -58,6 +58,42 @@
     return v ? v.levels : [];
   };
 
+  /**
+   * The cube levels a set of QUESTION ROW indices names, or null when this
+   * variable cannot be addressed in row space.
+   *
+   * Everything a reader picks arrives in row space: the filter bar, the custom
+   * banner and the composite builder all name a value by its position in the
+   * question's own row list (26_filter.js, selectionToFilter). A QUESTION
+   * variable's level IS that position and passes straight through. A BANNER
+   * variable's level is a COLUMN index, and columns begin after Total, so the
+   * two spaces are offset and a row taken at face value reports a different
+   * group under the reader's label. It is translated through the map
+   * cube_writer.R builds, which carries a row only where the row and the column
+   * name the same people.
+   *
+   * null means refuse. A row the map does not carry belongs to a banner that
+   * merged it with another or left it out, and there is no honest answer to
+   * give. A row mapped to -1 is a value nobody chose: it drops out of the
+   * selection and leaves an audience of nobody, which is what the respondent
+   * island returns for it.
+   */
+  cube.levelsForRows = function (name, rows) {
+    var v = TR.CUBE && TR.CUBE.vars && TR.CUBE.vars[name];
+    if (!v) return null;
+    var list = (rows || []).map(Number);
+    if (v.kind !== "banner") return list;
+    var map = v.rowmap;
+    if (!map) return null;
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var lv = map[String(list[i])];
+      if (lv === undefined || lv === null) return null;
+      if (lv >= 0) out.push(lv);
+    }
+    return out;
+  };
+
   cube.questionFacts = function (code) {
     var qs = TR.CUBE && TR.CUBE.questions;
     return (qs && Object.prototype.hasOwnProperty.call(qs, code)) ? qs[code] : null;
@@ -83,6 +119,7 @@
       return TR.txt("cube.refuse.order", { order: (TR.CUBE && TR.CUBE.order) || 2 });
     }
     if (refusal.reason === "undeclared") return TR.txt("cube.refuse.undeclared");
+    if (refusal.reason === "rows") return TR.txt("cube.refuse.rows");
     return TR.txt("cube.refuse.block", { k: (TR.CUBE && TR.CUBE.k) || 0 });
   };
 
@@ -338,7 +375,11 @@
         refused = { reason: "undeclared", "var": f.q };
         return;
       }
-      var wanted = (f.rows || []).map(Number);
+      var wanted = cube.levelsForRows(f.q, f.rows);
+      if (wanted === null) {
+        refused = { reason: "rows", "var": f.q };
+        return;
+      }
       var have = sel[f.q];
       sel[f.q] = have
         ? have.filter(function (x) { return wanted.indexOf(x) !== -1; })
@@ -398,8 +439,9 @@
         // design closes. Either one falls back to Total only, which is the
         // missing-spec behaviour a saved banner already has.
         if (def.box != null || !cube.isDeclared(def.code)) { ok = false; return; }
-        built.push(levelCol(def.label, "", def.code, (def.rows || []).map(Number),
-          { composite: true }));
+        var lv = cube.levelsForRows(def.code, def.rows);
+        if (lv === null) { ok = false; return; }
+        built.push(levelCol(def.label, "", def.code, lv, { composite: true }));
       });
       if (!ok) return { columns: columns, composite: true, missing: true };
       return { columns: columns.concat(built), composite: true, spec: spec };
@@ -433,12 +475,21 @@
           defs.push({ label: cat.label, members: [cat.index] });
         });
       }
+      // Built to one side first: a banner whose columns cannot all be
+      // translated shows Total only, exactly as an undeclared one does, rather
+      // than a table half of whose columns are about someone else.
       var letterAt = 0;
+      var made = [];
+      var translatable = true;
       defs.forEach(function (def) {
-        columns.push(levelCol(def.label,
-          String.fromCharCode(65 + (letterAt++ % 26)), code, def.members));
+        if (!translatable) return;
+        var lv = cube.levelsForRows(code, def.members);
+        if (lv === null) { translatable = false; return; }
+        made.push(levelCol(def.label,
+          String.fromCharCode(65 + (letterAt++ % 26)), code, lv));
       });
-      return { columns: columns, custom: true, source: q, mode: mode };
+      if (!translatable) return { columns: columns, custom: true, missing: true };
+      return { columns: columns.concat(made), custom: true, source: q, mode: mode };
     }
     var groupCols = TR.d2.groupCols(banner);
     if (!cube.isDeclared(banner)) {
