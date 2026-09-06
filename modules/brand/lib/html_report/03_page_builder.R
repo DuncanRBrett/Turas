@@ -599,9 +599,15 @@ build_br_category_controls <- function(cat_id, cat_name, config,
   # one slot so a reader still has one place to go.
   #
   # The comparison control has three states, and the trigger always reads
-  # the one that is live: focal only, compare with N, or all brands. The
+  # the one that is live: focal only, focal and N others, or all brands. The
   # published hidden-brand set matches the state in every case, so the words
-  # on the trigger and the rows in the tables cannot drift apart.
+  # on the trigger and the rows in the tables cannot drift apart. The word
+  # "Brands" stays on the trigger in every state, so it reads as a control
+  # rather than as a status line when nothing has been picked.
+  #
+  # There is no cap on the comparators. The tables have always shown every
+  # brand in the category, and chart legibility is the per-chart "Chart
+  # brands" control's job.
   brands <- .br_category_brand_list(cat_brands, cat_results, config)
   focal  <- config$focal_brand %||% ""
   # chip_default is the analyst's Brand_Config setting for how much the
@@ -628,7 +634,7 @@ build_br_category_controls <- function(cat_id, cat_name, config,
       '<button type="button" class="br-cmp-trigger" data-group="%s" ',
       'onclick="brToggleComparisonPopover(this)" aria-expanded="false">',
       '<span class="br-cmp-text" data-group="%s">%s</span>',
-      '<span class="br-cmp-count" data-group="%s" hidden>0</span></button>',
+      '<span class="br-cmp-count" data-group="%s" hidden>%s</span></button>',
       '<div class="br-cmp-popover" data-group="%s" data-cmp-mode="%s" hidden>',
       '<div class="br-cmp-modes">',
       '<button type="button" class="br-cmp-mode%s" data-cmp-set="focal" ',
@@ -636,12 +642,21 @@ build_br_category_controls <- function(cat_id, cat_name, config,
       '<button type="button" class="br-cmp-mode%s" data-cmp-set="all" ',
       'onclick="brSetComparisonMode(this)">All brands</button>',
       '</div>',
-      '<div class="br-cmp-head">Or compare the focal brand with up to five others</div>',
+      '<div class="br-cmp-head">Or tick the brands to compare with the focal brand</div>',
       '<div class="br-cmp-list">%s</div>',
       '</div>'),
       cat_id, cat_id, cat_id, paste(f_opts, collapse = ""),
-      cat_id, cat_id, if (start_all) "All brands" else "Focal only",
-      cat_id, cat_id, if (start_all) "all" else "focal",
+      cat_id, cat_id,
+      if (start_all) sprintf("Brands: all %d", length(brands))
+      else "Brands: focal only",
+      cat_id,
+      # The badge counts the brands on screen out of the category, which is
+      # what the words leave out. It is hidden in the two states the words
+      # already pin down, and brApplyComparisonSet repaints it on load, but
+      # it is emitted correct so a pre-script paint and a saved copy read
+      # the same as the live control.
+      sprintf("%d/%d", if (start_all) length(brands) else 1L, length(brands)),
+      cat_id, if (start_all) "all" else "focal",
       if (start_all) "" else " active", if (start_all) " active" else "",
       paste(comp_items, collapse = "")))
   }
@@ -1785,9 +1800,11 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 4px;
   border-radius: 9px; background: #e2e8f0; font-size: 11px; font-weight: 600;
 }
-/* display:inline-block above outranks the browser default for [hidden],
-   so the badge needs its own rule or it shows a stray 0 in the two states
-   that have no comparator count. */
+/* The badge reads "shown of total", which is the one thing the words on the
+   trigger leave out. It is hidden in the focal-only and all-brands states,
+   where the words already pin the number down, and display:inline-block
+   above outranks the browser default for [hidden], so it needs its own
+   rule or it shows through in those two states. */
 .br-cmp-count[hidden] { display: none; }
 .br-cmp-popover {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;

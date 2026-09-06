@@ -61,13 +61,19 @@ test_that("one focal select and one brand-set trigger, and no second copy", {
 })
 
 test_that("the trigger names the state it is in, not a bare number", {
+  # Duncan looked straight at the header and reported the brand selector
+  # missing, because in its opening state the trigger read "Focal only",
+  # which is a status line rather than a control. The word "Brands" now
+  # stays on it in every state.
   focal_only <- controls_sbc()
-  expect_match(focal_only, '<span class="br-cmp-text" data-group="dss">Focal only</span>',
+  expect_match(focal_only,
+               '<span class="br-cmp-text" data-group="dss">Brands: focal only</span>',
                fixed = TRUE)
   expect_match(focal_only, 'data-cmp-mode="focal"', fixed = TRUE)
-  # The count badge starts hidden: it means something only while comparators
-  # are picked, and a stray 0 beside "Focal only" reads as a contradiction.
-  expect_match(focal_only, '<span class="br-cmp-count" data-group="dss" hidden>0</span>',
+  # The count badge starts hidden: the words already pin the number down in
+  # the focal-only and all-brands states. It carries "shown of total", so
+  # the value it is emitted with matches the state rather than a stray 0.
+  expect_match(focal_only, '<span class="br-cmp-count" data-group="dss" hidden>1/4</span>',
                fixed = TRUE)
 })
 
@@ -77,8 +83,82 @@ test_that("chip_default = all opens the header on all brands", {
   # it, so the header and the config agree from the first paint.
   html <- controls_sbc(config = list(focal_brand = "IPK", chip_default = "all"))
   expect_match(html, 'data-cmp-mode="all"', fixed = TRUE)
-  expect_match(html, '>All brands</span>', fixed = TRUE)
+  expect_match(html, '>Brands: all 4</span>', fixed = TRUE)
+  expect_match(html, '<span class="br-cmp-count" data-group="dss" hidden>4/4</span>',
+               fixed = TRUE)
   expect_match(html, 'class="br-cmp-mode active" data-cmp-set="all"', fixed = TRUE)
+})
+
+test_that("the word Brands is on the trigger in every state the JS can set", {
+  # The R side emits two of the three states. The third, and the wording of
+  # all three at runtime, is set by brApplyComparisonSet, so the strings are
+  # read out of the JavaScript rather than trusted.
+  js <- read_sbc(REPORT_SBC, "js", "brand_report.js")
+  expect_match(js, '"Brands: focal only"', fixed = TRUE)
+  expect_match(js, '"Brands: all "', fixed = TRUE)
+  expect_match(js, '"Brands: focal + "', fixed = TRUE)
+  # The compact form is deliberate. Measured in headless Chrome at 800
+  # pixels, "Brands: focal and 14 others" takes the trigger to 210 pixels
+  # and wraps the control bar; this one holds 161 and one line. The trigger
+  # carries a title that spells the state out in words.
+  expect_match(js, 'Showing the focal brand and ', fixed = TRUE)
+  expect_match(js, 'Showing all ', fixed = TRUE)
+  expect_match(js, 'Showing the focal brand only, of ', fixed = TRUE)
+  # The badge still says something the words do not: how many of the
+  # category's brands are on screen.
+  expect_match(js, 'badge.textContent = String(shown) + "/" + String(total);',
+               fixed = TRUE)
+})
+
+
+# --- no cap, and no silent reversal ------------------------------------------
+
+test_that("the five-comparator cap is gone from the control", {
+  # The cap came from a single-category tracker where every view is a chart.
+  # Turas tables have always shown every brand, and chart legibility is the
+  # per-chart Chart brands control's job, so the reason for it was designed
+  # away rather than relaxed.
+  js <- read_sbc(REPORT_SBC, "js", "brand_report.js")
+  expect_false(grepl("CMP_MAX", js, fixed = TRUE))
+  html <- controls_sbc()
+  expect_false(grepl("up to five", html, fixed = TRUE))
+  expect_match(html, 'Or tick the brands to compare with the focal brand',
+               fixed = TRUE)
+})
+
+test_that("ticking a comparator can never untick it again", {
+  # The cap was enforced by setting box.checked = false, so a reader ticking
+  # a sixth brand watched the tick reverse under their finger with no
+  # message. That is the silent failure TRS exists to prevent. This guard is
+  # scoped to the one function a checkbox click enters: the focal change and
+  # the mode buttons do clear boxes, and both are consequences of a different
+  # action the reader just asked for, not a reversal of the click just made.
+  js <- read_sbc(REPORT_SBC, "js", "brand_report.js")
+  start <- regexpr("window.brComparisonSetChanged = function", js, fixed = TRUE)
+  expect_true(start > 0)
+  rest <- substring(js, start)
+  end <- regexpr("\n  };", rest, fixed = TRUE)
+  expect_true(end > 0)
+  body <- substring(rest, 1, end)
+  expect_false(grepl("checked = false", body, fixed = TRUE))
+  expect_false(grepl("checked=false", body, fixed = TRUE))
+  # The one early return left is the guard for a checkbox with no popover
+  # above it, which is a DOM that cannot exist in a rendered report. It
+  # carries no count and no threshold.
+  expect_false(grepl(".length >", body, fixed = TRUE))
+  expect_false(grepl(".length >=", body, fixed = TRUE))
+})
+
+test_that("all brands stays a mode rather than every box ticked", {
+  # The two are not the same claim, and the mode is what a category-wide
+  # view publishes, so nothing may derive one from the other.
+  js <- read_sbc(REPORT_SBC, "js", "brand_report.js")
+  expect_match(js, 'window.BrandSelector.setCategoryHidden(group, []);',
+               fixed = TRUE)
+  # cmpState only ever promotes to "compare" or demotes to "focal"; it never
+  # infers "all" from the checkboxes.
+  expect_match(js, 'if (mode !== "all") mode = comparators.length > 0 ? "compare" : "focal";',
+               fixed = TRUE)
 })
 
 test_that("the three states are all reachable from the popover", {

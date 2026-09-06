@@ -232,20 +232,30 @@
   // ==========================================================================
   // Persistent comparison set
   // ==========================================================================
-  // One control per category sets the focal brand and up to five comparators,
-  // and every destination respects it. Nothing is recomputed and no panel's
+  // One control per category sets the focal brand and its comparators, and
+  // every destination respects it. Nothing is recomputed and no panel's
   // own filtering is reimplemented: the control drives each panel's existing
   // focal select, and publishes the hidden-brand set to the shared
   // category-scoped store that BrandSelector already keeps.
-
-  var CMP_MAX = 5;
+  //
+  // There is no cap on the comparators. An earlier version stopped at five
+  // and enforced it by unticking the sixth box, which reversed a click with
+  // no message: a silent failure of exactly the kind TRS exists to prevent.
+  // The cap came from a single-category tracker where every view is a chart.
+  // Turas tables have always shown every brand in the category, and chart
+  // legibility is handled separately by the per-chart "Chart brands" control,
+  // so the reason for the cap has been designed away rather than relaxed.
+  // If a limit is ever needed here it must say so on screen; it may not undo
+  // the reader's click.
 
   // Three states, and the trigger always names the live one:
   //   "focal"   - only the focal brand is shown
   //   "compare" - the focal brand plus the picked comparators
   //   "all"     - every brand in the category
-  // "all" is a mode, not fifteen ticked boxes, so the five-comparator cap
-  // stays a real cap and a reader can still ask for the whole category.
+  // "all" stays a mode rather than a state derived from every box being
+  // ticked. A reader asking for the whole category is making a different
+  // claim from a reader who happens to have picked all of them, and the mode
+  // is what a category-wide view publishes.
   function cmpPopover(group) {
     return document.querySelector('.br-cmp-popover[data-group="' + group + '"]');
   }
@@ -308,16 +318,42 @@
     var st = cmpState(group);
     cmpSetMode(group, st.mode);
 
+    // The trigger keeps the word "Brands" in every state. Read as "Focal
+    // only", the control looked like a status line rather than a control,
+    // and the brand selector was reported missing by a reader looking
+    // straight at it. The badge carries what the words leave out: how many
+    // of the category's brands are on screen.
+    var pop = cmpPopover(group);
+    var total = pop ? pop.querySelectorAll(".br-cmp-check").length : 0;
+    var shown = st.mode === "all" ? total
+                                  : st.comparators.length + (st.focal ? 1 : 0);
     var badge = document.querySelector('.br-cmp-count[data-group="' + group + '"]');
     if (badge) {
-      badge.textContent = String(st.comparators.length);
+      badge.textContent = String(shown) + "/" + String(total);
       badge.hidden = st.mode !== "compare";
     }
     var text = document.querySelector('.br-cmp-text[data-group="' + group + '"]');
     if (text) {
-      text.textContent = st.mode === "all" ? "All brands"
-                       : st.mode === "compare" ? "Compare with"
-                       : "Focal only";
+      // "focal + N" rather than "focal and N others". Measured in headless
+      // Chrome at 800 pixels wide: the longer wording takes the trigger to
+      // 210 pixels and wraps the control bar onto a second line, while this
+      // one holds 161 and one line at every width tested. The title spells
+      // it out for anyone the shorthand does not.
+      text.textContent =
+        st.mode === "all" ? "Brands: all " + String(total)
+      : st.mode === "compare" ? "Brands: focal + " + String(st.comparators.length)
+      : "Brands: focal only";
+    }
+    var trig = document.querySelector('.br-cmp-trigger[data-group="' + group + '"]');
+    if (trig) {
+      trig.title =
+        st.mode === "all"
+          ? ("Showing all " + String(total) + " brands in this category")
+      : st.mode === "compare"
+          ? ("Showing the focal brand and " + String(st.comparators.length) +
+             " comparators, of " + String(total) + " brands in this category")
+      : ("Showing the focal brand only, of " + String(total) +
+         " brands in this category");
     }
 
     categoryPanels(group).forEach(function (p) { setPanelFocal(p, st.focal); });
@@ -352,7 +388,9 @@
     // The focal brand is always in the comparison set and cannot be unpicked,
     // so its own checkbox follows the dropdown. The brand that was focal
     // before is released rather than silently promoted to a comparator: a
-    // slot consumed without a click is a surprise, and there are only five.
+    // pick the reader never made is a surprise, whether or not slots are
+    // scarce. This is a consequence of changing the focal brand, which the
+    // reader did just ask for, not a reversal of a click on that checkbox.
     document.querySelectorAll(
       '.br-cmp-popover[data-group="' + group + '"] .br-cmp-check')
       .forEach(function (b) {
@@ -372,20 +410,14 @@
     // Ticking a brand always leaves "all brands": the picks are what the
     // reader is now asking for.
     pop.setAttribute("data-cmp-mode", "compare");
-    var st = cmpState(group);
-    if (st.comparators.length > CMP_MAX) {
-      // Five comparators is the cap the control advertises. The whole
-      // category is still one click away, through the All brands button.
-      box.checked = false;
-      window.brApplyComparisonSet(group);
-      return;
-    }
+    // Every tick stands. This function must never write box.checked: the
+    // one thing it may not do is undo the click that called it.
     window.brApplyComparisonSet(group);
   };
 
   // The two named states. "Focal only" clears the picks; "All brands" is a
-  // mode of its own rather than every box ticked, so the five-comparator
-  // cap keeps meaning what it says.
+  // mode of its own rather than every box ticked, because a reader asking
+  // for the category is not the same as a reader who ticked everything.
   window.brSetComparisonMode = function(btn) {
     var pop = btn.closest(".br-cmp-popover");
     if (!pop) return;

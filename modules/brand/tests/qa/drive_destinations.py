@@ -667,11 +667,17 @@ DRIVER = """
         var badge = panel.querySelector('.br-cmp-count');
         var focal = focalSel.value;
 
+        // The trigger must read as a control in every state, so the word
+        // "Brands" is on it whatever is picked. Duncan read the old
+        // "Focal only" and reported the selector missing.
+        var N = allBrands.length;
+        var bar = panel.querySelector('.br-controls');
+
         // State one, as the report opens.
         check(tab + ': opens on the state its config asked for',
-              textEl.textContent === 'Focal only' ||
-              textEl.textContent === 'All brands', textEl.textContent);
-        if (textEl.textContent === 'Focal only') {
+              textEl.textContent === 'Brands: focal only' ||
+              textEl.textContent === 'Brands: all ' + N, textEl.textContent);
+        if (textEl.textContent === 'Brands: focal only') {
           check(tab + ': the count badge is not shown with no comparators',
                 badge.hidden === true);
           checkBrandSet(panel, tab, 'focal only', [focal], allBrands);
@@ -689,15 +695,71 @@ DRIVER = """
           picked.push(c.value);
         });
         check(tab + ': the trigger names the comparison state',
-              textEl.textContent === 'Compare with', textEl.textContent);
-        check(tab + ': the count follows the picks',
-              badge.textContent === '3' && !badge.hidden, badge.textContent);
+              textEl.textContent === 'Brands: focal + 3', textEl.textContent);
+        check(tab + ': and its title spells the state out in words',
+              trigger.title === 'Showing the focal brand and 3 comparators, of ' +
+              N + ' brands in this category', trigger.title);
+        check(tab + ': the count says how many of the category are shown',
+              badge.textContent === '4/' + N && !badge.hidden,
+              badge.textContent);
         checkBrandSet(panel, tab, 'compare with 3', [focal].concat(picked), allBrands);
+
+        // No cap. The old control stopped at five by setting the sixth box
+        // back to unchecked, so a reader watched a tick reverse under their
+        // finger with no message. Every box is ticked here and every one
+        // must stay ticked, with the published set and the visible rows
+        // agreeing with the words on the trigger.
+        var all = [];
+        var reversed = [];
+        Array.prototype.forEach.call(checks, function (c) {
+          if (c.disabled) { all.push(c.value); return; }
+          if (!c.checked) {
+            c.checked = true;
+            c.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (!c.checked) reversed.push(c.value);
+          all.push(c.value);
+        });
+        check(tab + ': no tick is reversed, whatever the count',
+              reversed.length === 0, reversed.join(',') || 'none reversed');
+        check(tab + ': every brand in the category can be a comparator',
+              all.length === N && sameSet(all, allBrands),
+              all.length + ' of ' + N);
+        check(tab + ': the trigger counts every comparator',
+              textEl.textContent === 'Brands: focal + ' + (N - 1),
+              textEl.textContent);
+        check(tab + ': the count reaches the whole category',
+              badge.textContent === N + '/' + N, badge.textContent);
+        // Ticking every box is still "compare", not the all-brands mode:
+        // the two are different claims and only the mode publishes a
+        // category-wide view. The rows must agree either way.
+        check(tab + ': ticking every box does not silently become all-brands mode',
+              pop.getAttribute('data-cmp-mode') === 'compare',
+              pop.getAttribute('data-cmp-mode'));
+        checkBrandSet(panel, tab, 'every brand ticked', allBrands, allBrands);
+        // And the widest state must not push the control bar taller. The two
+        // measurements are taken back to back with only the trigger's text
+        // differing, so the comparison isolates the label. Measuring the
+        // opening state minutes earlier would fold in every scrollbar and
+        // destination change in between, which at the harness viewport of
+        // 800 pixels is enough on its own to tip the flex row onto a second
+        // line whatever the label says.
+        var widest = bar ? bar.getBoundingClientRect().height : 0;
+        var wideText = textEl.textContent;
+        textEl.textContent = 'Brands: focal only';
+        var narrowest = bar ? bar.getBoundingClientRect().height : 0;
+        textEl.textContent = wideText;
+        check(tab + ': the control bar is laid out, so its height means something',
+              narrowest > 0, String(narrowest));
+        check(tab + ': the widest trigger text does not reflow the control bar',
+              widest === narrowest,
+              wideText + ' -> ' + widest + ', narrowest -> ' + narrowest +
+              ', viewport ' + window.innerWidth);
 
         // State three: all brands.
         panel.querySelector('.br-cmp-mode[data-cmp-set="all"]').click();
         check(tab + ': the trigger names the all-brands state',
-              textEl.textContent === 'All brands', textEl.textContent);
+              textEl.textContent === 'Brands: all ' + N, textEl.textContent);
         check(tab + ': the count badge is not shown in the all-brands state',
               badge.hidden === true);
         checkBrandSet(panel, tab, 'all brands', allBrands, allBrands);
@@ -705,7 +767,7 @@ DRIVER = """
         // Back to state one, by name rather than by clearing.
         panel.querySelector('.br-cmp-mode[data-cmp-set="focal"]').click();
         check(tab + ': the trigger returns to the focal-only state',
-              textEl.textContent === 'Focal only', textEl.textContent);
+              textEl.textContent === 'Brands: focal only', textEl.textContent);
         checkBrandSet(panel, tab, 'focal only again', [focal], allBrands);
 
         // The focal brand reaches every panel, and changing it releases the
@@ -825,8 +887,11 @@ def main(argv):
     if not os.path.exists(CHROME):
         print("Chrome not found at", CHROME)
         return 2
+    # A width a report is actually read at. Chrome headless defaults to 800,
+    # where the header control bar is already on two lines whatever the
+    # trigger says, which would leave the reflow check unable to fail.
     cmd = [CHROME, "--headless", "--disable-gpu", "--no-sandbox",
-           "--allow-file-access-from-files",
+           "--allow-file-access-from-files", "--window-size=1280,900",
            "--virtual-time-budget=30000", "--dump-dom", "file://" + path]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     dom = proc.stdout

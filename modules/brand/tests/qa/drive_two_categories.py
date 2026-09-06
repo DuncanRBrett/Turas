@@ -144,8 +144,8 @@ DRIVER = """
     groups.forEach(function (g) {
       var h = header(g);
       check(g + ': the header rendered its opening state',
-            !!h.text && (h.text.textContent === 'Focal only' ||
-                         h.text.textContent === 'All brands'),
+            !!h.text && /^Brands: (focal only|all \d+)$/.test(
+              h.text.textContent),
             h.text ? h.text.textContent : 'no text');
       check(g + ': its panels registered a split-mode handle',
             panelHandles(g).length > 0, String(panelHandles(g).length));

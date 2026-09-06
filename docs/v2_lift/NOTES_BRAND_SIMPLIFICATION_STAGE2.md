@@ -726,9 +726,10 @@ appear.
 | `tests/qa/drive_two_categories.py` | **15 checks, 0 failed**, no console error |
 | IPK fixture report | 3,926,103 bytes before, **3,946,207 after**, 0.5 percent larger |
 
-Both reports were generated to the session scratchpad. Nothing was written
-into the repo, into OneDrive or into TurasProjects, and `preview_start` was
-not used.
+IPK fixture report: 3,960,006 bytes before, **3,962,424 bytes** after, 0.06
+percent larger. Both reports were generated to the session scratchpad.
+Nothing was written into the repo, into OneDrive or into TurasProjects, and
+`preview_start` was not used.
 
 **The control census, named rather than counted loosely.** In the fixture's
 one full-depth category: header focal selects 1 of 1 visible, header brand-set
@@ -1114,3 +1115,176 @@ Headline Metrics, drop a brand from each chart, check the note reads right,
 then save a copy, reopen it and confirm the header set, the chart deviations
 and the notes all came back. Then the Fable pre-merge review, briefed as
 independent of this session. Not merged, not pushed.
+
+
+# Stage 2 follow-up, part four: the header brand control, 6 September 2026
+
+Three changes Duncan agreed, all to the one comparison-set control in the
+category header. No analytical change, no new number, nothing recomputed.
+
+Baseline executed before the first edit, in this worktree at 6984baf0: brand
+suite **FAIL 0, WARN 1, SKIP 2, PASS 2933**, 90.4 s, run from the worktree
+root. It matches the brief. The tip's IPK fixture report was regenerated at
+the clean tree and came to **3,960,006 bytes**, the figure the previous
+session recorded, so the before-and-after diffs are against a reproduced
+baseline rather than a remembered one.
+
+## Change 1, the five-comparator cap is gone
+
+`brComparisonSetChanged` enforced a cap of five by setting `box.checked =
+false` and returning. A reader ticking a sixth brand watched the tick reverse
+under their finger with no message at all, which is the silent failure the
+project's TRS conventions exist to prevent.
+
+The cap came from the Timelaps benchmark, a single-category tracker where
+every view is a chart. Turas tables have always shown all fifteen brands and
+read perfectly well, and chart legibility is handled separately by the
+per-chart "Chart brands" control built earlier on this branch. The reason for
+the cap was designed away rather than relaxed, so it is removed outright: a
+reader may pick as many comparators as they like.
+
+`CMP_MAX` is gone from `brand_report.js`, and so is the only assignment to a
+checkbox's `checked` inside that function. The popover heading in
+`03_page_builder.R` no longer says "up to five others"; it reads "Or tick the
+brands to compare with the focal brand". The four comments that explained the
+cap say instead why there is none.
+
+**"All brands" stays a mode**, not a state derived from every box being
+ticked. The two are different claims, and the mode is what a category-wide
+view publishes. The harness asserts that ticking every box leaves
+`data-cmp-mode="compare"` while the rows on screen still show the whole
+category, so the two paths agree on what is visible without being confused
+for each other.
+
+## Change 2, the trigger reads as a control in every state
+
+It read "Focal only" with nothing picked, and Duncan looked straight at it
+and reported the brand selector missing. That is a findability failure, not a
+matter of taste. The word "Brands" is now on the trigger in all three states:
+
+| State | Trigger | Badge |
+|---|---|---|
+| focal | `Brands: focal only` | hidden |
+| compare | `Brands: focal + 3` | `4/15` |
+| all | `Brands: all 15` | hidden |
+
+**Two decisions inside that, made rather than asked.**
+
+The brief's example was `Brands: IPK and 3 others`. The wording here uses the
+generic word "focal" and the compact `+ N` form, for a reason that was
+measured rather than guessed. In headless Chrome on the regenerated fixture,
+with the trigger driven to fifteen of fifteen:
+
+| Wording | Trigger width | Control bar at 800px | at 1100px and up |
+|---|---|---|---|
+| `Brands: focal only` | 117.4 px | 51 px, one line | 51 px |
+| `Brands: focal + 14` | 160.6 px | 51 px, one line | 51 px |
+| `Brands: focal and 14 more` | 204.3 px | 88.5 px, two lines | 51 px |
+| `Brands: focal and 14 others` | 210.3 px | 88.5 px, two lines | 51 px |
+| `Brands: all 15` | 95.4 px | 51 px, one line | 51 px |
+
+Only the compact form holds one line at every width tested, and the focal
+brand's own name sits in the select immediately to its left, so repeating it
+would be both longer and redundant. The shorthand is spelled out in words on
+the trigger's `title`: "Showing the focal brand and 3 comparators, of 15
+brands in this category". `title` is a reflected attribute, so it survives a
+Save and a reopen, and it is repainted on load like the rest.
+
+The count badge now reads **shown of total**, which is the one thing the
+words leave out, rather than repeating the comparator count the words already
+carry. It stays hidden in the focal-only and all-brands states, where the
+words pin the number down on their own. It is emitted by R with the value its
+opening state implies, `1/15` or `15/15`, so a pre-script paint and a saved
+copy read the same as the live control.
+
+**The badge is grey, not amber.** `#e2e8f0` at `03_page_builder.R`, and it
+always has been. The amber is `.br-cf-trigger.br-cf-on` in
+`panels/00_chart_focus_widget.R`, the Chart brands control's deviating state.
+The badge was given a meaning rather than a colour; restyling it would be a
+change nobody asked for.
+
+## Change 3, no silent reversal, and coverage that says so
+
+Two layers, because one of them can be true while the other is not.
+
+- **In a browser.** The harness ticks every non-disabled box, then asserts
+  every one still reads `checked === true`, that the trigger counts all
+  fourteen, that the badge reaches `15/15`, and that the published hidden set
+  and the visible rows on every host agree with the whole category. It also
+  asserts the mode is still `compare`.
+- **In the source.** `test_single_brand_control.R` reads `brand_report.js`,
+  asserts `CMP_MAX` is absent, cuts out the body of `brComparisonSetChanged`
+  and asserts it contains no `checked = false` and no length comparison. The
+  guard is scoped to that one function deliberately:
+  `brComparisonFocalChanged` and `brSetComparisonMode` do clear boxes, and
+  both are consequences of a different action the reader just asked for, not
+  a reversal of the click that called them.
+
+**The reflow check took two corrections, and both mattered.** The first
+version compared the bar's height in the opening state against its height
+minutes later, and failed at 88.5 against 51. That was not the label: a
+destination switch in between is enough to tip the flex row. It now measures
+the bar with the widest text and again with the narrowest, back to back with
+nothing else changing, so it isolates the label.
+
+That still passed for the wrong reason. Chrome headless defaults to 800
+pixels wide, 756 once a scrollbar appears, where the bar is already on two
+lines whatever the trigger says, so both readings were 88.5 and a label that
+did reflow would have passed too. `drive_destinations.py` now passes
+`--window-size=1280,900`, a width a report is actually read at. The check
+reads **51 against 51 at viewport 1280**, on one line, and can now fail.
+
+**The save round trip now picks every comparator, not two.** The widest set
+is the new case, and a saved copy is where it would break. It carries all
+fourteen through `outerHTML` and back.
+
+## Executed, with the numbers
+
+| Check | Result |
+|---|---|
+| Brand suite, before the first edit, from the worktree root | FAIL 0, WARN 1, SKIP 2, PASS 2933 |
+| Brand suite, after, from the worktree root | **FAIL 0, WARN 1, SKIP 2, PASS 2952**, 99.4 s |
+| `test_single_brand_control.R` alone | FAIL 0, PASS 55, against 37 before |
+| `tests/qa/drive_destinations.py` | **353 checks, 0 failed**, no console error, against 331 before |
+| `tests/qa/drive_two_categories.py` | **15 checks, 0 failed**, no console error |
+| `tests/qa/drive_save_roundtrip.py` | **113 checks, 0 failed**, no console error, against 112 before |
+| `tests/qa/reachability_check.py`, 6984baf0 against this | **PASS**, data-subpanel 5 identical, data-section 29 identical, section ids 13 identical, island classes 8 identical, every parseable island numerically identical, the one unparseable span named in both |
+
+**The control census, on the fixture's one full-depth category.** Header focal
+selects 1 of 1 visible, header brand-set triggers 1 of 1 visible, per-panel
+focal selects 0 of 15 visible, per-panel brand filters 0 of 16 visible, Chart
+brands controls 10 mounted, 10 built, 8 visible beside their chart and 2
+behind a Show chart toggle. Unchanged from the previous session.
+
+IPK fixture report: 3,960,006 bytes before, **3,962,424 bytes** after, 0.06
+percent larger. Both reports were generated to the session scratchpad.
+Nothing was written into the repo, into OneDrive or into TurasProjects, and
+`preview_start` was not used.
+
+## Known limits, stated rather than left to be discovered
+
+- **The no-cap proof is on one category with fifteen brands.** The fixture
+  has one full-depth category. `drive_two_categories.py` clones it, so the
+  loop runs across two groups, but both carry the same fifteen brands. A
+  category with a different brand count is not covered by anything executed
+  here.
+- **The width table is a measurement, not a guarantee at every viewport.**
+  Five wordings were measured at 800, 1100, 1280 and 1440 pixels on the
+  fixture, whose category name is "Dry Seasonings & Spices" and whose longest
+  brand label is "Ina Paarman's Kitchen". A category with a much longer name
+  would consume the same row. What is asserted permanently is the relative
+  check: the widest label may not make the bar taller than the narrowest.
+- **The four elements that have never rendered through the shell with real
+  panel fragments still have not.** Branded Reach, Ad Hoc, Audience Lens and
+  Shopper Behaviour are absent from the fixture. None of them carries a
+  comparison-set control of its own, so this change adds nothing to that gap.
+- **`styler` was not run,** for the same reason as the previous three
+  sessions: the files this touches would be reformatted whole and the churn
+  would bury the change.
+
+## What Duncan still owes
+
+A `launch_turas()` run on the real IPK project. Open a category, read the
+trigger in all three states, tick more than five comparators and confirm
+nothing reverses, then save a copy and reopen it. Then the Fable pre-merge
+review, briefed as independent of this session. Not merged, not pushed.

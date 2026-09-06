@@ -258,16 +258,31 @@ __COMMON__
     check('the focal brand moved off the default', focalSel.value === wantFocal,
           opened + ' to ' + wantFocal);
 
-    // 2. Two comparators.
+    // 2. Every comparator. There is no cap on the comparison set any more,
+    //    so the set a saved copy has to carry is the whole category rather
+    //    than a handful. Picking two would leave the widest case, which is
+    //    the new one, unproven.
     var pop = panel.querySelector('.br-cmp-popover');
     var picked = [];
+    var offered = 0;
     pop.querySelectorAll('.br-cmp-check').forEach(function (b) {
-      if (b.disabled || picked.length >= 2) return;
+      offered++;
+      if (b.disabled) return;
       b.checked = true;
       b.dispatchEvent(new Event('change', { bubbles: true }));
       picked.push(b.value);
     });
-    check('two comparators are picked', picked.length === 2, picked.join(','));
+    check('every comparator the category offers is picked',
+          picked.length === offered - 1 && picked.length > 0,
+          picked.length + ' of ' + (offered - 1));
+    check('and not one of them was reversed',
+          picked.every(function (v) {
+            var box = null;
+            pop.querySelectorAll('.br-cmp-check').forEach(function (b) {
+              if (b.value === v) box = b;
+            });
+            return box && box.checked;
+          }), picked.join(','));
 
     // 3. Deviate every chart that can deviate. The header is not touched
     //    again after this: any header change resets every deviation, which
@@ -320,7 +335,7 @@ __COMMON__
       if (!new RegExp('class="br-cmp-check" value="' + c +
                       '"[^>]*checked').test(html)) ok = false;
     });
-    check('the serialised string carries both comparators as attributes', ok,
+    check('the serialised string carries every comparator as an attribute', ok,
           picked.join(','));
     // Both needles are assembled at runtime. The serialised string contains
     // this harness, so a literal needle would match its own source and the
