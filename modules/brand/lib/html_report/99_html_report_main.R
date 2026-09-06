@@ -63,7 +63,8 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   }
 
   for (layer_file in c("04_chart_builder.R", "02_table_builder.R",
-                        "01_data_transformer.R", "03_page_builder.R")) {
+                        "01_data_transformer.R", "03_page_builder.R",
+                        "03b_insight_number_check.R")) {
     fp <- file.path(report_dir, layer_file)
     if (file.exists(fp)) source(fp, local = FALSE)
   }
@@ -153,6 +154,27 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
       list()
     }
   )
+
+  # --- Layer 2c: the authored-insight number check ---
+  # Analyst-authored insights from the Section_Insights sheet are typed once
+  # and survive every re-run, so a sentence that was true when it was written
+  # can end up standing above a table whose figures have moved. Check each
+  # one's figures against its own section's data, at the view the section
+  # opens on. This never refuses a run: a stale sentence is reported three
+  # ways (console box, run warning, a marker inside the insight box in the
+  # HTML) and the report is still written.
+  insight_check <- tryCatch(
+    check_brand_section_insights(config$section_insights, results),
+    error = function(e) {
+      message(sprintf("[BRAND HTML] Insight number check failed: %s", e$message))
+      NULL
+    }
+  )
+  if (!is.null(insight_check)) {
+    config$section_insight_checks <- insight_check
+    brand_insight_check_console(insight_check)
+    gen_warnings <- c(gen_warnings, brand_insight_check_warnings(insight_check))
+  }
 
   # Load panel styles + JS (funnel + mental availability)
   brand_colour_cfg <- config$colour_focal %||% "#1A5276"

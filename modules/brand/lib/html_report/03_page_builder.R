@@ -196,12 +196,18 @@ build_br_tab_nav <- function(category_names, config, display_map = NULL,
 #'   Excel buttons are skipped. Used for Funnel and Mental Availability
 #'   sub-tab toolbars where the panel already renders its own pin /
 #'   PNG / Excel controls and a duplicate would clutter the UI.
+#' @param check_note Optional character. The authored-insight number check's
+#'   marker for this section, from brand_insight_check_note(). Rendered as a
+#'   sibling of the rendered view inside the insight container, never inside
+#'   the textarea: the panel pin dropdowns read .br-insight-editor, and a
+#'   marker in there would be pinned as part of the analyst's own text.
 #'
 #' @keywords internal
 build_br_section_toolbar <- function(section_id, prefill_text = NULL,
                                       internal_tab = NULL,
                                       initial_visible = TRUE,
-                                      omit_chart_buttons = FALSE) {
+                                      omit_chart_buttons = FALSE,
+                                      check_note = "") {
   has_text <- !is.null(prefill_text) && !is.na(prefill_text) &&
               nzchar(trimws(as.character(prefill_text)))
   prefill_text <- if (has_text) as.character(prefill_text) else ""
@@ -307,21 +313,40 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
       toggle_handler, section_id, toggle_label)
   }
 
+  check_note <- if (is.null(check_note) || is.na(check_note)) "" else
+    as.character(check_note)
+
   container_html <- sprintf('
 <div class="br-insight-container" data-section="%s" data-prefilled="%s" style="%s">
   <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
     style="%s">%s</textarea>
   <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
-    style="%s">%s</div>
+    style="%s">%s</div>%s
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
     section_id, if (has_text) "true" else "false", container_style,
     section_id, textarea_style, .br_esc(prefill_text),
     section_id, section_id, rendered_style, rendered_html,
+    check_note,
     section_id)
 
   paste0(wrapper_open, toolbar_html, container_html, wrapper_close)
+}
+
+
+#' The authored-insight number check's marker for one section, if any
+#'
+#' Safe accessor used by every toolbar call site. Returns "" when the check
+#' did not run (an older results object, a failure inside the check, a report
+#' generated without it) so a missing check can never break a page.
+#'
+#' @keywords internal
+.br_insight_check_note <- function(config, anchor) {
+  if (!exists("brand_insight_check_note", mode = "function")) return("")
+  tryCatch(
+    brand_insight_check_note(config$section_insight_checks, anchor),
+    error = function(e) "")
 }
 
 
@@ -413,7 +438,8 @@ build_br_summary_panel <- function(results, config) {
     section_id, section_id))
   parts <- c(parts, build_br_section_toolbar(
     section_id,
-    prefill_text = section_insight_for(config$section_insights, section_id)))
+    prefill_text = section_insight_for(config$section_insights, section_id),
+    check_note   = .br_insight_check_note(config, section_id)))
 
   cats <- results$results$categories
   if (!is.null(cats)) {
@@ -761,7 +787,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   toolbar_for <- function(sid) {
     build_br_section_toolbar(
       sid,
-      prefill_text = section_insight_for(config$section_insights, sid))
+      prefill_text = section_insight_for(config$section_insights, sid),
+      check_note   = .br_insight_check_note(config, sid))
   }
 
   parts <- character(0)
@@ -1106,7 +1133,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                                                    sub_anchor),
           internal_tab       = internal_tab,
           initial_visible    = TRUE,
-          omit_chart_buttons = TRUE))
+          omit_chart_buttons = TRUE,
+          check_note         = .br_insight_check_note(config, sub_anchor)))
       }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
@@ -1205,6 +1233,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         cb_toggle_label <- if (cb_has) "Edit Insight" else "+ Add Insight"
         cb_toggle_handler <- if (cb_has) "_brToggleInsightEdit" else "_brToggleInsight"
         cb_rendered_html <- if (cb_has) .br_render_insight_md(cb_insight_text) else ""
+        cb_check_note <- if (isTRUE(lf$primary))
+          .br_insight_check_note(config, section_id) else ""
 
         if (isTRUE(lf$primary)) parts <- c(parts, sprintf('
 <div class="cb-insight-footer" style="margin-top:20px;">
@@ -1216,7 +1246,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
       style="%s">%s</textarea>
     <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
-      style="%s">%s</div>
+      style="%s">%s</div>%s
     <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
       style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
   </div>
@@ -1225,6 +1255,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           section_id, if (cb_has) "true" else "false", cb_container_style,
           section_id, cb_textarea_style, .br_esc(cb_insight_text),
           section_id, section_id, cb_rendered_style, cb_rendered_html,
+          cb_check_note,
           section_id))
       } else {
         # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
@@ -1362,7 +1393,8 @@ build_br_portfolio_panel <- function(results, config) {
   # raw anchors through unchanged so each one wires correctly.
   parts <- c(parts, build_br_section_toolbar(
     section_id,
-    prefill_text = section_insight_for(config$section_insights, section_id)))
+    prefill_text = section_insight_for(config$section_insights, section_id),
+    check_note   = .br_insight_check_note(config, section_id)))
 
   # Brand picker chip row
   if (length(ordered_bcs) > 0L) {

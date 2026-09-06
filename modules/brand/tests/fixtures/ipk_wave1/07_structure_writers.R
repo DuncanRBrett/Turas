@@ -130,6 +130,38 @@ ipk_write_brand_config <- function(path) {
     stringsAsFactors = FALSE
   ))
 
+  # Section_Insights: analyst-authored notes that survive a re-run, the sheet
+  # R/01b_section_insights.R loads. Every figure below was read off a real
+  # run_brand() on this fixture and is correct for the view its section opens
+  # on, so the authored-insight number check
+  # (lib/html_report/03b_insight_number_check.R) has something true to run
+  # over and a false positive here is a real failure, not a fixture quirk.
+  # The funnel note quotes the nested chain, which is what the funnel page
+  # opens on: IPK 92 / 67 / 45 / 32, category average 61 / 24 / 10 / 6.
+  openxlsx::addWorksheet(wb, "Section_Insights")
+  openxlsx::writeData(wb, "Section_Insights", data.frame(
+    Category = c("_REPORT", "DSS", "DSS", "DSS"),
+    Section  = c("Executive Summary", "Brand Funnel",
+                 "Category Entry Points", "Word of Mouth"),
+    Insight  = c(
+      paste("IPK leads the Dry Seasonings funnel at every stage and holds",
+            "the top mental market share of the brands measured."),
+      paste("IPK is known to 92% of the sample and holds 67% at preference,",
+            "45% at past 12 months and 32% at past 3 months.",
+            "The category average runs 61% then 24%, so IPK is ahead at",
+            "every stage of the chain."),
+      paste("IPK's strongest entry point reaches 16.7% of the sample,",
+            "against 14.4% for Robertsons and for Knorr on the same one.",
+            "Mental penetration sits at 84% across the 15 entry points."),
+      paste("IPK receives positive word of mouth from 23.5% of category",
+            "buyers and shares it at 21.9%, both ahead of Robertsons at",
+            "21.9% received and 13.2% shared.")
+    ),
+    Order = 1:4,
+    Author = rep("Fixture", 4),
+    stringsAsFactors = FALSE
+  ))
+
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   invisible(path)
 }

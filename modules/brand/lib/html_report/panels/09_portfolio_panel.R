@@ -58,6 +58,11 @@ build_br_portfolio_panel <- function(results, config) {
   # into the current report.
   .pf_set_section_insights(config$section_insights)
   on.exit(.pf_set_section_insights(NULL), add = TRUE)
+  # Same stash for the authored-insight number check's findings, so a pf-*
+  # section whose note cites a figure the portfolio data does not carry gets
+  # the marker in the report, not only the console box and the run warning.
+  .pf_set_insight_checks(config$section_insight_checks)
+  on.exit(.pf_set_insight_checks(NULL), add = TRUE)
 
   # Portfolio-wide brand-colour map. Walks the master Brands sheet once
   # and produces a {BrandCode -> hex} dict that every Portfolio sub-tab
@@ -1126,6 +1131,18 @@ build_br_portfolio_panel <- function(results, config) {
     character(0) else section_insights
 }
 
+.pf_set_insight_checks <- function(checks) {
+  .pf_section_insights_env$checks <- checks
+}
+
+#' The authored-insight number check's marker for a portfolio sub-tab
+#' @keywords internal
+.pf_check_note <- function(section_id) {
+  if (!exists("brand_insight_check_note", mode = "function")) return("")
+  tryCatch(brand_insight_check_note(.pf_section_insights_env$checks, section_id),
+           error = function(e) "")
+}
+
 .pf_lookup_insight <- function(section_id) {
   m <- .pf_section_insights_env$current
   if (is.null(m) || length(m) == 0L) return("")
@@ -1190,7 +1207,7 @@ build_br_portfolio_panel <- function(results, config) {
   <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
     style="%s">%s</textarea>
   <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
-    style="%s">%s</div>
+    style="%s">%s</div>%s
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
@@ -1199,6 +1216,7 @@ build_br_portfolio_panel <- function(results, config) {
     section_id, if (has_text) "true" else "false", container_style,
     section_id, textarea_style, .pf_esc(prefill_text),
     section_id, section_id, rendered_style, rendered_html,
+    .pf_check_note(section_id),
     section_id
   )
 }
