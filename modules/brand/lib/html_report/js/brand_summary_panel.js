@@ -156,6 +156,7 @@
       renderFunnelCard(root, cat.funnel, brandCode, snap);
       renderWorkingCard(root, cat, brandCode, snap);
       renderWeakCard(root, cat, brandCode, snap);
+      renderOpportunitiesCard(root, cat, brandCode, snap);
       renderWomCard(root, snap);
       renderRepertoireCard(root, cat.dop, brandCode);
       renderPenetrationNotes(root, cat);
@@ -683,45 +684,76 @@
   }
 
   /* ---------------------------------------------------------------------
-   * What's working card: top-3 CEPs + top-3 attributes the focal brand
-   * over-indexes on (by advantage_pp, focal value minus cat avg in pp).
-   * Two columns side-by-side. Each item shows label, focal value, cat
-   * avg, signed delta.
+   * The two Why blocks, split by concept.
+   *
+   * They used to be split by direction, over-indexers in one card and
+   * under-indexers in the other, with category entry points and attributes
+   * mixed inside each. Those are different things: a category entry point
+   * is a buying moment, an attribute is what people say the brand is like,
+   * and a reader has to be able to tell which is which. So one card is
+   * moments and the other is associations, and inside each the split is
+   * ahead of the category average against behind it.
+   *
+   * The card keys stay `working` and `weak` because pins, PNG capture and
+   * Excel export resolve a section by data-section="brsum-<key>" and
+   * analysts have saved work against those names. The key is an identifier
+   * and the card title is a label; nothing derives one from the other.
    * --------------------------------------------------------------------- */
+  var CONCEPTS = {
+    working: {
+      block: 'cep',
+      unit: 'category entry point',
+      units: 'category entry points',
+      blurb: 'Category Entry Points: the buying moments people link to this brand. Source: the Mental Availability battery, as the % of respondents linking each moment to the brand. Ranked by the gap to the category average.'
+    },
+    weak: {
+      block: 'attrs',
+      unit: 'attribute',
+      units: 'attributes',
+      blurb: 'Brand attributes: what people say this brand is like. Source: the Mental Availability battery, as the % of respondents linking each attribute to the brand. Ranked by the gap to the category average.'
+    }
+  };
+
   function renderWorkingCard(root, cat, brandCode, snap) {
-    renderAdvantageCard(root, 'working', cat, brandCode, snap, 'top');
+    renderConceptCard(root, 'working', cat, brandCode, snap);
   }
   function renderWeakCard(root, cat, brandCode, snap) {
-    renderAdvantageCard(root, 'weak', cat, brandCode, snap, 'bottom');
+    renderConceptCard(root, 'weak', cat, brandCode, snap);
   }
 
-  /* Shared engine for the Working / Weak cards. direction = 'top' takes
-     the 3 items with the largest positive advantage_pp; 'bottom' takes
-     the 3 with the largest negative advantage_pp. CEP + attributes
-     render side-by-side. Each side falls back to "no items in this
-     direction" when no qualifying entry exists. */
-  function renderAdvantageCard(root, key, cat, brandCode, snap, direction) {
+  function renderConceptCard(root, key, cat, brandCode, snap) {
     var body = cardBody(root, key);
     if (!body) return;
-    var col = (snap && snap.colour) || '#1A5276';
-    var cepHtml  = advantageCol(cat.cep,   brandCode, direction, col, 'CEPs');
-    var attrHtml = advantageCol(cat.attrs, brandCode, direction, col, 'Attributes');
-    if (!cepHtml && !attrHtml) {
-      body.innerHTML = '<div class="brsum-card-empty">Mental Availability data not available.</div>';
+    var spec  = CONCEPTS[key];
+    var block = cat ? cat[spec.block] : null;
+    var col   = (snap && snap.colour) || '#1A5276';
+
+    var meta = cardMeta(root, key);
+    if (meta) meta.textContent = (block && block.base_label) ? block.base_label : '';
+
+    var aheadHtml  = advantageCol(block, brandCode, 'top', col,
+                                  'Ahead of the category average', spec);
+    var behindHtml = advantageCol(block, brandCode, 'bottom', col,
+                                  'Behind the category average', spec);
+    if (!aheadHtml && !behindHtml) {
+      body.innerHTML = '<div class="brsum-card-empty">' +
+        escHtml(spec.units.charAt(0).toUpperCase() + spec.units.slice(1)) +
+        ' were not measured for this category.</div>';
       return;
     }
-    var blurb = direction === 'top'
-      ? 'CEPs and attributes this brand <strong>over-indexes</strong> on, where its link rate is higher than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest positive first.'
-      : 'CEPs and attributes this brand <strong>under-indexes</strong> on, where its link rate is lower than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest negative first.';
     body.innerHTML =
-      '<p class="brsum-card-blurb">' + blurb + '</p>' +
+      '<p class="brsum-card-blurb">' + spec.blurb + '</p>' +
       '<div class="brsum-adv-grid">' +
-        (cepHtml  || '<div class="brsum-adv-col brsum-adv-empty">No CEP data.</div>') +
-        (attrHtml || '<div class="brsum-adv-col brsum-adv-empty">No attribute data.</div>') +
+        (aheadHtml  || '<div class="brsum-adv-col brsum-adv-empty">No ' +
+                       escHtml(spec.unit) + ' data.</div>') +
+        (behindHtml || '<div class="brsum-adv-col brsum-adv-empty">No ' +
+                       escHtml(spec.unit) + ' data.</div>') +
       '</div>';
   }
 
-  function advantageCol(block, brandCode, direction, col, title) {
+  /* Rank one concept's items for one direction. `spec` names the unit so an
+     empty column can say what it found none of. */
+  function advantageCol(block, brandCode, direction, col, title, spec) {
     if (!block || !block.available) return '';
     var brand = block.brands && block.brands[brandCode];
     if (!brand) return '';
@@ -748,17 +780,25 @@
     ranked.sort(function (a, b) {
       return direction === 'top' ? b.delta - a.delta : a.delta - b.delta;
     });
-    /* Drop wrong-sign rows so the "Working" card never lists negatives
-       and "Weak" never lists positives. Those don't fit the heading. */
+    /* Drop wrong-sign rows so the ahead column never lists a shortfall and
+       the behind column never lists a lead. Those don't fit the heading,
+       and promoting the least-strong item into a gap would invent one. */
+    var total = ranked.length;
     ranked = ranked.filter(function (r) {
       return direction === 'top' ? r.delta > 0 : r.delta < 0;
     });
+    var unit  = (spec && spec.unit)  || 'item';
+    var units = (spec && spec.units) || 'items';
     if (!ranked.length) {
+      var none = direction === 'top'
+        ? 'This brand is at or behind the category average on every one of the ' +
+          total + ' ' + units + ' measured.'
+        : 'This brand is at or above the category average on every one of the ' +
+          total + ' ' + units + ' measured. There is no ' + unit +
+          ' behind the category average to report.';
       return '<div class="brsum-adv-col">' +
                '<div class="brsum-adv-coltitle">' + escHtml(title) + '</div>' +
-               '<div class="brsum-adv-empty">No ' +
-                 (direction === 'top' ? 'over-indexers' : 'under-indexers') +
-               ' for this brand.</div>' +
+               '<div class="brsum-adv-empty">' + escHtml(none) + '</div>' +
              '</div>';
     }
     ranked = ranked.slice(0, 3);
@@ -781,6 +821,174 @@
              '<div class="brsum-adv-coltitle">' + escHtml(title) + '</div>' +
              '<ul class="brsum-adv-list">' + rows + '</ul>' +
            '</div>';
+  }
+
+  /* ---------------------------------------------------------------------
+   * Opportunities to examine.
+   *
+   * The block this replaces was labelled Protect, Build and Investigate,
+   * which reads as a model's decision. It is rules over numbers, so it says
+   * so, and every item names where it came from: a Mental Advantage
+   * decision, something read off the funnel above, or a rule of thumb.
+   *
+   * The hard rule here is that it never manufactures a weakness. When
+   * Mental Advantage returns no defend and no build item, the block says
+   * that plainly instead of promoting the least-strong item into a gap. A
+   * rule-of-thumb item may still name the largest and the smallest lead,
+   * but it is labelled as a rule of thumb and never as a model output.
+   * --------------------------------------------------------------------- */
+  function renderOpportunitiesCard(root, cat, brandCode, snap) {
+    var body = cardBody(root, 'opportunities');
+    if (!body) return;
+    var parts = [];
+    parts.push('<p class="brsum-card-blurb">Rules over the numbers on this ' +
+      'page, not a model recommendation. Each item names where it came ' +
+      'from, and nothing here is a finding on its own.</p>');
+
+    var adv = advantageDecisions(cat, brandCode);
+    if (!adv.measured) {
+      parts.push(oppNone('Mental Advantage was not run for this category, ' +
+        'so there is no defend or build item to report.'));
+    } else if (adv.defend.length || adv.build.length) {
+      var items = [];
+      adv.defend.slice(0, 2).forEach(function (d) {
+        items.push(oppItem('model', 'Mental Advantage: defend',
+          d.label + ' is linked to this brand well above what its size in the ' +
+          'category would predict, at ' + signed(d.advantage) + 'pp. ' +
+          'Mental Advantage marks it defend.'));
+      });
+      adv.build.slice(0, 2).forEach(function (d) {
+        items.push(oppItem('model', 'Mental Advantage: build',
+          d.label + ' is linked to this brand well below what its size in the ' +
+          'category would predict, at ' + signed(d.advantage) + 'pp. ' +
+          'Mental Advantage marks it build.'));
+      });
+      parts.push('<ul class="brsum-opp-list">' + items.join('') + '</ul>');
+    } else {
+      /* The honest empty case. On the IPK fixture this is what the focal
+         brand gets: every one of its category entry points and attributes
+         lands on maintain. */
+      var fname = (snap && snap.name) || 'This brand';
+      parts.push(oppNone('Mental Advantage returns no defend and no build ' +
+        'item for ' + fname + ' here. All ' + adv.n + ' measured ' + adv.what +
+        ' sit inside its threshold, which it reads as maintain. There is no ' +
+        'gap in this battery to report, and none is invented below.'));
+      var rules = [];
+      if (adv.best) {
+        rules.push(oppItem('rule-of-thumb', 'Rule of thumb: worth protecting',
+          adv.best.label + ' is this brand’s largest lead over the category ' +
+          'average, at ' + signed(adv.best.delta) + 'pp. A rule of thumb for ' +
+          'what to protect, not a model output.'));
+      }
+      if (adv.worst && adv.best && adv.worst.idx !== adv.best.idx) {
+        rules.push(oppItem('rule-of-thumb', 'Rule of thumb: worth watching',
+          adv.worst.label + ' is its ' +
+          (adv.worst.delta >= 0 ? 'smallest lead over' : 'largest shortfall against') +
+          ' the category average, at ' + signed(adv.worst.delta) + 'pp. A rule ' +
+          'of thumb for what to watch, not a model output.'));
+      }
+      if (rules.length) {
+        parts.push('<ul class="brsum-opp-list">' + rules.join('') + '</ul>');
+      }
+    }
+
+    var drop = biggestFunnelDrop(cat, brandCode);
+    if (drop) {
+      parts.push('<ul class="brsum-opp-list">' + oppItem('observed',
+        'Read off the funnel above',
+        'The largest step down is from ' + drop.from + ' at ' +
+        pctText(drop.fromValue) + ' to ' + drop.to + ' at ' +
+        pctText(drop.toValue) + ', which is ' + Math.round(drop.ratio * 100) +
+        '% of the stage before it.') + '</ul>');
+    }
+    body.innerHTML = parts.join('');
+  }
+
+  function oppItem(kind, tag, text) {
+    return '<li class="brsum-opp-item" data-brsum-opp-kind="' + kind + '">' +
+             '<span class="brsum-opp-tag">' + escHtml(tag) + '</span>' +
+             '<span class="brsum-opp-text">' + escHtml(text) + '</span>' +
+           '</li>';
+  }
+  function oppNone(text) {
+    return '<p class="brsum-opp-none" data-brsum-opp-none>' +
+           escHtml(text) + '</p>';
+  }
+  function signed(v) {
+    return (v >= 0 ? '+' : '') + Number(v).toFixed(1);
+  }
+  function pctText(v) {
+    return Math.round(v * 100) + '%';
+  }
+
+  /* Read the Mental Advantage decision the engine already wrote for each
+     stimulus, across both batteries. The decision is the model's, taken at
+     its own threshold against its own expected value; nothing is
+     reclassified here. The best and worst entries are the arithmetic gap to
+     the category average, which is the figure the two Why cards display, so
+     a rule-of-thumb item and the list above it cannot disagree. */
+  function advantageDecisions(cat, brandCode) {
+    var out = { measured: false, defend: [], build: [], n: 0,
+                what: 'items', best: null, worst: null };
+    var seen = [];
+    [['cep', 'category entry points'], ['attrs', 'attributes']].forEach(
+      function (pair) {
+        var block = cat ? cat[pair[0]] : null;
+        if (!block || !block.available) return;
+        var brand = block.brands && block.brands[brandCode];
+        if (!brand) return;
+        out.measured = true;
+        seen.push(pair[1]);
+        var stims  = block.stim_codes  || [];
+        var labels = block.stim_labels || stims;
+        var avgs   = block.cat_avg_pct || [];
+        var fps    = brand.focal_pct   || [];
+        var decs   = brand.decision    || [];
+        var advs   = brand.advantage_pp || [];
+        for (var i = 0; i < stims.length; i++) {
+          var label = labels[i] || stims[i];
+          var dec = String(decs[i] || '').toLowerCase();
+          if (dec === 'defend' || dec === 'build') {
+            out[dec].push({ label: label, advantage: advs[i] });
+          }
+          var fv = fps[i], av = avgs[i];
+          if (fv == null || isNaN(fv) || av == null || isNaN(av)) continue;
+          out.n++;
+          var entry = { idx: pair[0] + ':' + i, label: label, delta: fv - av };
+          if (!out.best  || entry.delta > out.best.delta)  out.best  = entry;
+          if (!out.worst || entry.delta < out.worst.delta) out.worst = entry;
+        }
+      });
+    out.defend.sort(function (a, b) { return b.advantage - a.advantage; });
+    out.build.sort(function (a, b) { return a.advantage - b.advantage; });
+    if (seen.length) out.what = seen.join(' and ');
+    return out;
+  }
+
+  /* The largest step down in the funnel this page already draws, as a share
+     of the stage before it. .biggest_drop_for_focal() in R/03_funnel.R finds
+     the same step under the default ratio conversion metric, and this is
+     phrased as a share of the stage before so it stays true whichever metric
+     the config sets. Nothing here is added to the payload. */
+  function biggestFunnelDrop(cat, brandCode) {
+    var f = cat && cat.funnel;
+    if (!f || !f.available) return null;
+    var vals = f.brands && f.brands[brandCode];
+    var keys = f.stage_keys || [];
+    var labs = f.stage_labels || keys;
+    if (!vals || vals.length < 2) return null;
+    var worst = null;
+    for (var i = 1; i < vals.length; i++) {
+      var prev = vals[i - 1], cur = vals[i];
+      if (prev == null || cur == null || isNaN(prev) || isNaN(cur) || prev <= 0)
+        continue;
+      var ratio = cur / prev;
+      if (!worst || ratio < worst.ratio) {
+        worst = { from: labs[i - 1] || keys[i - 1], to: labs[i] || keys[i],
+                  fromValue: prev, toValue: cur, ratio: ratio };
+      }
+    }
+    return worst;
   }
 
   /* ---------------------------------------------------------------------
@@ -1061,7 +1269,9 @@
                lines: lines, headline: lines.join(' ') };
     },
     tileFacts: function (snap, cat) { return tileFacts(heroAnchors(snap), cat); },
-    boughtWindowLabel: boughtWindowLabel
+    boughtWindowLabel: boughtWindowLabel,
+    advantageDecisions: advantageDecisions,
+    biggestFunnelDrop: biggestFunnelDrop
   };
 
   /* -------------------------------------------------------------------------

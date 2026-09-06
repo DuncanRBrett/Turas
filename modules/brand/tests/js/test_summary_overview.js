@@ -312,6 +312,117 @@ assert('and is absent when the category did not collect it',
   above.headline.indexOf('Net word of mouth') === -1);
 
 // ---------------------------------------------------------------------------
+section('Opportunities never manufactures a weakness');
+// ---------------------------------------------------------------------------
+// Shape copied from a generated IPK fixture report: stim_codes, stim_labels,
+// cat_avg_pct and a per-brand { focal_pct, decision, advantage_pp }.
+function advBlock(deltas, decisions, advantage) {
+  const n = deltas.length;
+  const avgs = [];
+  const fps = [];
+  for (let i = 0; i < n; i++) { avgs.push(10); fps.push(10 + deltas[i]); }
+  return {
+    available: true,
+    stim_codes: deltas.map(function (d, i) { return 'S' + (i + 1); }),
+    stim_labels: deltas.map(function (d, i) { return 'Item ' + (i + 1); }),
+    cat_avg_pct: avgs,
+    base_label: 'n=438, total respondents',
+    brands: { FOC: { focal_pct: fps,
+                     decision: decisions,
+                     advantage_pp: advantage } }
+  };
+}
+
+// The IPK fixture case, measured off the generated report: every one of the
+// 15 category entry points and 15 attributes is above the category average
+// (cep deltas 1.86 to 7.52, attrs 2.01 to 7.64) and every Mental Advantage
+// decision is Maintain. There is no under-indexer and no defend or build.
+const ALL_MAINTAIN = new Array(15).fill('Maintain');
+const CEP_DELTAS = [1.86, 5.99, 6.91, 7.14, 2.09, 6.45, 3.68, 6.22, 7.14, 5.05,
+                    3.46, 4.59, 7.52, 7.14, 5.77];
+const ATTR_DELTAS = [2.01, 6.10, 7.00, 7.20, 2.20, 6.50, 3.80, 6.30, 7.10, 5.10,
+                     3.50, 4.60, 7.64, 7.20, 5.80];
+const CAT_EMPTY = {
+  label: CAT_NAME, n_brands: 15, funnel: FUNNEL,
+  cep:   advBlock(CEP_DELTAS,  ALL_MAINTAIN, CEP_DELTAS.map(function (d) { return d - 4; })),
+  attrs: advBlock(ATTR_DELTAS, ALL_MAINTAIN, ATTR_DELTAS.map(function (d) { return d - 4; }))
+};
+
+const empty = D.advantageDecisions(CAT_EMPTY, 'FOC');
+assert('both batteries were measured', empty.measured);
+assertEqual('no defend item is found', empty.defend.length, 0);
+assertEqual('no build item is found', empty.build.length, 0);
+assertEqual('all thirty items are counted', empty.n, 30);
+assertEqual('and the block names both batteries', empty.what,
+  'category entry points and attributes');
+assertEqual('the largest lead is the largest arithmetic gap',
+  empty.best.label, 'Item 13');
+assert('the largest lead uses the gap the Why cards display',
+  Math.abs(empty.best.delta - 7.64) < 0.001);
+assertEqual('the smallest lead is the smallest arithmetic gap',
+  empty.worst.label, 'Item 1');
+assert('the smallest lead is still a lead, not a shortfall',
+  empty.worst.delta > 0);
+assert('the smallest lead uses the gap the Why cards display',
+  Math.abs(empty.worst.delta - 1.86) < 0.001);
+
+// A brand that does have defend and build items still gets them.
+const decs = ALL_MAINTAIN.slice();
+decs[2] = 'Defend'; decs[7] = 'Build';
+const advPP = CEP_DELTAS.map(function () { return 0; });
+advPP[2] = 8.4; advPP[7] = -6.1;
+const CAT_MIXED = {
+  label: CAT_NAME, n_brands: 15, funnel: FUNNEL,
+  cep: advBlock(CEP_DELTAS, decs, advPP),
+  attrs: null
+};
+const mixed = D.advantageDecisions(CAT_MIXED, 'FOC');
+assertEqual('the defend item is picked up', mixed.defend.length, 1);
+assertEqual('by its label', mixed.defend[0].label, 'Item 3');
+assertEqual('the build item is picked up', mixed.build.length, 1);
+assertEqual('by its label', mixed.build[0].label, 'Item 8');
+assertEqual('only the measured battery is named', mixed.what,
+  'category entry points');
+
+// Nothing measured at all is reported as nothing measured, not as no gaps.
+const none = D.advantageDecisions({ label: CAT_NAME }, 'FOC');
+assertEqual('an unmeasured category reports measured false', none.measured, false);
+assertEqual('with no defend items', none.defend.length, 0);
+assertEqual('and no build items', none.build.length, 0);
+
+// A brand absent from the battery is not read as a brand with no gaps.
+const absent = D.advantageDecisions(CAT_EMPTY, 'OTHER');
+assertEqual('a brand absent from the battery reports measured false',
+  absent.measured, false);
+
+// ---------------------------------------------------------------------------
+section('the funnel step is read off the funnel the page already draws');
+// ---------------------------------------------------------------------------
+const drop = D.biggestFunnelDrop(CAT_F, 'FOC');
+assert('a step is found', !!drop);
+assertEqual('from the stage before the largest fall', drop.from, 'Past 12 months');
+assertEqual('to the stage after it', drop.to, 'Past 3 months');
+// 0.449772 / 0.623288 = 0.7216117, which is the value .biggest_drop_for_focal()
+// returns for this brand on the IPK fixture under the default ratio metric.
+assert('and the ratio matches the engine to six places',
+  Math.abs(drop.ratio - 0.7216117) < 0.000001);
+
+assertEqual('no funnel means no step', D.biggestFunnelDrop({}, 'FOC'), null);
+assertEqual('one stage means no step',
+  D.biggestFunnelDrop({ funnel: { available: true, stage_keys: ['aware'],
+                                  stage_labels: ['Aware'],
+                                  brands: { FOC: [0.9] } } }, 'FOC'), null);
+// A zero stage cannot be divided into, and is skipped rather than reported
+// as an infinite fall.
+const zeroed = D.biggestFunnelDrop({ funnel: {
+  available: true,
+  stage_keys: ['aware', 'consideration', 'bought_target'],
+  stage_labels: ['Aware', 'Prefer', 'Past 3 months'],
+  brands: { FOC: [0.5, 0, 0] } } }, 'FOC');
+assertEqual('a zero stage is skipped', zeroed.from, 'Aware');
+assertEqual('leaving the step that can be computed', zeroed.to, 'Prefer');
+
+// ---------------------------------------------------------------------------
 section('no em dash reaches a reader');
 // ---------------------------------------------------------------------------
 [top, mid, last, nine, above, below, ld, ns, wr].forEach(function (r, i) {

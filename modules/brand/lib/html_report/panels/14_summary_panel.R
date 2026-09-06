@@ -363,6 +363,37 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .brsum-adv-item.is-over  .brsum-adv-delta { color: #065f46; background: #d1fae5; }
 .brsum-adv-item.is-under .brsum-adv-delta { color: #991b1b; background: #fee2e2; }
+
+/* ---- Opportunities to examine ---- */
+.brsum-opp-none {
+  margin: 0 0 12px; padding: 10px 14px;
+  border: 1px solid #e2e8f0; border-left: 4px solid #94a3b8;
+  border-radius: 8px; background: #f8fafc;
+  font-size: 12.5px; line-height: 1.5; color: #334155;
+}
+.brsum-opp-list { list-style: none; padding: 0; margin: 0 0 10px; }
+.brsum-opp-list:last-child { margin-bottom: 0; }
+.brsum-opp-item {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 9px 12px; margin-bottom: 8px;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff;
+}
+.brsum-opp-item:last-child { margin-bottom: 0; }
+.brsum-opp-tag {
+  align-self: flex-start;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: #475569;
+  padding: 2px 7px; border-radius: 999px; background: #f1f5f9;
+}
+.brsum-opp-item[data-brsum-opp-kind="model"] { border-left: 3px solid %FOCAL%; }
+.brsum-opp-item[data-brsum-opp-kind="rule-of-thumb"] {
+  border-left: 3px solid #cbd5e1;
+}
+.brsum-opp-item[data-brsum-opp-kind="rule-of-thumb"] .brsum-opp-tag {
+  color: #64748b; font-style: italic;
+}
+.brsum-opp-item[data-brsum-opp-kind="observed"] { border-left: 3px solid #94a3b8; }
+.brsum-opp-text { font-size: 12.5px; line-height: 1.5; color: #1e293b; }
 @media (max-width: 720px) {
   .brsum-adv-grid { grid-template-columns: 1fr; }
 }
