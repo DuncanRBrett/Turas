@@ -221,8 +221,13 @@ function pfRestorePinState(state) {
  */
 function pfInitFootprintTable() {
   var table = document.querySelector('.pf-fp-table');
-  if (!table || table.dataset.pfFpBound === '1') return;
-  table.dataset.pfFpBound = '1';
+  /* JS property, not dataset: a dataset flag serialises as data-pf-fp-bound
+     into a saved copy, so reopening that copy returned here early and left
+     the footprint focal select, brand chips and column sorting dead. A
+     property does not survive outerHTML, so a saved copy binds again, and
+     the stale attribute on copies already saved is now ignored. */
+  if (!table || table._pfFpBound === true) return;
+  table._pfFpBound = true;
 
   var section = document.getElementById('pf-subtab-footprint');
   if (!section) return;

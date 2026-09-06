@@ -37,9 +37,16 @@
     });
   }
 
+  /* The bound flag lives on the element as a JS property, not in dataset.
+     A dataset flag becomes a data-* attribute, which Save a copy writes into
+     the saved file through outerHTML. Reopening that copy then found the
+     flag already set, returned here early, and left the clear button and the
+     sub-tabs with no handlers. A property is dropped by serialisation, so a
+     saved copy binds again on open. It also heals copies already saved with
+     the stale attribute, which is now ignored. */
   function bindPanel(panel) {
-    if (!panel || panel.dataset.alBound === "1") return;
-    panel.dataset.alBound = "1";
+    if (!panel || panel._alBound === true) return;
+    panel._alBound = true;
 
     panel.addEventListener("click", function (ev) {
       var btn = ev.target.closest(".al-subtab-btn");
