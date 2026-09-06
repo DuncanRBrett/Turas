@@ -1,10 +1,10 @@
-# Focal Category Assignment — Setup Manual
+# Focal Category Assignment: Setup Manual
 
 **Purpose:** Step-by-step setup for the quota-aware focal category assignment system used in IPK-style brand health studies on Alchemer.
 
 **Audience:** Anyone setting up a new survey (test or live) that needs to randomly assign each respondent to one of N focal categories, while respecting quota fill levels.
 
-**Companion docs:** - `IPK_FOCAL_ASSIGNMENT_SPEC.md` — design rationale, iteration history, full quota tables. - This file — practical setup checklist.
+**Companion docs:** - `IPK_FOCAL_ASSIGNMENT_SPEC.md`: design rationale, iteration history, full quota tables. - This file: practical setup checklist.
 
 ------------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ Use this pattern when:
 Don't use this if:
 
 -   Every respondent answers every category (no assignment needed).
--   You're balancing on demographic dimensions only — Alchemer's native quotas handle that without JavaScript.
+-   You're balancing on demographic dimensions only. Alchemer's native quotas handle that without JavaScript.
 
 ------------------------------------------------------------------------
 
@@ -53,26 +53,26 @@ Before starting, have ready:
 
 ## Setup steps
 
-### Step 1 — Create the hidden value for focal category
+### Step 1: Create the hidden value for focal category
 
 In Build view on the assignment page (typically your screener page):
 
 1.  Click **Add New Action** → **Hidden Value Action**.
 2.  **Name:** `Assign Focal Category` (this name becomes the column in exports).
-3.  **Action Label** (optional but recommended): `focal_cat` — short, snake_case, becomes the SPSS variable name.
+3.  **Action Label** (optional but recommended): `focal_cat` (short, snake_case, becomes the SPSS variable name).
 4.  Leave **Populate with the following** and **Populate with a calculated value** both empty. The JavaScript will write to this field.
 5.  Save.
-6.  **Note the question ID** — hover the action in Build view and the numeric ID appears. You'll need this for the JS (`DEST_QID`).
+6.  **Note the question ID**. Hover the action in Build view and the numeric ID appears. You'll need this for the JS (`DEST_QID`).
 
-### Step 2 — Confirm the screener question reporting values
+### Step 2: Confirm the screener question reporting values
 
 The screener question (call it SQ1) must have reporting values that are **stable and case-sensitive**. The JS doesn't read these directly, but downstream logic and exports do.
 
-For each option that maps to a focal category, set its reporting value to the category code (e.g. `DSS`, `POS`, `PAS`, `BAK`). Non-core options (e.g. Pestos, Salad Dressings) can have any reporting value — they'll be ignored by the picker.
+For each option that maps to a focal category, set its reporting value to the category code (e.g. `DSS`, `POS`, `PAS`, `BAK`). Non-core options (e.g. Pestos, Salad Dressings) can have any reporting value. They'll be ignored by the picker.
 
-**Note the SQ1 question ID** — you'll need this for the JS (`SOURCE_QID`).
+**Note the SQ1 question ID**. You'll need this for the JS (`SOURCE_QID`).
 
-### Step 3 — Build the category quotas
+### Step 3: Build the category quotas
 
 For each focal category, create one hard quota:
 
@@ -80,17 +80,17 @@ For each focal category, create one hard quota:
 
 | Field | Setting |
 |----|----|
-| Quota Type | **Hard Quota — Disqualify when Full** |
+| Quota Type | **Hard Quota: Disqualify when Full** |
 | Quota Action | Display the Survey Disqualification Page |
-| Name | `cat_<CODE>` — e.g. `cat_DSS` (lowercase `cat_`, uppercase code, single underscore) |
+| Name | `cat_<CODE>`, e.g. `cat_DSS` (lowercase `cat_`, uppercase code, single underscore) |
 | Quota Limit | Your target sample size for that category |
-| Qualification Logic | "Assign Focal Category" — *is exactly equal to* — `<CODE>` |
+| Qualification Logic | "Assign Focal Category" *is exactly equal to* `<CODE>` |
 
-Repeat for each category. Names must match exactly — the JavaScript reads them by name via the webhook.
+Repeat for each category. Names must match exactly. The JavaScript reads them by name via the webhook.
 
 **Optional:** Add demographic × category split quotas (Region × Cat, Race × Cat) for finer-grained balance. These are pure Alchemer-side enforcement; the JS doesn't read them. See `IPK_FOCAL_ASSIGNMENT_SPEC.md` §2b–2c for the full structure.
 
-### Step 4 — Get an Alchemer API key
+### Step 4: Get an Alchemer API key
 
 If you already have an API key for the account, skip this step. Otherwise:
 
@@ -98,12 +98,12 @@ If you already have an API key for the account, skip this step. Otherwise:
 2.  Click **Create API Key**.
 3.  Name it descriptively (e.g. `Focal Assignment Quota Read`).
 4.  Alchemer shows the **API Key** (token) and **API Key Secret**.
-5.  **Copy both immediately** — the secret is shown only once and cannot be recovered later. If you lose it, you'll need to create a new key.
+5.  **Copy both immediately**. The secret is shown only once and cannot be recovered later. If you lose it, you'll need to create a new key.
 6.  Some Alchemer plans cap accounts at one API key; if so, the existing key must be reused.
 
-**The API hostname for Alchemer is `api.alchemer.com`** — not `restapi.alchemer.com` (which is an older/different domain that returns 404). Confirm in Account → API Access; Alchemer displays the correct hostname for your account.
+**The API hostname for Alchemer is `api.alchemer.com`**, not `restapi.alchemer.com` (which is an older/different domain that returns 404). Confirm in Account → API Access; Alchemer displays the correct hostname for your account.
 
-### Step 5 — Build the Webhook Action
+### Step 5: Build the Webhook Action
 
 On the assignment page:
 
@@ -133,7 +133,7 @@ On the assignment page:
 
 **Action ordering:** In the Build view's list of actions for this page, the Webhook Action must appear **above** the JavaScript Action. Alchemer fires actions top-to-bottom.
 
-### Step 6 — Build the JavaScript Action
+### Step 6: Build the JavaScript Action
 
 On the assignment page:
 
@@ -230,7 +230,7 @@ document.addEventListener("DOMContentLoaded", function() {
 })
 ```
 
-### Step 7 — Update the constants for your survey
+### Step 7: Update the constants for your survey
 
 The constants at the top of the JS are the only things that change between surveys:
 
@@ -241,15 +241,15 @@ The constants at the top of the JS are the only things that change between surve
 | `CORE_MATCHES` | One entry per focal category. `match` is a substring of the screener option's visible label; `code` is the category code (matches the quota names and the screener reporting values) |
 | `CORE_CODES` | List of all category codes, used to build quota lookup keys |
 
-**Important:** `CORE_MATCHES[i].match` is matched against the checkbox's `title` attribute — which is usually the option's visible label. If options are translated or reworded, update the substrings to match the new labels.
+**Important:** `CORE_MATCHES[i].match` is matched against the checkbox's `title` attribute, which is usually the option's visible label. If options are translated or reworded, update the substrings to match the new labels.
 
-### Step 8 — Disable the Back button on the assignment page
+### Step 8: Disable the Back button on the assignment page
 
 In Build view, click the page, then **Page Settings → Show Back Button → Off**.
 
-This prevents respondents from navigating back, re-ticking SQ1, and re-triggering the random pick — which could produce a different focal category and corrupt the quota fill.
+This prevents respondents from navigating back, re-ticking SQ1, and re-triggering the random pick, which could produce a different focal category and corrupt the quota fill.
 
-### Step 9 — Hide the webhook output from respondents
+### Step 9: Hide the webhook output from respondents
 
 By default, the webhook's "Display it" setting renders the raw JSON response on the page. Hide it via theme CSS:
 
@@ -265,7 +265,7 @@ By default, the webhook's "Display it" setting renders the raw JSON response on 
 
 This applies survey-wide. The JS reads `.sg-http-content` via `.textContent`, which works regardless of `display: none`.
 
-### Step 10 — Add fail-safe skip logic (optional but recommended)
+### Step 10: Add fail-safe skip logic (optional but recommended)
 
 On the assignment page, add page-level skip logic:
 
@@ -289,7 +289,7 @@ When porting this setup to a new survey, update these values:
 | Quotas | Names (`cat_<CODE>`), limits (target sample sizes), qualification (point at the new hidden value) |
 | Screener reporting values | Match the category codes (case-sensitive) |
 
-Everything else — page settings, CSS, action ordering — is the same.
+Everything else (page settings, CSS, action ordering) is the same.
 
 ------------------------------------------------------------------------
 
@@ -303,11 +303,11 @@ Everything else — page settings, CSS, action ordering — is the same.
 
 ### Smoke test (one response)
 
-1.  Open the survey via the live launch link (Share tab → primary survey link), **not** the in-builder Preview — `SGAPI.surveyData` is unreliable in the in-builder preview.
+1.  Open the survey via the live launch link (Share tab → primary survey link), **not** the in-builder Preview. `SGAPI.surveyData` is unreliable in the in-builder preview.
 2.  Get to the assignment page, tick two or three categories at the screener.
 3.  Open DevTools → Console.
 4.  Click Next.
-5.  In Response Explorer, find the new response and check the "Assign Focal Category" field — should be one of the category codes for a category you ticked.
+5.  In Response Explorer, find the new response and check the "Assign Focal Category" field: should be one of the category codes for a category you ticked.
 
 ### Console diagnostic (if smoke test fails)
 
@@ -338,7 +338,7 @@ Use the **Troubleshooting** table below to interpret the output.
 ### Hard quota fire test
 
 1.  Manually set one `cat_<CODE>` quota's limit to 1 in Alchemer.
-2.  Submit a response that gets assigned to that category — quota now at 1/1.
+2.  Submit a response that gets assigned to that category: quota now at 1/1.
 3.  Submit a second response that ticks **only** that category at the screener.
 4.  Expected: JS sees the cat is full, has nothing else to pick from → falls back to assigning the full category → Alchemer's hard quota DQs the respondent on submit.
 5.  Reset the limit before opening real fieldwork.
@@ -368,7 +368,7 @@ The webhook URL contains your API token and secret in plain text. Who can see it
 
 -   **Anyone with survey edit access** can open the Webhook Action and read the URL.
 -   **Anyone with response viewer access** sees the URL in the per-response action log.
--   **Respondents cannot** — the URL is server-side; only the response body is rendered to the page, and that's hidden via CSS.
+-   **Respondents cannot**. The URL is server-side; only the response body is rendered to the page, and that's hidden via CSS.
 
 Practical implications:
 
@@ -376,7 +376,7 @@ Practical implications:
 -   Before granting edit access to outside collaborators, consider whether they should see the credentials. There's no way to mask the URL field inside the Webhook Action UI.
 -   If your Alchemer plan allows multiple API keys, use a dedicated key for the webhook (named for the project) so you can delete it at end of fieldwork without affecting other integrations.
 -   If your plan caps you at one API key, treat that key as effectively permanent. Restrict edit access accordingly.
--   If credentials are ever compromised and self-service rotation isn't available, contact Alchemer support — they can regenerate keys server-side.
+-   If credentials are ever compromised and self-service rotation isn't available, contact Alchemer support. They can regenerate keys server-side.
 
 Don't paste the full URL (with credentials) into Slack, email, screen shares, or third-party tools beyond what's necessary.
 
@@ -386,10 +386,10 @@ Don't paste the full URL (with credentials) into Slack, email, screen shares, or
 
 When moving from test scale to live:
 
-1.  **Build quotas in the live survey** at live limits. Quotas don't transfer between surveys — they must be recreated.
+1.  **Build quotas in the live survey** at live limits. Quotas don't transfer between surveys. They must be recreated.
 2.  **Copy the Webhook Action and JavaScript Action** to the live survey's assignment page (Build → Copy Page, then prune what you don't need).
 3.  **Update the Webhook URL** with the live survey's ID. Use the same API key, or create a dedicated key for live (if your plan allows multiple).
-4.  **Update `DEST_QID` and `SOURCE_QID`** in the JS to match the question IDs in the live survey — IDs do not carry across surveys.
+4.  **Update `DEST_QID` and `SOURCE_QID`** in the JS to match the question IDs in the live survey. IDs do not carry across surveys.
 5.  **Re-run the smoke test and hard-quota fire test** in live.
 6.  **Delete any legacy/random-pick scripts** from the live survey to avoid double-assignment.
 7.  **Send a small panel batch (\~20 responses)** first; check the "Assign Focal Category" distribution in the data before opening full fieldwork.
@@ -405,7 +405,7 @@ When moving from test scale to live:
 
 **If a category fills early:**
 
--   The JS will stop assigning new respondents to that category automatically — no manual intervention needed.
+-   The JS will stop assigning new respondents to that category automatically, no manual intervention needed.
 -   Respondents who can only buy the full category will fall through to the hard quota and be DQ'd on submit.
 -   If DQ rate exceeds 20%, investigate panel composition vs. screener selection patterns.
 
@@ -416,7 +416,7 @@ When moving from test scale to live:
 
 ------------------------------------------------------------------------
 
-## Quick reference — checklist
+## Quick reference: checklist
 
 A new survey is ready to launch when all of these are true:
 

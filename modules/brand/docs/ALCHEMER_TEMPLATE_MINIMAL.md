@@ -1,6 +1,6 @@
-# Alchemer CBM Survey — Minimal Single-Category Template
+# Alchemer CBM Survey: Minimal Single-Category Template
 
-## Copy this. Extend by adding brands and CEPs. Don't delete — add.
+## Copy this. Extend by adding brands and CEPs. Don't delete, add.
 
 **Version:** 1.0\
 **Author:** The Research LampPost\
@@ -14,11 +14,11 @@
 
 ------------------------------------------------------------------------
 
-## Survey settings (hidden variables — add on Page 1)
+## Survey settings (hidden variables, add on Page 1)
 
 | Variable | Default value | Purpose |
 |----|----|----|
-| `Focal_Category` | `{CAT}` | Fixed for single-cat projects — all respondents get this value |
+| `Focal_Category` | `{CAT}` | Fixed for single-cat projects: all respondents get this value |
 | `Wave` | `1` | Update to `2`, `3` etc. for subsequent waves. Set via URL param `?wave=1` |
 
 ------------------------------------------------------------------------
@@ -28,9 +28,9 @@
 **No question aliases needed.**
 
 Wording:\
-*"Thank you for taking part in this study. We are researching how people shop for [general category description — do not name client]. This should take around [X] minutes. Your responses are completely confidential and will only be reported in aggregate. By continuing you confirm you are happy to participate."*
+*"Thank you for taking part in this study. We are researching how people shop for [general category description: do not name client]. This should take around [X] minutes. Your responses are completely confidential and will only be reported in aggregate. By continuing you confirm you are happy to participate."*
 
-Button: **I agree — let's start**
+Button: **I agree, let's start**
 
 ------------------------------------------------------------------------
 
@@ -42,7 +42,7 @@ Button: **I agree — let's start**
 
 ------------------------------------------------------------------------
 
-### Q1: SQ1 — long window screener (all categories)
+### Q1: SQ1, long window screener (all categories)
 
 | Field | Value |
 |----|----|
@@ -50,23 +50,23 @@ Button: **I agree — let's start**
 | Question type | **Checkbox (multi-select)** |
 | Question text | "In the last **12 months**, which of the following have you personally bought for your household? Please select all that apply." |
 
-**Options — fill in your categories. Order: Core first, Adjacent second, Peripheral third, None last.**
+**Options, fill in your categories. Order: Core first, Adjacent second, Peripheral third, None last.**
 
 | Option alias               | Option label      | Role     |
 |----------------------------|-------------------|----------|
 | `{CAT}`                    | {CAT_LABEL}       | **Core** |
 | `{ADJ1}`                   | {ADJ1_LABEL}      | Adjacent |
 | `{ADJ2}`                   | {ADJ2_LABEL}      | Adjacent |
-| — add more adjacent here — |                   |          |
-| `NONE`                     | None of the above | —        |
+| (add more adjacent here)   |                   |          |
+| `NONE`                     | None of the above | n/a      |
 
-**Exported columns:** `SQ1_{CAT}`, `SQ1_{ADJ1}`, `SQ1_{ADJ2}` — value = 1 if selected, 0 if not. Matches QuestionMap directly.
+**Exported columns:** `SQ1_{CAT}`, `SQ1_{ADJ1}`, `SQ1_{ADJ2}`, value = 1 if selected, 0 if not. Matches QuestionMap directly.
 
 **[TEMPLATE NOTE: Replace `{ADJ1}`, `{ADJ1_LABEL}` etc. with real adjacent category codes and labels. If there are no adjacent categories (rare), the checkbox still works with just one core option + NONE.]**
 
 ------------------------------------------------------------------------
 
-### Q2: SQ2\_{CAT} — target window (Core category only)
+### Q2: SQ2\_{CAT}, target window (Core category only)
 
 | Field | Value |
 |----|----|
@@ -76,7 +76,7 @@ Button: **I agree — let's start**
 | Question text | "And in the last **3 months**, have you bought **{CAT_LABEL}**?" |
 | Option value / label | `1` / Yes · `0` / No |
 
-**[TEMPLATE NOTE: Change "3 months" to match `Timeframe_Target` for this category. Adjacent categories do not get an SQ2 — 12-month qualification is sufficient for them.]**
+**[TEMPLATE NOTE: Change "3 months" to match `Timeframe_Target` for this category. Adjacent categories do not get an SQ2. 12-month qualification is sufficient for them.]**
 
 ------------------------------------------------------------------------
 
@@ -95,7 +95,7 @@ Only the Core category option triggers qualification. Respondents who selected a
 
 **Show one question per Adjacent category, to respondents who selected it in SQ1.**
 
-**[TEMPLATE NOTE: This page captures brand awareness for Adjacent categories. For a Core category, awareness is captured in the brand funnel (Page 5) — not here. If there are no adjacent categories, skip this page entirely.]**
+**[TEMPLATE NOTE: This page captures brand awareness for Adjacent categories. For a Core category, awareness is captured in the brand funnel (Page 5), not here. If there are no adjacent categories, skip this page entirely.]**
 
 ### Q3: BRANDAWARE\_{ADJ1}
 
@@ -104,15 +104,15 @@ Only the Core category option triggers qualification. Respondents who selected a
 | Question alias | `BRANDAWARE_{ADJ1}` |
 | Question type | Checkbox (multi-select) |
 | **Show logic** | `SQ1` option `{ADJ1}` is selected |
-| Question text | "Which of the following **{ADJ1_LABEL}** brands have you heard of — even if you have never bought them?" |
+| Question text | "Which of the following **{ADJ1_LABEL}** brands have you heard of, even if you have never bought them?" |
 
-**Options — add one row per brand:**
+**Options, add one row per brand:**
 
 | Option alias             | Option label           |
 |--------------------------|------------------------|
 | `{BRAND_A}`              | [Brand A display name] |
 | `{BRAND_B}`              | [Brand B display name] |
-| — add more brands here — |                        |
+| (add more brands here)   |                        |
 | `NONE`                   | None of these          |
 
 **Exported columns:** `BRANDAWARE_{ADJ1}_{BRAND_A}`, `BRANDAWARE_{ADJ1}_{BRAND_B}`, ...
@@ -157,9 +157,9 @@ OptionMapScale: `cat_buy_scale`
 
 ------------------------------------------------------------------------
 
-## Page 5: Brand funnel — attitude
+## Page 5: Brand funnel, attitude
 
-**Intro text on page:** *"We'd now like to understand how you feel about each of the following {CAT_LABEL} brands. Please answer for each brand, even ones you don't use — just say 'no opinion' if you don't know a brand."*
+**Intro text on page:** *"We'd now like to understand how you feel about each of the following {CAT_LABEL} brands. Please answer for each brand, even ones you don't use, just say 'no opinion' if you don't know a brand."*
 
 ### Q6: BRANDATT1\_{CAT}\_{BRAND_A}
 
@@ -171,7 +171,7 @@ OptionMapScale: `cat_buy_scale`
 
 | Option value | Option label |
 |----|----|
-| `1` | I love it — it's my favourite |
+| `1` | I love it, it's my favourite |
 | `2` | It's among the ones I prefer |
 | `3` | I wouldn't usually consider it, but I would if no other option |
 | `4` | I would refuse to buy this brand |
@@ -179,7 +179,7 @@ OptionMapScale: `cat_buy_scale`
 
 OptionMapScale: `attitude_scale`
 
-### Q7: BRANDATT2\_{CAT}\_{BRAND_A} — rejection OE
+### Q7: BRANDATT2\_{CAT}\_{BRAND_A}, rejection OE
 
 | Field | Value |
 |----|----|
@@ -202,7 +202,7 @@ OptionMapScale: `attitude_scale`
 
 ------------------------------------------------------------------------
 
-## Page 6: Brand funnel — penetration
+## Page 6: Brand funnel, penetration
 
 ### Q10: BRANDPEN1\_{CAT}
 
@@ -212,13 +212,13 @@ OptionMapScale: `attitude_scale`
 | Question type | Checkbox (multi-select) |
 | Question text | "Which of these **{CAT_LABEL}** brands have you personally bought in the last **12 months**?" |
 
-**Options — same brands as BRANDAWARE:**
+**Options, same brands as BRANDAWARE:**
 
 | Option alias        | Option label           |
 |---------------------|------------------------|
 | `{BRAND_A}`         | [Brand A display name] |
 | `{BRAND_B}`         | [Brand B display name] |
-| — add more brands — |                        |
+| (add more brands)   |                        |
 | `NONE`              | None of these          |
 
 **Exported columns:** `BRANDPEN1_{CAT}_{BRAND_A}`, `BRANDPEN1_{CAT}_{BRAND_B}`, ...
@@ -240,7 +240,7 @@ OptionMapScale: `attitude_scale`
 
 ------------------------------------------------------------------------
 
-### Q12: BRANDPEN3\_{CAT}\_{BRAND_A} — purchase frequency
+### Q12: BRANDPEN3\_{CAT}\_{BRAND_A}, purchase frequency
 
 | Field | Value |
 |----|----|
@@ -255,7 +255,7 @@ OptionMapScale: `attitude_scale`
 | `2`          | Most times                         |
 | `3`          | About half the time                |
 | `4`          | Occasionally                       |
-| `5`          | Rarely — this was a first purchase |
+| `5`          | Rarely, this was a first purchase  |
 
 OptionMapScale: `purchase_freq_scale`
 
@@ -269,7 +269,7 @@ OptionMapScale: `purchase_freq_scale`
 
 ## Page 7: CEP × brand matrix
 
-**Intro text on page:** *"Now we'd like to understand which brands come to mind in different situations. For each situation, please select all brands that come to mind — even if you don't buy them."*
+**Intro text on page:** *"Now we'd like to understand which brands come to mind in different situations. For each situation, please select all brands that come to mind, even if you don't buy them."*
 
 ### Q14: BRANDATTR\_{CAT}\_CEP01
 
@@ -277,15 +277,15 @@ OptionMapScale: `purchase_freq_scale`
 |----------------|---------------------------------------------|
 | Question alias | `BRANDATTR_{CAT}_CEP01`                     |
 | Question type  | Checkbox (multi-select)                     |
-| Question text  | "{CEP01_TEXT} — which brands come to mind?" |
+| Question text  | "{CEP01_TEXT}, which brands come to mind?"  |
 
-**Options — same brands as BRANDAWARE:**
+**Options, same brands as BRANDAWARE:**
 
 | Option alias        | Option label           |
 |---------------------|------------------------|
 | `{BRAND_A}`         | [Brand A display name] |
 | `{BRAND_B}`         | [Brand B display name] |
-| — add more brands — |                        |
+| (add more brands)   |                        |
 | `NONE`              | None of these          |
 
 **Exported columns:** `BRANDATTR_{CAT}_CEP01_{BRAND_A}`, `BRANDATTR_{CAT}_CEP01_{BRAND_B}`, ...
@@ -311,7 +311,7 @@ OptionMapScale: `purchase_freq_scale`
 | **Show logic** | `SQ2_{CAT}` = `1` (only ask recent buyers) |
 | Question text | "Where have you bought **{CAT_LABEL}** in the last **3 months**? Select all that apply." |
 
-**Options — customise channel list per category:**
+**Options, customise channel list per category:**
 
 | Option alias | Option label                                   |
 |--------------|------------------------------------------------|
@@ -346,7 +346,7 @@ OptionMapScale: `purchase_freq_scale`
 
 ------------------------------------------------------------------------
 
-## Page 10: Ad-hoc questions [OPTIONAL — OMIT IF NOT NEEDED]
+## Page 10: Ad-hoc questions [OPTIONAL, OMIT IF NOT NEEDED]
 
 **[TEMPLATE NOTE: Add any project-specific questions here. See ALCHEMER_PROGRAMMING_SPEC.md Section 13 for naming rules and how to register these in Survey_Structure.xlsx AdHoc sheet.]**
 
@@ -382,15 +382,15 @@ OptionMapScale: `purchase_freq_scale`
 |----|----|
 | Question alias | `WOM_POS_REC` |
 | Question type | Checkbox (multi-select) |
-| Question text | "In the last **3 months**, has someone you know — in person, by message, or online — said something **positive** about any of these brands?" |
+| Question text | "In the last **3 months**, has someone you know (in person, by message, or online) said something **positive** about any of these brands?" |
 
-**Options — focal category brands only:**
+**Options, focal category brands only:**
 
 | Option alias        | Option label           |
 |---------------------|------------------------|
 | `{BRAND_A}`         | [Brand A display name] |
 | `{BRAND_B}`         | [Brand B display name] |
-| — add more brands — |                        |
+| (add more brands)   |                        |
 | `NONE`              | No, none of these      |
 
 **[TEMPLATE NOTE: "3 months" should match `wom_timeframe` in Brand_Config Settings.]**
@@ -429,13 +429,13 @@ OptionMapScale: `wom_count_scale`
 
 ### Q24–Q25: WOM_NEG_COUNT\_{BRAND_A/B}
 
-*(Same pattern — show if `WOM_NEG_SHARE` option `{BRAND}` is selected)*
+*(Same pattern: show if `WOM_NEG_SHARE` option `{BRAND}` is selected)*
 
 **[ADD MORE BRANDS: One WOM_POS_COUNT and one WOM_NEG_COUNT per brand.]**
 
 ------------------------------------------------------------------------
 
-## Page 12: Distinctive Brand Assets [TOGGLE: element_dba — default OFF]
+## Page 12: Distinctive Brand Assets [TOGGLE: element_dba, default OFF]
 
 **[OMIT this page if `element_dba = N`. Enabling DBA adds approximately 2 minutes to survey length.]**
 
@@ -464,9 +464,9 @@ OptionMapScale: `dba_fame_scale`
 
 ------------------------------------------------------------------------
 
-## Page 13: Branded Reach [TOGGLE: element_branded_reach — default OFF]
+## Page 13: Branded Reach [TOGGLE: element_branded_reach, default OFF]
 
-**[OMIT this page if `element_branded_reach = N`. This section is included in the template for future use — it is not active by default.]**
+**[OMIT this page if `element_branded_reach = N`. This section is included in the template for future use. It is not active by default.]**
 
 *(See ALCHEMER_PROGRAMMING_SPEC.md Section 15 for full question spec.)*
 

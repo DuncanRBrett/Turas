@@ -1,23 +1,23 @@
-# Brand Module — Funnel Element Spec v2
+# Brand Module: Funnel Element Spec v2
 
-**Version:** 2.0 (draft, supersedes `Funnel.docx`) **Scope:** Single-category brand funnel as a derived view on shared CBM batteries. **Applies to:** `modules/brand/R/03_funnel.R` + HTML panel + Excel/CSV outputs. **Status:** Design spec — nothing implemented against it yet.
+**Version:** 2.0 (draft, supersedes `Funnel.docx`) **Scope:** Single-category brand funnel as a derived view on shared CBM batteries. **Applies to:** `modules/brand/R/03_funnel.R` + HTML panel + Excel/CSV outputs. **Status:** Design spec, nothing implemented against it yet.
 
 ------------------------------------------------------------------------
 
 ## 1. Purpose
 
-Produce an honest, richly-annotated diagnostic of where a brand gains or loses people relative to competitors — from awareness through consideration, buying, and brand preference. Stages are derived from core CBM data (no dedicated funnel questions).
+Produce an honest, richly-annotated diagnostic of where a brand gains or loses people relative to competitors, from awareness through consideration, buying, and brand preference. Stages are derived from core CBM data (no dedicated funnel questions).
 
 Supports three category types: transactional (FMCG), durable, service. Stage shape adapts by type. Visualisation contract is type-agnostic.
 
 ------------------------------------------------------------------------
 
-## 2. Scope — v1 vs deferred
+## 2. Scope: v1 vs deferred
 
 ### In v1 (this spec)
 
 -   Three category-type funnel shapes: transactional (up to 5 stages), durable (up to 4), service (up to 4).
--   **Nested-funnel derivation** — every stage is a subset of the previous.
+-   **Nested-funnel derivation**: every stage is a subset of the previous.
 -   **Four view layers:** metric cards, competitive table, shape chart, consideration detail.
 -   **Attitude decomposition** with segment-emphasis interaction (click Love / Reject / etc. to highlight).
 -   **Global brand selection** via chip picker + quick-select helpers, persisted to pin state.
@@ -25,14 +25,14 @@ Supports three category types: transactional (FMCG), durable, service. Stage sha
 -   **Weighted and unweighted bases** on every view.
 -   **Low-base warning** (configurable threshold); optional suppression (off by default).
 -   **Small-multiples alternate view** for the shape chart.
--   **Show-counts toggle** — same pattern as tabs (`show-freq` CSS class, driven by the user-visible control `Show counts` in the panel chrome). When enabled, every card and table cell displays the underlying weighted N below the %. Default off. Pin state persists the toggle.
+-   **Show-counts toggle**: same pattern as tabs (`show-freq` CSS class, driven by the user-visible control `Show counts` in the panel chrome). When enabled, every card and table cell displays the underlying weighted N below the %. Default off. Pin state persists the toggle.
 -   **Excel** (3 analytic sheets + metadata) + **CSV** (long format) outputs, with ClientCode and QuestionText on every row.
 
 ### Deferred to v1.1
 
--   **Segment overlay** — per-segment small-multiples funnel. Data structures carry segment flags; UI deferred.
--   **Tracker wave-over-wave UI** — data structures carry wave labels; UI is one-wave in v1.
--   **Confidence intervals** — omitted by decision (panel sampling is non-probability; MoE is pretence).
+-   **Segment overlay**: per-segment small-multiples funnel. Data structures carry segment flags; UI deferred.
+-   **Tracker wave-over-wave UI**: data structures carry wave labels; UI is one-wave in v1.
+-   **Confidence intervals**: omitted by decision (panel sampling is non-probability; MoE is pretence).
 
 ------------------------------------------------------------------------
 
@@ -44,10 +44,10 @@ Supports three category types: transactional (FMCG), durable, service. Stage sha
 |----|----|----|----|
 | 1 | Aware | Aware | `funnel.awareness = 1` |
 | 2 | Consideration | Consider | `aware = 1` AND `attitude ∈ {love, prefer, ambivalent}` |
-| 3 | Long Period | Long Period | prev stage AND `bought_long = 1` — omitted if role absent |
-| 4 | Target Period | Target Period | prev stage AND `bought_target = 1` — omitted if role absent |
+| 3 | Long Period | Long Period | prev stage AND `bought_long = 1`, omitted if role absent |
+| 4 | Target Period | Target Period | prev stage AND `bought_target = 1`, omitted if role absent |
 
-Stages 3–4 collapse individually when their roles are absent. Minimum funnel = stages 1–2. Heavy-buyer / frequency analysis is **not** a funnel stage — it lives in the Repertoire / Frequency element, where the full buying-rate distribution can be shown instead of a single threshold cut (v2.1 decision).
+Stages 3–4 collapse individually when their roles are absent. Minimum funnel = stages 1–2. Heavy-buyer / frequency analysis is **not** a funnel stage. It lives in the Repertoire / Frequency element, where the full buying-rate distribution can be shown instead of a single threshold cut (v2.1 decision).
 
 ### 3.2 Durable (up to 4 stages)
 
@@ -56,7 +56,7 @@ Stages 3–4 collapse individually when their roles are absent. Minimum funnel =
 | 1 | Aware | Aware | `funnel.awareness = 1` |
 | 2 | Consideration | Consideration | `aware = 1` AND attitude positive |
 | 3 | Current owner | Current owner | prev stage AND `current_owner = brand` |
-| 4 | Long-tenured | Long-tenured owner | prev stage AND `tenure ≥ tenure_threshold` — omitted if role absent or threshold not set |
+| 4 | Long-tenured | Long-tenured owner | prev stage AND `tenure ≥ tenure_threshold`, omitted if role absent or threshold not set |
 
 ### 3.3 Service (up to 4 stages)
 
@@ -65,9 +65,9 @@ Stages 3–4 collapse individually when their roles are absent. Minimum funnel =
 | 1 | Aware | Aware | `funnel.awareness = 1` |
 | 2 | Consideration | Consideration | `aware = 1` AND attitude positive |
 | 3 | Current customer | Current customer | prev stage AND `current_customer = brand` |
-| 4 | Long-tenured | Long-tenured customer | prev stage AND `tenure ≥ tenure_threshold` — omitted if absent |
+| 4 | Long-tenured | Long-tenured customer | prev stage AND `tenure ≥ tenure_threshold`, omitted if absent |
 
-Prior-brand data (`funnel.service.prior_brand`) is **not** rendered as a funnel stage. About drawer notes: *"prior-brand data available — see Repertoire"* when the role is populated.
+Prior-brand data (`funnel.service.prior_brand`) is **not** rendered as a funnel stage. About drawer notes: *"prior-brand data available, see Repertoire"* when the role is populated.
 
 ### 3.4 Nesting invariant
 
@@ -83,13 +83,13 @@ Earlier drafts placed a fifth "Preferred" stage (frequency argmax with ties) at 
 2.  Frequency is a distribution, not a milestone. Showing the full distribution in a dedicated Frequency view preserves information a single cut throws away.
 3.  Heavy-buyer-of-N-brands breaks the 1-respondent → 1-place mental model that funnel-shape reads ("we convert X% of aware into heavy") implicitly assume.
 
-Heavy buyers, Share of Requirements, and frequency bands therefore live in the Repertoire / Frequency element, not the funnel. The brand-level frequency role (`funnel.transactional.frequency`) is still loaded because the About drawer references it — the funnel just doesn't consume it as a stage.
+Heavy buyers, Share of Requirements, and frequency bands therefore live in the Repertoire / Frequency element, not the funnel. The brand-level frequency role (`funnel.transactional.frequency`) is still loaded because the About drawer references it. The funnel just doesn't consume it as a stage.
 
 ------------------------------------------------------------------------
 
 ## 4. Config schema additions
 
-### 4.1 `Brand_Config.xlsx` — Settings sheet
+### 4.1 `Brand_Config.xlsx`: Settings sheet
 
 | Setting | Type | Default | Notes |
 |----|----|----|----|
@@ -98,7 +98,7 @@ Heavy buyers, Share of Requirements, and frequency bands therefore live in the R
 | `funnel.warn_base` | integer | 75 | Show warning indicator when stage base \< this |
 | `funnel.suppress_base` | integer | 0 | Suppress metric when stage base \< this; 0 = never suppress |
 | `funnel.tenure_threshold` | string | (empty) | Ordinal value from the tenure OptionMap; required if durable/service loyalty stage wanted |
-| `funnel.stage_labels_override` | string | (empty) | Optional JSON — override default stage labels for this project |
+| `funnel.stage_labels_override` | string | (empty) | Optional JSON: override default stage labels for this project |
 | `funnel.significance_level` | numeric | 0.05 | Significance test alpha |
 
 ### 4.2 `Survey_Structure.xlsx`
@@ -111,7 +111,7 @@ Funnel populates roles per §4 of the Role Registry. Minimum roles for any funne
 
 ------------------------------------------------------------------------
 
-## 5. Function inventory — `modules/brand/R/03_funnel.R`
+## 5. Function inventory: `modules/brand/R/03_funnel.R`
 
 File target: ≤ 300 active lines. Current state will exceed: split into two files.
 
@@ -131,7 +131,7 @@ run_funnel(
 | Arg | Purpose |
 |----|----|
 | `data` | Survey data frame (respondent rows × coded columns) |
-| `role_map` | Named list — role → column spec (column name(s), pattern, option_map). Built by the config loader from Survey_Structure. |
+| `role_map` | Named list: role → column spec (column name(s), pattern, option_map). Built by the config loader from Survey_Structure. |
 | `brand_list` | Data frame with BrandCode, BrandName, DisplayOrder |
 | `config` | Named list of funnel.\* Settings values |
 | `weights` | Optional numeric respondent weights |
@@ -146,7 +146,7 @@ list(
   conversions,               # brand × stage-transition × metric
   attitude_decomposition,    # brand × 5 attitude positions (% of aware base)
   sig_results,               # focal vs each competitor + focal vs cat avg, per stage
-  base_warnings,             # per brand-stage cell — none/warn/suppress
+  base_warnings,             # per brand-stage cell: none/warn/suppress
   metrics_summary,           # condensed list for AI callouts + About
   warnings,                  # accumulator for PARTIAL status
   meta                       # category_type, focal_brand, wave, n_weighted, n_unweighted
@@ -189,7 +189,7 @@ list(
   ),
 
   cards = list(
-    # one entry per stage — focal brand + category average
+    # one entry per stage: focal brand + category average
     list(
       stage_index, stage_label,
       focal_pct, focal_base_weighted, focal_base_unweighted,
@@ -264,7 +264,7 @@ list(
 
 ------------------------------------------------------------------------
 
-## 7. Outputs — Excel + CSV
+## 7. Outputs: Excel + CSV
 
 ### 7.1 Excel (`funnel_{category_code}.xlsx`)
 
@@ -300,13 +300,13 @@ Two-proportion z-test from tabs module (`modules/tabs/lib/significance.R`).
 
 -   **Focal vs each competitor** at each stage (one test per stage per competitor).
 -   **Focal vs category average (excluding focal)** at each stage.
--   **No all-pairs matrix** — too noisy, not the primary diagnostic.
+-   **No all-pairs matrix**: too noisy, not the primary diagnostic.
 
 ### 8.3 Alpha
 
 -   Default 95% (α = 0.05), configurable via `funnel.significance_level`.
 
-### 8.4 Panel disclosure — canonical text
+### 8.4 Panel disclosure: canonical text
 
 About drawer carries verbatim:
 
@@ -318,15 +318,15 @@ About drawer carries verbatim:
 
 ### 9.1 Thresholds
 
--   `funnel.warn_base` (default 75) — metric rendered with warning indicator + tooltip.
--   `funnel.suppress_base` (default 0, off) — metric hidden, "—" shown when base below threshold.
--   Both configurable. Default behaviour: lenient — show all values with flags.
+-   `funnel.warn_base` (default 75): metric rendered with warning indicator + tooltip.
+-   `funnel.suppress_base` (default 0, off): metric hidden, "n/a" shown when base below threshold.
+-   Both configurable. Default behaviour: lenient, show all values with flags.
 
 ### 9.2 Per-stage application
 
 Applied to each stage's base independently, not to total sample size. A brand with total n=200 but Target Period n=15 gets the Target Period metric flagged while earlier stages pass.
 
-### 9.3 Nested-funnel methodology — canonical text
+### 9.3 Nested-funnel methodology: canonical text
 
 About drawer carries verbatim:
 
@@ -342,9 +342,9 @@ QuestionText values substituted from QuestionMap.
 
 Three synthetic 10-respondent fixtures, each hand-calculated in `funnel_known_answers.xlsx`:
 
--   **Transactional fixture** — 10 respondents × 3 brands, covering all 4 stages (Aware → Consider → Long Period → Target Period). Expected values pre-computed by hand.
--   **Durable fixture** — 10 respondents × 3 brands with `current_owner` + `tenure` covering threshold edge cases (= threshold, \< threshold, missing tenure).
--   **Service fixture** — 10 respondents × 3 brands with `current_customer` + `prior_brand`. Validates prior-brand is About-only, not a stage.
+-   **Transactional fixture**: 10 respondents × 3 brands, covering all 4 stages (Aware → Consider → Long Period → Target Period). Expected values pre-computed by hand.
+-   **Durable fixture**: 10 respondents × 3 brands with `current_owner` + `tenure` covering threshold edge cases (= threshold, \< threshold, missing tenure).
+-   **Service fixture**: 10 respondents × 3 brands with `current_customer` + `prior_brand`. Validates prior-brand is About-only, not a stage.
 
 Tests assert **exact** values from the hand calculations.
 
@@ -361,13 +361,13 @@ Tests assert **exact** values from the hand calculations.
 -   All brand codes contain non-ASCII → no encoding failures.
 -   Weights all equal 1 → weighted results match unweighted exactly.
 -   Weights sum to zero → guard refuses loud.
--   `suppress_base` set to 50 → metrics with base 30–49 show "—"; 50–74 show with warn; 75+ clean.
+-   `suppress_base` set to 50 → metrics with base 30–49 show "n/a"; 50–74 show with warn; 75+ clean.
 
 ### 10.3 Integration tests
 
 -   Full `run_brand()` against the 1Brand synthetic example end-to-end.
--   IPK multi-category fixture — per-category funnel with focal-category routing.
--   Weighted / unweighted parity — design weights produce expected ratios.
+-   IPK multi-category fixture: per-category funnel with focal-category routing.
+-   Weighted / unweighted parity: design weights produce expected ratios.
 -   Cross-module: significance-testing call returns expected structure from tabs module.
 
 ### 10.4 Coverage
@@ -426,17 +426,17 @@ modules/brand/tests/fixtures/
 Please confirm before I write any code:
 
 -   [ ] Stage derivation tables (§3.1–3.3) match your mental model for each category type.
--   [ ] Config settings (§4.1) — names and defaults acceptable.
--   [ ] Function signature (§5.1) — `run_funnel(data, role_map, brand_list, config, weights, sig_tester)` — shape is right.
--   [ ] Internal decomposition (§5.2) — seven internal functions at the right granularity.
--   [ ] HTML data contract (§6) — fields cover all four layers; structure is what the panel builder needs.
--   [ ] Excel (§7.1) — 3 analytic sheets + metadata is the right split.
--   [ ] CSV (§7.2) — long format columns cover what tracker + onward analysis needs.
--   [ ] Significance testing (§8) — focal-vs-competitor + focal-vs-cat-avg scope is right (no all-pairs).
--   [ ] Low-base handling (§9) — per-stage application with warn default 75 / no suppression default is correct.
--   [ ] Canonical About texts (§3.5, §8.4, §9.3) — wording is acceptable for client-facing reports.
--   [ ] Test fixture granularity (§10.1) — 10 respondents × 3 brands × 3 category types with hand-calculated expected values is the right level.
--   [ ] File split (§12) — splitting derivation + metrics into separate files meets the 300-line budget without over-fragmenting.
+-   [ ] Config settings (§4.1): names and defaults acceptable.
+-   [ ] Function signature (§5.1): `run_funnel(data, role_map, brand_list, config, weights, sig_tester)`, shape is right.
+-   [ ] Internal decomposition (§5.2): seven internal functions at the right granularity.
+-   [ ] HTML data contract (§6): fields cover all four layers; structure is what the panel builder needs.
+-   [ ] Excel (§7.1): 3 analytic sheets + metadata is the right split.
+-   [ ] CSV (§7.2): long format columns cover what tracker + onward analysis needs.
+-   [ ] Significance testing (§8): focal-vs-competitor + focal-vs-cat-avg scope is right (no all-pairs).
+-   [ ] Low-base handling (§9): per-stage application with warn default 75 / no suppression default is correct.
+-   [ ] Canonical About texts (§3.5, §8.4, §9.3): wording is acceptable for client-facing reports.
+-   [ ] Test fixture granularity (§10.1): 10 respondents × 3 brands × 3 category types with hand-calculated expected values is the right level.
+-   [ ] File split (§12): splitting derivation + metrics into separate files meets the 300-line budget without over-fragmenting.
 
 ------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-# Audience Lens — Spec v1
+# Audience Lens: Spec v1
 
 **Status:** Shipped on `feature/brand-audience-lens`
 **Module:** `modules/brand/`
@@ -16,10 +16,10 @@ Adds a per-category **Audience Lens** tab to the brand health report. The tab
 answers the client question *"how does our focal brand perform among defined
 sub-populations?"* without combinatorial blowup. Three internal sub-tabs:
 
-1. **Banner table** — total + every audience, all 14 KPIs side-by-side.
-2. **Per-audience cards** — deck-ready single-audience scorecards with delta vs
+1. **Banner table**: total + every audience, all 14 KPIs side-by-side.
+2. **Per-audience cards**: deck-ready single-audience scorecards with delta vs
    total per metric.
-3. **Pair scorecards** — buyer-vs-non-buyer (or any two-arm comparison)
+3. **Pair scorecards**: buyer-vs-non-buyer (or any two-arm comparison)
    side-by-side with auto-classified GROW / FIX / DEFEND chips.
 
 Each card has a per-card pin + PNG button (via the shared `TurasPins` library
@@ -80,7 +80,7 @@ Adds one column:
 |                      | SoM                   | ratio | Focal-link density across all CEPs.         |
 | Word of Mouth        | Net heard             | net   | Net positive minus net negative recall.     |
 |                      | Net said              | net   | Net positive minus net negative shared.     |
-| Loyalty & Behaviour  | Loyalty (SCR)         | %     | Brand-buyer base — N/A on non-buyer side.   |
+| Loyalty & Behaviour  | Loyalty (SCR)         | %     | Brand-buyer base: N/A on non-buyer side.    |
 |                      | Purchase distribution | dist  | Headline = % heavy buyers (top tercile).    |
 |                      | Purchase frequency    | num   | Mean times bought per period.               |
 
@@ -94,13 +94,13 @@ extensions.
 Applied only to **pair rows** (single-audience cards don't get chips). Order of
 precedence in the classifier:
 
-1. **DEFEND** — buyers ≫ non-buyers (gap ≥ threshold, sig) AND buyers > total.
+1. **DEFEND**: buyers ≫ non-buyers (gap ≥ threshold, sig) AND buyers > total.
    Strong position; protect against competitive erosion.
-2. **GROW** — buyers ≫ non-buyers (gap ≥ threshold, sig) but does NOT lead
-   total. Recruitment lever — close the mental gap among non-buyers.
-3. **FIX** — buyers strictly underperform total (no significant pair gap).
+2. **GROW**: buyers ≫ non-buyers (gap ≥ threshold, sig) but does NOT lead
+   total. Recruitment lever: close the mental gap among non-buyers.
+3. **FIX**: buyers strictly underperform total (no significant pair gap).
    Retention/satisfaction risk.
-4. **(no chip)** — neither condition fires.
+4. **(no chip)**: neither condition fires.
 
 When a metric is N/A on the non-buyer side (loyalty / distribution /
 frequency), the pair row never gets a chip.
@@ -113,7 +113,7 @@ frequency), the pair row never gets a chip.
 
 Every respondent is independently classified as either a focal-brand buyer
 (PairRole A) or a non-buyer (PairRole B). The two arms are mutually exclusive
-and exhaustive, but no within-pair pairing exists at the respondent level —
+and exhaustive, but no within-pair pairing exists at the respondent level:
 there is no respondent who is *both*. The test is therefore a
 **two-INDEPENDENT-proportions z-test**, not a paired-sample test. This is the
 standard framing for buyer/non-buyer comparisons in Romaniuk's work.
@@ -122,7 +122,7 @@ The classifier wraps `.al_sig_two_props()` which:
 - Uses the standard pooled-variance two-proportion z when expected counts ≥5.
 - Falls back to Fisher's exact when expected counts <5.
 - For non-proportion metrics (means, nets, ratios), uses a coarse
-  difference-of-means z. This is intentionally conservative for v1 — small
+  difference-of-means z. This is intentionally conservative for v1: small
   samples won't trip the sig flag for mean-based metrics.
 
 ### Mental Availability metrics
@@ -177,15 +177,15 @@ All refusals print a Shiny-visible boxed message to console.
 
 ## Implementation notes
 
-- **Whitelist loader gotcha** — every new R file in `modules/brand/R/` must
+- **Whitelist loader gotcha**: every new R file in `modules/brand/R/` must
   be added to `.source_brand_module()` at `00_main.R:54-87`. The five new
   files (13, 13a–13d) are registered there. Adding more without updating
   the list = silent load failure.
-- **TurasPins inliner gotcha** — all layout-critical CSS uses `!important`
+- **TurasPins inliner gotcha**: all layout-critical CSS uses `!important`
   and avoids `.al-panel`-ancestor selectors so the inliner can faithfully
   reproduce cards in pinned + PNG output. Card-level `data-pin-as-table`
   attribute tells `brand_pins.js` to capture the inner table directly.
-- **Verification path** — `launch_turas()` → GUI → pick the 9cat config →
+- **Verification path**: `launch_turas()` → GUI → pick the 9cat config →
   inspect the generated HTML and PNGs. Brand reports are NOT
   preview-served; do not run `preview_start`.
 

@@ -1,9 +1,9 @@
-# Brand Module — Portfolio Mapping Element Spec v1
+# Brand Module: Portfolio Mapping Element Spec v1
 
 **Version:** 1.0 (draft, supersedes `portfolio.docx`)
 **Scope:** Cross-category portfolio analysis built from category-buying (13m/3m) + cross-category awareness data collected *before* the focal category deep-dive.
 **Applies to:** `modules/brand/R/00_main.R` (existing `.compute_portfolio_data` skeleton), new `09_portfolio*.R` files, new HTML panel, Excel/CSV outputs.
-**Status:** Design spec — skeleton exists (00_main.R:849–945), analyses net-new.
+**Status:** Design spec. Skeleton exists (00_main.R:849–945), analyses net-new.
 
 ------------------------------------------------------------------------
 
@@ -16,37 +16,37 @@ Turn the up-front "which categories did you buy in?" + "which brands are you awa
 3. **How crowded is each category, and where is there still mental room?**
 4. **Which adjacent categories give me permission to extend?**
 
-All analyses are grounded in *revealed awareness conditioned on being a category buyer* — a denominator that makes every metric defensible.
+All analyses are grounded in *revealed awareness conditioned on being a category buyer*, a denominator that makes every metric defensible.
 
 ------------------------------------------------------------------------
 
-## 2. Scope — v1 vs deferred
+## 2. Scope: v1 vs deferred
 
 ### In v1
 
 - **Five analyses** (§4): Footprint Heatmap, Competitive Constellation, Clutter Quadrant, Portfolio Strength Map, Permission-to-Extend Table.
 - **Supporting metrics** (§5): Awareness Set Size, Repertoire Depth, Awareness Efficiency Ratio, Co-purchase matrix.
-- **New top-level "Portfolio" tab** — already reserved in nav (`03_page_builder.R:106–107`), gated by `element_portfolio = Y`.
+- **New top-level "Portfolio" tab**: already reserved in nav (`03_page_builder.R:106–107`), gated by `element_portfolio = Y`.
 - **Four subtabs inside Portfolio:** Footprint / Competitive Set / Category Context / Extension Opportunities.
 - **Weighted and unweighted bases** on every chart.
 - **Low-base suppression** at configurable `min_base` (default 30 unweighted).
-- **TurasPin integration** — every chart pinnable; constellation node click and quadrant dot click both pin-addressable.
-- **Show-counts toggle** — mirrors funnel/MA panel pattern.
+- **TurasPin integration**: every chart pinnable; constellation node click and quadrant dot click both pin-addressable.
+- **Show-counts toggle**: mirrors funnel/MA panel pattern.
 - **Excel** (5 analytic sheets + metadata) + **CSV** (long format) outputs.
 
 ### Deferred to v1.1
 
-- **Segment overlay** — same shape as funnel deferral; data carries segment flags, UI single-segment in v1.
-- **Tracker wave-over-wave** — portfolio shift analysis; data carries wave labels, UI single-wave.
-- **TURF on categories** — reach optimisation across categories (e.g. "smallest portfolio covering 80% of buyers").
-- **Price-tier overlay** — requires `price_tier` role not yet in role registry.
-- **Statistical significance** on co-awareness edges — needs bootstrap; deferred for performance reasons.
-- **Cross-panel brand filter via constellation node click** — in v1, a node click re-centres the constellation only. Filtering the whole Portfolio tab to the clicked brand is deferred (see §12 Q5).
+- **Segment overlay**: same shape as funnel deferral; data carries segment flags, UI single-segment in v1.
+- **Tracker wave-over-wave**: portfolio shift analysis; data carries wave labels, UI single-wave.
+- **TURF on categories**: reach optimisation across categories (e.g. "smallest portfolio covering 80% of buyers").
+- **Price-tier overlay**: requires `price_tier` role not yet in role registry.
+- **Statistical significance** on co-awareness edges: needs bootstrap; deferred for performance reasons.
+- **Cross-panel brand filter via constellation node click**: in v1, a node click re-centres the constellation only. Filtering the whole Portfolio tab to the clicked brand is deferred (see §12 Q5).
 
 ### Explicitly out of scope
 
 - Any analysis requiring purchase-at-brand level for non-focal categories (we only have awareness, not brand purchase, cross-category).
-- Hypothetical-extension questions ("would you buy focal brand if it launched in category X?") — not collected; we infer from revealed awareness.
+- Hypothetical-extension questions ("would you buy focal brand if it launched in category X?") are not collected; we infer from revealed awareness.
 
 ------------------------------------------------------------------------
 
@@ -56,17 +56,17 @@ All analyses are grounded in *revealed awareness conditioned on being a category
 
 | Column pattern | Semantic | Source |
 |---|---|---|
-| `SQ1_{cat_code}` | Bought in long window (13m) — 1/0 | Up-front screener, all respondents × all categories |
-| `SQ2_{cat_code}` | Bought in short window (3m) — 1/0 | Up-front screener, all respondents × all categories |
-| `BRANDAWARE_{cat_code}_{brand_code}` | Aware of brand in category — 1/0 | Cross-category awareness battery, **SQ1-gated** |
+| `SQ1_{cat_code}` | Bought in long window (13m): 1/0 | Up-front screener, all respondents × all categories |
+| `SQ2_{cat_code}` | Bought in short window (3m): 1/0 | Up-front screener, all respondents × all categories |
+| `BRANDAWARE_{cat_code}_{brand_code}` | Aware of brand in category: 1/0 | Cross-category awareness battery, **SQ1-gated** |
 | `{weight_variable}` | Survey weight | Config-driven |
 | `{respondent_id_col}` | Respondent ID | Config-driven |
 
 **Authoritative data fixture:** `modules/brand/tests/fixtures/generate_ipk_9cat_wave1.R` (1,200 respondents, 4 focal × 300). Lines 177–198 define the cross-category awareness logic:
 
-> All respondents answer brand awareness for every category — not just focal. For non-focal categories, awareness is **gated on `SQ1_{cat} = 1`** (the respondent qualified as a buyer in that category); non-qualifiers receive `0`, not `NA`.
+> All respondents answer brand awareness for every category, not just focal. For non-focal categories, awareness is **gated on `SQ1_{cat} = 1`** (the respondent qualified as a buyer in that category); non-qualifiers receive `0`, not `NA`.
 
-**Denominator rule (load-bearing):** every rate in §4 uses the set of **SQ1 qualifiers** for the relevant category as its denominator. This avoids the common pitfall of deflating awareness rates with structural zeros from non-qualifiers. Guard against this via `build_portfolio_base()` — one helper, reused by every analysis.
+**Denominator rule (load-bearing):** every rate in §4 uses the set of **SQ1 qualifiers** for the relevant category as its denominator. This avoids the common pitfall of deflating awareness rates with structural zeros from non-qualifiers. Guard against this via `build_portfolio_base()`: one helper, reused by every analysis.
 
 **Do NOT use** the legacy generator at `examples/9cat/04_data.R` for portfolio testing. That generator produces `n = 400` with awareness only for focal-assigned respondents and does not reflect the real questionnaire design. Tests must use the 1,200-row fixture above.
 
@@ -74,13 +74,13 @@ Detection: use existing `.detect_category_code()` (`00_main.R:763–783`) and `g
 
 ### 3.2 Required config keys
 
-Already in `01_config.R` schema — no schema changes needed:
+Already in `01_config.R` schema, so no schema changes needed:
 
-- `element_portfolio` — Y/N gate (default N)
-- `cross_category_awareness` — **must be Y** (TRS refuse if N and element_portfolio = Y)
-- `focal_brand` — brand code, required for focal-centric views
-- `focal_assignment` — drives which respondents are in the portfolio base
-- Categories sheet — `Analysis_Depth` column; portfolio uses **all** rows regardless of depth
+- `element_portfolio`: Y/N gate (default N)
+- `cross_category_awareness`: **must be Y** (TRS refuse if N and element_portfolio = Y)
+- `focal_brand`: brand code, required for focal-centric views
+- `focal_assignment`: drives which respondents are in the portfolio base
+- Categories sheet: `Analysis_Depth` column; portfolio uses **all** rows regardless of depth
 
 ### 3.3 New config keys (additive, all optional)
 
@@ -88,8 +88,8 @@ Already in `01_config.R` schema — no schema changes needed:
 |---|---|---|
 | `portfolio_min_base` | 30 | Unweighted cell suppression threshold |
 | `portfolio_cooccur_min_pairs` | 20 | Minimum co-occurrence count to draw an edge in constellation |
-| `portfolio_timeframe` | "3m" | "3m" (SQ2) or "13m" (SQ1) — default anchor; user can toggle in panel chrome (§12 Q1) |
-| `portfolio_extension_baseline` | "all" | "all" \| "non_buyers" — denominator for permission-to-extend lift |
+| `portfolio_timeframe` | "3m" | "3m" (SQ2) or "13m" (SQ1), the default anchor; user can toggle in panel chrome (§12 Q1) |
+| `portfolio_extension_baseline` | "all" | "all" \| "non_buyers": denominator for permission-to-extend lift |
 | `focal_home_category` | "" (auto) | Optional override; blank = auto-detect by highest `A(focal, c)` (§12 Q2) |
 
 All defaults chosen so running with no new config gives a sensible report.
@@ -110,13 +110,13 @@ Let `A(b, c)` = % of buyers of category `c` (per `portfolio_timeframe`) who are 
 
 **Matrix:** brands (rows) × categories (cols). Sort rows by total footprint (sum across cats). Sort cols by category size.
 
-**Chart:** `build_heat_strip()` (`04_chart_builder.R:272`) — **already exists**, reuse directly. Cell colour = awareness %, 0–100% ramp. Focal brand row highlighted.
+**Chart:** `build_heat_strip()` (`04_chart_builder.R:272`). It **already exists**, reuse directly. Cell colour = awareness %, 0–100% ramp. Focal brand row highlighted.
 
-**Defensibility:** Denominator is category buyers, not total sample. A brand with 80% awareness among category buyers and 10% among non-buyers is a strong brand in that category — this metric captures that correctly.
+**Defensibility:** Denominator is category buyers, not total sample. A brand with 80% awareness among category buyers and 10% among non-buyers is a strong brand in that category. This metric captures that correctly.
 
 **Edge cases:**
 - Category with <`portfolio_min_base` buyers → column suppressed, note in About drawer.
-- Brand absent from a category (not in QuestionMap) → cell shows `—` not `0%`. Rationale: not-asked ≠ not-aware.
+- Brand absent from a category (not in QuestionMap) → cell shows `n/a` not `0%`. Rationale: not-asked ≠ not-aware.
 
 ### 4.2 Competitive Constellation (Co-Awareness Network)
 
@@ -133,7 +133,7 @@ Use weighted counts.
 
 Threshold edges below `portfolio_cooccur_min_pairs` raw co-occurrences (suppress noise on small brands).
 
-**Chart:** Force-directed network — **net-new**. Create `build_network()` in `04_chart_builder.R`. SVG, inline, no JS physics (pre-computed layout via simple force simulation in R using `igraph::layout_with_fr` if available, else deterministic fallback).
+**Chart:** Force-directed network, **net-new**. Create `build_network()` in `04_chart_builder.R`. SVG, inline, no JS physics (pre-computed layout via simple force simulation in R using `igraph::layout_with_fr` if available, else deterministic fallback).
 
 - **Nodes:** one per brand. Size = total aware respondents. Colour = focal / focal's own portfolio / competitor (reuse `colour_focal`, `colour_focal_accent`, `colour_competitor` from config).
 - **Edges:** width ∝ Jaccard. Top-N edges only (`portfolio_edge_top_n`, default 40) to keep readable.
@@ -163,9 +163,9 @@ Plot one dot per category. Reference lines at category-median x and at `y = 1 / 
 - **Niche Opportunity:** low clutter, focal weak
 - **Forgotten / Wrong Battle:** high clutter, focal weak
 
-**Chart:** `build_scatter()` (`04_chart_builder.R:150`) — **already exists with quadrant support**, reuse. Dot size = category penetration in sample. Label every dot with category name.
+**Chart:** `build_scatter()` (`04_chart_builder.R:150`). It **already exists with quadrant support**, reuse. Dot size = category penetration in sample. Label every dot with category name.
 
-**Defensibility:** Every input is a survey-observed rate with a clear formula. Quadrant labels are interpretive — always print the underlying numbers beside the chart (small table).
+**Defensibility:** Every input is a survey-observed rate with a clear formula. Quadrant labels are interpretive. Always print the underlying numbers beside the chart (small table).
 
 **Edge cases:**
 - Focal brand absent from a category → plot at y=0 with explicit "not in category" annotation.
@@ -179,16 +179,16 @@ Plot one dot per category. Reference lines at category-median x and at `y = 1 / 
 
 For the focal brand (or any brand with ≥2 categories):
 - `x_c` = category penetration in total sample (unweighted n of SQ1/SQ2 buyers ÷ n_total)
-- `y_c` = `A(brand, c)` — awareness among category buyers
+- `y_c` = `A(brand, c)`: awareness among category buyers
 - bubble size = absolute weighted n of aware-buyers
 
-**Chart:** Bubble scatter — **net-new**. Add `build_bubble_scatter()` to `04_chart_builder.R`. Essentially `build_scatter()` with variable-radius points — either extend existing scatter or create a thin wrapper.
+**Chart:** Bubble scatter, **net-new**. Add `build_bubble_scatter()` to `04_chart_builder.R`. Essentially `build_scatter()` with variable-radius points. Either extend existing scatter or create a thin wrapper.
 
 Diagonal reference line at `y = x` conceptually flags "expected" performance if awareness scaled with category participation; above-line = earning, below-line = under-earning.
 
-**Interaction:** Brand selector at top of panel — chip picker reusing funnel/MA pattern. Default = focal brand. Switching brand re-renders only this chart.
+**Interaction:** Brand selector at top of panel, chip picker reusing funnel/MA pattern. Default = focal brand. Switching brand re-renders only this chart.
 
-**Defensibility:** Both axes are raw survey rates. The "expected" diagonal is the only interpretive layer — about drawer explains it is a visual aid, not a statistical prediction.
+**Defensibility:** Both axes are raw survey rates. The "expected" diagonal is the only interpretive layer. The about drawer explains it is a visual aid, not a statistical prediction.
 
 **Edge cases:**
 - Brand in only one category → chart replaced with single-category callout card.
@@ -205,8 +205,8 @@ For each category `c` *not* focal's home:
     lift(c) = P(aware of focal | bought c) / P(aware of focal | baseline)
 
 where baseline is controlled by `portfolio_extension_baseline`:
-- `"all"` — all respondents in sample
-- `"non_buyers"` — respondents who did NOT buy focal's home category (purer adjacency signal)
+- `"all"`: all respondents in sample
+- `"non_buyers"`: respondents who did NOT buy focal's home category (purer adjacency signal)
 
 Sort categories descending by lift. Show columns: Category | Buyers of c (n) | % aware of focal among buyers | Lift vs baseline | Significance flag.
 
@@ -288,16 +288,16 @@ New file: `R/09_portfolio_panel_data.R` with `build_portfolio_panel_data(portfol
 
 ### 7.1 Tab insertion
 
-Enable the reserved slot in `03_page_builder.R:106–107`. No nav code changes — already wired. Gate by `element_portfolio = Y`.
+Enable the reserved slot in `03_page_builder.R:106–107`. No nav code changes, already wired. Gate by `element_portfolio = Y`.
 
 ### 7.2 Subtab layout (within Portfolio tab)
 
 Four subtabs, reusing MA/funnel sub-nav CSS idiom:
 
-1. **Footprint** — hero strip + heatmap (§4.1)
-2. **Competitive Set** — constellation network (§4.2) + ranked co-awareness table
-3. **Category Context** — clutter quadrant (§4.3) + per-category context table
-4. **Extension** — portfolio strength map (§4.4) + permission-to-extend table (§4.5)
+1. **Footprint**: hero strip + heatmap (§4.1)
+2. **Competitive Set**: constellation network (§4.2) + ranked co-awareness table
+3. **Category Context**: clutter quadrant (§4.3) + per-category context table
+4. **Extension**: portfolio strength map (§4.4) + permission-to-extend table (§4.5)
 
 Each subtab has its own pin button and about drawer. Subtab state is pin-addressable (mirrors funnel's `fn-subtab` pattern in `03_funnel_panel.R:121–127`).
 
@@ -310,7 +310,7 @@ New file: `lib/html_report/js/brand_portfolio_panel.js`. Responsibilities:
 - Show-counts toggle
 - TurasPin adapter hooks (`.br-pin-btn`, via `brand_pins.js`)
 
-No charting libraries — SVG is emitted inline by the R builders.
+No charting libraries. SVG is emitted inline by the R builders.
 
 ------------------------------------------------------------------------
 
@@ -320,7 +320,7 @@ No charting libraries — SVG is emitted inline by the R builders.
 
 | File | Purpose |
 |---|---|
-| `R/09_portfolio.R` | Orchestrator — `run_portfolio()` wrapping existing skeleton |
+| `R/09_portfolio.R` | Orchestrator: `run_portfolio()` wrapping existing skeleton |
 | `R/09a_portfolio_footprint.R` | §4.1 footprint matrix computation |
 | `R/09b_portfolio_constellation.R` | §4.2 Jaccard + layout |
 | `R/09c_portfolio_clutter.R` | §4.3 quadrant data |
@@ -343,14 +343,14 @@ No charting libraries — SVG is emitted inline by the R builders.
 | `R/00_guard.R` | Add portfolio-specific guards (cross_category_awareness = Y check) |
 | `R/01_config.R` | Add the four new config keys (§3.3) with defaults + validation |
 | `lib/html_report/99_html_report_main.R` | Source new panel files |
-| `lib/html_report/04_chart_builder.R` | Add `build_network()`, `build_bubble_scatter()` — reuse heat_strip, scatter as-is |
+| `lib/html_report/04_chart_builder.R` | Add `build_network()`, `build_bubble_scatter()`. Reuse heat_strip, scatter as-is |
 | `R/99_output.R` | Wire portfolio Excel/CSV sheets into main output bundle |
 | `docs/ROLE_REGISTRY.md` | Document awareness-set role usage, link to this spec |
 
 ### Net-new chart builders (§4 flagged them)
 
-- `build_network()` — force-directed, inline SVG. Uses `igraph::layout_with_fr` if present, else a deterministic circular layout as fallback. Must run without igraph (graceful degradation).
-- `build_bubble_scatter()` — wrapper over `build_scatter()` with variable-radius support.
+- `build_network()`: force-directed, inline SVG. Uses `igraph::layout_with_fr` if present, else a deterministic circular layout as fallback. Must run without igraph (graceful degradation).
+- `build_bubble_scatter()`: wrapper over `build_scatter()` with variable-radius support.
 
 ------------------------------------------------------------------------
 
@@ -398,24 +398,24 @@ The next coding session is done when **all** of these pass:
 
 1. **Unit tests** cover each of `09a`–`09e` with synthetic fixtures; minimum 80% line coverage on new R files.
 2. **Integration test** runs `run_brand()` end-to-end on the 9-cat example with `element_portfolio = Y` and produces a non-empty Portfolio tab.
-3. **TRS tests** — each refusal code in §9 has a test that triggers it with a crafted input.
-4. **Nesting / structural tests** — Footprint matrix cell `A(b, c)` ∈ [0,1], Jaccard ∈ [0,1], lift > 0.
-5. **Rendering test** — HTML report loads in a browser (preview_start), Portfolio tab switches between all four subtabs, chip picker changes the strength map, clicking a constellation node re-centres and pins.
-6. **TurasPin round-trip** — pinning a constellation view, exporting pins, re-importing, and reopening yields the same view (node centred, subtab active, chip selected).
-7. **Low-base suppression** — forcing `portfolio_min_base = 99999` suppresses all cells with clear messaging; no crashes.
-8. **Performance** — on a 5,000-respondent × 10-category × 12-brand fixture, `run_portfolio()` completes in ≤3s on a developer laptop.
-9. **Excel + CSV outputs** — all six sheets present, row counts match in-memory structures.
-10. **Graceful degradation without igraph** — `build_network()` falls back to deterministic circular layout with a one-line About note.
+3. **TRS tests**: each refusal code in §9 has a test that triggers it with a crafted input.
+4. **Nesting / structural tests**: Footprint matrix cell `A(b, c)` ∈ [0,1], Jaccard ∈ [0,1], lift > 0.
+5. **Rendering test**: HTML report loads in a browser (preview_start), Portfolio tab switches between all four subtabs, chip picker changes the strength map, clicking a constellation node re-centres and pins.
+6. **TurasPin round-trip**: pinning a constellation view, exporting pins, re-importing, and reopening yields the same view (node centred, subtab active, chip selected).
+7. **Low-base suppression**: forcing `portfolio_min_base = 99999` suppresses all cells with clear messaging; no crashes.
+8. **Performance**: on a 5,000-respondent × 10-category × 12-brand fixture, `run_portfolio()` completes in ≤3s on a developer laptop.
+9. **Excel + CSV outputs**: all six sheets present, row counts match in-memory structures.
+10. **Graceful degradation without igraph**: `build_network()` falls back to deterministic circular layout with a one-line About note.
 
 ------------------------------------------------------------------------
 
 ## 12. Decisions (Duncan, 2026-04-21)
 
-All five previously-open questions are now resolved. The coder implements these verbatim — no re-litigation.
+All five previously-open questions are now resolved. The coder implements these verbatim. No re-litigation.
 
 ### Q1. Timeframe default
 
-**Decision:** default anchor = **`3m` (SQ2)**. Panel chrome exposes a single toggle `[3m | 13m]` that re-runs all portfolio analyses on the selected base. No side-by-side duplication — the toggle is the unified view-switcher.
+**Decision:** default anchor = **`3m` (SQ2)**. Panel chrome exposes a single toggle `[3m | 13m]` that re-runs all portfolio analyses on the selected base. No side-by-side duplication. The toggle is the unified view-switcher.
 
 - Config key: `portfolio_timeframe` default `"3m"` (already in §3.3).
 - Pin state must persist the toggle so pinned views round-trip correctly.
@@ -427,23 +427,23 @@ All five previously-open questions are now resolved. The coder implements these 
 
 - Auto-detect rule: home category = the cat with the highest `A(focal, c)` among cats where focal is present. Ties broken by highest `cat_penetration`.
 - New optional config key: `focal_home_category` (default blank). If set, it overrides auto-detect. Validation: must match a `cat_code` in the Categories sheet.
-- Add `focal_home_category` to the config schema alongside the four keys in §3.3 (so it becomes **five** new config keys — update §3.3 table in the coder's mental model).
+- Add `focal_home_category` to the config schema alongside the four keys in §3.3 (so it becomes **five** new config keys; update §3.3 table in the coder's mental model).
 - Home cat is surfaced in the About drawer: "Home category: POS (auto-detected from highest focal awareness)" or "Home category: DSS (configured)".
 
 ### Q3. Permission-to-extend significance
 
-**Decision:** **hybrid test** — two-prop z-test by default, auto-fallback to **Fisher's exact** when any 2×2 cell has expected count < 5 (standard small-sample rule). Benjamini–Hochberg FDR correction applied across categories regardless of which test produced each p-value.
+**Decision:** **hybrid test**, two-prop z-test by default, auto-fallback to **Fisher's exact** when any 2×2 cell has expected count < 5 (standard small-sample rule). Benjamini–Hochberg FDR correction applied across categories regardless of which test produced each p-value.
 
 - Test choice per row is recorded in the output (`test_used` column in `Portfolio_Extension`).
 - About drawer documents the fallback rule.
-- No config knob — rule is fixed.
+- No config knob: rule is fixed.
 
 ### Q4. Constellation layout engine
 
 **Decision:** **pure-R implementation, no igraph.** `igraph` is not in `renv.lock` and adding a heavyweight dependency for one chart fails the CLAUDE.md dependency-justification bar.
 
 - Implement a deterministic Fruchterman–Reingold layout in pure base R, ~50–80 lines. Seed from `set.seed(42L)` inside the function so runs are reproducible.
-- Soft-detect igraph: `if (requireNamespace("igraph", quietly = TRUE))` — if present, prefer `igraph::layout_with_fr` for layout quality; if absent, use the pure-R implementation. No user-visible difference in behaviour.
+- Soft-detect igraph: `if (requireNamespace("igraph", quietly = TRUE))`. If present, prefer `igraph::layout_with_fr` for layout quality; if absent, use the pure-R implementation. No user-visible difference in behaviour.
 - About drawer notes which engine rendered: "Layout: igraph Fruchterman–Reingold" or "Layout: Turas pure-R Fruchterman–Reingold".
 - Do **not** add `igraph` to `renv.lock`. It stays an optional enhancement.
 
@@ -452,7 +452,7 @@ All five previously-open questions are now resolved. The coder implements these 
 **Decision:** **re-centred view only for v1.** Clicking a constellation node re-centres the layout on that brand and pins the re-centred view. It does NOT filter the whole Portfolio panel to that brand.
 
 - Cross-panel brand filtering is a richer interaction but materially expands Phase 4 scope. Explicitly deferred to v1.1.
-- Add to §2 "Deferred to v1.1" list: *"Cross-panel brand filter via constellation node click — currently re-centres the constellation only."*
+- Add to §2 "Deferred to v1.1" list: *"Cross-panel brand filter via constellation node click: currently re-centres the constellation only."*
 - Pin payload for constellation = `{ subtab: "constellation", centred_brand: "IPK" }`. Nothing more.
 
 ------------------------------------------------------------------------
@@ -477,12 +477,12 @@ Read this whole section before writing a single line of code.
 
 ### 14.0 Preconditions (do these first, in order)
 
-1. **Read this spec end to end.** Especially §3.1 (denominator rule), §4 (analyses), §8 (file inventory), §9 (TRS refusals), §11 (acceptance criteria). If anything is unclear, stop and ask Duncan before coding — do not guess.
+1. **Read this spec end to end.** Especially §3.1 (denominator rule), §4 (analyses), §8 (file inventory), §9 (TRS refusals), §11 (acceptance criteria). If anything is unclear, stop and ask Duncan before coding. Do not guess.
 2. **Read CLAUDE.md** at the repo root. TRS refusals (no `stop()`), console-visible error formatter, 80% test coverage minimum, styler formatting, roxygen2 on exports. These are non-negotiable.
 3. **Verify the fixture exists and produces the shape the spec claims.** Source `modules/brand/tests/fixtures/generate_ipk_9cat_wave1.R` (or use the already-generated `.xlsx` it points to at `OUT_PATH`). Load the workbook, confirm: `nrow == 1200`, columns `SQ1_DSS..SQ1_ANT`, `SQ2_*`, and `BRANDAWARE_{cat}_{brand}` for all 9 cats × their brand lists exist. If any are missing, stop and flag.
 4. **Create a branch from the current working branch** (`feature/brand-report-nav-2layer` as of this writing; confirm via `git status`). Branch name: `feature/brand-portfolio`. Do not merge to main until Duncan reviews.
 5. **Do NOT use `examples/9cat/04_data.R`** for testing. It's the wrong design (400-respondent, focal-only awareness). Tests must use the 1,200-row fixture per §3.1.
-6. **Read §12 — every question is now answered.** No guessing. Implement verbatim:
+6. **Read §12. Every question is now answered.** No guessing. Implement verbatim:
    - Q1: anchor = 3m, panel exposes `[3m | 13m]` toggle, pin state persists.
    - Q2: auto-detect home cat by max `A(focal, c)`, tie-break on cat penetration; optional `focal_home_category` config override.
    - Q3: two-prop z-test default, auto-fallback to Fisher's exact when any expected cell count < 5; BH correction always applied; `test_used` column in output.
@@ -491,68 +491,68 @@ Read this whole section before writing a single line of code.
 
 ### 14.1 Build order (phases with commit points)
 
-Each phase ends with a commit. Do not merge phases into single commits — Duncan reviews phase-by-phase.
+Each phase ends with a commit. Do not merge phases into single commits. Duncan reviews phase-by-phase.
 
-#### Phase 1 — Base helper + config scaffolding
+#### Phase 1: Base helper + config scaffolding
 **Goal:** the denominator and config plumbing that every analysis depends on.
 
 - Create `R/09_portfolio.R` with stub `run_portfolio(data, categories, structure, config, weights)` that returns a TRS-shaped list with `status = "PASS"` and empty payloads.
-- Create `build_portfolio_base(data, cat_code, timeframe, weights)` helper — returns `list(idx = logical vector of qualifiers, n_uw, n_w)`. **This is the single source of truth for the denominator rule in §3.1.** Every analysis calls it; no analysis recomputes the SQ1/SQ2 mask inline.
+- Create `build_portfolio_base(data, cat_code, timeframe, weights)` helper. It returns `list(idx = logical vector of qualifiers, n_uw, n_w)`. **This is the single source of truth for the denominator rule in §3.1.** Every analysis calls it; no analysis recomputes the SQ1/SQ2 mask inline.
 - Add the four config keys from §3.3 to `R/01_config.R` (defaults + validation).
-- Add TRS refusals `CFG_PORTFOLIO_AWARENESS_OFF`, `CFG_PORTFOLIO_NO_CATEGORIES`, `DATA_PORTFOLIO_NO_AWARENESS_COLS`, `DATA_PORTFOLIO_TIMEFRAME_MISSING` to `R/00_guard.R` (per §9) — each with the CLAUDE.md console formatter.
-- Tests: `test_portfolio_base.R` — verify base helper returns expected counts on the 1,200-row fixture for every cat × timeframe combination.
+- Add TRS refusals `CFG_PORTFOLIO_AWARENESS_OFF`, `CFG_PORTFOLIO_NO_CATEGORIES`, `DATA_PORTFOLIO_NO_AWARENESS_COLS`, `DATA_PORTFOLIO_TIMEFRAME_MISSING` to `R/00_guard.R` (per §9), each with the CLAUDE.md console formatter.
+- Tests: `test_portfolio_base.R`. Verify base helper returns expected counts on the 1,200-row fixture for every cat × timeframe combination.
 
 **Verify:** `testthat::test_dir("modules/brand/tests/testthat", filter = "portfolio_base")` passes. Commit: `feat(brand): portfolio scaffolding + base helper + TRS guards`.
 
-#### Phase 2 — Analysis A (Footprint) + Analysis C (Clutter)
+#### Phase 2: Analysis A (Footprint) + Analysis C (Clutter)
 **Goal:** the two analyses that reuse existing chart builders. Prove the panel wiring end-to-end on the simpler cases first.
 
-- `R/09a_portfolio_footprint.R` — `compute_footprint_matrix()` per §4.1. Output: matrix [brand × cat] of awareness %, plus parallel bases matrix. Denominators via `build_portfolio_base()`.
-- `R/09c_portfolio_clutter.R` — `compute_clutter_data()` per §4.3. Output: data.frame with `cat, awareness_set_size_mean, focal_share_of_aware, cat_penetration, quadrant`.
-- `R/09f_portfolio_panel_data.R` — skeleton of `build_portfolio_panel_data()` with only Footprint + Clutter subtabs populated. Mirror the shape of `R/02a_ma_panel_data.R:46`.
-- `lib/html_report/panels/09_portfolio_panel.R` — HTML emitter, two subtabs active (Footprint, Category Context). Uses `build_heat_strip()` (`04_chart_builder.R:272`) and `build_scatter()` (`:150`) — **do not** create new chart builders in this phase.
-- `lib/html_report/js/brand_portfolio_panel.js` — subtab switching only. No constellation JS yet.
+- `R/09a_portfolio_footprint.R`: `compute_footprint_matrix()` per §4.1. Output: matrix [brand × cat] of awareness %, plus parallel bases matrix. Denominators via `build_portfolio_base()`.
+- `R/09c_portfolio_clutter.R`: `compute_clutter_data()` per §4.3. Output: data.frame with `cat, awareness_set_size_mean, focal_share_of_aware, cat_penetration, quadrant`.
+- `R/09f_portfolio_panel_data.R`: skeleton of `build_portfolio_panel_data()` with only Footprint + Clutter subtabs populated. Mirror the shape of `R/02a_ma_panel_data.R:46`.
+- `lib/html_report/panels/09_portfolio_panel.R`: HTML emitter, two subtabs active (Footprint, Category Context). Uses `build_heat_strip()` (`04_chart_builder.R:272`) and `build_scatter()` (`:150`). **Do not** create new chart builders in this phase.
+- `lib/html_report/js/brand_portfolio_panel.js`: subtab switching only. No constellation JS yet.
 - Enable the reserved Portfolio tab at `lib/html_report/03_page_builder.R:106–107` behind `element_portfolio = Y`.
 - Tests: unit tests on both compute functions + an integration test that runs `run_brand()` on the 1,200-row fixture and asserts the Portfolio tab HTML contains both charts.
 
 **Verify:**
 1. `testthat::test_dir("modules/brand/tests/testthat", filter = "portfolio_(footprint|clutter)")` passes.
-2. Open the generated HTML in `preview_start`, navigate to Portfolio, confirm heatmap renders and quadrant renders. **Do not ask Duncan to check — verify yourself via `preview_snapshot` + `preview_screenshot`.**
+2. Open the generated HTML in `preview_start`, navigate to Portfolio, confirm heatmap renders and quadrant renders. **Do not ask Duncan to check. Verify yourself via `preview_snapshot` + `preview_screenshot`.**
 
 Commit: `feat(brand): portfolio footprint + clutter analyses`.
 
-#### Phase 3 — Analysis D (Strength Map) + Analysis E (Permission)
+#### Phase 3: Analysis D (Strength Map) + Analysis E (Permission)
 **Goal:** the two focal-centric analyses that together form the "Extension" subtab.
 
-- `R/09d_portfolio_strength.R` — `compute_strength_map()` per §4.4. Per-brand data structure. Default brand = focal.
-- `R/09e_portfolio_extension.R` — `compute_extension_table()` per §4.5. Two-prop z-test with Benjamini–Hochberg adjustment (unless Duncan answered Q3 differently). Borrow z-test helper from `modules/tabs/` — do not reinvent.
+- `R/09d_portfolio_strength.R`: `compute_strength_map()` per §4.4. Per-brand data structure. Default brand = focal.
+- `R/09e_portfolio_extension.R`: `compute_extension_table()` per §4.5. Two-prop z-test with Benjamini–Hochberg adjustment (unless Duncan answered Q3 differently). Borrow z-test helper from `modules/tabs/`. Do not reinvent.
 - New chart builder: `build_bubble_scatter()` in `lib/html_report/04_chart_builder.R`. Thin wrapper over `build_scatter()` with variable-radius support. Add unit test.
 - Extend `build_portfolio_panel_data()` + HTML emitter for the Extension subtab (strength map + permission table).
-- Chip picker JS for brand selection on strength map — mirror MA panel's chip picker pattern.
+- Chip picker JS for brand selection on strength map: mirror MA panel's chip picker pattern.
 - Tests: unit tests on both compute functions + TRS refusal tests for `CALC_EXTENSION_NO_FOCAL_AWARENESS`.
 
 **Verify:** preview the HTML, click through brand chips on the strength map, confirm the bubble chart updates. Confirm the permission table renders with significance flags.
 
 Commit: `feat(brand): portfolio strength map + permission-to-extend`.
 
-#### Phase 4 — Analysis B (Constellation) — the hard one
+#### Phase 4: Analysis B (Constellation), the hard one
 **Goal:** the net-new network chart. Save for last because the graph layout is the riskiest piece.
 
-- `R/09b_portfolio_constellation.R` — `compute_constellation()` per §4.2. Jaccard across brand pairs. Pre-compute layout in R.
+- `R/09b_portfolio_constellation.R`: `compute_constellation()` per §4.2. Jaccard across brand pairs. Pre-compute layout in R.
 - New chart builder: `build_network()` in `04_chart_builder.R`. **Must work without igraph.** If `requireNamespace("igraph", quietly = TRUE)`, use `igraph::layout_with_fr`; else fallback to deterministic circular layout with a one-line note in the About drawer. Add unit test for the fallback path (force the non-igraph branch).
 - Extend `build_portfolio_panel_data()` + HTML emitter for the Competitive Set subtab.
 - Node-click JS: re-centre the view (per Q5 default). Pin-addressable via existing `brand_pins.js` adapter.
 - TRS refusal test for `CALC_CONSTELLATION_TOO_SPARSE`.
 
-**Verify:** preview the constellation, click a non-focal node, confirm it re-centres. Pin the view, export pins, re-import, reopen — confirm round-trip (per §11 criterion 6).
+**Verify:** preview the constellation, click a non-focal node, confirm it re-centres. Pin the view, export pins, re-import, reopen. Confirm round-trip (per §11 criterion 6).
 
 Commit: `feat(brand): portfolio competitive constellation`.
 
-#### Phase 5 — Outputs + supporting metrics + about drawer
+#### Phase 5: Outputs + supporting metrics + about drawer
 **Goal:** ship-ready polish.
 
 - Hero-strip KPI cards (§5) at the top of the Portfolio tab.
-- `R/09g_portfolio_output.R` — Excel + CSV writers per §10. Six sheets, `ClientCode`/`QuestionText` on every row.
+- `R/09g_portfolio_output.R`: Excel + CSV writers per §10. Six sheets, `ClientCode`/`QuestionText` on every row.
 - Wire into `R/99_output.R`.
 - About drawer copy for each subtab: formula, denominators, suppressions, limitations. Factual, no marketing language.
 - Update `docs/ROLE_REGISTRY.md` with awareness-set role note linking back to this spec.
@@ -561,8 +561,8 @@ Commit: `feat(brand): portfolio competitive constellation`.
 
 Commit: `feat(brand): portfolio outputs + supporting metrics + docs`.
 
-#### Phase 6 — Acceptance pass
-Run every item in §11 explicitly. Do not skip any. Produce a short checklist report in the PR description mapping each criterion to the evidence (file path, test name, screenshot). Performance test (§11 criterion 8) on the 1,200-row fixture — report actual runtime.
+#### Phase 6: Acceptance pass
+Run every item in §11 explicitly. Do not skip any. Produce a short checklist report in the PR description mapping each criterion to the evidence (file path, test name, screenshot). Performance test (§11 criterion 8) on the 1,200-row fixture. Report actual runtime.
 
 Commit (if any fixes): `fix(brand): portfolio acceptance pass`.
 
@@ -572,8 +572,8 @@ PR title: `feat(brand): portfolio mapping element (v1)`. Link PR body to this sp
 
 - **Denominator rule is inviolable.** Every rate uses `build_portfolio_base()`. No inline SQ1/SQ2 filtering anywhere else. A grep for `SQ1_` or `SQ2_` in new code should return only the helper.
 - **Never use `stop()`.** TRS refusals only, with console formatter.
-- **Never claim something works without verifying.** Duncan's standing rule: read the file, run the test, screenshot the preview. No "this should work" or "I believe this is correct" — only "I ran X and got Y".
-- **Do not use `examples/9cat/04_data.R`** anywhere — not in tests, not in examples, not in docs. If you need a synthetic dataset for testing, the 1,200-row fixture is authoritative.
+- **Never claim something works without verifying.** Duncan's standing rule: read the file, run the test, screenshot the preview. No "this should work" or "I believe this is correct", only "I ran X and got Y".
+- **Do not use `examples/9cat/04_data.R`** anywhere, not in tests, not in examples, not in docs. If you need a synthetic dataset for testing, the 1,200-row fixture is authoritative.
 - **Do not touch** unrelated files. If you spot a bug outside the portfolio scope, flag it as a spawn-task but do not fix it in this PR.
 - **Respect the file layout convention.** Module uses `R/` subdir with `lib/html_report/` for rendering. Follow suit.
 - **Style + docs.** Every new exported function gets roxygen2. Every new file ends with `styler::style_file()` clean. Run `roxygen2::roxygenise()` before each commit.

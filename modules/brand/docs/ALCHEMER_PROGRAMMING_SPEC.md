@@ -1,6 +1,6 @@
 # Alchemer Programming Specification
 
-## Turas Brand Module — Category Buyer Metrics (CBM) Template
+## Turas Brand Module: Category Buyer Metrics (CBM) Template
 
 **Version:** 1.1\
 **Author:** The Research LampPost\
@@ -13,9 +13,9 @@
 
 This document is the complete programming brief for any Turas Brand Module CBM survey. It tells you exactly what questions to programme, what to name them, and how to set up the routing logic in Alchemer.
 
-### How routing works in Alchemer — read this first
+### How routing works in Alchemer: read this first
 
-Almost all survey routing uses **Alchemer's built-in Logic system** — no scripting needed. Lua/Custom Scripts are a last resort for logic the built-in system cannot handle.
+Almost all survey routing uses **Alchemer's built-in Logic system**. No scripting needed. Lua/Custom Scripts are a last resort for logic the built-in system cannot handle.
 
 | Routing need | How to handle it in Alchemer |
 |----|----|
@@ -30,31 +30,31 @@ Almost all survey routing uses **Alchemer's built-in Logic system** — no scrip
 | Show WOM count only when WOM was shared | Built-in: **Show Logic** on the count question |
 | Show cross-cat awareness only if they bought it | Built-in: **Show Logic** on each awareness block |
 
-Each of these is set up through Alchemer's **Logic tab** on the question or action — no code required. The sections below walk through each one step by step.
+Each of these is set up through Alchemer's **Logic tab** on the question or action. No code required. The sections below walk through each one step by step.
 
-**IPK** is the reference implementation (9 categories). Most projects will have **one category only** — where this matters, you will see a `SINGLE-CAT` note.
+**IPK** is the reference implementation (9 categories). Most projects will have **one category only**. Where this matters, you will see a `SINGLE-CAT` note.
 
 Every question has a **question code** that must be used as the Alchemer question alias exactly as written. The Alchemer CSV export column names depend on this. If the alias is wrong the report will not run.
 
 ### Template toggles
 
-Each section is controlled by an on/off toggle in the `Brand_Config.xlsx` Settings sheet. The toggle name is shown at the top of each section (e.g. `element_wom`). If that element is not in scope for a project, set its toggle to `N` — then skip that entire section when programming.
+Each section is controlled by an on/off toggle in the `Brand_Config.xlsx` Settings sheet. The toggle name is shown at the top of each section (e.g. `element_wom`). If that element is not in scope for a project, set its toggle to `N`, then skip that entire section when programming.
 
 | Section | Toggle in Brand_Config | Default |
 |----|----|----|
-| Screeners | Always on | — |
+| Screeners | Always on | n/a |
 | Cross-category awareness | `cross_category_awareness` | Y |
-| Category buying | Always on | — |
+| Category buying | Always on | n/a |
 | Brand funnel | `element_funnel` | Y |
 | CEP × brand matrix | `element_mental_avail` | Y |
-| Purchase channels | *(no toggle — included with cat buying)* | Y |
-| Pack sizes | *(no toggle — included with cat buying)* | Y |
-| Ad-hoc questions | *(no toggle — omit section if no ad-hoc qs)* | — |
+| Purchase channels | *(no toggle: included with cat buying)* | Y |
+| Pack sizes | *(no toggle: included with cat buying)* | Y |
+| Ad-hoc questions | *(no toggle: omit section if no ad-hoc qs)* | n/a |
 | WOM | `element_wom` | Y |
 | DBA | `element_dba` | N |
 | Branded Reach | `element_branded_reach` | N |
 | Portfolio (cross-cat awareness) | `element_portfolio` | Y |
-| Demographics | Always on | — |
+| Demographics | Always on | n/a |
 
 ------------------------------------------------------------------------
 
@@ -78,7 +78,7 @@ Each category has a short uppercase code used in all column names.
 | Cook-in Sauces | `COO` | **Adjacent** | Brand awareness only (if respondent qualifies) |
 | Anti-pasta | `ANT` | **Adjacent** | Brand awareness only (if respondent qualifies) |
 
-**Category roles — what they mean:**
+**Category roles and what they mean:**
 
 | Role | `Analysis_Depth` in Brand_Config | Description |
 |----|----|----|
@@ -86,11 +86,11 @@ Each category has a short uppercase code used in all column names.
 | **Adjacent** | `awareness_only` | Appears in screener. Brand awareness shown to respondents who qualify. No deep dive. Feeds portfolio map. |
 | **Peripheral** | `screener_only` | Appears in screener only. No brand awareness questions. Used to capture demographic breadth of category buying without adding survey length. |
 
-> **SINGLE-CAT NOTE:** Most projects have one Core category and two to four Adjacent categories. The screener always includes all of them as checkboxes. Even if there is only one Core, the screener is still a checkbox — not a Yes/No — because adjacent categories are always included.
+> **SINGLE-CAT NOTE:** Most projects have one Core category and two to four Adjacent categories. The screener always includes all of them as checkboxes. Even if there is only one Core, the screener is still a checkbox, not a Yes/No, because adjacent categories are always included.
 
 ### 2.2 Brand codes
 
-Each brand has a short uppercase code. These must match the `BrandCode` column in the `Survey_Structure.xlsx` Brands sheet exactly. The survey programmer sets these — confirm with Duncan before programming.
+Each brand has a short uppercase code. These must match the `BrandCode` column in the `Survey_Structure.xlsx` Brands sheet exactly. The survey programmer sets these. Confirm with Duncan before programming.
 
 Example (DSS): `IPK`, `ROB`, `KNORR`, `CART`, `RAJAH`, `SFRI`, `SPMEC`, `WWTDSS`, `PNPDSS`, `CKRDSS`
 
@@ -114,9 +114,9 @@ Example (DSS): `IPK`, `ROB`, `KNORR`, `CART`, `RAJAH`, `SFRI`, `SPMEC`, `WWTDSS`
 
 | Turas variable type            | Alchemer question type to use              |
 |--------------------------------|--------------------------------------------|
-| Multi_Mention (per brand)      | Checkbox — one question, brands as options |
-| Single_Response (per brand)    | Radio button — separate question per brand |
-| Single_Response (per category) | Radio button — one question                |
+| Multi_Mention (per brand)      | Checkbox: one question, brands as options  |
+| Single_Response (per brand)    | Radio button: separate question per brand  |
+| Single_Response (per category) | Radio button: one question                 |
 | Numeric                        | Text entry (numeric validation)            |
 | Open_End                       | Essay / text entry                         |
 
@@ -134,10 +134,10 @@ Example (DSS): `IPK`, `ROB`, `KNORR`, `CART`, `RAJAH`, `SFRI`, `SPMEC`, `WWTDSS`
   Region screen   → disqualify if non-metro
       ↓
 [Section 1: Screeners]
-  SQ1: checkbox — ALL categories (Core + Adjacent + Peripheral if any)
+  SQ1: checkbox, ALL categories (Core + Adjacent + Peripheral if any)
   → JavaScript Action assigns Focal_Category randomly from eligible Core cats
   → Hidden Value Action stores Focal_Category
-  SQ2: checkbox — same options as SQ1, filtered by option-level logic to show only
+  SQ2: checkbox, same options as SQ1, filtered by option-level logic to show only
        categories the respondent selected in SQ1. Not required (lapsed buyers allowed).
       ↓
 [Routing 1: Disqualify if no Core category selected] ← Alchemer Disqualify Action
@@ -147,25 +147,25 @@ Example (DSS): `IPK`, `ROB`, `KNORR`, `CART`, `RAJAH`, `SFRI`, `SPMEC`, `WWTDSS`
   Show logic per question: SQ1 option selected AND Focal_Category ≠ that category
       ↓
 [Section 3: Focal category full deep dive]
-  3a. Brand awareness (focal cat) — BRANDAWARE_{FOCAL}
-  3b. Category buying — CATBUY_{FOCAL}
-  3c. Brand funnel — consideration, preference, usage
+  3a. Brand awareness (focal cat): BRANDAWARE_{FOCAL}
+  3b. Category buying: CATBUY_{FOCAL}
+  3c. Brand funnel: consideration, preference, usage
       ↓ (rejection OE: show logic, attitude = 4)
   3d. CEP × brand matrix
   3e. Channels & pack sizes
   3f. Ad-hoc questions (focal cat or sample-wide)
   3g. WOM                                          [toggle: element_wom]
       ↓
-[Section 4: DBA — ALL RESPONDENTS]                [toggle: element_dba]
+[Section 4: DBA, ALL RESPONDENTS]                 [toggle: element_dba]
       ↓
-[Section 5: Branded Reach — ALL RESPONDENTS]      [toggle: element_branded_reach]
+[Section 5: Branded Reach, ALL RESPONDENTS]       [toggle: element_branded_reach]
       ↓
-[Section 6: Demographics — ALL RESPONDENTS]
+[Section 6: Demographics, ALL RESPONDENTS]
       ↓
 [Thank you & close]
 ```
 
-> **SINGLE-CAT:** Section 0 qualifying questions still apply. Section 1 screener is a checkbox with one Core + adjacent categories. No JS focal assignment needed — all respondents get the one Core category as focal (set Focal_Category as a fixed Hidden Value = that category code). Non-focal awareness block is adjacent categories only. Sections 3a–3g shown to all qualified respondents.
+> **SINGLE-CAT:** Section 0 qualifying questions still apply. Section 1 screener is a checkbox with one Core + adjacent categories. No JS focal assignment needed. All respondents get the one Core category as focal (set Focal_Category as a fixed Hidden Value = that category code). Non-focal awareness block is adjacent categories only. Sections 3a–3g shown to all qualified respondents.
 
 ------------------------------------------------------------------------
 
@@ -179,7 +179,7 @@ Do not mention the client name or brand in the intro.
 
 ## 4b. Section 0: Qualifying Questions
 
-Place these on a dedicated page **before** the screener page. All disqualify actions fire when the respondent clicks Next on this page — they never reach SQ1.
+Place these on a dedicated page **before** the screener page. All disqualify actions fire when the respondent clicks Next on this page. They never reach SQ1.
 
 | Question | Alias | Type | Disqualify condition |
 |----|----|----|----|
@@ -192,9 +192,9 @@ Place these on a dedicated page **before** the screener page. All disqualify act
 
 **Age options** (IPK: women 30–50): Under 30 (`Under_30`), 30–34 (`30_34`), 35–39 (`35_39`), 40–44 (`40_44`), 45–50 (`45_50`), Over 50 (`Over_50`). Disqualify if `Under_30` or `Over_50`.
 
-**Industry screen options**: Market research or opinion polling (`MR`), Advertising or marketing (`Adv`), Food or grocery manufacturing (`Food`), Retail — grocery or supermarket (`Retail`), None of these (`None`). Disqualify if NOT `None`.
+**Industry screen options**: Market research or opinion polling (`MR`), Advertising or marketing (`Adv`), Food or grocery manufacturing (`Food`), Grocery or supermarket retail (`Retail`), None of these (`None`). Disqualify if NOT `None`.
 
-**Region options** (list key metros as city names, not province names — respondents in rural areas self-select to Other): Johannesburg / Pretoria (`GAU`), Cape Town (`WC`), Durban (`KZN`), Port Elizabeth / Gqeberha or East London (`EC`), Other (`Other`). Disqualify if `Other`.
+**Region options** (list key metros as city names, not province names; respondents in rural areas self-select to Other): Johannesburg / Pretoria (`GAU`), Cape Town (`WC`), Durban (`KZN`), Port Elizabeth / Gqeberha or East London (`EC`), Other (`Other`). Disqualify if `Other`.
 
 > **Project-specific:** Target gender, age range, and metro list will vary per project. Confirm with Duncan before programming. The industry screen is standard across all projects.
 
@@ -208,7 +208,7 @@ Place these on a dedicated page **before** the screener page. All disqualify act
 
 ### Screener design principle
 
-**SQ1 is always a checkbox — never a Yes/No.** Every project includes Core and Adjacent categories in the same checkbox, even when there is only one Core category. This gives you: - A richer picture of the respondent's category landscape - Cross-category awareness data for the portfolio map - Adjacent category buyer profiling without extra questions
+**SQ1 is always a checkbox, never a Yes/No.** Every project includes Core and Adjacent categories in the same checkbox, even when there is only one Core category. This gives you: - A richer picture of the respondent's category landscape - Cross-category awareness data for the portfolio map - Adjacent category buyer profiling without extra questions
 
 The number of categories in the checkbox is a design decision, not a technical one. For IPK: 9 categories. For a typical single-brand project: 1 Core + 2–4 Adjacent.
 
@@ -216,8 +216,8 @@ The number of categories in the checkbox is a design decision, not a technical o
 
 | Rule | Detail |
 |----|----|
-| **SQ1 — long window** | Single checkbox question. All categories (Core + Adjacent + Peripheral if any). "Bought in the last 12 months?" |
-| **SQ2 — target window** | One radio question per Core category. Shown only to respondents who selected that Core category in SQ1. |
+| **SQ1: long window** | Single checkbox question. All categories (Core + Adjacent + Peripheral if any). "Bought in the last 12 months?" |
+| **SQ2: target window** | One radio question per Core category. Shown only to respondents who selected that Core category in SQ1. |
 | **Target window duration** | Configurable per category in `Timeframe_Target` column of Brand_Config Categories sheet. Default 3 months; Baking Mixes 6 months. |
 | **Qualification rule** | Must select at least one Core category in SQ1. Adjacent-only or Peripheral-only buyers are screened out. |
 | **SQ2 is data, not a gate** | All respondents who selected a Core category in SQ1 see SQ2, regardless of their answer. SQ2 answer is stored for analysis (recent vs lapsed buyer). It does NOT determine qualification. |
@@ -225,19 +225,19 @@ The number of categories in the checkbox is a design decision, not a technical o
 
 ------------------------------------------------------------------------
 
-### SQ1 — long window screener (all categories, always a checkbox)
+### SQ1: long window screener (all categories, always a checkbox)
 
-**Critical naming rule:** Set the question alias to `SQ1` and set each category as a named option. Alchemer exports one column per option as `{QuestionAlias}_{OptionAlias}`. With alias `SQ1` and option `DSS`, the export column is `SQ1_DSS` — which matches the QuestionMap exactly.
+**Critical naming rule:** Set the question alias to `SQ1` and set each category as a named option. Alchemer exports one column per option as `{QuestionAlias}_{OptionAlias}`. With alias `SQ1` and option `DSS`, the export column is `SQ1_DSS`, which matches the QuestionMap exactly.
 
-Do **not** name the question `SQ1_ALL` — that exports as `SQ1_ALL_DSS`, which breaks the QuestionMap.
+Do **not** name the question `SQ1_ALL`. That exports as `SQ1_ALL_DSS`, which breaks the QuestionMap.
 
 | Field | Value |
 |----|----|
 | Question alias | `SQ1` |
-| Question type | **Checkbox (multi-select)** — always, even for single-Core projects |
+| Question type | **Checkbox (multi-select)**: always, even for single-Core projects |
 | Question text | "In the last **12 months**, which of the following have you personally bought for your household? Please select all that apply." |
 
-**Options — list Core categories first, then Adjacent, then Peripheral, then None:**
+**Options, list Core categories first, then Adjacent, then Peripheral, then None:**
 
 | Option alias | Option label | Role |
 |----|----|----|
@@ -250,9 +250,9 @@ Do **not** name the question `SQ1_ALL` — that exports as `SQ1_ALL_DSS`, which 
 | `PES` | Pestos | Adjacent |
 | `COO` | Cook-in sauces | Adjacent |
 | `ANT` | Antipasto / anti-pasta | Adjacent |
-| `NONE` | None of the above | — |
+| `NONE` | None of the above | n/a |
 
-**Exported columns:** `SQ1_DSS`, `SQ1_POS`, `SQ1_PAS`, `SQ1_BAK`, `SQ1_SLD`, `SQ1_STO`, `SQ1_PES`, `SQ1_COO`, `SQ1_ANT` — value = 1 if selected, 0 if not.
+**Exported columns:** `SQ1_DSS`, `SQ1_POS`, `SQ1_PAS`, `SQ1_BAK`, `SQ1_SLD`, `SQ1_STO`, `SQ1_PES`, `SQ1_COO`, `SQ1_ANT`, value = 1 if selected, 0 if not.
 
 > **SINGLE-CAT EXAMPLE:** One Core category (e.g. Shampoo `SHA`) + two Adjacent (e.g. Conditioner `CON`, Hair Treatment `HTR`). Checkbox with three options: `SHA`, `CON`, `HTR`, `NONE`. Exports as `SQ1_SHA`, `SQ1_CON`, `SQ1_HTR`. Screen out if `SQ1_SHA` not selected.
 
@@ -260,19 +260,19 @@ Do **not** name the question `SQ1_ALL` — that exports as `SQ1_ALL_DSS`, which 
 
 ------------------------------------------------------------------------
 
-### SQ2 — target window (all categories, filtered by SQ1)
+### SQ2: target window (all categories, filtered by SQ1)
 
-Programme as **one checkbox question** on a separate page (Target Window). Same category options as SQ1. Each option is shown only if the respondent selected that category in SQ1 — configured via **option-level Logic** on each option, not question-level logic.
+Programme as **one checkbox question** on a separate page (Target Window). Same category options as SQ1. Each option is shown only if the respondent selected that category in SQ1, configured via **option-level Logic** on each option, not question-level logic.
 
 | Field | Value |
 |----|----|
 | **Question alias** | `SQ2` |
 | **Question type** | Checkbox (multi-select) |
 | **Question text** | "And which of these have you personally bought in the last 3 months?" |
-| **Required** | No — lapsed buyers (bought 12m but not 3m) still proceed |
+| **Required** | No, lapsed buyers (bought 12m but not 3m) still proceed |
 | **Options** | Same 9 categories as SQ1 with same reporting values (DSS, POS, PAS, BAK, SLD, STO, PES, COO, ANT). Do NOT include "None of these". |
 
-**Option-level show logic** — set on each individual option:
+**Option-level show logic**, set on each individual option:
 
 | Option                  | Show only if               |
 |-------------------------|----------------------------|
@@ -288,7 +288,7 @@ Programme as **one checkbox question** on a separate page (Target Window). Same 
 
 To set option-level logic in Alchemer: edit each option → Logic tab → set condition.
 
-**Exported columns:** `SQ2_DSS`, `SQ2_POS`, `SQ2_PAS`, `SQ2_BAK`, `SQ2_SLD`, `SQ2_STO`, `SQ2_PES`, `SQ2_COO`, `SQ2_ANT` — value = 1 if selected, 0/blank if not.
+**Exported columns:** `SQ2_DSS`, `SQ2_POS`, `SQ2_PAS`, `SQ2_BAK`, `SQ2_SLD`, `SQ2_STO`, `SQ2_PES`, `SQ2_COO`, `SQ2_ANT`, value = 1 if selected, 0/blank if not.
 
 > **SQ2 is data, not a gate.** The answer determines buyer vs lapsed-buyer classification in analysis. It does not affect qualification or routing.
 
@@ -297,7 +297,7 @@ To set option-level logic in Alchemer: edit each option → Logic tab → set co
 ## 6. Routing 1: Qualification check (screen-out)
 
 **When:** End of the screener page (after SQ1 and all SQ2 questions).\
-**How:** Alchemer built-in **Disqualify Action** — no scripting needed.
+**How:** Alchemer built-in **Disqualify Action**. No scripting needed.
 
 **Step-by-step in Alchemer:**
 
@@ -312,7 +312,7 @@ To set option-level logic in Alchemer: edit each option → Logic tab → set co
     -   `SQ1` option `PAS` is NOT selected ← Core category
     -   `SQ1` option `BAK` is NOT selected ← Core category
 
-    *(List Core categories only — Adjacent and Peripheral do not qualify anyone)*
+    *(List Core categories only; Adjacent and Peripheral do not qualify anyone)*
 
 3.  Set the Disqualify message: *"Thank you for your time. Unfortunately you do not meet the criteria for this study."*
 
@@ -327,22 +327,22 @@ To set option-level logic in Alchemer: edit each option → Logic tab → set co
 ## 7. Routing 2: Focal category assignment
 
 **When:** On the screener page (same page as SQ1), fires when the respondent clicks Next.\
-**How:** **JavaScript Action** + **Hidden Value Action** — both placed on the screener page after SQ1.
+**How:** **JavaScript Action** + **Hidden Value Action**, both placed on the screener page after SQ1.
 
 The JavaScript randomly selects one Core category from those the respondent ticked in SQ1 and writes the category code (e.g. `DSS`) into the Hidden Value Action field `Focal_Category`. Alchemer's Distributed Logic Quota (set up separately under Tools → Quotas) monitors the distribution for balance but does not set the variable directly.
 
-### Step 1 — Add a Hidden Value Action to the screener page
+### Step 1: Add a Hidden Value Action to the screener page
 
 On the screener page (same page as SQ1), click **Add New → Action → Hidden Value**.
 
 | Field              | Value                                     |
 |--------------------|-------------------------------------------|
 | Name / Description | `Assign Focal Category`                   |
-| Populate with      | *(leave blank — the JS will write to it)* |
+| Populate with      | *(leave blank, the JS will write to it)*  |
 
 Note the **ID number** shown on this action in the builder (e.g. ID: 12). You need this for the JS.
 
-### Step 2 — Add a JavaScript Action to the screener page
+### Step 2: Add a JavaScript Action to the screener page
 
 On the same page, click **Add New → Action → JavaScript**. Name it `Assign Focal Category JS`.
 
@@ -403,9 +403,9 @@ document.addEventListener("DOMContentLoaded", function() {
 })
 ```
 
-**Important notes on the script:** - `CORE_MATCHES` uses partial title matching (not full option text) to avoid issues with `&` being HTML-encoded by Alchemer - Do NOT use double-quote characters inside string literals — Alchemer HTML-encodes them and breaks the JS - Test via the **Share → Anonymous link** in a browser with F12 console open. The test mode may suppress JS execution. - The script works correctly with the live survey link even if test mode shows no output
+**Important notes on the script:** - `CORE_MATCHES` uses partial title matching (not full option text) to avoid issues with `&` being HTML-encoded by Alchemer - Do NOT use double-quote characters inside string literals. Alchemer HTML-encodes them and breaks the JS - Test via the **Share → Anonymous link** in a browser with F12 console open. The test mode may suppress JS execution. - The script works correctly with the live survey link even if test mode shows no output
 
-### Step 3 — Set up Distributed Logic Quota for balance monitoring
+### Step 3: Set up Distributed Logic Quota for balance monitoring
 
 Go to **Tools → Quotas → Create Quota → Distributed Logic Quota**.
 
@@ -416,9 +416,9 @@ Go to **Tools → Quotas → Create Quota → Distributed Logic Quota**.
 | `Focal_PAS` | Your target            | SQ1 option PAS is selected |
 | `Focal_BAK` | Your target            | SQ1 option BAK is selected |
 
-Set **Complete Actions** to: *Continue collecting responses* (not stop — the panel provider manages hard quotas on their side).
+Set **Complete Actions** to: *Continue collecting responses* (not stop, the panel provider manages hard quotas on their side).
 
-The quota monitors balance but does not set `Focal_Category` directly — the JS does that.
+The quota monitors balance but does not set `Focal_Category` directly. The JS does that.
 
 > **SINGLE-CAT:** No JS or quota needed. Add a Hidden Value Action to the screener page with a fixed value = your category code (e.g. `DSS`). All respondents get the same focal category.
 
@@ -439,7 +439,7 @@ Programme as **one checkbox question per category**, each shown only to responde
 
 ### Core categories (DSS, POS, PAS, BAK)
 
-Shown to respondents who selected that Core category in SQ1 — which includes both their focal category and any other Core categories they qualify for.
+Shown to respondents who selected that Core category in SQ1, which includes both their focal category and any other Core categories they qualify for.
 
 #### BRANDAWARE_DSS
 
@@ -448,7 +448,7 @@ Shown to respondents who selected that Core category in SQ1 — which includes b
 | Question alias | `BRANDAWARE_DSS` |
 | Question type | Checkbox (multi-select) |
 | **Show logic** | `SQ1` option `DSS` is selected |
-| Question text | "Which of the following brands of **dry seasonings & spices** have you heard of — even if you have never bought them?" |
+| Question text | "Which of the following brands of **dry seasonings & spices** have you heard of, even if you have never bought them?" |
 | Options | One option per brand. Option alias = brand code. |
 | Example options | `IPK` / Ina Paarman's Kitchen · `ROB` / Robertsons · `KNORR` / Knorr · `CART` / Cartwright's · `RAJAH` / Rajah · `SFRI` / Safari · `SPMEC` / Spice Mecca · `WWTDSS` / Woolworths Taste · `PNPDSS` / PnP No Name · `CKRDSS` / Checkers House Brand |
 |  | `NONE` / None of these |
@@ -474,7 +474,7 @@ Repeat for `BRANDAWARE_STO`, `BRANDAWARE_PES`, `BRANDAWARE_COO`, `BRANDAWARE_ANT
 
 No brand awareness questions. Peripheral categories appear in SQ1 only. No questions are shown based on Peripheral selection.
 
-> **SINGLE-CAT:** Show the Adjacent awareness question(s) to respondents who selected that Adjacent category in SQ1. Core category awareness is not shown here — it is captured in Section 4 (Brand Funnel) as the first funnel step.
+> **SINGLE-CAT:** Show the Adjacent awareness question(s) to respondents who selected that Adjacent category in SQ1. Core category awareness is not shown here. It is captured in Section 4 (Brand Funnel) as the first funnel step.
 
 ------------------------------------------------------------------------
 
@@ -497,7 +497,7 @@ No brand awareness questions. Peripheral categories appear in SQ1 only. No quest
 | Field | Value |
 |----|----|
 | Question alias | `CATCOUNT_{CAT}` (e.g. `CATCOUNT_DSS`) |
-| Question type | Text entry — numeric, integer, 0–99 |
+| Question type | Text entry: numeric, integer, 0–99 |
 | Question text | "Roughly how many times have you bought **[category name]** in the last **[target_timeframe]** months?" |
 | Note | Target timeframe from `Timeframe_Target` in Categories sheet. DSS/POS/PAS = 3 months. BAK = 6 months. |
 
@@ -517,10 +517,10 @@ Programme as a **separate radio button question for each brand**. Questions appe
 | Question alias | `BRANDATT1_{CAT}_{BRAND}` (e.g. `BRANDATT1_DSS_IPK`) |
 | Question type | Radio button |
 | Question text | "Which of the following statements best describes how you feel about **[Brand Label]**?" |
-| Options | `1` / I love it — it's my favourite · `2` / It's among the ones I prefer · `3` / I wouldn't usually consider it, but I would if no other option · `4` / I would refuse to buy this brand · `5` / I have no opinion / I don't know this brand |
+| Options | `1` / I love it, it's my favourite · `2` / It's among the ones I prefer · `3` / I wouldn't usually consider it, but I would if no other option · `4` / I would refuse to buy this brand · `5` / I have no opinion / I don't know this brand |
 | OptionMapScale | `attitude_scale` |
 
-Repeat for each brand in the category. **All brands are shown regardless of awareness** — "no opinion" option handles brands they don't know. This is the Romaniuk approach.
+Repeat for each brand in the category. **All brands are shown regardless of awareness**. The "no opinion" option handles brands they don't know. This is the Romaniuk approach.
 
 > **Alchemer tip:** Group all attitude questions for a category on one page with a shared intro: *"For each of the following brands, please indicate how you feel about it."*
 
@@ -543,7 +543,7 @@ On the Logic tab of `BRANDATT2_DSS_IPK`: - **Show this question if:** `BRANDATT1
 
 > **NOTE:** One `BRANDATT2` question per brand per category. For IPK: 10 brands × 4 categories = 40 rejection OE questions, all hidden by default unless the respondent selects "refuse".
 
-### 4c. Penetration — long window
+### 4c. Penetration: long window
 
 | Field | Value |
 |----|----|
@@ -553,14 +553,14 @@ On the Logic tab of `BRANDATT2_DSS_IPK`: - **Show this question if:** `BRANDATT1
 | Options | One option per brand. Option alias = brand code. Plus `NONE` = None of these. |
 | Exported columns | `BRANDPEN1_DSS_IPK`, `BRANDPEN1_DSS_ROB`, ... |
 
-### 4d. Penetration — target window
+### 4d. Penetration: target window
 
 | Field | Value |
 |----|----|
 | Question alias | `BRANDPEN2_{CAT}` (e.g. `BRANDPEN2_DSS`) |
 | Question type | Checkbox (multi-select) |
 | Question text | "And which have you bought in the last **[target_timeframe] months**?" |
-| Options | Brands only (subset of BRANDPEN1 answers ideally via Alchemer piping — or show all brands) |
+| Options | Brands only (subset of BRANDPEN1 answers ideally via Alchemer piping, or show all brands) |
 | Exported columns | `BRANDPEN2_DSS_IPK`, `BRANDPEN2_DSS_ROB`, ... |
 
 ### 4e. Purchase frequency (per brand)
@@ -571,7 +571,7 @@ On the Logic tab of `BRANDATT2_DSS_IPK`: - **Show this question if:** `BRANDATT1
 | Question type | Radio button |
 | Shown to | Respondents who selected this brand in BRANDPEN2\_{CAT} |
 | Question text | "When you buy **[category name]**, how often do you choose **[Brand Label]**?" |
-| Options | `1` / Every time · `2` / Most times · `3` / About half the time · `4` / Occasionally · `5` / Rarely — this was a first purchase |
+| Options | `1` / Every time · `2` / Most times · `3` / About half the time · `4` / Occasionally · `5` / Rarely, this was a first purchase |
 | OptionMapScale | `purchase_freq_scale` |
 
 > **NOTE:** Programme one question per brand. Use Alchemer piping or conditional display so only brands selected in BRANDPEN2 are shown.
@@ -590,13 +590,13 @@ Programme as **one checkbox question per CEP**, brands as options.
 |----|----|
 | Question alias | `BRANDATTR_{CAT}_{CEPCODE}` (e.g. `BRANDATTR_DSS_CEP01`) |
 | Question type | Checkbox (multi-select) |
-| Question text | "**[CEP statement]** — which brands come to mind?" (e.g. "When I'm seasoning a roast meat dish — which brands come to mind?") |
+| Question text | "**[CEP statement]**, which brands come to mind?" (e.g. "When I'm seasoning a roast meat dish, which brands come to mind?") |
 | Options | One option per brand. Option alias = brand code. Plus `NONE` = None of these. |
 | Exported columns | `BRANDATTR_DSS_CEP01_IPK`, `BRANDATTR_DSS_CEP01_ROB`, ... |
 
 Repeat for all 15 CEPs per category. For IPK: 15 CEPs × 4 categories = 60 questions.
 
-> **INTRO TEXT:** Place an intro page before the CEP questions: *"We'd now like to understand which brands come to mind in different situations. For each situation, please select all brands that come to mind — even if you don't buy them."*
+> **INTRO TEXT:** Place an intro page before the CEP questions: *"We'd now like to understand which brands come to mind in different situations. For each situation, please select all brands that come to mind, even if you don't buy them."*
 
 > **SINGLE-CAT:** 15 questions. Shown to all qualified respondents.
 
@@ -632,7 +632,7 @@ Repeat for all 15 CEPs per category. For IPK: 15 CEPs × 4 categories = 60 quest
 
 ## 13. Section 6b: Ad-hoc questions
 
-**No Brand_Config toggle** — simply omit this section if there are no ad-hoc questions for the project.\
+**No Brand_Config toggle**: simply omit this section if there are no ad-hoc questions for the project.\
 **Shown to:** Either all respondents (sample-wide) or focal category respondents only (category-specific). Set per question.
 
 Ad-hoc questions are project-specific items that don't belong to the standard CBM battery. Examples: NPS, future purchase intent, specific product questions, claimed media consumption, prior advertising recall.
@@ -663,7 +663,7 @@ Each ad-hoc question needs a row in the AdHoc sheet:
 | `Variable_Type` | `Single_Response`, `Multi_Mention`, `Numeric`, or `Open_End` |
 | `OptionMapScale` | Scale name if question uses coded responses (else blank) |
 
-### Example — NPS (sample-wide)
+### Example: NPS (sample-wide)
 
 | Field | Value |
 |----|----|
@@ -674,7 +674,7 @@ Each ad-hoc question needs a row in the AdHoc sheet:
 | Options | `0` through `10` as separate radio options |
 | AdHoc sheet role | `adhoc.nps.ALL` |
 
-### Example — Future purchase intent (category-specific)
+### Example: Future purchase intent (category-specific)
 
 | Field | Value |
 |----|----|
@@ -702,7 +702,7 @@ Each ad-hoc question needs a row in the AdHoc sheet:
 |----|----|
 | Question alias | `WOM_POS_REC` |
 | Question type | Checkbox (multi-select) |
-| Question text | "In the last **[wom_timeframe]** (e.g. 3 months), has someone you know — in person or online — said something **positive** about any of these brands?" |
+| Question text | "In the last **[wom_timeframe]** (e.g. 3 months), has someone you know, in person or online, said something **positive** about any of these brands?" |
 | Options | One option per focal category brand. Option alias = brand code. Plus `NONE`. |
 | Note | `wom_timeframe` from Brand_Config Settings. |
 | Exported columns | `WOM_POS_REC_IPK`, `WOM_POS_REC_ROB`, ... |
@@ -727,7 +727,7 @@ Each ad-hoc question needs a row in the AdHoc sheet:
 | Options | Same brands + `NONE` |
 | Exported columns | `WOM_POS_SHARE_IPK`, ... |
 
-### 7d. Positive WOM count (per brand — built-in show logic)
+### 7d. Positive WOM count (per brand, built-in show logic)
 
 No scripting needed. Use Alchemer's built-in **Show Logic** on each count question.
 
@@ -748,7 +748,7 @@ Repeat the same pattern for negative WOM: `WOM_NEG_COUNT_{BRAND}` shown if `WOM_
 
 ## 14. Section 8: Distinctive Brand Assets (DBA)
 
-**Toggle:** `element_dba = Y` (default N — add 2 min to survey length)\
+**Toggle:** `element_dba = Y` (default N, add 2 min to survey length)\
 **Shown to:** All respondents.\
 **Purpose:** Which brand assets are famous? Which are uniquely attributed to IPK?
 
@@ -766,7 +766,7 @@ Show the asset (image, text, or audio). Ask if they've seen it before.
 
 ### 8b. Asset attribution (uniqueness)
 
-Shown to all respondents (not just those who recognised the asset — blind attribution reveals instinctive association).
+Shown to all respondents (not just those who recognised the asset; blind attribution reveals instinctive association).
 
 | Field | Value |
 |----|----|
@@ -787,10 +787,10 @@ Shown to all respondents (not just those who recognised the asset — blind attr
 
 ------------------------------------------------------------------------
 
-## 15. Section 9: Branded Reach [TEMPLATE — NOT IN IPK WAVE 1]
+## 15. Section 9: Branded Reach [TEMPLATE, NOT IN IPK WAVE 1]
 
 **Toggle:** `element_branded_reach = Y` (default N)\
-**Shown to:** All respondents (or focal category respondents only — configurable).\
+**Shown to:** All respondents (or focal category respondents only, configurable).\
 **Purpose:** Advertising recognition and media attribution.
 
 ### 9a. Advertising seen
@@ -852,9 +852,9 @@ When the survey is closed, export the data as follows:
 | Export format | CSV or Excel (.xlsx) |
 | Include | All responses (completed + partial if applicable) |
 | Column names | **Use question aliases** (not default Q1, Q2 etc.) |
-| Option values | **Numeric codes** (not label text) — critical for analysis |
-| Checkbox format | **Separate columns per option** — one column per brand |
-| Missing / not shown | Export as blank / NA — do NOT use 0 for questions not shown |
+| Option values | **Numeric codes** (not label text), critical for analysis |
+| Checkbox format | **Separate columns per option**: one column per brand |
+| Missing / not shown | Export as blank / NA. Do NOT use 0 for questions not shown |
 
 > **WARNING:** If Alchemer exports checkbox responses as a single comma-separated string column (e.g. "IPK, ROB, KNORR") instead of separate columns, the analysis will fail. Ensure **"Separate columns per option"** is selected in export settings.
 
@@ -892,13 +892,13 @@ IPK is a tracking study. Follow these rules to ensure wave-over-wave comparisons
 | Setup step | Action |
 |----|----|
 | Wave variable | Add a hidden question with alias `Wave` and a default value = wave number. Set via URL parameter: `?wave=1` for wave 1, `?wave=2` for wave 2. |
-| Survey copy | Copy the wave 1 survey for wave 2 — do not rebuild from scratch. Only the `Wave` default value changes. |
+| Survey copy | Copy the wave 1 survey for wave 2. Do not rebuild from scratch. Only the `Wave` default value changes. |
 | CEP stability | **Do not add or remove CEP statements between waves.** CEPs must be identical for trend analysis. If a CEP needs replacing, carry it in wave 2 and retire it in wave 3. |
 | Brand list | Adding brands between waves is acceptable but note they will have no wave 1 comparison. Removing brands breaks the trend. |
 | Config | Update `wave` in Brand_Config Settings for each new wave (e.g. `wave = 2`). Do not change `tracker_ids` (must remain `Y` from wave 1 onwards). |
 | Data files | Name each wave file clearly: `ipk_brand_wave1.xlsx`, `ipk_brand_wave2.xlsx`. Keep all waves in the same project folder. |
 
-> **3-wave planning note:** With 3 waves, the tracker module can run linear trend lines, flag significant changes, and calculate effect sizes. Ensure wave 1 data is clean and fully validated — it becomes the baseline all future waves are judged against.
+> **3-wave planning note:** With 3 waves, the tracker module can run linear trend lines, flag significant changes, and calculate effect sizes. Ensure wave 1 data is clean and fully validated. It becomes the baseline all future waves are judged against.
 
 ------------------------------------------------------------------------
 
@@ -912,13 +912,13 @@ IPK is a tracking study. Follow these rules to ensure wave-over-wave comparisons
 | Cross-category awareness (9 cats)                     | 9            |
 | Category buying (4 cats × 2 questions)                | 8            |
 | Brand attitude (4 cats × 10 brands)                   | 40           |
-| Rejection OE (4 cats × 10 brands — hidden)            | 40           |
+| Rejection OE (4 cats × 10 brands, hidden)             | 40           |
 | Penetration 12m + 3m (4 cats × 2)                     | 8            |
-| Purchase frequency (4 cats × 10 brands — conditional) | 40           |
+| Purchase frequency (4 cats × 10 brands, conditional)  | 40           |
 | CEP matrix (4 cats × 15 CEPs)                         | 60           |
 | Channels (4 cats)                                     | 4            |
 | Pack sizes (4 cats)                                   | 4            |
-| WOM (4 questions + 10 count × 2 — conditional)        | 24           |
+| WOM (4 questions + 10 count × 2, conditional)         | 24           |
 | DBA (5 assets × 2 questions)                          | 10           |
 | Demographics                                          | 7            |
 | **Total (visible questions per respondent)**          | **\~80–100** |
@@ -934,7 +934,7 @@ IPK is a tracking study. Follow these rules to ensure wave-over-wave comparisons
 | Brand attitude (8 brands)                   | 8           |
 | Rejection OE (hidden)                       | 8           |
 | Penetration 12m + 3m                        | 2           |
-| Purchase frequency (8 brands — conditional) | 8           |
+| Purchase frequency (8 brands, conditional)  | 8           |
 | CEP matrix (12 CEPs)                        | 12          |
 | Channels + pack sizes                       | 2           |
 | WOM                                         | 6           |

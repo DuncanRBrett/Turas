@@ -44,8 +44,8 @@ All elements are config-togglable via `element_*` settings in Brand_Config.xlsx.
 
 Two Excel files, both using relative paths (portable across machines):
 
-- **Brand_Config.xlsx** — Analysis settings, category definitions, element toggles
-- **Survey_Structure.xlsx** — Data dictionary: questions, brands, CEPs, attributes
+- **Brand_Config.xlsx**: Analysis settings, category definitions, element toggles
+- **Survey_Structure.xlsx**: Data dictionary of questions, brands, CEPs, attributes
 
 Valid `Type` values for the Categories sheet: `transactional`, `durable`, `service`.
 

@@ -1,4 +1,4 @@
-# Duplication of Awareness — Portfolio Module
+# Duplication of Awareness: Portfolio Module
 
 Branch: `feature/portfolio-duplication-of-awareness`
 Owner: Duncan
@@ -9,13 +9,13 @@ Created: 2026-05-23
 
 The Portfolio module currently surfaces three views of cross-brand awareness:
 
-- **Footprint** — a brand × category matrix of *univariate* awareness % (where is each brand known).
-- **Competitive Set / Constellation** — a per-category co-awareness network using Jaccard similarity, with a closest-rivals side-list.
-- **Category Context (Clutter)** — share-of-awareness and set-size scatter.
+- **Footprint**: a brand × category matrix of *univariate* awareness % (where is each brand known).
+- **Competitive Set / Constellation**: a per-category co-awareness network using Jaccard similarity, with a closest-rivals side-list.
+- **Category Context (Clutter)**: share-of-awareness and set-size scatter.
 
 None of these answer the *pairwise, asymmetric, benchmarked* question of:
 "Inside a single category, of the people aware of brand A, what percentage are
-also aware of brand B — and is that more or less than Sharp's Duplication Law
+also aware of brand B, and is that more or less than Sharp's Duplication Law
 would predict given each brand's awareness penetration?"
 
 That is the awareness analogue of the Repertoire module's
@@ -23,17 +23,17 @@ That is the awareness analogue of the Repertoire module's
 artefact for diagnosing competitive structure. Without it, Portfolio's
 competitive context views are visually clear but lack the quantitative
 benchmark that lets a reader say "X over-shares awareness with Y" or
-"Z is a partition — its awares are less likely than expected to know
+"Z is a partition. Its awares are less likely than expected to know
 anyone else".
 
 ## 2. Landscape & Approach
 
 **What exists:**
-- `modules/brand/R/04_repertoire.R` lines 162–298 — the Duplication of Purchase
+- `modules/brand/R/04_repertoire.R` lines 162–298: the Duplication of Purchase
   implementation. Produces observed crossover matrix, Sharp's D coefficient
   via no-intercept OLS over off-diagonal cells, expected matrix (D × b_j),
   deviation matrix (obs − exp).
-- `modules/brand/R/09b_portfolio_constellation.R` — already builds the
+- `modules/brand/R/09b_portfolio_constellation.R`: already builds the
   per-category brand × respondent awareness matrix via
   `.portfolio_aware_matrix()`. Computes Jaccard for the constellation graph.
 
@@ -42,7 +42,7 @@ Mirror the Duplication of Purchase methodology exactly, substituting
 *awareness penetration* a_j for *brand penetration* b_j. Reuse the existing
 `.portfolio_aware_matrix()` helper so we are not recomputing awareness sets.
 
-**Why not Jaccard:** Jaccard is symmetric — it loses the directionality that
+**Why not Jaccard:** Jaccard is symmetric. It loses the directionality that
 makes Duplication of Purchase so diagnostic (Pr(B|A) ≠ Pr(A|B) when
 penetrations differ). Sharp's law (D × penetration) is the published
 benchmark; Jaccard has no equivalent.
@@ -80,7 +80,7 @@ benchmark; Jaccard has no equivalent.
 - Pin to Views + PNG export hooks (standard portfolio toolbar).
 
 **Quality standards:**
-- TRS refusals — no `stop()`.
+- TRS refusals: no `stop()`.
 - All errors visible to console + Shiny notification.
 - Test coverage of every error condition.
 - Engine file ≤ 300 active lines.
@@ -88,7 +88,7 @@ benchmark; Jaccard has no equivalent.
 - Function size ≤ 50 active lines.
 
 **Constraints:**
-- Must reuse `.portfolio_aware_matrix()` — do not duplicate awareness column
+- Must reuse `.portfolio_aware_matrix()`: do not duplicate awareness column
   resolution.
 - Must register in `modules/brand/R/00_main.R` `.source_brand_module`
   whitelist (silent-load gotcha per memory).
@@ -141,7 +141,7 @@ chart. Dark-navy table style matching `.po_*` patterns. JS hooks
 ## 6. Growth Path
 
 - Same engine can be applied to *Consideration* and *Preference* funnel
-  stages — a duplication-of-X family.
+  stages, a duplication-of-X family.
 - D values across waves become a tracker metric (single number per
   category per wave).
 - Audience Lens cuts: D for high-frequency buyers vs low-frequency buyers
@@ -166,7 +166,7 @@ chart. Dark-navy table style matching `.po_*` patterns. JS hooks
 - [ ] All public functions documented with roxygen.
 - [ ] Whitelist updated in 00_main.R.
 - [ ] File size < 300 active lines.
-- [ ] No magic numbers — `min_effective_base` and base-flag threshold via
+- [ ] No magic numbers: `min_effective_base` and base-flag threshold via
       config.
 - [ ] All errors `cat()`-printed for Shiny console visibility.
 - [ ] Browser-verified via `launch_turas()` IPK 9-cat run.

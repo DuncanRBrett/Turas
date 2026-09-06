@@ -1,6 +1,6 @@
-# Brand Module — Role Registry
+# Brand Module: Role Registry
 
-**Version:** 1.0 (draft) **Applies to:** `modules/brand/` and `modules/portfolio/` **Status:** Draft for review — nothing implemented against it yet.
+**Version:** 1.0 (draft) **Applies to:** `modules/brand/` and `modules/portfolio/` **Status:** Draft for review, nothing implemented against it yet.
 
 ------------------------------------------------------------------------
 
@@ -29,7 +29,7 @@ Roles are **internal**. They never appear in the user-facing report. The report 
 
 ### 2.3 Variable Types (catalogue)
 
-The brand module reuses the `Variable_Type` vocabulary already defined in the tabs module (see `modules/tabs/lib/validation/structure_validators.R`). One shared catalogue across Turas — no parallel type system.
+The brand module reuses the `Variable_Type` vocabulary already defined in the tabs module (see `modules/tabs/lib/validation/structure_validators.R`). One shared catalogue across Turas, no parallel type system.
 
 | Type | Description | Example |
 |----|----|----|
@@ -42,7 +42,7 @@ The brand module reuses the `Variable_Type` vocabulary already defined in the ta
 | `Numeric` | Free-entry number (counts, amounts) | BRANDPENTRANS3 frequency |
 | `Open_End` | Free-text response | QBRANDATT2 rejection reason |
 
-**Ordinal vs nominal:** tabs does not split `Single_Response` into ordinal and nominal. Ordering semantics live in the OptionMap's `OrderIndex` column and in the role's declared position sub-roles (see §4.2 for the attitude scale example). Same approach here — keeps the Variable_Type vocabulary tight and pushes semantics to the map where they belong.
+**Ordinal vs nominal:** tabs does not split `Single_Response` into ordinal and nominal. Ordering semantics live in the OptionMap's `OrderIndex` column and in the role's declared position sub-roles (see §4.2 for the attitude scale example). Same approach here. It keeps the Variable_Type vocabulary tight and pushes semantics to the map where they belong.
 
 **Grid types (`Grid_Single`, `Grid_Multi`):** present in the tabs validator whitelist but not yet processed. Brand does not consume them today. See [modules/tabs/docs/GRID_SUPPORT_SPEC.md](../../tabs/docs/GRID_SUPPORT_SPEC.md) for the deferred development spec. Until that lands, grid-shaped data (e.g. the CEP × brand matrix) is declared as `Multi_Mention` with a compound `ColumnPattern` (see §5).
 
@@ -63,14 +63,14 @@ The brand module assumes the standard rectangular export shape produced by Alche
 
 -   **One row per respondent.** No respondent appears on more than one row. Panel ID is unique per row (see guard rule 4).
 -   **One column per question** for single-response / numeric / open-ended items.
--   **One column per option** for multi-response items. Values are 0/1/NA (or the declared equivalent). One column per option — not delimited strings.
+-   **One column per option** for multi-response items. Values are 0/1/NA (or the declared equivalent). One column per option, not delimited strings.
 -   **One column per cell** for grid / matrix items. A grid of *r* rows × *c* columns produces *r* × *c* columns in the data.
 
-`ColumnPattern` in QuestionMap (§11.1) declares the naming template — for example `{code}_{brandcode}` for a per-brand multi-mention, `{code}_{row}_{col}` for a grid cell. The guard refuses loud (`CFG_PATTERN_MISMATCH`) if the data does not match the declared shape. Long-format or delimited-column data is not supported; reshape upstream before feeding the module.
+`ColumnPattern` in QuestionMap (§11.1) declares the naming template, for example `{code}_{brandcode}` for a per-brand multi-mention, `{code}_{row}_{col}` for a grid cell. The guard refuses loud (`CFG_PATTERN_MISMATCH`) if the data does not match the declared shape. Long-format or delimited-column data is not supported; reshape upstream before feeding the module.
 
 ------------------------------------------------------------------------
 
-## 3. System namespace — shared across all elements
+## 3. System namespace: shared across all elements
 
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
@@ -80,8 +80,8 @@ The brand module assumes the standard rectangular export shape produced by Alche
 | `system.respondent.demographics` | per_respondent | Single_Response | Optional | Standard demographic columns; role per variable. |
 | `system.survey.wave` | per_respondent | Single_Response | Optional | Wave label (e.g., "W1-2025"). |
 | `system.category.id` | per_respondent | Single_Response | Optional | Focal category assigned per respondent (multi-category studies). |
-| `system.brand.list` | reference | — | Yes | BrandCode + BrandName + display order. Declared in `Survey_Structure.xlsx` Brands sheet. |
-| `system.category.list` | reference | — | Conditional | Required when multi-category. CategoryCode + CategoryName + type. |
+| `system.brand.list` | reference | n/a | Yes | BrandCode + BrandName + display order. Declared in `Survey_Structure.xlsx` Brands sheet. |
+| `system.category.list` | reference | n/a | Conditional | Required when multi-category. CategoryCode + CategoryName + type. |
 
 ------------------------------------------------------------------------
 
@@ -95,38 +95,38 @@ Three category-type sub-namespaces. `category.type` setting in Brand_Config.xlsx
 |----|----|----|----|----|
 | `funnel.awareness` | per_brand | Multi_Mention | Yes | BRANDAWARENESS equivalent. |
 | `funnel.attitude` | per_brand | Single_Response | Yes | QBRANDATT1 equivalent. Codes mapped via OptionMap to the 5 attitude position sub-roles. |
-| `funnel.rejection_oe` | per_brand | Open_End | Optional | QBRANDATT2 — rejection reason. Sparse: populated only when attitude = reject. |
+| `funnel.rejection_oe` | per_brand | Open_End | Optional | QBRANDATT2: rejection reason. Sparse: populated only when attitude = reject. |
 
 ### 4.2 Attitude position sub-roles (mapped via OptionMap)
 
 | Role                  | Maps to                                | Default code |
 |-----------------------|----------------------------------------|--------------|
-| `attitude.love`       | Strong positive — "favourite"          | 1            |
-| `attitude.prefer`     | Mild positive — "among those I prefer" | 2            |
+| `attitude.love`       | Strong positive, "favourite"           | 1            |
+| `attitude.prefer`     | Mild positive, "among those I prefer"  | 2            |
 | `attitude.ambivalent` | Would-buy-if-no-other-choice           | 3            |
 | `attitude.reject`     | Active rejection                       | 4            |
 | `attitude.no_opinion` | Neutral / no opinion                   | 5            |
 
 OptionMap allows inverting codes, omitting positions (e.g., no Ambivalent → Consideration = Love + Prefer), and supplying client-specific labels for legend display.
 
-### 4.3 Transactional (FMCG) — `category.type = transactional`
+### 4.3 Transactional (FMCG): `category.type = transactional`
 
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
-| `funnel.transactional.bought_long` | per_brand | Multi_Mention | Optional | BRANDPENTRANS1 — longer timeframe. |
-| `funnel.transactional.bought_target` | per_brand | Multi_Mention | Optional | BRANDPENTRANS2 — target timeframe. |
+| `funnel.transactional.bought_long` | per_brand | Multi_Mention | Optional | BRANDPENTRANS1: longer timeframe. |
+| `funnel.transactional.bought_target` | per_brand | Multi_Mention | Optional | BRANDPENTRANS2: target timeframe. |
 | `funnel.transactional.frequency` | per_brand | Numeric | Optional | BRANDPENTRANS3. Consumed by Repertoire / Frequency element (heavy-buyer, SoR). Not a funnel stage in v2.1. |
 
 At least one of the three required to render any buying stage.
 
-### 4.4 Durable — `category.type = durable`
+### 4.4 Durable: `category.type = durable`
 
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
 | `funnel.durable.current_owner` | per_respondent | Single_Response | Yes | BRANDPENDUR1. One brand per respondent. |
 | `funnel.durable.tenure` | per_respondent | Single_Response | Optional | BRANDPENDUR2. Required for loyalty stage. |
 
-### 4.5 Service — `category.type = service`
+### 4.5 Service: `category.type = service`
 
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
@@ -140,9 +140,9 @@ At least one of the three required to render any buying stage.
 
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
-| `ma.cep_matrix` | brand_matrix | Multi_Mention | Yes | Q1BRANDATTRIBUTE per CEP × brand. Binary. Declared with compound `ColumnPattern = {code}_{cep_code}_{brand_code}` — guard expands via CEPs × Brands lists. Will migrate to `Grid_Multi` when the grid stream ships (see [GRID_SUPPORT_SPEC](../../tabs/docs/GRID_SUPPORT_SPEC.md)). |
-| `ma.cep_list` | reference | — | Yes | CepCode + CepText + CepType (cep / attribute). Declared in Survey_Structure CEPs sheet. |
-| `ma.category_frequency` | per_respondent | Numeric | Optional | QCATEGORYBUYINGTRANS/DUR/SERV — for CEP importance weighting. |
+| `ma.cep_matrix` | brand_matrix | Multi_Mention | Yes | Q1BRANDATTRIBUTE per CEP × brand. Binary. Declared with compound `ColumnPattern = {code}_{cep_code}_{brand_code}`. Guard expands via CEPs × Brands lists. Will migrate to `Grid_Multi` when the grid stream ships (see [GRID_SUPPORT_SPEC](../../tabs/docs/GRID_SUPPORT_SPEC.md)). |
+| `ma.cep_list` | reference | n/a | Yes | CepCode + CepText + CepType (cep / attribute). Declared in Survey_Structure CEPs sheet. |
+| `ma.category_frequency` | per_respondent | Numeric | Optional | QCATEGORYBUYINGTRANS/DUR/SERV, for CEP importance weighting. |
 
 Reuses `funnel.awareness` for MPen normalisation.
 
@@ -172,9 +172,9 @@ Reuses `ma.cep_matrix` (performance) and `funnel.attitude` (preference outcome).
 
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
-| `dba.asset.{ordinal}.closed` | per_asset | Single_Response | Conditional | Closed attribution — one brand per asset. Required when `dba.mode = closed`. |
-| `dba.asset.{ordinal}.open` | per_asset | Open_End | Conditional | Open attribution — free-text. Required when `dba.mode = open`. |
-| `dba.asset_list` | reference | — | Yes | AssetCode + AssetLabel + AssetType + image ref. Declared in Survey_Structure Assets sheet. |
+| `dba.asset.{ordinal}.closed` | per_asset | Single_Response | Conditional | Closed attribution: one brand per asset. Required when `dba.mode = closed`. |
+| `dba.asset.{ordinal}.open` | per_asset | Open_End | Conditional | Open attribution: free-text. Required when `dba.mode = open`. |
+| `dba.asset_list` | reference | n/a | Yes | AssetCode + AssetLabel + AssetType + image ref. Declared in Survey_Structure Assets sheet. |
 
 Exactly one of `closed` / `open` per asset per project (`dba.mode` setting).
 
@@ -197,7 +197,7 @@ Reuses per-category funnel roles for penetration. Uses `system.category.id` for 
 | `wom.received_positive` | per_brand | Multi_Mention | Yes | QWOMBRAND1a |
 | `wom.received_negative` | per_brand | Multi_Mention | Yes | QWOMBRAND1b |
 | `wom.shared_positive_incidence` | per_brand | Multi_Mention | Yes | QWOMBRAND2a |
-| `wom.shared_positive_count` | per_brand | Numeric | Optional | QWOMBRAND2b — upgrades incidence to volume |
+| `wom.shared_positive_count` | per_brand | Numeric | Optional | QWOMBRAND2b: upgrades incidence to volume |
 | `wom.shared_negative_incidence` | per_brand | Multi_Mention | Yes | QWOMBRAND3a |
 | `wom.shared_negative_count` | per_brand | Numeric | Optional | QWOMBRAND3b |
 
@@ -205,7 +205,7 @@ Reuses per-category funnel roles for penetration. Uses `system.category.id` for 
 
 ## 11. `Survey_Structure.xlsx` schema
 
-### 11.1 QuestionMap sheet — one row per role the project populates
+### 11.1 QuestionMap sheet: one row per role the project populates
 
 | Column | Purpose |
 |----|----|
@@ -213,19 +213,19 @@ Reuses per-category funnel roles for penetration. Uses `system.category.id` for 
 | `ClientCode` | Client's question code in the data (e.g. `q1_aware`). |
 | `QuestionText` | Full question wording. Used as chart/card label and in About. |
 | `QuestionTextShort` | Optional shortened label for tight UI elements. |
-| `Variable_Type` | One of the catalogue types (§2.3). Column name mirrors the tabs module's `Variable_Type` exactly — same value vocabulary, so a single Survey_Structure row satisfies both modules. |
+| `Variable_Type` | One of the catalogue types (§2.3). Column name mirrors the tabs module's `Variable_Type` exactly: same value vocabulary, so a single Survey_Structure row satisfies both modules. |
 | `ColumnPattern` | Declared naming template: `{code}_{brandcode}`, `{code}_{index}`, `{code}`. Guard refuses loud if data does not match. |
 | `OptionMapScale` | Name of the OptionMap scale this row uses (blank for binary). |
 | `Notes` | Operator notes (not shown in report). |
 
-### 11.2 OptionMap sheet — one row per (code × scale)
+### 11.2 OptionMap sheet: one row per (code × scale)
 
 | Column | Purpose |
 |----|----|
 | `Scale` | Scale name (e.g. `attitude_scale`). |
 | `ClientCode` | Integer or string code in the data. |
 | `Role` | Position role this code maps to (e.g. `attitude.love`). Blank if code is non-analytic (e.g. "Don't know"). |
-| `ClientLabel` | Text the client used in the questionnaire — shown in report legend. |
+| `ClientLabel` | Text the client used in the questionnaire, shown in report legend. |
 | `OrderIndex` | Display order (integer). |
 
 ### 11.3 Existing sheets (unchanged)
@@ -240,18 +240,18 @@ Every module's `00_guard.R` validates before processing begins:
 
 1.  Every **Required** role has a QuestionMap row with a matching data column.
 2.  For each declared role, data columns match the declared `ColumnPattern` (no silent fallbacks).
-3.  For any role referencing an OptionMap (`Single_Response`, `Likert`, `Rating`), the scale is fully populated — every expected position role is either present or explicitly null.
+3.  For any role referencing an OptionMap (`Single_Response`, `Likert`, `Rating`), the scale is fully populated: every expected position role is either present or explicitly null.
 4.  `system.respondent.id` is unique per row.
 5.  `system.respondent.weight` is numeric, non-negative, non-zero-sum.
 6.  Brand list in `Brands` sheet is consistent with brand columns across roles (warn on orphan columns).
 
 All refusals use typed codes:
 
--   `CFG_ROLE_MISSING` — required role absent.
--   `CFG_COLUMN_NOT_FOUND` — role declared but column not in data.
--   `CFG_PATTERN_MISMATCH` — ColumnPattern does not match actual columns.
--   `CFG_OPTIONMAP_INCOMPLETE` — scale referenced but not fully defined.
--   `CFG_BRAND_ORPHAN` — data columns exist for brands not in Brands sheet.
+-   `CFG_ROLE_MISSING`: required role absent.
+-   `CFG_COLUMN_NOT_FOUND`: role declared but column not in data.
+-   `CFG_PATTERN_MISMATCH`: ColumnPattern does not match actual columns.
+-   `CFG_OPTIONMAP_INCOMPLETE`: scale referenced but not fully defined.
+-   `CFG_BRAND_ORPHAN`: data columns exist for brands not in Brands sheet.
 
 Refusals write to console per the Shiny error-box pattern and return a structured refusal to the caller.
 
@@ -283,7 +283,7 @@ Before building against this registry:
 
 **Denominator rule (load-bearing):** every portfolio rate uses `build_portfolio_base()` in `R/09_portfolio.R` as the single source of truth for the SQ1/SQ2 qualifier filter. No other file should filter these columns directly. See `R/09_portfolio.R` comment block §3.1 for the full rationale.
 
-**Detection:** `R/00_main.R:.detect_category_code()` matches `funnel.awareness.{cat_code}` QuestionMap rows to identify the cat_code for each category. This same detection is reused by portfolio — no parallel detection code.
+**Detection:** `R/00_main.R:.detect_category_code()` matches `funnel.awareness.{cat_code}` QuestionMap rows to identify the cat_code for each category. This same detection is reused by portfolio, no parallel detection code.
 
 **See also:** `modules/brand/docs/PORTFOLIO_SPEC_v1.md` for full specification.
 

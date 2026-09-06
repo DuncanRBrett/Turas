@@ -1,17 +1,17 @@
-# Category Buying Panel — v3 Spec (count-based, post-BRANDPEN3 clarification)
+# Category Buying Panel: v3 Spec (count-based, post-BRANDPEN3 clarification)
 
-**Supersedes:** `CAT_BUYING_SPEC.md` (v2 assumed ordinal scale / imputation — obsolete).
+**Supersedes:** `CAT_BUYING_SPEC.md` (v2 assumed ordinal scale / imputation, now obsolete).
 **Audience:** next coding session, fresh context.
 **Branch:** `feature/brand-report-nav-2layer`.
 **Precedent patterns to mirror:** `FUNNEL_SPEC_v2.md`, `panels/03_funnel_panel*.R`, `panels/02_ma_panel*.R`.
 
 ---
 
-## 1. Corrected data contract — what we actually have
+## 1. Corrected data contract: what we actually have
 
 ### 1.1 Per-respondent columns for the focal category (filtered as `cat_data`)
 
-The **longer** and **target** timeframe lengths are both **configurable per project** — they are not hard-coded. See §1.4 for the config fields. For the IPK worked example: longer = **12 months**, target = **3 months**.
+The **longer** and **target** timeframe lengths are both **configurable per project**. They are not hard-coded. See §1.4 for the config fields. For the IPK worked example: longer = **12 months**, target = **3 months**.
 
 | Column | Role | Type | Definition | Population rule |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@ The **longer** and **target** timeframe lengths are both **configurable per proj
 
 ### 1.2 Key implication
 
-Because `BRANDPEN3` is a per-brand purchase count in the **same target timeframe** as `BRANDPEN2`, every Dirichlet-family metric is **directly observable** — no equal-share imputation, no scale-direction games. This is the important correction vs v2.
+Because `BRANDPEN3` is a per-brand purchase count in the **same target timeframe** as `BRANDPEN2`, every Dirichlet-family metric is **directly observable**: no equal-share imputation, no scale-direction games. This is the important correction vs v2.
 
 ### 1.3 Configurable timeframes
 
@@ -39,16 +39,16 @@ Two new config fields (read in `modules/brand/R/01_config.R` alongside `wom_time
 Validation in `01_config.R`:
 
 - Must be positive integer after `as.integer()`.
-- `target_timeframe_months < longer_timeframe_months` — TRS-refuse `CFG_TIMEFRAME_INVALID` if not.
+- `target_timeframe_months < longer_timeframe_months`: TRS-refuse `CFG_TIMEFRAME_INVALID` if not.
 - Surface both values in the guard layer (`00_guard.R`) so a mismatch is caught once, not at every element.
 
-Also add to the three existing category config templates and the `Brand_Config.xlsx` template — two new cells under the "Parameters" block, labelled e.g., *"Target timeframe (months)"* and *"Longer timeframe (months)"*, with the defaults 3 and 12 prefilled.
+Also add to the three existing category config templates and the `Brand_Config.xlsx` template: two new cells under the "Parameters" block, labelled e.g., *"Target timeframe (months)"* and *"Longer timeframe (months)"*, with the defaults 3 and 12 prefilled.
 
-**Everywhere** the spec refers to "3 months" or "12 months" below, that is the IPK worked-example value, not a hard-coded assumption. Every function signature that needs the window length takes it as an argument sourced from config — never a literal.
+**Everywhere** the spec refers to "3 months" or "12 months" below, that is the IPK worked-example value, not a hard-coded assumption. Every function signature that needs the window length takes it as an argument sourced from config, never a literal.
 
 ### 1.4 Fixture needs regenerating before this work starts
 
-`modules/brand/tests/fixtures/generate_ipk_9cat_wave1.R` currently populates `BRANDPEN3` via `wsample(1:5, ...)` — that emits an ordinal 1–5, not a count. The generator must be updated to emit realistic non-negative integer counts (or midpoints) for 3m buyers before any testing against this spec is meaningful. See §9.
+`modules/brand/tests/fixtures/generate_ipk_9cat_wave1.R` currently populates `BRANDPEN3` via `wsample(1:5, ...)`. That emits an ordinal 1–5, not a count. The generator must be updated to emit realistic non-negative integer counts (or midpoints) for 3m buyers before any testing against this spec is meaningful. See §9.
 
 ---
 
@@ -106,7 +106,7 @@ Expected under DoP law: `exp_D_{ij} = D × b_j` where D is fit by OLS of off-dia
 
 The `NBDdirichlet` package (CRAN) takes:
 - `cat.pen` = `b` (§2.2)
-- `cat.buyrate` = `M / b` (purchases per category buyer — already what we compute)
+- `cat.buyrate` = `M / b` (purchases per category buyer, already what we compute)
 - `brand.share` = vector of `s_j` (§2.3)
 - `brand.pen.obs` (optional, for comparison) = vector of `b_j`
 - `brand.buyrate.obs` (optional) = vector of `w_j`
@@ -119,7 +119,7 @@ Must add `NBDdirichlet` to `renv.lock` via `renv::install("NBDdirichlet")` → `
 
 ---
 
-## 4. The six panel outputs — now all directly observable
+## 4. The six panel outputs: now all directly observable
 
 | # | Output | Formula source | Input columns |
 |---|---|---|---|
@@ -157,7 +157,7 @@ Respondents with `m_i > 99th percentile × 3` (per category, over buyers) are wi
 ### 5.5 Category reconciliation with CATBUY
 Compute `M_brand = mean(m_i | buyer_i)` from BRANDPEN3 and `M_stated = mean of cat_buy_scale monthly equivalent × T_target | buyer_i` from CATBUY. Both are expressed over the same `T_target` window, making them comparable. Report both in the norms table footer (example text with IPK values, `T_target = 3`):
 
-> "Category mean purchases per buyer over the last 3 months — BRANDPEN3: 4.2; CATBUY stated scale: 3.8. Dirichlet uses BRANDPEN3 (direct measurement)."
+> "Category mean purchases per buyer over the last 3 months. BRANDPEN3: 4.2; CATBUY stated scale: 3.8. Dirichlet uses BRANDPEN3 (direct measurement)."
 
 Footer text is templated on `T_target` so it reads correctly for any project. This is a data-quality transparency feature, not a failure mode.
 
@@ -184,8 +184,8 @@ Dirichlet is undefined with fewer than 2 brands; returns unstable estimates with
 | Path | Change |
 |---|---|
 | `modules/brand/R/00_main.R` | (a) Register new sources in the load block (~line 71). (b) After `run_cat_buying_frequency()` (~line 451), build the volume matrix then call the three new elements in sequence. (c) Pass volume matrix into `run_repertoire()` as `frequency_matrix`. (d) Store outputs on `cat_result$brand_volume`, `cat_result$dirichlet_norms`, `cat_result$buyer_heaviness`. |
-| `modules/brand/R/04_repertoire.R` | Fix the scale-direction bug in the existing `share_of_requirements` block (lines 237–271) — with BRANDPEN3 as counts, the existing formula is correct; delete the defensive `if (is.null(frequency_matrix))` no-op path and ensure SCR is always computed when counts are provided. Add `dop_expected_matrix`, `dop_deviation_matrix`, `dop_D_coefficient` as §2.5. |
-| `modules/brand/R/99_output.R` | New Excel sheets + CSV files per full-depth category: `dirichlet_{CAT}`, `market_share_{CAT}`, `buyer_heaviness_{CAT}`, `dop_deviation_{CAT}`. TRS-refuse with visible console box on missing inputs — do not silently skip. |
+| `modules/brand/R/04_repertoire.R` | Fix the scale-direction bug in the existing `share_of_requirements` block (lines 237–271). With BRANDPEN3 as counts, the existing formula is correct; delete the defensive `if (is.null(frequency_matrix))` no-op path and ensure SCR is always computed when counts are provided. Add `dop_expected_matrix`, `dop_deviation_matrix`, `dop_D_coefficient` as §2.5. |
+| `modules/brand/R/99_output.R` | New Excel sheets + CSV files per full-depth category: `dirichlet_{CAT}`, `market_share_{CAT}`, `buyer_heaviness_{CAT}`, `dop_deviation_{CAT}`. TRS-refuse with visible console box on missing inputs. Do not silently skip. |
 
 ### 6.3 New HTML panel files (follow `panels/03_funnel_panel*.R` pattern)
 
@@ -352,7 +352,7 @@ Refusal codes: `DATA_NO_BUYERS`, `DATA_ALL_SAME_M` (all buyers have identical `m
 
 Keep existing signature. Add:
 
-- When `frequency_matrix` is non-NULL (now always true for full categories), ensure `share_of_requirements` computes correctly — with `x_{ij}` as counts, the existing formula is mathematically right. Verify with a manual test.
+- When `frequency_matrix` is non-NULL (now always true for full categories), ensure `share_of_requirements` computes correctly. With `x_{ij}` as counts, the existing formula is mathematically right. Verify with a manual test.
 - Compute `dop_D_coefficient`: fit `obs_D_{ij} ~ 0 + b_j` via OLS over off-diagonal cells. Return as `numeric(1)`.
 - Compute `dop_expected_matrix` = `D × b_j` broadcast across rows.
 - Compute `dop_deviation_matrix` = `obs − exp` in percentage points.
@@ -366,10 +366,10 @@ Order top → bottom:
 
 1. **KPI strip** (single row of chips)
    - "% Category buyers" (existing)
-   - "Mean purchases per buyer (target timeframe)" — new, uses `M`
-   - "Focal SCR" — `SCR_focal` with Dirichlet expected in brackets, e.g., `34% (exp 38%)`
-   - "Focal 100%-loyal" — `L_focal` with expected in brackets
-   - "Focal NMI" — sparkline-style arrow vs 1.0
+   - "Mean purchases per buyer (target timeframe)": new, uses `M`
+   - "Focal SCR": `SCR_focal` with Dirichlet expected in brackets, e.g., `34% (exp 38%)`
+   - "Focal 100%-loyal": `L_focal` with expected in brackets
+   - "Focal NMI": sparkline-style arrow vs 1.0
 
 2. **Double Jeopardy scatter** (hero chart, full-width ~480px tall)
    - Default y = SCR. Toggle to y = w.
@@ -386,7 +386,7 @@ Order top → bottom:
 
 4. **Two-column row**
    - Left: Buyer heaviness stacked bars, one per brand, sorted focal-first then by share. Dotted reference lines at category-mix positions.
-   - Right: Buy-rate profile — horizontal bar per brand with reference line at `M/b`.
+   - Right: Buy-rate profile, horizontal bar per brand with reference line at `M/b`.
 
 5. **DoP deviation heatmap**
    - Diverging colour: green (positive), white (on law), red (negative).
@@ -394,13 +394,13 @@ Order top → bottom:
    - Toggle: "Show raw duplication" reverts to existing observed matrix.
    - Callout below flags partition candidates (≥ 3 brands with shared positive deviations > 10pp).
 
-6. **Collapsible "Descriptive detail"** (existing frequency bars, repertoire size, brand repertoire profile — demoted, not removed).
+6. **Collapsible "Descriptive detail"** (existing frequency bars, repertoire size, brand repertoire profile: demoted, not removed).
 
 ### 8.1 Toggles
 
-- Period toggle (none — target timeframe is fixed per project via config; the panel subtitle reads the values dynamically, e.g., for IPK: *"Target timeframe: last 3 months · Longer timeframe: last 12 months"*. Subtitle string templated on `target_months` + `longer_months`).
-- DJ y-axis toggle (SCR | w) — default SCR.
-- DoP heatmap toggle (Deviation | Observed) — default Deviation.
+- Period toggle (none: target timeframe is fixed per project via config; the panel subtitle reads the values dynamically, e.g., for IPK: *"Target timeframe: last 3 months · Longer timeframe: last 12 months"*. Subtitle string templated on `target_months` + `longer_months`).
+- DJ y-axis toggle (SCR | w): default SCR.
+- DoP heatmap toggle (Deviation | Observed): default Deviation.
 - Base toggle (% total / % aware) is **hidden** on this panel (all metrics are among buyers or among aware-and-buyer).
 
 ### 8.2 Accessibility
@@ -416,7 +416,7 @@ Every chart gets a plain-language summary paragraph above it, screen-reader frie
 Parameterise the generator (constants at file head, not magic numbers in function bodies):
 
 ```r
-# IPK worked-example windows — these must match the config defaults in §1.3
+# IPK worked-example windows: these must match the config defaults in §1.3
 TARGET_TIMEFRAME_MONTHS <- 3    # BRANDPEN2 + BRANDPEN3 window
 LONGER_TIMEFRAME_MONTHS <- 12   # BRANDPEN1 window
 
@@ -434,7 +434,7 @@ This must:
 - Produce positive duplication coefficient D (buyers overlap per the law).
 - Keep counts within plausible bounds for the chosen window (`< 10 × TARGET_TIMEFRAME_MONTHS` as a soft cap).
 - Be seed-stable.
-- If the window constants change, all downstream rate distributions rescale proportionally — no hand-tuned numbers tied to 3 months.
+- If the window constants change, all downstream rate distributions rescale proportionally: no hand-tuned numbers tied to 3 months.
 
 Re-emit all `ipk_9cat_wave1.xlsx` 1,200-row blocks with the new BRANDPEN3 values. Existing screener / awareness / attitude / CEP / attribute data preserved.
 
@@ -495,7 +495,7 @@ Per full-depth category, emit:
 | `buyer_heaviness_{CAT}` | `brand_heaviness` | BrandCode, Heavy/Med/Light %, WBar, NMI, n |
 | `dop_deviation_{CAT}` | `dop_deviation_matrix` | BrandCode column + one numeric col per partner brand |
 
-If any upstream element is `REFUSED`, write a short refusal sheet (`dirichlet_{CAT}_REFUSED`) carrying code + message + how_to_fix — do not skip silently.
+If any upstream element is `REFUSED`, write a short refusal sheet (`dirichlet_{CAT}_REFUSED`) carrying code + message + how_to_fix. Do not skip silently.
 
 ---
 
@@ -513,7 +513,7 @@ If any upstream element is `REFUSED`, write a short refusal sheet (`dirichlet_{C
 ## 13. Acceptance checklist
 
 - [ ] `target_timeframe_months` and `longer_timeframe_months` added to `01_config.R` defaults (3 and 12), validated in guard layer, and exposed in the `Brand_Config.xlsx` template
-- [ ] Every function signature that needs the window length receives it via arguments sourced from config — no hard-coded months anywhere
+- [ ] Every function signature that needs the window length receives it via arguments sourced from config: no hard-coded months anywhere
 - [ ] Fixture regenerated with count-based BRANDPEN3, using the parameterised `TARGET_TIMEFRAME_MONTHS` / `LONGER_TIMEFRAME_MONTHS` constants (§9)
 - [ ] `NBDdirichlet` added to `renv.lock`
 - [ ] `build_brand_volume_matrix()` returns reconciled pen_mat + x_mat + m_vec, with reconciliation counts
@@ -537,8 +537,8 @@ If any upstream element is `REFUSED`, write a short refusal sheet (`dirichlet_{C
 - No Pareto volume curve (defer; nice-to-have only).
 - No MA × DJ cross-view (defer).
 - No changes to Funnel, MA, WOM, Portfolio panels.
-- No re-implementation of Dirichlet maths — always use `NBDdirichlet`.
-- No removal of existing descriptive charts — they move to a collapsible section.
+- No re-implementation of Dirichlet maths. Always use `NBDdirichlet`.
+- No removal of existing descriptive charts. They move to a collapsible section.
 
 ---
 
@@ -546,6 +546,6 @@ If any upstream element is `REFUSED`, write a short refusal sheet (`dirichlet_{C
 
 - "Dirichlet expected values assume category is stationary over the target timeframe. Growing / declining categories produce systematic deviations."
 - "BRANDPEN3 is stated recall, subject to telescoping (over-reporting) and omission (under-reporting). Winsorisation at 99th percentile × 3 mitigates extreme outliers but does not correct systematic bias."
-- "When respondents give a range, the midpoint is used — this introduces modest loss of variance."
+- "When respondents give a range, the midpoint is used. This introduces modest loss of variance."
 - "For categories with < 4 brands, Dirichlet estimates are flagged as PARTIAL."
-- "The target timeframe (window for BRANDPEN2 + BRANDPEN3) and longer timeframe (window for BRANDPEN1) are project-configurable. Figures in this panel are expressed over the windows declared in the project config — IPK example: 3 months and 12 months."
+- "The target timeframe (window for BRANDPEN2 + BRANDPEN3) and longer timeframe (window for BRANDPEN1) are project-configurable. Figures in this panel are expressed over the windows declared in the project config. IPK example: 3 months and 12 months."

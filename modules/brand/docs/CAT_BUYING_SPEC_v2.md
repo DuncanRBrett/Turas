@@ -1,4 +1,4 @@
-# Category Buying Panel — v2 Spec (Dirichlet-grounded)
+# Category Buying Panel: v2 Spec (Dirichlet-grounded)
 
 > **SUPERSEDED on 2026-04-21 by `CAT_BUYING_SPEC_v3.md`.**
 > v2 was written assuming BRANDPEN3 was an ordinal share-of-choice scale and specified equal-share SCR imputation. That is wrong for the real IPK questionnaire, where BRANDPEN3 is a **purchase count (or midpoint-of-range)** per brand over the target timeframe. v3 uses direct observed metrics throughout. **Do not work from this file.**
@@ -12,7 +12,7 @@
 
 ## 1. Why we are doing this
 
-The Category Buying panel (currently renders `run_cat_buying_frequency()` + the repertoire outputs) is descriptive only — distribution bars, sole/dual/multi, crossover matrix. It does not benchmark, diagnose, or tell a brand-growth story. The rebuild turns it into a **diagnostic panel anchored in Ehrenberg-Bass / NBD-Dirichlet theory**, so TRL can point at any chart and cite a reference.
+The Category Buying panel (currently renders `run_cat_buying_frequency()` + the repertoire outputs) is descriptive only: distribution bars, sole/dual/multi, crossover matrix. It does not benchmark, diagnose, or tell a brand-growth story. The rebuild turns it into a **diagnostic panel anchored in Ehrenberg-Bass / NBD-Dirichlet theory**, so TRL can point at any chart and cite a reference.
 
 **Literature anchor (cite in panel footnote):**
 - Ehrenberg, Uncles & Goodhardt (2004), *Understanding brand performance measures: using Dirichlet benchmarks*, Journal of Business Research.
@@ -26,12 +26,12 @@ The Category Buying panel (currently renders `run_cat_buying_frequency()` + the 
 |---|----------|--------|--------------|
 | 1 | **Double Jeopardy scatter** (penetration × buy rate, fitted DJ curve) | NEW | Ehrenberg 1969, Sharp 2010 Ch.2 |
 | 2 | **Dirichlet norms table** (observed vs expected penetration, w, SCR, 100% loyals) | NEW | Goodhardt et al. 1984 |
-| 3 | **Share of Category Requirements (SCR)** — elevate to KPI, fix for non-TRANS | EXTEND | Ehrenberg 1988 |
+| 3 | **Share of Category Requirements (SCR)**: elevate to KPI, fix for non-TRANS | EXTEND | Ehrenberg 1988 |
 | 4 | **Duplication-of-Purchase deviation heatmap** (observed vs expected, partitions flagged) | EXTEND | Romaniuk & Sharp 2016 Ch.7 |
 | 5 | **Buyer-base heaviness composition** (heavy/med/light category buyer decomp per brand) | NEW | Sharp 2010 Ch.6 (Natural Monopoly) |
-| 6 | **Buy-rate profile** — brand buyers' category buy-rate vs category mean (w-bar view) | NEW | Kennedy & Ehrenberg 2001 |
+| 6 | **Buy-rate profile**: brand buyers' category buy-rate vs category mean (w-bar view) | NEW | Kennedy & Ehrenberg 2001 |
 
-**Out of scope this session:** wave-on-wave growth quadrant (needs tracker integration — park), Pareto volume curve (nice-to-have, defer), MA×DJ cross-view (defer). Do not spec or scaffold these.
+**Out of scope this session:** wave-on-wave growth quadrant (needs tracker integration, so park it), Pareto volume curve (nice-to-have, defer), MA×DJ cross-view (defer). Do not spec or scaffold these.
 
 ## 3. Files to create / modify
 
@@ -56,11 +56,11 @@ The Category Buying panel (currently renders `run_cat_buying_frequency()` + the 
 | `modules/brand/lib/html_report/01_data_transformer.R` | Extend the cat-buying branch (around line 77–203) to pipe the new outputs into the panel's chart/table payload. |
 | `modules/brand/lib/html_report/02_table_builder.R` | `build_cat_buying_tables()` gains `dirichlet_norms` and `dop_deviation` arguments. Keep existing tables as lower sections. |
 | `modules/brand/lib/html_report/03_page_builder.R` | Replace the inline Category Buying block (lines ~352–onwards) with a single call to `render_cat_buying_panel()` (the new panel file). Keep the tab definition on line 276 unchanged. |
-| `modules/brand/R/99_output.R` | Excel: add sheets `dirichlet_norms_{CAT}` and `buyer_heaviness_{CAT}`. CSV: emit parallel files. TRS-refuse on missing inputs (do not silently skip — WOM output bug lesson). |
+| `modules/brand/R/99_output.R` | Excel: add sheets `dirichlet_norms_{CAT}` and `buyer_heaviness_{CAT}`. CSV: emit parallel files. TRS-refuse on missing inputs (do not silently skip: WOM output bug lesson). |
 
 ## 4. Dependency
 
-Use `NBDdirichlet` (CRAN, stable, maintained by Feng & Rossi). Add via `renv::install("NBDdirichlet")` then `renv::snapshot()`. It implements the closed-form Dirichlet expectations and is the standard reference implementation cited in Kantar/Nielsen work. **Do not re-implement the Dirichlet math** — we want defensibility, not novelty in the maths layer.
+Use `NBDdirichlet` (CRAN, stable, maintained by Feng & Rossi). Add via `renv::install("NBDdirichlet")` then `renv::snapshot()`. It implements the closed-form Dirichlet expectations and is the standard reference implementation cited in Kantar/Nielsen work. **Do not re-implement the Dirichlet math**. We want defensibility, not novelty in the maths layer.
 
 Fallback: if `NBDdirichlet` is unavailable at runtime, the engine must TRS-refuse with `PKG_DIRICHLET_MISSING` and clear `how_to_fix` instructing `renv::install("NBDdirichlet")`. Never silently substitute an ad-hoc implementation.
 
@@ -68,18 +68,18 @@ Fallback: if `NBDdirichlet` is unavailable at runtime, the engine must TRS-refus
 
 From the orchestrator, per category (`cat_data`):
 
-- `pen_mat` — n_resp × n_brands binary penetration (already built for `run_repertoire`)
-- `cat_buying_frequency` output (from §6.1 of existing code) — includes `distribution`, `mean_freq`, `pct_buyers`, and the per-respondent scale codes available on the raw column
+- `pen_mat`: n_resp × n_brands binary penetration (already built for `run_repertoire`)
+- `cat_buying_frequency` output (from §6.1 of existing code): includes `distribution`, `mean_freq`, `pct_buyers`, and the per-respondent scale codes available on the raw column
 - Raw `cat_buy_scale` codes (accessible via `data[[freq_col]]` inside the orchestrator)
-- `weights` — respondent weights (1.0 in dev sample, must still thread through)
-- `focal_brand` — the focal brand code for the category
+- `weights`: respondent weights (1.0 in dev sample, must still thread through)
+- `focal_brand`: the focal brand code for the category
 - Brand codes + labels
 
-## 6. Data contracts — new outputs
+## 6. Data contracts: new outputs
 
 All functions return TRS-compliant lists. `status` ∈ {`PASS`, `PARTIAL`, `REFUSED`}. Follow the `run_cat_buying_frequency()` conventions in `08_cat_buying.R:52-197` for error codes and refusal shape.
 
-### 6.1 `run_dirichlet_norms()` — new, in `08b_dirichlet_norms.R`
+### 6.1 `run_dirichlet_norms()`: new, in `08b_dirichlet_norms.R`
 
 **Signature**
 ```r
@@ -97,7 +97,7 @@ run_dirichlet_norms(
 **Method**
 1. **Category mean purchases per buyer (M)**: map scale codes → monthly rates via `.CAT_BUY_SCALE_WEIGHTS` (same constant as `08_cat_buying.R:18-24`); weighted mean over buyers only; scale to period.
 2. **Category penetration (b)**: share of respondents where `rowSums(pen_mat) > 0`, weighted.
-3. **Market shares (s_j)**: for each brand, `share_j = Σ_respondents (pen_j × cat_freq_monthly) / Σ_respondents (Σ_brands pen × cat_freq_monthly)`. Weighted. This is the *volume-weighted* share, which is what the Dirichlet expects. Do **not** use raw penetration as share — document this clearly in the function roxygen.
+3. **Market shares (s_j)**: for each brand, `share_j = Σ_respondents (pen_j × cat_freq_monthly) / Σ_respondents (Σ_brands pen × cat_freq_monthly)`. Weighted. This is the *volume-weighted* share, which is what the Dirichlet expects. Do **not** use raw penetration as share. Document this clearly in the function roxygen.
 4. Call `NBDdirichlet::dirichlet(cat.pen = b, cat.buyrate = M/b, brand.share = s, brand.pen.obs = observed_pen, brand.buyrate.obs = observed_w)` (consult CRAN vignette for exact argument names at implementation time).
 5. Extract expected values: `bj_exp`, `wj_exp`, `SCR_exp`, `pct_100_loyal_exp`.
 6. Compute deviations: `dev_pct = (observed − expected) / expected × 100`. Flag `|dev| > 20%` as `over`/`under`.
@@ -138,18 +138,18 @@ list(
 ```
 
 **TRS refusals (minimum set)**
-- `DATA_NO_PENETRATION` — `pen_mat` null/empty (copy pattern from `04_repertoire.R:47`)
-- `DATA_NO_BUYERS` — zero category buyers
-- `DATA_SINGLE_BRAND` — fewer than 2 brands (Dirichlet undefined)
-- `CFG_SCALE_MISSING` — `option_map` lacks `cat_buy_scale` rows
-- `CALC_DIRICHLET_FAILED` — `NBDdirichlet` call errored; include the underlying message in `context`
-- `PKG_DIRICHLET_MISSING` — package not installed
+- `DATA_NO_PENETRATION`: `pen_mat` null/empty (copy pattern from `04_repertoire.R:47`)
+- `DATA_NO_BUYERS`: zero category buyers
+- `DATA_SINGLE_BRAND`: fewer than 2 brands (Dirichlet undefined)
+- `CFG_SCALE_MISSING`: `option_map` lacks `cat_buy_scale` rows
+- `CALC_DIRICHLET_FAILED`: `NBDdirichlet` call errored; include the underlying message in `context`
+- `PKG_DIRICHLET_MISSING`: package not installed
 
 **Sanity checks (PARTIAL rather than REFUSED)**
 - `Σ s_j` deviates from 1 by > 0.01 → warn, normalise, return PARTIAL
 - Expected penetration > 1 for any brand → warn, clamp to 0.99, return PARTIAL
 
-### 6.2 `compute_scr_from_freq()` — new helper in `08b_dirichlet_norms.R`
+### 6.2 `compute_scr_from_freq()`: new helper in `08b_dirichlet_norms.R`
 
 Current `share_of_requirements` in `run_repertoire()` only fires when `frequency_matrix` is non-null (TRANS categories). IPK is non-TRANS. So we need an **imputed SCR** from the category scale:
 
@@ -158,16 +158,16 @@ compute_scr_from_freq(pen_mat, cat_buy_scale_codes, brand_codes,
                      option_map, weights = NULL)
 ```
 
-**Method** — for each respondent i: total category purchases `m_i` from scale mapping; allocate evenly across their bought brands (absent brand-level frequency data, equal-share is the standard assumption, per Ehrenberg & Uncles 1999). Then SCR_j = Σ_i (allocated_j_i) / Σ_i m_i over buyers of j, weighted.
+**Method**. For each respondent i: total category purchases `m_i` from scale mapping; allocate evenly across their bought brands (absent brand-level frequency data, equal-share is the standard assumption, per Ehrenberg & Uncles 1999). Then SCR_j = Σ_i (allocated_j_i) / Σ_i m_i over buyers of j, weighted.
 
 **Output**
 ```r
 data.frame(BrandCode, SCR_Pct, n_buyers, method = "equal_share_imputation")
 ```
 
-Document the imputation in roxygen — `@note` field. The panel footnote must say "SCR imputed via equal-share allocation (Ehrenberg & Uncles 1999); direct SCR requires brand-level purchase frequency data."
+Document the imputation in roxygen, in the `@note` field. The panel footnote must say "SCR imputed via equal-share allocation (Ehrenberg & Uncles 1999); direct SCR requires brand-level purchase frequency data."
 
-### 6.3 `run_buyer_heaviness()` — new, in `08c_buyer_heaviness.R`
+### 6.3 `run_buyer_heaviness()`: new, in `08c_buyer_heaviness.R`
 
 **Signature**
 ```r
@@ -201,7 +201,7 @@ list(
 )
 ```
 
-### 6.4 `04_repertoire.R` — extend crossover output
+### 6.4 `04_repertoire.R`: extend crossover output
 
 Add two matrices alongside existing `crossover_matrix` (which is the observed-duplication cross-tab).
 
@@ -226,15 +226,15 @@ Leave `crossover_matrix` unchanged (it is load-bearing for the existing heatmap 
 
 All charts = pure SVG, no external libs. Follow the style in `04_chart_builder.R` (viewBox, inline `<style>`, `br-chart-*` class naming).
 
-### 7.1 KPI strip — extend existing
+### 7.1 KPI strip: extend existing
 Keep existing "% Category buyers" and "Mean buy rate" chips. **Add:**
-- SCR (focal brand) — labelled "Share of requirements (focal)" with tiny bracket showing Dirichlet expected value. Format: `34% (exp. 38%)`.
+- SCR (focal brand): labelled "Share of requirements (focal)" with tiny bracket showing Dirichlet expected value. Format: `34% (exp. 38%)`.
 - Mean repertoire size (already in repertoire summary; surface here).
-- Natural Monopoly Index (focal) — single-value chip with sparkline-style arrow vs 1.0.
+- Natural Monopoly Index (focal): single-value chip with sparkline-style arrow vs 1.0.
 
-### 7.2 Double Jeopardy scatter (HERO — top of panel)
-- x = penetration (%) — log scale optional, default linear
-- y = SCR (%) — **primary DJ metric**. Option (in panel footer toggle) to switch y = `w` (buy rate).
+### 7.2 Double Jeopardy scatter (HERO, top of panel)
+- x = penetration (%): log scale optional, default linear
+- y = SCR (%): **primary DJ metric**. Option (in panel footer toggle) to switch y = `w` (buy rate).
 - Points = brands; focal brand highlighted; label each point with brand code.
 - Overlay: fitted curve from `dirichlet_norms$dj_curve`.
 - Annotate brands `>20%` off the curve: "over-performer" / "under-performer".
@@ -257,17 +257,17 @@ Horizontal bar per brand: `WBar_Brand` with a vertical reference line at `WBar_C
 
 Proposed order top-to-bottom:
 1. KPI strip (§7.1)
-2. Double Jeopardy scatter (§7.2) — hero
+2. Double Jeopardy scatter (§7.2): hero
 3. Dirichlet norms table (§7.3)
 4. Two-column: Buyer heaviness (§7.5) | Buy-rate profile (§7.6)
 5. DoP deviation heatmap (§7.4) + partition callout
-6. (Existing) Frequency distribution bars + repertoire size + brand repertoire profile — demoted to a collapsible "Descriptive detail" section at the bottom. Keep available but stop leading with them.
+6. (Existing) Frequency distribution bars + repertoire size + brand repertoire profile, demoted to a collapsible "Descriptive detail" section at the bottom. Keep available but stop leading with them.
 
 **Open question for Duncan:** should the DJ scatter's default y-axis be SCR (loyalty) or w (buy rate)? Academia is split; SCR is more popular in Romaniuk/Sharp, w in Ehrenberg original. Default proposed = SCR; toggle to w.
 
 ## 9. HTML/JS behaviour
 
-- Base toggle (% total / % aware) **does not apply** to this panel — all metrics are among category buyers. Hide the toggle on this tab; do not just disable it silently.
+- Base toggle (% total / % aware) **does not apply** to this panel. All metrics are among category buyers. Hide the toggle on this tab; do not just disable it silently.
 - Period toggle (monthly / quarterly / annual) for the norms table + w/SCR metrics. Default = annual. Implement via `data-period` attribute on the table body and JS swap, following the MA tab toggle pattern in `panels/02_ma_panel.R`.
 - Tooltips: reuse the `br-tooltip` class pattern from `04_chart_builder.R`.
 - Accessibility: every chart needs a text summary paragraph above it (screen-reader + AI-annotation friendly). Copy pattern from `03c_funnel_panel_data.R`.
@@ -275,12 +275,12 @@ Proposed order top-to-bottom:
 ## 10. Excel / CSV outputs (`99_output.R`)
 
 **New sheets per full-depth category:**
-- `dirichlet_{CAT}` — the `norms_table` from §6.1
-- `market_share_{CAT}` — volume-weighted shares
-- `buyer_heaviness_{CAT}` — `brand_heaviness` from §6.3
-- `dop_deviation_{CAT}` — `dop_deviation_matrix`
+- `dirichlet_{CAT}`: the `norms_table` from §6.1
+- `market_share_{CAT}`: volume-weighted shares
+- `buyer_heaviness_{CAT}`: `brand_heaviness` from §6.3
+- `dop_deviation_{CAT}`: `dop_deviation_matrix`
 
-**Required: TRS-refuse with visible console output** if any of these outputs are missing from `cat_result`. Do **not** silently skip (reference the existing WOM output bug as the failure mode to avoid — `project_brand_module.md` §Priority 2).
+**Required: TRS-refuse with visible console output** if any of these outputs are missing from `cat_result`. Do **not** silently skip (reference the existing WOM output bug as the failure mode to avoid: see `project_brand_module.md` §Priority 2).
 
 ## 11. Tests
 
@@ -288,7 +288,7 @@ Follow the module's `testthat` layout (`modules/brand/tests/testthat/`). Use or 
 
 ### `test_dirichlet_norms.R` (minimum ~25 tests)
 - Happy path: synthetic 5-brand category, check `norms_table` row count, column names, deviation signs.
-- Reproduces a published textbook example (e.g., Ehrenberg 1988 toothpaste data — coder to verify numbers against source).
+- Reproduces a published textbook example (e.g., Ehrenberg 1988 toothpaste data, coder to verify numbers against source).
 - TRS refusals: each code in §6.1.
 - Weighted vs unweighted consistency (uniform weights → identical to unweighted within 1e-6).
 - Missing `NBDdirichlet` package → `PKG_DIRICHLET_MISSING`.
@@ -298,24 +298,24 @@ Follow the module's `testthat` layout (`modules/brand/tests/testthat/`). Use or 
 - Tertile boundaries correct under both methods.
 - Focal brand NMI computation.
 - Weighted path.
-- Empty brand (zero buyers) — row present with NA, not dropped.
+- Empty brand (zero buyers): row present with NA, not dropped.
 
 ### `test_cat_buying_panel.R` (minimum ~10 tests)
 - Panel HTML contract: required `data-*` attributes present.
 - Period toggle renders all three period variants into the DOM.
 - No JS console errors expected (assert via HTML string grep for known error-producing patterns).
-- Panel degrades gracefully when `dirichlet_norms$status == "REFUSED"` — shows refusal message, descriptive section still renders.
+- Panel degrades gracefully when `dirichlet_norms$status == "REFUSED"`: shows refusal message, descriptive section still renders.
 
 Re-run the whole brand test suite after changes: target ≥ 812 pass (current baseline), plus the new tests. No regressions allowed.
 
-## 12. Conventions — reminders
+## 12. Conventions: reminders
 
 - **TRS everywhere**: no `stop()`, no `warning()` without a structured return. Copy the `handle_error()` console-box pattern from `CLAUDE.md` for any user-facing refusal in `00_main.R`.
 - **`cat_data` vs `data`**: all six additions are per-category → use `cat_data`. Do not touch Portfolio.
 - **Attitude base convention** does not apply here (we are in buyer-only land).
 - **Weights thread**: every new function must accept `weights` and pass it through. `sum(weights, na.rm = TRUE) <= 0` triggers `weights <- NULL` (match `08_cat_buying.R:84`).
 - **Roxygen2** on every exported function; `@references` section pointing at the literature anchor.
-- **Version constants**: each new file declares `<MODULE>_VERSION <- "1.0"` and emits the loaded-message (suppressed under `TESTTHAT=true`) — match the pattern at `08_cat_buying.R:14` and `:204-207`.
+- **Version constants**: each new file declares `<MODULE>_VERSION <- "1.0"` and emits the loaded-message (suppressed under `TESTTHAT=true`). Match the pattern at `08_cat_buying.R:14` and `:204-207`.
 
 ## 13. Acceptance checklist
 
@@ -335,10 +335,10 @@ Re-run the whole brand test suite after changes: target ≥ 812 pass (current ba
 ## 14. What this session must NOT do
 
 - Do not touch the Funnel, MA, WOM, or Portfolio panels.
-- Do not re-implement Dirichlet maths from scratch — use `NBDdirichlet`.
+- Do not re-implement Dirichlet maths from scratch. Use `NBDdirichlet`.
 - Do not remove the existing descriptive charts (they move, they do not disappear).
-- Do not remove `share_of_requirements` field from `run_repertoire()` — another module may depend on it.
-- Do not alter `cat_buy_scale` mappings or the `.CAT_BUY_SCALE_WEIGHTS` constant — reuse from `08_cat_buying.R`.
+- Do not remove `share_of_requirements` field from `run_repertoire()`. Another module may depend on it.
+- Do not alter `cat_buy_scale` mappings or the `.CAT_BUY_SCALE_WEIGHTS` constant. Reuse from `08_cat_buying.R`.
 - Do not add TRANS-category frequency logic (out of scope; IPK is non-TRANS).
 
 ## 15. Post-session handover note to write
@@ -349,4 +349,4 @@ At end of session, update `/Users/duncan/.claude/projects/-Users-duncan-Dev-Tura
 - List new files under §Key files
 - Note the `NBDdirichlet` dependency
 
-Also spawn a follow-up memory for the growth-quadrant + Pareto + MA×DJ ideas that were deferred — they are on the roadmap, not lost.
+Also spawn a follow-up memory for the growth-quadrant + Pareto + MA×DJ ideas that were deferred. They are on the roadmap, not lost.
