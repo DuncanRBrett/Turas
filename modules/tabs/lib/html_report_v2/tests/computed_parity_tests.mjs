@@ -763,6 +763,16 @@ run("the first banner value is a real audience, not an empty one", () => {
   eq(m.columns[0].base, 10, "Alpha is ten people");
 });
 
+run("a value nobody chose is an audience of nobody, not a refusal", () => {
+  // Gamma exists as an option and no one picked it, so the banner gave it no
+  // column. A base of 0 is the true answer, and the one the respondent island
+  // returns; refusing would claim the report cannot answer when it just has.
+  const TR = campusFixture({ "0": 1, "1": 2, "2": -1 });
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Campus", rows: [2] }], {});
+  assert(!m.refused, "the cut is served");
+  eq(m.columns[0].base, 0, "and nobody is in it");
+});
+
 run("a value with no column of its own is refused, not answered as somebody else", () => {
   // Beta is missing from the map: its banner merged it with another campus or
   // left it out, so no published column holds exactly those people.
