@@ -686,9 +686,23 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
     lx <- lx + nchar(att_labels[k]) * 6 + 28
   }
 
+  # The legacy wide adapter writes NA_real_ for any stage or attitude position
+  # the survey did not measure. A 5-level attitude scale, for one, leaves
+  # Price_Pct NA for every brand. Reading a segment width straight off that
+  # NA made "if (seg_w > 1)" a missing-value error, which took the whole chart
+  # layer down on every IPK-shaped run. Read each column defensively and treat
+  # an unmeasured position as a zero-width segment.
+  col_val <- function(nm, i) {
+    v <- funnel_df[[nm]]
+    if (is.null(v) || length(v) < i) return(NA_real_)
+    suppressWarnings(as.numeric(v[i]))
+  }
+  att_cols_src <- c("Love_Pct", "Prefer_Pct", "Ambivalent_Pct",
+                    "Price_Pct", "Avoid_Pct", "NoOpinion_Pct")
+
   for (i in seq_len(n)) {
     brand <- funnel_df$BrandCode[i]
-    is_focal <- !is.null(focal_brand) && brand == focal_brand
+    is_focal <- !is.null(focal_brand) && !is.na(brand) && brand == focal_brand
     y_base <- mt + (i - 1) * (bar_h * 2 + gap)
     fw <- if (is_focal) "700" else "400"
     fc <- if (is_focal) "#1e293b" else "#64748b"
@@ -698,19 +712,17 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
       ml - 10, y_base + bar_h / 2, fc, fw, .br_escape(.br_trunc(brand, 14))))
 
     # Aware bar (full width = aware %)
-    aware <- funnel_df$Aware_Pct[i]
-    aware_w <- max(1, aware / 100 * cw)
+    aware <- col_val("Aware_Pct", i)
+    aware_w <- if (is.finite(aware)) max(1, aware / 100 * cw) else 1
     parts <- c(parts, sprintf(
       '<rect x="%d" y="%g" width="%g" height="%d" rx="3" fill="#e2e8f0"/>', ml, y_base, aware_w, bar_h))
 
     # Attitude decomposition within aware bar
     # 6-level scale (IPK 2026): Avoid replaced Reject. Single column only.
-    avoid_pct <- funnel_df$Avoid_Pct[i]
-    price_pct <- funnel_df$Price_Pct[i] %||% 0
-    att_pcts <- c(funnel_df$Love_Pct[i], funnel_df$Prefer_Pct[i],
-                  funnel_df$Ambivalent_Pct[i], price_pct, avoid_pct,
-                  funnel_df$NoOpinion_Pct[i])
+    att_pcts <- vapply(att_cols_src, col_val, numeric(1), i = i,
+                       USE.NAMES = FALSE)
     att_total <- sum(att_pcts, na.rm = TRUE)
+    att_pcts[!is.finite(att_pcts)] <- 0
     if (att_total > 0) {
       ax <- ml
       for (k in seq_along(att_pcts)) {
@@ -735,8 +747,8 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
 
     # Bought bar (second row)
     y2 <- y_base + bar_h + 2
-    bought <- funnel_df$Bought_Pct[i]
-    bought_w <- max(1, bought / 100 * cw)
+    bought <- col_val("Bought_Pct", i)
+    bought_w <- if (is.finite(bought)) max(1, bought / 100 * cw) else 1
     bar_col <- if (is_focal) brand_colour else comp_colour
     parts <- c(parts,
       sprintf('<rect x="%d" y="%g" width="%g" height="%d" rx="3" fill="%s" opacity="0.7"/>', ml, y2, bought_w, bar_h - 4, bar_col),
