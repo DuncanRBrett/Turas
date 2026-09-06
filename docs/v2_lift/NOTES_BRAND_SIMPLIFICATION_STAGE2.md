@@ -66,12 +66,18 @@ These decided the shape of the build.
 
 ## Deviations and losses, logged
 
-- **Excel export scope for `repertoire-<cat>` narrows.** Today
-  `_brExportPanel('repertoire-dss')` collects every table under
-  `#section-repertoire-dss`, which is all eight cat-buying sub-tabs. After the
-  split that wrapper contains the Category Context host only. Stage 5 replaces
-  the per-table toolbars with one per destination main view and one per
-  Advanced drawer, which restores the coverage properly. Quantified below.
+- **The `repertoire-<cat>` pin and export narrow, and this is the one place
+  "nothing may be lost" is bent.** `#section-repertoire-dss` used to wrap the
+  whole cat-buying panel; after the split it wraps the Category Context host
+  only. Counted in the two IPK fixture reports: **9 tables and 321,923 bytes
+  before, 2 tables and 61,147 bytes after**. So `_brExportPanel` on that
+  anchor now carries Category Context rather than all eight sub-tabs, and
+  `brTogglePin('repertoire-dss')` captures the same narrower root. Brand
+  Summary, Dirichlet Norms, Loyalty Segmentation, Purchase Distribution,
+  Buyer Heaviness and Duplication of Purchase have no pin or export control
+  of their own until Stage 5 gives each destination main view and each
+  Advanced drawer one. Every one of them is still reachable, and their
+  numbers are unchanged; it is the export and pin reach that shrinks.
 - **The Overview destination has no content of its own in Stage 2.** Stage 3
   builds it. To keep five destination buttons per category without showing an
   empty destination, the Overview holds one card that switches to the Summary
@@ -222,17 +228,79 @@ Three things found by trying to break the shell rather than by reading it.
 
 ## Final numbers, all executed in this session
 
-- Brand suite: **FAIL 0, WARN 1, SKIP 2, PASS 2733**, against a baseline of
-  2542 with the same 0 failures.
-- IPK fixture report: 3,870,211 bytes before, **3,917,953 after**, 1.2 percent.
-- `reachability_check.py`: **PASS**. data-subpanel 5 values identical,
-  data-section 29 identical, section ids 13 identical, all eight island classes
-  present with numeric content identical.
-- `drive_destinations.py` in headless Chrome: **45 checks, 0 failed**, no
-  console error and no uncaught exception.
+These were superseded by the run recorded at the end of this document.
 
 ## What Duncan still owes
 
 Regenerate a real brand report through `launch_turas()` and eyeball the five
 destinations, then a Fable pre-merge review briefed as independent of this
 session. Not merged, not pushed.
+
+## Second adversarial pass, after an independent review of this session
+
+Five more things, three of which changed what could honestly be claimed.
+
+1. **The island gate had a hole.** `_numbers()` in `reachability_check.py`
+   fell back to harvesting digits out of any body that failed to parse as
+   JSON. The whole JavaScript bundle sits in a `<script>` of its own and
+   contains the literal text of island tags it builds at runtime, so the regex
+   sweep found a span of source code and reported it as a second
+   `fn-panel-data` payload whose digits happened to match. That bundle is a
+   file this work edits, so the match was luck. `json.loads` is now mandatory:
+   a body that does not parse is counted, named and excluded, and the script
+   fails if the set of unparseable spans differs between the two reports.
+   With the hole closed the funnel island is one payload, identical, and the
+   five islands with no class attribute do parse and are identical.
+2. **The old focal brand was silently promoted to a comparator.** Changing the
+   focal from IPK to ROB re-enabled IPK's checkbox with `checked` still set, so
+   a comparator slot was consumed without a click, out of five. The previous
+   focal is now released.
+3. **Requirement A was unproven for the Category Buying hosts.** The Chrome
+   harness read the new focal back off the Mental Availability and funnel
+   hosts only, and `setCategoryHidden` writes the shared store whether or not
+   anything subscribes, so the store check would have passed with seven dead
+   hosts. `data-cb-cat-code="dss"` was confirmed to match `data-group="dss"`,
+   and the harness now reads the focal back off `.cb-focus-select` too. It
+   passes.
+4. **The test file claimed a route it did not assert.** Two tests were added:
+   one reads `js/brand_report.js` and asserts `switchCategorySubtab` still
+   exists and still carries the `.ma-subtab-btn`, `.fn-subtab-btn`,
+   `.cb-subtab-btn` and `.br-insight-wrap[data-insight-internal-tab]`
+   selectors; the other asserts the three panel sub-navs are still hidden by
+   the one CSS rule rather than removed from the DOM.
+5. **One harness assertion was wrong, not the code.** It expected the
+   comparator count to stay at two after the focal changed to a brand that was
+   one of the two comparators. Corrected to expect one.
+
+## Known limits, stated rather than left to be discovered
+
+- **Four elements have never rendered through the new shell with real panel
+  fragments.** Branded Reach, Ad Hoc, Audience Lens and Shopper Behaviour are
+  all absent from the IPK fixture, the three example generators are broken on
+  main, and the unit tests use stub panel fragments. Their `.br_leaf_host`
+  branches are otherwise unchanged from the code that shipped, and the
+  suite's own panel-level tests still cover the panels themselves, but the
+  first real render of those four inside a destination is Duncan's
+  `launch_turas()` run on a project that configures them.
+- **The category switcher's JavaScript has not run in a browser.**
+  `brSwitchCategoryFromControl()` is exercised only by the R-side test that
+  checks the dropdown renders. The fixture has one full-depth category, so the
+  slot renders as static text there. The real IPK project has four, and that is
+  the path Duncan will use first.
+- **The comparison set does not survive Save.** A checkbox's `checked` is a
+  property, not an attribute, and the Save button serialises `outerHTML`; the
+  lift's mirror covers textareas only. Not asked for in Stage 2, and no
+  commentary or pin is affected, but a reader will expect the picks to persist.
+
+## Final numbers, all executed in this session
+
+- Brand suite: **FAIL 0, WARN 1, SKIP 2, PASS 2740**, against a baseline of
+  2542 with the same 0 failures. The 198 added are the new structural tests.
+- IPK fixture report: 3,870,211 bytes before, **3,918,223 after**, 1.2 percent
+  larger.
+- `modules/brand/tests/qa/reachability_check.py`: **PASS**. data-subpanel 5
+  values identical, data-section 29 identical, section ids 13 identical, and
+  every JSON island that parses identical in numeric content, with the one
+  unparseable span named in both reports rather than silently compared.
+- `modules/brand/tests/qa/drive_destinations.py` in headless Chrome:
+  **48 checks, 0 failed**, no console error and no uncaught exception.

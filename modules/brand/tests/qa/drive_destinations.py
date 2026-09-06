@@ -174,16 +174,38 @@ DRIVER = """
           if (!other && o.value !== focalSel.value) other = o.value;
         });
         if (other) {
+          var wasFocal = focalSel.value;
           focalSel.value = other;
           focalSel.dispatchEvent(new Event('change', { bubbles: true }));
           var maSel = panel.querySelector('.ma-focus-select');
           var fnSel = panel.querySelector('.fn-focus-select');
+          var cbSel = panel.querySelector(
+            'select.cb-focus-select[data-cb-action="focus"]');
           check(tab + ': focal reaches the Mental Availability host',
                 !maSel || maSel.value === other,
                 maSel ? maSel.value : 'no MA host');
           check(tab + ': focal reaches the funnel host',
                 !fnSel || fnSel.value === other,
                 fnSel ? fnSel.value : 'no funnel host');
+          check(tab + ': focal reaches the Category Buying host',
+                !cbSel || cbSel.value === other,
+                cbSel ? cbSel.value : 'no cat-buying host');
+
+          // Changing the focal brand must not promote the old focal into a
+          // comparator slot the reader never picked.
+          var oldBox = null;
+          Array.prototype.forEach.call(checks, function (c) {
+            if (c.value === wasFocal) oldBox = c;
+          });
+          check(tab + ': the previous focal is released, not promoted',
+                oldBox && !oldBox.checked,
+                oldBox ? ('checked=' + oldBox.checked) : 'no checkbox');
+          // A brand promoted to focal stops being a comparator, so the
+          // expected count drops by one when the new focal was picked.
+          var want = String(2 - (picked.indexOf(other) >= 0 ? 1 : 0));
+          check(tab + ': comparator count follows the picks, nothing added',
+                badge && badge.textContent === want,
+                badge ? (badge.textContent + ' want ' + want) : 'none');
         }
 
         var clear = panel.querySelector('.br-cmp-clear');

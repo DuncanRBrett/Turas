@@ -283,14 +283,18 @@
 
   window.brComparisonFocalChanged = function(sel) {
     var group = sel.getAttribute("data-group");
-    // The focal brand is always in the comparison set and cannot be
-    // unpicked, so its own checkbox follows the dropdown.
+    // The focal brand is always in the comparison set and cannot be unpicked,
+    // so its own checkbox follows the dropdown. The brand that was focal
+    // before is released rather than silently promoted to a comparator: a
+    // slot consumed without a click is a surprise, and there are only five.
     document.querySelectorAll(
       '.br-cmp-popover[data-group="' + group + '"] .br-cmp-check')
       .forEach(function (b) {
         var isFocal = (b.value === sel.value);
+        var wasFocal = b.disabled && !isFocal;
         b.disabled = isFocal;
         if (isFocal) b.checked = true;
+        else if (wasFocal) b.checked = false;
       });
     window.brApplyComparisonSet(group);
   };

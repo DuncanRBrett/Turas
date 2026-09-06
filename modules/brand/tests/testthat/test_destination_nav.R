@@ -354,3 +354,32 @@ test_that("the category switcher lists full-depth categories only", {
   expect_equal(n_dn(one, 'class="br-cat-select"'), 0L)
   expect_equal(n_dn(one, "br-control-static"), 1L)
 })
+
+
+# --- section 7 of the impact map: what must not change ----------------------
+
+test_that("the switchCategorySubtab route into the panels' hidden buttons survives", {
+  js <- paste(readLines(file.path(ROOT_DN, "modules", "brand", "lib",
+                                   "html_report", "js", "brand_report.js"),
+                        warn = FALSE), collapse = "\n")
+  expect_true(grepl("window.switchCategorySubtab = function", js, fixed = TRUE))
+  # The route is a click on the panel's own hidden sub-tab button. That is how
+  # the Mental Availability and funnel panels run their state updates, and the
+  # destination switcher shares the same helper.
+  expect_true(grepl(".ma-subtab-btn[data-ma-subtab-target=", js, fixed = TRUE))
+  expect_true(grepl(".fn-subtab-btn[data-fn-subtab-target=", js, fixed = TRUE))
+  # Extended to the cat-buying panel, whose sub-nav is now hidden too.
+  expect_true(grepl(".cb-subtab-btn[data-cb-tab=", js, fixed = TRUE))
+  # The .br-insight-wrap show and hide logic still runs on activation.
+  expect_true(grepl(".br-insight-wrap[data-insight-internal-tab]", js,
+                    fixed = TRUE))
+  expect_true(grepl("window.switchBrandDestination = function", js, fixed = TRUE))
+})
+
+test_that("the three panel sub-navs stay in the DOM and stay hidden by CSS", {
+  css <- paste(readLines(file.path(ROOT_DN, "modules", "brand", "lib",
+                                    "html_report", "03_page_builder.R"),
+                         warn = FALSE), collapse = "\n")
+  expect_true(grepl(".fn-subnav, .ma-subnav, .cb-subnav { display: none !important; }",
+                    css, fixed = TRUE))
+})
