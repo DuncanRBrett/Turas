@@ -74,6 +74,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     wave_label = config$wave_label %||% as.character(result$meta$wave %||% ""),
     n_weighted = result$meta$n_weighted,
     n_unweighted = result$meta$n_unweighted,
+    n_effective = result$meta$n_effective %||% result$meta$n_unweighted,
     stage_count = length(stage_keys),
     stage_keys = stage_keys,
     stage_labels = .stage_labels_for(stage_keys, overrides = lbl_overrides),
@@ -458,12 +459,15 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       "(total at stage N divided by total at stage N-1), not individual",
       "respondent transitions."),
     base_note = sprintf(
-      "Base: n = %d unweighted, %.1f weighted. Focal brand: %s.",
+      "Base: n = %d unweighted, %.1f weighted, %.1f effective (Kish). Focal brand: %s.",
       result$meta$n_unweighted, result$meta$n_weighted,
+      as.numeric(result$meta$n_effective %||% result$meta$n_unweighted),
       result$meta$focal_brand),
     significance_note = paste(
-      "Significance tests use a two-proportion z-test. Panel sampling is",
-      "non-probability; margin of error is not reported."),
+      "Significance tests and confidence intervals use a two-proportion",
+      "z-test on the Kish effective sample size, so weighting is charged",
+      "for the precision it costs. Panel sampling is non-probability;",
+      "margin of error is not reported."),
     heavy_buyer_note = paste(
       "Heavy-buyer and frequency analysis — how often respondents buy each",
       "brand — lives in the Repertoire / Frequency view, not the funnel.",

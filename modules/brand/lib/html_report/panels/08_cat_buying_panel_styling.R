@@ -36,6 +36,8 @@ paste0(
 .cb-kpi-val.amber   { color: #92400e; }
 .cb-kpi-val.muted   { color: #334155; }
 .cb-kpi-label { font-size: 11px; color: #64748b; margin-top: 2px; }
+.cb-kpi-base  { font-size: 10px; color: #94a3b8; font-weight: 400; }
+.cb-table-base-note { font-size: 11px; color: #64748b; margin: 6px 2px 0; line-height: 1.4; }
 .cb-section-title {
   font-size: 14px; font-weight: 600; color: #334155; margin: 20px 0 8px;
 }

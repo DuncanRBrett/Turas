@@ -485,7 +485,7 @@ build_br_portfolio_panel <- function(results, config) {
   panel_data_json <- .pf_cn_to_json(per_cat, focal_colour, brand_colours)
   data_script <- sprintf(
     '<script type="application/json" id="pf-cn-data">%s</script>',
-    panel_data_json
+    .br_json_island(panel_data_json)
   )
 
   # One <div> per category — only the default starts visible. Each
@@ -702,7 +702,7 @@ build_br_portfolio_panel <- function(results, config) {
                                   brand_colours = brand_colours)
   data_script <- sprintf(
     '<script type="application/json" id="pf-cl-data">%s</script>',
-    payload_json
+    .br_json_island(payload_json)
   )
 
   # Brand picker — union of brands across all clutter cats, focal first.
@@ -936,7 +936,7 @@ build_br_portfolio_panel <- function(results, config) {
                                   brand_colours = brand_colours)
   data_script <- sprintf(
     '<script type="application/json" id="pf-ex-data">%s</script>',
-    payload_json
+    .br_json_island(payload_json)
   )
 
   # ---- Initial server-side strength SVG so the page works pre-JS.

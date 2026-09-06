@@ -269,6 +269,14 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     return(data)
   }
 
+  # --- STEP 3a: Data-shape guard (review 2026-07-12, M1) ---
+  # Refuse a raw Alchemer export or the retired column-per-brand shape here,
+  # with the re-export instruction, rather than letting either fall through
+  # to generic missing-column errors deep in the elements.
+  shape_guard <- brand_with_refusal_handler(guard_alchemer_parser_shape(data))
+  shape_refusal <- .brand_as_refusal(shape_guard)
+  if (!is.null(shape_refusal)) return(shape_refusal)
+
   # Validate data
   data_guard <- guard_validate_data(data, structure, config)
   if (identical(data_guard$status, "REFUSED")) {
@@ -283,7 +291,11 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   weight_col <- config$weight_variable
   if (!is.null(weight_col) && !is.na(weight_col) && nchar(trimws(weight_col)) > 0 &&
       weight_col %in% names(data)) {
-    weights <- data[[weight_col]]
+    # Non-numeric or blank weight cells refuse here (M8; review F3). The
+    # coercer has already written the boxed reason to the console.
+    coerced <- .brand_coerce_weights(data[[weight_col]], weight_col)
+    if (identical(coerced$status, "REFUSED")) return(coerced)
+    weights <- coerced$weights
   }
 
   categories <- config$categories
@@ -821,6 +833,14 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           list(status = "REFUSED", message = e$message)
         }
       )
+      # Loop level, not inside a handler closure: plain assignment reaches
+      # run_brand's warnings_list (a <<- here would skip it for the global).
+      br_res <- cat_result$branded_reach
+      if (is.list(br_res) && identical(br_res$status, "PARTIAL") &&
+          length(br_res$warnings) > 0) {
+        warnings_list <- c(warnings_list,
+          sprintf("%s: %s", cat_name, br_res$warnings))
+      }
     }
 
     # Audience Lens (full categories only; respects per-category opt-in via
@@ -843,7 +863,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         })
 
       if (is.list(al_audiences) && identical(al_audiences$status, "REFUSED")) {
-        warnings_list <<- c(warnings_list,
+        # loop level: plain assignment (a <<- here skipped the local list)
+        warnings_list <- c(warnings_list,
           sprintf("[AUDIENCE LENS %s] %s: %s",
                   al_audiences$code, cat_name, al_audiences$message))
         cat_result$audience_lens <- al_audiences

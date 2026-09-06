@@ -172,8 +172,10 @@ classify_chip <- function(metric_a, metric_b, metric_total,
 #'
 #' @keywords internal
 .al_sig_two_props <- function(ma, mb, alpha = 0.10) {
-  pa <- ma$value; na <- ma$n_base
-  pb <- mb$value; nb <- mb$n_base
+  # Test on the Kish effective n when the metric carries one (H2); the
+  # unweighted count is the legacy fallback.
+  pa <- ma$value; na <- ma$n_eff %||% ma$n_base
+  pb <- mb$value; nb <- mb$n_eff %||% mb$n_base
   if (is.na(pa) || is.na(pb) || na <= 0 || nb <= 0) {
     return(list(p_value = NA_real_, sig = FALSE, test = "none"))
   }
@@ -189,7 +191,12 @@ classify_chip <- function(metric_a, metric_b, metric_total,
     p_pool <- (xa + xb) / (na + nb)
     e <- min(na * p_pool, na * (1 - p_pool), nb * p_pool, nb * (1 - p_pool))
     if (e < 5) {
-      m <- matrix(c(xa, na - xa, xb, nb - xb), nrow = 2)
+      # Fisher needs whole counts; n_eff is fractional by design (H2), so
+      # the bases are rounded here. The z branch below keeps them as is.
+      na_i <- max(1L, as.integer(round(na))); nb_i <- max(1L, as.integer(round(nb)))
+      xa_i <- min(na_i, as.integer(round(pa * na_i)))
+      xb_i <- min(nb_i, as.integer(round(pb * nb_i)))
+      m <- matrix(c(xa_i, na_i - xa_i, xb_i, nb_i - xb_i), nrow = 2)
       pv <- tryCatch(stats::fisher.test(m)$p.value, error = function(e) NA_real_)
       return(list(p_value = pv, sig = !is.na(pv) && pv < alpha,
                   test = "fisher"))

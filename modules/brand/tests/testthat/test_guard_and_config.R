@@ -239,6 +239,18 @@ test_that("guard_validate_brand_config refuses invalid focal_assignment", {
   expect_error(guard_validate_brand_config(config))
 })
 
+test_that("guard_validate_brand_config refuses an unknown portfolio_extension_baseline", {
+  base <- list(
+    project_name = "Test", client_name = "Client", focal_brand = "IPK",
+    data_file = "data.csv", output_dir = "out", structure_file = "ss.xlsx"
+  )
+  # "buyers" was offered by an old template but never implemented
+  expect_error(guard_validate_brand_config(c(base, portfolio_extension_baseline = "buyers")),
+               "CFG_INVALID_EXTENSION_BASELINE")
+  expect_equal(guard_validate_brand_config(c(base, portfolio_extension_baseline = "non_buyers"))$status, "PASS")
+  expect_equal(guard_validate_brand_config(c(base, portfolio_extension_baseline = "all"))$status, "PASS")
+})
+
 test_that("guard_validate_categories passes with valid categories", {
   cats <- data.frame(
     Category = c("Dry Seasonings & Spices", "Ready Meals"),

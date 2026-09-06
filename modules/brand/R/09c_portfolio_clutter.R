@@ -83,6 +83,8 @@ compute_clutter_data <- function(data, role_map, categories, structure,
   timeframe   <- config$portfolio_timeframe %||% "3m"
   min_base    <- config$portfolio_min_base  %||% 30L
   n_total     <- nrow(data)
+  # Weighted denominator for category penetration (review 2026-07-12, H1)
+  total_w     <- if (!is.null(weights)) sum(weights, na.rm = TRUE) else as.numeric(n_total)
 
   if (!"CategoryCode" %in% names(categories)) {
     return(list(status = "REFUSED",
@@ -112,7 +114,7 @@ compute_clutter_data <- function(data, role_map, categories, structure,
     if (base$n_uw == 0L) {
       suppressed <- c(suppressed, cat_code); next
     }
-    if (base$n_uw < min_base) {
+    if (!.brand_meets_min_base(base$n_uw, min_base)) {
       suppressed <- c(suppressed, cat_code); next
     }
 
@@ -129,7 +131,7 @@ compute_clutter_data <- function(data, role_map, categories, structure,
     metrics   <- .compute_clutter_metrics(aware_mat, focal_brand,
                                              base$idx, weights)
 
-    cat_pen     <- base$n_uw / n_total
+    cat_pen     <- if (total_w > 0) base$n_w / total_w else NA_real_
     fair_share  <- if (metrics$n_brands > 0L) 1 / metrics$n_brands else NA_real_
     focal_share <- if (metrics$sum_brand_pcts > 0) {
       metrics$focal_pct / metrics$sum_brand_pcts

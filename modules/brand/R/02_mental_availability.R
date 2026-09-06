@@ -7,7 +7,7 @@
 # ==============================================================================
 # Computes Romaniuk/EBI Mental Availability metrics:
 #   - MMS (Mental Market Share): brand's share of all brand-CEP links
-#   - MPen (Mental Penetration): % of category buyers linking brand to >= 1 CEP
+#   - MPen (Mental Penetration): % of all respondents in the category sample linking brand to >= 1 CEP
 #   - NS (Network Size): avg CEPs linked per buyer (among linkers)
 #   - CEP x brand matrix: linkage percentages
 #   - CEP TURF: optimal CEP combination for maximum mental reach
@@ -183,7 +183,9 @@ calculate_mms <- function(linkage_tensor, weights = NULL) {
 
 #' Calculate Mental Penetration for all brands
 #'
-#' MPen = % of category buyers who link the brand to at least one CEP.
+#' MPen = % of all respondents in the category sample (weighted) who link
+#' the brand to at least one CEP. The denominator is nrow(data), not the
+#' category-buyer subset.
 #' Measures the brand's mental reach.
 #'
 #' @param linkage_tensor Named list of brand matrices.

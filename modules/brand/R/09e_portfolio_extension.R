@@ -183,7 +183,7 @@ compute_extension_table <- function(data, role_map, categories, structure,
     if (!is.null(base$status)) next
     if (base$n_uw == 0L) { suppressed <- c(suppressed, cat_code); next }
 
-    low_base_flag <- base$n_uw < min_base
+    low_base_flag <- !.brand_meets_min_base(base$n_uw, min_base)
     if (low_base_flag) suppressed <- c(suppressed, cat_code)
 
     aw_root <- .portfolio_aware_root(role_map, cat_code)
@@ -208,10 +208,17 @@ compute_extension_table <- function(data, role_map, categories, structure,
       p_c / p_base
     } else NA_real_
 
-    x1_int <- as.integer(round(x1_w))
-    n1_int <- as.integer(round(n1_w))
-    x2_int <- as.integer(round(x2_w))
-    n2_int <- as.integer(round(n2_w))
+    # Test on the Kish effective n of each base, not the weighted total
+    # (review 2026-07-12, H2): the proportion stays weighted, the
+    # information behind it is what the weights actually carry.
+    base_w <- if (baseline_mode == EXTENSION_BASELINE_NON_BUYERS &&
+                  !is.null(home_buyer_idx)) w[home_buyer_idx == 0L] else w
+    n1_eff <- .brand_effective_n(w[base$idx])
+    n2_eff <- .brand_effective_n(base_w)
+    x1_int <- as.integer(round(if (is.na(p_c)) 0 else p_c * n1_eff))
+    n1_int <- as.integer(round(n1_eff))
+    x2_int <- as.integer(round(if (is.na(p_base)) 0 else p_base * n2_eff))
+    n2_int <- as.integer(round(n2_eff))
     sig    <- .ext_sig_test(x1_int, n1_int, x2_int, n2_int)
 
     rows_list[[cat_code]] <- list(

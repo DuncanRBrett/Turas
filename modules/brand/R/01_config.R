@@ -156,7 +156,6 @@ load_brand_config <- function(config_path, project_root = NULL) {
     config$target_timeframe_months %||% 3L)
   config$longer_timeframe_months <- as.integer(
     config$longer_timeframe_months %||% 12L)
-  config$db_importance_method <- config$db_importance_method %||% "differential"
   config$decimal_places <- as.integer(config$decimal_places %||% 0L)
   config$colour_focal <- config$colour_focal %||% "#1A5276"
   config$colour_focal_accent <- config$colour_focal_accent %||% "#2E86C1"

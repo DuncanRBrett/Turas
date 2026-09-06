@@ -137,7 +137,11 @@ report. `N` = skip.
 | Setting | Default | What it does | Allowed values |
 |----|----|----|----|
 | `db_use_catdriver` | Y | Whether to use the catdriver module (SHAP values) for derived importance. More rigorous than the simple differential approach. | `Y` or `N` |
-| `db_importance_method` | `differential` | Importance method when catdriver is not used. `differential` = buyer vs non-buyer gap. | `differential` |
+
+When `db_use_catdriver = N` the engine derives importance as the buyer minus
+non-buyer gap on each CEP and attribute. There is no other method and no
+setting selects one (the old `db_importance_method` row was never read and
+has been removed from the template).
 
 ------------------------------------------------------------------------
 
@@ -204,6 +208,7 @@ primary colour should be the brand's actual primary colour.
 | `report_title` | Optional | Title shown in the HTML report header. | Free text |
 | `report_subtitle` | Optional | Subtitle shown under the title (e.g. `Wave 1 Baseline` or `Q1 2026`). | Free text |
 | `show_about_section` | Optional | Whether to include the About & Methodology section with academic references. | `Y` or `N` |
+| `chip_default` | Optional (default `focal_only`) | Initial state of the brand-chip bars on the MA, Funnel, WOM and Category Buying panels. `focal_only` starts with the focal brand and the category average on and the other brands greyed off (the analyst turns them on by clicking their chips); `all` starts with every brand on. | `focal_only` or `all` |
 | `structure_file` | **Required** | Path to Survey_Structure.xlsx, relative to this config file. | e.g. `Survey_Structure.xlsx` |
 
 ------------------------------------------------------------------------
@@ -222,6 +227,11 @@ to the Settings sheet if needed.
 | `funnel_conversion_metric` | `ratio` | How funnel conversion rates are calculated. |
 | `funnel_warn_base` | 75 | Funnel base-size warning threshold. |
 | `funnel_suppress_base` | 0 | Funnel base-size suppression threshold (0 = never suppress). |
+| `funnel_tenure_threshold` | *(blank)* | Numeric cut-off applied to the funnel tenure question (role `funnel.durable.tenure` or `funnel.service.tenure`): respondents whose value is at or above it count as long-tenured for that stage. Blank drops the tenure stage, which is the normal setting for a transactional category. |
+| `portfolio_min_base` | 30 | Minimum unweighted number of category buyers for a category's portfolio cells (footprint, clutter, strength, DoP awareness) to be reported. Smaller categories are listed as low base. |
+| `portfolio_cooccur_min_pairs` | 20 | Minimum unweighted number of category buyers aware of both of two brands before a co-occurrence link is drawn between them on the portfolio constellation chart. |
+| `portfolio_extension_baseline` | `all` | Baseline that each category's focal-brand awareness is compared against in the Portfolio Extension table. `all` compares against every respondent; `non_buyers` compares against respondents who do not buy the focal brand's home category (needs `focal_home_category`). Any other value is refused. |
+| `audience_lens_max` | 6 | Maximum number of audiences a category may declare for the Audience Lens panel (a pair counts as one). A category declaring more is refused with `CFG_AUDIENCE_CEILING_EXCEEDED`; the template limits the value to 2 to 8. |
 | `decimal_places` | 0 | Decimal places in report output. |
 
 ------------------------------------------------------------------------
@@ -373,6 +383,14 @@ categories (common for the focal brand), it gets a row for each.
 | `IsFocal` | **Required** | Whether this is the focal (client) brand for this category. Exactly one row per category must be `Y`. | `Y` or `N` |
 | `Colour` | Optional | Hex colour for this brand in charts and chips. If blank, the focal brand uses `colour_focal` from Settings, competitors use `colour_competitor`. | Hex code (e.g. `#D62728`) or blank |
 | `BrandCodeAlias` | Optional | Alternate suffix / option value the *data file* uses for this brand in this category. Leave blank when the data column suffix matches `BrandCode` exactly. Set when the Alchemer survey was programmed with a different SKU / option value (e.g. `FNF` for a brand whose canonical BrandCode is `FNFPS`). The engine accepts BOTH `BrandCode` AND `BrandCodeAlias` when resolving per-brand columns and slot values. | Short code matching the data, or blank |
+
+**Reserved BrandCode values.** The engine treats a BrandCode whose letters
+reduce to `NONE`, `NOTA`, `NA` or `NONEOFTHEABOVE` (case-insensitive, after
+stripping digits and punctuation, so `N/A`, `n.a.` and `NONE_1` all count) as
+the "None of the above" pseudo-brand. Such a row is dropped from every brand
+table, funnel and CEP linkage. Do not use these strings, or anything that
+reduces to them, as the code of a real brand. The convention in every shipped
+project and fixture is the single code `NONE`.
 
 **⚠️ CategoryCode in the Brands sheet must match CategoryCode in Brand_Config Categories.** These two codes are the join key that links brands to categories in the Portfolio element. A mismatch — even a whitespace difference — will cause that category's brands to be dropped from portfolio analyses without any error.
 
@@ -780,7 +798,11 @@ The data file (`.csv` or `.xlsx`) must follow these conventions:
     column contains the category code (e.g. `DSS`, `RM`) for each
     respondent's assigned focal category.
 -   **Weight column:** if `weight_variable` is set, this column contains
-    the post-stratification weight.
+    the post-stratification weight. Every respondent needs one. A
+    non-numeric cell refuses the run with `DATA_WEIGHT_NOT_NUMERIC`,
+    naming the offending values. A blank cell refuses it with
+    `DATA_WEIGHT_BLANK`, naming the data rows. To run unweighted, leave
+    `weight_variable` blank.
 
 ------------------------------------------------------------------------
 

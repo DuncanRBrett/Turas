@@ -102,7 +102,7 @@ compute_footprint_matrix <- function(data, role_map, categories, structure,
       next
     }
 
-    if (base$n_uw < min_base) suppressed <- c(suppressed, cat_code)
+    if (!.brand_meets_min_base(base$n_uw, min_base)) suppressed <- c(suppressed, cat_code)
 
     cat_codes    <- c(cat_codes, cat_code)
     cat_n_buyers <- c(cat_n_buyers, base$n_uw)

@@ -25,6 +25,7 @@ ROOT <- .find_root_ah()
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "11_demographics.R"))
 source(file.path(ROOT, "modules", "brand", "R", "12_adhoc.R"))
 

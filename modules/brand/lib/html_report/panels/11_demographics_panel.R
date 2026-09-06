@@ -70,7 +70,7 @@ build_demographics_panel_html <- function(panel_data,
     sprintf('<div class="demo-panel" id="%s" data-focal-colour="%s">',
             panel_id, .demo_esc(focal_colour)),
     sprintf('<script type="application/json" class="demo-panel-data">%s</script>',
-            json_payload),
+            .br_json_island(json_payload)),
     .demo_panel_header(panel_data),
     .demo_panel_global_controls(panel_data),
     .demo_panel_focal_picker(panel_data, brand_cols),
@@ -312,9 +312,14 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo_panel_header <- function(pd) {
   scope_lbl <- pd$meta$scope_label %||% "Total sample"
   n_total   <- pd$meta$n_total
+  # The header n is the full sample; every percentage in the tables is
+  # taken within its own demographic option's known base (weighted), which
+  # is smaller. Say so, and point at the count toggle that reveals it.
+  wt_word   <- if (isTRUE(pd$meta$weighted)) "weighted" else "unweighted"
   base_lbl  <- if (!is.null(n_total) && !is.na(n_total))
-    sprintf("Base: n = %s", format(n_total, big.mark = ","))
-  else "Base: full respondent set"
+    sprintf("Sample: n = %s respondents. Percentages are %s, within each option's known base (toggle Show counts for the per-cell n).",
+            format(n_total, big.mark = ","), wt_word)
+  else sprintf("Sample: full respondent set. Percentages are %s, within each option's known base (toggle Show counts for the per-cell n).", wt_word)
   sprintf(
     '<header class="demo-panel-header">
        <div class="demo-panel-header-title">Demographics &mdash; %s</div>

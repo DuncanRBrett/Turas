@@ -259,7 +259,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   # Row 1: Base
   base_html  <- paste0(
     '<tr class="ct-row ma-metrics-base">',
-    '<td class="ct-td ct-label-col"><strong>Base</strong></td>',
+    '<td class="ct-td ct-label-col"><strong>Base (all respondents, unweighted n)</strong></td>',
     fmt_base_cell(n_resp), fmt_base_cell(n_resp),
     fmt_base_cell(n_resp), fmt_base_cell(n_resp),
     '</tr>'
@@ -314,7 +314,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     th_sort("mms",  "Mental Market Share",
             "Brand\u2019s share of all brand-CEP links in the category"),
     th_sort("mpen", "Mental Penetration",
-            "% of category buyers linking the brand to at least one CEP"),
+            "% of all respondents in this category sample (weighted) who link the brand to at least one CEP; the base row shows the unweighted n"),
     th_sort("ns",   "Network Size",
             "Average CEPs linked per buyer who links at least one"),
     th_sort("som",  "Share of Mind",

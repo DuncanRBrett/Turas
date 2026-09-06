@@ -18,6 +18,8 @@ local({
     getwd()
   }
   root <- find_root()
+  # 09b calls .brand_meets_min_base() from the guard layer (review M4)
+  source(file.path(root, "modules", "brand", "R", "00_guard.R"), local = FALSE)
   source(file.path(root, "modules", "brand", "R",
                    "09b_portfolio_dop_awareness.R"), local = FALSE)
 })

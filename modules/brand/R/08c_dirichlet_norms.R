@@ -1,4 +1,4 @@
-BRAND_DIRICHLET_VERSION <- "1.0"
+BRAND_DIRICHLET_VERSION <- "1.2"
 
 # Minimum |deviation %| to flag a brand as over / under
 .DJ_DEV_FLAG_THRESHOLD <- 20
@@ -94,6 +94,7 @@ run_dirichlet_norms <- function(pen_mat,
     return(dir_result)
 
   exp_df <- dir_result$expected
+  warnings_out <- c(warnings_out, dir_result$warnings %||% character(0))
 
   # --- Deviation table (§3) ---
   norms_tbl <- .dn_build_norms_table(obs, exp_df, brand_codes)
@@ -125,6 +126,7 @@ run_dirichlet_norms <- function(pen_mat,
     observed         = obs[, c("BrandCode", "Penetration_Pct", "BuyRate",
                                "SCR_Pct", "Pct100Loyal", "Brand_Buyers_n")],
     expected         = exp_df,
+    nstar_used       = dir_result$nstar_used,
     norms_table      = norms_tbl,
     dj_curve         = dj_curve,
     metrics_summary  = ms,
@@ -193,35 +195,101 @@ run_dirichlet_norms <- function(pen_mat,
 }
 
 
+# nstar is where NBDdirichlet truncates the NBD category purchase-count
+# distribution. Every closure the engine reads (brand.pen, brand.buyrate, wp,
+# Pn, p.rj.n) sums over 0:nstar, and the brand-level S is fitted over the same
+# range, so a truncation that drops real mass biases every expected value.
+# The package default of 50 is too short for a category bought about ten
+# times in the window (IPK Dry Seasonings: kept mass 0.9945, expected SCR off
+# by up to 2 points, two of fifteen DJ flags flipped). The ladder doubles
+# until the fit converges. Extraction cost is quadratic in nstar
+# (brand.buyrate sums 1:n for each n), hence the cap at 400 (about 7 s for
+# 15 brands).
+.DN_NSTAR_LADDER <- c(50L, 100L, 200L, 400L)
+.DN_PN_MASS_MIN  <- 1 - 1e-6
+
+
+#' Has the Dirichlet fit converged at its nstar?
+#'
+#' Accepts a fit only when the package's own check passed (\code{error == 0}:
+#' kept mass at least 0.99 and truncated mean within 0.1 of M) and the kept
+#' mass of the purchase-count distribution is at least
+#' \code{.DN_PN_MASS_MIN}, the point past which the expected values no longer
+#' move at four decimals.
+#' @param dir_obj A \code{dirichlet} object.
+#' @return list(ok, mass, nstar).
+#' @keywords internal
+.dn_nstar_ok <- function(dir_obj) {
+  ns   <- as.integer(dir_obj$nstar %||% NA_integer_)
+  mass <- tryCatch(
+    sum(vapply(0:ns, function(k) as.numeric(dir_obj$Pn(k)), numeric(1))),
+    error = function(e) NA_real_)
+  err_flag <- suppressWarnings(as.integer(dir_obj$error %||% 1L))
+  ok <- isTRUE(err_flag == 0L) && is.finite(mass) && mass >= .DN_PN_MASS_MIN
+  list(ok = ok, mass = mass, nstar = ns)
+}
+
+
 #' Call NBDdirichlet and extract expected metrics
+#'
+#' Fits at each nstar on \code{.DN_NSTAR_LADDER} until \code{.dn_nstar_ok()}
+#' accepts the fit. The package reports a truncated distribution with
+#' \code{cat()}, not a condition, so each attempt's console output is
+#' captured: a retry that then converges must not leave a "too small" line
+#' behind. At the top of the ladder a fit the package itself accepts
+#' (\code{error == 0}) but that misses the tighter mass check is used with a
+#' warning (the element goes PARTIAL); a fit the package rejects is a refusal.
+#' @param nstar_ladder Integer vector of nstar values to try, in order.
 #' @keywords internal
 .dn_call_dirichlet <- function(cat_pen, cat_mean_purch, brand_shares,
-                                brand_pen_obs, brand_codes) {
-  result <- tryCatch({
-    # NBDdirichlet::dirichlet() signature:
-    #   dirichlet(cat.pen, cat.buyrate, brand.share, brand.pen.obs)
-    # brand.pen.obs is required — observed brand penetration as fractions
-    # suppressWarnings: the package emits informational "nstar is too small"
-    # notices during maximum-likelihood estimation on small samples. These are
-    # not errors — the calculation still completes and our guard validates the
-    # output. Suppressing here keeps test and console output clean.
-    dir_obj <- suppressWarnings(NBDdirichlet::dirichlet(
+                                brand_pen_obs, brand_codes,
+                                nstar_ladder = .DN_NSTAR_LADDER) {
+  fit_at <- function(ns) tryCatch({
+    dir_obj <- NULL
+    utils::capture.output(dir_obj <- suppressWarnings(NBDdirichlet::dirichlet(
       cat.pen       = cat_pen,
       cat.buyrate   = cat_mean_purch,
       brand.share   = brand_shares,
-      brand.pen.obs = brand_pen_obs
-    ))
+      brand.pen.obs = brand_pen_obs,
+      nstar         = ns
+    )))
     dir_obj
   }, error = function(e) {
     list(.error = conditionMessage(e))
   })
 
-  if (!is.null(result$.error))
-    return(.dn_refuse("CALC_DIRICHLET_FAILED",
-                      sprintf("NBDdirichlet::dirichlet() failed: %s",
-                              result$.error)))
+  result <- NULL
+  check  <- list(ok = FALSE, mass = NA_real_, nstar = NA_integer_)
+  for (ns in nstar_ladder) {
+    result <- fit_at(ns)
+    if (!is.null(result$.error))
+      return(.dn_refuse("CALC_DIRICHLET_FAILED",
+                        sprintf("NBDdirichlet::dirichlet() failed at nstar = %d: %s",
+                                ns, result$.error)))
+    check <- .dn_nstar_ok(result)
+    if (isTRUE(check$ok)) break
+  }
 
-  # Extract expected metrics — package returns a list with $pen, $buyrate, etc.
+  fit_warnings <- character(0)
+  pkg_ok <- isTRUE(suppressWarnings(as.integer(result$error %||% 1L)) == 0L)
+  if (!isTRUE(check$ok) && pkg_ok) {
+    fit_warnings <- sprintf(paste0(
+      "Dirichlet fit used nstar = %d with kept purchase-count mass %.6f ",
+      "(below %.6f); expected values may move in the third decimal"),
+      check$nstar, check$mass, .DN_PN_MASS_MIN)
+  }
+  if (!isTRUE(check$ok) && !pkg_ok)
+    return(.dn_refuse("CALC_DIRICHLET_NSTAR",
+                      sprintf(paste0(
+                        "The NBD purchase-count distribution does not converge ",
+                        "by nstar = %d (kept mass %.5f, M = %.3f purchases per ",
+                        "respondent). The category is bought too often for the ",
+                        "Dirichlet norm to be fitted here; the observed metrics ",
+                        "are still valid but the norm comparison cannot be shown."),
+                        check$nstar, check$mass, as.numeric(result$M %||% NA_real_))))
+
+  # Extract the theoretical brand metrics through the object's function API
+  # (see .dn_extract_expected). A failure here is a refusal, never NA-under-PASS.
   exp_df <- tryCatch(
     .dn_extract_expected(result, brand_codes),
     error = function(e)
@@ -229,43 +297,116 @@ run_dirichlet_norms <- function(pen_mat,
   )
 
   if (is.list(exp_df) && !is.null(exp_df$.error))
-    return(.dn_refuse("CALC_DIRICHLET_FAILED",
-                      sprintf("Failed to extract Dirichlet output: %s",
+    return(.dn_refuse("CALC_DIRICHLET_EXTRACT",
+                      sprintf("Failed to extract Dirichlet expected values: %s",
                               exp_df$.error)))
 
-  list(status = "PASS", expected = exp_df)
+  bad <- .dn_expected_problems(exp_df)
+  if (length(bad) > 0)
+    return(.dn_refuse("CALC_DIRICHLET_EXTRACT",
+                      paste0("Dirichlet expected values are missing or out of range: ",
+                             paste(bad, collapse = "; "),
+                             ". The observed metrics are still valid but the norm ",
+                             "comparison cannot be shown for this category.")))
+
+  list(status = "PASS", expected = exp_df,
+       nstar_used = check$nstar, pn_mass = check$mass,
+       warnings = fit_warnings)
 }
 
 
 #' Extract brand-level expected values from NBDdirichlet result object
+#'
+#' The \code{dirichlet} object carries no data fields for the brand-level
+#' theoretical metrics; it carries closures. Per brand index \code{j}:
+#' \itemize{
+#'   \item \code{brand.pen(j)}: theoretical penetration (fraction of the
+#'     category population buying brand j in the base period);
+#'   \item \code{brand.buyrate(j)}: theoretical purchase frequency among
+#'     brand j buyers;
+#'   \item \code{wp(j)}: theoretical category purchase frequency among
+#'     brand j buyers, so SCR = \code{brand.buyrate(j) / wp(j)};
+#'   \item 100 percent loyal: the share of brand j buyers whose every
+#'     category purchase was brand j, computed from the object's own
+#'     \code{Pn(n)} (category purchase-count distribution) and
+#'     \code{p.rj.n(n, n, j)} (all n purchases go to j), summed over
+#'     \code{1:nstar} and divided by \code{brand.pen(j)}.
+#' }
+#' None of these closures vectorise over \code{j}; each is called once per
+#' brand. \code{summary.dirichlet()} is deliberately not used: it rounds to
+#' two decimals and mutates the object's period through \code{period.set()}.
+#'
+#' A previous version probed \code{dir_obj[["pen"]]} and similar fields
+#' that the package never defines, so every expected value was NA under a
+#' PASS status (production review 2026-07-12, C1).
 #' @keywords internal
 .dn_extract_expected <- function(dir_obj, brand_codes) {
   n <- length(brand_codes)
 
-  # NBDdirichlet returns a list; access $pen (penetration), $buyrate, $SCR,
-  # $heavy (100%-loyal) fields.  Field names may vary by package version.
-  get_field <- function(obj, candidates) {
-    for (nm in candidates) {
-      v <- tryCatch(obj[[nm]], error = function(e) NULL)
-      if (!is.null(v) && length(v) >= n) return(as.numeric(v[seq_len(n)]))
-    }
-    rep(NA_real_, n)
-  }
+  needed <- c("brand.pen", "brand.buyrate", "wp", "Pn", "p.rj.n", "nstar")
+  missing <- needed[!vapply(needed, function(nm) !is.null(dir_obj[[nm]]),
+                            logical(1))]
+  if (length(missing) > 0)
+    stop(sprintf("dirichlet object lacks %s", paste(missing, collapse = ", ")))
 
-  pen_exp    <- get_field(dir_obj, c("pen", "penetration", "brand.pen"))
-  buyrate_exp <- get_field(dir_obj, c("buyrate", "buy.rate", "brand.buyrate"))
-  scr_exp    <- get_field(dir_obj,
-                           c("SCR", "scr", "share.of.category.requirements"))
-  loyal_exp  <- get_field(dir_obj, c("heavy", "sole", "100loyal"))
+  n_obj <- dir_obj$nbrand %||% NA_integer_
+  if (!is.na(n_obj) && n_obj != n)
+    stop(sprintf("dirichlet object has %d brands, expected %d", n_obj, n))
+
+  per_brand <- function(f) vapply(seq_len(n), function(j) as.numeric(f(j)),
+                                  numeric(1))
+
+  pen_exp     <- per_brand(dir_obj$brand.pen)
+  buyrate_exp <- per_brand(dir_obj$brand.buyrate)
+  wp_exp      <- per_brand(dir_obj$wp)
+  scr_exp     <- ifelse(is.finite(wp_exp) & wp_exp > 0,
+                        buyrate_exp / wp_exp, NA_real_)
+
+  n_star  <- as.integer(dir_obj$nstar)
+  pn_vec  <- vapply(seq_len(n_star), function(k) as.numeric(dir_obj$Pn(k)),
+                    numeric(1))
+  loyal_exp <- vapply(seq_len(n), function(j) {
+    all_j <- vapply(seq_len(n_star),
+                    function(k) as.numeric(dir_obj$p.rj.n(k, k, j)),
+                    numeric(1))
+    if (!is.finite(pen_exp[j]) || pen_exp[j] <= 0) return(NA_real_)
+    sum(pn_vec * all_j) / pen_exp[j]
+  }, numeric(1))
 
   data.frame(
-    BrandCode          = brand_codes,
+    BrandCode           = brand_codes,
     Penetration_Pct_Exp = pen_exp * 100,
     BuyRate_Exp         = buyrate_exp,
     SCR_Pct_Exp         = scr_exp * 100,
     Pct100Loyal_Exp     = loyal_exp * 100,
     stringsAsFactors    = FALSE
   )
+}
+
+
+#' Name the expected-value columns that are missing or out of range
+#'
+#' Returns character(0) when every expected value is finite and inside its
+#' valid range (penetration, SCR and loyalty in 0 to 100; buy rate above 0).
+#' @keywords internal
+.dn_expected_problems <- function(exp_df) {
+  checks <- list(
+    Penetration_Pct_Exp = c(0, 100),
+    BuyRate_Exp         = c(0, Inf),
+    SCR_Pct_Exp         = c(0, 100),
+    Pct100Loyal_Exp     = c(0, 100)
+  )
+  problems <- character(0)
+  for (col in names(checks)) {
+    v <- exp_df[[col]]
+    if (is.null(v)) { problems <- c(problems, paste(col, "absent")); next }
+    rng <- checks[[col]]
+    ok <- is.finite(v) & v >= rng[1] & v <= rng[2]
+    if (!all(ok))
+      problems <- c(problems, sprintf("%s (%d of %d values)", col,
+                                      sum(!ok), length(v)))
+  }
+  problems
 }
 
 
@@ -317,7 +458,7 @@ run_dirichlet_norms <- function(pen_mat,
                   !all(is.na(exp_df$SCR_Pct_Exp))) {
     tryCatch(
       stats::approx(exp_df$Penetration_Pct_Exp / 100, exp_df$SCR_Pct_Exp,
-                    xout = x_grid, rule = 2)$y,
+                    xout = x_grid, rule = 2, ties = mean)$y,
       error = function(e) rep(NA_real_, length(x_grid)))
   } else rep(NA_real_, length(x_grid))
 
@@ -325,7 +466,7 @@ run_dirichlet_norms <- function(pen_mat,
                 !all(is.na(exp_df$BuyRate_Exp))) {
     tryCatch(
       stats::approx(exp_df$Penetration_Pct_Exp / 100, exp_df$BuyRate_Exp,
-                    xout = x_grid, rule = 2)$y,
+                    xout = x_grid, rule = 2, ties = mean)$y,
       error = function(e) rep(NA_real_, length(x_grid)))
   } else rep(NA_real_, length(x_grid))
 

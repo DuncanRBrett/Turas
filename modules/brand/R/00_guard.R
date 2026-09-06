@@ -109,6 +109,232 @@ brand_with_refusal_handler <- function(expr) {
 }
 
 
+#' Source one file from modules/shared/lib, wherever the Turas root is
+#'
+#' Walks up from TURAS_ROOT / TURAS_HOME / the working directory, the same
+#' way tabs, confidence and maxdiff find the shared library. Refuses loudly
+#' when the file cannot be found: a silent local fallback is exactly the
+#' divergence OPUS-0 removed.
+#' @keywords internal
+.brand_source_shared <- function(file_name) {
+  rel   <- file.path("modules", "shared", "lib", file_name)
+  roots <- c(Sys.getenv("TURAS_ROOT", ""), Sys.getenv("TURAS_HOME", ""))
+  roots <- roots[nzchar(roots)]
+  d <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  for (i in 1:10) {
+    roots <- c(roots, d)
+    parent <- dirname(d)
+    if (identical(parent, d)) break
+    d <- parent
+  }
+  hits <- file.path(roots, rel)
+  hits <- hits[file.exists(hits)]
+  if (length(hits) == 0) {
+    cat(sprintf("\n=== TURAS BRAND ERROR ===\n[PKG_SHARED_LIB_MISSING] Cannot find %s from %s\nHow to fix: run from the Turas root or set TURAS_ROOT.\n=========================\n\n",
+                rel, getwd()))
+    stop(sprintf("[BRAND PKG_SHARED_LIB_MISSING] %s not found", rel), call. = FALSE)
+  }
+  source(hits[[1L]], local = FALSE)
+  invisible(hits[[1L]])
+}
+
+
+#' Kish effective sample size, one definition for the platform
+#'
+#' Thin access to \code{calculate_effective_n()} in
+#' \code{modules/shared/lib/effective_n.R} (OPUS-0). Every significance test
+#' and confidence interval in the brand module tests a weighted estimate on
+#' this base, never on the raw weighted total (production review
+#' 2026-07-12, H2). Unweighted input returns the plain count.
+#'
+#' @param weights Numeric vector of weights for the respondents in the base
+#'   (NULL means unweighted).
+#' @param n Integer. Number of respondents in the base; used when
+#'   \code{weights} is NULL.
+#' @return Numeric effective n (fractional by design).
+#' @keywords internal
+.brand_effective_n <- function(weights, n = length(weights)) {
+  if (is.null(weights)) return(as.numeric(n))
+  if (!exists("calculate_effective_n", mode = "function"))
+    .brand_source_shared("effective_n.R")
+  calculate_effective_n(as.numeric(weights))
+}
+
+
+#' Minimum-base disclosure predicate, one definition for the platform
+#'
+#' Thin access to \code{meets_min_base()} in
+#' \code{modules/shared/lib/disclosure_gate.R} (OPUS-0). NA and non-finite
+#' bases never pass.
+#' @param base Numeric vector of bases.
+#' @param min_base Single number, default 30.
+#' @return Logical vector.
+#' @keywords internal
+.brand_meets_min_base <- function(base, min_base = 30L) {
+  if (!exists("meets_min_base", mode = "function"))
+    .brand_source_shared("disclosure_gate.R")
+  meets_min_base(base, min_base = min_base)
+}
+
+
+#' Normalise any refusal-shaped object to the module's list contract
+#'
+#' \code{with_refusal_handler()} returns a \code{turas_refusal_result} with
+#' \code{run_status = "REFUSE"}; the engines return plain lists with
+#' \code{status = "REFUSED"}. Callers that must return a refusal upward get
+#' one shape from here.
+#'
+#' @param x Anything.
+#' @return A list with status, code, message and how_to_fix when \code{x}
+#'   is a refusal; NULL otherwise.
+#' @keywords internal
+.brand_as_refusal <- function(x) {
+  is_ref <- inherits(x, "turas_refusal_result") ||
+    (is.list(x) && (identical(x$status, "REFUSED") || isTRUE(x$refused)))
+  if (!is_ref) return(NULL)
+  list(
+    status     = "REFUSED",
+    code       = x$code %||% "BUG_UNHANDLED",
+    message    = x$message %||% x$problem %||% "Refused",
+    how_to_fix = x$how_to_fix %||% NULL
+  )
+}
+
+
+#' Coerce a weight column to numeric or refuse
+#'
+#' Weights arrive as whatever the data file held. A character column (a
+#' stray "n/a", a thousands separator) used to error somewhere downstream
+#' with a message about arithmetic on non-numeric arguments. Now: numeric-
+#' looking text is coerced, anything else is a DATA_WEIGHT_NOT_NUMERIC
+#' refusal naming the offending values (review 2026-07-12, M8).
+#'
+#' A blank or NA cell is a DATA_WEIGHT_BLANK refusal naming the data rows
+#' (review 2026-09-05, F3; Duncan's ruling 2026-09-06). Every earlier
+#' behaviour here was unsafe: NA propagated into Mental Availability,
+#' which sums weights without \code{na.rm} and returned NA for every
+#' brand, and the zero-fill that replaced it silently dropped those
+#' respondents from every weighted number. The data gets fixed before any
+#' numbers come out.
+#'
+#' A weight column that is not in the data at all never reaches this
+#' function; \code{run_brand()} skips it and runs unweighted.
+#'
+#' @param w Vector from the data frame.
+#' @param weight_col Column name, for the message.
+#' @return list(weights = numeric) or a refusal list.
+#' @keywords internal
+.brand_coerce_weights <- function(w, weight_col) {
+  w_num <- suppressWarnings(as.numeric(as.character(w)))
+  bad   <- !is.na(w) & !(is.character(w) & trimws(as.character(w)) == "") &
+           is.na(w_num)
+  if (any(bad)) {
+    offenders <- unique(as.character(w[bad]))
+    msg <- sprintf(
+      "Weight column '%s' holds %d non-numeric value(s): %s",
+      weight_col, sum(bad),
+      paste(head(offenders, 8), collapse = ", "))
+    cat("\n=== TURAS BRAND ERROR ===\n[DATA_WEIGHT_NOT_NUMERIC] ", msg,
+        "\nHow to fix: make every cell in the weight column a number.\n=========================\n\n", sep = "")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_WEIGHT_NOT_NUMERIC",
+      message = msg,
+      how_to_fix = sprintf(
+        "Make every cell in '%s' numeric, or point weight_variable at a numeric column.",
+        weight_col)))
+  }
+
+  blank_rows <- which(is.na(w_num))
+  if (length(blank_rows) > 0) {
+    how_to_fix <- sprintf(
+      paste0("Give every respondent a weight in '%s', or drop the rows with no ",
+             "weight from the data file, or clear weight_variable in Settings ",
+             "to run the report unweighted."),
+      weight_col)
+    msg <- sprintf(
+      "Weight column '%s' has %d blank cell(s) at data rows %s%s",
+      weight_col, length(blank_rows),
+      paste(head(blank_rows, 10), collapse = ", "),
+      if (length(blank_rows) > 10) ", ..." else "")
+    cat("\n=== TURAS BRAND ERROR ===\n[DATA_WEIGHT_BLANK] ", msg,
+        "\nHow to fix: ", how_to_fix,
+        "\n=========================\n\n", sep = "")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_WEIGHT_BLANK",
+      message = msg,
+      how_to_fix = how_to_fix))
+  }
+
+  list(weights = w_num)
+}
+
+
+#' Decide what the GUI tells the analyst after a run
+#'
+#' Pure function so the decision is testable outside Shiny. The engine's
+#' PARTIAL status, its warnings and the two output generators' results all
+#' feed one verdict: \code{level} is "success", "partial" or "error".
+#' A generator refusal is never reported as success (review 2026-07-12,
+#' M2) and a PARTIAL run is never announced as "completed successfully"
+#' (H5).
+#'
+#' @param res Result of \code{run_brand()}.
+#' @param html_result,xlsx_result Generator results (lists with status).
+#' @param out_html,out_xlsx The paths the generators were asked to write.
+#' @return list(level, success, headline, warnings, html_path, xlsx_path).
+#' @keywords internal
+brand_gui_outcome <- function(res, html_result = NULL, xlsx_result = NULL,
+                              out_html = NULL, out_xlsx = NULL) {
+  if (is.null(res) || identical(res$status, "REFUSED")) {
+    return(list(level = "error", success = FALSE,
+                headline = paste(res$message %||% "Brand analysis refused",
+                                 collapse = "\n"),
+                warnings = character(0), html_path = NULL, xlsx_path = NULL))
+  }
+
+  gen_check <- function(gen, path, label) {
+    ok <- !is.null(gen) && identical(gen$status, "PASS") &&
+          !is.null(path) && file.exists(path)
+    notes <- as.character(gen$warnings %||% character(0))
+    notes <- if (length(notes) > 0) paste0(label, ": ", notes) else character(0)
+    if (ok) return(list(path = path, problem = NULL, notes = notes))
+    reason <- gen$message %||% gen$code %||%
+      if (is.null(gen)) "generator did not run" else "generator did not return PASS"
+    list(path = NULL,
+         problem = sprintf("%s was not written: %s", label,
+                           paste(reason, collapse = " ")),
+         notes = notes)
+  }
+  html <- gen_check(html_result, out_html, "HTML report")
+  xlsx <- gen_check(xlsx_result, out_xlsx, "Excel report")
+
+  gen_problems <- c(html$problem, xlsx$problem)
+  # A generator that returned PASS but dropped a layer (for example the
+  # chart transform) reports that in $warnings; it is a warning here too.
+  gen_notes    <- c(html$notes, xlsx$notes)
+  run_warnings <- c(gen_notes, as.character(res$warnings %||% character(0)))
+  all_warnings <- c(gen_problems, run_warnings)
+
+  level <- if (length(all_warnings) > 0 || identical(res$status, "PARTIAL"))
+    "partial" else "success"
+
+  headline <- if (identical(level, "success")) {
+    "Brand analysis completed successfully."
+  } else if (length(gen_problems) > 0) {
+    sprintf("Brand analysis ran, but %s. See Step 5 and the console.",
+            paste(sub(":.*$", "", gen_problems), collapse = " and "))
+  } else {
+    sprintf("Brand analysis completed with %d warning(s). See Step 5 and the console.",
+            length(run_warnings))
+  }
+
+  list(level = level, success = TRUE, headline = headline,
+       warnings = all_warnings, html_path = html$path, xlsx_path = xlsx$path)
+}
+
+
 # ==============================================================================
 # GUARD VALIDATION FUNCTIONS
 # ==============================================================================
@@ -184,6 +410,22 @@ guard_validate_brand_config <- function(config) {
       how_to_fix = "Set focal_assignment to 'balanced', 'quota', or 'priority'",
       expected = "balanced, quota, or priority",
       observed = focal_assignment
+    )
+  }
+
+  # Validate portfolio_extension_baseline. The template once offered
+  # "buyers", which the engine never read: it fell through to "all"
+  # silently. Only the two values the engine implements are accepted.
+  ext_base <- trimws(as.character(config$portfolio_extension_baseline %||% "all"))
+  if (!ext_base %in% c("all", "non_buyers")) {
+    brand_refuse(
+      code = "CFG_INVALID_EXTENSION_BASELINE",
+      title = "Invalid portfolio_extension_baseline",
+      problem = sprintf("portfolio_extension_baseline = '%s' is not valid", ext_base),
+      why_it_matters = "Selects the comparison base for the Portfolio Extension table; an unknown value used to be treated as 'all' without warning",
+      how_to_fix = "Set portfolio_extension_baseline to 'all' or 'non_buyers' (or leave it blank for 'all')",
+      expected = "all or non_buyers",
+      observed = ext_base
     )
   }
 

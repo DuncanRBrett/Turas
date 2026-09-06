@@ -289,11 +289,7 @@ BRAND_CONFIG_VERSION <- "2.0"
         list(name = "db_use_catdriver", required = FALSE, default = "Y",
              description = "Use the catdriver module for SHAP-derived importance scores. More statistically rigorous than the simple buyer/non-buyer differential method. Requires catdriver to be installed.",
              valid_values_text = "Y or N",
-             dropdown = c("Y", "N")),
-        list(name = "db_importance_method", required = FALSE, default = "differential",
-             description = "Importance derivation method when catdriver is disabled (db_use_catdriver = N). 'differential' = buyer minus non-buyer gap on each CEP/attribute.",
-             valid_values_text = "differential",
-             dropdown = c("differential"))
+             dropdown = c("Y", "N"))
       )
     ),
 
@@ -340,9 +336,9 @@ BRAND_CONFIG_VERSION <- "2.0"
              valid_values_text = "Integer >= 5",
              integer_range = c(5, 200)),
         list(name = "portfolio_extension_baseline", required = FALSE, default = "all",
-             description = "Denominator for portfolio extension scores. 'all' = all qualified respondents; 'buyers' = category buyers only.",
-             valid_values_text = "all, buyers",
-             dropdown = c("all", "buyers"))
+             description = "Baseline that each category's focal-brand awareness is compared against in the Portfolio Extension table. 'all' = every respondent; 'non_buyers' = respondents who do not buy the focal brand's home category (focal_home_category must be set).",
+             valid_values_text = "all, non_buyers",
+             dropdown = c("all", "non_buyers"))
       )
     ),
 
@@ -1150,7 +1146,13 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(name = "Category", width = 24, required = TRUE,
          description = "Category this asset is associated with, or 'ALL' for brand-level assets."),
     list(name = "Brand", width = 16, required = TRUE,
-         description = "BrandCode of the brand this asset belongs to."),
+         description = "BrandCode of the brand this asset belongs to (the code from the Brands sheet, not the label)."),
+    list(name = "SeenQuestionCode", width = 24, required = TRUE,
+         description = "Data column for the recognition question for this asset (1 = recognised). Referenced by the QuestionMap reach.seen.{asset} row."),
+    list(name = "BrandQuestionCode", width = 24, required = TRUE,
+         description = "Data column for the brand attribution question. Cell values are a BrandCode from this category's Brands list, DK or OTHER (closed list)."),
+    list(name = "MediaQuestionCode", width = 24, required = FALSE,
+         description = "Data column root for the 'Where did you see it?' multi-mention question. Values are MediaCode entries from the ReachMedia sheet."),
     list(name = "MediaType", width = 18, required = FALSE,
          description = "Media channel type for grouping in the panel (e.g. TV, OOH, Digital, Print, Radio).",
          dropdown = c("TV", "Digital", "OOH", "Print", "Radio", "Sponsorship", "Other")),
@@ -1161,14 +1163,23 @@ BRAND_CONFIG_VERSION <- "2.0"
 
 .build_marketing_reach_examples <- function() {
   list(
-    list(AssetCode = "TV_AD_Q1_2026", AssetLabel = "TV ad — Q1 2026",
+    list(AssetCode = "TV_AD_Q1_2026", AssetLabel = "TV ad, Q1 2026",
          Category = "DSS", Brand = "IPK",
+         SeenQuestionCode = "REACH_SEEN_TV_AD_Q1_2026",
+         BrandQuestionCode = "REACH_BRAND_TV_AD_Q1_2026",
+         MediaQuestionCode = "REACH_MEDIA_TV_AD_Q1_2026",
          MediaType = "TV", ImagePath = "assets/reach/tv_ad_q1_2026.png"),
-    list(AssetCode = "OOH_NATIONAL_JAN", AssetLabel = "Billboard — January 2026",
+    list(AssetCode = "OOH_NATIONAL_JAN", AssetLabel = "Billboard, January 2026",
          Category = "ALL", Brand = "IPK",
+         SeenQuestionCode = "REACH_SEEN_OOH_NATIONAL_JAN",
+         BrandQuestionCode = "REACH_BRAND_OOH_NATIONAL_JAN",
+         MediaQuestionCode = "REACH_MEDIA_OOH_NATIONAL_JAN",
          MediaType = "OOH", ImagePath = ""),
-    list(AssetCode = "DIGITAL_FACEBOOK_FEB", AssetLabel = "Facebook ad — February 2026",
+    list(AssetCode = "DIGITAL_FACEBOOK_FEB", AssetLabel = "Facebook ad, February 2026",
          Category = "DSS", Brand = "IPK",
+         SeenQuestionCode = "REACH_SEEN_DIGITAL_FACEBOOK_FEB",
+         BrandQuestionCode = "REACH_BRAND_DIGITAL_FACEBOOK_FEB",
+         MediaQuestionCode = "REACH_MEDIA_DIGITAL_FACEBOOK_FEB",
          MediaType = "Digital", ImagePath = "")
   )
 }

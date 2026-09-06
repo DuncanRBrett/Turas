@@ -33,6 +33,8 @@ source(file.path(ROOT, "modules", "brand", "R", "07_dba.R"))
 source(file.path(ROOT, "modules", "brand", "R", "07a_dba_panel_data.R"))
 # Panel HTML renderers
 source(file.path(ROOT, "modules", "brand", "lib", "html_report",
+                 "panels", "00_json_island.R"))
+source(file.path(ROOT, "modules", "brand", "lib", "html_report",
                  "panels", "00_shared_placeholder.R"))
 source(file.path(ROOT, "modules", "brand", "lib", "html_report",
                  "panels", "07_dba_panel.R"))

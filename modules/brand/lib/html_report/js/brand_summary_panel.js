@@ -158,6 +158,7 @@
       renderWeakCard(root, cat, brandCode, snap);
       renderWomCard(root, snap);
       renderRepertoireCard(root, cat.dop, brandCode);
+      renderPenetrationNotes(root, cat);
       /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
@@ -439,6 +440,34 @@
    * distribution) is not measured in this study. Reuses the mini-funnel
    * renderer (focal + cat-avg side-by-side, stacked stage bars).
    * --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+   * "Which penetration is which" — one table per category listing every
+   * penetration-like figure the report shows, with its base and definition
+   * (production review 2026-07-12, M7). Category-level, so it does not
+   * change with the selected brand.
+   * --------------------------------------------------------------------- */
+  function renderPenetrationNotes(root, cat) {
+    var box = root.querySelector('[data-brsum-pen-notes]');
+    if (!box) return;
+    var pn = cat && cat.penetration_notes;
+    if (!pn || !pn.notes || !pn.notes.length) { box.hidden = true; box.innerHTML = ''; return; }
+    var rows = pn.notes.map(function (n) {
+      var val = (n.value == null || isNaN(n.value)) ? 'n/a' : (Math.round(n.value * 10) / 10) + '%';
+      var base = escHtml(n.base || '');
+      if (n.n != null && n.base_n != null) base += ' (n = ' + n.n + ' of ' + n.base_n + ', unweighted)';
+      else if (n.base_n != null) base += ' (n = ' + n.base_n + ', unweighted)';
+      return '<tr><th scope="row">' + escHtml(n.label || '') + '</th>' +
+             '<td class="brsum-pen-val">' + val + '</td>' +
+             '<td>' + base + '</td>' +
+             '<td class="brsum-pen-def">' + escHtml(n.definition || '') + '</td></tr>';
+    }).join('');
+    box.innerHTML = '<div class="brsum-pen-notes-title">' + escHtml(pn.title || '') + '</div>' +
+      '<p class="brsum-pen-notes-intro">' + escHtml(pn.intro || '') + '</p>' +
+      '<table><thead><tr><th>Figure</th><th>Value</th><th>Base</th><th>What it measures</th></tr></thead><tbody>' +
+      rows + '</tbody></table>';
+    box.hidden = false;
+  }
+
   function renderFunnelCard(root, funnelBlock, brandCode, snap) {
     renderMiniFunnelCard(root, 'funnel', funnelBlock, brandCode, snap,
       { emptyMessage: 'Funnel data not available.' });
@@ -795,6 +824,7 @@
     var selected = text.substring(start, end);
     var replacement = before + (selected || 'text') + after;
     editor.value = text.substring(0, start) + replacement + text.substring(end);
+    if (window._brSyncCommentary) window._brSyncCommentary(editor);
     editor.focus();
     var newPos = start + before.length + (selected || 'text').length;
     editor.setSelectionRange(newPos, newPos);

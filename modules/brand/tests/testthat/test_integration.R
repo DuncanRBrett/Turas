@@ -51,7 +51,9 @@ for (f in brand_files) {
 # Creates a complete test environment: config files + synthetic survey data
 
 .create_integration_fixtures <- function(tmp_dir = tempdir(),
-                                          n_resp = 200, seed = 42) {
+                                          n_resp = 200, seed = 42,
+                                          weight_values = NULL,
+                                          reach_values = NULL) {
   set.seed(seed)
 
   config_path <- file.path(tmp_dir, "Brand_Config.xlsx")
@@ -104,6 +106,14 @@ for (f in brand_files) {
     data[[paste0("WOM_NEG_SHARE_", brand)]] <- rbinom(n_resp, 1, 0.02)
   }
 
+  if (!is.null(weight_values)) data$WT <- weight_values
+  if (!is.null(reach_values)) {
+    # One ad, everyone saw it, attribution values supplied by the caller
+    data$REACH_SEEN_AD1    <- 1L
+    data$REACH_BRAND_AD1   <- rep_len(reach_values, n_resp)
+    data$REACH_MEDIA_AD1_1 <- "TV"
+  }
+
   write.csv(data, data_path, row.names = FALSE)
 
   # --- Create Brand_Config.xlsx ---
@@ -124,6 +134,16 @@ for (f in brand_files) {
               "0.05", "30", "75"),
     stringsAsFactors = FALSE
   )
+  if (!is.null(weight_values)) {
+    settings <- rbind(settings, data.frame(Setting = "weight_variable",
+                                           Value = "WT",
+                                           stringsAsFactors = FALSE))
+  }
+  if (!is.null(reach_values)) {
+    settings <- rbind(settings, data.frame(Setting = "element_branded_reach",
+                                           Value = "Y",
+                                           stringsAsFactors = FALSE))
+  }
   openxlsx::writeData(wb_cfg, "Settings", settings)
 
   openxlsx::addWorksheet(wb_cfg, "Categories")
@@ -239,6 +259,19 @@ for (f in brand_files) {
     OrderIndex = 1:5,
     stringsAsFactors = FALSE
   ))
+  if (!is.null(reach_values)) {
+    openxlsx::addWorksheet(wb_ss, "MarketingReach")
+    openxlsx::writeData(wb_ss, "MarketingReach", data.frame(
+      AssetCode = "AD1", AssetLabel = "TV ad", Category = "DSS", Brand = "IPK",
+      SeenQuestionCode = "REACH_SEEN_AD1", BrandQuestionCode = "REACH_BRAND_AD1",
+      MediaQuestionCode = "REACH_MEDIA_AD1", MediaType = "TV", ImagePath = "",
+      stringsAsFactors = FALSE))
+    openxlsx::addWorksheet(wb_ss, "ReachMedia")
+    openxlsx::writeData(wb_ss, "ReachMedia", data.frame(
+      MediaCode = "TV", MediaLabel = "TV", DisplayOrder = 1L,
+      stringsAsFactors = FALSE))
+  }
+
 
   openxlsx::saveWorkbook(wb_ss, structure_path, overwrite = TRUE)
 
@@ -349,4 +382,113 @@ test_that("run_brand completes in reasonable time", {
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
   expect_true(result$elapsed_seconds < 30)
+})
+
+
+# ==============================================================================
+# Review 2026-07-12 follow-ups: M1 (shape guard wired), M8 (weights numeric)
+# ==============================================================================
+
+test_that("run_brand refuses a raw Alchemer export before any element runs (M1)", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_rawexport")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  fixtures <- .create_integration_fixtures(tmp_dir)
+  # Overwrite the data file with a raw-export shape: X1..X6 placeholder
+  # headers carrying data, no parser columns.
+  raw <- as.data.frame(matrix(sample(1:5, 60, TRUE), nrow = 10,
+                              dimnames = list(NULL, paste0("X", 1:6))))
+  write.csv(raw, fixtures$data_path, row.names = FALSE)
+
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "REFUSED")
+  expect_equal(result$code, "DATA_NO_ALCHEMER_PARSER_OUTPUT")
+  expect_true(grepl("AlchemerParser", paste(result$how_to_fix, collapse = " ")))
+})
+
+test_that("run_brand refuses a non-numeric weight column with the offending values named (M8)", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_badweights")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  w <- rep("1.2", 200); w[c(5, 40)] <- c("n/a", "1,5")
+  fixtures <- .create_integration_fixtures(tmp_dir, weight_values = w)
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "REFUSED")
+  expect_equal(result$code, "DATA_WEIGHT_NOT_NUMERIC")
+  expect_true(grepl("n/a", result$message, fixed = TRUE))
+  expect_true(grepl("1,5", result$message, fixed = TRUE))
+})
+
+test_that("run_brand refuses blank weight cells and names the rows (F3)", {
+  # Duncan's ruling (2026-09-06, review F3): a blank cell in a weight column
+  # that otherwise has data stops the run so the data can be fixed. This test
+  # previously expected the zero-fill plus a PARTIAL warning; it was updated
+  # with the behaviour, not deleted.
+  tmp_dir <- file.path(tempdir(), "brand_integration_blankweights")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  w <- as.character(round(runif(200, 0.5, 2), 3)); w[c(7, 120)] <- ""
+  fixtures <- .create_integration_fixtures(tmp_dir, weight_values = w)
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "REFUSED")
+  expect_equal(result$code, "DATA_WEIGHT_BLANK")
+  expect_true(grepl("2 blank cell", result$message, fixed = TRUE))
+  expect_true(grepl("rows 7, 120", result$message, fixed = TRUE))
+  expect_true(grepl("weight_variable", paste(result$how_to_fix, collapse = " "),
+                    fixed = TRUE))
+})
+
+test_that("run_brand coerces numeric-looking text weights and runs weighted (M8)", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_textweights")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  fixtures <- .create_integration_fixtures(
+    tmp_dir, weight_values = as.character(round(runif(200, 0.5, 2), 3)))
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_true(result$status %in% c("PASS", "PARTIAL"))
+  expect_false(is.null(result$results$categories[["Dry Seasonings & Spices"]]))
+})
+
+
+# ==============================================================================
+# Branded reach through run_brand(): the element runs when configured, and a
+# misattribution refusal surfaces as PARTIAL with a warning (not swallowed)
+# ==============================================================================
+
+test_that("run_brand runs Branded Reach when a MarketingReach sheet exists", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_reach_ok")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+  if (exists("warnings_list", envir = globalenv())) rm("warnings_list", envir = globalenv())
+
+  fixtures <- .create_integration_fixtures(tmp_dir, reach_values = c("IPK", "ROB", "DK", "OTHER"))
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  br <- result$results$categories[["Dry Seasonings & Spices"]]$branded_reach
+  expect_false(is.null(br))
+  expect_equal(br$status, "PASS")
+  expect_equal(length(br$ads), 1L)
+  expect_true("AD1" %in% names(br$misattribution))
+  expect_false(any(grepl("Branded reach", result$warnings)))
+})
+
+test_that("run_brand reports PARTIAL with the misattribution warning on an out-of-domain attribution", {
+  tmp_dir <- file.path(tempdir(), "brand_integration_reach_bad")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+  if (exists("warnings_list", envir = globalenv())) rm("warnings_list", envir = globalenv())
+
+  fixtures <- .create_integration_fixtures(tmp_dir, reach_values = c("IPK", "Knorr", "ROB", "DK"))
+  result <- run_brand(fixtures$config_path, verbose = FALSE)
+  expect_equal(result$status, "PARTIAL")
+  expect_true(any(grepl("misattribution skipped", result$warnings, fixed = TRUE)))
+  expect_true(any(grepl("Knorr", result$warnings, fixed = TRUE)))
+  # The warning reached run_brand's own list, not a stray global
+  expect_false(exists("warnings_list", envir = globalenv()))
+  br <- result$results$categories[["Dry Seasonings & Spices"]]$branded_reach
+  expect_equal(br$status, "PARTIAL")
+  expect_equal(length(br$ads), 1L)
 })

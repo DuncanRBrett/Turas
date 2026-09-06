@@ -36,7 +36,7 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
   payload_json <- .pf_dopa_to_json(dop_aware, focal_brand, focal_colour)
   data_script <- sprintf(
     '<script type="application/json" id="pf-dopa-data">%s</script>',
-    payload_json
+    .br_json_island(payload_json)
   )
 
   view_toggle <- paste0(

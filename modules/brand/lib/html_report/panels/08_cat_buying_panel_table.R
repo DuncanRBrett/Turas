@@ -147,13 +147,22 @@ cb_norms_table_html <- function(norms_table,
     sprintf("%.1f", cat_buying_freq$mean_freq * target_months)
   } else "?"
 
+  base_txt <- if (!is.null(category_metrics) &&
+                  is.finite(as.numeric(category_metrics$n_respondents %||% NA))) {
+    sprintf(paste0("Penetration = weighted %% of all %s category respondents ",
+                   "(%s category buyers) who bought the brand in the last %d months. ",
+                   "Buy rate, SCR and 100%% loyals are among each brand's buyers. "),
+            format(as.integer(category_metrics$n_respondents), big.mark = ","),
+            format(as.integer(category_metrics$n_buyers %||% NA), big.mark = ","),
+            target_months)
+  } else ""
   footer_txt <- sprintf(
-    paste0("Category mean purchases per buyer over the last %d months \u2014 ",
+    paste0("%sCategory mean purchases per buyer over the last %d months \u2014 ",
            "from per-brand purchase counts: %s; from the stated-frequency ",
            "scale: %s. Dirichlet uses the per-brand counts (direct ",
            "measurement). \u0394%% flags: \u2265\u00b120%% shaded. ",
            "Source: Goodhardt, Ehrenberg &amp; Chatfield (1984)."),
-    target_months, m_brand, m_stated)
+    base_txt, target_months, m_brand, m_stated)
 
   lines <- c(lines, sprintf(
     '<tfoot><tr><td colspan="13" style="font-size:10px;color:#94a3b8;padding:6px 4px;text-align:left;font-style:italic;">%s</td></tr></tfoot>',
@@ -523,6 +532,25 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     body_rows <- c(body_rows, .row_html(row, "cbp-brand-row", .cb_esc(lbl)))
   }
 
+  # Base on the face of the table (review 2026-07-12, M7): penetration is
+  # a share of ALL category respondents, the per-buyer columns are among
+  # each brand's buyers, and the Loyalty table's "% cat buyers" uses the
+  # category buyers as its base instead.
+  n_resp_cm <- suppressWarnings(as.integer(category_metrics$n_respondents %||% NA))
+  n_buy_cm  <- suppressWarnings(as.integer(category_metrics$n_buyers %||% NA))
+  base_caption <- if (!is.null(category_metrics) && is.finite(n_resp_cm)) {
+    sprintf(paste0(
+      '<p class="cb-table-base-note">Penetration = weighted %% of all %s category ',
+      'respondents (%s of them are P%dM category buyers) who bought the brand in the ',
+      'last %d months. Buy rate and SCR are among each brand\u2019s buyers; volume share is the brand\u2019s share of all category purchase volume. ',
+      'The Loyalty table\u2019s %% cat buyers uses the %s category buyers as its base, ',
+      'so it reads higher than penetration for the same brand.</p>'),
+      format(n_resp_cm, big.mark = ","),
+      if (is.finite(n_buy_cm)) format(n_buy_cm, big.mark = ",") else "n/a",
+      as.integer(target_months), as.integer(target_months),
+      if (is.finite(n_buy_cm)) format(n_buy_cm, big.mark = ",") else "the")
+  } else ""
+
   paste(c(
     '<div class="cb-brand-freq-wrap">',
     sprintf('<table class="cb-brand-freq-table" id="%s" data-cb-heatmap="off">', tbl_id),
@@ -530,7 +558,9 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     '<tbody>',
     body_rows,
     '</tbody>',
-    '</table></div>'
+    '</table>',
+    base_caption,
+    '</div>'
   ), collapse = "\n")
 }
 

@@ -272,6 +272,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 }
 
 .pfo_escape_json <- function(s) {
-  # Only the closing-script sequence needs escaping inside <script type="...">
-  gsub("</script", "<\\/script", s, fixed = TRUE)
+  # "</script" alone is not enough ("<!--" + "<script" also breaks the
+  # island); delegate to the shared escape in 00_json_island.R.
+  .br_json_island(s)
 }

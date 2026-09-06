@@ -255,12 +255,15 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
 .funnel_meta <- function(config, focal_brand, data, weights, derived) {
   n_u <- nrow(data)
   n_w <- if (is.null(weights)) n_u else sum(weights, na.rm = TRUE)
+  # Kish effective n: the base every CI in the panel is computed on (H2)
+  n_e <- if (is.null(weights)) n_u else .brand_effective_n(weights)
   list(
     category_type = config[["category.type"]] %||% "transactional",
     focal_brand   = focal_brand,
     wave          = config$wave %||% NA,
     n_unweighted  = n_u,
     n_weighted    = n_w,
+    n_effective   = n_e,
     stage_count   = length(derived$stages),
     stage_keys    = names(derived$stages)
   )

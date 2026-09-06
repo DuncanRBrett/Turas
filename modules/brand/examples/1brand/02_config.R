@@ -114,11 +114,7 @@
       fields = list(
         list(name = "db_use_catdriver", required = FALSE, default = "Y",
              description = "[Optional] Use catdriver module for derived importance (SHAP values)",
-             valid_values_text = "Y or N", dropdown = c("Y", "N")),
-        list(name = "db_importance_method", required = FALSE, default = "differential",
-             description = "[Optional] Fallback method when catdriver is not used",
-             valid_values_text = "differential (buyer vs non-buyer gap)",
-             dropdown = c("differential"))
+             valid_values_text = "Y or N", dropdown = c("Y", "N"))
       )
     ),
 

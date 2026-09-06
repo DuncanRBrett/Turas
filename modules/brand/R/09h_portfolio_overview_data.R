@@ -299,7 +299,13 @@ build_portfolio_overview <- function(results, config) {
     brand_codes
   )
 
-  cat_usage_pct <- if (n_total > 0L) base$n_uw / n_total * 100 else NA_real_
+  # Category penetration on the same weighted basis as every other cell in
+  # this record (awareness above is weighted). Before this change it was
+  # base$n_uw / n_total, an unweighted share sitting beside weighted numbers
+  # (production review 2026-07-12, H1). Unweighted counts stay available as
+  # n_buyers_uw / total_n_uw for the on-face base label.
+  total_w <- if (!is.null(weights)) sum(weights, na.rm = TRUE) else as.numeric(n_total)
+  cat_usage_pct <- if (is.finite(total_w) && total_w > 0) base$n_w / total_w * 100 else NA_real_
 
   deep_dive <- NULL
   if (identical(analysis_depth, "full") && !is.null(category_results)) {
