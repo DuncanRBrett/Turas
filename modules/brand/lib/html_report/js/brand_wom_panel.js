@@ -16,9 +16,16 @@
 (function () {
   "use strict";
 
+  /* The init flag is a plain JS property, not a dataset entry. A dataset
+     flag becomes a data-* attribute, and Save a copy writes the live DOM out
+     through outerHTML, so the saved file would carry it. Reopening that copy
+     would find the flag already set, return here early, and leave this panel
+     with no handlers at all. A property is dropped by serialisation, so a
+     saved copy binds again on open, and a copy already saved with the stale
+     attribute heals because the attribute is no longer read. */
   function initWomPanel(panel) {
-    if (!panel || panel.dataset.womInit === "1") return;
-    panel.dataset.womInit = "1";
+    if (!panel || panel._womBound === true) return;
+    panel._womBound = true;
 
     var table = panel.querySelector(".wom-table");
     if (!table) return;

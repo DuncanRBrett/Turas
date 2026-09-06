@@ -25,6 +25,19 @@ library(testthat)
 })
 
 
+# The first version of this scan matched "bound" only, and two panels named
+# their flag womInit and brReachInit and sailed through it for the same bug.
+# The name is not the point: any once-only guard written into dataset is the
+# defect, so every word a developer reaches for is listed here.
+.BFS_FLAG_WORDS <- c("Bound", "Init", "Built", "Ready", "Wired", "Done",
+                     "Mounted", "Bind", "Attached", "Registered", "Setup")
+
+.bfs_flag_pattern <- function() {
+  words <- paste(c(.BFS_FLAG_WORDS, tolower(.BFS_FLAG_WORDS)), collapse = "|")
+  sprintf("dataset\\.[A-Za-z_$][A-Za-z0-9_$]*(%s)", words)
+}
+
+
 test_that("no brand panel writes a bind flag through dataset", {
   expect_true(dir.exists(.bfs_js_dir))
   files <- list.files(.bfs_js_dir, pattern = "\\.js$", full.names = TRUE)
@@ -34,13 +47,26 @@ test_that("no brand panel writes a bind flag through dataset", {
   for (f in files) {
     lines <- readLines(f, warn = FALSE)
     code <- lines[!grepl("^\\s*(//|\\*|/\\*)", lines)]
-    hits <- grep("dataset\\.[A-Za-z_$][A-Za-z0-9_$]*[Bb]ound", code)
+    hits <- grep(.bfs_flag_pattern(), code)
     if (length(hits)) {
       offenders <- c(offenders, sprintf("%s: %s", basename(f),
                                         trimws(code[hits])))
     }
   }
   expect_identical(offenders, character(0))
+})
+
+
+test_that("the scan would catch a differently named flag", {
+  # The regression that motivated widening the pattern: womInit carried
+  # exactly this shape and the old scan passed.
+  sample <- c('    if (!panel || panel.dataset.womInit === "1") return;',
+              '    panel.dataset.brReachInit = "1";',
+              '    el.dataset.pfFpBound = "1";')
+  expect_equal(length(grep(.bfs_flag_pattern(), sample)), 3L)
+  # A dataset read that is real state, not a bind guard, must not trip it.
+  expect_equal(length(grep(.bfs_flag_pattern(),
+                           c("card.dataset.demoQIdx", "el.dataset.pfFocal"))), 0L)
 })
 
 
@@ -60,14 +86,18 @@ test_that("no brand panel reads a bind flag from a data-*-bound attribute", {
 })
 
 
-test_that("the two known sites bind on a JS property instead", {
-  al <- readLines(file.path(.bfs_js_dir, "brand_audience_lens_panel.js"),
-                  warn = FALSE)
-  expect_true(any(grepl("panel._alBound === true", al, fixed = TRUE)))
-  expect_true(any(grepl("panel._alBound = true", al, fixed = TRUE)))
-
-  pf <- readLines(file.path(.bfs_js_dir, "brand_portfolio_panel.js"),
-                  warn = FALSE)
-  expect_true(any(grepl("table._pfFpBound === true", pf, fixed = TRUE)))
-  expect_true(any(grepl("table._pfFpBound = true", pf, fixed = TRUE)))
+test_that("every known site binds on a JS property instead", {
+  sites <- list(
+    list(file = "brand_audience_lens_panel.js", expr = "panel._alBound"),
+    list(file = "brand_portfolio_panel.js",     expr = "table._pfFpBound"),
+    list(file = "brand_wom_panel.js",           expr = "panel._womBound"),
+    list(file = "brand_branded_reach_panel.js", expr = "panel._brReachBound")
+  )
+  for (s in sites) {
+    txt <- readLines(file.path(.bfs_js_dir, s$file), warn = FALSE)
+    expect_true(any(grepl(paste0(s$expr, " === true"), txt, fixed = TRUE)),
+                info = s$file)
+    expect_true(any(grepl(paste0(s$expr, " = true"), txt, fixed = TRUE)),
+                info = s$file)
+  }
 })

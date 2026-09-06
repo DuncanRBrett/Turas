@@ -11,9 +11,13 @@
 (function () {
   "use strict";
 
+  /* The init flag is a plain JS property, not a dataset entry, for the same
+     reason as the Audience Lens panel: a dataset flag becomes a data-*
+     attribute, Save a copy writes it into the saved file, and reopening that
+     copy would find the flag set and leave the sub-tab nav unbound. */
   function initBrReachPanel(panel) {
-    if (!panel || panel.dataset.brReachInit === "1") return;
-    panel.dataset.brReachInit = "1";
+    if (!panel || panel._brReachBound === true) return;
+    panel._brReachBound = true;
 
     var nav = panel.querySelector(".br-reach-subnav");
     if (!nav) return;
