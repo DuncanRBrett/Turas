@@ -20,8 +20,9 @@
 # because a sentence is stale is worse than the stale sentence. A flagged
 # insight produces three things, in this order of visibility:
 #
-#   1. a console box, because Turas runs inside a Shiny app and the operator
-#      debugs from the R console;
+#   1. a console box in the brand module's own "=== TURAS BRAND ... ==="
+#      shape, because Turas runs inside a Shiny app and the operator debugs
+#      from the R console;
 #   2. a run warning, spliced into generate_brand_html_report()'s $warnings,
 #      which is what brand_gui_outcome() shows the operator;
 #   3. a marker rendered inside the insight box in the HTML itself, so the
@@ -65,7 +66,7 @@
 # fires constantly is ignored, so four kinds of number are left alone:
 #   * 0 to 10 and exactly 100, which the shared helper already skips. Covers
 #     "top 3", "wave 2", ranks, and a difference of a few points.
-#   * a four-digit number in 1900..2100, read as a year. A percentage is never
+#   * a four-digit number in 1900..2099, read as a year. A percentage is never
 #     four digits. A base that happens to be 2000 is skipped too, which errs
 #     towards saying nothing rather than crying wolf.
 #   * a number carrying a difference unit: 17pp, 17 ppt, 17 pts, 17 points,
@@ -74,6 +75,9 @@
 #     to accept it would make the pool cover almost every integer and gut the
 #     check. The two levels the difference is drawn from are still checked,
 #     which is what caught the real case.
+#   * a timeframe carrying its unit: "past 12 months", "past 3m". The funnel's
+#     own stage label is "Past 12 months", so naming the stage is not a claim
+#     about a figure in it.
 #   * a base quoted inline: n=1,200 or "base of 1,200". Analysts quote a base
 #     from elsewhere in the report often enough that it is not worth flagging.
 #
@@ -157,6 +161,15 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   s <- gsub(
     "(?<![\\d.])-?\\d+(?:\\.\\d+)?(?=\\s*(?:pp|ppt|pts|percentage\\s+points|points)\\b)",
     "dd", s, perl = TRUE, ignore.case = TRUE)
+
+  # A timeframe carrying its unit: "past 12 months", "past 3m", "last 6 weeks".
+  # The funnel's own stage is labelled "Past 12 months", so an insight that
+  # names the stage it is describing carries a 12 that is not a figure from
+  # the table. Without this every such sentence fires on any report where no
+  # brand happens to sit within tolerance of 12.
+  s <- gsub(
+    "(?<![\\d.])\\d+(?:\\.\\d+)?(?=\\s*(?:m|mth|mths|month|months|w|wk|wks|week|weeks|d|day|days|yr|yrs|year|years)\\b)",
+    "tt", s, perl = TRUE, ignore.case = TRUE)
 
   # A four-digit year. A percentage is never four digits. The lookarounds keep
   # 21999 and the 1999 inside 1999.5 out of it, while still masking a year
@@ -483,7 +496,8 @@ check_brand_section_insights <- function(section_insights, results) {
     paste(figs, collapse = ", ")
   view_txt <- if (nzchar(finding$view %||% ""))
     sprintf(" on %s", finding$view) else ""
-  sprintf("%s does not appear in this section's data%s", fig_txt, view_txt)
+  verb <- if (length(figs) == 1L) "does not appear" else "do not appear"
+  sprintf("%s %s in this section's data%s", fig_txt, verb, view_txt)
 }
 
 
@@ -506,31 +520,31 @@ brand_insight_check_warnings <- function(check) {
 #' Print the console box for a flagged run
 #'
 #' Turas runs inside a Shiny app and the operator reads the R console, so the
-#' box has to stand out in a scrolling log. Matches the shape in CLAUDE.md.
+#' box has to stand out in a scrolling log. Uses the brand module's own box,
+#' the "=== TURAS BRAND ... ===" form that brand_refuse() prints in
+#' R/00_guard.R, rather than inventing a third shape.
 #'
 #' @param check Result of check_brand_section_insights().
 #' @return Invisible NULL. Prints nothing when nothing was flagged.
 #' @export
 brand_insight_check_console <- function(check) {
   if (is.null(check) || length(check$findings) == 0L) return(invisible(NULL))
-  cat("\n+--- TURAS BRAND: AUTHORED INSIGHT NUMBER CHECK ---------+\n")
-  cat("| An insight typed into the Section_Insights sheet cites a\n")
-  cat("| figure that is not in the data of the section it sits on.\n")
-  cat("| The report was still written. Edit the sheet and re-run.\n")
-  cat("|\n")
+  cat("\n=== TURAS BRAND: AUTHORED INSIGHT NUMBER CHECK ===\n")
+  cat("An insight typed into the Section_Insights sheet cites a figure that",
+      "is not in the data of the section it sits on.\n")
+  cat("The report was still written.\n")
   for (f in check$findings) {
-    cat(sprintf("| Section: %s\n", f$anchor))
-    cat(sprintf("|   Figures not found: %s\n",
-                if (length(f$figures) == 0L) "one or more, see the report marker"
-                else paste(f$figures, collapse = ", ")))
+    cat("Section:", f$anchor, "\n")
+    cat("  Figures not found:",
+        if (length(f$figures) == 0L) "one or more, see the report marker"
+        else paste(f$figures, collapse = ", "), "\n")
     if (nzchar(f$view %||% ""))
-      cat(sprintf("|   Read against: %s\n", f$view))
+      cat("  Read against:", f$view, "\n")
   }
-  cat("|\n")
-  cat("| How to fix: open the Section_Insights sheet in the brand\n")
-  cat("| config workbook, correct the sentence for that section,\n")
-  cat("| and generate the report again.\n")
-  cat("+--------------------------------------------------------+\n\n")
+  cat("How to fix: open the Section_Insights sheet in the brand config",
+      "workbook, correct the sentence for that section, and generate the",
+      "report again.\n")
+  cat("==================================================\n\n")
   invisible(NULL)
 }
 

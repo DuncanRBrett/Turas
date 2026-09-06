@@ -50,10 +50,16 @@ because the funnel's nested figures are derived at render time by
 
 Reporting, three ways, in order of who sees it:
 
-1. **Console box** in the CLAUDE.md shape. Turas runs inside a Shiny app and
-   the operator debugs from the R console.
-2. **Run warning**, appended to `generate_brand_html_report()`'s `$warnings`,
-   which is what `brand_gui_outcome()` puts in front of the operator.
+1. **Console box** in the brand module's own `=== TURAS BRAND ... ===` shape,
+   the one `brand_refuse()` prints in `R/00_guard.R`, rather than a third
+   shape. Turas runs inside a Shiny app and the operator debugs from the R
+   console.
+2. **Run warning**, appended to `generate_brand_html_report()`'s `$warnings`.
+   Read through to the consumer rather than taken from a comment:
+   `brand_gui_outcome()` in `R/00_guard.R` picks the generator's `$warnings`
+   up in `gen_check()`, prefixes them "HTML report: ", folds them into
+   `all_warnings`, and `run_brand_gui.R` renders that list in Step 5 with the
+   partial-status banner.
 3. **A marker in the HTML**, a `.br-insight-check` div rendered inside the
    insight container, next to the sentence, so the reader of the report knows
    the note was not checked out rather than only the operator seeing it in a
@@ -134,7 +140,8 @@ never extracted.
 | Left alone | Rule | Covers |
 |---|---|---|
 | 0 to 10, and exactly 100 | shared helper | "top 3", "wave 2", ranks, a difference of a few points |
-| 1900 to 2100, four digits | masked as a year | "the 2026 wave, up on 2023" |
+| 1900 to 2099, four digits | masked as a year | "the 2026 wave, up on 2023" |
+| a timeframe carrying its unit | masked: `m`, `mth`, `month`, `week`, `day`, `yr`, `year`, singular or plural | "past 12 months", "past 3m", "the last 26 weeks" |
 | a number carrying a difference unit | masked: `pp`, `ppt`, `pts`, `points`, `percentage points` | "17pp", "down 7 points" |
 | a base quoted inline | masked: `n=1,200`, "base of 1,200" | a base quoted from another section |
 
@@ -144,6 +151,14 @@ funnel that is roughly 1,800 differences over a 0 to 100 range, which would
 cover nearly every integer and gut the check. Masking the difference and still
 checking the two levels either side is strictly better, and it is what catches
 the real case: 17pp is left alone, while the 59 it is derived from is flagged.
+
+On timeframes: this one is not decoration. The funnel's own stage is labelled
+"Past 12 months", and Duncan's sentence says "past 12m". 12 is above the
+shared helper's 0 to 10 skip, so without the mask every funnel insight that
+names its stages fires on any report where no brand happens to sit within 0.6
+of 12. It survived the first cut of the tests only by coincidence: the
+constructed pool holds a category average of 12.5 and the fixture pool holds a
+competitor at 12.
 
 Thousands separators are stripped first. The shared regex reads "1,200" as 1
 and 200; percentages, decimals and signs it already handles.
@@ -235,7 +250,7 @@ returned **status PASS**, wrote 4,022,086 bytes, printed the console box, and
 returned one warning:
 
     authored insight on section funnel-dss cites a figure the section does not
-    carry: 42, 47, 27 does not appear in this section's data on the nested
+    carry: 42, 47, 27 do not appear in this section's data on the nested
     funnel, the view this page opens on
 
 (42, 47 and 27 rather than 59, 31 and 20 because that probe read the sentence
@@ -264,8 +279,8 @@ From the runs themselves, on this branch with every change in place.
 
 | Gate | Result |
 |---|---|
-| Brand suite, repo root, `testthat::test_dir("modules/brand/tests/testthat")` | **FAIL 0, WARN 1, SKIP 2, PASS 3358**, 102.9 s (baseline 3247) |
-| `test_insight_number_check.R` alone | FAIL 0, WARN 0, SKIP 0, PASS 111 |
+| Brand suite, repo root, `testthat::test_dir("modules/brand/tests/testthat")` | **FAIL 0, WARN 1, SKIP 2, PASS 3365**, 107.8 s (baseline 3247) |
+| `test_insight_number_check.R` alone | FAIL 0, WARN 0, SKIP 0, PASS 118 |
 | `drive_destinations.py` | 353 checks, 0 failed, exit 0 |
 | `drive_save_roundtrip.py` | 113 checks, 0 failed, exit 0 |
 | `drive_two_categories.py` | 15 checks, 0 failed, exit 0 |
@@ -312,6 +327,17 @@ suite above.
 - `ipk_write_brand_config()` keeps its existing `openxlsx::saveWorkbook()`
   call rather than moving to `turas_saveWorkbook()`. It is a fixture writer
   with no data validation to lose, and switching it is outside this task.
+
+## A note for the next session
+
+`test_insight_number_check.R` is now a canary on the fixture. Its insights
+quote IPK's nested funnel at 92 / 67 / 45 / 32 and a category average of 61
+then 24, read off a real run. If the IPK fixture is ever regenerated with a
+different seed, or an engine change moves those figures, the test will fail
+with a stale-figure finding on `funnel-dss`. That is the check working on the
+fixture's own authored text, not a bug in the check. The fix is to re-read the
+figures off a fresh run and update the four insights in
+`ipk_write_brand_config()`.
 
 ## Not done, and not verified
 

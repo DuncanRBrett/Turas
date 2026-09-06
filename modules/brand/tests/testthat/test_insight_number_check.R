@@ -191,6 +191,12 @@ test_that("a flagged run produces a warning naming the section and figures", {
   expect_length(w, 1L)
   expect_match(w, "funnel-dss", fixed = TRUE)
   expect_match(w, "59", fixed = TRUE)
+  # several figures take a plural verb; one takes the singular
+  expect_match(w, "do not appear", fixed = TRUE)
+  one <- list(findings = list(`funnel-dss` = list(
+    anchor = "funnel-dss", figures = "59", view = "")))
+  expect_match(brand_insight_check_warnings(one), "does not appear",
+               fixed = TRUE)
 })
 
 test_that("a clean run produces no warning and prints no console box", {
@@ -204,7 +210,8 @@ test_that("the console box names the section, the figures and the fix", {
                                       .inc_results())
   out <- paste(capture.output(brand_insight_check_console(chk)),
                collapse = "\n")
-  expect_match(out, "AUTHORED INSIGHT NUMBER CHECK")
+  expect_match(out, "=== TURAS BRAND: AUTHORED INSIGHT NUMBER CHECK ===",
+               fixed = TRUE)
   expect_match(out, "funnel-dss", fixed = TRUE)
   expect_match(out, "59", fixed = TRUE)
   expect_match(out, "Section_Insights", fixed = TRUE)
@@ -274,6 +281,24 @@ test_that("a year is not read as a figure from the section", {
   expect_equal(.bin_prepare_text("A mean of 1999.5 units."),
                "A mean of 1999.5 units.")
   expect_equal(.bin_prepare_text("21999 respondents"), "21999 respondents")
+})
+
+test_that("a timeframe carrying its unit is not checked as a figure", {
+  # the funnel's own stage is labelled "Past 12 months", so naming the stage
+  # is not a claim about a figure in it. Without this, every funnel insight
+  # that names its stages fires on any report where no brand sits within
+  # tolerance of 12.
+  expect_equal(
+    .bin_prepare_text("22% at past 12 months and 16% at past 3m"),
+    "22% at past tt months and 16% at past ttm")
+  expect_true(deterministic_number_check(
+    .bin_prepare_text("Holds 22% at past 12 months."), c(22))$pass)
+  expect_true(deterministic_number_check(
+    .bin_prepare_text("Over the last 26 weeks it held 22%."), c(22))$pass)
+  # a word that merely starts with a unit letter is not a unit
+  expect_equal(.bin_prepare_text("A spend of 16 million."),
+               "A spend of 16 million.")
+  expect_equal(.bin_prepare_text("Read in 12 minutes."), "Read in 12 minutes.")
 })
 
 test_that("an inline base is not checked", {
