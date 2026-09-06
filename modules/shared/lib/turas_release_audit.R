@@ -79,9 +79,11 @@ if (!exists("%||%", mode = "function")) {
 #'   5. Every demographic cut a comment carries names a group the CUBE says is at
 #'      least k people. This is the one check that does not take the island's word
 #'      for anything: it reads the tags actually shipped and prices them against
-#'      the published cell bases. A cut naming more variables than the cube's
-#'      order cannot be priced from the file at all, and is counted and reported
-#'      rather than passed over in silence.
+#'      the published cell bases. A cut the cube does not publish, because it
+#'      names more variables than the cube's order or because that crossing was
+#'      refused, cannot be priced from the file at all. Those are counted and
+#'      reported, never treated as violations: an unpublished crossing is not a
+#'      small group, and reading it as one accused nine safe tags on SACS 2025.
 #'
 #' @param body The data-qual island body, already extracted.
 #' @param cube_body The data-cube island body, for check 5. NA when there is none.
@@ -170,7 +172,16 @@ release_audit_qual <- function(body, cube_body = NA_character_) {
       ckey <- paste(vapply(ordered, function(v) as.character(cut[[v]]), character(1)),
                     collapse = "|")
       cell <- if (is.null(slice)) NULL else slice$cells[[ckey]]
-      base <- if (is.null(cell) || is.null(cell$a)) 0 else suppressWarnings(as.numeric(cell$a[[1]]))
+      # An ABSENT slice or cell is a crossing the cube did not publish, which is
+      # not the same fact as a small group and must not be read as one. SACS 2025
+      # refuses all three of its two-variable slices, and reading those as groups
+      # of nobody accused nine perfectly safe tags. A check that cannot run is
+      # counted as one that did not run.
+      if (is.null(cell) || is.null(cell$a)) {
+        out$unverifiable <- out$unverifiable + 1L
+        next
+      }
+      base <- suppressWarnings(as.numeric(cell$a[[1]]))
       if (!is.na(k) && !is.na(base) && base < k) small <- c(small, key)
     }
     if (length(small)) {
@@ -239,16 +250,41 @@ release_audit_cube <- function(body) {
   }
 
   # 2 and 3. cell bases, and whole blocks
+  #
+  # A PUBLISHED MARGIN is the exception, and it is the cube writer's own rule
+  # rather than a loosening of this one. A one-variable slice on a banner
+  # variable IS that banner, and the crosstab already prints it column by
+  # column, base by base, with the sub-k columns blanked. So the cube suppresses
+  # the CELL there rather than the cut: the base ships, the answers do not, and
+  # nothing is disclosed that the workbook has not already published. Every other
+  # slice is a crossing nobody published, and the whole-block rule stands.
+  #
+  # Without this the audit flagged 161 deliberately suppressed cells on SACS 2025
+  # and would have refused any project with a small banner column. An audit that
+  # fires on a correct file gets skipped, and a skipped audit is no audit.
+  var_kind <- function(v) {
+    d <- (cube$vars %||% list())[[v]]
+    if (is.null(d)) "" else as.character(d$kind %||% "")
+  }
+  published_margin <- function(skey) {
+    if (identical(skey, "*")) return(FALSE)
+    parts <- strsplit(skey, "*", fixed = TRUE)[[1]]
+    length(parts) == 1L && identical(var_kind(parts[[1]]), "banner")
+  }
+
   sub_k <- 0L
   cells <- 0L
   for (skey in names(cube$slices %||% list())) {
     slice <- cube$slices[[skey]]
     if (is.null(slice)) next
+    margin <- published_margin(skey)
     for (rec in (slice$cells %||% list())) {
       a <- rec$a
       if (is.null(a)) next
       cells <- cells + 1L
       v <- suppressWarnings(as.numeric(a[[1]]))
+      # The base of a published banner column is in the workbook already.
+      if (margin) next
       if (!is.na(v) && v > 0 && !is.na(k) && v < k) sub_k <- sub_k + 1L
     }
     for (qcode in names(slice$q %||% list())) {
@@ -259,6 +295,10 @@ release_audit_cube <- function(body) {
         if (is.null(b)) next
         cells <- cells + 1L
         v <- suppressWarnings(as.numeric(b[[1]]))
+        # On a margin the sub-k cell must be SUPPRESSED: it ships its base and no
+        # answers. One that is under k and not suppressed is a real violation,
+        # margin or not, so the exemption is on the marker, never on the slice.
+        if (margin && isTRUE(rec$sup)) next
         if (!is.na(v) && v > 0 && !is.na(k) && v < k) sub_k <- sub_k + 1L
       }
     }
@@ -381,7 +421,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
     # Said out loud, because a check that could not run is not a check that passed.
     if (qual_audit$present && qual_audit$unverifiable > 0)
       paste0("│ ", pad("Comment tags not priceable"), ": ",
-             sprintf("%d combination(s) name more variables than the cube carries",
+             sprintf(paste0("%d combination(s): the cube does not publish that ",
+                            "crossing, so its size cannot be read from this file"),
                      qual_audit$unverifiable))
   )
 
