@@ -75,7 +75,7 @@ run_adhoc_question <- function(values,
   codes        <- prep$codes
   labels       <- prep$labels
 
-  # Reuse the demographic engine — it gives us total + brand_cut for free
+  # Reuse the demographic engine: it gives us total + brand_cut for free
   # and applies the same Wilson CI logic.
   if (!exists("run_demographic_question", mode = "function")) {
     return(.adhoc_refuse("PKG_MISSING",
@@ -183,7 +183,7 @@ run_adhoc_question <- function(values,
 
 
 .adhoc_fmt <- function(x) {
-  if (is.na(x)) return("—")
+  if (is.na(x)) return("n/a")
   if (abs(x - round(x)) < 1e-6) return(sprintf("%.0f", x))
   sprintf("%.1f", x)
 }
@@ -214,7 +214,7 @@ run_adhoc_question <- function(values,
 #' v2 counterpart to \code{resolve_adhoc_role()}. Walks
 #' \code{role_map[[role]]} for column_root + variable_type + option_scale,
 #' then resolves the option list via \code{.demo_lookup_options()}. Returns
-#' NULL when the role is unmapped or — when \code{data} is supplied — its
+#' NULL when the role is unmapped or. When \code{data} is supplied, its
 #' column is absent from the data (caller silently skips).
 #'
 #' @param role_map Named list from \code{build_brand_role_map()}.

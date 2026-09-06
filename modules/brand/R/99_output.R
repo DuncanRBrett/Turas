@@ -6,7 +6,7 @@
 #
 # VERSION: 1.0
 #
-# SIZE-EXCEPTION: generate_brand_excel is a sequential write pipeline — one
+# SIZE-EXCEPTION: generate_brand_excel is a sequential write pipeline, one
 # sheet per element per category. Decomposing further would fragment a linear
 # series of write operations without improving readability.
 #
@@ -201,7 +201,7 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
       if (!is.null(dn)) {
         if (identical(dn$status, "REFUSED")) {
           cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
-          cat(sprintf("│ Context: 99_output — dirichlet for %s\n", cat_name))
+          cat(sprintf("│ Context: 99_output, dirichlet for %s\n", cat_name))
           cat(sprintf("│ Code:    %s\n", dn$code %||% "UNKNOWN"))
           cat(sprintf("│ Message: %s\n", dn$message %||% ""))
           cat("└───────────────────────────────────────────────────────┘\n\n")
@@ -227,7 +227,7 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
       if (!is.null(bh)) {
         if (identical(bh$status, "REFUSED")) {
           cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
-          cat(sprintf("│ Context: 99_output — buyer heaviness for %s\n", cat_name))
+          cat(sprintf("│ Context: 99_output, buyer heaviness for %s\n", cat_name))
           cat(sprintf("│ Code:    %s\n", bh$code %||% "UNKNOWN"))
           cat(sprintf("│ Message: %s\n", bh$message %||% ""))
           cat("└───────────────────────────────────────────────────────┘\n\n")
@@ -237,7 +237,7 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
         }
       }
 
-      # DoP deviation matrix (§11) — from repertoire element
+      # DoP deviation matrix (§11): from repertoire element
       rep2 <- cat_res$repertoire
       if (!is.null(rep2) && !identical(rep2$status, "REFUSED")) {
         if (!is.null(rep2$dop_deviation_matrix))
@@ -289,14 +289,14 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
     )
   }
 
-  # Demographics — one sheet per question, plus a roll-up
+  # Demographics, one sheet per question, plus a roll-up
   demo <- results$results$demographics
   if (!is.null(demo) && identical(demo$status, "PASS") &&
       length(demo$questions) > 0L) {
     .write_demographic_sheets(wb, demo, header_style, .write_sheet)
   }
 
-  # Ad Hoc — one sheet per question (scope-prefixed)
+  # Ad Hoc, one sheet per question (scope-prefixed)
   ah <- results$results$adhoc
   if (!is.null(ah) && identical(ah$status, "PASS") &&
       length(ah$questions) > 0L) {

@@ -6,7 +6,7 @@
 # (plus DK and OTHER buckets).
 #
 # This is the diagnostic that tells you whether competitors are getting
-# credit for your ads — Romaniuk's "branding %" decomposed by who got
+# credit for your ads, Romaniuk's "branding %" decomposed by who got
 # the credit when not the focal.
 #
 # VERSION: 1.0
@@ -32,7 +32,7 @@ BRAND_BRANDED_REACH_MISATTRIBUTION_VERSION <- "1.1"
 #'   compute_br_reach_metrics.
 #' @param seen_recognised_value Integer. Default 1L (matches reach_seen_scale).
 #'
-#' @return List with status and (when PASS) \code{tables} — a named list
+#' @return List with status and (when PASS) \code{tables}, a named list
 #'   keyed by AssetCode. Each entry is a data frame with columns:
 #'   BrandCode, BrandLabel, n, pct_of_seen, is_correct.
 #'

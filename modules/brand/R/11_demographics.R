@@ -1,7 +1,7 @@
 # ==============================================================================
 # BRAND MODULE - DEMOGRAPHICS ELEMENT
 # ==============================================================================
-# SIZE-EXCEPTION: ~315 active lines. The file is a cohesive engine pipeline —
+# SIZE-EXCEPTION: ~315 active lines. The file is a cohesive engine pipeline,
 # one `run_demographic_question()` entry point and five private helper
 # sections (total distribution, focal-brand buyer/non-buyer cut, light/medium/
 # heavy tier cut, per-brand audience-share cut, per-brand penetration-in-
@@ -23,7 +23,7 @@
 #   * brand_cut               - % among each brand's BUYERS  (audience share)
 #   * brand_nonbuyer_cut      - % among each brand's NON-BUYERS (audience share)
 #   * brand_penetration_long  - within-option penetration per brand (the
-#                                primary panel cell metric — "% of 30-35s
+#                                primary panel cell metric, "% of 30-35s
 #                                who buy IPK")
 #   * brand_total_penetration - per-brand cat-wide penetration (the heatmap
 #                                baseline for brand_penetration_long)
@@ -72,9 +72,9 @@ BRAND_DEMOGRAPHICS_VERSION <- "2.0"
 #'   \item{tier_cut}{NULL or list(light = df, medium = df, heavy = df). Focal-brand only.}
 #'   \item{brand_cut}{NULL or data frame keyed by BrandCode + Base_n + Pct_<CODE>. Distribution of each brand's BUYERS across the option list.}
 #'   \item{brand_nonbuyer_cut}{NULL or data frame, same shape as \code{brand_cut}. Distribution of each brand's NON-BUYERS (pen == 0, not NA) across the option list.}
-#'   \item{brand_penetration_long}{NULL or data frame: one row per brand, columns Pct_<code> = % of respondents in option <code> who buy this brand, Base_n_<code> = unweighted known-base for that option. The panel cell metric — answers "is this brand over/under-performing in this demographic option?" at a glance.}
-#'   \item{brand_total_penetration}{NULL or data frame: one row per brand, Pct_Total = cat-wide penetration (% of all respondents who buy this brand). Legend / context only — not used as the cell-shading baseline (see \code{option_avg_penetration}).}
-#'   \item{option_avg_penetration}{Named numeric vector keyed by option_code: the per-option mean penetration across all brands. THIS is the competitive baseline used by the panel — table Cat-avg column and chart marker both read from this vector in penetration mode, and brand cells are shaded vs this baseline.}
+#'   \item{brand_penetration_long}{NULL or data frame: one row per brand, columns Pct_<code> = % of respondents in option <code> who buy this brand, Base_n_<code> = unweighted known-base for that option. The panel cell metric. Answers "is this brand over/under-performing in this demographic option?" at a glance.}
+#'   \item{brand_total_penetration}{NULL or data frame: one row per brand, Pct_Total = cat-wide penetration (% of all respondents who buy this brand). Legend / context only, not used as the cell-shading baseline (see \code{option_avg_penetration}).}
+#'   \item{option_avg_penetration}{Named numeric vector keyed by option_code: the per-option mean penetration across all brands. THIS is the competitive baseline used by the panel, table Cat-avg column and chart marker both read from this vector in penetration mode, and brand cells are shaded vs this baseline.}
 #'   \item{n_total}{Unweighted respondents with valid (non-NA) value}
 #'   \item{n_respondents}{Total rows in input}
 #'
@@ -102,7 +102,7 @@ run_demographic_question <- function(values,
                                  mask = rep(TRUE, n_rows), w = w,
                                  conf_level = conf_level)
 
-  # Optional second baseline — distribution across the full screened
+  # Optional second baseline: distribution across the full screened
   # study sample (not just cat-routed respondents). The panel toggles
   # between this and total_df when the user picks "Total sample" vs
   # "Cat avg" as the baseline. Computed only when study_values supplied.
@@ -197,8 +197,8 @@ run_demographic_question <- function(values,
 # INTERNAL: BRAND CUTS (brand x option matrices)
 # ==============================================================================
 # Two parallel views of the demographic distribution, one row per brand:
-#   .demo_brand_cut          — buyers of that brand   (pen > 0)
-#   .demo_brand_nonbuyer_cut — non-buyers of that brand (pen == 0, not NA)
+#   .demo_brand_cut: buyers of that brand   (pen > 0)
+#   .demo_brand_nonbuyer_cut, non-buyers of that brand (pen == 0, not NA)
 #
 # Both share .demo_per_brand_distribution which turns a respondent-x-brand
 # logical mask matrix into the long-format Pct_<CODE> + CI_<CODE>_*
@@ -246,7 +246,7 @@ run_demographic_question <- function(values,
 # option lets the panel render buyer% + non-buyer% summing to 100% per cell
 # and answer "is brand X over- or under-performing in 30-35?" at a glance.
 #
-# NA handling — NA pen entries (routing skips) are excluded from BOTH the
+# NA handling: NA pen entries (routing skips) are excluded from BOTH the
 # numerator AND the per-option denominator so the buyer + complement still
 # sum to 100% within the known base. Base_n_<code> exposes the option's
 # unweighted known-base so the panel can warn on small-base cells.
@@ -258,7 +258,7 @@ run_demographic_question <- function(values,
                                 length(values))
   if (is.null(ctx)) return(NULL)
 
-  # Per-option known-base counts (same for all brands — known-base is per
+  # Per-option known-base counts (same for all brands. Known-base is per
   # respondent x brand, but for IPK-style per-cat data NAs are uniform per
   # column). For NA-heavy multi-cat data we compute per-brand later if needed.
   per_brand <- lapply(seq_along(brand_codes), function(b) {
@@ -293,7 +293,7 @@ run_demographic_question <- function(values,
 
 
 # Per-option mean penetration across all brands. THE category-average
-# baseline in penetration mode — answers "what's the typical brand's
+# baseline in penetration mode, answers "what's the typical brand's
 # pen rate among 30-35s?". Per-row so the chart marker and the table's
 # Cat-avg column can both move down the option list. NA brand cells are
 # excluded from the mean (an option with zero respondents in one brand's
@@ -315,7 +315,7 @@ run_demographic_question <- function(values,
 
 # Cat-wide penetration of each brand (single number per brand). Useful as
 # legend context ("IPK overall pen = 16%") but no longer the cell-shading
-# baseline — see .demo_option_avg_penetration for the per-row competitive
+# baseline, see .demo_option_avg_penetration for the per-row competitive
 # baseline that drives both the chart marker and the table heatmap.
 .demo_brand_total_penetration <- function(pen_mat, brand_codes, brand_labels,
                                            w) {
@@ -362,7 +362,7 @@ run_demographic_question <- function(values,
 # respondent-x-brand logical mask matrix (one column per brand, TRUE = include
 # that respondent in that brand's cut). Same row shape as v1 brand_cut.
 #
-# IMPORTANT — column-name preservation. Option codes that contain spaces or
+# IMPORTANT: column-name preservation. Option codes that contain spaces or
 # punctuation (e.g. "Gauteng Metro", "R25-R35") would be silently munged by
 # the default as.data.frame() name-fixer to "Pct_Gauteng.Metro" etc., which
 # then breaks the downstream paste0("Pct_", codes) lookup in
@@ -508,7 +508,7 @@ run_demographic_question <- function(values,
     rows <- opts[!is.na(opts$QuestionCode) &
                    trimws(as.character(opts$QuestionCode)) == question_code,
                   , drop = FALSE]
-    # Filter to ShowInOutput = Y (or unspecified — default visible)
+    # Filter to ShowInOutput = Y (or unspecified: default visible)
     if (nrow(rows) > 0L && "ShowInOutput" %in% names(rows)) {
       keep <- is.na(rows$ShowInOutput) |
               toupper(trimws(as.character(rows$ShowInOutput))) %in% c("", "Y", "YES")
@@ -554,7 +554,7 @@ run_demographic_question <- function(values,
 #' v2 alternative to \code{resolve_demographic_role()}. The legacy resolver
 #' walks a Survey_Structure QuestionMap sheet; the v2 resolver reads the
 #' inferred entry from \code{build_brand_role_map()}. The role naming
-#' convention is \code{demographics.\{key\}} (lowercase) — e.g.
+#' convention is \code{demographics.\{key\}} (lowercase), e.g.
 #' \code{demographics.age} for the column \code{DEMO_AGE}.
 #'
 #' Option codes/labels come from the survey structure's Options sheet

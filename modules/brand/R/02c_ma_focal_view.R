@@ -11,14 +11,14 @@
 # for its Excel/CSV outputs; this file produces the data shape the MA
 # Mental Advantage sub-tab consumes for its focal-brand drill-down.
 #
-# Read labels (locked at four — see sketches/MA_BUYER_GAP_BUILD_PLAN.md §2):
+# Read labels (locked at four, see sketches/MA_BUYER_GAP_BUILD_PLAN.md §2):
 #   STRENGTH   high MA + high buyer gap   buyer-validated competitive edge
 #   FAME_GAP   high MA + flat/neg gap     market thinks of you, buyers don't
-#                                          reinforce — delivery / experience gap
-#   BUYER_EDGE flat MA + high buyer gap   buyers know it, market doesn't —
+#                                          reinforce, delivery / experience gap
+#   BUYER_EDGE flat MA + high buyer gap   buyers know it, market doesn't,
 #                                          awareness opportunity
 #   WEAK       low MA (any gap)           drop from comms or rebuild
-#   (none)     flat MA + flat gap         no signal — chip left empty
+#   (none)     flat MA + flat gap         no signal, chip left empty
 #   suppressed base < min_base            gap NA, row marked Below_Min_Base
 #
 # Two-proportion z is the significance test for the buyer gap:
@@ -42,7 +42,7 @@ MA_FOCAL_VIEW_VERSION   <- "1.1"
 # misleading regardless of how the calc lands.
 MA_FOCAL_VIEW_MIN_BASE  <- 20L
 MA_FOCAL_VIEW_GAP_THR   <- 5    # pp
-MA_FOCAL_VIEW_MA_THR    <- 5    # pp — match MA_DEFAULT_THRESHOLD_PP
+MA_FOCAL_VIEW_MA_THR    <- 5    # pp: match MA_DEFAULT_THRESHOLD_PP
 MA_FOCAL_VIEW_Z_THR     <- 1.96
 
 
@@ -54,7 +54,7 @@ MA_FOCAL_VIEW_Z_THR     <- 1.96
 #'
 #' Pure function; vectorised. Returns one of \code{"STRENGTH"},
 #' \code{"FAME_GAP"}, \code{"BUYER_EDGE"}, \code{"WEAK"}, \code{""} (no
-#' chip — flat on both axes), or \code{"INSUFFICIENT"} (base too small).
+#' chip, flat on both axes), or \code{"INSUFFICIENT"} (base too small).
 #'
 #' Decision rules (locked):
 #'   below_min_base          -> "INSUFFICIENT"
@@ -204,7 +204,7 @@ calculate_ma_focal_view <- function(linkage_tensor, codes, focal_brand, pen,
   # Coerce pen to 0/1
   pen <- if (is.null(pen)) rep(0L, n_resp) else as.integer(!is.na(pen) & pen > 0)
   if (length(pen) != n_resp) {
-    # length mismatch is a programming error — surface as empty rather than crash
+    # length mismatch is a programming error, surface as empty rather than crash
     return(.fv_empty_df())
   }
 
@@ -249,7 +249,7 @@ calculate_ma_focal_view <- function(linkage_tensor, codes, focal_brand, pen,
     col_vals <- brand_mat[, code]
     col_vals[is.na(col_vals)] <- 0
 
-    # Unweighted "yes" counts — used for min-base check only
+    # Unweighted "yes" counts, used for min-base check only
     x_buy_unw    <- sum(col_vals[buyers])
     x_nonbuy_unw <- sum(col_vals[non_buyers])
 

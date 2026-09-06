@@ -17,7 +17,7 @@
 # Significance: standardised chi-square residual
 #   z[s,b] = (actual[s,b] - expected[s,b]) / sqrt(expected[s,b])
 # Significant at 95% when |z| > 1.96. Bootstrap CIs are a documented stretch
-# (see About drawer in panel) — not implemented in v1.
+# (see About drawer in panel), not implemented in v1.
 #
 # Decision categorisation follows Quantilope/Romaniuk practice:
 #   defend   if ma_score >=  +threshold_pp  (default 5pp)
@@ -95,19 +95,19 @@ MA_SIG_Z_THRESHOLD <- 1.96
 # SECTION 2: PER-STIMULUS PENETRATION (ANY BRAND)
 # ==============================================================================
 
-#' Calculate stimulus penetration — % of respondents linking any brand
+#' Calculate stimulus penetration: % of respondents linking any brand
 #'
-#' Stimulus "competitiveness" — % of respondents who link more brands than
+#' Stimulus "competitiveness", % of respondents who link more brands than
 #' the category-wide average to each stimulus.
 #'
 #' Used as the X-axis of the Strategic Quadrant. The previous metric
 #' (% of respondents linking >=1 brand) collapsed to ~99% on every CEP
 #' in surveys where Alchemer routes a CATA "which brands come to mind"
-#' question — respondents pick at least one brand for nearly every CEP,
+#' question, respondents pick at least one brand for nearly every CEP,
 #' so the X-axis lost all discriminating power.
 #'
 #' The new metric is threshold-relative:
-#'   1. Build a (respondents x stimuli) matrix of brand-link counts —
+#'   1. Build a (respondents x stimuli) matrix of brand-link counts,
 #'      for each cell, how many real brands the respondent linked to
 #'      that stimulus.
 #'   2. Compute the grand mean of that matrix (across all resp x stim
@@ -147,7 +147,7 @@ MA_SIG_Z_THRESHOLD <- 1.96
   # on every stimulus in small samples and ruin the X-axis variation of the
   # Strategic Quadrant. Skip them here defensively so old Brand_Configs that
   # still include NONE rows produce sensible MA charts.
-  # Shared helper in 00_data_access.R — single source of truth for the
+  # Shared helper in 00_data_access.R: single source of truth for the
   # NONE-pseudo-brand detection rule. Upstream filter in 00_main.R already
   # drops these rows; this is belt-and-braces in case a caller passes a
   # tensor still containing them.
@@ -202,7 +202,7 @@ MA_SIG_Z_THRESHOLD <- 1.96
 #'
 #' @param ma_score Numeric. MA score in percentage points (can be NA).
 #' @param threshold_pp Numeric. Symmetric threshold around zero.
-#' @return Character — "defend", "build", "maintain", or "na".
+#' @return Character: "defend", "build", "maintain", or "na".
 #' @keywords internal
 .ma_classify_decision <- function(ma_score, threshold_pp = MA_DEFAULT_THRESHOLD_PP) {
   ifelse(is.na(ma_score), "na",
@@ -219,7 +219,7 @@ MA_SIG_Z_THRESHOLD <- 1.96
 #'
 #' Computes Romaniuk's Mental Advantage matrix together with significance
 #' (standardised chi-square residuals) and Defend/Build/Maintain decisions.
-#' Pure analytics — no I/O, no presentation. Throws on programming errors;
+#' Pure analytics: no I/O, no presentation. Throws on programming errors;
 #' returns zero matrices on degenerate but legal data (zero linkage, single
 #' brand, single stimulus).
 #'
@@ -310,7 +310,7 @@ calculate_mental_advantage <- function(linkage_tensor, codes,
 
   advantage    <- (actual - expected) / n_respondents * 100
   safe_expected <- ifelse(expected > 0, expected, NA_real_)
-  # Pearson standardised residual — exact for unweighted data.
+  # Pearson standardised residual: exact for unweighted data.
   # Under rim weighting the expected cell counts still use observed marginals
   # so this approximates the design-corrected residual; a Rao-Scott correction
   # would be more rigorous but is not material for the typical weight ranges

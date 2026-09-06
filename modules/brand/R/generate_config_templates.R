@@ -4,7 +4,7 @@
 # SIZE-EXCEPTION: openxlsx workbook-builder pipeline. Each sheet is
 # defined inline (column specs + descriptions + example rows + styles)
 # so the template generation is one self-contained call. Splitting per
-# sheet would multiply file count for no readability gain — the
+# sheet would multiply file count for no readability gain, the
 # sheets are read top-to-bottom as a single Excel file.
 #
 # Generates professional Excel config templates for the brand module:
@@ -95,7 +95,7 @@ BRAND_CONFIG_VERSION <- "2.0"
   }
 
   # TRS-FALLBACK: template-generation helper, not analytical code. The
-  # template_styles.R loader is a hard prerequisite — if it's missing,
+  # template_styles.R loader is a hard prerequisite, if it's missing,
   # there's no graceful degradation possible. stop() surfaces the
   # message immediately because TRS infrastructure isn't loaded yet
   # (template generation runs ahead of the brand module).
@@ -110,7 +110,7 @@ BRAND_CONFIG_VERSION <- "2.0"
 
 
 # ==============================================================================
-# BRAND_CONFIG.XLSX — SETTINGS
+# BRAND_CONFIG.XLSX: SETTINGS
 # ==============================================================================
 
 .build_brand_settings_def <- function() {
@@ -130,7 +130,7 @@ BRAND_CONFIG_VERSION <- "2.0"
              description = "Title displayed in the HTML report header.",
              valid_values_text = "Free text"),
         list(name = "report_subtitle", required = FALSE, default = "",
-             description = "Subtitle line below title. Typical use: wave label or fieldwork dates (e.g. 'Wave 1 Baseline — Q1 2026').",
+             description = "Subtitle line below title. Typical use: wave label or fieldwork dates (e.g. 'Wave 1 Baseline, Q1 2026').",
              valid_values_text = "Free text"),
         list(name = "study_type", required = TRUE, default = "cross-sectional",
              description = "Study design. Panel studies carry respondent IDs for longitudinal tracking.",
@@ -192,7 +192,7 @@ BRAND_CONFIG_VERSION <- "2.0"
       section_name = "ANALYTICAL ELEMENTS  (Y = include, N = exclude)",
       fields = list(
         list(name = "element_funnel", required = FALSE, default = "Y",
-             description = "Brand funnel: Awareness > Disposition > Bought (target) > Primary. Derived from BRANDAWARE, BRANDATT1, BRANDPEN2, BRANDPEN3 columns — no extra survey questions needed.",
+             description = "Brand funnel: Awareness > Disposition > Bought (target) > Primary. Derived from BRANDAWARE, BRANDATT1, BRANDPEN2, BRANDPEN3 columns, no extra survey questions needed.",
              valid_values_text = "Y or N",
              dropdown = c("Y", "N")),
         list(name = "element_mental_avail", required = FALSE, default = "Y",
@@ -347,7 +347,7 @@ BRAND_CONFIG_VERSION <- "2.0"
       section_name = "AUDIENCE LENS OPTIONS  (only if element_audience_lens = Y)",
       fields = list(
         list(name = "audience_lens_max", required = FALSE, default = 6,
-             description = "Maximum number of audience segments to show side-by-side in the Audience Lens panel. Minimum 2 (for a pair). Each audience requires its own column of analysis — keep <=6 for readability.",
+             description = "Maximum number of audience segments to show side-by-side in the Audience Lens panel. Minimum 2 (for a pair). Each audience requires its own column of analysis, keep <=6 for readability.",
              valid_values_text = "2 to 8",
              integer_range = c(2, 8))
       )
@@ -436,7 +436,7 @@ BRAND_CONFIG_VERSION <- "2.0"
 
 
 # ==============================================================================
-# BRAND_CONFIG.XLSX — TABLE SHEETS
+# BRAND_CONFIG.XLSX: TABLE SHEETS
 # ==============================================================================
 
 .build_categories_columns <- function() {
@@ -452,7 +452,7 @@ BRAND_CONFIG_VERSION <- "2.0"
          description = "Category type. 'transactional' = fast-moving goods bought frequently; 'durable' = infrequently replaced items; 'service' = ongoing subscriptions or services. Controls question wording and penetration structure.",
          dropdown = c("transactional", "durable", "service")),
     list(name = "Analysis_Depth", width = 18, required = FALSE,
-         description = "'full' = complete CBM battery (Mental Availability, Funnel, Repertoire, etc.). 'awareness_only' = only cross-category awareness collected — no deep-dive panels. Use awareness_only for peripheral categories included only for Portfolio breadth.",
+         description = "'full' = complete CBM battery (Mental Availability, Funnel, Repertoire, etc.). 'awareness_only' = only cross-category awareness collected, no deep-dive panels. Use awareness_only for peripheral categories included only for Portfolio breadth.",
          dropdown = c("full", "awareness_only")),
     list(name = "Timeframe_Long", width = 18, required = TRUE,
          description = "Long purchase window label (e.g. '12 months'). Matches longer_timeframe_months in Settings. Used in funnel labels."),
@@ -516,7 +516,7 @@ BRAND_CONFIG_VERSION <- "2.0"
 
 
 # ==============================================================================
-# SURVEY_STRUCTURE — SHARED SHEETS (questions, options, composite metrics)
+# SURVEY_STRUCTURE: SHARED SHEETS (questions, options, composite metrics)
 # ==============================================================================
 
 .build_project_settings_def <- function() {
@@ -586,9 +586,9 @@ BRAND_CONFIG_VERSION <- "2.0"
 .build_unified_questions_columns <- function() {
   list(
     list(name = "QuestionCode", width = 28, required = TRUE,
-         description = "Unique code matching the column name prefix in the data file (case-sensitive). For slot-indexed questions (Multi_Mention brand batteries) use the ROOT code — the role inferrer adds the _1, _2 ... slot suffix automatically. Examples: BRANDAWARE_DSS, DEMO_AGE, Q_Gender."),
+         description = "Unique code matching the column name prefix in the data file (case-sensitive). For slot-indexed questions (Multi_Mention brand batteries) use the ROOT code. The role inferrer adds the _1, _2 ... slot suffix automatically. Examples: BRANDAWARE_DSS, DEMO_AGE, Q_Gender."),
     list(name = "QuestionText", width = 50, required = TRUE,
-         description = "Full question wording as shown in output reports. For brand batteries use a short descriptive label (e.g. 'Brand awareness — Dry Seasonings & Spices')."),
+         description = "Full question wording as shown in output reports. For brand batteries use a short descriptive label (e.g. 'Brand awareness: Dry Seasonings & Spices')."),
     list(name = "Variable_Type", width = 20, required = TRUE,
          description = "Question type. Brand module uses Single_Response/Multi_Mention. Tabs module uses the full type set. See Variable Type Reference sheet for full descriptions.",
          dropdown = c("Single_Mention", "Single_Response", "Multi_Mention", "Likert",
@@ -597,20 +597,20 @@ BRAND_CONFIG_VERSION <- "2.0"
          description = "Number of data columns: 1 for most types; for Multi_Mention slot-indexed questions enter the number of slots (brands + 1 for NONE). For tabs Ranking enter the number of items ranked.",
          integer_range = c(1, 500)),
     list(name = "Category", width = 24, required = FALSE,
-         description = "TABS: section/grouping label for output organisation (e.g. 'Demographics', 'Satisfaction'). BRAND: informational only — the brand module infers battery and category from the question code naming convention."),
+         description = "TABS: section/grouping label for output organisation (e.g. 'Demographics', 'Satisfaction'). BRAND: informational only, the brand module infers battery and category from the question code naming convention."),
     list(name = "Ranking_Format", width = 16, required = FALSE,
-         description = "TABS ONLY — required for Ranking questions. 'Position' = each item column holds rank position number. 'Item' = each rank column holds item code.",
+         description = "TABS ONLY: required for Ranking questions. 'Position' = each item column holds rank position number. 'Item' = each rank column holds item code.",
          dropdown = c("Position", "Item")),
     list(name = "Ranking_Positions", width = 18, required = FALSE,
-         description = "TABS ONLY — for Ranking: how many items each respondent ranks (e.g. 3 for 'rank your top 3').",
+         description = "TABS ONLY, for Ranking: how many items each respondent ranks (e.g. 3 for 'rank your top 3').",
          integer_range = c(1, 100)),
     list(name = "Ranking_Direction", width = 18, required = FALSE,
-         description = "TABS ONLY — for Ranking: does Rank 1 mean best or worst?",
+         description = "TABS ONLY, for Ranking: does Rank 1 mean best or worst?",
          dropdown = c("BestToWorst", "WorstToBest")),
     list(name = "Min_Value", width = 12, required = FALSE,
-         description = "TABS ONLY — for Numeric questions: minimum expected value (used for validation and binning)."),
+         description = "TABS ONLY, for Numeric questions: minimum expected value (used for validation and binning)."),
     list(name = "Max_Value", width = 12, required = FALSE,
-         description = "TABS ONLY — for Numeric questions: maximum expected value."),
+         description = "TABS ONLY, for Numeric questions: maximum expected value."),
     list(name = "Notes", width = 30, required = FALSE,
          description = "Internal notes (not shown in output).")
   )
@@ -635,32 +635,32 @@ BRAND_CONFIG_VERSION <- "2.0"
          Category = "Screener",
          Notes = "Slot-indexed: SQ2_1...SQ2_N. Used as portfolio denominator (3m timeframe)"),
     list(QuestionCode = "BRANDAWARE_DSS",
-         QuestionText = "Brands heard of — Dry Seasonings & Spices",
+         QuestionText = "Brands heard of: Dry Seasonings & Spices",
          Variable_Type = "Multi_Mention", Columns = 8,
          Category = "Awareness",
          Notes = "Convention: BRANDAWARE_{CAT}. Slot-indexed. Role: funnel.awareness.DSS + portfolio.awareness.DSS"),
     list(QuestionCode = "BRANDATTR_DSS_CEP01",
-         QuestionText = "CEP 1 — Good for a quick weeknight meal (DSS)",
+         QuestionText = "CEP 1: Good for a quick weeknight meal (DSS)",
          Variable_Type = "Multi_Mention", Columns = 8,
          Category = "Mental Availability",
          Notes = "Convention: BRANDATTR_{CAT}_{CEP/ATTR code}. Role: mental_avail.cep.DSS.CEP01"),
     list(QuestionCode = "BRANDATT1_DSS_IPK",
-         QuestionText = "Brand attitude — IPK (Dry Seasonings)",
+         QuestionText = "Brand attitude: IPK (Dry Seasonings)",
          Variable_Type = "Single_Response", Columns = 1,
          Category = "Funnel",
          Notes = "Convention: BRANDATT1_{CAT}_{BRAND}. Per-brand. Role: funnel.attitude.DSS, per_brand entry"),
     list(QuestionCode = "BRANDPEN2_DSS",
-         QuestionText = "Brands bought in last 3 months — Dry Seasonings",
+         QuestionText = "Brands bought in last 3 months: Dry Seasonings",
          Variable_Type = "Multi_Mention", Columns = 8,
          Category = "Penetration",
          Notes = "Convention: BRANDPEN2_{CAT}. Role: funnel.bought_target.DSS + repertoire.pen_target.DSS"),
     list(QuestionCode = "BRANDPEN3_DSS",
-         QuestionText = "Purchase frequency (bought X times) — Dry Seasonings",
+         QuestionText = "Purchase frequency (bought X times): Dry Seasonings",
          Variable_Type = "Multi_Mention", Columns = 7,
          Category = "Penetration",
          Notes = "Convention: BRANDPEN3_{CAT}. Per-brand frequency sum. Role: repertoire.freq.DSS"),
     list(QuestionCode = "WOM_POS_REC_DSS",
-         QuestionText = "Received positive WOM — Dry Seasonings",
+         QuestionText = "Received positive WOM: Dry Seasonings",
          Variable_Type = "Multi_Mention", Columns = 8,
          Category = "WOM",
          Notes = "Convention: WOM_POS_REC_{CAT}. Slot-indexed. Role: wom.pos_rec.DSS"),
@@ -680,7 +680,7 @@ BRAND_CONFIG_VERSION <- "2.0"
          Category = "Shopper",
          Notes = "Convention: CHANNEL_{CAT}. Role: channel.purchase.DSS. Channels defined in Channels sheet"),
     list(QuestionCode = "BRANDPEN1_DSS",
-         QuestionText = "Brands bought in last 12 months — Dry Seasonings",
+         QuestionText = "Brands bought in last 12 months: Dry Seasonings",
          Variable_Type = "Multi_Mention", Columns = 8,
          Category = "Penetration",
          Notes = "Convention: BRANDPEN1_{CAT}. Role: funnel.bought_longer.DSS"),
@@ -689,17 +689,17 @@ BRAND_CONFIG_VERSION <- "2.0"
          QuestionText = "What is your gender?",
          Variable_Type = "Single_Mention", Columns = 1,
          Category = "Demographics",
-         Notes = "Standard tabs question — use in Crosstab_Config as banner"),
+         Notes = "Standard tabs question: use in Crosstab_Config as banner"),
     list(QuestionCode = "Q_Satisfaction",
          QuestionText = "How satisfied are you overall? (1-5)",
          Variable_Type = "Rating", Columns = 1,
          Category = "Satisfaction",
-         Notes = "Tabs Rating question — generates mean score in crosstabs"),
+         Notes = "Tabs Rating question: generates mean score in crosstabs"),
     list(QuestionCode = "Q_NPS",
          QuestionText = "Likelihood to recommend (0-10)",
          Variable_Type = "NPS", Columns = 1,
          Category = "Loyalty",
-         Notes = "Tabs NPS — auto-calculates Promoters/Passives/Detractors")
+         Notes = "Tabs NPS: auto-calculates Promoters/Passives/Detractors")
   )
 }
 
@@ -718,24 +718,24 @@ BRAND_CONFIG_VERSION <- "2.0"
          description = "Y = show this option in output tables. N = hide (useful for suppressing 'None of the above' rows in some views but not others).",
          dropdown = c("Y", "N")),
     list(name = "ExcludeFromIndex", width = 18, required = FALSE,
-         description = "TABS ONLY — exclude from mean/index calculations (e.g. Don't know, N/A). Y = exclude.",
+         description = "TABS ONLY: exclude from mean/index calculations (e.g. Don't know, N/A). Y = exclude.",
          dropdown = c("Y", "")),
     list(name = "Index_Weight", width = 14, required = FALSE,
-         description = "TABS ONLY — numeric weight for the Likert index (e.g. -100 to 100). Every option needs one; with none, no index row is written. Rating means don't use it - see OptionValue."),
+         description = "TABS ONLY: numeric weight for the Likert index (e.g. -100 to 100). Every option needs one; with none, no index row is written. Rating means don't use it - see OptionValue."),
     list(name = "OptionValue", width = 14, required = FALSE,
-         description = "TABS ONLY — numeric value used for calculations instead of OptionText. Scores Rating means and box/NET ordering; leave blank when OptionText is already the number."),
+         description = "TABS ONLY: numeric value used for calculations instead of OptionText. Scores Rating means and box/NET ordering; leave blank when OptionText is already the number."),
     list(name = "BoxCategory", width = 22, required = FALSE,
-         description = "TABS ONLY — group options into summary rows (e.g. 'Top 2 Box', 'Satisfied', 'Promoters'). Options sharing a BoxCategory label are summed."),
+         description = "TABS ONLY: group options into summary rows (e.g. 'Top 2 Box', 'Satisfied', 'Promoters'). Options sharing a BoxCategory label are summed."),
     list(name = "Min", width = 10, required = FALSE,
-         description = "TABS ONLY — for Numeric binning: minimum value of this bin (e.g. 18 for '18-24' age band)."),
+         description = "TABS ONLY, for Numeric binning: minimum value of this bin (e.g. 18 for '18-24' age band)."),
     list(name = "Max", width = 10, required = FALSE,
-         description = "TABS ONLY — for Numeric binning: maximum value of this bin (e.g. 24 for '18-24' age band).")
+         description = "TABS ONLY, for Numeric binning: maximum value of this bin (e.g. 24 for '18-24' age band).")
   )
 }
 
 .build_unified_options_examples <- function() {
   list(
-    # Brand: BRANDAWARE — brand codes as option values
+    # Brand: BRANDAWARE, brand codes as option values
     list(QuestionCode = "BRANDAWARE_DSS", OptionText = "IPK",
          DisplayText = "Ina Paarman's Kitchen",
          DisplayOrder = 1, ShowInOutput = "Y"),
@@ -782,7 +782,7 @@ BRAND_CONFIG_VERSION <- "2.0"
 .build_composite_metrics_columns <- function() {
   list(
     list(name = "CompositeCode", width = 24, required = TRUE,
-         description = "TABS ONLY — unique identifier for this composite score (e.g. COMP_SAT_OVERALL). Used as sheet name in output. Brand module ignores this sheet."),
+         description = "TABS ONLY: unique identifier for this composite score (e.g. COMP_SAT_OVERALL). Used as sheet name in output. Brand module ignores this sheet."),
     list(name = "CompositeLabel", width = 35, required = TRUE,
          description = "Display name shown in output (e.g. 'Overall Satisfaction Index')."),
     list(name = "CalculationType", width = 18, required = TRUE,
@@ -816,7 +816,7 @@ BRAND_CONFIG_VERSION <- "2.0"
 
 
 # ==============================================================================
-# SURVEY_STRUCTURE — BRAND-SPECIFIC SHEETS
+# SURVEY_STRUCTURE: BRAND-SPECIFIC SHEETS
 # ==============================================================================
 
 .build_brands_columns <- function() {
@@ -989,7 +989,7 @@ BRAND_CONFIG_VERSION <- "2.0"
          ClientCode = "CATBUY_DSS",
          Variable_Type = "Single_Response",
          OptionMapScale = "cat_buy_scale",
-         Notes = "Category buying frequency — coded response mapped to buy-rate multiplier via cat_buy_scale OptionMap"),
+         Notes = "Category buying frequency: coded response mapped to buy-rate multiplier via cat_buy_scale OptionMap"),
     list(Role = "cat_buying.frequency.RM",
          ClientCode = "CATBUY_RM",
          Variable_Type = "Single_Response",
@@ -999,7 +999,7 @@ BRAND_CONFIG_VERSION <- "2.0"
          ClientCode = "DEMO_PROVINCE",
          Variable_Type = "Single_Response",
          OptionMapScale = "",
-         Notes = "Province demographics — options defined in Options sheet by QuestionCode = DEMO_PROVINCE"),
+         Notes = "Province demographics: options defined in Options sheet by QuestionCode = DEMO_PROVINCE"),
     list(Role = "adhoc.Q_BrandPerception.ALL",
          ClientCode = "Q_BrandPerception",
          Variable_Type = "Single_Mention",
@@ -1026,7 +1026,7 @@ BRAND_CONFIG_VERSION <- "2.0"
 
 .build_optionmap_examples <- function() {
   list(
-    # cat_buy_scale — buying frequency mapped to annual buy-rate multiplier
+    # cat_buy_scale: buying frequency mapped to annual buy-rate multiplier
     list(Scale = "cat_buy_scale", ClientCode = "sev_pw",
          Role = "cat_buy_scale.several_week",
          ClientLabel = "Several times a week", OrderIndex = 1),
@@ -1042,7 +1042,7 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(Scale = "cat_buy_scale", ClientCode = "never",
          Role = "cat_buy_scale.never",
          ClientLabel = "I don't buy in this category", OrderIndex = 5),
-    # attitude_scale — brand attitude hierarchy
+    # attitude_scale: brand attitude hierarchy
     list(Scale = "attitude_scale", ClientCode = "1",
          Role = "attitude_scale.love",
          ClientLabel = "I love it / it's my favourite", OrderIndex = 1),
@@ -1058,7 +1058,7 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(Scale = "attitude_scale", ClientCode = "5",
          Role = "attitude_scale.no_opinion",
          ClientLabel = "I have no opinion about this brand", OrderIndex = 5),
-    # reach_seen_scale — branded reach recognition
+    # reach_seen_scale: branded reach recognition
     list(Scale = "reach_seen_scale", ClientCode = "1",
          Role = "reach_seen_scale.recognised",
          ClientLabel = "I recognise this", OrderIndex = 1),
@@ -1142,7 +1142,7 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(name = "AssetCode", width = 18, required = TRUE,
          description = "Unique code for this marketing asset (e.g. TV_AD_Q1_2026, OOH_CAPE_JAN). Referenced by the Branded Reach engine."),
     list(name = "AssetLabel", width = 35, required = TRUE,
-         description = "Display label for the asset in outputs (e.g. 'TV ad — January 2026')."),
+         description = "Display label for the asset in outputs (e.g. 'TV ad, January 2026')."),
     list(name = "Category", width = 24, required = TRUE,
          description = "Category this asset is associated with, or 'ALL' for brand-level assets."),
     list(name = "Brand", width = 16, required = TRUE,
@@ -1224,7 +1224,7 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(name = "FilterColumn", width = 24, required = TRUE,
          description = "Data column to test for this audience filter (e.g. BRANDPEN2_DSS, DEMO_GENDER, Focal_Category)."),
     list(name = "FilterOp", width = 12, required = TRUE,
-         description = "Comparison operator. Type one of: == != > < >= <= in not_in. Use 'in' / 'not_in' with comma-separated FilterValue (e.g. IPK,ROB). Note: no dropdown — < and > cannot be listed in Excel inline validations."),
+         description = "Comparison operator. Type one of: == != > < >= <= in not_in. Use 'in' / 'not_in' with comma-separated FilterValue (e.g. IPK,ROB). Note: no dropdown. < and > cannot be listed in Excel inline validations."),
     list(name = "FilterValue", width = 30, required = TRUE,
          description = "Value(s) to compare against. For 'in' / 'not_in' operators: comma-separated list (e.g. IPK,ROB). For '==' operators: single value (e.g. IPK, 1, FEMALE).")
   )
@@ -1286,14 +1286,14 @@ BRAND_CONFIG_VERSION <- "2.0"
            "Likert", "Rating", "NPS", "Ranking", "Numeric", "Open_End"),
     V2 = c(
       "Pick-one: respondent selects exactly one option",
-      "Identical to Single_Mention — alternate name used in brand module",
+      "Identical to Single_Mention: alternate name used in brand module",
       "Check-all-that-apply: respondent can select multiple options. Also used for slot-indexed brand batteries",
       "Agreement scale with custom index weights (-100 to +100)",
       "Numeric scale where the mean is meaningful (e.g. 1-5, 1-10)",
       "Net Promoter Score (0-10). Auto-calculates Promoters/Passives/Detractors",
       "Ordered preference ranking. Columns = number of ranked items",
       "Open-ended numeric response. Supports binning via Options Min/Max",
-      "Free text — not processed in crosstabs or brand analysis"
+      "Free text: not processed in crosstabs or brand analysis"
     ),
     V3 = c("1", "1", ">1 (# slots)", "1", "1", "1", ">1 (# items)", "1", "1"),
     V4 = c(
@@ -1342,7 +1342,7 @@ BRAND_CONFIG_VERSION <- "2.0"
   openxlsx::mergeCells(wb, sheet, cols = 1:4, rows = 1)
 
   openxlsx::writeData(wb, sheet,
-    x = paste0("The brand module infers analytical roles from question code names automatically — ",
+    x = paste0("The brand module infers analytical roles from question code names automatically: ",
                "no Battery or Category column needed. Follow these naming patterns exactly. ",
                "This sheet is for reference only."),
     startRow = 2, startCol = 1)
@@ -1420,10 +1420,10 @@ BRAND_CONFIG_VERSION <- "2.0"
       "wom.neg_share.{CAT}",
       "wom.pos_count.{CAT}  (per_brand)",
       "wom.neg_count.{CAT}  (per_brand)",
-      "cat_buying.frequency.{CAT}  — needs QuestionMap + OptionMap",
+      "cat_buying.frequency.{CAT}: needs QuestionMap + OptionMap",
       "cat_buying.count.{CAT}",
-      "channel.purchase.{CAT}  — needs Channels sheet",
-      "cat_buying.packsize.{CAT}  — needs PackSizes sheet",
+      "channel.purchase.{CAT}: needs Channels sheet",
+      "cat_buying.packsize.{CAT}: needs PackSizes sheet",
       "screener.cat_buyers_longer  (slot-indexed)",
       "screener.cat_buyers_target  (slot-indexed)",
       "demographics.{KEY}",
@@ -1450,7 +1450,7 @@ BRAND_CONFIG_VERSION <- "2.0"
       "Multi_Mention, slot-indexed. Requires Channels sheet",
       "Multi_Mention, slot-indexed. Requires PackSizes sheet",
       "Multi_Mention, slot-indexed. One slot per category + NONE (SQ1_1...SQ1_N)",
-      "Multi_Mention, slot-indexed. One slot per category (SQ2_1...SQ2_N — no NONE)",
+      "Multi_Mention, slot-indexed. One slot per category (SQ2_1...SQ2_N, no NONE)",
       "Single_Response. Shown in Demographics panel",
       "BRANDAWARE_{CAT} is dual-purposed: also feeds cross-category portfolio",
       "Single_Response / Multi_Mention. Fame = recognition question",
@@ -1511,7 +1511,7 @@ generate_brand_config_template <- function(output_path, overwrite = FALSE) {
 
   # TRS-FALLBACK: rethrow template-styles loader failure with a tagged
   # message. Template generation is a developer tool that runs ahead of
-  # the brand module — TRS infrastructure isn't loaded at this point.
+  # the brand module. TRS infrastructure isn't loaded at this point.
   tryCatch(.ensure_template_styles(),
            error = function(e) stop(sprintf("Cannot load template styles: %s", e$message)))
 
@@ -1520,7 +1520,7 @@ generate_brand_config_template <- function(output_path, overwrite = FALSE) {
   write_settings_sheet(
     wb, "Settings",
     .build_brand_settings_def(),
-    title = "TURAS Brand Module — Configuration",
+    title = "TURAS Brand Module: Configuration",
     subtitle = "Edit the Value column only. Yellow cells are editable. Use dropdowns where provided."
   )
 
@@ -1596,7 +1596,7 @@ generate_brand_survey_structure_template <- function(output_path,
 
   # TRS-FALLBACK: rethrow template-styles loader failure with a tagged
   # message. Template generation is a developer tool that runs ahead of
-  # the brand module — TRS infrastructure isn't loaded at this point.
+  # the brand module. TRS infrastructure isn't loaded at this point.
   tryCatch(.ensure_template_styles(),
            error = function(e) stop(sprintf("Cannot load template styles: %s", e$message)))
 
@@ -1606,7 +1606,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_settings_sheet(
     wb, "Project",
     .build_project_settings_def(),
-    title = "TURAS Survey Structure — Project Settings",
+    title = "TURAS Survey Structure: Project Settings",
     subtitle = "Shared across brand, tabs, and tracker modules. Values here must match Brand_Config.xlsx."
   )
 
@@ -1616,7 +1616,7 @@ generate_brand_survey_structure_template <- function(output_path,
     .build_unified_questions_columns(),
     title = "Question Definitions  [SHARED: used by brand module AND tabs module]",
     subtitle = paste0(
-      "One row per question. Brand module: follow the naming convention in the Question Naming Guide sheet — ",
+      "One row per question. Brand module: follow the naming convention in the Question Naming Guide sheet: ",
       "roles are inferred automatically from question code prefixes (BRANDAWARE_, BRANDATTR_, etc.). ",
       "Tabs module: use any QuestionCode and set Variable_Type. Blue rows are examples."
     ),
@@ -1642,7 +1642,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "Composite_Metrics",
     .build_composite_metrics_columns(),
-    title = "Composite Metric Definitions  [TABS MODULE ONLY — brand module ignores this sheet]",
+    title = "Composite Metric Definitions  [TABS MODULE ONLY: brand module ignores this sheet]",
     subtitle = "Define composite scores that combine multiple questions. Blue rows are examples.",
     example_rows = .build_composite_metrics_examples(),
     num_blank_rows = 20
@@ -1686,15 +1686,15 @@ generate_brand_survey_structure_template <- function(output_path,
     num_blank_rows = 30
   )
 
-  # ---- BRAND: QuestionMap (role overrides / inserts — advanced, optional) ----
+  # ---- BRAND: QuestionMap (role overrides / inserts, advanced, optional) ----
   write_table_sheet(
     wb, "QuestionMap",
     .build_questionmap_columns(),
-    title = "Question Role Map  [BRAND MODULE — optional overrides]",
+    title = "Question Role Map  [BRAND MODULE: optional overrides]",
     subtitle = paste0(
       "Advanced: override or supplement the convention-inferred role map. ",
-      "Most questions do NOT need a row here — roles are inferred from naming conventions automatically. ",
-      "Use QuestionMap for: (1) cat_buying.frequency — needs OptionMapScale; ",
+      "Most questions do NOT need a row here. Roles are inferred from naming conventions automatically. ",
+      "Use QuestionMap for: (1) cat_buying.frequency, which needs OptionMapScale; ",
       "(2) demographics questions that do not follow DEMO_ prefix; ",
       "(3) ad hoc questions with adhoc. role prefix. Blue rows are examples."
     ),
@@ -1702,11 +1702,11 @@ generate_brand_survey_structure_template <- function(output_path,
     num_blank_rows = 30
   )
 
-  # ---- BRAND: OptionMap (scale definitions — needed for some QuestionMap rows) ----
+  # ---- BRAND: OptionMap (scale definitions, needed for some QuestionMap rows) ----
   write_table_sheet(
     wb, "OptionMap",
     .build_optionmap_columns(),
-    title = "Option Scale Definitions  [BRAND MODULE — needed with QuestionMap OptionMapScale]",
+    title = "Option Scale Definitions  [BRAND MODULE: needed with QuestionMap OptionMapScale]",
     subtitle = paste0(
       "Define reusable response scales referenced by OptionMapScale in QuestionMap. ",
       "Each scale (cat_buy_scale, attitude_scale, etc.) appears as a block of rows. ",
@@ -1720,7 +1720,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "Channels",
     .build_channels_columns(),
-    title = "Purchase Channel Definitions  [BRAND MODULE — Shopper Behaviour panel]",
+    title = "Purchase Channel Definitions  [BRAND MODULE: Shopper Behaviour panel]",
     subtitle = paste0(
       "Purchase channel options for the Shopper Behaviour panel. ",
       "One row per channel per category. ChannelCode must match values in CHANNEL_{CAT} data column. ",
@@ -1734,7 +1734,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "PackSizes",
     .build_packsizes_columns(),
-    title = "Pack Size Definitions  [BRAND MODULE — Shopper Behaviour panel]",
+    title = "Pack Size Definitions  [BRAND MODULE: Shopper Behaviour panel]",
     subtitle = paste0(
       "Pack size options for the Shopper Behaviour panel. ",
       "One row per pack size per category. PackCode must match values in PACK_{CAT} data column. ",
@@ -1748,7 +1748,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "MarketingReach",
     .build_marketing_reach_columns(),
-    title = "Marketing Asset Definitions  [BRAND MODULE — Branded Reach panel, only if element_branded_reach = Y]",
+    title = "Marketing Asset Definitions  [BRAND MODULE: Branded Reach panel, only if element_branded_reach = Y]",
     subtitle = paste0(
       "One row per marketing asset (ad, OOH execution, etc.) to test for recognition. ",
       "AssetCode referenced by the Branded Reach engine. Leave blank if element_branded_reach = N. ",
@@ -1762,7 +1762,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "ReachMedia",
     .build_reach_media_columns(),
-    title = "Reach Media Channel Definitions  [BRAND MODULE — Branded Reach panel]",
+    title = "Reach Media Channel Definitions  [BRAND MODULE: Branded Reach panel]",
     subtitle = paste0(
       "Media channels for the Branded Reach 'Where did you see this?' question. ",
       "MediaCode must match values in the reach media attribution question in the data. ",
@@ -1776,7 +1776,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "AudienceLens",
     .build_audience_lens_columns(),
-    title = "Audience Lens Definitions  [BRAND MODULE — only if element_audience_lens = Y]",
+    title = "Audience Lens Definitions  [BRAND MODULE: only if element_audience_lens = Y]",
     subtitle = paste0(
       "Define audience segments for side-by-side comparison across all brand metrics. ",
       "AudienceID referenced by AudienceLens_Use in Brand_Config Categories sheet. ",
@@ -1790,7 +1790,7 @@ generate_brand_survey_structure_template <- function(output_path,
   write_table_sheet(
     wb, "DBA_Assets",
     .build_dba_structure_columns(),
-    title = "DBA Asset Definitions  [BRAND MODULE — only if element_dba = Y]",
+    title = "DBA Asset Definitions  [BRAND MODULE: only if element_dba = Y]",
     subtitle = paste0(
       "Maps asset codes to their Fame and Uniqueness question codes in the data. ",
       "AssetCode must match Brand_Config DBA_Assets sheet. Blue rows are examples."

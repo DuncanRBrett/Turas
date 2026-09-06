@@ -54,7 +54,7 @@ build_funnel_legacy_wide <- function(result, brand_list) {
   out$Ambivalent_Pct  <- 100 * att_pcts$attitude.ambivalent
   out$Price_Pct       <- 100 * att_pcts$attitude.price
   out$Avoid_Pct       <- 100 * att_pcts$attitude.avoid
-  # 6-level scale (IPK 2026 onward) renamed "Reject" to "Avoid" — single
+  # 6-level scale (IPK 2026 onward) renamed "Reject" to "Avoid", single
   # column only. Legacy 5-level surveys feed through the same canonicalisation,
   # so the Avoid_Pct column carries both old "reject" and new "avoid" values.
   out$NoOpinion_Pct   <- 100 * att_pcts$attitude.no_opinion

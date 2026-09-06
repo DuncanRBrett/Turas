@@ -46,7 +46,7 @@ BRAND_VOLUME_VERSION <- "2.0"
 #'   \item{x_mat}{n_resp × n_brands numeric matrix of winsorised purchase counts}
 #'   \item{m_vec}{Numeric vector length n_resp of per-respondent category volume}
 #'   \item{reconciliation}{Named list of diagnostic counts}
-#'   \item{warnings}{Character vector — populated for PARTIAL}
+#'   \item{warnings}{Character vector, populated for PARTIAL}
 #'
 #' @references Goodhardt, Ehrenberg & Chatfield (1984).
 #'
@@ -88,7 +88,7 @@ build_brand_volume_matrix <- function(cat_data,
   has_slots_freq <- length(.bv_slot_cols(cat_data, freq_prefix)) > 0
 
   if (has_slots_pen && has_slots_freq) {
-    # Slot-indexed path — use data-access helpers
+    # Slot-indexed path: use data-access helpers
     pen_logical <- multi_mention_brand_matrix(cat_data, pen_target_prefix,
                                               brands,
                                               brand_aliases = brand_aliases)
@@ -99,7 +99,7 @@ build_brand_volume_matrix <- function(cat_data,
                                         brand_aliases = brand_aliases)
     x_mat[is.na(x_mat) | x_mat < 0] <- 0
   } else {
-    # Legacy per-brand-column path — preserved for backward compatibility
+    # Legacy per-brand-column path: preserved for backward compatibility
     missing_pen  <- character(0)
     missing_freq <- character(0)
     for (bi in seq_along(brands)) {
@@ -146,7 +146,7 @@ build_brand_volume_matrix <- function(cat_data,
   #           Dirichlet, repertoire, and any per-buyer mean.
   #   Case B: BRANDPEN2 says "didn't buy" but BRANDPEN3 > 0 → promote to
   #           buyer (trust the frequency answer). Inflates the buyer
-  #           count vs the raw BRANDPEN2 flag — diverges from the funnel.
+  #           count vs the raw BRANDPEN2 flag, diverges from the funnel.
   # We keep both A and B for downstream consumers that need the cleaned
   # matrix (sole loyalty, SCR, Dirichlet), but Portfolio overview reads
   # pen_mat_raw above so its "% who bought" tracks the funnel exactly.
@@ -216,7 +216,7 @@ build_brand_volume_matrix <- function(cat_data,
   result <- list(
     status         = if (length(warnings_out) > 0) "PARTIAL" else "PASS",
     pen_mat        = pen_mat,
-    pen_mat_raw    = pen_mat_raw,  # BRANDPEN2 unreconciled — used by
+    pen_mat_raw    = pen_mat_raw,  # BRANDPEN2 unreconciled, used by
                                     # Portfolio overview "% who bought"
                                     # so it matches the Funnel exactly.
     x_mat          = x_mat,

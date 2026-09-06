@@ -29,14 +29,14 @@ if (!exists("%||%")) {
 #' @param wom_result List. Output from \code{run_wom()}.
 #' @param brand_list Data frame. Category-scoped brand list with columns
 #'   \code{BrandCode} and (optionally) \code{BrandLabel}.
-#' @param config List. Additional config — supports:
+#' @param config List. Additional config: supports:
 #'   \item{category_label}{Character. Category display label.}
 #'   \item{wave_label}{Character. Wave label.}
 #'   \item{focal_brand_code}{Character. Overrides wom_result$metrics_summary.}
 #'   \item{focal_colour}{Character. Hex colour for the focal brand.}
 #'   \item{brand_colours}{Named list BrandCode -> hex colour. Drives chip
 #'     colouring in the show/hide controls bar.}
-#'   \item{timeframe_label}{Character. e.g. "last 3 months" — appears in
+#'   \item{timeframe_label}{Character. e.g. "last 3 months", appears in
 #'     question labels.}
 #'
 #' @return List with \code{meta}, \code{columns}, \code{brands},
@@ -133,14 +133,14 @@ build_wom_panel_data <- function(wom_result,
   # Said pos / Said neg for every brand respondents recognise. Including
   # all-zero rows in the cat avg drags every metric down by ~1/n per
   # zero-data brand and pulls cat avgs across categories toward a common
-  # diluted floor — making genuinely different categories look similar.
+  # diluted floor, making genuinely different categories look similar.
   #
   # Engine confirms the "no data" -> 0 path: pct_from_logical_matrix and
   # freq_from_per_brand both return 0 when the role can't be resolved
   # (no WOM column for the brand) or no respondent has a positive value.
   # Filtering all-zero rows from cat avg restores the honest mean across
   # brands that actually have WOM data. The all-zero brands still render
-  # as rows in the table — they just don't drag the cat-avg row.
+  # as rows in the table. They just don't drag the cat-avg row.
   wom_active <- (rp > 0) | (rn > 0) | (sp > 0) | (sn > 0)
   cat_avg <- lapply(col_values, function(v) {
     finite_v <- v[is.finite(v) & wom_active]

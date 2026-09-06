@@ -83,7 +83,7 @@ EXTENSION_BASELINE_NON_BUYERS <- "non_buyers"
 # V2: SLOT-INDEXED EXTENSION TABLE
 # ==============================================================================
 
-#' Compute permission-to-extend table (v2 — slot-indexed)
+#' Compute permission-to-extend table (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_extension_table()}.  The focal-awareness
 #' vector in each category comes from \code{respondent_picked()} on the
@@ -99,7 +99,7 @@ EXTENSION_BASELINE_NON_BUYERS <- "non_buyers"
 #' @param config List with portfolio settings + \code{focal_brand}.
 #' @param weights Numeric vector or NULL.
 #' @param footprint_result List or NULL. From
-#'   \code{compute_footprint_matrix()} — used to auto-detect home cat.
+#'   \code{compute_footprint_matrix()}, used to auto-detect home cat.
 #' @return Same list shape as \code{compute_extension_table()}.
 #' @export
 compute_extension_table <- function(data, role_map, categories, structure,
@@ -124,7 +124,7 @@ compute_extension_table <- function(data, role_map, categories, structure,
     return(list(
       status     = "REFUSED",
       code       = "CALC_EXTENSION_NO_FOCAL_AWARENESS",
-      message    = "focal_brand is empty — cannot compute extension lift",
+      message    = "focal_brand is empty. Cannot compute extension lift",
       how_to_fix = "Set focal_brand in the brand config"
     ))
   }
@@ -134,7 +134,7 @@ compute_extension_table <- function(data, role_map, categories, structure,
   if (is.null(brands_df) || nrow(brands_df) == 0L) {
     return(list(status = "REFUSED",
                 code = "CFG_NO_BRAND_LIST",
-                message = "structure$brands is empty — cannot compute extension",
+                message = "structure$brands is empty. Cannot compute extension",
                 how_to_fix = "Populate the Brands sheet"))
   }
   focal_in_cats <- unique(as.character(

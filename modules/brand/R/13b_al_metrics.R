@@ -3,7 +3,7 @@
 # ==============================================================================
 # For a given respondent subset (logical mask `keep_idx`), computes the 14
 # focal-brand KPIs in four families. All metrics are computed directly from
-# the survey data using the QuestionMap role registry — the audience lens
+# the survey data using the QuestionMap role registry, the audience lens
 # does NOT call into upstream engines, which keeps it tolerant of partial
 # upstream failures and makes the result self-contained.
 #
@@ -12,7 +12,7 @@
 #   MENTAL AVAILABILITY  mpen · network_size · mms · som
 #   WORD OF MOUTH        net_heard · net_said
 #   LOYALTY & BEHAVIOUR  loyalty_scr · purchase_distribution · purchase_frequency
-#                        (last three are brand-buyer-base metrics — N/A on the
+#                        (last three are brand-buyer-base metrics, N/A on the
 #                        non-buyer side of pair audiences by definition)
 #
 # Each metric returns a list with:
@@ -27,7 +27,7 @@
 BRAND_AL_METRICS_VERSION <- "1.0"
 
 
-# Static metric definitions — order is the display order in the banner table.
+# Static metric definitions: order is the display order in the banner table.
 .AL_METRIC_GROUPS <- list(
   list(group = "Funnel & Equity", metrics = list(
     list(id = "awareness",     label = "Aided awareness",      kind = "pct"),
@@ -161,11 +161,11 @@ audience_lens_metric_catalog <- function() .AL_METRIC_GROUPS
 # ==============================================================================
 # v2 reads respondent data via 00_data_access.R helpers and resolves columns
 # from a v2 role map (built by build_brand_role_map). Same metric catalogue
-# and per-metric output shape as v1 — the only difference is the seam between
+# and per-metric output shape as v1. The only difference is the seam between
 # the role registry and respondent data.
 #
 # Tracker-friendliness note: every per-respondent indicator built here is a
-# pure function of (data, role_map, focal_brand) — no report-internal state.
+# pure function of (data, role_map, focal_brand), no report-internal state.
 # The Audience Lens v3 project (post-cutover) will materialise these as
 # per-respondent KPI columns so the tracker module can lift them across
 # waves without re-implementing the math.
@@ -321,7 +321,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 
 #' % of subset whose attitude code is in `codes`
 #'
-#' Single_Response semantics — NA in the attitude column means "didn't
+#' Single_Response semantics: NA in the attitude column means "didn't
 #' answer" so it's excluded from the base.
 #' @keywords internal
 .al_metric_pct_from_attitude <- function(att_vec, weights, keep_idx, codes,
@@ -336,7 +336,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 }
 
 
-#' Mental Availability block — v2 (role-map driven CEPs)
+#' Mental Availability block: v2 (role-map driven CEPs)
 #' @keywords internal
 .al_metric_ma_block <- function(data, role_map, weights, keep_idx,
                                     brand_codes, cat_code, focal_brand,
@@ -408,7 +408,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 }
 
 
-#' Word of Mouth block — v2 (role-map driven mention sets)
+#' Word of Mouth block: v2 (role-map driven mention sets)
 #' @keywords internal
 .al_metric_wom_block <- function(data, role_map, weights, keep_idx,
                                      cat_code, focal_brand) {
@@ -441,7 +441,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 }
 
 
-#' Share of Category Requirements (SCR) — v2
+#' Share of Category Requirements (SCR): v2
 #' @keywords internal
 .al_metric_scr <- function(freq_mat, weights, buyer_keep, focal_brand) {
   if (is.null(freq_mat) || !is.matrix(freq_mat) ||
@@ -464,7 +464,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 }
 
 
-#' Purchase frequency (mean focal-brand count among focal buyers) — v2
+#' Purchase frequency (mean focal-brand count among focal buyers), v2
 #' @keywords internal
 .al_metric_purchase_freq <- function(focal_freq, weights, buyer_keep) {
   if (is.null(focal_freq)) {
@@ -483,7 +483,7 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 }
 
 
-#' Purchase distribution (% heavy buyers, top tercile of frequency) — v2
+#' Purchase distribution (% heavy buyers, top tercile of frequency), v2
 #' @keywords internal
 .al_metric_purchase_dist <- function(focal_freq, weights, buyer_keep) {
   if (is.null(focal_freq)) {

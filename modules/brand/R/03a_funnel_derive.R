@@ -23,13 +23,13 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 #
 #   The funnel models the buyer journey as a classical brand funnel:
 #     Aware (recognise the brand)
-#     -> Consider (Love or Prefer attitude — top-2 of the 6-level scale)
+#     -> Consider (Love or Prefer attitude, top-2 of the 6-level scale)
 #     -> Bought 12 months (long-period physical penetration)
 #     -> Bought 3 months  (target-window physical penetration)
 #
 #   Choice of top-2 attitude codes (Love + Prefer) over the legacy top-4
 #   (Love + Prefer + Ambivalent + Price-conditional):
-#     - Top-4 produced "everyone aware considers" collapse — for popular
+#     - Top-4 produced "everyone aware considers" collapse, for popular
 #       brands in IPK 2026, top-4 let 85-97% of aware respondents through
 #       so the consideration stage barely narrowed the funnel.
 #     - Top-2 produces meaningful narrowing across all 51 brand-cats
@@ -40,7 +40,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 #   Mental Availability (CEP-based MPen, MMS, Network Size, etc.) lives
 #   on the Mental Availability tab in full Romaniuk-canonical form. The
 #   funnel and the MA tab measure DIFFERENT constructs by design and so
-#   carry different numbers — the funnel tracks loyalty-style buyer
+#   carry different numbers, the funnel tracks loyalty-style buyer
 #   conversion, the MA tab tracks growth-potential memory presence.
 .FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2")
 
@@ -51,7 +51,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 
 # Category type -> ordered stage list. Transactional funnels are 4 stages
 # (Aware → Consider → Long Period → Target Period). Heavy-buyer / frequency
-# analysis lives in the Repertoire / Frequency element, not here — the
+# analysis lives in the Repertoire / Frequency element, not here, the
 # funnel is a leakage story with unambiguous binary stages (FUNNEL_SPEC_v2 §3).
 .FUNNEL_STAGE_PLAN <- list(
   transactional = c("aware", "consideration",
@@ -75,12 +75,12 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
   long_tenured_s     = "Long-tenured customer"
 )
 
-# Stage definitions — shown as clickable ? popovers in the HTML report
+# Stage definitions: shown as clickable ? popovers in the HTML report
 # and exported to the About drawer / Excel metadata sheet. Operator can
 # override per project via config$funnel.stage_definitions.
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
-  consideration      = "Aware respondents who actively prefer the brand — Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
+  consideration      = "Aware respondents who actively prefer the brand: Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
   bought_long        = "Those who prefer the brand and have bought it in the longer timeframe asked on the survey.",
   bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
   current_owner_d    = "Those who prefer the brand and currently own it in the category.",
@@ -91,7 +91,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 
 # Positive attitude role set used as the Consider membership gate when the
 # survey carries an OptionMap on the attitude column. Top-2 only (Love +
-# Prefer) — the industry-conventional top-2-box consider definition.
+# Prefer), the industry-conventional top-2-box consider definition.
 # Ambivalent and Price-conditional respondents are NOT considered: they
 # don't have an active preference, only a conditional willingness.
 .FUNNEL_POSITIVE_ATTITUDE_ROLES <- c(
@@ -139,7 +139,7 @@ derive_funnel_stages <- function(data, role_map, category_type,
   plan    <- .FUNNEL_STAGE_PLAN[[category_type]]
   brands  <- as.character(brand_list$BrandCode)
   n_resp  <- nrow(data)
-  # See BrandCodeAlias in BRAND_CONFIG_GUIDE.md — opt-in fallback for
+  # See BrandCodeAlias in BRAND_CONFIG_GUIDE.md: opt-in fallback for
   # surveys where the per-brand column suffix or slot option value differs
   # from the canonical brand code.
   brand_aliases <- .brand_aliases_from_list(brand_list)
@@ -147,7 +147,7 @@ derive_funnel_stages <- function(data, role_map, category_type,
   stages_out <- list()
   warns      <- character(0)
 
-  # AGGREGATE FUNNEL — each stage uses its own raw survey response matrix
+  # AGGREGATE FUNNEL: each stage uses its own raw survey response matrix
   # (no AND with prior stages). The funnel narrows in aggregate because most
   # respondents are coherent (aware → positive → bought past 12m → bought past
   # 3m forms a nesting hierarchy for the majority), but non-monotonic answers
@@ -160,7 +160,7 @@ derive_funnel_stages <- function(data, role_map, category_type,
   #
   # Cumulative-AND behaviour (matrix & prev_mat) was removed 2026-05-24 after
   # it was found to silently drop ~11pp of IPK POS past-3m buyers vs the raw
-  # BRANDPEN2 count. See validate_nesting() below — it now functions as a
+  # BRANDPEN2 count. See validate_nesting() below, it now functions as a
   # genuine post-hoc check on the data rather than a tautology guaranteed by
   # the AND. Brands whose aggregate counts violate nesting are surfaced via
   # a PARTIAL warning in stage rendering rather than forcibly clamped.
@@ -243,16 +243,16 @@ validate_nesting <- function(stages, weights = NULL) {
       bad <- which(violations)
       for (bi in bad) {
         warnings_out <- c(warnings_out, sprintf(
-          "Brand %s: stage '%s' count (%.0f) exceeds stage '%s' count (%.0f) — non-monotonic survey responses reported as recorded.",
+          "Brand %s: stage '%s' count (%.0f) exceeds stage '%s' count (%.0f), non-monotonic survey responses reported as recorded.",
           names(curr_counts)[bi], keys[i], curr_counts[bi],
           keys[i - 1], prev_counts[bi]))
       }
     }
   }
-  # v3 (2026-05-24): aggregate funnel — non-monotonic stages no longer
+  # v3 (2026-05-24): aggregate funnel, non-monotonic stages no longer
   # refuse. Returns a structured result so callers can attach warnings to
   # the funnel result's $warnings field. Old loud-refusal behaviour was
-  # removed alongside the cumulative-AND in derive_funnel_stages() — both
+  # removed alongside the cumulative-AND in derive_funnel_stages(), both
   # contradicted the panel's own explainer text ("each stage is asked
   # independently"; "the funnel narrows in aggregate, but it is not a
   # respondent journey"; non-monotonic answers should be reported, not
@@ -386,15 +386,15 @@ validate_nesting <- function(stages, weights = NULL) {
     {
       # Programming-error sentinel: an unrecognised stage key has reached
       # this dispatcher despite the upstream plan validation. Should never
-      # fire in normal operation — listed in PRODUCTION_REVIEW_BRAND.md I1
+      # fire in normal operation, listed in PRODUCTION_REVIEW_BRAND.md I1
       # as an acceptable TRS-FALLBACK because the boxed brand_refuse path
       # is preferred and the stop() is the last-resort guard.
-      msg <- sprintf("BUG_UNKNOWN_STAGE: Unknown funnel stage key '%s'. File a bug — this should not occur with valid config.", key)
+      msg <- sprintf("BUG_UNKNOWN_STAGE: Unknown funnel stage key '%s'. File a bug. This should not occur with valid config.", key)
       if (exists("brand_refuse", mode = "function")) {
         brand_refuse(code = "BUG_UNKNOWN_STAGE", title = "Unknown Funnel Stage Key",
                      problem = sprintf("Stage key '%s' has no handler in .derive_stage_matrix()", key),
                      why_it_matters = "An unrecognised key in the execution plan means no stage data will be produced.",
-                     how_to_fix = "This is an internal error — file a bug report. The key should never reach this function unless the plan was corrupted.")
+                     how_to_fix = "This is an internal error, file a bug report. The key should never reach this function unless the plan was corrupted.")
       } else {
         stop(msg, call. = FALSE)  # TRS-FALLBACK: bootstrap path only
       }
@@ -404,10 +404,10 @@ validate_nesting <- function(stages, weights = NULL) {
 
 
 # ==============================================================================
-# STAGE BUILDERS — V2 (use 00_data_access.R helpers)
+# STAGE BUILDERS: V2 (use 00_data_access.R helpers)
 # ==============================================================================
 
-#' Awareness stage — slot-indexed Multi_Mention root
+#' Awareness stage: slot-indexed Multi_Mention root
 #' @keywords internal
 .stage_awareness <- function(role_map, data, brands, n_resp, cat_code,
                              brand_aliases = NULL) {
@@ -415,7 +415,7 @@ validate_nesting <- function(stages, weights = NULL) {
   .multi_mention_or_empty(entry, data, brands, n_resp, brand_aliases)
 }
 
-#' Consideration stage — attitude top-2 (Love + Prefer)
+#' Consideration stage: attitude top-2 (Love + Prefer)
 #'
 #' A respondent passes the Consider stage for a brand iff they are aware
 #' of the brand AND hold a top-2 positive attitude (Love or Prefer).
@@ -466,7 +466,7 @@ validate_nesting <- function(stages, weights = NULL) {
     }
 
     # When a brand has NO per-brand attitude column (column-name mismatch
-    # between awareness and attitude — e.g. PAS list contains WWT but data
+    # between awareness and attitude, e.g. PAS list contains WWT but data
     # exports BRANDATT1_PAS_WWPS only), single_response_brand_matrix returns
     # an all-NA column for that brand. Treating that as FALSE silently
     # collapses every downstream stage to 0% AND trips the nesting check
@@ -487,7 +487,7 @@ validate_nesting <- function(stages, weights = NULL) {
   }
 }
 
-#' Penetration long-window — slot-indexed Multi_Mention
+#' Penetration long-window: slot-indexed Multi_Mention
 #' @keywords internal
 .stage_penetration_long <- function(role_map, data, brands, n_resp, cat_code,
                                     brand_aliases = NULL) {
@@ -502,7 +502,7 @@ validate_nesting <- function(stages, weights = NULL) {
                                          brand_aliases))
 }
 
-#' Penetration target window — slot-indexed Multi_Mention
+#' Penetration target window: slot-indexed Multi_Mention
 #' @keywords internal
 .stage_penetration_target <- function(role_map, data, brands, n_resp,
                                       cat_code, brand_aliases = NULL) {
@@ -574,18 +574,18 @@ validate_nesting <- function(stages, weights = NULL) {
 }
 
 
-#' Tenure stage (durable/service) — respondent's tenure ≥ threshold,
+#' Tenure stage (durable/service): respondent's tenure ≥ threshold,
 #' coupled to current-owner / current-customer for brand specificity
 #'
-#' Tenure is a single numeric column with no brand information of its own —
+#' Tenure is a single numeric column with no brand information of its own.
 #' it's the answer to "how long have you owned/used your current brand?".
 #' Brand specificity comes from the paired current_owner_d (durable) /
 #' current_customer_s (service) column, which says WHICH brand the
 #' respondent uses. The two columns together define this stage:
 #'   mat[i, b] = (current_owner[i] == b) AND (tenure[i] >= threshold)
 #'
-#' This is a definitional coupling at the stage level — composing the
-#' two source questions to derive the stage's brand×respondent matrix —
+#' This is a definitional coupling at the stage level, composing the
+#' two source questions to derive the stage's brand×respondent matrix,
 #' not a cumulative-AND across funnel stages. See the AGGREGATE FUNNEL
 #' note in derive_funnel_stages() for the distinction.
 #'
@@ -619,7 +619,7 @@ validate_nesting <- function(stages, weights = NULL) {
   owner_entry <- if (!is.null(owner_role))
     .lookup_role(role_map, owner_role, cat_code) else NULL
   if (is.null(owner_entry)) {
-    # No paired owner role — fall back to brand-agnostic (every brand gets
+    # No paired owner role: fall back to brand-agnostic (every brand gets
     # the same long-tenured flag). Surfaces a warning so the operator
     # notices.
     mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
@@ -627,7 +627,7 @@ validate_nesting <- function(stages, weights = NULL) {
     for (b in brands) mat[, b] <- long
     return(list(matrix = mat,
                 warning = sprintf(
-                  "Stage '%s': paired owner/customer role absent — tenure flag applied to every brand identically.",
+                  "Stage '%s': paired owner/customer role absent, tenure flag applied to every brand identically.",
                   label)))
   }
 
@@ -639,7 +639,7 @@ validate_nesting <- function(stages, weights = NULL) {
     for (b in brands) mat[, b] <- long
     return(list(matrix = mat,
                 warning = sprintf(
-                  "Stage '%s': owner column '%s' not in data — tenure flag applied to every brand identically.",
+                  "Stage '%s': owner column '%s' not in data, tenure flag applied to every brand identically.",
                   label, owner_col %||% "(NULL)")))
   }
 

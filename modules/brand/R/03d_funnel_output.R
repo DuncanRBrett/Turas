@@ -61,7 +61,7 @@ BRAND_FUNNEL_OUTPUT_VERSION <- "2.0"
 #' @param result List from \code{run_funnel()}.
 #' @param brand_list Data frame with BrandCode and BrandLabel.
 #' @param role_map Named list. Used to enrich header rows with ClientCode +
-#'   QuestionText. NULL is allowed — the workbook still writes, minus that
+#'   QuestionText. NULL is allowed. The workbook still writes, minus that
 #'   enrichment.
 #' @param output_path Character. Full path to the .xlsx file to write.
 #' @param config List of the funnel.* config values used at runtime.

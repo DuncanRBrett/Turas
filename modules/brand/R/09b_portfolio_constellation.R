@@ -13,7 +13,7 @@
 # (slot-indexed) variants side-by-side; v1 is scheduled for deletion at
 # rebuild cutover (planning doc §9 step 5), bringing the file back inside
 # the 300-active-line default.
-# Denominator: build_portfolio_base() per §3.1 — never inline SQ1_/SQ2_.
+# Denominator: build_portfolio_base() per §3.1, never inline SQ1_/SQ2_.
 # ==============================================================================
 
 CONSTELLATION_MIN_BRANDS <- 3L
@@ -39,7 +39,7 @@ CONSTELLATION_LAYOUT_KK     <- "Turas pure-R Kamada-Kawai (1 - Jaccard)"
 #' brands with Jaccard 0.9 sit close (distance 0.1) and two brands with
 #' Jaccard 0.1 sit far (distance 0.9). This is a deliberate replacement for
 #' Fruchterman-Reingold, which collapses dense high-Jaccard clusters into a
-#' single dot — see PORTFOLIO_SPEC notes on layout choice.
+#' single dot, see PORTFOLIO_SPEC notes on layout choice.
 #'
 #' Algorithm (Kamada & Kawai 1989, "An algorithm for drawing general
 #' undirected graphs"): minimise
@@ -244,7 +244,7 @@ CONSTELLATION_LAYOUT_KK     <- "Turas pure-R Kamada-Kawai (1 - Jaccard)"
 }
 
 
-#' Compute competitive constellation (v2 — slot-indexed)
+#' Compute competitive constellation (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_constellation()}.  Builds the cross-cat
 #' any-awareness matrix from \code{structure$brands} and the slot-indexed
@@ -283,7 +283,7 @@ compute_constellation <- function(data, role_map, categories, structure,
   if (is.null(brands_df) || nrow(brands_df) == 0L) {
     return(list(status = "REFUSED",
                 code = "CFG_NO_BRAND_LIST",
-                message = "structure$brands is empty — cannot build constellation",
+                message = "structure$brands is empty. Cannot build constellation",
                 how_to_fix = "Populate the Brands sheet in Survey_Structure"))
   }
 
@@ -324,7 +324,7 @@ compute_constellation <- function(data, role_map, categories, structure,
       status     = "REFUSED",
       code       = "CALC_CONSTELLATION_TOO_SPARSE",
       message    = sprintf(
-        "Only %d brands with aware respondents — need at least %d for constellation.",
+        "Only %d brands with aware respondents: need at least %d for constellation.",
         length(present_brands), CONSTELLATION_MIN_BRANDS),
       how_to_fix = "Ensure at least 3 brands have non-zero awareness in the data"
     ))
@@ -355,7 +355,7 @@ compute_constellation <- function(data, role_map, categories, structure,
     }
   }
 
-  # Full pairwise table (sorted desc) — kept alongside the chart-rendered
+  # Full pairwise table (sorted desc): kept alongside the chart-rendered
   # top-N so tooltips / Excel can surface the Jaccard for any pair, not
   # just the ones drawn as edges.
   edges_full_df <- if (length(edge_rows) > 0L) {
@@ -410,7 +410,7 @@ compute_constellation <- function(data, role_map, categories, structure,
 }
 
 
-#' Compute per-category constellations (v2 — slot-indexed)
+#' Compute per-category constellations (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_constellations_per_cat()}.  For each
 #' category in \code{categories}, builds the brand x respondent awareness
@@ -554,7 +554,7 @@ compute_constellations_per_cat <- function(data, role_map, categories,
       status  = "REFUSED",
       code    = "CALC_CONSTELLATION_TOO_SPARSE",
       message = sprintf(
-        "Only %d brand(s) with aware buyers — need at least %d.",
+        "Only %d brand(s) with aware buyers: need at least %d.",
         length(present), CONSTELLATION_MIN_BRANDS),
       n_aware = setNames(as.numeric(n_aware_w), brand_codes)
     ))
@@ -583,7 +583,7 @@ compute_constellations_per_cat <- function(data, role_map, categories,
     }
   }
 
-  # Full pairwise table (sorted desc) — kept alongside the chart-rendered
+  # Full pairwise table (sorted desc): kept alongside the chart-rendered
   # top-N so the tooltip can surface the actual Jaccard for any pair, not
   # just the ones drawn as edges.
   edges_full_df <- if (length(edge_rows) > 0L) {

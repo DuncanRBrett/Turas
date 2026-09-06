@@ -5,7 +5,7 @@
 # the brand HTML report renders. Loads a `Section_Insights` sheet from the
 # brand config workbook, maps friendly Category + Section labels to the raw
 # data-section anchor IDs used in the HTML, and exposes the result as
-# config$section_insights — a named character vector keyed by anchor ID,
+# config$section_insights, a named character vector keyed by anchor ID,
 # values are the insight text (markdown supported).
 #
 # Mirror of tabs/lib/crosstabs/crosstabs_config.R::load_comments_sheet()
@@ -22,7 +22,7 @@
 #   POS      | Mental Advantage    | Closest gaps of any...  | 6     | DB     | 2026-05-24
 #
 # Reserved Category code:
-#   _REPORT — cross-cutting sections that aren't per-category
+#   _REPORT: cross-cutting sections that aren't per-category
 #             (Executive Summary, Background, Portfolio sub-tabs).
 #
 # Reserved Section codes (case-insensitive on lookup):
@@ -69,7 +69,7 @@ BRAND_SECTION_INSIGHTS_VERSION <- "1.0"
 
 # Per-category friendly-to-element map. Anchor = element-{cat_id} where
 # cat_id is the lower-cased CategoryCode with non-alphanumerics replaced
-# by hyphens — same rule as build_br_category_panel() in 03_page_builder.R.
+# by hyphens, same rule as build_br_category_panel() in 03_page_builder.R.
 #
 # v1.1: Funnel + Mental Availability now have per-sub-tab anchors so the
 # analyst can write a distinct insight on each sub-tab. The element keys
@@ -91,7 +91,7 @@ BRAND_SECTION_INSIGHTS_VERSION <- "1.0"
   "ma metrics"             = "metrics",       # Headline Metrics sub-tab
   "headline metrics"       = "metrics",
   "metrics"                = "metrics",
-  # Category Buying — single tab today
+  # Category Buying: single tab today
   "category buying"        = "repertoire",
   "cat buying"             = "repertoire",
   "repertoire"             = "repertoire",
@@ -138,7 +138,7 @@ BRAND_SECTION_INSIGHTS_VERSION <- "1.0"
 #' Convert a CategoryCode to the cat_id used in HTML anchor IDs
 #'
 #' Matches the rule in build_br_category_panel() in
-#' modules/brand/lib/html_report/03_page_builder.R — lower-case the code
+#' modules/brand/lib/html_report/03_page_builder.R, lower-case the code
 #' and replace non-alphanumerics with hyphens.
 #'
 #' @keywords internal
@@ -170,7 +170,7 @@ BRAND_SECTION_INSIGHTS_VERSION <- "1.0"
 
   # Pass through raw anchor IDs (start with reserved prefix or contain a hyphen
   # that looks like an element-cat pattern). Anything unrecognised goes through
-  # unchanged so the loader is permissive — analysts can type the raw anchor
+  # unchanged so the loader is permissive. Analysts can type the raw anchor
   # directly when they prefer it.
   if (startsWith(sec_raw, "_")) return(sec_raw)
 
@@ -274,7 +274,7 @@ load_section_insights_sheet <- function(config_path) {
     if (anyDuplicated(anchors) != 0L) {
       dup <- unique(anchors[duplicated(anchors)])
       cat(sprintf(
-        "  [INFO] Section_Insights: %d duplicate anchor(s) — last entry wins: %s\n",
+        "  [INFO] Section_Insights: %d duplicate anchor(s). Last entry wins: %s\n",
         length(dup), paste(dup, collapse = ", ")))
     }
     result <- stats::setNames(insights, anchors)
@@ -305,7 +305,7 @@ load_section_insights_sheet <- function(config_path) {
 section_insight_for <- function(section_insights, anchor) {
   if (is.null(section_insights) || length(section_insights) == 0L) return("")
   if (is.null(anchor) || is.na(anchor) || !nzchar(anchor)) return("")
-  # Use `[` not `[[` — the former tolerates a missing name (returns an NA-named
+  # Use `[` not `[[`: the former tolerates a missing name (returns an NA-named
   # element), the latter throws "subscript out of bounds" on a plain named
   # character vector. Either calling convention works on a list, but the
   # loader returns a named character vector for compactness.

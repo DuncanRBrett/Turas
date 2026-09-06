@@ -1,20 +1,20 @@
 # ==============================================================================
-# BRAND MODULE — GUARDS V2 (REBUILD)
+# BRAND MODULE: GUARDS V2 (REBUILD)
 # ==============================================================================
 # Rebuild-specific guard helpers. Extend the legacy 00_guard.R with:
 #
-#   * guard_alchemer_parser_shape(data) — refuses if the data file looks
+#   * guard_alchemer_parser_shape(data): refuses if the data file looks
 #     like a raw Alchemer export (column-per-brand format) instead of
 #     parser-cleaned slot-indexed format.
 #
-#   * guard_slot_columns_present(data, root, expected) — refuses if a
+#   * guard_slot_columns_present(data, root, expected). Refuses if a
 #     Multi_Mention root's expected slot columns are missing.
 #
-#   * guard_per_brand_column_present(data, root, cat, brand) — refuses if a
+#   * guard_per_brand_column_present(data, root, cat, brand). Refuses if a
 #     per-brand single-response column is absent (used by elements that
 #     require attitude/WOM-count data).
 #
-#   * resolve_active_categories(data, brand_config) — non-refusing helper.
+#   * resolve_active_categories(data, brand_config), non-refusing helper.
 #     Returns the categories we should report on: Active = Y AND at least
 #     one expected column present in data. Categories with Active = Y but
 #     no data in the file get a "data not yet collected" placeholder.
@@ -81,7 +81,7 @@ guard_alchemer_parser_shape <- function(data) {
       title = "Data appears to be a raw Alchemer export",
       problem = paste(
         "Found", sum(raw_placeholders),
-        "columns named like X1, X2, ... — typical of an unparsed Alchemer",
+        "columns named like X1, X2, ..., typical of an unparsed Alchemer",
         "export with multi-row headers."),
       how_to_fix = c(
         "Run AlchemerParser on the export first.",
@@ -189,13 +189,13 @@ guard_per_brand_column_present <- function(data, root, cat_code, brand_code) {
 #'
 #' Active = Y in Brand_Config AND at least one expected data column present.
 #' Returns three lists:
-#'   * full       — Active + has data; render full report
-#'   * partial    — Active + has SOME but not all expected columns; render
+#'   * full: Active + has data; render full report
+#'   * partial. Active + has SOME but not all expected columns; render
 #'                  with placeholder cards for missing elements
-#'   * awaiting   — Active but zero data columns present
-#'   * inactive   — Active = N (silently skipped from report)
+#'   * awaiting, Active but zero data columns present
+#'   * inactive, Active = N (silently skipped from report)
 #'
-#' Non-refusing — caller decides how to render each list.
+#' Non-refusing, caller decides how to render each list.
 #'
 #' @param data Data frame.
 #' @param brand_config List with $categories.
@@ -239,7 +239,7 @@ resolve_active_categories <- function(data, brand_config) {
 
 #' Classify a category's data presence in the file
 #'
-#' Looks for the expected DSS-style core columns. Heuristic — works for the
+#' Looks for the expected DSS-style core columns. Heuristic. Works for the
 #' canonical naming convention; QuestionMap overrides bypass this check.
 #'
 #' @keywords internal
@@ -276,7 +276,7 @@ resolve_active_categories <- function(data, brand_config) {
     # TRS-FALLBACK: brand_refuse() is the canonical handler; this
     # branch only fires if 00_guard.R hasn't loaded before this file.
     # Boxed cat() above already provides TRS-formatted user output.
-    msg <- sprintf("[%s] %s — %s\nHow to fix: %s",
+    msg <- sprintf("[%s] %s: %s\nHow to fix: %s",
                    code, title, problem,
                    paste(how_to_fix, collapse = "; "))
     cat("\n=== TURAS ERROR ===\n", msg, "\n===================\n", sep = "")

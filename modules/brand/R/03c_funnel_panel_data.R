@@ -194,7 +194,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   #                   stage; used by the "% of total" toggle)
   #   pct_nested    = cumulative-chain count at this stage / cumulative
   #                   count at the immediately previous stage (% previous)
-  #   pct_aware     = (stage[k] AND aware) count / aware count — independent
+  #   pct_aware     = (stage[k] AND aware) count / aware count, independent
   #                   intersection with aware, NOT chained through prior
   #                   behaviour stages (% aware)
   # Counts for the n=X (Y) display under each toggle:
@@ -436,7 +436,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       colours[[code]] <- col
     } else {
       message(sprintf(
-        "Brand '%s': Colour '%s' is not a valid hex colour — skipped.",
+        "Brand '%s': Colour '%s' is not a valid hex colour, skipped.",
         code, col
       ))
     }
@@ -449,10 +449,10 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   list(
     question_texts = .question_texts_from_warnings(result),
     methodology_note = paste(
-      "Each stage is measured by its own survey question — \"which of these",
+      "Each stage is measured by its own survey question, \"which of these",
       "brands have you heard of?\", the per-brand attitude question (\"how do",
       "you feel about [brand]?\"), \"bought in the last 12 months\", and",
-      "\"bought in the last 3 months\" — not by routing or skip logic.",
+      "\"bought in the last 3 months\", not by routing or skip logic.",
       "Aggregate counts almost always nest because most respondents are",
       "coherent, and Turas refuses to render brands whose aggregate stage",
       "counts violate nesting. Conversion ratios are aggregate ratios",
@@ -469,8 +469,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       "for the precision it costs. Panel sampling is non-probability;",
       "margin of error is not reported."),
     heavy_buyer_note = paste(
-      "Heavy-buyer and frequency analysis — how often respondents buy each",
-      "brand — lives in the Repertoire / Frequency view, not the funnel.",
+      "Heavy-buyer and frequency analysis: how often respondents buy each",
+      "brand: lives in the Repertoire / Frequency view, not the funnel.",
       "Funnel stages are behavioural milestones (aware → buy), not loyalty cuts."),
     prior_brand_note = if ("funnel.service.prior_brand" %in% names(
       result$role_map_used %||% list())) {
@@ -544,7 +544,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 .stage_label_overrides <- function(config) {
   ov <- list()
   # Treat NA, NA_character_, and the literal string "NA" (from openxlsx
-  # reading blank cells via as.character()) as "no override" — otherwise the
+  # reading blank cells via as.character()) as "no override", otherwise the
   # table headers display "Past NA" instead of falling back to the default
   # "Long Period" / "Target Period" labels.
   .is_real <- function(x) {

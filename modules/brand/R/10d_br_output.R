@@ -101,7 +101,7 @@ build_branded_reach_panel_data <- function(result,
     }
   }
 
-  # Worst misattribution leak — highest single-competitor share among
+  # Worst misattribution leak: highest single-competitor share among
   # respondents-who-saw-it across all ads.
   leak <- .br_worst_misattribution(ads, misattribution, focal_brand)
   if (!is.null(leak)) {
@@ -150,7 +150,7 @@ build_branded_reach_panel_data <- function(result,
     if (is.null(df) || !is.data.frame(df) || nrow(df) == 0L) next
     # Drop the focal row, the DK row, and the OTHER row to find the
     # single competitor pulling the most credit. Note: use a vectorised
-    # comparison — isTRUE() returns a scalar from a vector and would
+    # comparison. isTRUE() returns a scalar from a vector and would
     # leave the focal row in the candidate set.
     not_focal  <- !(df$is_correct %in% TRUE)
     not_bucket <- !(df$BrandCode %in% c("DK", "OTHER"))

@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE — DATA-ACCESS LAYER
+# BRAND MODULE: DATA-ACCESS LAYER
 # ==============================================================================
 # Shared helpers that every analytical element calls to read respondent-level
 # answers from the AlchemerParser-shape data file. Two question shapes are
@@ -14,7 +14,7 @@
 #      Helper: single_response_brand_column() / single_response_brand_matrix().
 #
 # Every brand-analysis function in modules/brand/R/ MUST go through these
-# helpers. Direct data[[paste0(...)]] access is forbidden in the rebuild —
+# helpers. Direct data[[paste0(...)]] access is forbidden in the rebuild.
 # the helpers are the single seam between the role registry and respondent
 # data.
 #
@@ -90,7 +90,7 @@ respondent_picked <- function(data, root, option_code, aliases = NULL) {
 #' @param data Data frame.
 #' @param root Question root code (e.g. \code{"BRANDAWARE_DSS"}).
 #' @param brand_codes Character vector of brand codes (or a brand_list data
-#'   frame with a \code{BrandCode} column — and optionally
+#'   frame with a \code{BrandCode} column, and optionally
 #'   \code{BrandCodeAlias} for the alias-aware path).
 #' @param brand_aliases Optional named character vector mapping BrandCode →
 #'   alternate option-value suffix that may appear in the data slots. Used to
@@ -111,7 +111,7 @@ multi_mention_brand_matrix <- function(data, root, brand_codes,
                                         brand_aliases = NULL) {
   .require_dataframe(data)
   .require_root(root)
-  # Accept brand_list data frame for ergonomic call sites — extract codes +
+  # Accept brand_list data frame for ergonomic call sites, extract codes +
   # auto-detect aliases. Existing character-vector callers are untouched.
   if (is.data.frame(brand_codes)) {
     bl <- brand_codes
@@ -133,7 +133,7 @@ multi_mention_brand_matrix <- function(data, root, brand_codes,
   for (b in brand_codes) {
     # Match the canonical brand code AND its alias (if declared). The alias
     # path was added to handle Alchemer surveys programmed with a different
-    # option value than the structure's BrandCode — e.g. IPK 2026 POS where
+    # option value than the structure's BrandCode, e.g. IPK 2026 POS where
     # F&F's option value was 'FNF' but the brand code is 'FNFPS'.
     targets <- b
     if (!is.null(brand_aliases) && b %in% names(brand_aliases)) {
@@ -161,7 +161,7 @@ multi_mention_brand_matrix <- function(data, root, brand_codes,
 #' @param root Question root (e.g. \code{"BRANDATT1"}).
 #' @param cat_code Category code (e.g. \code{"DSS"}).
 #' @param brand_code Brand code (e.g. \code{"IPK"}).
-#' @return Vector of length \code{nrow(data)} — the raw column.
+#' @return Vector of length \code{nrow(data)}: the raw column.
 #' @examples
 #' \dontrun{
 #'   att <- single_response_brand_column(data, "BRANDATT1", "DSS", "IPK")
@@ -191,7 +191,7 @@ single_response_brand_column <- function(data, root, cat_code, brand_code) {
 #'
 #' For per-brand Single_Response families. Concatenates
 #' \code{single_response_brand_column()} across the brand list. Brands without
-#' a corresponding column contribute an NA column (does NOT refuse — caller
+#' a corresponding column contribute an NA column (does NOT refuse, caller
 #' decides whether missing brands are an error in their context).
 #'
 #' Returns a character matrix to preserve original coding (numeric or string);
@@ -201,7 +201,7 @@ single_response_brand_column <- function(data, root, cat_code, brand_code) {
 #' @param root Question root (e.g. \code{"BRANDATT1"}).
 #' @param cat_code Category code (e.g. \code{"DSS"}).
 #' @param brand_codes Character vector of brand codes (or a brand_list data
-#'   frame with a \code{BrandCode} column — and optionally
+#'   frame with a \code{BrandCode} column, and optionally
 #'   \code{BrandCodeAlias} for the alias-aware path).
 #' @param brand_aliases Optional named character vector mapping BrandCode →
 #'   alternate column-suffix that may appear in the data. Used to reconcile
@@ -222,7 +222,7 @@ single_response_brand_column <- function(data, root, cat_code, brand_code) {
 single_response_brand_matrix <- function(data, root, cat_code, brand_codes,
                                           brand_aliases = NULL) {
   .require_dataframe(data)
-  # Accept brand_list data frame for ergonomic call sites — extract codes +
+  # Accept brand_list data frame for ergonomic call sites, extract codes +
   # auto-detect aliases. Existing character-vector callers are untouched.
   if (is.data.frame(brand_codes)) {
     bl <- brand_codes
@@ -317,7 +317,7 @@ multi_mention_indicator_matrix <- function(data, root, codes) {
 #' a numeric matrix where cell [i, brand] = count if the brand appears in
 #' any slot for respondent i, else 0.
 #'
-#' Slot N in BRANDPEN3 maps to the brand at slot N in BRANDPEN2 — the
+#' Slot N in BRANDPEN3 maps to the brand at slot N in BRANDPEN2, the
 #' Alchemer Continuous Sum question is piped from the previous Multi_Mention.
 #'
 #' @param data Data frame.
@@ -326,7 +326,7 @@ multi_mention_indicator_matrix <- function(data, root, codes) {
 #' @param root_values Question root for the numeric per-slot values
 #'   (e.g. "BRANDPEN3_DSS").
 #' @param brand_codes Character vector of brand codes (or a brand_list data
-#'   frame with a \code{BrandCode} column — and optionally
+#'   frame with a \code{BrandCode} column, and optionally
 #'   \code{BrandCodeAlias} for the alias-aware path).
 #' @param brand_aliases Optional named character vector mapping BrandCode →
 #'   alternate option-value that may appear in the data slots (see
@@ -436,7 +436,7 @@ slot_paired_numeric_matrix <- function(data, root_codes, root_values,
   )
 }
 
-#' Local refusal helper — wraps brand_refuse() if available, else stop()
+#' Local refusal helper: wraps brand_refuse() if available, else stop()
 #'
 #' During the rebuild, this file may be sourced before 00_guard.R.
 #' @keywords internal
@@ -448,7 +448,7 @@ brand_da_refuse <- function(code, title, problem, how_to_fix,
                  why_it_matters = "Data-access layer cannot proceed.",
                  how_to_fix = how_to_fix, missing = missing, ...)
   } else {
-    msg <- sprintf("[%s] %s — %s\nHow to fix: %s",
+    msg <- sprintf("[%s] %s: %s\nHow to fix: %s",
                    code, title, problem,
                    paste(how_to_fix, collapse = "; "))
     cat("\n=== TURAS ERROR ===\n", msg, "\n===================\n", sep = "")
@@ -456,7 +456,7 @@ brand_da_refuse <- function(code, title, problem, how_to_fix,
     # stop() only fires during the rebuild when this file is sourced
     # before 00_guard.R (i.e. brand_refuse isn't yet defined). The boxed
     # message above is already TRS-formatted, so the user-facing output
-    # is identical to a normal refusal — only the control-flow shape
+    # is identical to a normal refusal, only the control-flow shape
     # differs (raised error instead of returned list).
     stop(msg, call. = FALSE)
   }
@@ -472,14 +472,14 @@ brand_da_refuse <- function(code, title, problem, how_to_fix,
 #' Survey instruments sometimes include a "None of the above" option in the
 #' BRANDAWARE pick list as an escape hatch ("I don't recognise any of these
 #' brands"). The corresponding row in the Brands sheet is a pseudo-brand,
-#' not a real one — it should never appear as a row in funnel / WoM /
+#' not a real one. It should never appear as a row in funnel / WoM /
 #' relationship tables, nor as a real brand in CEP linkage computations.
 #'
 #' Matches common variants case-insensitively after stripping non-letter
 #' characters: NONE, NoTA, N/A, n.a., n_a, noneoftheabove.
 #'
 #' @param brand_code Character vector of brand codes (NA-safe).
-#' @return Logical vector — TRUE where the code is a NONE pseudo-brand.
+#' @return Logical vector: TRUE where the code is a NONE pseudo-brand.
 #' @keywords internal
 .is_none_brand_code <- function(brand_code) {
   if (is.null(brand_code) || length(brand_code) == 0L) {

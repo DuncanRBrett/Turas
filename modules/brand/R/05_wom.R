@@ -28,12 +28,12 @@ WOM_VERSION <- "1.0"
 #'
 #' Required role-map entries (per category):
 #' \itemize{
-#'   \item \code{wom.pos_rec.\{cat\}}   — Multi_Mention root, brand codes as values
-#'   \item \code{wom.neg_rec.\{cat\}}   — Multi_Mention root
-#'   \item \code{wom.pos_share.\{cat\}} — Multi_Mention root
-#'   \item \code{wom.neg_share.\{cat\}} — Multi_Mention root
-#'   \item \code{wom.pos_count.\{cat\}} — per-brand Single_Response, numeric
-#'   \item \code{wom.neg_count.\{cat\}} — per-brand Single_Response, numeric
+#'   \item \code{wom.pos_rec.\{cat\}}, Multi_Mention root, brand codes as values
+#'   \item \code{wom.neg_rec.\{cat\}}, Multi_Mention root
+#'   \item \code{wom.pos_share.\{cat\}}, Multi_Mention root
+#'   \item \code{wom.neg_share.\{cat\}}, Multi_Mention root
+#'   \item \code{wom.pos_count.\{cat\}}, per-brand Single_Response, numeric
+#'   \item \code{wom.neg_count.\{cat\}}, per-brand Single_Response, numeric
 #' }
 #' Missing roles produce zero columns (graceful partial output) rather than a
 #' refusal, matching legacy behaviour where missing prefixes left the

@@ -328,7 +328,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       msg
     ))
     warnings_list <<- c(warnings_list,
-      sprintf("%s — v2 elements will skip", msg))
+      sprintf("%s: v2 elements will skip", msg))
     NULL
   })
 
@@ -410,7 +410,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                              data[[focal_col]] == cat_code]
                    } else weights
 
-    # Mental Availability (full categories only — awareness_only cats have no CEPs).
+    # Mental Availability (full categories only: awareness_only cats have no CEPs).
     # v2 entry walks role_map for mental_avail.cep.{cat}.* (and .attr.* for the
     # brand-image battery) and rebuilds the linkage tensor from slot-indexed
     # data via multi_mention_brand_matrix(). Legacy
@@ -456,7 +456,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           stringsAsFactors = FALSE
         )
 
-        # Brand image attributes (optional — same matrix shape as CEP)
+        # Brand image attributes (optional: same matrix shape as CEP)
         attr_linkage <- NULL
         if (!is.null(cat_attrs) && nrow(cat_attrs) > 0) {
           attr_linkage <- tryCatch(
@@ -489,7 +489,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                        stringsAsFactors = FALSE) else NULL
         )
 
-        # MA Focal Brand View — pairs MA scores with the focal brand's
+        # MA Focal Brand View: pairs MA scores with the focal brand's
         # buyer/non-buyer linkage gap (replaces the standalone Drivers &
         # Barriers HTML page; D&B Excel/CSV outputs are unchanged).
         # Computed for EVERY brand so the in-page focal picker can
@@ -570,7 +570,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
     # Funnel (role-registry architecture; full categories only). v2 path
     # passes the global role_map (built once after Step 3) directly to
-    # run_funnel — no per-category QuestionMap normalisation needed because
+    # run_funnel, no per-category QuestionMap normalisation needed because
     # v2 role names already carry the .{cat} suffix that .lookup_role
     if (isTRUE(config$element_funnel) && cat_depth == "full") {
       if (verbose) cat("  Running Funnel...\n")
@@ -705,7 +705,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           }
         )
 
-        # P1.2 fix: buyer heaviness requires a successful Dirichlet run —
+        # P1.2 fix: buyer heaviness requires a successful Dirichlet run,
         # both analyses depend on the same Dirichlet parameterisation.
         if (!identical(cat_result$dirichlet_norms$status, "REFUSED")) {
           if (verbose) cat("  Running buyer heaviness...\n")
@@ -772,7 +772,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       # requires QuestionMap rows + per-channel indicator columns. Surveys
       # that store channels in slot columns (CHANNEL_<CAT>_1..6 or
       # CAT_LOC_<CAT>_1..6, each slot carrying the channel code as text)
-      # don't fit that resolver — compute a simple distribution here so the
+      # don't fit that resolver, compute a simple distribution here so the
       # cat panel can still render a "buying location" section.
       if (is.null(cat_result$shopper_location) &&
           exists("compute_buying_location", mode = "function")) {
@@ -812,7 +812,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
-    # Branded Reach (full categories only; v2 entry — placeholder-aware).
+    # Branded Reach (full categories only; v2 entry: placeholder-aware).
     # When structure has no MarketingReach sheet (IPK Wave 1), v2 returns a
     # PASS placeholder so the panel-data renderer can show "Data not yet
     # collected for Branded Reach". Otherwise delegates to run_branded_reach.
@@ -999,7 +999,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   # --- STEP 5: Brand-level elements ---
 
-  # DBA — v2 entry. Always runs when element is enabled; v2 emits a
+  # DBA: v2 entry. Always runs when element is enabled; v2 emits a
   # placeholder result when the structure has no DBA assets or the
   # per-asset Fame/Unique columns are absent from data.
   if (isTRUE(config$element_dba)) {
@@ -1032,14 +1032,14 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   }
 
   # WOM is now per-category (see Step 4 above). No brand-level WOM.
-  # Demographics + Ad Hoc are also per-category — see the per-category
+  # Demographics + Ad Hoc are also per-category, see the per-category
   # block above; results land on category_results[[cat]]$demographics
   # and $adhoc and surface as sub-tabs inside each category panel.
 
   # --- STEP 5c: Sample-wide shopper context + focal brand engagement ---
   # Both engines are NULL-safe: if the source columns aren't in the data,
   # they return NULL and the summary panel skips the section. No element
-  # flag — these surface whenever the columns are present.
+  # flag: these surface whenever the columns are present.
   if (exists("compute_shopper_context", mode = "function")) {
     results$shopper_context <- tryCatch(
       compute_shopper_context(data, structure, weights),
@@ -1124,13 +1124,13 @@ if (!exists(".find_brand_col", mode = "function")) {
 # Wraps the new run_funnel() signature. Returns a refusal list rather than
 # throwing, so a single-category refusal does not abort the whole brand
 # analysis. When the structure lacks a QuestionMap sheet the funnel is
-# skipped loudly — there is no legacy fallback; the operator must add the
+# skipped loudly: there is no legacy fallback; the operator must add the
 # QuestionMap per modules/brand/docs/ROLE_REGISTRY.md §11.
 
 #' Run the funnel for one category against the v2 role map
 #'
 #' v2 sibling of \code{.run_funnel_for_category}. Skips the legacy
-#' QuestionMap normalisation entirely — the v2 role_map already has
+#' QuestionMap normalisation entirely, the v2 role_map already has
 #' \code{funnel.awareness.DSS}-style keys, and \code{run_funnel}'s
 #' \code{.lookup_role} resolves them via the \code{cat_code} config field.
 #' @keywords internal
@@ -1154,9 +1154,9 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 #' Map MA item codes to display labels
 #'
-#' v2 emits per-cat CEP codes (CEP01, CEP02, ...) directly — labels come from
+#' v2 emits per-cat CEP codes (CEP01, CEP02, ...) directly, labels come from
 #' \code{cat_ceps$CEPText} indexed by \code{cat_ceps$CEPCode}. Legacy emits
-#' question codes (\code{CEP01_DSS}) — labels come from
+#' question codes (\code{CEP01_DSS}), labels come from
 #' \code{cep_questions$QuestionText} by position.
 #' @keywords internal
 .ma_resolve_cep_labels <- function(cep_codes, cat_ceps, use, cep_questions) {
@@ -1296,7 +1296,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 # elements weren't run the cut sub-results collapse to NULL and the
 # panel hides those tabs silently.
 
-#' Demographics dispatcher (v2 — role-map driven)
+#' Demographics dispatcher (v2: role-map driven)
 #'
 #' v2 sibling of \code{.run_demographics_for_category}. Walks role_map for
 #' \code{^demographics\\.*} keys (the v2 namespace; legacy used \code{demo.*})
@@ -1362,7 +1362,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 # Resolve one demo.* role and run the engine. Returns NULL when the role
 # can't be resolved or its data column is absent (caller skips silently).
 # Synthetic "Buyer status" + "Heaviness" demographic tables removed from the
-# panel per Duncan 2026-05-23 — they duplicated information already shown in
+# panel per Duncan 2026-05-23. They duplicated information already shown in
 # the brand-level Buyer Heaviness analysis (BuyHvy Excel sheet) and the
 # Repertoire / SoR panels, and added noise to the demographics matrix. The
 # constructor functions (.demo_synthetic_buyer_status / .demo_synthetic_heaviness)
@@ -1394,7 +1394,7 @@ if (!exists(".find_brand_col", mode = "function")) {
   list(
     role          = "demo.synthetic.buyer_status",
     column        = NA_character_,
-    question_text = sprintf("Buyer status — %s", focal_lbl),
+    question_text = sprintf("Buyer status: %s", focal_lbl),
     short_label   = "Buyer status",
     variable_type = "Single_Response",
     codes         = c("BUYER", "NON_BUYER"),
@@ -1501,7 +1501,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 
 # Legacy brand-level demographics dispatcher kept for callers that still
-# need a sample-wide view (none currently — engine runs per-category in
+# need a sample-wide view (none currently. Engine runs per-category in
 # the orchestrator loop). Retained as an unused helper signature stub so
 # the function name remains greppable in case the brand-level view returns.
 # Build the focal-brand buyer indicator across all full categories. A
@@ -1523,7 +1523,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 # from brand_volume. Returns the legacy-shape PASS payload (questions[],
 # n_total, weighted) when at least one role resolves; otherwise the v2
 # placeholder so the panel-data renderer can show "Data not yet collected
-# for Ad Hoc" — matching the placeholder pattern across the rebuild.
+# for Ad Hoc", matching the placeholder pattern across the rebuild.
 
 .run_adhoc_for_category <- function(role_map, structure, config,
                                         data_full, weights_full,
@@ -1575,7 +1575,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 
 # ==============================================================================
-# AD HOC DISPATCH (per-category, legacy QuestionMap path — superseded by v2)
+# AD HOC DISPATCH (per-category, legacy QuestionMap path, superseded by v2)
 # ==============================================================================
 # For each category, picks up:
 #   - adhoc.<key>.<CATCODE>  rows belonging to this category, scoped to

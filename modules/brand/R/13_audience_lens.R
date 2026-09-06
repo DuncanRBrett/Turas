@@ -18,7 +18,7 @@
 # column in Brand_Config.xlsx).
 #
 # All 14 KPIs are recomputed inside this engine for each audience subset so
-# the audience lens stands on its own — no leakage from filtered upstream
+# the audience lens stands on its own, no leakage from filtered upstream
 # blocks. The KPI definitions live in 11b_al_metrics.R and intentionally
 # mirror (not call) the upstream engines' definitions: this keeps the lens
 # tolerant of partial failures upstream and makes the Romaniuk metrics
@@ -100,7 +100,7 @@ BRAND_AUDIENCE_LENS_VERSION <- "1.0"
 # role registry (00_role_map_v2.R). It delegates KPI computation to the v2
 # metric block in 13b_al_metrics.R. Audience parsing (13a_al_audiences.R),
 # pair classification (13c_al_classify.R) and panel-data shaping
-# (13d_al_panel_data.R) work unchanged on the v2 result shape — those files
+# (13d_al_panel_data.R) work unchanged on the v2 result shape, those files
 # operate on the metric output, not the data layer underneath.
 #
 # Tracker-friendliness note (per memory entry
@@ -118,14 +118,14 @@ BRAND_AUDIENCE_LENS_VERSION <- "1.0"
 #'
 #' Required role-map entries (per category \code{cat_code}):
 #' \itemize{
-#'   \item \code{funnel.awareness.\{cat\}} — BRANDAWARE root (Multi_Mention)
-#'   \item \code{funnel.attitude.\{cat\}} — BRANDATT1 per-brand compound
-#'   \item \code{funnel.penetration_target.\{cat\}} — BRANDPEN2 root
-#'   \item \code{funnel.frequency.\{cat\}} — BRANDPEN3 root (optional)
-#'   \item \code{mental_avail.cep.\{cat\}.*} — BRANDATTR CEPs (optional;
+#'   \item \code{funnel.awareness.\{cat\}}, BRANDAWARE root (Multi_Mention)
+#'   \item \code{funnel.attitude.\{cat\}}, BRANDATT1 per-brand compound
+#'   \item \code{funnel.penetration_target.\{cat\}}, BRANDPEN2 root
+#'   \item \code{funnel.frequency.\{cat\}}, BRANDPEN3 root (optional)
+#'   \item \code{mental_avail.cep.\{cat\}.*}, BRANDATTR CEPs (optional;
 #'         block is skipped when no CEP roles are present)
 #'   \item \code{wom.pos_rec.\{cat\}} / \code{wom.neg_rec.\{cat\}} /
-#'         \code{wom.pos_share.\{cat\}} / \code{wom.neg_share.\{cat\}} —
+#'         \code{wom.pos_share.\{cat\}} / \code{wom.neg_share.\{cat\}}.
 #'         WOM mention sets (optional)
 #' }
 #'

@@ -195,7 +195,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
 
   # Treat NULL / NA / blank uniformly when deciding whether a path setting is
   # populated. A freshly-generated Brand_Config from AlchemerExport leaves
-  # these blank for the analyst to fill in — without the NA guard a blank cell
+  # these blank for the analyst to fill in, without the NA guard a blank cell
   # crashes the loader with "missing value where TRUE/FALSE needed".
   .is_set <- function(x) !is.null(x) && length(x) > 0L && !is.na(x) &&
                           nchar(trimws(as.character(x))) > 0L
@@ -232,7 +232,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
     # Try simple format first (headers in row 1) - most reliable
     cats <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 1)
     # If "Category" column not found in row-1 read, the sheet has title/description
-    # rows — scan startRow 2, 3, 4 until we find the real headers
+    # rows, scan startRow 2, 3, 4 until we find the real headers
     if (!is.null(cats) && !"Category" %in% names(cats)) {
       for (.sr in 2:4) {
         cats2 <- tryCatch(
@@ -288,7 +288,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
     config$dba_assets <- dba_assets
   }
 
-  # Load optional Section_Insights sheet — analyst-authored insights keyed
+  # Load optional Section_Insights sheet: analyst-authored insights keyed
   # by HTML section anchor, pre-filled into each panel's "+ Add Insight"
   # editor at render time. Survives any re-run because it lives in the
   # config workbook, not in the generated HTML. See R/01b_section_insights.R.
@@ -345,7 +345,7 @@ load_brand_survey_structure <- function(structure_path) {
   .load_table <- function(sheet_name) {
     tryCatch({
       # Suppress "No data found on worksheet" warnings from openxlsx when a
-      # sheet exists but is empty — treat the same as a missing sheet (NULL).
+      # sheet exists but is empty, treat the same as a missing sheet (NULL).
       df <- suppressWarnings(
         openxlsx::read.xlsx(structure_path, sheet = sheet_name, startRow = 1)
       )
@@ -458,7 +458,7 @@ load_brand_survey_structure <- function(structure_path) {
 #' @param category Character. Category display name.
 #' @param cat_code Character. Short category code (e.g. "DSS"). When supplied
 #'   and the Brands sheet has a \code{CategoryCode} column, filters by code
-#'   rather than display name — more robust when the Category name column
+#'   rather than display name, more robust when the Category name column
 #'   contains template placeholders.
 #'
 #' @return Data frame of brands for the category.

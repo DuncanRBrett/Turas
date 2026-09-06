@@ -1,23 +1,23 @@
 # ==============================================================================
-# BRAND MODULE — SHOPPER CONTEXT + FOCAL ENGAGEMENT (sample-wide)
+# BRAND MODULE: SHOPPER CONTEXT + FOCAL ENGAGEMENT (sample-wide)
 # ==============================================================================
 # Two thin engines that surface IPK-2026's sample-wide shopper questions on the
-# Summary tab. Neither is per-category — both compute one number set against
+# Summary tab. Neither is per-category, both compute one number set against
 # the whole sample.
 #
-#   compute_shopper_context()  — grocery chains, media channels, recipe-use freq
+#   compute_shopper_context(): grocery chains, media channels, recipe-use freq
 #                                Roots discovered by convention: GroceryChains,
 #                                MEDIA, RECIPE. Multi-mention slots carry the
 #                                option label text; the single-mention RECIPE
 #                                column carries the 5-pt scale value.
 #
-#   compute_focal_engagement() — focal-brand behavioural KPIs. Looks for
+#   compute_focal_engagement(): focal-brand behavioural KPIs. Looks for
 #                                <FOCAL>WEB, <FOCAL>BOOK, <FOCAL>_RECIPE
 #                                Single_Response Yes/No columns. <FOCAL>_RECIPE
 #                                is conditional on RECIPE != "Never" (the
 #                                Never-recipe-users segment can't have tried
 #                                the focal's recipes so they're excluded from
-#                                the base — reported separately).
+#                                the base, reported separately).
 #
 # Both engines return a list ready to hand to the panel renderer; no HTML here.
 # Returns NULL when no relevant data columns exist.
@@ -189,7 +189,7 @@ compute_shopper_context <- function(data, structure, weights = NULL) {
 
 # Resolve a focal-engagement column by convention. Returns the actual data
 # column name when present; NULL otherwise. The IPK 2026 column names are
-# IPKWEB / IPKBOOK / IPK_RECIPE — for any other focal code we look for
+# IPKWEB / IPKBOOK / IPK_RECIPE, for any other focal code we look for
 # {focal}WEB / {focal}BOOK / {focal}_RECIPE first, then fall back to the
 # literal IPK column name (so a non-IPK config still surfaces the IPK questions
 # verbatim when the survey reuses them).
@@ -226,7 +226,7 @@ compute_shopper_context <- function(data, structure, weights = NULL) {
 #' Slot-indexed multi-mention: `<root>_1..6` where each slot carries an
 #' option code (e.g. "SPMKT") when picked, NA otherwise. Roots tried in
 #' order: `CHANNEL_<CAT>` (canonical), `CAT_LOC_<CAT>` (legacy IPK naming).
-#' Returns NULL when neither root has columns in the data — callers should
+#' Returns NULL when neither root has columns in the data. Callers should
 #' skip rendering rather than treating absence as an error.
 #'
 #' Labels come from the Options sheet keyed on the same root code (the

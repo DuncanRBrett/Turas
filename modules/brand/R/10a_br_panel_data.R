@@ -42,7 +42,7 @@ BRAND_BRANDED_REACH_METRICS_VERSION <- "1.0"
 #'   "Yes, I have seen this advertising" (default 1L; matches reach_seen_scale
 #'   row 1 in modules/brand/examples/9cat).
 #'
-#' @return List with status and (when PASS) an \code{ads} field — one row per
+#' @return List with status and (when PASS) an \code{ads} field, one row per
 #'   ad shown to this category. Each row carries: asset_code, asset_label,
 #'   image_path, correct_brand, n_eligible, n_seen, n_correct, reach_pct,
 #'   branded_reach_pct, branding_pct.

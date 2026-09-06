@@ -5,7 +5,7 @@
 # frequency question (cat_buying.frequency.{CAT} role in QuestionMap).
 #
 # The question captures ALL respondents (buyers + non-buyers). The "never"
-# level is the non-buyer base. This is intentional — the frequency
+# level is the non-buyer base. This is intentional, the frequency
 # distribution doubles as category penetration data.
 #
 # VERSION: 1.0
@@ -97,7 +97,7 @@ run_cat_buying_frequency <- function(freq_col_data, option_map = NULL,
     if (nrow(sub) > 0) scale_df <- sub
   }
 
-  # Build distribution rows — from scale_df (labelled) or unique values (bare)
+  # Build distribution rows: from scale_df (labelled) or unique values (bare)
   dist_rows <- if (!is.null(scale_df)) {
     # Pre-compute trimmed codes for comparison
     sc_codes <- trimws(as.character(scale_df$ClientCode))

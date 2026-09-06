@@ -6,7 +6,7 @@
 #   y_c = focal brand's share of category awareness
 # and classifies each category into one of four strategic quadrants.
 #
-# Denominator: build_portfolio_base() per §3.1 — never inline SQ1_/SQ2_.
+# Denominator: build_portfolio_base() per §3.1, never inline SQ1_/SQ2_.
 # ==============================================================================
 
 
@@ -62,7 +62,7 @@
 }
 
 
-#' Compute portfolio clutter quadrant data (v2 — slot-indexed)
+#' Compute portfolio clutter quadrant data (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_clutter_data()} that uses the slot-indexed
 #' data-access layer. Iterates \code{categories$CategoryCode} directly (no
@@ -182,7 +182,7 @@ compute_clutter_data <- function(data, role_map, categories, structure,
                        !is.na(ref_x) &&
                        clutter_df$awareness_set_size_mean[i] > ref_x
     # Labels describe the structural state of the focal brand in each
-    # category's mental space — they deliberately avoid prescribing action
+    # category's mental space, they deliberately avoid prescribing action
     # ("opportunity", "deprioritise") because that depends on the category's
     # commercial role for the brand, not the chart position.
     if (is_strong && !is_high_clutter) return("Dominant")

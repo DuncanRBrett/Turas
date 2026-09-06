@@ -195,7 +195,7 @@ DBA_PLACEHOLDER_NOTE <- "Data not yet collected for DBA"
 
 
 # ==============================================================================
-# V2 ENTRY POINT — placeholder-aware, structure-driven
+# V2 ENTRY POINT: placeholder-aware, structure-driven
 # ==============================================================================
 
 #' Run DBA analysis from a Survey_Structure (v2 entry)
@@ -209,7 +209,7 @@ DBA_PLACEHOLDER_NOTE <- "Data not yet collected for DBA"
 #'
 #' Otherwise delegates to \code{.run_dba_core()}. DBA reads per-asset Fame /
 #' Unique columns by name from the assets data frame so no role-map
-#' intermediation is needed — this entry is a thin structure-aware wrapper.
+#' intermediation is needed. This entry is a thin structure-aware wrapper.
 #'
 #' @param data Data frame.
 #' @param structure List from a Survey_Structure loader.

@@ -4,11 +4,11 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 
 
 # ==============================================================================
-# LAYER A — RAW-DATA COMPUTATION (called by run_brand)
+# LAYER A: RAW-DATA COMPUTATION (called by run_brand)
 # ==============================================================================
 
 # ==============================================================================
-# LAYER B — PRESENTATION WRAPPER (called by HTML panel)
+# LAYER B: PRESENTATION WRAPPER (called by HTML panel)
 # ==============================================================================
 
 #' Return the pre-computed Portfolio Overview payload for the HTML panel
@@ -37,7 +37,7 @@ build_portfolio_overview <- function(results, config) {
 
 
 # ==============================================================================
-# PRIVATE — per-category record assembly
+# PRIVATE: per-category record assembly
 # ==============================================================================
 
 .po_depth_from_cfg <- function(categories, i) {
@@ -47,7 +47,7 @@ build_portfolio_overview <- function(results, config) {
 }
 
 # ==============================================================================
-# PRIVATE — deep-dive enrichment
+# PRIVATE: deep-dive enrichment
 # ==============================================================================
 
 .po_deep_dive_block <- function(cat_rec, brand_codes) {
@@ -137,13 +137,13 @@ build_portfolio_overview <- function(results, config) {
 
 
 # ==============================================================================
-# PRIVATE — brand list + names
+# PRIVATE: brand list + names
 # ==============================================================================
 
 .po_brand_names <- function(cat_brands, brand_codes) {
   default <- stats::setNames(as.list(brand_codes), brand_codes)
   # The Survey_Structure template ships with `BrandLabel` (e.g. "Ina
-  # Paarman's Kitchen") — the older / external schema variant uses
+  # Paarman's Kitchen"), the older / external schema variant uses
   # `BrandName`. Honour whichever is present so the focal dropdown,
   # deep-dive cards, and any other downstream consumer get human
   # display names instead of brand codes.
@@ -201,14 +201,14 @@ build_portfolio_overview <- function(results, config) {
 
 
 # ==============================================================================
-# PRIVATE — category-code detection (funnel + cross_cat awareness roles)
+# PRIVATE: category-code detection (funnel + cross_cat awareness roles)
 # ==============================================================================
 
 # Like .detect_category_code() in 00_main.R but (a) recognises
 # `cross_cat.awareness.{CC}` rows so awareness-only categories resolve, and
 # (b) picks the BEST match rather than the first match above threshold. The
 # best-match rule matters when focal/crossover brands appear in multiple
-# categories' BRANDAWARE_* columns — a first-match rule would bind the wrong
+# categories' BRANDAWARE_* columns. A first-match rule would bind the wrong
 # category code and cause collisions in cats_list.
 .po_detect_cat_code <- function(qmap, cat_brands, data) {
   if (is.null(qmap) || nrow(qmap) == 0) return(NULL)
@@ -238,7 +238,7 @@ build_portfolio_overview <- function(results, config) {
 
 
 # ==============================================================================
-# PRIVATE — refusal helper
+# PRIVATE: refusal helper
 # ==============================================================================
 
 .po_refuse <- function(code, message, how_to_fix) {
@@ -282,7 +282,7 @@ build_portfolio_overview <- function(results, config) {
 
   base <- build_portfolio_base(data, cat_code, timeframe, weights)
   if (!is.null(base$status)) return(NULL)
-  # Skip categories with zero qualifiers — denominator would be 0 and
+  # Skip categories with zero qualifiers: denominator would be 0 and
   # the panel renderer shows a "no respondents in this category yet"
   # placeholder downstream rather than an all-NA awareness card.
   if (base$n_uw == 0L) return(NULL)
@@ -329,7 +329,7 @@ build_portfolio_overview <- function(results, config) {
 }
 
 
-#' Compute the Portfolio Overview payload (v2 — slot-indexed)
+#' Compute the Portfolio Overview payload (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_portfolio_overview_data()}.  Uses
 #' \code{categories$CategoryCode} for direct cat_code lookup (no detection)
@@ -344,7 +344,7 @@ build_portfolio_overview <- function(results, config) {
 #' @param config List with \code{focal_brand} +
 #'   \code{portfolio_timeframe}.
 #' @param weights Numeric vector or NULL.
-#' @param category_results List or NULL — passes through to deep-dive
+#' @param category_results List or NULL: passes through to deep-dive
 #'   enrichment.
 #' @return Same list shape as \code{compute_portfolio_overview_data()}.
 #' @export

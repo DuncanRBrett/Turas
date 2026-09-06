@@ -393,9 +393,9 @@ run_repertoire <- function(penetration_matrix, brand_codes,
 #'
 #' Required role-map entries:
 #' \itemize{
-#'   \item \code{funnel.penetration_target.\{cat\}} — BRANDPEN2 root
+#'   \item \code{funnel.penetration_target.\{cat\}}, BRANDPEN2 root
 #'         (Multi_Mention slot-indexed; mandatory)
-#'   \item \code{funnel.frequency.\{cat\}} — BRANDPEN3 root
+#'   \item \code{funnel.frequency.\{cat\}}, BRANDPEN3 root
 #'         (Multi_Mention or Continuous_Sum slot-indexed; optional)
 #' }
 #'

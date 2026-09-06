@@ -10,7 +10,7 @@
 # Pair Z-test framing: every respondent is independently classified as either
 # a focal-brand buyer (PairRole = A) or non-buyer (PairRole = B). The two
 # arms are mutually exclusive and exhaustive, but no within-pair pairing
-# exists at the respondent level — there's no respondent who is "both" — so
+# exists at the respondent level. There's no respondent who is "both", so
 # the test is a two-INDEPENDENT-proportions z-test, not a paired-sample test.
 # This framing is documented in the module README to head off methodological
 # pushback.
@@ -136,7 +136,7 @@ classify_chip <- function(metric_a, metric_b, metric_total,
   big_positive_gap <- !is.na(gap) && gap >= gap_pp && isTRUE(sig)
   buyers_lead_total <- !is.na(metric_a) && !is.na(metric_total) &&
                           metric_a > metric_total
-  # Underperformance means strictly below the category total — parity is
+  # Underperformance means strictly below the category total. Parity is
   # not a red flag.
   buyers_underperform_total <- !is.na(metric_a) && !is.na(metric_total) &&
                                   metric_a < metric_total
@@ -155,7 +155,7 @@ classify_chip <- function(metric_a, metric_b, metric_total,
   }
   if (buyers_underperform_total) {
     return(list(chip = "FIX",
-                reason = "Focal buyers underperform category total — retention risk"))
+                reason = "Focal buyers underperform category total: retention risk"))
   }
   list(chip = NA_character_, reason = "No significant pair gap")
 }
@@ -166,7 +166,7 @@ classify_chip <- function(metric_a, metric_b, metric_total,
 #' Returns p_value, sig (vs alpha already applied via thresholds$alpha),
 #' and test label. Falls back to Fisher's exact when expected cell count < 5.
 #' For mean-based metrics (kind = "num"/"net"/"ratio") we approximate with a
-#' one-sided z on the difference using a normal SE — this is a v1
+#' one-sided z on the difference using a normal SE. This is a v1
 #' simplification; v2 will switch to a proper t-test on respondent-level
 #' values once those are propagated.
 #'
@@ -183,7 +183,7 @@ classify_chip <- function(metric_a, metric_b, metric_total,
   # When the metric is a proportion (in [0,1] for both arms), use a
   # two-proportion z. When it isn't (means/nets/ratios where the value can be
   # outside [0,1]), use a difference-of-means z with a coarse SE. The point
-  # of the v1 sig flag is to highlight notable gaps for the analyst — fine-
+  # of the v1 sig flag is to highlight notable gaps for the analyst, fine-
   # grained inference is a v2 follow-up.
   is_prop <- pa >= 0 && pa <= 1 && pb >= 0 && pb <= 1
   if (is_prop) {
@@ -209,7 +209,7 @@ classify_chip <- function(metric_a, metric_b, metric_total,
   }
 
   # Difference-of-means z (coarse): assume sd ~ |value| as a fallback so we
-  # at least flag big differences. This is intentionally conservative — most
+  # at least flag big differences. This is intentionally conservative, most
   # mean-based metrics won't trip a sig flag at small samples.
   sd_a <- max(abs(pa), 1e-6); sd_b <- max(abs(pb), 1e-6)
   se <- sqrt(sd_a^2 / na + sd_b^2 / nb)

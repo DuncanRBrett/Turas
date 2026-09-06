@@ -4,7 +4,7 @@
 # Computes A(b, c) = weighted awareness % among category buyers for every
 # brand × category pair.
 #
-# Denominator: build_portfolio_base() per §3.1 — never inline SQ1_/SQ2_.
+# Denominator: build_portfolio_base() per §3.1, never inline SQ1_/SQ2_.
 # ==============================================================================
 
 
@@ -40,7 +40,7 @@
 }
 
 
-#' Compute portfolio footprint matrix (v2 — slot-indexed)
+#' Compute portfolio footprint matrix (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_footprint_matrix()} that uses the
 #' slot-indexed data-access layer. The \code{categories} data frame must

@@ -19,12 +19,12 @@ BRAND_DIRICHLET_VERSION <- "1.2"
 #' @param focal_brand Character or NULL. Focal brand code for metrics_summary.
 #' @param weights Numeric vector or NULL. Respondent weights.
 #' @param target_months Integer. REQUIRED.  From \code{config$target_timeframe_months}.
-#'   Used for chart labels and panel footer text only — Dirichlet maths are
+#'   Used for chart labels and panel footer text only. Dirichlet maths are
 #'   period-agnostic.
 #' @param longer_months Integer or NULL. From \code{config$longer_timeframe_months}.
 #'   Used in panel subtitle only.
 #'
-#' @return List — see §7.2 of CAT_BUYING_SPEC_v3 for the full schema.
+#' @return List, see §7.2 of CAT_BUYING_SPEC_v3 for the full schema.
 #'
 #' @references Goodhardt, Ehrenberg & Chatfield (1984).
 #'
@@ -84,7 +84,7 @@ run_dirichlet_norms <- function(pen_mat,
   warnings_out <- character(0)
   if (n_brands < 4)
     warnings_out <- c(warnings_out,
-      sprintf("Only %d brands — Dirichlet estimates may be unstable", n_brands))
+      sprintf("Only %d brands: Dirichlet estimates may be unstable", n_brands))
 
   dir_result <- .dn_call_dirichlet(
     cat_pen, cat_mean_purch, obs$Share_Pct / 100,

@@ -90,10 +90,10 @@ calculate_differential_importance <- function(tensor, pen, brand_code,
 #' Merges importance (differential) and performance (focal linkage %) for each
 #' CEP and assigns each to one of four quadrants:
 #' \itemize{
-#'   \item \strong{Maintain}     — high importance, high performance
-#'   \item \strong{Strengthen}   — high importance, low performance (priority gap)
-#'   \item \strong{Monitor}      — low importance, high performance
-#'   \item \strong{Deprioritise} — low importance, low performance
+#'   \item \strong{Maintain}, high importance, high performance
+#'   \item \strong{Strengthen}, high importance, low performance (priority gap)
+#'   \item \strong{Monitor}, low importance, high performance
+#'   \item \strong{Deprioritise}, low importance, low performance
 #' }
 #' Thresholds are the median |differential| (importance) and median linkage %
 #' (performance) across all CEPs in the set.
@@ -340,8 +340,8 @@ run_drivers_barriers <- function(linkage, cep_mat, pen, focal_brand,
 #'
 #' Required role-map entries:
 #' \itemize{
-#'   \item \code{mental_avail.cep.\{cat\}.*} — slot-indexed CEP roles
-#'   \item \code{funnel.penetration_target.\{cat\}} — BRANDPEN2 root
+#'   \item \code{mental_avail.cep.\{cat\}.*}, slot-indexed CEP roles
+#'   \item \code{funnel.penetration_target.\{cat\}}, BRANDPEN2 root
 #'         (target-window buyer flag for the focal brand)
 #' }
 #'

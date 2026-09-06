@@ -19,12 +19,12 @@ BRAND_FUNNEL_METRICS_VERSION <- "2.0"
 
 # Attitude position roles in display order (matches ROLE_REGISTRY §4.2).
 # Six-level scale (IPK 2026 onwards):
-#   love       — "I love it. It's my favourite"
-#   prefer     — "It's one of my preferred brands"
-#   ambivalent — "I would only consider it if nothing else is available"
-#   price      — "I would only buy it if the price was right"
-#   avoid      — "I would avoid this brand"           (renamed from reject)
-#   no_opinion — "I have no opinion / don't know this brand"
+#   love: "I love it. It's my favourite"
+#   prefer. "It's one of my preferred brands"
+#   ambivalent. "I would only consider it if nothing else is available"
+#   price. "I would only buy it if the price was right"
+#   avoid. "I would avoid this brand"           (renamed from reject)
+#   no_opinion. "I have no opinion / don't know this brand"
 .FUNNEL_ATTITUDE_POSITIONS <- c(
   "attitude.love", "attitude.prefer", "attitude.ambivalent",
   "attitude.price", "attitude.avoid", "attitude.no_opinion"
@@ -104,18 +104,18 @@ calculate_stage_metrics <- function(stages, weights = NULL,
   # ===========================================================================
   # Filtered rates for the "% of previous" and "% of aware" toggles.
   # The headline % (pct_weighted / pct_unweighted) is the RAW aggregate
-  # rate — each stage uses its own survey response, independent of the
+  # rate: each stage uses its own survey response, independent of the
   # other stages (per the panel explainer; aggregate semantics).
   #
   # The two filtered toggles each apply a different rule:
   #
-  # % of aware  — independent intersection with aware (NOT chained
+  # % of aware: independent intersection with aware (NOT chained
   #               through preceding behaviour stages):
   #   pct_aware[k]      = sum((stage[k] AND stage[1]) * w) / sum(stage[1] * w)
   #   base_stage_aware  = sum((stage[k] AND stage[1]) * w)
   #   base_aware        = sum(stage[1] * w)
   #
-  # % of previous — cumulative chain (each stage AND every prior stage):
+  # % of previous, cumulative chain (each stage AND every prior stage):
   #   cum[1]            = stage[1] matrix (aware)
   #   cum[k]            = cum[k-1] AND stage[k]
   #   pct_nested[k]     = sum(cum[k] * w) / sum(cum[k-1] * w)
@@ -180,7 +180,7 @@ calculate_stage_metrics <- function(stages, weights = NULL,
         df$base_stage_aware_unweighted[i] <- inter_counts_u[sk, b]
         df$base_chain_unweighted[i]       <- cum_counts_u[sk, b]
         # % of aware = (stage[k] AND aware) count / aware count.
-        # Aware stage pinned to 1.0 (entry — aware/aware = 100%).
+        # Aware stage pinned to 1.0 (entry: aware/aware = 100%).
         df$pct_aware_filtered[i] <- if (identical(sk, stage_names[1])) {
           if (!is.na(aware_b) && aware_b > 0) 1.0 else NA_real_
         } else if (!is.na(aware_b) && aware_b > 0 && !is.na(inter_b)) {
@@ -345,7 +345,7 @@ calculate_attitude_decomposition <- function(attitude_entry, awareness_matrix,
 # run_significance_tests
 # ==============================================================================
 
-#' Two-proportion z-tests per stage — three comparison families
+#' Two-proportion z-tests per stage, three comparison families
 #'
 #' Emits three comparison flavours per stage:
 #' \describe{
@@ -355,7 +355,7 @@ calculate_attitude_decomposition <- function(attitude_entry, awareness_matrix,
 #'     that brand's proportion vs the category average computed over
 #'     every OTHER brand at the same stage. Used for in-cell ▲/▼ flags
 #'     across the whole table, not just the focal row.}
-#'   \item{\code{focal_vs_cat_avg}}{Legacy alias — same as
+#'   \item{\code{focal_vs_cat_avg}}{Legacy alias, same as
 #'     \code{brand_vs_cat_avg} for the focal row. Kept so existing panel
 #'     code reading this comparison keeps working.}
 #' }
@@ -465,7 +465,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # Brands with no data column at all for this stage (entire column NA)
   # carry NA through, not 0. Required so a brand declared in the awareness
   # battery but missing from the per-brand attitude battery (column-name
-  # mismatch) shows "—" in the consideration column instead of a misleading
+  # mismatch) shows "n/a" in the consideration column instead of a misleading
   # 0% and a false nesting violation downstream.
   all_na_cols <- colSums(!is.na(m)) == 0
   # Kish effective n of the respondents this column is measured on (the
@@ -529,7 +529,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   aware_logical <- as.logical(aware_vec)
   aware_w <- sum(weights[aware_logical], na.rm = TRUE)
 
-  # Case-insensitive value matching — see .option_map_by_role for why
+  # Case-insensitive value matching, see .option_map_by_role for why
   # role_to_codes carries both numeric codes ("1") and label aliases
   # ("Love", "Price only", ...). Survey may export either form per question.
   values_char <- tolower(trimws(as.character(col_values)))
@@ -544,7 +544,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
     # without first declaring awareness (common in Alchemer routing where
     # BRANDATT1 is asked to everyone in a category, not just those who picked
     # the brand in BRANDAWARE). Using count_total / aware_w would silently
-    # over-count "% aware" — sometimes far over 100% — because the numerator
+    # over-count "% aware", sometimes far over 100%, because the numerator
     # includes respondents not in the aware denominator. We emit both
     # quantities so the panel renderer can show pct_aware = count_aware /
     # aware_w (proper subset).
@@ -575,7 +575,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # both so the same OptionMap drives both old and new code paths. Also
   # canonicalises the legacy "reject" name to "avoid".
   #
-  # IMPORTANT — Alchemer surveys often export the per-brand attitude questions
+  # IMPORTANT: Alchemer surveys often export the per-brand attitude questions
   # inconsistently: one column comes through as numeric codes (1..6), the next
   # as short labels ("Love", "Prefer", "Price only", "Avoid", "No opinion")
   # because the question's "Reporting Value" was set per question. Rather than
@@ -668,7 +668,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 }
 
 
-#' Category average excluding one brand — used both for the focal's
+#' Category average excluding one brand: used both for the focal's
 #' vs-average comparison and for every brand's own vs-average test.
 #'
 #' pct is the simple mean of per-brand percentages (not a pooled proportion).
@@ -696,7 +696,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
        pct     = avg_pct)
 }
 
-# Backwards-compat alias — older code paths may still reference this.
+# Backwards-compat alias: older code paths may still reference this.
 .category_average_excluding_focal <- function(stage_rows, focal_brand) {
   .category_average_excluding(stage_rows, focal_brand)
 }

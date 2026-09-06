@@ -3,10 +3,10 @@
 # ==============================================================================
 # For each brand present in ≥1 category, produces a per-category data frame:
 #   cat_pen     = category penetration in total sample
-#   brand_aware = A(brand, cat) — awareness among category buyers (0-100)
+#   brand_aware = A(brand, cat), awareness among category buyers (0-100)
 #   aware_n_w   = weighted count of aware buyers
 #
-# Denominator: build_portfolio_base() per §3.1 — never inline SQ1_/SQ2_.
+# Denominator: build_portfolio_base() per §3.1, never inline SQ1_/SQ2_.
 # Relies on .compute_category_awareness() from 09a_portfolio_footprint.R.
 # ==============================================================================
 
@@ -15,7 +15,7 @@
 # V2: SLOT-INDEXED STRENGTH MAP
 # ==============================================================================
 
-#' Compute portfolio strength map data (v2 — slot-indexed)
+#' Compute portfolio strength map data (v2: slot-indexed)
 #'
 #' v2 alternative to \code{compute_strength_map()} that uses the slot-indexed
 #' data-access layer. Iterates \code{categories$CategoryCode} directly;

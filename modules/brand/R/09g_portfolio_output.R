@@ -6,7 +6,7 @@
 #   Portfolio_Extension, Portfolio_Meta).
 # CSV:  same 6 files, written to {output_dir}/portfolio/ subdir.
 #
-# Both functions are thin — they delegate formatting decisions to the caller's
+# Both functions are thin, they delegate formatting decisions to the caller's
 # workbook/directory; they only write data.
 # ==============================================================================
 

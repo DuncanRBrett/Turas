@@ -36,7 +36,7 @@ BRAND_BUYER_HEAVINESS_VERSION <- "1.0"
 #' @param focal_brand Character or NULL. For metrics_summary.
 #' @param weights Numeric vector or NULL. Respondent weights.
 #'
-#' @return List — see §7.3 of CAT_BUYING_SPEC_v3.
+#' @return List, see §7.3 of CAT_BUYING_SPEC_v3.
 #'
 #' @references Ehrenberg (1988); Romaniuk & Sharp (2022).
 #'
@@ -212,7 +212,7 @@ run_buyer_heaviness <- function(pen_mat,
   # Find q33: smallest m where cumulative weight >= target.
   # By construction this gives light_p >= 1/3. When ties at q33 push light_p
   # outside tolerance, the only way to reduce light is to drop the tied group
-  # at q33 into medium — i.e. step q33 DOWN to the next distinct value below.
+  # at q33 into medium, i.e. step q33 DOWN to the next distinct value below.
   # We compare both candidates (current and next-lower) and keep whichever is
   # closer to 1/3. Pushing q33 UP would only enlarge light and is incorrect.
   q33_idx <- which(cumw >= target)[1]

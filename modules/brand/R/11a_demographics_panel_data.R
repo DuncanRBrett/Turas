@@ -58,9 +58,9 @@ build_demographics_panel_data <- function(questions,
     ))
   }
 
-  # Drop questions whose engine result was REFUSED — they would render as
+  # Drop questions whose engine result was REFUSED. They would render as
   # broken cards. The meta block records the count so the renderer can show
-  # a footer note ("3 of 6 demographic questions skipped — see console").
+  # a footer note ("3 of 6 demographic questions skipped, see console").
   kept    <- list()
   skipped <- character(0)
   for (q in questions) {
@@ -113,10 +113,10 @@ build_demographics_panel_data <- function(questions,
   brand_long          <- .demo_panel_brand_long(res$brand_cut, q$codes)
   brand_nonbuyer_long <- .demo_panel_brand_long(res$brand_nonbuyer_cut,
                                                  q$codes)
-  # Penetration-in-option is the table's primary metric — each cell is "% of
+  # Penetration-in-option is the table's primary metric. Each cell is "% of
   # respondents in this demographic option who buy this brand". The cat-
   # average baseline is the PER-OPTION mean pen across brands (in
-  # option_avg_penetration) — that's what the table Cat-avg column and chart
+  # option_avg_penetration). That's what the table Cat-avg column and chart
   # marker display, and what cells are shaded against. brand_total_pen is
   # kept as legend context ("focal overall pen") but no longer drives shading.
   brand_pen_long  <- .demo_panel_brand_long(res$brand_penetration_long,
@@ -201,7 +201,7 @@ build_demographics_panel_data <- function(questions,
 .demo_panel_dist <- function(df) {
   if (is.null(df) || !is.data.frame(df) || nrow(df) == 0L) return(list())
   base_n <- if ("Base_n" %in% names(df)) as.integer(df$Base_n[1L]) else NA_integer_
-  # Drop options with zero respondents — these are screen-outs (e.g. IPK 2026
+  # Drop options with zero respondents: these are screen-outs (e.g. IPK 2026
   # excluded under-30 / 51+ ages, Prefer-not-to-answer race, income brackets
   # below the screening cutoff, regions outside the targeted provinces).
   # Empty rows otherwise render as zero-filled cells that misleadingly look
@@ -223,7 +223,7 @@ build_demographics_panel_data <- function(questions,
 
 # Re-emit a brand_cut / brand_nonbuyer_cut / brand_penetration_long data frame
 # as one entry per brand x option. brand_penetration_long carries an extra
-# per-option Base_n_<code> column — when present, it's forwarded as
+# per-option Base_n_<code> column, when present, it's forwarded as
 # base_n_in_option on the cell so the panel can compute buyer/non-buyer n.
 .demo_panel_brand_long <- function(brand_df, codes) {
   if (is.null(brand_df) || !is.data.frame(brand_df) || nrow(brand_df) == 0L) {

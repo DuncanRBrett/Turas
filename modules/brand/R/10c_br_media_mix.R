@@ -24,7 +24,7 @@ BRAND_BRANDED_REACH_MEDIA_VERSION <- "1.0"
 #' @param cat_code Character or NULL.
 #' @param seen_recognised_value Integer. Default 1L.
 #'
-#' @return List with status and (when PASS) \code{tables} — named list keyed
+#' @return List with status and (when PASS) \code{tables}, named list keyed
 #'   by AssetCode. Each entry is a data frame with columns: MediaCode,
 #'   MediaLabel, n, pct_of_seen.
 #'

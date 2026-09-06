@@ -1,11 +1,11 @@
 # ==============================================================================
 # BRAND MODULE - BRANDED REACH (ROMANIUK)
 # ==============================================================================
-# Phase 1 skeleton. Computes the three Romaniuk metrics per ad —
+# Phase 1 skeleton. Computes the three Romaniuk metrics per ad,
 #   reach %             (saw the ad)
 #   branded reach %     (saw + correctly attributed brand)
 #   branding %          (of those who saw, % correctly attributed)
-# — plus a misattribution table and a media-channel mix per ad.
+#, plus a misattribution table and a media-channel mix per ad.
 #
 # Required survey-structure inputs (already present in modules/brand/examples/9cat):
 #   - MarketingReach sheet: AssetCode, AssetLabel, ImagePath, Brand, Category,
@@ -13,7 +13,7 @@
 #   - ReachMedia sheet:     MediaCode, MediaLabel, DisplayOrder
 #   - reach_seen_scale OptionMap: 1 = recognised, 2 = not recognised
 #   - reach.seen.{ad}, reach.brand.{ad}, reach.media.{ad} QuestionMap rows
-#     (Variable_Type for reach.brand is Single_Response — the cell value is
+#     (Variable_Type for reach.brand is Single_Response. The cell value is
 #     a brand code from the category Brands list, "DK", or "OTHER".)
 #
 # Helpers live in 10a/10b/10c; 10d shapes the result for the HTML panel.
@@ -76,7 +76,7 @@ run_branded_reach_assets <- function(data, asset_list, brand_list, media_list,
                        "Pass the category-filtered survey data frame"))
   }
 
-  # Guard: asset list — if missing/empty, skip silently with PASS empty
+  # Guard: asset list, if missing/empty, skip silently with PASS empty
   if (is.null(asset_list) || !is.data.frame(asset_list) ||
       nrow(asset_list) == 0) {
     return(list(
@@ -166,7 +166,7 @@ if (!exists("%||%")) {
 
 
 # ==============================================================================
-# V2 ENTRY POINT — placeholder-aware, structure-driven
+# V2 ENTRY POINT: placeholder-aware, structure-driven
 # ==============================================================================
 
 #' Run Branded Reach analysis from a Survey_Structure (v2 entry)

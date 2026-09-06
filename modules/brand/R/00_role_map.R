@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE — ROLE MAP V2 (CONVENTION-FIRST + OPTIONAL OVERRIDE)
+# BRAND MODULE: ROLE MAP V2 (CONVENTION-FIRST + OPTIONAL OVERRIDE)
 # ==============================================================================
 # New public entry for the rebuild. Infers role entries from question codes
 # (00_role_inference.R) and optionally merges per-role overrides from an
@@ -26,7 +26,7 @@ BRAND_ROLE_MAP_V2_VERSION <- "2.0"
 #' @param structure List from a Survey_Structure loader. Must contain:
 #'   - questions: data frame (Questions sheet)
 #'   - brands:    data frame (Brands sheet) or NULL
-#'   - questionmap: data frame (QuestionMap sheet) or NULL — optional override
+#'   - questionmap: data frame (QuestionMap sheet) or NULL, optional override
 #' @param brand_config List from Brand_Config loader. Must contain:
 #'   - categories: data frame with CategoryCode + Active columns
 #' @param data Optional. Data frame of respondent data. When supplied, the
@@ -116,14 +116,14 @@ resolve_role_columns <- function(role_map, data) {
     if (is.na(role) || role == "") next  # skip blank rows
 
     existing <- role_map[[role]]
-    # ColumnRoot is the canonical name; ClientCode is what the template uses —
+    # ColumnRoot is the canonical name; ClientCode is what the template uses,
     # accept either so the standard QuestionMap template works without renaming.
     column_root <- .nz_str(row$ColumnRoot %||% row$ColumnPattern %||% row$ClientCode)
     variable_type <- .nz_str(row$Variable_Type)
     option_scale  <- .nz_str(row$OptionMapScale)
 
     if (is.null(existing)) {
-      # New role — minimal entry
+      # New role: minimal entry
       role_map[[role]] <- list(
         role = role, category = NA_character_,
         client_code = column_root, variable_type = variable_type,
@@ -134,7 +134,7 @@ resolve_role_columns <- function(role_map, data) {
         detail = list()
       )
     } else {
-      # Existing role — selectively override fields
+      # Existing role: selectively override fields
       if (!is.na(column_root) && column_root != "") {
         existing$column_root <- column_root
       }

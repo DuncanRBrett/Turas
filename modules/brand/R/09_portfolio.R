@@ -110,7 +110,7 @@ build_portfolio_base <- function(data, cat_code,
 #'
 #' @param role_map Named list from \code{build_brand_role_map()} or NULL.
 #' @param cat_code Character scalar. Category code.
-#' @return Character scalar — the awareness root.
+#' @return Character scalar: the awareness root.
 #' @keywords internal
 .portfolio_aware_root <- function(role_map, cat_code) {
   if (!is.null(role_map)) {
@@ -135,7 +135,7 @@ build_portfolio_base <- function(data, cat_code,
 #'
 #' Returns an integer 0/1 matrix \code{[nrow(data) x length(brand_codes)]} with
 #' \code{brand_codes} as colnames. Brands whose code never appears in any slot
-#' contribute an all-zero column — caller decides whether that means "not
+#' contribute an all-zero column. Caller decides whether that means "not
 #' aware" or "not asked". (For the legacy column-per-brand fixture, slot
 #' columns are absent and the helper returns an all-zero matrix; that fixture
 #' is scheduled for retirement at cutover.)
@@ -157,7 +157,7 @@ build_portfolio_base <- function(data, cat_code,
 
 
 # ==============================================================================
-# MAIN ORCHESTRATOR (stub — filled in phases 2-5)
+# MAIN ORCHESTRATOR (stub: filled in phases 2-5)
 # ==============================================================================
 
 # ==============================================================================
@@ -165,7 +165,7 @@ build_portfolio_base <- function(data, cat_code,
 # ==============================================================================
 
 # ==============================================================================
-# V2 ORCHESTRATOR — slot-indexed parser-shape data
+# V2 ORCHESTRATOR: slot-indexed parser-shape data
 # ==============================================================================
 
 run_portfolio <- function(data, role_map, categories, structure, config,
@@ -199,7 +199,7 @@ run_portfolio <- function(data, role_map, categories, structure, config,
   n_total <- nrow(data)
   total_w <- if (!is.null(weights)) sum(weights, na.rm = TRUE) else as.numeric(n_total)
 
-  # Phase 2 — footprint + clutter
+  # Phase 2: footprint + clutter
   footprint_result <- tryCatch(
     compute_footprint_matrix(data, role_map, categories, structure, config, weights),
     error = function(e) {
@@ -216,7 +216,7 @@ run_portfolio <- function(data, role_map, categories, structure, config,
     }
   )
 
-  # Phase 3 — strength map + extension + per-brand extension
+  # Phase 3: strength map + extension + per-brand extension
   strength_result <- tryCatch(
     compute_strength_map(data, role_map, categories, structure, config, weights),
     error = function(e) {
@@ -243,7 +243,7 @@ run_portfolio <- function(data, role_map, categories, structure, config,
     }
   )
 
-  # Phase 4 — cross-cat + per-cat constellations
+  # Phase 4: cross-cat + per-cat constellations
   constellation_result <- tryCatch(
     compute_constellation(data, role_map, categories, structure, config, weights),
     error = function(e) {
@@ -259,7 +259,7 @@ run_portfolio <- function(data, role_map, categories, structure, config,
     }
   )
 
-  # Duplication of Awareness — Sharp / Ehrenberg analogue on awareness
+  # Duplication of Awareness: Sharp / Ehrenberg analogue on awareness
   # penetration, complements the constellation chart in the Competitive
   # Set sub-tab with a quantitative pairwise matrix per category.
   dop_awareness_result <- tryCatch(

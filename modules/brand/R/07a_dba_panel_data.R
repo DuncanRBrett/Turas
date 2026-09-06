@@ -7,7 +7,7 @@
 # and computes a recommended-action verb per asset.
 #
 # Engine output shape (07_dba.R) carries dba_metrics + metrics_summary.
-# This shaper does NOT recompute metrics — it only adds derived fields
+# This shaper does NOT recompute metrics. It only adds derived fields
 # the renderer needs (CI bounds, action verbs, sorted asset order).
 #
 # VERSION: 1.0
@@ -21,7 +21,7 @@ BRAND_DBA_PANEL_DATA_VERSION <- "1.0"
 # Quadrant → recommended action mapping (Romaniuk's framework)
 .DBA_ACTIONS <- list(
   "Use or Lose"     = "Maintain consistent use across all touchpoints.",
-  "Avoid Alone"     = "Pair with stronger assets — never use as sole brand cue.",
+  "Avoid Alone"     = "Pair with stronger assets: never use as sole brand cue.",
   "Invest to Build" = "Increase exposure; the asset earns when seen.",
   "Ignore or Test"  = "Replace, retire, or run a creative test."
 )
@@ -207,28 +207,28 @@ build_dba_panel_data <- function(result,
   if (use_or_lose > 0) {
     insights[[length(insights) + 1L]] <- list(
       verb = "Anchor",
-      text = sprintf("%d of %d assets sit in 'Use or Lose' — they are the brand's anchor identifiers.",
+      text = sprintf("%d of %d assets sit in 'Use or Lose'. They are the brand's anchor identifiers.",
                       use_or_lose, n_total)
     )
   }
   if (avoid_alone > 0) {
     insights[[length(insights) + 1L]] <- list(
       verb = "Pair",
-      text = sprintf("%d 'Avoid Alone' asset%s — high recognition but credit leaks; never use solo.",
+      text = sprintf("%d 'Avoid Alone' asset%s: high recognition but credit leaks; never use solo.",
                       avoid_alone, if (avoid_alone == 1) "" else "s")
     )
   }
   if (invest > 0) {
     insights[[length(insights) + 1L]] <- list(
       verb = "Invest",
-      text = sprintf("%d 'Invest to Build' asset%s — strong attribution but low fame; expand exposure.",
+      text = sprintf("%d 'Invest to Build' asset%s: strong attribution but low fame; expand exposure.",
                       invest, if (invest == 1) "" else "s")
     )
   }
   if (ignore > 0) {
     insights[[length(insights) + 1L]] <- list(
       verb = "Test",
-      text = sprintf("%d 'Ignore or Test' asset%s — neither famous nor distinctive; replace or test.",
+      text = sprintf("%d 'Ignore or Test' asset%s: neither famous nor distinctive; replace or test.",
                       ignore, if (ignore == 1) "" else "s")
     )
   }

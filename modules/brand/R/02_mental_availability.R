@@ -65,7 +65,7 @@ build_cep_linkage <- function(data, role_map, cat_code, brands,
   }
   brand_codes <- as.character(brands$BrandCode)
   n_resp <- nrow(data)
-  # See BrandCodeAlias in BRAND_CONFIG_GUIDE.md — handles surveys where the
+  # See BrandCodeAlias in BRAND_CONFIG_GUIDE.md: handles surveys where the
   # option value in the data differs from the canonical brand code.
   brand_aliases <- .brand_aliases_from_list(brands)
 
@@ -277,7 +277,7 @@ calculate_ns <- function(linkage_tensor, weights = NULL) {
 #' Calculate CEP x brand linkage percentages
 #'
 #' For each CEP, what percentage of category buyers link it to each brand.
-#' This is the raw association data — the richest analytical asset.
+#' This is the raw association data, the richest analytical asset.
 #'
 #' @param linkage_tensor Named list of brand matrices.
 #' @param cep_codes Character vector. CEP codes.
@@ -566,7 +566,7 @@ run_mental_availability <- function(linkage, cep_labels = NULL,
     n_attrs <- length(attr_codes)
   }
 
-  # --- Mental Advantage (Romaniuk) — runs whenever calculate_mental_advantage
+  # --- Mental Advantage (Romaniuk): runs whenever calculate_mental_advantage
   # is loaded. Failures degrade to NULL so the rest of the panel survives.
   cep_advantage <- .ma_safe_advantage(
     linkage$linkage_tensor, cep_codes, weights, n_resp,

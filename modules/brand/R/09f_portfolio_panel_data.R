@@ -119,15 +119,15 @@ build_portfolio_panel_data <- function(portfolio_result, config,
       "(\"which of these brands have you heard of?\"). Denominator =",
       "screener-qualified category buyers (SQ2 for 3-month window,",
       "SQ1 for 12-month). No purchase / volume data feeds into these cells -",
-      "it is a pure mental-availability map. A dash (\u2014) means the brand was",
-      "not in that category's awareness battery — not that awareness is 0%."
+      "it is a pure mental-availability map. An \"n/a\" cell means the brand",
+      "was not in that category's awareness battery, not that awareness is 0%."
     ),
     clutter = paste(
       "Clutter Quadrant: x-axis = how many brands a typical category buyer",
       "knows (awareness set size). y-axis = focal brand's share of all brand",
       "awareness in the category. Reference lines: median awareness set size",
       "(vertical) and median fair share (1/k) across categories (horizontal).",
-      "Quadrant labels are interpretive — the underlying values are shown in",
+      "Quadrant labels are interpretive. The underlying values are shown in",
       "the table below."
     ),
     constellation = paste(

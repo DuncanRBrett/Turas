@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE — CONVENTION-FIRST ROLE INFERENCE
+# BRAND MODULE: CONVENTION-FIRST ROLE INFERENCE
 # ==============================================================================
 # Walks the Survey_Structure Questions sheet + Brand_Config Categories + Brand
 # list and produces role entries by naming convention. The full set of
@@ -22,8 +22,8 @@
 #     notes              = string
 #   )
 #
-# This file owns ONLY the inference rules. The public entry — combining
-# inference + QuestionMap overrides — lives in 00_role_map.R.
+# This file owns ONLY the inference rules. The public entry, combining
+# inference + QuestionMap overrides. Lives in 00_role_map.R.
 #
 # VERSION: 1.0
 # ==============================================================================
@@ -68,7 +68,7 @@ infer_role_map <- function(questions, brands, active_cats) {
           length(active_cats) > 0L && !(m$category %in% active_cats)) next
       kind <- m$column_kind %||% "system"
       if (kind == "per_brand") {
-        # Defer — collect brands by role
+        # Defer: collect brands by role
         if (is.null(per_brand_collect[[m$role]])) {
           per_brand_collect[[m$role]] <- list(
             match = m, qrow = qrow, brands = character(0)
@@ -96,7 +96,7 @@ infer_role_map <- function(questions, brands, active_cats) {
 
 
 # ==============================================================================
-# PATTERN MATCHING — recognise question codes by convention
+# PATTERN MATCHING: recognise question codes by convention
 # ==============================================================================
 
 #' Match a question code against the convention patterns
@@ -141,7 +141,7 @@ infer_role_map <- function(questions, brands, active_cats) {
                      category = NULL, column_kind = "multi_mention_root")))
   }
 
-  # Demographics — DEMO_{KEY}
+  # Demographics: DEMO_{KEY}
   if (grepl("^DEMO_", qc)) {
     key <- sub("^DEMO_", "", qc)
     return(list(list(pattern = "demographic",
@@ -167,7 +167,7 @@ infer_role_map <- function(questions, brands, active_cats) {
   }
 
   # CEP / Attribute matrices: BRANDATTR_{CAT}_{CEP|ATT}{NN}
-  # (DSS / PAS convention — per-CEP or per-attribute question with brands as options)
+  # (DSS / PAS convention, per-CEP or per-attribute question with brands as options)
   m <- regmatches(qc, regexec("^BRANDATTR_([A-Z0-9]+)_(CEP|ATT)([0-9]+)$",
                               qc))[[1]]
   if (length(m) == 4L) {
@@ -182,7 +182,7 @@ infer_role_map <- function(questions, brands, active_cats) {
   }
 
   # CEP matrices: BRANDCEP_{CAT}{NN}
-  # (BAK / POS convention — same shape as BRANDATTR_<CAT>_CEP<NN> but the
+  # (BAK / POS convention, same shape as BRANDATTR_<CAT>_CEP<NN> but the
   # category is glued to the CEP number without an underscore. Maps to the
   # same mental_avail.cep.<CAT>.CEP<NN> role so build_cep_linkage finds it.)
   m <- regmatches(qc, regexec("^BRANDCEP_([A-Z]+)([0-9]+)$", qc))[[1]]
@@ -197,7 +197,7 @@ infer_role_map <- function(questions, brands, active_cats) {
   }
 
   # Attribute matrices: BRANDATTR_{CAT}{NN}
-  # (POS convention — like BRANDATTR_<CAT>_ATT<NN> but with cat glued to the
+  # (POS convention, like BRANDATTR_<CAT>_ATT<NN> but with cat glued to the
   # number, no _ATT separator. Maps to mental_avail.attr.<CAT>.ATT<NN> so
   # build_cep_linkage(item_kind = "attr") picks it up alongside the
   # DSS/PAS/BAK BRANDATTR_<CAT>_ATT<NN> form handled above.)
@@ -237,7 +237,7 @@ infer_role_map <- function(questions, brands, active_cats) {
                      column_kind = "multi_mention_root")))
   }
 
-  # Brand awareness — also feeds portfolio
+  # Brand awareness: also feeds portfolio
   m <- regmatches(qc, regexec("^BRANDAWARE_([A-Z0-9]+)$", qc))[[1]]
   if (length(m) == 2L) {
     return(list(
@@ -300,7 +300,7 @@ infer_role_map <- function(questions, brands, active_cats) {
     }
   }
 
-  # Ad hoc — sample-wide ADHOC_{KEY} or category-specific ADHOC_{KEY}_{CAT}
+  # Ad hoc: sample-wide ADHOC_{KEY} or category-specific ADHOC_{KEY}_{CAT}
   m <- regmatches(qc, regexec("^ADHOC_([A-Z0-9]+)_([A-Z0-9]+)$", qc))[[1]]
   if (length(m) == 3L) {
     return(list(list(pattern = "adhoc_cat",
@@ -318,13 +318,13 @@ infer_role_map <- function(questions, brands, active_cats) {
                      column_kind = "adhoc")))
   }
 
-  # No convention matched — caller may fall back to QuestionMap override
+  # No convention matched: caller may fall back to QuestionMap override
   list()
 }
 
 
 # ==============================================================================
-# ENTRY BUILDERS — one per column_kind
+# ENTRY BUILDERS, one per column_kind
 # ==============================================================================
 
 .build_entry_from_match <- function(m, qc, qrow, brands_by_cat) {

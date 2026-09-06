@@ -255,10 +255,10 @@ compute_dop_awareness_per_cat <- function(data, role_map, categories,
 #'   \code{.portfolio_aware_matrix()}.
 #' @param brand_codes Character vector of brand codes (matrix column order).
 #' @param brand_lbls Named character vector of brand display labels.
-#' @param base_idx Integer vector — row indices of category buyers.
-#' @param weights Numeric vector — full-length weights.
-#' @param cat_code Character — category code (for the payload).
-#' @param cat_label Character — category display label.
+#' @param base_idx Integer vector: row indices of category buyers.
+#' @param weights Numeric vector: full-length weights.
+#' @param cat_code Character: category code (for the payload).
+#' @param cat_label Character: category display label.
 #'
 #' @return List: per-category DoA payload. See top-of-file documentation.
 #' @keywords internal

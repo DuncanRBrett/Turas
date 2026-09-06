@@ -74,7 +74,7 @@ brand_refuse <- function(code, title, problem, why_it_matters, how_to_fix,
   } else {
     # TRS-FALLBACK: turas_refuse() is the canonical TRS handler. This
     # branch fires only if shared/lib/trs_refusal.R isn't loaded ahead
-    # of the brand module — bootstrap edge case. The boxed cat() above
+    # of the brand module, bootstrap edge case. The boxed cat() above
     # already mirrors the TRS format, so user-facing output is
     # identical.
     cat("\n=== TURAS BRAND ERROR ===\n")
@@ -733,13 +733,13 @@ guard_validate_data <- function(data, structure, config) {
 #'
 #' Error codes (§9 of PORTFOLIO_SPEC_v1.md):
 #' \itemize{
-#'   \item \code{CFG_PORTFOLIO_AWARENESS_OFF} — element_portfolio=Y but
+#'   \item \code{CFG_PORTFOLIO_AWARENESS_OFF}, element_portfolio=Y but
 #'     cross_category_awareness=N
-#'   \item \code{CFG_PORTFOLIO_NO_CATEGORIES} — no categories with detectable
+#'   \item \code{CFG_PORTFOLIO_NO_CATEGORIES}, no categories with detectable
 #'     cat_code columns
-#'   \item \code{DATA_PORTFOLIO_NO_AWARENESS_COLS} — zero BRANDAWARE_* columns
+#'   \item \code{DATA_PORTFOLIO_NO_AWARENESS_COLS}, zero BRANDAWARE_* columns
 #'     found in data despite config saying Y
-#'   \item \code{DATA_PORTFOLIO_TIMEFRAME_MISSING} — portfolio_timeframe requires
+#'   \item \code{DATA_PORTFOLIO_TIMEFRAME_MISSING}. Portfolio_timeframe requires
 #'     SQ2_* (or SQ1_*) columns that are absent from the data
 #' }
 #'
@@ -817,7 +817,7 @@ guard_validate_portfolio <- function(data, categories, structure, config) {
     sq_alt_cols   <- grep(paste0("^", sq_alt_prefix), names(data), value = TRUE)
     alt_msg <- if (length(sq_alt_cols) > 0) {
       sprintf(
-        " However, %s* columns ARE present — consider setting portfolio_timeframe = '%s'.",
+        " However, %s* columns ARE present, consider setting portfolio_timeframe = '%s'.",
         sq_alt_prefix, if (identical(timeframe, "3m")) "13m" else "3m"
       )
     } else ""

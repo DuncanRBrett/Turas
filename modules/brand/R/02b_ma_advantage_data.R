@@ -143,7 +143,7 @@ build_ma_advantage_block <- function(ma_result,
 # Reshapes the per-brand data frames from calculate_ma_focal_view()
 # into a JSON-safe map keyed by brand code. The HTML focal picker
 # selects a brand and the JS swaps the rendered table to the matching
-# slice — no R re-run needed when focal changes in the page.
+# slice: no R re-run needed when focal changes in the page.
 
 .ma_adv_focal_view_set <- function(focal_view_set, codes, labels, focal_code) {
   if (is.null(focal_view_set) || !is.list(focal_view_set)) return(NULL)

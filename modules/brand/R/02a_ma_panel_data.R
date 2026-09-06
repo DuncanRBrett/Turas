@@ -8,9 +8,9 @@
 # payload consumed by build_ma_panel_html() and brand_ma_panel.js.
 #
 # The panel exposes three sub-tabs:
-#   - Attributes   — brand-image attribute x brand matrix
-#   - CEPs         — CEP x brand linkage matrix (with base toggle)
-#   - Metrics      — MPen, NS, MMS per brand + CEP penetration ranking
+#   - Attributes: brand-image attribute x brand matrix
+#   - CEPs, CEP x brand linkage matrix (with base toggle)
+#   - Metrics, MPen, NS, MMS per brand + CEP penetration ranking
 #
 # All three tabs share: brands-as-columns, heatmap variation vs category
 # average, chip picker, pin, export, focal-row accent.
@@ -198,10 +198,10 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   texts[is.na(texts)] <- codes[is.na(texts)]
 
   # Per-stimulus category average across brands (simple mean of brand
-  # percentages — a pooled category-level reading).
+  # percentages, a pooled category-level reading).
   brand_vals <- matrix_df[, brand_codes, drop = FALSE]
   stim_avg <- rowMeans(as.matrix(brand_vals), na.rm = TRUE)
-  # Row CI around the cat-avg — treats brand values as a sample of the
+  # Row CI around the cat-avg: treats brand values as a sample of the
   # category. Used server-side to classify each cell as above/within/below
   # and to colour the cat-avg column's "greyed CI band".
   stim_ci <- vapply(seq_len(nrow(matrix_df)), function(i) {
@@ -215,11 +215,11 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   stim_ci_lower <- stim_ci[1, ]
   stim_ci_upper <- stim_ci[2, ]
 
-  # Per-brand average across stimuli (column means) — used for the
+  # Per-brand average across stimuli (column means): used for the
   # summary row.
   brand_avg <- colMeans(as.matrix(brand_vals), na.rm = TRUE)
 
-  # n for each (brand, stim) cell — used for Show-count and sig tests.
+  # n for each (brand, stim) cell, used for Show-count and sig tests.
   # Without per-cell bases we use the category n (weighted or raw) as a
   # denominator; when awareness_by_brand is provided, aware-base is
   # n_total * aware%/100.
@@ -287,7 +287,7 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     }
   }
 
-  # Cat-avg CI width per row — shown as a shaded cat-avg column marker
+  # Cat-avg CI width per row: shown as a shaded cat-avg column marker
   list(
     codes         = codes,
     labels        = texts,
@@ -350,7 +350,7 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   som <- round(ifelse(mpen > 0, mms * 100 / mpen, NA_real_), 1)
 
   # Silent-zero mask (mirrors C1 fix in 14_summary_panel.R). The MA engine
-  # returns 0 (not NA) for brands with no linkage data — including those
+  # returns 0 (not NA) for brands with no linkage data, including those
   # zeros in the cat-avg / CI bounds drags the reference distribution
   # toward a diluted floor and lets the per-brand band classification
   # ("above" / "below" / "within") read against a wrong mean. Marking
@@ -437,7 +437,7 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     som  = brand_codes[which.max(som)]
   )
 
-  # Total CEP links across all brands — denominator for MMS show-counts
+  # Total CEP links across all brands: denominator for MMS show-counts
   # (brand links / category total). Sum the per-brand totals; ignore NA
   # so brands with missing metrics don't poison the total.
   total_links_vec <- vapply(table_rows, function(r) {

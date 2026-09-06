@@ -88,7 +88,7 @@ parse_audience_lens_definitions <- function(structure, config, cat_code,
   if (nrow(in_scope) == 0) return(list())
 
   # 4) Resolve which IDs apply to this category from the opt-in spec.
-  #    Accept either AudienceID or PairID — listing a PairID pulls both
+  #    Accept either AudienceID or PairID: listing a PairID pulls both
   #    pair members in.
   selected_ids <- if (toupper(use_raw) %in% c("ALL", "ALL_AVAILABLE")) {
     unique(trimws(as.character(in_scope$AudienceID)))
@@ -278,7 +278,7 @@ resolve_audience_index <- function(a, data) {
 }
 
 
-# Pair counts as one audience for the ceiling — give it a single key.
+# Pair counts as one audience for the ceiling, give it a single key.
 .al_count_key <- function(selected) {
   if ("PairID" %in% names(selected)) {
     pid <- trimws(as.character(selected$PairID))
