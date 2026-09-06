@@ -28,31 +28,31 @@ source(file.path(ROOT, "modules", "brand", "R", "05_wom.R"))
 # ------------------------------------------------------------------------------
 # Hand-coded mini-fixture: 5 respondents, 3 brands
 # ------------------------------------------------------------------------------
-# WOM_POS_REC_DSS_*  — heard positive
+# WOM_POS_REC_DSS_*: heard positive
 #   r1: IPK, ROB | r2: IPK | r3: ROB, CART | r4: NONE | r5: IPK, ROB, CART
 #   IPK heard pos: r1,r2,r5 -> 3/5 = 60%
 #   ROB heard pos: r1,r3,r5 -> 3/5 = 60%
 #   CART heard pos: r3,r5  -> 2/5 = 40%
 #
-# WOM_NEG_REC_DSS_* — heard negative
+# WOM_NEG_REC_DSS_*, heard negative
 #   r1: ROB | r2: NONE | r3: NONE | r4: IPK, CART | r5: NONE
 #   IPK heard neg: r4 -> 1/5 = 20%
 #   ROB heard neg: r1 -> 1/5 = 20%
 #   CART heard neg: r4 -> 1/5 = 20%
 #
-# WOM_POS_SHARE_DSS_* — said positive
+# WOM_POS_SHARE_DSS_*, said positive
 #   r1: IPK | r2: NONE | r3: NONE | r4: NONE | r5: IPK, ROB
 #   IPK said pos: r1,r5 -> 2/5 = 40%
 #   ROB said pos: r5    -> 1/5 = 20%
 #   CART said pos: 0    -> 0%
 #
-# WOM_NEG_SHARE_DSS_* — said negative
+# WOM_NEG_SHARE_DSS_*, said negative
 #   r1: NONE | r2: NONE | r3: ROB | r4: NONE | r5: NONE
 #   IPK said neg: 0
 #   ROB said neg: r3 -> 1/5 = 20%
 #   CART said neg: 0
 #
-# WOM_POS_COUNT_DSS_{BRAND} — sharing frequency among sharers
+# WOM_POS_COUNT_DSS_{BRAND}, sharing frequency among sharers
 #   IPK: r1=2, r5=4 -> mean 3.0; others NA / 0
 #   ROB: r5=1            -> mean 1.0
 #   CART: all 0          -> mean 0

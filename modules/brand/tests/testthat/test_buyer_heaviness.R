@@ -1,5 +1,5 @@
 # ==============================================================================
-# TEST: run_buyer_heaviness() — 08d_buyer_heaviness.R
+# TEST: run_buyer_heaviness(), 08d_buyer_heaviness.R
 # Coverage: tertile counts, NMI = 100 for category-identical mix,
 #           empty brand (no buyers), DATA_ALL_SAME_M, weighted path.
 # ==============================================================================

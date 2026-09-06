@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_branded_reach (Branded Reach placeholder migration — Step 3j)
+# Tests for run_branded_reach (Branded Reach placeholder migration: Step 3j)
 # ==============================================================================
 # IPK Wave 1 has no MarketingReach sheet, so v2's primary contract is the
 # placeholder path: when assets are absent or empty, return a structured
@@ -8,7 +8,7 @@
 #
 # Also verifies the live path: when assets are present, the v2 wrapper
 # delegates to run_branded_reach() (existing 9cat regression coverage stays
-# in test_branded_reach.R — this file only verifies wrapper plumbing).
+# in test_branded_reach.R, this file only verifies wrapper plumbing).
 # ==============================================================================
 library(testthat)
 
@@ -238,7 +238,7 @@ test_that("Channel chip names the highest-average channel across ads", {
   pd <- build_branded_reach_panel_data(.fake_br_result(),
                                         focal_brand = "IPK")
   ch <- Filter(function(x) x$verb == "Channel", pd$insights)[[1]]
-  # TV avg 46.5%, OOH avg 38.4%, Facebook avg 45% — TV wins
+  # TV avg 46.5%, OOH avg 38.4%, Facebook avg 45%. TV wins
   expect_match(ch$text, "TV")
 })
 

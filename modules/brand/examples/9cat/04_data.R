@@ -68,7 +68,7 @@
 
   df <- data.frame(row.names = seq_len(n), stringsAsFactors = FALSE)
 
-  # Category buying — ordinal frequency (CATBUY) + numeric count (CATCOUNT)
+  # Category buying: ordinal frequency (CATBUY) + numeric count (CATCOUNT)
   catbuy_col   <- sprintf("CATBUY_%s",   cat_code)
   catcount_col <- sprintf("CATCOUNT_%s", cat_code)
   cat_buy      <- .rcat9(n, c(0.13, 0.37, 0.34, 0.14, 0.02))
@@ -180,7 +180,7 @@
   }
 
   # Purchase channels (conditional on buying in category)
-  # CHANNEL_{CAT}_{CHANNELCODE} — multi-mention, buyers only
+  # CHANNEL_{CAT}_{CHANNELCODE}, multi-mention, buyers only
   bought <- df[[catbuy_col]] < 5L  # anyone who buys at all
   channel_probs <- c(SUPMKT=0.88, SPECIA=0.18, ONLINE=0.22,
                      CONVEN=0.12, WHOLES=0.15, MARKET=0.08, OTHER=0.04)
@@ -192,7 +192,7 @@
   }
 
   # Pack sizes (conditional on buying in category)
-  # PACKSIZE_{CAT}_{PACKSIZECODE} — multi-mention, buyers only.
+  # PACKSIZE_{CAT}_{PACKSIZECODE}, multi-mention, buyers only.
   # Synthetic prevalences are tuned so MEDIUM / LARGE dominate (typical for
   # food staples), SMALL is moderate, and MULTI is a minority "bulk-buy"
   # signal. Real surveys would calibrate these from observed shares.
@@ -508,10 +508,10 @@ generate_9cat_data <- function(output_path, n = NULL, seed = 42, overwrite = TRU
   )
 
   # Ad hoc questions
-  # ADHOC_NPS — 0-10 numeric scale (NPS-style) for all respondents.
+  # ADHOC_NPS, 0-10 numeric scale (NPS-style) for all respondents.
   # Right-skewed: most respondents in 6-9 range, light tails at 0-3 and 10.
   adhoc_nps <- pmin(10L, pmax(0L, as.integer(round(rbeta(n_total, 4.5, 1.8) * 10))))
-  # ADHOC_FUTURE_<CAT> — 5-point likelihood per full category, populated only
+  # ADHOC_FUTURE_<CAT>: 5-point likelihood per full category, populated only
   # for respondents in that focal category. Skews to "probably" (code 2-3).
   adhoc_future_cols <- list()
   for (cc in c("DSS", "POS", "PAS", "BAK")) {

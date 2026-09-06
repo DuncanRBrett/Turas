@@ -9,16 +9,16 @@ IPK synthetic config, used to browser-verify the
 The brand module's `examples/3cat/` and `examples/9cat/` are stale after
 the IPK rebuild and will not run. The canonical IPK config in OneDrive
 (`OneDrive/.../IPK/Tabs/synthetic/8822527_*.xlsx`) is the single working
-example, but it must not be modified — it is in active use on the live
+example, but it must not be modified. It is in active use on the live
 IPK project.
 
 This script copies the canonical files into two sister folders and
 mutates the copies:
 
-- `BR_DBA_test/placeholder/` — element flags Y, MR + DBA sheets stripped
+- `BR_DBA_test/placeholder/`: element flags Y, MR + DBA sheets stripped
   to headers only. Used to verify the "Data not yet collected"
   placeholder cards render cleanly.
-- `BR_DBA_test/populated/` — element flags Y, MR + DBA sheets populated
+- `BR_DBA_test/populated/`: element flags Y, MR + DBA sheets populated
   with synthetic asset definitions, synthetic data extended with
   required Reach + DBA response columns. Used to verify the modern
   panels render with real data.
@@ -42,7 +42,7 @@ After running, verify the canonical file hashes match those recorded in
 
 - 3 Marketing Reach ads (one DSS-only TV, one ALL-category OOH, one
   POS-only digital), all attributed to IPK.
-- 4 DBAs (LOGO, COLOUR, TAGLINE, CHARACTER) — same set defined in the
+- 4 DBAs (LOGO, COLOUR, TAGLINE, CHARACTER): same set defined in the
   canonical Brand_Config, mapped to question codes in the Structure.
 - Synthetic data extended with 9 reach columns (`reach.seen.*`,
   `reach.brand.*`, `reach.media.*`) and 8 DBA columns

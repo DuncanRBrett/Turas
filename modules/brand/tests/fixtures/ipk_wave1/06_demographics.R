@@ -1,5 +1,5 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — DEMOGRAPHICS
+# IPK WAVE 1 FIXTURE: DEMOGRAPHICS
 # ==============================================================================
 # DEMO_* questions for all respondents. Coding: numeric codes (matching
 # IPK_DEMO_* distributions in 01_constants.R).

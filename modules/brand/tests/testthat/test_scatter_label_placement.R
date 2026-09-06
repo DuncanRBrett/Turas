@@ -1,9 +1,9 @@
 # ==============================================================================
-# Tests for .place_scatter_labels() — collision-aware label placement
+# Tests for .place_scatter_labels(): collision-aware label placement
 # ==============================================================================
 # Used by the Category Context (clutter) and Extension (strength) scatters
 # in the brand portfolio panel. When two categories sit at the same (x, y)
-# their bubbles are drawn at the same place — the placement algorithm
+# their bubbles are drawn at the same place, the placement algorithm
 # moves the *labels* off in different directions so the chart stays
 # readable without distorting the data.
 # ==============================================================================
@@ -54,12 +54,12 @@ test_that(".place_scatter_labels: empty input returns empty list", {
 
 
 # ------------------------------------------------------------------------------
-# The IPK overlap case — three categories at exactly the same (x, y)
+# The IPK overlap case, three categories at exactly the same (x, y)
 # should get labels in three DIFFERENT positions.
 # ------------------------------------------------------------------------------
 
 test_that(".place_scatter_labels: stacked points get distinct anchors", {
-  # Three categories at the same coordinate — exactly the IPK Wave 1
+  # Three categories at the same coordinate: exactly the IPK Wave 1
   # Salad Dressings / Stock Powder / Cook-in Sauces situation.
   points <- list(
     list(svgx = 200, svgy = 200, r = 10, label = "Salad Dressings",
@@ -73,7 +73,7 @@ test_that(".place_scatter_labels: stacked points get distinct anchors", {
                                 plot_left = 0, plot_right = 720,
                                 plot_top  = 0, plot_bot   = 520)
 
-  # Different points in 2D — no two labels share an anchor coordinate.
+  # Different points in 2D, no two labels share an anchor coordinate.
   centres <- lapply(out, function(p) c(p$cx, p$cy))
   uniq <- unique(centres)
   expect_equal(length(uniq), 3L,
@@ -91,7 +91,7 @@ test_that(".place_scatter_labels: stacked points get distinct anchors", {
 
 
 test_that(".place_scatter_labels: well-separated points keep east anchor", {
-  # Points spaced far apart — no collision — should pick the cheap
+  # Points spaced far apart. No collision. Should pick the cheap
   # default east position with no leader line.
   points <- list(
     list(svgx = 100, svgy = 100, r = 8, label = "A", is_focal = FALSE),
@@ -130,7 +130,7 @@ test_that(".place_scatter_labels: focal point processed first (gets default east
 
 
 test_that(".place_scatter_labels: respects chart edges (leftmost point)", {
-  # Point hard against the left edge — should NOT pick a left/west anchor
+  # Point hard against the left edge: should NOT pick a left/west anchor
   # that would push the label off the chart.
   points <- list(
     list(svgx = 10, svgy = 200, r = 8, label = "Left-edge label that is wide",
@@ -143,7 +143,7 @@ test_that(".place_scatter_labels: respects chart edges (leftmost point)", {
                                 plot_top  = 0, plot_bot   = 500)
   # Edge point's label should stay inside the chart (x range 0..500).
   pl1 <- out[[1]]
-  expect_gte(pl1$cx, -10)  # cx is anchor, not left edge — small margin OK
+  expect_gte(pl1$cx, -10)  # cx is anchor, not left edge, small margin OK
   # The corresponding label box's right edge should not exceed plot_right
   char_w <- 10 * 0.55
   label_w <- char_w * nchar(points[[1]]$label)
@@ -155,7 +155,7 @@ test_that(".place_scatter_labels: respects chart edges (leftmost point)", {
 
 
 # ------------------------------------------------------------------------------
-# Determinism — same inputs → same outputs
+# Determinism: same inputs → same outputs
 # ------------------------------------------------------------------------------
 
 test_that(".place_scatter_labels: deterministic", {

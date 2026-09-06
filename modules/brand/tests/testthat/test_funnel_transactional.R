@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL (TRANSACTIONAL CATEGORY TYPE) — v2 port
+# BRAND MODULE TESTS: FUNNEL (TRANSACTIONAL CATEGORY TYPE), v2 port
 # ==============================================================================
 # Known-answer tests on a hand-built slot-indexed 10-respondent fixture that
 # encodes the same truth as the legacy funnel_transactional_10resp.csv.
@@ -128,7 +128,7 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
              stringsAsFactors = FALSE)
 }
 
-# Role map — base-keyed (cat_code = NULL in config) plus legacy output-layer
+# Role map: base-keyed (cat_code = NULL in config) plus legacy output-layer
 # aliases so 03d_funnel_output.R's .role_map_lookup_for_stages() finds them.
 .trans_rm <- function() {
   aw <- .mm_entry("funnel.awareness", "TSX", "BRANDAWARE",
@@ -156,11 +156,11 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
   modifyList(defaults, list(...))
 }
 
-# Expected values — AGGREGATE funnel (v3, 2026-05-24).
+# Expected values: AGGREGATE funnel (v3, 2026-05-24).
 # Each stage uses its own raw survey response (per the panel explainer:
 # "each stage is asked independently … the funnel narrows in aggregate,
 # but it is not a respondent journey"). No cumulative AND with prior
-# stages — matches what derive_funnel_stages() now does after the
+# stages. Matches what derive_funnel_stages() now does after the
 # cumulative-AND was removed at 03a_funnel_derive.R:160.
 #
 # Per-respondent attitude codes from the fixture (Row -> I R C):
@@ -218,7 +218,7 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 test_that("run_funnel returns PASS or PARTIAL status on complete transactional fixture", {
   # v3 aggregate funnel: status may be PARTIAL when raw counts don't nest
   # (e.g. bought_long > consideration for a brand). That's a warning, not
-  # an error — the engine reports the data as recorded.
+  # an error. The engine reports the data as recorded.
   res <- run_funnel(.trans_data(), .trans_rm(), .trans_brands(), .trans_cfg())
   expect_true(res$status %in% c("PASS", "PARTIAL"))
 })
@@ -279,7 +279,7 @@ test_that("Preferred/heavy_buyer stages are not materialised", {
 # ==============================================================================
 
 test_that("IPK conversion ratios match hand-calculated drops (aggregate)", {
-  # Aggregate funnel — conversion ratios are aggregate ratios per the
+  # Aggregate funnel: conversion ratios are aggregate ratios per the
   # panel explainer: total count at later stage / total count at earlier
   # stage. Not a per-respondent transition.
   res <- run_funnel(.trans_data(), .trans_rm(), .trans_brands(), .trans_cfg())

@@ -128,7 +128,7 @@
 
   cat_code <- ipk_category()$code
 
-  # Attitude scale (Romaniuk 5-level) — note options 1..3 = positive disposition
+  # Attitude scale (Romaniuk 5-level): note options 1..3 = positive disposition
   attitude <- list(
     list(code = sprintf("BRANDATT1_%s", cat_code), val = "1",
          text = "I love it / it's my favourite",                                order = 1),
@@ -160,7 +160,7 @@
     list(code = sprintf("BRANDPEN3_%s", cat_code), val = "5", text = "Rarely / first purchase", order = 5)
   )
 
-  # WOM occasion count scales (QWOMBRAND2b / QWOMBRAND3b) — per brand, conditional on sharing
+  # WOM occasion count scales (QWOMBRAND2b / QWOMBRAND3b): per brand, conditional on sharing
   wom_count_options <- list(
     list(code = "WOM_POS_COUNT", val = "1", text = "Once",          order = 1),
     list(code = "WOM_POS_COUNT", val = "2", text = "Twice",         order = 2),
@@ -197,7 +197,7 @@
 # Brand-specific hex colours. Focal (IPK) and two key competitors have fixed
 # colours; others left blank so they pick up the automatic Tableau-10 palette.
 .BRAND_COLOURS_1BRAND <- list(
-  IPK   = "#1A5276",   # Turas navy — focal brand
+  IPK   = "#1A5276",   # Turas navy, focal brand
   ROB   = "#C0392B",   # Robertsons red
   KNORR = "#E67E22"    # Knorr amber
 )
@@ -246,7 +246,7 @@
 
 
 # ==============================================================================
-# QUESTIONMAP SHEET (role-registry architecture — required for funnel element)
+# QUESTIONMAP SHEET (role-registry architecture: required for funnel element)
 # ==============================================================================
 
 .build_questionmap_columns <- function() {
@@ -256,7 +256,7 @@
     list(name = "ClientCode",         width = 24, required = TRUE,
          description = "Client question code used as column prefix in the data file"),
     list(name = "QuestionText",       width = 52, required = TRUE,
-         description = "Full question wording — shown in chart/card labels and About drawer"),
+         description = "Full question wording: shown in chart/card labels and About drawer"),
     list(name = "QuestionTextShort",  width = 26, required = FALSE,
          description = "Optional shortened label for tight UI elements"),
     list(name = "Variable_Type",      width = 20, required = TRUE,
@@ -269,7 +269,7 @@
     list(name = "OptionMapScale",     width = 20, required = FALSE,
          description = "Scale name in OptionMap sheet. Leave blank for binary/free-text."),
     list(name = "Notes",              width = 40, required = FALSE,
-         description = "Operator notes — not shown in report")
+         description = "Operator notes: not shown in report")
   )
 }
 
@@ -330,7 +330,7 @@
          Variable_Type     = "Multi_Mention",
          ColumnPattern     = "{code}_{brandcode}",
          OptionMapScale    = "",
-         Notes             = "BRANDPENTRANS1 — longer timeframe"),
+         Notes             = "BRANDPENTRANS1: longer timeframe"),
     list(Role = "funnel.transactional.bought_target",
          ClientCode        = sprintf("BRANDPEN2_%s", cat_code),
          QuestionText      = sprintf("Which of these brands have you bought in the last %s?", tft),
@@ -338,7 +338,7 @@
          Variable_Type     = "Multi_Mention",
          ColumnPattern     = "{code}_{brandcode}",
          OptionMapScale    = "",
-         Notes             = "BRANDPENTRANS2 — target timeframe"),
+         Notes             = "BRANDPENTRANS2: target timeframe"),
     list(Role = "funnel.transactional.frequency",
          ClientCode        = sprintf("BRANDPEN3_%s", cat_code),
          QuestionText      = paste("How frequently do you buy each brand",
@@ -347,7 +347,7 @@
          Variable_Type     = "Numeric",
          ColumnPattern     = "{code}_{brandcode}",
          OptionMapScale    = "",
-         Notes             = "BRANDPENTRANS3 — frequency scale 1-5")
+         Notes             = "BRANDPENTRANS3: frequency scale 1-5")
   )
 }
 
@@ -359,13 +359,13 @@
 .build_optionmap_columns <- function() {
   list(
     list(name = "Scale",       width = 20, required = TRUE,
-         description = "Scale name — must match OptionMapScale in QuestionMap"),
+         description = "Scale name: must match OptionMapScale in QuestionMap"),
     list(name = "ClientCode",  width = 14, required = TRUE,
          description = "Integer or string code as it appears in the data"),
     list(name = "Role",        width = 28, required = FALSE,
          description = "Position role this code maps to (e.g. attitude.love). Blank = non-analytic."),
     list(name = "ClientLabel", width = 52, required = TRUE,
-         description = "Client question wording for this response option — shown in report legend"),
+         description = "Client question wording for this response option: shown in report legend"),
     list(name = "OrderIndex",  width = 14, required = TRUE,
          description = "Display order (integer). Lower = first.",
          integer_range = c(1, 100))

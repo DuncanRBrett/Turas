@@ -1,5 +1,5 @@
 # ==============================================================================
-# TEST: run_dirichlet_norms() — 08c_dirichlet_norms.R
+# TEST: run_dirichlet_norms(), 08c_dirichlet_norms.R
 # Coverage: observed metrics, deviation flags, share normalisation,
 #           textbook known-answer, TRS refusals, weighted path,
 #           PKG_DIRICHLET_MISSING simulation.
@@ -271,7 +271,7 @@ test_that("PKG_DIRICHLET_MISSING returned when package unavailable (mocked)", {
                                target_months = 3L)
     expect_equal(res$code, "PKG_DIRICHLET_MISSING")
   } else {
-    skip("NBDdirichlet is installed — PKG_DIRICHLET_MISSING path not reachable")
+    skip("NBDdirichlet is installed, PKG_DIRICHLET_MISSING path not reachable")
   }
 })
 

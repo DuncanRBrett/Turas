@@ -73,7 +73,7 @@ test_that("build_brand_volume_matrix reads slot-indexed BRANDPEN2 + BRANDPEN3", 
   expect_equal(res$x_mat[, "IPK"],  c(5, 4, 0, 0))
   expect_equal(res$x_mat[, "ROB"],  c(2, 0, 3, 0))
   expect_equal(res$x_mat[, "CART"], c(0, 0, 6, 0))
-  # pen_mat_raw is the unreconciled BRANDPEN2 buyer flag — Portfolio
+  # pen_mat_raw is the unreconciled BRANDPEN2 buyer flag, Portfolio
   # overview reads this so its "% who bought" matches the funnel exactly.
   # In this fixture there's no pen=0/freq>0 inconsistency so raw == reconciled.
   expect_equal(res$pen_mat_raw, res$pen_mat)

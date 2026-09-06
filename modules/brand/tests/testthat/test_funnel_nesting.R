@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL NESTING INVARIANT (§3.4) — v2 port
+# BRAND MODULE TESTS: FUNNEL NESTING INVARIANT (§3.4), v2 port
 # ==============================================================================
 # Validates that:
 # 1. Stage counts decrease monotonically by construction (nested derivation).

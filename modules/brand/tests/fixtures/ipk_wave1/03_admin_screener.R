@@ -1,5 +1,5 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — ADMIN + QUALIFYING + SCREENER
+# IPK WAVE 1 FIXTURE: ADMIN + QUALIFYING + SCREENER
 # ==============================================================================
 # Generates the system / qualifying / SQ1 / SQ2 / focal-category portion of
 # the dataset. All respondents in the fixture pass qualifying (target gender,
@@ -15,7 +15,7 @@ ipk_build_admin_screener <- function() {
   n <- IPK_N_RESPONDENTS
   ts <- ipk_sample_timestamps(n)
 
-  # System columns — leading "Response.ID" matches the Alchemer parser output
+  # System columns: leading "Response.ID" matches the Alchemer parser output
   # (uses BOM on first column; we use a clean name here, no BOM)
   out <- data.frame(
     Response.ID    = seq_len(n) + 3L,  # Alchemer numbers from ~4 in IPK
@@ -30,7 +30,7 @@ ipk_build_admin_screener <- function() {
     stringsAsFactors = FALSE
   )
 
-  # Consent + qualifying — all-pass values for fixture respondents
+  # Consent + qualifying: all-pass values for fixture respondents
   out$I.agree.to.participate.in.this.survey <- "I agree"
   out$Gender          <- sample(IPK_QUAL_GENDER_VALUES, n, replace = TRUE)
   out$Age             <- sample(IPK_QUAL_AGE_VALUES, n, replace = TRUE)
@@ -38,7 +38,7 @@ ipk_build_admin_screener <- function() {
   out$Region <- sample(IPK_QUAL_REGION_VALUES, n,
                        replace = TRUE, prob = IPK_QUAL_REGION_PROBS)
 
-  # SQ1 + SQ2 + Focal_Category — generated per respondent
+  # SQ1 + SQ2 + Focal_Category: generated per respondent
   sq1_n_slots <- length(IPK_CATEGORIES) + 1L  # 9 cats + 1 spare
   sq2_n_slots <- length(IPK_CATEGORIES)
   sq1_store <- list()
@@ -69,7 +69,7 @@ ipk_build_admin_screener <- function() {
 
   out$Focal_Category <- focal_vec
 
-  # Wave column — derived per tracker convention
+  # Wave column: derived per tracker convention
   out$Wave <- IPK_WAVE
 
   list(

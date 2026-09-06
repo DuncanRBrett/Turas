@@ -8,7 +8,7 @@
 #      KPIs, and option codes;
 #   3. the slim Context chips collapse to "" when both engines absent.
 #
-# Whitespace / class-name probes only — no DOM diffing.
+# Whitespace / class-name probes only: no DOM diffing.
 # ==============================================================================
 
 # Source the panel + its helpers. Test-time chdir = FALSE keeps the working

@@ -72,7 +72,7 @@ mk_brand_config <- function(active = c("DSS", "POS")) {
 
 
 # ------------------------------------------------------------------------------
-# infer_role_map — convention-first inference
+# infer_role_map: convention-first inference
 # ------------------------------------------------------------------------------
 
 test_that("infer_role_map covers the canonical IPK pattern set", {
@@ -156,7 +156,7 @@ test_that("infer_role_map populates entry shape correctly", {
 
 
 # ------------------------------------------------------------------------------
-# build_brand_role_map — full pipeline (inference + override + resolution)
+# build_brand_role_map: full pipeline (inference + override + resolution)
 # ------------------------------------------------------------------------------
 
 test_that("build_brand_role_map resolves slot columns against data", {
@@ -257,14 +257,14 @@ test_that("role map resolves cleanly against the IPK Wave 1 fixture", {
 
   rm <- build_brand_role_map(structure, brand_config, data)
 
-  # DSS funnel awareness — slot columns resolved
+  # DSS funnel awareness: slot columns resolved
   e <- rm[["funnel.awareness.DSS"]]
   expect_false(is.null(e))
   expect_equal(e$column_root, "BRANDAWARE_DSS")
   expect_equal(length(e$columns), 16L)  # 15 brands + NONE
   expect_true(all(grepl("^BRANDAWARE_DSS_[0-9]+$", e$columns)))
 
-  # CEP01 — same shape
+  # CEP01: same shape
   e <- rm[["mental_avail.cep.DSS.CEP01"]]
   expect_false(is.null(e))
   expect_equal(length(e$columns), 16L)
@@ -274,6 +274,6 @@ test_that("role map resolves cleanly against the IPK Wave 1 fixture", {
   expect_false(is.null(e))
   expect_equal(e$columns, "CATBUY_DSS")
 
-  # Sample-wide ad hoc absent — no NPS in fixture
+  # Sample-wide ad hoc absent: no NPS in fixture
   expect_false("adhoc.nps.ALL" %in% names(rm))
 })

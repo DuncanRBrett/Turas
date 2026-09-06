@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_adhoc + resolve_adhoc_role (Ad Hoc placeholder — Step 3l)
+# Tests for run_adhoc + resolve_adhoc_role (Ad Hoc placeholder, Step 3l)
 # ==============================================================================
 # IPK Wave 1 has no ADHOC_* columns, so v2's primary contract is the
 # placeholder path: when no adhoc.* roles resolve in scope, return a
@@ -31,7 +31,7 @@ source(file.path(ROOT, "modules", "brand", "R", "12_adhoc.R"))
 
 
 # ------------------------------------------------------------------------------
-# Placeholder contract — empty role map / wrong-scope role
+# Placeholder contract: empty role map / wrong-scope role
 # ------------------------------------------------------------------------------
 
 test_that("run_adhoc returns PASS-placeholder when role map has no adhoc roles", {
@@ -86,7 +86,7 @@ test_that("run_adhoc returns placeholder when data frame is empty", {
 
 
 # ------------------------------------------------------------------------------
-# resolve_adhoc_role — guard rails
+# resolve_adhoc_role: guard rails
 # ------------------------------------------------------------------------------
 
 test_that("resolve_adhoc_role returns NULL for unknown role", {
@@ -132,10 +132,10 @@ test_that("resolve_adhoc_role returns spec for numeric role without options", {
 # Live path: hand-coded mini fixture, scope filter both branches
 # ------------------------------------------------------------------------------
 # 6 respondents, two adhoc questions:
-#   ADHOC_NPS  (sample-wide, Numeric)            — values 1..6
+#   ADHOC_NPS  (sample-wide, Numeric), values 1..6
 #   ADHOC_FUTURE_DSS (DSS-scoped, Single_Response with codes 1/2/3)
 #
-# Hand-calc for ALL scope NPS — engine bins to quartiles when n>5 unique
+# Hand-calc for ALL scope NPS, engine bins to quartiles when n>5 unique
 # values, so we expect status PASS with the question record present and
 # a 4-row total table. We assert the wrapper plumbing, not engine maths.
 
@@ -149,7 +149,7 @@ mk_ah_data <- function() {
 }
 
 # DSS role uses Numeric here so the test does not depend on an Options sheet
-# — the engine bins values automatically. Single_Response handling is tested
+#, the engine bins values automatically. Single_Response handling is tested
 # implicitly via the 14_demographics_v2 suite, which shares the option lookup.
 mk_ah_role_map <- function() {
   questions <- data.frame(

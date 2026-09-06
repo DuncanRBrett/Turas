@@ -130,7 +130,7 @@
 
   tier_boost <- switch(brand$quality_tier,
     "premium" = switch(attr_code,
-      "ATTR01" = 0.80,  # value — weaker for premium
+      "ATTR01" = 0.80,  # value, weaker for premium
       "ATTR02" = 1.40,  # quality
       "ATTR03" = 1.25,  # trust
       "ATTR04" = 1.10,
@@ -144,8 +144,8 @@
       "ATTR05" = 1.10,
       1),
     "value" = switch(attr_code,
-      "ATTR01" = 1.45,  # value — strong for value brands
-      "ATTR02" = 0.65,  # quality — weaker
+      "ATTR01" = 1.45,  # value, strong for value brands
+      "ATTR02" = 0.65,  # quality, weaker
       "ATTR03" = 0.80,
       "ATTR04" = 0.90,
       "ATTR05" = 1.25,

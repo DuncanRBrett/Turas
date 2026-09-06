@@ -65,7 +65,7 @@ add_category_buying <- function(df) {
 #' Add per-brand awareness columns
 #'
 #' One binary column per brand: BRANDAWARE_{CAT}_{BRAND}.
-#' Awareness is correlated across brands within a respondent — people who are
+#' Awareness is correlated across brands within a respondent. People who are
 #' more category-engaged (CATBUY high frequency) are aware of more brands.
 #'
 #' @keywords internal

@@ -1,5 +1,5 @@
 # ==============================================================================
-# TEST: Portfolio Duplication of Awareness — 09b_portfolio_dop_awareness.R
+# TEST: Portfolio Duplication of Awareness, 09b_portfolio_dop_awareness.R
 # Coverage: hand-verified observed cells, Sharp's D OLS, expected = D * a_j,
 # deviation = obs - exp, diagonal, weighted base, single-brand refusal,
 # zero-awareness refusal.
@@ -68,7 +68,7 @@ run_fixture <- function(weights = rep(1, 10)) {
 
 
 # ==============================================================================
-# OBSERVED MATRIX — hand-verified cells
+# OBSERVED MATRIX: hand-verified cells
 # ==============================================================================
 
 test_that("observed cell A->B equals 75% on hand fixture", {
@@ -96,7 +96,7 @@ test_that("observed diagonal is 100 on every row", {
 
 
 # ==============================================================================
-# SHARP'S D COEFFICIENT — hand-verified
+# SHARP'S D COEFFICIENT: hand-verified
 # ==============================================================================
 
 test_that("D coefficient equals 25465/37800 = 0.6737 on hand fixture", {
@@ -155,7 +155,7 @@ test_that("deviation matrix equals observed minus expected on every off-diag", {
 
 
 # ==============================================================================
-# WEIGHTED BASE — symmetry between weighting and replication
+# WEIGHTED BASE: symmetry between weighting and replication
 # ==============================================================================
 
 test_that("doubling a respondent's weight matches duplicating their row", {

@@ -1,5 +1,5 @@
 # ==============================================================================
-# TESTS — Shopper context + focal engagement engines (14_shopper_summary.R)
+# TESTS: Shopper context + focal engagement engines (14_shopper_summary.R)
 # ==============================================================================
 # Two thin sample-wide engines. Tests cover:
 #   - happy-path percentages
@@ -29,7 +29,7 @@ if (dir.exists(panels_dir) &&
 
 
 # Minimal 4-respondent fixture covering every question. Hand-verified counts
-# below — engines should match exactly.
+# below. Engines should match exactly.
 .fixture_data <- function() {
   data.frame(
     GroceryChains_1 = c("Checkers", "Checkers", NA, "Pick n Pay"),

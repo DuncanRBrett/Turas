@@ -246,7 +246,7 @@ test_that("data access works against the IPK Wave 1 fixture", {
                                            c("SPMKT", "ONLINE", "FARM"))
   expect_equal(dim(ch_mat), c(nrow(dss), 3))
   expect_true(all(ch_mat %in% c(0L, 1L)))
-  # Most DSS focal recent buyers pick SPMKT — should be the most-picked
+  # Most DSS focal recent buyers pick SPMKT: should be the most-picked
   # channel by a wide margin.
   share <- colSums(ch_mat) / nrow(dss)
   expect_true(share[["SPMKT"]] >= max(share))
@@ -278,7 +278,7 @@ test_that(".is_none_brand_code matches every documented NONE variant", {
 test_that(".is_none_brand_code is FALSE for real brand codes", {
   # Common South African dry-seasoning brand codes from the IPK fixture
   # plus edge-case names that contain letter sequences that look like
-  # NONE but aren't ("NOMU", "Annona") — must NOT be flagged.
+  # NONE but aren't ("NOMU", "Annona"). Must NOT be flagged.
   expect_equal(.is_none_brand_code(c("IPK", "ROB", "KNORR", "CART",
                                      "NOMU", "Annona", "SSG", "HND")),
                rep(FALSE, 8L))
@@ -312,7 +312,7 @@ test_that(".drop_none_brands is a no-op when no NONE rows are present", {
     stringsAsFactors = FALSE
   )
   out <- .drop_none_brands(df)
-  # Identical (not just equal) — function should return the input unchanged
+  # Identical (not just equal): function should return the input unchanged
   # to avoid copy overhead in the common case.
   expect_identical(out, df)
 })

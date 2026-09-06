@@ -2,7 +2,7 @@
 # 1BRAND SYNTHETIC EXAMPLE - MATRIX DATA BUILDERS
 # ==============================================================================
 # CEP x brand matrix (150 columns) and attribute x brand matrix (50 columns).
-# These are the most data-dense parts of the survey — for each respondent who
+# These are the most data-dense parts of the survey, for each respondent who
 # is aware of a brand, we simulate whether they link that brand to each CEP /
 # attribute, using the factor model in 04a_data_helpers.R.
 # ==============================================================================
@@ -73,7 +73,7 @@ add_attribute_matrix <- function(df) {
   brands <- ipk_brands()
   attrs  <- ipk_attributes()
 
-  # Separate engagement factor (less variation than CEPs — attributes are
+  # Separate engagement factor (less variation than CEPs: attributes are
   # more universally known than situation-specific CEPs)
   engagement <- .rtrunc(n, mean = 1.0, sd = 0.15, lo = 0.55, hi = 1.45)
 

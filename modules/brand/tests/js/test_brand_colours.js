@@ -4,7 +4,7 @@
 // Run from the Turas project root with:
 //   node modules/brand/tests/js/test_brand_colours.js
 //
-// No test framework required — uses a tiny hand-rolled assert helper.
+// No test framework required. Uses a tiny hand-rolled assert helper.
 // All tests are known-answer tests: input in, expected output asserted exactly.
 // =============================================================================
 
@@ -12,7 +12,7 @@
 /* Bootstrap: load the module under test                                       */
 /* -------------------------------------------------------------------------- */
 
-'use strict';  // applied to this block only — vm.runInThisContext runs outside strict scope
+'use strict';  // applied to this block only. vm.runInThisContext runs outside strict scope
 
 const fs   = require('fs');
 const path = require('path');
@@ -93,7 +93,7 @@ assertEqual('null code returns NEUTRAL', TurasColours.getBrandColour({}, null), 
 assertEqual('hashColour(null) returns NEUTRAL', TurasColours.hashColour(null),   TurasColours.NEUTRAL);
 
 /* -------------------------------------------------------------------------- */
-/* 3. Priority 1 — explicit Brands-sheet colour overrides hash                 */
+/* 3. Priority 1: explicit Brands-sheet colour overrides hash                 */
 /* -------------------------------------------------------------------------- */
 
 console.log('3. Explicit brand colour override');
@@ -106,7 +106,7 @@ var sibling = TurasColours.getBrandColour(pdExplicit, 'COMP1');
 assert('sibling not in map gets a hash colour', sibling !== '#ff0000' && /^#[0-9a-f]{6}$/i.test(sibling));
 
 /* -------------------------------------------------------------------------- */
-/* 4. Priority 2 — focal brand colour                                          */
+/* 4. Priority 2: focal brand colour                                          */
 /* -------------------------------------------------------------------------- */
 
 console.log('4. Focal brand colour');
@@ -116,14 +116,14 @@ assertEqual('focal brand gets focal colour', TurasColours.getBrandColour(pdFocal
 assert('non-focal brand does not get focal colour', TurasColours.getBrandColour(pdFocal, 'BETA') !== '#003366');
 
 /* -------------------------------------------------------------------------- */
-/* 5. Priority 3 — stable hash fallback                                        */
+/* 5. Priority 3: stable hash fallback                                        */
 /* -------------------------------------------------------------------------- */
 
 console.log('5. Stable hash fallback');
 
 var pdEmpty = makePd({ focal_brand_code: 'FOCAL' });
 
-// Known-answer: djb2('ROB') % 10 — compute manually then assert.
+// Known-answer: djb2('ROB') % 10, compute manually then assert.
 // djb2: h=5381, R→h=(5381<<5)+5381+82=178990, O→h=(178990<<5)+178990+79=5760489, B→h=(5760489<<5)+5760489+66=185492418
 // 185492418 % 10 = 8 → palette[8] = '#9c755f'
 var robColour = TurasColours.getBrandColour(pdEmpty, 'ROB');
@@ -213,5 +213,5 @@ assert('focal, B, C all different colours', cA !== cB && cA !== cC && cB !== cC)
 /* Summary                                                                     */
 /* -------------------------------------------------------------------------- */
 
-console.log('\n' + (failed === 0 ? 'PASS' : 'FAIL') + ' — ' + passed + ' passed, ' + failed + ' failed\n');
+console.log('\n' + (failed === 0 ? 'PASS' : 'FAIL') + ': ' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed > 0 ? 1 : 0);

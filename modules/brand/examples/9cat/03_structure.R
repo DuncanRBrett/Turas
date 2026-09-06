@@ -25,7 +25,7 @@
     list(name = "ClientCode",         width = 24, required = TRUE,
          description = "Client question code used as column prefix in the data file"),
     list(name = "QuestionText",       width = 52, required = TRUE,
-         description = "Full question wording — shown in chart/card labels and About drawer"),
+         description = "Full question wording: shown in chart/card labels and About drawer"),
     list(name = "QuestionTextShort",  width = 26, required = FALSE,
          description = "Optional shortened label for tight UI elements"),
     list(name = "Variable_Type",      width = 20, required = TRUE,
@@ -38,20 +38,20 @@
     list(name = "OptionMapScale",     width = 20, required = FALSE,
          description = "Scale name in OptionMap sheet. Leave blank for binary/free-text."),
     list(name = "Notes",              width = 40, required = FALSE,
-         description = "Operator notes — not shown in report")
+         description = "Operator notes: not shown in report")
   )
 }
 
 .build_optionmap_columns <- function() {
   list(
     list(name = "Scale",       width = 20, required = TRUE,
-         description = "Scale name — must match OptionMapScale in QuestionMap"),
+         description = "Scale name: must match OptionMapScale in QuestionMap"),
     list(name = "ClientCode",  width = 14, required = TRUE,
          description = "Integer or string code as it appears in the data"),
     list(name = "Role",        width = 28, required = FALSE,
          description = "Position role this code maps to (e.g. attitude.love). Blank = non-analytic."),
     list(name = "ClientLabel", width = 52, required = TRUE,
-         description = "Client question wording for this response option — shown in report legend"),
+         description = "Client question wording for this response option: shown in report legend"),
     list(name = "OrderIndex",  width = 14, required = TRUE,
          description = "Display order (integer). Lower = first.",
          integer_range = c(1, 100))
@@ -232,7 +232,7 @@
 
   full_cats <- Filter(function(c) c$analysis_depth == "full", cat9_categories())
 
-  # Attitude scale (Romaniuk 5-level) — one set per full category
+  # Attitude scale (Romaniuk 5-level), one set per full category
   attitude <- unlist(lapply(full_cats, function(cat) {
     code <- sprintf("BRANDATT1_%s", cat$code)
     list(
@@ -244,7 +244,7 @@
     )
   }), recursive = FALSE)
 
-  # Category buying frequency — one set per full category
+  # Category buying frequency, one set per full category
   cat_buy <- unlist(lapply(full_cats, function(cat) {
     code <- sprintf("CATBUY_%s", cat$code)
     list(
@@ -256,7 +256,7 @@
     )
   }), recursive = FALSE)
 
-  # Brand purchase frequency (BRANDPEN3) — one set per full category
+  # Brand purchase frequency (BRANDPEN3), one set per full category
   pen_freq <- unlist(lapply(full_cats, function(cat) {
     code <- sprintf("BRANDPEN3_%s", cat$code)
     list(
@@ -278,7 +278,7 @@
   )
   wom_neg_count <- lapply(wom_pos_count, function(r) { r$code <- "WOM_NEG_COUNT"; r })
 
-  # DBA fame binary scale — one set per asset
+  # DBA fame binary scale, one set per asset
   dba_fame <- unlist(lapply(cat9_dba_assets(), function(a) {
     code <- sprintf("DBA_FAME_%s", a$code)
     list(
@@ -287,7 +287,7 @@
     )
   }), recursive = FALSE)
 
-  # Marketing reach seen — binary scale per asset
+  # Marketing reach seen: binary scale per asset
   reach_seen <- unlist(lapply(cat9_reach_assets(), function(a) {
     code <- sprintf("REACH_SEEN_%s", a$code)
     list(
@@ -296,7 +296,7 @@
     )
   }), recursive = FALSE)
 
-  # Channel options — one set per full category (shared channel list)
+  # Channel options, one set per full category (shared channel list)
   channel_opts <- unlist(lapply(full_cats, function(cat) {
     code <- sprintf("CHANNEL_%s", cat$code)
     mapply(function(ch, i) list(code = code, val = ch$code, text = ch$label, order = i),
@@ -580,10 +580,10 @@
   full_cats  <- Filter(function(c) c$analysis_depth == "full",           cat9_categories())
   aware_cats <- Filter(function(c) c$analysis_depth == "awareness_only", cat9_categories())
 
-  # Screener rows — one pair per category (all 9: full + awareness-only)
+  # Screener rows, one pair per category (all 9: full + awareness-only)
   # ClientCode includes the category suffix so ColumnPattern = "{code}" resolves
   # directly to the data column (e.g. SQ1_DSS, SQ2_DSS, SQ1_SLD, etc.).
-  # Note: {catcode} is NOT a supported role-map token — embed cat in ClientCode.
+  # Note: {catcode} is NOT a supported role-map token, embed cat in ClientCode.
   screener_rows <- unlist(lapply(cat9_categories(), function(cat) {
     list(
       list(Role = sprintf("screener.long.%s",   cat$code),
@@ -594,7 +594,7 @@
            Variable_Type = "Single_Response",
            ColumnPattern = "{code}",
            OptionMapScale = "",
-           Notes = sprintf("SQ1CATBUYTRANS — column SQ1_%s. 1=yes, 0=no", cat$code)),
+           Notes = sprintf("SQ1CATBUYTRANS: column SQ1_%s. 1=yes, 0=no", cat$code)),
       list(Role = sprintf("screener.target.%s", cat$code),
            ClientCode = sprintf("SQ2_%s", cat$code),
            QuestionText = sprintf("Bought %s in the last %s (screener)",
@@ -603,7 +603,7 @@
            Variable_Type = "Single_Response",
            ColumnPattern = "{code}",
            OptionMapScale = "",
-           Notes = sprintf("SQ2CATBUYTRANS — column SQ2_%s. 1=yes, 0=no", cat$code))
+           Notes = sprintf("SQ2CATBUYTRANS: column SQ2_%s. 1=yes, 0=no", cat$code))
     )
   }), recursive = FALSE)
 
@@ -621,7 +621,7 @@
          ClientCode = "Focal_Category", QuestionText = "Focal category assigned to respondent",
          QuestionTextShort = "Focal Cat", Variable_Type = "Single_Response",
          ColumnPattern = "{code}", OptionMapScale = "",
-         Notes = "DSS, POS, PAS, or BAK — full categories only")
+         Notes = "DSS, POS, PAS, or BAK, full categories only")
   )
 
   # Funnel rows per full category (6 roles each)
@@ -636,7 +636,7 @@
            Variable_Type = "Multi_Mention",
            ColumnPattern = "{code}_{brandcode}",
            OptionMapScale = "",
-           Notes = sprintf("QBRANDAWARE — %s category", cat$name)),
+           Notes = sprintf("QBRANDAWARE: %s category", cat$name)),
       list(Role = sprintf("funnel.attitude.%s", cat$code),
            ClientCode = sprintf("BRANDATT1_%s", cat$code),
            QuestionText = "Which of the following statements best describes how you feel about this brand?",
@@ -676,7 +676,7 @@
            Variable_Type = "Rating",
            ColumnPattern = "{code}_{brandcode}",
            OptionMapScale = "purchase_freq_scale",
-           Notes = "BRANDPENTRANS3 — scale 1=Every time … 5=Rarely")
+           Notes = "BRANDPENTRANS3: scale 1=Every time … 5=Rarely")
     )
   }), recursive = FALSE)
 
@@ -689,7 +689,7 @@
          Variable_Type = "Multi_Mention",
          ColumnPattern = "{code}_{brandcode}",
          OptionMapScale = "",
-         Notes = sprintf("Cross-category awareness only — %s is not a focal category", cat$name))
+         Notes = sprintf("Cross-category awareness only: %s is not a focal category", cat$name))
   })
 
   # WOM rows (brand-level, full-category brands)
@@ -701,7 +701,7 @@
          Variable_Type = "Multi_Mention",
          ColumnPattern = "{code}_{brandcode}",
          OptionMapScale = "",
-         Notes = "QWOMBRAND1a — filled for focal category brands only"),
+         Notes = "QWOMBRAND1a: filled for focal category brands only"),
     list(Role = "wom.received_negative",
          ClientCode = "WOM_NEG_REC",
          QuestionText = "Has someone you know shared something NEGATIVE about this brand in the last 3 months?",
@@ -725,7 +725,7 @@
          Variable_Type = "Rating",
          ColumnPattern = "{code}_{brandcode}",
          OptionMapScale = "wom_count_scale",
-         Notes = "QWOMBRAND2b — conditional on WOM_POS_SHARE = 1"),
+         Notes = "QWOMBRAND2b: conditional on WOM_POS_SHARE = 1"),
     list(Role = "wom.shared_negative",
          ClientCode = "WOM_NEG_SHARE",
          QuestionText = "Have you shared something NEGATIVE about this brand in the last 3 months?",
@@ -741,7 +741,7 @@
          Variable_Type = "Rating",
          ColumnPattern = "{code}_{brandcode}",
          OptionMapScale = "wom_count_scale",
-         Notes = "QWOMBRAND3b — conditional on WOM_NEG_SHARE = 1")
+         Notes = "QWOMBRAND3b: conditional on WOM_NEG_SHARE = 1")
   )
 
   # Category buying rows (2 per full category: frequency ordinal + count numeric)
@@ -763,7 +763,7 @@
            Variable_Type = "Numeric",
            ColumnPattern = "{code}",
            OptionMapScale = "",
-           Notes = "QCATEGORYBUYINGTRANS Q016 — numeric count; no option scale")
+           Notes = "QCATEGORYBUYINGTRANS Q016: numeric count; no option scale")
     )
   }), recursive = FALSE)
 
@@ -780,13 +780,13 @@
          Variable_Type = "Multi_Mention",
          ColumnPattern = "{code}_{channelcode}",
          OptionMapScale = "",
-         Notes = paste0("Q020 — multi-mention; one binary column per channel. ",
+         Notes = paste0("Q020: multi-mention; one binary column per channel. ",
                         "Resolves to CHANNEL_", cat$code, "_{CHANNELCODE} ",
                         "(e.g. CHANNEL_", cat$code, "_SUPMKT)."))
   })
 
   # Pack-size rows (1 per full category; options in PackSizes sheet).
-  # Optional question — present only because IPK measures pack-size mix
+  # Optional question: present only because IPK measures pack-size mix
   # alongside channel use. Resolves to one column per band, e.g.
   # PACKSIZE_DSS_SMALL ... PACKSIZE_DSS_MULTI. Consumed by
   # run_shopper_packsize().
@@ -817,7 +817,7 @@
            Variable_Type = "Single_Response",
            ColumnPattern = "{code}",
            OptionMapScale = "reach_seen_scale",
-           Notes = sprintf("Q013 recognition — %s; 1=yes, 2=no", cat_note)),
+           Notes = sprintf("Q013 recognition: %s; 1=yes, 2=no", cat_note)),
       list(Role = sprintf("reach.brand.%s", a$code),
            ClientCode = sprintf("REACH_BRAND_%s", a$code),
            QuestionText = sprintf("Which brand was this advertising for? (%s)", a$label),
@@ -825,7 +825,7 @@
            Variable_Type = "Single_Response",
            ColumnPattern = "{code}",
            OptionMapScale = "",
-           Notes = paste0("Q014 — prompted single-select. Cell value is a brand code from ",
+           Notes = paste0("Q014: prompted single-select. Cell value is a brand code from ",
                           "the category Brands list, or 'DK' (don't know) / 'OTHER' (other).")),
       list(Role = sprintf("reach.media.%s", a$code),
            ClientCode = sprintf("REACH_MEDIA_%s", a$code),
@@ -834,11 +834,11 @@
            Variable_Type = "Multi_Mention",
            ColumnPattern = "{code}",
            OptionMapScale = "",
-           Notes = "Q015 — comma-separated media codes; options in ReachMedia sheet")
+           Notes = "Q015: comma-separated media codes; options in ReachMedia sheet")
     )
   }), recursive = FALSE)
 
-  # DBA rows (one pair per asset — brand-level, IPK only)
+  # DBA rows (one pair per asset: brand-level, IPK only)
   dba_rows <- unlist(lapply(cat9_dba_assets(), function(a) list(
     list(Role = sprintf("dba.fame.%s", a$code),
          ClientCode = sprintf("DBA_FAME_%s", a$code),
@@ -870,7 +870,7 @@
            "Single_Response" else d$variable_type,
          ColumnPattern = "{code}",
          OptionMapScale = "",
-         Notes = sprintf("Demographic %s — coded values map to Options sheet", d$code))
+         Notes = sprintf("Demographic %s: coded values map to Options sheet", d$code))
   })
 
   # Ad hoc question roles (illustrative; one ALL-scope and one per full
@@ -884,7 +884,7 @@
          Variable_Type = "Numeric",
          ColumnPattern = "{code}",
          OptionMapScale = "",
-         Notes = "Ad hoc — Net Promoter Score; auto-bucketed by quartile")
+         Notes = "Ad hoc: Net Promoter Score; auto-bucketed by quartile")
   )
   per_cat_adhoc_rows <- lapply(full_cats, function(cat) {
     list(Role = sprintf("adhoc.future_intent.%s", cat$code),
@@ -895,7 +895,7 @@
          Variable_Type = "Single_Response",
          ColumnPattern = "{code}",
          OptionMapScale = "future_intent_scale",
-         Notes = "Ad hoc — 5-point likelihood scale shared across full categories")
+         Notes = "Ad hoc: 5-point likelihood scale shared across full categories")
   })
   adhoc_rows <- c(all_adhoc_rows, per_cat_adhoc_rows)
 
@@ -1048,7 +1048,7 @@
     list(name = "Category",         width = 24, required = FALSE,
          description = "Category this question applies to (leave blank / ALL for all respondents)"),
     list(name = "AnalysisNote",     width = 48, required = FALSE,
-         description = "How this question should be used in analysis — for analyst reference only")
+         description = "How this question should be used in analysis, for analyst reference only")
   )
 }
 
@@ -1247,7 +1247,7 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
     title    = "Ad Hoc Question Definitions",
     subtitle = paste0(
       "Client-specific questions not part of the standard CBM battery. ",
-      "Add one row per ad hoc question. The analysis engine ignores this sheet — ",
+      "Add one row per ad hoc question. The analysis engine ignores this sheet: ",
       "ad hoc questions are processed separately by the analyst. ",
       "Response options can be added to the Options sheet using the same QuestionCode."
     ),

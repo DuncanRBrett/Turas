@@ -1,7 +1,7 @@
 # ==============================================================================
 # 1BRAND SYNTHETIC EXAMPLE - BRAND-LEVEL DATA BUILDERS
 # ==============================================================================
-# Word-of-Mouth and Distinctive Brand Assets — the two batteries that operate
+# Word-of-Mouth and Distinctive Brand Assets: the two batteries that operate
 # at brand level rather than per-category (Category = "ALL" in the structure).
 # ==============================================================================
 
@@ -13,12 +13,12 @@
 #' Add WOM columns
 #'
 #' Per brand, four binary indicators plus two brand-level frequency scales:
-#'   WOM_POS_REC_{BRAND}   — received positive WOM about this brand
-#'   WOM_NEG_REC_{BRAND}   — received negative WOM about this brand
-#'   WOM_POS_SHARE_{BRAND} — shared positive WOM about this brand
-#'   WOM_NEG_SHARE_{BRAND} — shared negative WOM about this brand
-#'   WOM_POS_FREQ          — overall frequency of hearing positive WOM (1-5)
-#'   WOM_NEG_FREQ          — overall frequency of hearing negative WOM (1-5)
+#'   WOM_POS_REC_{BRAND}: received positive WOM about this brand
+#'   WOM_NEG_REC_{BRAND}, received negative WOM about this brand
+#'   WOM_POS_SHARE_{BRAND}, shared positive WOM about this brand
+#'   WOM_NEG_SHARE_{BRAND}, shared negative WOM about this brand
+#'   WOM_POS_FREQ, overall frequency of hearing positive WOM (1-5)
+#'   WOM_NEG_FREQ, overall frequency of hearing negative WOM (1-5)
 #'
 #' Positive WOM tracks brand strength (bigger brands get more positive WOM).
 #' Shared positive WOM is driven by attitude = 1 (love).
@@ -97,8 +97,8 @@ add_wom <- function(df) {
 #' Add DBA columns
 #'
 #' Per asset, two columns:
-#'   DBA_FAME_{ASSET}   — 1 = recognised, 2 = not recognised
-#'   DBA_UNIQUE_{ASSET} — brand code attributed (only if fame = 1)
+#'   DBA_FAME_{ASSET}: 1 = recognised, 2 = not recognised
+#'   DBA_UNIQUE_{ASSET}, brand code attributed (only if fame = 1)
 #'
 #' Fame rate and correct-attribution rate come from the asset definition in
 #' ipk_dba_assets(). Respondents who don't recognise an asset (fame = 2)

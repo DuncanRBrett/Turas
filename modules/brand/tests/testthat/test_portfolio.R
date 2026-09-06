@@ -4,7 +4,7 @@
 # First step of §9 step 3i. Migrates the central denominator helper
 # (build_portfolio_base) to slot-indexed SQ1 / SQ2 columns. Per the spec
 # (§3.1 of PORTFOLIO_SPEC_v1) build_portfolio_base is the single source
-# of truth for the screener-qualifier filter — all sub-analyses
+# of truth for the screener-qualifier filter: all sub-analyses
 # (footprint, constellation, clutter, strength, extension) call it.
 #
 # The remaining sub-analyses (09a..09e) still use legacy
@@ -36,7 +36,7 @@ source(file.path(ROOT, "modules", "brand", "R", "09_portfolio.R"))
 #
 # DSS qualifiers @ 3m: r1, r2, r6 -> 3
 # DSS qualifiers @ 13m: r1, r2, r5, r6 -> 4
-# POS qualifiers @ 3m (no SQ2 hit): falls back to SQ1 if SQ2 missing — but
+# POS qualifiers @ 3m (no SQ2 hit): falls back to SQ1 if SQ2 missing, but
 #   SQ2 columns DO exist in this fixture so 3m-no-fallback returns 0 SQ2
 #   matches for POS. Hand check: r1 SQ2=DSS, none = POS, so 0.
 # ------------------------------------------------------------------------------

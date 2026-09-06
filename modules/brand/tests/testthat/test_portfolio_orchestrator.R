@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_portfolio — cross-cat portfolio orchestrator (Step 4d)
+# Tests for run_portfolio: cross-cat portfolio orchestrator (Step 4d)
 # ==============================================================================
 # run_portfolio wires the eight v2 sub-analyses (footprint, clutter,
 # strength, extension, per-brand extension, cross-cat constellation,
@@ -8,12 +8,12 @@
 # rebuild cutover (planning doc §9 step 5).
 #
 # Coverage:
-#   1. Orchestrator-level happy path — every panel populated.
-#   2. Result shape parity with run_portfolio v1 — same top-level keys.
-#   3. Slot-aware repertoire depth — v2 supporting metric uses
+#   1. Orchestrator-level happy path: every panel populated.
+#   2. Result shape parity with run_portfolio v1: same top-level keys.
+#   3. Slot-aware repertoire depth: v2 supporting metric uses
 #      respondent_picked() over CategoryCodes, not the legacy column grep.
-#   4. Guard refusal — cross_category_awareness off, no BRANDAWARE cols.
-#   5. .compute_portfolio_data router — routes to v2 when role_map non-NULL,
+#   4. Guard refusal: cross_category_awareness off, no BRANDAWARE cols.
+#   5. .compute_portfolio_data router: routes to v2 when role_map non-NULL,
 #      legacy when NULL.
 # ==============================================================================
 library(testthat)
@@ -52,7 +52,7 @@ source(file.path(ROOT, "modules", "brand", "R", "09e_portfolio_extension.R"))
 # BAK qualifiers (SQ2):  none (cat dropped)
 #
 # Hand-checked supporting metrics for focal = "A", min_base = 1, 3m:
-#   focal_footprint_breadth = 2  (DSS=100%, POS=50% — both > 0)
+#   focal_footprint_breadth = 2  (DSS=100%, POS=50%, both > 0)
 #   n_cats_total            = 3  (DSS, POS, BAK)
 #   mean_repertoire_depth   = (2+1+1+2+1+1+0+1) / 8 = 1.125
 #     (per-respondent count of distinct CategoryCodes in SQ2_1..N, where
@@ -123,7 +123,7 @@ mk_pforch_config <- function(focal = "A", min_base = 1L,
 
 
 # ------------------------------------------------------------------------------
-# Happy path — every panel populated
+# Happy path: every panel populated
 # ------------------------------------------------------------------------------
 
 test_that("run_portfolio: happy path returns PASS with footprint, clutter, strength, extension, supporting", {
@@ -140,7 +140,7 @@ test_that("run_portfolio: happy path returns PASS with footprint, clutter, stren
   expect_equal(out$n_total, 8L)
   expect_equal(out$n_weighted, 8.0)
 
-  # Top-level shape parity with v1 (plus dop_awareness — Sharp / Ehrenberg
+  # Top-level shape parity with v1 (plus dop_awareness: Sharp / Ehrenberg
   # Duplication of Awareness matrix per category, added with the Competitive
   # Set sub-tab in feature/portfolio-duplication-of-awareness).
   expect_named(out, c(
@@ -151,7 +151,7 @@ test_that("run_portfolio: happy path returns PASS with footprint, clutter, stren
     "supporting", "suppressions"
   ), ignore.order = TRUE)
 
-  # Footprint matrix has the live cats (BAK dropped — no qualifiers)
+  # Footprint matrix has the live cats (BAK dropped, no qualifiers)
   expect_false(is.null(out$footprint_matrix))
   expect_setequal(setdiff(names(out$footprint_matrix), "Brand"), c("DSS", "POS"))
 
@@ -169,7 +169,7 @@ test_that("run_portfolio: happy path returns PASS with footprint, clutter, stren
 })
 
 
-test_that("run_portfolio: supporting metrics — slot-aware repertoire depth", {
+test_that("run_portfolio: supporting metrics, slot-aware repertoire depth", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
@@ -178,7 +178,7 @@ test_that("run_portfolio: supporting metrics — slot-aware repertoire depth", {
   out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   sup <- out$supporting
-  # Hand-checked: A is aware in DSS (100%) AND POS (50%) — both > 0 -> breadth = 2
+  # Hand-checked: A is aware in DSS (100%) AND POS (50%), both > 0 -> breadth = 2
   expect_equal(sup$focal_footprint_breadth, 2L)
   expect_equal(sup$n_cats_total, 3L)
 
@@ -187,7 +187,7 @@ test_that("run_portfolio: supporting metrics — slot-aware repertoire depth", {
   expect_equal(sup$mean_repertoire_depth, 9 / 8, tolerance = 1e-9)
 
   # The legacy v1 supporting helper would return 0 here (slot SQ2_1 cells
-  # hold strings, integer cast NA) — confirms v2 path executed.
+  # hold strings, integer cast NA), confirms v2 path executed.
   expect_gt(sup$mean_repertoire_depth, 0)
 })
 
@@ -211,7 +211,7 @@ test_that("run_portfolio: suppressed_cats aggregates across sub-analyses", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
-  # min_base = 5 — POS (n=4) flagged in footprint suppressed_cats
+  # min_base = 5: POS (n=4) flagged in footprint suppressed_cats
   config     <- mk_pforch_config(min_base = 5L)
 
   out <- run_portfolio(data, role_map = NULL, categories, structure, config)
@@ -263,7 +263,7 @@ test_that("run_portfolio: role_map override threads through to sub-analyses", {
   structure  <- mk_pforch_structure()
   config     <- mk_pforch_config()
 
-  # Provide an explicit role_map that points at the same convention root —
+  # Provide an explicit role_map that points at the same convention root.
   # asserts the override path is wired (would otherwise silently fall back).
   role_map <- list(
     portfolio.awareness.DSS = list(column_root = "BRANDAWARE_DSS",

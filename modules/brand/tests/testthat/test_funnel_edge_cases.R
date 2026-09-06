@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL EDGE CASES — v2 port
+# BRAND MODULE TESTS: FUNNEL EDGE CASES, v2 port
 # ==============================================================================
 # Covers the non-happy paths listed in FUNNEL_SPEC_v2 §10.2:
 #   - Zero awareness (all stages 0%, conversions NA not NaN)

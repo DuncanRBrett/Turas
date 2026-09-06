@@ -178,7 +178,7 @@ test_that("IPK Wave 1: every DEMO_* role resolves and runs end-to-end", {
 
 
 # ==============================================================================
-# .demo_brand_nonbuyer_cut — buyer-vs-non-buyer demographic profile
+# .demo_brand_nonbuyer_cut: buyer-vs-non-buyer demographic profile
 # ==============================================================================
 # Hand-computed fixture:
 #   6 respondents, 1 demographic question with 2 options ("A", "B"), 2 brands.
@@ -246,7 +246,7 @@ test_that(".demo_brand_cut and .demo_brand_nonbuyer_cut are complementary", {
 
 
 test_that(".demo_brand_nonbuyer_cut excludes NA pen rows from the base", {
-  # NA pen entries are routing skips — neither buyer nor non-buyer.
+  # NA pen entries are routing skips, neither buyer nor non-buyer.
   fx <- mk_bnbc_fixture()
   fx$pen_mat[5, "X"] <- NA  # respondent 5 not asked about X
   fx$pen_mat[5, "Y"] <- NA

@@ -7,11 +7,11 @@
 # pattern (BRANDAWARE_{cat}_{brand} == 1L).
 #
 # Three test layers:
-#   1. The shared helper .portfolio_aware_matrix() — known-answer.
-#   2. Each compute_*_v2() — known-answer on a hand-coded 3-cat x 4-brand
+#   1. The shared helper .portfolio_aware_matrix(): known-answer.
+#   2. Each compute_*_v2(): known-answer on a hand-coded 3-cat x 4-brand
 #      mini-fixture, plus invariant checks (low-base suppression, missing
 #      CategoryCode refusal).
-#   3. IPK Wave 1 integration — runs each v2 entry against the real fixture
+#   3. IPK Wave 1 integration: runs each v2 entry against the real fixture
 #      and asserts the output shape + non-trivial values.
 # ==============================================================================
 library(testthat)
@@ -62,7 +62,7 @@ source(file.path(ROOT, "modules", "brand", "R", "09h_portfolio_overview_data.R")
 #   r5 -> DSS  r6 -> POS  r7 -> NONE  r8 -> POS
 # DSS qualifiers: r1,r2,r3,r4,r5 (n=5)
 # POS qualifiers: r1,r4,r6,r8     (n=4)
-# BAK qualifiers: 0 (no SQ2 hits) — base will REFUSE; cat dropped
+# BAK qualifiers: 0 (no SQ2 hits). Base will REFUSE; cat dropped
 #
 # DSS awareness % among DSS qualifiers (r1..r5):
 #   A: r1,r2,r3,r4,r5 -> 5/5 = 100%
@@ -138,7 +138,7 @@ mk_pf_v2_config <- function(focal = "A", min_base = 1L,
 
 
 # ------------------------------------------------------------------------------
-# .portfolio_aware_matrix — known-answer
+# .portfolio_aware_matrix: known-answer
 # ------------------------------------------------------------------------------
 
 test_that(".portfolio_aware_matrix: DSS produces hand-checked 0/1 matrix", {
@@ -175,7 +175,7 @@ test_that(".portfolio_aware_matrix: role_map override resolves a custom root", {
 
 
 # ------------------------------------------------------------------------------
-# compute_footprint_matrix — known-answer
+# compute_footprint_matrix: known-answer
 # ------------------------------------------------------------------------------
 
 test_that("compute_footprint_matrix: DSS + POS rows match hand-calculated %", {
@@ -203,7 +203,7 @@ test_that("compute_footprint_matrix: DSS + POS rows match hand-calculated %", {
   expect_equal(m$DSS[m$Brand == "D"], 20)
   expect_equal(m$POS[m$Brand == "D"], 0)
 
-  # Bases — DSS qualifies 5, POS qualifies 4
+  # Bases: DSS qualifies 5, POS qualifies 4
   expect_equal(out$bases_df$n_buyers_uw[out$bases_df$cat == "DSS"], 5L)
   expect_equal(out$bases_df$n_buyers_uw[out$bases_df$cat == "POS"], 4L)
 
@@ -216,14 +216,14 @@ test_that("compute_footprint_matrix: low-base cats appear in suppressed_cats", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
-  # min_base = 5 — POS (n=4) flagged, DSS (n=5) keeps
+  # min_base = 5: POS (n=4) flagged, DSS (n=5) keeps
   config     <- mk_pf_v2_config(min_base = 5L)
 
   out <- compute_footprint_matrix(data, role_map = NULL, categories,
                                       structure, config)
   expect_true("POS" %in% out$suppressed_cats)
   expect_false("DSS" %in% out$suppressed_cats)
-  # POS is still emitted in the matrix per the v1 contract — flag is for
+  # POS is still emitted in the matrix per the v1 contract. Flag is for
   # the renderer.
   expect_true("POS" %in% setdiff(names(out$matrix_df), "Brand"))
 })
@@ -287,7 +287,7 @@ test_that("IPK Wave 1: compute_footprint_matrix runs and returns a brand x cat m
   cats_df   <- openxlsx::read.xlsx(bc_path, sheet = "Categories")
   structure <- list(brands = brands_df, questionmap = NULL)
 
-  # Active-only category list — must have CategoryCode
+  # Active-only category list: must have CategoryCode
   active_cats <- cats_df[!is.na(cats_df$Active) &
                           toupper(cats_df$Active) == "Y", , drop = FALSE]
   expect_true("CategoryCode" %in% names(active_cats))
@@ -405,7 +405,7 @@ test_that("compute_strength_map: per-brand rows match hand calculation", {
   expect_equal(pos_a$brand_aware, 50)
   expect_equal(pos_a$aware_n_w, 2)
 
-  # D appears in DSS only (0% in POS still passes — brand_aware = 0)
+  # D appears in DSS only (0% in POS still passes, brand_aware = 0)
   expect_true("D" %in% names(per))
   d_dss <- per[["D"]][per[["D"]]$cat == "DSS", , drop = FALSE]
   expect_equal(d_dss$brand_aware, 20)
@@ -496,7 +496,7 @@ test_that("compute_extension_per_brand: walks brand universe from structure$bran
   expect_true(all(c("A","B","C") %in% names(out$per_brand)))
   expect_equal(out$brand_names[["A"]], "Brand_A")
 
-  # Per-brand result shape — each is a full extension_table result
+  # Per-brand result shape: each is a full extension_table result
   expect_true(is.data.frame(out$per_brand[["A"]]$extension_df))
   expect_equal(out$per_brand[["A"]]$home_cat, "DSS")
 })
@@ -594,7 +594,7 @@ test_that("compute_portfolio_overview_data: builds per-cat awareness records", {
   expect_true("POS" %in% names(out$categories))
   expect_false("BAK" %in% names(out$categories))
 
-  # Brand list — A is focal, n_categories_present > 0
+  # Brand list: A is focal, n_categories_present > 0
   expect_equal(out$brands$brand_code[1], "A")
 })
 
@@ -612,7 +612,7 @@ test_that("compute_portfolio_overview_data: refuses on missing CategoryCode", {
 
 
 # ------------------------------------------------------------------------------
-# Integration: IPK Wave 1 fixture — every v2 sub-analysis runs end-to-end
+# Integration: IPK Wave 1 fixture. Every v2 sub-analysis runs end-to-end
 # ------------------------------------------------------------------------------
 
 test_that("IPK Wave 1: every portfolio v2 sub-analysis runs end-to-end", {

@@ -133,7 +133,7 @@ test_that("Active brand band still classifies correctly post-mask", {
   block <- .ma_build_metrics_block(
     ma, c("AAA","BBB","ZZZ"), c("Alpha","Bravo","Charlie"), "AAA"
   )
-  # AAA at 50% vs masked mean of 40% — band membership depends on the
+  # AAA at 50% vs masked mean of 40%. Band membership depends on the
   # 2-brand SE which is wide. Assert it's NOT "na" (i.e. the masking
   # didn't accidentally drop AAA from the classification).
   aaa_row <- block$table[[1]]
@@ -155,7 +155,7 @@ test_that("All-zero category yields NA cat-avgs (no silent-zero centre)", {
   block <- .ma_build_metrics_block(
     ma, c("X","Y"), c("X","Y"), "X"
   )
-  # Active set is empty — cat-avg must be NA, not a misleading 0.
+  # Active set is empty. Cat-avg must be NA, not a misleading 0.
   expect_true(is.na(block$cat_avg$mpen))
   expect_true(is.na(block$cat_avg$ns))
   expect_true(is.na(block$cat_avg$mms))

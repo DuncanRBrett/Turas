@@ -40,29 +40,29 @@ source(file.path(ROOT, "modules", "brand", "R", "13c_al_classify.R"))
 
 mk_al_mini_data <- function() {
   data.frame(
-    # BRANDAWARE_DSS — slot-indexed Multi_Mention
+    # BRANDAWARE_DSS: slot-indexed Multi_Mention
     BRANDAWARE_DSS_1 = c("IPK","IPK","IPK","ROB","IPK", NA,  "ROB","IPK"),
     BRANDAWARE_DSS_2 = c("ROB", NA,  "ROB", NA,  "CART", NA, "CART","ROB"),
     BRANDAWARE_DSS_3 = c(NA,    NA,  "CART", NA,  NA,    NA,  NA,    NA),
 
-    # BRANDATT1_DSS_<brand> — per-brand Single_Response
+    # BRANDATT1_DSS_<brand>: per-brand Single_Response
     BRANDATT1_DSS_IPK  = c(1L, 2L, 3L, 4L, 1L, NA, 5L, 2L),
     BRANDATT1_DSS_ROB  = c(2L, 3L, 1L, 1L, 4L, NA, 2L, 3L),
     BRANDATT1_DSS_CART = c(3L, 4L, 2L, 5L, 1L, NA, 1L, 4L),
 
-    # BRANDPEN2_DSS — slot-indexed buyer codes
+    # BRANDPEN2_DSS: slot-indexed buyer codes
     BRANDPEN2_DSS_1 = c("IPK","IPK","ROB", NA,  "IPK", NA,  "CART","IPK"),
     BRANDPEN2_DSS_2 = c("ROB", NA,   NA,   NA,  "CART", NA,  NA,    NA),
 
-    # BRANDPEN3_DSS — slot-paired counts (slot N maps to brand at BRANDPEN2 slot N)
+    # BRANDPEN3_DSS: slot-paired counts (slot N maps to brand at BRANDPEN2 slot N)
     BRANDPEN3_DSS_1 = c(2,    4,    2,    NA,  1,    NA,  2,     1),
     BRANDPEN3_DSS_2 = c(1,    NA,   NA,   NA,  3,    NA,  NA,    NA),
 
-    # CEP01 — slot-indexed Multi_Mention (which brands link to this CEP)
+    # CEP01: slot-indexed Multi_Mention (which brands link to this CEP)
     BRANDATTR_DSS_CEP01_1 = c("IPK","IPK","ROB", NA,  "IPK", NA, "CART","IPK"),
     BRANDATTR_DSS_CEP01_2 = c("ROB", NA,  NA,    NA,  NA,    NA,  NA,   "ROB"),
 
-    # CEP02 — slot-indexed
+    # CEP02: slot-indexed
     BRANDATTR_DSS_CEP02_1 = c("IPK", NA,  "CART","ROB","CART", NA,  "ROB","IPK"),
     BRANDATTR_DSS_CEP02_2 = c(NA,    NA,   NA,   NA,    NA,   NA,   NA,   NA),
 
@@ -157,7 +157,7 @@ mk_al_mini_audiences <- function() {
 #   purchase_freq 8/4   = 2.000
 #   purchase_dist 0.25  (% heavy buyers, top tercile bucket = freq 4)
 #
-# IPK Buyer audience (r1,r2,r5,r8 — n=4):
+# IPK Buyer audience (r1,r2,r5,r8, n=4):
 #   awareness     4/4   = 1.000
 #   consideration 4/4   = 1.000
 #   brand_love    2/4   = 0.500
@@ -168,11 +168,11 @@ mk_al_mini_audiences <- function() {
 #   som           6/8   = 0.750
 #   net_heard     3/4   = 0.750
 #   net_said      2/4   = 0.500
-#   loyalty_scr   8/12  ~ 0.6667 (same as total — buyer set IS the buyer set)
+#   loyalty_scr   8/12  ~ 0.6667 (same as total. Buyer set IS the buyer set)
 #   purchase_freq 2.000 (same)
 #   purchase_dist 0.250 (same)
 #
-# IPK Non-buyer audience (r3,r4,r6,r7 — n=4):
+# IPK Non-buyer audience (r3,r4,r6,r7, n=4):
 #   awareness     1/4   = 0.250
 #   consideration 0/3   = 0.000  (NA on r6 excluded)
 #   brand_love    0/3   = 0.000
@@ -327,7 +327,7 @@ test_that("run_audience_lens wires up audiences + classifier end-to-end", {
 
   rows <- pair$rows
   # Awareness pair row: A=1.0, B=0.25, total=0.625, gap=+0.75. Sig power
-  # at n=4 vs 4 is too low to clear alpha=0.10 (Fisher p~0.143) — that
+  # at n=4 vs 4 is too low to clear alpha=0.10 (Fisher p~0.143), that
   # check belongs in test_audience_lens_classifier, not here. We assert
   # the value/delta wiring is correct.
   aw_row <- rows[rows$metric_id == "awareness", ]
@@ -392,7 +392,7 @@ test_that("all-suppressed audiences return PARTIAL with the right code", {
 
 # ------------------------------------------------------------------------------
 # Integration: against the IPK Wave 1 fixture (no AudienceLens sheet declared
-# yet in the fixture — verify graceful behaviour on the empty-audiences path).
+# yet in the fixture: verify graceful behaviour on the empty-audiences path).
 # ------------------------------------------------------------------------------
 
 test_that("IPK Wave 1: run_audience_lens returns PASS with no audiences", {

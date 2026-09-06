@@ -2,10 +2,10 @@
 # GENERATE SYNTHETIC IPK 9-CATEGORY SAMPLE DATA
 # ==============================================================================
 # Creates ipk_9cat_wave1.xlsx with 1,200 respondents:
-#   300 focal DSS (Dry Seasonings & Spices)    — full CBM
-#   300 focal POS (Pour Over Sauces)           — full CBM
-#   300 focal PAS (Pasta Sauces)               — full CBM
-#   300 focal BAK (Baking Mixes)               — full CBM
+#   300 focal DSS (Dry Seasonings & Spices): full CBM
+#   300 focal POS (Pour Over Sauces), full CBM
+#   300 focal PAS (Pasta Sauces): full CBM
+#   300 focal BAK (Baking Mixes), full CBM
 # All 1,200 also get screener + awareness data for awareness-only categories.
 # ==============================================================================
 
@@ -16,13 +16,13 @@ OUT_PATH <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Turas
 N <- 1200
 N_PER_CAT <- 300
 
-# Timeframe constants — must match config defaults in §1.3 of CAT_BUYING_SPEC_v3.
+# Timeframe constants: must match config defaults in §1.3 of CAT_BUYING_SPEC_v3.
 # BRANDPEN3 = count of purchases in the last TARGET_TIMEFRAME_MONTHS months.
 # Change these constants here and all BRANDPEN3 distributions rescale automatically.
 TARGET_TIMEFRAME_MONTHS <- 3L   # BRANDPEN2 + BRANDPEN3 window
 LONGER_TIMEFRAME_MONTHS <- 12L  # BRANDPEN1 window
 
-# BRANDPEN3 generation parameters — tuned so category mean M ≈ 4–5 per buyer
+# BRANDPEN3 generation parameters: tuned so category mean M ≈ 4–5 per buyer
 # over TARGET_TIMEFRAME_MONTHS = 3, producing a realistic DJ gradient:
 #   focal brand (IPK): negbin(mu=6, theta=2), clamped to [1, 10*TARGET_TIMEFRAME_MONTHS]
 #   competitors:       negbin(mu=3, theta=1.5), clamped to [1, 10*TARGET_TIMEFRAME_MONTHS]
@@ -57,7 +57,7 @@ n_attrs <- 10L
 channels  <- c("SUPMKT","SPECIA","ONLINE","CONVEN","WHOLES","MARKET","OTHER")
 packsizes <- c("SMALL","MEDIUM","LARGE","MULTI")
 
-# WOM brands — all brands across all 4 full categories (unique set)
+# WOM brands: all brands across all 4 full categories (unique set)
 wom_brands <- unique(unlist(brands[full_cats]))
 
 # Reach assets
@@ -201,7 +201,7 @@ make_focal_block <- function(cat, id_start) {
 
   # ---- Pack sizes (only for focal cat buyers) -------------------------------
   # Snapshot/restore RNG state so this newly added block does not shift the
-  # main random stream — the portfolio-base tests assert specific counts
+  # main random stream: the portfolio-base tests assert specific counts
   # (DSS = 506, STO = 349, ...) that depend on the unaltered post-channel
   # sequence. A separate per-category seed gives reproducible pack data
   # without disturbing those magic numbers.

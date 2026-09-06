@@ -10,12 +10,12 @@
 #
 # Column-naming conventions (multi-category extensions of the 1brand pattern):
 #   Awareness / Attitude / Penetration : BRANDAWARE_{CAT}_{BRAND}
-#   CEP matrix        : {CEPCODE}_{BRAND}   — CEP codes are globally unique
+#   CEP matrix        : {CEPCODE}_{BRAND}. CEP codes are globally unique
 #                         DSS = CEP01–CEP15
 #                         PAS = CEP16–CEP30
 #                         SLD = CEP31–CEP45
 #   Attribute matrix  : {CAT}_{ATTRCODE}_{BRAND}  (same 5 attrs per cat)
-#   WOM               : WOM_POS_REC_{BRAND}  etc.  — brand codes globally unique
+#   WOM               : WOM_POS_REC_{BRAND}  etc., brand codes globally unique
 #   DBA               : DBA_FAME_{ASSET}  /  DBA_UNIQUE_{ASSET}  (IPK only)
 # ==============================================================================
 
@@ -238,7 +238,7 @@ cat3_cep_codes <- function(cat_code) {
 # ==============================================================================
 # BRAND IMAGE ATTRIBUTES  (5, same across all categories)
 # ==============================================================================
-# Perception items — not entry points. Reported separately from CEPs.
+# Perception items: not entry points. Reported separately from CEPs.
 # Column names are CATEGORY-prefixed to keep multi-category columns distinct:
 #   e.g. DSS_ATTR01_IPK  vs  PAS_ATTR01_IPK
 # ==============================================================================
@@ -265,7 +265,7 @@ cat3_attr_codes <- function() {
 
 
 # ==============================================================================
-# DBA ASSETS  (Ina Paarman's Kitchen only — 5 distinctive brand assets)
+# DBA ASSETS  (Ina Paarman's Kitchen only: 5 distinctive brand assets)
 # ==============================================================================
 # DBA is brand-level: all respondents (across all 3 categories) see these
 # assets. Column names: DBA_FAME_{ASSET}  and  DBA_UNIQUE_{ASSET}

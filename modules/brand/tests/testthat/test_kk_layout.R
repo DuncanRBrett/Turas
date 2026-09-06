@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for .kk_layout_r — Kamada-Kawai constellation layout
+# Tests for .kk_layout_r: Kamada-Kawai constellation layout
 # ==============================================================================
 # Replaces Fruchterman-Reingold for the competitive constellation: KK targets
 # pairwise Euclidean distance proportional to (1 - jaccard) so dense
@@ -76,7 +76,7 @@ test_that(".kk_layout_r handles n=2 deterministically by Jaccard", {
 
 
 # ------------------------------------------------------------------------------
-# Geometric correctness — the property that fixes the IPK constellation
+# Geometric correctness: the property that fixes the IPK constellation
 # ------------------------------------------------------------------------------
 
 test_that(".kk_layout_r places dense Jaccard cluster tight + outlier far", {
@@ -103,7 +103,7 @@ test_that(".kk_layout_r places dense Jaccard cluster tight + outlier far", {
   expect_gt(d_AC, 0.05); expect_lt(d_AC, 0.30)
   expect_gt(d_BC, 0.05); expect_lt(d_BC, 0.30)
 
-  # Outlier sits far — d_AD should be ~0.9 (the direct edge), and d_BD/d_CD
+  # Outlier sits far. d_AD should be ~0.9 (the direct edge), and d_BD/d_CD
   # follow shortest path through A so should also be larger than the
   # triangle distances.
   expect_gt(d_AD, 0.5)
@@ -111,7 +111,7 @@ test_that(".kk_layout_r places dense Jaccard cluster tight + outlier far", {
   expect_gt(d_CD, d_AC)
 
   # The point of moving from FR to KK: outlier is genuinely separated from
-  # the cluster — d_AD should be at least 3x the average triangle distance.
+  # the cluster. d_AD should be at least 3x the average triangle distance.
   triangle_mean <- mean(c(d_AB, d_AC, d_BC))
   expect_gt(d_AD / triangle_mean, 3)
 })
@@ -149,10 +149,10 @@ test_that(".kk_layout_r handles disconnected components without blowing up", {
   expect_true(all(is.finite(pos)))
 
   d <- function(i, j) sqrt(sum((pos[i, ] - pos[j, ])^2))
-  # Within-triangle distances — all should be similar
+  # Within-triangle distances: all should be similar
   d_within_1 <- mean(c(d(1, 2), d(1, 3), d(2, 3)))
   d_within_2 <- mean(c(d(4, 5), d(4, 6), d(5, 6)))
-  # Across-component distance — should be larger
+  # Across-component distance: should be larger
   d_across <- mean(c(d(1, 4), d(2, 5), d(3, 6)))
 
   expect_gt(d_across, d_within_1)
@@ -172,7 +172,7 @@ test_that(".kk_layout_r handles Jaccard >= 1 without crashing (defensive)", {
 
 
 # ------------------------------------------------------------------------------
-# Performance — 60-node IPK-shape graph
+# Performance: 60-node IPK-shape graph
 # ------------------------------------------------------------------------------
 
 test_that(".kk_layout_r runs in under 5 seconds for a 60-node dense graph", {

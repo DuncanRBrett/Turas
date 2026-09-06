@@ -1,11 +1,11 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — CONSTANTS
+# IPK WAVE 1 FIXTURE: CONSTANTS
 # ==============================================================================
 # Synthetic universe for the IPK Wave 1 fixture. Every other fixture script
 # (data generation + Survey_Structure + Brand_Config) derives from these
 # constants so the whole bundle stays self-consistent.
 #
-# Categories follow the live IPK Alchemer build — 4 Core (DSS, POS, PAS, BAK)
+# Categories follow the live IPK Alchemer build: 4 Core (DSS, POS, PAS, BAK)
 # + 5 Adjacent (SLD, STO, PES, COO, ANT). Only DSS has the deep dive populated;
 # Core categories POS/PAS/BAK are declared Active but have shell-only data so
 # the partial-data placeholder path is exercised.
@@ -23,7 +23,7 @@ IPK_N_RESPONDENTS <- 1200L
 IPK_WAVE <- 1L
 IPK_WOM_TIMEFRAME <- "3 months"
 
-# Project metadata — required by brand_config guards (00_guard.R:130).
+# Project metadata: required by brand_config guards (00_guard.R:130).
 # Wired into Brand_Config Settings sheet so the fixture is launch_turas-runnable.
 IPK_PROJECT_NAME <- "IPK Brand Health Wave 1"
 IPK_CLIENT_NAME  <- "Ina Paarman's Kitchen"
@@ -114,7 +114,7 @@ IPK_FOCAL_BRAND <- list(
   SLD = "IPK", STO = "IPK", PES = "IPK", COO = "IPK", ANT = "IPK"
 )
 
-# Display name lookup — used by Survey_Structure Brands sheet (BrandLabel).
+# Display name lookup: used by Survey_Structure Brands sheet (BrandLabel).
 # Brands absent from this map fall back to BrandCode.
 IPK_BRAND_LABELS <- c(
   IPK    = "Ina Paarman's Kitchen",
@@ -149,7 +149,7 @@ ipk_brand_slot_count <- function(cat_code) {
 }
 
 # ------------------------------------------------------------------------------
-# CEPs and Attributes (DSS only — other Core cats added later as Jess builds them)
+# CEPs and Attributes (DSS only: other Core cats added later as Jess builds them)
 # ------------------------------------------------------------------------------
 
 IPK_CEPS_DSS <- list(

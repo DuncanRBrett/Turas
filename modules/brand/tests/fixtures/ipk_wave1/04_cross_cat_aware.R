@@ -1,5 +1,5 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — CROSS-CATEGORY BRAND AWARENESS
+# IPK WAVE 1 FIXTURE: CROSS-CATEGORY BRAND AWARENESS
 # ==============================================================================
 # Generates BRANDAWARE_{CAT}_1...N columns for every category. Each
 # respondent answers BRANDAWARE_{CAT} only for categories they selected in
@@ -7,16 +7,16 @@
 #
 # Awareness probabilities follow IPK_BRANDS list order (focal first; decay
 # linear toward 0.30 for the least-known brand). NONE option is added when
-# the respondent recognises zero brands in the category — keeps the data
+# the respondent recognises zero brands in the category. Keeps the data
 # realistic.
 # ==============================================================================
 
 #' Build BRANDAWARE_* columns across all categories for all respondents
 #'
-#' @param sq1_per_resp List of length N_RESPONDENTS — each element is a
+#' @param sq1_per_resp List of length N_RESPONDENTS. Each element is a
 #'   character vector of category codes that respondent selected in SQ1.
 #' @return Data frame, N_RESPONDENTS rows, one column per slot per category.
-#' @return Plus an attribute "awareness_matrix" — list keyed by category,
+#' @return Plus an attribute "awareness_matrix": list keyed by category,
 #'   each a logical matrix [n_resp x n_brands] of who recognised which brand.
 #'   Used downstream so DSS deep dive (Section 5) is gated by awareness
 #'   correctly (consideration ⊆ awareness).

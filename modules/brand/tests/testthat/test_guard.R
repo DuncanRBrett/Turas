@@ -171,7 +171,7 @@ test_that("guards pass + categorisation correct on the IPK Wave 1 fixture", {
 
   res <- resolve_active_categories(data, bc)
   # DSS has full deep-dive, POS/PAS/BAK are Active but partial (BRANDAWARE
-  # only — no penetration data in fixture)
+  # only, no penetration data in fixture)
   expect_true("DSS" %in% res$full)
   expect_true(all(c("POS", "PAS", "BAK") %in% res$partial))
   # All 5 Adjacent categories are also Active and should be partial too

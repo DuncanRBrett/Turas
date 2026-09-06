@@ -1,5 +1,5 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — STRUCTURE WRITERS
+# IPK WAVE 1 FIXTURE: STRUCTURE WRITERS
 # ==============================================================================
 # Builds Survey_Structure.xlsx and Brand_Config.xlsx alongside the data file
 # so the bundle is a complete project (data + config + structure). Schema
@@ -8,7 +8,7 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Survey_Structure.xlsx — tabs-format Project + Questions + Options +
+# Survey_Structure.xlsx: tabs-format Project + Questions + Options +
 # brand-extension Brands / CEPs / Attributes / Channels / PackSizes sheets.
 # QuestionMap omitted (convention-first inference is the default).
 # ------------------------------------------------------------------------------
@@ -27,7 +27,7 @@ ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx") 
               "study_date", "lead", "notes",
               "data_file_path", "output_dir", "expected_n",
               "weight_column_exists"),
-    Value = c("IPK Brand Health — Wave 1 (fixture)", "IPK_W1_FIX",
+    Value = c("IPK Brand Health: Wave 1 (fixture)", "IPK_W1_FIX",
               "Ina Paarman's Kitchen", "Tracker", "20260430",
               "Duncan Brett", "Synthetic fixture for brand IPK rebuild",
               data_path, "out", as.character(IPK_N_RESPONDENTS), "N"),
@@ -65,7 +65,7 @@ ipk_write_survey_structure <- function(path, data_path = "ipk_wave1_data.xlsx") 
 }
 
 # ------------------------------------------------------------------------------
-# Brand_Config.xlsx — Settings + Categories + AdHoc + AudienceLens
+# Brand_Config.xlsx: Settings + Categories + AdHoc + AudienceLens
 # ------------------------------------------------------------------------------
 
 #' Write Brand_Config.xlsx for the IPK Wave 1 fixture
@@ -111,7 +111,7 @@ ipk_write_brand_config <- function(path) {
   openxlsx::addWorksheet(wb, "Categories")
   openxlsx::writeData(wb, "Categories", cats)
 
-  # AdHoc — none in fixture
+  # AdHoc: none in fixture
   openxlsx::addWorksheet(wb, "AdHoc")
   openxlsx::writeData(wb, "AdHoc", data.frame(
     Role = character(0), ClientCode = character(0),
@@ -120,7 +120,7 @@ ipk_write_brand_config <- function(path) {
     stringsAsFactors = FALSE
   ))
 
-  # AudienceLens — focal-brand-buyer pair for DSS only
+  # AudienceLens: focal-brand-buyer pair for DSS only
   openxlsx::addWorksheet(wb, "AudienceLens")
   openxlsx::writeData(wb, "AudienceLens", data.frame(
     AudienceCode = "buyer_pair_DSS",
@@ -172,52 +172,52 @@ ipk_write_brand_config <- function(path) {
   for (cat_meta in IPK_CATEGORIES) {
     cat <- cat_meta$code
     add_q(paste0("BRANDAWARE_", cat),
-          paste("Brand awareness —", cat_meta$label),
+          paste("Brand awareness:", cat_meta$label),
           "Multi_Mention", ipk_brand_slot_count(cat))
   }
 
-  # DSS deep dive only — others added when Jess builds them
+  # DSS deep dive only: others added when Jess builds them
   cat <- "DSS"
   n_slots <- ipk_brand_slot_count(cat)
   for (cep in IPK_CEPS_DSS) {
     add_q(paste0("BRANDATTR_", cat, "_", cep$code),
-          paste("CEP —", cep$text), "Multi_Mention", n_slots)
+          paste("CEP:", cep$text), "Multi_Mention", n_slots)
   }
   for (att in IPK_ATTS_DSS) {
     add_q(paste0("BRANDATTR_", cat, "_", att$code),
-          paste("Attribute —", att$text), "Multi_Mention", n_slots)
+          paste("Attribute:", att$text), "Multi_Mention", n_slots)
   }
   for (b in IPK_BRANDS[[cat]]) {
     add_q(paste0("BRANDATT1_", cat, "_", b),
-          paste("Attitude —", b), "Single_Response", 1L)
+          paste("Attitude:", b), "Single_Response", 1L)
     add_q(paste0("BRANDATT2_", cat, "_", b),
-          paste("Rejection OE —", b), "Open_End", 1L)
+          paste("Rejection OE:", b), "Open_End", 1L)
   }
   for (typ in c("WOM_POS_REC", "WOM_POS_SHARE",
                 "WOM_NEG_REC", "WOM_NEG_SHARE")) {
     add_q(paste0(typ, "_", cat),
-          paste("WOM —", typ, "—", cat), "Multi_Mention", n_slots)
+          paste("WOM:", typ, "n/a", cat), "Multi_Mention", n_slots)
   }
   for (b in IPK_BRANDS[[cat]]) {
     add_q(paste0("WOM_POS_COUNT_", cat, "_", b),
-          paste("WOM positive count —", b), "Single_Response", 1L)
+          paste("WOM positive count:", b), "Single_Response", 1L)
     add_q(paste0("WOM_NEG_COUNT_", cat, "_", b),
-          paste("WOM negative count —", b), "Single_Response", 1L)
+          paste("WOM negative count:", b), "Single_Response", 1L)
   }
-  add_q(paste0("CATBUY_", cat), paste("Category buying frequency —", cat),
+  add_q(paste0("CATBUY_", cat), paste("Category buying frequency:", cat),
         "Single_Response", 1L)
-  add_q(paste0("CATCOUNT_", cat), paste("Category count —", cat),
+  add_q(paste0("CATCOUNT_", cat), paste("Category count:", cat),
         "Numeric", 1L)
-  add_q(paste0("CHANNEL_", cat), paste("Channels —", cat),
+  add_q(paste0("CHANNEL_", cat), paste("Channels:", cat),
         "Multi_Mention", length(IPK_CHANNELS))
-  add_q(paste0("PACK_", cat), paste("Pack sizes —", cat),
+  add_q(paste0("PACK_", cat), paste("Pack sizes:", cat),
         "Multi_Mention", length(IPK_PACK_SIZES))
   add_q(paste0("BRANDPEN1_", cat),
-        paste("Penetration 12m —", cat), "Multi_Mention", n_slots)
+        paste("Penetration 12m:", cat), "Multi_Mention", n_slots)
   add_q(paste0("BRANDPEN2_", cat),
-        paste("Penetration target —", cat), "Multi_Mention", n_slots)
+        paste("Penetration target:", cat), "Multi_Mention", n_slots)
   add_q(paste0("BRANDPEN3_", cat),
-        paste("Purchase frequency (continuous sum) —", cat),
+        paste("Purchase frequency (continuous sum):", cat),
         "Multi_Mention", length(IPK_BRANDS[[cat]]))
 
   do.call(rbind, rows)
@@ -234,7 +234,7 @@ ipk_write_brand_config <- function(path) {
     )
   }
 
-  # SQ1 / SQ2 — category options
+  # SQ1 / SQ2: category options
   for (i in seq_along(IPK_CATEGORIES)) {
     c <- IPK_CATEGORIES[[i]]
     add_opt("SQ1", c$code, c$label, i)
@@ -242,7 +242,7 @@ ipk_write_brand_config <- function(path) {
   }
   add_opt("SQ1", "NONE", "None of the above", length(IPK_CATEGORIES) + 1L)
 
-  # BRANDAWARE per cat — brand options + NONE
+  # BRANDAWARE per cat: brand options + NONE
   for (cat_meta in IPK_CATEGORIES) {
     cat <- cat_meta$code
     qc <- paste0("BRANDAWARE_", cat)
@@ -253,7 +253,7 @@ ipk_write_brand_config <- function(path) {
             length(IPK_BRANDS[[cat]]) + 1L)
   }
 
-  # DSS BRANDATTR (CEP + ATT) — brand options + NONE
+  # DSS BRANDATTR (CEP + ATT): brand options + NONE
   cat <- "DSS"
   for (item in c(IPK_CEPS_DSS, IPK_ATTS_DSS)) {
     qc <- paste0("BRANDATTR_", cat, "_", item$code)
@@ -272,7 +272,7 @@ ipk_write_brand_config <- function(path) {
     }
   }
 
-  # WOM mention sets — brand options + NONE
+  # WOM mention sets, brand options + NONE
   for (typ in c("WOM_POS_REC", "WOM_POS_SHARE",
                 "WOM_NEG_REC", "WOM_NEG_SHARE")) {
     qc <- paste0(typ, "_", cat)
@@ -312,7 +312,7 @@ ipk_write_brand_config <- function(path) {
     add_opt(qc, pk$code, pk$label, j)
   }
 
-  # BRANDPEN1 / BRANDPEN2 — brand options + NONE
+  # BRANDPEN1 / BRANDPEN2: brand options + NONE
   for (root in c("BRANDPEN1", "BRANDPEN2")) {
     qc <- paste0(root, "_", cat)
     for (j in seq_along(IPK_BRANDS[[cat]])) {
@@ -322,14 +322,14 @@ ipk_write_brand_config <- function(path) {
             length(IPK_BRANDS[[cat]]) + 1L)
   }
 
-  # BRANDPEN3 — slot index = brand position from BRANDPEN2 piping; OptionText
+  # BRANDPEN3: slot index = brand position from BRANDPEN2 piping; OptionText
   # is the brand at that slot for this fixture.
   qc <- paste0("BRANDPEN3_", cat)
   for (j in seq_along(IPK_BRANDS[[cat]])) {
     add_opt(qc, IPK_BRANDS[[cat]][j], IPK_BRANDS[[cat]][j], j)
   }
 
-  # Demographic option codes — short
+  # Demographic option codes: short
   for (key in c("DEMO_AGE", "DEMO_GENDER", "DEMO_PROVINCE",
                 "DEMO_GROCERY_ROLE", "DEMO_HH_SIZE",
                 "DEMO_EMPLOYMENT", "DEMO_SEM")) {

@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL (SERVICE CATEGORY TYPE) — v2 port
+# BRAND MODULE TESTS: FUNNEL (SERVICE CATEGORY TYPE), v2 port
 # ==============================================================================
 # Known-answer tests on a hand-built slot-indexed service fixture. The service
 # fixture mirrors the durable fixture row-for-row (same awareness + attitude)
@@ -25,9 +25,9 @@
 #   Consideration      IPK=7 (70%)  ROB=6 (60%)  CART=5 (50%)
 #   Current_customer_s IPK=4 (40%)  ROB=2 (20%)  CART=2 (20%)
 #   Long_tenured_s     IPK=3 (30%)  ROB=0 (0%)   CART=1 (10%)
-#     IPK owners R1,R6,R8,R10: tenures 3,2,3,3 — ≥3: R1,R8,R10
-#     ROB owners R2,R4: tenures 2,1 — none ≥3
-#     CART owners R3,R9: tenures 4,1 — only R3
+#     IPK owners R1,R6,R8,R10: tenures 3,2,3,3, ≥3: R1,R8,R10
+#     ROB owners R2,R4: tenures 2,1, none ≥3
+#     CART owners R3,R9: tenures 4,1, only R3
 # ==============================================================================
 library(testthat)
 
@@ -173,7 +173,7 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
   if (nrow(row) == 0L) NA_real_ else row$pct_weighted
 }
 
-# Expected values (hand-calculated for top-2 attitude consider — codes 1, 2).
+# Expected values (hand-calculated for top-2 attitude consider: codes 1, 2).
 .expected_pct <- list(
   aware               = c(IPK = 0.9, ROB = 0.8, CART = 0.7),
   consideration       = c(IPK = 0.5, ROB = 0.4, CART = 0.4),

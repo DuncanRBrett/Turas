@@ -5,7 +5,7 @@
 #   300 respondents x ~320 columns
 #   Fully-reproducible via withr::with_seed()
 #
-# File sequencing (mandatory order — later steps depend on earlier columns):
+# File sequencing (mandatory order, later steps depend on earlier columns):
 #   1. Core: ID, weight, demographics, category buying
 #   2. Awareness (per brand)
 #   3. Attitude (conditional on awareness)
@@ -128,7 +128,7 @@ generate_1brand_data <- function(output_path, n = 300, seed = 42) {
   group_attr <- as.vector(outer(attr_codes, brand_codes,
                                  FUN = function(a, b) paste0(a, "_", b)))
 
-  # Group 7: WOM — order mirrors CBM TRANS question sequence
+  # Group 7: WOM, order mirrors CBM TRANS question sequence
   # QWOMBRAND1a=POS_REC, 1b=NEG_REC, 2a=POS_SHARE, 2b=POS_COUNT, 3a=NEG_SHARE, 3b=NEG_COUNT
   group_wom <- c(
     sprintf("WOM_POS_REC_%s",   brand_codes),
@@ -148,7 +148,7 @@ generate_1brand_data <- function(output_path, n = 300, seed = 42) {
   ordered <- c(group_core, group_aware, group_att, group_pen,
                group_cep, group_attr, group_wom, group_dba)
 
-  # Sanity check — every generated column should be in the ordered list
+  # Sanity check: every generated column should be in the ordered list
   missing_cols <- setdiff(names(df), ordered)
   if (length(missing_cols) > 0) {
     warning(sprintf("Columns not in ordering plan: %s",

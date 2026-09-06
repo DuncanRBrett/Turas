@@ -3,16 +3,16 @@
 # ==============================================================================
 # The MA / repertoire / WOM engines return 0 (not NA) for brands without data.
 # A naive mean() over those columns silently dilutes every cat-avg toward
-# zero — the same bug class that caused the May 2026 WOM cat-avg incident
+# zero, the same bug class that caused the May 2026 WOM cat-avg incident
 # (fix 3633238b, on the panel-data layer for WOM only). The Summary panel
 # .brsum_brand_snapshot() builds 5- and 4-chip cat-avg strips and must apply
 # matching masks so the Summary card and the deep-dive tabs agree on the
 # same metric.
 #
 # Each test constructs a tiny three-brand cat_result:
-#   AAA — full data
-#   BBB — full data
-#   ZZZ — all-zero across MA, WOM, repertoire (the "no data collected" brand)
+#   AAA: full data
+#   BBB, full data
+#   ZZZ, all-zero across MA, WOM, repertoire (the "no data collected" brand)
 # and asserts that ZZZ is excluded from every cat-avg.
 # ==============================================================================
 
@@ -32,7 +32,7 @@ source(file.path(ROOT, "modules", "brand", "lib", "html_report", "panels",
                  "14_summary_panel.R"))
 
 
-# Helper — build a category_result containing the three-brand fixture.
+# Helper: build a category_result containing the three-brand fixture.
 mk_silent_zero_cr <- function() {
   # MA: AAA + BBB have real values; ZZZ is all-zero.
   ma_mms <- data.frame(
@@ -78,7 +78,7 @@ mk_silent_zero_cr <- function() {
     stringsAsFactors = FALSE
   )
 
-  # Funnel: minimal — one bought_target row per brand (engine NAs missing
+  # Funnel: minimal, one bought_target row per brand (engine NAs missing
   # rows, but we leave all three present + finite so the mask doesn't kick in
   # for funnel; cat-avg = 20%).
   stages <- data.frame(
@@ -192,7 +192,7 @@ test_that("Headline sentence MMS comparison uses the masked cat-avg", {
 
 test_that("All-zero category yields NA cat-avgs (no division-by-empty)", {
   # Edge case: every brand has no data. Mask is empty. Expect NA-rendered
-  # ("—") rather than NaN or a spurious 0.
+  # ("n/a") rather than NaN or a spurious 0.
   cr <- mk_silent_zero_cr()
   # Wipe AAA + BBB to all-zero so only the "active" set is empty.
   cr$mental_availability$mms$MMS  <- c(0, 0, 0)
@@ -212,7 +212,7 @@ test_that("All-zero category yields NA cat-avgs (no division-by-empty)", {
                      snap$focal_metrics)[[1]]
   wom_chip <- Filter(function(x) identical(x$label, "Net WOM"),
                      snap$focal_metrics)[[1]]
-  expect_identical(mms_chip$cat_avg, "—")
-  expect_identical(loy_chip$cat_avg, "—")
-  expect_identical(wom_chip$cat_avg, "—")
+  expect_identical(mms_chip$cat_avg, "n/a")
+  expect_identical(loy_chip$cat_avg, "n/a")
+  expect_identical(wom_chip$cat_avg, "n/a")
 })

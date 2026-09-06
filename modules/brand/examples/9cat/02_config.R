@@ -178,7 +178,7 @@
   )
 }
 
-# Categories sheet — 9 rows: 4 full + 5 awareness-only
+# Categories sheet: 9 rows: 4 full + 5 awareness-only
 # Includes Analysis_Depth column (custom extension)
 .build_9cat_categories_columns_extended <- function() {
   list(

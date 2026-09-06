@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL PANEL DATA CONTRACT — v2 port
+# BRAND MODULE TESTS: FUNNEL PANEL DATA CONTRACT, v2 port
 # ==============================================================================
 # Validates build_funnel_panel_data() returns the structure the HTML panel
 # renderer expects, using the same 10-respondent transactional fixture used in
@@ -183,7 +183,7 @@ test_that("funnel cards carry focal pct, category-avg pct, and warning flag per 
 })
 
 
-test_that("relationship cards — 5 attitude positions with focal vs avg", {
+test_that("relationship cards: 5 attitude positions with focal vs avg", {
   panel <- build_funnel_panel_data(.run_fixture(), .trans_brands(), list())
   expect_equal(length(panel$cards$relationship), 5L)
 
@@ -236,13 +236,13 @@ test_that("table includes Average-of-all-brands row with both pct modes", {
   aware_avg <- panel$table$avg_all_brands[[1]]
   expect_equal(aware_avg$stage_key,    "aware")
   expect_equal(aware_avg$pct_absolute, 0.8, tolerance = 1e-9)  # mean(0.9, 0.8, 0.7)
-  # Aware stage is the funnel entry — both filtered toggles pin every brand
+  # Aware stage is the funnel entry, both filtered toggles pin every brand
   # to 1.0 there, so the mean across brands is also 1.0.
   expect_equal(aware_avg$pct_nested, 1.0, tolerance = 1e-9)
   expect_equal(aware_avg$pct_aware,  1.0, tolerance = 1e-9)
 
   # Category-average row at the consideration stage. Per spec, each toggle's
-  # value is the simple mean of the per-brand toggle values at that stage —
+  # value is the simple mean of the per-brand toggle values at that stage,
   # apply each formula at the per-brand level, then average across brands.
   # That is *not* the same as ratio-of-means when brand bases differ.
   cons_avg <- panel$table$avg_all_brands[[2]]

@@ -54,13 +54,13 @@ ipk_study_meta <- function() {
 # BRANDS
 # ==============================================================================
 # Each brand has:
-#   code            — short identifier used in column names (e.g. CEP01_IPK)
-#   label           — display label for charts and tables
-#   is_focal        — TRUE for exactly one brand
-#   strength        — 0..1; drives overall linkage rate in synthetic data
-#   awareness_rate  — probability a respondent is aware of this brand
-#   specialty       — NULL or one of: curry / traditional / exotic / value
-#   quality_tier    — one of: premium / mainstream / value
+#   code: short identifier used in column names (e.g. CEP01_IPK)
+#   label, display label for charts and tables
+#   is_focal: TRUE for exactly one brand
+#   strength, 0..1; drives overall linkage rate in synthetic data
+#   awareness_rate. Probability a respondent is aware of this brand
+#   specialty, NULL or one of: curry / traditional / exotic / value
+#   quality_tier, one of: premium / mainstream / value
 # ==============================================================================
 
 ipk_brands <- function() {
@@ -108,7 +108,7 @@ ipk_brands <- function() {
 #
 # Each CEP has an optional `specialty_match` that boosts linkage probability
 # for brands with that specialty in the synthetic data (creates realistic
-# brand-CEP concentration patterns — e.g. Rajah strong on curry CEP).
+# brand-CEP concentration patterns, e.g. Rajah strong on curry CEP).
 # ==============================================================================
 
 ipk_ceps <- function() {

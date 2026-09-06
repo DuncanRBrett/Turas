@@ -37,7 +37,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "04_repertoire.R"))
 
 
 # ==============================================================================
-# run_cat_buying_frequency — guard tests
+# run_cat_buying_frequency: guard tests
 # ==============================================================================
 
 test_that("refuses NULL data", {
@@ -65,7 +65,7 @@ test_that("refuses mismatched weights", {
 
 
 # ==============================================================================
-# run_cat_buying_frequency — known-data tests (labelled scale)
+# run_cat_buying_frequency: known-data tests (labelled scale)
 # ==============================================================================
 
 test_that("known distribution matches hand-calculated percentages", {
@@ -128,7 +128,7 @@ test_that("works without option_map (fallback to unique codes)", {
 
 
 # ==============================================================================
-# run_cat_buying_frequency — weighted tests
+# run_cat_buying_frequency: weighted tests
 # ==============================================================================
 
 test_that("weighted distribution sums to 100%", {

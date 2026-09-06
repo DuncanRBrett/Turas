@@ -1,5 +1,5 @@
 # ==============================================================================
-# TEST: DoP expected/deviation — 04_repertoire.R §2.5 / §7.4
+# TEST: DoP expected/deviation, 04_repertoire.R §2.5 / §7.4
 # Coverage: D coefficient OLS, deviation matrix sign, partition detection,
 #           two-brand minimum.
 # ==============================================================================
@@ -113,7 +113,7 @@ test_that("deviation = observed - expected (positive when obs > exp)", {
 
 
 # ==============================================================================
-# PARTITION DETECTION (conceptual — ≥3 brands with shared pos deviations >10pp)
+# PARTITION DETECTION (conceptual: ≥3 brands with shared pos deviations >10pp)
 # ==============================================================================
 
 test_that("partition candidates: 3 brands with large positive deviations present", {
@@ -132,7 +132,7 @@ test_that("partition candidates: 3 brands with large positive deviations present
 
   if (!is.null(res$dop_deviation_matrix)) {
     dev_mat <- as.matrix(res$dop_deviation_matrix[, -1])
-    # Among A, B, C — deviations from the law should be positive
+    # Among A, B, C. Deviations from the law should be positive
     abc_devs <- c(dev_mat["A", "B"], dev_mat["A", "C"],
                   dev_mat["B", "A"], dev_mat["B", "C"])
     if (!any(is.na(abc_devs))) {

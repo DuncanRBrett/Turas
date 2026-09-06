@@ -207,7 +207,7 @@ test_that("calculate_ma_focal_view returns empty df on bad inputs", {
 
 test_that("calculate_ma_focal_view handles unmatched stimulus codes gracefully", {
   fx <- .fv_make_tensor()
-  # Add a bogus code that's not in any brand matrix — row should come back
+  # Add a bogus code that's not in any brand matrix. Row should come back
   # with NA gap fields and Below_Min_Base=TRUE.
   out <- calculate_ma_focal_view(
     linkage_tensor = fx$tensor,
@@ -243,6 +243,6 @@ test_that("uniform within-group weights preserve proportions and verdict but inc
   expect_true(all(abs(out_w$Gap_Z) >= abs(out_unw$Gap_Z)))
   # Significance verdict preserved (both above / below 1.96 threshold)
   expect_equal(out_unw$Gap_Significant, out_w$Gap_Significant)
-  # N_Buyer stays unweighted — it controls min-base suppression only
+  # N_Buyer stays unweighted, it controls min-base suppression only
   expect_equal(out_unw$N_Buyer, out_w$N_Buyer)
 })

@@ -1,7 +1,7 @@
 # ==============================================================================
 # Tests for Mental Advantage end-to-end through the v2 pipeline
 # ==============================================================================
-# Step 3d of the IPK rebuild — Mental Advantage. The MA analytics
+# Step 3d of the IPK rebuild: Mental Advantage. The MA analytics
 # (02b_mental_advantage.R) and the panel-data shaper (02b_ma_advantage_data.R)
 # both consume tensors / ma_result lists rather than raw data, so they need
 # no migration. What this test file proves is that the full chain
@@ -37,7 +37,7 @@ source(file.path(ROOT, "modules", "brand", "R", "02b_ma_advantage_data.R"))
 # ------------------------------------------------------------------------------
 # Hand-coded mini-fixture: 6 respondents, 2 CEPs, 3 brands
 # ------------------------------------------------------------------------------
-# Linkage tensor (resp x cep) — designed so IPK has clear defend on CEP01,
+# Linkage tensor (resp x cep): designed so IPK has clear defend on CEP01,
 # build on CEP02; ROB has the inverse; CART is balanced/maintain.
 #
 #   Resp  CEP01 picks         CEP02 picks
@@ -173,7 +173,7 @@ test_that("hand-coded fixture: algebraic invariant sum(actual - expected) == 0",
 
 
 # ------------------------------------------------------------------------------
-# Stimulus penetration — threshold-relative metric (Strategic Quadrant X-axis)
+# Stimulus penetration: threshold-relative metric (Strategic Quadrant X-axis)
 # ------------------------------------------------------------------------------
 # Hand-coded 3-resp x 3-stim fixture proving the new metric:
 #   - Build a (resp x stim) matrix of real-brand link counts (NONE excluded)
@@ -219,13 +219,13 @@ test_that("stim_penetration degrades safely on empty / zero-resp linkage", {
   # comparison ignores incidental attribute differences.
   bare <- function(x) { attributes(x) <- NULL; x }
 
-  # Empty linkage tensor (no brands at all) — should return zeros and
+  # Empty linkage tensor (no brands at all): should return zeros and
   # NA threshold, not error out.
   r_empty <- .ma_stimulus_penetration(list(), c("s1", "s2"))
   expect_equal(bare(r_empty), c(0, 0))
   expect_true(is.na(attr(r_empty, "threshold")))
 
-  # Zero-row matrices (no respondents) — same.
+  # Zero-row matrices (no respondents): same.
   r_zero <- .ma_stimulus_penetration(
     list(A = matrix(0L, nrow = 0, ncol = 2,
                     dimnames = list(NULL, c("s1", "s2")))),
@@ -356,7 +356,7 @@ test_that("IPK Wave 1: MA advantage block renders for CEPs + attributes", {
   expect_equal(total_cls + na_cells, nrow(dss_ceps))
 
   # The synthetic fixture deliberately balances CEP linkage across brands so
-  # every cell stays within ~4pp of expected — at the default +/-5pp threshold
+  # every cell stays within ~4pp of expected, at the default +/-5pp threshold
   # focal IPK lands entirely in "maintain", which is the correct, defensible
   # outcome. Re-run the focal-summary classifier with a 1pp threshold to
   # exercise the defend / build branches.
@@ -410,7 +410,7 @@ test_that("focal_view data frame propagates into the advantage block", {
 
   # Build a focal-view df via the engine. Mini fixture has only 6 resp so
   # every row will be Below_Min_Base (suppression path); pen is arbitrary
-  # (the fixture has no BRANDPEN2 columns — we just need a valid 6-vector).
+  # (the fixture has no BRANDPEN2 columns, we just need a valid 6-vector).
   pen <- as.integer(c(1, 1, 1, 0, 0, 0))
   fv_df <- calculate_ma_focal_view(
     linkage_tensor = cep_link$linkage_tensor,

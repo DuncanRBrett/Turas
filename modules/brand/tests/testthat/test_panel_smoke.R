@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — PANEL BUILDER SMOKE TESTS
+# BRAND MODULE TESTS: PANEL BUILDER SMOKE TESTS
 # ==============================================================================
 # Verifies that each panel HTML builder function:
 #   1. Handles NULL / empty / REFUSED inputs gracefully (returns empty-state HTML
@@ -7,9 +7,9 @@
 #   2. Produces valid non-empty HTML for minimal valid inputs.
 #
 # These are structural smoke tests. Detailed behaviour is covered by:
-#   test_funnel_panel_table.R  — funnel table chrome + heatmap
-#   test_cat_buying_panel.R    — cat-buying panel data contract
-#   test_shopper_panel.R       — shopper / location sub-tabs
+#   test_funnel_panel_table.R: funnel table chrome + heatmap
+#   test_cat_buying_panel.R, cat-buying panel data contract
+#   test_shopper_panel.R, shopper / location sub-tabs
 # ==============================================================================
 
 library(testthat)
@@ -58,7 +58,7 @@ for (f in sort(list.files(panels_dir, pattern = "\\.R$", full.names = TRUE))) {
 # ==============================================================================
 # SECTION A: NULL / EMPTY GUARD PATHS
 # Every panel builder must return a non-NULL character string when given
-# NULL or an empty / REFUSED payload — never throw, never return NULL.
+# NULL or an empty / REFUSED payload: never throw, never return NULL.
 # ==============================================================================
 
 test_that("build_funnel_panel_html: NULL → graceful empty-state character", {
@@ -330,7 +330,7 @@ test_that("build_ma_panel_html: valid MA result → non-empty HTML", {
   ma_res <- run_mental_availability(.sp_ma_linkage(),
                                      focal_brand = "IPK")
   skip_if(is.null(ma_res) || identical(ma_res$status, "REFUSED"),
-          "run_mental_availability returned REFUSED — skip MA smoke test")
+          "run_mental_availability returned REFUSED: skip MA smoke test")
 
   pd <- build_ma_panel_data(ma_res, .sp_ma_brand_list(), .sp_ma_cep_list(),
                              attribute_list = NULL,
@@ -346,7 +346,7 @@ test_that("build_ma_panel_html: valid MA result → non-empty HTML", {
 
 
 # ==============================================================================
-# SECTION C: STRUCTURAL ASSERTIONS — panel wrappers + JSON data containers
+# SECTION C: STRUCTURAL ASSERTIONS, panel wrappers + JSON data containers
 # Only for the pipeline-driven panels above (null guard already tested in A).
 # ==============================================================================
 

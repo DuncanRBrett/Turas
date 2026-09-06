@@ -5,17 +5,17 @@
 # with option-value 'FNF' in the Alchemer survey, even though the canonical
 # BrandCode in Survey_Structure_Brand.xlsx is 'FNFPS' (consistent with the
 # other 6 categories). The mismatch made every F&F per-brand column (BRANDATT,
-# WOM_COUNT) invisible to the engine — F&F appeared as 0 across the POS WOM
+# WOM_COUNT) invisible to the engine, F&F appeared as 0 across the POS WOM
 # panel and POS attribute matrix even though the underlying data was complete.
 #
 # BrandCodeAlias on the Brands sheet declares the alternate suffix /
 # slot-option-value. The brand-matrix helpers in 00_data_access.R fall back
 # to the alias when the canonical column / value is absent. The same alias
 # applies to both shapes:
-#   * multi_mention_brand_matrix() — slot value lookup (BRANDAWARE_, BRANDPEN2_)
-#   * single_response_brand_matrix() — per-brand column suffix (BRANDATT1_<cat>_)
-#   * slot_paired_numeric_matrix() — code-slot value lookup (BRANDPEN2 piped)
-#   * respondent_picked() — single-brand slot value lookup
+#   * multi_mention_brand_matrix(): slot value lookup (BRANDAWARE_, BRANDPEN2_)
+#   * single_response_brand_matrix(), per-brand column suffix (BRANDATT1_<cat>_)
+#   * slot_paired_numeric_matrix(), code-slot value lookup (BRANDPEN2 piped)
+#   * respondent_picked(), single-brand slot value lookup
 # ==============================================================================
 
 library(testthat)
@@ -120,7 +120,7 @@ test_that("multi_mention_brand_matrix resolves slot values via the alias", {
   expect_identical(with_alias[, "BBB"],
                    c(FALSE, TRUE, TRUE, TRUE, FALSE, FALSE))
 
-  # AAA + CCC unaffected — exact match wins:
+  # AAA + CCC unaffected: exact match wins:
   expect_identical(with_alias[, "AAA"],
                    c(TRUE, FALSE, TRUE, TRUE, TRUE, FALSE))
   expect_identical(with_alias[, "CCC"],
@@ -235,7 +235,7 @@ test_that("run_wom resolves WOM panel values via BrandCodeAlias", {
     wom_neg_rec_POS_1   = sample(c("AAA", "B", NA), n, replace = TRUE),
     wom_pos_share_POS_1 = sample(c("AAA", "B", NA), n, replace = TRUE),
     wom_neg_share_POS_1 = sample(c("AAA", NA), n, replace = TRUE),
-    # Per-brand frequency columns — BBB's column suffix is "B" (alias).
+    # Per-brand frequency columns: BBB's column suffix is "B" (alias).
     wom_pos_count_POS_AAA = sample(c(0, 1, 2, NA), n, replace = TRUE),
     wom_pos_count_POS_B   = sample(c(0, 1, 2, NA), n, replace = TRUE),
     wom_pos_count_POS_CCC = sample(c(0, 1, 2, NA), n, replace = TRUE),
@@ -263,7 +263,7 @@ test_that("run_wom resolves WOM panel values via BrandCodeAlias", {
 
   out <- run_wom(data, role_map, "POS", brand_list)
   expect_identical(out$status, "PASS")
-  # BBB row must NOT be all-zero — the alias resolves its data.
+  # BBB row must NOT be all-zero, the alias resolves its data.
   bbb_row <- out$wom_metrics[out$wom_metrics$BrandCode == "BBB", ]
   expect_true(nrow(bbb_row) == 1L)
   expect_true(bbb_row$ReceivedPos_Pct > 0 ||

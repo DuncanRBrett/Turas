@@ -30,7 +30,7 @@ source(file.path(ROOT, "modules", "brand", "R", "06_drivers_barriers.R"))
 # ------------------------------------------------------------------------------
 # Hand-coded mini-fixture: 8 respondents, 2 CEPs, 3 brands
 # ------------------------------------------------------------------------------
-# BRANDPEN2_DSS slots — target-window buyers (the buyer flag):
+# BRANDPEN2_DSS slots: target-window buyers (the buyer flag):
 #   r1: IPK            r5: IPK, ROB
 #   r2: IPK, CART      r6: ROB, CART
 #   r3: IPK, ROB       r7: NONE
@@ -38,7 +38,7 @@ source(file.path(ROOT, "modules", "brand", "R", "06_drivers_barriers.R"))
 # Buyers of IPK: r1, r2, r3, r5  (4 of 8)
 # Non-buyers of IPK: r4, r6, r7, r8 (4 of 8)
 #
-# BRANDATTR_DSS_CEP01 — link CEP01 to brand X:
+# BRANDATTR_DSS_CEP01, link CEP01 to brand X:
 #   r1: IPK            r5: IPK
 #   r2: IPK, ROB       r6: ROB
 #   r3: IPK            r7: NONE
@@ -47,7 +47,7 @@ source(file.path(ROOT, "modules", "brand", "R", "06_drivers_barriers.R"))
 # IPK non-buyers linking CEP01 to IPK: 0 of 4 = 0%
 # Differential = 100 - 0 = 100pp
 #
-# BRANDATTR_DSS_CEP02 — link CEP02 to brand X:
+# BRANDATTR_DSS_CEP02, link CEP02 to brand X:
 #   r1: ROB            r5: CART
 #   r2: ROB            r6: CART
 #   r3: ROB            r7: NONE

@@ -2,15 +2,15 @@
 # Tests for the modern DBA panel: data shaper + HTML renderers
 # ==============================================================================
 # Covers:
-#   build_dba_panel_data()     — engine result -> JSON payload
+#   build_dba_panel_data(): engine result -> JSON payload
 #     - placeholder pass-through
 #     - REFUSED handling
 #     - Wilson 95% CI calculation (known-answer)
 #     - insight callouts (count + content)
-#   build_dba_panel_html()     — orchestrator
-#   build_dba_quadrant_html()  — quadrant scatter
-#   build_dba_detail_html()    — asset detail cards
-#   build_dba_panel_styles()   — CSS bundle
+#   build_dba_panel_html(), orchestrator
+#   build_dba_quadrant_html(), quadrant scatter
+#   build_dba_detail_html(), asset detail cards
+#   build_dba_panel_styles(), CSS bundle
 #   build_shared_placeholder_card() / build_shared_placeholder_styles()
 #
 # Tests are deterministic and inline-fixture (no external file deps).
@@ -47,7 +47,7 @@ source(file.path(ROOT, "modules", "brand", "lib", "html_report",
 
 
 # ------------------------------------------------------------------------------
-# build_dba_panel_data() — placeholder, REFUSED, full path
+# build_dba_panel_data(): placeholder, REFUSED, full path
 # ------------------------------------------------------------------------------
 
 test_that("placeholder engine result passes through to placeholder panel data", {
@@ -114,7 +114,7 @@ test_that("full engine result builds assets + insights with Wilson CIs", {
 
 
 # ------------------------------------------------------------------------------
-# Wilson CI helper — known-answer values
+# Wilson CI helper: known-answer values
 # ------------------------------------------------------------------------------
 
 test_that("Wilson CI returns NA when n is zero", {
@@ -140,7 +140,7 @@ test_that("Wilson CI bounds are clipped to [0, 100]", {
 
 
 # ------------------------------------------------------------------------------
-# Insight builder — quadrant counts + lead/watch chips
+# Insight builder: quadrant counts + lead/watch chips
 # ------------------------------------------------------------------------------
 
 test_that("insights include quadrant-specific verbs only when count > 0", {
@@ -166,7 +166,7 @@ test_that("insights include quadrant-specific verbs only when count > 0", {
 
 
 # ------------------------------------------------------------------------------
-# build_dba_panel_html() — orchestrator behaviour
+# build_dba_panel_html(): orchestrator behaviour
 # ------------------------------------------------------------------------------
 
 test_that("placeholder HTML uses shared-placeholder-card class", {
@@ -214,7 +214,7 @@ test_that("full HTML contains both sub-tabs and the panel root", {
 
 
 # ------------------------------------------------------------------------------
-# Quadrant SVG — defensive empty-state + axis labels
+# Quadrant SVG: defensive empty-state + axis labels
 # ------------------------------------------------------------------------------
 
 test_that("quadrant view emits an empty-state when no assets present", {
@@ -242,7 +242,7 @@ test_that("quadrant view labels all four quadrants", {
 
 
 # ------------------------------------------------------------------------------
-# Asset Detail — card per asset, image fallback, CI band
+# Asset Detail: card per asset, image fallback, CI band
 # ------------------------------------------------------------------------------
 
 test_that("asset detail emits one card per asset with safe DOM ids", {

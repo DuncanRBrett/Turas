@@ -241,7 +241,7 @@ test_that("the norms table footer carries no em dash", {
   html <- render_cat_buying_panel(.cbds_panel_data())
   foot <- regmatches(html, regexpr("<tfoot>.*?</tfoot>", html))
   expect_true(nzchar(foot))
-  expect_false(grepl("—", foot, fixed = TRUE))
+  expect_false(grepl(intToUtf8(8212L), foot, fixed = TRUE))
 })
 
 

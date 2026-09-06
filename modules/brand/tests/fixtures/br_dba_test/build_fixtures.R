@@ -4,11 +4,11 @@
 # Produces two parallel fixture folders for the feature/branded-reach-and-dba
 # branch:
 #
-#   <SYNTH>/BR_DBA_test/placeholder/  — element flags Y, MR + DBA sheets
+#   <SYNTH>/BR_DBA_test/placeholder/: element flags Y, MR + DBA sheets
 #                                       stripped to headers only. Verifies
 #                                       "Data not yet collected" cards.
 #
-#   <SYNTH>/BR_DBA_test/populated/    — element flags Y, MR + DBA sheets
+#   <SYNTH>/BR_DBA_test/populated/: element flags Y, MR + DBA sheets
 #                                       populated with synthetic asset
 #                                       definitions, synthetic data
 #                                       extended with required Reach + DBA
@@ -52,7 +52,7 @@ copy_canonical <- function(target_dir) {
 }
 
 # ------------------------------------------------------------------------------
-# Helpers — flip element flags in Brand_Config Settings
+# Helpers: flip element flags in Brand_Config Settings
 # ------------------------------------------------------------------------------
 
 set_element_flags <- function(brand_config_path, flags) {
@@ -71,7 +71,7 @@ set_element_flags <- function(brand_config_path, flags) {
 }
 
 # ------------------------------------------------------------------------------
-# Helpers — strip example data rows in a sheet (keep header + description rows)
+# Helpers: strip example data rows in a sheet (keep header + description rows)
 # ------------------------------------------------------------------------------
 
 # Sheets in this fixture follow the convention: row 1 = section title,
@@ -109,11 +109,11 @@ build_placeholder <- function() {
 }
 
 # ------------------------------------------------------------------------------
-# Helpers — populate MarketingReach + DBA + synthetic data
+# Helpers: populate MarketingReach + DBA + synthetic data
 # ------------------------------------------------------------------------------
 
 # Synthetic asset definitions for the populated fixture. Three reach ads:
-# one DSS-only TV ad, one ALL-category OOH, one POS-only digital — all
+# one DSS-only TV ad, one ALL-category OOH, one POS-only digital, all
 # attributed to IPK. Four DBAs already defined in canonical Brand_Config.
 
 POP_DBA_STRUCTURE <- data.frame(
@@ -148,7 +148,7 @@ write_data_rows <- function(workbook_path, sheet_name, rows_df, header_row = 3L)
   # Header row in canonical templates is row 3, descriptions row 4.
   # We append `rows_df` starting at row 5.
   # Column names of rows_df must match row 3 header values exactly (or we
-  # rely on positional column order — we use positional here).
+  # rely on positional column order, we use positional here).
   wb <- openxlsx::loadWorkbook(workbook_path)
   current <- openxlsx::readWorkbook(wb, sheet = sheet_name, colNames = FALSE)
   # Trim canonical to first 4 rows (header + desc), drop any examples
@@ -252,7 +252,7 @@ extend_synthetic_data <- function(data_path, ads_df, media_codes,
     d[[media_col]] <- media_vec
   }
 
-  # DBA columns — varied mixed across quadrants
+  # DBA columns: varied mixed across quadrants
   asset_quadrants <- c(LOGO = "use_or_lose", COLOUR = "use_or_lose",
                        TAGLINE = "invest_to_build", CHARACTER = "avoid_alone")
   for (a in dba_assets$AssetCode) {
@@ -310,7 +310,7 @@ build_populated <- function() {
   write_data_rows(structure, "MarketingReach", POP_REACH_ADS)
 
   # Replace Structure DBA_Assets rows so all 4 Brand_Config assets have
-  # question-code mappings — otherwise the engine will refuse for the
+  # question-code mappings. Otherwise the engine will refuse for the
   # missing one.
   write_data_rows(structure, "DBA_Assets", POP_DBA_STRUCTURE)
 

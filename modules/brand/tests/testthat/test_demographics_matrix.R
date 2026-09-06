@@ -51,7 +51,7 @@ source(file.path("..", "..", "lib", "html_report", "panels",
 
 
 # ------------------------------------------------------------------------------
-# build_demographics_matrix_table — known-answer rendering
+# build_demographics_matrix_table: known-answer rendering
 # ------------------------------------------------------------------------------
 
 test_that("matrix table places focal brand in column 2 and lists all brands", {
@@ -88,7 +88,7 @@ test_that("matrix table cell percentages match engine output (penetration mode)"
 })
 
 
-test_that("each option renders TWO rows — Buyer + Non-buyer — with role classes", {
+test_that("each option renders TWO rows, Buyer + Non-buyer, with role classes", {
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_table(
     pd$questions[[1]], focal_brand = "BR_A",
@@ -116,7 +116,7 @@ test_that("buyer row carries the brand's buyer pct; non-buyer row the non-buyer 
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L)
-  # Use (?s) for DOTALL — cell content can span newlines in the HTML.
+  # Use (?s) for DOTALL: cell content can span newlines in the HTML.
   buyer_rows <- regmatches(html,
     gregexpr('(?s)<tr class="demo-row-buyer">.*?</tr>', html, perl = TRUE))[[1]]
   nonbuyer_rows <- regmatches(html,
@@ -154,7 +154,7 @@ test_that("matrix table emits hidden n spans for the JS counts toggle to reveal"
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L)
   expect_match(html, '<span class="demo-cell-n" hidden>n=', fixed = TRUE)
-  # CI ranges were dropped — Demographics tab is a quick comparison only.
+  # CI ranges were dropped. Demographics tab is a quick comparison only.
   expect_false(grepl('demo-cell-ci', html, fixed = TRUE))
 })
 
@@ -212,10 +212,10 @@ test_that("buyer cell shows within-demo penetration; non-buyer cell shows its co
   nonbuyer_rows <- regmatches(html,
     gregexpr('(?s)<tr class="demo-row-nonbuyer">.*?</tr>', html, perl = TRUE))[[1]]
 
-  # First option (A) — buyer row shows 100% for BR_A and 0% for BR_B
+  # First option (A): buyer row shows 100% for BR_A and 0% for BR_B
   expect_match(buyer_rows[1], "100%", fixed = TRUE)
   expect_match(buyer_rows[1], "0%",   fixed = TRUE)
-  # First option (A) — non-buyer row shows 0% for BR_A and 100% for BR_B
+  # First option (A): non-buyer row shows 0% for BR_A and 100% for BR_B
   # (complements of the buyer cells)
   expect_match(nonbuyer_rows[1], "100%", fixed = TRUE)
   expect_match(nonbuyer_rows[1], "0%",   fixed = TRUE)
@@ -223,7 +223,7 @@ test_that("buyer cell shows within-demo penetration; non-buyer cell shows its co
 
 
 # ------------------------------------------------------------------------------
-# build_demographics_matrix_chart — focal bar + reference marker
+# build_demographics_matrix_chart: focal bar + reference marker
 # ------------------------------------------------------------------------------
 
 test_that("matrix chart renders one row per option, buyer view only", {
@@ -262,7 +262,7 @@ test_that("share-mode chart marker reflects per-row cat-avg %", {
   # Fixture: option A has cat-avg 60% (6 of 10 rows). Scale-max for the
   # chart is 100 (BR_A reaches 100% on A). Marker at 60/100 = 60.0%.
   # Legend label format: line-swatch + bare "cat avg" (no "Marker:" prefix
-  # any more — the line swatch icon visually identifies it as a marker).
+  # any more, the line swatch icon visually identifies it as a marker).
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
@@ -276,8 +276,8 @@ test_that("share-mode chart marker reflects per-row cat-avg %", {
 
 
 test_that("penetration-mode chart has TWO markers per row: per-option avg + focal overall", {
-  # Fixture: option A — BR_A 100% pen, BR_B 0% pen → avg = 50%.
-  #           option B — BR_A   0% pen, BR_B 100% pen → avg = 50%.
+  # Fixture: option A, BR_A 100% pen, BR_B 0% pen → avg = 50%.
+  #           option B: BR_A   0% pen, BR_B 100% pen → avg = 50%.
   #           BR_A cat-wide overall pen = 60%.
   # Scale-max = max(100, 50, 60) = 100.
   #   Primary marker (per-row avg) at 50/100 = 50.0% on BOTH rows.
@@ -377,7 +377,7 @@ test_that("penetration-mode scale-max ignores per-row cat-avg (invisible in this
     panel_data = pd, decimal_places = 0L,
     metric = "penetration")
   expect_match(html, 'style="width:25\\.0%', perl = TRUE)
-  # Demographic size (80% for BIG) must NOT leak into scale_max — if it did,
+  # Demographic size (80% for BIG) must NOT leak into scale_max. If it did,
   # the BIG bar would render at 12.5/80 = 15.6%, not 25%.
   expect_false(grepl('style="width:15\\.6%', html, perl = TRUE))
 })
@@ -394,7 +394,7 @@ test_that("penetration-mode chart bar value reads penetration not share", {
     pen_mat = pen, brand_codes = "BR_X", brand_labels = "Brand X")
   # Share of BR_X buyers in option A = 1/3 (one of three buyers is in A)
   # Penetration of BR_X in option A = 1/2 (one of two A respondents buys)
-  # — different values, so the chart code path is observable.
+  #, different values, so the chart code path is observable.
   pd <- build_demographics_panel_data(
     questions = list(list(
       role = "demo.t", column = "X", question_text = "T", short_label = "T",

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_dba (DBA placeholder migration — Step 3h)
+# Tests for run_dba (DBA placeholder migration: Step 3h)
 # ==============================================================================
 # IPK Wave 1 has no DBA columns yet, so v2's primary contract is the
 # placeholder path: when assets are absent or the per-asset Fame / Unique
@@ -7,7 +7,7 @@
 # the panel-data renderer can surface as "Data not yet collected for DBA".
 #
 # Also verifies the live path: when assets and data are both present, the
-# v2 wrapper delegates to run_dba() unchanged — same shape, same numbers.
+# v2 wrapper delegates to run_dba() unchanged, same shape, same numbers.
 # ==============================================================================
 library(testthat)
 

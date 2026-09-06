@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL OUTPUT (Excel + CSV) — v2 port
+# BRAND MODULE TESTS: FUNNEL OUTPUT (Excel + CSV), v2 port
 # ==============================================================================
 # Tests for write_funnel_excel() and write_funnel_csv() on the same
 # 10-respondent transactional fixture used in test_funnel_transactional.R.

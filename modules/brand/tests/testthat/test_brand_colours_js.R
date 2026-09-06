@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — brand_colours.js structural integrity
+# BRAND MODULE TESTS: brand_colours.js structural integrity
 # ==============================================================================
 # Verifies that:
 #   1. brand_colours.js exists at the expected path

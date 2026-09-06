@@ -235,7 +235,7 @@
 
       # For brands shared across categories: if brand is ALSO in another category,
       # respondents in the OTHER category still get NA (they weren't asked about
-      # this brand because their focal category may not include it — unless it does)
+      # this brand because their focal category may not include it, unless it does)
       wom_df[rows, pos_rec_col]   <- pos_rec
       wom_df[rows, neg_rec_col]   <- neg_rec
       wom_df[rows, pos_share_col] <- pos_share

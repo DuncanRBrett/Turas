@@ -1,13 +1,13 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — ORCHESTRATOR
+# IPK WAVE 1 FIXTURE: ORCHESTRATOR
 # ==============================================================================
 # Run this file to (re)generate the IPK Wave 1 fixture bundle:
-#   * ipk_wave1_data.xlsx       — synthetic respondent-level data
-#   * Survey_Structure.xlsx     — tabs-format + brand-extension sheets
-#   * Brand_Config.xlsx         — settings / categories / adhoc / audience lens
+#   * ipk_wave1_data.xlsx: synthetic respondent-level data
+#   * Survey_Structure.xlsx, tabs-format + brand-extension sheets
+#   * Brand_Config.xlsx: settings / categories / adhoc / audience lens
 #
 # All three files together form a complete project the brand module can run.
-# Determinism: set.seed(IPK_FIXTURE_SEED) — same seed → same fixture.
+# Determinism: set.seed(IPK_FIXTURE_SEED), same seed → same fixture.
 #
 # Usage:
 #   source("modules/brand/tests/fixtures/ipk_wave1/00_generate.R")

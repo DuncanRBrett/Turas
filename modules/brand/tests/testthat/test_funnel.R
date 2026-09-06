@@ -3,9 +3,9 @@
 # ==============================================================================
 # Two layers:
 #   1. Hand-coded known-answer test on a slot-indexed mini-fixture
-#      (10 respondents × 3 brands) — verifies derive_funnel_stages and
+#      (10 respondents × 3 brands), verifies derive_funnel_stages and
 #      calculate_stage_metrics produce exactly the expected counts.
-#   2. Integration test against the IPK Wave 1 fixture — verifies end-to-end
+#   2. Integration test against the IPK Wave 1 fixture, verifies end-to-end
 #      run_funnel() succeeds with sane shape + nesting + attitude.
 #
 # Legacy column-per-brand funnel tests (test_funnel_transactional.R etc.)
@@ -37,7 +37,7 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 # ==============================================================================
 # Layer 1: Hand-coded known-answer test (10 respondents × 3 brands)
 # ==============================================================================
-# Worked example — same shape as the legacy test_funnel_transactional fixture
+# Worked example: same shape as the legacy test_funnel_transactional fixture
 # but encoded in slot-indexed format and IPK numeric attitude codes.
 #
 #  Resp  BRANDAWARE_DSS  BRANDATT1_DSS_*  BRANDPEN1_DSS  BRANDPEN2_DSS
@@ -62,7 +62,7 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 # After nesting (each stage AND'd with previous):
 # Aware:        9 8 7
 # Consider:     7 6 5  (already nested with Aware in worked example)
-# Pen long:     min(consider, pen-long) — verify post-AND
+# Pen long:     min(consider, pen-long), verify post-AND
 # Pen target:   min(pen-long, pen-target)
 # ==============================================================================
 
@@ -171,7 +171,7 @@ test_that("derive_funnel_stages produces hand-calculated counts", {
   aw <- derived$stages$aware$matrix
   expect_equal(unname(colSums(aw)), c(9, 8, 7))  # IPK ROB CART
 
-  # Consideration nested with awareness — top-2 codes 1/2 = positive (Love+Prefer)
+  # Consideration nested with awareness: top-2 codes 1/2 = positive (Love+Prefer)
   cons <- derived$stages$consideration$matrix
   expect_equal(unname(colSums(cons)), c(5, 4, 4))
 
@@ -186,7 +186,7 @@ test_that("derive_funnel_stages produces hand-calculated counts", {
   # Raw BRANDPEN2 counts from the mini_data fixture (lines 97-103)
   expect_equal(unname(colSums(pen2)), c(5, 4, 4))
 
-  # No derivation warnings — validate_nesting warnings are attached
+  # No derivation warnings: validate_nesting warnings are attached
   # downstream in run_funnel(), not in derive_funnel_stages().
   expect_length(derived$warnings, 0L)
 })

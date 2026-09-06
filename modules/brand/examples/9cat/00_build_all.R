@@ -4,7 +4,7 @@
 # Generates all three artefacts for the IPK 9-category brand health study:
 #   1. Brand_Config.xlsx         (polished, fully filled)
 #   2. Survey_Structure.xlsx     (polished, fully filled)
-#   3. ipk_9cat_wave1.xlsx       (1200 synthetic respondents — 300 per full category)
+#   3. ipk_9cat_wave1.xlsx       (1200 synthetic respondents: 300 per full category)
 #
 # Study design:
 #   4 FULL CBM categories (DSS, POS, PAS, BAK): complete battery
@@ -84,7 +84,7 @@
 #'   OneDrive Examples/IPK_9Category folder.
 #' @param n    Integer. Total respondents; divided equally across 4 full
 #'   categories (default: pulled from \code{cat9_study_meta()$sample_size},
-#'   currently 1200 — matches the portfolio test fixture).
+#'   currently 1200. Matches the portfolio test fixture).
 #' @param seed Integer. RNG seed for reproducible data (default: 42).
 #' @return Named list with paths to the three generated files.
 #' @export
@@ -117,8 +117,8 @@ build_9cat_synthetic_example <- function(output_dir = NULL, n = NULL, seed = 42)
   cat(sprintf("\n=== Build complete ===\n"))
   cat(sprintf("  Files written:         3\n"))
   cat(sprintf("  Respondents:           %d (%d per full category)\n", n, floor(n / 4)))
-  cat(sprintf("  Full categories:       %d (DSS, POS, PAS, BAK) — complete CBM battery\n", n_full_cats))
-  cat(sprintf("  Awareness-only cats:   %d (SLD, STO, PES, COO, ANT) — brand awareness only\n", n_aware_cats))
+  cat(sprintf("  Full categories:       %d (DSS, POS, PAS, BAK), complete CBM battery\n", n_full_cats))
+  cat(sprintf("  Awareness-only cats:   %d (SLD, STO, PES, COO, ANT), brand awareness only\n", n_aware_cats))
   cat(sprintf("  Brands (full cats):    %d total (%d per category, some shared)\n",
               n_brands_full, 10))
   cat(sprintf("  CEPs:                  %d total (15 per full category, globally unique)\n", n_ceps_total))

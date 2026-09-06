@@ -60,14 +60,14 @@ test_that("pin buttons carry the shared br-pin-btn class so brand_pins.js wires 
 test_that("section ids are unique across the card grid", {
   html <- .brsum_card_grid_skeleton()
   # data-section appears twice per card (once on <section>, once on the
-  # <button>) — that's expected. Check unique values match the card count.
+  # <button>). That's expected. Check unique values match the card count.
   ids <- regmatches(html, gregexpr('data-section="brsum-[^"]+"', html))[[1]]
   expect_identical(length(unique(ids)), SUMMARY_CARD_COUNT)
 })
 
 
 # ------------------------------------------------------------------------------
-# Analyst commentary block — pinnable as its own section
+# Analyst commentary block: pinnable as its own section
 # ------------------------------------------------------------------------------
 
 test_that("analyst commentary renders a pin button + data-pin-as-table region", {

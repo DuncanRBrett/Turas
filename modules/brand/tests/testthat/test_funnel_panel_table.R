@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL PANEL TABLE RENDERER — v2 port
+# BRAND MODULE TESTS: FUNNEL PANEL TABLE RENDERER, v2 port
 # ==============================================================================
 # Covers the HTML contract for the table-polish pass:
 #   - Base row as first tbody row (with small-base warning)

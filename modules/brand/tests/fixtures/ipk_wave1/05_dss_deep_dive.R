@@ -1,33 +1,33 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — DSS DEEP DIVE
+# IPK WAVE 1 FIXTURE: DSS DEEP DIVE
 # ==============================================================================
 # Generates the full DSS deep-dive battery for respondents whose Focal_Category
 # = "DSS". All other respondents get NA across these columns.
 #
 # Battery covers:
-#   * BRANDATTR_DSS_CEP01..15 + ATT01..15 — slot-indexed Multi_Mention
-#   * BRANDATT1_DSS_{brand}                — per-brand Single_Response (1-5)
-#   * BRANDATT2_DSS_{brand}                — per-brand Open_End (mostly NA)
+#   * BRANDATTR_DSS_CEP01..15 + ATT01..15: slot-indexed Multi_Mention
+#   * BRANDATT1_DSS_{brand}, per-brand Single_Response (1-5)
+#   * BRANDATT2_DSS_{brand}, per-brand Open_End (mostly NA)
 #   * WOM_POS_REC_DSS / WOM_POS_SHARE_DSS
-#     WOM_NEG_REC_DSS / WOM_NEG_SHARE_DSS  — slot-indexed Multi_Mention
+#     WOM_NEG_REC_DSS / WOM_NEG_SHARE_DSS, slot-indexed Multi_Mention
 #   * WOM_POS_COUNT_DSS_{brand} / WOM_NEG_COUNT_DSS_{brand}
-#                                         — per-brand Single_Response (1-5)
-#   * CATBUY_DSS                          — Single_Response (1-5)
-#   * CATCOUNT_DSS                        — Numeric (0-99)
-#   * CHANNEL_DSS_1..6                    — slot-indexed Multi_Mention
-#   * PACK_DSS_1..4                       — slot-indexed Multi_Mention
-#   * BRANDPEN1_DSS_1..16                 — slot-indexed (12-month buyers)
-#   * BRANDPEN2_DSS_1..16                 — slot-indexed (3-month buyers)
-#   * BRANDPEN3_DSS_1..15                 — Continuous Sum, numeric per slot
+#, per-brand Single_Response (1-5)
+#   * CATBUY_DSS, Single_Response (1-5)
+#   * CATCOUNT_DSS, Numeric (0-99)
+#   * CHANNEL_DSS_1..6, slot-indexed Multi_Mention
+#   * PACK_DSS_1..4, slot-indexed Multi_Mention
+#   * BRANDPEN1_DSS_1..16, slot-indexed (12-month buyers)
+#   * BRANDPEN2_DSS_1..16, slot-indexed (3-month buyers)
+#   * BRANDPEN3_DSS_1..15, Continuous Sum, numeric per slot
 # ==============================================================================
 
 CAT_DSS <- "DSS"
 
 #' Build the full DSS deep dive for all respondents
 #'
-#' @param focal Character vector length N — Focal_Category per respondent.
+#' @param focal Character vector length N, Focal_Category per respondent.
 #' @param awareness_dss Logical matrix [n x n_brands] from cross-cat awareness.
-#' @param sq2_per_resp List length N — SQ2 category selections per respondent.
+#' @param sq2_per_resp List length N: SQ2 category selections per respondent.
 #' @return Data frame with all DSS deep-dive columns.
 ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
   n <- IPK_N_RESPONDENTS
@@ -51,7 +51,7 @@ ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
     out[[paste0("BRANDATT1_", CAT_DSS, "_", b)]] <- attitude_mat[, b]
     out[[paste0("BRANDATT2_", CAT_DSS, "_", b)]] <- ifelse(
       !is.na(attitude_mat[, b]) & attitude_mat[, b] == "4",
-      "Refused — fictional reason for fixture",
+      "Refused: fictional reason for fixture",
       NA_character_
     )
   }
@@ -73,7 +73,7 @@ ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
 }
 
 # ------------------------------------------------------------------------------
-# CEP / ATT × brand matrix — slot-indexed Multi_Mention per CEP/ATT row
+# CEP / ATT × brand matrix: slot-indexed Multi_Mention per CEP/ATT row
 # ------------------------------------------------------------------------------
 
 .ipk_dss_attrs <- function(out, n, n_slots, is_dss, items, aware_mat, kind) {
@@ -124,7 +124,7 @@ ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
 }
 
 # ------------------------------------------------------------------------------
-# WOM — 4 multi-mention sets + per-brand counts (conditional)
+# WOM: 4 multi-mention sets + per-brand counts (conditional)
 # ------------------------------------------------------------------------------
 
 .ipk_dss_wom <- function(out, n, n_slots, is_dss, brands, aware_mat) {
@@ -188,7 +188,7 @@ ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
     pmin(99, pmax(0, round(rgamma(n, shape = 2.5, rate = 0.6)))),
     NA_real_)
 
-  # Channels — slot-indexed; only respondents who bought DSS in last 3m
+  # Channels: slot-indexed; only respondents who bought DSS in last 3m
   channel_codes <- vapply(IPK_CHANNELS, function(c) c$code, character(1))
   pack_codes    <- vapply(IPK_PACK_SIZES, function(c) c$code, character(1))
   recent_buyer  <- vapply(seq_len(n),
@@ -220,7 +220,7 @@ ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
 }
 
 # ------------------------------------------------------------------------------
-# Penetration 1, 2, 3 — slot-indexed P1 + P2; per-slot continuous-sum P3
+# Penetration 1, 2, 3, slot-indexed P1 + P2; per-slot continuous-sum P3
 # ------------------------------------------------------------------------------
 
 .ipk_dss_penetration <- function(out, n, n_slots, is_dss, brands, aware_mat) {
@@ -250,7 +250,7 @@ ipk_build_dss_deep_dive <- function(focal, awareness_dss, sq2_per_resp) {
     out[[paste0("BRANDPEN2_DSS_", j)]] <- store_p2[[paste0("BRANDPEN2_DSS_", j)]] %||% rep(NA_character_, n)
   }
 
-  # BRANDPEN3 — Continuous Sum, 15 slots (= length(brands)). Slot j holds the
+  # BRANDPEN3: Continuous Sum, 15 slots (= length(brands)). Slot j holds the
   # numeric purchase frequency for whichever brand was at position j in P2.
   for (j in seq_len(length(brands))) {
     out[[paste0("BRANDPEN3_DSS_", j)]] <- NA_real_

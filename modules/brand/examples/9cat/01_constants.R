@@ -28,7 +28,7 @@
 #   Awareness    : BRANDAWARE_{CAT}_{BRAND}
 #   Attitude     : BRANDATT1_{CAT}_{BRAND}
 #   Penetration  : BRANDPEN1_{CAT}_{BRAND}
-#   CEP matrix   : {CEPCODE}_{BRAND}  — globally unique codes
+#   CEP matrix   : {CEPCODE}_{BRAND}, globally unique codes
 #                  DSS=CEP01-15, POS=CEP16-30, PAS=CEP31-45, BAK=CEP46-60
 #   Attr matrix  : {CAT}_{ATTRCODE}_{BRAND}  (full categories only)
 #   WOM          : WOM_POS_REC_{BRAND}  etc.  (full categories only)
@@ -319,7 +319,7 @@ cat9_all_brand_codes <- function() unique(unlist(lapply(c("DSS","POS","PAS","BAK
 
 
 # ==============================================================================
-# CATEGORY ENTRY POINTS — full categories only (15 per cat, globally unique)
+# CATEGORY ENTRY POINTS, full categories only (15 per cat, globally unique)
 #   DSS: CEP01–CEP15
 #   POS: CEP16–CEP30
 #   PAS: CEP31–CEP45
@@ -427,7 +427,7 @@ cat9_attr_codes <- function() vapply(cat9_attributes(), function(a) a$code, char
 
 
 # ==============================================================================
-# DBA ASSETS  (Ina Paarman's Kitchen only — 5 distinctive brand assets)
+# DBA ASSETS  (Ina Paarman's Kitchen only: 5 distinctive brand assets)
 # All respondents across all 9 categories see these assets.
 # ==============================================================================
 
@@ -474,7 +474,7 @@ cat9_channel_codes <- function() vapply(cat9_channels(), function(c) c$code, cha
 
 
 # ==============================================================================
-# PACK SIZES  (shared across all full categories — ordered: small -> large -> multi)
+# PACK SIZES  (shared across all full categories: ordered: small -> large -> multi)
 # ==============================================================================
 # Used for the optional cat_buying.packsize.{CAT} role. Same logical bands
 # work across the four full categories; only the indicative gram / mL
@@ -501,16 +501,16 @@ cat9_packsize_codes <- function() vapply(cat9_packsizes(), function(p) p$code, c
 
 cat9_reach_assets <- function() {
   list(
-    list(code = "ADTV01",   label = "IPK TV spot — 'Taste the difference'",
+    list(code = "ADTV01",   label = "IPK TV spot: 'Taste the difference'",
          category = "ALL", brand = "IPK",
          image_path = "assets/reach/ipk_tv_ad_01.jpg"),
-    list(code = "ADDIG01",  label = "IPK digital banner — pasta range",
+    list(code = "ADDIG01",  label = "IPK digital banner: pasta range",
          category = "PAS", brand = "IPK",
          image_path = "assets/reach/ipk_digital_pas_01.jpg"),
-    list(code = "ADDIG02",  label = "IPK digital banner — seasoning range",
+    list(code = "ADDIG02",  label = "IPK digital banner: seasoning range",
          category = "DSS", brand = "IPK",
          image_path = "assets/reach/ipk_digital_dss_01.jpg"),
-    list(code = "ADPR01",   label = "IPK print ad — Taste magazine",
+    list(code = "ADPR01",   label = "IPK print ad: Taste magazine",
          category = "ALL", brand = "IPK",
          image_path = "assets/reach/ipk_print_taste_01.jpg")
   )

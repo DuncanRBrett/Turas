@@ -45,7 +45,9 @@ test_that("three penetration figures are listed with value, base and definition"
   expect_equal(pn$notes[[3]]$n, 45L); expect_equal(pn$notes[[3]]$base_n, 80L)
   for (n in pn$notes) {
     expect_true(nzchar(n$definition)); expect_true(nzchar(n$base))
-    expect_false(grepl("—", paste(n$definition, n$label, pn$intro)))
+    expect_false(grepl(intToUtf8(8212L),
+                       paste(n$definition, n$label, pn$intro),
+                       fixed = TRUE))
   }
   expect_match(pn$notes[[3]]$label, "P3M")
 })

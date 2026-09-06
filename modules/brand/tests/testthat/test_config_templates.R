@@ -195,7 +195,7 @@ test_that("Survey_Structure Questions sheet has correct columns", {
                 info = sprintf("Missing column: %s", col))
   }
 
-  # v2 architecture dropped Battery — role inference uses Variable_Type instead
+  # v2 architecture dropped Battery. Role inference uses Variable_Type instead
   expect_false("Battery" %in% actual_cols,
                label = "Battery column should not exist in v2 Questions sheet")
 })

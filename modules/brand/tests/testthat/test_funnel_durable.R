@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL (DURABLE CATEGORY TYPE) — v2 port
+# BRAND MODULE TESTS: FUNNEL (DURABLE CATEGORY TYPE), v2 port
 # ==============================================================================
 # Known-answer tests on a hand-built slot-indexed durable fixture.
 # tenure_threshold = 3 (≥ 3 counts as long-tenured).
@@ -25,9 +25,9 @@
 #     IPK: R1,R6,R8,R10 (all in consideration)
 #     ROB: R2,R4; CART: R3,R9
 #   Long-tenured (thr=3): IPK=3 (30%)  ROB=0 (0%)  CART=1 (10%)
-#     IPK owners tenures: 3,2,3,3 — ≥3: R1,R8,R10
-#     ROB owners tenures: 2,1 — none
-#     CART owners tenures: 4,1 — only R3
+#     IPK owners tenures: 3,2,3,3, ≥3: R1,R8,R10
+#     ROB owners tenures: 2,1, none
+#     CART owners tenures: 4,1, only R3
 #
 # With thr=2: IPK=4 (40%)  ROB=1 (10%)  CART=1 (10%)
 #   IPK: all 4 owners ≥2 tenure; ROB: R2(ten=2); CART: R3(ten=4)
@@ -222,11 +222,11 @@ test_that("Long-tenured stage matches hand calc with threshold = 3", {
 test_that("Changing tenure_threshold to 2 shifts only the long-tenured stage", {
   res <- run_funnel(.dur_data(), .dur_rm(), .dur_brands(), .dur_cfg(tenure_threshold = 2))
 
-  # IPK owners R1,R6,R8,R10 with tenures 3,2,3,3 — all ≥2 → 4/10 = 40%
+  # IPK owners R1,R6,R8,R10 with tenures 3,2,3,3, all ≥2 → 4/10 = 40%
   expect_equal(.pct_for(res$stages, "long_tenured_d", "IPK"), 0.4, tolerance = 1e-9)
-  # ROB owners R2,R4 with tenures 2,1 — only R2 ≥2 → 1/10 = 10%
+  # ROB owners R2,R4 with tenures 2,1, only R2 ≥2 → 1/10 = 10%
   expect_equal(.pct_for(res$stages, "long_tenured_d", "ROB"), 0.1, tolerance = 1e-9)
-  # CART owners R3,R9 with tenures 4,1 — only R3 ≥2 → 1/10 = 10%
+  # CART owners R3,R9 with tenures 4,1, only R3 ≥2 → 1/10 = 10%
   expect_equal(.pct_for(res$stages, "long_tenured_d", "CART"), 0.1, tolerance = 1e-9)
 
   # current_owner_d unchanged at threshold change

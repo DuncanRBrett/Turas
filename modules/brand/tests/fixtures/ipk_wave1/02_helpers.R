@@ -1,5 +1,5 @@
 # ==============================================================================
-# IPK WAVE 1 FIXTURE — HELPERS
+# IPK WAVE 1 FIXTURE: HELPERS
 # ==============================================================================
 # Shared utilities for the fixture generator: slot-indexed encoding (the
 # Alchemer-parser shape), brand awareness-decay model (so generated data has
@@ -8,7 +8,7 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Slot-indexed encoding — the canonical shape AlchemerParser produces for
+# Slot-indexed encoding: the canonical shape AlchemerParser produces for
 # Multi_Mention questions. For a question with N options, the data has columns
 # Q_1 ... Q_N. Selected option codes appear left-packed in the slots; unused
 # slots are NA. Order within slots reflects the order of selection.
@@ -44,7 +44,7 @@ ipk_slot_colnames <- function(root, n_slots) {
 
 #' Append a respondent's slot-encoded answers to a list-of-vectors store
 #'
-#' Internal helper — builds the per-column character vectors as we walk
+#' Internal helper, builds the per-column character vectors as we walk
 #' respondents, keeping memory bounded.
 #'
 #' @keywords internal
@@ -73,7 +73,7 @@ ipk_record_slots <- function(store, root, selected, n_slots, resp_idx) {
 #' list. Returns a named numeric vector.
 #'
 #' @param cat_code Category code (e.g. "DSS").
-#' @return Named numeric vector — names = brand codes, values = awareness probs.
+#' @return Named numeric vector: names = brand codes, values = awareness probs.
 ipk_awareness_probs <- function(cat_code) {
   brands <- IPK_BRANDS[[cat_code]]
   focal  <- IPK_FOCAL_BRAND[[cat_code]]
@@ -133,7 +133,7 @@ ipk_penetration_target_prob <- function(brand, cat_code) {
 #' Sample a category list from per-cat selection probabilities (SQ1)
 #'
 #' @return Character vector of category codes the respondent selected (always
-#'   includes at least one Core category — qualification rule).
+#'   includes at least one Core category, qualification rule).
 ipk_sample_sq1_categories <- function() {
   # Probability of selecting each category
   core_probs <- c(DSS = 0.85, POS = 0.55, PAS = 0.65, BAK = 0.50)
@@ -151,17 +151,17 @@ ipk_sample_sq1_categories <- function() {
   selected
 }
 
-#' Sample SQ2 (target-window buyers) from SQ1 selections — a subset
+#' Sample SQ2 (target-window buyers) from SQ1 selections: a subset
 #'
 #' @param sq1 Character vector of SQ1 selections.
-#' @return Character vector — subset of sq1 (lapsed buyers excluded).
+#' @return Character vector: subset of sq1 (lapsed buyers excluded).
 ipk_sample_sq2_categories <- function(sq1) {
   # ~75% of SQ1 selections also bought in target window
   keep <- runif(length(sq1)) < 0.75
   sq1[keep]
 }
 
-#' Assign focal category — random pick from Core categories the respondent
+#' Assign focal category: random pick from Core categories the respondent
 #' selected in SQ1.
 #'
 #' @param sq1 Character vector of SQ1 selections.
@@ -174,7 +174,7 @@ ipk_assign_focal <- function(sq1) {
 
 #' Sample from a discrete distribution
 #'
-#' Wrapper for sample() with named probs vector — used for demographics.
+#' Wrapper for sample() with named probs vector, used for demographics.
 #'
 #' @param dist List with $codes and $probs.
 #' @return Single character code.
@@ -191,7 +191,7 @@ ipk_sample_discrete <- function(dist) {
 #' the right column types.
 #'
 #' Patterns coerced:
-#'   * BRANDATT1_*, BRANDATT2_* — only BRANDATT1 (rejection OE stays character)
+#'   * BRANDATT1_*, BRANDATT2_*. Only BRANDATT1 (rejection OE stays character)
 #'   * WOM_POS_COUNT_*, WOM_NEG_COUNT_*
 #'   * CATBUY_*
 #'   * DEMO_* (all)

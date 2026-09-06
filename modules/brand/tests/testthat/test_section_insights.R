@@ -112,7 +112,7 @@ test_that("omit_chart_buttons strips pin / PNG / Excel from the toolbar", {
   expect_false(grepl("br-export-btn", html_slim),
                info = "Slim toolbar must not emit an Excel button")
   expect_match(html_slim, "br-insight-toggle")
-  # Insight container itself stays — that's the point of the toolbar
+  # Insight container itself stays. That's the point of the toolbar
   expect_match(html_slim, 'class="br-insight-container"')
 })
 
@@ -208,7 +208,7 @@ test_that("section_insight_for returns the stored text on hit", {
 
 
 # ------------------------------------------------------------------------------
-# Loader — round-trip via a temp xlsx
+# Loader: round-trip via a temp xlsx
 # ------------------------------------------------------------------------------
 
 .make_si_sheet <- function(rows) {

@@ -1,5 +1,5 @@
 # ==============================================================================
-# BRAND MODULE TESTS — FUNNEL INTEGRATION (end-to-end) — v2 port
+# BRAND MODULE TESTS: FUNNEL INTEGRATION (end-to-end), v2 port
 # ==============================================================================
 # Exercises run_brand() against a hand-calculated transactional fixture using
 # v2-format config files (Questions sheet, CategoryCode in Categories). Also
@@ -27,7 +27,7 @@ source(file.path(ROOT, "modules", "brand", "R", "99_output.R"))
 
 
 # ==============================================================================
-# Shared fixture helpers (manual role map — for direct run_funnel() tests)
+# Shared fixture helpers (manual role map, for direct run_funnel() tests)
 # ==============================================================================
 
 .pack_mm <- function(picks, root) {
@@ -181,8 +181,8 @@ source(file.path(ROOT, "modules", "brand", "R", "99_output.R"))
                       "BRANDATT1_TSX_CART",
                       "BRANDPEN1_TSX", "BRANDPEN2_TSX"),
     QuestionText  = c("Brand awareness",
-                      "Attitude — IPK", "Attitude — ROB",
-                      "Attitude — CART",
+                      "Attitude: IPK", "Attitude: ROB",
+                      "Attitude: CART",
                       "Penetration 12m", "Penetration target"),
     Variable_Type = c("Multi_Mention",
                       "Single_Response", "Single_Response",
@@ -279,7 +279,7 @@ test_that("run_brand produces the hand-calculated stage percentages", {
 
 
 # ==============================================================================
-# Weight parity (direct run_funnel — no run_brand round-trip needed)
+# Weight parity (direct run_funnel: no run_brand round-trip needed)
 # ==============================================================================
 
 test_that("All-equal weights produce identical stage percentages to unweighted", {

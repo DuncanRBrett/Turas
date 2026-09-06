@@ -4,7 +4,7 @@
 # never carry a NONE row with em-dash cells.
 # ==============================================================================
 # The engine's get_brands_for_category() filters NONE. The HTML transformer
-# reads structure$brands DIRECTLY (bypassing that helper) — so it has to
+# reads structure$brands DIRECTLY (bypassing that helper), so it has to
 # repeat the filter. This test pins the duplication so the next refactor
 # can't silently regress it.
 # ==============================================================================
@@ -73,7 +73,7 @@ test_that(".dt_drop_none_brands tolerates NULL / empty input", {
 
 
 test_that(".dt_drop_none_brands tolerates a table without BrandCode column", {
-  # CEPs / Attributes / DBA tables don't have BrandCode — must be untouched.
+  # CEPs / Attributes / DBA tables don't have BrandCode. Must be untouched.
   tbl <- data.frame(CEPCode = c("CEP01", "CEP02"), stringsAsFactors = FALSE)
   out <- .dt_drop_none_brands(tbl)
   expect_identical(out, tbl)

@@ -80,7 +80,7 @@ CATS      <- make_categories()
 CONFIG    <- make_config()
 
 # ---------------------------------------------------------------------------
-# CRITERION 2 — Integration: run_portfolio() produces PASS with all sub-analyses
+# CRITERION 2: Integration: run_portfolio() produces PASS with all sub-analyses
 # ---------------------------------------------------------------------------
 cat("--- Criterion 2: Integration test ---\n")
 r2 <- run_portfolio(DATA, CATS, STRUCTURE, CONFIG)
@@ -94,7 +94,7 @@ cat(if (cat2_ok) "  PASS: run_portfolio returns PASS with all 5 sub-analyses\n" 
   "  FAIL: integration test failed\n")
 
 # ---------------------------------------------------------------------------
-# CRITERION 3 — TRS refusal codes (§9)
+# CRITERION 3: TRS refusal codes (§9)
 # ---------------------------------------------------------------------------
 cat("\n--- Criterion 3: TRS refusal codes ---\n")
 cfg_noaware <- within(make_config(), { cross_category_awareness <- FALSE })
@@ -119,7 +119,7 @@ cat(sprintf("  CALC_CONSTELLATION_TOO_SPARSE: %s\n",
   if (identical(r_sparse$status, "REFUSED") &&
       identical(r_sparse$code, "CALC_CONSTELLATION_TOO_SPARSE")) "PASS" else "FAIL"))
 
-# CALC_EXTENSION_NO_FOCAL_AWARENESS — triggered when no BRANDAWARE_*_IPK columns
+# CALC_EXTENSION_NO_FOCAL_AWARENESS: triggered when no BRANDAWARE_*_IPK columns
 no_focal_d <- DATA
 ipk_cols <- grep("BRANDAWARE_.*_IPK$", names(no_focal_d), value = TRUE)
 no_focal_d <- no_focal_d[, setdiff(names(no_focal_d), ipk_cols), drop = FALSE]
@@ -129,7 +129,7 @@ cat(sprintf("  CALC_EXTENSION_NO_FOCAL_AWARENESS: %s\n",
       identical(r_nofocal$code, "CALC_EXTENSION_NO_FOCAL_AWARENESS")) "PASS" else "FAIL"))
 
 # ---------------------------------------------------------------------------
-# CRITERION 4 — Structural: Jaccard in [0,1], lift > 0, footprint in [0,100]
+# CRITERION 4: Structural: Jaccard in [0,1], lift > 0, footprint in [0,100]
 # ---------------------------------------------------------------------------
 cat("\n--- Criterion 4: Structural tests ---\n")
 r4 <- r2
@@ -154,7 +154,7 @@ if (!is.null(r4$footprint_matrix)) {
 }
 
 # ---------------------------------------------------------------------------
-# CRITERION 7 — Low-base suppression: min_base=9999 → all cats suppressed
+# CRITERION 7: Low-base suppression: min_base=9999 → all cats suppressed
 # ---------------------------------------------------------------------------
 cat("\n--- Criterion 7: Low-base suppression ---\n")
 r7 <- run_portfolio(DATA, CATS, STRUCTURE, make_config(min_base = 9999L))
@@ -166,7 +166,7 @@ cat(sprintf("  All cats suppressed with min_base=9999: %s\n",
 cat(sprintf("  Suppressed cats: %s\n", paste(r7$suppressions$low_base_cats, collapse=", ")))
 
 # ---------------------------------------------------------------------------
-# CRITERION 8 — Performance: run_portfolio on 600 respondents × 3 cats
+# CRITERION 8: Performance: run_portfolio on 600 respondents × 3 cats
 # ---------------------------------------------------------------------------
 cat("\n--- Criterion 8: Performance test ---\n")
 t8 <- system.time(
@@ -177,7 +177,7 @@ cat(sprintf("  run_portfolio on 600 resp × 3 cats: %.2f sec %s\n",
   if (t8["elapsed"] < 3.0) "PASS" else "WARN (>3s)"))
 
 # ---------------------------------------------------------------------------
-# CRITERION 9 — Excel+CSV outputs: 6 sheets present
+# CRITERION 9: Excel+CSV outputs: 6 sheets present
 # ---------------------------------------------------------------------------
 cat("\n--- Criterion 9: Excel + CSV outputs ---\n")
 tmp_dir <- tempdir()
@@ -198,7 +198,7 @@ if (requireNamespace("openxlsx", quietly = TRUE)) {
 }
 
 # ---------------------------------------------------------------------------
-# CRITERION 10 — No igraph: pure-R layout works
+# CRITERION 10: No igraph: pure-R layout works
 # ---------------------------------------------------------------------------
 cat("\n--- Criterion 10: Pure-R FR layout (no igraph required) ---\n")
 pos <- .fr_layout_r(n = 5L, adj = matrix(0.5, 5, 5) - diag(0.5, 5), n_iter = 20L)
