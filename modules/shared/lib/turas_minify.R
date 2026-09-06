@@ -449,6 +449,292 @@
 }
 
 
+# -- Embedded documents carried as islands ------------------------------------
+#
+# The srcdoc pair above hardens a document written into markup as an attribute.
+# A composed report carries its pages the other way round: as a JSON island the
+# shell reads and hands to an iframe as a srcdoc PROPERTY, which is markup to
+# nobody and so was invisible to everything below.
+#
+# That is how the VAS integrated report shipped readable. Its thirteen section
+# pages, the two cross-cutting pages, the wallet, the two profile pages and the
+# dashboard all travel as `<script type="application/json">` islands, written
+# by build_vas_integrated_report.py AFTER turas_minify() had already run over
+# the crosstab report and closed it. Step 2b looks for `srcdoc="` and found
+# none. Step 6b skips application/json by design. So nineteen whole pages, with
+# their comments and their analytical function names, went out untouched inside
+# a file that was otherwise hardened. Found 6 September 2026 by grepping the
+# delivered file for `itemStats` and getting 65 hits.
+#
+# Opt-in, via data-embed="document" on the island. Automatic detection was the
+# obvious alternative and is the wrong call: a page that genuinely publishes a
+# global would be broken silently by hardening it, and the builder is the only
+# thing that knows whether its page is self-contained.
+#
+# Deliberately NOT data-island="v2". These two mechanisms are independent and
+# should stay that way. Once a page has been through here its data is already
+# unreadable, because the obfuscator's string array swallows the JSON payload
+# along with everything else; encoding it again in step 8c costs a further
+# third of the file to hide what is already hidden. A caller that wants both
+# can set both attributes.
+
+#' Which script blocks are islands carrying a whole embedded document
+#'
+#' @param html The HTML string.
+#' @return List of blocks from .minify_extract_blocks(), possibly empty.
+#' @keywords internal
+.minify_document_island_blocks <- function(html) {
+  blocks <- .minify_extract_blocks(html, "script")
+  Filter(function(b) {
+    identical(b$type, "application/json") &&
+      grepl("data-embed\\s*=\\s*[\"\']document[\"\']", b$open_tag, perl = TRUE) &&
+      nzchar(trimws(b$content)) &&
+      !identical(trimws(b$content), "null")
+  }, blocks)
+}
+
+
+#' Names the source declared at top level that survived into the output
+#'
+#' The gate that stops this whole mechanism looking like it worked when it did
+#' not. `minify_profile.json` sets renameGlobals false and terser runs with
+#' --mangle toplevel=false, both deliberately, so a name declared in a script's
+#' OUTERMOST scope is left alone. The Turas core escapes that only because its
+#' bundle sits inside an IIFE, one scope down, where renaming is allowed.
+#'
+#' A page written without that wrapper therefore passes through the whole
+#' hardening pass with every function name intact, and the file looks hardened
+#' because its comments are gone and its core is scrambled. That is exactly what
+#' the VAS pages did: comments 94 down to 1, and `itemStats` still there five
+#' times.
+#'
+#' So the wrap is the page builder's job and this is the check that it was done.
+#'
+#' Both halves look for a DECLARATION, not for the bare name. Searching the
+#' output for the name alone over-reports badly, because a function name often
+#' matches something that is meant to survive: `shares()` in the VAS betting
+#' page also names a `<div id="shares">` and a `flags.shares` data key, and the
+#' obfuscator preserves markup and property names by design
+#' (`renameProperties: false`). That produced a refusal on a page whose function
+#' had in fact been renamed correctly. Matching `function shares` instead of
+#' `shares` tells the two apart exactly: a renamed function leaves no
+#' declaration behind under its old name.
+#'
+#' @param source_js The script body before hardening.
+#' @param output The hardened document.
+#' @return Character vector of leaked names, empty when clean.
+#' @keywords internal
+.minify_leaked_top_level_names <- function(source_js, output) {
+  decl <- "(?:async\\s+)?(?:function|const|let|var|class)\\s+"
+  # Anchored to the start of a line: an indented declaration is already inside
+  # something, so it is one scope down and will be renamed.
+  m <- gregexpr(paste0("(?m)^", decl, "([A-Za-z_$][\\w$]*)"), source_js,
+                perl = TRUE)[[1]]
+  if (m[1] == -1L) return(character(0))
+  starts <- attr(m, "capture.start")
+  lens <- attr(m, "capture.length")
+  names_found <- unique(substring(source_js, starts, starts + lens - 1L))
+  if (length(names_found) == 0L) return(character(0))
+  leaked <- vapply(names_found, function(nm) {
+    grepl(paste0(decl, nm, "\\b"), output, perl = TRUE)
+  }, logical(1))
+  sort(names_found[leaked])
+}
+
+
+#' Harden every embedded document carried as a marked island
+#'
+#' Recurses into turas_minify() exactly as .minify_harden_srcdoc() does, then
+#' runs the leak gate over the result. Must run before step 8c, so that a
+#' caller who marks an island both ways encodes the hardened bytes rather than
+#' the readable ones.
+#'
+#' @param html The HTML string.
+#' @param opts Named list of options to pass down, as step 2b builds it.
+#' @param verbose Print per-island progress.
+#' @return List with html, count, obfuscated.
+#' @keywords internal
+.minify_harden_document_islands <- function(html, opts, verbose = FALSE) {
+  blocks <- .minify_document_island_blocks(html)
+  if (length(blocks) == 0L) {
+    return(list(html = html, count = 0L, obfuscated = FALSE))
+  }
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    turas_refuse(
+      code = "PKG_JSONLITE_MISSING",
+      title = "jsonlite is needed to harden an embedded document island",
+      problem = sprintf(
+        "%d island(s) are marked data-embed=\"document\" but jsonlite is not installed.",
+        length(blocks)),
+      why_it_matters = paste(
+        "The island bodies are JSON and cannot be read without it, so the pages",
+        "they carry would ship readable inside a file that is otherwise hardened."),
+      how_to_fix = c("install.packages('jsonlite')",
+                     "Or clear the client deliverable checkbox to keep a development build."),
+      module = "MINIFY"
+    )
+  }
+
+  hardened <- 0L
+  obfuscated <- FALSE
+  contents <- vector("list", length(blocks))
+
+  for (i in seq_along(blocks)) {
+    block <- blocks[[i]]
+    id <- .minify_block_id(block$open_tag)
+
+    inner <- tryCatch(jsonlite::fromJSON(block$content), error = function(e) e)
+    if (inherits(inner, "error") || !is.character(inner) || length(inner) != 1L) {
+      .minify_refuse_island_doc(
+        id, "its body is not a JSON string holding a document",
+        c("The island must hold ONE JSON string, which is the whole page",
+          "Check the builder that wrote it"))
+    }
+    # A fragment is not a document, and only a whole page is safe to hand to a
+    # recursive pass. A doctype OR an <html> tag, not both: the html element's
+    # start tag is optional in HTML and three of the nineteen VAS pages omit it,
+    # opening `<!doctype html>` straight into `<meta charset>`. Testing for
+    # `<html` alone, as step 2b does for the maxdiff simulator, refused those
+    # three.
+    if (!grepl("<!doctype", inner, ignore.case = TRUE) &&
+        !grepl("<html", inner, fixed = TRUE)) {
+      .minify_refuse_island_doc(
+        id, "its payload is not a whole HTML document",
+        c("data-embed=\"document\" says the island carries a page",
+          "A page needs a doctype or an <html> tag; this has neither",
+          "Remove the attribute if it carries something else"))
+    }
+
+    source_js <- paste(vapply(.minify_extract_blocks(inner, "script"),
+                              function(b) b$content, character(1)),
+                       collapse = "\n")
+
+    work <- tempfile(pattern = "turas_island_", fileext = ".html")
+    out <- tempfile(pattern = "turas_island_min_", fileext = ".html")
+    on.exit(unlink(c(work, out)), add = TRUE)
+    writeLines(inner, work, useBytes = TRUE)
+
+    res <- tryCatch(
+      turas_minify(work, output_path = out,
+                   strip_meta = opts$strip_meta, minify_js = opts$minify_js,
+                   minify_css = opts$minify_css, minify_html = opts$minify_html,
+                   obfuscate_js = opts$obfuscate_js, watermark = opts$watermark,
+                   client_safe = opts$client_safe, deliverable = opts$deliverable,
+                   verbose = FALSE),
+      # The embedded document's own refusal already names its code, problem and
+      # fix, so it passes through rather than being rewrapped into something
+      # less specific. Same choice as step 2b.
+      turas_refusal = function(e) stop(e),
+      error = function(e) e
+    )
+    if (inherits(res, "error")) {
+      .minify_refuse_island_doc(id, conditionMessage(res),
+        c("Extract that island's payload and run turas_minify() on it by hand",
+          "Or clear the client deliverable checkbox to keep a development build."))
+    }
+
+    done <- paste(readLines(out, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+
+    # The gate. Only meaningful once obfuscation actually ran, so a build with
+    # the obfuscator switched off is not failed for a thing it never attempted.
+    if (isTRUE(opts$obfuscate_js) && res$js_blocks_obfuscated > 0L) {
+      leaked <- .minify_leaked_top_level_names(source_js, done)
+      if (length(leaked) > 0L) {
+        msg <- sprintf(
+          "Island '%s' still exposes %d top-level name(s) after hardening: %s",
+          id, length(leaked),
+          paste(utils::head(leaked, 8L), collapse = ", "))
+        fix <- c(
+          "The page's script is not wrapped, so the outermost scope is left alone",
+          "Wrap the page's script body in (function(){\"use strict\"; ... })()",
+          "The page builder does this, not the minifier: only it knows the page is self-contained")
+        if (isTRUE(opts$deliverable)) {
+          cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+          cat("| Context:    Minify, embedded document island\n")
+          cat("| Code:       CALC_MINIFY_ISLAND_NAMES_LEAKED\n")
+          cat("| Message:   ", msg, "\n")
+          for (fx in fix) cat("| How to fix:", fx, "\n")
+          cat("+-------------------------------------------------------------+\n\n")
+          turas_refuse(
+            code = "CALC_MINIFY_ISLAND_NAMES_LEAKED",
+            title = "An embedded page shipped its function names",
+            problem = msg,
+            why_it_matters = paste(
+              "The file would look hardened, because its comments are gone and",
+              "its core is scrambled, while the embedded page still names every",
+              "function it defines. That is the state this step exists to end."),
+            how_to_fix = fix,
+            module = "MINIFY"
+          )
+        } else {
+          warning(msg, call. = FALSE)
+        }
+      }
+    }
+
+    contents[[i]] <- .minify_island_doc_payload(done)
+    hardened <- hardened + 1L
+    obfuscated <- obfuscated || (res$js_blocks_obfuscated > 0L)
+    if (verbose) {
+      cat(sprintf("  Island document hardened: %s (%d/%d JS blocks obfuscated)\n",
+                  id, res$js_blocks_obfuscated, res$js_blocks_processed))
+    }
+  }
+
+  html <- .minify_replace_blocks(html, blocks, contents)
+  list(html = html, count = hardened, obfuscated = obfuscated)
+}
+
+
+#' Serialise a document back into an island body
+#'
+#' The `</` to `<\/` escape is not decoration. Without it the first `</div>` in
+#' the payload closes the surrounding script element and the rest of the page
+#' becomes markup. JSON reads `\/` as `/`, so the browser's JSON.parse returns
+#' the document unchanged. This mirrors island() in
+#' build_vas_integrated_report.py, which applies the same escape on the way in.
+#'
+#' @keywords internal
+.minify_island_doc_payload <- function(doc) {
+  txt <- as.character(jsonlite::toJSON(doc, auto_unbox = TRUE))
+  gsub("</", "<\\\\/", txt, fixed = TRUE)
+}
+
+
+#' The id attribute of a block, for error messages
+#' @keywords internal
+.minify_block_id <- function(open_tag) {
+  m <- regexpr('id\\s*=\\s*["\']([^"\']*)["\']', open_tag, perl = TRUE)
+  if (m < 0) return("(no id)")
+  substr(open_tag, attr(m, "capture.start")[1],
+         attr(m, "capture.start")[1] + attr(m, "capture.length")[1] - 1L)
+}
+
+
+#' Refuse on one island, with the console output Shiny needs
+#' @keywords internal
+.minify_refuse_island_doc <- function(id, problem, how_to_fix) {
+  msg <- sprintf("Island '%s' could not be hardened: %s", id, problem)
+  cat("\n+-- TURAS ERROR ----------------------------------------------+\n")
+  cat("| Context:    Minify, embedded document island\n")
+  cat("| Code:       CALC_MINIFY_ISLAND_DOC_FAILED\n")
+  cat("| Message:   ", msg, "\n")
+  for (fx in how_to_fix) cat("| How to fix:", fx, "\n")
+  cat("+-------------------------------------------------------------+\n\n")
+  turas_refuse(
+    code = "CALC_MINIFY_ISLAND_DOC_FAILED",
+    title = "An embedded document island could not be hardened",
+    problem = msg,
+    why_it_matters = paste(
+      "The island carries a whole page. Left unprocessed it ships readable",
+      "inside a file that is otherwise hardened, which is the thing this step",
+      "exists to stop."),
+    how_to_fix = how_to_fix,
+    module = "MINIFY"
+  )
+}
+
+
 # -- Block extraction ---------------------------------------------------------
 
 #' Where every iframe srcdoc attribute value sits in an HTML string
@@ -477,6 +763,56 @@
 }
 
 
+#' Blank the body of every JSON island, keeping every position
+#'
+#' A composed report carries whole pages inside JSON islands, and a page brings
+#' its own `<style>` and `<script>` OPENING tags with it. Those are text, not
+#' elements, but they look identical to the extractor. Their closing tags do
+#' not: the composer escapes `</` to `<\/` so the island cannot end its own
+#' script element early, which is exactly what makes the opening tags dangerous.
+#' An opening tag with no matching close sends the lazy `[\s\S]*?` span scanning
+#' to the end of the document and back.
+#'
+#' On the VAS integrated report, 12.5 MB with nineteen pages aboard, that costs
+#' PCRE its match limit: the `<style>` search warned "match limit exceeded" and
+#' returned 2 of the blocks instead of scanning cleanly. It was correct by luck
+#' of ordering, because both real style elements sit ahead of the islands. Put a
+#' style element AFTER them and a page's opening tag inside an island would pair
+#' with it, and the CSS pass would rewrite a span straddling island boundaries.
+#'
+#' So the island bodies are blanked before matching. Spaces, one for one, so
+#' every position in the blanked copy is the same position in the original and
+#' the caller can still extract real content from the original. Found and fixed
+#' 6 September 2026, while hardening the first composed report.
+#'
+#' @param html The HTML string.
+#' @return The same string with JSON island bodies replaced by spaces.
+#' @keywords internal
+.minify_mask_island_bodies <- function(html) {
+  # Bounded on both sides: `[^>]*` cannot run past the end of a tag, and the
+  # close is a fixed string searched forward from the open. Neither can
+  # backtrack, whatever the island holds.
+  om <- gregexpr('<script[^>]*type\\s*=\\s*["\']application/json["\'][^>]*>',
+                 html, perl = TRUE, ignore.case = TRUE)[[1]]
+  if (om[1] == -1L) return(html)
+  starts <- as.integer(om)
+  lens <- attr(om, "match.length")
+  n <- nchar(html)
+
+  for (i in seq_along(starts)) {
+    body_start <- starts[i] + lens[i]
+    if (body_start > n) next
+    rel <- regexpr("</script>", substr(html, body_start, n), fixed = TRUE)
+    if (rel < 0) next
+    body_end <- body_start + rel - 2L
+    if (body_end < body_start) next
+    substr(html, body_start, body_end) <-
+      strrep(" ", body_end - body_start + 1L)
+  }
+  html
+}
+
+
 #' Extract Tagged Blocks from HTML
 #'
 #' Extracts content and positions of <style> or <script> blocks. For script
@@ -496,7 +832,13 @@
   # Case-sensitive — Turas generates lowercase HTML tags; uppercase <Style> in
   # JS string literals (Excel export) must not match.
   pattern <- paste0("(<", tag, "(?=[\\s>])[^>]*>)([\\s\\S]*?)(</", tag, ">)")
-  matches <- gregexpr(pattern, html, perl = TRUE)[[1]]
+
+  # Match against a copy whose JSON island bodies are blanked, so a page
+  # carried inside an island cannot contribute a stray opening tag. Blanking
+  # preserves length, so every position below indexes the ORIGINAL html and
+  # real content is still extracted from it. See .minify_mask_island_bodies().
+  search_html <- .minify_mask_island_bodies(html)
+  matches <- gregexpr(pattern, search_html, perl = TRUE)[[1]]
   if (matches[1] == -1L) return(list())
 
   # When extracting <style> blocks, filter out any that fall inside a <script>
@@ -509,12 +851,17 @@
   # were being handed to terser, failing, and warning on every build. The
   # attribute's own quotes are safe to match on: the builder escapes every inner
   # quote to &quot; before embedding, so [^"]* reaches the real closing quote.
-  srcdoc_ranges <- if (tag == "script") .minify_srcdoc_ranges(html) else NULL
+  # Both of these read search_html, not html, for the same reason the main match
+  # does: a page carried inside an island brings its own srcdoc attributes and
+  # script tags, and neither is an element of THIS document. The script span
+  # below is the same lazy pattern that hit PCRE's match limit on the composed
+  # VAS report, so it needs the masked copy as much as the main match does.
+  srcdoc_ranges <- if (tag == "script") .minify_srcdoc_ranges(search_html) else NULL
 
   script_ranges <- NULL
   if (tag == "style") {
     sp <- paste0("(<script(?=[\\s>])[^>]*>)([\\s\\S]*?)(</script>)")
-    sm <- gregexpr(sp, html, perl = TRUE)[[1]]
+    sm <- gregexpr(sp, search_html, perl = TRUE)[[1]]
     if (sm[1] != -1L) {
       script_ranges <- data.frame(
         start = as.integer(sm),
@@ -1112,6 +1459,11 @@
   cat(sprintf("CSS blocks:    %d processed\n", result$css_blocks_processed))
   cat(sprintf("Meta tags:     %d stripped\n", result$meta_tags_stripped))
   cat(sprintf("HTML comments: %d removed\n", result$html_comments_removed))
+  # Only when there were any. A crosstab report carries none of these and the
+  # line would be noise on every build that is not a composed report.
+  if (isTRUE(result$island_documents_hardened > 0L)) {
+    cat(sprintf("Embedded pages:%d hardened\n", result$island_documents_hardened))
+  }
   if (nzchar(result$watermark_client %||% "")) {
     cat(sprintf("Watermark:     %s\n", result$watermark_client))
   }
@@ -1360,6 +1712,26 @@ turas_minify <- function(input_path,
     html <- sd$html
     srcdoc_hardened <- sd$count
     srcdoc_obfuscated <- isTRUE(sd$obfuscated)
+  }
+
+  # -- Step 2c: Harden embedded documents carried as islands ------------------
+  # The other half of 2b, for a composed report: pages that reach their iframe
+  # as a srcdoc PROPERTY rather than an attribute. Before step 8c, so a caller
+  # who marks an island both ways encodes hardened bytes rather than readable
+  # ones. See .minify_harden_document_islands().
+  island_docs_hardened <- 0L
+  island_doc_obfuscated <- FALSE
+  if (isTRUE(deliverable)) {
+    idoc <- .minify_harden_document_islands(
+      html,
+      opts = list(strip_meta = strip_meta, minify_js = minify_js,
+                  minify_css = minify_css, minify_html = minify_html,
+                  obfuscate_js = obfuscate_js, watermark = watermark,
+                  client_safe = client_safe, deliverable = deliverable),
+      verbose = verbose)
+    html <- idoc$html
+    island_docs_hardened <- idoc$count
+    island_doc_obfuscated <- isTRUE(idoc$obfuscated)
   }
 
   # -- Step 3: Strip meta tags ------------------------------------------------
@@ -1701,7 +2073,7 @@ turas_minify <- function(input_path,
     minified_js = minified_js_combined,
     input_size_bytes = input_size,
     output_size_bytes = output_size,
-    obfuscated = obfuscation_applied || srcdoc_obfuscated,
+    obfuscated = obfuscation_applied || srcdoc_obfuscated || island_doc_obfuscated,
     watermark_client = if (nzchar(watermark_client)) watermark_client else NULL
   )
 
@@ -1739,6 +2111,7 @@ turas_minify <- function(input_path,
     client_safe = isTRUE(client_safe),
     deliverable = isTRUE(deliverable),
     srcdoc_documents_hardened = srcdoc_hardened,
+    island_documents_hardened = island_docs_hardened,
     islands_encoded = islands_encoded,
     island_seed = island_seed,
     release_audit = release,

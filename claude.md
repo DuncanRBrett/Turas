@@ -811,6 +811,36 @@ quoting it.
   testthat sources files directly, so tests pass while the feature is absent.
 - **VAS engine files**: `VAS_LIBRARY_FILES` in `modules/vas/vas_pipeline.R`.
 
+### Composed reports (a report built by stitching pages into a Turas report)
+- **Compose from the `_dev` copy, and harden LAST.** Hardening cannot be
+  applied twice, so anything appended to an already-hardened report ships
+  readable inside it. The VAS integrated report did exactly that until 6 Sep
+  2026: nineteen pages and the shell patch, with their comments and function
+  names, inside a file whose engine was properly obfuscated. Call
+  `scripts/turas_harden_report.R <composed_dev.html> <out.html>` as the final
+  step.
+- **A page carried in an island needs an IIFE, or its names survive.**
+  `minify_profile.json` sets `renameGlobals: false` and terser runs
+  `--mangle toplevel=false`, both on purpose, so a name in a script's outermost
+  scope is never renamed. The Turas core escapes this only because its bundle is
+  wrapped. Mark the island `data-embed="document"` and wrap the page's script in
+  `(function(){"use strict"; ... })()`. Step 2c of `turas_minify.R` refuses a
+  deliverable whose embedded page still declares its own names.
+- **`data-embed="document"` and `data-island="v2"` are different things.** The
+  first hardens the page inside an island (step 2c); the second base64-encodes
+  the island body (step 8c). Once a page is hardened its data is already
+  unreadable, so encoding it too costs about a third of the file for nothing.
+  Measured on VAS: 18.3 MB versus 21.5 MB.
+- **An island body contains tags that are not elements.** A page inside an
+  island brings its own `<script>` and `<style>` OPENING tags, while its closing
+  tags are escaped to `<\/`. `.minify_extract_blocks()` masks island bodies
+  before matching for that reason. Without the mask the `<style>` search on the
+  12.5 MB composed report exceeded PCRE's match limit and silently returned 2
+  blocks instead of scanning cleanly.
+- **A CLI belongs in `scripts/`, never in `modules/shared/lib/`.** Three tabs
+  tests source every `.R` file in that directory. A script that runs on source
+  will `quit()` in the middle of the suite.
+
 ### Report rendering
 - **TurasPins capture inliner skips default-looking values** (`none`,
   `normal`, `auto`, `0px`, ...) in `TurasPins._inlineCaptureStyles`
