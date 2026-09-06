@@ -378,7 +378,7 @@
     if (mpenCmp === 'above' && penCmp === 'above')
       verdictClause = ' Strong on both mental (MPen) and physical (% bought) availability.';
     else if (mpenCmp === 'above' && penCmp === 'below')
-      verdictClause = ' Mental availability is above the category average, but physical purchase is lagging, a conversion gap.';
+      verdictClause = ' Mental availability is above the category average, but physical purchase is lagging. That is a conversion gap.';
     else if (mpenCmp === 'below' && penCmp === 'above')
       verdictClause = ' Punching above its mental availability on physical purchase, but the mental base is the constraint.';
     else if (mpenCmp === 'below' && penCmp === 'below')
@@ -502,8 +502,8 @@
       return;
     }
     var blurb = direction === 'top'
-      ? 'CEPs and attributes this brand <strong>over-indexes</strong> on: its link rate is higher than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest positive first.'
-      : 'CEPs and attributes this brand <strong>under-indexes</strong> on: its link rate is lower than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest negative first.';
+      ? 'CEPs and attributes this brand <strong>over-indexes</strong> on, where its link rate is higher than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest positive first.'
+      : 'CEPs and attributes this brand <strong>under-indexes</strong> on, where its link rate is lower than the category average. Source: Mental Availability battery (% of respondents linking each item to the brand). Ranked by the gap to the category average, biggest negative first.';
     body.innerHTML =
       '<p class="brsum-card-blurb">' + blurb + '</p>' +
       '<div class="brsum-adv-grid">' +

@@ -557,7 +557,7 @@ build_br_portfolio_panel <- function(results, config) {
     'A common misreading is &ldquo;0.56 = 56% of IPK awares know Knorr&rdquo;. That is <em>not</em> what this score is; that conditional number lives on the Duplication of Awareness table below.</p>',
 
     '<p class="pf-cn-reading-line"><strong>What to do with it:</strong> ',
-    'The brands at the top of the side list are the ones to study first, they’re your real rivals in this category. ',
+    'The brands at the top of the side list are the ones to study first. They are your real rivals in this category. ',
     'If your focal sits alone with no high-Jaccard neighbours, you have distinctive mental space to defend. ',
     'If it sits inside a tight cluster, your differentiation is doing less work than the chart might suggest. ',
     'Use the focal picker to repeat the read for any other brand in this category, or switch categories with the chips above.</p>',
@@ -753,11 +753,11 @@ build_br_portfolio_panel <- function(results, config) {
     'In a category where buyers each know 4–5 brands on average, those individual awareness scores can sum to 400% or more, so a 58% awareness rate ends up as roughly <strong>14%</strong> share of awareness. ',
     'Awareness % tells you how many people know the brand at all; share of awareness tells you how big a slice of mental space the brand owns once you account for how many other brands are competing for that same head-space.</p>',
 
-    '<p class="pf-cl-reading-line"><strong>The four quadrants</strong> describe the <em>state</em> of the focal brand in each category&rsquo;s mental space. Not what to do about it. The strategic call always depends on the category&rsquo;s commercial role for the brand. ',
-    '<strong>Dominant</strong> (top-left, low clutter / high share), few brands compete for awareness here and you own a big slice of it. ',
-    '<strong>Contested</strong> (top-right, high clutter / high share), many brands compete and you hold your own; you are winning ground in a busy mental space. ',
-    '<strong>Open space</strong> (bottom-left, low clutter / low share), few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in. Read alongside category penetration (the dot size) before drawing conclusions. ',
-    '<strong>Crowded out</strong> (bottom-right, high clutter / low share), many brands compete and you have a small share of awareness. You are in this category but not winning the awareness fight. Whether to push harder or accept the position depends on whether this category is a strategic priority. The chart does not answer that.</p>',
+    '<p class="pf-cl-reading-line"><strong>The four quadrants</strong> describe the <em>state</em> of the focal brand in each category&rsquo;s mental space, not what to do about it. The strategic call always depends on the category&rsquo;s commercial role for the brand. ',
+    '<strong>Dominant</strong> (top-left, low clutter / high share): few brands compete for awareness here and you own a big slice of it. ',
+    '<strong>Contested</strong> (top-right, high clutter / high share): many brands compete and you hold your own; you are winning ground in a busy mental space. ',
+    '<strong>Open space</strong> (bottom-left, low clutter / low share): few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in. Read alongside category penetration (the dot size) before drawing conclusions. ',
+    '<strong>Crowded out</strong> (bottom-right, high clutter / low share): many brands compete and you have a small share of awareness. You are in this category but not winning the awareness fight. Whether to push harder or accept the position depends on whether this category is a strategic priority. The chart does not answer that.</p>',
 
     '<p class="pf-cl-reading-line"><strong>What to do with it:</strong> ',
     'Hover any dot to see the exact set size, focal awareness, share of awareness, category penetration and quadrant. ',
@@ -989,10 +989,10 @@ build_br_portfolio_panel <- function(results, config) {
 
     '<p class="pf-ex-reading-line"><strong>How to read the extension table:</strong> ',
     'For every measured category that <em>isn’t</em> the focal’s home, <em>lift</em> = how much more likely buyers of that category are to be aware of the focal compared with the baseline awareness rate. ',
-    '<strong>Lift &gt; 1</strong> means buyers of that category have an above-average awareness of the focal, there’s a halo to lean on if you launched there. ',
+    '<strong>Lift &gt; 1</strong> means buyers of that category have an above-average awareness of the focal. There is a halo to lean on if you launched there. ',
     '<strong>Lift ≈ 1</strong> means no halo; entering would be cold-starting awareness. ',
     '<strong>★</strong> = significant after BH correction across all rows; <strong>†</strong> = low category base, interpret cautiously. ',
-    'The home row sits at the top as a reference and is greyed out, it’s not an extension target, it’s where the brand already lives.</p>',
+    'The home row sits at the top as a reference and is greyed out. It is not an extension target, it is where the brand already lives.</p>',
 
     '<p class="pf-ex-reading-line"><strong>How lift is actually calculated:</strong> ',
     '<code class="pf-ex-formula">lift(category) = P(aware of focal | bought category) ÷ P(aware of focal | baseline)</code> ',

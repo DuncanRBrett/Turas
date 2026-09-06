@@ -5,7 +5,7 @@
 # sections: Purchase Location (channels) and Pack Sizes. Each section
 # reuses the brands-as-rows / options-as-columns table layout from the
 # Loyalty and Distribution tabs (.cb_rel_table_html) so the visual
-# contract, sortable headers, CI-band heatmap, "show counts" toggle.
+# contract (sortable headers, CI-band heatmap, "show counts" toggle)
 # stays consistent across the panel.
 #
 # The tab silently hides any section whose engine returned NULL or

@@ -394,7 +394,7 @@ validate_nesting <- function(stages, weights = NULL) {
         brand_refuse(code = "BUG_UNKNOWN_STAGE", title = "Unknown Funnel Stage Key",
                      problem = sprintf("Stage key '%s' has no handler in .derive_stage_matrix()", key),
                      why_it_matters = "An unrecognised key in the execution plan means no stage data will be produced.",
-                     how_to_fix = "This is an internal error, file a bug report. The key should never reach this function unless the plan was corrupted.")
+                     how_to_fix = "This is an internal error. File a bug report. The key should never reach this function unless the plan was corrupted.")
       } else {
         stop(msg, call. = FALSE)  # TRS-FALLBACK: bootstrap path only
       }

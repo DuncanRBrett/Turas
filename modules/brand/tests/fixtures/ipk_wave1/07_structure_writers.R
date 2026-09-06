@@ -196,7 +196,7 @@ ipk_write_brand_config <- function(path) {
   for (typ in c("WOM_POS_REC", "WOM_POS_SHARE",
                 "WOM_NEG_REC", "WOM_NEG_SHARE")) {
     add_q(paste0(typ, "_", cat),
-          paste("WOM:", typ, "n/a", cat), "Multi_Mention", n_slots)
+          paste("WOM:", typ, "for", cat), "Multi_Mention", n_slots)
   }
   for (b in IPK_BRANDS[[cat]]) {
     add_q(paste0("WOM_POS_COUNT_", cat, "_", b),

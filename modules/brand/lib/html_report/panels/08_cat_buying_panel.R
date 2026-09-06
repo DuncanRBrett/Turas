@@ -648,7 +648,7 @@ render_cat_buying_panel <- function(panel_data) {
     paste0(
       '<p style="font-size:12px;color:#64748b;margin:4px 0 10px;">',
       'Tertiles are built from <strong>total category purchases per respondent</strong> ',
-      'over the <strong>past %d months</strong>: not per-brand. Every category buyer ',
+      'over the <strong>past %d months</strong>, not per-brand. Every category buyer ',
       'is placed into one of three equal-weighted thirds (Light / Medium / Heavy ',
       '<em>category</em> buyers). Each brand row then shows what %% of <em>that brand&apos;s ',
       'buyers</em> come from each category tertile (sums to 100%% across the row). ',
@@ -827,7 +827,7 @@ render_cat_buying_panel <- function(panel_data) {
     'Everything on this tab is about the <em>category</em>, not any one brand. ',
     'We take every category buyer in the study and split them into three ',
     'equal-weighted thirds: Light, Medium and Heavy <em>category</em> ',
-    'buyers: based on how many total category purchases each person made ',
+    'buyers, based on how many total category purchases each person made ',
     'in the past ', as.integer(t_months), ' months (their total across every ',
     'brand they bought, not just one). Each brand row then asks: <em>of the ',
     'people who bought this brand, what mix of light / medium / heavy ',
@@ -1272,7 +1272,7 @@ render_cat_buying_panel <- function(panel_data) {
   # Per-column category avg & SD across brands (for CI band & heatmap).
   #
   # Two regimes:
-  #   1. Per-brand base (Distribution, Heaviness). Base_n_map carries the
+  #   1. Per-brand base (Distribution, Heaviness): base_n_map carries the
   #      brand-buyer count per brand. The Cat avg uses the POOLED formula:
   #         sum(pct_i × base_i) / sum(base_i)
   #      which is "across every (brand × buyer) cell, what % fall in this

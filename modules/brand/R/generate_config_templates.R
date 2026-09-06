@@ -192,7 +192,7 @@ BRAND_CONFIG_VERSION <- "2.0"
       section_name = "ANALYTICAL ELEMENTS  (Y = include, N = exclude)",
       fields = list(
         list(name = "element_funnel", required = FALSE, default = "Y",
-             description = "Brand funnel: Awareness > Disposition > Bought (target) > Primary. Derived from BRANDAWARE, BRANDATT1, BRANDPEN2, BRANDPEN3 columns, no extra survey questions needed.",
+             description = "Brand funnel: Awareness > Disposition > Bought (target) > Primary. Derived from BRANDAWARE, BRANDATT1, BRANDPEN2, BRANDPEN3 columns. No extra survey questions needed.",
              valid_values_text = "Y or N",
              dropdown = c("Y", "N")),
         list(name = "element_mental_avail", required = FALSE, default = "Y",
@@ -347,7 +347,7 @@ BRAND_CONFIG_VERSION <- "2.0"
       section_name = "AUDIENCE LENS OPTIONS  (only if element_audience_lens = Y)",
       fields = list(
         list(name = "audience_lens_max", required = FALSE, default = 6,
-             description = "Maximum number of audience segments to show side-by-side in the Audience Lens panel. Minimum 2 (for a pair). Each audience requires its own column of analysis, keep <=6 for readability.",
+             description = "Maximum number of audience segments to show side-by-side in the Audience Lens panel. Minimum 2 (for a pair). Each audience requires its own column of analysis, so keep <=6 for readability.",
              valid_values_text = "2 to 8",
              integer_range = c(2, 8))
       )
@@ -597,20 +597,20 @@ BRAND_CONFIG_VERSION <- "2.0"
          description = "Number of data columns: 1 for most types; for Multi_Mention slot-indexed questions enter the number of slots (brands + 1 for NONE). For tabs Ranking enter the number of items ranked.",
          integer_range = c(1, 500)),
     list(name = "Category", width = 24, required = FALSE,
-         description = "TABS: section/grouping label for output organisation (e.g. 'Demographics', 'Satisfaction'). BRAND: informational only, the brand module infers battery and category from the question code naming convention."),
+         description = "TABS: section/grouping label for output organisation (e.g. 'Demographics', 'Satisfaction'). BRAND: informational only. The brand module infers battery and category from the question code naming convention."),
     list(name = "Ranking_Format", width = 16, required = FALSE,
          description = "TABS ONLY: required for Ranking questions. 'Position' = each item column holds rank position number. 'Item' = each rank column holds item code.",
          dropdown = c("Position", "Item")),
     list(name = "Ranking_Positions", width = 18, required = FALSE,
-         description = "TABS ONLY, for Ranking: how many items each respondent ranks (e.g. 3 for 'rank your top 3').",
+         description = "TABS ONLY: for Ranking: how many items each respondent ranks (e.g. 3 for 'rank your top 3').",
          integer_range = c(1, 100)),
     list(name = "Ranking_Direction", width = 18, required = FALSE,
-         description = "TABS ONLY, for Ranking: does Rank 1 mean best or worst?",
+         description = "TABS ONLY: for Ranking: does Rank 1 mean best or worst?",
          dropdown = c("BestToWorst", "WorstToBest")),
     list(name = "Min_Value", width = 12, required = FALSE,
-         description = "TABS ONLY, for Numeric questions: minimum expected value (used for validation and binning)."),
+         description = "TABS ONLY: for Numeric questions: minimum expected value (used for validation and binning)."),
     list(name = "Max_Value", width = 12, required = FALSE,
-         description = "TABS ONLY, for Numeric questions: maximum expected value."),
+         description = "TABS ONLY: for Numeric questions: maximum expected value."),
     list(name = "Notes", width = 30, required = FALSE,
          description = "Internal notes (not shown in output).")
   )
@@ -727,9 +727,9 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(name = "BoxCategory", width = 22, required = FALSE,
          description = "TABS ONLY: group options into summary rows (e.g. 'Top 2 Box', 'Satisfied', 'Promoters'). Options sharing a BoxCategory label are summed."),
     list(name = "Min", width = 10, required = FALSE,
-         description = "TABS ONLY, for Numeric binning: minimum value of this bin (e.g. 18 for '18-24' age band)."),
+         description = "TABS ONLY: for Numeric binning: minimum value of this bin (e.g. 18 for '18-24' age band)."),
     list(name = "Max", width = 10, required = FALSE,
-         description = "TABS ONLY, for Numeric binning: maximum value of this bin (e.g. 24 for '18-24' age band).")
+         description = "TABS ONLY: for Numeric binning: maximum value of this bin (e.g. 24 for '18-24' age band).")
   )
 }
 
@@ -1224,7 +1224,7 @@ BRAND_CONFIG_VERSION <- "2.0"
     list(name = "FilterColumn", width = 24, required = TRUE,
          description = "Data column to test for this audience filter (e.g. BRANDPEN2_DSS, DEMO_GENDER, Focal_Category)."),
     list(name = "FilterOp", width = 12, required = TRUE,
-         description = "Comparison operator. Type one of: == != > < >= <= in not_in. Use 'in' / 'not_in' with comma-separated FilterValue (e.g. IPK,ROB). Note: no dropdown. < and > cannot be listed in Excel inline validations."),
+         description = "Comparison operator. Type one of: == != > < >= <= in not_in. Use 'in' / 'not_in' with comma-separated FilterValue (e.g. IPK,ROB). Note: no dropdown, because < and > cannot be listed in Excel inline validations."),
     list(name = "FilterValue", width = 30, required = TRUE,
          description = "Value(s) to compare against. For 'in' / 'not_in' operators: comma-separated list (e.g. IPK,ROB). For '==' operators: single value (e.g. IPK, 1, FEMALE).")
   )
@@ -1616,8 +1616,8 @@ generate_brand_survey_structure_template <- function(output_path,
     .build_unified_questions_columns(),
     title = "Question Definitions  [SHARED: used by brand module AND tabs module]",
     subtitle = paste0(
-      "One row per question. Brand module: follow the naming convention in the Question Naming Guide sheet: ",
-      "roles are inferred automatically from question code prefixes (BRANDAWARE_, BRANDATTR_, etc.). ",
+      "One row per question. Brand module: follow the naming convention in the Question Naming Guide sheet. ",
+      "Roles are inferred automatically from question code prefixes (BRANDAWARE_, BRANDATTR_, etc.). ",
       "Tabs module: use any QuestionCode and set Variable_Type. Blue rows are examples."
     ),
     example_rows = .build_unified_questions_examples(),

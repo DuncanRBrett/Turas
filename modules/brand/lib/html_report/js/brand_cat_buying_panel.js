@@ -1730,7 +1730,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ': Duplication of Purchase'
+    var title = baseTitle ? baseTitle + ', Duplication of Purchase'
                           : 'Duplication of Purchase';
     var html = cbCaptureDopHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -1837,7 +1837,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ': Category Context' : 'Category Context';
+    var title = baseTitle ? baseTitle + ', Category Context' : 'Category Context';
 
     var html = cbCaptureContextHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -1908,7 +1908,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ': Shopper Behaviour' : 'Shopper Behaviour';
+    var title = baseTitle ? baseTitle + ', Shopper Behaviour' : 'Shopper Behaviour';
 
     var html = cbCaptureShopperHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -1950,7 +1950,7 @@
                      dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
                      context: 'Category Context', shopper: 'Shopper Behaviour' };
     var tabLabel = tabLabels[tabKey] || tabKey;
-    var title = baseTitle ? baseTitle + ': ' + tabLabel : tabLabel;
+    var title = baseTitle ? baseTitle + ', ' + tabLabel : tabLabel;
 
     var content = { sectionKey: panel.id || tabKey, title: title,
                     chartSvg: '', tableHtml: '', insightText: '' };
@@ -2119,7 +2119,7 @@
     var section = panel.closest('.br-element-section') || panel.parentNode;
     var titleEl = section ? section.querySelector('.br-element-title') : null;
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
-    var title = baseTitle ? baseTitle + ': Category Context' : 'Category Context';
+    var title = baseTitle ? baseTitle + ', Category Context' : 'Category Context';
 
     var html = cbCaptureContextHtml(activeTab, flags);
     var insightText = (flags.insight && editor) ? editor.value.trim() : '';
@@ -2144,7 +2144,7 @@
                      dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
                      context: 'Category Context', shopper: 'Shopper Behaviour' };
     var tabLabel = tabLabels[tabKey] || tabKey;
-    var title = baseTitle ? baseTitle + ': ' + tabLabel : tabLabel;
+    var title = baseTitle ? baseTitle + ', ' + tabLabel : tabLabel;
 
     /* Capture chart HTML (all CB charts are HTML div-based) */
     var capturedChartHtml = '';

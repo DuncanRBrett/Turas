@@ -256,7 +256,7 @@ build_audience_lens_panel_html <- function(panel_data,
   rows <- paste(vapply(card$rows, function(r) {
     if (isTRUE(r$buyer_base_na)) {
       sprintf(
-        '<tr class="al-audrow al-audrow-na"><td class="al-audrow-label">%s</td><td class="al-audrow-val">N/A †</td><td class="al-audrow-delta">n/a</td></tr>',
+        '<tr class="al-audrow al-audrow-na"><td class="al-audrow-label">%s</td><td class="al-audrow-val">N/A †</td><td class="al-audrow-delta">N/A</td></tr>',
         .al_esc(r$metric_label))
     } else {
       sprintf(

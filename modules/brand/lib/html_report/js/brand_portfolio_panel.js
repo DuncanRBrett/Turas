@@ -1138,7 +1138,7 @@ function pfCnRenderRivals(panel, catCode, focalCode) {
       ? 'No competitors share enough co-awareness with ' + escapeHtmlMaybe(focalLabel) +
         ' to register in this category. ' +
         'It either dominates mental space here or has too few aware buyers for stable comparisons.'
-      : escapeHtmlMaybe(focalLabel) + ' is not present in this category, pick another focal or a different category.';
+      : escapeHtmlMaybe(focalLabel) + ' is not present in this category. Pick another focal or a different category.';
     ol.innerHTML = '<li class="pf-cn-rivals-empty">' + msg + '</li>';
     return;
   }
@@ -1969,8 +1969,8 @@ function pfExRenderTable(ext, brandLabel) {
   if (rows.length === 0) {
     return '<div class="pf-ex-empty">' +
       '<p><strong>No extension lift data for ' + pfClEsc(brandLabel) + '.</strong></p>' +
-      '<p>Permission-to-extend analysis needs cross-category awareness data: ' +
-      'the questionnaire has to ask whether buyers in <em>other</em> categories are aware of ' +
+      '<p>Permission-to-extend analysis needs cross-category awareness data. ' +
+      'The questionnaire has to ask whether buyers in <em>other</em> categories are aware of ' +
       pfClEsc(brandLabel) + '. ' +
       'For this brand the questionnaire didn’t collect that data, so there are no extension ' +
       'targets to score.</p>' +
@@ -1991,7 +1991,7 @@ function pfExRenderTable(ext, brandLabel) {
     return '<div class="pf-ex-empty">' +
       '<p><strong>' + pfClEsc(brandLabel) + ' is only measured in 1 category (' +
       pfClEsc(homeLabel) + ').</strong></p>' +
-      '<p>Permission-to-extend ranks <em>other</em> categories by their awareness lift for the focal brand: ' +
+      '<p>Permission-to-extend ranks <em>other</em> categories by their awareness lift for the focal brand, ' +
       'so it needs at least one non-home category with cross-category awareness data. ' +
       'For ' + pfClEsc(brandLabel) + ', the questionnaire didn’t ask buyers of other categories whether they’re aware of this brand, ' +
       'so there are no extension targets to score.</p>' +

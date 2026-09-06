@@ -1327,7 +1327,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 # Per-category context: eight category-level metrics.
 # Brand-count metrics (avg # of brands at each funnel stage) sum the
-# weighted per-brand penetrations. Pct_weighted is in 0..1 so the sum
+# weighted per-brand penetrations: pct_weighted is in 0..1 so the sum
 # is directly the average count of brands per respondent at that stage.
 # Avg CEPs per respondent sums cep_penetration percentages and divides
 # by 100. Returns NULL fields when the upstream engine didn't run.

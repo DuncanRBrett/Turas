@@ -416,7 +416,7 @@
       var maTitle = (stim === "attributes")       ? "Brand Attributes"
                   : (stim === "ceps")             ? "Category Entry Points"
                   : (stim === "metrics")          ? "Headline Metrics"
-                  : (stim === "advantage_focal")  ? "Mental Advantage: Focal Brand View"
+                  : (stim === "advantage_focal")  ? "Mental Advantage, Focal Brand View"
                   : (stim === "advantage")        ? "Mental Advantage"
                   : stim;
       if (!content.title || content.title === sid) {

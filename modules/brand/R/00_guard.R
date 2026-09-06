@@ -739,7 +739,7 @@ guard_validate_data <- function(data, structure, config) {
 #'     cat_code columns
 #'   \item \code{DATA_PORTFOLIO_NO_AWARENESS_COLS}, zero BRANDAWARE_* columns
 #'     found in data despite config saying Y
-#'   \item \code{DATA_PORTFOLIO_TIMEFRAME_MISSING}. Portfolio_timeframe requires
+#'   \item \code{DATA_PORTFOLIO_TIMEFRAME_MISSING}: portfolio_timeframe requires
 #'     SQ2_* (or SQ1_*) columns that are absent from the data
 #' }
 #'

@@ -214,8 +214,8 @@ run_adhoc_question <- function(values,
 #' v2 counterpart to \code{resolve_adhoc_role()}. Walks
 #' \code{role_map[[role]]} for column_root + variable_type + option_scale,
 #' then resolves the option list via \code{.demo_lookup_options()}. Returns
-#' NULL when the role is unmapped or. When \code{data} is supplied, its
-#' column is absent from the data (caller silently skips).
+#' NULL when the role is unmapped, or, when \code{data} is supplied, when
+#' its column is absent from the data (caller silently skips).
 #'
 #' @param role_map Named list from \code{build_brand_role_map()}.
 #' @param role Character. Exact role name (e.g. "adhoc.brand_love.DSS").

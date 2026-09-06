@@ -469,8 +469,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       "for the precision it costs. Panel sampling is non-probability;",
       "margin of error is not reported."),
     heavy_buyer_note = paste(
-      "Heavy-buyer and frequency analysis: how often respondents buy each",
-      "brand: lives in the Repertoire / Frequency view, not the funnel.",
+      "Heavy-buyer and frequency analysis (how often respondents buy each",
+      "brand) lives in the Repertoire / Frequency view, not the funnel.",
       "Funnel stages are behavioural milestones (aware → buy), not loyalty cuts."),
     prior_brand_note = if ("funnel.service.prior_brand" %in% names(
       result$role_map_used %||% list())) {

@@ -2274,7 +2274,7 @@
         ? window.brReadBaseLabel(maSubtab) : '';
       TurasPins.add({
         sectionKey: 'ma-' + activeKey + '-' + Date.now(),
-        title: baseTitle + ': ' + subLabel,
+        title: baseTitle + ', ' + subLabel,
         subtitle: maBaseLabel ? 'Base: ' + maBaseLabel : '',
         baseText: maBaseLabel,
         chartSvg: chartSvg, chartHtml: '',
@@ -2330,7 +2330,7 @@
         var htm = (!svg && !tbl) ? captureHtml(el) : '';
         TurasPins.add({
           sectionKey: 'ma-metrics-' + key + '-' + Date.now(),
-          title: baseTitle + ': ' + def.label,
+          title: baseTitle + ', ' + def.label,
           chartSvg: svg, chartHtml: '',
           tableHtml: tbl || htm,
           insightText: (pinIndex === 0) ? metricsInsight : '',
@@ -2344,7 +2344,7 @@
       if (pinIndex === 0 && metricsInsight) {
         TurasPins.add({
           sectionKey: 'ma-metrics-insight-' + Date.now(),
-          title: baseTitle + ': Insight',
+          title: baseTitle + ', Insight',
           chartSvg: '', chartHtml: '',
           tableHtml: '',
           insightText: metricsInsight,
@@ -2360,7 +2360,7 @@
       var advSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
       var advFocalName = (pd.meta && pd.meta.focal_brand_name) || focal || 'Focal';
       var advBaseLabel = 'total respondents';
-      var advTitleSuffix = ': Mental Advantage, ' + advFocalName + ', Base: ' + advBaseLabel;
+      var advTitleSuffix = ', Mental Advantage, ' + advFocalName;
       var advInsight = '';
       if (optKeys.indexOf('insight') >= 0) {
         var taA = panel.querySelector('.ma-insight-box-text[data-ma-stim="advantage"]');

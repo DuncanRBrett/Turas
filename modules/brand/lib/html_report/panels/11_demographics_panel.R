@@ -345,7 +345,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     # radio flips.
     '<span class="demo-baseline-wrap" data-demo-baseline-group>',
     '<span class="demo-control-label">Baseline:</span>',
-    '<label class="demo-control-check" title="Compare focal brand against the CATEGORY-BUYER average for this question. Best for spotting what is distinctive about this brand within its category, the academic default (Romaniuk / Ehrenberg-Bass)."><input type="radio" name="demo-baseline" data-demo-baseline="cat" checked> Cat avg</label>',
+    '<label class="demo-control-check" title="Compare focal brand against the CATEGORY-BUYER average for this question. Best for spotting what is distinctive about this brand within its category. This is the academic default (Romaniuk / Ehrenberg-Bass)."><input type="radio" name="demo-baseline" data-demo-baseline="cat" checked> Cat avg</label>',
     '<label class="demo-control-check" title="Compare focal brand against the WHOLE SCREENED SAMPLE for this question. Best for cross-category reads (same denominator across all categories) and for population-relative skews."><input type="radio" name="demo-baseline" data-demo-baseline="study"> Total sample</label>',
     '</span>',
     '<span class="demo-control-sep"></span>',
