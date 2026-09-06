@@ -192,6 +192,11 @@ tabs_delivery_interactivity <- function(config_obj,
 #' @keywords internal
 TABS_QUAL_CUTS_RANK <- c(allow = 1L, safe = 2L, block = 3L)
 TABS_QUAL_TEXT_RANK <- c(full = 1L, redacted = 2L, hidden = 3L)
+# How a comment is keyed. "respondent" gives one index and one token per person,
+# the same in every question, so any two of that person's comments can be joined
+# into a profile. "question" keys a comment by its position in its own question
+# and ships no token. Client-safe raises it, whatever the config said.
+TABS_QUAL_KEY_RANK <- c(respondent = 1L, question = 2L)
 
 tabs_delivery_qual_dials <- function(config_obj,
                                      gui_mode = get0("TURAS_DELIVERY_MODE",
@@ -206,6 +211,7 @@ tabs_delivery_qual_dials <- function(config_obj,
   # thing it is describing can never disagree about an unset dial.
   config_cuts <- norm(cfg$qual_demographic_cuts, "allow", TABS_QUAL_CUTS_RANK)
   config_text <- norm(cfg$qual_confidentiality_mode, "hidden", TABS_QUAL_TEXT_RANK)
+  config_key <- norm(cfg$qual_comment_key, "respondent", TABS_QUAL_KEY_RANK)
 
   gui <- tolower(trimws(as.character(gui_mode %||% NA_character_)[1]))
   client_safe <- gui %in% c("client_safe_interactive", "client_safe_frozen",
@@ -219,6 +225,10 @@ tabs_delivery_qual_dials <- function(config_obj,
       if (k_set) "safe" else "block"
     } else "block"
   text_floor <- if (client_safe) "redacted" else NULL
+  # Every client-safe mode, frozen included: a frozen file still carries the
+  # comment records, so the key that joins them across questions is exposure there
+  # too, and nothing in a frozen file needs one.
+  key_floor <- if (client_safe) "question" else NULL
 
   cuts <- config_cuts
   reason <- "config"
@@ -233,8 +243,15 @@ tabs_delivery_qual_dials <- function(config_obj,
     text_mode <- text_floor
   }
 
-  list(cuts = cuts, text_mode = text_mode,
+  comment_key <- config_key
+  if (!is.null(key_floor) &&
+      TABS_QUAL_KEY_RANK[[key_floor]] > TABS_QUAL_KEY_RANK[[comment_key]]) {
+    comment_key <- key_floor
+  }
+
+  list(cuts = cuts, text_mode = text_mode, comment_key = comment_key,
        config_cuts = config_cuts, config_text_mode = config_text,
+       config_comment_key = config_key,
        reason = reason)
 }
 
@@ -254,6 +271,7 @@ tabs_apply_qual_floor <- function(config_obj, dials) {
   if (is.null(config_obj) || is.null(dials)) return(config_obj)
   config_obj$qual_demographic_cuts <- dials$cuts
   config_obj$qual_confidentiality_mode <- dials$text_mode
+  config_obj$qual_comment_key <- dials$comment_key
   config_obj
 }
 
@@ -308,6 +326,11 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
     hidden   = "no text in the file (counts and themes only)",
     text_mode)
 
+  key_txt <- if (!has_qual) "not applicable" else switch(
+    tolower(trimws(as.character(cfg$qual_comment_key %||% "respondent"))),
+    question = "question-local (no comment joins to another across questions)",
+    "one per respondent (comments CAN be joined across questions)")
+
   tags_txt <- if (!has_qual) "not applicable" else switch(
     cuts,
     block = "none (comments carry no demographics)",
@@ -327,6 +350,11 @@ tabs_delivery_manifest <- function(micro, qual_json, config_obj,
     paste0("│ ", pad("Direct identifiers"), ": NO (indices only, never IDs or raw text)"),
     paste0("│ ", pad("Verbatim comments"), ": ", verbatim_txt),
     paste0("│ ", pad("Comment demographic tags"), ": ", tags_txt),
+    paste0("│ ", pad("Comment key"), ": ", key_txt),
+    # An assertion, and labelled as one. No build can tell whether a human read
+    # the comments, so the manifest must not let it read as a measured control.
+    if (has_qual && isTRUE(cfg$qual_manual_review))
+      paste0("│ ", pad("Manual review"), ": ASSERTED by the analyst (not verified by the build)"),
     paste0("│ ", pad("Minimum reporting base"), ": ", k_txt),
     paste0("│ ", pad("Live filters, custom banners"), ": ",
            if (has_micro) "ON"

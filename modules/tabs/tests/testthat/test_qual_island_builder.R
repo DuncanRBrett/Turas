@@ -94,7 +94,7 @@ test_that("FULL mode ships the exact verbatim, no scrubbing", {
   q <- island$questions[[1]]
   expect_equal(island$textMode, "full")
   expect_equal(first_record(q, 0L)$text, "Email me at bob@example.com")
-  expect_false(q$meta$pii_scrubbed)
+  expect_false(q$meta$redactions > 0L)
 })
 
 test_that("HIDDEN mode nulls every verbatim (numbers still ship)", {
@@ -103,7 +103,7 @@ test_that("HIDDEN mode nulls every verbatim (numbers still ship)", {
   expect_equal(island$textMode, "hidden")
   expect_true(is.na(first_record(q, 0L)$text))         # -> JSON null -> "[quote hidden]"
   expect_equal(first_record(q, 0L)$tier, 2L)           # numbers/tier still present
-  expect_false(q$meta$pii_scrubbed)
+  expect_false(q$meta$redactions > 0L)
 })
 
 test_that("REDACTED mode scrubs direct identifiers and flags the scrub", {
@@ -113,7 +113,7 @@ test_that("REDACTED mode scrubs direct identifiers and flags the scrub", {
   expect_equal(island$textMode, "redacted")
   expect_equal(first_record(q, 0L)$text, "Email me at [redacted]")   # email gone
   expect_equal(first_record(q, 1L)$text, "Call [redacted] please")    # phone gone
-  expect_true(q$meta$pii_scrubbed)
+  expect_true(q$meta$redactions > 0L)
   expect_gte(q$meta$redactions, 2L)
 })
 
@@ -375,4 +375,119 @@ test_that("qual_build_question_island keeps its pre-I20 arity", {
   q <- qual_build_question_island(themed_question(records), master$id_to_idx, "full")
   expect_equal(q$base$answered, 2L)
   for (r in q$records) expect_false("rid" %in% names(r))
+})
+
+
+# ==============================================================================
+# QUESTION-LOCAL COMMENT KEYS
+# ==============================================================================
+# A record's idx and its reader token are the SAME value for a person in every
+# question they answered, so either one joins that person's comments into a
+# profile. One comment can be anonymous while six are not. Client-safe builds are
+# keyed by position within a question instead, and carry no token.
+
+keyed_master <- function() list(id_to_idx = stats::setNames(c(4L, 9L), c("1", "2")), n = 12L)
+
+keyed_questions <- function() list(
+  themed_question(list(mk_rec("1", "a1", themeVals = list(Service = 1L)),
+                       mk_rec("2", "a2", themeVals = list(Service = 1L)))),
+  themed_question(list(mk_rec("2", "b2", themeVals = list(Service = 1L))))
+)
+
+test_that("respondent keying is unchanged, and is what links a person's comments", {
+  isl <- qual_build_data_qual(keyed_questions(), keyed_master(),
+    list(text_mode = "full", demographic_cuts = "block"),
+    rid_map = c("1" = "tok1", "2" = "tok2"))
+  q1 <- isl$questions[[1]]; q2 <- isl$questions[[2]]
+  expect_equal(q1$records[[2]]$idx, 9L)      # respondent 2, wherever they appear
+  expect_equal(q2$records[[1]]$idx, 9L)
+  expect_equal(q1$records[[2]]$rid, "tok2")
+  expect_equal(q2$records[[1]]$rid, "tok2")
+  expect_null(isl$commentKey)                # absent, so a records island is unchanged
+})
+
+test_that("question keying numbers a comment by its place in its own question", {
+  isl <- qual_build_data_qual(keyed_questions(), keyed_master(),
+    list(text_mode = "full", demographic_cuts = "block", comment_key = "question"),
+    rid_map = c("1" = "tok1", "2" = "tok2"))
+  q1 <- isl$questions[[1]]; q2 <- isl$questions[[2]]
+  expect_equal(vapply(q1$records, function(r) r$idx, integer(1)), 0:1)
+  expect_equal(q2$records[[1]]$idx, 0L)
+  expect_equal(isl$commentKey, "question")
+})
+
+test_that("question keying ships no reader token, even with a sidecar to hand", {
+  isl <- qual_build_data_qual(keyed_questions(), keyed_master(),
+    list(text_mode = "full", demographic_cuts = "block", comment_key = "question"),
+    rid_map = c("1" = "tok1", "2" = "tok2"))
+  for (q in isl$questions) for (r in q$records) expect_null(r$rid)
+})
+
+test_that("no key survives that joins one person across two questions", {
+  # The property, as an extractor would test it: the same person wrote a2 and b2,
+  # and nothing in the island says so.
+  isl <- qual_build_data_qual(keyed_questions(), keyed_master(),
+    list(text_mode = "full", demographic_cuts = "block", comment_key = "question"),
+    rid_map = c("1" = "tok1", "2" = "tok2"))
+  keyset <- function(q) vapply(q$records, function(r) {
+    paste0(r$idx, "/", if (is.null(r$rid)) "" else r$rid)
+  }, character(1))
+  # Every key in question 2 also appears in question 1, which is the point: a
+  # shared key now means "same position", not "same person", so it carries nothing.
+  expect_true(all(keyset(isl$questions[[2]]) %in% keyset(isl$questions[[1]])))
+  # And the person who wrote in BOTH is not identifiable as such: their two
+  # comments carry keys 1 and 0.
+  expect_equal(isl$questions[[1]]$records[[2]]$idx, 1L)
+  expect_equal(isl$questions[[2]]$records[[1]]$idx, 0L)
+})
+
+test_that("an unknown key mode falls back to respondent rather than to nothing", {
+  isl <- qual_build_data_qual(keyed_questions(), keyed_master(),
+    list(text_mode = "full", demographic_cuts = "block", comment_key = "Nonsense"))
+  expect_null(isl$commentKey)
+  expect_equal(isl$questions[[1]]$records[[1]]$idx, 4L)
+})
+
+
+# ==============================================================================
+# HONEST DIAGNOSTICS
+# ==============================================================================
+
+test_that("scrub_ran says the scrub ran; redactions says what it found", {
+  # pii_scrubbed was `redactions > 0`, so a question whose text WAS scrubbed and
+  # held nothing to remove reported FALSE and read as "no scrub was applied". An
+  # independent review drew exactly that conclusion from a build that had
+  # scrubbed every comment.
+  clean <- qual_build_data_qual(
+    list(themed_question(list(mk_rec("1", "nothing to redact here",
+                                     themeVals = list(Service = 1L))))),
+    list(id_to_idx = stats::setNames(0L, "1"), n = 1L),
+    list(text_mode = "redacted", demographic_cuts = "block"))
+  expect_true(clean$questions[[1]]$meta$scrub_ran)
+  expect_equal(clean$questions[[1]]$meta$redactions, 0L)
+
+  dirty <- qual_build_data_qual(
+    list(themed_question(list(mk_rec("1", "mail me at bob@example.com",
+                                     themeVals = list(Service = 1L))))),
+    list(id_to_idx = stats::setNames(0L, "1"), n = 1L),
+    list(text_mode = "redacted", demographic_cuts = "block"))
+  expect_true(dirty$questions[[1]]$meta$scrub_ran)
+  expect_true(dirty$questions[[1]]$meta$redactions > 0L)
+
+  # No scrub asked for, so none ran. Not the same as one that found nothing.
+  raw <- qual_build_data_qual(
+    list(themed_question(list(mk_rec("1", "bob@example.com",
+                                     themeVals = list(Service = 1L))))),
+    list(id_to_idx = stats::setNames(0L, "1"), n = 1L),
+    list(text_mode = "full", demographic_cuts = "block"))
+  expect_false(raw$questions[[1]]$meta$scrub_ran)
+})
+
+test_that("manual review is carried as an assertion, and only when asserted", {
+  base_args <- list(text_mode = "hidden", demographic_cuts = "block")
+  plain <- qual_build_data_qual(keyed_questions(), keyed_master(), base_args)
+  expect_null(plain$manualReview)
+  claimed <- qual_build_data_qual(keyed_questions(), keyed_master(),
+    c(base_args, list(manual_review = TRUE)))
+  expect_true(claimed$manualReview)
 })

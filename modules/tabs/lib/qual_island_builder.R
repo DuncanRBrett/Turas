@@ -263,7 +263,7 @@ qual_kanon_tags_by_group <- function(rows, ids, bands, labels, k) {
 #' @return The per-question island list (code, title, type, base, themes, records, meta).
 qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labels = character(0),
                                        demo_map = NULL, scope = "all", rid_map = NULL,
-                                       cut_map = NULL) {
+                                       cut_map = NULL, comment_key = "respondent") {
   themes <- question$roles$themes
   theme_list <- lapply(seq_along(themes),
                        function(i) list(id = i - 1L, label = themes[[i]]$label))
@@ -271,28 +271,51 @@ qual_build_question_island <- function(question, id_to_idx, text_mode, demo_labe
                                   vapply(themes, function(t) t$label, character(1)))
   records <- list()
   redactions <- 0L
+  shipped_text <- FALSE
   for (rec in question$records) {
     # Single-bracket lookup returns NA for an unknown id (the [[ ]] form errors); this
     # matters for the Phase-2 join, where a qual id may be absent from the host index.
     slot <- unname(id_to_idx[rec$id])
     if (length(slot) != 1L || is.na(slot)) next
     if (!is.null(demo_map)) rec$demos <- demo_map[[as.character(rec$id)]]   # "safe" mode k-anon tags
+    # QUESTION-LOCAL KEYS. Both the respondent index and the reader token are the
+    # SAME value for a person in every question they answered, so either one joins
+    # that person's comments into a profile. One comment can be anonymous while six
+    # are not. Under "question" the record carries its position in THIS question and
+    # no token at all, and nothing in the file says the two are one person.
+    #
+    # The cost, and it is a real one: a reader mark is then keyed by position, so a
+    # re-export that shifts a comment's position moves the mark with the position
+    # rather than with the comment. That is the trade the client-safe build makes,
+    # and the analyst's own full build is unaffected.
+    local_key <- identical(comment_key, "question")
+    emit_idx <- if (local_key) length(records) else slot
     # Same single-bracket lookup discipline as id_to_idx: an id the sidecar has never
     # seen yields NA, which the record builder drops (that record simply keeps idx keying).
-    rid <- if (is.null(rid_map)) NULL else unname(rid_map[as.character(rec$id)])
+    rid <- if (local_key || is.null(rid_map)) NULL
+           else unname(rid_map[as.character(rec$id)])
     cut <- if (is.null(cut_map)) NULL else cut_map[[as.character(rec$id)]]
-    built <- qual_build_record_island(rec, slot, theme_id_map, text_mode, demo_labels, scope,
+    built <- qual_build_record_island(rec, emit_idx, theme_id_map, text_mode, demo_labels, scope,
                                       rid, cut)
     records[[length(records) + 1L]] <- built$record
     redactions <- redactions + built$redactions
+    if (!is.null(built$record$text) && !is.na(built$record$text)) shipped_text <- TRUE
   }
+  # The scrub RAN when the dial asked for it and there was text for it to run on.
+  # Distinct from whether it found anything, which is `redactions`.
+  scrub_ran <- identical(text_mode, "redacted") && shipped_text
   out <- list(code = question$code, title = question$title, type = question$type,
        sheet = question$sheet,
        base = list(answered = length(records), asked = NA_integer_),
        themes = theme_list, records = records,
+       # scrub_ran and redactions are two different facts and used to be one badly
+       # named field. pii_scrubbed was `redactions > 0`, so a question whose text
+       # WAS scrubbed and held no identifiers to remove reported FALSE, and read as
+       # "no privacy scrub was applied". An independent review drew exactly that
+       # conclusion from a build that had scrubbed every comment.
        meta = list(dropped_codes = question$meta$dropped_codes,
                    n_records = length(records),
-                   pii_scrubbed = redactions > 0L, redactions = redactions))
+                   scrub_ran = scrub_ran, redactions = redactions))
   # A split-bearing question (band-unioned open-end) carries its split axis so the JS
   # can offer an All / <band> segmented view over the records.
   if (!is.null(question$split)) out$split <- question$split
@@ -422,11 +445,27 @@ qual_build_data_qual <- function(questions, master, config = list(), rid_map = N
       cut_map <- kept
     }
   }
+  # How a comment is keyed. "respondent" is the historic shape: one index and one
+  # reader token per person, the same in every question. "question" keys a comment
+  # by its position in its own question and ships no token, so no two comments in
+  # the file can be known to come from the same person. The client-safe delivery
+  # modes floor this dial, see tabs_delivery_qual_dials().
+  comment_key <- tolower(trimws(as.character(qual_cfg(config, "comment_key", "respondent"))))
+  if (!comment_key %in% c("respondent", "question")) comment_key <- "respondent"
+  # An assertion by the analyst, never a measurement: no build can tell whether a
+  # human read the comments. Reported as asserted wherever it is shown.
+  manual_review <- isTRUE(qual_cfg(config, "manual_review", FALSE))
+
   islands <- lapply(questions,
                     function(q) qual_build_question_island(q, master$id_to_idx, text_mode, demo_labels,
-                                                           demo_map, scope, rid_map, cut_map))
+                                                           demo_map, scope, rid_map, cut_map,
+                                                           comment_key))
   out <- list(textMode = text_mode, demographicCuts = cuts, noteworthyDefault = default_tier,
               verbatimScope = scope, n = master$n, questions = islands)
+  # Emitted only when it is not the historic default, so a records build's island is
+  # byte-identical to one built before this existed.
+  if (!identical(comment_key, "respondent")) out$commentKey <- comment_key
+  if (isTRUE(manual_review)) out$manualReview <- TRUE
   if (length(demo_labels)) {
     out$demographics <- lapply(banner_dims, function(d) list(label = d$label, values = d$values))
   }

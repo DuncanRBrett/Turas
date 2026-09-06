@@ -1327,9 +1327,19 @@
     hubsPersist();
     return true;
   };
+  /** True when this island's comment keys are QUESTION-LOCAL: a record's idx is its
+   *  position in its own question and no reader token ships, so nothing in the file
+   *  says two comments came from the same person. Client-safe builds are keyed this
+   *  way (tabs_delivery_qual_dials). Anything that counts PEOPLE has to fail closed
+   *  here rather than count keys and get a larger, flattering number. */
+  qual.unlinkable = function () {
+    return !!(TR.QUAL && TR.QUAL.commentKey === "question");
+  };
+
   /** Distinct respondents behind a set of collected items (idx == the respondent). The
    *  privacy unit for the hub k-gate: a named hub that isolates fewer than k distinct
-   *  respondents must not be exported to the report. */
+   *  respondents must not be exported to the report. Meaningless when the keys are
+   *  question-local, and the caller checks qual.unlinkable() before trusting it. */
   qual.hubDistinctRespondents = function (items) {
     var seen = {};
     (items || []).forEach(function (it) { if (it && it.record) seen[it.record.idx] = 1; });
@@ -2483,8 +2493,14 @@
     // the threshold protects is DEMOGRAPHIC tags on a small named set. So a hub with fewer
     // than k distinct respondents keeps its comments but drops the per-comment tags, on
     // screen AND in the exported exhibit, rather than being blocked from the report.
+    // On a question-local island the count above cannot be taken: two comments from
+    // one person carry different keys and would count as two people, so a hub that
+    // really isolates three would clear a gate set at ten. The number is unknowable
+    // by design, so the gate fails closed and the hub keeps its comments without
+    // per-comment tags, which is exactly what a below-k hub already does.
     var hubBelowK = !!(activeHub && TR.disclosure && TR.disclosure.active && TR.disclosure.active() &&
-      qual.hubDistinctRespondents(shown) < TR.disclosure.minBase());
+      (qual.unlinkable() ||
+        qual.hubDistinctRespondents(shown) < TR.disclosure.minBase()));
     var safeDemos = activeHub
       ? !hubBelowK
       : !(TR.disclosure && TR.disclosure.audienceTooSmall && TR.disclosure.audienceTooSmall());

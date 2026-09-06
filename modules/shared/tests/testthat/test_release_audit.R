@@ -153,3 +153,122 @@ test_that("the audit refuses a non-string argument rather than guessing", {
   expect_error(turas_release_audit(NULL), "single string")
   expect_error(turas_release_audit(c("a", "b")), "single string")
 })
+
+
+# ==============================================================================
+# THE COMMENT ISLAND
+# ==============================================================================
+# The cube audit asks whether the quantitative payload keeps its word. These ask
+# the same of the qualitative one, which is where the SACS 2025 client-safe build
+# was naming individuals while its crosstabs refused any group under ten. The
+# audit runs BEFORE the islands are encoded (turas_minify step 8b), so the bodies
+# here are plain JSON, exactly as it sees them.
+
+qual_body <- function(comment_key = "question", cuts = "safe", text = "redacted",
+                      rid = FALSE, cut = '{"Q1":1}') {
+  rec <- sprintf('{"idx":0,"text":"a"%s%s}',
+                 if (rid) ',"rid":"abc123"' else "",
+                 if (nzchar(cut)) paste0(',"cut":', cut) else "")
+  sprintf(paste0('{"textMode":"%s","demographicCuts":"%s"%s,',
+                 '"n":40,"questions":[{"code":"QUAL1","records":[%s]}]}'),
+          text, cuts,
+          if (nzchar(comment_key)) sprintf(',"commentKey":"%s"', comment_key) else "",
+          rec)
+}
+
+# One declared variable. Both cells clear k, so the cube answers for itself and a
+# violation in these tests can only have come from the comment island.
+CUBE_FOR_QUAL <- paste0(
+  '{"k":10,"n":40,"order":2,"vars":{"Q1":{"kind":"banner","levels":[1,2]}},',
+  '"slices":{"Q1":{"cells":{"1":{"a":[30,30,30]},"2":{"a":[10,10,10]}},"q":{}}}}')
+
+# The same cube with level 2 down to three people. Its own rule flags it too, and
+# that is the point: the small cell has to exist for a comment to be tagged to it.
+CUBE_WITH_SMALL_CELL <- paste0(
+  '{"k":10,"n":40,"order":2,"vars":{"Q1":{"kind":"banner","levels":[1,2]}},',
+  '"slices":{"Q1":{"cells":{"1":{"a":[30,30,30]},"2":{"a":[3,3,3]}},"q":{}}}}')
+
+qual_page <- function(..., cube = CUBE_FOR_QUAL) page(island("data-qual", qual_body(...)),
+                                                      island("data-cube", cube))
+
+
+test_that("a client-safe comment island that keeps its promises passes", {
+  a <- turas_release_audit(qual_page(), client_safe = TRUE, refuse = FALSE)
+  expect_length(a$qual$violations, 0)
+  expect_false(a$client_safe_violation)
+  expect_equal(a$qual$comment_key, "question")
+  expect_equal(a$qual$records, 1L)
+  expect_match(paste(a$lines, collapse = "\n"), "keyed by question")
+})
+
+
+test_that("comments keyed one per respondent are refused on a client-safe build", {
+  # The finding this exists for: one comment can be anonymous while six from the
+  # same person are a profile.
+  a <- turas_release_audit(qual_page(comment_key = ""), client_safe = TRUE, refuse = FALSE)
+  expect_true(a$client_safe_violation)
+  expect_match(paste(a$qual$violations, collapse = " "), "join")
+  expect_equal(a$status, "FLAGGED")
+})
+
+
+test_that("a reader token is caught even when the island declares itself safe", {
+  # The declaration and the payload disagreeing is exactly what a check on the
+  # declaration alone would wave through.
+  a <- turas_release_audit(qual_page(comment_key = "question", rid = TRUE),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_true(a$client_safe_violation)
+  expect_match(paste(a$qual$violations, collapse = " "), "reader token")
+})
+
+
+test_that("un-anonymised tags and raw text are each refused", {
+  a <- turas_release_audit(qual_page(cuts = "allow"), client_safe = TRUE, refuse = FALSE)
+  expect_match(paste(a$qual$violations, collapse = " "), "demographicCuts = 'allow'")
+  b <- turas_release_audit(qual_page(text = "full"), client_safe = TRUE, refuse = FALSE)
+  expect_match(paste(b$qual$violations, collapse = " "), "textMode = 'full'")
+})
+
+
+test_that("a tag naming a group the cube itself calls small is refused", {
+  # The check that takes nothing on trust: level 2 holds three people and the
+  # cube says so, so a comment wearing that tag is refused however the dials are
+  # set. This is what catches a k-anonymiser that ran against the wrong universe.
+  a <- turas_release_audit(qual_page(cut = '{"Q1":2}', cube = CUBE_WITH_SMALL_CELL),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_true(a$client_safe_violation)
+  expect_match(paste(a$qual$violations, collapse = " "), "smaller than k=10")
+  # And the same tag against the same cube's LARGE cell passes, so the check is
+  # reading the base rather than refusing every tag it sees.
+  b <- turas_release_audit(qual_page(cut = '{"Q1":1}', cube = CUBE_WITH_SMALL_CELL),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_length(b$qual$violations, 0)
+})
+
+
+test_that("a tag the cube cannot price is counted and said, not passed over", {
+  # Three variables against an order-2 cube. A check that could not run is not a
+  # check that passed, so it reaches the face of the audit.
+  a <- turas_release_audit(qual_page(cut = '{"Q1":1,"Q2":1,"Q3":1}'),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_equal(a$qual$unverifiable, 1L)
+  expect_match(paste(a$lines, collapse = "\n"), "not priceable")
+})
+
+
+test_that("a FULL build is not judged by the client-safe comment rules", {
+  # Every dial at its most permissive, and no client-safe declaration: nothing to
+  # answer for. An audit that cries wolf on a correct file gets skipped.
+  a <- turas_release_audit(qual_page(comment_key = "", cuts = "allow", text = "full",
+                                     rid = TRUE), client_safe = FALSE, refuse = FALSE)
+  expect_false(a$client_safe_violation)
+})
+
+
+test_that("no comment island at all is absent, and answers for nothing", {
+  a <- turas_release_audit(page(island("data-cube", CUBE_FOR_QUAL)),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_false(a$qual$present)
+  expect_length(a$qual$violations, 0)
+  expect_match(paste(a$lines, collapse = "\n"), "Comment island\\s*: absent")
+})

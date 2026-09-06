@@ -535,6 +535,19 @@ assert(qual.hubSetInsight("nope", "x") === false, "hubSetInsight false on an unk
 assert(qual.hubDistinctRespondents([{ record: { idx: 0 } }, { record: { idx: 0 } }, { record: { idx: 3 } }]) === 2,
   "hubDistinctRespondents counts distinct respondents (idx), not comments");
 
+// On a QUESTION-LOCAL island that count is meaningless: two comments from one
+// person carry different keys, so a hub that really isolates three people would
+// count as six and clear a gate set at ten. The flag is what the caller checks
+// before trusting the number, and it has to fail closed.
+{
+  const savedQual = TR.QUAL;
+  TR.QUAL = { commentKey: "question", questions: [] };
+  assert(qual.unlinkable() === true, "a question-keyed island declares itself unlinkable");
+  TR.QUAL = { questions: [] };
+  assert(qual.unlinkable() === false, "a respondent-keyed island does not");
+  TR.QUAL = savedQual;
+}
+
 const exItems = [
   { qcode: "Q1", record: { idx: 0, sentiment: 1, text: "great value", demos: { Campus: "Cape Town" } }, question: { title: "Why recommend?" } },
   { qcode: "Q2", record: { idx: 1, sentiment: 3, text: "slow", demos: { Campus: "Durban" } }, question: { title: "Anything else?" } }
