@@ -551,12 +551,71 @@
     });
   }
 
-  // --- Save report ---
-  window._brSaveReport = function() {
+  // --- Selection persistence: the same mirror, for the brand controls ---
+  // The commentary mirror above exists because a textarea's .value is live
+  // state that outerHTML never sees. Three more pieces of live state have
+  // exactly that shape, and until this they were lost on Save:
+  //
+  //   * a checkbox's .checked. The content attribute is defaultChecked, so
+  //     ticking a comparator changes nothing outerHTML can see.
+  //   * an option's .selected. Same story: the content attribute is
+  //     defaultSelected, so the focal brand a reader picked did not persist.
+  //   * a panel's chart-only hidden set, which lives on its BrandSelector
+  //     handle and never touched the DOM at all.
+  //
+  // The third one was the dangerous one. The note above a narrowed chart is
+  // a plain text node, so it DID survive serialisation while the state
+  // behind it did not: a reopened copy could show a note saying the chart
+  // omits three brands with a chart that showed all of them. A client-facing
+  // artefact making a false statement. BrandChartFocus.prepareForSave()
+  // writes that set into the DOM here; restoreAll() reads it back after the
+  // header has published on load, which is the only safe order because every
+  // published set resets a panel's chart-only set to its table set.
+  //
+  // Scope is deliberate and narrow: the category header's own controls, plus
+  // the per-chart deviation. Panel-local view state (base toggles, sort
+  // order, the table-or-chart card switch) is not mirrored and never was.
+  window._brSyncSelectionState = function() {
+    document.querySelectorAll(".br-controls select").forEach(function (sel) {
+      for (var i = 0; i < sel.options.length; i++) {
+        var o = sel.options[i];
+        if (o.selected) o.setAttribute("selected", "");
+        else o.removeAttribute("selected");
+      }
+    });
+    document.querySelectorAll(".br-controls input[type=\"checkbox\"]")
+      .forEach(function (cb) {
+        if (cb.checked) cb.setAttribute("checked", "");
+        else cb.removeAttribute("checked");
+        // disabled reflects on its own, but the focal brand's locked box is
+        // the one control whose attribute must not drift, so it is written
+        // rather than assumed.
+        if (cb.disabled) cb.setAttribute("disabled", "");
+        else cb.removeAttribute("disabled");
+      });
+    if (window.BrandChartFocus &&
+        typeof window.BrandChartFocus.prepareForSave === "function") {
+      window.BrandChartFocus.prepareForSave();
+    }
+  };
+
+  // Everything a saved copy needs written into the DOM, in one place, so the
+  // Save button and the QA round trip exercise the same code.
+  window._brSyncReportState = function() {
     // Belt and braces: mirror every textarea once more before serialising,
     // in case a panel wrote .value programmatically without an input event.
     window._brSyncAllCommentary();
-    var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+    window._brSyncSelectionState();
+  };
+
+  window._brSerialiseReport = function() {
+    window._brSyncReportState();
+    return "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+  };
+
+  // --- Save report ---
+  window._brSaveReport = function() {
+    var html = window._brSerialiseReport();
     var blob = new Blob([html], { type: "text/html" });
     var meta = document.querySelector('meta[name="turas-source-filename"]');
     var fname = meta ? meta.content.replace(/\.html$/, "") + "_saved.html" : "brand_report.html";
@@ -646,6 +705,15 @@
       seen[g] = true;
       window.brApplyComparisonSet(g);
     });
+    // A reopened saved copy carries each chart's deviation as an attribute.
+    // It is put back here and nowhere else, because every published set
+    // resets a panel's chart-only set to its table set, so a restore that
+    // ran before the loop above would be wiped by it. This is the one place
+    // that is guaranteed to be after every header publish on load.
+    if (window.BrandChartFocus &&
+        typeof window.BrandChartFocus.restoreAll === "function") {
+      window.BrandChartFocus.restoreAll();
+    }
   }
   window.brApplyAllComparisonSets = brApplyAllComparisonSets;
 

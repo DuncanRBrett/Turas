@@ -220,20 +220,36 @@
     paintNote(mount, st);
   }
 
+  // The mount is empty in a freshly generated report, so this builds the
+  // trigger. It is NOT empty in a saved copy: outerHTML serialises the
+  // trigger this function built, while __cfBuilt is a plain property that
+  // serialisation drops. Appending unconditionally would give every chart in
+  // a reopened copy two triggers, and the single-control census would only
+  // catch it on a report nobody runs the census against. So an existing
+  // trigger is adopted and rewired, and a stale popover, whose checkboxes
+  // are dead state, is dropped and rebuilt on the next open as always.
   function buildMount(mount) {
     if (mount.__cfBuilt) return;
     mount.__cfBuilt = true;
 
-    var trigger = document.createElement("button");
-    trigger.type = "button";
-    trigger.className = "br-cf-trigger";
+    mount.querySelectorAll(".br-cf-pop").forEach(function (p) { p.remove(); });
+
+    var trigger = mount.querySelector(".br-cf-trigger");
+    if (!trigger) {
+      trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "br-cf-trigger";
+      mount.appendChild(trigger);
+    }
     trigger.setAttribute("aria-haspopup", "true");
     trigger.setAttribute("aria-expanded", "false");
-    var lbl = document.createElement("span");
-    lbl.className = "br-cf-label";
-    lbl.textContent = "Chart brands: same as table";
-    trigger.appendChild(lbl);
-    mount.appendChild(trigger);
+    var lbl = trigger.querySelector(".br-cf-label");
+    if (!lbl) {
+      lbl = document.createElement("span");
+      lbl.className = "br-cf-label";
+      lbl.textContent = "Chart brands: same as table";
+      trigger.appendChild(lbl);
+    }
 
     trigger.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -267,6 +283,65 @@
     document.querySelectorAll(".br-cf[data-chartfocus]").forEach(refreshMount);
   }
 
+  // --- surviving Save ------------------------------------------------------
+  // A chart's deviation lives on its panel's BrandSelector handle, which is
+  // JavaScript state that outerHTML cannot see. The note above the chart is
+  // a plain text node, so before this it was the half that DID survive: a
+  // reopened copy could carry a note saying the chart omits three brands
+  // above a chart showing all of them. Writing the set into the DOM at save
+  // time and reading it back at load closes that.
+  //
+  // The attribute is written only here, never by refreshMount, so a restore
+  // cannot race a repaint that would clear the value it is about to read.
+  var SAVE_ATTR = "data-cf-saved";
+
+  function prepareForSave() {
+    document.querySelectorAll(".br-cf[data-chartfocus]").forEach(function (m) {
+      // An open popover is dead state once serialised: its checkboxes carry
+      // .checked, which outerHTML never sees, and it is rebuilt on the next
+      // open anyway.
+      m.querySelectorAll(".br-cf-pop").forEach(function (p) { p.remove(); });
+      var t = m.querySelector(".br-cf-trigger");
+      if (t) t.setAttribute("aria-expanded", "false");
+
+      var handle = handleFor(m);
+      if (!handle) { m.removeAttribute(SAVE_ATTR); return; }
+      var st = readState(handle);
+      if (st.deviating.length === 0) { m.removeAttribute(SAVE_ATTR); return; }
+      m.setAttribute(SAVE_ATTR, st.deviating.map(function (b) {
+        return b.code;
+      }).join(","));
+    });
+  }
+
+  // Read every saved deviation first, then apply, because building a mount
+  // repaints it and a one-pass loop would read a value it had just changed.
+  // Union with the header's own hidden set, never a difference, so a restore
+  // obeys the same only-narrows rule the control does.
+  function restoreAll() {
+    var wanted = [];
+    document.querySelectorAll(".br-cf[data-chartfocus]").forEach(function (m) {
+      var raw = m.getAttribute(SAVE_ATTR) || "";
+      wanted.push({
+        mount: m,
+        codes: raw ? raw.split(",").filter(function (c) { return !!c; }) : []
+      });
+    });
+    wanted.forEach(function (w) {
+      buildMount(w.mount);
+      var handle = w.codes.length ? handleFor(w.mount) : null;
+      if (handle) {
+        var hidden = [];
+        handle.getHidden().forEach(function (c) { hidden.push(c); });
+        w.codes.forEach(function (c) {
+          if (hidden.indexOf(c) < 0) hidden.push(c);
+        });
+        handle.setHiddenChart(hidden);
+      }
+      refreshMount(w.mount);
+    });
+  }
+
   document.addEventListener("click", function (ev) {
     if (ev.target && ev.target.closest && !ev.target.closest(".br-cf")) {
       closeAllPopovers(null);
@@ -276,6 +351,10 @@
   window.BrandChartFocus = {
     init: init,
     refreshAll: refreshAll,
+    // Called by _brSyncSelectionState() just before the page is serialised,
+    // and by brApplyAllComparisonSets() at the end of the load-time publish.
+    prepareForSave: prepareForSave,
+    restoreAll: restoreAll,
     // Read the pin and PNG clause for a captured root, or "" when nothing in
     // it deviates. brand_pins.js and the panel-local capture paths call this.
     clauseFor: function (root) {
