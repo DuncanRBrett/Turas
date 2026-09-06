@@ -96,7 +96,7 @@
     var el = tooltipEl(panel); if (el) el.setAttribute('hidden', '');
   }
   function decisionLabel(d) {
-    return d === 'defend' ? 'Defend' : d === 'build' ? 'Build' : d === 'maintain' ? 'Maintain' : 'n/a';
+    return d === 'defend' ? 'Defend' : d === 'build' ? 'Build' : d === 'maintain' ? 'Maintain' : '–';
   }
   function tooltipHtml(p, base) {
     // p.penLabel is the X-axis row label including the dynamic threshold
@@ -111,7 +111,7 @@
       ['MA',                   fmtScore(p.ma) + 'pp' + (p.isSig ? ' •' : '')],
       [penLabel,               p.pen.toFixed(1) + '%'],
       ['Linkage (' + (base === 'aware' ? '% aware' : '% total') + ')',
-        p.size != null ? p.size.toFixed(1) + '%' : 'n/a']
+        p.size != null ? p.size.toFixed(1) + '%' : '–']
     ];
     var rowHtml = rows.map(function (r) {
       return '<div class="ma-adv-tooltip-row"><span class="ma-adv-tooltip-key">' +
@@ -287,7 +287,7 @@
   }
 
   function fmtPp(v, suppressed) {
-    if (suppressed || v == null || isNaN(v)) return 'n/a';
+    if (suppressed || v == null || isNaN(v)) return '&ndash;';
     return (v >= 0 ? '+' : '') + (Math.round(v * 10) / 10).toFixed(1);
   }
 
@@ -365,7 +365,7 @@
       var gapCls  = r.below_min_base ? 'ma-fv-gap-suppressed'
                                       : 'ma-fv-' + focalBucket(r.buyer_gap, 'gap', false);
       var maTxt   = fmtPp(r.ma_score, false) + maStar;
-      var gapTxt  = r.below_min_base ? 'n/a' : fmtPp(r.buyer_gap, false) + gapStar;
+      var gapTxt  = r.below_min_base ? '&ndash;' : fmtPp(r.buyer_gap, false) + gapStar;
       var stimTitle = 'Buyers ' + (r.buyer_pct != null ? r.buyer_pct.toFixed(1) : '–') +
                       '%  ·  Non-buyers ' + (r.nonbuyer_pct != null ? r.nonbuyer_pct.toFixed(1) : '–') + '%';
       return '<tr>' +
@@ -885,7 +885,7 @@
       html += '<tr><td>' + escHtml(lbl) + '</td>';
       brands.forEach(function (b) {
         var c = cellByKey[stimCode + '|' + b];
-        if (!c || c.ma == null) { html += '<td>n/a</td>'; return; }
+        if (!c || c.ma == null) { html += '<td>–</td>'; return; }
         var dec = c.ma >= threshold ? 'defend' : c.ma <= -threshold ? 'build' : 'maintain';
         var cls = dec + (b === focal ? ' focal' : '');
         var sigSfx = c.is_sig ? ' •' : '';

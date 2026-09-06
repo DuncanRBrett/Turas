@@ -650,7 +650,7 @@
       if (pick) {
         span.textContent = 'n=' + pick;
       } else {
-        span.textContent = 'n/a';
+        span.textContent = '\u2013';
       }
     });
     /* Cells: data-ma-n-total and data-ma-n-aware always carry the SAME
@@ -667,7 +667,7 @@
       if (!span) return;
       var val = pctTotal;
       if (mode === 'aware' && !isNaN(pctAware)) { val = pctAware; }
-      if (isNaN(val)) { span.textContent = 'n/a'; return; }
+      if (isNaN(val)) { span.textContent = '–'; return; }
       span.textContent = Math.round(val) + '%';
       if (nSpan) {
         nSpan.textContent = nTotal ? ('n=' + nTotal) : '';
@@ -1056,7 +1056,7 @@
 
     var dp = (pd.config && pd.config.decimal_places != null) ? pd.config.decimal_places : 0;
     function fmtVal(val, unit) {
-      if (val == null || isNaN(Number(val))) return 'n/a';
+      if (val == null || isNaN(Number(val))) return '\u2013';
       return unit === 'pct' ? Number(val).toFixed(dp) + '%' : Number(val).toFixed(2);
     }
 
@@ -2061,7 +2061,7 @@
           var brand = td.getAttribute('data-ma-brand');
           if (brand && brand !== '__avg__') {
             var n = td.getAttribute(nAttr);
-            html += '<td class="base-row">' + (n ? 'n=' + n : 'n/a') + '</td>';
+            html += '<td class="base-row">' + (n ? 'n=' + n : '\u2013') + '</td>';
           } else {
             html += '<td class="base-row">' + td.textContent.trim() + '</td>';
           }
@@ -2084,13 +2084,13 @@
           var ciLo = td.getAttribute('data-ma-ci-lower');
           var ciHi = td.getAttribute('data-ma-ci-upper');
           var ciStr = (ciLo && ciHi) ? ' (' + Math.round(parseFloat(ciLo)) + '\u2013' + Math.round(parseFloat(ciHi)) + '%)' : '';
-          html += '<td>' + (isNaN(pct) ? 'n/a' : Math.round(pct) + '%' + ciStr) + '</td>';
+          html += '<td>' + (isNaN(pct) ? '\u2013' : Math.round(pct) + '%' + ciStr) + '</td>';
         } else {
-          if (vis[brand] === false) { html += '<td>n/a</td>'; return; }
+          if (vis[brand] === false) { html += '<td>\u2013</td>'; return; }
           var isFocal = (brand === focal);
           var cls = isFocal ? ' class="focal"' : '';
           var pct = parseFloat(td.getAttribute(pctAttr));
-          html += '<td' + cls + '>' + (isNaN(pct) ? 'n/a' : Math.round(pct) + '%') + '</td>';
+          html += '<td' + cls + '>' + (isNaN(pct) ? '\u2013' : Math.round(pct) + '%') + '</td>';
         }
       });
       html += '</tr>';
@@ -2104,11 +2104,11 @@
           clone.querySelectorAll('button, input').forEach(function (el) { el.remove(); });
           html += '<td class="count">' + escHtml(clone.textContent.trim()) + ' (n=)</td>';
         } else if (brand === '__avg__') {
-          html += '<td class="count">n/a</td>';
+          html += '<td class="count">\u2013</td>';
         } else {
-          if (vis[brand] === false) { html += '<td class="count">n/a</td>'; return; }
+          if (vis[brand] === false) { html += '<td class="count">\u2013</td>'; return; }
           var n = td.getAttribute(nAttr);
-          html += '<td class="count">' + (n ? 'n=' + n : 'n/a') + '</td>';
+          html += '<td class="count">' + (n ? 'n=' + n : '\u2013') + '</td>';
         }
       });
       html += '</tr>';

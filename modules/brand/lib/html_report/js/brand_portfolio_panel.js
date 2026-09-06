@@ -1355,17 +1355,17 @@ function pfClRenderTable(rows, focalCode, data) {
     return '<tr>' +
       '<td class="pf-cl-td-cat">' + pfClEsc(r.cat_label) + '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.set_size_mean == null ? 'n/a' : Number(r.set_size_mean).toFixed(1)) +
+        (r.set_size_mean == null ? '–' : Number(r.set_size_mean).toFixed(1)) +
         '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.focal_pct == null ? 'n/a' : Math.round(r.focal_pct) + '%') + '</td>' +
+        (r.focal_pct == null ? '–' : Math.round(r.focal_pct) + '%') + '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.focal_share == null ? 'n/a' :
+        (r.focal_share == null ? '–' :
           Math.round(r.focal_share * 100) + '%') + '</td>' +
       '<td class="pf-cl-td-num">' +
-        (r.cat_penetration == null ? 'n/a' :
+        (r.cat_penetration == null ? '–' :
           Math.round(r.cat_penetration * 100) + '%') + '</td>' +
-      '<td class="pf-cl-td-cat">' + pfClEsc(r.quadrant || 'n/a') + '</td>' +
+      '<td class="pf-cl-td-cat">' + pfClEsc(r.quadrant || '–') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -1705,7 +1705,7 @@ function pfClPretty(lo, hi, n) {
 }
 
 function pfClFormatNum(v, d) {
-  if (v == null || !isFinite(v)) return 'n/a';
+  if (v == null || !isFinite(v)) return '–';
   return Number(v).toFixed(d);
 }
 function pfClTrunc(s, n) {
@@ -1987,7 +1987,7 @@ function pfExRenderTable(ext, brandLabel) {
   // cross-cat awareness is limited to its home category. Show the home
   // row plus an explanation of why there's nothing to extend INTO.
   if (nonHome.length === 0) {
-    var homeLabel = homeRow ? (homeRow.cat_label || homeRow.cat) : (homeCat || 'n/a');
+    var homeLabel = homeRow ? (homeRow.cat_label || homeRow.cat) : (homeCat || '–');
     return '<div class="pf-ex-empty">' +
       '<p><strong>' + pfClEsc(brandLabel) + ' is only measured in 1 category (' +
       pfClEsc(homeLabel) + ').</strong></p>' +
@@ -2015,12 +2015,12 @@ function pfExRenderTable(ext, brandLabel) {
   var body = rendered.map(function (r) {
     var rowCls = r.is_home ? ' class="pf-ex-row-home"' : '';
     var lbl = pfClEsc(r.cat_label || r.cat);
-    var n   = r.n_buyers_uw == null ? 'n/a' :
+    var n   = r.n_buyers_uw == null ? '–' :
                 Number(r.n_buyers_uw).toLocaleString('en-US');
-    var aw  = (r.focal_aware_pct == null || isNaN(r.focal_aware_pct)) ? 'n/a' :
+    var aw  = (r.focal_aware_pct == null || isNaN(r.focal_aware_pct)) ? '–' :
                 (Math.round(r.focal_aware_pct) + '%');
     var lift = r.is_home ? '<span class="pf-ex-home-tag">home</span>' :
-                ((r.lift == null || isNaN(r.lift)) ? 'n/a' :
+                ((r.lift == null || isNaN(r.lift)) ? '–' :
                   (r.low_base_flag ? Number(r.lift).toFixed(2) + ' †' :
                                       Number(r.lift).toFixed(2)));
     var sig = '';
@@ -2194,7 +2194,7 @@ function pfDopaHeatBg(v, focalColour, view) {
 }
 
 function pfDopaFmt(v, view) {
-  if (v == null || isNaN(v)) return 'n/a';
+  if (v == null || isNaN(v)) return '–';
   if (view === 'deviation') {
     return (v >= 0 ? '+' : '') + v.toFixed(1);
   }
@@ -2250,10 +2250,10 @@ function pfDopaBuildTable(catObj, view, focal, focalColour) {
       var bg = pfDopaHeatBg(v, focalColour, view);
       var isDiag = rRow.code === rCol.code;
       var diagCls = isDiag ? ' pf-dopa-diag' : '';
-      var txt = isDiag && view !== 'deviation' ? 'n/a' : pfDopaFmt(v, view);
+      var txt = isDiag && view !== 'deviation' ? '–' : pfDopaFmt(v, view);
       var suffix = (view === 'deviation' || isDiag) ? '' : '%';
       html.push('<td class="pf-dopa-cell' + diagCls + '" style="background:' + bg + ';">' +
-                txt + (txt === 'n/a' ? '' : suffix) + '</td>');
+                txt + (txt === '–' ? '' : suffix) + '</td>');
     });
     html.push('</tr>');
   });
@@ -2275,9 +2275,9 @@ function pfDopaRenderForCat(catCode) {
   if (!catObj) {
     host.innerHTML = '<p style="color:#94a3b8;padding:12px 0;">No Duplication of Awareness data for this category.</p>';
     var dEmpty = document.querySelector('[data-pf-dopa-d]');
-    if (dEmpty) dEmpty.textContent = 'n/a';
+    if (dEmpty) dEmpty.textContent = '–';
     var catEmpty = document.querySelector('[data-pf-dopa-cat-label]');
-    if (catEmpty) catEmpty.textContent = 'n/a';
+    if (catEmpty) catEmpty.textContent = '–';
     PF_DOPA_STATE.cat = catCode;
     return;
   }
@@ -2288,7 +2288,7 @@ function pfDopaRenderForCat(catCode) {
 
   var dEl = document.querySelector('[data-pf-dopa-d]');
   if (dEl) dEl.textContent = (catObj.D != null && !isNaN(catObj.D))
-    ? Number(catObj.D).toFixed(3) : 'n/a';
+    ? Number(catObj.D).toFixed(3) : '–';
   var catEl = document.querySelector('[data-pf-dopa-cat-label]');
   if (catEl) catEl.textContent = catObj.cat_label || catCode;
 }

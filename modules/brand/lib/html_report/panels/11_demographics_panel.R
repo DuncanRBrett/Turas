@@ -512,7 +512,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 
 
 .demo_int <- function(v) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("&ndash;")
   format(as.integer(round(v)), big.mark = ",")
 }
 

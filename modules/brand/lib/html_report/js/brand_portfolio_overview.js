@@ -29,11 +29,11 @@
       .replace(/"/g, '&quot;');
   }
   function fmtPct(v) {
-    if (v === null || v === undefined || isNaN(v)) return 'n/a';
+    if (v === null || v === undefined || isNaN(v)) return '\u2013';
     return Math.round(v) + '%';
   }
   function fmtNum(v, d) {
-    if (v === null || v === undefined || isNaN(v)) return 'n/a';
+    if (v === null || v === undefined || isNaN(v)) return '\u2013';
     return Number(v).toFixed(d == null ? 1 : d);
   }
 
@@ -173,8 +173,8 @@
       var pill = r.depth === 'full'
         ? '<span class="pfo-pill pfo-pill-deep">Deep-dive</span>'
         : '<span class="pfo-pill pfo-pill-aware">Awareness</span>';
-      var rankTxt = r.rank == null ? 'n/a' : '#' + r.rank + ' of ' + r.n_brands;
-      var gapTxt = r.gap == null ? 'n/a'
+      var rankTxt = r.rank == null ? '\u2013' : '#' + r.rank + ' of ' + r.n_brands;
+      var gapTxt = r.gap == null ? '\u2013'
         : (r.gap <= 0.5 ? '<span class="pfo-gap-leader">Leader</span>' :
            '\u2212' + Math.round(r.gap) + ' pp');
       function tdNum(v, fmt) {

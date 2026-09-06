@@ -1411,7 +1411,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
 
   # ---- Top channel (always emit a slot so the row is visible in the
-  #      card; missing data renders as "n/a" rather than disappearing)
+  #      card; missing data renders as "–" rather than disappearing)
   loc <- cr$shopper_location
   if (!is.null(loc) && !identical(loc$status, "REFUSED") &&
       !is.null(loc$top$label) && !is.na(loc$top$label) &&
@@ -1500,7 +1500,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
   # Masked-mean helper: NA-safe mean restricted to rows whose BrandCode is in
   # `active`. Returns NA_real_ when no active rows remain (so the chip
-  # renders "n/a" rather than 0). Empty `active` means "no brand has data for
+  # renders "–" rather than 0). Empty `active` means "no brand has data for
   # this engine in this category", also NA, not a silent zero (this is
   # the C1 invariant, see test_summary_cat_avg_masks.R).
   .masked_mean <- function(df, col, active) {
@@ -1780,7 +1780,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       mean(as.numeric(df[[col]][keep]), na.rm = TRUE)
     }
     fmt_pct1 <- function(x) {
-      if (!is.finite(x)) "n/a" else sprintf("%.0f%%", x)
+      if (!is.finite(x)) "–" else sprintf("%.0f%%", x)
     }
 
     n_total_wom <- as.numeric(cr$funnel$meta$n_unweighted %||%
@@ -1986,9 +1986,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   paste(
     '<div class="brsum-focal-context" data-brsum-focal-context>',
       '<span class="brsum-fc-eyebrow">FOCAL</span>',
-      '<span class="brsum-fc-brand" data-brsum-fc-brand>n/a</span>',
+      '<span class="brsum-fc-brand" data-brsum-fc-brand>&ndash;</span>',
       '<span class="brsum-fc-divider">&middot;</span>',
-      '<span class="brsum-fc-cat" data-brsum-fc-cat>n/a</span>',
+      '<span class="brsum-fc-cat" data-brsum-fc-cat>&ndash;</span>',
     '</div>',
     sep = "\n"
   )
@@ -2123,9 +2123,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     cards <- c(cards, sprintf(
       '<div class="brsum-mini-card" data-brsum-mini-cat="%s" onclick="brsumSwitchCat(\'%s\')">
          <div class="brsum-mini-cat">%s</div>
-         <div class="brsum-mini-row"><span>Mental Market Share</span><span class="brsum-mini-num" data-brsum-mini-metric="mms">n/a</span></div>
-         <div class="brsum-mini-row"><span>Mental Penetration</span><span class="brsum-mini-num" data-brsum-mini-metric="mpen">n/a</span></div>
-         <div class="brsum-mini-row"><span>Bought past 3 months</span><span class="brsum-mini-num" data-brsum-mini-metric="bt">n/a</span></div>
+         <div class="brsum-mini-row"><span>Mental Market Share</span><span class="brsum-mini-num" data-brsum-mini-metric="mms">&ndash;</span></div>
+         <div class="brsum-mini-row"><span>Mental Penetration</span><span class="brsum-mini-num" data-brsum-mini-metric="mpen">&ndash;</span></div>
+         <div class="brsum-mini-row"><span>Bought past 3 months</span><span class="brsum-mini-num" data-brsum-mini-metric="bt">&ndash;</span></div>
        </div>',
       .brsum_esc(cn), .brsum_esc(cn), .brsum_esc(cn)
     ))
@@ -2193,7 +2193,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 #  - default: value is in 0..1 (e.g. MMS)
 .brsum_pct <- function(x, suffix = "%", scale = 100,
                        already_pct = FALSE) {
-  if (is.null(x) || is.na(x)) return("n/a")
+  if (is.null(x) || is.na(x)) return("–")
   if (already_pct) return(sprintf("%.0f%s", x, suffix))
   sprintf("%.0f%s", x * scale, suffix)
 }
@@ -2201,7 +2201,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 # Signed-integer formatter (for net WOM)
 .brsum_signed <- function(x) {
-  if (is.null(x) || is.na(x)) return("n/a")
+  if (is.null(x) || is.na(x)) return("–")
   if (x > 0) sprintf("+%.0f", x)
   else sprintf("%.0f", x)
 }
@@ -2209,7 +2209,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 # Plain numeric formatter (for NS, avg purchases, not a percentage)
 .brsum_num <- function(x, digits = 1) {
-  if (is.null(x) || is.na(x) || !is.finite(x)) return("n/a")
+  if (is.null(x) || is.na(x) || !is.finite(x)) return("–")
   sprintf(paste0("%.", as.integer(digits), "f"), x)
 }
 

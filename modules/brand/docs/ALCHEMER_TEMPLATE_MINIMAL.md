@@ -58,7 +58,7 @@ Button: **I agree, let's start**
 | `{ADJ1}`                   | {ADJ1_LABEL}      | Adjacent |
 | `{ADJ2}`                   | {ADJ2_LABEL}      | Adjacent |
 | (add more adjacent here)   |                   |          |
-| `NONE`                     | None of the above | n/a      |
+| `NONE`                     | None of the above | –        |
 
 **Exported columns:** `SQ1_{CAT}`, `SQ1_{ADJ1}`, `SQ1_{ADJ2}`, value = 1 if selected, 0 if not. Matches QuestionMap directly.
 

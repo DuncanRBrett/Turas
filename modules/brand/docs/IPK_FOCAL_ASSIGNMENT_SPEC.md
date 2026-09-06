@@ -22,7 +22,7 @@ For quotas to fire on submit (rather than later in the survey), all quota dimens
 
 | Stage | Contents | Why |
 |---|---|---|
-| Earlier pages | Existing admin / intro / qualifying: no changes required from this spec | n/a |
+| Earlier pages | Existing admin / intro / qualifying: no changes required from this spec | – |
 | Before Screener / Focal Assignment | **Region** and **Race** (and ideally Age, Income too) | Demographic quotas can only fire once these are answered. Ask them up-front so the cat × demographic quotas evaluate on the assignment page's submit |
 | **Screener / Focal Assignment page** | SQ1 question + `hv_focal_cat` hidden value + Webhook Action + JavaScript Action + screen-out skip rule + Back button disabled | All assignment logic happens here. Same page = no merge-code piping needed |
 | After Focal Assignment | Brand deep-dive blocks (CEP, attitudes, behaviour, etc.) | Respondent only reaches these if all quotas had room |

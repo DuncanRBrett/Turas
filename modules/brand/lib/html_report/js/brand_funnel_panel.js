@@ -589,10 +589,10 @@
         ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
         : null;
       var pctEl = card.querySelector(".tk-hero-value");
-      if (pctEl) pctEl.textContent = focalPct == null ? "n/a"
+      if (pctEl) pctEl.textContent = focalPct == null ? "–"
                    : Math.round(focalPct * 100) + "%";
       var cmpEl = card.querySelector(".fn-card-compare strong");
-      if (cmpEl) cmpEl.textContent = cavg == null ? "n/a"
+      if (cmpEl) cmpEl.textContent = cavg == null ? "–"
                    : Math.round(cavg * 100) + "%";
       var baseEl = card.querySelector(".fn-card-base");
       if (baseEl) baseEl.textContent = focalBaseU == null ? ""
@@ -635,10 +635,10 @@
         ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
         : null;
       var pctEl = card.querySelector(".tk-hero-value");
-      if (pctEl) pctEl.textContent = focalPct == null ? "n/a"
+      if (pctEl) pctEl.textContent = focalPct == null ? "–"
                    : Math.round(focalPct * 100) + "%";
       var cmpEl = card.querySelector(".fn-card-compare strong");
-      if (cmpEl) cmpEl.textContent = cavg == null ? "n/a"
+      if (cmpEl) cmpEl.textContent = cavg == null ? "–"
                    : Math.round(cavg * 100) + "%";
     });
   }
@@ -992,7 +992,7 @@
         var r = avgMap[k];
         var pct = pickMiniPct(r, null, si);
         var barW = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
-        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "n/a";
+        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2013";
         html += '<div class="fn-mf-stage">';
         html += '<div class="fn-mf-bar-bg"><div class="fn-mf-bar" style="width:' + barW + '%;background:' + avgColor + ';"></div></div>';
         html += '<div class="fn-mf-label">' + escapeAttr(stageLabels[si] || k) + ' <span class="fn-mf-pct">' + pctStr + '</span></div>';
@@ -1054,7 +1054,7 @@
         var cell  = cellMap[code] && cellMap[code][k];
         var pct   = pickMiniPct(cell, code, si);
         var barW  = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
-        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "n/a";
+        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2013";
 
         html += '<div class="fn-mf-stage">';
         html += '<div class="fn-mf-bar-bg">';
@@ -2950,7 +2950,7 @@
       var span = td.querySelector(".fn-rel-base-num");
       if (!span) return;
       if (!isFinite(n) || n <= 0) {
-        span.textContent = "n/a";
+        span.textContent = "–";
         span.classList.remove("ct-low-base", "ct-base-n");
         span.classList.add("ct-na");
         return;

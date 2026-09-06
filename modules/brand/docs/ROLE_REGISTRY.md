@@ -80,8 +80,8 @@ The brand module assumes the standard rectangular export shape produced by Alche
 | `system.respondent.demographics` | per_respondent | Single_Response | Optional | Standard demographic columns; role per variable. |
 | `system.survey.wave` | per_respondent | Single_Response | Optional | Wave label (e.g., "W1-2025"). |
 | `system.category.id` | per_respondent | Single_Response | Optional | Focal category assigned per respondent (multi-category studies). |
-| `system.brand.list` | reference | n/a | Yes | BrandCode + BrandName + display order. Declared in `Survey_Structure.xlsx` Brands sheet. |
-| `system.category.list` | reference | n/a | Conditional | Required when multi-category. CategoryCode + CategoryName + type. |
+| `system.brand.list` | reference | – | Yes | BrandCode + BrandName + display order. Declared in `Survey_Structure.xlsx` Brands sheet. |
+| `system.category.list` | reference | – | Conditional | Required when multi-category. CategoryCode + CategoryName + type. |
 
 ------------------------------------------------------------------------
 
@@ -141,7 +141,7 @@ At least one of the three required to render any buying stage.
 | Role | Cardinality | Type | Required | Notes |
 |----|----|----|----|----|
 | `ma.cep_matrix` | brand_matrix | Multi_Mention | Yes | Q1BRANDATTRIBUTE per CEP × brand. Binary. Declared with compound `ColumnPattern = {code}_{cep_code}_{brand_code}`. Guard expands via CEPs × Brands lists. Will migrate to `Grid_Multi` when the grid stream ships (see [GRID_SUPPORT_SPEC](../../tabs/docs/GRID_SUPPORT_SPEC.md)). |
-| `ma.cep_list` | reference | n/a | Yes | CepCode + CepText + CepType (cep / attribute). Declared in Survey_Structure CEPs sheet. |
+| `ma.cep_list` | reference | – | Yes | CepCode + CepText + CepType (cep / attribute). Declared in Survey_Structure CEPs sheet. |
 | `ma.category_frequency` | per_respondent | Numeric | Optional | QCATEGORYBUYINGTRANS/DUR/SERV, for CEP importance weighting. |
 
 Reuses `funnel.awareness` for MPen normalisation.
@@ -174,7 +174,7 @@ Reuses `ma.cep_matrix` (performance) and `funnel.attitude` (preference outcome).
 |----|----|----|----|----|
 | `dba.asset.{ordinal}.closed` | per_asset | Single_Response | Conditional | Closed attribution: one brand per asset. Required when `dba.mode = closed`. |
 | `dba.asset.{ordinal}.open` | per_asset | Open_End | Conditional | Open attribution: free-text. Required when `dba.mode = open`. |
-| `dba.asset_list` | reference | n/a | Yes | AssetCode + AssetLabel + AssetType + image ref. Declared in Survey_Structure Assets sheet. |
+| `dba.asset_list` | reference | – | Yes | AssetCode + AssetLabel + AssetType + image ref. Declared in Survey_Structure Assets sheet. |
 
 Exactly one of `closed` / `open` per asset per project (`dba.mode` setting).
 

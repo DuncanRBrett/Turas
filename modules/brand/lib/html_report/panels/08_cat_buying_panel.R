@@ -750,10 +750,10 @@ render_cat_buying_panel <- function(panel_data) {
     else                 c(label = "Strong light-buyer skew",  colour = "#059669")
 
   # Format helpers
-  fmt_pct <- function(x) if (!is.finite(x)) "n/a" else sprintf("%.0f%%", x)
-  fmt_n   <- function(x) if (!is.finite(x)) "n/a" else sprintf("%.1f", x)
+  fmt_pct <- function(x) if (!is.finite(x)) "&ndash;" else sprintf("%.0f%%", x)
+  fmt_n   <- function(x) if (!is.finite(x)) "&ndash;" else sprintf("%.1f", x)
   fmt_gap <- function(x) {
-    if (!is.finite(x)) return("n/a")
+    if (!is.finite(x)) return("&ndash;")
     sgn <- if (x >= 0) "+" else ""
     sprintf("%s%.1f", sgn, x)
   }
@@ -789,7 +789,7 @@ render_cat_buying_panel <- function(panel_data) {
     #   '<span data-kpi-verdict style="display:inline-block;padding:1px 7px;border-radius:8px;background:%s;color:#fff;font-size:10px;margin-left:4px;">%s</span>',
     #   '</div>',
     #   '</div>'),
-    #   if (!is.finite(nmi)) "n/a" else sprintf("%.0f", nmi),
+    #   if (!is.finite(nmi)) "&ndash;" else sprintf("%.0f", nmi),
     #   nmi_verdict[["colour"]], nmi_verdict[["label"]]),
     '</div>'
   )
@@ -1210,9 +1210,9 @@ render_cat_buying_panel <- function(panel_data) {
     else if (v < avg - sd_v) "cb-hm-below"
     else "cb-hm-near"
   }
-  fmt_pct <- function(v) if (!is.na(v)) sprintf("%.0f%%", v) else "n/a"
+  fmt_pct <- function(v) if (!is.na(v)) sprintf("%.0f%%", v) else "\u2013"
   fmt_n   <- function(v) {
-    if (is.null(v) || is.na(v)) return("n/a")
+    if (is.null(v) || is.na(v)) return("\u2013")
     if (v >= 1000) format(round(v), big.mark = ",", scientific = FALSE) else sprintf("%d", as.integer(round(v)))
   }
 
@@ -1349,11 +1349,11 @@ render_cat_buying_panel <- function(panel_data) {
   # Cat avg row: drops the Base column when base_in_buyers_cell is on.
   avg_row <- if (isTRUE(base_in_buyers_cell)) {
     sprintf(
-      '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">n/a</td>%s</tr>',
+      '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2013</td>%s</tr>',
       avg_seg_cells)
   } else {
     sprintf(
-      '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">n/a</td><td class="ct-td ct-data-col cb-col-base">n/a</td>%s</tr>',
+      '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2013</td><td class="ct-td ct-data-col cb-col-base">\u2013</td>%s</tr>',
       avg_seg_cells)
   }
 
@@ -1411,7 +1411,7 @@ render_cat_buying_panel <- function(panel_data) {
                             if (!is.na(v)) sprintf("%.4f", v) else "",
                             fmt_pct(v),
                             fmt_n(n_cell))
-      n_label <- if (!is.na(n_cell)) paste0("n=", fmt_n(n_cell)) else "n/a"
+      n_label <- if (!is.na(n_cell)) paste0("n=", fmt_n(n_cell)) else "\u2013"
       sprintf(
         paste0('<td class="ct-td ct-data-col cb-seg-cell %s"%s>',
                '<span class="cb-val-pct">%s</span>',
@@ -1512,9 +1512,9 @@ render_cat_buying_panel <- function(panel_data) {
       val_txt <- if (length(bi_orig) == 1 && col_nm %in% names(data_df) &&
                      !is.na(data_df[[col_nm]][bi_orig])) {
         sprintf("%.0f%%", data_df[[col_nm]][bi_orig])
-      } else "n/a"
+      } else "\u2013"
       after_focal <- if (is_foc) {
-        avg_txt <- if (!is.na(cat_avg)) sprintf("%.0f%%", cat_avg) else "n/a"
+        avg_txt <- if (!is.na(cat_avg)) sprintf("%.0f%%", cat_avg) else "\u2013"
         sprintf('<td class="ct-td ct-data-col cb-td-catavg" data-cb-brand="__avg__"><span class="ct-val">%s</span></td>',
                 avg_txt)
       } else ""
@@ -1749,7 +1749,7 @@ render_cat_buying_panel <- function(panel_data) {
   if (!is.null(dn) && !identical(dn$status, "REFUSED")) {
     ms      <- dn$metrics_summary
     scr_val <- if (!is.null(ms$focal_scr_obs) && !is.na(ms$focal_scr_obs))
-      sprintf("%.0f%%", ms$focal_scr_obs) else "n/a"
+      sprintf("%.0f%%", ms$focal_scr_obs) else "\u2013"
     scr_exp <- if (!is.null(ms$focal_scr_exp) && !is.na(ms$focal_scr_exp))
       sprintf("exp %.0f%%", ms$focal_scr_exp) else ""
     chips <- c(chips, sprintf(
@@ -1757,7 +1757,7 @@ render_cat_buying_panel <- function(panel_data) {
       scr_val, scr_exp))
 
     loy_val <- if (!is.null(ms$focal_loyal_obs) && !is.na(ms$focal_loyal_obs))
-      sprintf("%.0f%%", ms$focal_loyal_obs) else "n/a"
+      sprintf("%.0f%%", ms$focal_loyal_obs) else "\u2013"
     loy_exp <- if (!is.null(ms$focal_loyal_exp) && !is.na(ms$focal_loyal_exp))
       sprintf("exp %.0f%%", ms$focal_loyal_exp) else ""
     chips <- c(chips, sprintf(
@@ -1767,7 +1767,7 @@ render_cat_buying_panel <- function(panel_data) {
 
   if (!is.null(bh) && !identical(bh$status, "REFUSED")) {
     nmi_val   <- bh$metrics_summary$focal_nmi %||% NA
-    nmi_txt   <- if (!is.na(nmi_val)) sprintf("%.0f", nmi_val) else "n/a"
+    nmi_txt   <- if (!is.na(nmi_val)) sprintf("%.0f", nmi_val) else "\u2013"
     nmi_arrow <- if (!is.na(nmi_val)) {
       if (nmi_val < 85) "\u2193" else if (nmi_val > 115) "\u2191" else "\u2192"
     } else ""
@@ -1860,16 +1860,16 @@ render_cat_buying_panel <- function(panel_data) {
   if (length(codes) == 0) return("")
 
   for (bc in codes) {
-    scr_obs <- "n/a"; scr_exp <- ""
-    loy_obs <- "n/a"; loy_exp <- ""
-    nmi_txt <- "n/a"; nmi_arrow <- ""
+    scr_obs <- "\u2013"; scr_exp <- ""
+    loy_obs <- "\u2013"; loy_exp <- ""
+    nmi_txt <- "\u2013"; nmi_arrow <- ""
     # Heaviness focal KPI strip fields (per-focal-brand, so they must be
     # in this map so _cbSetFocal can swap them on dropdown change).
-    hv_heavy   <- "n/a"
-    hv_wbar    <- "n/a"
-    hv_wbar_cat <- "n/a"
-    hv_wbar_gap <- "n/a"
-    hv_idx     <- "n/a"
+    hv_heavy   <- "\u2013"
+    hv_wbar    <- "\u2013"
+    hv_wbar_cat <- "\u2013"
+    hv_wbar_gap <- "\u2013"
+    hv_idx     <- "\u2013"
     hv_verdict_label  <- "n/a"
     hv_verdict_colour <- "#94a3b8"
 

@@ -70,7 +70,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     # category). Return em-dash placeholder instead of crashing the whole
     # panel transform with "argument is of length zero".
     if (length(code) == 0L || is.na(code[[1L]]) || !nzchar(code[[1L]])) {
-      return("n/a")
+      return("–")
     }
     idx <- match(code, pd$config$brand_codes)
     if (is.na(idx)) code else brand_names[idx]
@@ -79,10 +79,10 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   dp <- as.integer(pd$config$decimal_places %||% 0L)
 
   card <- function(label, focal_val, avg_val, leader_code, unit, metric_key) {
-    focal_disp <- if (is.null(focal_val) || is.na(focal_val)) "n/a"
+    focal_disp <- if (is.null(focal_val) || is.na(focal_val)) "\u2013"
                   else if (unit == "pct") sprintf(paste0("%.", dp, "f%%"), focal_val)
                   else sprintf("%.2f", focal_val)
-    avg_disp <- if (is.null(avg_val) || is.na(avg_val)) "n/a"
+    avg_disp <- if (is.null(avg_val) || is.na(avg_val)) "\u2013"
                 else if (unit == "pct") sprintf(paste0("%.", dp, "f%%"), avg_val)
                 else sprintf("%.2f", avg_val)
     lead_name <- leader_name(leader_code)
@@ -167,7 +167,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   }
   fmt_cell <- function(val, band, fmt, n_html = "") {
     if (is.null(val) || is.na(val))
-      return('<td class="ct-td ct-data-col ct-na">n/a</td>')
+      return('<td class="ct-td ct-data-col ct-na">&ndash;</td>')
     disp   <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), val) else sprintf("%.2f", val)
     band_s <- as.character(band %||% "within")
     bg     <- ci_bg(band_s)
@@ -179,7 +179,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   # Category-average cell with visual 95% CI range bar
   fmt_avg_ci_cell <- function(avg_val, ci_lo, ci_hi, max_val, fmt) {
     if (is.null(avg_val) || is.na(avg_val))
-      return('<td class="ct-td ct-data-col ma-metrics-cat-avg">n/a</td>')
+      return('<td class="ct-td ct-data-col ma-metrics-cat-avg">&ndash;</td>')
     disp    <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), avg_val) else sprintf("%.2f", avg_val)
     lo_disp <- if (!is.null(ci_lo) && !is.na(ci_lo))
       (if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), ci_lo) else sprintf("%.2f", ci_lo)) else ""
@@ -204,7 +204,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
 
   fmt_base_cell <- function(n) {
     if (is.null(n) || is.na(n))
-      return('<td class="ct-td ct-data-col ct-na">n/a</td>')
+      return('<td class="ct-td ct-data-col ct-na">&ndash;</td>')
     sprintf('<td class="ct-td ct-data-col"><span class="ct-val">%s</span></td>',
             format(as.integer(n), big.mark = ","))
   }

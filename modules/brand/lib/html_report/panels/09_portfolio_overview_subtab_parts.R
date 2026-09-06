@@ -118,16 +118,16 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     '<span class="pfo-pill pfo-pill-deep">Deep-dive</span>' else
     '<span class="pfo-pill pfo-pill-aware">Awareness</span>'
 
-  fmt_pct <- function(v) if (is.null(v) || is.na(v)) "n/a" else
+  fmt_pct <- function(v) if (is.null(v) || is.na(v)) "\u2013" else
     sprintf("%.0f%%", v)
-  fmt_num <- function(v, d = 1) if (is.null(v) || is.na(v)) "n/a" else
+  fmt_num <- function(v, d = 1) if (is.null(v) || is.na(v)) "\u2013" else
     sprintf(paste0("%.", d, "f"), v)
   fmt_rank <- function(r) {
-    if (is.null(r$rank) || is.na(r$rank)) return("n/a")
+    if (is.null(r$rank) || is.na(r$rank)) return("\u2013")
     sprintf("#%d of %d", r$rank, r$n_brands)
   }
   fmt_gap <- function(v) {
-    if (is.null(v) || is.na(v)) return("n/a")
+    if (is.null(v) || is.na(v)) return("\u2013")
     if (v <= 0.5) return('<span class="pfo-gap-leader">Leader</span>')
     sprintf("\u2212%.0f pp", v)
   }

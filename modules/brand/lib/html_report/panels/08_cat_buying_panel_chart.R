@@ -463,7 +463,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     v
   }
   fmt_n <- function(n) {
-    if (!is.finite(n)) return("n/a")
+    if (!is.finite(n)) return("\u2013")
     if (n >= 1000) format(round(n), big.mark = ",", scientific = FALSE)
     else sprintf("%d", as.integer(round(n)))
   }
@@ -544,7 +544,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     cells <- character(0)
     for (j in seq_along(brands)) {
       if (i == j) {
-        cells <- c(cells, '<td class="cb-dop-diag" style="text-align:center;">n/a</td>')
+        cells <- c(cells, '<td class="cb-dop-diag" style="text-align:center;">\u2013</td>')
         next
       }
       val <- tryCatch(as.numeric(dev_matrix[i, brands[j]]), error = function(e) NA)
@@ -562,7 +562,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
       } else {
         dev_val <- val
       }
-      val_txt <- if (is.na(val)) "n/a" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
+      val_txt <- if (is.na(val)) "\u2013" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
       attrs <- cell_attrs(val, j, obs, exp_val, dev_val)
       data_v_attr <- if (!is.na(val)) sprintf(' data-v="%.4f"', val) else ' data-v=""'
       # Show-counts companion: n = pct * row_buyers / 100 (hidden by default).
@@ -584,7 +584,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     v    <- col_avgs[j]
     sdv  <- col_sds[j]
     if (!is.finite(v)) {
-      return('<td class="cb-dop-avg-cell" data-v="" style="text-align:center;">n/a</td>')
+      return('<td class="cb-dop-avg-cell" data-v="" style="text-align:center;">\u2013</td>')
     }
     txt  <- sprintf("%.0f%%", v)
     data_v_attr <- sprintf(' data-v="%.4f"', v)
@@ -1407,8 +1407,8 @@ cb_dop_cluster_map_html <- function(obs_matrix,
     weak     = "Treat partitions as exploratory: limited structure.",
     poor     = "No clear partition structure: interpret with caution.",
     na       = "Could not compute reliability.")
-  coph_disp <- if (is.finite(coph_corr)) sprintf("%.2f", coph_corr) else "n/a"
-  sil_disp  <- if (is.finite(avg_sil))   sprintf("%.2f", avg_sil)   else "n/a"
+  coph_disp <- if (is.finite(coph_corr)) sprintf("%.2f", coph_corr) else "–"
+  sil_disp  <- if (is.finite(avg_sil))   sprintf("%.2f", avg_sil)   else "–"
   # Multi-line tooltip via CSS popover (the native title attribute was
   # unreliable for newline-formatted content across browsers).
   fit_aria <- sprintf(

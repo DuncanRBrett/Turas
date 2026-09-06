@@ -313,7 +313,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 .demo_table_na_cell <- function(extra_class, colcode, brand_code) {
   sprintf(
     '<td class="%s" data-demo-col="%s" data-demo-brand="%s">
-       <span class="demo-na">n/a</span>
+       <span class="demo-na">&ndash;</span>
      </td>',
     extra_class, colcode, .demo_table_esc(brand_code %||% ""))
 }
@@ -344,7 +344,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
 .demo_table_pct <- function(v, dp) {
   if (is.null(v) || is.na(v) || !is.finite(v))
-    return('<span class="demo-na">n/a</span>')
+    return('<span class="demo-na">&ndash;</span>')
   sprintf("%.*f%%", as.integer(dp), v)
 }
 

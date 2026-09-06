@@ -319,7 +319,7 @@ About drawer carries verbatim:
 ### 9.1 Thresholds
 
 -   `funnel.warn_base` (default 75): metric rendered with warning indicator + tooltip.
--   `funnel.suppress_base` (default 0, off): metric hidden, "n/a" shown when base below threshold.
+-   `funnel.suppress_base` (default 0, off): metric hidden, "–" shown when base below threshold.
 -   Both configurable. Default behaviour: lenient, show all values with flags.
 
 ### 9.2 Per-stage application
@@ -361,7 +361,7 @@ Tests assert **exact** values from the hand calculations.
 -   All brand codes contain non-ASCII → no encoding failures.
 -   Weights all equal 1 → weighted results match unweighted exactly.
 -   Weights sum to zero → guard refuses loud.
--   `suppress_base` set to 50 → metrics with base 30–49 show "n/a"; 50–74 show with warn; 75+ clean.
+-   `suppress_base` set to 50 → metrics with base 30–49 show "–"; 50–74 show with warn; 75+ clean.
 
 ### 10.3 Integration tests
 

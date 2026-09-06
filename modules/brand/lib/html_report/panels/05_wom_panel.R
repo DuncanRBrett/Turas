@@ -300,7 +300,7 @@ build_wom_panel_html <- function(panel_data,
   paste0(
     '<tr class="ct-row fn-row-avg-all wom-row-avg" data-locked="1">',
     '<td class="ct-td ct-label-col"><em>Category average</em></td>',
-    '<td class="ct-td ct-data-col wom-col-base" hidden><span style="color:#94a3b8;font-size:11px;">n/a</span></td>',
+    '<td class="ct-td ct-data-col wom-col-base" hidden><span style="color:#94a3b8;font-size:11px;">\u2013</span></td>',
     cells,
     '</tr>'
   )
@@ -311,7 +311,7 @@ build_wom_panel_html <- function(panel_data,
 
 .wom_base_cell <- function(n, focal_cls) {
   if (is.null(n) || is.na(n) || !is.finite(n)) {
-    return(sprintf('<td class="ct-td ct-data-col%s ct-na">n/a</td>', focal_cls))
+    return(sprintf('<td class="ct-td ct-data-col%s ct-na">&ndash;</td>', focal_cls))
   }
   ni <- as.integer(n)
   warn <- ni < 30L
@@ -326,7 +326,7 @@ build_wom_panel_html <- function(panel_data,
 .wom_data_cell <- function(value, col, focal_cls, stats_block,
                             base_n = NA_integer_) {
   if (is.null(value) || is.na(value) || !is.finite(value)) {
-    return(sprintf('<td class="ct-td ct-data-col%s ct-na">n/a</td>', focal_cls))
+    return(sprintf('<td class="ct-td ct-data-col%s ct-na">&ndash;</td>', focal_cls))
   }
   val_type <- col$value_type
   display  <- .wom_format_value(value, val_type)
@@ -376,7 +376,7 @@ build_wom_panel_html <- function(panel_data,
 .wom_cat_avg_cell <- function(stats_block, col, base_n = NA_real_) {
   if (is.null(stats_block) || is.null(stats_block$mean) ||
       is.na(stats_block$mean)) {
-    return('<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg ct-na">n/a</td>')
+    return('<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg ct-na">&ndash;</td>')
   }
   m      <- stats_block$mean
   lo     <- stats_block$ci_lower

@@ -150,7 +150,7 @@
         const diff = (cell.pct != null && tot != null) ? cell.pct - tot : null;
         const bg = heatColour(diff);
         const cls = "demo-heat-cell" + (b.brand_code === focalBrand ? " focal-col" : "");
-        return `<td class="${cls}" style="background-color:${bg}" title="vs total: ${diff == null ? "n/a" : (diff>=0?"+":"") + diff.toFixed(dp)}pp">${pctStr(cell.pct, dp)}</td>`;
+        return `<td class="${cls}" style="background-color:${bg}" title="vs total: ${diff == null ? "–" : (diff>=0?"+":"") + diff.toFixed(dp)}pp">${pctStr(cell.pct, dp)}</td>`;
       }).join("");
       return `<tr><td class="demo-row-label">${esc(b.brand_label || b.brand_code)}</td>${tds}<td class="demo-row-n">${intStr(b.base_n)}</td></tr>`;
     }).join("");
@@ -170,11 +170,11 @@
 
   // ---- formatters / helpers ----
   function pctStr(v, dp) {
-    if (v == null || !isFinite(v)) return '<span class="demo-na">n/a</span>';
+    if (v == null || !isFinite(v)) return '<span class="demo-na">&ndash;</span>';
     return v.toFixed(dp) + "%";
   }
   function intStr(v) {
-    if (v == null || !isFinite(v)) return "n/a";
+    if (v == null || !isFinite(v)) return "&ndash;";
     return Math.round(v).toLocaleString();
   }
   function esc(s) {

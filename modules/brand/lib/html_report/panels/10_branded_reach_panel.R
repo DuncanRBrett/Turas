@@ -368,12 +368,12 @@ build_branded_reach_panel_html <- function(panel_data,
 # ==============================================================================
 
 .br_reach_pct <- function(v, dp) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="br-reach-na">n/a</span>')
+  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="br-reach-na">–</span>')
   sprintf("%.*f%%", as.integer(dp), 100 * v)
 }
 
 .br_reach_int <- function(v) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("–")
   sprintf("%d", as.integer(round(v)))
 }
 

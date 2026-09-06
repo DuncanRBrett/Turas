@@ -325,7 +325,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   avg_cells <- paste(vapply(att_roles, function(role) {
     pct_aw <- cat_avg_aware[[role]]
     if (!is.finite(pct_aw))
-      return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">n/a</td>')
+      return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">&ndash;</td>')
     pt_total <- cat_avg_total[[role]]
     n_eff <- max(1, n_effective)
     ci_aw_lo <- max(0, pct_aw - 1.96 * sqrt(max(0, pct_aw * (1 - pct_aw)) / n_eff))
@@ -356,7 +356,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   avg_row <- paste0(
     '<tr class="ct-row fn-row-avg-all fn-rel-row">',
     '<td class="ct-td ct-label-col"><em>Category avg</em></td>',
-    '<td class="ct-td ct-data-col fn-rel-td-avg"><span style="color:#94a3b8;font-size:11px;">n/a</span></td>',
+    '<td class="ct-td ct-data-col fn-rel-td-avg"><span style="color:#94a3b8;font-size:11px;">\u2013</span></td>',
     avg_cells,
     '</tr>'
   )
@@ -436,7 +436,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   } else {
     sprintf(paste0(
       '<td class="ct-td ct-data-col fn-rel-base-cell%s"%s>',
-      '<span class="ct-na fn-rel-base-num">n/a</span></td>'),
+      '<span class="ct-na fn-rel-base-num">&ndash;</span></td>'),
       focal_cls, total_attr)
   }
 
@@ -444,7 +444,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     # segments[[role]] = % of all category respondents (total base) after session-3 fix
     pct_total <- as.numeric(brand$segments[[role]] %||% NA_real_)
     if (!is.finite(pct_total))
-      return(sprintf('<td class="ct-td ct-data-col%s ct-na">n/a</td>', focal_cls))
+      return(sprintf('<td class="ct-td ct-data-col%s ct-na">&ndash;</td>', focal_cls))
 
     # Prefer the per-segment pct_aware computed at the metric layer
     # (count_aware / aware_w. Proper subset, can't exceed 100%). Falls

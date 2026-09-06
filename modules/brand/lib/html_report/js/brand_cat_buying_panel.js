@@ -1533,22 +1533,22 @@
             var valEl  = chip.querySelector('[data-kpi-val]');
             var subEl  = chip.querySelector('[data-kpi-sub]');
             if (kpiKey === 'scr') {
-              if (valEl) valEl.textContent = kd.scr_obs || 'n/a';
+              if (valEl) valEl.textContent = kd.scr_obs || '\u2013';
               if (subEl) subEl.textContent = kd.scr_exp || '';
             } else if (kpiKey === 'loyal') {
-              if (valEl) valEl.textContent = kd.loyal_obs || 'n/a';
+              if (valEl) valEl.textContent = kd.loyal_obs || '\u2013';
               if (subEl) subEl.textContent = kd.loyal_exp || '';
             } else if (kpiKey === 'nmi') {
-              if (valEl) valEl.textContent = (kd.nmi || 'n/a') + (kd.nmi_arrow || '');
+              if (valEl) valEl.textContent = (kd.nmi || '\u2013') + (kd.nmi_arrow || '');
             } else if (kpiKey === 'hv-heavy') {
-              if (valEl) valEl.textContent = kd.hv_heavy || 'n/a';
+              if (valEl) valEl.textContent = kd.hv_heavy || '\u2013';
             } else if (kpiKey === 'hv-wbar') {
-              if (valEl) valEl.textContent = kd.hv_wbar || 'n/a';
+              if (valEl) valEl.textContent = kd.hv_wbar || '\u2013';
               if (subEl) subEl.innerHTML =
-                '(all cat buyers avg ' + (kd.hv_wbar_cat || 'n/a') +
-                ' \u00b7 gap <strong>' + (kd.hv_wbar_gap || 'n/a') + '</strong>)';
+                '(all cat buyers avg ' + (kd.hv_wbar_cat || '\u2013') +
+                ' \u00b7 gap <strong>' + (kd.hv_wbar_gap || '\u2013') + '</strong>)';
             } else if (kpiKey === 'hv-light') {
-              if (valEl) valEl.textContent = kd.hv_idx || 'n/a';
+              if (valEl) valEl.textContent = kd.hv_idx || '\u2013';
               var verdictEl = chip.querySelector('[data-kpi-verdict]');
               if (verdictEl) {
                 verdictEl.textContent = kd.hv_verdict_label || '';

@@ -465,7 +465,7 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # Brands with no data column at all for this stage (entire column NA)
   # carry NA through, not 0. Required so a brand declared in the awareness
   # battery but missing from the per-brand attitude battery (column-name
-  # mismatch) shows "n/a" in the consideration column instead of a misleading
+  # mismatch) shows "–" in the consideration column instead of a misleading
   # 0% and a false nesting violation downstream.
   all_na_cols <- colSums(!is.na(m)) == 0
   # Kish effective n of the respondents this column is measured on (the

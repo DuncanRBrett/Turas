@@ -42,19 +42,19 @@ Each section is controlled by an on/off toggle in the `Brand_Config.xlsx` Settin
 
 | Section | Toggle in Brand_Config | Default |
 |----|----|----|
-| Screeners | Always on | n/a |
+| Screeners | Always on | – |
 | Cross-category awareness | `cross_category_awareness` | Y |
-| Category buying | Always on | n/a |
+| Category buying | Always on | – |
 | Brand funnel | `element_funnel` | Y |
 | CEP × brand matrix | `element_mental_avail` | Y |
 | Purchase channels | *(no toggle: included with cat buying)* | Y |
 | Pack sizes | *(no toggle: included with cat buying)* | Y |
-| Ad-hoc questions | *(no toggle: omit section if no ad-hoc qs)* | n/a |
+| Ad-hoc questions | *(no toggle: omit section if no ad-hoc qs)* | – |
 | WOM | `element_wom` | Y |
 | DBA | `element_dba` | N |
 | Branded Reach | `element_branded_reach` | N |
 | Portfolio (cross-cat awareness) | `element_portfolio` | Y |
-| Demographics | Always on | n/a |
+| Demographics | Always on | – |
 
 ------------------------------------------------------------------------
 
@@ -250,7 +250,7 @@ Do **not** name the question `SQ1_ALL`. That exports as `SQ1_ALL_DSS`, which bre
 | `PES` | Pestos | Adjacent |
 | `COO` | Cook-in sauces | Adjacent |
 | `ANT` | Antipasto / anti-pasta | Adjacent |
-| `NONE` | None of the above | n/a |
+| `NONE` | None of the above | – |
 
 **Exported columns:** `SQ1_DSS`, `SQ1_POS`, `SQ1_PAS`, `SQ1_BAK`, `SQ1_SLD`, `SQ1_STO`, `SQ1_PES`, `SQ1_COO`, `SQ1_ANT`, value = 1 if selected, 0 if not.
 

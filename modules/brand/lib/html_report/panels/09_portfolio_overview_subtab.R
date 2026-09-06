@@ -154,7 +154,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 }
 
 .pfo_hero_cards <- function(k, focal_colour) {
-  fmt_n   <- function(x) if (is.null(x) || is.na(x)) "n/a" else
+  fmt_n   <- function(x) if (is.null(x) || is.na(x)) "\u2013" else
     sprintf("%.0f%%", x)
   card <- function(value, label) sprintf(
     '<div class="pf-kpi-card"><div class="pf-kpi-value">%s</div><div class="pf-kpi-label">%s</div></div>',
@@ -195,7 +195,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
     depth_badge <- if (identical(r$depth, "full"))
       '<span class="pfo-depth-badge pfo-depth-full">Deep-dive</span>' else
       '<span class="pfo-depth-badge pfo-depth-aware">Awareness</span>'
-    value_str <- if (is.finite(r$value)) sprintf("%.0f%%", r$value) else "n/a"
+    value_str <- if (is.finite(r$value)) sprintf("%.0f%%", r$value) else "–"
     sprintf(
       '<div class="pfo-bar-row"><div class="pfo-bar-label">%s%s</div><div class="pfo-bar-track"><div class="pfo-bar-fill" style="width:%.1f%%;background:%s;"></div></div><div class="pfo-bar-value">%s</div></div>',
       .pf_esc(r$cat_name), depth_badge, pct, focal_colour, value_str

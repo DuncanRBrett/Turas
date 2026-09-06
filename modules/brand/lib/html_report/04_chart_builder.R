@@ -78,7 +78,7 @@ br_svg_wrap <- function(inner, width, height, aria_label) {
 }
 
 .br_fmt <- function(x, digits = 1, pct = FALSE) {
-  if (is.na(x)) return("n/a")
+  if (is.na(x)) return("\u2013")
   if (pct) sprintf("%.*f%%", digits, x) else sprintf("%.*f", digits, x)
 }
 
@@ -567,7 +567,7 @@ build_heat_strip <- function(matrix_df, focal_brand = NULL,
       if (is_absent) {
         bg      <- "#f1f5f9"
         txt_col <- "#94a3b8"
-        cell_label <- "n/a"
+        cell_label <- "\u2013"
       } else {
         intensity  <- min(1, val / max_val)
         bg         <- sprintf("rgba(26,82,118,%.2f)", 0.08 + intensity * 0.45)

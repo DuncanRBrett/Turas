@@ -282,7 +282,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 # ==============================================================================
 
 .demo_chart_pct <- function(v, dp) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("&ndash;")
   sprintf("%.*f%%", as.integer(dp), v)
 }
 

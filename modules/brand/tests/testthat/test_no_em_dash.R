@@ -112,7 +112,7 @@ test_that("no em dash reaches the reader from the brand engine or report layer",
     cat("\n=== EM DASH GATE ===\n")
     cat(sprintf("%d line(s) carry an em dash:\n", length(offenders)))
     cat(paste0("  ", offenders, collapse = "\n"), "\n")
-    cat("Replace it with a full stop, comma or colon, or with \"n/a\" ")
+    cat("Replace it with a full stop, comma or colon, or with an en dash ")
     cat("where it stands in for a blank cell.\n")
     cat("====================\n\n")
   }

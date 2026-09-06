@@ -192,7 +192,7 @@ test_that("Headline sentence MMS comparison uses the masked cat-avg", {
 
 test_that("All-zero category yields NA cat-avgs (no division-by-empty)", {
   # Edge case: every brand has no data. Mask is empty. Expect NA-rendered
-  # ("n/a") rather than NaN or a spurious 0.
+  # ("–") rather than NaN or a spurious 0.
   cr <- mk_silent_zero_cr()
   # Wipe AAA + BBB to all-zero so only the "active" set is empty.
   cr$mental_availability$mms$MMS  <- c(0, 0, 0)
@@ -212,7 +212,7 @@ test_that("All-zero category yields NA cat-avgs (no division-by-empty)", {
                      snap$focal_metrics)[[1]]
   wom_chip <- Filter(function(x) identical(x$label, "Net WOM"),
                      snap$focal_metrics)[[1]]
-  expect_identical(mms_chip$cat_avg, "n/a")
-  expect_identical(loy_chip$cat_avg, "n/a")
-  expect_identical(wom_chip$cat_avg, "n/a")
+  expect_identical(mms_chip$cat_avg, "–")
+  expect_identical(loy_chip$cat_avg, "–")
+  expect_identical(wom_chip$cat_avg, "–")
 })

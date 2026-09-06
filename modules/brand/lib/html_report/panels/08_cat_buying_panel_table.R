@@ -60,10 +60,10 @@ cb_norms_table_html <- function(norms_table,
     return('<p class="cb-refused">Norms table not available.</p>')
 
   fmt_pct <- function(x, d = 1) {
-    if (is.na(x)) return("n/a") else sprintf("%.*f%%", d, x)
+    if (is.na(x)) return("\u2013") else sprintf("%.*f%%", d, x)
   }
   fmt_n <- function(x, d = 2) {
-    if (is.na(x)) return("n/a") else sprintf("%.*f", d, x)
+    if (is.na(x)) return("\u2013") else sprintf("%.*f", d, x)
   }
   dev_cls <- function(v) {
     if (is.na(v)) return("")
@@ -225,7 +225,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
     for (i in seq_len(nrow(cat_fd))) {
       lbl_i <- .cb_esc(labels[i])
       pct_i <- if (!is.na(cat_fd$Pct[i])) sprintf("%.1f%%", cat_fd$Pct[i])
-               else "n/a"
+               else "\u2013"
       lines <- c(lines, sprintf('<tr><td>%s</td><td style="text-align:right;">%s</td></tr>',
                                  lbl_i, pct_i))
     }
@@ -252,7 +252,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
       bb_i  <- if ("Brands_Bought" %in% names(rs))
         .cb_esc(as.character(rs$Brands_Bought[i])) else as.character(i)
       pct_i <- if ("Percentage" %in% names(rs) && !is.na(rs$Percentage[i]))
-        sprintf("%.1f%%", rs$Percentage[i]) else "n/a"
+        sprintf("%.1f%%", rs$Percentage[i]) else "\u2013"
       lines <- c(lines, sprintf('<tr><td>%s</td><td style="text-align:right;">%s</td></tr>',
                                  bb_i, pct_i))
     }
@@ -303,9 +303,9 @@ cb_brand_freq_scr_table_html <- function(norms_table,
                          !is.na(category_metrics$mean_purchases))
     as.numeric(category_metrics$mean_purchases) else NA_real_
 
-  fmt_pct  <- function(x) if (is.na(x)) "n/a" else sprintf("%.0f%%", x)
-  fmt_n    <- function(x) if (is.na(x)) "n/a" else sprintf("%.1f", x)
-  fmt_int  <- function(x) if (is.na(x) || x == 0L) "n/a" else
+  fmt_pct  <- function(x) if (is.na(x)) "\u2013" else sprintf("%.0f%%", x)
+  fmt_n    <- function(x) if (is.na(x)) "\u2013" else sprintf("%.1f", x)
+  fmt_int  <- function(x) if (is.na(x) || x == 0L) "\u2013" else
     formatC(as.integer(x), format = "d", big.mark = ",")
 
   vol_share_fn <- function(pen, buy_rate) {
@@ -509,7 +509,7 @@ cb_brand_freq_scr_table_html <- function(norms_table,
   body_rows <- c(body_rows, paste0(
     '<tr class="cbp-avg-row">',
     '<td class="ct-label-col" style="font-style:italic;">Category avg</td>',
-    '<td class="cb-base-td">n/a</td>',
+    '<td class="cb-base-td">\u2013</td>',
     sprintf('<td class="cb-avg-td cb-avg-td-ci" data-v="%s"><span class="cb-val-pct">%s</span>%s</td>',
             formatC(avg_pen, format = "f", digits = 2),
             fmt_pct(avg_pen),
@@ -551,7 +551,7 @@ cb_brand_freq_scr_table_html <- function(norms_table,
       'The Loyalty table\u2019s %% cat buyers uses the %s category buyers as its base, ',
       'so it reads higher than penetration for the same brand.</p>'),
       format(n_resp_cm, big.mark = ","),
-      if (is.finite(n_buy_cm)) format(n_buy_cm, big.mark = ",") else "n/a",
+      if (is.finite(n_buy_cm)) format(n_buy_cm, big.mark = ",") else "\u2013",
       as.integer(target_months), as.integer(target_months),
       if (is.finite(n_buy_cm)) format(n_buy_cm, big.mark = ",") else "the")
   } else ""

@@ -209,12 +209,12 @@
       var cn = card.getAttribute('data-brsum-mini-cat');
       var snap = cats[cn] && cats[cn].brands && cats[cn].brands[brandCode];
       var fm = (snap && snap.focal_metrics) ? snap.focal_metrics : null;
-      var mms  = (fm && fm[0]) ? fm[0].value : 'n/a';
-      var mpen = (fm && fm[1]) ? fm[1].value : 'n/a';
-      var bt   = (fm && fm[2]) ? fm[2].value : 'n/a';
+      var mms  = (fm && fm[0]) ? fm[0].value : '–';
+      var mpen = (fm && fm[1]) ? fm[1].value : '–';
+      var bt   = (fm && fm[2]) ? fm[2].value : '–';
       var setVal = function (sel, v) {
         var el = card.querySelector('[data-brsum-mini-metric="' + sel + '"]');
-        if (el) el.innerHTML = (v == null || v === '') ? 'n/a' : escHtml(String(v));
+        if (el) el.innerHTML = (v == null || v === '') ? '–' : escHtml(String(v));
       };
       setVal('mms',  mms);
       setVal('mpen', mpen);
@@ -246,14 +246,14 @@
   function renderPlaceholder(root, key, msg) {
     var body = cardBody(root, key);
     if (!body) return;
-    body.innerHTML = '<div class="brsum-card-empty">' + escHtml(msg || 'n/a') + '</div>';
+    body.innerHTML = '<div class="brsum-card-empty">' + escHtml(msg || '–') + '</div>';
   }
 
   function renderFocalContext(root, snap, cat, catName) {
     var brandEl = root.querySelector('[data-brsum-fc-brand]');
     var catEl   = root.querySelector('[data-brsum-fc-cat]');
-    if (brandEl) brandEl.textContent = (snap && snap.name) ? snap.name : 'n/a';
-    if (catEl)   catEl.textContent   = catName || (cat && cat.label) || 'n/a';
+    if (brandEl) brandEl.textContent = (snap && snap.name) ? snap.name : '–';
+    if (catEl)   catEl.textContent   = catName || (cat && cat.label) || '–';
     /* The header strip uses the focal colour as its background gradient,
        set via the --brsum-brand-colour custom prop on .brsum-root. */
   }
@@ -270,7 +270,7 @@
              '<div class="brsum-vchip-label">' + escHtml(label) + '</div>' +
              '<div class="brsum-vchip-value brsum-focal-value" style="color:' + focalColour + '">' +
                escHtml(value) + '</div>' +
-             (catAvg && catAvg !== 'n/a'
+             (catAvg && catAvg !== '–'
                ? '<div class="brsum-vchip-catavg">cat avg <span>' + escHtml(catAvg) + '</span></div>'
                : '') +
              (leaderHtml || '') +
@@ -314,21 +314,21 @@
   function heroAnchor(label, value, catAvg, colour) {
     return '<div class="brsum-hero-anchor">' +
              '<div class="brsum-hero-anchor-v brsum-focal-value" style="color:' + colour + '">' +
-               escHtml(value || 'n/a') + '</div>' +
+               escHtml(value || '–') + '</div>' +
              '<div class="brsum-hero-anchor-l">' + escHtml(label) + '</div>' +
-             (catAvg && catAvg !== 'n/a'
+             (catAvg && catAvg !== '–'
                ? '<div class="brsum-hero-anchor-a">cat avg ' + escHtml(catAvg) + '</div>'
                : '') +
            '</div>';
   }
 
   /* Resolve the 4 anchor numbers + rank from the snapshot. Falls back to
-     a "n/a" string when the source field is missing or NA. */
+     a "–" string when the source field is missing or NA. */
   function heroAnchors(snap) {
-    var out = { mms: 'n/a', mms_avg: 'n/a', mms_rank: null,
-                mpen: 'n/a', mpen_avg: 'n/a',
-                pen:  'n/a', pen_avg:  'n/a',
-                scr:  'n/a', scr_avg:  'n/a' };
+    var out = { mms: '–', mms_avg: '–', mms_rank: null,
+                mpen: '–', mpen_avg: '–',
+                pen:  '–', pen_avg:  '–',
+                scr:  '–', scr_avg:  '–' };
     if (snap.ma_metrics && snap.ma_metrics.length) {
       for (var i = 0; i < snap.ma_metrics.length; i++) {
         var m = snap.ma_metrics[i];
@@ -424,7 +424,7 @@
       var leader = '';
       if (m.is_leader) {
         leader = '<div class="brsum-vchip-leader brsum-leader-on">CATEGORY LEADER</div>';
-      } else if (m.leader && m.leader !== 'n/a') {
+      } else if (m.leader && m.leader !== '–') {
         leader = '<div class="brsum-vchip-leader">Leader: ' + escHtml(m.leader) + '</div>';
       }
       html += valueChip(m.label, m.value, m.cat_avg, col, leader);
@@ -452,7 +452,7 @@
     var pn = cat && cat.penetration_notes;
     if (!pn || !pn.notes || !pn.notes.length) { box.hidden = true; box.innerHTML = ''; return; }
     var rows = pn.notes.map(function (n) {
-      var val = (n.value == null || isNaN(n.value)) ? 'n/a' : (Math.round(n.value * 10) / 10) + '%';
+      var val = (n.value == null || isNaN(n.value)) ? '–' : (Math.round(n.value * 10) / 10) + '%';
       var base = escHtml(n.base || '');
       if (n.n != null && n.base_n != null) base += ' (n = ' + n.n + ' of ' + n.base_n + ', unweighted)';
       else if (n.base_n != null) base += ' (n = ' + n.base_n + ', unweighted)';
@@ -665,8 +665,8 @@
     return '<div class="' + cls + '">' +
              '<div class="brsum-wom-label">' + escHtml(row.label) + '</div>' +
              '<div class="brsum-wom-vals">' +
-               '<div class="brsum-wom-val">' + escHtml(row.value || 'n/a') + '</div>' +
-               (row.cat_avg && row.cat_avg !== 'n/a'
+               '<div class="brsum-wom-val">' + escHtml(row.value || '–') + '</div>' +
+               (row.cat_avg && row.cat_avg !== '–'
                  ? '<div class="brsum-wom-catavg">cat avg ' + escHtml(row.cat_avg) + '</div>'
                  : '') +
              '</div>' +
@@ -689,7 +689,7 @@
    *   seg_codes  / seg_labels    (Brand attitude / Loyalty / Purchase dist)
    * --------------------------------------------------------------------- */
   function fmtPctSingle(v) {
-    if (v == null || isNaN(v)) return 'n/a';
+    if (v == null || isNaN(v)) return '–';
     return Math.round(v * 100) + '%';
   }
 

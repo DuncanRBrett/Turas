@@ -72,7 +72,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   if (!isTRUE(max_pct > 0)) max_pct <- 1
 
   bars <- paste(vapply(rows, function(r) {
-    label <- r$label %||% r$value %||% "n/a"
+    label <- r$label %||% r$value %||% "–"
     is_filler <- grepl("^none", label, ignore.case = TRUE)
     .brss_bar_row(label, r$pct_weighted %||% 0, max_pct, focal_colour, is_filler)
   }, character(1)), collapse = "")
@@ -87,7 +87,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   pct <- kpi$pct_yes %||% NA_real_
   n_total <- kpi$n_total %||% 0
   base_note <- kpi$base_note %||% sprintf("Base: %d respondents.", n_total)
-  pct_display <- if (is.na(pct)) "n/a" else sprintf("%.0f%%", pct)
+  pct_display <- if (is.na(pct)) "–" else sprintf("%.0f%%", pct)
   sprintf(
     paste0('<div class="brss-kpi-card">',
            '<div class="brss-kpi-value" style="color:%s">%s</div>',

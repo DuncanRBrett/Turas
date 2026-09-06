@@ -271,12 +271,12 @@ build_adhoc_panel_html <- function(panel_data,
 # ==============================================================================
 
 .adhoc_pct <- function(v, dp) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="demo-na">n/a</span>')
+  if (is.null(v) || is.na(v) || !is.finite(v)) return('<span class="demo-na">&ndash;</span>')
   sprintf("%.*f%%", as.integer(dp), v)
 }
 
 .adhoc_int <- function(v) {
-  if (is.null(v) || is.na(v) || !is.finite(v)) return("n/a")
+  if (is.null(v) || is.na(v) || !is.finite(v)) return("&ndash;")
   format(as.integer(round(v)), big.mark = ",")
 }
 

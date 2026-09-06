@@ -50,8 +50,8 @@ build_pf_dop_aware_block <- function(dop_aware, focal_brand, focal_colour) {
   d_line <- paste0(
     '<div class="pf-dopa-d-line">',
     'Sharp&#39;s duplication coefficient ',
-    '<span class="pf-dopa-d-value" data-pf-dopa-d>n/a</span> ',
-    'for <span class="pf-dopa-cat-label" data-pf-dopa-cat-label>n/a</span>',
+    '<span class="pf-dopa-d-value" data-pf-dopa-d>&ndash;</span> ',
+    'for <span class="pf-dopa-cat-label" data-pf-dopa-cat-label>&ndash;</span>',
     '</div>'
   )
 

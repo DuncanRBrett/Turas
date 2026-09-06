@@ -99,7 +99,7 @@ build_audience_lens_panel_html <- function(panel_data,
         cls <- .al_banner_cell_class(cell, au)
         sprintf('<td class="al-banner-cell %s" title="n=%s">%s</td>',
                 cls,
-                if (cell$buyer_base_na) "n/a" else
+                if (cell$buyer_base_na) "–" else
                   format(cell$n_base, big.mark = ","),
                 .al_esc(cell$formatted))
       }, character(1))
@@ -389,7 +389,7 @@ build_audience_lens_panel_html <- function(panel_data,
 
 .al_render_chip <- function(chip, reason) {
   if (is.na(chip) || !nzchar(chip) || identical(toupper(chip), "NONE")) {
-    return('<span class="al-chip al-chip-none">n/a</span>')
+    return('<span class="al-chip al-chip-none">–</span>')
   }
   cls <- paste0("al-chip al-chip-", tolower(chip))
   sprintf('<span class="%s" title="%s">%s</span>',

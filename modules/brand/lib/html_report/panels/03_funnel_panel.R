@@ -399,7 +399,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
 
 .fn_pct_string <- function(pct) {
-  if (is.null(pct) || is.na(pct)) return("n/a")
+  if (is.null(pct) || is.na(pct)) return("&ndash;")
   sprintf("%.0f%%", 100 * pct)
 }
 

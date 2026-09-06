@@ -183,7 +183,7 @@ run_adhoc_question <- function(values,
 
 
 .adhoc_fmt <- function(x) {
-  if (is.na(x)) return("n/a")
+  if (is.na(x)) return("–")
   if (abs(x - round(x)) < 1e-6) return(sprintf("%.0f", x))
   sprintf("%.1f", x)
 }

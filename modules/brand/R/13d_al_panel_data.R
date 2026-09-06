@@ -52,8 +52,8 @@ build_audience_lens_panel_data <- function(result, category_label,
         if (is.null(bm)) {
           return(list(value = NA_real_, n_base = 0L, base_state = b$base_state,
                       delta_vs_total = NA_real_,
-                      buyer_base_na = FALSE, formatted = "n/a",
-                      delta_formatted = "n/a"))
+                      buyer_base_na = FALSE, formatted = "–",
+                      delta_formatted = "–"))
         }
         # N/A on non-buyer pair side for buyer-base metrics
         is_b_side_of_pair <- !is.null(b$audience$pair_id) &&
@@ -64,7 +64,7 @@ build_audience_lens_panel_data <- function(result, category_label,
           return(list(value = NA_real_, n_base = 0L, base_state = b$base_state,
                       delta_vs_total = NA_real_,
                       buyer_base_na = TRUE, formatted = "N/A †",
-                      delta_formatted = "n/a"))
+                      delta_formatted = "–"))
         }
         tot <- (total$metrics[[m$id]] %||% list(value = NA_real_))$value
         delta <- if (!is.na(bm$value) && !is.na(tot)) bm$value - tot else NA_real_
@@ -77,7 +77,7 @@ build_audience_lens_panel_data <- function(result, category_label,
       })
       total_cell <- {
         tm <- total$metrics[[m$id]]
-        if (is.null(tm)) list(value = NA_real_, formatted = "n/a") else
+        if (is.null(tm)) list(value = NA_real_, formatted = "–") else
           list(value = tm$value,
                formatted = .al_fmt_value(tm$value, m$kind, decimal_places))
       }
@@ -113,7 +113,7 @@ build_audience_lens_panel_data <- function(result, category_label,
           value_formatted = if (buyer_base_na) "N/A †" else
             .al_fmt_value(if (is.null(bm)) NA_real_ else bm$value,
                            m$kind, decimal_places),
-          delta_formatted = if (buyer_base_na) "n/a" else
+          delta_formatted = if (buyer_base_na) "–" else
             .al_fmt_delta(delta, m$kind, decimal_places),
           note = if (is.null(bm)) NULL else bm$note
         )
@@ -141,7 +141,7 @@ build_audience_lens_panel_data <- function(result, category_label,
                                    mapply(.al_fmt_value, pc$rows$value_b,
                                           pc$rows$kind, decimal_places,
                                           USE.NAMES = FALSE))
-    pc$rows$delta_fmt <- ifelse(pc$rows$buyer_base, "n/a",
+    pc$rows$delta_fmt <- ifelse(pc$rows$buyer_base, "–",
                                  mapply(.al_fmt_delta, pc$rows$delta_ab,
                                         pc$rows$kind, decimal_places,
                                         USE.NAMES = FALSE))
@@ -183,7 +183,7 @@ build_audience_lens_panel_data <- function(result, category_label,
 # ==============================================================================
 
 .al_fmt_value <- function(v, kind, dp) {
-  if (length(v) == 0 || is.na(v) || !is.finite(v)) return("n/a")
+  if (length(v) == 0 || is.na(v) || !is.finite(v)) return("–")
   dp <- as.integer(dp)
   switch(as.character(kind),
     "pct"   = sprintf("%.*f%%", dp, 100 * v),
@@ -197,7 +197,7 @@ build_audience_lens_panel_data <- function(result, category_label,
 
 
 .al_fmt_delta <- function(v, kind, dp) {
-  if (length(v) == 0 || is.na(v) || !is.finite(v)) return("n/a")
+  if (length(v) == 0 || is.na(v) || !is.finite(v)) return("–")
   dp <- as.integer(dp)
   switch(as.character(kind),
     "pct"   = sprintf("%+.*fpp", dp, 100 * v),

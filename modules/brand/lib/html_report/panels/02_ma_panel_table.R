@@ -175,7 +175,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     focal_cls <- if (is_focal) " ma-td-focal" else ""
     if (is.null(c)) {
       cells_html <- c(cells_html,
-        sprintf('<td class="ct-td ct-data-col ct-na%s">n/a</td>',
+        sprintf('<td class="ct-td ct-data-col ct-na%s">&ndash;</td>',
                 focal_cls))
     } else {
       cells_html <- c(cells_html, .ma_cell_html(c, focal_cls, stim))
@@ -230,7 +230,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
   sig       <- cell$sig_vs_avg %||% "na"
 
   if (is.null(pct_total) || is.na(pct_total)) {
-    return(sprintf('<td class="ct-td ct-data-col ct-na%s">n/a</td>',
+    return(sprintf('<td class="ct-td ct-data-col ct-na%s">&ndash;</td>',
                    focal_cls))
   }
 
@@ -265,7 +265,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 .ma_catavg_cell_html <- function(avg_pct, ci_lower, ci_upper, base_n) {
   if (is.null(avg_pct) || is.na(avg_pct)) {
-    return('<td class="ct-td ct-data-col ma-td-catavg ct-na" data-ma-brand="__avg__">n/a</td>')
+    return('<td class="ct-td ct-data-col ma-td-catavg ct-na" data-ma-brand="__avg__">&ndash;</td>')
   }
   # Funnel-style CI mini-bar (matches .ma-ci-bar-wrap used on Metrics tab and
   # the Category Buying DoP category-average row). Values are % on a 0-100 scale.
@@ -313,7 +313,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     v <- brand_avg[[b]]
     if (is.na(v)) {
       row_cells <- c(row_cells,
-        sprintf('<td class="ct-td ct-data-col ct-na%s" data-ma-brand="%s">n/a</td>',
+        sprintf('<td class="ct-td ct-data-col ct-na%s" data-ma-brand="%s">&ndash;</td>',
                 focal_cls, .ma_esc(b)))
     } else {
       row_cells <- c(row_cells, sprintf(
@@ -350,7 +350,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     round(ap_num * base / 100)
   } else NULL
 
-  n_total_display <- if (is.null(n_total) || is.na(n_total)) "n/a"
+  n_total_display <- if (is.null(n_total) || is.na(n_total)) "&ndash;"
                      else sprintf("n=%d", as.integer(n_total))
 
   cells <- character(0)
@@ -367,7 +367,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
     if (is_focal) {
       cells <- c(cells,
-        '<td class="ct-td ct-data-col ma-td-catavg ma-base-n" data-ma-brand="__avg__">n/a</td>')
+        '<td class="ct-td ct-data-col ma-td-catavg ma-base-n" data-ma-brand="__avg__">&ndash;</td>')
     }
   }
 

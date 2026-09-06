@@ -590,7 +590,7 @@
 
   function naCell(extraClass, colcode, brandCode) {
     return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}">
-      <span class="demo-na">n/a</span>
+      <span class="demo-na">&ndash;</span>
     </td>`;
   }
 
@@ -603,7 +603,7 @@
   }
 
   function pctStr(v, dp) {
-    if (v == null || !isFinite(v)) return '<span class="demo-na">n/a</span>';
+    if (v == null || !isFinite(v)) return '<span class="demo-na">&ndash;</span>';
     return v.toFixed(dp) + "%";
   }
   function countSpan(n) {

@@ -295,7 +295,7 @@ cb_buying_location_html <- function(result, focal_colour = "#1A5276") {
                          numeric(1)), na.rm = TRUE)
   if (!isTRUE(max_pct > 0)) max_pct <- 1
   bars <- paste(vapply(result$rows, function(r) {
-    label <- r$label %||% r$value %||% "n/a"
+    label <- r$label %||% r$value %||% "–"
     pct   <- r$pct_weighted %||% 0
     width <- max(2, min(100, pct / max_pct * 100))
     sprintf(paste0(

@@ -257,9 +257,9 @@ build_br_portfolio_panel <- function(results, config) {
     )
   }
 
-  fmt_n <- function(x) if (is.null(x) || is.na(x)) "n/a" else
+  fmt_n <- function(x) if (is.null(x) || is.na(x)) "\u2013" else
     format(round(x, 1), nsmall = 1)
-  fmt_x <- function(x) if (is.null(x) || is.na(x)) "n/a" else
+  fmt_x <- function(x) if (is.null(x) || is.na(x)) "\u2013" else
     sprintf("%.1f\u00d7", x)
 
   n_cats <- supporting$n_cats_total %||% 0L

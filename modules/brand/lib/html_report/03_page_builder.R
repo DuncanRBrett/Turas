@@ -425,14 +425,14 @@ build_br_summary_panel <- function(results, config) {
 
       mms_val <- if (!is.null(ma) && !is.null(ma$metrics_summary$focal_mms)) {
         sprintf("%.1f%%", ma$metrics_summary$focal_mms * 100)
-      } else "n/a"
+      } else "\u2013"
       mpen_val <- if (!is.null(ma) && !is.null(ma$metrics_summary$focal_mpen)) {
         sprintf("%.0f%%", ma$metrics_summary$focal_mpen * 100)
-      } else "n/a"
+      } else "\u2013"
       aware_val <- if (!is.null(funnel) &&
                         !is.null(funnel$metrics_summary$focal_by_stage$aware)) {
         sprintf("%.0f%%", 100 * funnel$metrics_summary$focal_by_stage$aware)
-      } else "n/a"
+      } else "\u2013"
 
       parts <- c(parts, sprintf('
 <div class="br-cat-card" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">
@@ -830,9 +830,9 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         cbf <- cat_results$cat_buying_frequency
         if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
           pct_b  <- if (!is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
-            sprintf("%.0f%%", cbf$pct_buyers) else "n/a"
+            sprintf("%.0f%%", cbf$pct_buyers) else "\u2013"
           mfreq  <- if (!is.null(cbf$mean_freq) && !is.na(cbf$mean_freq))
-            sprintf("%.1f\u00d7/month", cbf$mean_freq) else "n/a"
+            sprintf("%.1f\u00d7/month", cbf$mean_freq) else "\u2013"
           n_resp <- if (!is.null(cbf$n_respondents) && !is.na(cbf$n_respondents))
             sprintf("n = %d all respondents", cbf$n_respondents) else ""
 
@@ -1013,9 +1013,9 @@ build_br_portfolio_panel <- function(results, config) {
     init_aw   <- aw_map[[active_bc]]
     # both cat_usage_pct and awareness_pct from portfolio_overview are 0-100 scale
     usage_str <- if (!is.null(usage_pct) && is.finite(usage_pct))
-      sprintf("%.0f%%", usage_pct) else "n/a"
+      sprintf("%.0f%%", usage_pct) else "\u2013"
     aware_str <- if (!is.null(init_aw) && is.finite(init_aw))
-      sprintf("%.0f%%", init_aw) else "n/a"
+      sprintf("%.0f%%", init_aw) else "\u2013"
 
     depth_badge <- if (depth == "full")
       sprintf('<span style="background:#EBF5FB;color:%s;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">Full</span>',
@@ -1062,7 +1062,7 @@ build_br_portfolio_panel <- function(results, config) {
       try { map = JSON.parse(row.getAttribute("data-br-port-awareness")); } catch(x) {}
       var val = map[brand];
       var cell = row.querySelector(".br-port-aware-cell");
-      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val) + "%%" : "n/a";
+      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val) + "%%" : "\u2013";
     });
   });
 })();

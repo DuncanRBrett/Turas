@@ -16,7 +16,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 }
 
 .bt_fmt <- function(x, d = 1, pct = FALSE) {
-  if (is.na(x)) return("n/a")
+  if (is.na(x)) return("\u2013")
   if (pct) sprintf("%.*f%%", d, x) else sprintf("%.*f", d, x)
 }
 
@@ -238,8 +238,8 @@ build_crossover_grid_table <- function(crossover_matrix, focal_brand = NULL) {
 
     for (cb in col_brands) {
       val <- crossover_matrix[[cb]][i]
-      cell_text <- if (is.na(val)) "n/a"
-                   else if (val >= 100) "n/a"
+      cell_text <- if (is.na(val)) "\u2013"
+                   else if (val >= 100) "\u2013"
                    else sprintf("%.0f%%", val)
       cell_style <- .heat_bg(val)
       if (!is.null(focal_brand) && cb == focal_brand) {
