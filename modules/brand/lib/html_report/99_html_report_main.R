@@ -169,10 +169,16 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
       sep = "\n")
   }
   if (exists("build_ma_panel_styles", mode = "function")) {
+    # build_ma_panel_styles() already returns its CSS inside a
+    # <style class="ma-panel-styles"> tag, as the funnel, advantage and brand
+    # selector styling functions do. Wrapping it again nested one style
+    # element inside another, and a CSS parser recovering from that discards
+    # the malformed prelude plus the next declaration block, which killed
+    # .ma-panel { --ma-brand: ...; position: relative; background: #fff;
+    # border: ... } outright. Proved in headless Chrome 6 September 2026.
     css <- tryCatch(build_ma_panel_styles(brand_colour_cfg), error = function(e) "")
     if (nzchar(trimws(css)))
-      panel_styles <- paste(panel_styles,
-        paste0('<style class="ma-panel-styles">', css, '</style>'), sep = "\n")
+      panel_styles <- paste(panel_styles, css, sep = "\n")
   }
   if (exists("build_ma_advantage_styles", mode = "function")) {
     css <- tryCatch(build_ma_advantage_styles(brand_colour_cfg), error = function(e) "")
