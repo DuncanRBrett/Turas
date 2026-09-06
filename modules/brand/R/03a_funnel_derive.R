@@ -42,7 +42,10 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 #   funnel and the MA tab measure DIFFERENT constructs by design and so
 #   carry different numbers, the funnel tracks loyalty-style buyer
 #   conversion, the MA tab tracks growth-potential memory presence.
-.FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2")
+#
+# Membership is named by ROLE, never by raw code (2026-09-06). See
+# .FUNNEL_CONSIDERATION_ROLES and .funnel_resolve_consideration() below for
+# why, and for what happens to a config that still carries raw codes.
 
 
 # ==============================================================================
@@ -102,14 +105,253 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
   long_tenured_s     = "Current customers of the brand whose tenure meets or exceeds the configured tenure threshold. This stage is gated on being a current customer of the brand, and not on awareness or preference. The base toggle above the table sets whether the stages are combined."
 )
 
-# Positive attitude role set used as the Consider membership gate when the
-# survey carries an OptionMap on the attitude column. Top-2 only (Love +
-# Prefer), the industry-conventional top-2-box consider definition.
-# Ambivalent and Price-conditional respondents are NOT considered: they
-# don't have an active preference, only a conditional willingness.
-.FUNNEL_POSITIVE_ATTITUDE_ROLES <- c(
+# ==============================================================================
+# CONSIDERATION SET
+# ==============================================================================
+#
+# The Consider stage's membership is named by ROLE, not by raw response code.
+# A role is a position on the attitude scale ("attitude.love"); a code is
+# whatever this particular survey happened to export for it ("1", or "Love",
+# or "I love it. it's my favourite"). Naming roles means one definition
+# survives a survey that exports some attitude columns as numbers and others
+# as labels, which Alchemer does routinely.
+#
+# Until 2026-09-06 the config knob took raw codes, and an override silently
+# changed the MECHANISM as well as the membership: codes equal to the built-in
+# pair were resolved through the OptionMap by role, and anything else was
+# matched literally against the data. Overriding a label-encoded category
+# therefore returned an empty stage rather than refusing. The resolver below
+# is the single path; raw codes are resolved to roles first and then expanded
+# the same way.
+#
+# Default set. A role in this set that the survey's scale does not carry is
+# dropped and reported, not refused, because scales of different lengths are
+# legitimately in the field. A role the OPERATOR names and the scale does not
+# carry is a refusal.
+.FUNNEL_CONSIDERATION_ROLES <- c(
   "attitude.love", "attitude.prefer"
 )
+
+# Spellings an operator may reasonably type in the Settings sheet, mapped to
+# the canonical role. "reject" to "avoid" is handled separately by
+# .funnel_canonical_attitude_role() in 03b_funnel_metrics.R.
+.FUNNEL_CONSIDERATION_ROLE_SYNONYMS <- c(
+  "attitude.price_only"        = "attitude.price",
+  "attitude.priceonly"         = "attitude.price",
+  "attitude.price_conditional" = "attitude.price",
+  "attitude.conditional"       = "attitude.price",
+  "attitude.noopinion"         = "attitude.no_opinion",
+  "attitude.none"              = "attitude.no_opinion",
+  "attitude.dont_know"         = "attitude.no_opinion",
+  "attitude.do_not_know"       = "attitude.no_opinion"
+)
+
+
+#' Normalise operator-supplied consideration role names
+#'
+#' Accepts a character vector or a single comma / semicolon separated string,
+#' short names ("love, prefer, price") or full ones ("attitude.love"), in any
+#' case, with spaces or hyphens where the canonical name has an underscore.
+#'
+#' @param roles Character vector or string.
+#' @return Character vector of canonical role names, deduplicated.
+#' @keywords internal
+.funnel_normalise_consideration_roles <- function(roles) {
+  r <- as.character(unlist(roles, use.names = FALSE))
+  r <- unlist(strsplit(r, "[,;]"), use.names = FALSE)
+  r <- tolower(trimws(r))
+  r <- r[!is.na(r) & nzchar(r)]
+  if (length(r) == 0L) return(character(0))
+  bare <- !grepl("^attitude\\.", r)
+  r[bare] <- paste0("attitude.", r[bare])
+  r <- gsub("[ \\-]+", "_", r)
+  hit <- r %in% names(.FUNNEL_CONSIDERATION_ROLE_SYNONYMS)
+  r[hit] <- unname(.FUNNEL_CONSIDERATION_ROLE_SYNONYMS[r[hit]])
+  unique(.funnel_canonical_attitude_role(r))
+}
+
+
+#' Resolve the Consider stage's accepted response values
+#'
+#' One path for every caller. The attitude scale is resolved to a role to
+#' codes map by \code{.resolve_attitude_role_codes()} (operator override,
+#' then OptionMap, then the built-in five-level convention), and the named
+#' roles are looked up in it. A role the operator named that the scale does
+#' not carry is a TRS refusal, not an empty stage. A role in the BUILT-IN
+#' default set that the scale does not carry is dropped and reported, because
+#' a five-level scale legitimately has no price-conditional level.
+#'
+#' @param attitude_entry Role-map entry for funnel.attitude.
+#' @param roles Character vector of role names (already normalised).
+#' @param roles_are_default TRUE when \code{roles} is the built-in set rather
+#'   than an operator choice.
+#' @param codes Optional character vector of legacy raw response codes. When
+#'   supplied it REPLACES \code{roles}: each code is resolved back to the role
+#'   whose accepted set contains it and expanded to that role's full set.
+#' @param cat_code Category code, for the refusal message only.
+#'
+#' @return List with \code{values} (lowercase accepted response values),
+#'   \code{roles_used}, \code{roles_dropped}, \code{unmatched_codes},
+#'   \code{source} ("roles" or "codes"), \code{notes} (character vector).
+#' @keywords internal
+.funnel_resolve_consideration <- function(attitude_entry, roles,
+                                          roles_are_default = TRUE,
+                                          codes = NULL, cat_code = NULL) {
+  role_to_codes <- .resolve_attitude_role_codes(attitude_entry)
+  if (!is.list(role_to_codes)) role_to_codes <- list()
+
+  .accepted <- function(role) {
+    v <- role_to_codes[[role]]
+    v <- tolower(trimws(as.character(v %||% character(0))))
+    unique(v[!is.na(v) & nzchar(v)])
+  }
+
+  notes <- character(0)
+
+  if (!is.null(codes) && length(codes) > 0) {
+    raw <- tolower(trimws(as.character(unlist(codes, use.names = FALSE))))
+    raw <- raw[!is.na(raw) & nzchar(raw)]
+    declared      <- .funnel_declared_scale_roles(attitude_entry)
+    matched_roles <- character(0)
+    unmatched     <- character(0)
+    for (code in raw) {
+      owner <- Filter(function(r) code %in% .accepted(r), declared)
+      if (length(owner) > 0) {
+        matched_roles <- c(matched_roles, unlist(owner, use.names = FALSE))
+      } else {
+        unmatched <- c(unmatched, code)
+      }
+    }
+    matched_roles <- unique(matched_roles)
+    values <- unique(c(unlist(lapply(matched_roles, .accepted),
+                              use.names = FALSE),
+                       unmatched))
+    notes <- c(notes, sprintf(
+      paste("funnel.positive_attitude_codes is deprecated. Codes %s resolved",
+            "to roles %s. Set funnel_consideration_roles to the role names",
+            "instead, so the definition survives a survey that exports",
+            "labels rather than numbers."),
+      paste(raw, collapse = ", "),
+      if (length(matched_roles) > 0) paste(matched_roles, collapse = ", ")
+      else "(none)"))
+    if (length(unmatched) > 0) {
+      notes <- c(notes, sprintf(
+        paste("Codes %s match no position on the attitude scale and are",
+              "matched literally against the data. Check the OptionMap."),
+        paste(unmatched, collapse = ", ")))
+    }
+    return(list(values = values, roles_used = matched_roles,
+                roles_dropped = character(0), unmatched_codes = unmatched,
+                source = "codes", notes = notes))
+  }
+
+  known <- roles %in% .FUNNEL_ATTITUDE_POSITIONS
+  if (any(!known)) {
+    .funnel_refuse_unknown_roles(roles[!known])
+  }
+  declared <- .funnel_declared_scale_roles(attitude_entry)
+  present  <- roles %in% declared &
+                vapply(roles, function(r) length(.accepted(r)) > 0, logical(1))
+  if (any(!present) && !isTRUE(roles_are_default)) {
+    .funnel_refuse_absent_roles(roles[!present], declared, cat_code)
+  }
+  dropped <- roles[!present]
+  used    <- roles[present]
+  if (length(dropped) > 0) {
+    notes <- c(notes, sprintf(
+      paste("The attitude scale carries no %s level, so the Consider stage",
+            "is %s on this survey."),
+      paste(sub("^attitude\\.", "", dropped), collapse = " or "),
+      paste(sub("^attitude\\.", "", used), collapse = " plus ")))
+  }
+  values <- unique(unlist(lapply(used, .accepted), use.names = FALSE))
+  list(values = values, roles_used = used, roles_dropped = dropped,
+       unmatched_codes = character(0), source = "roles", notes = notes)
+}
+
+
+#' Which positions the survey's attitude scale actually declares
+#'
+#' Not the same question as "what values would match this role".
+#' \code{.option_map_by_role()} folds a set of hardcoded label aliases into
+#' every role, so its result is never empty and cannot answer whether the
+#' scale carries a level. This reads the declaration itself: the operator's
+#' \code{attitude_role_codes} override, else the OptionMap's Role column,
+#' else the built-in five-level convention.
+#'
+#' @param attitude_entry Role-map entry for funnel.attitude.
+#' @return Character vector of canonical role names.
+#' @keywords internal
+.funnel_declared_scale_roles <- function(attitude_entry) {
+  if (!is.null(attitude_entry$attitude_role_codes)) {
+    src <- attitude_entry$attitude_role_codes
+    keep <- vapply(src, function(v) length(v) > 0, logical(1))
+    return(.funnel_canonical_attitude_role(names(src)[keep]))
+  }
+  om <- attitude_entry$option_map
+  if (!is.null(om) && is.data.frame(om) && "Role" %in% names(om)) {
+    r <- tolower(trimws(as.character(om$Role)))
+    r <- r[!is.na(r) & nzchar(r)]
+    r <- sub("^attitude_scale\\.", "attitude.", r)
+    return(unique(.funnel_canonical_attitude_role(r)))
+  }
+  keep <- vapply(.FUNNEL_DEFAULT_ATTITUDE_ROLE_CODES,
+                 function(v) length(v) > 0, logical(1))
+  .funnel_canonical_attitude_role(
+    names(.FUNNEL_DEFAULT_ATTITUDE_ROLE_CODES)[keep])
+}
+
+
+#' @keywords internal
+.funnel_refuse_unknown_roles <- function(bad) {
+  brand_refuse(
+    code = "CFG_CONSIDERATION_ROLE_UNKNOWN",
+    title = "Unrecognised Consideration Role",
+    problem = sprintf(
+      "funnel_consideration_roles names %s, which is not a position on the attitude scale.",
+      paste(bad, collapse = ", ")),
+    why_it_matters = paste(
+      "The Consider stage is defined by naming positions on the attitude",
+      "scale. A name Turas does not recognise would silently contribute no",
+      "respondents, and the stage would read lower than it should."
+    ),
+    how_to_fix = c(
+      sprintf("Use one or more of: %s.",
+              paste(sub("^attitude\\.", "", .FUNNEL_ATTITUDE_POSITIONS),
+                    collapse = ", ")),
+      "Short names are accepted, so 'love, prefer, price' is enough.",
+      "See modules/brand/docs/FUNNEL_SPEC_v2.md."
+    ),
+    expected = paste(.FUNNEL_ATTITUDE_POSITIONS, collapse = ", "),
+    observed = paste(bad, collapse = ", ")
+  )
+}
+
+
+#' @keywords internal
+.funnel_refuse_absent_roles <- function(bad, declared, cat_code) {
+  have <- declared
+  brand_refuse(
+    code = "CFG_CONSIDERATION_ROLE_ABSENT",
+    title = "Consideration Role Not On This Scale",
+    problem = sprintf(
+      "funnel_consideration_roles names %s, which the attitude scale for %s does not carry.",
+      paste(bad, collapse = ", "), cat_code %||% "this category"),
+    why_it_matters = paste(
+      "Turas would have to compute the Consider stage without the level you",
+      "asked for. That returns a stage that looks computed but is missing",
+      "respondents you meant to include, which is worse than refusing."
+    ),
+    how_to_fix = c(
+      sprintf("Levels declared on this scale: %s.",
+              if (length(have) > 0) paste(have, collapse = ", ") else "(none)"),
+      "Add the missing level to the OptionMap sheet (Scale = attitude_scale) with its Role, or",
+      "drop it from funnel_consideration_roles in Brand_Config.xlsx Settings."
+    ),
+    expected = paste(have, collapse = ", "),
+    missing = paste(bad, collapse = ", ")
+  )
+}
 
 
 # ==============================================================================
@@ -134,23 +376,46 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 #' @param brand_list Data frame with BrandCode column.
 #' @param tenure_threshold Character. Value from the tenure OptionMap at or
 #'   above which "long-tenured" is TRUE. NULL disables the tenure stage.
+#' @param consideration_roles Character vector of attitude role names that
+#'   make up the Consider stage. Defaults to
+#'   \code{.FUNNEL_CONSIDERATION_ROLES}.
+#' @param positive_attitude_codes Deprecated. Raw response codes, kept so a
+#'   config written before 2026-09-06 keeps working. When supplied it
+#'   replaces \code{consideration_roles} and is resolved through the same
+#'   OptionMap path.
 #'
 #' @return List with:
 #'   \item{stages}{Named list of stage entries, each a list with \code{key},
 #'     \code{label}, \code{matrix} (logical, respondents × brands).}
 #'   \item{warnings}{Character vector. Reasons for dropped stages.}
+#'   \item{consideration}{Resolution record from
+#'     \code{.funnel_resolve_consideration()}.}
 #'   \item{category_type}{Echoed.}
 #'
 #' @export
 derive_funnel_stages <- function(data, role_map, category_type,
                                  brand_list, tenure_threshold = NULL,
                                  cat_code = NULL,
-                                 positive_attitude_codes =
-                                   .FUNNEL_POSITIVE_ATTITUDE_CODES) {
+                                 consideration_roles = NULL,
+                                 positive_attitude_codes = NULL) {
 
   .check_category_type(category_type)
   .require_role_lookup(role_map, "funnel.awareness", cat_code)
   .require_role_lookup(role_map, "funnel.attitude", cat_code)
+
+  # One resolution, one refusal point. Both the stage matrix below and the
+  # meta the panel reports are built from this record.
+  roles_are_default <- is.null(consideration_roles) ||
+                        length(consideration_roles) == 0L
+  roles <- if (roles_are_default) .FUNNEL_CONSIDERATION_ROLES else
+             .funnel_normalise_consideration_roles(consideration_roles)
+  consideration <- .funnel_resolve_consideration(
+    attitude_entry    = .lookup_role(role_map, "funnel.attitude", cat_code),
+    roles             = roles,
+    roles_are_default = roles_are_default,
+    codes             = positive_attitude_codes,
+    cat_code          = cat_code)
+  .funnel_report_consideration(consideration, cat_code)
 
   plan    <- .FUNNEL_STAGE_PLAN[[category_type]]
   brands  <- as.character(brand_list$BrandCode)
@@ -183,7 +448,7 @@ derive_funnel_stages <- function(data, role_map, category_type,
   for (key in plan) {
     mat <- .derive_stage_matrix(
       key, data, role_map, brands, n_resp, category_type,
-      tenure_threshold, cat_code, positive_attitude_codes,
+      tenure_threshold, cat_code, consideration$values,
       brand_aliases = brand_aliases)
     if (is.null(mat$matrix)) {
       warns <- c(warns, mat$warning)
@@ -196,7 +461,28 @@ derive_funnel_stages <- function(data, role_map, category_type,
     )
   }
 
-  list(stages = stages_out, warnings = warns, category_type = category_type)
+  list(stages = stages_out, warnings = warns,
+       consideration = consideration, category_type = category_type)
+}
+
+
+#' Print the consideration resolution to the console
+#'
+#' Turas runs inside a Shiny app, so anything the operator has to act on is
+#' written to the console as well as carried in the result (CLAUDE.md,
+#' Deployment Context). A dropped default role and a deprecated code list are
+#' both operator-visible facts, and neither degrades the run to PARTIAL.
+#' @keywords internal
+.funnel_report_consideration <- function(consideration, cat_code) {
+  if (length(consideration$notes) == 0) return(invisible(FALSE))
+  cat("\n=== TURAS BRAND: FUNNEL CONSIDER STAGE ===\n")
+  cat("Category:", cat_code %||% "(single category)", "\n")
+  for (n in consideration$notes) cat(" *", n, "\n")
+  cat("Consider set:",
+      if (length(consideration$roles_used) > 0)
+        paste(consideration$roles_used, collapse = ", ") else "(empty)", "\n")
+  cat("==========================================\n\n")
+  invisible(TRUE)
 }
 
 
@@ -370,14 +656,14 @@ validate_nesting <- function(stages, weights = NULL) {
 #' @keywords internal
 .derive_stage_matrix <- function(key, data, role_map, brands, n_resp,
                                  category_type, tenure_threshold,
-                                 cat_code, positive_attitude_codes,
+                                 cat_code, consideration_values,
                                  brand_aliases = NULL) {
 
   switch(key,
     aware = list(matrix = .stage_awareness(
       role_map, data, brands, n_resp, cat_code, brand_aliases)),
     consideration = list(matrix = .stage_consideration(
-      role_map, data, brands, n_resp, cat_code, positive_attitude_codes,
+      role_map, data, brands, n_resp, cat_code, consideration_values,
       brand_aliases)),
 
     bought_long = .stage_penetration_long(
@@ -433,25 +719,28 @@ validate_nesting <- function(stages, weights = NULL) {
   .multi_mention_or_empty(entry, data, brands, n_resp, brand_aliases)
 }
 
-#' Consideration stage: attitude top-2 (Love + Prefer)
+#' Consideration stage: the resolved consideration set
 #'
-#' A respondent passes the Consider stage for a brand iff they are aware
-#' of the brand AND hold a top-2 positive attitude (Love or Prefer).
-#' Ambivalent / Price-conditional / Avoid / No-opinion respondents are
-#' excluded.
+#' A respondent passes the Consider stage for a brand when their answer to
+#' the per-brand attitude question sits at one of the scale positions named
+#' by the consideration set. The set arrives already resolved, by
+#' \code{.funnel_resolve_consideration()} in this file, so this function has
+#' one matching path and no fallback: it matches lowercased, trimmed response
+#' values against \code{consideration_values}.
 #'
-#' Uses alias-aware matching via \code{.option_map_by_role()} in
-#' 03b_funnel_metrics.R, so a survey that exports some attitude columns
-#' as numeric codes ("1", "2") and others as text labels ("love",
-#' "prefer") still resolves consistently. Falls back to the raw
-#' \code{pos_codes} when no OptionMap is available on the entry.
+#' The resolution is alias-aware via \code{.option_map_by_role()} in
+#' 03b_funnel_metrics.R, so a survey that exports some attitude columns as
+#' numeric codes ("1", "2") and others as text labels ("love", "prefer")
+#' resolves the same way. Before 2026-09-06 that resolution ran only when the
+#' config had not overridden the set, and an override was matched literally,
+#' which returned an empty stage on a label-encoded category.
 #'
 #' Mental Penetration (≥1 CEP linkage, per Romaniuk Better Brand Health)
 #' is reported separately on the Mental Availability tab, not in the
 #' funnel.
 #' @keywords internal
 .stage_consideration <- function(role_map, data, brands, n_resp, cat_code,
-                                 pos_codes, brand_aliases = NULL) {
+                                 consideration_values, brand_aliases = NULL) {
   entry <- .lookup_role(role_map, "funnel.attitude", cat_code)
   if (is.null(entry)) return(.empty_brand_matrix(brands, n_resp))
   if (isTRUE(entry$per_brand)) {
@@ -461,27 +750,10 @@ validate_nesting <- function(stages, weights = NULL) {
     out <- matrix(FALSE, n_resp, length(brands),
                   dimnames = list(NULL, brands))
 
-    is_default_pos_codes <- identical(
-      as.character(pos_codes),
-      as.character(.FUNNEL_POSITIVE_ATTITUDE_CODES)
-    )
-    role_to_codes <- if (is_default_pos_codes) {
-      tryCatch(.resolve_attitude_role_codes(entry),
-               error = function(e) NULL)
-    } else NULL
-
-    if (!is.null(role_to_codes)) {
-      positive_vals <- unique(unlist(
-        role_to_codes[.FUNNEL_POSITIVE_ATTITUDE_ROLES],
-        use.names = FALSE
-      ))
-      positive_vals <- tolower(trimws(as.character(positive_vals)))
-      positive_vals <- positive_vals[nzchar(positive_vals)]
-      positive_vals <- unique(c(positive_vals,
-                                tolower(as.character(pos_codes))))
-    } else {
-      positive_vals <- tolower(trimws(as.character(pos_codes)))
-    }
+    positive_vals <- tolower(trimws(as.character(
+      consideration_values %||% character(0))))
+    positive_vals <- unique(positive_vals[!is.na(positive_vals) &
+                                            nzchar(positive_vals)])
 
     # When a brand has NO per-brand attitude column (column-name mismatch
     # between awareness and attitude, e.g. PAS list contains WWT but data

@@ -1189,6 +1189,19 @@ if (!exists(".find_brand_col", mode = "function")) {
   tenure <- config$funnel_tenure_threshold %||%
              config$`funnel.tenure_threshold`
   alpha <- config$alpha %||% 0.05
+  # Consider-stage membership, named by attitude role. Blank in Settings
+  # means the Turas default set. The raw-code key below it is the pre
+  # 2026-09-06 knob, still read so an existing config keeps working.
+  .blank_to_null <- function(x) {
+    if (is.null(x)) return(NULL)
+    v <- as.character(x)
+    v <- v[!is.na(v) & nzchar(trimws(v))]
+    if (length(v) == 0) NULL else v
+  }
+  cons_roles <- .blank_to_null(config$funnel_consideration_roles %||%
+                                 config$`funnel.consideration_roles`)
+  pos_codes <- .blank_to_null(config$funnel_positive_attitude_codes %||%
+                                config$`funnel.positive_attitude_codes`)
 
   list(
     `category.type`            = cat_type,
@@ -1198,7 +1211,9 @@ if (!exists(".find_brand_col", mode = "function")) {
     `funnel.warn_base`         = warn_b,
     `funnel.suppress_base`     = supp_b,
     `funnel.tenure_threshold`  = tenure,
-    `funnel.significance_level` = alpha
+    `funnel.significance_level` = alpha,
+    `funnel.consideration_roles` = cons_roles,
+    `funnel.positive_attitude_codes` = pos_codes
   )
 }
 

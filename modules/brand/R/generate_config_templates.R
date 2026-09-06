@@ -278,7 +278,10 @@ BRAND_CONFIG_VERSION <- "2.0"
              integer_range = c(0, 200)),
         list(name = "funnel_tenure_threshold", required = FALSE, default = "",
              description = "Attitude scale code that marks the boundary between 'non-user' and 'rejector' in the funnel. Typically the code for 'I would refuse to buy this brand'. Leave blank to derive from OptionMap.",
-             valid_values_text = "Attitude option code (e.g. 4), or blank")
+             valid_values_text = "Attitude option code (e.g. 4), or blank"),
+        list(name = "funnel_consideration_roles", required = FALSE, default = "",
+             description = "Which positions on the brand attitude scale count as consideration. Named by role, never by response code, so the definition survives a survey that exports labels rather than numbers. Comma separated. Leave blank for the Turas standard. Valid roles: love, prefer, ambivalent, price, avoid, no_opinion. A role named here that the scale does not carry refuses the run rather than returning an empty stage.",
+             valid_values_text = "Comma separated roles (e.g. love, prefer, price), or blank")
       )
     ),
 

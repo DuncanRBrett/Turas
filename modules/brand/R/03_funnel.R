@@ -64,8 +64,11 @@ run_funnel <- function(data, role_map, brand_list, config,
   tenure_thr    <- config[["funnel.tenure_threshold"]]
 
   cat_code <- config$cat_code  # may be NULL for legacy single-cat callers
-  pos_codes <- config[["funnel.positive_attitude_codes"]] %||%
-    .FUNNEL_POSITIVE_ATTITUDE_CODES
+  # The Consider stage is named by role. funnel.positive_attitude_codes is
+  # the pre-2026-09-06 raw-code knob, still honoured, resolved through the
+  # same OptionMap path and reported as deprecated on the console.
+  cons_roles <- config[["funnel.consideration_roles"]]
+  pos_codes  <- config[["funnel.positive_attitude_codes"]]
 
   derived <- derive_funnel_stages(
     data          = data,
@@ -74,6 +77,7 @@ run_funnel <- function(data, role_map, brand_list, config,
     brand_list    = brand_list,
     tenure_threshold = tenure_thr,
     cat_code      = cat_code,
+    consideration_roles = cons_roles,
     positive_attitude_codes = pos_codes
   )
   # v3 aggregate funnel: validate_nesting returns structured warnings rather
@@ -265,7 +269,16 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
     n_weighted    = n_w,
     n_effective   = n_e,
     stage_count   = length(derived$stages),
-    stage_keys    = names(derived$stages)
+    stage_keys    = names(derived$stages),
+    # How the Consider stage was defined on this run: which scale positions
+    # it accepted, which named position the scale did not carry, and whether
+    # the definition came from role names or from a deprecated code list.
+    consideration = list(
+      roles_used    = derived$consideration$roles_used %||% character(0),
+      roles_dropped = derived$consideration$roles_dropped %||% character(0),
+      source        = derived$consideration$source %||% "roles",
+      notes         = derived$consideration$notes %||% character(0)
+    )
   )
 }
 
