@@ -59,7 +59,24 @@ test_that("missing sources are simply omitted; nothing at all gives NULL", {
   expect_null(.brsum_penetration_notes(list(), list(), "Nowhere"))
 })
 
-test_that("the summary card grid carries the callout container", {
-  html <- .brsum_card_grid_skeleton()
+test_that("the How this works drawer carries the callout container", {
+  # Stage 3 moved the "Which penetration is which" block out of the card
+  # grid, where it was always open, into the collapsed "How this works"
+  # drawer at the foot of the Overview. The container keeps its name, so
+  # renderPenetrationNotes() in js/brand_summary_panel.js still finds it.
+  html <- .brsum_howto_drawer()
   expect_true(grepl("data-brsum-pen-notes", html, fixed = TRUE))
+  expect_false(grepl("data-brsum-pen-notes", .brsum_card_grid_skeleton(),
+                     fixed = TRUE))
+
+  # The drawer starts collapsed, and the toggle says so.
+  expect_true(grepl('class="brsum-howto-body" hidden', html, fixed = TRUE))
+  expect_true(grepl('aria-expanded="false"', html, fixed = TRUE))
+  expect_true(grepl("brsumToggleHowTo(this)", html, fixed = TRUE))
+
+  # One disclosure, not two: the methodology callout inside the drawer is
+  # rendered expanded, so opening the drawer shows everything.
+  if (exists("turas_callout", mode = "function")) {
+    expect_false(grepl("t-callout collapsed", html, fixed = TRUE))
+  }
 })

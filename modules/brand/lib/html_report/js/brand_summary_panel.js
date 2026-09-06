@@ -695,9 +695,10 @@
    * ahead of the category average against behind it.
    *
    * The card keys stay `working` and `weak` because pins, PNG capture and
-   * Excel export resolve a section by data-section="brsum-<key>" and
-   * analysts have saved work against those names. The key is an identifier
-   * and the card title is a label; nothing derives one from the other.
+   * Excel export resolve a section by its data-section attribute, which is
+   * brsum plus the key, and analysts have saved work against those names.
+   * The key is an identifier and the card title is a label; nothing derives
+   * one from the other.
    * --------------------------------------------------------------------- */
   var CONCEPTS = {
     working: {
@@ -1281,6 +1282,23 @@
     var wrap = btn ? btn.closest('[data-brsum-edu]') : null;
     if (!wrap) return;
     wrap.classList.toggle('open');
+  };
+
+  /* -------------------------------------------------------------------------
+   * "How this works" drawer (collapsed by default)
+   *
+   * Holds the methodology text and the "Which penetration is which" block.
+   * The drawer is the one disclosure: the callout inside it is rendered
+   * expanded, so opening the drawer shows everything rather than presenting
+   * a second thing to click.
+   * ------------------------------------------------------------------------- */
+  window.brsumToggleHowTo = function (btn) {
+    var wrap = btn ? btn.closest('.brsum-howto') : null;
+    var body = wrap ? wrap.querySelector('.brsum-howto-body') : null;
+    if (!body) return;
+    var opening = body.hidden;
+    body.hidden = !opening;
+    btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
   };
 
   /* -------------------------------------------------------------------------

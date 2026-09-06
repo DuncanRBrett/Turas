@@ -106,7 +106,7 @@ build_brand_summary_panel <- function(results, config) {
           else ""),
         shopper_summary_html,
         closing_strip_html,
-        .brsum_educational_callout(),
+        .brsum_howto_drawer(),
       '</div>',
     '</div>',
     sep = "\n"
@@ -687,6 +687,25 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 .brsum-edu-body p { margin: 6px 0; }
 .brsum-edu-body strong { color: #0f172a; }
 
+/* ---- How this works drawer (collapsed) ---- */
+.brsum-howto { margin: 40px 0 0; border-top: 1px solid #e2e8f0;
+  padding-top: 16px; }
+.brsum-howto-toggle { background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 0; }
+.brsum-howto-toggle:hover { color: %FOCAL%; }
+.brsum-howto-arrow { display: inline-block; transition: transform 0.15s;
+  font-size: 10px; color: #94a3b8; }
+.brsum-howto-arrow::before { content: "\\25BE"; }
+.brsum-howto-toggle[aria-expanded="true"] .brsum-howto-arrow {
+  transform: rotate(180deg);
+}
+.brsum-howto-body { margin-top: 10px; }
+.brsum-howto-body .brsum-pen-notes { margin-top: 0; }
+.brsum-howto-body .brsum-edu { margin: 14px 0 0; border-top: none;
+  padding-top: 0; }
+
 /* ---- Responsive collapse ---- */
 @media (max-width: 820px) {
   .brsum-card-grid { grid-template-columns: 1fr; }
@@ -701,10 +720,14 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 /* ---- Print ---- */
 @media print {
-  .brsum-dropdown-bar, .brsum-insight-toolbar, .brsum-edu-toggle {
+  .brsum-dropdown-bar, .brsum-insight-toolbar, .brsum-edu-toggle,
+  .brsum-howto-toggle, .brsum-tile-go {
     display: none !important;
   }
   .brsum-edu-body { display: block !important; }
+  /* A collapsed drawer must still print: it holds the bases and the
+     definitions, and a printed page cannot be opened. */
+  .brsum-howto-body[hidden] { display: block !important; }
   [data-brsum-fade] { opacity: 1 !important; }
 }
 '
@@ -2217,7 +2240,6 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       card("conversation", "Word of mouth"),
       card("repertoire",   "Repertoire ties, who focal buyers also buy"),
     '</div>',
-    '<aside class="brsum-pen-notes" data-brsum-pen-notes hidden aria-live="polite"></aside>',
     sep = "\n"
   )
 }
@@ -2315,15 +2337,48 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
-.brsum_educational_callout <- function() {
+.brsum_educational_callout <- function(collapsed = TRUE) {
   # Body sourced from the central callout registry
   # (modules/shared/lib/callouts/callouts.json -> brand.executive_summary).
-  # Editable via the Callout Editor.
+  # Editable via the Callout Editor. The text is unchanged; only whether it
+  # starts collapsed is a caller's choice, because inside the "How this
+  # works" drawer the drawer is already the disclosure and a second one
+  # would make the reader click twice for the same thing.
   if (exists("turas_callout", mode = "function")) {
-    turas_callout("brand", "executive_summary", collapsed = TRUE)
+    turas_callout("brand", "executive_summary", collapsed = collapsed)
   } else {
     ""
   }
+}
+
+
+# "How this works", collapsed.
+#
+# Everything that explains the page rather than reporting it: the
+# methodology callout, and the "Which penetration is which" block that sets
+# the report's several penetration figures side by side with their bases.
+# Both were previously loose on the page, the callout with a disclosure of
+# its own and the penetration block always open under the card grid. The
+# text of neither is changed.
+#
+# It renders even when the penetration block has nothing to say, because the
+# methodology callout is always worth having; when both are empty it renders
+# nothing at all rather than an empty drawer.
+.brsum_howto_drawer <- function() {
+  callout <- .brsum_educational_callout(collapsed = FALSE)
+  paste(
+    '<section class="brsum-howto" data-brsum-howto>',
+      '<button type="button" class="brsum-howto-toggle" aria-expanded="false" ',
+        'onclick="brsumToggleHowTo(this)">How this works',
+        '<span class="brsum-howto-arrow" aria-hidden="true"></span></button>',
+      '<div class="brsum-howto-body" hidden>',
+        '<aside class="brsum-pen-notes" data-brsum-pen-notes hidden ',
+          'aria-live="polite"></aside>',
+        callout,
+      '</div>',
+    '</section>',
+    sep = "\n"
+  )
 }
 
 
