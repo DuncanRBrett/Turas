@@ -466,6 +466,232 @@ build_br_summary_panel <- function(results, config) {
 }
 
 
+# ==============================================================================
+# DESTINATIONS
+# ==============================================================================
+# The five places a reader can be inside one category.
+#
+# `id` is the stable internal identifier. It appears in data-destination and
+# nowhere else, and it is deliberately not derivable from `label`: the display
+# words are expected to change once the vocabulary has been tested on a
+# client, and a rename must not touch a single data-* value, a data-section
+# anchor or a pin anchor. Those are a config contract; analysts have already
+# typed names such as advantage-pas and ceps-pas into Section_Insights sheets.
+#
+# Nothing in the report may derive a label from an id or an id from a label.
+
+#' Destination registry
+#' @keywords internal
+.BR_DESTINATIONS <- list(
+  list(id = "overview", label = "Overview"),
+  list(id = "mental",   label = "Mental Availability"),
+  list(id = "buying",   label = "Brand and Buying"),
+  list(id = "meaning",  label = "Brand Meaning"),
+  list(id = "audience", label = "Audience")
+)
+
+#' Where each leaf lives
+#'
+#' Keyed on the leaf key, which is the historical \code{data-subtab} value or,
+#' for Category Buying, \code{cb-} plus the \code{data-cb-tab} value. `tier`
+#' is "main" or "advanced"; `order` sorts within a tier.
+#'
+#' Nineteen leaves, each appearing exactly once. Brand Attributes sits with
+#' Category Entry Points under Mental Availability: both are memory
+#' structures. Brand Meaning therefore holds Brand Attitude, Word of Mouth
+#' and Branded Reach, which is what people say and see.
+#'
+#' @keywords internal
+.BR_LEAF_HOMES <- list(
+  "fn-funnel"       = list(dest = "buying",   tier = "main",     order = 10),
+  "cb-context"      = list(dest = "buying",   tier = "main",     order = 20),
+  "cb-brands"       = list(dest = "buying",   tier = "main",     order = 30),
+  "cb-norms"        = list(dest = "buying",   tier = "advanced", order = 10),
+  "cb-loyalty"      = list(dest = "buying",   tier = "advanced", order = 20),
+  "cb-dist"         = list(dest = "buying",   tier = "advanced", order = 30),
+  "cb-heaviness"    = list(dest = "buying",   tier = "advanced", order = 40),
+  "cb-dop"          = list(dest = "buying",   tier = "advanced", order = 50),
+  "ma-metrics"      = list(dest = "mental",   tier = "main",     order = 10),
+  "ma-ceps"         = list(dest = "mental",   tier = "main",     order = 20),
+  "ma-attributes"   = list(dest = "mental",   tier = "main",     order = 30),
+  "ma-advantage"    = list(dest = "mental",   tier = "main",     order = 40),
+  "fn-relationship" = list(dest = "meaning",  tier = "main",     order = 10),
+  "wom"             = list(dest = "meaning",  tier = "main",     order = 20),
+  "branded_reach"   = list(dest = "meaning",  tier = "advanced", order = 10),
+  "demographics"    = list(dest = "audience", tier = "main",     order = 10),
+  "adhoc"           = list(dest = "audience", tier = "main",     order = 20),
+  "audience_lens"   = list(dest = "audience", tier = "advanced", order = 10),
+  "cb-shopper"      = list(dest = "audience", tier = "advanced", order = 20)
+)
+
+#' Display labels for the Advanced accordion headers
+#'
+#' Separate from every identifier, for the reason given above the destination
+#' registry. Nothing reads a key out of this list to build an attribute.
+#'
+#' @keywords internal
+.BR_LEAF_LABELS <- list(
+  "fn-funnel"       = "Brand Funnel",
+  "fn-relationship" = "Brand Attitude",
+  "ma-metrics"      = "Headline Metrics",
+  "ma-ceps"         = "Category Entry Points",
+  "ma-attributes"   = "Brand Attributes",
+  "ma-advantage"    = "Mental Advantage",
+  "cb-context"      = "Category Context",
+  "cb-brands"       = "Brand Summary",
+  "cb-norms"        = "Dirichlet Norms",
+  "cb-loyalty"      = "Loyalty Segmentation",
+  "cb-dist"         = "Purchase Distribution",
+  "cb-heaviness"    = "Buyer Heaviness",
+  "cb-dop"          = "Duplication of Purchase",
+  "cb-shopper"      = "Shopper Behaviour",
+  "wom"             = "Word of Mouth",
+  "branded_reach"   = "Branded Reach",
+  "demographics"    = "Demographics",
+  "adhoc"           = "Ad Hoc",
+  "audience_lens"   = "Audience Lens"
+)
+
+
+#' Build the header control area for one category
+#'
+#' A slot system, not two controls side by side. Slot three is reserved and
+#' rendered empty, so a period selector can be added when wave comparison is
+#' built without moving the two controls that exist. Every slot carries
+#' data-slot; nothing here reads a display label.
+#'
+#' Slot one is the category switcher. It lists full-depth categories only.
+#' Slot two is the comparison set: one focal brand and up to five
+#' comparators, applied to every destination in the category.
+#'
+#' @keywords internal
+build_br_category_controls <- function(cat_id, cat_name, config,
+                                        cat_results, category_choices = NULL,
+                                        cat_brands = NULL) {
+  parts <- character(0)
+  parts <- c(parts, sprintf('<div class="br-controls" data-group="%s">', cat_id))
+
+  # --- slot 1: category -----------------------------------------------------
+  parts <- c(parts, '<div class="br-control-slot" data-slot="category">')
+  if (!is.null(category_choices) && length(category_choices) > 1L) {
+    opts <- vapply(category_choices, function(ch) sprintf(
+      '<option value="%s"%s>%s</option>',
+      .br_esc(ch$id), if (identical(ch$id, cat_id)) " selected" else "",
+      .br_esc(ch$label)), character(1))
+    parts <- c(parts, sprintf(paste0(
+      '<label class="br-control-label" for="br-cat-select-%s">Category</label>',
+      '<select class="br-cat-select" id="br-cat-select-%s" data-group="%s" ',
+      'onchange="brSwitchCategoryFromControl(this)">%s</select>'),
+      cat_id, cat_id, cat_id, paste(opts, collapse = "")))
+  } else {
+    parts <- c(parts, sprintf(
+      '<span class="br-control-label">Category</span><span class="br-control-static">%s</span>',
+      .br_esc(cat_name)))
+  }
+  parts <- c(parts, '</div>')
+
+  # --- slot 2: comparison set ----------------------------------------------
+  brands <- .br_category_brand_list(cat_brands, cat_results, config)
+  focal  <- config$focal_brand %||% ""
+  parts <- c(parts, '<div class="br-control-slot" data-slot="comparison">')
+  if (length(brands) > 0L) {
+    f_opts <- vapply(brands, function(b) sprintf(
+      '<option value="%s"%s>%s</option>',
+      .br_esc(b$code), if (identical(b$code, focal)) " selected" else "",
+      .br_esc(b$label)), character(1))
+    comp_items <- vapply(brands, function(b) sprintf(paste0(
+      '<label class="br-cmp-item"><input type="checkbox" class="br-cmp-check" ',
+      'value="%s"%s onchange="brComparisonSetChanged(this)"><span>%s</span></label>'),
+      .br_esc(b$code),
+      if (identical(b$code, focal)) " disabled checked" else "",
+      .br_esc(b$label)), character(1))
+    parts <- c(parts, sprintf(paste0(
+      '<label class="br-control-label" for="br-focal-select-%s">Focal brand</label>',
+      '<select class="br-focal-select" id="br-focal-select-%s" data-group="%s" ',
+      'onchange="brComparisonFocalChanged(this)">%s</select>',
+      '<button type="button" class="br-cmp-trigger" data-group="%s" ',
+      'onclick="brToggleComparisonPopover(this)" aria-expanded="false">',
+      'Compare with <span class="br-cmp-count" data-group="%s">0</span></button>',
+      '<div class="br-cmp-popover" data-group="%s" hidden>',
+      '<div class="br-cmp-head">Up to five comparator brands</div>',
+      '<div class="br-cmp-list">%s</div>',
+      '<button type="button" class="br-cmp-clear" ',
+      'onclick="brClearComparisonSet(this)">Clear comparators</button>',
+      '</div>'),
+      cat_id, cat_id, cat_id, paste(f_opts, collapse = ""),
+      cat_id, cat_id, cat_id, paste(comp_items, collapse = "")))
+  }
+  parts <- c(parts, '</div>')
+
+  # --- slot 3: reserved for a period selector -------------------------------
+  # Wave comparison is not built. The slot exists so that adding it later is
+  # an insertion into an empty container, not a rebuild of this bar.
+  parts <- c(parts, sprintf(
+    '<div class="br-control-slot br-control-slot-empty" data-slot="period" data-group="%s"></div>',
+    cat_id))
+
+  parts <- c(parts, '</div>')
+  paste(parts, collapse = "\n")
+}
+
+
+#' Brands sheet rows for one category
+#'
+#' Uses the transformer's own category filter so the comparison-set control
+#' and the panels agree on which brands belong to a category.
+#'
+#' @keywords internal
+.br_brands_for_cat <- function(results, cat_results, cat_key) {
+  all_brands <- results$structure$brands
+  if (is.null(all_brands) || !is.data.frame(all_brands) ||
+      nrow(all_brands) == 0) return(NULL)
+  if (exists(".dt_drop_none_brands", mode = "function"))
+    all_brands <- .dt_drop_none_brands(all_brands)
+  cat_code <- cat_results$cat_code %||% NULL
+  cat_disp <- cat_results$category %||% cat_key
+  if (exists(".filter_brands_for_cat", mode = "function")) {
+    bl <- .filter_brands_for_cat(all_brands, cat_code, cat_disp)
+    if (!is.null(bl) && nrow(bl) > 0) return(bl)
+  }
+  NULL
+}
+
+
+#' Brand codes and labels for one category, focal first
+#'
+#' Reads the Brands sheet rows for this category, the same source the panels
+#' use, so the comparison-set control offers exactly the brands the panels
+#' can show. Falls back to the funnel stages when the sheet is absent.
+#'
+#' @keywords internal
+.br_category_brand_list <- function(cat_brands, cat_results, config) {
+  focal <- config$focal_brand %||% ""
+  codes <- character(0)
+  labels <- list()
+
+  if (!is.null(cat_brands) && is.data.frame(cat_brands) &&
+      nrow(cat_brands) > 0 && "BrandCode" %in% names(cat_brands)) {
+    codes <- as.character(cat_brands$BrandCode)
+    lbls  <- if ("BrandLabel" %in% names(cat_brands))
+      as.character(cat_brands$BrandLabel) else codes
+    keep  <- nzchar(codes) & !duplicated(codes)
+    codes <- codes[keep]; lbls <- lbls[keep]
+    for (i in seq_along(codes)) labels[[codes[i]]] <- lbls[i]
+  } else {
+    st <- cat_results$funnel$stages
+    if (!is.null(st) && "brand_code" %in% names(st)) {
+      codes <- unique(as.character(st$brand_code))
+      codes <- codes[nzchar(codes)]
+      for (cd in codes) labels[[cd]] <- cd
+    }
+  }
+  if (length(codes) == 0L) return(list())
+  ordered <- c(if (focal %in% codes) focal else character(0),
+               setdiff(codes, focal))
+  lapply(ordered, function(cd) list(code = cd, label = labels[[cd]] %||% cd))
+}
+
+
 #' Build a category panel with 2-layer flat sub-tabs
 #'
 #' Each element's internal sections (Funnel/Relationship, Attributes/CEPs/Metrics)
@@ -479,7 +705,9 @@ build_br_summary_panel <- function(results, config) {
 #' @keywords internal
 build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                                      config, panels = list(),
-                                     cat_display_name = NULL) {
+                                     cat_display_name = NULL,
+                                     category_choices = NULL,
+                                     cat_brands = NULL) {
   # cat_id is based on CategoryCode when available (same as transformer) so
   # that panel lookup keys in the `panels` list match element IDs in the page.
   cat_id <- gsub("[^a-z0-9]", "-",
@@ -527,115 +755,238 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   # 06_drivers_barriers.R still runs; its Importance / IxP / Competitive
   # Advantage / Rejection sheets continue to write to Excel and CSV.
 
-  # Build flat sub-tab list in the required display order.
-  # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
-  # internal_tab (which internal panel tab to switch to, "" = n/a).
-  flat_tabs <- list()
-  if (has_funnel) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "fn-funnel",       label = "Brand Funnel",
-                subpanel = "fn",  internal_tab = "funnel")),
-      list(list(key = "fn-relationship", label = "Brand Attitude",
-                subpanel = "fn",  internal_tab = "relationship"))
-    )
-  }
-  if (has_ma) {
-    has_ma_advantage <- !is.null(cat_results$mental_availability) && (
-      !is.null(cat_results$mental_availability$cep_advantage) ||
-      !is.null(cat_results$mental_availability$attribute_advantage))
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "ma-attributes",   label = "Brand Attributes",
-                subpanel = "ma",  internal_tab = "attributes")),
-      list(list(key = "ma-ceps",         label = "Category Entry Points",
-                subpanel = "ma",  internal_tab = "ceps"))
-    )
-    if (has_ma_advantage) {
-      flat_tabs <- c(flat_tabs,
-        list(list(key = "ma-advantage",  label = "Mental Advantage",
-                  subpanel = "ma",  internal_tab = "advantage")))
-    }
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "ma-metrics",      label = "MA Metrics",
-                subpanel = "ma",  internal_tab = "metrics"))
-    )
-  }
-  if (has_repertoire) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "rep",             label = "Category Buying",
-                subpanel = "rep", internal_tab = ""))
-    )
-  }
-  if (has_wom) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "wom",             label = "Word of Mouth",
-                subpanel = "wom", internal_tab = ""))
-    )
-  }
-  if (has_branded_reach) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "branded_reach",   label = "Branded Reach",
-                subpanel = "br", internal_tab = ""))
-    )
-  }
-  if (has_demographics) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "demographics",    label = "Demographics",
-                subpanel = "demo", internal_tab = ""))
-    )
-  }
-  if (has_adhoc) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "adhoc",           label = "Ad Hoc",
-                subpanel = "ah", internal_tab = ""))
-    )
-  }
-  if (has_audience_lens) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "audience_lens",   label = "Audience Lens",
-                subpanel = "al", internal_tab = ""))
-    )
+  # ---------------------------------------------------------------------
+  # Leaves. One analytical view, one host.
+  #
+  # A panel whose internal sub-tabs land in different destinations cannot
+  # keep them in one DOM host, so the funnel, Mental Availability and
+  # Category Buying panels are each rendered once per internal sub-tab
+  # (Duncan's ruling 1, option (a) in impact map section 9 item 0). Only
+  # the primary host of each panel carries the section wrapper id, the
+  # data-section anchor and the JSON payload; the others read the payload
+  # from the primary through data-island-host.
+  #
+  # `key` is the historical data-subtab value where one existed, so the
+  # leaf-to-destination table below keys on values that already have a
+  # meaning in this codebase. Display labels never appear in a data-*
+  # attribute and never drive one.
+  # ---------------------------------------------------------------------
+  has_ma_advantage <- !is.null(panels[[paste0("ma_", cat_id, "__advantage")]])
+
+  cand <- list(
+    list(key = "fn-funnel",       el = "funnel",     sp = "fn",   it = "funnel",
+         cb = "", pk = paste0("funnel_", cat_id),
+         primary = TRUE,  gate = has_funnel),
+    list(key = "fn-relationship", el = "funnel",     sp = "fn",   it = "relationship",
+         cb = "", pk = paste0("funnel_", cat_id, "__relationship"),
+         primary = FALSE, gate = has_funnel),
+    list(key = "ma-metrics",      el = "ma",         sp = "ma",   it = "metrics",
+         cb = "", pk = paste0("ma_", cat_id),
+         primary = TRUE,  gate = has_ma),
+    list(key = "ma-ceps",         el = "ma",         sp = "ma",   it = "ceps",
+         cb = "", pk = paste0("ma_", cat_id, "__ceps"),
+         primary = FALSE, gate = has_ma),
+    list(key = "ma-attributes",   el = "ma",         sp = "ma",   it = "attributes",
+         cb = "", pk = paste0("ma_", cat_id, "__attributes"),
+         primary = FALSE, gate = has_ma),
+    list(key = "ma-advantage",    el = "ma",         sp = "ma",   it = "advantage",
+         cb = "", pk = paste0("ma_", cat_id, "__advantage"),
+         primary = FALSE, gate = has_ma && has_ma_advantage),
+    list(key = "cb-context",      el = "repertoire", sp = "rep",  it = "",
+         cb = "context",   pk = paste0("cat_buying_", cat_id),
+         primary = TRUE,  gate = has_repertoire),
+    list(key = "cb-brands",       el = "repertoire", sp = "rep",  it = "",
+         cb = "brands",    pk = paste0("cat_buying_", cat_id, "__brands"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "cb-norms",        el = "repertoire", sp = "rep",  it = "",
+         cb = "norms",     pk = paste0("cat_buying_", cat_id, "__norms"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "cb-loyalty",      el = "repertoire", sp = "rep",  it = "",
+         cb = "loyalty",   pk = paste0("cat_buying_", cat_id, "__loyalty"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "cb-dist",         el = "repertoire", sp = "rep",  it = "",
+         cb = "dist",      pk = paste0("cat_buying_", cat_id, "__dist"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "cb-heaviness",    el = "repertoire", sp = "rep",  it = "",
+         cb = "heaviness", pk = paste0("cat_buying_", cat_id, "__heaviness"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "cb-dop",          el = "repertoire", sp = "rep",  it = "",
+         cb = "dop",       pk = paste0("cat_buying_", cat_id, "__dop"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "cb-shopper",      el = "repertoire", sp = "rep",  it = "",
+         cb = "shopper",   pk = paste0("cat_buying_", cat_id, "__shopper"),
+         primary = FALSE, gate = has_repertoire),
+    list(key = "wom",             el = "wom",        sp = "wom",  it = "",
+         cb = "", pk = paste0("wom_", cat_id),
+         primary = TRUE,  gate = has_wom),
+    list(key = "branded_reach",   el = "branded_reach", sp = "br", it = "",
+         cb = "", pk = paste0("branded_reach_", cat_id),
+         primary = TRUE,  gate = has_branded_reach),
+    list(key = "demographics",    el = "demographics", sp = "demo", it = "",
+         cb = "", pk = paste0("demographics_", cat_id),
+         primary = TRUE,  gate = has_demographics),
+    list(key = "adhoc",           el = "adhoc",      sp = "ah",   it = "",
+         cb = "", pk = paste0("adhoc_", cat_id),
+         primary = TRUE,  gate = has_adhoc),
+    list(key = "audience_lens",   el = "audience_lens", sp = "al", it = "",
+         cb = "", pk = paste0("audience_lens_", cat_id),
+         primary = TRUE,  gate = has_audience_lens)
+  )
+
+  # A leaf survives when its element is configured and, for a non-primary
+  # host, when the panel fragment for that sub-tab was actually produced.
+  leaves <- Filter(function(lf) {
+    if (!isTRUE(lf$gate)) return(FALSE)
+    if (isTRUE(lf$primary)) return(TRUE)
+    !is.null(panels[[lf$pk]])
+  }, cand)
+
+  # ---------------------------------------------------------------------
+  # Destination containers
+  # ---------------------------------------------------------------------
+  dest_ids <- vapply(.BR_DESTINATIONS, function(d) d$id, character(1))
+  home_of  <- function(key) .BR_LEAF_HOMES[[key]]
+
+  leaves_for <- function(dest_id, tier) {
+    sel <- Filter(function(lf) {
+      h <- home_of(lf$key)
+      !is.null(h) && identical(h$dest, dest_id) && identical(h$tier, tier)
+    }, leaves)
+    ord <- vapply(sel, function(lf) home_of(lf$key)$order, numeric(1))
+    sel[order(ord)]
   }
 
-  # Sub-tab navigation bar
-  if (length(flat_tabs) > 0) {
-    subtab_btns <- vapply(seq_along(flat_tabs), function(i) {
-      tab <- flat_tabs[[i]]
-      active_cls <- if (i == 1) " active" else ""
-      sprintf(
-        '<button class="br-subtab-btn%s" data-group="%s" data-subtab="%s" data-subpanel="%s" data-internal-tab="%s" onclick="switchCategorySubtab(this)">%s</button>',
-        active_cls, cat_id, tab$key, tab$subpanel, tab$internal_tab, tab$label
-      )
+  # The Overview always renders: it holds the route to this category's
+  # entry on the Summary tab until Stage 3 builds it out.
+  dest_has_content <- function(dest_id) {
+    if (identical(dest_id, "overview")) return(TRUE)
+    length(leaves_for(dest_id, "main")) > 0L ||
+      length(leaves_for(dest_id, "advanced")) > 0L
+  }
+  live_dests <- Filter(function(d) dest_has_content(d$id), .BR_DESTINATIONS)
+
+  # Header control area. A slot system rather than two hard-coded controls,
+  # so a period selector can be added later without moving anything.
+  parts <- c(parts, build_br_category_controls(cat_id, cat_name, config,
+                                                cat_results, category_choices,
+                                                cat_brands = cat_brands))
+
+  # Destination navigation
+  if (length(live_dests) > 0L) {
+    dest_btns <- vapply(seq_along(live_dests), function(i) {
+      d <- live_dests[[i]]
+      sprintf(paste0('<button class="br-destination-btn%s" data-group="%s" ',
+                     'data-destination="%s" onclick="switchBrandDestination(this)">%s</button>'),
+              if (i == 1L) " active" else "", cat_id, d$id, .br_esc(d$label))
     }, character(1))
-    parts <- c(parts, sprintf('<div class="br-subtab-nav">%s</div>',
-                              paste(subtab_btns, collapse = "\n")))
+    parts <- c(parts, sprintf('<div class="br-destination-nav">%s</div>',
+                              paste(dest_btns, collapse = "\n")))
   }
 
-  # One sub-panel per element. Active sub-panel = the one containing the first tab.
-  first_subpanel <- if (length(flat_tabs) > 0) flat_tabs[[1]]$subpanel else ""
-
-  # Element map: subpanel key → element name used for chart/panel lookup keys
-  element_map <- list()
-  if (has_funnel)        element_map[["fn"]]  <- "funnel"
-  if (has_ma)            element_map[["ma"]]  <- "ma"
-  if (has_repertoire)    element_map[["rep"]] <- "repertoire"
-  if (has_wom)           element_map[["wom"]] <- "wom"
-  if (has_branded_reach) element_map[["br"]]  <- "branded_reach"
-  if (has_demographics)  element_map[["demo"]] <- "demographics"
-  if (has_adhoc)         element_map[["ah"]]  <- "adhoc"
-  if (has_audience_lens) element_map[["al"]]  <- "audience_lens"
-
-  for (sp_key in names(element_map)) {
-    el        <- element_map[[sp_key]]
-    active    <- if (sp_key == first_subpanel) " active" else ""
-    section_id <- paste0(el, "-", cat_id)
-    chart_key  <- paste0(el, "_", cat_id)
-
+  for (i in seq_along(live_dests)) {
+    d <- live_dests[[i]]
     parts <- c(parts, sprintf(
-      '<div class="br-subpanel%s" data-group="%s" data-subpanel="%s">',
-      active, cat_id, sp_key))
-    parts <- c(parts, sprintf(
-      '<div class="br-element-section" id="section-%s" data-section="%s">',
-      section_id, section_id))
+      '<div class="br-destination%s" data-group="%s" data-destination="%s">',
+      if (i == 1L) " active" else "", cat_id, d$id))
+
+    parts <- c(parts, '<div class="br-dest-main">')
+    if (identical(d$id, "overview")) {
+      parts <- c(parts, .br_overview_placeholder(cat_id, cat_name))
+    }
+    for (lf in leaves_for(d$id, "main")) {
+      parts <- c(parts, .br_leaf_host(lf, cat_id, cat_name, cat_results,
+                                       charts, tables, config, panels,
+                                       toolbar_for))
+    }
+    parts <- c(parts, '</div>')
+
+    adv <- leaves_for(d$id, "advanced")
+    if (length(adv) > 0L) {
+      parts <- c(parts, sprintf(paste0(
+        '<div class="br-advanced" data-group="%s" data-destination="%s">',
+        '<button type="button" class="br-advanced-toggle" ',
+        'onclick="brToggleAdvanced(this)" aria-expanded="false">',
+        'Advanced</button>',
+        '<div class="br-advanced-body" hidden>'), cat_id, d$id))
+      for (j in seq_along(adv)) {
+        lf  <- adv[[j]]
+        lbl <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
+        # Compact accordion: one researcher-grade analysis expanded at a
+        # time (Duncan's ruling 7).
+        parts <- c(parts, sprintf(paste0(
+          '<div class="br-adv-item" data-group="%s" data-leaf="%s">',
+          '<button type="button" class="br-adv-toggle" ',
+          'onclick="brToggleAdvancedItem(this)" aria-expanded="%s">%s</button>',
+          '<div class="br-adv-body"%s>'),
+          cat_id, lf$key,
+          if (j == 1L) "true" else "false",
+          .br_esc(lbl),
+          if (j == 1L) "" else " hidden"))
+        parts <- c(parts, .br_leaf_host(lf, cat_id, cat_name, cat_results,
+                                         charts, tables, config, panels,
+                                         toolbar_for))
+        parts <- c(parts, '</div></div>')
+      }
+      parts <- c(parts, '</div></div>')
+    }
+
+    parts <- c(parts, '</div>')
+  }
+
+  parts <- c(parts, '</div>')
+  paste(parts, collapse = "\n")
+}
+
+
+#' Placeholder card for the Overview destination
+#'
+#' Stage 2 rehomes the existing analyses; the Overview itself is built in
+#' Stage 3. Until then the destination carries the route to this category's
+#' entry on the Summary tab, so the destination is never shown empty and no
+#' number or finding is manufactured to fill it.
+#'
+#' @keywords internal
+.br_overview_placeholder <- function(cat_id, cat_name) {
+  sprintf('
+<div class="br-overview-stub">
+  <h3 class="br-element-title">Overview: %s</h3>
+  <p>The headline picture for this category is on the Summary tab.</p>
+  <button type="button" class="br-overview-stub-btn"
+    onclick="brOpenSummaryFor(\'%s\')">Open the summary for %s</button>
+</div>',
+    .br_esc(cat_name), .br_esc(cat_id), .br_esc(cat_name))
+}
+
+
+#' Render one leaf as its own sub-panel host
+#'
+#' Emits the `.br-subpanel` host, the `.br-element-section` wrapper and the
+#' element body. Only a primary host wears the wrapper id and the
+#' `data-section` anchor, so the anchor set the report carries is unchanged
+#' by the split.
+#'
+#' @keywords internal
+.br_leaf_host <- function(lf, cat_id, cat_name, cat_results, charts, tables,
+                           config, panels, toolbar_for) {
+  el          <- lf$el
+  section_id  <- paste0(el, "-", cat_id)
+  legacy_key  <- paste0(el, "_", cat_id)
+  # The funnel and MA branches read the host's own fragment. The repertoire
+  # branch keeps looking up a "repertoire_<cat>" chart key that no panel
+  # writes, which is how it reaches its own cat-buying lookup below.
+  chart_key   <- if (el %in% c("funnel", "ma")) lf$pk else legacy_key
+  cb_panel_key <- lf$pk
+  internal_tab <- lf$it
+
+  wrapper <- if (isTRUE(lf$primary)) sprintf(
+    '<div class="br-element-section" id="section-%s" data-section="%s">',
+    section_id, section_id) else '<div class="br-element-section">'
+
+  parts <- character(0)
+  parts <- c(parts, sprintf(
+    '<div class="br-subpanel active" data-group="%s" data-subpanel="%s" data-internal-tab="%s" data-cb-tab="%s" data-leaf="%s">',
+    cat_id, lf$sp, internal_tab, lf$cb, lf$key))
+  parts <- c(parts, wrapper)
 
     if (!is.null(panels[[chart_key]])) {
       # WOM, branded-reach, repertoire/cat-buying, funnel, and MA panels
@@ -682,30 +1033,23 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         # toggle here to avoid duplicate pin buttons. The panel pin
         # dropdowns read .br-insight-editor from the parent section so
         # the Section_Insights text still pins correctly.
-        sub_specs <- if (el == "funnel") {
-          list(
-            list(anchor_el = "funnel",       internal = "funnel"),
-            list(anchor_el = "attitude",     internal = "relationship")
-          )
-        } else {
-          list(
-            list(anchor_el = "attributes",   internal = "attributes"),
-            list(anchor_el = "advantage",    internal = "advantage"),
-            list(anchor_el = "ceps",         internal = "ceps"),
-            list(anchor_el = "metrics",      internal = "metrics")
-          )
-        }
-        for (i in seq_along(sub_specs)) {
-          sp <- sub_specs[[i]]
-          sub_anchor <- paste0(sp$anchor_el, "-", cat_id)
-          parts <- c(parts, build_br_section_toolbar(
-            section_id         = sub_anchor,
-            prefill_text       = section_insight_for(config$section_insights,
-                                                     sub_anchor),
-            internal_tab       = sp$internal,
-            initial_visible    = (i == 1L),
-            omit_chart_buttons = TRUE))
-        }
+        #
+        # Each host carries exactly one of these, its own. The anchor names
+        # are unchanged: funnel and attitude for the funnel panel,
+        # attributes / advantage / ceps / metrics for Mental Availability.
+        # Note that the attitude anchor does not match its internal tab
+        # name, "relationship"; that mismatch is pre-existing and analysts'
+        # Section_Insights sheets depend on it.
+        anchor_el <- if (identical(internal_tab, "relationship")) "attitude"
+                     else internal_tab
+        sub_anchor <- paste0(anchor_el, "-", cat_id)
+        parts <- c(parts, build_br_section_toolbar(
+          section_id         = sub_anchor,
+          prefill_text       = section_insight_for(config$section_insights,
+                                                   sub_anchor),
+          internal_tab       = internal_tab,
+          initial_visible    = TRUE,
+          omit_chart_buttons = TRUE))
       }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
@@ -748,7 +1092,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       # v3: rendered by the new Dirichlet panel when available (panels key
       # "cat_buying_<cat_id>"); falls back to the legacy inline block when the
       # Dirichlet pipeline was not run or all upstream elements were REFUSED.
-      cb_panel_key <- paste0("cat_buying_", cat_id)
+      # cb_panel_key is the host's own fragment, set by .br_leaf_host().
 
       if (!is.null(panels[[cb_panel_key]])) {
         # New Dirichlet panel: self-contained HTML fragment.
@@ -757,7 +1101,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         #     relocate them into the Brand Summary controls bar (right side).
         #   - No redundant h3 title or timeframe subtitle.
         #   - +Add Insight button moved BELOW the panel, full width.
-        parts <- c(parts, sprintf('
+        #
+        # The toolbar, its section anchor and the insight footer belong to
+        # the primary host only. A secondary cat-buying host repeating them
+        # would put several buttons and containers on one anchor, and
+        # brTogglePin resolves an anchor by taking the first match.
+        if (isTRUE(lf$primary)) parts <- c(parts, sprintf('
 <div class="br-section-toolbar cb-toolbar-top" data-section="%s" style="display:flex;gap:8px;margin-bottom:12px;">
   <button class="br-pin-btn" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin to Views"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
@@ -777,8 +1126,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         # Cat-Buying insight footer. Supports Section_Insights prefill via
         # the standard config$section_insights lookup. When pre-filled the
         # container opens by default and the rendered view shows the text.
-        cb_insight_text <- section_insight_for(config$section_insights,
-                                               section_id)
+        cb_insight_text <- if (isTRUE(lf$primary))
+          section_insight_for(config$section_insights, section_id) else ""
         cb_has <- nzchar(cb_insight_text)
         # Single %, see note in build_br_section_toolbar above.
         cb_base_container <- "margin-top:12px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
@@ -800,7 +1149,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         cb_toggle_handler <- if (cb_has) "_brToggleInsightEdit" else "_brToggleInsight"
         cb_rendered_html <- if (cb_has) .br_render_insight_md(cb_insight_text) else ""
 
-        parts <- c(parts, sprintf('
+        if (isTRUE(lf$primary)) parts <- c(parts, sprintf('
 <div class="cb-insight-footer" style="margin-top:20px;">
   <button class="br-insight-toggle" onclick="%s(\'%s\')"
     style="width:100%%;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;padding:10px 14px;color:#334155;background:#f8fafc;font-weight:600;">
@@ -856,32 +1205,29 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
             'Brand repertoire size, sole loyalty, and duplication of purchase among category buyers.</p>')
         }
 
-        if (!is.null(charts[[chart_key]])) {
-          for (ch in charts[[chart_key]]) {
+        if (!is.null(charts[[legacy_key]])) {
+          for (ch in charts[[legacy_key]]) {
             parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
           }
         }
-        if (!is.null(tables[[chart_key]])) {
-          parts <- c(parts, tables[[chart_key]])
+        if (!is.null(tables[[legacy_key]])) {
+          parts <- c(parts, tables[[legacy_key]])
         }
       }
     } else {
       # Legacy path: any future elements without a dedicated panel
       parts <- c(parts, toolbar_for(section_id))
-      if (!is.null(charts[[chart_key]])) {
-        for (ch in charts[[chart_key]]) {
+      if (!is.null(charts[[legacy_key]])) {
+        for (ch in charts[[legacy_key]]) {
           parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
         }
       }
-      if (!is.null(tables[[chart_key]])) {
-        parts <- c(parts, tables[[chart_key]])
+      if (!is.null(tables[[legacy_key]])) {
+        parts <- c(parts, tables[[legacy_key]])
       }
     }
 
-    parts <- c(parts, '</div></div>')
-  }
-
-  parts <- c(parts, '</div>')
+  parts <- c(parts, '</div></div>')
   paste(parts, collapse = "\n")
 }
 
@@ -1293,7 +1639,7 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 /* 2-layer nav: internal panel sub-navbars are hidden. Their tabs are
    promoted to the category-level .br-subtab-nav. The internal nav HTML
    is kept in the DOM so JS click-dispatch still works. */
-.fn-subnav, .ma-subnav { display: none !important; }
+.fn-subnav, .ma-subnav, .cb-subnav { display: none !important; }
 
 /* === PINNED CARD (br-pinned-*): matches conjoint/tabs visual standard === */
 .br-pinned-card {
@@ -1353,12 +1699,114 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   .br-pinned-card-actions { display: none !important; }
   .br-panel { display: block !important; page-break-inside: avoid; }
   .br-subpanel { display: block !important; }
+  .br-destination { display: block !important; }
 }
+
   ', brand_colour, accent_colour, brand_colour,
      brand_colour, brand_colour, brand_colour,
      brand_colour, brand_colour,
      brand_colour, brand_colour,
      brand_colour, brand_colour)
+
+  # The five-destination shell's CSS is appended rather than folded into the
+  # sprintf above: R caps a format string at 8192 characters, and the bundle
+  # is already close to it. This block needs no substitution because the
+  # base rule set defines --br-brand.
+  module_css <- paste0(module_css, '
+/* === Five-destination shell ============================================== */
+/* The category header control area is a slot system, not a fixed pair of
+   controls: slot three is reserved and empty until a period selector is
+   added for wave comparison. */
+.br-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
+  padding: 10px 14px; margin-bottom: 14px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+}
+.br-control-slot { display: flex; align-items: center; gap: 8px; position: relative; }
+.br-control-slot-empty { display: none; }
+.br-control-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px; }
+.br-control-static { font-size: 13px; font-weight: 600; color: #1e293b; }
+.br-cat-select, .br-focal-select {
+  font-size: 13px; padding: 5px 8px; border: 1px solid #cbd5e1;
+  border-radius: 6px; background: #fff; color: #1e293b; max-width: 240px;
+}
+.br-cmp-trigger {
+  font-size: 12px; padding: 5px 10px; border: 1px solid #cbd5e1;
+  border-radius: 6px; background: #fff; color: #334155; cursor: pointer;
+}
+.br-cmp-trigger:hover { border-color: #94a3b8; }
+.br-cmp-count {
+  display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 4px;
+  border-radius: 9px; background: #e2e8f0; font-size: 11px; font-weight: 600;
+}
+.br-cmp-popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  min-width: 240px; max-height: 320px; overflow-y: auto;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.12); padding: 10px 12px;
+}
+.br-cmp-head { font-size: 11px; color: #64748b; margin-bottom: 6px; }
+.br-cmp-item {
+  display: flex; align-items: center; gap: 7px; padding: 3px 0;
+  font-size: 13px; color: #1e293b; cursor: pointer;
+}
+.br-cmp-item input[disabled] + span { color: #94a3b8; }
+.br-cmp-clear {
+  margin-top: 8px; width: 100%; font-size: 12px; padding: 5px 8px;
+  border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc;
+  color: #475569; cursor: pointer;
+}
+
+.br-destination-nav {
+  display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.br-destination-btn {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 11px 18px; font-size: 13px; font-weight: 600; color: #94a3b8;
+  cursor: pointer; transition: all 0.15s;
+}
+.br-destination-btn:hover { color: #64748b; }
+.br-destination-btn.active { color: var(--br-brand); border-bottom-color: var(--br-brand); }
+.br-destination { display: none; }
+.br-destination.active { display: block; }
+/* Inside a destination the host is always laid out: the destination
+   container is what shows and hides, not the sub-panel. */
+.br-destination .br-subpanel { display: block; }
+
+.br-advanced { margin-top: 8px; }
+.br-advanced-toggle {
+  width: 100%; text-align: left; font-size: 13px; font-weight: 600;
+  color: #475569; background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 8px; padding: 10px 14px; cursor: pointer;
+}
+.br-advanced-toggle:hover { background: #f1f5f9; }
+.br-advanced-toggle::after { content: " \25BE"; color: #94a3b8; }
+.br-advanced-toggle[aria-expanded="true"]::after { content: " \25B4"; }
+.br-advanced-body { margin-top: 10px; }
+.br-adv-item { margin-bottom: 8px; }
+.br-adv-toggle {
+  width: 100%; text-align: left; font-size: 13px; font-weight: 600;
+  color: #334155; background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 8px; padding: 9px 14px; cursor: pointer;
+}
+.br-adv-toggle:hover { background: #f8fafc; }
+.br-adv-toggle::after { content: " \25BE"; color: #94a3b8; }
+.br-adv-toggle[aria-expanded="true"]::after { content: " \25B4"; }
+.br-adv-body { margin-top: 8px; }
+
+.br-overview-stub {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 20px 24px; margin-bottom: 16px;
+}
+.br-overview-stub p { font-size: 13px; color: #64748b; margin: 4px 0 14px; }
+.br-overview-stub-btn {
+  font-size: 13px; font-weight: 600; padding: 8px 14px;
+  border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;
+  color: #334155; cursor: pointer;
+}
+
+')
 
   # --- Panels ---
   category_names <- names(results$results$categories)
@@ -1400,13 +1848,24 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
     panel_parts <- c(panel_parts, build_br_summary_panel(results, config))
   }
 
+  # The persistent category switcher lists full-depth categories only.
+  # Awareness-only categories produce no category panel and stay on the
+  # Portfolio tab, where they already live (impact map section 9 item 6).
+  category_choices <- lapply(deep_cats, function(ck) {
+    cr <- results$results$categories[[ck]]
+    list(id    = gsub("[^a-z0-9]", "-", tolower(cr$cat_code %||% ck)),
+         label = cat_display_map[[ck]] %||% cr$category %||% ck)
+  })
+
   for (cat_key in deep_cats) {
     cr_entry    <- results$results$categories[[cat_key]]
     cat_display <- cat_display_map[[cat_key]]
     panel_parts <- c(panel_parts, build_br_category_panel(
       cat_key, cr_entry,
       charts, tables, config, panels = panels,
-      cat_display_name = cat_display
+      cat_display_name = cat_display,
+      category_choices = category_choices,
+      cat_brands = .br_brands_for_cat(results, cr_entry, cat_key)
     ))
   }
 

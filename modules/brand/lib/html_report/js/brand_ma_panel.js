@@ -45,8 +45,24 @@
 
   function escHtml(s) { return escAttr(s); }
 
+  // The category key groups every host of one category so the shared brand
+  // selection store reaches all of them. Read from the attribute, not the
+  // element id: a secondary host's id carries a sub-tab suffix.
+  function maCategoryKey(panel) {
+    return panel.getAttribute('data-category-key') ||
+           (panel.id || '').replace(/^ma-/, '');
+  }
+
+  // A category's Mental Availability panel is rendered as one host per
+  // internal sub-tab. Only the primary host carries the payload script; a
+  // secondary host names it with data-island-host.
   function readPayload(panel) {
     var el = panel.querySelector('script.ma-panel-data');
+    if (!el) {
+      var hostId = panel.getAttribute('data-island-host');
+      var host = hostId ? document.getElementById(hostId) : null;
+      if (host) el = host.querySelector('script.ma-panel-data');
+    }
     if (!el) return null;
     try { return JSON.parse(el.textContent || '{}'); }
     catch (e) { return null; }
@@ -329,7 +345,7 @@
     // needs to close the popover. panel.id is "ma-<catcode>" e.g. "ma-bak".
     panel.__maSelector = window.BrandSelector.create({
       panelId:            panel.id || 'ma',
-      categoryKey:        (panel.id || '').replace(/^ma-/, ''),
+      categoryKey:        maCategoryKey(panel),
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,

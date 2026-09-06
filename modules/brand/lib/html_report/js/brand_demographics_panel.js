@@ -777,7 +777,7 @@
   }
   // Re-init when category sub-tabs activate (panel may not exist at first paint)
   document.addEventListener("click", function (e) {
-    if (e.target && e.target.closest && e.target.closest(".br-tab-btn, .br-subtab-btn")) {
+    if (e.target && e.target.closest && e.target.closest(".br-tab-btn, .br-subtab-btn, .br-destination-btn, .br-adv-toggle, .br-advanced-toggle")) {
       setTimeout(bootAll, 0);
     }
   });

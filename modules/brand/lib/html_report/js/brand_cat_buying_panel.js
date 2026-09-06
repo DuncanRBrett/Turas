@@ -72,8 +72,19 @@
     document.querySelectorAll('.cb-panel').forEach(initCbPanel);
   });
 
+  // A category's Category Buying panel is rendered as one host per sub-tab.
+  // Only the primary host carries the payload scripts; a secondary host
+  // names the primary with data-island-host.
+  function cbIslandScript(panel, cls) {
+    var el = panel.querySelector('script.' + cls);
+    if (el) return el;
+    var hostId = panel.getAttribute('data-island-host');
+    var host = hostId ? document.getElementById(hostId) : null;
+    return host ? host.querySelector('script.' + cls) : null;
+  }
+
   function initCbPanel(panel) {
-    var scriptEl = panel.querySelector('script.cb-panel-chart-data');
+    var scriptEl = cbIslandScript(panel, 'cb-panel-chart-data');
     if (!scriptEl) return;
     var pd;
     try { pd = JSON.parse(scriptEl.textContent || '{}'); }
@@ -247,7 +258,9 @@
     // table (or vice versa), useful when showing the full table for
     // reference but emphasising a smaller subset in the chart.
     panel.__cbSelector = window.BrandSelector.create({
-      panelId:            'cb-' + catCode,
+      // panelId MUST be unique per host: the selector REGISTRY is keyed by
+      // it, and one category renders several cat-buying hosts.
+      panelId:            panel.id || ('cb-' + catCode),
       categoryKey:        catCode,
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,

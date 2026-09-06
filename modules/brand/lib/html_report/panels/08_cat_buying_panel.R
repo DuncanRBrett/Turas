@@ -67,12 +67,26 @@ if (!exists(".cb_esc", mode = "function")) {
 #' still render.
 #'
 #' @param panel_data List produced by \code{transform_cat_buying_panel_data()}.
+#' @param only_tab Character or NULL. One \code{data-cb-tab} key. When set,
+#'   only that sub-tab's content is emitted and it renders visible. The
+#'   hidden sub-nav is emitted in full either way. NULL is the pre-split
+#'   behaviour: every sub-tab, Category Context visible.
+#' @param island Logical. FALSE suppresses both JSON payload scripts and the
+#'   panel CSS bundle, for a second host of the same category.
+#' @param island_host Character or NULL. Element id of the panel root that
+#'   carries the payloads, emitted as \code{data-island-host}.
+#' @param kpi_strip Logical. FALSE suppresses the panel-level KPI strip. It
+#'   belongs to the Brand and Buying main view, so only the host that lands
+#'   there carries it.
 #' @return Character. A single HTML fragment (string).
 #' @export
-render_cat_buying_panel <- function(panel_data) {
+render_cat_buying_panel <- function(panel_data, only_tab = NULL,
+                                    island = TRUE, island_host = NULL,
+                                    kpi_strip = TRUE) {
   if (is.null(panel_data)) {
     return('<div class="cb-refused">Category Buying panel data not available.</div>')
   }
+  wants <- function(tab) is.null(only_tab) || identical(only_tab, tab)
 
   cat_code     <- panel_data$category_code %||% "cat"
   focal        <- panel_data$focal_brand   %||% NULL
@@ -92,28 +106,42 @@ render_cat_buying_panel <- function(panel_data) {
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
 
-  panel_id <- paste0("cb-panel-", cat_code)
+  # Host identity. The Category Context host is the primary one: it keeps the
+  # historical id, the panel CSS and the payload scripts, and it is the host
+  # that the section wrapper and its toolbar wrap in the page builder.
+  is_primary <- is.null(only_tab) || identical(only_tab, "context")
+  panel_id <- if (is_primary) paste0("cb-panel-", cat_code)
+              else paste0("cb-panel-", cat_code, "-", only_tab)
+  open_tab <- if (is.null(only_tab)) "context" else only_tab
   parts    <- character(0)
 
-  if (exists("cb_panel_css", mode = "function")) parts <- c(parts, cb_panel_css())
+  if (isTRUE(island) && exists("cb_panel_css", mode = "function"))
+    parts <- c(parts, cb_panel_css())
+
+  host_attr <- if (!is.null(island_host) && nzchar(island_host))
+    sprintf(' data-island-host="%s"', .cb_esc(island_host)) else ""
 
   parts <- c(parts, sprintf(
-    '<div class="cb-panel cb-on-context" id="%s" data-cb-cat-code="%s" data-focal-colour="%s" data-chip-default="%s" style="--cb-focal-colour:%s;">',
-    panel_id, .cb_esc(cat_code), .cb_esc(fcol), chip_default, .cb_esc(fcol)))
+    '<div class="cb-panel cb-on-%s" id="%s" data-cb-cat-code="%s" data-focal-colour="%s" data-chip-default="%s"%s style="--cb-focal-colour:%s;">',
+    .cb_esc(open_tab), panel_id, .cb_esc(cat_code), .cb_esc(fcol),
+    chip_default, host_attr, .cb_esc(fcol)))
 
-  # JSON: per-brand KPI data for focal switcher
-  parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
+  if (isTRUE(island)) {
+    # JSON: per-brand KPI data for focal switcher
+    parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
 
-  # JSON: chart data for JS stacked bar renderer
-  parts <- c(parts, .cb_chart_data_json(
-    dn, bh, focal, fcol, brand_labels, brand_colours, dist_labels, cat_code))
+    # JSON: chart data for JS stacked bar renderer
+    parts <- c(parts, .cb_chart_data_json(
+      dn, bh, focal, fcol, brand_labels, brand_colours, dist_labels, cat_code))
+  }
 
   # Sub-tab navigation (Shopper tab only when at least one section has data)
   has_shopper <- (!is.null(panel_data$shopper_location) &&
                    !identical(panel_data$shopper_location$status, "REFUSED")) ||
                  (!is.null(panel_data$shopper_packsize) &&
                    !identical(panel_data$shopper_packsize$status, "REFUSED"))
-  parts <- c(parts, .cb_sub_tab_nav(cat_code, has_shopper = has_shopper))
+  parts <- c(parts, .cb_sub_tab_nav(cat_code, has_shopper = has_shopper,
+                                     active_tab = open_tab))
 
   # Brand picker (focal <select> + show/hide chips): BELOW the sub-tab nav
   parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code,
@@ -127,7 +155,8 @@ render_cat_buying_panel <- function(panel_data) {
   # and the JS focal switcher re-hydrates [data-kpi] chips panel-wide, so
   # keeping them out of a tab means they are live and readable whichever tab
   # the reader is on.
-  parts <- c(parts, .cb_kpi_strip(dn, bh, cbf, rep, fcol, focal, t_months))
+  if (isTRUE(kpi_strip))
+    parts <- c(parts, .cb_kpi_strip(dn, bh, cbf, rep, fcol, focal, t_months))
 
   # ----- Tab 1: Category Context (default) -----------------------------------
   # Shopper context chips (top channel + top pack size) live INSIDE the
@@ -135,7 +164,8 @@ render_cat_buying_panel <- function(panel_data) {
   # so the user sees one unified row of category-level KPIs.
   shop_chips_html <- if (exists("cb_shopper_context_chips", mode = "function"))
     cb_shopper_context_chips(panel_data) else ""
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="context">')
+  if (wants("context")) {
+  parts <- c(parts, .cb_tab_open("context", only_tab))
   parts <- c(parts, .cb_context_tab(cbf, rep, dn, bh, dist_labels,
                                      extra_chips = shop_chips_html))
   # Sample-level buying location (Q2). Surfaces when the per-brand shopper
@@ -147,11 +177,14 @@ render_cat_buying_panel <- function(panel_data) {
     parts <- c(parts, cb_buying_location_html(panel_data$buying_location, fcol))
   }
   parts <- c(parts, '</div>')
+  }
 
   # ----- Tab 2: Brand Performance Summary ------------------------------------
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="brands" hidden>')
+  if (wants("brands")) {
+  parts <- c(parts, .cb_tab_open("brands", only_tab))
   parts <- c(parts, .cb_brands_tab(dn, bh, focal, brand_labels, t_months))
   parts <- c(parts, '</div>')
+  }
 
   # Base counts + "% buyers (of cat buyers)" derived from loyalty segments.
   # Used as the Base and "% Buyers" columns on the Loyalty & Distribution tabs.
@@ -173,10 +206,12 @@ render_cat_buying_panel <- function(panel_data) {
   # carries the observed per-brand table with a chart toggle of its own, and
   # a 13-column norms table plus two charts underneath would crowd it. These
   # three are the model diagnostics, so they read better together.
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="norms" hidden>')
+  if (wants("norms")) {
+  parts <- c(parts, .cb_tab_open("norms", only_tab))
   parts <- c(parts, .cb_norms_tab(dn, cbf, focal, fcol, cat_code,
                                    brand_labels, t_months))
   parts <- c(parts, '</div>')
+  }
 
   # ----- Tab 4: Loyalty Segmentation -----------------------------------------
   loy_seg_codes  <- c("sole", "primary", "secondary", "nobuy")
@@ -184,7 +219,8 @@ render_cat_buying_panel <- function(panel_data) {
   loy_data       <- if (has_bh) bh$brand_loyalty_segments else NULL
   loy_col_names  <- c("Sole_Pct", "Primary_Pct", "Secondary_Pct", "NoBuy_Pct")
 
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="loyalty" hidden>')
+  if (wants("loyalty")) {
+  parts <- c(parts, .cb_tab_open("loyalty", only_tab))
   parts <- c(parts, .cb_ma_style_tab(
     scope        = "loyalty",
     data_df      = loy_data,
@@ -205,6 +241,7 @@ render_cat_buying_panel <- function(panel_data) {
     target_months  = t_months,
     refused_source = bh))
   parts <- c(parts, '</div>')
+  }
 
   # ----- Tab 5: Purchase Distribution ----------------------------------------
   default_dist <- c("Light (1\u00d7)", "Moderate (2\u00d7)",
@@ -215,7 +252,8 @@ render_cat_buying_panel <- function(panel_data) {
   dist_col_names <- c("Freq1_Pct", "Freq2_Pct", "Freq3to5_Pct", "Freq6plus_Pct")
   dist_data      <- if (has_bh) bh$brand_freq_dist else NULL
 
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dist" hidden>')
+  if (wants("dist")) {
+  parts <- c(parts, .cb_tab_open("dist", only_tab))
   parts <- c(parts, .cb_ma_style_tab(
     scope        = "dist",
     data_df      = dist_data,
@@ -235,6 +273,7 @@ render_cat_buying_panel <- function(panel_data) {
     target_months  = t_months,
     refused_source = bh))
   parts <- c(parts, '</div>')
+  }
 
   # ----- Tab 6: Buyer Heaviness ----------------------------------------------
   # Ehrenberg-Bass Natural Monopoly Law diagnostic. The cut is on CATEGORY
@@ -250,7 +289,8 @@ render_cat_buying_panel <- function(panel_data) {
   hv_col_names  <- c("Heavy_Pct", "Medium_Pct", "Light_Pct")
   hv_data       <- if (has_bh) bh$brand_heaviness else NULL
 
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="heaviness" hidden>')
+  if (wants("heaviness")) {
+  parts <- c(parts, .cb_tab_open("heaviness", only_tab))
   parts <- c(parts, .cb_heaviness_tab(
     data_df        = hv_data,
     col_names      = hv_col_names,
@@ -265,20 +305,23 @@ render_cat_buying_panel <- function(panel_data) {
     base_n_map     = brand_buyers_n_map,
     refused_source = bh))
   parts <- c(parts, '</div>')
+  }
 
   # ----- Tab 7: Duplication of Purchase --------------------------------------
-  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dop" hidden>')
+  if (wants("dop")) {
+  parts <- c(parts, .cb_tab_open("dop", only_tab))
   parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels,
                                  brand_buyers_n = brand_buyers_n_map,
                                  focal_colour   = fcol,
                                  t_months       = t_months))
   parts <- c(parts, '</div>')
+  }
 
   # ----- Tab 8: Shopper Behaviour (optional) --------------------------------
   shopper_html <- if (exists("cb_shopper_tab_html", mode = "function"))
     cb_shopper_tab_html(panel_data) else ""
-  if (nzchar(shopper_html)) {
-    parts <- c(parts, '<div class="cb-subtab" data-cb-tab="shopper" hidden>')
+  if (nzchar(shopper_html) && wants("shopper")) {
+    parts <- c(parts, .cb_tab_open("shopper", only_tab))
     parts <- c(parts, shopper_html)
     parts <- c(parts, '</div>')
   }
@@ -292,7 +335,23 @@ render_cat_buying_panel <- function(panel_data) {
 # SUB-TAB NAV
 # ==============================================================================
 
-.cb_sub_tab_nav <- function(cat_code, has_shopper = FALSE) {
+#' Opening tag for one cat-buying sub-tab div
+#'
+#' A split host carries exactly one sub-tab and that sub-tab must render
+#' visible: the panel JS reads the open tab back with
+#' \code{panel.querySelector('.cb-subtab:not([hidden])')}.
+#'
+#' @keywords internal
+.cb_tab_open <- function(key, only_tab = NULL) {
+  open <- if (is.null(only_tab)) identical(key, "context")
+          else identical(key, only_tab)
+  sprintf('<div class="cb-subtab" data-cb-tab="%s"%s>',
+          .cb_esc(key), if (open) "" else " hidden")
+}
+
+
+.cb_sub_tab_nav <- function(cat_code, has_shopper = FALSE,
+                            active_tab = "context") {
   tabs <- list(
     list(key = "context",   label = "Category Context"),
     list(key = "brands",    label = "Brand Summary"),
@@ -306,7 +365,7 @@ render_cat_buying_panel <- function(panel_data) {
     tabs <- c(tabs, list(list(key = "shopper", label = "Shopper Behaviour")))
   }
   btns <- paste(vapply(tabs, function(t) {
-    active <- if (identical(t$key, "context")) " active" else ""
+    active <- if (identical(t$key, active_tab)) " active" else ""
     sprintf(
       '<button type="button" class="cb-subtab-btn%s" data-cb-tab="%s">%s</button>',
       active, t$key, .cb_esc(t$label))

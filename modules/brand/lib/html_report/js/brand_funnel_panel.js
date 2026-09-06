@@ -258,8 +258,24 @@
     }
   }
 
+  // The category key groups every host of one category so the shared brand
+  // selection store reaches all of them. It is read from the attribute, not
+  // from the element id, because a secondary host's id carries a suffix.
+  function fnCategoryKey(panel) {
+    return panel.getAttribute("data-category-key") ||
+           (panel.id || "").replace(/^fn-/, "");
+  }
+
+  // A category's funnel is rendered as more than one host (the funnel host
+  // and the Brand Attitude host). Only the primary host carries the payload
+  // script; a secondary host names it with data-island-host.
   function readPayload(panel) {
     var el = panel.querySelector("script.fn-panel-data");
+    if (!el) {
+      var hostId = panel.getAttribute("data-island-host");
+      var host = hostId ? document.getElementById(hostId) : null;
+      if (host) el = host.querySelector("script.fn-panel-data");
+    }
     if (!el) return null;
     try { return JSON.parse(el.textContent || "{}"); }
     catch(e) { console.warn("Funnel panel JSON parse failed", e); return null; }
@@ -685,7 +701,7 @@
     // own DOM id (e.g. "fn-dss") is the natural unique anchor.
     panel.__fnAttitudeSelector = window.BrandSelector.create({
       panelId:       (panel.id || "fn") + "-attitude",
-      categoryKey:   (panel.id || "").replace(/^fn-/, ""),
+      categoryKey:   fnCategoryKey(panel),
       triggerEl:     trigger,
       anchorEl:      trigger.parentElement,
       brands:        brandList,
@@ -735,7 +751,7 @@
     // for every category panel except the most-recently-built.
     panel.__fnSelector = window.BrandSelector.create({
       panelId:            panel.id || "fn-funnel",
-      categoryKey:        (panel.id || "").replace(/^fn-/, ""),
+      categoryKey:        fnCategoryKey(panel),
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,

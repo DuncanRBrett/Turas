@@ -362,12 +362,25 @@ transform_brand_panels <- function(results, config) {
     # Link the Export button to the pre-written funnel Excel workbook that
     # write_funnel_excel() drops next to the HTML report.
     xlsx_name <- sprintf("funnel_%s.xlsx", cat_id)
-    panel_html <- build_funnel_panel_html(panel_data,
-                                          category_code = cat_id,
-                                          focal_colour = focal_colour,
-                                          excel_filename = xlsx_name,
-                                          chip_default = config$chip_default %||% "focal_only")
-    panels[[paste0("funnel_", cat_id)]] <- panel_html
+    # One host per internal sub-tab: the funnel tab lands in Brand and
+    # Buying, the relationship tab (labelled Brand Attitude) in Brand
+    # Meaning, so the two cannot share one DOM host. The funnel host is
+    # primary: it keeps the id fn-<cat> and carries the JSON payload, and
+    # the relationship host points at it with data-island-host.
+    .fn_host <- function(tab, primary) {
+      build_funnel_panel_html(
+        panel_data,
+        category_code  = cat_id,
+        focal_colour   = focal_colour,
+        excel_filename = xlsx_name,
+        chip_default   = config$chip_default %||% "focal_only",
+        only_tab       = tab,
+        island         = primary,
+        island_host    = if (primary) NULL else paste0("fn-", cat_id))
+    }
+    panels[[paste0("funnel_", cat_id)]] <- .fn_host("funnel", TRUE)
+    panels[[paste0("funnel_", cat_id, "__relationship")]] <-
+      .fn_host("relationship", FALSE)
   }
 
   # --- Mental Availability panels (per category) ---
@@ -440,11 +453,31 @@ transform_brand_panels <- function(results, config) {
           focal_colour = focal_colour,
           decimal_places = config$decimal_places %||% 0L))
 
-      ma_html <- build_ma_panel_html(ma_pd,
-                                      category_code = cat_id,
-                                      focal_colour = focal_colour,
-                                      chip_default = config$chip_default %||% "focal_only")
-      panels[[paste0("ma_", cat_id)]] <- ma_html
+      # One host per internal sub-tab. Brand Attributes, Category Entry
+      # Points, Mental Advantage and Headline Metrics all land in Mental
+      # Availability, but each is its own item there, so each needs its own
+      # host. The metrics host is primary: it keeps the id ma-<cat>, carries
+      # the JSON payload and wears the section-ma-<cat> wrapper.
+      .ma_host <- function(tab, primary) {
+        build_ma_panel_html(
+          ma_pd,
+          category_code = cat_id,
+          focal_colour  = focal_colour,
+          chip_default  = config$chip_default %||% "focal_only",
+          only_tab      = tab,
+          island        = primary,
+          island_host   = if (primary) NULL else paste0("ma-", cat_id))
+      }
+      panels[[paste0("ma_", cat_id)]] <- .ma_host("metrics", TRUE)
+      # A sub-tab that has no data emits no .ma-subtab div; the marker is
+      # the only reliable presence test, because the gating lives in the
+      # panel builder and is not duplicated here.
+      for (tab in c("attributes", "ceps", "advantage")) {
+        html <- .ma_host(tab, FALSE)
+        if (grepl(sprintf('data-ma-subtab="%s"', tab), html, fixed = TRUE)) {
+          panels[[paste0("ma_", cat_id, "__", tab)]] <- html
+        }
+      }
     }
   }
 
@@ -518,16 +551,41 @@ transform_brand_panels <- function(results, config) {
         chip_default          = config$chip_default %||% "focal_only"
       )
 
-      cb_html <- tryCatch(
-        render_cat_buying_panel(panel_data),
-        error = function(e) {
-          message(sprintf("[BRAND HTML] Cat buying panel failed for %s: %s",
-                          cat_name, e$message))
-          NULL
-        }
-      )
+      # One host per data-cb-tab. The eight sub-tabs land in three different
+      # destination-and-tier slots (Brand and Buying main, Brand and Buying
+      # Advanced, Audience Advanced), so they cannot share one DOM host. The
+      # Category Context host is primary: it keeps the id cb-panel-<cat>,
+      # carries both JSON payloads and the panel CSS, wears the
+      # section-repertoire-<cat> wrapper, and shows the panel KPI strip.
+      .cb_host <- function(tab, primary) {
+        tryCatch(
+          render_cat_buying_panel(
+            panel_data,
+            only_tab    = tab,
+            island      = primary,
+            island_host = if (primary) NULL else paste0("cb-panel-", cat_id),
+            kpi_strip   = primary),
+          error = function(e) {
+            message(sprintf("[BRAND HTML] Cat buying panel failed for %s (%s): %s",
+                            cat_name, tab, e$message))
+            NULL
+          })
+      }
+      cb_html <- .cb_host("context", TRUE)
       if (!is.null(cb_html)) {
         panels[[paste0("cat_buying_", cat_id)]] <- cb_html
+        for (tab in c("brands", "norms", "loyalty", "dist", "heaviness",
+                      "dop", "shopper")) {
+          html <- .cb_host(tab, FALSE)
+          # Shopper Behaviour only renders when the shopper engines ran. The
+          # marker is the presence test; the gating stays in the panel.
+          if (!is.null(html) &&
+              grepl(sprintf('data-cb-tab="%s"', tab), html, fixed = TRUE) &&
+              grepl(sprintf('<div class="cb-subtab" data-cb-tab="%s"', tab),
+                    html, fixed = TRUE)) {
+            panels[[paste0("cat_buying_", cat_id, "__", tab)]] <- html
+          }
+        }
       }
     }
   }

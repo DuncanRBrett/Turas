@@ -36,13 +36,29 @@ BRAND_FUNNEL_PANEL_VERSION <- "2.0"
 #' @param excel_filename Character or NULL. Path (relative to the HTML file)
 #'   of the dedicated funnel Excel workbook. When set, the Export button
 #'   downloads this file; when NULL the button alerts with a setup hint.
+#' @param only_tab Character or NULL. When set to \code{"funnel"} or
+#'   \code{"relationship"}, the fragment carries only that internal sub-tab's
+#'   content (the Summary cards travel with the funnel tab, where they are
+#'   unreached today and stay unreached). The hidden sub-nav is emitted in
+#'   full either way, because \code{switchCategorySubtab()} routes by clicking
+#'   the button inside the host. NULL emits every sub-tab, which is the
+#'   pre-split behaviour and what direct callers and tests still get.
+#' @param island Logical. FALSE suppresses the JSON payload script, for a
+#'   second host of the same category that reads the payload from the
+#'   primary host instead.
+#' @param island_host Character or NULL. Element id of the panel root that
+#'   carries the payload. Emitted as \code{data-island-host} so the panel JS
+#'   can find it.
 #'
 #' @return Character. A single HTML fragment (string).
 #' @export
 build_funnel_panel_html <- function(panel_data, category_code = "cat",
                                     focal_colour = "#1A5276",
                                     excel_filename = NULL,
-                                    chip_default = "focal_only") {
+                                    chip_default = "focal_only",
+                                    only_tab = NULL,
+                                    island = TRUE,
+                                    island_host = NULL) {
   if (is.null(panel_data) || is.null(panel_data$meta) ||
       length(panel_data$meta) == 0) {
     return('<div class="fn-panel-empty">Funnel not available for this category.</div>')
@@ -51,21 +67,36 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   chip_default <- if (identical(chip_default, "all")) "all" else "focal_only"
   panel_data$config$chip_default <- chip_default
 
-  panel_id <- paste0("fn-", category_code)
+  # Host identity. The primary host (every sub-tab, or the funnel sub-tab)
+  # keeps the historical id so nothing that resolves fn-<cat> moves.
+  is_primary <- is.null(only_tab) || identical(only_tab, "funnel")
+  panel_id <- if (is_primary) paste0("fn-", category_code)
+              else paste0("fn-", category_code, "-", only_tab)
+  wants <- function(tab) is.null(only_tab) || identical(only_tab, tab)
+
   json_payload <- .funnel_panel_json(panel_data, focal_colour)
   excel_attr <- if (!is.null(excel_filename) && nzchar(excel_filename))
     sprintf(' data-fn-excel-filename="%s"', .fn_esc(excel_filename)) else ""
+  host_attr <- if (!is.null(island_host) && nzchar(island_host))
+    sprintf(' data-island-host="%s"', .fn_esc(island_host)) else ""
+  active_tab <- if (is.null(only_tab)) "funnel" else only_tab
 
   paste0(
-    sprintf('<div class="fn-panel" id="%s" data-focal-colour="%s" data-chip-default="%s"%s>',
-            panel_id, focal_colour, chip_default, excel_attr),
-    sprintf('<script type="application/json" class="fn-panel-data">%s</script>',
-            .br_json_island(json_payload)),
-    .fn_sub_tabs(),
+    sprintf('<div class="fn-panel" id="%s" data-category-key="%s" data-focal-colour="%s" data-chip-default="%s"%s%s>',
+            panel_id, .fn_esc(category_code), focal_colour, chip_default,
+            excel_attr, host_attr),
+    if (isTRUE(island))
+      sprintf('<script type="application/json" class="fn-panel-data">%s</script>',
+              .br_json_island(json_payload)) else "",
+    .fn_sub_tabs(active_tab),
     .fn_focus_bar(panel_data),
+    # The Summary cards travel with the funnel host. They are unreached in
+    # the report as shipped and stay unreached here (Duncan's ruling 5).
+    if (wants("funnel")) paste0(
     '<div class="fn-subtab" data-fn-subtab="summary" hidden>',
       .fn_cards_section(panel_data, focal_colour),
-    '</div>',
+    '</div>') else "",
+    if (wants("funnel")) paste0(
     '<div class="fn-subtab" data-fn-subtab="funnel">',
       .fn_table_controls(panel_data),
       .fn_table_section(panel_data, focal_colour),
@@ -83,10 +114,12 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
       # leak onto the Summary or Relationship sub-tabs (each has its own
       # callout / explanation).
       .fn_about_section(panel_data),
-    '</div>',
-    '<div class="fn-subtab" data-fn-subtab="relationship" hidden>',
+    '</div>') else "",
+    if (wants("relationship")) paste0(
+    sprintf('<div class="fn-subtab" data-fn-subtab="relationship"%s>',
+            if (identical(only_tab, "relationship")) "" else " hidden"),
       .fn_relationship_section(panel_data, focal_colour),
-    '</div>',
+    '</div>') else "",
     '</div>'
   )
 }
@@ -125,12 +158,21 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 }
 
 
-.fn_sub_tabs <- function() {
-  '<nav class="fn-subnav" role="tablist" aria-label="Funnel sections">
-     <button type="button" class="fn-subtab-btn" data-fn-subtab-target="summary" role="tab" aria-selected="false">Summary</button>
-     <button type="button" class="fn-subtab-btn active" data-fn-subtab-target="funnel" role="tab" aria-selected="true">Funnel</button>
-     <button type="button" class="fn-subtab-btn" data-fn-subtab-target="relationship" role="tab" aria-selected="false">Relationship</button>
-   </nav>'
+.fn_sub_tabs <- function(active_tab = "funnel") {
+  tabs <- list(
+    list(key = "summary",      label = "Summary"),
+    list(key = "funnel",       label = "Funnel"),
+    list(key = "relationship", label = "Relationship")
+  )
+  btns <- vapply(tabs, function(t) {
+    on <- identical(t$key, active_tab)
+    sprintf(paste0('<button type="button" class="fn-subtab-btn%s" ',
+                   'data-fn-subtab-target="%s" role="tab" aria-selected="%s">%s</button>'),
+            if (on) " active" else "", t$key,
+            if (on) "true" else "false", t$label)
+  }, character(1))
+  sprintf('<nav class="fn-subnav" role="tablist" aria-label="Funnel sections">%s</nav>',
+          paste(btns, collapse = ""))
 }
 
 

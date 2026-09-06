@@ -36,10 +36,22 @@ BRAND_MA_PANEL_VERSION <- "1.0"
 #'
 #' @return Character. A single HTML fragment (string).
 #' @export
+#' @param only_tab Character or NULL. One of \code{"attributes"},
+#'   \code{"ceps"}, \code{"advantage"} or \code{"metrics"}. When set, only
+#'   that internal sub-tab's content is emitted and it renders visible. The
+#'   hidden sub-nav is emitted in full either way, because
+#'   \code{switchCategorySubtab()} routes by clicking the button inside the
+#'   host. NULL is the pre-split behaviour.
+#' @param island Logical. FALSE suppresses the JSON payload script.
+#' @param island_host Character or NULL. Element id of the panel root that
+#'   carries the payload, emitted as \code{data-island-host}.
 build_ma_panel_html <- function(panel_data, category_code = "cat",
                                 focal_colour = "#1A5276",
                                 excel_filename = NULL,
-                                chip_default = "focal_only") {
+                                chip_default = "focal_only",
+                                only_tab = NULL,
+                                island = TRUE,
+                                island_host = NULL) {
   if (is.null(panel_data) || is.null(panel_data$meta) ||
       length(panel_data$meta) == 0 ||
       (is.null(panel_data$ceps) && is.null(panel_data$attributes))) {
@@ -49,7 +61,13 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   chip_default <- if (identical(chip_default, "all")) "all" else "focal_only"
   panel_data$config$chip_default <- chip_default
 
-  panel_id <- paste0("ma-", category_code)
+  # Host identity. The metrics host is the primary one: it carries the
+  # historical id and the section wrapper, and it is where the payload lives.
+  is_primary <- is.null(only_tab) || identical(only_tab, "metrics")
+  panel_id <- if (is_primary) paste0("ma-", category_code)
+              else paste0("ma-", category_code, "-", only_tab)
+  wants <- function(tab) is.null(only_tab) || identical(only_tab, tab)
+
   json_payload <- .ma_panel_json(panel_data, focal_colour)
   excel_attr <- if (!is.null(excel_filename) && nzchar(excel_filename))
     sprintf(' data-ma-excel-filename="%s"', .ma_esc(excel_filename)) else ""
@@ -61,18 +79,25 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   has_advantage <- !is.null(panel_data$advantage) &&
                     length(panel_data$advantage$available_stims) > 0
 
-  # Default tab: attributes first if present, else CEPs
-  default_tab <- if (has_attrs) "attributes" else "ceps"
+  # Default tab: attributes first if present, else CEPs. A split host makes
+  # its own sub-tab the default so the panel JS opens on the right one with
+  # no click, which would otherwise race the DOMContentLoaded init.
+  default_tab <- if (!is.null(only_tab)) only_tab
+                 else if (has_attrs) "attributes" else "ceps"
+  host_attr <- if (!is.null(island_host) && nzchar(island_host))
+    sprintf(' data-island-host="%s"', .ma_esc(island_host)) else ""
 
   paste0(
-    sprintf('<div class="ma-panel" id="%s" data-focal-colour="%s" data-chip-default="%s" style="--ma-brand:%s"%s>',
-            panel_id, focal_colour, chip_default, focal_colour, excel_attr),
-    sprintf('<script type="application/json" class="ma-panel-data">%s</script>',
-            .br_json_island(json_payload)),
+    sprintf('<div class="ma-panel" id="%s" data-category-key="%s" data-focal-colour="%s" data-chip-default="%s" style="--ma-brand:%s"%s%s>',
+            panel_id, .ma_esc(category_code), focal_colour, chip_default,
+            focal_colour, excel_attr, host_attr),
+    if (isTRUE(island))
+      sprintf('<script type="application/json" class="ma-panel-data">%s</script>',
+              .br_json_island(json_payload)) else "",
     .ma_sub_tabs(has_attrs, has_ceps, default_tab, has_advantage = has_advantage),
     .ma_focus_bar(panel_data),
 
-    if (has_attrs) paste0(
+    if (has_attrs && wants("attributes")) paste0(
       sprintf('<div class="ma-subtab" data-ma-subtab="attributes"%s>',
               if (default_tab != "attributes") " hidden" else ""),
       .ma_controls_bar(panel_data, stim = "attributes"),
@@ -89,7 +114,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       '</div>'
     ) else "",
 
-    if (has_ceps) paste0(
+    if (has_ceps && wants("ceps")) paste0(
       sprintf('<div class="ma-subtab" data-ma-subtab="ceps"%s>',
               if (default_tab != "ceps") " hidden" else ""),
       .ma_controls_bar(panel_data, stim = "ceps"),
@@ -106,20 +131,23 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       '</div>'
     ) else "",
 
-    if (has_advantage) paste0(
-      '<div class="ma-subtab" data-ma-subtab="advantage" hidden>',
+    if (has_advantage && wants("advantage")) paste0(
+      sprintf('<div class="ma-subtab" data-ma-subtab="advantage"%s>',
+              if (identical(only_tab, "advantage")) "" else " hidden"),
       build_ma_advantage_section(panel_data, focal_colour = focal_colour),
       '</div>'
     ) else "",
 
-    '<div class="ma-subtab" data-ma-subtab="metrics" hidden>',
+    if (wants("metrics")) paste0(
+    sprintf('<div class="ma-subtab" data-ma-subtab="metrics"%s>',
+            if (identical(only_tab, "metrics")) "" else " hidden"),
       .ma_metrics_section(panel_data, focal_colour = focal_colour),
       .ma_insight_box(stim = "metrics"),
       # The framework + metric-formula callout lives on the Metrics
       # sub-tab where the metrics it explains are actually shown.
       sprintf('<div class="ma-about-availability">%s</div>',
               .ma_about_section(panel_data)),
-    '</div>',
+    '</div>') else "",
     '</div>'
   )
 }

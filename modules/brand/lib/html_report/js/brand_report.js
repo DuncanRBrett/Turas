@@ -38,11 +38,146 @@
     }
   };
 
-  // --- Category sub-tab switching (2-layer nav) ---
-  // Each button carries data-subpanel (which .br-subpanel to make active) and
-  // data-internal-tab (which internal panel tab to switch to). The internal
-  // panel nav bars (.fn-subnav / .ma-subnav) are hidden via CSS but remain in
-  // the DOM so dispatching a click on them triggers their own JS state updates.
+  // --- Activating one sub-panel host ---
+  // Shared by the destination switcher and by switchCategorySubtab. The two
+  // things a host needs on activation, unchanged from the flat sub-tab bar:
+  //   1. show only the .br-insight-wrap whose data-insight-internal-tab
+  //      matches this host's internal tab, so one Section_Insights box is
+  //      visible at a time;
+  //   2. click the panel's own hidden sub-tab button, which is how the MA,
+  //      funnel and cat-buying panels run their own state updates and
+  //      re-render charts that were laid out while hidden.
+  function activateHost(host) {
+    if (!host) return;
+    var internalTab = host.getAttribute("data-internal-tab") || "";
+    var cbTab       = host.getAttribute("data-cb-tab") || "";
+
+    if (internalTab) {
+      host.querySelectorAll('.br-insight-wrap[data-insight-internal-tab]')
+        .forEach(function (w) {
+          w.style.display =
+            (w.getAttribute('data-insight-internal-tab') === internalTab)
+              ? 'block' : 'none';
+        });
+
+      // MA panel: click the hidden .ma-subtab-btn
+      var maBtn = host.querySelector(
+        '.ma-subtab-btn[data-ma-subtab-target="' + internalTab + '"]'
+      );
+      if (maBtn) { maBtn.click(); return; }
+
+      // Funnel panel: click the hidden .fn-subtab-btn
+      var fnBtn = host.querySelector(
+        '.fn-subtab-btn[data-fn-subtab-target="' + internalTab + '"]'
+      );
+      if (fnBtn) { fnBtn.click(); return; }
+    }
+
+    if (cbTab) {
+      // Cat-buying panel: click the hidden .cb-subtab-btn
+      var cbBtn = host.querySelector(
+        '.cb-subtab-btn[data-cb-tab="' + cbTab + '"]'
+      );
+      if (cbBtn) cbBtn.click();
+    }
+  }
+  window.brActivateHost = activateHost;
+
+  function hostsIn(root) {
+    return root ? Array.prototype.slice.call(
+      root.querySelectorAll(".br-subpanel")) : [];
+  }
+
+  // --- Destination switching (five destinations per category) ---
+  window.switchBrandDestination = function(btn) {
+    var group = btn.getAttribute("data-group");
+    var dest  = btn.getAttribute("data-destination");
+
+    document.querySelectorAll('.br-destination-btn[data-group="' + group + '"]')
+      .forEach(function(b) {
+        b.classList.toggle("active", b.getAttribute("data-destination") === dest);
+      });
+
+    var active = null;
+    document.querySelectorAll('.br-destination[data-group="' + group + '"]')
+      .forEach(function(d) {
+        var on = d.getAttribute("data-destination") === dest;
+        d.classList.toggle("active", on);
+        if (on) active = d;
+      });
+
+    if (!active) return;
+    // Only hosts that are actually laid out are re-activated: a host inside
+    // a collapsed Advanced item is activated when that item is expanded.
+    var main = active.querySelector(".br-dest-main");
+    hostsIn(main).forEach(activateHost);
+    active.querySelectorAll(".br-adv-body:not([hidden])").forEach(function(b) {
+      hostsIn(b).forEach(activateHost);
+    });
+  };
+
+  // --- Advanced drawer, and its one-at-a-time accordion ---
+  window.brToggleAdvanced = function(btn) {
+    var body = btn.parentNode ? btn.parentNode.querySelector(".br-advanced-body") : null;
+    if (!body) return;
+    var open = body.hidden;
+    body.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      body.querySelectorAll(".br-adv-body:not([hidden])").forEach(function(b) {
+        hostsIn(b).forEach(activateHost);
+      });
+    }
+  };
+
+  window.brToggleAdvancedItem = function(btn) {
+    var item = btn.closest(".br-adv-item");
+    var wrap = item ? item.parentNode : null;
+    if (!item || !wrap) return;
+    var body = item.querySelector(".br-adv-body");
+    if (!body) return;
+    var opening = body.hidden;
+
+    // One researcher-grade analysis expanded at a time.
+    wrap.querySelectorAll(".br-adv-item").forEach(function(other) {
+      var ob = other.querySelector(".br-adv-body");
+      var ot = other.querySelector(".br-adv-toggle");
+      if (!ob) return;
+      ob.hidden = true;
+      if (ot) ot.setAttribute("aria-expanded", "false");
+    });
+
+    if (opening) {
+      body.hidden = false;
+      btn.setAttribute("aria-expanded", "true");
+      hostsIn(body).forEach(activateHost);
+    }
+  };
+
+  // --- Overview route into the Summary tab for one category ---
+  window.brOpenSummaryFor = function(catId) {
+    window.switchBrandTab("summary");
+    var sel = document.querySelector(".brsum-cat-select") ||
+              document.querySelector('.brsum-dropdown-bar select');
+    if (!sel) return;
+    for (var i = 0; i < sel.options.length; i++) {
+      var v = String(sel.options[i].value || "");
+      if (v.toLowerCase().replace(/[^a-z0-9]/g, "-") === catId) {
+        sel.value = sel.options[i].value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+    }
+  };
+
+  // --- Category sub-tab switching (kept: the panel-internal route) ---
+  // Nothing in the destination shell calls this, but it stays valid and
+  // stays the one way a caller reaches a panel's internal tab. Each button
+  // carries data-subpanel and data-internal-tab. The internal panel nav bars
+  // (.fn-subnav / .ma-subnav / .cb-subnav) are hidden via CSS but remain in
+  // the DOM so dispatching a click on them triggers their own JS updates.
+  // The host selector now also matches on data-internal-tab, because one
+  // category renders several hosts per sub-panel since the render was split.
   window.switchCategorySubtab = function(btn) {
     var group       = btn.getAttribute("data-group");
     var subtab      = btn.getAttribute("data-subtab");
@@ -53,45 +188,162 @@
       b.classList.toggle("active", b.getAttribute("data-subtab") === subtab);
     });
 
+    var sel = '.br-subpanel[data-group="' + group + '"]';
+    var own = sel + '[data-subpanel="' + subpanel + '"]';
+    if (internalTab) own += '[data-internal-tab="' + internalTab + '"]';
+
     // Show the sub-panel that owns this tab
-    document.querySelectorAll('.br-subpanel[data-group="' + group + '"]').forEach(function(p) {
-      p.classList.toggle("active", p.getAttribute("data-subpanel") === subpanel);
+    document.querySelectorAll(sel).forEach(function(p) {
+      p.classList.toggle("active", p.matches(own));
     });
 
-    // Route to the correct internal tab within the now-active sub-panel
-    if (internalTab) {
-      var activeSubPanel = document.querySelector(
-        '.br-subpanel[data-group="' + group + '"][data-subpanel="' + subpanel + '"]'
-      );
-      if (activeSubPanel) {
-        // Show only the per-sub-tab insight toolbar that matches the active
-        // internal tab. Section_Insights v1.1 emits one .br-insight-wrap per
-        // internal sub-tab (funnel/relationship/attributes/etc.) so each
-        // sub-tab has its own anchor; hide the others to keep one insight
-        // visible at a time.
-        var wraps = activeSubPanel.querySelectorAll(
-          '.br-insight-wrap[data-insight-internal-tab]'
-        );
-        wraps.forEach(function (w) {
-          w.style.display =
-            (w.getAttribute('data-insight-internal-tab') === internalTab)
-              ? 'block' : 'none';
-        });
-
-        // MA panel: click the hidden .ma-subtab-btn
-        var maBtn = activeSubPanel.querySelector(
-          '.ma-subtab-btn[data-ma-subtab-target="' + internalTab + '"]'
-        );
-        if (maBtn) { maBtn.click(); return; }
-
-        // Funnel panel: click the hidden .fn-subtab-btn
-        var fnBtn = activeSubPanel.querySelector(
-          '.fn-subtab-btn[data-fn-subtab-target="' + internalTab + '"]'
-        );
-        if (fnBtn) { fnBtn.click(); }
-      }
-    }
+    if (internalTab) activateHost(document.querySelector(own));
   };
+
+
+  // ==========================================================================
+  // Persistent comparison set
+  // ==========================================================================
+  // One control per category sets the focal brand and up to five comparators,
+  // and every destination respects it. Nothing is recomputed and no panel's
+  // own filtering is reimplemented: the control drives each panel's existing
+  // focal select, and publishes the hidden-brand set to the shared
+  // category-scoped store that BrandSelector already keeps.
+
+  var CMP_MAX = 5;
+
+  function cmpState(group) {
+    var boxes = document.querySelectorAll(
+      '.br-cmp-popover[data-group="' + group + '"] .br-cmp-check');
+    var focalSel = document.getElementById("br-focal-select-" + group);
+    var focal = focalSel ? focalSel.value : "";
+    var comparators = [];
+    boxes.forEach(function (b) {
+      if (b.checked && b.value !== focal) comparators.push(b.value);
+    });
+    return { focal: focal, comparators: comparators };
+  }
+
+  // Every panel host in this category, whatever its destination.
+  function categoryPanels(group) {
+    var sel = '.fn-panel[data-category-key="' + group + '"],' +
+              '.ma-panel[data-category-key="' + group + '"],' +
+              '.cb-panel[data-cb-cat-code="' + group + '"]';
+    return Array.prototype.slice.call(document.querySelectorAll(sel));
+  }
+
+  function setPanelFocal(panel, code) {
+    var sel = panel.querySelector(".fn-focus-select") ||
+              panel.querySelector(".ma-focus-select") ||
+              panel.querySelector('select.cb-focus-select[data-cb-action="focus"]') ||
+              panel.querySelector(".wom-focus-select");
+    if (!sel || !code) return;
+    var found = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (String(sel.options[i].value) === String(code)) { found = true; break; }
+    }
+    if (!found || sel.value === code) return;
+    sel.value = code;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  window.brApplyComparisonSet = function(group) {
+    var st = cmpState(group);
+    var badge = document.querySelector('.br-cmp-count[data-group="' + group + '"]');
+    if (badge) badge.textContent = String(st.comparators.length);
+
+    categoryPanels(group).forEach(function (p) { setPanelFocal(p, st.focal); });
+
+    // Visible set = focal plus comparators. With no comparators picked the
+    // control makes no claim about visibility and hides nothing, so the
+    // panels keep whatever the analyst last chose on them.
+    if (typeof window.BrandSelector === "undefined" ||
+        !window.BrandSelector.setCategoryHidden) return;
+    if (st.comparators.length === 0) {
+      window.BrandSelector.setCategoryHidden(group, []);
+      return;
+    }
+    var show = {};
+    show[st.focal] = true;
+    st.comparators.forEach(function (c) { show[c] = true; });
+    var hidden = window.BrandSelector.categoryBrands(group).filter(function (c) {
+      return !show[c];
+    });
+    window.BrandSelector.setCategoryHidden(group, hidden);
+  };
+
+  window.brComparisonFocalChanged = function(sel) {
+    var group = sel.getAttribute("data-group");
+    // The focal brand is always in the comparison set and cannot be
+    // unpicked, so its own checkbox follows the dropdown.
+    document.querySelectorAll(
+      '.br-cmp-popover[data-group="' + group + '"] .br-cmp-check')
+      .forEach(function (b) {
+        var isFocal = (b.value === sel.value);
+        b.disabled = isFocal;
+        if (isFocal) b.checked = true;
+      });
+    window.brApplyComparisonSet(group);
+  };
+
+  window.brComparisonSetChanged = function(box) {
+    var pop = box.closest(".br-cmp-popover");
+    if (!pop) return;
+    var group = pop.getAttribute("data-group");
+    var st = cmpState(group);
+    if (st.comparators.length > CMP_MAX) {
+      // Five comparators is the cap the control advertises.
+      box.checked = false;
+      return;
+    }
+    window.brApplyComparisonSet(group);
+  };
+
+  window.brClearComparisonSet = function(btn) {
+    var pop = btn.closest(".br-cmp-popover");
+    if (!pop) return;
+    var group = pop.getAttribute("data-group");
+    pop.querySelectorAll(".br-cmp-check").forEach(function (b) {
+      if (!b.disabled) b.checked = false;
+    });
+    window.brApplyComparisonSet(group);
+  };
+
+  window.brToggleComparisonPopover = function(btn) {
+    var group = btn.getAttribute("data-group");
+    var pop = document.querySelector('.br-cmp-popover[data-group="' + group + '"]');
+    if (!pop) return;
+    var open = pop.hidden;
+    document.querySelectorAll(".br-cmp-popover").forEach(function (p) { p.hidden = true; });
+    document.querySelectorAll(".br-cmp-trigger").forEach(function (t) {
+      t.setAttribute("aria-expanded", "false");
+    });
+    pop.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+
+  window.brSwitchCategoryFromControl = function(sel) {
+    var target = sel.value;
+    if (!target) return;
+    // Keep the reader on the same destination in the category they move to.
+    var group = sel.getAttribute("data-group");
+    var activeBtn = document.querySelector(
+      '.br-destination-btn[data-group="' + group + '"].active');
+    var dest = activeBtn ? activeBtn.getAttribute("data-destination") : null;
+    window.switchBrandTab("cat-" + target);
+    if (!dest) return;
+    var newBtn = document.querySelector(
+      '.br-destination-btn[data-group="' + target + '"][data-destination="' + dest + '"]');
+    if (newBtn) window.switchBrandDestination(newBtn);
+  };
+
+  document.addEventListener("click", function (ev) {
+    if (ev.target && ev.target.closest &&
+        !ev.target.closest(".br-cmp-popover") &&
+        !ev.target.closest(".br-cmp-trigger")) {
+      document.querySelectorAll(".br-cmp-popover").forEach(function (p) { p.hidden = true; });
+    }
+  }, true);
 
   // --- Insight editor ---
   window._brToggleInsight = function(sectionId) {

@@ -430,8 +430,34 @@
     };
   }
 
+  // Publish a hidden set for a whole category. The persistent
+  // comparison-set control uses this: it decides which brands a category
+  // should show, and every registered panel in that category applies it
+  // through its own filtering. Nothing is recomputed.
+  function setCategoryHidden(categoryKey, codes) {
+    if (!categoryKey) return;
+    CATEGORY_STORE[categoryKey] = arrToSet(codes);
+    var subs = CATEGORY_SUBSCRIBERS[categoryKey] || [];
+    subs.forEach(function (sub) {
+      applyRemoteHiddenSet(sub, CATEGORY_STORE[categoryKey]);
+    });
+  }
+
+  // Brand codes known to any panel registered under this category.
+  function categoryBrands(categoryKey) {
+    var seen = {}, out = [];
+    (CATEGORY_SUBSCRIBERS[categoryKey] || []).forEach(function (sub) {
+      sub.brands.forEach(function (b) {
+        if (!seen[b.code]) { seen[b.code] = true; out.push(b.code); }
+      });
+    });
+    return out;
+  }
+
   window.BrandSelector = {
     create: create,
-    closeAll: closeAll
+    closeAll: closeAll,
+    setCategoryHidden: setCategoryHidden,
+    categoryBrands: categoryBrands
   };
 })();
