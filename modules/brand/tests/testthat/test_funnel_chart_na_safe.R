@@ -108,7 +108,7 @@ test_that("build_funnel_chart: a missing attitude column keeps the colour mappin
 })
 
 
-test_that("transform_brand_charts: the IPK-shaped funnel frame survives the loop", {
+test_that("build_funnel_chart: the IPK-shaped funnel frame survives the loop", {
   # Two brands, one of them with every attitude position missing, is the
   # shape that took the chart layer down.
   df <- rbind(

@@ -1734,7 +1734,7 @@ render_cat_buying_panel <- function(panel_data) {
       !is.null(dn$category_metrics$mean_purchases)) {
     mp_val <- sprintf("%.1f", dn$category_metrics$mean_purchases)
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Mean purchases / buyer (%dm)</div></div>',
+      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Mean purchases / category buyer (%dm)</div></div>',
       mp_val, t_months))
   }
 
@@ -1742,7 +1742,7 @@ render_cat_buying_panel <- function(panel_data) {
       !is.null(rep$mean_repertoire) && !is.na(rep$mean_repertoire)) {
     mr_txt <- sprintf("%.1f", rep$mean_repertoire)
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip muted"><div class="cb-kpi-val muted">%s</div><div class="cb-kpi-label">Avg brands bought / buyer</div></div>',
+      '<div class="cb-kpi-chip muted"><div class="cb-kpi-val muted">%s</div><div class="cb-kpi-label">Avg brands bought / category buyer</div></div>',
       mr_txt))
   }
 
