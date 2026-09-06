@@ -200,3 +200,39 @@ identical.
   tabs, not among the nineteen leaves. Mental Advantage is rehomed whole into
   the Mental Availability main view. Cutting into
   `build_ma_advantage_section()` is a later job.
+
+## Adversarial pass, and what it caught
+
+Three things found by trying to break the shell rather than by reading it.
+
+1. **The Overview route pointed at a class that does not exist.** It looked for
+   `.brsum-cat-select`; the summary panel's dropdown carries `data-brsum-cat`,
+   and its option values are the category display name, not the cat id. The
+   route now matches on the name and keeps the id as a fallback. The Chrome
+   harness gained a check that clicking the Overview card opens the Summary tab
+   with this category selected, and it passes.
+2. **Advanced content would have vanished from a printed report.** The print
+   rules unhid `.br-panel`, `.br-subpanel` and, after this change,
+   `.br-destination`, but a collapsed drawer or accordion item stays hidden
+   through the `hidden` attribute. Print now unhides `.br-advanced-body` and
+   `.br-adv-body` as well, so nothing is lost on paper.
+3. **A destination whose only content sits in Advanced opened on a blank main
+   view.** Audience with Audience Lens configured but no Demographics and no Ad
+   Hoc is the real case. Its drawer now starts open, and a test covers it.
+
+## Final numbers, all executed in this session
+
+- Brand suite: **FAIL 0, WARN 1, SKIP 2, PASS 2733**, against a baseline of
+  2542 with the same 0 failures.
+- IPK fixture report: 3,870,211 bytes before, **3,917,953 after**, 1.2 percent.
+- `reachability_check.py`: **PASS**. data-subpanel 5 values identical,
+  data-section 29 identical, section ids 13 identical, all eight island classes
+  present with numeric content identical.
+- `drive_destinations.py` in headless Chrome: **45 checks, 0 failed**, no
+  console error and no uncaught exception.
+
+## What Duncan still owes
+
+Regenerate a real brand report through `launch_turas()` and eyeball the five
+destinations, then a Fable pre-merge review briefed as independent of this
+session. Not merged, not pushed.

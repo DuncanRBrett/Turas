@@ -155,19 +155,28 @@
   };
 
   // --- Overview route into the Summary tab for one category ---
-  window.brOpenSummaryFor = function(catId) {
+  // The summary panel's category dropdown is keyed on the category's display
+  // name, not on the cat id the category tab uses, so the name is passed in
+  // and matched first; the id is the fallback for a report whose summary
+  // options are keyed differently.
+  window.brOpenSummaryFor = function(catId, catName) {
     window.switchBrandTab("summary");
-    var sel = document.querySelector(".brsum-cat-select") ||
-              document.querySelector('.brsum-dropdown-bar select');
+    var sel = document.querySelector("[data-brsum-cat]");
     if (!sel) return;
+    var pick = null;
     for (var i = 0; i < sel.options.length; i++) {
-      var v = String(sel.options[i].value || "");
-      if (v.toLowerCase().replace(/[^a-z0-9]/g, "-") === catId) {
-        sel.value = sel.options[i].value;
-        sel.dispatchEvent(new Event("change", { bubbles: true }));
-        return;
+      var o = sel.options[i];
+      var v = String(o.value || "");
+      if (catName && (v === catName || o.textContent.trim() === catName)) {
+        pick = o.value; break;
+      }
+      if (v.toLowerCase().replace(/[^a-z0-9]+/g, "-") === catId) {
+        pick = o.value;
       }
     }
+    if (pick === null) return;
+    sel.value = pick;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
   };
 
   // --- Category sub-tab switching (kept: the panel-internal route) ---

@@ -902,12 +902,18 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
 
     adv <- leaves_for(d$id, "advanced")
     if (length(adv) > 0L) {
+      # A destination whose only content sits in Advanced would otherwise
+      # open on an empty main view, so its drawer starts open.
+      main_empty <- length(leaves_for(d$id, "main")) == 0L &&
+        !identical(d$id, "overview")
       parts <- c(parts, sprintf(paste0(
         '<div class="br-advanced" data-group="%s" data-destination="%s">',
         '<button type="button" class="br-advanced-toggle" ',
-        'onclick="brToggleAdvanced(this)" aria-expanded="false">',
+        'onclick="brToggleAdvanced(this)" aria-expanded="%s">',
         'Advanced</button>',
-        '<div class="br-advanced-body" hidden>'), cat_id, d$id))
+        '<div class="br-advanced-body"%s>'), cat_id, d$id,
+        if (main_empty) "true" else "false",
+        if (main_empty) "" else " hidden"))
       for (j in seq_along(adv)) {
         lf  <- adv[[j]]
         lbl <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
@@ -952,9 +958,9 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   <h3 class="br-element-title">Overview: %s</h3>
   <p>The headline picture for this category is on the Summary tab.</p>
   <button type="button" class="br-overview-stub-btn"
-    onclick="brOpenSummaryFor(\'%s\')">Open the summary for %s</button>
+    onclick="brOpenSummaryFor(\'%s\', \'%s\')">Open the summary for %s</button>
 </div>',
-    .br_esc(cat_name), .br_esc(cat_id), .br_esc(cat_name))
+    .br_esc(cat_name), .br_esc(cat_id), .br_esc(cat_name), .br_esc(cat_name))
 }
 
 
@@ -1700,6 +1706,10 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   .br-panel { display: block !important; page-break-inside: avoid; }
   .br-subpanel { display: block !important; }
   .br-destination { display: block !important; }
+  /* Advanced content is collapsed on screen, never dropped from print. */
+  .br-advanced-body[hidden], .br-adv-body[hidden] {
+    display: block !important; visibility: visible !important;
+  }
 }
 
   ', brand_colour, accent_colour, brand_colour,

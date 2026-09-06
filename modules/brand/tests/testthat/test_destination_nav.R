@@ -217,6 +217,24 @@ test_that("one category with only the funnel still gets a coherent shell", {
   expect_equal(n_dn(out, 'class="br-advanced"'), 0L)
 })
 
+test_that("a destination whose only content is Advanced opens with the drawer open", {
+  # Audience with Audience Lens configured and no Demographics and no Ad Hoc:
+  # the main view has nothing, so the drawer must not start collapsed or the
+  # destination reads as empty.
+  cr <- fake_cat_results(demo = FALSE, lens = TRUE)
+  out <- render_cat(
+    cat_results = cr,
+    panels = fake_panels(c(full_keys[!full_keys %in% "demographics_dss"],
+                            "audience_lens_dss")))
+  aud <- regmatches(out, regexpr(
+    '<div class="br-destination" data-group="dss" data-destination="audience">.*',
+    out))
+  expect_true(nzchar(aud))
+  expect_true(grepl('aria-expanded="true">Advanced', aud, fixed = TRUE))
+  expect_false(grepl('class="br-advanced-body" hidden', substr(aud, 1, 2000),
+                     fixed = TRUE))
+})
+
 test_that("an Advanced drawer opens collapsed with one item expanded", {
   out <- render_cat()
   expect_true(n_dn(out, 'class="br-advanced-body" hidden') >= 1L)

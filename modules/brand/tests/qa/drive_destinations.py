@@ -189,6 +189,22 @@ DRIVER = """
         var clear = panel.querySelector('.br-cmp-clear');
         if (clear) clear.click();
       }
+
+      // --- the Overview route into the Summary tab ---
+      var stubBtn = panel.querySelector('.br-overview-stub-btn');
+      if (stubBtn) {
+        stubBtn.click();
+        var summary = document.getElementById('panel-summary');
+        check(tab + ': overview route opens the Summary tab',
+              summary && summary.classList.contains('active'));
+        var catSel = document.querySelector('[data-brsum-cat]');
+        var label = panel.querySelector('.br-overview-stub h3');
+        var want = label ? label.textContent.replace(/^Overview:\s*/, '') : '';
+        check(tab + ': overview route selects this category',
+              catSel && catSel.value === want,
+              catSel ? (catSel.value + ' vs ' + want) : 'no select');
+        window.switchBrandTab(tab);
+      }
     });
 
     check('no console error and no uncaught exception', qa.errors.length === 0,
