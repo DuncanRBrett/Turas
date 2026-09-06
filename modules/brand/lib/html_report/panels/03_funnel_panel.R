@@ -203,7 +203,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   } else ""
 
   sprintf(
-    '<div class="fn-focus-bar">
+    '<div class="fn-focus-bar br-header-governed">
        <label class="fn-ctl-label">Focal brand</label>
        <select class="fn-focus-select" data-fn-action="focus">%s</select>
        %s

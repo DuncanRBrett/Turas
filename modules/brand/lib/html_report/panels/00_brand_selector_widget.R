@@ -13,6 +13,14 @@
 #' count comes from \code{length(brands)}; the visible count is rendered by
 #' JS at runtime from the initial-hidden set.
 #'
+#' The button carries \code{br-header-governed}. Inside the category
+#' report the one brand control a reader sees is the header's focal select
+#' and comparison set, which drives every panel's own filtering through the
+#' shared category store; this per-panel trigger stays in the DOM so that
+#' machinery keeps working, and the class hides it. The hiding rule names
+#' the class alone, with no ancestor, so a pinned or exported copy of a
+#' panel hides it too.
+#'
 #' @param panel_id Character. Unique id used by JS to find this trigger
 #'   (e.g. \code{"demographics"}, \code{"funnel-awareness"}).
 #' @param n_total Integer. Total number of brands; the visible-count badge
@@ -35,7 +43,7 @@ build_brand_selector_trigger <- function(panel_id,
   }
   sprintf(
     paste0(
-      '<button type="button" class="bs-trigger" ',
+      '<button type="button" class="bs-trigger br-header-governed" ',
       'data-bs-panel="%s" aria-haspopup="true" aria-expanded="false">',
       '<span class="bs-trigger-icon" aria-hidden="true">&#x25A4;</span>',
       '<span class="bs-trigger-text">%s</span>',

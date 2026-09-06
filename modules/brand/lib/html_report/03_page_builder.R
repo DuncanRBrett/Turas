@@ -561,8 +561,10 @@ build_br_summary_panel <- function(results, config) {
 #' data-slot; nothing here reads a display label.
 #'
 #' Slot one is the category switcher. It lists full-depth categories only.
-#' Slot two is the comparison set: one focal brand and up to five
-#' comparators, applied to every destination in the category.
+#' Slot two is the brand control: one focal select and one comparison
+#' trigger, applied to every destination in the category. It is the only
+#' brand control a reader sees; every panel's own focal select and brand
+#' filter carries \code{br-header-governed} and is hidden.
 #'
 #' @keywords internal
 build_br_category_controls <- function(cat_id, cat_name, config,
@@ -590,9 +592,23 @@ build_br_category_controls <- function(cat_id, cat_name, config,
   }
   parts <- c(parts, '</div>')
 
-  # --- slot 2: comparison set ----------------------------------------------
+  # --- slot 2: focal brand and comparison set -------------------------------
+  # Two controls, deliberately. The focal brand is one choice and the
+  # comparison set is many, and folding them together would put the most
+  # important choice in the report behind a click. They sit side by side in
+  # one slot so a reader still has one place to go.
+  #
+  # The comparison control has three states, and the trigger always reads
+  # the one that is live: focal only, compare with N, or all brands. The
+  # published hidden-brand set matches the state in every case, so the words
+  # on the trigger and the rows in the tables cannot drift apart.
   brands <- .br_category_brand_list(cat_brands, cat_results, config)
   focal  <- config$focal_brand %||% ""
+  # chip_default is the analyst's Brand_Config setting for how much the
+  # panels show on open. It is what the header starts on, so the one control
+  # inherits the setting rather than overriding it.
+  start_all <- identical(tolower(as.character(config$chip_default %||% "focal_only")),
+                         "all")
   parts <- c(parts, '<div class="br-control-slot" data-slot="comparison">')
   if (length(brands) > 0L) {
     f_opts <- vapply(brands, function(b) sprintf(
@@ -611,15 +627,23 @@ build_br_category_controls <- function(cat_id, cat_name, config,
       'onchange="brComparisonFocalChanged(this)">%s</select>',
       '<button type="button" class="br-cmp-trigger" data-group="%s" ',
       'onclick="brToggleComparisonPopover(this)" aria-expanded="false">',
-      'Compare with <span class="br-cmp-count" data-group="%s">0</span></button>',
-      '<div class="br-cmp-popover" data-group="%s" hidden>',
-      '<div class="br-cmp-head">Up to five comparator brands</div>',
+      '<span class="br-cmp-text" data-group="%s">%s</span>',
+      '<span class="br-cmp-count" data-group="%s" hidden>0</span></button>',
+      '<div class="br-cmp-popover" data-group="%s" data-cmp-mode="%s" hidden>',
+      '<div class="br-cmp-modes">',
+      '<button type="button" class="br-cmp-mode%s" data-cmp-set="focal" ',
+      'onclick="brSetComparisonMode(this)">Focal only</button>',
+      '<button type="button" class="br-cmp-mode%s" data-cmp-set="all" ',
+      'onclick="brSetComparisonMode(this)">All brands</button>',
+      '</div>',
+      '<div class="br-cmp-head">Or compare the focal brand with up to five others</div>',
       '<div class="br-cmp-list">%s</div>',
-      '<button type="button" class="br-cmp-clear" ',
-      'onclick="brClearComparisonSet(this)">Clear comparators</button>',
       '</div>'),
       cat_id, cat_id, cat_id, paste(f_opts, collapse = ""),
-      cat_id, cat_id, cat_id, paste(comp_items, collapse = "")))
+      cat_id, cat_id, if (start_all) "All brands" else "Focal only",
+      cat_id, cat_id, if (start_all) "all" else "focal",
+      if (start_all) "" else " active", if (start_all) " active" else "",
+      paste(comp_items, collapse = "")))
   }
   parts <- c(parts, '</div>')
 
@@ -906,28 +930,40 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       # open on an empty main view, so its drawer starts open.
       main_empty <- length(leaves_for(d$id, "main")) == 0L &&
         !identical(d$id, "overview")
+      # A drawer that starts closed opens on its list of titles, so the
+      # reader sees what is in there and picks. A drawer that starts open,
+      # because the destination has nothing else, opens on its first item,
+      # so the destination is never a bare list of headings.
+      # One item needs one disclosure, not two: the drawer is the
+      # disclosure and the item is a heading over the content.
+      single <- length(adv) == 1L
       parts <- c(parts, sprintf(paste0(
         '<div class="br-advanced" data-group="%s" data-destination="%s">',
         '<button type="button" class="br-advanced-toggle" ',
         'onclick="brToggleAdvanced(this)" aria-expanded="%s">',
-        'Advanced</button>',
+        'Advanced<span class="br-advanced-count">%d</span></button>',
         '<div class="br-advanced-body"%s>'), cat_id, d$id,
         if (main_empty) "true" else "false",
+        length(adv),
         if (main_empty) "" else " hidden"))
       for (j in seq_along(adv)) {
         lf  <- adv[[j]]
         lbl <- .BR_LEAF_LABELS[[lf$key]] %||% lf$key
         # Compact accordion: one researcher-grade analysis expanded at a
         # time (Duncan's ruling 7).
-        parts <- c(parts, sprintf(paste0(
-          '<div class="br-adv-item" data-group="%s" data-leaf="%s">',
+        open <- single || (main_empty && j == 1L)
+        head_html <- if (single) sprintf(
+          '<div class="br-adv-toggle br-adv-static">%s</div>', .br_esc(lbl))
+        else sprintf(paste0(
           '<button type="button" class="br-adv-toggle" ',
-          'onclick="brToggleAdvancedItem(this)" aria-expanded="%s">%s</button>',
+          'onclick="brToggleAdvancedItem(this)" aria-expanded="%s">%s</button>'),
+          if (open) "true" else "false", .br_esc(lbl))
+        parts <- c(parts, sprintf(paste0(
+          '<div class="br-adv-item%s" data-group="%s" data-leaf="%s">%s',
           '<div class="br-adv-body"%s>'),
-          cat_id, lf$key,
-          if (j == 1L) "true" else "false",
-          .br_esc(lbl),
-          if (j == 1L) "" else " hidden"))
+          if (single) " br-adv-item-single" else "",
+          cat_id, lf$key, head_html,
+          if (open) "" else " hidden"))
         parts <- c(parts, .br_leaf_host(lf, cat_id, cat_name, cat_results,
                                          charts, tables, config, panels,
                                          toolbar_for))
@@ -1749,23 +1785,44 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 4px;
   border-radius: 9px; background: #e2e8f0; font-size: 11px; font-weight: 600;
 }
+/* display:inline-block above outranks the browser default for [hidden],
+   so the badge needs its own rule or it shows a stray 0 in the two states
+   that have no comparator count. */
+.br-cmp-count[hidden] { display: none; }
 .br-cmp-popover {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
   min-width: 240px; max-height: 320px; overflow-y: auto;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
   box-shadow: 0 8px 24px rgba(15,23,42,0.12); padding: 10px 12px;
 }
-.br-cmp-head { font-size: 11px; color: #64748b; margin-bottom: 6px; }
+.br-cmp-head { font-size: 11px; color: #64748b; margin: 10px 0 6px; }
 .br-cmp-item {
   display: flex; align-items: center; gap: 7px; padding: 3px 0;
   font-size: 13px; color: #1e293b; cursor: pointer;
 }
 .br-cmp-item input[disabled] + span { color: #94a3b8; }
-.br-cmp-clear {
-  margin-top: 8px; width: 100%; font-size: 12px; padding: 5px 8px;
+.br-cmp-modes { display: flex; gap: 6px; }
+.br-cmp-mode {
+  flex: 1; font-size: 12px; padding: 5px 8px;
   border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc;
   color: #475569; cursor: pointer;
 }
+.br-cmp-mode:hover { border-color: #cbd5e1; }
+.br-cmp-mode.active {
+  border-color: var(--br-brand); color: var(--br-brand); background: #fff;
+  font-weight: 600;
+}
+/* In "all brands" mode the picks are not what is being shown, so the list
+   says so rather than sitting there looking live. */
+.br-cmp-list-off { opacity: 0.45; }
+
+/* The category header control is the one place a reader chooses the focal
+   brand and the comparison set. Every panel keeps its own focal select and
+   its own brand filter in the DOM, because the header drives them and the
+   panel JS binds to them, but they are not shown. The selector names the
+   class alone, with no ancestor, so a pinned view or a PNG capture that is
+   re-parented out of the destination hides them too. */
+.br-header-governed { display: none !important; }
 
 .br-destination-nav {
   display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;
@@ -1784,26 +1841,46 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
    container is what shows and hides, not the sub-panel. */
 .br-destination .br-subpanel { display: block; }
 
-.br-advanced { margin-top: 8px; }
+/* Two tiers of disclosure, and they must not look alike. The drawer is a
+   quiet section label with a rule above it; the items under it are list
+   rows, indented and lighter. scroll-margin-top clears the sticky
+   .br-tab-nav so an opened item lands under the tab bar, not behind it. */
+.br-advanced { margin-top: 30px; border-top: 1px solid #e2e8f0; }
 .br-advanced-toggle {
-  width: 100%; text-align: left; font-size: 13px; font-weight: 600;
-  color: #475569; background: #f8fafc; border: 1px solid #e2e8f0;
-  border-radius: 8px; padding: 10px 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.9px; text-transform: uppercase; color: #94a3b8;
+  background: none; border: none; padding: 12px 2px; cursor: pointer;
+  scroll-margin-top: 64px;
 }
-.br-advanced-toggle:hover { background: #f1f5f9; }
-.br-advanced-toggle::after { content: " \\25BE"; color: #94a3b8; }
+/* The marker sits at the far edge, where a reader looks for it, rather
+   than pushed up against the label. */
+.br-advanced-toggle::after { margin-left: auto; letter-spacing: 0; }
+.br-adv-toggle::after { float: right; }
+.br-advanced-toggle:hover { color: #64748b; }
+.br-advanced-toggle::after { content: " \\25BE"; }
 .br-advanced-toggle[aria-expanded="true"]::after { content: " \\25B4"; }
-.br-advanced-body { margin-top: 10px; }
-.br-adv-item { margin-bottom: 8px; }
-.br-adv-toggle {
-  width: 100%; text-align: left; font-size: 13px; font-weight: 600;
-  color: #334155; background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 8px; padding: 9px 14px; cursor: pointer;
+.br-advanced-count {
+  display: inline-block; padding: 0 6px;
+  border-radius: 9px; background: #eef2f6; color: #64748b;
+  font-size: 10px; font-weight: 700; letter-spacing: 0;
 }
-.br-adv-toggle:hover { background: #f8fafc; }
+.br-advanced-body { margin-top: 2px; }
+.br-adv-item { border-top: 1px solid #eef2f6; }
+.br-adv-item:last-child { border-bottom: 1px solid #eef2f6; }
+.br-adv-toggle {
+  display: block; width: 100%; text-align: left; font-size: 13px;
+  font-weight: 600; color: #334155; background: none; border: none;
+  padding: 12px 2px 12px 15px; cursor: pointer; scroll-margin-top: 64px;
+}
+.br-adv-toggle:hover { color: var(--br-brand); }
 .br-adv-toggle::after { content: " \\25BE"; color: #94a3b8; }
 .br-adv-toggle[aria-expanded="true"]::after { content: " \\25B4"; }
-.br-adv-body { margin-top: 8px; }
+/* A drawer holding one item needs one disclosure, so its heading is a
+   heading and carries no marker. */
+.br-adv-static { cursor: default; color: #475569; }
+.br-adv-static::after { content: ""; }
+.br-adv-body { margin: 0 0 18px 15px; }
 
 .br-overview-stub {
   background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;

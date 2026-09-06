@@ -117,6 +117,20 @@
   };
 
   // --- Advanced drawer, and its one-at-a-time accordion ---
+  // Opening either tier moves what is on screen, sometimes by the height of
+  // a whole panel, so the thing the reader clicked is scrolled back under
+  // the sticky tab bar afterwards. scroll-margin-top on the toggles does
+  // the clearing; smooth is deliberate, so the reader sees the page move
+  // rather than finding themselves somewhere new.
+  function brRevealToggle(btn) {
+    if (!btn || !btn.scrollIntoView) return;
+    try {
+      btn.scrollIntoView({ block: "start", behavior: "smooth" });
+    } catch (e) {
+      btn.scrollIntoView(true);
+    }
+  }
+
   window.brToggleAdvanced = function(btn) {
     var body = btn.parentNode ? btn.parentNode.querySelector(".br-advanced-body") : null;
     if (!body) return;
@@ -127,6 +141,7 @@
       body.querySelectorAll(".br-adv-body:not([hidden])").forEach(function(b) {
         hostsIn(b).forEach(activateHost);
       });
+      brRevealToggle(btn);
     }
   };
 
@@ -144,7 +159,7 @@
       var ot = other.querySelector(".br-adv-toggle");
       if (!ob) return;
       ob.hidden = true;
-      if (ot) ot.setAttribute("aria-expanded", "false");
+      if (ot && ot.tagName === "BUTTON") ot.setAttribute("aria-expanded", "false");
     });
 
     if (opening) {
@@ -152,6 +167,10 @@
       btn.setAttribute("aria-expanded", "true");
       hostsIn(body).forEach(activateHost);
     }
+    // Collapsing the item that was open above this one pulls the clicked
+    // header up the page; the reveal puts it back where the reader is
+    // looking, whether the click opened or closed something.
+    brRevealToggle(btn);
   };
 
   // --- Overview route into the Summary tab for one category ---
@@ -221,23 +240,51 @@
 
   var CMP_MAX = 5;
 
+  // Three states, and the trigger always names the live one:
+  //   "focal"   - only the focal brand is shown
+  //   "compare" - the focal brand plus the picked comparators
+  //   "all"     - every brand in the category
+  // "all" is a mode, not fifteen ticked boxes, so the five-comparator cap
+  // stays a real cap and a reader can still ask for the whole category.
+  function cmpPopover(group) {
+    return document.querySelector('.br-cmp-popover[data-group="' + group + '"]');
+  }
+
   function cmpState(group) {
-    var boxes = document.querySelectorAll(
-      '.br-cmp-popover[data-group="' + group + '"] .br-cmp-check');
+    var pop = cmpPopover(group);
+    var boxes = pop ? pop.querySelectorAll(".br-cmp-check") : [];
     var focalSel = document.getElementById("br-focal-select-" + group);
     var focal = focalSel ? focalSel.value : "";
     var comparators = [];
-    boxes.forEach(function (b) {
+    Array.prototype.forEach.call(boxes, function (b) {
       if (b.checked && b.value !== focal) comparators.push(b.value);
     });
-    return { focal: focal, comparators: comparators };
+    var mode = pop ? (pop.getAttribute("data-cmp-mode") || "focal") : "focal";
+    if (mode !== "all") mode = comparators.length > 0 ? "compare" : "focal";
+    return { focal: focal, comparators: comparators, mode: mode };
+  }
+
+  function cmpSetMode(group, mode) {
+    var pop = cmpPopover(group);
+    if (!pop) return;
+    pop.setAttribute("data-cmp-mode", mode);
+    pop.querySelectorAll(".br-cmp-mode").forEach(function (b) {
+      var key = b.getAttribute("data-cmp-set");
+      b.classList.toggle("active",
+        (key === "all" && mode === "all") ||
+        (key === "focal" && mode === "focal"));
+    });
+    pop.querySelector(".br-cmp-list").classList.toggle("br-cmp-list-off",
+                                                       mode === "all");
   }
 
   // Every panel host in this category, whatever its destination.
   function categoryPanels(group) {
     var sel = '.fn-panel[data-category-key="' + group + '"],' +
               '.ma-panel[data-category-key="' + group + '"],' +
-              '.cb-panel[data-cb-cat-code="' + group + '"]';
+              '.cb-panel[data-cb-cat-code="' + group + '"],' +
+              '.wom-panel[data-cat-code="' + group + '"],' +
+              '.demo-panel[id="demo-panel-' + group + '"]';
     return Array.prototype.slice.call(document.querySelectorAll(sel));
   }
 
@@ -245,7 +292,8 @@
     var sel = panel.querySelector(".fn-focus-select") ||
               panel.querySelector(".ma-focus-select") ||
               panel.querySelector('select.cb-focus-select[data-cb-action="focus"]') ||
-              panel.querySelector(".wom-focus-select");
+              panel.querySelector(".wom-focus-select") ||
+              panel.querySelector(".demo-focal-select");
     if (!sel || !code) return;
     var found = false;
     for (var i = 0; i < sel.options.length; i++) {
@@ -258,17 +306,27 @@
 
   window.brApplyComparisonSet = function(group) {
     var st = cmpState(group);
+    cmpSetMode(group, st.mode);
+
     var badge = document.querySelector('.br-cmp-count[data-group="' + group + '"]');
-    if (badge) badge.textContent = String(st.comparators.length);
+    if (badge) {
+      badge.textContent = String(st.comparators.length);
+      badge.hidden = st.mode !== "compare";
+    }
+    var text = document.querySelector('.br-cmp-text[data-group="' + group + '"]');
+    if (text) {
+      text.textContent = st.mode === "all" ? "All brands"
+                       : st.mode === "compare" ? "Compare with"
+                       : "Focal only";
+    }
 
     categoryPanels(group).forEach(function (p) { setPanelFocal(p, st.focal); });
 
-    // Visible set = focal plus comparators. With no comparators picked the
-    // control makes no claim about visibility and hides nothing, so the
-    // panels keep whatever the analyst last chose on them.
+    // The visible set follows the state exactly, in all three states, so
+    // the words on the trigger and the rows in the tables never disagree.
     if (typeof window.BrandSelector === "undefined" ||
         !window.BrandSelector.setCategoryHidden) return;
-    if (st.comparators.length === 0) {
+    if (st.mode === "all") {
       window.BrandSelector.setCategoryHidden(group, []);
       return;
     }
@@ -303,22 +361,36 @@
     var pop = box.closest(".br-cmp-popover");
     if (!pop) return;
     var group = pop.getAttribute("data-group");
+    // Ticking a brand always leaves "all brands": the picks are what the
+    // reader is now asking for.
+    pop.setAttribute("data-cmp-mode", "compare");
     var st = cmpState(group);
     if (st.comparators.length > CMP_MAX) {
-      // Five comparators is the cap the control advertises.
+      // Five comparators is the cap the control advertises. The whole
+      // category is still one click away, through the All brands button.
       box.checked = false;
+      window.brApplyComparisonSet(group);
       return;
     }
     window.brApplyComparisonSet(group);
   };
 
-  window.brClearComparisonSet = function(btn) {
+  // The two named states. "Focal only" clears the picks; "All brands" is a
+  // mode of its own rather than every box ticked, so the five-comparator
+  // cap keeps meaning what it says.
+  window.brSetComparisonMode = function(btn) {
     var pop = btn.closest(".br-cmp-popover");
     if (!pop) return;
     var group = pop.getAttribute("data-group");
-    pop.querySelectorAll(".br-cmp-check").forEach(function (b) {
-      if (!b.disabled) b.checked = false;
-    });
+    var want = btn.getAttribute("data-cmp-set");
+    if (want === "focal") {
+      pop.querySelectorAll(".br-cmp-check").forEach(function (b) {
+        if (!b.disabled) b.checked = false;
+      });
+      pop.setAttribute("data-cmp-mode", "focal");
+    } else {
+      pop.setAttribute("data-cmp-mode", "all");
+    }
     window.brApplyComparisonSet(group);
   };
 
@@ -550,6 +622,25 @@
     URL.revokeObjectURL(a.href);
   };
 
+  // Publish every category's opening state once, so the header and the
+  // panels agree from the first paint rather than only after a click.
+  //
+  // This has to run after the panels have registered with BrandSelector,
+  // because categoryBrands() is a union over registered subscribers and
+  // would return an empty list before then. brand_report.js is first in the
+  // bundle, so its DOMContentLoaded handler runs before every panel's;
+  // window load runs after all of them.
+  function brApplyAllComparisonSets() {
+    var seen = {};
+    document.querySelectorAll(".br-cmp-popover[data-group]").forEach(function (p) {
+      var g = p.getAttribute("data-group");
+      if (!g || seen[g]) return;
+      seen[g] = true;
+      window.brApplyComparisonSet(g);
+    });
+  }
+  window.brApplyAllComparisonSets = brApplyAllComparisonSets;
+
   // --- Init ---
   function init() {
     initTableSort();
@@ -560,5 +651,13 @@
     document.addEventListener("DOMContentLoaded", init);
   } else {
     init();
+  }
+
+  if (document.readyState === "complete") {
+    setTimeout(brApplyAllComparisonSets, 0);
+  } else {
+    window.addEventListener("load", function () {
+      setTimeout(brApplyAllComparisonSets, 0);
+    });
   }
 })();

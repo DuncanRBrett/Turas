@@ -235,13 +235,35 @@ test_that("a destination whose only content is Advanced opens with the drawer op
                      fixed = TRUE))
 })
 
-test_that("an Advanced drawer opens collapsed with one item expanded", {
+test_that("a closed Advanced drawer opens on its list of titles", {
   out <- render_cat()
   expect_true(n_dn(out, 'class="br-advanced-body" hidden') >= 1L)
-  # One researcher-grade analysis expanded at a time (ruling 7): exactly one
-  # accordion toggle per drawer starts expanded.
-  expect_equal(n_dn(out, 'class="br-adv-toggle" onclick="brToggleAdvancedItem(this)" aria-expanded="true"'),
-               n_dn(out, 'class="br-advanced"'))
+  # A drawer that starts closed has nothing expanded inside it, so opening
+  # it shows the reader the titles and lets them choose. The drawer that
+  # starts open, because its destination has no main view, is the exception
+  # and is covered by its own test above.
+  expect_equal(
+    n_dn(out, 'class="br-adv-toggle" onclick="brToggleAdvancedItem(this)" aria-expanded="true"'),
+    0L)
+  expect_true(
+    n_dn(out, 'class="br-adv-toggle" onclick="brToggleAdvancedItem(this)" aria-expanded="false"') >= 2L)
+})
+
+test_that("the Advanced drawer names how many analyses it holds", {
+  out <- render_cat()
+  # Five leaves land in Brand and Buying Advanced on a full-depth category.
+  expect_match(out, '<span class="br-advanced-count">5</span>', fixed = TRUE)
+})
+
+test_that("a drawer holding one analysis has one level of disclosure", {
+  # Brand Meaning with Branded Reach configured and nothing else in its
+  # Advanced tier. The item's heading is a heading, not a second toggle,
+  # and its body is not hidden behind a click of its own.
+  out <- render_cat(cat_results = fake_cat_results(reach = TRUE),
+                    panels = fake_panels(c(full_keys, "branded_reach_dss")))
+  expect_match(out,
+    '<div class="br-adv-item br-adv-item-single" data-group="dss" data-leaf="branded_reach"><div class="br-adv-toggle br-adv-static">Branded Reach</div><div class="br-adv-body">',
+    fixed = TRUE)
 })
 
 

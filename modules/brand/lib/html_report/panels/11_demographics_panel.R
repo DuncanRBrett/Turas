@@ -385,7 +385,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     label    = "Filter brands"
   )
   paste0(
-    '<div class="demo-chip-row demo-focal-row">',
+    '<div class="demo-chip-row demo-focal-row br-header-governed">',
     '<label class="demo-chip-row-label" for="demo-focal-select">Focal brand:</label>',
     '<select id="demo-focal-select" class="demo-focal-select" data-demo-focal-select>',
     paste(options_html, collapse = ""),

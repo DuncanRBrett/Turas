@@ -119,7 +119,7 @@ build_wom_panel_html <- function(panel_data,
   )
 
   sprintf(
-    '<div class="wom-focus-bar">
+    '<div class="wom-focus-bar br-header-governed">
        <label class="wom-ctl-label">Focal brand</label>
        <select class="wom-focus-select" data-wom-action="focus">%s</select>
        %s

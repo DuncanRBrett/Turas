@@ -382,7 +382,14 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
                              extra_chips = "") {
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Category Context</div>')
-  parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">Category-level purchase frequency and brand repertoire distributions among category buyers.</p>')
+  # The closing sentence is the honesty note the header brand control needs:
+  # this view has no brand dimension, so the comparison set cannot narrow it
+  # and a reader must not be left wondering why nothing changed.
+  parts <- c(parts, paste0(
+    '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
+    'Category-level purchase frequency and brand repertoire distributions ',
+    'among category buyers. These figures describe the category as a whole, ',
+    'so the brand comparison set does not change them.</p>'))
 
   # Avg purchases and Avg brands bought moved to the panel-level KPI strip
   # above the sub-tabs, where they sit beside the focal-brand chips and stay
@@ -509,7 +516,9 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
     'What the Dirichlet model expects each brand to achieve given its ',
     'penetration, set beside what it actually achieved. Brands off the ',
     'Double Jeopardy line are labelled. Deviations of 20% or more are shaded ',
-    'in the table.</p>')
+    'in the table. Every brand in the category is shown: the model is fitted ',
+    'across the whole category, so the brand comparison set does not narrow ',
+    'this view.</p>')
 
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   if (!has_dn) {
@@ -1034,7 +1043,9 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
     '<strong>Deviations</strong> = observed &minus; expected, in pp ',
     '(expected = D &times; column-brand penetration when the DoP law is fitted, ',
     'else the column average across other brand rows). Hover any cell to see the ',
-    'observed, expected, and deviation values together.',
+    'observed, expected, and deviation values together. ',
+    'Every brand in the category is shown: the matrix reads across all ',
+    'brands, so the brand comparison set does not narrow it.',
     '</p>'),
     as.integer(t_months)))
 
@@ -1912,7 +1923,7 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
   } else ""
 
   sprintf(
-    '<div class="cb-focus-bar">
+    '<div class="cb-focus-bar br-header-governed">
        <label class="cb-focus-label">Focal brand</label>
        <select class="cb-focus-select" data-cb-action="focus" onchange="_cbSetFocal(this,\'%s\')">%s</select>
        %s

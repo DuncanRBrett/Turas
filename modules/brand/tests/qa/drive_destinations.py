@@ -5,8 +5,15 @@ There is no puppeteer or playwright in this checkout, so the report is copied,
 a QA harness is injected into the copy, and Chrome renders it once with
 --dump-dom. The harness runs inside the real page against the real bundled
 JavaScript: it clicks every destination button, opens every Advanced drawer
-and every accordion item, exercises the comparison-set control, and records
-what it saw plus any console error or uncaught exception.
+and every accordion item, drives the header brand control through its three
+states, and records what it saw plus any console error or uncaught exception.
+
+The brand checks assert identity, not counts. For every host it reads which
+brand codes are on screen and compares them with the set the header names,
+because a count is what let two disagreeing brand filters ship. It also
+asserts that exactly one focal control and one brand-set control are
+visible in a category, and that no per-panel copy of either has a box on
+screen while both still exist in the DOM for the header to drive.
 
 Usage:
     python3 drive_destinations.py REPORT.html [--keep]
@@ -62,6 +69,96 @@ DRIVER = """
     return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
   }
 
+  // --- the single-brand-control rule ---
+  // Duncan opened a Stage 2 report and saw FOCAL BRAND twice and two brand
+  // filters whose counts disagreed. Counting alone is what let that ship, so
+  // these checks assert identity: which brand codes are on screen, not how
+  // many. Every element that carries a brand code is swept, so a table with
+  // brands as rows and a matrix with brands as columns are both covered.
+  var BRAND_ATTRS = ['data-brand', 'data-cb-brand', 'data-fn-brand',
+                     'data-ma-brand', 'data-demo-brand', 'data-wom-brand'];
+
+  // Hosts with no brand-coded element to sweep. cb-context is category
+  // level and has no brand dimension at all. The Mental Advantage matrix
+  // keys its columns by stimulus, not by brand code, so it is checked on
+  // its visible column count instead: one label column plus one per brand.
+  var NO_BRAND_CODES = { 'cb-context': 'none', 'ma-advantage': 'columns' };
+
+  // Views that cover the whole category whatever the comparison set is,
+  // and say so in their own caption.
+  var WHOLE_CATEGORY = { 'cb-norms': 1, 'cb-dop': 1, 'cb-shopper': 1 };
+
+  function visibleBrandCodes(host) {
+    var seen = {};
+    BRAND_ATTRS.forEach(function (a) {
+      host.querySelectorAll('[' + a + ']').forEach(function (el) {
+        if (el.closest('.br-cmp-popover')) return;
+        var v = el.getAttribute(a);
+        if (!v || v === '__avg__') return;
+        if (!visible(el)) return;
+        seen[v] = true;
+      });
+    });
+    return Object.keys(seen).sort();
+  }
+
+  function visibleHeadCells(host) {
+    var hdr = host.querySelector('thead tr');
+    if (!hdr) return 0;
+    var n = 0;
+    Array.prototype.forEach.call(hdr.children, function (c) {
+      if (visible(c)) n++;
+    });
+    return n;
+  }
+
+  // Lay a host out so what it shows can be measured: activate its
+  // destination, and expand its accordion item when it sits in one.
+  function exposeHost(panel, host) {
+    var dest = host.closest('.br-destination');
+    if (dest) {
+      var b = panel.querySelector('.br-destination-btn[data-destination="' +
+                                  dest.getAttribute('data-destination') + '"]');
+      if (b) window.switchBrandDestination(b);
+    }
+    var item = host.closest('.br-adv-item');
+    if (item) {
+      var drawerBtn = item.closest('.br-advanced')
+        .querySelector('.br-advanced-toggle');
+      if (drawerBtn.getAttribute('aria-expanded') !== 'true') drawerBtn.click();
+      var it = item.querySelector('.br-adv-toggle');
+      if (it && it.tagName === 'BUTTON' &&
+          it.getAttribute('aria-expanded') !== 'true') it.click();
+    }
+  }
+
+  function sameSet(a, b) {
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  function checkBrandSet(panel, tab, stateName, want, allBrands) {
+    var wantSorted = want.slice().sort();
+    panel.querySelectorAll('.br-subpanel').forEach(function (host) {
+      var leaf = host.getAttribute('data-leaf');
+      exposeHost(panel, host);
+      var kind = NO_BRAND_CODES[leaf];
+      var expect = WHOLE_CATEGORY[leaf] ? allBrands.slice().sort() : wantSorted;
+      if (kind === 'none') return;
+      if (kind === 'columns') {
+        var vc = visibleHeadCells(host);
+        check(tab + '/' + stateName + '/' + leaf + ': one column per brand shown',
+              vc === expect.length + 1, vc + ' columns for ' +
+              expect.length + ' brands');
+        return;
+      }
+      var got = visibleBrandCodes(host);
+      check(tab + '/' + stateName + '/' + leaf + ': shows exactly the chosen brands',
+            sameSet(got, expect), got.join(',') + ' want ' + expect.join(','));
+    });
+  }
+
   function run() {
     var catPanels = document.querySelectorAll('.br-panel[id^="panel-cat-"]');
     check('at least one category panel', catPanels.length > 0,
@@ -103,72 +200,140 @@ DRIVER = """
         var drawer = cont ? cont.querySelector('.br-advanced') : null;
         if (drawer) {
           var toggle = drawer.querySelector('.br-advanced-toggle');
-          toggle.click();
+          var wasOpen = toggle.getAttribute('aria-expanded') === 'true';
+          if (!wasOpen) toggle.click();
           var body = drawer.querySelector('.br-advanced-body');
           check(tab + '/' + id + ': advanced drawer opens', !body.hidden);
           var items = drawer.querySelectorAll('.br-adv-item');
           check(tab + '/' + id + ': advanced has items', items.length > 0,
                 String(items.length));
-          Array.prototype.forEach.call(items, function (item) {
-            var it = item.querySelector('.br-adv-toggle');
-            var ib = item.querySelector('.br-adv-body');
-            // The accordion toggles, so an already-expanded item needs two
-            // clicks to end up expanded. The first item starts expanded.
-            it.click();
-            if (ib.hidden) it.click();
-            check(tab + '/' + id + '/' + item.getAttribute('data-leaf') +
-                  ': accordion item expands', !ib.hidden);
-            var open = drawer.querySelectorAll('.br-adv-body:not([hidden])');
-            check(tab + '/' + id + ': one item expanded at a time',
-                  open.length === 1, String(open.length));
-          });
+          var single = items.length === 1;
+          if (single) {
+            // One analysis needs one disclosure. The drawer is the
+            // disclosure; the item is a heading over its content.
+            var only = items[0];
+            check(tab + '/' + id + ': a single item has one level of disclosure',
+                  only.classList.contains('br-adv-item-single') &&
+                  !!only.querySelector('.br-adv-static') &&
+                  !only.querySelector('.br-adv-body').hidden);
+          } else if (!wasOpen) {
+            // A drawer that started closed opens on its list of titles, so
+            // the reader can see what is in there before opening one.
+            check(tab + '/' + id + ': the drawer opens on its list of titles',
+                  drawer.querySelectorAll('.br-adv-body:not([hidden])').length === 0,
+                  String(drawer.querySelectorAll('.br-adv-body:not([hidden])').length));
+          }
+          if (!single) {
+            Array.prototype.forEach.call(items, function (item) {
+              var it = item.querySelector('.br-adv-toggle');
+              var ib = item.querySelector('.br-adv-body');
+              // A drawer that starts open starts on its first item, so that
+              // one is already expanded and the first click closes it. Only
+              // a collapsed item is being asked to expand.
+              var startedOpen = !ib.hidden;
+              it.click();
+              if (startedOpen) it.click();
+              check(tab + '/' + id + '/' + item.getAttribute('data-leaf') +
+                    ': one click expands the item', !ib.hidden);
+              var open = drawer.querySelectorAll('.br-adv-body:not([hidden])');
+              check(tab + '/' + id + ': one item expanded at a time',
+                    open.length === 1, String(open.length));
+            });
+          }
         }
 
         out.destinations.push({ tab: tab, id: id, hosts: hosts,
                                 stub: stub, advanced: adv });
       });
 
-      // --- comparison-set control ---
+      // --- one brand control per category, and it tells the truth ---
       var focalSel = panel.querySelector('.br-focal-select');
-      var checks = panel.querySelectorAll('.br-cmp-check');
-      check(tab + ': comparison control present', !!focalSel && checks.length > 0,
-            'brands=' + checks.length);
+      var trigger  = panel.querySelector('.br-cmp-trigger');
+      var checks   = panel.querySelectorAll('.br-cmp-check');
+      check(tab + ': one focal control on screen',
+            panel.querySelectorAll('.br-focal-select').length === 1 &&
+            !!focalSel && visible(focalSel));
+      check(tab + ': one brand-set control on screen',
+            panel.querySelectorAll('.br-cmp-trigger').length === 1 &&
+            !!trigger && visible(trigger));
+
+      // Every panel keeps its own copy, driven by the header, and none of
+      // them has a box on screen. A rule scoped under .br-destination would
+      // pass a count check and still show through in a pin, so this asserts
+      // the rendered geometry.
+      var panelFocal = panel.querySelectorAll(
+        '.fn-focus-select,.ma-focus-select,.cb-focus-select,' +
+        '.wom-focus-select,.demo-focal-select');
+      var shownFocal = 0;
+      panelFocal.forEach(function (e) { if (visible(e)) shownFocal++; });
+      check(tab + ': no second focal control is visible',
+            shownFocal === 0, shownFocal + ' of ' + panelFocal.length + ' shown');
+      var panelFilter = panel.querySelectorAll('.bs-trigger');
+      var shownFilter = 0;
+      panelFilter.forEach(function (e) { if (visible(e)) shownFilter++; });
+      check(tab + ': no second brand filter is visible',
+            shownFilter === 0, shownFilter + ' of ' + panelFilter.length + ' shown');
+      check(tab + ': the panels still carry their own controls to drive',
+            panelFocal.length > 0 && panelFilter.length > 0,
+            panelFocal.length + ' focal, ' + panelFilter.length + ' filter');
+
       if (focalSel && checks.length > 2) {
-        var trig = panel.querySelector('.br-cmp-trigger');
-        trig.click();
+        var allBrands = [];
+        Array.prototype.forEach.call(checks, function (c) { allBrands.push(c.value); });
+        var textEl = panel.querySelector('.br-cmp-text');
+        var badge = panel.querySelector('.br-cmp-count');
+        var focal = focalSel.value;
+
+        // State one, as the report opens.
+        check(tab + ': opens on the state its config asked for',
+              textEl.textContent === 'Focal only' ||
+              textEl.textContent === 'All brands', textEl.textContent);
+        if (textEl.textContent === 'Focal only') {
+          check(tab + ': the count badge is not shown with no comparators',
+                badge.hidden === true);
+          checkBrandSet(panel, tab, 'focal only', [focal], allBrands);
+        }
+
+        // State two: pick three comparators.
+        trigger.click();
         var pop = panel.querySelector('.br-cmp-popover');
         check(tab + ': comparison popover opens', pop && !pop.hidden);
-
-        // Pick two comparators.
         var picked = [];
         Array.prototype.forEach.call(checks, function (c) {
-          if (c.disabled || picked.length >= 2) return;
+          if (c.disabled || picked.length >= 3) return;
           c.checked = true;
           c.dispatchEvent(new Event('change', { bubbles: true }));
           picked.push(c.value);
         });
-        var badge = panel.querySelector('.br-cmp-count');
-        check(tab + ': comparator count shown', badge && badge.textContent === '2',
-              badge ? badge.textContent : 'none');
+        check(tab + ': the trigger names the comparison state',
+              textEl.textContent === 'Compare with', textEl.textContent);
+        check(tab + ': the count follows the picks',
+              badge.textContent === '3' && !badge.hidden, badge.textContent);
+        checkBrandSet(panel, tab, 'compare with 3', [focal].concat(picked), allBrands);
 
-        // The hidden set published to the shared store must exclude the
-        // focal brand and the two comparators, and nothing else may be shown.
-        var store = window._brandSelectorCategoryStore || {};
-        var group = panel.id.replace(/^panel-cat-/, '');
-        var hidden = store[group];
-        if (hidden) {
-          var focalHidden = hidden.has(focalSel.value);
-          var compHidden = picked.some(function (p) { return hidden.has(p); });
-          check(tab + ': comparison set keeps focal visible', !focalHidden);
-          check(tab + ': comparison set keeps comparators visible', !compHidden);
-          check(tab + ': comparison set hides the rest', hidden.size > 0,
-                'hidden=' + hidden.size);
-        } else {
-          check(tab + ': comparison set reached the shared store', false,
-                'no entry for ' + group);
-        }
+        // State three: all brands.
+        panel.querySelector('.br-cmp-mode[data-cmp-set="all"]').click();
+        check(tab + ': the trigger names the all-brands state',
+              textEl.textContent === 'All brands', textEl.textContent);
+        check(tab + ': the count badge is not shown in the all-brands state',
+              badge.hidden === true);
+        checkBrandSet(panel, tab, 'all brands', allBrands, allBrands);
 
-        // Change the focal brand and read it back off a panel.
+        // Back to state one, by name rather than by clearing.
+        panel.querySelector('.br-cmp-mode[data-cmp-set="focal"]').click();
+        check(tab + ': the trigger returns to the focal-only state',
+              textEl.textContent === 'Focal only', textEl.textContent);
+        checkBrandSet(panel, tab, 'focal only again', [focal], allBrands);
+
+        // The focal brand reaches every panel, and changing it releases the
+        // brand that was focal rather than spending a comparator slot.
+        trigger.click();
+        var first = null;
+        Array.prototype.forEach.call(checks, function (c) {
+          if (!first && !c.disabled) { first = c; }
+        });
+        first.checked = true;
+        first.dispatchEvent(new Event('change', { bubbles: true }));
         var other = null;
         Array.prototype.forEach.call(focalSel.options, function (o) {
           if (!other && o.value !== focalSel.value) other = o.value;
@@ -181,18 +346,18 @@ DRIVER = """
           var fnSel = panel.querySelector('.fn-focus-select');
           var cbSel = panel.querySelector(
             'select.cb-focus-select[data-cb-action="focus"]');
+          var womSel = panel.querySelector('.wom-focus-select');
+          var demoSel = panel.querySelector('.demo-focal-select');
           check(tab + ': focal reaches the Mental Availability host',
-                !maSel || maSel.value === other,
-                maSel ? maSel.value : 'no MA host');
+                !maSel || maSel.value === other, maSel ? maSel.value : 'no MA host');
           check(tab + ': focal reaches the funnel host',
-                !fnSel || fnSel.value === other,
-                fnSel ? fnSel.value : 'no funnel host');
+                !fnSel || fnSel.value === other, fnSel ? fnSel.value : 'no funnel host');
           check(tab + ': focal reaches the Category Buying host',
-                !cbSel || cbSel.value === other,
-                cbSel ? cbSel.value : 'no cat-buying host');
-
-          // Changing the focal brand must not promote the old focal into a
-          // comparator slot the reader never picked.
+                !cbSel || cbSel.value === other, cbSel ? cbSel.value : 'no cat-buying host');
+          check(tab + ': focal reaches the Word of Mouth host',
+                !womSel || womSel.value === other, womSel ? womSel.value : 'no WOM host');
+          check(tab + ': focal reaches the Demographics host',
+                !demoSel || demoSel.value === other, demoSel ? demoSel.value : 'no demo host');
           var oldBox = null;
           Array.prototype.forEach.call(checks, function (c) {
             if (c.value === wasFocal) oldBox = c;
@@ -200,17 +365,10 @@ DRIVER = """
           check(tab + ': the previous focal is released, not promoted',
                 oldBox && !oldBox.checked,
                 oldBox ? ('checked=' + oldBox.checked) : 'no checkbox');
-          // A brand promoted to focal stops being a comparator, so the
-          // expected count drops by one when the new focal was picked.
-          var want = String(2 - (picked.indexOf(other) >= 0 ? 1 : 0));
-          check(tab + ': comparator count follows the picks, nothing added',
-                badge && badge.textContent === want,
-                badge ? (badge.textContent + ' want ' + want) : 'none');
         }
-
-        var clear = panel.querySelector('.br-cmp-clear');
-        if (clear) clear.click();
+        panel.querySelector('.br-cmp-mode[data-cmp-set="focal"]').click();
       }
+
 
       // --- the Overview route into the Summary tab ---
       var stubBtn = panel.querySelector('.br-overview-stub-btn');

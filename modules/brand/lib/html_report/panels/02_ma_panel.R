@@ -205,8 +205,10 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 
   sprintf(
     '<div class="ma-focus-bar">
-       <label class="ma-ctl-label">Focal brand</label>
-       <select class="ma-focus-select" data-ma-action="focus">%s</select>
+       <span class="ma-focus-pick br-header-governed">
+         <label class="ma-ctl-label">Focal brand</label>
+         <select class="ma-focus-select" data-ma-action="focus">%s</select>
+       </span>
        %s
        %s
      </div>',

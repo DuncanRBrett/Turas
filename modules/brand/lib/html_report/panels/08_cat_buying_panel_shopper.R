@@ -50,7 +50,9 @@ cb_shopper_tab_html <- function(panel_data) {
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
     'Where category buyers shop and what pack sizes they choose. ',
     'Multi-mention questions: a respondent can select more than one ',
-    'option, so brand rows may sum to more than 100%.</p>')
+    'option, so brand rows may sum to more than 100%. Every brand in the ',
+    'category is shown: the brand comparison set does not narrow this ',
+    'view.</p>')
 
   parts <- c(parts, .cb_shop_kpi_chips(loc, pak))
 

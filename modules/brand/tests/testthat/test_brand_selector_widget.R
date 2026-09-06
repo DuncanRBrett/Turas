@@ -29,7 +29,9 @@ source(file.path(ROOT, "modules", "brand", "lib", "html_report", "panels",
 
 test_that("trigger emits a button with correct panel id and count", {
   html <- build_brand_selector_trigger("demographics", n_total = 13L)
-  expect_match(html, 'class="bs-trigger"', fixed = TRUE)
+  # br-header-governed is what hides this per-panel trigger inside the
+  # category report, where the header control is the one brand control.
+  expect_match(html, 'class="bs-trigger br-header-governed"', fixed = TRUE)
   expect_match(html, 'data-bs-panel="demographics"', fixed = TRUE)
   expect_match(html, '(13/13)', fixed = TRUE)
   expect_match(html, 'aria-haspopup="true"', fixed = TRUE)
