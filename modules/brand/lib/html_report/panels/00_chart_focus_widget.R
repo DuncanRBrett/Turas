@@ -113,6 +113,16 @@ build_chart_focus_styles <- function() {
     "  padding: 6px 10px; margin: 0 0 8px; border-radius: 0 4px 4px 0;",
     "}",
     ".br-cf-note[hidden] { display: none; }",
+    # On paper there is nothing to click, so the control is noise. The note
+    # is the opposite: it is the only thing on a printed chart that explains
+    # why it shows fewer brands than the table beside it, so it stays. The
+    # page's own print block unhides only the two Advanced bodies, so a note
+    # with nothing to say still prints as nothing.
+    "@media print {",
+    "  .br-cf { display: none !important; }",
+    "  .br-cf-note { display: block !important; }",
+    "  .br-cf-note[hidden] { display: none !important; }",
+    "}",
     sep = "\n"
   )
 }

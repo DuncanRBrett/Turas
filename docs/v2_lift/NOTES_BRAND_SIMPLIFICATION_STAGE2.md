@@ -697,6 +697,15 @@ writers. The table never deviates, so an exported sheet always matches the
 header set. A test asserts the exporter reads no chart DOM, so the claim
 breaks loudly if that ever changes.
 
+## On paper
+
+Nothing in the page's print block hides `.br-cmp-trigger`, so the header
+control already prints. A "Chart brands: same as table" button on every chart
+would be noise on paper, and there is nothing to click, so the control is
+hidden in print and the note is not. The page's print block unhides only the
+two Advanced bodies, so a note with nothing to say still prints as nothing.
+A test asserts both halves and that the page block never names `br-cf`.
+
 ## The two chart areas that ship collapsed
 
 Brand Summary and Word of Mouth render their chart behind the panel's own
@@ -710,12 +719,12 @@ appear.
 | Check | Result |
 |---|---|
 | Brand suite, before the first edit | FAIL 0, WARN 1, SKIP 2, PASS 2780 |
-| Brand suite, after | **FAIL 0, WARN 1, SKIP 2, PASS 2865** |
-| `test_chart_focus.R` alone | 85 assertions, 0 failures |
+| Brand suite, after | **FAIL 0, WARN 1, SKIP 2, PASS 2869**, 87.9 s |
+| `test_chart_focus.R` alone | 89 assertions, 0 failures |
 | `tests/qa/reachability_check.py` | **PASS**. data-subpanel 5 identical, data-section 29 identical, section ids 13 identical, island classes 8 identical, every parseable island numerically identical, the one unparseable span named in both |
-| `tests/qa/drive_destinations.py` | **259 checks, 0 failed**, no console error and no uncaught exception, against 113 before |
+| `tests/qa/drive_destinations.py` | **279 checks, 0 failed**, no console error and no uncaught exception, against 113 before |
 | `tests/qa/drive_two_categories.py` | **15 checks, 0 failed**, no console error |
-| IPK fixture report | 3,926,103 bytes before, **3,946,054 after**, 0.5 percent larger |
+| IPK fixture report | 3,926,103 bytes before, **3,946,207 after**, 0.5 percent larger |
 
 Both reports were generated to the session scratchpad. Nothing was written
 into the repo, into OneDrive or into TurasProjects, and `preview_start` was
@@ -728,11 +737,21 @@ brand filters 0 of 16 visible, and Chart brands controls 8 mounted, 8 built,
 6 visible beside their chart with 2 behind a Show chart toggle. The eight are
 intended and are counted by name so they never read as strays.
 
+**The popover was measured, not just read.** An ancestor with `overflow`
+would leave the control reachable in the DOM and unusable on screen. The
+harness reads `getBoundingClientRect()` after opening it and asserts real
+width and height and that it is not clipped above or to the left of its host.
+On the six hosts whose chart area is on screen it comes out at about 490 by
+320 pixels, unclipped. The two collapsed areas are exempt: they have no
+geometry, and no chart to deviate.
+
 **What the Chrome harness now proves about the split.** Per chart: the control
 opens matching its table; the popover offers exactly what the header shows and
 no more; the focal brand cannot be dropped; after unticking one brand the
 table set is unchanged and the chart set is the table set plus that one brand;
-the trigger reads "N of M" and carries the deviating style; the note is shown
+the trigger reads "N of M" and carries the deviating style; the locked
+checkbox is the brand the header calls focal, so the lock follows a focal
+change rather than sticking to whoever was first; the note is shown
 and names what is missing; a capture of the chart area carries the note and
 does not carry the control; and a header change clears the deviation and puts
 the chart set back in step with the table set. On the three stacked-bar hosts,

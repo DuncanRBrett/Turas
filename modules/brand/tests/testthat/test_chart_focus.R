@@ -87,6 +87,8 @@ test_that("every chart-brands rule names its class with no ancestor", {
   css <- build_chart_focus_styles()
   lines <- strsplit(css, "\n", fixed = TRUE)[[1]]
   selectors <- trimws(sub("\\{\\s*$", "", grep("\\{\\s*$", lines, value = TRUE)))
+  # @media print is an at-rule, not a selector. Its own body is checked below.
+  selectors <- selectors[!grepl("^@", selectors)]
   expect_gt(length(selectors), 5L)
   for (sel in selectors) {
     expect_match(sel, "^\\.br-cf", info = sel)
@@ -103,7 +105,9 @@ test_that("the note carries its own colour, weight and rail", {
   # as plain black text with no rail, which is exactly the case where a
   # reader most needs to see it.
   css <- build_chart_focus_styles()
-  note <- sub(".*\\.br-cf-note \\{", "", css)
+  # The FIRST .br-cf-note block. R's sub() is greedy, so a ".*" anchor would
+  # land on the print override instead of the rule being tested.
+  note <- strsplit(css, ".br-cf-note {", fixed = TRUE)[[1]][2]
   note <- sub("\\}.*", "", note)
   for (prop in c("font-size", "font-weight", "color", "background",
                  "border-left", "padding")) {
@@ -112,6 +116,26 @@ test_that("the note carries its own colour, weight and rail", {
   # No CSS variable: a panel-scoped variable resolves to nothing once the
   # captured HTML sits in a body-level container.
   expect_false(grepl("var(--", note, fixed = TRUE))
+})
+
+test_that("print drops the control and keeps the note", {
+  # On paper there is nothing to click, so a "Chart brands: same as table"
+  # button on every chart is noise. The note is the opposite: it is the only
+  # thing on a printed chart that says why it shows fewer brands than the
+  # table beside it. The page's print block unhides only the two Advanced
+  # bodies, so a note with nothing to say still prints as nothing.
+  css <- build_chart_focus_styles()
+  block <- sub(".*@media print \\{", "", css)
+  block <- sub("\\n\\}.*", "", block)
+  expect_match(block, ".br-cf { display: none !important; }", fixed = TRUE)
+  expect_match(block, ".br-cf-note { display: block !important; }", fixed = TRUE)
+  expect_match(block, ".br-cf-note[hidden] { display: none !important; }",
+               fixed = TRUE)
+  # And nothing in the page's own print block unhides a hidden note.
+  pb <- read_cf(REPORT_CF, "03_page_builder.R")
+  pr <- sub(".*@media print \\{", "", pb)
+  pr <- sub("\\n\\}.*", "", pr)
+  expect_false(grepl("br-cf", pr, fixed = TRUE))
 })
 
 test_that("the styles reach the page, from the widget that emits the markup", {

@@ -265,11 +265,37 @@ DRIVER = """
       trigger.click();
       var pop = mount.querySelector('.br-cf-pop');
       check(tab + '/' + scope + ': the popover opens', !!pop && !pop.hidden);
+      // Open in the DOM is not open on screen. An ancestor with overflow
+      // would leave the control reachable and unusable, so the popover is
+      // measured, not just read.
+      // Only where the chart area is on screen. The two areas that ship
+      // collapsed behind their panel's own "Show chart" toggle have no
+      // geometry to measure, and no chart to deviate either.
+      if (pop && !areaHidden) {
+        var pr = pop.getBoundingClientRect();
+        var hr = (host || mount.parentElement).getBoundingClientRect();
+        check(tab + '/' + scope + ': the popover has real geometry',
+              pr.width > 60 && pr.height > 40,
+              Math.round(pr.width) + 'x' + Math.round(pr.height));
+        check(tab + '/' + scope + ': the popover is not clipped away',
+              pr.top >= hr.top - 4 && pr.left >= hr.left - 4 &&
+              pr.right > pr.left,
+              'pop ' + Math.round(pr.top) + ',' + Math.round(pr.left) +
+              ' host ' + Math.round(hr.top) + ',' + Math.round(hr.left));
+      }
       var boxes = mount.querySelectorAll('.br-cf-check');
-      var locked = 0;
-      Array.prototype.forEach.call(boxes, function (b) { if (b.disabled) locked++; });
+      var locked = 0, lockedValue = null;
+      Array.prototype.forEach.call(boxes, function (b) {
+        if (b.disabled) { locked++; lockedValue = b.value; }
+      });
       check(tab + '/' + scope + ': the focal brand cannot be dropped',
             locked === 1, locked + ' locked of ' + boxes.length);
+      // And the locked one is the brand the header calls focal, so the lock
+      // follows a focal change rather than sticking to whoever was first.
+      var headerFocal = panel.querySelector('.br-focal-select');
+      check(tab + '/' + scope + ': the locked brand is the header focal',
+            !!headerFocal && lockedValue === headerFocal.value,
+            lockedValue + ' vs ' + (headerFocal ? headerFocal.value : 'none'));
       // The popover offers exactly what the header shows, never more, so it
       // can only narrow.
       var offered = boxes.length;
