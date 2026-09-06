@@ -398,7 +398,12 @@ build_config_workbook <- function(path, output_filename, weighted,
 
   selection <- data.frame(
     QuestionCode = c("Cohort", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6"),
-    Include = c("N", "Y", "Y", "Y", "Y", "Y", "Y"),
+    # Cohort is REPORTED as well as bannered, which is the ordinary shape of a
+    # demographic in a real project and the one that puts a question's row
+    # indices and a banner's column indices in front of the same reader. A
+    # filter on Cohort is then a filter on a banner variable, which is the cut
+    # the cube has to translate rather than take at face value.
+    Include = c("Y", "Y", "Y", "Y", "Y", "Y", "Y"),
     UseBanner = c("Y", "N", "N", "N", "N", "N", "N"),
     BannerLabel = c("Cohort", "", "", "", "", "", ""),
     DisplayOrder = c(1L, NA, NA, NA, NA, NA, NA),

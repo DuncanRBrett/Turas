@@ -102,12 +102,186 @@
     }
   ],
   "categories": [
+    "Demographics",
     "Usage",
     "Satisfaction",
     "Value",
     "Advocacy"
   ],
   "questions": [
+    {
+      "code": "Cohort",
+      "title": "Cohort",
+      "category": "Demographics",
+      "theme": "",
+      "key_share": "",
+      "type": "single",
+      "bases": [
+        {
+          "n": 200,
+          "low": false,
+          "nWeighted": 276,
+          "nEff": 173.77497947
+        },
+        {
+          "n": 40,
+          "low": false,
+          "nWeighted": 79.6,
+          "nEff": 37.04490178
+        },
+        {
+          "n": 60,
+          "low": false,
+          "nWeighted": 60,
+          "nEff": 55.55555556
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 74.4,
+          "nEff": 46.31325301
+        },
+        {
+          "n": 50,
+          "low": false,
+          "nWeighted": 62,
+          "nEff": 46.31325301
+        }
+      ],
+      "rows": [
+        {
+          "kind": "category",
+          "label": "Alpha",
+          "pct": [
+            29,
+            100,
+            0,
+            0,
+            0
+          ],
+          "n": [
+            80,
+            80,
+            0,
+            0,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "Beta",
+          "pct": [
+            22,
+            0,
+            100,
+            0,
+            0
+          ],
+          "n": [
+            60,
+            0,
+            60,
+            0,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "CD",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "CD",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "Gamma",
+          "pct": [
+            27,
+            0,
+            0,
+            100,
+            0
+          ],
+          "n": [
+            74,
+            0,
+            0,
+            74,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "Delta",
+          "pct": [
+            22,
+            0,
+            0,
+            0,
+            100
+          ],
+          "n": [
+            62,
+            0,
+            0,
+            0,
+            62
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            "BC"
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            "BC"
+          ]
+        }
+      ],
+      "scale_max": null,
+      "gauge_green": null,
+      "gauge_amber": null
+    },
     {
       "code": "Q1",
       "title": "Have you used the service in the last month?",

@@ -96,12 +96,176 @@
     }
   ],
   "categories": [
+    "Demographics",
     "Usage",
     "Satisfaction",
     "Value",
     "Advocacy"
   ],
   "questions": [
+    {
+      "code": "Cohort",
+      "title": "Cohort",
+      "category": "Demographics",
+      "theme": "",
+      "key_share": "",
+      "type": "single",
+      "bases": [
+        {
+          "n": 200,
+          "low": false
+        },
+        {
+          "n": 40,
+          "low": false
+        },
+        {
+          "n": 60,
+          "low": false
+        },
+        {
+          "n": 50,
+          "low": false
+        },
+        {
+          "n": 50,
+          "low": false
+        }
+      ],
+      "rows": [
+        {
+          "kind": "category",
+          "label": "Alpha",
+          "pct": [
+            20,
+            100,
+            0,
+            0,
+            0
+          ],
+          "n": [
+            40,
+            40,
+            0,
+            0,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "Beta",
+          "pct": [
+            30,
+            0,
+            100,
+            0,
+            0
+          ],
+          "n": [
+            60,
+            0,
+            60,
+            0,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "CD",
+            "",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "CD",
+            "",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "Gamma",
+          "pct": [
+            25,
+            0,
+            0,
+            100,
+            0
+          ],
+          "n": [
+            50,
+            0,
+            0,
+            50,
+            0
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "BD",
+            ""
+          ]
+        },
+        {
+          "kind": "category",
+          "label": "Delta",
+          "pct": [
+            25,
+            0,
+            0,
+            0,
+            100
+          ],
+          "n": [
+            50,
+            0,
+            0,
+            0,
+            50
+          ],
+          "sig": [
+            "",
+            "",
+            "",
+            "",
+            "BC"
+          ],
+          "sig2": [
+            "",
+            "",
+            "",
+            "",
+            "BC"
+          ]
+        }
+      ],
+      "scale_max": null,
+      "gauge_green": null,
+      "gauge_amber": null
+    },
     {
       "code": "Q1",
       "title": "Have you used the service in the last month?",

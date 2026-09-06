@@ -116,6 +116,66 @@ cube_var_levels <- function(vdef, micro) {
 }
 
 
+#' Question row to cube level, for one declared variable
+#'
+#' The report asks for a cut in ROW space. The filter bar, the custom banner and
+#' the composite builder all name a value by its position in the question's own
+#' row list (26_filter.js, selectionToFilter). A QUESTION variable's level IS
+#' that position, so it needs no map. A BANNER variable's level is a COLUMN
+#' index, and the columns begin after Total, so the two spaces are offset and
+#' every filter taken at face value answers about the wrong group.
+#'
+#' A row maps to a column only when the two name the SAME people. A banner that
+#' merges two options into one column, or that leaves an option out, cannot
+#' serve that row: the answer would be a real table about a group the reader did
+#' not ask for, which is worse than no answer. Those rows are left OUT of the
+#' map and the report refuses them in a sentence.
+#'
+#' A category row nobody chose maps to -1, an audience of nobody. That is not a
+#' refusal: it is the true answer, and the respondent island gives the same one.
+#'
+#' @param vdef One variable definition from cube_var_defs()
+#' @param micro The microdata list
+#' @param dl_q The data layer question with this variable's code, or NULL
+#' @return Named list, row index (as a name) to column index, or NULL when this
+#'   variable cannot be addressed in row space at all
+#' @keywords internal
+cube_var_rowmap <- function(vdef, micro, dl_q) {
+  if (!identical(vdef$kind, "banner")) return(NULL)
+  if (is.null(dl_q)) return(NULL)
+  a <- micro$answers[[vdef$source]]
+  cols <- micro$banner_vars[[vdef$source]]
+  # A multi-mention answer is a set rather than a partition, so no row of it
+  # names a single group of people and none of it can be mapped.
+  if (is.null(a) || is.list(a) || is.null(cols)) return(NULL)
+  rows <- cube_row_indices(dl_q, "category")
+  if (length(rows) == 0) return(NULL)
+  a <- as.integer(a)
+  cols <- as.integer(cols)
+  in_row <- !is.na(a) & a != CUBE_ANSWERED_UNSHOWN & a != CUBE_NO_COLUMN
+  in_col <- !is.na(cols) & cols != CUBE_NO_COLUMN & cols >= 0L &
+    cols %in% vdef$levels
+  out <- list()
+  for (r in rows) {
+    picked <- in_row & a == r
+    n_row <- sum(picked)
+    if (n_row == 0L) {
+      out[[as.character(r)]] <- -1L
+      next
+    }
+    # Everyone who gave this answer has to be in one column, and that column has
+    # to hold nobody else. Either half failing means the column is not this row.
+    if (any(picked & !in_col)) next
+    seen <- unique(cols[picked])
+    if (length(seen) != 1L) next
+    if (sum(in_col & cols == seen) != n_row) next
+    out[[as.character(r)]] <- as.integer(seen)
+  }
+  if (length(out) == 0) return(NULL)
+  out
+}
+
+
 #' The declared variables of a cube
 #'
 #' Banner groups first, in the data layer's own order, then the questions named
@@ -490,6 +550,9 @@ build_cube <- function(micro, data_layer, config_obj) {
 
   defs <- cube_var_defs(micro, data_layer, filter_vars)
   rejected_vars <- attr(defs, "rejected") %||% character(0)
+  # Questions by code, for the row-to-level map a banner variable needs.
+  dl_by_code <- list()
+  for (q in data_layer$questions) dl_by_code[[q$code]] <- q
   if (length(defs) == 0) return(NULL)
   var_names <- names(defs)
   levels_by_var <- lapply(defs, cube_var_levels, micro = micro)
@@ -629,7 +692,10 @@ build_cube <- function(micro, data_layer, config_obj) {
   list(schema_version = CUBE_SCHEMA_VERSION,
        n = n, k = k, order = order, weighted = weighted,
        vars = lapply(defs, function(d) {
-         list(kind = d$kind, levels = as.integer(d$levels))
+         v <- list(kind = d$kind, levels = as.integer(d$levels))
+         rmap <- cube_var_rowmap(d, micro, dl_by_code[[d$source]])
+         if (!is.null(rmap)) v$rowmap <- rmap
+         v
        }),
        questions = qmeta,
        slices = slices,

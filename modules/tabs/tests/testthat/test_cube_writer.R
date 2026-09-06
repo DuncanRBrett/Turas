@@ -464,3 +464,106 @@ test_that("the score range and the score source travel with the question", {
   expect_equal(cube$questions$Q2$score_hi, 3)
   expect_true("boxes" %in% unlist(cube$questions$Q2$has))
 })
+
+
+# --- the row-to-level map -----------------------------------------------------
+#
+# A banner variable's level is a COLUMN index; every cut a reader picks names a
+# value by its position in the question's own ROW list. The map is the only
+# thing holding the two together, and where it cannot be built honestly the
+# report has to refuse rather than answer about a different group.
+
+rowmap_var <- function(levels = c(1L, 2L)) {
+  list(name = "Grp", kind = "banner", source = "Grp", levels = as.integer(levels))
+}
+
+rowmap_q <- function(n_rows = 2) {
+  list(code = "Grp",
+       rows = lapply(seq_len(n_rows),
+                     function(i) list(kind = "category", label = paste0("c", i))))
+}
+
+rowmap_micro <- function(answers, columns) {
+  list(n = length(answers), answers = list(Grp = as.integer(answers)),
+       banner_vars = list(Grp = as.integer(columns)))
+}
+
+test_that("a banner that is one column per answer maps row to column", {
+  m <- rowmap_micro(c(0L, 0L, 1L, 1L), c(1L, 1L, 2L, 2L))
+  map <- cube_var_rowmap(rowmap_var(), m, rowmap_q())
+  # Row 0 is column 1, not column 0: the columns begin after Total, which is the
+  # offset that made a filter answer about the campus above the one ticked.
+  expect_equal(map[["0"]], 1L)
+  expect_equal(map[["1"]], 2L)
+})
+
+test_that("a question variable needs no map", {
+  m <- rowmap_micro(c(0L, 1L), c(1L, 2L))
+  vdef <- list(name = "Grp", kind = "question", source = "Grp", levels = 0:1)
+  expect_null(cube_var_rowmap(vdef, m, rowmap_q()))
+})
+
+test_that("an answer nobody gave maps to an audience of nobody, not a refusal", {
+  # Three options offered, the third chosen by no one. Filtering to it is a base
+  # of 0, which is the true answer and the one the respondent island gives.
+  m <- rowmap_micro(c(0L, 0L, 1L, 1L), c(1L, 1L, 2L, 2L))
+  map <- cube_var_rowmap(rowmap_var(), m, rowmap_q(3))
+  expect_equal(map[["2"]], -1L)
+})
+
+test_that("a banner that merges two answers into one column maps neither", {
+  # Both answers land in column 1, so no column holds either group on its own.
+  # Answering the cut anyway would report the pair under one of their labels.
+  m <- rowmap_micro(c(0L, 0L, 1L, 1L), c(1L, 1L, 1L, 1L))
+  map <- cube_var_rowmap(rowmap_var(levels = 1L), m, rowmap_q())
+  expect_null(map[["0"]])
+  expect_null(map[["1"]])
+})
+
+test_that("an answer the banner leaves out is not mapped, and the rest still are", {
+  # Three answers, two columns: the third group is in no column of the banner,
+  # so the cube holds no cell for it and there is nothing honest to return.
+  m <- rowmap_micro(c(0L, 1L, 2L), c(1L, 2L, CUBE_NO_COLUMN))
+  map <- cube_var_rowmap(rowmap_var(), m, rowmap_q(3))
+  expect_equal(map[["0"]], 1L)
+  expect_equal(map[["1"]], 2L)
+  expect_null(map[["2"]])
+})
+
+test_that("a column holding somebody the answer does not is not that answer", {
+  # r3 is in column 2 but answered nothing shown. Column 2 is therefore bigger
+  # than answer 1, and the two cannot stand in for each other.
+  m <- rowmap_micro(c(0L, 1L, CUBE_ANSWERED_UNSHOWN), c(1L, 2L, 2L))
+  map <- cube_var_rowmap(rowmap_var(), m, rowmap_q())
+  expect_equal(map[["0"]], 1L)
+  expect_null(map[["1"]])
+})
+
+test_that("a multi-mention banner question cannot be mapped at all", {
+  m <- list(n = 2, answers = list(Grp = list(c(0L, 1L), 1L)),
+            banner_vars = list(Grp = c(1L, 2L)))
+  expect_null(cube_var_rowmap(rowmap_var(), m, rowmap_q()))
+})
+
+test_that("build_cube ships the map for a banner question the report tables", {
+  layer <- fixture_layer()
+  # The banner question, reported as well as bannered: the ordinary shape of a
+  # demographic, and the one where a filter arrives in row space.
+  layer$questions <- c(list(list(code = "Grp", type = "single",
+    rows = list(list(kind = "category", label = "A"),
+                list(kind = "category", label = "B")))), layer$questions)
+  micro <- fixture_micro()
+  micro$answers$Grp <- c(0L, 0L, 0L, 1L, 1L, 1L)
+  cube <- build_cube(micro, layer, fixture_config())
+  expect_equal(cube$vars$Grp$kind, "banner")
+  expect_equal(cube$vars$Grp$levels, c(1L, 2L))
+  expect_equal(cube$vars$Grp$rowmap[["0"]], 1L)
+  expect_equal(cube$vars$Grp$rowmap[["1"]], 2L)
+  # And it survives serialisation, which is what the report actually reads.
+  expect_true(grepl('"rowmap"', serialize_cube(cube), fixed = TRUE))
+})
+
+test_that("a banner with no question in the report ships no map", {
+  cube <- build_cube(fixture_micro(), fixture_layer(), fixture_config())
+  expect_null(cube$vars$Grp$rowmap)
+})

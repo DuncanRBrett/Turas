@@ -425,21 +425,44 @@ function compareSources(TR, q, micro, cube, label, boundary) {
   return cells;
 }
 
+/**
+ * The values the filter bar would offer for a declared variable: the CATEGORY
+ * ROW indices of the question with that code.
+ *
+ * Row indices, not cube levels. The filter bar, the custom banner and the
+ * composite builder all name a value by its position in the question's own row
+ * list (26_filter.js, selectionToFilter). A question variable's cube level
+ * happens to BE that index, so enumerating a cube's own levels agreed with the
+ * filter bar by coincidence and never exercised the case where the two differ.
+ * A banner variable's level is a COLUMN index instead, and columns begin after
+ * Total, so every one of them is offset from the row the reader ticked.
+ *
+ * A declared variable the report does not table cannot be picked at all, so it
+ * contributes no views.
+ */
+function filterableRows(island, code) {
+  const q = (island.questions || []).filter((x) => x.code === code)[0];
+  if (!q) return [];
+  const out = [];
+  (q.rows || []).forEach((r, ri) => { if (r.kind === "category") out.push(ri); });
+  return out;
+}
+
 /** Every (banner, filters) view the enumeration covers, for one cube. */
 function enumerateViews(TR, island, cube) {
   const banners = (island.banner_groups || []).map((b) => b.id);
   const declared = Object.keys(cube.vars);
-  const questionVars = declared.filter((v) => cube.vars[v].kind === "question");
+  const pickable = declared.filter((v) => filterableRows(island, v).length > 0);
   const bannerIds = banners.slice();
-  questionVars.forEach((code) => {
+  pickable.forEach((code) => {
     bannerIds.push("custom:" + code + ":cat");
     bannerIds.push("custom:" + code + ":net");
   });
   const filterSets = [[]];
   const single = [];
-  questionVars.forEach((code) => {
-    cube.vars[code].levels.forEach((lv) => {
-      single.push({ var: code, filter: { q: code, rows: [lv] } });
+  pickable.forEach((code) => {
+    filterableRows(island, code).forEach((ri) => {
+      single.push({ var: code, filter: { q: code, rows: [ri] } });
     });
   });
   single.forEach((s) => filterSets.push([s.filter]));
@@ -479,6 +502,9 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
 
   const views = enumerateViews(microTR, island, cube);
   let served = 0, refused = 0, cells = 0;
+  // Counted by reason. A cube that refused its way to a pass would show it
+  // here: the numbers are printed with the summary, every run.
+  const why = {};
   const boundary = { count: 0, notes: [] };
 
   run(name + ": every enumerated view matches the respondent island exactly", () => {
@@ -494,6 +520,7 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
       if (cm.refused) {
         // A refusal must be for a stated reason, never a silent blank.
         assert(cm.refusedReason, label + " states why the cut is refused");
+        why[cm.refusedReason] = (why[cm.refusedReason] || 0) + 1;
         refused++;
         return;
       }
@@ -509,7 +536,9 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
     });
   });
   console.log("    " + views.length + " views enumerated, " + served +
-    " served, " + refused + " refused, " + cells + " cells compared, " +
+    " served, " + refused + " refused (" +
+    (Object.keys(why).sort().map((r) => r + " " + why[r]).join(", ") || "none") +
+    "), " + cells + " cells compared, " +
     boundary.count + " on a rounding boundary");
   boundary.notes.slice(0, 6).forEach((nt) => notes.push(nt));
   if (boundary.notes.length > 6) {
@@ -525,8 +554,8 @@ function runCubeConfiguration(name, islandFile, microFile, cubeFile) {
       const qc = cubeTR.d2.questionByCode(v.code);
       const cm = cubeTR.model._computedModel(qc, v.banner, v.filters, true);
       if (!cm.refused) return;
-      assert(["order", "undeclared", "block"].indexOf(cm.refusedReason) !== -1,
-        "refusal reason is one of order / undeclared / block, got " +
+      assert(["order", "undeclared", "block", "rows"].indexOf(cm.refusedReason) !== -1,
+        "refusal reason is one of order / undeclared / block / rows, got " +
         JSON.stringify(cm.refusedReason));
     });
     assert(served > 0, "the cube serves at least one view");
@@ -562,6 +591,16 @@ function withheldFixture() {
     banner_groups: [{ id: "Dept", name: "Department" }],
     categories: [],
     questions: [{
+      // The banner question, reported as well as bannered. Its rows are the
+      // space a filter arrives in; the columns after Total are the space the
+      // cube stores. The row map is what holds the two together.
+      code: "Dept", title: "Dept", category: "", type: "single",
+      bases: [{ n: 21 }, { n: 20 }, { n: 1 }],
+      rows: [
+        { kind: "category", label: "Big", pct: [95, 100, 0], n: [20, 20, 0], sig: ["", "", ""] },
+        { kind: "category", label: "Small", pct: [5, 0, 100], n: [1, 0, 1], sig: ["", "", ""] }
+      ]
+    }, {
       code: "Q1", title: "Q1", category: "", type: "single",
       bases: [{ n: 21 }, { n: 20 }, { n: 1 }],
       rows: [
@@ -572,7 +611,7 @@ function withheldFixture() {
   };
   const cube = {
     schema_version: 1, n: 21, k: 5, order: 2, weighted: false,
-    vars: { Dept: { kind: "banner", levels: [1, 2] } },
+    vars: { Dept: { kind: "banner", levels: [1, 2], rowmap: { "0": 1, "1": 2 } } },
     questions: { Q1: { has: ["answers"] } },
     slices: {
       "*": { cells: { "*": { a: [21, 21, 21] } },
@@ -630,9 +669,139 @@ run("a selection mixing a withheld cell with a reported one blanks too", () => {
 run("a filter onto the withheld group is refused, not answered from nothing", () => {
   const TR = withheldFixture();
   const q = TR.d2.questionByCode("Q1");
-  const m = TR.model.forQuestion("Q1", "", [{ q: "Dept", rows: [2] }], {});
+  // Row 1 is "Small", which the row map sends to column 2. Named in row space
+  // because that is what the filter bar sends.
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Dept", rows: [1] }], {});
   const yes = m.rows.filter((r) => r.label === "Yes")[0];
   eq(yes.cells[0].pct, null, "the Total column carries no figure for a group of one");
+});
+
+/* ---------------------------------------------------------------------------
+   CP-4b. ROW SPACE versus LEVEL SPACE.
+
+   Everything a reader picks is named by its position in the question's own row
+   list. A banner variable's cube level is a COLUMN index instead, and the
+   columns begin after Total, so the two are offset by at least one and a cut
+   taken at face value reports a different group under the reader's label. On a
+   client-safe interactive build the cube is the only source, so there is
+   nothing else to catch it.
+--------------------------------------------------------------------------- */
+
+/** Three campuses, unequal, so picking the wrong one cannot look right. */
+function campusFixture(rowmap) {
+  const TR = makeEngine();
+  const agg = {
+    schema_version: 2,
+    project: { name: "T", low_base_threshold: 1, min_reporting_base: 3,
+      alpha: 0.05, format: {} },
+    columns: [
+      { label: "Total", group: "total", letter: "" },
+      { label: "Alpha", group: "Campus", letter: "A" },
+      { label: "Beta", group: "Campus", letter: "B" },
+      { label: "Gamma", group: "Campus", letter: "C" }
+    ],
+    banner_groups: [{ id: "Campus", name: "Campus" }],
+    categories: [],
+    questions: [{
+      code: "Campus", title: "Campus", category: "", type: "single",
+      bases: [{ n: 19 }, { n: 10 }, { n: 5 }, { n: 4 }],
+      rows: [
+        { kind: "category", label: "Alpha", pct: [53, 100, 0, 0], n: [10, 10, 0, 0], sig: ["", "", "", ""] },
+        { kind: "category", label: "Beta", pct: [26, 0, 100, 0], n: [5, 0, 5, 0], sig: ["", "", "", ""] },
+        { kind: "category", label: "Gamma", pct: [21, 0, 0, 100], n: [4, 0, 0, 4], sig: ["", "", "", ""] }
+      ]
+    }, {
+      code: "Q1", title: "Q1", category: "", type: "single",
+      bases: [{ n: 19 }, { n: 10 }, { n: 5 }, { n: 4 }],
+      rows: [
+        { kind: "category", label: "Yes", pct: [47, 60, 40, 25], n: [9, 6, 2, 1], sig: ["", "", "", ""] },
+        { kind: "category", label: "No", pct: [53, 40, 60, 75], n: [10, 4, 3, 3], sig: ["", "", "", ""] }
+      ]
+    }]
+  };
+  const campusVar = { kind: "banner", levels: [1, 2, 3] };
+  if (rowmap) campusVar.rowmap = rowmap;
+  const cube = {
+    schema_version: 1, n: 19, k: 3, order: 2, weighted: false,
+    vars: { Campus: campusVar },
+    questions: { Campus: { has: ["answers"] }, Q1: { has: ["answers"] } },
+    slices: {
+      "*": { cells: { "*": { a: [19, 19, 19] } },
+        q: { Q1: { "*": { b: [19, 19, 19], r: { "0": 9, "1": 10 } } } } },
+      Campus: {
+        cells: { "1": { a: [10, 10, 10] }, "2": { a: [5, 5, 5] }, "3": { a: [4, 4, 4] } },
+        q: { Q1: {
+          "1": { b: [10, 10, 10], r: { "0": 6, "1": 4 } },
+          "2": { b: [5, 5, 5], r: { "0": 2, "1": 3 } },
+          "3": { b: [4, 4, 4], r: { "0": 1, "1": 3 } }
+        } }
+      }
+    },
+    blocks: { shipped: 3, refused: 0 }
+  };
+  install(TR, agg, null, cube);
+  return TR;
+}
+
+run("a filter on a banner value answers about the group the reader ticked", () => {
+  const TR = campusFixture({ "0": 1, "1": 2, "2": 3 });
+  // Row 1 is Beta, five people. Read as a level it would be column 1, Alpha,
+  // ten people: a full and plausible table about the wrong campus.
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Campus", rows: [1] }], {});
+  assert(!m.refused, "the cut is served");
+  eq(m.columns[0].base, 5, "the audience is Beta, not the campus above it");
+  const yes = m.rows.filter((r) => r.label === "Yes")[0];
+  eq(Math.round(yes.cells[0].pct), 40, "and its figures are Beta's");
+});
+
+run("the first banner value is a real audience, not an empty one", () => {
+  const TR = campusFixture({ "0": 1, "1": 2, "2": 3 });
+  // Row 0 read as a level is column 0, which is Total and is no cell of the
+  // banner at all, so the untranslated version returns a base of nobody.
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Campus", rows: [0] }], {});
+  assert(!m.refused, "the cut is served");
+  eq(m.columns[0].base, 10, "Alpha is ten people");
+});
+
+run("a value with no column of its own is refused, not answered as somebody else", () => {
+  // Beta is missing from the map: its banner merged it with another campus or
+  // left it out, so no published column holds exactly those people.
+  const TR = campusFixture({ "0": 1, "2": 3 });
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Campus", rows: [1] }], {});
+  assert(m.refused, "the cut is refused");
+  eq(m.refusedReason, "rows", "and says which kind of refusal it is");
+  // The sentence itself is authored in the callout registry. This sandbox
+  // loads no text module, so that the key is declared and authored is checked
+  // where the whole catalogue is: test_report_text.R, "every key the real
+  // renderer calls is declared and authored".
+  const mask = TR.stats.mask([{ q: "Campus", rows: [1] }]);
+  eq(mask.refused.reason, "rows", "the mask carries the reason the bar renders");
+});
+
+run("a banner with no map at all cannot be cut in row space", () => {
+  // An older file, or a banner built from something the report does not table.
+  const TR = campusFixture(null);
+  const m = TR.model.forQuestion("Q1", "", [{ q: "Campus", rows: [0] }], {});
+  assert(m.refused, "the cut is refused rather than guessed");
+  eq(m.refusedReason, "rows", "for the stated reason");
+});
+
+run("a custom banner on a banner question crosses the right columns", () => {
+  const TR = campusFixture({ "0": 1, "1": 2, "2": 3 });
+  const q = TR.d2.questionByCode("Q1");
+  const m = TR.model._computedModel(q, "custom:Campus:cat", [], false);
+  eq(m.columns.length, 4, "Total plus one column per campus");
+  eq(m.columns[1].base, 10, "Alpha");
+  eq(m.columns[2].base, 5, "Beta");
+  eq(m.columns[3].base, 4, "Gamma");
+});
+
+run("a custom banner it cannot translate shows Total only", () => {
+  const TR = campusFixture({ "0": 1, "2": 3 });
+  const q = TR.d2.questionByCode("Q1");
+  const m = TR.model._computedModel(q, "custom:Campus:cat", [], false);
+  eq(m.columns.length, 1, "no half-built banner with a column about someone else");
+  eq(m.columns[0].base, 19, "and Total still reports");
 });
 
 runCubeConfiguration("unweighted", "parity_island.json", "parity_micro.json",

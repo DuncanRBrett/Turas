@@ -231,8 +231,21 @@
     for (var i = 0; i < filters.length; i++) {
       if (filters[i].box) return false;            // no box variables in the cube
       if (vars.indexOf(filters[i].q) === -1) return false;
+      // A comment carries its author's LEVEL of each declared variable. For a
+      // banner variable that is a column index, and the filter bar sends a row
+      // index, so the two have to be translated rather than compared. A cut
+      // that cannot be translated is not servable, and the tab says so on its
+      // face instead of listing somebody else's comments under the chip.
+      if (qual._cutLevels(filters[i]) === null) return false;
     }
     return true;
+  };
+
+  /** The levels one filter names, in the space the comments' cut is written in,
+   *  or null when it cannot be translated. See cube.levelsForRows. */
+  qual._cutLevels = function (f) {
+    if (!TR.cube || !TR.cube.levelsForRows) return null;
+    return TR.cube.levelsForRows(f.q, f.rows);
   };
 
   /** True when a cut is live but cannot be applied to the comments. */
@@ -288,9 +301,10 @@
     // The comments' own cut. A record with no level for a filtered variable is
     // NOT in the cut: it cannot be placed, and placing it anyway would put a
     // comment in a group the build already decided was too small to name.
+    // Translated, because cutServable has already established that it can be.
     var want = filters.map(function (f) {
       var set = {};
-      (f.rows || []).forEach(function (ri) { set[Number(ri)] = true; });
+      (qual._cutLevels(f) || []).forEach(function (lv) { set[Number(lv)] = true; });
       return { q: f.q, set: set };
     });
     return (records || []).filter(function (r) {
