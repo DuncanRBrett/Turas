@@ -395,11 +395,25 @@ Run this session, on this branch:
   elements, and the manifest parses with nineteen sections listed.
 - The refusal paths were exercised, not just written: a missing hardening step
   wrote the readable file and refused to write a client one.
-- Strict mode, which the wrapper introduces, was checked two ways across all
-  nineteen pages. Every page parses under `"use strict"`, and an acorn scope
-  analysis found no assignment to an undeclared identifier, which is the one
-  failure a parse check cannot see. The analyser was validated against a page
-  with a deliberate implicit global, which it caught.
+- Strict mode, which the wrapper introduces, was checked three ways across all
+  nineteen pages. Every page parses under `"use strict"`. An acorn scope
+  analysis found no assignment to an undeclared identifier, which is the failure
+  a parse check cannot see. A second acorn pass found no bare `this` at program
+  level, which is the failure the scope analysis cannot see: inside the wrapper
+  `this` is undefined rather than window, so `this.x = 1` would throw and
+  `var me = this` would silently be undefined. Both analysers were validated
+  against a page carrying the fault they look for, and both caught it.
+- A page builder was run against a wrapped template, rather than the wrap being
+  applied to an already-built page as in the earlier tests. All five builders
+  substitute with a plain `.replace()` on `__DATA__` and `__THEME__`, so the
+  wrap cannot disturb them, but that was reasoning until
+  `build_vas_section_report.py data Lotto` was executed. Its output opens with
+  the wrapper, passes both strict-mode analysers, hardens to PASS, and leaks no
+  declarations: `itemStats` 5 to 0, `MICRO` 13 to 0.
+- Non-ASCII survives the island round trip, which adds a `jsonlite::toJSON` hop
+  the srcdoc path does not have. The Bills island was decoded out of the
+  hardened composed file and still carries both the em dash and the middot its
+  titles use.
 
 Not verified, and left to Duncan's run:
 
@@ -410,6 +424,11 @@ Not verified, and left to Duncan's run:
 - The real `Run VAS Integrated Report.command`, launched from Finder. A login
   shell finds `Rscript` and all four node tools, and the `.command` now checks
   for them up front, but the double-click itself is untested.
+- The leak gate matches declarations, so it cannot see a name published as a
+  property: `window.foo = function ...` would survive, because the obfuscator
+  preserves property names on purpose. No VAS page does this; all nineteen were
+  checked for `window.X =` and `globalThis.X =` and none has either. Worth
+  knowing before the next composed report.
 - The pages in the OneDrive folder are still the old unwrapped ones. The
   templates carry the wrapper now, so step 2 through step 6 will regenerate them
   wrapped on the next run. Until that run, a build would refuse, which is the
