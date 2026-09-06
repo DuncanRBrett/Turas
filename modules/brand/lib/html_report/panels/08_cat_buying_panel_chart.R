@@ -134,37 +134,68 @@ cb_dj_scatter_svg <- function(norms_table, dj_curve,
       curve_pts))
   }
 
-  # Points
+  # Points. Label placement is collision aware: every dot goes to the shared
+  # placer as an obstacle, but a dot that carries no label is given an empty
+  # one so its own box takes up no room and pushes nothing. Falls back to the
+  # old fixed offset if the chart-builder layer is not loaded.
+  pt_specs <- vector("list", length(brands))
   for (bi in seq_along(brands)) {
-    xp <- to_px_x(x_obs[bi])
-    yp <- to_px_y(y_obs[bi])
     is_focal <- !is.null(focal_brand) && brands[bi] == focal_brand
-    col  <- if (is_focal) focal_colour else "#94a3b8"
-    r    <- if (is_focal) 6 else 4
     # DJ_Flag is optional: a norms table built without it must still render,
     # and norms_table$DJ_Flag[bi] is then NULL, which "||" refuses.
     flag <- if ("DJ_Flag" %in% names(norms_table))
       as.character(norms_table$DJ_Flag[bi]) else NA_character_
     show_label <- isTRUE(is_focal) ||
       (length(flag) == 1L && !is.na(flag) && !identical(flag, "on_line"))
-    lbl  <- .cb_brand_lbl(brands[bi], brand_labels)
+    lbl <- .cb_brand_lbl(brands[bi], brand_labels)
+    pt_specs[[bi]] <- list(
+      svgx       = to_px_x(x_obs[bi]),
+      svgy       = to_px_y(y_obs[bi]),
+      r          = if (is_focal) 6 else 4,
+      label      = if (show_label) lbl else "",
+      full_label = lbl,
+      is_focal   = isTRUE(is_focal),
+      show_label = show_label,
+      col        = if (is_focal) focal_colour else "#94a3b8")
+  }
+
+  placements <- if (exists(".place_scatter_labels", mode = "function")) {
+    .place_scatter_labels(
+      points    = pt_specs,
+      plot_left = pad$l, plot_right = pad$l + cw,
+      plot_top  = pad$t, plot_bot   = pad$t + ch,
+      font_size = 9,     pad        = 3)
+  } else NULL
+
+  for (bi in seq_along(brands)) {
+    pt <- pt_specs[[bi]]
 
     lines <- c(lines, sprintf(
       '<g data-brand="%s">', .cb_esc(brands[bi])))
     lines <- c(lines, sprintf(
       '<circle class="cb-brand-dot" cx="%.1f" cy="%.1f" r="%d" fill="%s" stroke="#fff" stroke-width="1.5">',
-      xp, yp, r, col))
+      pt$svgx, pt$svgy, pt$r, pt$col))
     lines <- c(lines, sprintf(
       '<title>%s\nPen: %.1f%%\n%s: %.1f</title>',
-      .cb_esc(lbl), x_obs[bi], y_lab, y_obs[bi]))
+      .cb_esc(pt$full_label), x_obs[bi], y_lab, y_obs[bi]))
     lines <- c(lines, "</circle>")
 
-    if (show_label) {
+    if (pt$show_label) {
+      pl   <- if (!is.null(placements)) placements[[bi]] else NULL
+      lx   <- if (is.null(pl)) pt$svgx + pt$r + 2 else pl$cx
+      ly   <- if (is.null(pl)) pt$svgy + 3        else pl$cy
+      anch <- if (is.null(pl)) "start"            else pl$anchor
+      # A label pushed clear of its dot gets a leader line, as build_scatter does.
+      if (!is.null(pl) && isTRUE(pl$leader)) {
+        lines <- c(lines, sprintf(
+          '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#cbd5e1" stroke-width="0.8" opacity="0.7"/>',
+          pt$svgx, pt$svgy, pl$cx, pl$cy))
+      }
       lines <- c(lines, sprintf(
-        '<text class="cb-brand-label" x="%.1f" y="%.1f" font-size="9" fill="%s" font-weight="%s">%s</text>',
-        xp + r + 2, yp + 3, col,
-        if (is_focal) "700" else "400",
-        .cb_esc(lbl)))
+        '<text class="cb-brand-label" x="%.1f" y="%.1f" text-anchor="%s" font-size="9" fill="%s" font-weight="%s">%s</text>',
+        lx, ly, anch, pt$col,
+        if (pt$is_focal) "700" else "400",
+        .cb_esc(pt$full_label)))
     }
     lines <- c(lines, '</g>')
   }
