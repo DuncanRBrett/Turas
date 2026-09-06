@@ -435,5 +435,71 @@ const EM_DASH = String.fromCharCode(8212);
 });
 
 // ---------------------------------------------------------------------------
+// Stage 4: the mini funnel and the funnel step read the nested chain.
+//
+// The card used to draw each stage on its own base while the funnel
+// destination, since Stage 4, opens on the nested chain. Two shapes from one
+// dataset, with nothing on the page saying which was which. The block now
+// carries both series and nestedFunnelBlock() picks the nested one where the
+// payload has it. biggestFunnelDrop() reads the same block, so the sentence
+// under the card always describes the funnel the card drew.
+//
+// The chain counts are the IPK fixture's own, read off a generated report on
+// 6 September 2026: 405, 293, 195 and 142 of 438 respondents still in the
+// chain at each stage.
+// ---------------------------------------------------------------------------
+console.log('nested funnel block: the nested series wins where it exists');
+const FUNNEL_ABS = {
+  available: true,
+  stage_keys: ['aware', 'consideration', 'bought_long', 'bought_target'],
+  stage_labels: ['Aware', 'Prefer', 'Past 12 months', 'Past 3 months'],
+  base_label: 'n=438, total respondents',
+  cat_avg: [0.6135, 0.2434, 0.2333, 0.1253],
+  brands: { FOC: [0.924658, 0.668950, 0.623288, 0.449772] }
+};
+const FUNNEL_NESTED = Object.assign({}, FUNNEL_ABS, {
+  nested: true,
+  base_label_nested: 'n=438, total respondents. Nested: each stage counts ' +
+                     'respondents who passed every earlier stage',
+  cat_avg_nested: [0.6135, 0.2434, 0.1038, 0.0568],
+  brands_nested: { FOC: [405 / 438, 293 / 438, 195 / 438, 142 / 438] }
+});
+
+const swapped = D.nestedFunnelBlock(FUNNEL_NESTED);
+assert('the card draws the chain at past 12 months',
+  Math.abs((swapped.brands.FOC[2]) - (195 / 438)) < 1e-9);
+assert('and at past 3 months',
+  Math.abs((swapped.brands.FOC[3]) - (142 / 438)) < 1e-9);
+assert('the category average moves with it',
+  Math.abs((swapped.cat_avg[3]) - (0.0568)) < 1e-9);
+assert('the base line says it is nested',
+       swapped.base_label.indexOf('Nested') >= 0);
+assert('the original block is not mutated',
+       FUNNEL_NESTED.brands.FOC[2] === 0.623288);
+
+console.log('nested funnel block: a payload without the chain is left alone');
+const kept = D.nestedFunnelBlock(FUNNEL_ABS);
+assert('the absolute series stands',
+  Math.abs((kept.brands.FOC[2]) - (0.623288)) < 1e-9);
+assert('and its base line does not claim a nesting',
+       kept.base_label.indexOf('Nested') < 0);
+assertEqual('a missing block stays missing', D.nestedFunnelBlock(null), null);
+
+console.log('funnel step: it names a step of the series the card draws');
+const stepNested = D.biggestFunnelDrop({ funnel: FUNNEL_NESTED }, 'FOC');
+assertEqual('nested: from', stepNested.from, 'Prefer');
+assertEqual('nested: to', stepNested.to, 'Past 12 months');
+assert('nested: the ratio is the chain ratio',
+  Math.abs((stepNested.ratio) - (195 / 293)) < 1e-9);
+
+const stepAbs = D.biggestFunnelDrop({ funnel: FUNNEL_ABS }, 'FOC');
+assertEqual('absolute: from', stepAbs.from, 'Past 12 months');
+assertEqual('absolute: to', stepAbs.to, 'Past 3 months');
+assert('absolute: the ratio is the unnested ratio',
+  Math.abs((stepAbs.ratio) - (0.449772 / 0.623288)) < 1e-9);
+assert('the two series give different answers, which is why it must read one',
+       stepNested.to !== stepAbs.to);
+
+// ---------------------------------------------------------------------------
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed === 0 ? 0 : 1);

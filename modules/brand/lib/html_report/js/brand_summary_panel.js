@@ -685,9 +685,30 @@
     box.hidden = false;
   }
 
+  /* The card draws the same view the funnel destination opens on: the
+     nested chain, where each stage counts the respondents who passed that
+     stage and every earlier one. A payload without the chain figures keeps
+     the absolute series, and either way the card's base line under the
+     title says which of the two it is showing. See nestedFunnelBlock(). */
   function renderFunnelCard(root, funnelBlock, brandCode, snap) {
-    renderMiniFunnelCard(root, 'funnel', funnelBlock, brandCode, snap,
-      { emptyMessage: 'Funnel data not available.' });
+    renderMiniFunnelCard(root, 'funnel', nestedFunnelBlock(funnelBlock),
+      brandCode, snap, { emptyMessage: 'Funnel data not available.' });
+  }
+
+  /* Swap the block's series for the nested ones when the payload carries
+     them. Everything downstream (the card, and the funnel step the
+     Opportunities block names) then reads one series, so the two cannot
+     drift apart. */
+  function nestedFunnelBlock(block) {
+    if (!block || !block.available || !block.nested || !block.brands_nested) {
+      return block;
+    }
+    var out = {};
+    Object.keys(block).forEach(function (k) { out[k] = block[k]; });
+    out.brands = block.brands_nested;
+    if (block.cat_avg_nested) out.cat_avg = block.cat_avg_nested;
+    if (block.base_label_nested) out.base_label = block.base_label_nested;
+    return out;
   }
 
   /* ---------------------------------------------------------------------
@@ -974,12 +995,21 @@
   }
 
   /* The largest step down in the funnel this page already draws, as a share
-     of the stage before it. .biggest_drop_for_focal() in R/03_funnel.R finds
-     the same step under the default ratio conversion metric, and this is
-     phrased as a share of the stage before so it stays true whichever metric
-     the config sets. Nothing here is added to the payload. */
+     of the stage before it.
+
+     It reads the SAME series the card above it draws, which since Stage 4
+     is the nested chain where the payload carries one. On the chain the
+     successive ratio is the engine's pct_nested_filtered, so the sentence
+     is the conversion between two stages of a real funnel. On a payload
+     without the chain it falls back to the absolute series, which is what
+     .biggest_drop_for_focal() in R/03_funnel.R computes under the default
+     ratio conversion metric.
+
+     The sentence is phrased as a share of the stage before, so it stays
+     true whichever series is in play and whichever conversion metric the
+     config sets. */
   function biggestFunnelDrop(cat, brandCode) {
-    var f = cat && cat.funnel;
+    var f = nestedFunnelBlock(cat && cat.funnel);
     if (!f || !f.available) return null;
     var vals = f.brands && f.brands[brandCode];
     var keys = f.stage_keys || [];
@@ -1279,7 +1309,8 @@
     tileFacts: function (snap, cat) { return tileFacts(heroAnchors(snap), cat); },
     boughtWindowLabel: boughtWindowLabel,
     advantageDecisions: advantageDecisions,
-    biggestFunnelDrop: biggestFunnelDrop
+    biggestFunnelDrop: biggestFunnelDrop,
+    nestedFunnelBlock: nestedFunnelBlock
   };
 
   /* -------------------------------------------------------------------------

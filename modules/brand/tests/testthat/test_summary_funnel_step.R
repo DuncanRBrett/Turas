@@ -1,27 +1,34 @@
 # ==============================================================================
-# BRAND MODULE TESTS: the Overview's funnel step agrees with the engine
+# BRAND MODULE TESTS: the Overview's funnel step is the step it draws
 # ==============================================================================
-# "Opportunities to examine" names the largest step down in the funnel. The
-# engine already finds that step: .biggest_drop_for_focal() in R/03_funnel.R,
-# over calculate_conversions()'s output.
+# "Opportunities to examine" names the largest step down in the funnel. It
+# derives that step in JavaScript from the mini-funnel block
+# .brsum_funnel_minif() writes into the JSON island, and it must read the
+# same series the card above it draws. Otherwise the sentence describes a
+# funnel the reader cannot see.
 #
-# The Overview does not read that answer. It derives the step in JavaScript
-# from the mini-funnel block .brsum_funnel_minif() already writes into the
-# JSON island, because reading the engine's answer would mean adding numbers
-# to the island, and the Stage 2 reachability gate asserts the island's
-# numeric content is unchanged.
+# Stage 4 (6 September 2026) changed which series that is. The card now
+# draws the nested chain, matching the funnel destination's default view, so
+# the step is the smallest successive ratio of the chain. That ratio is the
+# engine's own pct_nested_filtered, computed in calculate_stage_metrics():
 #
-# So the two methods have to be shown to agree. They do, under the default
-# conversion metric, because both are the smallest successive-stage ratio of
-# the same pct_weighted series. This test proves it on a series built here,
-# rather than leaving the claim to be inferred from reading two files.
+#     chain[k] / n_weighted  over  chain[k-1] / n_weighted  ==  pct_nested[k]
 #
-# The divergence, stated rather than left to be found: with
-# funnel.conversion_metric set to "absolute_gap", the engine's biggest drop is
-# the largest absolute fall in percentage points, which can be a different
-# step. The Overview always reports the ratio, and says so in its own words
-# ("which is N% of the stage before it"), so its sentence stays true either
-# way; it is the engine's answer it may then differ from.
+# which is what the first test below asserts, on real chain counts.
+#
+# A payload with no chain column keeps the absolute series, and there the
+# step is the one .biggest_drop_for_focal() in R/03_funnel.R reports under
+# the default ratio conversion metric. That branch is still exercised, so
+# both series are covered and the fallback cannot rot.
+#
+# The divergence from the engine, stated rather than left to be found. The
+# engine's conversion metrics are computed on the UNNESTED pct_weighted
+# series, so under the nested card the Overview's step and
+# .biggest_drop_for_focal() can name different stages. The Overview's
+# sentence phrases itself as a share of the stage before ("which is N% of
+# the stage before it"), which stays true of the series it draws either way.
+# With funnel.conversion_metric set to "absolute_gap" the engine's answer
+# moves again, for a third reason.
 # ==============================================================================
 
 library(testthat)
@@ -54,8 +61,9 @@ source(file.path(ROOT_SFS, "modules", "brand", "lib", "html_report", "panels",
 
 # The IPK fixture's focal brand, measured off a generated report on
 # 6 September 2026: aware 92.4658%, prefer 66.895%, past 12 months 62.3288%,
-# past 3 months 44.9772% of total respondents. Its largest step down is
-# 44.9772 / 62.3288 = 0.7216117, which is what the engine reports.
+# past 3 months 44.9772% of total respondents. Its largest step down on that
+# unnested series is 44.9772 / 62.3288 = 0.7216117, which is what the engine
+# reports.
 .sfs_stages <- function() {
   stages <- c("aware", "consideration", "bought_long", "bought_target")
   vals <- list(
@@ -71,13 +79,37 @@ source(file.path(ROOT_SFS, "modules", "brand", "lib", "html_report", "panels",
   out
 }
 
+# The same fixture with the cumulative-chain counts the engine computes,
+# also measured off that report: 405, 293, 195, 142 respondents out of 438
+# still in the chain at each stage. The second brand's counts are made up,
+# and are here only so the category average has more than one value.
+.sfs_stages_with_chain <- function() {
+  out <- .sfs_stages()
+  chain <- list(FOC = c(405, 293, 195, 142), OTHER = c(300, 120, 90, 40))
+  out$base_chain_filtered <- NA_real_
+  for (b in names(chain)) {
+    for (i in seq_along(chain[[b]])) {
+      k <- c("aware", "consideration", "bought_long", "bought_target")[i]
+      out$base_chain_filtered[out$brand_code == b & out$stage_key == k] <-
+        chain[[b]][i]
+    }
+  }
+  out
+}
+
+.sfs_meta <- function() list(n_unweighted = 438, n_weighted = 438)
+
 
 # The Overview's own derivation, in R, line for line with
 # biggestFunnelDrop() in js/brand_summary_panel.js: the smallest successive
 # ratio of the mini-funnel block's per-brand vector, skipping any step whose
 # preceding stage is zero or missing.
 .sfs_overview_step <- function(block, brand_code) {
-  vals <- block$brands[[brand_code]]
+  # nestedFunnelBlock() in the JS swaps in the nested series when the
+  # payload carries it, and biggestFunnelDrop() then reads that. Mirrored
+  # here so this test walks the same path the reader's browser does.
+  vals <- if (isTRUE(block$nested) && !is.null(block$brands_nested))
+    block$brands_nested[[brand_code]] else block$brands[[brand_code]]
   keys <- block$stage_keys
   if (is.null(vals) || length(vals) < 2) return(NULL)
   worst <- NULL
@@ -93,17 +125,87 @@ source(file.path(ROOT_SFS, "modules", "brand", "lib", "html_report", "panels",
 }
 
 
-test_that("the Overview's funnel step is the step the engine reports", {
+test_that("the mini funnel draws the nested chain when the payload has it", {
+  stage_df <- .sfs_stages_with_chain()
+  cr <- list(funnel = list(status = "PASS", stages = stage_df,
+                           meta = .sfs_meta()))
+  block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
+                               list(FOC = "Focal", OTHER = "Other"))
+  expect_true(isTRUE(block$available))
+  expect_true(isTRUE(block$nested))
+
+  # Each stage is the chain count over the weighted total, asserted rather
+  # than eyeballed: 405/438, 293/438, 195/438, 142/438.
+  expect_equal(unname(block$brands_nested$FOC),
+               c(405, 293, 195, 142) / 438, tolerance = 1e-9)
+  # The category average is the per-brand figure averaged, the same
+  # convention the absolute series uses.
+  expect_equal(unname(block$cat_avg_nested),
+               (c(405, 293, 195, 142) / 438 + c(300, 120, 90, 40) / 438) / 2,
+               tolerance = 1e-9)
+  # And the card says which of the two series it is drawing.
+  expect_true(grepl("Nested", block$base_label_nested, fixed = TRUE))
+  expect_false(identical(block$base_label_nested, block$base_label))
+})
+
+
+test_that("the Overview's step is the engine's pct_nested on that chain", {
+  stage_df <- .sfs_stages_with_chain()
+  cr <- list(funnel = list(status = "PASS", stages = stage_df,
+                           meta = .sfs_meta()))
+  block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
+                               list(FOC = "Focal", OTHER = "Other"))
+  overview <- .sfs_overview_step(block, "FOC")
+  expect_false(is.null(overview))
+
+  # The smallest successive ratio of the chain. 293/405 = 0.7234568,
+  # 195/293 = 0.6655290, 142/195 = 0.7282051. The smallest is the middle
+  # one, so the step the Overview names is prefer to past 12 months.
+  expect_identical(overview$from, "consideration")
+  expect_identical(overview$to,   "bought_long")
+  expect_equal(overview$ratio, 195 / 293, tolerance = 1e-9)
+
+  # That ratio is exactly what the engine computes as pct_nested_filtered
+  # for the same stage, so the sentence is a real conversion and not a
+  # number invented by the panel.
+  chain <- c(405, 293, 195, 142)
+  nested <- chain[-1] / chain[-length(chain)]
+  expect_equal(min(nested), overview$ratio, tolerance = 1e-12)
+})
+
+
+test_that("the step moves with the series, which is the point of the change", {
+  # On the unnested series the engine names past 12 months to past 3 months.
+  # On the chain it names prefer to past 12 months. The two are different
+  # answers about different things, and the Overview reports the one it
+  # draws. Left as a test so nobody re-couples them by accident.
+  stage_df <- .sfs_stages_with_chain()
+  conv_df <- calculate_conversions(stage_df, method = "ratio")
+  engine <- .biggest_drop_for_focal(conv_df, "FOC")
+  expect_identical(engine$to_stage, "bought_target")
+
+  cr <- list(funnel = list(status = "PASS", stages = stage_df,
+                           meta = .sfs_meta()))
+  block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
+                               list(FOC = "Focal", OTHER = "Other"))
+  overview <- .sfs_overview_step(block, "FOC")
+  expect_identical(overview$to, "bought_long")
+  expect_false(identical(overview$to, engine$to_stage))
+})
+
+
+test_that("with no chain in the payload it falls back to the engine's step", {
   stage_df <- .sfs_stages()
   conv_df <- calculate_conversions(stage_df, method = "ratio")
   engine <- .biggest_drop_for_focal(conv_df, "FOC")
   expect_false(is.null(engine))
 
   cr <- list(funnel = list(status = "PASS", stages = stage_df,
-                           meta = list(n_unweighted = 438, n_weighted = 438)))
+                           meta = .sfs_meta()))
   block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
                                list(FOC = "Focal", OTHER = "Other"))
   expect_true(isTRUE(block$available))
+  expect_false(isTRUE(block$nested))
 
   overview <- .sfs_overview_step(block, "FOC")
   expect_false(is.null(overview))
@@ -121,6 +223,25 @@ test_that("the Overview's funnel step is the step the engine reports", {
 })
 
 
+test_that("a chain that cannot be divided leaves the absolute series alone", {
+  stage_df <- .sfs_stages_with_chain()
+  cr <- list(funnel = list(status = "PASS", stages = stage_df,
+                           meta = list(n_unweighted = 438, n_weighted = NA)))
+  block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
+                               list(FOC = "Focal", OTHER = "Other"))
+  expect_false(isTRUE(block$nested))
+  expect_null(block$brands_nested)
+
+  stage_df2 <- .sfs_stages_with_chain()
+  stage_df2$base_chain_filtered <- NA_real_
+  cr2 <- list(funnel = list(status = "PASS", stages = stage_df2,
+                            meta = .sfs_meta()))
+  block2 <- .brsum_funnel_minif(cr2, c("FOC", "OTHER"),
+                                list(FOC = "Focal", OTHER = "Other"))
+  expect_false(isTRUE(block2$nested))
+})
+
+
 test_that("they still agree when the largest fall is at another step", {
   stage_df <- .sfs_stages()
   # Move the largest proportional fall to aware -> consideration.
@@ -132,7 +253,7 @@ test_that("they still agree when the largest fall is at another step", {
   engine <- .biggest_drop_for_focal(conv_df, "FOC")
 
   cr <- list(funnel = list(status = "PASS", stages = stage_df,
-                           meta = list(n_unweighted = 438, n_weighted = 438)))
+                           meta = .sfs_meta()))
   block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
                                list(FOC = "Focal", OTHER = "Other"))
   overview <- .sfs_overview_step(block, "FOC")
@@ -150,7 +271,7 @@ test_that("a zero stage is skipped rather than reported as a total fall", {
   stage_df$pct_unweighted <- stage_df$pct_weighted
 
   cr <- list(funnel = list(status = "PASS", stages = stage_df,
-                           meta = list(n_unweighted = 438, n_weighted = 438)))
+                           meta = .sfs_meta()))
   block <- .brsum_funnel_minif(cr, c("FOC", "OTHER"),
                                list(FOC = "Focal", OTHER = "Other"))
   overview <- .sfs_overview_step(block, "FOC")

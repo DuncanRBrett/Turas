@@ -64,7 +64,8 @@ DRIVER = """
 <script>
 (function () {
   var qa = window.__turasQa;
-  var out = { checks: [], errors: qa.errors, tiles: [], routes: [] };
+  var out = { checks: [], errors: qa.errors, tiles: [], routes: [],
+              funnel: null };
   function check(name, ok, detail) {
     out.checks.push({ name: name, ok: !!ok, detail: detail || '' });
   }
@@ -262,6 +263,50 @@ DRIVER = """
       if (sumBtn) sumBtn.click();
     }
 
+    // ---- The mini funnel draws the same view the funnel page opens on --
+    // Stage 4. The card used to draw each stage on its own base while the
+    // funnel destination opened on the nested chain: two shapes from one
+    // dataset, with nothing on the page saying which was which.
+    var fBody = $('[data-brsum-card-body="funnel"]', root);
+    var fMeta = $('[data-brsum-card-meta="funnel"]', root);
+    check('the buying funnel card renders', !!fBody && visible(fBody));
+    var bIsland = $('script.brsum-data') || $('.brsum-data');
+    var bd = null;
+    try { bd = JSON.parse(bIsland.textContent); } catch (e) { bd = null; }
+    var catSel = $('[data-brsum-cat]', root);
+    var catKey = catSel ? catSel.value : null;
+    var catBlk = (bd && bd.categories && catKey) ? bd.categories[catKey] : null;
+    var fb = catBlk ? catBlk.funnel : null;
+    var brandSel = $('[data-brsum-brand]', root);
+    var bcode = brandSel ? brandSel.value : null;
+    if (fBody && fb && fb.available && bcode) {
+      check('the payload carries the nested series', !!fb.nested,
+            String(fb.nested));
+      var series = (fb.nested && fb.brands_nested) ? fb.brands_nested[bcode]
+                                                   : (fb.brands || {})[bcode];
+      var shown = $$('.brsum-mf-focal .brsum-mf-pct', fBody)
+                    .map(function (e) { return txt(e); });
+      out.funnel = {
+        nested: !!fb.nested, shown: shown, meta: txt(fMeta),
+        expected: (series || []).map(function (v) {
+          return (v == null || isNaN(v)) ? '\u2013'
+                 : Math.round(v * 100) + '%';
+        })
+      };
+      check('the card draws the series the payload says it draws',
+            JSON.stringify(out.funnel.shown) ===
+            JSON.stringify(out.funnel.expected),
+            out.funnel.shown.join(' ') + ' vs ' +
+            out.funnel.expected.join(' '));
+      if (fb.nested) {
+        check('the card says on its face that it is nested',
+              /Nested/.test(txt(fMeta)), txt(fMeta));
+        var absSeries = (fb.brands || {})[bcode] || [];
+        check('the nested series really differs from the absolute one',
+              JSON.stringify(series) !== JSON.stringify(absSeries));
+      }
+    }
+
     check('no console error or uncaught exception', qa.errors.length === 0,
           qa.errors.slice(0, 3).join(' | '));
     report();
@@ -328,6 +373,12 @@ def main(argv):
     for r in res["routes"]:
         print("  %-4s -> %-9s %-18s landed=%s"
               % (r["tile"], r["dest"], r["panel"], r["landed"]))
+
+    if res.get("funnel"):
+        f = res["funnel"]
+        print("\nBuying funnel card")
+        print("  nested=%s  shown=%s" % (f["nested"], " ".join(f["shown"])))
+        print("  base: %s" % f["meta"])
 
     if res.get("opportunities"):
         print("\nOpportunities to examine")

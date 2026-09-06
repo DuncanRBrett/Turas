@@ -702,6 +702,8 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   transform: rotate(180deg);
 }
 .brsum-howto-body { margin-top: 10px; }
+.brsum-howto-note { margin: 0 0 14px; font-size: 12px; line-height: 1.55;
+  color: #475569; max-width: 900px; }
 .brsum-howto-body .brsum-pen-notes { margin-top: 0; }
 .brsum-howto-body .brsum-edu { margin: 14px 0 0; border-top: none;
   padding-top: 0; }
@@ -965,13 +967,73 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   base_label <- .brsum_base_text(n_total, "total_respondents") %||%
     "% of total respondents"
 
+  # ---------------------------------------------------------------------
+  # The nested chain, which is what the funnel destination now shows by
+  # default. Without it the Overview card would draw one shape and the
+  # funnel page another, from the same data, with no way for a reader to
+  # tell which was which.
+  #
+  # base_chain_filtered is the weighted count of respondents who passed
+  # this stage and every earlier one (calculate_stage_metrics() in
+  # R/03b_funnel_metrics.R); n_weighted is sum(weights), the denominator
+  # pct_weighted already uses. This is the one figure Stage 4 adds to the
+  # brsum payload, and the reachability gate records it as an addition:
+  # unlike the funnel panel, the Overview has no chain count of its own to
+  # derive it from in the browser.
+  #
+  # A payload without the chain column, or without a weighted total, keeps
+  # the absolute series and says so in its own base line, rather than
+  # showing a shape it cannot support.
+  # ---------------------------------------------------------------------
+  n_w <- suppressWarnings(as.numeric(fn$meta$n_weighted %||% NA_real_))
+  has_chain <- "base_chain_filtered" %in% names(st) &&
+               is.finite(n_w) && n_w > 0
+  nested_map <- NULL
+  cat_avg_nested <- NULL
+  base_label_nested <- NULL
+  if (has_chain) {
+    chain_at <- function(k, bc) {
+      v <- suppressWarnings(as.numeric(
+        st$base_chain_filtered[st$stage_key == k & st$brand_code == bc]))
+      if (length(v) == 1 && is.finite(v)) v / n_w else NA_real_
+    }
+    nested_map <- list()
+    for (bc in brand_codes) {
+      nested_map[[bc]] <- vapply(stage_keys, function(k) chain_at(k, bc),
+                                 numeric(1))
+    }
+    # Same convention as the absolute average above and as the funnel
+    # panel's own category-average row: the view's formula per brand, then
+    # the mean across brands.
+    cat_avg_nested <- vapply(stage_keys, function(k) {
+      vals <- suppressWarnings(as.numeric(
+        st$base_chain_filtered[st$stage_key == k])) / n_w
+      vals <- vals[is.finite(vals)]
+      if (length(vals) == 0) NA_real_ else mean(vals)
+    }, numeric(1))
+    base_label_nested <- paste0(
+      base_label,
+      ". Nested: each stage counts respondents who passed every earlier stage")
+    if (all(!is.finite(unlist(nested_map)))) {
+      has_chain <- FALSE
+      nested_map <- NULL
+      cat_avg_nested <- NULL
+      base_label_nested <- NULL
+    }
+  }
+
   list(
-    available    = TRUE,
-    stage_keys   = stage_keys,
-    stage_labels = unname(stage_labels),
-    base_label   = base_label,
-    cat_avg      = unname(cat_avg),
-    brands       = brands_map
+    available      = TRUE,
+    stage_keys     = stage_keys,
+    stage_labels   = unname(stage_labels),
+    base_label     = base_label,
+    cat_avg        = unname(cat_avg),
+    brands         = brands_map,
+    nested         = isTRUE(has_chain),
+    base_label_nested = base_label_nested,
+    cat_avg_nested = if (is.null(cat_avg_nested)) NULL
+                     else unname(cat_avg_nested),
+    brands_nested  = nested_map
   )
 }
 
@@ -2367,6 +2429,35 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # It renders even when the penetration block has nothing to say, because the
 # methodology callout is always worth having; when both are empty it renders
 # nothing at all rather than an empty drawer.
+#' Why the funnel card and the purchase tile do not match.
+#'
+#' Stage 4 moved the funnel to the nested chain, and the Overview's card
+#' followed it. The headline purchase tile did not: it is a penetration
+#' figure on that stage's own survey response, which is what the rest of
+#' the report means by penetration, and moving it would have changed a
+#' number nobody asked to change. Two figures for the same window then sit
+#' on one page, so the page says why.
+#'
+#' Worded so it stays true on a payload where the card falls back to the
+#' unnested series: the card's own base line is what states which of the two
+#' it drew.
+#' @keywords internal
+.brsum_funnel_base_note <- function() {
+  paste0(
+    '<p class="brsum-howto-note">',
+    '<strong>The buying funnel card and the purchase tile sit on different ',
+    'bases.</strong> The card draws the nested funnel wherever the data ',
+    'supports it: each stage counts only the respondents who passed every ',
+    'earlier stage, and the base line under the card title says which of ',
+    'the two series it drew. The headline purchase tile is that same stage ',
+    'on its own survey response, over all respondents, which is the figure ',
+    'the rest of the report calls penetration. Both are right and they ',
+    'answer different questions, so they are not expected to agree. The ',
+    'Brand and Buying destination carries a base toggle that shows the ',
+    'funnel either way.</p>')
+}
+
+
 .brsum_howto_drawer <- function() {
   callout <- .brsum_educational_callout(collapsed = FALSE)
   paste(
@@ -2375,6 +2466,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
         'onclick="brsumToggleHowTo(this)">How this works',
         '<span class="brsum-howto-arrow" aria-hidden="true"></span></button>',
       '<div class="brsum-howto-body" hidden>',
+        .brsum_funnel_base_note(),
         '<aside class="brsum-pen-notes" data-brsum-pen-notes hidden ',
           'aria-live="polite"></aside>',
         callout,

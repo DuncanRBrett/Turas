@@ -415,3 +415,80 @@ test_that("no definition carries a digit", {
     expect_false(grepl("[0-9]", .FUNNEL_DEFAULT_DEFINITIONS[[k]]), info = k)
   }
 })
+
+
+# ==============================================================================
+# Weighted data
+# ==============================================================================
+# The fixture is unweighted, so every chain count in the tests above is a head
+# count and the denominator is the sample size. The formula is a weighted
+# count over sum(weights), and that pair has to hold when the weights are not
+# all one. This drives the engine itself rather than a hand-built payload.
+
+source(file.path(ROOT_FND, "modules", "brand", "R", "00_guard.R"))
+source(file.path(ROOT_FND, "modules", "brand", "R", "03b_funnel_metrics.R"))
+
+test_that("the nested figure is a weighted proportion when weights are real", {
+  n <- 8
+  brands <- c("A", "B")
+  mk <- function(v) {
+    m <- matrix(v, nrow = n, ncol = length(brands), dimnames = list(NULL, brands))
+    m
+  }
+  # Respondent 1..8. Brand A: aware for 1-6, prefers 1-4, bought 1-3 but also
+  # 7 (who never said they were aware). Brand B: aware 1-3, prefers 1-2,
+  # bought 1-2.
+  aware  <- mk(c(rep(TRUE, 6), FALSE, FALSE))
+  aware[, "B"] <- c(rep(TRUE, 3), rep(FALSE, 5))
+  prefer <- mk(c(rep(TRUE, 4), rep(FALSE, 4)))
+  prefer[, "B"] <- c(TRUE, TRUE, rep(FALSE, 6))
+  bought <- mk(c(TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE))
+  bought[, "B"] <- c(TRUE, TRUE, rep(FALSE, 6))
+
+  stages <- list(
+    aware = list(key = "aware", label = "Aware", matrix = aware),
+    consideration = list(key = "consideration", label = "Prefer",
+                         matrix = prefer),
+    bought_target = list(key = "bought_target", label = "Bought",
+                         matrix = bought))
+
+  w <- c(2.5, 0.5, 1.5, 1, 1, 1, 3, 0.5)
+  sum_w <- sum(w)
+  df <- calculate_stage_metrics(stages, weights = w, warn_base = 0)
+
+  get <- function(b, k, col) df[[col]][df$brand_code == b & df$stage_key == k]
+
+  # Brand A. The chain is aware, then aware AND prefer, then all three.
+  expect_equal(get("A", "aware", "base_chain_filtered"), sum(w[1:6]))
+  expect_equal(get("A", "consideration", "base_chain_filtered"), sum(w[1:4]))
+  expect_equal(get("A", "bought_target", "base_chain_filtered"), sum(w[1:3]))
+
+  # Respondent 7 bought brand A on their own say-so and is in the absolute
+  # count for that stage, but never named it as known, so the chain drops
+  # them. This is the whole point of the nested view.
+  expect_equal(get("A", "bought_target", "base_weighted"), sum(w[c(1, 2, 3, 7)]))
+  expect_true(get("A", "bought_target", "base_weighted") >
+              get("A", "bought_target", "base_chain_filtered"))
+
+  # The nested figure, which is what .fn_chain_pct() computes.
+  nested <- vapply(c("aware", "consideration", "bought_target"),
+                   function(k) get("A", k, "base_chain_filtered") / sum_w,
+                   numeric(1))
+  expect_equal(unname(nested), c(sum(w[1:6]), sum(w[1:4]), sum(w[1:3])) / sum_w)
+  expect_true(all(nested >= 0 & nested <= 1))
+  expect_true(all(diff(nested) <= 0))
+
+  # It is not the unweighted head count over n, which is what a reader would
+  # get if the weights were dropped.
+  expect_false(isTRUE(all.equal(unname(nested[3]), 3 / n)))
+
+  # And the first stage still agrees with the absolute figure.
+  expect_equal(unname(nested[1]), get("A", "aware", "pct_weighted"),
+               tolerance = 1e-12)
+
+  # The panel helper reads the same thing off a cell.
+  cell <- list(base_chain_filtered = get("A", "bought_target",
+                                         "base_chain_filtered"))
+  expect_equal(.fn_chain_pct(cell, sum_w), unname(nested[3]),
+               tolerance = 1e-12)
+})

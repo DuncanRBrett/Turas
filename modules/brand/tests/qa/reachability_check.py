@@ -8,6 +8,18 @@ every data-subpanel and every data-section in an old report and a new one and
 asserts the sets are equal, and it compares the JSON islands so a rehoming
 cannot quietly change a number.
 
+One island class is allowed to GROW, and only to grow: see ADDITIVE below.
+Stage 4 made the nested chain the funnel's default view. The funnel panel
+needed nothing new for it, because its payload already carries the
+cumulative-chain count and the weighted total, so the browser derives the
+view. The Overview's mini funnel had neither, and drawing it on the absolute
+series would have left the Overview showing one shape while the funnel
+destination showed another. So the chain series was added to brsum-data.
+
+For an additive class the old numbers must still all be there, in the same
+order, and the added ones are listed. Every other class stays on exact
+equality, and a number that DISAPPEARS is a failure everywhere.
+
 Usage:
     python3 reachability_check.py OLD.html NEW.html
 Exit status 0 when the reports agree, 1 otherwise.
@@ -33,6 +45,33 @@ def element_ids(html):
 
 
 NUM = re.compile(r'-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?')
+
+# Island classes permitted to carry numbers the old report did not, with the
+# reason. Everything in the old payload must still be present, in order; only
+# additions are tolerated. Add to this only with a written reason, and expect
+# to justify it: the point of the gate is that a rearrangement cannot move a
+# number without someone deciding that it should.
+ADDITIVE = {
+    "brsum-data": (
+        "Stage 4, 2026-09-06: the Overview's mini funnel draws the nested "
+        "chain, and the chain is not derivable in the browser from what the "
+        "Overview payload held. Adds funnel.brands_nested, "
+        "funnel.cat_avg_nested and funnel.base_label_nested per category."
+    ),
+}
+
+
+def is_subsequence(old, new):
+    """Every value in `old`, in order, somewhere in `new`."""
+    it = iter(new)
+    return all(any(x == y for y in it) for x in old)
+
+
+def added_values(old, new):
+    """The values `new` carries beyond `old`, as a multiset difference."""
+    rest = Counter(new)
+    rest.subtract(Counter(old))
+    return sorted(v for v, k in rest.items() for _ in range(max(0, k)))
 
 
 def islands(html):
@@ -87,6 +126,27 @@ def _numbers(body):
     return tuple(NUM.findall(json.dumps(parsed, sort_keys=True)))
 
 
+def _grew_only(old_payloads, new_payloads):
+    """Pair the payloads of one class and check each new one only grew.
+
+    Returns the flat list of added values, or None when any old payload has
+    no new payload that still contains all of its numbers in order.
+    """
+    remaining = list(new_payloads)
+    added = []
+    for op in sorted(old_payloads):
+        match = None
+        for np in remaining:
+            if is_subsequence(op, np):
+                match = np
+                break
+        if match is None:
+            return None
+        remaining.remove(match)
+        added.extend(added_values(op, match))
+    return added
+
+
 def report(name, old, new):
     ok = True
     missing = sorted(old - new)
@@ -129,10 +189,24 @@ def main(old_path, new_path):
         if o_isl[cls] == n_isl[cls]:
             print("  %s: %d distinct payload(s), numeric content identical"
                   % (cls, len(o_isl[cls])))
-        else:
+            continue
+        if cls in ADDITIVE:
+            grew = _grew_only(o_isl[cls], n_isl[cls])
+            if grew is not None:
+                print("  %s: numeric content GREW, nothing lost (+%d values)"
+                      % (cls, len(grew)))
+                print("      allowed: %s" % ADDITIVE[cls])
+                shown = grew[:12]
+                print("      added: %s%s"
+                      % (", ".join(shown),
+                         " ..." if len(grew) > len(shown) else ""))
+                continue
             ok = False
-            print("  %s: NUMERIC CONTENT DIFFERS (old %d distinct, new %d)"
-                  % (cls, len(o_isl[cls]), len(n_isl[cls])))
+            print("  %s: CONTENT CHANGED, not a pure addition" % cls)
+            continue
+        ok = False
+        print("  %s: NUMERIC CONTENT DIFFERS (old %d distinct, new %d)"
+              % (cls, len(o_isl[cls]), len(n_isl[cls])))
 
     print("Result:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
