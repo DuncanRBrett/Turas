@@ -278,7 +278,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   font-variant-numeric: tabular-nums;
 }
 .brsum-tile-rank {
-  align-self: flex-start;
+  align-self: flex-start; margin-top: 2px;
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px;
   text-transform: uppercase; color: %FOCAL%;
   padding: 2px 8px; border-radius: 999px;
@@ -2138,8 +2138,11 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
         '<div class="brsum-tile-label" data-brsum-tile-label>', label, '</div>',
         '<div class="brsum-tile-value brsum-focal-value" ',
           'data-brsum-tile-value>&ndash;</div>',
-        '<div class="brsum-tile-rank" data-brsum-tile-rank hidden></div>',
+        # The comparison sits directly under the value on every tile, so the
+        # four comparison lines read across as one row. The rank, which only
+        # one tile carries, goes below it rather than between the two.
         compare,
+        '<div class="brsum-tile-rank" data-brsum-tile-rank hidden></div>',
         if (nzchar(note))
           paste0('<div class="brsum-tile-note">', note, '</div>') else '',
         '<button type="button" class="brsum-tile-go" ',
