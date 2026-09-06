@@ -234,6 +234,8 @@
   list(
     list(
       Category         = cat_def$name,
+      CategoryCode     = cat_def$code,
+      Active           = "Y",
       Type             = cat_def$type,
       Timeframe_Long   = cat_def$timeframe_long,
       Timeframe_Target = cat_def$timeframe_target,

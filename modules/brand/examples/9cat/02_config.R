@@ -184,6 +184,11 @@
   list(
     list(name="Category",        width=28, required=TRUE,
          description="Category name as it appears in the data and report"),
+    list(name="CategoryCode",    width=16, required=TRUE,
+         description="[REQUIRED] Short category code (e.g. DSS). Must match CategoryCode on the Survey_Structure Brands sheet and the suffix in BRANDAWARE_DSS."),
+    list(name="Active",          width=10, required=TRUE,
+         description="[REQUIRED] Y = analyse this category in this run. N = leave it out.",
+         dropdown=c("Y","N")),
     list(name="Type",            width=18, required=TRUE,
          description="Category type. Controls question wording and penetration structure",
          dropdown=c("transaction","durable","service")),
@@ -205,6 +210,8 @@
 .build_9cat_categories_rows <- function() {
   lapply(cat9_categories(), function(c) list(
     Category         = c$name,
+    CategoryCode     = c$code,
+    Active           = "Y",
     Type             = c$type,
     Analysis_Depth   = c$analysis_depth,
     Timeframe_Long   = c$timeframe_long,

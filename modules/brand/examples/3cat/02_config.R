@@ -223,6 +223,8 @@
 .build_3cat_categories_rows <- function() {
   lapply(cat3_categories(), function(c) list(
     Category         = c$name,
+    CategoryCode     = c$code,
+    Active           = "Y",
     Type             = c$type,
     Timeframe_Long   = c$timeframe_long,
     Timeframe_Target = c$timeframe_target,

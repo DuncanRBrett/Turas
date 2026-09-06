@@ -46,37 +46,45 @@
   cat_name <- ipk_category()$name
   cat_def  <- ipk_category()
 
+  # Columns on the unified Questions sheet records how many data columns the
+  # question occupies. A slot-indexed Multi_Mention brand battery gets one
+  # slot per brand plus one for NONE; a question asked once per brand gets one
+  # column per brand; everything else gets one.
+  n_brands   <- length(ipk_brands())
+  slot_cols  <- n_brands + 1L
+  brand_cols <- n_brands
+
   # ---- Category-level questions ----
   cat_qs <- list(
     list(QuestionCode = sprintf("CATBUY_%s", cat_def$code),
          QuestionText = sprintf("How often do you buy %s?", tolower(cat_name)),
-         VariableType = "Single_Mention", Battery = "cat_buying", Category = cat_name),
+         Variable_Type = "Single_Mention", Columns = 1, Category = cat_name),
     list(QuestionCode = sprintf("BRANDAWARE_%s", cat_def$code),
          QuestionText = sprintf("Which of these brands of %s have you heard of?", tolower(cat_name)),
-         VariableType = "Multi_Mention", Battery = "awareness", Category = cat_name),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = cat_name),
     list(QuestionCode = sprintf("BRANDATT1_%s", cat_def$code),
          QuestionText = "Which of these statements best describes how you feel about this brand?",
-         VariableType = "Single_Mention", Battery = "attitude", Category = cat_name),
+         Variable_Type = "Single_Mention", Columns = brand_cols, Category = cat_name),
     list(QuestionCode = sprintf("BRANDATT2_%s", cat_def$code),
          QuestionText = "Why would you refuse to buy this brand? (open-ended)",
-         VariableType = "Open_End", Battery = "attitude_oe", Category = cat_name),
+         Variable_Type = "Open_End", Columns = brand_cols, Category = cat_name),
     list(QuestionCode = sprintf("BRANDPEN1_%s", cat_def$code),
          QuestionText = sprintf("Which of these brands have you bought in the last %s?", cat_def$timeframe_long),
-         VariableType = "Multi_Mention", Battery = "penetration", Category = cat_name),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = cat_name),
     list(QuestionCode = sprintf("BRANDPEN2_%s", cat_def$code),
          QuestionText = sprintf("Which of these brands have you bought in the last %s?", cat_def$timeframe_target),
-         VariableType = "Multi_Mention", Battery = "penetration", Category = cat_name),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = cat_name),
     list(QuestionCode = sprintf("BRANDPEN3_%s", cat_def$code),
          QuestionText = "How frequently do you buy each brand when purchasing in this category?",
-         VariableType = "Rating", Battery = "penetration", Category = cat_name)
+         Variable_Type = "Rating", Columns = brand_cols, Category = cat_name)
   )
 
   # ---- CEPs (one question per CEP) ----
   cep_qs <- lapply(ipk_ceps(), function(c) list(
     QuestionCode = c$code,
     QuestionText = c$text,
-    VariableType = "Multi_Mention",
-    Battery      = "cep_matrix",
+    Variable_Type = "Multi_Mention",
+    Columns      = slot_cols,
     Category     = cat_name
   ))
 
@@ -84,8 +92,8 @@
   attr_qs <- lapply(ipk_attributes(), function(a) list(
     QuestionCode = a$code,
     QuestionText = a$text,
-    VariableType = "Multi_Mention",
-    Battery      = "attribute",
+    Variable_Type = "Multi_Mention",
+    Columns      = slot_cols,
     Category     = cat_name
   ))
 
@@ -93,27 +101,27 @@
   # Follows CBM TRANS questions: QWOMBRAND1a/1b (received), 2a/2b (shared+count), 3a/3b (neg+count)
   wom_qs <- list(
     list(QuestionCode = "WOM_POS_REC",   QuestionText = "Has someone shared something POSITIVE about any of these brands in the last 3 months? (QWOMBRAND1a)",
-         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = "ALL"),
     list(QuestionCode = "WOM_NEG_REC",   QuestionText = "Has someone shared something NEGATIVE about any of these brands in the last 3 months? (QWOMBRAND1b)",
-         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = "ALL"),
     list(QuestionCode = "WOM_POS_SHARE", QuestionText = "Have you shared something POSITIVE about any of these brands in the last 3 months? (QWOMBRAND2a)",
-         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = "ALL"),
     list(QuestionCode = "WOM_POS_COUNT", QuestionText = "On how many occasions have you shared something POSITIVE about each brand in the last 3 months? (QWOMBRAND2b)",
-         VariableType = "Rating",        Battery = "wom", Category = "ALL"),
+         Variable_Type = "Rating",        Columns = brand_cols, Category = "ALL"),
     list(QuestionCode = "WOM_NEG_SHARE", QuestionText = "Have you shared something NEGATIVE about any of these brands in the last 3 months? (QWOMBRAND3a)",
-         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
+         Variable_Type = "Multi_Mention", Columns = slot_cols, Category = "ALL"),
     list(QuestionCode = "WOM_NEG_COUNT", QuestionText = "On how many occasions have you shared something NEGATIVE about each brand in the last 3 months? (QWOMBRAND3b)",
-         VariableType = "Rating",        Battery = "wom", Category = "ALL")
+         Variable_Type = "Rating",        Columns = brand_cols, Category = "ALL")
   )
 
   # ---- DBA battery (brand-level, one fame + one uniqueness question per asset) ----
   dba_qs <- unlist(lapply(ipk_dba_assets(), function(a) list(
     list(QuestionCode = sprintf("DBA_FAME_%s",   a$code),
          QuestionText = sprintf("Have you seen this before? (%s)", a$label),
-         VariableType = "Single_Mention", Battery = "dba", Category = "ALL"),
+         Variable_Type = "Single_Mention", Columns = 1, Category = "ALL"),
     list(QuestionCode = sprintf("DBA_UNIQUE_%s", a$code),
          QuestionText = sprintf("Which brand does this belong to? (%s)", a$label),
-         VariableType = "Open_End",       Battery = "dba", Category = "ALL")
+         Variable_Type = "Open_End",       Columns = 1, Category = "ALL")
   )), recursive = FALSE)
 
   c(cat_qs, cep_qs, attr_qs, wom_qs, dba_qs)
@@ -204,8 +212,10 @@
 
 .build_1brand_brands_rows <- function() {
   cat_name <- ipk_category()$name
+  cat_code <- ipk_category()$code
   lapply(ipk_brands(), function(b) list(
     Category     = cat_name,
+    CategoryCode = cat_code,
     BrandCode    = b$code,
     BrandLabel   = b$label,
     DisplayOrder = b$display_order,
@@ -216,8 +226,10 @@
 
 .build_1brand_ceps_rows <- function() {
   cat_name <- ipk_category()$name
+  cat_code <- ipk_category()$code
   mapply(function(c, i) list(
     Category     = cat_name,
+    CategoryCode = cat_code,
     CEPCode      = c$code,
     CEPText      = c$text,
     DisplayOrder = i
@@ -226,8 +238,10 @@
 
 .build_1brand_attrs_rows <- function() {
   cat_name <- ipk_category()$name
+  cat_code <- ipk_category()$code
   mapply(function(a, i) list(
     Category     = cat_name,
+    CategoryCode = cat_code,
     AttrCode     = a$code,
     AttrText     = a$text,
     DisplayOrder = i
@@ -428,7 +442,7 @@ generate_1brand_structure <- function(output_path, overwrite = TRUE) {
 
   write_table_sheet(
     wb, "Questions",
-    .build_questions_columns(),
+    .build_unified_questions_columns(),
     title    = "Question Definitions",
     subtitle = "Every CBM question in this survey, mapped to battery and category.",
     example_rows   = .build_1brand_questions_rows(),
@@ -437,7 +451,7 @@ generate_1brand_structure <- function(output_path, overwrite = TRUE) {
 
   write_table_sheet(
     wb, "Options",
-    .build_options_columns(),
+    .build_unified_options_columns(),
     title    = "Response Option Definitions",
     subtitle = "Labels for coded responses on categorical questions.",
     example_rows   = .build_1brand_options_rows(),
