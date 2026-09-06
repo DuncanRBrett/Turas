@@ -425,8 +425,13 @@ assertEqual('leaving the step that can be computed', zeroed.to, 'Prefer');
 // ---------------------------------------------------------------------------
 section('no em dash reaches a reader');
 // ---------------------------------------------------------------------------
+// The character is BUILT rather than typed, the way
+// modules/brand/tests/testthat/test_no_em_dash.R builds it, so this file can
+// name the thing it bans without carrying a single instance of it.
+const EM_DASH = String.fromCharCode(8212);
 [top, mid, last, nine, above, below, ld, ns, wr].forEach(function (r, i) {
-  assert('headline ' + i + ' carries no em dash', r.headline.indexOf('—') === -1);
+  assert('headline ' + i + ' carries no em dash',
+    r.headline.indexOf(EM_DASH) === -1);
 });
 
 // ---------------------------------------------------------------------------
