@@ -51,6 +51,42 @@
 
 # javascript-obfuscator config, written to a temp JSON file per invocation and
 # mirrored for the node gates in minify_profile.json.
+
+
+# ---------------------------------------------------------------------------
+# The release audit is this file's OWN dependency, loaded here rather than left
+# to the caller.
+#
+# Step 8b below calls turas_release_audit(): it is the only thing standing
+# between a client-safe declaration and a file that breaks it. Eight module GUIs
+# source turas_minify.R independently and the audit was in none of their lists,
+# so exists("turas_release_audit") was FALSE in every real build, the check was
+# skipped in silence, and the declaration guarded nothing. Found 6 September 2026
+# by running the audit by hand against a delivered SACS build and asking why the
+# build had not refused.
+#
+# Pairing it with the file that uses it is what stops that returning: a ninth
+# caller gets the audit without knowing it needs one.
+.MINIFY_LIB_DIR <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) NA_character_)
+
+.minify_load_release_audit <- function() {
+  if (exists("turas_release_audit", mode = "function")) return(TRUE)
+  candidates <- c(
+    if (!is.na(.MINIFY_LIB_DIR)) file.path(.MINIFY_LIB_DIR, "turas_release_audit.R"),
+    if (nzchar(Sys.getenv("TURAS_HOME")))
+      file.path(Sys.getenv("TURAS_HOME"), "modules", "shared", "lib", "turas_release_audit.R"),
+    file.path(getwd(), "modules", "shared", "lib", "turas_release_audit.R")
+  )
+  for (path in candidates) {
+    if (!is.null(path) && file.exists(path)) {
+      ok <- tryCatch({ source(path); TRUE }, error = function(e) FALSE)
+      if (ok && exists("turas_release_audit", mode = "function")) return(TRUE)
+    }
+  }
+  FALSE
+}
+
+.minify_load_release_audit()
 #
 # What survived the previous settings was property names and the one string in
 # five that stringArrayThreshold 0.8 left alone. Raising the threshold to 1.0
@@ -1552,9 +1588,38 @@ turas_minify <- function(input_path,
   # not a declaration. It sits before the write on purpose: an audit that ran
   # after the write left a respondent-level file on disk under the clean
   # deliverable name and then said no (found by Duncan, 4 Sep 2026).
+  .minify_load_release_audit()
   release <- if (exists("turas_release_audit", mode = "function")) {
     turas_release_audit(html, client_safe = isTRUE(client_safe), refuse = TRUE)
-  } else NULL
+  } else {
+    # A declaration that cannot be checked must not pass quietly. On a full build
+    # the audit is a report and its absence is a warning; on a client-safe one it
+    # is the gate, and a missing gate is not an open one.
+    if (isTRUE(client_safe)) {
+      if (exists("turas_refuse", mode = "function")) {
+        turas_refuse(
+          code = "CFG_RELEASE_AUDIT_UNAVAILABLE",
+          title = "Client-safe build cannot be checked, so it is not written",
+          problem = paste(
+            "This build was declared client-safe, and turas_release_audit.R could",
+            "not be loaded, so nothing checked what the file actually contains."),
+          why_it_matters = paste(
+            "The client-safe declaration is enforced by that audit and by nothing",
+            "else. Without it the build would ship on the strength of a radio",
+            "button, which is what it was written to replace."),
+          how_to_fix = c(
+            "Check that modules/shared/lib/turas_release_audit.R exists in this checkout.",
+            "It is loaded automatically beside turas_minify.R; a missing file is the usual cause.",
+            "The dev copy is kept, so nothing on disk is mistaken for a client file."),
+          module = "MINIFY")
+      } else {
+        stop("Client-safe build declared but the release audit could not be loaded",
+             call. = FALSE)
+      }
+    }
+    add_warning("Release audit unavailable: the delivered file was not checked")
+    NULL
+  }
 
   # -- Step 8c: Encode the data islands ---------------------------------------
   # After the audit, not before. The audit reads "n": out of the respondent

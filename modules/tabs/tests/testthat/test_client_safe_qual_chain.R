@@ -52,13 +52,15 @@ chain_questions <- function() list(chain_question("Q_A", c("1", "2", "3", "4", "
                                    chain_question("Q_B", c("2", "3")))
 chain_levels <- function() list(Cohort = c(1L, 1L, 1L, 1L, 1L, 2L))
 
-# A cube that agrees with those levels, built as a real one is: Cohort 1 holds
-# five people and ships, Cohort 2 holds one and is withheld, so the cube keeps its
-# own rule. A comment still wearing a Cohort 2 tag therefore names a group the
-# cube will not even report, which is exactly what the audit has to catch.
+# A cube that agrees with those levels, built as a real one is. Cohort is a
+# PUBLISHED MARGIN, so both cells ship their base, including the one that holds a
+# single person: the crosstab prints that column and its base already, and the
+# cube suppresses the cell's answers rather than the cut. So the cube keeps its
+# own rule, AND the audit can price a Cohort 2 tag and see that it names one
+# person. That is the case the whole chain exists to catch.
 CHAIN_CUBE <- paste0(
   '{"k":5,"n":6,"order":2,"vars":{"Cohort":{"kind":"banner","levels":[1,2]}},',
-  '"slices":{"Cohort":{"cells":{"1":{"a":[5,5,5]}},"q":{}}}}')
+  '"slices":{"Cohort":{"cells":{"1":{"a":[5,5,5]},"2":{"a":[1,1,1]}},"q":{}}}}')
 
 chain_page <- function(qual_json) {
   paste0("<html><body>",

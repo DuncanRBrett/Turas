@@ -272,3 +272,79 @@ test_that("no comment island at all is absent, and answers for nothing", {
   expect_length(a$qual$violations, 0)
   expect_match(paste(a$lines, collapse = "\n"), "Comment island\\s*: absent")
 })
+
+
+# ==============================================================================
+# THE PUBLISHED MARGIN, AND WHAT "CANNOT BE PRICED" MEANS
+# ==============================================================================
+# Both of these were found on 6 September 2026 by running the audit by hand
+# against a delivered SACS build. It reported 168 cube violations and 9 comment
+# violations on a file that was correct, which is the failure mode the audit's
+# own header warns about: one that fires on a good file gets skipped.
+
+# A banner variable, its margin shipped column by column, with one small column
+# suppressed exactly as the writer does it.
+MARGIN_CUBE <- paste0(
+  '{"k":10,"n":40,"order":2,"vars":{"Dept":{"kind":"banner","levels":[1,2]}},',
+  '"slices":{"Dept":{"cells":{"1":{"a":[37,37,37]},"2":{"a":[3,3,3]}},',
+  '"q":{"Q1":{"1":{"b":[37,37,37]},"2":{"b":[3,3,3],"sup":true}}}}}}')
+
+test_that("a published banner margin may carry a column smaller than k", {
+  # The crosstab already prints that column and its base. The cube suppresses
+  # the CELL there rather than the cut, which is the writer's own rule.
+  a <- turas_release_audit(page(island("data-cube", MARGIN_CUBE)),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_length(a$cube$violations, 0)
+  expect_false(a$client_safe_violation)
+})
+
+test_that("a small cell on a margin that is NOT suppressed is still a violation", {
+  # The exemption is on the suppression marker, never on the slice: a margin cell
+  # under k that still carries its answers is the thing k exists to stop.
+  loose <- sub('"b":\\[3,3,3\\],"sup":true', '"b":[3,3,3]', MARGIN_CUBE)
+  a <- turas_release_audit(page(island("data-cube", loose)),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_true(length(a$cube$violations) > 0)
+  expect_match(paste(a$cube$violations, collapse = " "), "between 1 and k - 1")
+})
+
+test_that("a crossing nobody published is still judged by the whole-block rule", {
+  # Two variables is a crossing the workbook never printed, so there is no
+  # published base to appeal to and the exemption must not reach it.
+  crossed <- paste0(
+    '{"k":10,"n":40,"order":2,',
+    '"vars":{"Dept":{"kind":"banner","levels":[1,2]},"Q9":{"kind":"question","levels":[0,1]}},',
+    '"slices":{"Dept*Q9":{"cells":{"1|0":{"a":[3,3,3]}},"q":{}}}}')
+  a <- turas_release_audit(page(island("data-cube", crossed)),
+                           client_safe = TRUE, refuse = FALSE)
+  expect_match(paste(a$cube$violations, collapse = " "), "between 1 and k - 1")
+})
+
+test_that("a tag whose crossing the cube refused is unpriceable, not a violation", {
+  # SACS 2025 refuses all three of its two-variable slices, and reading those as
+  # groups of nobody accused nine safe tags of naming one person.
+  refused <- paste0(
+    '{"k":10,"n":40,"order":2,',
+    '"vars":{"Q1":{"kind":"banner","levels":[1,2]},"Q2":{"kind":"banner","levels":[7,8]}},',
+    '"slices":{"Q1":{"cells":{"1":{"a":[30,30,30]}},"q":{}},"Q1*Q2":null}}')
+  a <- turas_release_audit(
+    page(island("data-qual", qual_body(cut = '{"Q1":1,"Q2":7}')),
+         island("data-cube", refused)),
+    client_safe = TRUE, refuse = FALSE)
+  expect_length(a$qual$violations, 0)
+  expect_equal(a$qual$unverifiable, 1L)
+  expect_false(a$client_safe_violation)
+})
+
+test_that("a cell missing from a slice the cube DID publish is also unpriceable", {
+  # Same rule, one level down: the slice shipped but this cell is not in it.
+  partial <- paste0(
+    '{"k":10,"n":40,"order":2,"vars":{"Q1":{"kind":"banner","levels":[1,2]}},',
+    '"slices":{"Q1":{"cells":{"1":{"a":[30,30,30]}},"q":{}}}}')
+  a <- turas_release_audit(
+    page(island("data-qual", qual_body(cut = '{"Q1":2}')),
+         island("data-cube", partial)),
+    client_safe = TRUE, refuse = FALSE)
+  expect_length(a$qual$violations, 0)
+  expect_equal(a$qual$unverifiable, 1L)
+})

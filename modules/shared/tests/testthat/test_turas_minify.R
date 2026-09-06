@@ -1732,3 +1732,69 @@ test_that("a document whose last script block is a JSON island still minifies", 
   expect_true(grepl('id="data-agg"', written, fixed = TRUE))
   expect_true(grepl('id="user-state"', written, fixed = TRUE))
 })
+
+
+# ==============================================================================
+# THE RELEASE AUDIT IS LOADED, NOT ASSUMED
+# ==============================================================================
+# turas_minify step 8b calls turas_release_audit(), and it is the only thing
+# between a client-safe declaration and a file that breaks it. Eight module GUIs
+# source turas_minify.R independently and the audit was in none of their lists,
+# so exists() was FALSE in every real build, the check was skipped in silence and
+# the declaration guarded nothing. Found 6 September 2026 by running the audit by
+# hand against a delivered SACS build and asking why the build had not refused.
+#
+# This suite sources the audit itself at the top, which is exactly how a broken
+# pairing hides. The check therefore runs in a FRESH R process that sources only
+# turas_minify.R, which is what a module GUI does.
+
+test_that("sourcing turas_minify alone brings the release audit with it", {
+  root <- rprojroot::find_root(rprojroot::has_dir("modules"))
+  minify <- file.path(root, "modules", "shared", "lib", "turas_minify.R")
+  expect_true(file.exists(minify))
+  rscript <- file.path(R.home("bin"), "Rscript")
+  out <- suppressWarnings(system2(
+    rscript,
+    c("--vanilla", "-e",
+      shQuote(sprintf(
+        'source("%s"); cat(exists("turas_release_audit", mode = "function"))',
+        minify))),
+    stdout = TRUE, stderr = FALSE))
+  expect_true(any(grepl("TRUE", out, fixed = TRUE)),
+              info = paste("a fresh process sourcing only turas_minify.R must have",
+                           "the audit; got:", paste(out, collapse = " | ")))
+})
+
+test_that("the loader finds the audit from an unrelated working directory", {
+  # The GUIs run from the project root, but a scheduled or headless caller need
+  # not, and the loader resolves the file beside turas_minify.R rather than
+  # against getwd().
+  root <- rprojroot::find_root(rprojroot::has_dir("modules"))
+  minify <- file.path(root, "modules", "shared", "lib", "turas_minify.R")
+  rscript <- file.path(R.home("bin"), "Rscript")
+  out <- suppressWarnings(system2(
+    rscript,
+    c("--vanilla", "-e",
+      shQuote(sprintf(
+        'setwd(tempdir()); source("%s"); cat(exists("turas_release_audit", mode = "function"))',
+        minify))),
+    stdout = TRUE, stderr = FALSE))
+  expect_true(any(grepl("TRUE", out, fixed = TRUE)))
+})
+
+test_that("a client-safe build with no audit refuses instead of shipping", {
+  # The branch itself cannot be exercised here without unloading the audit this
+  # suite depends on, so this reads the source. It guards the thing that matters:
+  # that the else-branch refuses on a client-safe build rather than carrying on
+  # with a NULL audit, which is what it used to do.
+  root <- rprojroot::find_root(rprojroot::has_dir("modules"))
+  src <- readLines(file.path(root, "modules", "shared", "lib", "turas_minify.R"),
+                   warn = FALSE)
+  call_at <- grep("turas_release_audit\\(html", src)
+  refuse_at <- grep("CFG_RELEASE_AUDIT_UNAVAILABLE", src)
+  expect_length(call_at, 1)
+  expect_true(length(refuse_at) >= 1)
+  # The refusal belongs to the same else-branch, so it sits just after the call.
+  expect_true(min(refuse_at) > call_at)
+  expect_true(min(refuse_at) - call_at < 30)
+})
