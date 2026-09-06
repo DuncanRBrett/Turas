@@ -118,8 +118,8 @@ build_portfolio_panel_data <- function(portfolio_result, config,
       "are aware of the brand. Numerator = upfront BRANDAWARE multi-pick",
       "(\"which of these brands have you heard of?\"). Denominator =",
       "screener-qualified category buyers (SQ2 for 3-month window,",
-      "SQ1 for 12-month). No purchase / volume data feeds into these cells -",
-      "it is a pure mental-availability map. An \"n/a\" cell means the brand",
+      "SQ1 for 12-month). No purchase / volume data feeds into these cells.",
+      "It is a pure mental-availability map. A dashed cell means the brand",
       "was not in that category's awareness battery, not that awareness is 0%."
     ),
     clutter = paste(

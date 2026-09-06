@@ -116,7 +116,7 @@ Let `A(b, c)` = % of buyers of category `c` (per `portfolio_timeframe`) who are 
 
 **Edge cases:**
 - Category with <`portfolio_min_base` buyers → column suppressed, note in About drawer.
-- Brand absent from a category (not in QuestionMap) → cell shows `n/a` not `0%`. Rationale: not-asked ≠ not-aware.
+- Brand absent from a category (not in QuestionMap) → cell shows a dash, not `0%`. Rationale: not-asked ≠ not-aware.
 
 ### 4.2 Competitive Constellation (Co-Awareness Network)
 

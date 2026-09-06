@@ -319,7 +319,7 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
       n_str <- if (!is.na(n_cell)) sprintf("n=%d", n_cell) else ""
 
       if (is.null(v) || is.na(v) || !is.finite(v)) {
-        sprintf('<td class="pf-fp-td pf-fp-td-na" data-pf-fp-val="" data-pf-fp-col="%s">n/a</td>',
+        sprintf('<td class="pf-fp-td pf-fp-td-na" data-pf-fp-val="" data-pf-fp-col="%s">\u2013</td>',
                 .pf_esc(cc))
       } else {
         # Heat colours are inlined as CSS custom properties so the JS-driven
