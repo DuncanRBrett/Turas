@@ -166,8 +166,10 @@ section('the rank clause renders at rank 1, mid-table and last');
 const top = D.heroHeadline(snapshot({ rank: 1, of: 15, name: 'Top Brand' }),
                            CAT, CAT_NAME);
 assertEqual('rank 1 is read', top.rank, 1);
-assert('rank 1 names the brand as category leader by Mental Market Share',
-  top.headline.indexOf('Top Brand is the category leader by Mental Market Share') === 0);
+assert('rank 1 states the brand has the largest Mental Market Share',
+  top.lines[0].indexOf('Top Brand has the largest Mental Market Share') === 0);
+assert('rank 1 names the field size',
+  top.lines[0].indexOf('of 15 brands measured') > 0);
 assert('rank 1 names the category',
   top.headline.indexOf(CAT_NAME) > 0);
 
@@ -176,8 +178,8 @@ const mid = D.heroHeadline(snapshot({ rank: 8, of: 15, name: 'Mid Brand' }),
 assertEqual('mid rank is read', mid.rank, 8);
 assert('mid-table states the rank and the field size',
   mid.headline.indexOf('#8 of 15') > 0);
-assert('mid-table does not claim leadership',
-  mid.headline.indexOf('category leader') === -1);
+assert('mid-table does not claim the largest share',
+  mid.headline.indexOf('largest Mental Market Share') === -1);
 assert('mid-table does not claim a bottom quartile',
   mid.headline.indexOf('bottom-quartile') === -1);
 
@@ -186,8 +188,8 @@ const last = D.heroHeadline(snapshot({ rank: 15, of: 15, name: 'Last Brand' }),
 assertEqual('last rank is read', last.rank, 15);
 assert('last states the rank and the field size',
   last.headline.indexOf('#15 of 15') > 0);
-assert('last does not claim leadership',
-  last.headline.indexOf('category leader') === -1);
+assert('last does not claim the largest share',
+  last.headline.indexOf('largest Mental Market Share') === -1);
 
 // Every one of the three renders a clause that is not the bare fallback.
 [top, mid, last].forEach(function (r, i) {
@@ -204,9 +206,115 @@ assert('the rank denominator wins over n_brands',
   nine.headline.indexOf('#9 of 9') > 0);
 
 // ---------------------------------------------------------------------------
+section('the four headline tiles read the right field for each figure');
+// ---------------------------------------------------------------------------
+const FUNNEL = {
+  available: true,
+  stage_keys: ['aware', 'consideration', 'bought_long', 'bought_target'],
+  stage_labels: ['Aware', 'Prefer', 'Past 12 months', 'Past 3 months'],
+  base_label: 'n=438, total respondents',
+  cat_avg: [0.613546, 0.243379, 0.233333, 0.125266],
+  brands: { FOC: [0.924658, 0.66895, 0.623288, 0.449772] }
+};
+const CAT_F = { label: CAT_NAME, n_brands: 15, funnel: FUNNEL };
+
+const facts = D.tileFacts(snapshot({ rank: 1, of: 15 }), CAT_F);
+assertEqual('there are exactly four tiles', Object.keys(facts).length, 4);
+assertEqual('Mental Penetration takes the MPen value', facts.mpen.value, '84%');
+assertEqual('and its category average', facts.mpen.catAvg, '56%');
+assertEqual('Mental Market Share takes the MMS value', facts.mms.value, '10%');
+assertEqual('only Mental Market Share carries a rank', facts.mms.rank.rank, 1);
+assert('Mental Penetration carries no manufactured rank', facts.mpen.rank == null);
+assert('the bought tile carries no manufactured rank', facts.bt.rank == null);
+assert('Share of Category Requirement carries no manufactured rank',
+  facts.scr.rank == null);
+assertEqual('the bought tile takes the funnel bought_target figure',
+  facts.bt.value, '45%');
+assertEqual('and its category average', facts.bt.catAvg, '13%');
+assertEqual('Share of Category Requirement takes the observed SCR',
+  facts.scr.value, '71%');
+assertEqual('and its category average', facts.scr.catAvg, '42%');
+
+assertEqual('the bought tile is labelled from the funnel stage label',
+  facts.bt.label, 'Bought, past 3 months');
+const FUNNEL_6M = JSON.parse(JSON.stringify(FUNNEL));
+FUNNEL_6M.stage_labels[3] = 'Past 6 months';
+assertEqual('a study with a different window reads its own words',
+  D.boughtWindowLabel({ funnel: FUNNEL_6M }), 'Bought, past 6 months');
+assertEqual('no funnel means the static label stands',
+  D.boughtWindowLabel({}), null);
+assertEqual('a funnel with no target stage means the same',
+  D.boughtWindowLabel({ funnel: { available: true, stage_keys: ['aware'],
+                                   stage_labels: ['Aware'] } }), null);
+
+// A brand with no figure at all gets en dashes, never a zero.
+const bare = { name: 'Bare Brand', focal_metrics: [], ma_metrics: [],
+               brand_summary: [] };
+const bareFacts = D.tileFacts(bare, { label: CAT_NAME });
+['mpen', 'mms', 'bt', 'scr'].forEach(function (k) {
+  assertEqual('an absent ' + k + ' figure is an en dash',
+    bareFacts[k].value, '–');
+});
+
+// ---------------------------------------------------------------------------
+section('What the numbers say states comparisons rather than diagnoses');
+// ---------------------------------------------------------------------------
+const above = D.heroHeadline(
+  snapshot({ rank: 1, of: 15, name: 'Above Brand' }), CAT_F, CAT_NAME);
+assert('it states Mental Penetration against the category average',
+  above.headline.indexOf('Mental Penetration is above the category average at 84% against 56%') > 0);
+assert('it states the bought share against the category average',
+  above.headline.indexOf('the share who bought in the target window is above it at 45% against 13%') > 0);
+assert('it states Share of Category Requirement',
+  above.headline.indexOf('Share of Category Requirement is above the category average at 71% against 42%') > 0);
+
+const below = D.heroHeadline(
+  snapshot({ rank: 12, of: 15, name: 'Below Brand', mpen: '20%', mpenAvg: '56%',
+             bt: '4%', btAvg: '13%', scr: '18%', scrAvg: '42%' }),
+  CAT_F, CAT_NAME);
+assert('a lagging brand is stated flat, not diagnosed',
+  below.headline.indexOf('Mental Penetration is below the category average') > 0);
+assert('the retired conversion-gap diagnosis is gone',
+  below.headline.indexOf('conversion gap') === -1);
+assert('the retired punching-above phrasing is gone',
+  below.headline.indexOf('Punching above') === -1);
+
+// A leader flag on ma_metrics is reported; nothing recomputes leadership.
+const leader = snapshot({ rank: 1, of: 15, name: 'Leader Brand' });
+leader.ma_metrics[0].is_leader = true;   // Mental Penetration (MPen)
+leader.ma_metrics[2].is_leader = true;   // Mental Market Share (MMS)
+const ld = D.heroHeadline(leader, CAT_F, CAT_NAME);
+assert('the leadership clause names both measures it leads',
+  ld.headline.indexOf('It leads the category on Mental Penetration (MPen) and Mental Market Share (MMS).') > 0);
+const noLead = D.heroHeadline(snapshot({ rank: 5, of: 15 }), CAT_F, CAT_NAME);
+assert('a brand that leads nothing gets no leadership clause',
+  noLead.headline.indexOf('It leads the category') === -1);
+
+// A clause whose figures are missing is dropped, never softened into prose.
+const noScr = snapshot({ rank: 3, of: 15 });
+noScr.brand_summary = noScr.brand_summary.filter(function (m) {
+  return m.key !== 'scr_obs';
+});
+const ns = D.heroHeadline(noScr, CAT_F, CAT_NAME);
+assert('a missing SCR drops its clause',
+  ns.headline.indexOf('Share of Category Requirement') === -1);
+assert('and the rest of the sentence still stands',
+  ns.headline.indexOf('Mental Penetration is above') > 0);
+
+// Word of mouth is reported only when the category collected it.
+const wom = snapshot({ rank: 2, of: 15 });
+wom.wom = { available: true,
+            heard: { net: { label: 'Net heard', value: '+14', cat_avg: '+9' } } };
+const wr = D.heroHeadline(wom, CAT_F, CAT_NAME);
+assert('net word of mouth is compared when it exists',
+  wr.headline.indexOf('Net word of mouth heard is above the category average at +14 against +9') > 0);
+assert('and is absent when the category did not collect it',
+  above.headline.indexOf('Net word of mouth') === -1);
+
+// ---------------------------------------------------------------------------
 section('no em dash reaches a reader');
 // ---------------------------------------------------------------------------
-[top, mid, last, nine].forEach(function (r, i) {
+[top, mid, last, nine, above, below, ld, ns, wr].forEach(function (r, i) {
   assert('headline ' + i + ' carries no em dash', r.headline.indexOf('—') === -1);
 });
 

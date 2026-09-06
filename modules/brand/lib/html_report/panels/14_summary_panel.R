@@ -65,6 +65,13 @@ build_brand_summary_panel <- function(results, config) {
 
   json_payload <- .brsum_json(payload)
 
+  # The category tab id, derived exactly as build_br_category_panel() derives
+  # it, so a headline tile can reach the destination that holds its evidence.
+  cat_ids <- stats::setNames(
+    lapply(deep_cats, function(cn) {
+      gsub("[^a-z0-9]", "-", tolower(cats[[cn]]$cat_code %||% cn))
+    }), deep_cats)
+
   closing_strip_html <- .brsum_closing_strip(deep_cats, payload, focal_brand)
 
   # Sample-wide shopper context + focal-brand engagement sections. Both are
@@ -88,7 +95,7 @@ build_brand_summary_panel <- function(results, config) {
         sprintf('<script type="application/json" class="brsum-data">%s</script>',
                 .br_json_island(json_payload)),
         .brsum_header(),
-        .brsum_dropdown_bar(payload),
+        .brsum_dropdown_bar(payload, cat_ids),
         '<div class="brsum-dashboard" data-brsum-fade>',
           .brsum_focal_context_strip(),
           .brsum_card_grid_skeleton(),
@@ -252,8 +259,59 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   padding: 8px 0;
 }
 
-/* ---- Hero card (1st card: auto-generated verdict + 4 anchor numbers) ---- */
-.brsum-hero { display: flex; flex-direction: column; gap: 12px; }
+/* ---- Hero card: four headline tiles + What the numbers say ---- */
+.brsum-hero { display: flex; flex-direction: column; gap: 16px; }
+.brsum-tilestrip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+}
+.brsum-tile {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  padding: 14px 14px 10px; border: 1px solid #e2e8f0; border-radius: 10px;
+  border-top: 3px solid %FOCAL%; background: #fbfcfe;
+}
+.brsum-tile-label {
+  font-size: 11px; font-weight: 600; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.4px; line-height: 1.3;
+}
+.brsum-tile-value {
+  font-size: 30px; font-weight: 700; color: #1e293b; line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.brsum-tile-rank {
+  align-self: flex-start;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px;
+  text-transform: uppercase; color: %FOCAL%;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(26, 82, 118, 0.08); border: 1px solid rgba(26, 82, 118, 0.18);
+}
+.brsum-tile .br-compare-slot { font-size: 11px; color: #64748b; }
+.brsum-tile .br-compare-value {
+  font-weight: 600; color: #475569; font-variant-numeric: tabular-nums;
+}
+.brsum-tile-note { font-size: 10.5px; color: #94a3b8; line-height: 1.35; }
+.brsum-tile-go {
+  margin-top: auto; align-self: flex-start;
+  background: none; border: none; padding: 6px 0 0;
+  font-size: 11px; font-weight: 600; color: %FOCAL%;
+  cursor: pointer; text-align: left; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.brsum-tile-go::after { content: " \\203A"; text-decoration: none; }
+.brsum-tile-go:hover { color: #0f172a; }
+.brsum-verdict {
+  padding: 14px 0 2px; border-top: 1px solid #e2e8f0;
+}
+.brsum-verdict-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: #475569; margin-bottom: 6px;
+}
+.brsum-verdict-body {
+  font-size: 15px; line-height: 1.5; font-weight: 500; color: #0f172a;
+}
+.brsum-verdict-body p { margin: 0 0 6px; }
+.brsum-verdict-body p:last-child { margin-bottom: 0; }
+/* Kept: brand_pins.js and the print sheet still reference the hero rank
+   badge, and a pin captured before this build carries the old class. */
 .brsum-hero-rank {
   display: inline-block; align-self: flex-start;
   font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
@@ -261,26 +319,11 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   padding: 4px 10px; border-radius: 999px;
   background: rgba(26, 82, 118, 0.08); border: 1px solid rgba(26, 82, 118, 0.18);
 }
-.brsum-hero-verdict {
-  font-size: 16px; line-height: 1.45; font-weight: 600; color: #0f172a;
-  letter-spacing: -0.005em;
+@media (max-width: 900px) {
+  .brsum-tilestrip { grid-template-columns: repeat(2, 1fr); }
 }
-.brsum-hero-anchors {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
-  padding: 14px 0 4px; border-top: 1px solid #e2e8f0;
-}
-.brsum-hero-anchor { display: flex; flex-direction: column; gap: 2px; }
-.brsum-hero-anchor-v {
-  font-size: 28px; font-weight: 700; color: #1e293b; line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.brsum-hero-anchor-l {
-  font-size: 11px; font-weight: 600; color: #475569;
-  text-transform: uppercase; letter-spacing: 0.4px;
-}
-.brsum-hero-anchor-a { font-size: 10px; color: #94a3b8; }
-@media (max-width: 720px) {
-  .brsum-hero-anchors { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 520px) {
+  .brsum-tilestrip { grid-template-columns: 1fr; }
 }
 
 /* ---- Working / Weak cards (top-3 over/under-indexers, side-by-side) ---- */
@@ -1945,10 +1988,21 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
-.brsum_dropdown_bar <- function(payload) {
+# `cat_ids` maps the category name to the id its category tab and its
+# destination buttons carry (`cat-<id>` and data-group="<id>"). It rides on
+# the option element rather than in the JSON island so that a headline tile
+# can route to a destination without the island gaining a field. The id is
+# derived the same way the page builder derives it, from CategoryCode where
+# there is one. A category with no id gets no attribute, and its tiles then
+# make no route rather than guessing one.
+.brsum_dropdown_bar <- function(payload, cat_ids = NULL) {
   cat_options <- vapply(names(payload$categories), function(cn) {
-    sprintf('<option value="%s">%s</option>',
-            .brsum_esc(cn), .brsum_esc(cn))
+    cid <- if (!is.null(cat_ids) && cn %in% names(cat_ids))
+      as.character(cat_ids[[cn]]) else ""
+    id_attr <- if (nzchar(cid))
+      sprintf(' data-cat-id="%s"', .brsum_esc(cid)) else ""
+    sprintf('<option value="%s"%s>%s</option>',
+            .brsum_esc(cn), id_attr, .brsum_esc(cn))
   }, character(1))
 
   # Brand options are populated dynamically by JS based on selected category;
@@ -1995,53 +2049,140 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
+# The four headline tiles.
+#
+# Four, not six: Duncan's ruling, with five the absolute maximum. Awareness
+# and consideration are descriptive and live on Brand and Buying; these four
+# place the brand against the rest of the category. MMS carries its rank on
+# the tile rather than spending a fifth tile on it. No other tile has a rank
+# in the payload and none is manufactured here.
+#
+# The comparison on every tile is a Stage 2 comparison slot, which names its
+# source in data-compare-source. Today that source is the category average
+# for all four; when wave comparison is built, the same element carries the
+# change since the last wave and no tile has to be rewritten. The label is
+# never a hard-coded "vs category average" sentence.
+#
+# The markup is static and JS fills the value, the rank and the comparison
+# figure, exactly as the Mental Availability hero cards work. The tile's own
+# label is static too, except the bought-window tile: its wording comes from
+# the funnel's own stage label, so a study with a different target window
+# reads its own words rather than a hard-coded "3 months".
+.brsum_headline_tiles <- function() {
+  tile <- function(key, label, dest, dest_label, note = "") {
+    compare <- if (exists("br_compare_slot", mode = "function"))
+      br_compare_slot("Category average", "", source = "category-average",
+                      extra_class = "brsum-tile-compare")
+    else
+      paste0('<div class="br-compare-slot brsum-tile-compare" data-compare-slot ',
+             'data-compare-source="category-average">',
+             '<span class="br-compare-label">Category average</span> ',
+             '<span class="br-compare-value">&ndash;</span></div>')
+    paste0(
+      '<div class="brsum-tile" data-brsum-tile="', key, '" ',
+        'data-brsum-dest="', dest, '">',
+        '<div class="brsum-tile-label" data-brsum-tile-label>', label, '</div>',
+        '<div class="brsum-tile-value brsum-focal-value" ',
+          'data-brsum-tile-value>&ndash;</div>',
+        '<div class="brsum-tile-rank" data-brsum-tile-rank hidden></div>',
+        compare,
+        if (nzchar(note))
+          paste0('<div class="brsum-tile-note">', note, '</div>') else '',
+        '<button type="button" class="brsum-tile-go" ',
+          'onclick="brsumGoTo(this)">', dest_label, '</button>',
+      '</div>')
+  }
+  paste0(
+    '<div class="brsum-tilestrip" data-brsum-tiles>',
+      tile("mpen", "Mental Penetration", "mental", "Mental Availability"),
+      tile("mms",  "Mental Market Share", "mental", "Mental Availability"),
+      tile("bt",   "Bought in the target window", "buying", "Brand and Buying"),
+      tile("scr",  "Share of Category Requirement", "buying", "Brand and Buying"),
+    '</div>')
+}
+
+
+# The hero card's body: the four headline tiles, then the derived sentence.
+# The sentence is titled "What the numbers say" rather than "Verdict": it is
+# rules-based output and the old title claimed more certainty than that
+# earns. Every clause in it is still derived from a number on this page.
+.brsum_hero_body <- function() {
+  paste0(
+    '<div class="brsum-hero">',
+      .brsum_headline_tiles(),
+      '<div class="brsum-verdict" data-brsum-verdict>',
+        '<div class="brsum-verdict-title">What the numbers say</div>',
+        '<div class="brsum-verdict-body" data-brsum-verdict-body></div>',
+      '</div>',
+    '</div>')
+}
+
+
 .brsum_card_grid_skeleton <- function() {
-  # 6-card narrative layout. Each card is independently pinnable via the
-  # standard brand_pins.js workflow, section data-section="brsum-{key}"
-  # is what brTogglePin looks up; data-pin-as-table tells captureFromRoot
-  # to grab the rendered card content (no <table> or <svg> required).
+  # Each card is independently pinnable via the standard brand_pins.js
+  # workflow, section data-section="brsum-{key}" is what brTogglePin looks
+  # up; data-pin-as-table tells captureFromRoot to grab the rendered card
+  # content (no <table> or <svg> required).
   #
-  # Card story arc (top -> bottom):
-  #   1. Hero: single-sentence verdict + 4 anchor numbers (MMS /
-  #                      MPen / % bought / SCR). Full-width.
-  #   2. Mental: MMS / SoM / Network Size vs leader. The mental-
-  #                      availability story.
-  #   3. Funnel: Aware -> Prefer -> Bought funnel (claimed
-  #                      buying behaviour, not physical distribution).
-  #   4. Working: Top 3 CEPs + top 3 attributes the focal over-
-  #                      indexes on. Wide for the side-by-side columns.
-  #   5. Weak: Bottom 3 CEPs + bottom 3 attributes the focal
-  #                      under-indexes on. Wide for the same reason.
-  #   6. Conversation: Word of mouth (heard + said + occasions).
-  #   7. Repertoire: Top 2 DoP partners + top 2 rivals (who focal's
-  #                      buyers cohabit with above / below the column
-  #                      average; complements the funnel + WOM view).
-  card <- function(key, title, wide = FALSE) {
+  # Card order, top to bottom, is the Stage 3 Overview:
+  #   1. Hero: four headline tiles + "What the numbers say". Full-width.
+  #   2. Working: the moments this brand owns, from Category Entry
+  #                      Points. Wide.
+  #   3. Weak: the associations this brand owns, from brand
+  #                      attributes. Wide.
+  #   4. Opportunities: rules-based, from Mental Advantage decisions and
+  #                      the funnel's largest step down. Wide. Not pinnable
+  #                      in Stage 3; adding a data-section here would add a
+  #                      pin anchor, and Stage 5 gives every destination one
+  #                      export toolbar instead.
+  #   5. Mental: MMS / SoM / Network Size vs leader.
+  #   6. Funnel: Aware -> Prefer -> Bought.
+  #   7. Conversation: Word of mouth (heard + said).
+  #   8. Repertoire: Top 2 DoP partners + top 2 rivals.
+  #
+  # The card keys are internal identifiers and the titles are display
+  # labels, and nothing derives one from the other. `working` and `weak`
+  # were named when the split was over-indexers against under-indexers;
+  # the split is now Category Entry Points against attributes, which is a
+  # difference of concept a reader can act on. The keys keep their names
+  # because pins, PNG capture and Excel export resolve a section by them
+  # and analysts have saved work against them.
+  card <- function(key, title, wide = FALSE, body = "", pinnable = TRUE) {
     cls <- if (wide) ' brsum-card-wide' else ''
     section_id <- paste0('brsum-', key)
+    section_attr <- if (pinnable)
+      paste0(' data-section="', section_id, '"') else ''
+    pin_btn <- if (pinnable) paste0(
+      '<button type="button" class="br-pin-btn brsum-card-pin" ',
+        'data-section="', section_id, '" ',
+        'onclick="brTogglePin(\'', section_id, '\')" ',
+        'title="Pin this card" aria-label="Pin this card">&#x1F4CC;</button>')
+      else ''
+    body_attr <- if (pinnable) ' data-pin-as-table' else ''
     paste0(
       '<section class="brsum-card brsum-card-', key, cls,
-        '" data-brsum-card="', key, '" data-section="', section_id, '">',
+        '" data-brsum-card="', key, '"', section_attr, '>',
         '<header class="brsum-card-header">',
           '<h3 class="brsum-card-title">', title, '</h3>',
           '<div class="brsum-card-header-right">',
             '<span class="brsum-card-meta" data-brsum-card-meta="', key, '"></span>',
-            '<button type="button" class="br-pin-btn brsum-card-pin" ',
-              'data-section="', section_id, '" ',
-              'onclick="brTogglePin(\'', section_id, '\')" ',
-              'title="Pin this card" aria-label="Pin this card">&#x1F4CC;</button>',
+            pin_btn,
           '</div>',
         '</header>',
-        '<div class="brsum-card-body" data-brsum-card-body="', key, '" data-pin-as-table></div>',
+        '<div class="brsum-card-body" data-brsum-card-body="', key, '"',
+          body_attr, '>', body, '</div>',
       '</section>')
   }
   paste(
     '<div class="brsum-card-grid">',
-      card("hero",         "Brand at a glance",                                  wide = TRUE),
+      card("hero",          "Brand at a glance", wide = TRUE,
+           body = .brsum_hero_body()),
+      card("working",       "Moments this brand owns",       wide = TRUE),
+      card("weak",          "Associations this brand owns",  wide = TRUE),
+      card("opportunities", "Opportunities to examine",      wide = TRUE,
+           pinnable = FALSE),
       card("mental",       "Mental availability"),
       card("funnel",       "Buying funnel"),
-      card("working",      "What’s working: over-indexers",               wide = TRUE),
-      card("weak",         "Where the brand is weakest, under-indexers",  wide = TRUE),
       card("conversation", "Word of mouth"),
       card("repertoire",   "Repertoire ties, who focal buyers also buy"),
     '</div>',

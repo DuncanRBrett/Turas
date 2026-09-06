@@ -282,46 +282,126 @@
    * + 4 anchor numbers (MMS / MPen / % bought / SCR), all on the focal
    * brand. Sets the story for everything below.
    * --------------------------------------------------------------------- */
+  /* The tile markup is emitted by R, once, and this fills it. That is the
+     Mental Availability hero-card pattern and it keeps the comparison slot
+     in one place: br_compare_slot() in panels/00_json_island.R writes the
+     element and its data-compare-source, and nothing here builds a second
+     copy of that markup or hard-codes the words "vs category average". */
   function renderHeroCard(root, snap, cat, catName, brandCode) {
     var body = cardBody(root, 'hero');
     if (!body) return;
+    var strip   = body.querySelector('[data-brsum-tiles]');
+    var verdict = body.querySelector('[data-brsum-verdict-body]');
+
     if (!snap) {
-      body.innerHTML = '<div class="brsum-card-empty">No data for this brand.</div>';
+      if (verdict) verdict.innerHTML =
+        '<div class="brsum-card-empty">No data for this brand.</div>';
+      if (strip) $$('.brsum-tile', strip).forEach(function (t) {
+        setTileValue(t, null, null, null);
+      });
       return;
     }
-    var col      = snap.colour || '#1A5276';
-    var fname    = snap.name || brandCode || 'Focal brand';
-    var anchors  = heroAnchors(snap);
-    var verdict  = heroHeadline(snap, cat, catName, fname, anchors);
-    var rankBadge = anchors.mms_rank
-      ? '<div class="brsum-hero-rank">Rank ' + escHtml(anchors.mms_rank) +
-          (anchors.mms_rank_of ? ' of ' + escHtml(anchors.mms_rank_of) : '') +
-          ' by Mental Market Share</div>'
-      : '';
-    var anchorsHtml = [
-      heroAnchor('Mental Market Share', anchors.mms,   anchors.mms_avg,  col),
-      heroAnchor('Mental Penetration',  anchors.mpen,  anchors.mpen_avg, col),
-      heroAnchor('% who bought',        anchors.pen,   anchors.pen_avg,  col),
-      heroAnchor('Loyalty (SCR)',       anchors.scr,   anchors.scr_avg,  col)
-    ].join('');
-    body.innerHTML =
-      '<div class="brsum-hero">' +
-        rankBadge +
-        '<div class="brsum-hero-verdict">' + escHtml(verdict) + '</div>' +
-        '<div class="brsum-hero-anchors">' + anchorsHtml + '</div>' +
-      '</div>';
+
+    var col     = snap.colour || '#1A5276';
+    var fname   = snap.name || brandCode || 'Focal brand';
+    var anchors = heroAnchors(snap);
+    var tiles   = tileFacts(anchors, cat);
+
+    if (strip) {
+      $$('.brsum-tile', strip).forEach(function (tile) {
+        var key = tile.getAttribute('data-brsum-tile');
+        var f = tiles[key];
+        if (!f) return;
+        if (f.label) {
+          var lab = tile.querySelector('[data-brsum-tile-label]');
+          if (lab) lab.textContent = f.label;
+        }
+        setTileValue(tile, f.value, f.catAvg, f.rank, col);
+      });
+    }
+
+    if (verdict) {
+      verdict.innerHTML = heroHeadline(snap, cat, catName, fname, anchors)
+        .map(function (s) { return '<p>' + escHtml(s) + '</p>'; }).join('');
+    }
   }
 
-  function heroAnchor(label, value, catAvg, colour) {
-    return '<div class="brsum-hero-anchor">' +
-             '<div class="brsum-hero-anchor-v brsum-focal-value" style="color:' + colour + '">' +
-               escHtml(value || '–') + '</div>' +
-             '<div class="brsum-hero-anchor-l">' + escHtml(label) + '</div>' +
-             (catAvg && catAvg !== '–'
-               ? '<div class="brsum-hero-anchor-a">cat avg ' + escHtml(catAvg) + '</div>'
-               : '') +
-           '</div>';
+  /* Fill one tile. An absent figure is an en dash, never a zero and never a
+     borrowed value. When the comparison figure is absent the slot says so by
+     switching its source to "none", so a reader and a later wave build can
+     both tell an empty slot from a real comparison. */
+  function setTileValue(tile, value, catAvg, rank, colour) {
+    var v = tile.querySelector('[data-brsum-tile-value]');
+    if (v) {
+      v.textContent = (value == null || value === '') ? '–' : value;
+      if (colour) v.style.color = colour;
+    }
+    var slot = tile.querySelector('[data-compare-slot]');
+    if (slot) {
+      var cv = slot.querySelector('.br-compare-value');
+      var has = catAvg != null && catAvg !== '' && catAvg !== '–';
+      if (cv) cv.textContent = has ? catAvg : '–';
+      slot.setAttribute('data-compare-source', has ? 'category-average' : 'none');
+    }
+    var r = tile.querySelector('[data-brsum-tile-rank]');
+    if (r) {
+      if (rank && rank.rank) {
+        r.textContent = 'Rank ' + rank.rank +
+          (rank.of ? ' of ' + rank.of : '') + ' in the category';
+        r.hidden = false;
+      } else {
+        r.textContent = '';
+        r.hidden = true;
+      }
+    }
   }
+
+  /* What each headline tile shows. Four tiles, keyed on the tile ids the R
+     skeleton emits. Only Mental Market Share carries a rank: it is the only
+     metric the payload ranks, and ranking another one here would be a new
+     computation on a different base to the one the MA tab reports. */
+  function tileFacts(a, cat) {
+    return {
+      mpen: { value: a.mpen, catAvg: a.mpen_avg },
+      mms:  { value: a.mms,  catAvg: a.mms_avg,
+              rank: { rank: a.mms_rank, of: a.mms_rank_of } },
+      bt:   { value: a.bt,   catAvg: a.bt_avg,
+              label: boughtWindowLabel(cat) },
+      scr:  { value: a.scr,  catAvg: a.scr_avg }
+    };
+  }
+
+  /* The bought-window tile takes its wording from the funnel's own stage
+     label, so a study whose target window is not three months reads its own
+     words. With no funnel the static label in the skeleton stands. */
+  function boughtWindowLabel(cat) {
+    var f = cat && cat.funnel;
+    if (!f || !f.available || !f.stage_keys || !f.stage_labels) return null;
+    var i = f.stage_keys.indexOf('bought_target');
+    if (i < 0 || !f.stage_labels[i]) return null;
+    return 'Bought, ' + String(f.stage_labels[i]).toLowerCase();
+  }
+
+  /* Route from a headline tile to the destination that holds its evidence.
+     The category tab id rides on the selected <option> as data-cat-id, put
+     there by the R skeleton, so nothing has to guess it from a label. */
+  window.brsumGoTo = function (el) {
+    var host = el && el.closest ? el.closest('[data-brsum-dest]') : null;
+    var dest = host ? host.getAttribute('data-brsum-dest') : null;
+    var root = document.querySelector('.brsum-root');
+    var sel  = root ? root.querySelector('[data-brsum-cat]') : null;
+    var opt  = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
+    var catId = opt ? opt.getAttribute('data-cat-id') : null;
+    if (!dest || !catId) return;
+    if (typeof window.switchBrandTab === 'function') {
+      window.switchBrandTab('cat-' + catId);
+    }
+    var btn = document.querySelector(
+      '.br-destination-btn[data-group="' + catId + '"][data-destination="' + dest + '"]');
+    if (btn && typeof window.switchBrandDestination === 'function') {
+      window.switchBrandDestination(btn);
+    }
+  };
 
   /* Normalise whatever a payload carries for a rank into { rank, of }.
      The R payload writes the MMS rank as the string "Rank 1 / 15" on
@@ -373,6 +453,7 @@
     var out = { mms: '–', mms_avg: '–', mms_rank: null, mms_rank_of: null,
                 mpen: '–', mpen_avg: '–',
                 pen:  '–', pen_avg:  '–',
+                bt:   '–', bt_avg:   '–',
                 scr:  '–', scr_avg:  '–' };
     if (snap.ma_metrics && snap.ma_metrics.length) {
       for (var i = 0; i < snap.ma_metrics.length; i++) {
@@ -399,6 +480,13 @@
         out.mms_rank = rf.rank; out.mms_rank_of = rf.of;
       }
     }
+    /* The bought-in-the-target-window figure. It comes from focal_metrics,
+       which reads the funnel's bought_target stage, so the tile's value and
+       the tile's label share one source. brand_summary carries a second
+       purchase figure on a different base; the "Which penetration is which"
+       block in the drawer sets the two out side by side. */
+    var bm = metricByLabel(snap.focal_metrics, ['bought target', 'bought']);
+    if (bm) { out.bt = bm.value; out.bt_avg = bm.cat_avg; }
     if (snap.brand_summary && snap.brand_summary.length) {
       for (var j = 0; j < snap.brand_summary.length; j++) {
         var s = snap.brand_summary[j];
@@ -414,38 +502,98 @@
     return out;
   }
 
-  /* Auto-headline. Picks one of a small set of fact-driven templates
-     based on MMS rank, MPen-vs-cat-avg, and pen-vs-cat-avg. Never
-     generates flowery prose. Every output is a direct fact statement
-     the reader can verify against the anchor numbers above. */
+  /* "What the numbers say".
+   *
+   * The old title was "verdict" and two of its clauses read as diagnoses:
+   * "That is a conversion gap", "punching above its mental availability".
+   * Rules over four comparisons do not earn that, so every clause here is
+   * the comparison stated flat, in the reader's own units, and each one is
+   * omitted rather than softened when its figures are missing. Returns an
+   * array of sentences; the caller renders one paragraph each.
+   */
   function heroHeadline(snap, cat, catName, fname, a) {
-    var rank   = a.mms_rank ? parseInt(a.mms_rank, 10) : null;
+    var out = [];
+    var rank = a.mms_rank ? parseInt(a.mms_rank, 10) : null;
     /* The denominator the rank was computed against wins over the count of
        brands in the picker: the two diverge when a brand is in the picker
        but absent from the MMS table. */
     var nBrands = a.mms_rank_of || ((cat && cat.n_brands) ? cat.n_brands : null);
-    var mpenCmp = compareToAvg(a.mpen, a.mpen_avg);
-    var penCmp  = compareToAvg(a.pen,  a.pen_avg);
-    var rankClause = '';
-    if (rank === 1) rankClause = fname + ' is the category leader by Mental Market Share in ' + catName + '.';
-    else if (rank === 2 || rank === 3) rankClause = fname + ' ranks #' + rank + ' by MMS in ' + catName + '.';
-    else if (rank && nBrands && rank >= Math.ceil(nBrands * 0.75))
-      rankClause = fname + ' sits at #' + rank + ' of ' + nBrands + ' by MMS in ' + catName + ': bottom-quartile mental position.';
-    else if (rank) rankClause = fname + ' ranks #' + rank + (nBrands ? ' of ' + nBrands : '') + ' by MMS in ' + catName + '.';
-    else rankClause = fname + ' in ' + catName + '.';
+    var where = catName ? (' in ' + catName) : '';
 
-    /* Verdict clause: adds one fact about the brand vs cat avg. */
-    var verdictClause = '';
-    if (mpenCmp === 'above' && penCmp === 'above')
-      verdictClause = ' Strong on both mental (MPen) and physical (% bought) availability.';
-    else if (mpenCmp === 'above' && penCmp === 'below')
-      verdictClause = ' Mental availability is above the category average, but physical purchase is lagging. That is a conversion gap.';
-    else if (mpenCmp === 'below' && penCmp === 'above')
-      verdictClause = ' Punching above its mental availability on physical purchase, but the mental base is the constraint.';
-    else if (mpenCmp === 'below' && penCmp === 'below')
-      verdictClause = ' Below the category average on both mental and physical availability.';
-    else verdictClause = '';
-    return rankClause + verdictClause;
+    /* 1. Where the brand sits in the category, by the one metric that is
+          ranked in the payload. */
+    if (rank === 1) {
+      out.push(fname + ' has the largest Mental Market Share' + where +
+               (nBrands ? ', of ' + nBrands + ' brands measured' : '') + '.');
+    } else if (rank && nBrands) {
+      out.push(fname + ' ranks #' + rank + ' of ' + nBrands +
+               ' on Mental Market Share' + where + '.');
+    } else if (rank) {
+      out.push(fname + ' ranks #' + rank + ' on Mental Market Share' + where + '.');
+    } else {
+      out.push(fname + where.replace(/^ in /, ' is measured in ') + '.');
+    }
+
+    /* 2. Mental against physical, stated as two comparisons rather than as
+          a diagnosis of the gap between them. */
+    var mpenCmp = compareToAvg(a.mpen, a.mpen_avg);
+    var btCmp   = compareToAvg(a.bt,   a.bt_avg);
+    if (mpenCmp && btCmp) {
+      out.push('Mental Penetration is ' + cmpWords(mpenCmp) +
+               ' the category average at ' + a.mpen + ' against ' + a.mpen_avg +
+               '; the share who bought in the target window is ' +
+               cmpWords(btCmp) + ' it at ' + a.bt + ' against ' + a.bt_avg + '.');
+    } else if (mpenCmp) {
+      out.push('Mental Penetration is ' + cmpWords(mpenCmp) +
+               ' the category average at ' + a.mpen + ' against ' + a.mpen_avg + '.');
+    } else if (btCmp) {
+      out.push('The share who bought in the target window is ' + cmpWords(btCmp) +
+               ' the category average at ' + a.bt + ' against ' + a.bt_avg + '.');
+    }
+
+    /* 3. Loyalty, on the same footing. */
+    var scrCmp = compareToAvg(a.scr, a.scr_avg);
+    if (scrCmp) {
+      out.push('Share of Category Requirement is ' + cmpWords(scrCmp) +
+               ' the category average at ' + a.scr + ' against ' + a.scr_avg +
+               ': the share of its buyers’ category purchases the brand takes.');
+    }
+
+    /* 4. Whether the brand leads any Mental Availability measure. Read off
+          the is_leader flag the payload already carries, not recomputed. */
+    var leads = [];
+    if (snap.ma_metrics && snap.ma_metrics.length) {
+      for (var i = 0; i < snap.ma_metrics.length; i++) {
+        if (snap.ma_metrics[i].is_leader) leads.push(snap.ma_metrics[i].label);
+      }
+    }
+    if (leads.length) {
+      out.push('It leads the category on ' + joinWords(leads) + '.');
+    }
+
+    /* 5. Word of mouth, when the category collected it. */
+    if (snap.wom && snap.wom.available && snap.wom.heard && snap.wom.heard.net) {
+      var wn = snap.wom.heard.net;
+      var womCmp = compareToAvg(wn.value, wn.cat_avg);
+      if (womCmp) {
+        out.push('Net word of mouth heard is ' + cmpWords(womCmp) +
+                 ' the category average at ' + wn.value + ' against ' +
+                 wn.cat_avg + '.');
+      }
+    }
+    return out;
+  }
+
+  function cmpWords(c) {
+    if (c === 'above') return 'above';
+    if (c === 'below') return 'below';
+    return 'in line with';
+  }
+
+  function joinWords(list) {
+    if (list.length === 1) return list[0];
+    if (list.length === 2) return list[0] + ' and ' + list[1];
+    return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
   }
 
   /* Comparison helper. Strips % / digits-only-with-comma formatting and
@@ -908,9 +1056,12 @@
     heroHeadline: function (snap, cat, catName) {
       var a = heroAnchors(snap);
       var fname = (snap && snap.name) || 'Focal brand';
+      var lines = heroHeadline(snap, cat, catName, fname, a);
       return { anchors: a, rank: a.mms_rank, of: a.mms_rank_of,
-               headline: heroHeadline(snap, cat, catName, fname, a) };
-    }
+               lines: lines, headline: lines.join(' ') };
+    },
+    tileFacts: function (snap, cat) { return tileFacts(heroAnchors(snap), cat); },
+    boughtWindowLabel: boughtWindowLabel
   };
 
   /* -------------------------------------------------------------------------
