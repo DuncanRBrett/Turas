@@ -225,6 +225,8 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
                                 margin: 4px 0 2px; letter-spacing: -0.5px; }
 .ma-hero-compare { font-size: 11.5px; color: #64748b; }
 .ma-hero-compare strong { color: #334155; }
+.br-compare-slot .br-compare-value { color: #334155; font-weight: 600; }
+.br-compare-slot .br-compare-label { color: #94a3b8; }
 .ma-hero-leader { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 .ma-hero-leader-focal { color: #059669; font-weight: 700;
                          text-transform: uppercase; letter-spacing: 0.4px; }

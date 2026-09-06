@@ -1773,6 +1773,18 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
 .cb_kpi_strip <- function(dn, bh, cbf, rep = NULL, fcol, focal, t_months) {
   chips <- character(0)
 
+  # Every headline chip carries a comparison slot that names its source,
+  # rather than a comparison spelled into the label. A chip with nothing to
+  # compare against renders an empty slot, an en dash, so the strip has one
+  # shape and a wave comparison later fills the slots that are empty today.
+  slot <- function(label, value, source) {
+    if (exists("br_compare_slot", mode = "function"))
+      br_compare_slot(label, value, source = source,
+                      extra_class = "cb-kpi-compare")
+    else sprintf('<div class="cb-kpi-compare">%s %s</div>', label,
+                 if (nzchar(value)) value else "\u2013")
+  }
+
   # The category-buyer share needs the frequency question's Role to be set in
   # the Options sheet. Where it is not, pct_buyers is NA and the chip would
   # read as an empty placeholder, so it is left out rather than shown blank.
@@ -1783,26 +1795,27 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
     n_asked <- if (is.finite(as.numeric(cbf$n_respondents %||% NA)))
       as.integer(cbf$n_respondents) else NA_integer_
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip" title="%s"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">%% Category buyers%s</div></div>',
+      '<div class="cb-kpi-chip" title="%s"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">%% Category buyers%s</div>%s</div>',
       "Weighted % of respondents asked the category frequency question whose answer is anything but never. Not the same base as the Loyalty table (% of category buyers) or the norms table (% of all category respondents).",
       pct_b,
-      if (is.na(n_asked)) "" else sprintf(" <span class=\"cb-kpi-base\">of %s asked</span>", format(n_asked, big.mark = ","))))
+      if (is.na(n_asked)) "" else sprintf(" <span class=\"cb-kpi-base\">of %s asked</span>", format(n_asked, big.mark = ",")),
+      slot("Comparison", "", "none")))
   }
 
   if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
       !is.null(dn$category_metrics$mean_purchases)) {
     mp_val <- sprintf("%.1f", dn$category_metrics$mean_purchases)
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Mean purchases / category buyer (%dm)</div></div>',
-      mp_val, t_months))
+      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Mean purchases / category buyer (%dm)</div>%s</div>',
+      mp_val, t_months, slot("Comparison", "", "none")))
   }
 
   if (!is.null(rep) && !identical(rep$status, "REFUSED") &&
       !is.null(rep$mean_repertoire) && !is.na(rep$mean_repertoire)) {
     mr_txt <- sprintf("%.1f", rep$mean_repertoire)
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip muted"><div class="cb-kpi-val muted">%s</div><div class="cb-kpi-label">Avg brands bought / category buyer</div></div>',
-      mr_txt))
+      '<div class="cb-kpi-chip muted"><div class="cb-kpi-val muted">%s</div><div class="cb-kpi-label">Avg brands bought / category buyer</div>%s</div>',
+      mr_txt, slot("Comparison", "", "none")))
   }
 
   if (!is.null(dn) && !identical(dn$status, "REFUSED")) {
@@ -1810,18 +1823,18 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
     scr_val <- if (!is.null(ms$focal_scr_obs) && !is.na(ms$focal_scr_obs))
       sprintf("%.0f%%", ms$focal_scr_obs) else "\u2013"
     scr_exp <- if (!is.null(ms$focal_scr_exp) && !is.na(ms$focal_scr_exp))
-      sprintf("exp %.0f%%", ms$focal_scr_exp) else ""
+      sprintf("%.0f%%", ms$focal_scr_exp) else ""
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip green" data-kpi="scr"><div class="cb-kpi-val green" data-kpi-val>%s</div><div class="cb-kpi-label">Focal SCR <span data-kpi-sub>%s</span></div></div>',
-      scr_val, scr_exp))
+      '<div class="cb-kpi-chip green" data-kpi="scr"><div class="cb-kpi-val green" data-kpi-val>%s</div><div class="cb-kpi-label">Focal SCR</div><div class="br-compare-slot cb-kpi-compare" data-compare-slot data-compare-source="dirichlet-expected"><span class="br-compare-label">Dirichlet expected</span> <span class="br-compare-value" data-kpi-sub>%s</span></div></div>',
+      scr_val, if (nzchar(scr_exp)) scr_exp else "\u2013"))
 
     loy_val <- if (!is.null(ms$focal_loyal_obs) && !is.na(ms$focal_loyal_obs))
       sprintf("%.0f%%", ms$focal_loyal_obs) else "\u2013"
     loy_exp <- if (!is.null(ms$focal_loyal_exp) && !is.na(ms$focal_loyal_exp))
-      sprintf("exp %.0f%%", ms$focal_loyal_exp) else ""
+      sprintf("%.0f%%", ms$focal_loyal_exp) else ""
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip" data-kpi="loyal"><div class="cb-kpi-val" data-kpi-val>%s</div><div class="cb-kpi-label">Focal 100%%-loyal <span data-kpi-sub>%s</span></div></div>',
-      loy_val, loy_exp))
+      '<div class="cb-kpi-chip" data-kpi="loyal"><div class="cb-kpi-val" data-kpi-val>%s</div><div class="cb-kpi-label">Focal 100%%-loyal</div><div class="br-compare-slot cb-kpi-compare" data-compare-slot data-compare-source="dirichlet-expected"><span class="br-compare-label">Dirichlet expected</span> <span class="br-compare-value" data-kpi-sub>%s</span></div></div>',
+      loy_val, if (nzchar(loy_exp)) loy_exp else "\u2013"))
   }
 
   if (!is.null(bh) && !identical(bh$status, "REFUSED")) {
@@ -1831,8 +1844,9 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
       if (nmi_val < 85) "\u2193" else if (nmi_val > 115) "\u2191" else "\u2192"
     } else ""
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip amber" data-kpi="nmi" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% × 100. Above 100 = mass / leader pattern (Natural Monopoly Law). Below 100 = niche / heavy-skewed base."><div class="cb-kpi-val amber" data-kpi-val>%s%s</div><div class="cb-kpi-label">Focal Light-buyer index (100 = mirrors cat)</div></div>',
-      nmi_txt, nmi_arrow))
+      '<div class="cb-kpi-chip amber" data-kpi="nmi" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% × 100. Above 100 = mass / leader pattern (Natural Monopoly Law). Below 100 = niche / heavy-skewed base."><div class="cb-kpi-val amber" data-kpi-val>%s%s</div><div class="cb-kpi-label">Focal Light-buyer index</div>%s</div>',
+      nmi_txt, nmi_arrow,
+      slot("Category baseline", "100", "category-average")))
   }
 
   sprintf('<div class="cb-kpi-strip">%s</div>', paste(chips, collapse = "\n"))
@@ -1936,9 +1950,9 @@ render_cat_buying_panel <- function(panel_data, only_tab = NULL,
       nt <- dn$norms_table; ri <- which(nt$BrandCode == bc)
       if (length(ri) == 1) {
         if (!is.na(nt$SCR_Obs_Pct[ri]))     scr_obs <- sprintf("%.0f%%", nt$SCR_Obs_Pct[ri])
-        if (!is.na(nt$SCR_Exp_Pct[ri]))     scr_exp <- sprintf("exp %.0f%%", nt$SCR_Exp_Pct[ri])
+        if (!is.na(nt$SCR_Exp_Pct[ri]))     scr_exp <- sprintf("%.0f%%", nt$SCR_Exp_Pct[ri])
         if (!is.na(nt$Pct100Loyal_Obs[ri])) loy_obs <- sprintf("%.0f%%", nt$Pct100Loyal_Obs[ri])
-        if (!is.na(nt$Pct100Loyal_Exp[ri])) loy_exp <- sprintf("exp %.0f%%", nt$Pct100Loyal_Exp[ri])
+        if (!is.na(nt$Pct100Loyal_Exp[ri])) loy_exp <- sprintf("%.0f%%", nt$Pct100Loyal_Exp[ri])
       }
     }
     if (has_bh) {

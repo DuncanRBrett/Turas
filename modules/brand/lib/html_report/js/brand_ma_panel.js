@@ -1095,8 +1095,11 @@
       }
       card.style.borderLeftColor = focalColour;
 
-      // Category avg (static: doesn't change with focal)
-      var avgEl = card.querySelector('.ma-hero-compare strong');
+      // Comparison slot (static: the category average does not change with
+      // the focal brand). The slot names its source in data-compare-source,
+      // so a future wave comparison fills the same element.
+      var avgEl = card.querySelector('.ma-hero-compare .br-compare-value') ||
+                  card.querySelector('.ma-hero-compare strong');
       if (avgEl) avgEl.textContent = fmtVal(catAvg[def.key], def.unit);
 
       // Leader line

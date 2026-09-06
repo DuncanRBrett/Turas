@@ -177,8 +177,12 @@ test_that("the KPI strip renders the focal expected values as sub-labels", {
   html <- render_cat_buying_panel(.cbds_panel_data())
   expect_true(grepl('data-kpi="scr"', html, fixed = TRUE))
   expect_true(grepl('data-kpi="loyal"', html, fixed = TRUE))
-  expect_true(grepl("exp 40%", html, fixed = TRUE))
-  expect_true(grepl("exp 15%", html, fixed = TRUE))
+  # The comparison is a slot that names its source, so the chip carries the
+  # figure alone under a "Dirichlet expected" label rather than "exp 40%".
+  expect_true(grepl('data-compare-source="dirichlet-expected"', html, fixed = TRUE))
+  expect_true(grepl(">Dirichlet expected</span>", html, fixed = TRUE))
+  expect_true(grepl(">40%</span>", html, fixed = TRUE))
+  expect_true(grepl(">15%</span>", html, fixed = TRUE))
 })
 
 
@@ -189,8 +193,9 @@ test_that("the KPI strip sub-label matches the JSON payload the JS swaps in", {
   pd <- .cbds_panel_data()
   html <- render_cat_buying_panel(pd)
   sub_txt <- regmatches(
-    html, regexpr('data-kpi="scr">.*?<span data-kpi-sub>[^<]*</span>', html))
-  rendered <- sub('.*<span data-kpi-sub>([^<]*)</span>', "\\1", sub_txt)
+    html,
+    regexpr('data-kpi="scr">.*?data-kpi-sub>[^<]*</span>', html))
+  rendered <- sub('.*data-kpi-sub>([^<]*)</span>', "\\1", sub_txt)
   json <- .cb_kpi_json_script(pd$dirichlet_norms, pd$buyer_heaviness, "TST")
   expect_true(grepl(sprintf('"scr_exp":"%s"', rendered), json, fixed = TRUE))
 })

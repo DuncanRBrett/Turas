@@ -91,16 +91,26 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
       '<div class="ma-hero-leader ma-hero-leader-focal">Category leader</div>'
       else sprintf('<div class="ma-hero-leader">Leader: <strong>%s</strong></div>',
                    .ma_esc(lead_name))
+    # The comparison is a slot that names its source, not a sentence. When
+    # wave comparison is built, the same slot carries the change since the
+    # last wave; nothing about the card has to be rewritten for that.
+    compare <- if (exists("br_compare_slot", mode = "function"))
+      br_compare_slot("Category average", avg_disp,
+                      source = if (identical(avg_disp, "\u2013")) "none"
+                               else "category-average",
+                      extra_class = "ma-hero-compare")
+      else sprintf('<div class="ma-hero-compare">Category average %s</div>',
+                   avg_disp)
     sprintf(
       '<div class="tk-hero-card ma-hero-card" data-ma-metric="%s" style="border-left-color:%s;">
          <div class="tk-hero-label">%s</div>
          <div class="tk-hero-value" style="color:%s;">%s</div>
-         <div class="ma-hero-compare">Category avg: <strong>%s</strong></div>
+         %s
          %s
        </div>',
       metric_key, focal_colour, .ma_esc(label),
       focal_colour, focal_disp,
-      avg_disp, leader_line)
+      compare, leader_line)
   }
 
   paste0(
