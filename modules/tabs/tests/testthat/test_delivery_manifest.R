@@ -408,9 +408,69 @@ test_that("the run applies the qualitative floor before it builds the comment is
   resolve <- grep("tabs_delivery_qual_dials\\(", src)
   apply_it <- grep("tabs_apply_qual_floor\\(", src)
   island <- grep("build_integrated_qual_island\\(", src)
+  # The standalone comment report is a second door into the same island builder,
+  # and it takes the same config object. It has to be behind the floor too.
+  standalone <- grep("build_qual_report_v2\\(", src)
   expect_true(length(resolve) >= 1)
   expect_true(length(apply_it) >= 1)
   expect_true(length(island) >= 1)
+  expect_true(length(standalone) >= 1)
   expect_lt(max(resolve), min(apply_it))
   expect_lt(max(apply_it), min(island))
+  expect_lt(max(apply_it), min(standalone))
+})
+
+
+test_that("client safe keys comments by question, whichever client safe mode", {
+  for (g in c("client_safe_interactive", "client_safe_frozen", "client_safe")) {
+    r <- tabs_delivery_qual_dials(
+      list(qual_comment_key = "respondent", min_reporting_base = 10), g)
+    expect_equal(r$comment_key, "question", info = g)
+    expect_equal(r$config_comment_key, "respondent", info = g)
+  }
+  # A frozen file carries the comment records too, so the key that joins them
+  # across questions is exposure there as well, and nothing in a frozen file
+  # needs one.
+})
+
+test_that("a full report keeps respondent keying, and an unset dial defaults to it", {
+  expect_equal(tabs_delivery_qual_dials(
+    list(qual_comment_key = "respondent", min_reporting_base = 10), "full")$comment_key,
+    "respondent")
+  expect_equal(tabs_delivery_qual_dials(list(min_reporting_base = 10),
+                                        NA_character_)$comment_key, "respondent")
+  # An unknown value is not treated as the stricter option by accident.
+  expect_equal(tabs_delivery_qual_dials(
+    list(qual_comment_key = "Nonsense", min_reporting_base = 10),
+    NA_character_)$comment_key, "respondent")
+})
+
+test_that("a config already keyed by question is never lowered", {
+  r <- tabs_delivery_qual_dials(
+    list(qual_comment_key = "question", min_reporting_base = 10), "full")
+  expect_equal(r$comment_key, "question")
+})
+
+test_that("the comment key is written back, and the manifest reports it", {
+  cfg <- list(qual_comment_key = "respondent", qual_demographic_cuts = "allow",
+              qual_confidentiality_mode = "full", min_reporting_base = 10)
+  out <- tabs_apply_qual_floor(cfg, tabs_delivery_qual_dials(cfg, "client_safe_interactive"))
+  expect_equal(out$qual_comment_key, "question")
+  m <- tabs_delivery_manifest(NULL, "{\"questions\":[]}", out)
+  expect_match(joined(m), "Comment key\\s*: question-local")
+  # And a records build says the opposite plainly, rather than saying nothing.
+  m2 <- tabs_delivery_manifest(NULL, "{\"questions\":[]}", cfg)
+  expect_match(joined(m2), "one per respondent")
+})
+
+test_that("manual review is reported as asserted, and only when claimed", {
+  cfg <- list(qual_comment_key = "question", qual_demographic_cuts = "safe",
+              qual_confidentiality_mode = "redacted", min_reporting_base = 10)
+  m <- tabs_delivery_manifest(NULL, "{\"questions\":[]}", cfg)
+  expect_false(grepl("Manual review", joined(m), fixed = TRUE))
+  m2 <- tabs_delivery_manifest(NULL, "{\"questions\":[]}",
+                               c(cfg, list(qual_manual_review = TRUE)))
+  # No build can tell whether a human read the comments, so the word ASSERTED
+  # has to be on the line itself.
+  expect_match(joined(m2), "Manual review\\s*: ASSERTED")
 })

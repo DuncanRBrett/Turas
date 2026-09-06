@@ -120,7 +120,10 @@ build_integrated_qual_island <- function(qual_workbook, config_obj, survey_data,
     demographic_cuts = config_obj$qual_demographic_cuts,
     noteworthy_default = config_obj$qual_noteworthy_default,
     verbatim_scope = config_obj$qual_verbatim_scope,
-    min_reporting_base = config_obj$min_reporting_base),   # k for "safe" tag anonymisation
+    min_reporting_base = config_obj$min_reporting_base,   # k for "safe" tag anonymisation
+    # Floored by the delivery mode before it gets here, see tabs_delivery_qual_dials().
+    comment_key = config_obj$qual_comment_key,
+    manual_review = config_obj$qual_manual_review),
     rid_map = reader_keys$map,
     # Per-respondent level on each DECLARED variable, from the aggregate cube's
     # own definitions. Supplied only on a cube build; NULL everywhere else, so a
@@ -275,7 +278,10 @@ build_qual_report_v2 <- function(qual_workbook, output_path, config_obj, module 
     demographic_cuts = config_obj$qual_demographic_cuts,
     noteworthy_default = config_obj$qual_noteworthy_default,
     verbatim_scope = config_obj$qual_verbatim_scope,
-    min_reporting_base = config_obj$min_reporting_base),   # k for "safe" tag anonymisation
+    min_reporting_base = config_obj$min_reporting_base,   # k for "safe" tag anonymisation
+    # Floored by the delivery mode before it gets here, see tabs_delivery_qual_dials().
+    comment_key = config_obj$qual_comment_key,
+    manual_review = config_obj$qual_manual_review),
     rid_map = reader_keys$map)
 
   # The quant run used a minimal unweighted/dual-sig config; re-brand the project

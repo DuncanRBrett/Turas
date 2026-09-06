@@ -97,7 +97,7 @@
       "meta": {
         "dropped_codes": 0,
         "n_records": 4,
-        "pii_scrubbed": false,
+        "scrub_ran": false,
         "redactions": 0
       },
       "split": {
@@ -149,7 +149,7 @@
       "meta": {
         "dropped_codes": 0,
         "n_records": 2,
-        "pii_scrubbed": false,
+        "scrub_ran": false,
         "redactions": 0
       }
     }

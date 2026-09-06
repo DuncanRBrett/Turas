@@ -60,6 +60,130 @@ if (!exists("%||%", mode = "function")) {
 .RELEASE_AGGREGATE_ISLANDS <- c("data-agg", "data-cube")
 
 
+#' Audit a COMMENT island against a client-safe build's promises
+#'
+#' The cube audit above asks whether the quantitative payload keeps its word.
+#' This asks the same of the qualitative one, which is where the SACS 2025
+#' client-safe build turned out to be naming individuals while its crosstabs
+#' refused any group under ten.
+#'
+#' Five checks, each a thing a client-safe comment island claims:
+#'   1. It declares question-local comment keys. A person's comments must not be
+#'      joinable across questions: one comment can be anonymous while six are a
+#'      profile.
+#'   2. It carries no reader token. That is the field that used to do the
+#'      joining, and its absence is checked separately from the declaration so a
+#'      build whose declaration and payload disagree is caught.
+#'   3. Its demographic tags are k-anonymised or absent, never "allow".
+#'   4. Its verbatim text is not the raw `full` mode.
+#'   5. Every demographic cut a comment carries names a group the CUBE says is at
+#'      least k people. This is the one check that does not take the island's word
+#'      for anything: it reads the tags actually shipped and prices them against
+#'      the published cell bases. A cut naming more variables than the cube's
+#'      order cannot be priced from the file at all, and is counted and reported
+#'      rather than passed over in silence.
+#'
+#' @param body The data-qual island body, already extracted.
+#' @param cube_body The data-cube island body, for check 5. NA when there is none.
+#' @return list(present, comment_key, cuts, text_mode, records, unverifiable,
+#'   violations); violations is empty when the island keeps its promises.
+#' @keywords internal
+release_audit_qual <- function(body, cube_body = NA_character_) {
+  out <- list(present = FALSE, comment_key = NA_character_, cuts = NA_character_,
+              text_mode = NA_character_, records = 0L, unverifiable = 0L,
+              violations = character(0))
+  if (is.na(body) || !nzchar(body) || identical(body, "null")) return(out)
+  out$present <- TRUE
+  isl <- tryCatch(jsonlite::fromJSON(body, simplifyVector = FALSE),
+                  error = function(e) NULL)
+  if (is.null(isl)) {
+    out$violations <- "the data-qual island did not parse"
+    return(out)
+  }
+  out$comment_key <- as.character(isl$commentKey %||% "respondent")
+  out$cuts <- as.character(isl$demographicCuts %||% "allow")
+  out$text_mode <- as.character(isl$textMode %||% "hidden")
+
+  # 1. the declaration
+  if (!identical(out$comment_key, "question")) {
+    out$violations <- c(out$violations, sprintf(
+      paste0("the comments are keyed one per respondent, so a reader can join ",
+             "the same person's comments across questions (commentKey = '%s')"),
+      out$comment_key))
+  }
+
+  # 2. the token, checked in the payload rather than in the declaration
+  has_rid <- FALSE
+  records <- 0L
+  cuts_seen <- list()
+  for (q in (isl$questions %||% list())) {
+    for (rec in (q$records %||% list())) {
+      records <- records + 1L
+      rid <- rec$rid
+      if (!is.null(rid) && length(rid) == 1L && !is.na(rid) && nzchar(as.character(rid))) {
+        has_rid <- TRUE
+      }
+      cut <- rec$cut
+      if (!is.null(cut) && length(cut)) {
+        key <- paste(names(cut), unlist(cut), sep = "=", collapse = "|")
+        cuts_seen[[key]] <- cut
+      }
+    }
+  }
+  out$records <- records
+  if (has_rid) {
+    out$violations <- c(out$violations,
+      "a comment carries a reader token, which is the same value in every question")
+  }
+
+  # 3 and 4. the two dials
+  if (identical(out$cuts, "allow")) {
+    out$violations <- c(out$violations,
+      "every demographic tag ships against every comment (demographicCuts = 'allow')")
+  }
+  if (identical(out$text_mode, "full")) {
+    out$violations <- c(out$violations,
+      "verbatim text ships raw, with no direct-identifier scrub (textMode = 'full')")
+  }
+
+  # 5. the tags actually shipped, priced against the cube's own cell bases
+  cube <- NULL
+  if (!is.na(cube_body) && nzchar(cube_body) && !identical(cube_body, "null")) {
+    cube <- tryCatch(jsonlite::fromJSON(cube_body, simplifyVector = FALSE),
+                     error = function(e) NULL)
+  }
+  if (!is.null(cube) && length(cuts_seen)) {
+    k <- suppressWarnings(as.numeric(cube$k %||% NA_real_))
+    order <- suppressWarnings(as.integer(cube$order %||% NA_integer_))
+    var_order <- names(cube$vars %||% list())
+    small <- character(0)
+    for (key in names(cuts_seen)) {
+      cut <- cuts_seen[[key]]
+      names_in <- names(cut)
+      if (is.na(order) || length(names_in) > order || !all(names_in %in% var_order)) {
+        out$unverifiable <- out$unverifiable + 1L
+        next
+      }
+      ordered <- names_in[order(match(names_in, var_order))]
+      skey <- paste(ordered, collapse = "*")
+      slice <- cube$slices[[skey]]
+      ckey <- paste(vapply(ordered, function(v) as.character(cut[[v]]), character(1)),
+                    collapse = "|")
+      cell <- if (is.null(slice)) NULL else slice$cells[[ckey]]
+      base <- if (is.null(cell) || is.null(cell$a)) 0 else suppressWarnings(as.numeric(cell$a[[1]]))
+      if (!is.na(k) && !is.na(base) && base < k) small <- c(small, key)
+    }
+    if (length(small)) {
+      out$violations <- c(out$violations, sprintf(
+        paste0("%d demographic tag combination(s) on comments name a group the ",
+               "cube itself reports as smaller than k=%s, the first being %s"),
+        length(small), format(k), small[1]))
+    }
+  }
+  out
+}
+
+
 #' Audit an aggregate cube island against its own promises
 #'
 #' Three checks, each a thing the cube claims about itself:
@@ -193,7 +317,9 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
     stop("turas_release_audit: html must be a single string", call. = FALSE)
   }
 
-  cube_audit <- release_audit_cube(release_island_body(html, "data-cube"))
+  cube_body <- release_island_body(html, "data-cube")
+  cube_audit <- release_audit_cube(cube_body)
+  qual_audit <- release_audit_qual(release_island_body(html, "data-qual"), cube_body)
 
   micro_body <- release_island_body(html, "data-micro")
   micro_present <- !is.na(micro_body) && nzchar(micro_body) &&
@@ -228,7 +354,8 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
   ip_hits <- ip_hits[ip_hits > 0L]
 
   cube_violation <- isTRUE(client_safe) && length(cube_audit$violations) > 0
-  violation <- isTRUE(client_safe) && (micro_present || cube_violation)
+  qual_violation <- isTRUE(client_safe) && length(qual_audit$violations) > 0
+  violation <- isTRUE(client_safe) && (micro_present || cube_violation || qual_violation)
 
   pad <- function(x) formatC(x, width = 32, flag = "-")
   lines <- c(
@@ -245,12 +372,27 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
     paste0("│ ", pad("Aggregate cube"), ": ",
            if (!cube_audit$present) "absent"
            else sprintf("present (k = %s, up to %s variables, %s cells)",
-                        format(cube_audit$k), cube_audit$order, format(cube_audit$cells)))
+                        format(cube_audit$k), cube_audit$order, format(cube_audit$cells))),
+    paste0("│ ", pad("Comment island"), ": ",
+           if (!qual_audit$present) "absent"
+           else sprintf("present (%s comments, keyed by %s, tags %s, text %s)",
+                        format(qual_audit$records), qual_audit$comment_key,
+                        qual_audit$cuts, qual_audit$text_mode)),
+    # Said out loud, because a check that could not run is not a check that passed.
+    if (qual_audit$present && qual_audit$unverifiable > 0)
+      paste0("│ ", pad("Comment tags not priceable"), ": ",
+             sprintf("%d combination(s) name more variables than the cube carries",
+                     qual_audit$unverifiable))
   )
 
   if (length(cube_audit$violations)) {
     lines <- c(lines, "│", "│ The cube does not keep its own promises:")
     for (v in cube_audit$violations) lines <- c(lines, paste0("│   ", v))
+  }
+
+  if (length(qual_audit$violations)) {
+    lines <- c(lines, "│", "│ The comment island does not keep its own promises:")
+    for (v in qual_audit$violations) lines <- c(lines, paste0("│   ", v))
   }
 
   if (length(ip_hits)) {
@@ -269,9 +411,11 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
 
   out <- list(
     status = if (!micro_present && !length(identifiers) && !length(ip_hits) &&
-                 !length(cube_audit$violations)) "PASS" else "FLAGGED",
+                 !length(cube_audit$violations) &&
+                 !length(qual_audit$violations)) "PASS" else "FLAGGED",
     microdata = list(present = micro_present, n = micro_n, weights = micro_weights),
     cube = cube_audit,
+    qual = qual_audit,
     identifiers = identifiers,
     ip = ip_hits,
     lines = lines,
@@ -283,26 +427,38 @@ turas_release_audit <- function(html, client_safe = FALSE, refuse = TRUE) {
       turas_refuse(
         code = "CFG_CLIENT_SAFE_VIOLATED",
         title = if (micro_present) "Client-safe build still contains respondent-level data"
-                else "Client-safe build carries an aggregate cube that breaks its own rule",
+                else if (cube_violation)
+                  "Client-safe build carries an aggregate cube that breaks its own rule"
+                else "Client-safe build carries comments that identify their authors",
         problem = if (micro_present) sprintf(
           "This build was declared client-safe, but the file carries a populated data-micro island (%s de-identified records).",
           if (is.na(micro_n)) "count unreadable" else micro_n)
-        else paste0(
+        else if (cube_violation) paste0(
           "This build was declared client-safe, and its aggregate cube does not keep ",
-          "its own promises: ", paste(cube_audit$violations, collapse = "; "), "."),
+          "its own promises: ", paste(cube_audit$violations, collapse = "; "), ".")
+        else paste0(
+          "This build was declared client-safe, and its comment island does not keep ",
+          "its own promises: ", paste(qual_audit$violations, collapse = "; "), "."),
         why_it_matters = paste(
-          "A client-safe file carries no respondent-level records, and any",
-          "aggregates in it keep their own k rule. This build does not match",
-          "the mode it was declared under."),
+          "A client-safe file carries no respondent-level records, any",
+          "aggregates in it keep their own k rule, and its comments neither name",
+          "a group below that rule nor join one person's answers across",
+          "questions. This build does not match the mode it was declared under."),
         how_to_fix = if (micro_present) c(
           "Choose 'Client safe' in the tabs GUI before running: the build then drops the island itself.",
           "Running outside the GUI: set html_report_v2_interactivity = none on the Settings sheet.",
           "The island is decided when the report is built, so it cannot be removed afterwards.",
           "Or build without declaring client-safe, if respondent data is acceptable for this recipient.")
-        else c(
+        else if (cube_violation) c(
           "Raise min_reporting_base and rebuild: the cube then withholds the cuts that are too small.",
           "Or set html_report_v2_interactivity = none for published tables with no live views.",
-          "The cube is decided when the report is built, so it cannot be repaired afterwards."),
+          "The cube is decided when the report is built, so it cannot be repaired afterwards.")
+        else c(
+          "Choose a client-safe delivery mode in the tabs GUI and rebuild: it raises the comment dials itself.",
+          "Running outside the GUI: set qual_comment_key = question and qual_demographic_cuts = safe on the Settings sheet.",
+          "qual_demographic_cuts = safe needs min_reporting_base above 1 to mean anything.",
+          "Or set qual_confidentiality_mode = hidden to ship themes and counts with no verbatim text.",
+          "The comment island is decided when the report is built, so it cannot be repaired afterwards."),
         module = "RELEASE AUDIT"
       )
     } else {
