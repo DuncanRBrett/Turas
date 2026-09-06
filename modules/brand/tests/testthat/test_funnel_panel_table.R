@@ -6,7 +6,8 @@
 #   - Focal + Category-average rows locked (data-locked="1")
 #   - Sort buttons on every stage header AND brand header
 #   - Per-column heatmap shading (deeper colour on larger value within column)
-#   - In-cell ▲/▼ when sig_vs_avg is higher/lower
+#   - sig_vs_avg carried on the cell as data-fn-sig-avg (the badge itself is
+#     written by the JS, and only outside the nested default view)
 #   - data-fn-sort-<stage> + data-fn-sort-brand on every competitor row
 #   - Stage column headers render for every stage (data-fn-stage attribute)
 # ==============================================================================
@@ -277,14 +278,25 @@ test_that("Inline sig badge renders ▲ when brand is sig-higher than cat avg", 
   )
   html <- build_funnel_table_section(fake_panel)
   flat <- .flatten_html(html)
-  expect_true(grepl("fn-sig-up", flat))
-  expect_true(grepl("fn-sig-down", flat))
+  # 2026-09-06: the default view is the nested chain, and the engine's test
+  # is run on each stage's own base, so no badge is rendered here. The
+  # direction rides on the cell instead and brand_funnel_panel.js writes the
+  # badge back when the reader switches to a view the test belongs to. It is
+  # left out of the markup rather than hidden, because the pin and PNG
+  # capture drops a display:none it reads as a default value.
+  expect_false(grepl("fn-sig-up", flat))
+  expect_false(grepl("fn-sig-down", flat))
+  aware_cells <- regmatches(flat, gregexpr(
+    '<td [^>]*data-fn-stage="aware".*?</td>', flat, perl = TRUE))[[1]]
+  expect_true(any(grepl('data-fn-sig-avg="higher"', aware_cells)))
+  expect_true(any(grepl('data-fn-sig-avg="lower"', aware_cells)))
   cons_cells <- regmatches(flat, gregexpr(
     '<td [^>]*data-fn-stage="consideration".*?</td>', flat,
     perl = TRUE))[[1]]
   expect_true(length(cons_cells) >= 2)
   for (c in cons_cells) {
     expect_false(grepl("fn-sig-up|fn-sig-down", c), info = c)
+    expect_true(grepl('data-fn-sig-avg="not_sig"', c), info = c)
   }
 })
 

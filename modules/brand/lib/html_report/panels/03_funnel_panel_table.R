@@ -38,6 +38,13 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   stage_defs <- pd$meta$stage_definitions %||% character(0)
   cells_by_stage <- .fn_cells_by_stage(table$cells, stage_keys)
   col_max <- .fn_per_column_max(cells_by_stage, stage_keys)
+  # Nested chain percentage, the default view. Derived here rather than in
+  # the engine: the cumulative-chain count is already in the payload and
+  # n_weighted is the same denominator pct_absolute uses, so the view needs
+  # no new engine number. See .fn_chain_pct().
+  n_weighted <- as.numeric(pd$meta$n_weighted %||% NA_real_)
+  chain_avg  <- .fn_chain_avg_by_stage(table$cells, stage_keys, brand_codes,
+                                       n_weighted)
 
   paste0(
     '<section class="fn-section fn-table-section">',
@@ -48,13 +55,52 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     .fn_row_base(stage_keys, table$cells, brand_codes,
                  n_total = pd$meta$n_unweighted),
     .fn_row_focal(stage_keys, focal, brand_names[match(focal, brand_codes)],
-                  table$cells, focal_colour, col_max),
-    .fn_row_avg_all(stage_keys, table$avg_all_brands, col_max),
+                  table$cells, focal_colour, col_max, n_weighted),
+    .fn_row_avg_all(stage_keys, table$avg_all_brands, col_max, chain_avg),
     .fn_rows_competitors(stage_keys, brand_codes, brand_names, focal,
-                         table$cells, col_max),
+                         table$cells, col_max, n_weighted),
     '</tbody></table></div>',
     '</section>'
   )
+}
+
+
+#' Nested chain percentage for one cell: cumulative-chain count over the
+#' weighted respondent total.
+#'
+#' \code{base_chain_filtered} counts the respondents who passed this stage
+#' and every earlier one; \code{n_weighted} is \code{sum(weights)}, which is
+#' the denominator \code{pct_weighted} already uses. So at the first stage
+#' this returns the same figure as \code{pct_absolute}, and every later
+#' stage sits at or below the one before it.
+#' @keywords internal
+.fn_chain_pct <- function(cell, n_weighted) {
+  if (is.null(cell)) return(NA_real_)
+  chain <- suppressWarnings(as.numeric(cell$base_chain_filtered %||% NA_real_))
+  if (!is.finite(chain) || !is.finite(n_weighted) || n_weighted <= 0) {
+    return(NA_real_)
+  }
+  chain / n_weighted
+}
+
+
+#' Category-average chain percentage per stage.
+#'
+#' Same convention as \code{.avg_all_brands_row()} in 03c_funnel_panel_data.R:
+#' apply the view's formula per brand, then average across brands. Not the
+#' ratio of the summed counts.
+#' @keywords internal
+.fn_chain_avg_by_stage <- function(cells, stage_keys, brand_codes, n_weighted) {
+  vapply(stage_keys, function(k) {
+    vals <- vapply(cells, function(c) {
+      if (!identical(c$stage_key, k) || !(c$brand_code %in% brand_codes)) {
+        return(NA_real_)
+      }
+      .fn_chain_pct(c, n_weighted)
+    }, numeric(1))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) NA_real_ else mean(vals)
+  }, numeric(1), USE.NAMES = TRUE)
 }
 
 
@@ -137,7 +183,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
 
 .fn_row_focal <- function(stage_keys, focal, focal_name, cells, focal_colour,
-                          col_max) {
+                          col_max, n_weighted = NA_real_) {
   if (is.null(focal) || !nzchar(focal)) return("")
   display <- focal_name %||% focal
   cells_for <- .fn_cells_for_brand(cells, focal)
@@ -147,13 +193,13 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     sprintf('<tr class="ct-row fn-row-focal" %s>', row_attrs),
     sprintf('<td class="ct-td ct-label-col fn-row-focal-label">%s <span class="fn-focal-badge">FOCAL</span></td>',
             .fn_esc(display)),
-    .fn_cells_html(stage_keys, cells_for, col_max),
+    .fn_cells_html(stage_keys, cells_for, col_max, n_weighted),
     '</tr>'
   )
 }
 
 
-.fn_row_avg_all <- function(stage_keys, avg_rows, col_max) {
+.fn_row_avg_all <- function(stage_keys, avg_rows, col_max, chain_avg = NULL) {
   if (is.null(avg_rows) || length(avg_rows) == 0) return("")
   by_key <- stats::setNames(avg_rows,
     vapply(avg_rows, function(r) r$stage_key, character(1)))
@@ -163,17 +209,22 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     pct_abs <- r$pct_absolute %||% NA_real_
     if (is.null(pct_abs) || is.na(pct_abs))
       return('<td class="ct-td ct-data-col ct-na fn-td-avg">&ndash;</td>')
-    # All three base values are surfaced as data attributes so applyPctMode()
+    # All four base values are surfaced as data attributes so applyPctMode()
     # in brand_funnel_panel.js can reflow this cell when the user toggles
-    # between % total / % previous / % aware. Sentinel brand code "__avg__"
-    # so the cat-avg row is included by the .ct-td[data-fn-brand][data-fn-stage]
-    # selector without colliding with any real brand code.
+    # between the nested funnel / each stage on its own / % previous /
+    # % aware. Sentinel brand code "__avg__" so the cat-avg row is included
+    # by the .ct-td[data-fn-brand][data-fn-stage] selector without colliding
+    # with any real brand code.
     pct_nes <- r$pct_nested %||% pct_abs
     pct_aw  <- r$pct_aware  %||% pct_abs
+    pct_chn <- if (is.null(chain_avg)) NA_real_ else chain_avg[[k]] %||% NA_real_
+    if (!is.finite(pct_chn %||% NA_real_)) pct_chn <- pct_abs
     ci_lo   <- r$ci_lo %||% NA_real_
     ci_hi   <- r$ci_hi %||% NA_real_
     safe_max <- max(0.01, as.numeric(col_max[[k]] %||% 1), na.rm = TRUE)
-    disp    <- sprintf("%.0f%%", 100 * pct_abs)
+    # Rendered text is the DEFAULT view (the nested chain), so the emitted
+    # file reads correctly before any script runs and when it is printed.
+    disp    <- sprintf("%.0f%%", 100 * pct_chn)
     lo_disp <- if (is.finite(ci_lo)) sprintf("%.0f%%", 100 * ci_lo) else ""
     hi_disp <- if (is.finite(ci_hi)) sprintf("%.0f%%", 100 * ci_hi) else ""
     fill_left <- if (nzchar(lo_disp)) max(0, min(94, 100 * ci_lo / safe_max)) else 0
@@ -191,8 +242,9 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
       '<td class="ct-td ct-data-col fn-td-avg fn-td-avg-ci"
            data-fn-stage="%s" data-fn-brand="__avg__"
            data-fn-pct-abs="%.6f" data-fn-pct-nes="%.6f" data-fn-pct-aw="%.6f"
+           data-fn-pct-chn="%.6f"
            data-sort-val="%.6f"><span class="ct-val fn-pct-primary">%s</span>%s</td>',
-      .fn_esc(k), pct_abs, pct_nes, pct_aw, pct_abs, disp, ci_bar)
+      .fn_esc(k), pct_abs, pct_nes, pct_aw, pct_chn, pct_abs, disp, ci_bar)
   }, character(1))
   paste0(
     '<tr class="ct-row fn-row-avg-all" data-locked="1">',
@@ -204,19 +256,19 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
 
 .fn_rows_competitors <- function(stage_keys, brand_codes, brand_names,
-                                 focal, cells, col_max) {
+                                 focal, cells, col_max, n_weighted = NA_real_) {
   non_focal_idx <- which(brand_codes != focal)
   if (length(non_focal_idx) == 0) return("")
   order_idx <- non_focal_idx[order(tolower(brand_names[non_focal_idx]))]
   rows <- vapply(order_idx, function(i) {
     b <- brand_codes[i]; nm <- brand_names[i]
     cells_for <- .fn_cells_for_brand(cells, b)
-    sort_attrs <- .fn_brand_sort_attrs(cells_for, stage_keys, nm)
+    sort_attrs <- .fn_brand_sort_attrs(cells_for, stage_keys, nm, n_weighted)
     paste0(
       sprintf('<tr class="ct-row fn-row-competitor" data-fn-brand="%s"%s>',
               .fn_esc(b), sort_attrs),
       sprintf('<td class="ct-td ct-label-col">%s</td>', .fn_esc(nm)),
-      .fn_cells_html(stage_keys, cells_for, col_max),
+      .fn_cells_html(stage_keys, cells_for, col_max, n_weighted),
       '</tr>'
     )
   }, character(1))
@@ -224,7 +276,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-.fn_brand_sort_attrs <- function(cells_for, stage_keys, brand_name) {
+.fn_brand_sort_attrs <- function(cells_for, stage_keys, brand_name,
+                                 n_weighted = NA_real_) {
   # Emit one sort attribute per stage per base mode so setSort() in
   # brand_funnel_panel.js can pick the right value when the user sorts
   # while a non-default base is active. Without the per-mode attributes
@@ -235,21 +288,26 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   #   data-fn-sort-<k>-abs  -> pct_absolute
   #   data-fn-sort-<k>-nes  -> pct_nested
   #   data-fn-sort-<k>-aw   -> pct_aware
+  #   data-fn-sort-<k>-chn  -> nested chain over the weighted total
   fmt <- function(v) if (is.na(v)) "" else sprintf("%.6f", v)
   parts <- vapply(stage_keys, function(k) {
     cell <- cells_for[[k]] %||% list()
     abs_v <- cell$pct_absolute %||% NA_real_
     nes_v <- cell$pct_nested   %||% abs_v
     aw_v  <- cell$pct_aware    %||% abs_v
+    chn_v <- .fn_chain_pct(cells_for[[k]], n_weighted)
+    if (!is.finite(chn_v)) chn_v <- abs_v
     sprintf(paste0(
         ' data-fn-sort-%s="%s"',
         ' data-fn-sort-%s-abs="%s"',
         ' data-fn-sort-%s-nes="%s"',
-        ' data-fn-sort-%s-aw="%s"'),
+        ' data-fn-sort-%s-aw="%s"',
+        ' data-fn-sort-%s-chn="%s"'),
       .fn_esc(k), fmt(abs_v),
       .fn_esc(k), fmt(abs_v),
       .fn_esc(k), fmt(nes_v),
-      .fn_esc(k), fmt(aw_v))
+      .fn_esc(k), fmt(aw_v),
+      .fn_esc(k), fmt(chn_v))
   }, character(1))
   paste0(
     sprintf(' data-fn-sort-brand="%s"', .fn_esc(tolower(brand_name))),
@@ -294,7 +352,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-.fn_cells_html <- function(stage_keys, cells_by_stage_for_brand, col_max) {
+.fn_cells_html <- function(stage_keys, cells_by_stage_for_brand, col_max,
+                           n_weighted = NA_real_) {
   vals <- vapply(stage_keys, function(k) {
     c <- cells_by_stage_for_brand[[k]]
     if (is.null(c)) return('<td class="ct-td ct-data-col ct-na">&ndash;</td>')
@@ -303,7 +362,9 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
                   k, c$brand_code,
                   col_max = col_max[[k]],
                   sig_vs_avg = c$sig_vs_avg %||% "na",
-                  row_class = "")
+                  row_class = "",
+                  pct_chain = .fn_chain_pct(c, n_weighted),
+                  base_chain_u = c$base_chain_unweighted %||% NA_real_)
   }, character(1))
   paste(vals, collapse = "")
 }
@@ -311,7 +372,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
 .fn_cell_html <- function(pct_absolute, pct_nested, pct_aware, base_w, base_u,
                           stage_key, brand_code, col_max, sig_vs_avg,
-                          row_class = "") {
+                          row_class = "", pct_chain = NA_real_,
+                          base_chain_u = NA_real_) {
   if (is.null(pct_absolute) || is.na(pct_absolute)) {
     return(sprintf('<td class="ct-td ct-data-col ct-na %s">&ndash;</td>', row_class))
   }
@@ -319,21 +381,41 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   abs_display    <- sprintf("%.0f%%", 100 * pct_absolute)
   nested_display <- if (is.null(pct_nested) || is.na(pct_nested)) abs_display
                     else sprintf("%.0f%%", 100 * pct_nested)
-  base_display <- if (is.finite(base_u %||% NA_real_))
+  # The nested chain is the default view, so it is what the file says
+  # before any script runs. Falls back to the absolute figure when the
+  # chain count is missing, which is what every other view does too.
+  pct_chain_val <- if (is.null(pct_chain) || !is.finite(pct_chain))
+                     pct_absolute else pct_chain
+  default_display <- sprintf("%.0f%%", 100 * pct_chain_val)
+  # Count under the cell follows the view: the nested view counts the
+  # respondents still in the chain, not the stage's own raw count.
+  base_display <- if (is.finite(base_chain_u %||% NA_real_))
+                    sprintf("n=%d", as.integer(base_chain_u))
+                  else if (is.finite(base_u %||% NA_real_))
                     sprintf("n=%d", as.integer(base_u))
                   else ""
 
   is_warn <- is.finite(base_u %||% NA_real_) &&
              !is.na(base_u) && as.numeric(base_u) < .FN_SMALL_BASE
   dim_cls <- if (is_warn) " ct-low-base-dim" else ""
-  sig_badge <- .fn_sig_badge(sig_vs_avg)
+  # No significance mark in the default (nested) view. The engine's test is
+  # run on each stage's own base, so its verdict is about the figure the
+  # "Each stage on its own" view shows, not about the chain. The direction
+  # rides on the cell as an attribute and brand_funnel_panel.js writes the
+  # badge back when the reader switches to a view the test belongs to.
+  # It is left out of the markup rather than hidden with CSS: the pin and
+  # PNG capture drops a display:none it reads as a default value, so a
+  # hidden badge would reappear on the exported card.
+  sig_attr <- sprintf(' data-fn-sig-avg="%s"', .fn_esc(sig_vs_avg %||% "na"))
+  sig_badge <- ""
   pct_aw_val <- if (is.null(pct_aware) || is.na(pct_aware)) pct_absolute else pct_aware
 
   sprintf(
     '<td class="ct-td ct-data-col ct-heatmap-cell%s %s" data-heatmap="%s"
          data-fn-stage="%s" data-fn-brand="%s"
          data-fn-pct-abs="%.6f" data-fn-pct-nes="%.6f" data-fn-pct-aw="%.6f"
-         data-fn-base="%s"
+         data-fn-pct-chn="%.6f"
+         data-fn-base="%s"%s
          data-sort-val="%.6f">
        <span class="ct-val fn-pct-primary">%s</span>%s
        <span class="ct-freq fn-pct-count">%s</span>
@@ -343,9 +425,11 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     pct_absolute, if (is.null(pct_nested) || is.na(pct_nested))
                     pct_absolute else pct_nested,
     pct_aw_val,
+    pct_chain_val,
     if (is.finite(base_u %||% NA_real_)) as.integer(base_u) else "",
+    sig_attr,
     pct_absolute,
-    abs_display, sig_badge, base_display
+    default_display, sig_badge, base_display
   )
 }
 

@@ -158,6 +158,39 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-meta-row {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
 }
+
+/* "How this works" under the base toggle, collapsed by default. Mirrors
+   the Overview drawer (.brsum-howto) rather than inventing a second
+   idiom. The arrow escape is doubled because this bundle is an R string. */
+/* The card strip sits on a sub-tab away from the base toggle, so it says
+   which base it is drawn on. */
+.fn-cards-base-note {
+  font-size: 11px; color: #64748b; font-style: italic; margin: 0 0 8px;
+}
+
+.fn-base-howto { margin: 0 0 12px; }
+.fn-base-howto-toggle {
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: #475569;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.fn-base-howto-toggle:hover { color: var(--fn-brand); }
+.fn-base-howto-arrow { display: inline-block; transition: transform 0.15s; }
+.fn-base-howto-arrow::before { content: "\\25BE"; }
+.fn-base-howto-toggle[aria-expanded="true"] .fn-base-howto-arrow {
+  transform: rotate(180deg);
+}
+.fn-base-howto-body {
+  margin-top: 8px; font-size: 12px; line-height: 1.55; color: #475569;
+  max-width: 900px;
+}
+.fn-base-howto-body p { margin: 0 0 8px; }
+.fn-base-howto-body ul { margin: 0 0 8px; padding-left: 18px; }
+.fn-base-howto-body li { margin-bottom: 5px; }
+@media print {
+  .fn-base-howto-toggle { display: none; }
+  .fn-base-howto-body[hidden] { display: block !important; }
+}
 .fn-controls .fn-ctl-group {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }

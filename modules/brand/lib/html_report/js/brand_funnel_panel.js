@@ -15,7 +15,8 @@
 //   • Focus dropdown: reassigns focal brand across cards/table/chart.
 //   • Table chips: show/hide brand columns (independent of chart chips).
 //   • Chart chips: show/hide brand lines on slope chart.
-//   • % mode: nested (default) ⇄ absolute.
+//   • Base toggle, four views: the nested chain (default), each stage on
+//     its own base, % of the previous stage, % of those aware.
 //   • Show counts: appends n=X under every percentage cell.
 //   • Chart view: slope ⇄ small-multiples.
 //   • Segment emphasis: highlights one attitude position + auto-sorts
@@ -44,7 +45,14 @@
     panel.__fnData = payload;
     panel.__fnState = {
       focal: (payload.meta && payload.meta.focal_brand_code) || null,
-      pctMode: "total",
+      /* "chain" is the nested funnel and the default: at each stage the
+         count is the respondents who passed that stage and every earlier
+         one, over the weighted respondent total. The other three are
+         "total" (each stage on its own base), "previous" (each stage over
+         the stage before it, along the same chain) and "aware". R renders
+         the table in the chain view already, so this only has to agree
+         with what the file says. */
+      pctMode: "chain",
       showCounts: false,
       showChart: true,
       showValues: "focal",  // "focal" | "all" | "none"
@@ -150,7 +158,8 @@
       var pdHM = panel.__fnData;
       var cellsHM     = (pdHM && pdHM.table && pdHM.table.cells) || [];
       var stageKeysHM = (pdHM && pdHM.table && pdHM.table.stage_keys) || [];
-      var pctModeHM   = (panel.__fnState && panel.__fnState.pctMode) || "total";
+      var pctModeHM   = (panel.__fnState && panel.__fnState.pctMode) || "chain";
+      var nWeightedHM = nWeightedOf(pdHM);
       var awareStageHM = stageKeysHM[0];
       var brandAwarePctHM = {};
       cellsHM.forEach(function(c){
@@ -162,7 +171,8 @@
         var maxV = 0;
         cellsHM.forEach(function(c){
           if (c.stage_key !== sk) return;
-          var v = cellValueForMode(c, pctModeHM, awareStageHM, brandAwarePctHM);
+          var v = cellValueForMode(c, pctModeHM, awareStageHM, brandAwarePctHM,
+                                   nWeightedHM);
           if (v != null && !isNaN(v) && v > maxV) maxV = v;
         });
         colMaxHM[sk] = maxV > 0 ? maxV : 1;
@@ -178,6 +188,7 @@
         var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
         var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
         var awV   = parseFloat(td.getAttribute("data-fn-pct-aw"));
+        var chnV  = parseFloat(td.getAttribute("data-fn-pct-chn"));
         if (!sk || isNaN(absV)) {
           // Fallback to the static attribute when per-base data is absent.
           var staticC = td.getAttribute("data-heatmap");
@@ -188,8 +199,9 @@
           stage_key: sk, brand_code: brand,
           pct_absolute: absV,
           pct_nested: isNaN(nesV) ? null : nesV,
-          pct_aware:  isNaN(awV)  ? null : awV
-        }, pctModeHM, awareStageHM, brandAwarePctHM);
+          pct_aware:  isNaN(awV)  ? null : awV,
+          pct_chain:  isNaN(chnV) ? null : chnV
+        }, pctModeHM, awareStageHM, brandAwarePctHM, nWeightedHM);
         if (pct == null || isNaN(pct)) return;
         var cmax = colMaxHM[sk] || 1;
         var frac = Math.min(1, Math.max(0, pct / cmax));
@@ -207,7 +219,8 @@
       if (!pd || !pd.table) return;
       var cells       = pd.table.cells     || [];
       var stageKeys   = pd.table.stage_keys || [];
-      var pctMode     = (panel.__fnState && panel.__fnState.pctMode) || "total";
+      var pctMode     = (panel.__fnState && panel.__fnState.pctMode) || "chain";
+      var nWeightedCI = nWeightedOf(pd);
       var awareStage  = stageKeys[0];
       var brandAwarePct = {};
       cells.forEach(function(c){
@@ -218,7 +231,8 @@
         var vals = [];
         cells.forEach(function(c){
           if (c.stage_key !== sk) return;
-          var v = cellValueForMode(c, pctMode, awareStage, brandAwarePct);
+          var v = cellValueForMode(c, pctMode, awareStage, brandAwarePct,
+                                   nWeightedCI);
           if (v != null && !isNaN(v)) vals.push(v);
         });
         if (vals.length < 2) return;
@@ -242,13 +256,15 @@
         var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
         var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
         var awV   = parseFloat(td.getAttribute("data-fn-pct-aw"));
+        var chnV  = parseFloat(td.getAttribute("data-fn-pct-chn"));
         var pct = cellValueForMode({
           stage_key:    sk,
           brand_code:   brand,
           pct_absolute: isNaN(absV) ? null : absV,
           pct_nested:   isNaN(nesV) ? null : nesV,
-          pct_aware:    isNaN(awV)  ? null : awV
-        }, pctMode, awareStage, brandAwarePct);
+          pct_aware:    isNaN(awV)  ? null : awV,
+          pct_chain:    isNaN(chnV) ? null : chnV
+        }, pctMode, awareStage, brandAwarePct, nWeightedCI);
         if (pct == null || isNaN(pct)) return;
         var cls = pct > bnds.upper ? "fn-ci-above"
                 : pct < bnds.lower ? "fn-ci-below"
@@ -320,7 +336,22 @@
       });
     });
 
-    // Base (% of total / previous / aware), tabs segmented-button style
+    // "How this works" under the base toggle. Collapsed by default; the
+    // body is emitted by .fn_base_howto() in 03_funnel_panel.R.
+    panel.querySelectorAll('button[data-fn-action="basehowto"]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var wrap = btn.closest("[data-fn-base-howto]");
+        if (!wrap) return;
+        var body = wrap.querySelector(".fn-base-howto-body");
+        if (!body) return;
+        var open = !body.hidden;
+        body.hidden = open;
+        btn.setAttribute("aria-expanded", open ? "false" : "true");
+      });
+    });
+
+    // Base toggle (nested funnel / each stage on its own / previous /
+    // aware), tabs segmented-button style
     panel.querySelectorAll('button[data-fn-action="pctmode"]').forEach(function(btn){
       btn.addEventListener("click", function(){
         var mode = btn.getAttribute("data-fn-pctmode");
@@ -586,10 +617,24 @@
     buildRelChart(panel);
   }
 
+  /* Summary cards, redrawn at the active base and for the active focal.
+     The card's category average is the mean over the NON-focal brands,
+     which is what .card_for_stage() computes in R and a different set from
+     the table's Category average row. Both were true before this stage and
+     both stay true; only the view they are drawn at changes. */
   function rebuildFunnelCards(panel, focal) {
     var pd = panel.__fnData;
     if (!pd || !pd.table) return;
-    var cells = pd.table.cells || [];
+    var cells     = pd.table.cells || [];
+    var stageKeys = pd.table.stage_keys || [];
+    var mode      = (panel.__fnState && panel.__fnState.pctMode) || "chain";
+    var nWeighted = nWeightedOf(pd);
+    var awareKey  = stageKeys[0];
+    var brandAwarePct = {};
+    cells.forEach(function(c) {
+      if (c.stage_key === awareKey) brandAwarePct[c.brand_code] = c.pct_absolute;
+    });
+    var origFocal = pd.meta && pd.meta.focal_brand_code;
     panel.querySelectorAll(".fn-card-funnel").forEach(function(card){
       var stageKey = card.getAttribute("data-fn-stage");
       var focalPct = null, otherPcts = [];
@@ -597,26 +642,42 @@
       for (var i = 0; i < cells.length; i++) {
         var c = cells[i];
         if (c.stage_key !== stageKey) continue;
+        var v = cellValueForMode(c, mode, awareKey, brandAwarePct, nWeighted);
         if (c.brand_code === focal) {
-          focalPct = c.pct_absolute;
-          focalBaseU = c.base_unweighted;
-        } else if (c.pct_absolute != null) {
-          otherPcts.push(c.pct_absolute);
+          focalPct = v;
+          /* The count follows the view: the two chained views count the
+             respondents still in the chain, not the stage's raw count. */
+          focalBaseU = (mode === "chain" || mode === "previous")
+            ? (c.base_chain_unweighted != null ? c.base_chain_unweighted
+                                               : c.base_unweighted)
+            : (mode === "aware" ? c.base_stage_aware_unweighted
+                                : c.base_unweighted);
+        } else if (v != null && !isNaN(v)) {
+          otherPcts.push(v);
         }
       }
       var cavg = otherPcts.length
         ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
         : null;
       var pctEl = card.querySelector(".tk-hero-value");
-      if (pctEl) pctEl.textContent = focalPct == null ? "–"
-                   : Math.round(focalPct * 100) + "%";
+      if (pctEl) pctEl.textContent = (focalPct == null || isNaN(focalPct))
+                   ? "–" : Math.round(focalPct * 100) + "%";
       var cmpEl = card.querySelector(".fn-card-compare strong");
       if (cmpEl) cmpEl.textContent = cavg == null ? "–"
                    : Math.round(cavg * 100) + "%";
       var baseEl = card.querySelector(".fn-card-base");
       if (baseEl) baseEl.textContent = focalBaseU == null ? ""
                     : "Focal n = " + Math.round(focalBaseU);
+      /* The card's significance direction was computed for the report's
+         own focal brand (comparison focal_vs_cat_avg, a different test
+         from the per-brand one the table cells carry). After a focal
+         switch it no longer describes the brand on the card, so it is
+         dropped rather than left to mislabel the new one. */
+      if (origFocal && focal && focal !== origFocal) {
+        card.setAttribute("data-fn-sig-avg", "na");
+      }
     });
+    applySigBadges(panel, mode);
   }
 
   function rebuildRelationshipCards(panel, focal) {
@@ -859,18 +920,24 @@
   }
 
   // ---------------------------------------------------------------------------
-  // % mode: rewrite cell text, base row n=, and cell count spans.
+  // % mode: rewrite cell text, base row n=, cell count spans, the summary
+  // cards, and the significance badges.
   //
-  // All three toggles read pre-computed values from data-* attributes set by
+  // All four toggles read pre-computed values from data-* attributes set by
   // the R template (.fn_cell_html in 03_funnel_panel_table.R):
+  //   "chain"    → data-fn-pct-chn (base_chain_filtered / n_weighted, the
+  //                                  nested funnel and the default view)
   //   "total"    → data-fn-pct-abs (pct_weighted)
-  //   "previous" → data-fn-pct-nes (pct_nested_filtered, cumulative chain)
+  //   "previous" → data-fn-pct-nes (pct_nested_filtered, each stage over the
+  //                                  stage before it along the same chain)
   //   "aware"    → data-fn-pct-aw  (pct_aware_filtered, independent
   //                                  intersection with aware, see
   //                                  calculate_stage_metrics)
   //
   // Cell count format (Show count on): n=<stage_count> (<mode_denom>)
-  // Base row format: n=300 (varies by brand) for non-total modes ≥ stage 2.
+  // Base row format: n=300 (varies by brand) for the two modes whose
+  // denominator moves with the brand. The chain view's denominator is the
+  // whole sample at every stage, so it stays n=300 throughout.
   // ---------------------------------------------------------------------------
   function applyPctMode(panel) {
     var mode = panel.__fnState.pctMode;
@@ -879,6 +946,7 @@
     // --- 1. Rewrite primary pct text in every data cell ----------------------
     var primaryAttr = mode === "previous" ? "data-fn-pct-nes"
                     : mode === "aware"    ? "data-fn-pct-aw"
+                    : mode === "chain"    ? "data-fn-pct-chn"
                     : "data-fn-pct-abs";
     panel.querySelectorAll(".ct-td[data-fn-pct-abs], .fn-td[data-fn-pct-abs]")
       .forEach(function(td) {
@@ -925,7 +993,12 @@
       dataCells.forEach(function(td, i) {
         var span = td.querySelector(".ct-base-n, .ct-low-base");
         if (!span) return;
-        if (mode === "total" || mode === "absolute" || i === 0) {
+        /* The chain view divides by the whole sample at every stage, so
+           its base row is the sample at every stage too. Only the two
+           views whose denominator moves with the brand carry the
+           qualifier. */
+        if (mode === "total" || mode === "absolute" || mode === "chain" ||
+            i === 0) {
           span.textContent = "n=" + nTotal;
         } else {
           span.textContent = "n=" + nTotal + " (varies by brand)";
@@ -961,6 +1034,11 @@
           var prevCell = (cellByBrandStage[brand] || {})[stageKeys[stageIdx - 1]];
           denom = prevCell ? roundOrNull(prevCell.base_chain_unweighted) : null;
         }
+      } else if (mode === "chain") {
+        /* Still in the chain at this stage, over the whole sample. The
+           denominator is the base row, so it is not repeated per cell. */
+        num = roundOrNull(cell.base_chain_unweighted);
+        if (num == null) num = roundOrNull(cell.base_unweighted);
       } else {
         num = roundOrNull(cell.base_unweighted);
       }
@@ -970,6 +1048,76 @@
         ? "n=" + num + " (" + denom + ")"
         : "n=" + num;
     });
+
+    // --- 5. Significance badges and the summary cards ------------------------
+    applySigBadges(panel, mode);
+    rebuildFunnelCards(panel, panel.__fnState.focal);
+    updateCardsBaseNote(panel, mode);
+  }
+
+  // ---------------------------------------------------------------------------
+  // The engine's brand-versus-category-average triangle.
+  //
+  // The test is run on each stage's own base, so its verdict belongs to the
+  // "Each stage on its own" figure. In the nested view the badge is removed
+  // from the DOM rather than hidden: TurasPins' capture inliner drops a
+  // display:none it reads as a default value, so a hidden badge comes back
+  // on a pinned card or a PNG. R renders no badge at all, because the
+  // nested view is the default; this puts it back when the reader moves to
+  // a view the test was computed for, and takes it away again on return.
+  // ---------------------------------------------------------------------------
+  function sigBadgeHtml(direction) {
+    if (direction === "higher") {
+      return '<span class="ct-sig fn-sig-up" title="Higher than category ' +
+             'average (p<0.05)">\u25B2</span>';
+    }
+    if (direction === "lower") {
+      return '<span class="ct-sig fn-sig-down" title="Lower than category ' +
+             'average (p<0.05)">\u25BC</span>';
+    }
+    return "";
+  }
+
+  function applySigBadges(panel, mode) {
+    var show = (mode !== "chain");
+    panel.querySelectorAll("[data-fn-sig-avg]").forEach(function(el) {
+      /* Only this badge is removed. The arrows applyTableSigMarkers()
+         writes carry .fn-sig-avg, which is a different class token and
+         does not match either selector. */
+      el.querySelectorAll(".ct-sig, .fn-sig").forEach(function(b) { b.remove(); });
+      if (!show) return;
+      var dir = el.getAttribute("data-fn-sig-avg");
+      if (el.classList.contains("fn-card-funnel")) {
+        var html = dir === "higher"
+          ? '<span class="fn-sig fn-sig-up">\u2191</span>'
+          : dir === "lower"
+          ? '<span class="fn-sig fn-sig-down">\u2193</span>' : "";
+        if (!html) return;
+        var valEl = el.querySelector(".tk-hero-value");
+        if (valEl) valEl.insertAdjacentHTML("afterend", html);
+        return;
+      }
+      var badge = sigBadgeHtml(dir);
+      if (!badge) return;
+      var primary = el.querySelector(".fn-pct-primary");
+      if (primary) primary.insertAdjacentHTML("afterend", badge);
+    });
+  }
+
+  // The card strip sits on its own sub-tab, away from the base toggle, so
+  // it states the base it is drawn on rather than leaving the reader to
+  // remember which view is active.
+  function updateCardsBaseNote(panel, mode) {
+    var note = panel.querySelector("[data-fn-cards-base-note]");
+    if (!note) return;
+    note.textContent = "Base: " + baseModeLabelFor(mode);
+  }
+
+  function baseModeLabelFor(mode) {
+    if (mode === "previous") return "% of previous stage";
+    if (mode === "aware")    return "% of those aware";
+    if (mode === "total" || mode === "absolute") return "each stage on its own";
+    return "the nested funnel, % of all respondents";
   }
 
   // ---------------------------------------------------------------------------
@@ -1024,14 +1172,33 @@
 
     /* Base-mode resolution: reads the engine-computed pct fields directly
        so the mini-funnel, table, and chart agree on every cell.
+         "chain"    -> base_chain_filtered / n_weighted (the nested funnel)
          "total"    -> pct_absolute (pct_weighted)
-         "previous" -> pct_nested   (pct_nested_filtered, cumulative chain)
+         "previous" -> pct_nested   (pct_nested_filtered, each stage over
+                                     the stage before it)
          "aware"    -> pct_aware    (pct_aware_filtered, independent
                                      intersection with aware) */
     var awareStageKey = stageKeys[0];
+    var nWeightedMF   = nWeightedOf(pd);
+    /* avg_all_brands carries the other three views but not the chain, so
+       the category average at the chain base is computed here, the same
+       way: the view's formula per brand, then the mean across brands. */
+    var chainAvgMF = (pctMode === "chain")
+      ? chainAvgByStage(cells, stageKeys, nWeightedMF) : null;
 
     function pickMiniPct(obj, brandCode, stageIdx) {
       if (!obj) return null;
+      if (pctMode === "chain") {
+        /* The cat-avg row object has no chain count of its own; it is
+           keyed by stage in chainAvgMF instead. */
+        var own = chainPct(obj, nWeightedMF);
+        if (own != null) return own;
+        if (chainAvgMF && obj.stage_key != null) {
+          var a = chainAvgMF[obj.stage_key];
+          if (a != null) return a;
+        }
+        return obj.pct_absolute;
+      }
       if (pctMode === "previous") {
         return obj.pct_nested != null ? obj.pct_nested : obj.pct_absolute;
       }
@@ -1370,9 +1537,36 @@
     //   "total": absolute % of all respondents
     //   "previous", each stage as % of the previous stage
     //   "aware", each stage as % of awareness (awareness pinned to 100%)
-    var pctMode = state.pctMode || "total";
+    var pctMode = state.pctMode || "chain";
+    /* The chain series is not in shape_chart (adding it would put a new
+       number in the payload island). It is assembled from the table cells,
+       which carry base_chain_filtered for every brand and stage, and keyed
+       by the series' own brand_code. The category-average series has no
+       brand_code, so it falls through to the per-stage chain average. */
+    var nWeightedCH = nWeightedOf(pd);
+    var chainByBrand = null, chainAvgCH = null;
+    if (pctMode === "chain" && pd.table) {
+      var tCells = pd.table.cells || [];
+      var tKeys  = pd.table.stage_keys || [];
+      chainByBrand = {};
+      tCells.forEach(function(c) {
+        if (!chainByBrand[c.brand_code]) chainByBrand[c.brand_code] = {};
+        chainByBrand[c.brand_code][c.stage_key] = chainPct(c, nWeightedCH);
+      });
+      chainAvgCH = chainAvgByStage(tCells, tKeys, nWeightedCH);
+    }
     function pickPcts(series) {
       if (!series) return null;
+      if (pctMode === "chain") {
+        var keys = series.stage_keys || stageKeys;
+        var lookup = (series.brand_code && chainByBrand)
+          ? chainByBrand[series.brand_code] : null;
+        if (!lookup && !chainAvgCH) return series.pct_values;
+        return keys.map(function(k) {
+          var v = lookup ? lookup[k] : (chainAvgCH ? chainAvgCH[k] : null);
+          return (v == null || isNaN(v)) ? null : v;
+        });
+      }
       if (pctMode === "previous") return series.pct_values_nes || series.pct_values;
       if (pctMode === "aware")    return series.pct_values_aw  || series.pct_values;
       return series.pct_values;
@@ -1657,11 +1851,22 @@
 
     var nTotal = pd.meta ? Math.round(pd.meta.n_weighted || 0) : 0;
     var awareStageKey = stageKeys[0];
+    var nWeightedEx = nWeightedOf(pd);
+    var chainAvgEx  = (pctMode === "chain")
+      ? chainAvgByStage(cells, stageKeys, nWeightedEx) : null;
 
     // Pick the correct pct value for the current mode. Reads engine-computed
-    // pct fields directly from the cell payload.
+    // pct fields directly from the cell payload; the chain view divides the
+    // cumulative-chain count by the weighted respondent total.
     function pickPct(obj, brandCode, stageIdx) {
       if (!obj) return null;
+      if (pctMode === "chain") {
+        var own = chainPct(obj, nWeightedEx);
+        if (own != null) return own;
+        if (chainAvgEx && obj.stage_key != null &&
+            chainAvgEx[obj.stage_key] != null) return chainAvgEx[obj.stage_key];
+        return obj.pct_absolute;
+      }
       if (pctMode === "previous") return obj.pct_nested != null ? obj.pct_nested : obj.pct_absolute;
       if (pctMode === "aware") {
         if (obj.pct_aware != null) return obj.pct_aware;
@@ -1671,9 +1876,12 @@
       return obj.pct_absolute;
     }
 
-    // Helper: base row n=, n=300 (varies by brand) for non-total modes ≥ stage 2.
+    // Helper: base row n=. The two views whose denominator moves with the
+    // brand carry the qualifier; the chain view divides by the whole
+    // sample at every stage, so it does not.
     function baseRowN(stageIdx) {
-      if (pctMode === "total" || pctMode === "absolute" || stageIdx === 0) {
+      if (pctMode === "total" || pctMode === "absolute" ||
+          pctMode === "chain" || stageIdx === 0) {
         return nTotal ? "n=" + nTotal : "";
       }
       return nTotal ? "n=" + nTotal + " (varies by brand)" : "";
@@ -1697,6 +1905,9 @@
           var prevCell = cellMap[code] && cellMap[code][stageKeys[stageIdx - 1]];
           denom = prevCell ? roundOrNull(prevCell.base_chain_unweighted) : null;
         }
+      } else if (pctMode === "chain") {
+        num = roundOrNull(c.base_chain_unweighted);
+        if (num == null) num = roundOrNull(c.base_unweighted);
       } else {
         num = roundOrNull(c.base_unweighted);
       }
@@ -1706,9 +1917,16 @@
 
     var focal = panel.__fnState.focal;
     var tdStyle = 'border:1px solid #ccc;padding:4px 8px;font-family:Calibri,sans-serif;font-size:12px;';
-    var baseModeLabel = pctMode === "previous" ? "% of previous stage"
-                      : pctMode === "aware"    ? "% of aware respondents"
-                      : "% of total sample";
+    /* The exported workbook has to say which view it carries: a sheet of
+       percentages with no base line is the same defect as an unlabelled
+       slide. This is the row directly above the header. */
+    var baseModeLabel = pctMode === "previous"
+        ? "% of the previous stage. Cumulative chain: each stage counts respondents who passed every earlier stage, over the stage before it."
+      : pctMode === "aware"
+        ? "% of those aware. Each stage crossed with awareness, over the aware count. Preference is not a precondition."
+      : (pctMode === "total" || pctMode === "absolute")
+        ? "Each stage on its own, % of the total sample. The stages are not chained, so a later stage can read higher than an earlier one."
+        : "The nested funnel, % of the total sample. Each stage counts respondents who passed that stage and every earlier one.";
 
     var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office"' +
       ' xmlns:x="urn:schemas-microsoft-com:office:excel"' +
@@ -1820,14 +2038,16 @@
     /* Pick the sort attribute that matches the active base toggle. The
        table emits four attributes per stage:
          data-fn-sort-<k>      (legacy, == abs)
-         data-fn-sort-<k>-abs  (% total)
-         data-fn-sort-<k>-nes  (% previous)
-         data-fn-sort-<k>-aw   (% aware)
+         data-fn-sort-<k>-abs  (each stage on its own)
+         data-fn-sort-<k>-nes  (% previous stage)
+         data-fn-sort-<k>-aw   (% of those aware)
+         data-fn-sort-<k>-chn  (the nested funnel, the default)
        Without the mode-aware pick, switching to % aware and re-sorting
        silently re-applied the % total order. */
-    var pctMode = (panel.__fnState && panel.__fnState.pctMode) || "total";
+    var pctMode = (panel.__fnState && panel.__fnState.pctMode) || "chain";
     var suffix  = pctMode === "previous" ? "-nes"
                   : pctMode === "aware"  ? "-aw"
+                  : pctMode === "chain"  ? "-chn"
                   : "-abs";
     var competitors = Array.prototype.slice.call(
       tbody.querySelectorAll('tr.fn-row-competitor'));
@@ -1954,8 +2174,60 @@
   // engine now pre-computes pct_aware as the true within-aware conditional
   // rate via per-respondent intersection, so it always sits in [0, 1].
   // ---------------------------------------------------------------------------
-  function cellValueForMode(cell, mode, awareStageKey, brandAwarePct) {
+  // ---------------------------------------------------------------------------
+  // Nested chain helpers.
+  //
+  // base_chain_filtered is the weighted count of respondents who passed this
+  // stage and every earlier one; meta.n_weighted is sum(weights), the same
+  // denominator pct_absolute uses. So chainPct at the first stage equals
+  // pct_absolute there, and every later stage sits at or below the one
+  // before it. Nothing new is added to the payload: both fields are already
+  // in it (see .panel_table / .panel_meta in R/03c_funnel_panel_data.R).
+  // ---------------------------------------------------------------------------
+  function nWeightedOf(pd) {
+    var n = pd && pd.meta ? Number(pd.meta.n_weighted) : NaN;
+    return (isFinite(n) && n > 0) ? n : null;
+  }
+
+  /* Accepts either a payload cell (base_chain_filtered + the panel's
+     n_weighted) or a cell-like object rebuilt from the td's
+     data-fn-pct-chn attribute, which several call sites do. */
+  function chainPct(cell, nWeighted) {
     if (!cell) return null;
+    if (cell.pct_chain != null && !isNaN(cell.pct_chain)) return cell.pct_chain;
+    if (!nWeighted) return null;
+    var c = cell.base_chain_filtered;
+    if (c == null || isNaN(c)) return null;
+    return c / nWeighted;
+  }
+
+  /* Category average at the chain base: the view's formula applied per
+     brand and then averaged across brands, the same convention
+     .avg_all_brands_row() uses in R for the other three views. Keyed by
+     stage. */
+  function chainAvgByStage(cells, stageKeys, nWeighted) {
+    var out = {};
+    stageKeys.forEach(function(sk) {
+      var vals = [];
+      cells.forEach(function(c) {
+        if (c.stage_key !== sk) return;
+        var v = chainPct(c, nWeighted);
+        if (v != null && !isNaN(v)) vals.push(v);
+      });
+      out[sk] = vals.length
+        ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length
+        : null;
+    });
+    return out;
+  }
+
+  function cellValueForMode(cell, mode, awareStageKey, brandAwarePct,
+                            nWeighted) {
+    if (!cell) return null;
+    if (mode === "chain") {
+      var ch = chainPct(cell, nWeighted);
+      return ch != null ? ch : cell.pct_absolute;
+    }
     if (mode === "previous") {
       return cell.pct_nested != null ? cell.pct_nested : cell.pct_absolute;
     }
@@ -1985,12 +2257,20 @@
     if (!pd || !pd.table) return;
     var cells     = pd.table.cells     || [];
     var stageKeys = pd.table.stage_keys || [];
-    var mode      = (panel.__fnState && panel.__fnState.pctMode) || "total";
+    var mode      = (panel.__fnState && panel.__fnState.pctMode) || "chain";
+    var nWeightedSG = nWeightedOf(pd);
 
     // Always remove old arrows before re-rendering (toggle re-invokes us).
     panel.querySelectorAll(".ct-heatmap-cell .fn-sig-avg").forEach(function(a) {
       a.remove();
     });
+
+    /* The nested view carries no significance mark at all. This arrow is a
+       comparison against the spread of brands at the active base, and the
+       triangle beside it is the engine's test on each stage's own base;
+       neither was computed on the chain. Showing nothing is the honest
+       answer, and the drawer under the base toggle says so. */
+    if (mode === "chain") return;
 
     // Build aware-pct lookup once for "aware" mode.
     var awareStageKey = stageKeys[0];
@@ -2005,7 +2285,8 @@
       var vals = [];
       cells.forEach(function(c) {
         if (c.stage_key !== sk) return;
-        var v = cellValueForMode(c, mode, awareStageKey, brandAwarePct);
+        var v = cellValueForMode(c, mode, awareStageKey, brandAwarePct,
+                                 nWeightedSG);
         if (v != null && !isNaN(v)) vals.push(v);
       });
       if (vals.length < 2) return;
@@ -2029,14 +2310,17 @@
       var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
       var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
       var awV   = parseFloat(td.getAttribute("data-fn-pct-aw"));
+      var chnV  = parseFloat(td.getAttribute("data-fn-pct-chn"));
       var cell = {
         stage_key:    sk,
         brand_code:   brand,
         pct_absolute: isNaN(absV) ? null : absV,
         pct_nested:   isNaN(nesV) ? null : nesV,
-        pct_aware:    isNaN(awV)  ? null : awV
+        pct_aware:    isNaN(awV)  ? null : awV,
+        pct_chain:    isNaN(chnV) ? null : chnV
       };
-      var pct = cellValueForMode(cell, mode, awareStageKey, brandAwarePct);
+      var pct = cellValueForMode(cell, mode, awareStageKey, brandAwarePct,
+                                 nWeightedSG);
       if (pct == null || isNaN(pct)) return;
       var valEl = td.querySelector(".fn-pct-primary");
       if (!valEl) return;
@@ -2071,7 +2355,8 @@
     var cells       = pd.table.cells     || [];
     var stageKeys   = pd.table.stage_keys || [];
     if (cells.length === 0 || stageKeys.length === 0) return;
-    var pctMode     = (panel.__fnState && panel.__fnState.pctMode) || "total";
+    var pctMode     = (panel.__fnState && panel.__fnState.pctMode) || "chain";
+    var nWeightedAR = nWeightedOf(pd);
     var awareStage  = stageKeys[0];
 
     // brand \u2192 pct_absolute at stage 1 (used by cellValueForMode in aware mode)
@@ -2087,7 +2372,8 @@
       var vals = [];
       cells.forEach(function(c) {
         if (c.stage_key !== sk) return;
-        var v = cellValueForMode(c, pctMode, awareStage, brandAwarePct);
+        var v = cellValueForMode(c, pctMode, awareStage, brandAwarePct,
+                                 nWeightedAR);
         if (v != null && !isNaN(v)) vals.push(v);
       });
       var td = panel.querySelector(
@@ -2478,9 +2764,10 @@
   function initRelChart(panel) {
     if (!panel.querySelector("[data-fn-rel-chart]")) return;
     panel.__fnState.relEmphasisSet  = new Set();
-    /* Default to % of total: matches the funnel table's "% of total"
-       default so analysts read the two pages on the same denominator
-       before drilling into the conversion-from-aware view. */
+    /* The relationship view stays on % of total. Its rows are the six
+       attitude positions, not funnel stages, so there is no chain to
+       nest and the funnel table's new nested default does not apply
+       here. Left as it was. */
     panel.__fnState.relBase         = "total";
     panel.__fnState.relSortCol      = "brand";
     panel.__fnState.relSortDir      = "asc";
@@ -3408,5 +3695,17 @@
     svgEl.setAttribute("height", H);
     svgEl.innerHTML = parts.join("");
   }
+
+  /* Pure base-mode helpers, exposed for the node known-answer tests in
+     modules/brand/tests/js/test_funnel_nested.js. Nothing in the report
+     reads these; the panel calls them directly inside the closure. Same
+     arrangement as window.brsumDerive in brand_summary_panel.js. */
+  window.fnDerive = {
+    chainPct: chainPct,
+    chainAvgByStage: chainAvgByStage,
+    cellValueForMode: cellValueForMode,
+    baseModeLabelFor: baseModeLabelFor,
+    sigBadgeHtml: sigBadgeHtml
+  };
 
 })();
