@@ -213,9 +213,11 @@ These are outside the five-destination change but must keep working.
 | Brand Meaning | Brand Attitude, Brand Attributes, Word of Mouth | Branded Reach, full attribute matrices |
 | Audience | Demographics, Ad Hoc | Audience Lens, Shopper Behaviour |
 
-Twelve category sub-tabs plus eight Category Buying sub-sub-tabs, twenty
-destinations for the reader today, become five plus five drawers. Every one of
-the twenty appears exactly once in the table above.
+The reader faces nineteen places to click inside one category today: eleven of
+the twelve category sub-tabs are leaves, and the twelfth, Category Buying, opens
+eight more. They become five destinations, four of them with an Advanced drawer
+and the Overview with a "How this works" drawer instead. Every one of the
+nineteen appears exactly once in the table above.
 
 ## 9. Findings that need a ruling before Stage 2
 
