@@ -467,14 +467,24 @@ PARITY_WORKBOOKS <- c(
   "Parity_Crosstab_Config_NoPop.xlsx", "Parity_Crosstab_Config_Plain.xlsx"
 )
 
-#' Write the fixture workbooks if any of them is missing
+#' Write the fixture workbooks if any is missing or older than the generator
 #'
 #' The repo gitignores *.xlsx, so the workbooks are NOT committed. This
 #' generator is. Callers (the harness, the island regenerator) call this first;
 #' generation is deterministic, so a rebuilt workbook is the same workbook.
+#'
+#' A workbook older than the script that writes it is a STALE fixture, not a
+#' valid cache. Presence alone used to be the test, so a checkout that already
+#' had the workbooks kept running an older design of the fixture and failed the
+#' harness for a reason that had nothing to do with the code under test. Cheap
+#' to rule out: the whole set writes in about a second.
 ensure_parity_project <- function(dir = FIXTURE_DIR) {
-  present <- file.exists(file.path(dir, PARITY_WORKBOOKS))
-  if (!all(present)) generate_parity_project(dir)
+  files <- file.path(dir, PARITY_WORKBOOKS)
+  present <- file.exists(files)
+  script <- file.path(dir, "generate_parity_project.R")
+  stale <- all(present) && file.exists(script) &&
+    any(file.mtime(files) < file.mtime(script))
+  if (!all(present) || stale) generate_parity_project(dir)
   invisible(dir)
 }
 
