@@ -520,7 +520,9 @@ Programme as a **separate radio button question for each brand**. Questions appe
 | Options | `1` / I love it, it's my favourite · `2` / It's among the ones I prefer · `3` / I wouldn't usually consider it, but I would if no other option · `4` / I would refuse to buy this brand · `5` / I have no opinion / I don't know this brand |
 | OptionMapScale | `attitude_scale` |
 
-Repeat for each brand in the category. **All brands are shown regardless of awareness**. The "no opinion" option handles brands they don't know. This is the Romaniuk approach.
+Repeat for each brand in the category. As written above, **all brands are shown regardless of awareness**, with the "no opinion" option handling brands the respondent does not know. That is the Romaniuk approach and it gives you the attitude distribution for brands people cannot recall.
+
+> **DECIDE THIS BEFORE YOU BUILD IT.** An ungated attitude question means the funnel's stages were never routed, so Turas reports them as separate measures with conversion ratios and says on the face of the report that the nested funnel view is unavailable. If the client wants a funnel, gate this question on `BRANDAWARE_{CAT}` with Alchemer Show Logic. Read **ALCHEMER_GATING_GUIDE.md** in this directory first: it has the four rules, what gating costs you, and a middle path that keeps both.
 
 > **Alchemer tip:** Group all attitude questions for a category on one page with a shared intro: *"For each of the following brands, please indicate how you feel about it."*
 
@@ -553,6 +555,8 @@ On the Logic tab of `BRANDATT2_DSS_IPK`: - **Show this question if:** `BRANDATT1
 | Options | One option per brand. Option alias = brand code. Plus `NONE` = None of these. |
 | Exported columns | `BRANDPEN1_DSS_IPK`, `BRANDPEN1_DSS_ROB`, ... |
 
+> **For a measured funnel, pipe these options from `BRANDAWARE_{CAT}`** so a respondent can only report buying a brand they named as known. See ALCHEMER_GATING_GUIDE.md.
+
 ### 4d. Penetration: target window
 
 | Field | Value |
@@ -560,7 +564,7 @@ On the Logic tab of `BRANDATT2_DSS_IPK`: - **Show this question if:** `BRANDATT1
 | Question alias | `BRANDPEN2_{CAT}` (e.g. `BRANDPEN2_DSS`) |
 | Question type | Checkbox (multi-select) |
 | Question text | "And which have you bought in the last **[target_timeframe] months**?" |
-| Options | Brands only (subset of BRANDPEN1 answers ideally via Alchemer piping, or show all brands) |
+| Options | Brands only, piped from the `BRANDPEN1_{CAT}` answers. Not optional if you want a funnel: "bought in the last three months but not in the last twelve" is a routing failure, not a finding. See ALCHEMER_GATING_GUIDE.md. |
 | Exported columns | `BRANDPEN2_DSS_IPK`, `BRANDPEN2_DSS_ROB`, ... |
 
 ### 4e. Purchase frequency (per brand)

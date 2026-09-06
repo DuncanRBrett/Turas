@@ -387,3 +387,93 @@ they cannot drift again.
 
 Brand suite after Stage 3: **FAIL 0, WARN 1, SKIP 2, PASS 3360**. Node gate
 suite: 23, 40 and 116 assertions, 0 failed.
+
+---
+
+## Stage 4: the questionnaire guidance
+
+`modules/brand/docs/ALCHEMER_GATING_GUIDE.md`. Two pages, written for whoever
+programmes the next brand survey, on the assumption that a long document does
+not get read.
+
+Four rules: gate attitude on awareness, gate the longer purchase window on
+awareness, keep the target window piped from the longer one (which the
+template already calls "ideal" and which this makes mandatory), and do **not**
+gate purchase on attitude, because the gap between preference and purchase is
+one of the more useful things the funnel shows.
+
+What gating costs, said plainly: the attitude distribution for brands people
+do not recall, which is real information about a small brand's memory
+footprint and is why the CBM template asks the question of everyone. The guide
+names the Ehrenberg-Bass template it came from, by its path in this directory,
+and offers a middle path (gate the battery, add one ungated focal-brand
+attitude question in the ad-hoc section) that keeps both at the cost of one
+question. It also shows the console box to look for on soft-launch data, while
+the survey is still live and the logic can still be fixed.
+
+### The conflict this had to resolve rather than sit beside
+
+`ALCHEMER_PROGRAMMING_SPEC.md` section 4a says, in bold, "All brands are shown
+regardless of awareness ... This is the Romaniuk approach". A guide prescribing
+gating cannot simply be filed next to that: the next programmer follows the
+spec.
+
+So the spec now carries the decision at the three points where it is made.
+Section 4a keeps the ungated wording and adds a boxed note saying what an
+ungated attitude question does to the funnel report and pointing at the guide;
+section 4c gains a line about piping the long window from awareness; section
+4d turns "ideally via Alchemer piping" into a requirement with the reason.
+Nothing in the spec was deleted: both instruments remain legitimate, and the
+spec now makes the reader choose rather than defaulting them into one.
+
+### Two things the guide does not claim
+
+- The spec documents a **five-level** attitude scale (love, prefer,
+  ambivalent, refuse, no opinion) and Duncan's IPK 2026 instrument is
+  six-level with a price-conditional level at code 4. That gap is real and is
+  flagged in ROLE_REGISTRY.md §4.2, but rewriting the spec's scale is a larger
+  change than this task and was not made.
+- Nothing in the guide has been tested against a live Alchemer survey in this
+  session. The Turas behaviour it describes has been executed; the Alchemer
+  logic it prescribes is written from the spec's own routing patterns.
+
+---
+
+## Final state
+
+| Gate | Result |
+|---|---|
+| Brand suite, repo root | FAIL 0, WARN 1, SKIP 2, **PASS 3360** (baseline 3247) |
+| Node gate suite | 23, 40 and 116 assertions, 0 failed |
+| `drive_funnel_base.py` | 99 gated, 79 ungated, 0 failed |
+| `drive_overview.py` | 60 gated, 58 ungated, 0 failed |
+| `drive_destinations.py` | 353 on both, 0 failed |
+| `drive_two_categories.py` | 15 on both, 0 failed |
+| `drive_save_roundtrip.py` | 113 on both, 0 failed |
+| `reachability_check.py` | PASS, islands numerically identical, ADDITIVE untouched |
+
+The one WARN and the two SKIPs are the baseline's, unchanged.
+
+## Owed to Duncan
+
+1. **A `launch_turas()` run and an eyeball.** Everything here was generated to
+   a scratchpad. Nothing was written into OneDrive or TurasProjects, and the
+   real IPK config was never run.
+2. **The shared callout `brand.funnel`** in
+   `modules/shared/lib/callouts/callouts.json`, which this task may not touch.
+   It says the Prefer stage is the top two of the scale, says Turas refuses on
+   nesting violations, and describes three base toggles. All three are now
+   wrong. It needs a rewrite alongside the toggle-count fix the Stage 4
+   simplification log already owes.
+3. **A ruling on the six-level scale in ALCHEMER_PROGRAMMING_SPEC.md.** The
+   spec still documents the five-level version.
+4. **A decision on whether the IPK fixture should be regenerated on the
+   six-level scale.** It is five-level and declares no OptionMap, so the new
+   default's price-conditional level is dropped on every fixture run and the
+   six-level path is covered by unit tests only. Regenerating the fixture would
+   mean inventing price-conditional answers for an instrument that never asked
+   the question, which was not done.
+5. Then a review briefed as independent of this session.
+
+**Not merged and not pushed.** Branch `fix/brand-funnel-consideration`, four
+commits on top of 088736c9.
