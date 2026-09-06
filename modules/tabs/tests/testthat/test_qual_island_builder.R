@@ -211,6 +211,56 @@ test_that("demographic_cuts='safe' k-anonymises comment tags against min_reporti
   expect_equal(r4$demos$Tenure, "5yr")
 })
 
+test_that("demographic_cuts='safe' k-anonymises the CUT, not only the display tags", {
+  # The cut is what a live filter matches a comment on, and it is a different
+  # field from the display demographics. A client-safe build with an
+  # un-anonymised cut names one person as surely as a respondent record does:
+  # on SACS 2025, 57 of 144 tagged commenters were alone in their Campus,
+  # Department and Tenure combination. This is the property, stated once.
+  m <- list(id_to_idx = stats::setNames(0:3, as.character(1:4)), n = 4L)
+  q <- themed_question(list(mk_rec("1", "c1", themeVals = list(Service = 1L)),
+                            mk_rec("2", "c2", themeVals = list(Service = 1L)),
+                            mk_rec("3", "c3", themeVals = list(Service = 1L)),
+                            mk_rec("4", "c4", themeVals = list(Service = 1L))))
+  # Dept: three in level 1, one alone in level 2. Tenure: one alone in 7,
+  # three in 8. Every crossing of the two is a group of one or two.
+  levels <- list(Dept = c(1L, 1L, 1L, 2L), Tenure = c(7L, 8L, 8L, 8L))
+  k <- 2
+
+  loose <- qual_build_data_qual(list(q), m,
+    list(text_mode = "hidden", demographic_cuts = "allow", min_reporting_base = k),
+    cut_levels = levels)
+  # Every level ships, including the one that is a group of one.
+  expect_equal(first_record(loose$questions[[1]], 3L)$cut$Dept, 2L)
+  expect_equal(first_record(loose$questions[[1]], 0L)$cut$Tenure, 7L)
+
+  tight <- qual_build_data_qual(list(q), m,
+    list(text_mode = "hidden", demographic_cuts = "safe", min_reporting_base = k),
+    cut_levels = levels)
+  # Respondent 4 is alone in Dept 2, so that level is dropped and only the
+  # tenure it shares with two others survives.
+  r4 <- first_record(tight$questions[[1]], 3L)$cut
+  expect_null(r4$Dept)
+  expect_equal(r4$Tenure, 8L)
+  # Respondent 1 is one of three in Dept 1 but alone in Tenure 7.
+  r1 <- first_record(tight$questions[[1]], 0L)$cut
+  expect_equal(r1$Dept, 1L)
+  expect_null(r1$Tenure)
+
+  # The property as a reviewer would test it: every surviving cut describes a
+  # group of at least k people in the study, so no comment can be narrowed to
+  # one person by the levels it carries. Counted against the TRUE levels, which
+  # is what an extractor would be narrowing.
+  for (i in 0:3) {
+    cut <- first_record(tight$questions[[1]], i)$cut
+    if (is.null(cut) || !length(cut)) next
+    covered <- rep(TRUE, 4)
+    for (nm in names(cut)) covered <- covered & (levels[[nm]] == cut[[nm]])
+    expect_gte(sum(covered), k)
+  }
+})
+
+
 test_that("invalid text mode falls back to hidden; dials and defaults carried", {
   island <- qual_build_data_qual(list(themed_question(records)), master,
                                  list(text_mode = "bogus", demographic_cuts = "block",

@@ -144,6 +144,120 @@ tabs_delivery_interactivity <- function(config_obj,
 }
 
 
+#' Resolve the QUALITATIVE confidentiality dials one run actually builds
+#'
+#' The same floor rule as tabs_delivery_interactivity, applied to the two dials
+#' that decide what the comment island carries. It exists because the two were
+#' unconnected: a build could be told to carry no respondent records and still
+#' ship every comment tagged with the reader's full demographic triple, which
+#' names one person as surely as a record does. On the SACS 2025 build 57 of the
+#' 144 tagged commenters were the only person in their Campus, Department and
+#' Tenure combination, on a file whose crosstabs refuse any group under ten.
+#'
+#' Ordered least to most protected:
+#'   tags   allow    every tag ships
+#'          safe     k-anonymised: a comment keeps a tag only while the
+#'                   combination it belongs to still covers k people
+#'          block    no tags, so the comments cannot follow a filter at all
+#'   text   full     the raw verbatim
+#'          redacted direct identifiers (email, URL, phone) scrubbed
+#'          hidden   no text, counts and themes only
+#'
+#'   full                     no floor. The config's dials stand.
+#'   client_safe_interactive  tags to `safe`, text to `redacted`. `safe` and not
+#'                            `block` because this mode's promise is that the
+#'                            comments follow the filter, and blocking the tags
+#'                            withdraws that. Text is floored only off `full`:
+#'                            a curated excerpt is the point of the tab, and an
+#'                            email address in it is not.
+#'   client_safe_frozen       tags to `block`, text to `redacted`. Nothing in a
+#'                            frozen file can filter, so a tag serves no reader
+#'                            and is exposure with no function.
+#'
+#' `safe` is a promise about k, so it needs one. Where min_reporting_base is not
+#' above 1 a client-safe build floors the tags to `block` instead, which is the
+#' same trade tabs_delivery_interactivity makes when a cube is asked for without
+#' a threshold: strictly safer, and said out loud rather than assumed.
+#'
+#' @param config_obj The built config object.
+#' @param gui_mode The GUI's delivery mode, as tabs_delivery_interactivity takes.
+#'
+#' @return A list with structure:
+#'   \item{cuts}{"allow", "safe" or "block": the tag dial this run builds}
+#'   \item{text_mode}{"full", "redacted" or "hidden": the text dial}
+#'   \item{config_cuts}{What the config alone asked for}
+#'   \item{config_text_mode}{The same, for text}
+#'   \item{reason}{"config", "gui" or "needs_k": what decided the tag dial}
+#'
+#' @keywords internal
+TABS_QUAL_CUTS_RANK <- c(allow = 1L, safe = 2L, block = 3L)
+TABS_QUAL_TEXT_RANK <- c(full = 1L, redacted = 2L, hidden = 3L)
+
+tabs_delivery_qual_dials <- function(config_obj,
+                                     gui_mode = get0("TURAS_DELIVERY_MODE",
+                                                     envir = .GlobalEnv,
+                                                     ifnotfound = NA_character_)) {
+  cfg <- config_obj %||% list()
+  norm <- function(value, default, ranks) {
+    v <- tolower(trimws(as.character(value %||% default)[1]))
+    if (!length(v) || is.na(v) || !v %in% names(ranks)) default else v
+  }
+  # The same defaults the island builder applies, so this function and the
+  # thing it is describing can never disagree about an unset dial.
+  config_cuts <- norm(cfg$qual_demographic_cuts, "allow", TABS_QUAL_CUTS_RANK)
+  config_text <- norm(cfg$qual_confidentiality_mode, "hidden", TABS_QUAL_TEXT_RANK)
+
+  gui <- tolower(trimws(as.character(gui_mode %||% NA_character_)[1]))
+  client_safe <- gui %in% c("client_safe_interactive", "client_safe_frozen",
+                            "client_safe")
+  k <- suppressWarnings(as.numeric(cfg$min_reporting_base))
+  k_set <- length(k) == 1L && !is.na(k) && k > 1
+
+  cuts_floor <- if (!client_safe) NULL
+    else if (identical(gui, "client_safe_interactive")) {
+      # A promise about k needs a k. Without one, `safe` ships raw tags.
+      if (k_set) "safe" else "block"
+    } else "block"
+  text_floor <- if (client_safe) "redacted" else NULL
+
+  cuts <- config_cuts
+  reason <- "config"
+  if (!is.null(cuts_floor) &&
+      TABS_QUAL_CUTS_RANK[[cuts_floor]] > TABS_QUAL_CUTS_RANK[[cuts]]) {
+    cuts <- cuts_floor
+    reason <- if (identical(gui, "client_safe_interactive") && !k_set) "needs_k" else "gui"
+  }
+  text_mode <- config_text
+  if (!is.null(text_floor) &&
+      TABS_QUAL_TEXT_RANK[[text_floor]] > TABS_QUAL_TEXT_RANK[[text_mode]]) {
+    text_mode <- text_floor
+  }
+
+  list(cuts = cuts, text_mode = text_mode,
+       config_cuts = config_cuts, config_text_mode = config_text,
+       reason = reason)
+}
+
+
+#' Apply the qualitative floor to a config object
+#'
+#' Written back into the config so every reader downstream (the island builder,
+#' the manifest, the source-exposure warning) sees ONE set of values. A floor
+#' that only some readers honoured would put a manifest line and the file it
+#' describes out of step, which is the failure this whole layer exists to stop.
+#'
+#' @param config_obj The built config object.
+#' @param dials The result of tabs_delivery_qual_dials().
+#' @return The config object with the two dials set to their effective values.
+#' @keywords internal
+tabs_apply_qual_floor <- function(config_obj, dials) {
+  if (is.null(config_obj) || is.null(dials)) return(config_obj)
+  config_obj$qual_demographic_cuts <- dials$cuts
+  config_obj$qual_confidentiality_mode <- dials$text_mode
+  config_obj
+}
+
+
 #' Describe what a finished v2 build contains, as manifest lines
 #'
 #' @param micro The microdata island list from build_microdata(), or NULL.

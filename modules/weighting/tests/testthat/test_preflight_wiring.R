@@ -14,7 +14,7 @@
 #        engine read allow_unmatched / allow_empty_targets, so the refusal told
 #        the operator to set a flag that then changed nothing.
 
-turas_root <- rprojroot::find_root(rprojroot::has_dir(".git"))
+turas_root <- rprojroot::find_root(rprojroot::has_dir("modules"))
 wlib <- file.path(turas_root, "modules", "weighting", "lib")
 
 suppressWarnings({

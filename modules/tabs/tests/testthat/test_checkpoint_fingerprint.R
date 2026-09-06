@@ -11,7 +11,7 @@
 # temp directory. The pre-existing checkpoint tests assert on formals() and
 # deparse(body()), which pin signatures rather than behaviour.
 
-.ckpt_lib <- file.path(rprojroot::find_root(rprojroot::has_dir(".git")),
+.ckpt_lib <- file.path(rprojroot::find_root(rprojroot::has_dir("modules")),
                        "modules", "tabs", "lib")
 source(file.path(.ckpt_lib, "logging_utils.R"), local = FALSE)
 source(file.path(.ckpt_lib, "crosstabs", "checkpoint.R"), local = FALSE)
