@@ -287,7 +287,13 @@ test_that("the JS default agrees with what R rendered", {
                                   "html_report", "js",
                                   "brand_funnel_panel.js"),
                         warn = FALSE), collapse = "\n")
-  expect_true(grepl('pctMode: "chain"', js, fixed = TRUE))
+  # The default follows the gating flag, the same way R's active button does:
+  # the chain on a routed instrument, each stage on its own where the
+  # questionnaire asked every question of everyone.
+  expect_true(grepl('pctMode: isGated(payload) ? "chain" : "total"', js,
+                    fixed = TRUE))
+  expect_true(grepl("function isGated(payload)", js, fixed = TRUE))
+  expect_true(grepl("g.gated !== false", js, fixed = TRUE))
 })
 
 test_that("all four views are reachable and each names its computation", {

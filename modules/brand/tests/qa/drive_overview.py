@@ -280,8 +280,20 @@ DRIVER = """
     var brandSel = $('[data-brsum-brand]', root);
     var bcode = brandSel ? brandSel.value : null;
     if (fBody && fb && fb.available && bcode) {
-      check('the payload carries the nested series', !!fb.nested,
-            String(fb.nested));
+      // The Overview's mini funnel must agree with the funnel destination
+      // about which mode the report is in. On a routed survey both draw the
+      // nested chain; where the questionnaire asked every question of
+      // everyone, the funnel destination has no nested view and the
+      // Overview must not draw one either.
+      var fnIsland = $('script.fn-panel-data') || $('.fn-panel-data');
+      var fnPd = null;
+      try { fnPd = JSON.parse(fnIsland.textContent); } catch (e) { fnPd = null; }
+      var fnGated = !(fnPd && fnPd.meta && fnPd.meta.gating &&
+                      fnPd.meta.gating.gated === false);
+      check('the mini funnel agrees with the funnel destination on the mode',
+            !!fb.nested === fnGated,
+            'overview nested=' + String(fb.nested) + ', funnel gated=' +
+              String(fnGated));
       var series = (fb.nested && fb.brands_nested) ? fb.brands_nested[bcode]
                                                    : (fb.brands || {})[bcode];
       var shown = $$('.brsum-mf-focal .brsum-mf-pct', fBody)

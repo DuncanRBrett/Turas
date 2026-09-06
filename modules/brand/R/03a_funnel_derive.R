@@ -596,6 +596,114 @@ validate_nesting <- function(stages, weights = NULL) {
 
 
 # ==============================================================================
+# PUBLIC: detect_instrument_gating
+# ==============================================================================
+
+# Which stage each stage must sit inside if the QUESTIONNAIRE gated it. Every
+# stage is checked against awareness; these pairs are the extra within-window
+# checks the CBM template's own routing implies.
+#
+# Purchase is NOT checked against consideration. The template does not gate
+# buying on attitude and Turas does not ask it to: a respondent can buy a
+# brand they are lukewarm about. Checking that pair would report a properly
+# gated instrument as ungated.
+.FUNNEL_GATING_PAIRS <- list(
+  bought_target  = "bought_long",
+  long_tenured_d = "current_owner_d",
+  long_tenured_s = "current_customer_s"
+)
+
+#' Did the questionnaire gate the funnel questions, or not?
+#'
+#' A nested funnel drawn from ungated questions is a picture of an ordering
+#' the survey never enforced. This decides which of the two the report is
+#' entitled to draw, and it decides it from the respondent rows rather than
+#' from the aggregate totals.
+#'
+#' The aggregate test (does any brand's consideration count exceed its
+#' awareness count) misses the common case: an ungated instrument where every
+#' brand still happens to read lower at the later stage, which would then draw
+#' a nested funnel from ungated questions, the thing this exists to prevent.
+#' A single respondent who is at a later stage without being at the earlier
+#' one is proof the instrument did not route, because skip logic makes that
+#' row impossible. That test subsumes the aggregate one.
+#'
+#' Head counts throughout. Weighting is a property of the sample, not of the
+#' questionnaire, and a fractional weight cannot make an impossible row
+#' possible.
+#'
+#' Brands whose column is entirely NA at either stage are skipped, the same
+#' exclusion \code{validate_nesting()} makes and for the same reason: the
+#' brand has no data column for that stage, so there is nothing to check.
+#'
+#' @param stages Named list from \code{derive_funnel_stages()$stages}.
+#' @param aware_key Character. The awareness stage's key.
+#'
+#' @return List with:
+#'   \item{gated}{TRUE when no respondent sits at a later stage without the
+#'     earlier one, for every checked pair.}
+#'   \item{mode}{"nested" or "separate".}
+#'   \item{breaches}{Data frame: stage_key, against, brand_code, n_respondents.}
+#'   \item{breach_stages}{Character vector of the stage keys involved.}
+#'   \item{checked}{Data frame of the pairs actually tested.}
+#'
+#' @export
+detect_instrument_gating <- function(stages, aware_key = "aware") {
+  empty <- data.frame(stage_key = character(0), against = character(0),
+                      brand_code = character(0), n_respondents = integer(0),
+                      stringsAsFactors = FALSE)
+  keys <- names(stages)
+  if (length(keys) < 2 || !(aware_key %in% keys)) {
+    return(list(gated = TRUE, mode = "nested", breaches = empty,
+                breach_stages = character(0), checked = empty[, 1:2]))
+  }
+
+  pairs <- list()
+  for (k in setdiff(keys, aware_key)) {
+    pairs[[length(pairs) + 1]] <- c(k, aware_key)
+    inner <- .FUNNEL_GATING_PAIRS[[k]]
+    if (!is.null(inner) && inner %in% keys) {
+      pairs[[length(pairs) + 1]] <- c(k, inner)
+    }
+  }
+
+  rows <- list()
+  for (p in pairs) {
+    curr <- stages[[p[1]]]$matrix
+    prev <- stages[[p[2]]]$matrix
+    if (is.null(curr) || is.null(prev)) next
+    brands <- intersect(colnames(curr), colnames(prev))
+    for (b in brands) {
+      cv <- curr[, b]
+      pv <- prev[, b]
+      if (all(is.na(cv)) || all(is.na(pv))) next
+      # A respondent at the later stage who is not at the earlier one. NA at
+      # the later stage is not a breach; NA at the earlier one is not
+      # evidence of an answer, so it is not counted either.
+      n <- sum(!is.na(cv) & cv & !is.na(pv) & !pv)
+      if (n > 0) {
+        rows[[length(rows) + 1]] <- data.frame(
+          stage_key = p[1], against = p[2], brand_code = b,
+          n_respondents = as.integer(n), stringsAsFactors = FALSE)
+      }
+    }
+  }
+
+  breaches <- if (length(rows) == 0) empty else do.call(rbind, rows)
+  gated <- nrow(breaches) == 0
+  checked <- data.frame(
+    stage_key = vapply(pairs, `[`, character(1), 1),
+    against   = vapply(pairs, `[`, character(1), 2),
+    stringsAsFactors = FALSE)
+  list(gated = gated,
+       mode = if (gated) "nested" else "separate",
+       breaches = breaches,
+       breach_stages = unique(breaches$stage_key),
+       checked = checked)
+}
+
+
+# ==============================================================================
 # INTERNAL: ARG CHECKS
 # ==============================================================================
 

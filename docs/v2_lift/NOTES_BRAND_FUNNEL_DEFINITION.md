@@ -244,3 +244,146 @@ already lists the toggle count as owed; the consideration set is a second
 reason to rewrite that entry.
 
 Brand suite after Stage 2: **FAIL 0, WARN 1, SKIP 2, PASS 3276**.
+
+---
+
+## Stage 3: whether the questionnaire gated the questions decides the report
+
+Turas must not draw a nested funnel from ungated questions, because the
+picture asserts an ordering the survey never enforced.
+`detect_instrument_gating()` in `03a_funnel_derive.R` decides which of the two
+reports the reader gets.
+
+### The rule, and a deviation from the brief worth flagging
+
+The brief's rule is aggregate: if any brand's consideration exceeds its
+awareness, the questions were not gated. **That rule misses the case it
+matters most for.** An ungated instrument can easily produce totals that fall
+at every stage for every brand, and a nested funnel drawn from it would look
+perfectly well behaved. The implemented rule is respondent level: count
+respondents who sit at a later stage without the earlier one. Routing makes
+such a row impossible, so one row is proof. It subsumes the aggregate rule,
+because a brand whose later count exceeds its earlier one must contain at
+least one such row.
+
+Head counts, not weighted. Weighting is a property of the sample, not of the
+questionnaire, and a fractional weight cannot make an impossible row possible.
+Brands whose column is entirely NA at either stage are skipped, the same
+exclusion `validate_nesting()` makes.
+
+**Pairs tested:** every stage against awareness, plus the target purchase
+window against the longer one, and long tenure against current ownership. Not
+purchase against consideration: the CBM template does not gate buying on
+attitude, and checking that pair would report a properly gated instrument as
+ungated. The gated unit fixture proves this, with respondents who bought a
+brand they were lukewarm about and no breach reported.
+
+### What the two modes look like
+
+| | Gated | Ungated |
+|---|---|---|
+| Notice on the page | "Nested funnel" | "Separate measures" |
+| "Funnel, % of all" toggle | rendered, active on load | not rendered at all |
+| Default view | the nested chain | each stage on its own |
+| "% of those aware" | present | present |
+| "% of previous stage" | present | present |
+| Table cells before any script runs | chain figure | each stage's own figure |
+| Overview mini funnel | nested series | absolute series |
+| `data-fn-pct-chn` on each cell | the chain | equals `data-fn-pct-abs` |
+
+The cumulative counts stay in the payload in both modes, because "% of
+previous stage" and "% of those aware" are the two conversion ratios the
+brief asks the separate-measures report to carry, and both are honest
+intersections rather than routing claims. What the ungated report withholds
+is the "% of all" chain view, the one that draws the whole funnel as a
+shrinking bar of the sample.
+
+The notice sits outside `.fn-controls`, next to the control it explains, for
+the same reason `.fn_base_howto()` does: the controls bar is hidden in print
+and a reader with a printed page cannot open a drawer.
+
+### The reachability gate is honoured, not amended
+
+`reachability_check.py` compares the numeric content of every JSON island on
+exact equality, and the gating finding rides in the funnel payload. So the
+on-page statement is **digit free** by design, and a testthat case asserts it
+stays that way in both modes. The counts behind it go to the console and to
+`meta$gating`, not into the island.
+
+Executed: `python3 reachability_check.py report_baseline.html
+report_gated.html`, where the baseline was generated from a `git archive` of
+088736c9 into a scratch tree. **Result: PASS**, with `fn-panel-data` and every
+other island reported as "numeric content identical". No entry was added to
+`ADDITIVE`.
+
+### Proved both ways, on rendered reports
+
+Two reports, both generated to the scratchpad only, neither written into the
+repo or any project folder.
+
+- **Gated: the IPK fixture itself.** `detect_instrument_gating()` reports
+  `gated = TRUE`, mode nested, no breaches. Its generator routes the attitude
+  question on awareness, and its purchase picks sit inside awareness. The
+  report renders the nested notice, keeps the chain toggle active on load, and
+  the mini funnel keeps its nested series.
+- **Ungated: a scratch copy of the fixture.** The three fixture files were
+  copied to the scratchpad and the data workbook rebuilt from scratch with
+  `turas_saveWorkbook()`, never `loadWorkbook()` plus save. 135 attitude cells
+  that the gated instrument had left at no-opinion for brands the respondent
+  never named were set to Love, a fixed every-twentieth selection. The console
+  then reports "135 respondent rows across 15 brands" at the consideration
+  stage, the report renders the ungated notice, carries **no** chain button,
+  and defaults to each stage on its own.
+
+### QA scripts
+
+Run against both reports.
+
+| Script | Gated | Ungated |
+|---|---|---|
+| `drive_funnel_base.py` | 99 checks, 0 failed | 79 checks, 0 failed |
+| `drive_overview.py` | 60 checks, 0 failed | 58 checks, 0 failed |
+| `drive_destinations.py` | 353 checks, 0 failed | 353 checks, 0 failed |
+| `drive_two_categories.py` | 15 checks, 0 failed | 15 checks, 0 failed |
+| `drive_save_roundtrip.py` | 113 checks, 0 failed | 113 checks, 0 failed |
+| `reachability_check.py` | PASS against the 088736c9 baseline | not applicable |
+
+Two of them needed changing, and both changes are the gate becoming
+mode-aware rather than the gate being weakened.
+
+- `drive_funnel_base.py` asserted the nested view was active on load and that
+  four toggles existed. It now reads the gating flag from the payload, expects
+  the right default and the right toggle set for each mode, checks that the
+  page carries a notice whose label agrees with the payload and whose text is
+  a reason rather than a label, and in the ungated mode checks that no
+  rendered cell carries a chain figure of its own and that the chain view
+  cannot be reached from the controls.
+- `drive_overview.py` asserted the Overview payload always carries the nested
+  series. It now asserts the Overview and the funnel destination **agree**
+  about the mode. That check caught a real contradiction: the Overview's mini
+  funnel was still drawing the nested chain on the ungated report while the
+  funnel destination said the nested view was unavailable. Fixed in
+  `14_summary_panel.R`, which now drops the nested series when the funnel
+  reports ungated.
+
+### Two stale claims corrected on the way
+
+- `.panel_about$methodology_note` said Turas "refuses to render brands whose
+  aggregate stage counts violate nesting". It does not, and has not since
+  2026-05-24. It now states the gating finding and says non-nesting brands are
+  reported as recorded.
+- FUNNEL_SPEC_v2.md §3.4 said the stages were nested by construction and that
+  a violation refuses with `CALC_NESTING_VIOLATED`. Rewritten to describe the
+  two checks that actually run and what each one does.
+
+### A label bug found while checking the rendered report
+
+The generated report still said "Prefer" after the Stage 2 default changed.
+`03c_funnel_panel_data.R` and `03d_funnel_output.R` each carry their own copy
+of the stage-label table, both commented "must mirror
+.FUNNEL_DEFAULT_LABELS", and neither did. Both corrected, and
+`test_funnel_consideration_roles.R` now holds the three tables together so
+they cannot drift again.
+
+Brand suite after Stage 3: **FAIL 0, WARN 1, SKIP 2, PASS 3360**. Node gate
+suite: 23, 40 and 116 assertions, 0 failed.

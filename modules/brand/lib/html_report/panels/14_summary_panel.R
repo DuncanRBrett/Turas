@@ -985,8 +985,15 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   # the absolute series and says so in its own base line, rather than
   # showing a shape it cannot support.
   # ---------------------------------------------------------------------
+  # ...and not at all where the questionnaire did not route the questions.
+  # The funnel destination drops its nested view on such a survey, and the
+  # Overview has to drop the mini funnel's nested series with it, or the two
+  # pages contradict each other on the same data. The absolute series and its
+  # own base line are what remain. See detect_instrument_gating() in
+  # R/03a_funnel_derive.R.
+  gated <- is.null(fn$meta$gating) || isTRUE(fn$meta$gating$gated)
   n_w <- suppressWarnings(as.numeric(fn$meta$n_weighted %||% NA_real_))
-  has_chain <- "base_chain_filtered" %in% names(st) &&
+  has_chain <- gated && "base_chain_filtered" %in% names(st) &&
                is.finite(n_w) && n_w > 0
   nested_map <- NULL
   cat_avg_nested <- NULL

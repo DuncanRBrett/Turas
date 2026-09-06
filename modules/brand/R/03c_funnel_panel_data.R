@@ -78,7 +78,13 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     stage_count = length(stage_keys),
     stage_keys = stage_keys,
     stage_labels = .stage_labels_for(stage_keys, overrides = lbl_overrides),
-    stage_definitions = .stage_definitions_for(stage_keys, def_overrides)
+    stage_definitions = .stage_definitions_for(stage_keys, def_overrides),
+    # Which mode the funnel is in, and why, in the words the reader sees.
+    # The JS reads $gated to decide whether the nested base toggle exists;
+    # the panel prints $statement above the table.
+    gating = result$meta$gating %||%
+      list(gated = TRUE, mode = "nested", breach_stages = character(0),
+           statement = "")
   )
 }
 
@@ -449,15 +455,14 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   list(
     question_texts = .question_texts_from_warnings(result),
     methodology_note = paste(
-      "Each stage is measured by its own survey question, \"which of these",
+      "Each stage is measured by its own survey question: \"which of these",
       "brands have you heard of?\", the per-brand attitude question (\"how do",
-      "you feel about [brand]?\"), \"bought in the last 12 months\", and",
-      "\"bought in the last 3 months\", not by routing or skip logic.",
-      "Aggregate counts almost always nest because most respondents are",
-      "coherent, and Turas refuses to render brands whose aggregate stage",
-      "counts violate nesting. Conversion ratios are aggregate ratios",
-      "(total at stage N divided by total at stage N-1), not individual",
-      "respondent transitions."),
+      "you feel about [brand]?\"), and the two buying questions.",
+      .funnel_about_gating_note(result),
+      "Brands whose stage counts do not nest are reported as recorded, with",
+      "a warning; nothing is clamped and nothing is dropped. Conversion",
+      "ratios are aggregate ratios (total at one stage divided by the total",
+      "at the stage before it), not individual respondent transitions."),
     base_note = sprintf(
       "Base: n = %d unweighted, %.1f weighted, %.1f effective (Kish). Focal brand: %s.",
       result$meta$n_unweighted, result$meta$n_weighted,
@@ -506,7 +511,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   # Must mirror .FUNNEL_DEFAULT_LABELS in 03a_funnel_derive.R.
   labels <- c(
     aware              = "Aware",
-    consideration      = "Prefer",
+    consideration      = "Consider",
     bought_long        = "Long Period",
     bought_target      = "Target Period",
     current_owner_d    = "Current owner",
@@ -596,6 +601,18 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   if (nrow(row) == 0) return("not_sig")
   if (!isTRUE(row$significant)) return("not_sig")
   row$direction[1]
+}
+
+
+#' The gating finding, for the About drawer's methodology paragraph
+#' @keywords internal
+.funnel_about_gating_note <- function(result) {
+  g <- result$meta$gating
+  if (is.null(g) || !nzchar(g$statement %||% "")) {
+    return(paste("Whether the questionnaire routed those questions decides",
+                 "whether the stages nest."))
+  }
+  g$statement
 }
 
 

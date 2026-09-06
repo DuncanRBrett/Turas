@@ -43,8 +43,16 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   # n_weighted is the same denominator pct_absolute uses, so the view needs
   # no new engine number. See .fn_chain_pct().
   n_weighted <- as.numeric(pd$meta$n_weighted %||% NA_real_)
+  # On a survey whose questionnaire did not route the funnel questions there
+  # is no chain to draw: the ordering it would assert is one the survey never
+  # enforced. Withholding the denominator is what switches every cell, the
+  # category-average row and the sort keys onto each stage's own figure, which
+  # is also what the base toggle defaults to and what the reader sees before
+  # any script runs. See detect_instrument_gating() in 03a_funnel_derive.R.
+  gated <- is.null(pd$meta$gating) || isTRUE(pd$meta$gating$gated)
+  chain_denom <- if (gated) n_weighted else NA_real_
   chain_avg  <- .fn_chain_stats_by_stage(table$cells, stage_keys, brand_codes,
-                                         n_weighted)
+                                         chain_denom)
 
   paste0(
     '<section class="fn-section fn-table-section">',
@@ -55,10 +63,10 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     .fn_row_base(stage_keys, table$cells, brand_codes,
                  n_total = pd$meta$n_unweighted),
     .fn_row_focal(stage_keys, focal, brand_names[match(focal, brand_codes)],
-                  table$cells, focal_colour, col_max, n_weighted),
+                  table$cells, focal_colour, col_max, chain_denom),
     .fn_row_avg_all(stage_keys, table$avg_all_brands, col_max, chain_avg),
     .fn_rows_competitors(stage_keys, brand_codes, brand_names, focal,
-                         table$cells, col_max, n_weighted),
+                         table$cells, col_max, chain_denom),
     '</tbody></table></div>',
     '</section>'
   )

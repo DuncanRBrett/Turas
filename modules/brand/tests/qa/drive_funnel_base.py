@@ -142,16 +142,38 @@ DRIVER = """
       };
     });
 
+    // ---- Which mode the report is in ----------------------------------
+    // The nested chain exists only where the questionnaire routed the
+    // questions. On an ungated instrument R renders no chain button, the
+    // default is each stage on its own, and the page says why. Both modes
+    // are driven here, so this gate covers whichever the report is in.
+    var gated = !(pd.meta.gating && pd.meta.gating.gated === false);
+    out.gated = gated;
+    var notice = $('[data-fn-gating]', panel);
+    check('the panel says on its face which mode it is in', !!notice,
+          notice ? notice.getAttribute('data-fn-gating') : 'none');
+    check('the notice agrees with the payload',
+          !!notice && notice.getAttribute('data-fn-gating') ===
+            (gated ? 'gated' : 'ungated'));
+    check('the notice gives a reason, not just a label',
+          !!notice && txt(notice).length > 60, notice ? txt(notice) : 'none');
+
+    var defaultMode = gated ? 'chain' : 'total';
+    var defaultField = gated ? 'chain' : 'abs';
+
     // ---- The default view --------------------------------------------
     var active = $('.fn-base-switcher .sig-btn-active', panel);
     check('a base toggle is active on load', !!active);
-    check('the active toggle on load is the nested funnel',
-          !!active && active.getAttribute('data-fn-pctmode') === 'chain',
-          active ? active.getAttribute('data-fn-pctmode') : 'none');
-    check('the active toggle is the only one that says funnel',
+    check('the active toggle on load is the default for this mode',
+          !!active && active.getAttribute('data-fn-pctmode') === defaultMode,
+          (active ? active.getAttribute('data-fn-pctmode') : 'none') +
+            ', expected ' + defaultMode);
+    check('at most one toggle says funnel',
           $$('.fn-base-switcher .sig-btn', panel).filter(function (b) {
             return /funnel/i.test(txt(b));
-          }).length === 1);
+          }).length === (gated ? 1 : 0));
+    check('the chain toggle is offered only where the survey routed',
+          !!$('.fn-base-switcher [data-fn-pctmode="chain"]', panel) === gated);
 
     var row = $('tr.fn-row-focal', panel);
     check('the focal row is in the table', !!row);
@@ -177,18 +199,19 @@ DRIVER = """
     }
 
     var modes = [
-      { mode: 'chain',    field: 'chain' },
       { mode: 'total',    field: 'abs' },
       { mode: 'previous', field: 'nested' },
       { mode: 'aware',    field: 'aware' }
     ];
+    if (gated) modes.unshift({ mode: 'chain', field: 'chain' });
 
     // Load state first, without clicking anything.
     var onLoad = readRow();
     stageKeys.forEach(function (k) {
-      check('on load, ' + k + ' shows the nested figure',
-            onLoad[k] === pct(want[k].chain),
-            'screen ' + onLoad[k] + ', payload ' + pct(want[k].chain));
+      var expect = pct(want[k][defaultField]);
+      check('on load, ' + k + ' shows the ' + defaultMode + ' figure',
+            onLoad[k] === expect,
+            'screen ' + onLoad[k] + ', payload ' + expect);
     });
 
     // The chain must not rise; the absolute view on this data must rise
@@ -200,10 +223,32 @@ DRIVER = """
       if (chainVals[i] > chainVals[i - 1] + 1e-9) chainRises = true;
       if (absVals[i] > absVals[i - 1] + 1e-9) absRises = true;
     }
-    check('the nested chain never rises', !chainRises,
-          chainVals.map(function (v) { return pct(v); }).join(' '));
-    check('the two views differ somewhere on this report',
-          JSON.stringify(chainVals) !== JSON.stringify(absVals));
+    if (gated) {
+      check('the nested chain never rises', !chainRises,
+            chainVals.map(function (v) { return pct(v); }).join(' '));
+      check('the two views differ somewhere on this report',
+            JSON.stringify(chainVals) !== JSON.stringify(absVals));
+    } else {
+      // The cumulative counts stay in the payload, because "% of previous"
+      // and "% of those aware" are the conversion ratios this mode reports
+      // and both are honest intersections. What must not survive is the
+      // "% of all" view, which draws the chain as the whole funnel. So the
+      // rendered cells carry no chain figure of their own: every
+      // data-fn-pct-chn equals its cell's own data-fn-pct-abs.
+      var chainAttrsMatchAbs = true, sampled = 0;
+      $$('tr.fn-row-focal td[data-fn-stage], tr.fn-row-competitor td[data-fn-stage]',
+         panel).forEach(function (td) {
+        var chn = td.getAttribute('data-fn-pct-chn');
+        var abs = td.getAttribute('data-fn-pct-abs');
+        if (chn == null || abs == null) return;
+        sampled += 1;
+        if (chn !== abs) chainAttrsMatchAbs = false;
+      });
+      check('no rendered cell carries a chain figure of its own',
+            sampled > 0 && chainAttrsMatchAbs, sampled + ' cells sampled');
+      check('and the chain view cannot be reached from the controls',
+            !$('.fn-base-switcher [data-fn-pctmode="chain"]', panel));
+    }
 
     // ---- Each toggle -------------------------------------------------
     modes.forEach(function (m) {
@@ -360,8 +405,9 @@ DRIVER = """
       ? (captured.match(/class="mode"[^>]*>([^<]*)</) || [])[1] : null;
     out.exportBase = baseRow || null;
     check('the Excel export carries a base line', !!baseRow, baseRow || 'none');
-    check('the export names the nested view it was taken in',
-          !!baseRow && /nested funnel/i.test(baseRow), baseRow || 'none');
+    check('the export names the view it was taken in',
+          !!baseRow && (gated ? /nested funnel/i : /of those aware/i)
+            .test(baseRow), baseRow || 'none');
 
     check('no console error and no uncaught exception', qa.errors.length === 0,
           qa.errors.slice(0, 3).join(' | '));

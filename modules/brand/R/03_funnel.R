@@ -88,6 +88,11 @@ run_funnel <- function(data, role_map, brand_list, config,
     derived$warnings <- c(derived$warnings, nesting_check$warnings)
   }
 
+  # Did the questionnaire route these questions, or ask them all of everyone?
+  # The answer decides whether the report may draw a nested funnel at all.
+  gating <- detect_instrument_gating(derived$stages)
+  .funnel_report_gating(gating, cat_code)
+
   stage_df <- calculate_stage_metrics(
     stages        = derived$stages,
     weights       = weights,
@@ -127,7 +132,7 @@ run_funnel <- function(data, role_map, brand_list, config,
     sig_results = sig_df,
     metrics_summary = summary_list,
     warnings = derived$warnings,
-    meta = .funnel_meta(config, focal_brand, data, weights, derived),
+    meta = .funnel_meta(config, focal_brand, data, weights, derived, gating),
     # Role map retained so downstream writers (Excel + CSV) can carry
     # ClientCode + QuestionText onto every row without re-resolving.
     role_map = role_map
@@ -256,7 +261,44 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
 }
 
 
-.funnel_meta <- function(config, focal_brand, data, weights, derived) {
+#' Stage labels used in the gating sentence, without the report's overrides
+#' @keywords internal
+.funnel_plain_stage_label <- function(key) {
+  tolower(.FUNNEL_DEFAULT_LABELS[[key]] %||% key)
+}
+
+
+#' The gating finding in plain words, for the face of the report
+#'
+#' Digit free on purpose. The reachability gate in
+#' modules/brand/tests/qa/reachability_check.py compares the numeric content
+#' of every JSON island, and this sentence rides in the funnel payload. The
+#' counts behind it go to the console and to the meta the operator reads, not
+#' into the island.
+#' @keywords internal
+.funnel_gating_sentence <- function(gating) {
+  if (isTRUE(gating$gated)) {
+    return(paste(
+      "The questionnaire routed these questions, so the stages nest and the",
+      "funnel is drawn as a funnel. No respondent reached a later stage",
+      "without the one before it."))
+  }
+  stages <- unique(gating$breaches$stage_key)
+  labels <- paste(vapply(stages, .funnel_plain_stage_label, character(1)),
+                  collapse = " and ")
+  paste0(
+    "The questionnaire did not route these questions: it asked every one of ",
+    "them about every brand. Respondents reached ", labels, " for brands ",
+    "they did not name as known, which routing would have made impossible. ",
+    "So the stages are reported as separate measures, each on its own base, ",
+    "with the conversion ratios beside them. The nested funnel view is not ",
+    "available here, because a nested picture would show an ordering the ",
+    "survey never enforced.")
+}
+
+
+.funnel_meta <- function(config, focal_brand, data, weights, derived,
+                         gating = NULL) {
   n_u <- nrow(data)
   n_w <- if (is.null(weights)) n_u else sum(weights, na.rm = TRUE)
   # Kish effective n: the base every CI in the panel is computed on (H2)
@@ -278,8 +320,47 @@ build_metrics_summary <- function(stage_df, conv_df, att_df, focal_brand) {
       roles_dropped = derived$consideration$roles_dropped %||% character(0),
       source        = derived$consideration$source %||% "roles",
       notes         = derived$consideration$notes %||% character(0)
+    ),
+    # Whether the instrument gated the questions, and therefore whether the
+    # report may draw a nested funnel. See detect_instrument_gating().
+    gating = list(
+      gated         = isTRUE(gating$gated %||% TRUE),
+      mode          = gating$mode %||% "nested",
+      breach_stages = gating$breach_stages %||% character(0),
+      statement     = .funnel_gating_sentence(
+        gating %||% list(gated = TRUE))
     )
   )
+}
+
+
+#' Print the gating finding to the console
+#'
+#' The counts live here rather than in the payload: the reachability gate
+#' compares island numbers, and the on-page statement is deliberately digit
+#' free.
+#' @keywords internal
+.funnel_report_gating <- function(gating, cat_code) {
+  if (isTRUE(gating$gated)) return(invisible(FALSE))
+  cat("\n=== TURAS BRAND: FUNNEL NOT GATED ===\n")
+  cat("Category:", cat_code %||% "(single category)", "\n")
+  cat("The questionnaire asked the funnel questions of everyone, so the",
+      "stages do not nest.\n")
+  cat("Respondents at a later stage without the earlier one:\n")
+  b <- gating$breaches
+  agg <- stats::aggregate(b$n_respondents,
+                          by = list(stage = b$stage_key, against = b$against),
+                          FUN = sum)
+  for (i in seq_len(nrow(agg))) {
+    cat(sprintf("  %-16s not %-16s %d respondent rows across %d brands\n",
+                agg$stage[i], agg$against[i], agg$x[i],
+                sum(b$stage_key == agg$stage[i] &
+                      b$against == agg$against[i])))
+  }
+  cat("The report shows the stages as separate measures with conversion",
+      "ratios, not a nested funnel.\n")
+  cat("=====================================\n\n")
+  invisible(TRUE)
 }
 
 

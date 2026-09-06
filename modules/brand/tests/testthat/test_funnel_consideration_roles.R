@@ -366,3 +366,19 @@ test_that("A five-level scale drops the price level and reports it", {
 test_that("The Consider stage is labelled Consider, not Prefer", {
   expect_equal(.FUNNEL_DEFAULT_LABELS$consideration, "Consider")
 })
+
+
+test_that("The three stage-label tables still agree with one another", {
+  # 03c_funnel_panel_data.R and 03d_funnel_output.R each carry their own copy
+  # of the label table, both commented "must mirror .FUNNEL_DEFAULT_LABELS".
+  # They did not, which is how the report kept saying Prefer after the
+  # default changed. This holds them together.
+  source(file.path(ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"),
+         local = TRUE)
+  source(file.path(ROOT, "modules", "brand", "R", "03d_funnel_output.R"),
+         local = TRUE)
+  for (k in names(.FUNNEL_DEFAULT_LABELS)) {
+    expect_equal(.stage_label(k), .FUNNEL_DEFAULT_LABELS[[k]], info = k)
+    expect_equal(.stage_label_export(k), .FUNNEL_DEFAULT_LABELS[[k]], info = k)
+  }
+})

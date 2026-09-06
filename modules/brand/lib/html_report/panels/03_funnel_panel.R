@@ -101,8 +101,11 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
       .fn_table_controls(panel_data),
       # Sits outside .fn-controls on purpose: the controls bar is hidden in
       # print, and a reader with a printed page cannot open a drawer, so the
-      # explanation of the base has to survive the print rule.
-      .fn_base_howto(),
+      # explanation of the base has to survive the print rule. The gating
+      # statement is here for the same reason, and above the how-this-works
+      # drawer because it decides which views exist.
+      .fn_gating_notice(panel_data),
+      .fn_base_howto(panel_data),
       .fn_table_section(panel_data, focal_colour),
       '<div class="fn-mf-section-heading">Mini Funnels</div>',
       '<div class="fn-mini-funnels-view" data-fn-view="minifunnels"></div>',
@@ -226,6 +229,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 .fn_table_controls <- function(pd) {
   # BrandSelector trigger lives in .fn_focus_bar (next to the focal-brand
   # <select>), see Demographics / WoM / Cat Buying for the same pattern.
+  g <- (pd$meta %||% list())$gating
+  gated <- is.null(g) || isTRUE(g$gated)
 
   paste0(
     '<div class="fn-controls controls-bar">',
@@ -240,11 +245,20 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     # data-fn-pctmode, and the pin and PNG exporters read the active
     # button's text through brReadBaseLabel(), so these labels have to read
     # as a base after the word "Base:".
+    # The nested chain is offered only when the questionnaire routed the
+    # questions. On an ungated instrument the chain would assert an ordering
+    # the survey never enforced, so the button is not rendered at all and
+    # "Each stage on its own" is the active default, with the two conversion
+    # ratios beside it. See .fn_gating_notice() and detect_instrument_gating().
     '<div class="sig-level-switcher fn-base-switcher" role="group" aria-label="Percentage base">',
     '<span class="sig-level-label">Base:</span>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="pctmode" data-fn-pctmode="chain" aria-pressed="true" title="The nested funnel. Each stage counts respondents who passed every earlier stage, as a percentage of all respondents.">Funnel, % of all</button>',
-    '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="total" aria-pressed="false" title="Each stage on its own survey response, as a percentage of all respondents. The stages are not chained, so a later stage can read higher than an earlier one.">Each stage on its own</button>',
-    '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="previous" aria-pressed="false" title="Each stage as a percentage of the stage before it, along the same chain the nested view uses.">% of previous stage</button>',
+    if (gated)
+      '<button type="button" class="sig-btn sig-btn-active" data-fn-action="pctmode" data-fn-pctmode="chain" aria-pressed="true" title="The nested funnel. Each stage counts respondents who passed every earlier stage, as a percentage of all respondents.">Funnel, % of all</button>'
+    else "",
+    sprintf('<button type="button" class="sig-btn%s" data-fn-action="pctmode" data-fn-pctmode="total" aria-pressed="%s" title="Each stage on its own survey response, as a percentage of all respondents. The stages are not chained, so a later stage can read higher than an earlier one.">Each stage on its own</button>',
+            if (gated) "" else " sig-btn-active",
+            if (gated) "false" else "true"),
+    '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="previous" aria-pressed="false" title="Each stage as a percentage of the stage before it. On a routed survey this walks the nested chain; where the survey did not route, it is the plain step-to-step ratio.">% of previous stage</button>',
     '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="aware" aria-pressed="false" title="Each stage crossed with awareness and divided by the aware count. Awareness pinned to 100%. Preference is not a precondition.">% of those aware</button>',
     '</div>',
     '<button type="button" class="fn-pin-dropdown-btn export-btn" data-fn-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
@@ -264,8 +278,49 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 #' view shows no significance mark, is written here instead, next to the
 #' control it explains. Its toggle is handled in brand_funnel_panel.js
 #' (\code{data-fn-action="basehowto"}).
+#' Whether the questionnaire gated the questions, said on the page
+#'
+#' Not only in a console warning. A reader looking at a funnel is entitled to
+#' know whether the survey enforced the ordering the picture implies, and a
+#' reader looking at separate measures is entitled to know why the funnel
+#' view is missing. Sits outside \code{.fn-controls} so it survives the print
+#' rule that hides the controls bar.
+#'
+#' Digit free: the reachability gate compares the numeric content of every
+#' JSON island and this text rides in the funnel payload. The counts behind
+#' it go to the console.
 #' @keywords internal
-.fn_base_howto <- function() {
+.fn_gating_notice <- function(pd) {
+  g <- (pd$meta %||% list())$gating
+  if (is.null(g) || !nzchar(g$statement %||% "")) return("")
+  gated <- isTRUE(g$gated)
+  mode_label <- if (gated) "Nested funnel" else "Separate measures"
+  cls <- if (gated) "fn-gating-note fn-gating-gated"
+         else "fn-gating-note fn-gating-ungated"
+  sprintf(paste0(
+    '<div class="%s" data-fn-gating="%s" data-fn-gating-mode="%s">',
+    '<span class="fn-gating-mode">%s</span>',
+    '<span class="fn-gating-text">%s</span>',
+    '</div>'),
+    cls, if (gated) "gated" else "ungated", .fn_esc(g$mode %||% "nested"),
+    mode_label, .fn_esc(g$statement))
+}
+
+
+#' @keywords internal
+.fn_base_howto <- function(pd = NULL) {
+  g <- (pd$meta %||% list())$gating
+  gated <- is.null(g) || isTRUE(g$gated)
+  nested_bullet <- if (gated) paste0(
+        '<li><strong>Funnel, % of all.</strong> The nested chain. At each stage the ',
+        'count is the respondents who passed that stage and every earlier one, ',
+        'divided by all respondents in the category. This is the only view in which ',
+        'the stages narrow by construction, and the only one the word funnel fits.</li>')
+    else paste0(
+        '<li><strong>Funnel, % of all is not offered on this survey.</strong> ',
+        'The questionnaire did not route the questions, so a respondent could ',
+        'answer a later one without the earlier one. Chaining those answers ',
+        'would draw an ordering the survey never enforced.</li>')
   paste0(
     '<div class="fn-base-howto" data-fn-base-howto>',
       '<button type="button" class="fn-base-howto-toggle" aria-expanded="false" ',
@@ -273,12 +328,9 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
         '<span class="fn-base-howto-arrow" aria-hidden="true"></span></button>',
       '<div class="fn-base-howto-body" hidden>',
         '<p><strong>The base toggle sets which question the table answers.</strong> ',
-        'The four views are not four scalings of one number.</p>',
+        'The views are not scalings of one number.</p>',
         '<ul>',
-        '<li><strong>Funnel, % of all.</strong> The nested chain. At each stage the ',
-        'count is the respondents who passed that stage and every earlier one, ',
-        'divided by all respondents in the category. This is the only view in which ',
-        'the stages narrow by construction, and the only one the word funnel fits.</li>',
+        nested_bullet,
         '<li><strong>Each stage on its own.</strong> Each stage\'s own survey response ',
         'over all respondents, with nothing chained. The stages are asked ',
         'independently, so a later stage can read higher than an earlier one. ',

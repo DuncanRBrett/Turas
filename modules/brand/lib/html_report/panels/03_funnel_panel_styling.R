@@ -168,6 +168,29 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   font-size: 11px; color: #64748b; font-style: italic; margin: 0 0 8px;
 }
 
+/* Gating notice: whether the questionnaire routed the funnel questions, and
+   therefore whether the nested view exists. Sits above the how-this-works
+   drawer and outside .fn-controls, so it survives the print rule that hides
+   the controls bar. Never collapsed: it is the reason the views on the page
+   are the views on the page. */
+.fn-gating-note {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 10px; padding: 8px 12px; border-radius: 4px;
+  font-size: 12px; line-height: 1.55; max-width: 900px;
+}
+.fn-gating-note .fn-gating-mode {
+  font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+  font-size: 11px; white-space: nowrap;
+}
+.fn-gating-gated {
+  background: #f1f5f9; color: #475569; border-left: 3px solid #94a3b8;
+}
+.fn-gating-ungated {
+  background: #fff7ed; color: #7c2d12; border-left: 3px solid #ea580c;
+}
+@media print {
+  .fn-gating-note { break-inside: avoid; }
+}
 .fn-base-howto { margin: 0 0 12px; }
 .fn-base-howto-toggle {
   background: none; border: none; cursor: pointer; padding: 0;

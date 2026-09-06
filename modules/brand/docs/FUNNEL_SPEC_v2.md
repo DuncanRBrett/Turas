@@ -88,11 +88,24 @@ Being able to point at the respondent's own words is what makes the stage defens
 
 Prior-brand data (`funnel.service.prior_brand`) is **not** rendered as a funnel stage. About drawer notes: *"prior-brand data available, see Repertoire"* when the role is populated.
 
-### 3.4 Nesting invariant
+### 3.4 Nesting, and whether the instrument earned it
 
-For every brand B and every stage S \> 1: `count(B, S) ≤ count(B, S-1)`.
+**Stages are not nested by construction.** Each one is derived from its own survey response and is not ANDed into the next (changed 2026-05-24, after the cumulative AND was found to be dropping about eleven points of IPK POS past-three-month buyers against the raw count). The cumulative chain that the nested views read is computed downstream in `calculate_stage_metrics()`.
 
-Nested by construction: each stage's derivation ANDs the previous stage's boolean matrix. Guard test enforces on every run. On violation, refuse with `CALC_NESTING_VIOLATED` and a diagnostic showing the offending (brand, stage, count) tuple.
+Two separate checks run on every funnel.
+
+`validate_nesting()` is the **aggregate** check: for every brand B and every consecutive pair of stages, does `count(B, S)` exceed `count(B, S-1)`? A brand that fails is reported as a warning and the run goes PARTIAL. Nothing is clamped, nothing is dropped, and nothing refuses: a non-monotonic answer is a fact about the data, and hiding it would be worse than showing it.
+
+`detect_instrument_gating()` is the **respondent-level** check, and it decides which report the reader gets. It counts respondents who sit at a later stage without the earlier one, brand by brand, on head counts, skipping brands whose column is entirely NA at either stage. Routing makes such a row impossible, so a single one is proof the questionnaire did not route.
+
+The pairs tested are every stage against awareness, plus the target purchase window against the longer one and long tenure against current ownership. Purchase is **not** tested against consideration: the template does not gate buying on attitude, and a respondent can buy a brand they are lukewarm about.
+
+- **Gated** (no breaches): the report draws the nested funnel as before, and says on the page that the questionnaire routed the questions.
+- **Ungated** (any breach): the "Funnel, % of all" base view is not rendered at all, the default becomes "Each stage on its own", the two conversion ratios ("% of those aware" and "% of previous stage") stay, and the page carries a notice saying the survey did not route and that a nested picture would assert an ordering the survey never enforced. The Overview's mini funnel drops its nested series to match.
+
+The aggregate check on its own is not sufficient for this decision. An ungated instrument can still produce totals that fall at every stage, and a nested funnel drawn from it would look perfectly well behaved. The respondent-level check subsumes the aggregate one.
+
+To measure a funnel rather than infer one, gate the questions. See ALCHEMER_GATING_GUIDE.md.
 
 ### 3.5 Why no Heavy Buyer / Preferred stage
 

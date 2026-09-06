@@ -39,6 +39,14 @@
   // ---------------------------------------------------------------------------
   // Panel init
   // ---------------------------------------------------------------------------
+  /* Did the questionnaire route the funnel questions? Absent flag means yes,
+     so an older payload keeps the behaviour it had. */
+  function isGated(payload) {
+    var g = payload && payload.meta && payload.meta.gating;
+    if (!g) return true;
+    return g.gated !== false;
+  }
+
   function initPanel(panel) {
     var payload = readPayload(panel);
     if (!payload) return;
@@ -51,8 +59,13 @@
          "total" (each stage on its own base), "previous" (each stage over
          the stage before it, along the same chain) and "aware". R renders
          the table in the chain view already, so this only has to agree
-         with what the file says. */
-      pctMode: "chain",
+         with what the file says.
+
+         Unless the questionnaire did not route the questions. Then the
+         chain asserts an ordering the survey never enforced, R does not
+         render the button, and the default is each stage on its own. See
+         detect_instrument_gating() in 03a_funnel_derive.R. */
+      pctMode: isGated(payload) ? "chain" : "total",
       showCounts: false,
       showChart: true,
       showValues: "focal",  // "focal" | "all" | "none"
