@@ -127,3 +127,120 @@ that; matching still uses the alias-tolerant set.
   asserts codes and the equivalent roles agree, and drives both refusals.
 - Full brand suite after Stage 1: **FAIL 0, WARN 1, SKIP 2, PASS 3264**,
   96.0 s. Baseline plus the 17 new assertions.
+
+---
+
+## Stage 2: the standard consideration set is Love, Prefer, Price-conditional
+
+`.FUNNEL_CONSIDERATION_ROLES` is now `attitude.love`, `attitude.prefer`,
+`attitude.price`. The stage's default label moves from "Prefer" to
+"Consider", because a price-conditional respondent is in the set and does not
+prefer the brand, so the old label described something narrower than the
+stage measures.
+
+The reasoning, recorded so it does not have to be re-argued: code 4 says the
+respondent will buy the brand if the price is right, so they are in the
+consideration set price-conditionally. Code 3 says, in the respondent's own
+words, that they would only consider it if nothing else were available, so
+they are not. Drawing the line on what the respondent said is what makes it
+defensible to a client.
+
+The earlier top-2 choice was made against top-4, and top-4 let 85 to 97 per
+cent of aware respondents through on popular IPK 2026 brands. That
+observation stands. The level responsible for it is Ambivalent, and
+Ambivalent is the one that stays out.
+
+### Before and after, every category in the fixture
+
+`run_brand()` on `modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx`,
+`project_root` = the fixture directory, once at the Stage 1 tip and once at
+the Stage 2 tip. Both runs returned status PASS. Nothing was written into the
+repo or into any project folder; `run_brand()` writes no files.
+
+**Eight of the nine categories carry no funnel block** and so have no number
+to move: Pour Over Sauces, Pasta Sauces, Baking Mixes, Salad Dressings, Stock
+Powder / Liquid, Pestos, Cook-in Sauces, Anti-pasta. Only Dry Seasonings &
+Spices is analysed at full depth in this fixture.
+
+**Dry Seasonings & Spices, n = 438 unweighted (the routed subset, not the
+1,200 screened), funnel status PARTIAL both runs.**
+
+| Brand | Aware before | Aware after | Consider before | Consider after |
+|---|---|---|---|---|
+| IPK | 92.5% | 92.5% | 66.9% | 66.9% |
+| ROB | 85.2% | 85.2% | 30.8% | 30.8% |
+| KNORR | 84.9% | 84.9% | 31.3% | 31.3% |
+| CART | 75.1% | 75.1% | 25.8% | 25.8% |
+| CHS | 77.2% | 77.2% | 30.8% | 30.8% |
+| FNF | 73.1% | 73.1% | 26.0% | 26.0% |
+| WWT | 67.6% | 67.6% | 25.1% | 25.1% |
+| PNP | 65.5% | 65.5% | 21.7% | 21.7% |
+| SSG | 57.8% | 57.8% | 19.4% | 19.4% |
+| RAJ | 50.2% | 50.2% | 16.2% | 16.2% |
+| SAF | 49.5% | 49.5% | 21.0% | 21.0% |
+| SPM | 43.4% | 43.4% | 13.5% | 13.5% |
+| CHK | 39.0% | 39.0% | 14.6% | 14.6% |
+| HND | 34.5% | 34.5% | 11.6% | 11.6% |
+| DEL | 24.9% | 24.9% | 10.3% | 10.3% |
+
+**Nothing moved, and that is the correct result.** `identical()` on the
+before and after `$stages`, `$conversions` and `$attitude_decomposition`
+frames all returned TRUE. The fixture's instrument is the five-level scale
+from ALCHEMER_PROGRAMMING_SPEC.md (love, prefer, ambivalent, refuse, no
+opinion) and it declares no OptionMap sheet, so the scale resolves through
+the built-in five-level convention, which has **no price-conditional level at
+all**. The new default drops the role it cannot find and reports it:
+
+```
+=== TURAS BRAND: FUNNEL CONSIDER STAGE ===
+Category: DSS
+ * The attitude scale carries no price level, so the Consider stage is love
+   plus prefer on this survey.
+```
+
+and `meta$consideration$roles_dropped` reads `attitude.price`. The run stays
+PARTIAL for the pre-existing nesting reason, not for this.
+
+### What the change does on a scale that carries the level
+
+The fixture cannot show it, so it is shown on the six-level unit fixture in
+`test_funnel_consideration_roles.R`, whose ten respondents are hand counted.
+IPK's attitudes there are two Love, two Prefer, two Price-conditional, two
+Ambivalent, one Avoid, one No opinion.
+
+| Consideration set | Consider, IPK |
+|---|---|
+| Love + Prefer (the old default) | 40% |
+| Love + Prefer + Price (the new default) | 60% |
+| Love + Prefer + Price + Ambivalent (the old top-4) | 80% |
+
+**Known limit, stated rather than left to be found.** No report has been
+rendered on a six-level scale in this session. Doing that would mean either
+running Duncan's real IPK config, which is out of bounds, or inventing
+price-conditional answers for a fixture whose instrument never asked the
+question. The six-level path is proved by the hand-counted unit fixture and
+by the fixture's own dropped-role report, not by a rendered report.
+
+### Documentation updated
+
+- `modules/brand/docs/FUNNEL_SPEC_v2.md`: new §3.1a states the standard, how
+  to override it, what happens when a level is missing, and the legacy code
+  key. The stage table's derivation column and three §10.2 edge cases were
+  corrected.
+- `modules/brand/docs/ROLE_REGISTRY.md` §4.2: `attitude.price` added to the
+  role table, `attitude.reject` folded into `attitude.avoid` as the pre-2026
+  name, and a warning that a six-level instrument must declare its scale on
+  the OptionMap sheet or code 4 falls through to Avoid.
+
+### Owed to Duncan, not touched here
+
+The shared callout `brand.funnel` in
+`modules/shared/lib/callouts/callouts.json` still says the Prefer stage is
+"the top-2 of the 6-point scale (Love + Prefer)", still says Turas "refuses to
+render a brand whose aggregate counts violate nesting", which it does not, and
+still describes three base toggles when there are four. It sits outside
+`modules/brand`, which this task may not touch. The Stage 4 simplification log
+already lists the toggle count as owed; the consideration set is a second
+reason to rewrite that entry.
+
+Brand suite after Stage 2: **FAIL 0, WARN 1, SKIP 2, PASS 3276**.

@@ -23,19 +23,24 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 #
 #   The funnel models the buyer journey as a classical brand funnel:
 #     Aware (recognise the brand)
-#     -> Consider (Love or Prefer attitude, top-2 of the 6-level scale)
+#     -> Consider (the consideration set, see .FUNNEL_CONSIDERATION_ROLES)
 #     -> Bought 12 months (long-period physical penetration)
 #     -> Bought 3 months  (target-window physical penetration)
 #
-#   Choice of top-2 attitude codes (Love + Prefer) over the legacy top-4
-#   (Love + Prefer + Ambivalent + Price-conditional):
-#     - Top-4 produced "everyone aware considers" collapse, for popular
-#       brands in IPK 2026, top-4 let 85-97% of aware respondents through
-#       so the consideration stage barely narrowed the funnel.
-#     - Top-2 produces meaningful narrowing across all 51 brand-cats
-#       (51/51 monotonic) and gives the strongest cross-brand predictor
-#       of past-3-month purchase (Pearson avg 0.97 vs purchase, beating
+#   History of the Consider set, kept because the observations are still
+#   worth having:
+#     - The legacy top-4 (Love + Prefer + Ambivalent + Price-conditional)
+#       produced an "everyone aware considers" collapse: on popular IPK 2026
+#       brands it let 85 to 97 per cent of aware respondents through, so the
+#       stage barely narrowed the funnel.
+#     - Top-2 (Love + Prefer) narrowed meaningfully across all 51 brand-cats
+#       (51/51 monotonic) and gave the strongest cross-brand predictor of
+#       past-3-month purchase (Pearson avg 0.97 vs purchase, beating
 #       awareness and CEP-based Mental Penetration).
+#     - The standard set from 2026-09-06 is Love + Prefer + Price-conditional.
+#       Ambivalent is what caused the collapse, and Ambivalent is the level
+#       whose own wording says the respondent is not considering the brand.
+#       Price-conditional says the opposite.
 #
 #   Mental Availability (CEP-based MPen, MMS, Network Size, etc.) lives
 #   on the Mental Availability tab in full Romaniuk-canonical form. The
@@ -69,7 +74,10 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # runtime via config$funnel.stage_labels_override.
 .FUNNEL_DEFAULT_LABELS <- list(
   aware              = "Aware",
-  consideration      = "Prefer",
+  # "Consider", not "Prefer" (2026-09-06). A price-conditional respondent is
+  # in the set and does not prefer the brand, so the old label described a
+  # narrower thing than the stage measures.
+  consideration      = "Consider",
   bought_long        = "Long Period",
   bought_target      = "Target Period",
   current_owner_d    = "Current owner",
@@ -96,7 +104,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # funnel payload.
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
-  consideration      = "Respondents who actively prefer the brand on the attitude question: Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. The attitude question is asked about every brand, whether or not the respondent named it as known, so this stage is measured on its own and is not gated on awareness. The base toggle above the table sets whether the stages are combined. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
+  consideration      = "Respondents who put the brand in their consideration set on the attitude question: Love (it's my favourite), Prefer (I prefer it but don't always get it), or Price-conditional (I would only buy it if the price was right). The price-conditional respondent is telling you they will buy the brand, so they are in the set. Ambivalent respondents say they would only consider it if nothing else were available, so they are out, and so are Avoid and No-opinion respondents. A scale with no price-conditional level yields Love and Prefer. The attitude question is asked about every brand, whether or not the respondent named it as known, so this stage is measured on its own and is not gated on awareness. The base toggle above the table sets whether the stages are combined. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
   bought_long        = "Respondents who say they bought the brand in the longer timeframe asked on the survey. The purchase question is asked about every brand, so this stage is measured on its own and is not gated on awareness or preference. The base toggle above the table sets whether the stages are combined.",
   bought_target      = "Respondents who say they bought the brand in the target (shorter) timeframe asked on the survey. Measured on its own, and not gated on awareness, on preference, or on the longer timeframe. The base toggle above the table sets whether the stages are combined.",
   current_owner_d    = "Respondents who name the brand as the one they currently own in the category. Measured on its own, and not gated on awareness or preference. The base toggle above the table sets whether the stages are combined.",
@@ -124,12 +132,34 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # is the single path; raw codes are resolved to roles first and then expanded
 # the same way.
 #
-# Default set. A role in this set that the survey's scale does not carry is
-# dropped and reported, not refused, because scales of different lengths are
-# legitimately in the field. A role the OPERATOR names and the scale does not
-# carry is a refusal.
+# The Turas standard consideration set for a transactional funnel
+# (2026-09-06): Love, Prefer, Price-conditional.
+#
+# The line is drawn on what the respondent said, which is what makes the
+# stage defensible to a client. On the six-level scale:
+#   * Price-conditional says "I would only buy it if the price was right".
+#     That is a respondent telling you they will buy the brand. They are in
+#     the consideration set, price permitting, and leaving them out
+#     understates the brand's commercial reach.
+#   * Ambivalent says "I would only consider it if nothing else is
+#     available". That is a respondent telling you they are not considering
+#     it. They stay out.
+#
+# This replaces the earlier top-2-box set (Love + Prefer), which was chosen
+# because the alternative on the table then was top-4, and top-4 let 85 to
+# 97 per cent of aware respondents through on popular IPK 2026 brands so the
+# stage barely narrowed. That observation stands; the fix for it is to drop
+# Ambivalent, not to drop Price-conditional as well. The stage is
+# consideration, not preference, which is also how Duncan's programmed
+# questionnaire describes it.
+#
+# A role in this set that the survey's scale does not declare is dropped and
+# reported, not refused: a five-level scale legitimately has no
+# price-conditional level, and on such a survey the stage is Love + Prefer
+# and says so. A role the OPERATOR names that the scale does not declare is
+# a refusal.
 .FUNNEL_CONSIDERATION_ROLES <- c(
-  "attitude.love", "attitude.prefer"
+  "attitude.love", "attitude.prefer", "attitude.price"
 )
 
 # Spellings an operator may reasonably type in the Settings sheet, mapped to

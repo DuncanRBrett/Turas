@@ -43,11 +43,30 @@ Supports three category types: transactional (FMCG), durable, service. Stage sha
 | \# | Stage | Default label | Derivation |
 |----|----|----|----|
 | 1 | Aware | Aware | `funnel.awareness = 1` |
-| 2 | Consideration | Consider | `aware = 1` AND `attitude ∈ {love, prefer, ambivalent}` |
+| 2 | Consideration | Consider | `attitude` sits at one of the roles in the consideration set, see 3.1a |
 | 3 | Long Period | Long Period | prev stage AND `bought_long = 1`, omitted if role absent |
 | 4 | Target Period | Target Period | prev stage AND `bought_target = 1`, omitted if role absent |
 
 Stages 3–4 collapse individually when their roles are absent. Minimum funnel = stages 1–2. Heavy-buyer / frequency analysis is **not** a funnel stage. It lives in the Repertoire / Frequency element, where the full buying-rate distribution can be shown instead of a single threshold cut (v2.1 decision).
+
+### 3.1a The consideration set
+
+**Standard, from 6 September 2026: Love, Prefer, Price-conditional.** In code, `.FUNNEL_CONSIDERATION_ROLES` in `modules/brand/R/03a_funnel_derive.R`.
+
+The set is named by **role**, never by response code. A role is a position on the attitude scale (`attitude.price`); a code is whatever the survey exported for it (`4`, or `Price only`). Naming roles is what lets one definition survive a survey that exports some attitude columns as numbers and others as labels, which Alchemer does routinely.
+
+The line sits where the respondent put it:
+
+- **Price-conditional** says "I would only buy it if the price was right". That respondent is telling you they will buy the brand. They are in the set, price permitting, and excluding them understates the brand's commercial reach.
+- **Ambivalent** says "I would only consider it if nothing else is available". That respondent is telling you they are not considering it. They stay out. Ambivalent is also the level that caused the old top-4 set to collapse, letting 85 to 97 per cent of aware respondents through on popular IPK 2026 brands.
+
+Being able to point at the respondent's own words is what makes the stage defensible to a client.
+
+**Overriding it.** Settings key `funnel_consideration_roles`, comma separated, short or full names: `love, prefer, price`. Valid roles are listed in ROLE_REGISTRY.md §4.2.
+
+**When a level is missing.** A role in the built-in set that the survey's scale does not declare is dropped, reported on the console and in `meta$consideration$roles_dropped`, and the run continues: a five-level scale legitimately has no price-conditional level, and the stage is then Love + Prefer. A role the **operator** names that the scale does not declare refuses with `CFG_CONSIDERATION_ROLE_ABSENT`, because Turas would otherwise return a stage that looks computed and is missing people. An unrecognised role name refuses with `CFG_CONSIDERATION_ROLE_UNKNOWN`.
+
+**Legacy `funnel.positive_attitude_codes`.** Still read. Each code is resolved back to the role whose declared values contain it and expanded to that role's full set of codes and labels, so it now behaves identically to naming the roles. A code matching no declared position is matched literally and reported. Deprecated: prefer the role names.
 
 ### 3.2 Durable (up to 4 stages)
 
@@ -355,7 +374,9 @@ Tests assert **exact** values from the hand calculations.
 -   Fabricated nesting violation → guard refuses with diagnostic.
 -   Missing optional role → stage omitted; rest of funnel renders; About lists what's missing.
 -   Missing required role → guard refuses loud at config-load, not run time.
--   OptionMap omits Ambivalent → Consideration = Love + Prefer only; About explains.
+-   OptionMap omits the price-conditional level → Consideration = Love + Prefer, the drop is reported on the console and in meta$consideration$roles_dropped.
+-   Operator names a role the scale does not declare → CFG_CONSIDERATION_ROLE_ABSENT, not an empty stage.
+-   Attitude columns export labels rather than codes → a role-named consideration set reads the same on both.
 -   Inverted attitude scale (1 = no_opinion, 5 = love) → correctly remapped; same results.
 -   Frequency role absent → funnel still runs at 4 stages; About drawer notes heavy-buyer analysis lives in Repertoire/Frequency.
 -   All brand codes contain non-ASCII → no encoding failures.

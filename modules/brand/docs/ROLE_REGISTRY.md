@@ -99,15 +99,20 @@ Three category-type sub-namespaces. `category.type` setting in Brand_Config.xlsx
 
 ### 4.2 Attitude position sub-roles (mapped via OptionMap)
 
-| Role                  | Maps to                                | Default code |
-|-----------------------|----------------------------------------|--------------|
-| `attitude.love`       | Strong positive, "favourite"           | 1            |
-| `attitude.prefer`     | Mild positive, "among those I prefer"  | 2            |
-| `attitude.ambivalent` | Would-buy-if-no-other-choice           | 3            |
-| `attitude.reject`     | Active rejection                       | 4            |
-| `attitude.no_opinion` | Neutral / no opinion                   | 5            |
+| Role                  | Maps to                                        | Five-level default code |
+|-----------------------|------------------------------------------------|-------------------------|
+| `attitude.love`       | Strong positive, "favourite"                   | 1                       |
+| `attitude.prefer`     | Mild positive, "among those I prefer"          | 2                       |
+| `attitude.ambivalent` | Would-consider-only-if-nothing-else-available  | 3                       |
+| `attitude.price`      | Would-buy-only-if-the-price-was-right          | not on the five-level scale |
+| `attitude.avoid`      | Active rejection (`attitude.reject` is the pre-2026 name, still accepted) | 4 |
+| `attitude.no_opinion` | Neutral / no opinion                           | 5                       |
 
-OptionMap allows inverting codes, omitting positions (e.g., no Ambivalent → Consideration = Love + Prefer), and supplying client-specific labels for legend display.
+The default-code column is the fallback used **only** when the role-map entry carries no OptionMap and no `attitude_role_codes` override. Duncan's IPK 2026 instrument is six-level (love 1, prefer 2, ambivalent 3, price 4, avoid 5, no opinion 6) and **must** declare its scale on the OptionMap sheet (`Scale = attitude_scale`), or code 4 falls through to Avoid and the price-conditional group is invisible.
+
+OptionMap allows inverting codes, omitting positions, and supplying client-specific labels for legend display.
+
+**Which of these count as consideration** is a separate decision from which exist on the scale. It is set by `funnel_consideration_roles` and defaults to Love + Prefer + Price-conditional. See FUNNEL_SPEC_v2.md §3.1a. Omitting a position from the OptionMap does not silently shrink the stage: a role the operator named refuses, and a role in the built-in default set is dropped and reported.
 
 ### 4.3 Transactional (FMCG): `category.type = transactional`
 

@@ -297,3 +297,72 @@ test_that("Neither refusal fires for the built-in default set", {
   expect_true(res5$status %in% c("PASS", "PARTIAL"))
   expect_false("attitude.price" %in% res5$meta$consideration$roles_used)
 })
+
+
+# ==============================================================================
+# The Turas standard consideration set
+# ==============================================================================
+
+test_that("The default set is Love, Prefer and Price-conditional", {
+  expect_equal(.FUNNEL_CONSIDERATION_ROLES,
+               c("attitude.love", "attitude.prefer", "attitude.price"))
+})
+
+
+test_that("On a six-level scale the default admits the price-conditional", {
+  res <- run_funnel(.cr_data("labels"), .cr_role_map(.cr_optionmap_6()),
+                    .cr_brands(), .cr_cfg())
+  # Love 2 + Prefer 2 + Price only 2 of 10 for IPK.
+  expect_equal(.cr_pct(res$stages, "consideration", "IPK"), 0.6,
+               tolerance = 1e-9)
+  expect_equal(res$meta$consideration$roles_used,
+               c("attitude.love", "attitude.prefer", "attitude.price"))
+  expect_length(res$meta$consideration$roles_dropped, 0L)
+})
+
+
+test_that("The price-conditional respondents are what the new default adds", {
+  new_default <- run_funnel(.cr_data("labels"), .cr_role_map(.cr_optionmap_6()),
+                            .cr_brands(), .cr_cfg())
+  old_top2 <- run_funnel(.cr_data("labels"), .cr_role_map(.cr_optionmap_6()),
+                         .cr_brands(),
+                         .cr_cfg(`funnel.consideration_roles` =
+                                   c("love", "prefer")))
+  expect_equal(.cr_pct(old_top2$stages, "consideration", "IPK"), 0.4,
+               tolerance = 1e-9)
+  expect_equal(.cr_pct(new_default$stages, "consideration", "IPK"), 0.6,
+               tolerance = 1e-9)
+})
+
+
+test_that("The ambivalent respondents stay out of the default set", {
+  res <- run_funnel(.cr_data("labels"), .cr_role_map(.cr_optionmap_6()),
+                    .cr_brands(), .cr_cfg())
+  with_ambiv <- run_funnel(.cr_data("labels"), .cr_role_map(.cr_optionmap_6()),
+                           .cr_brands(),
+                           .cr_cfg(`funnel.consideration_roles` =
+                                     c("love", "prefer", "price",
+                                       "ambivalent")))
+  # IPK has two ambivalent respondents, and they are not in the default set.
+  expect_equal(.cr_pct(with_ambiv$stages, "consideration", "IPK") -
+                 .cr_pct(res$stages, "consideration", "IPK"),
+               0.2, tolerance = 1e-9)
+})
+
+
+test_that("A five-level scale drops the price level and reports it", {
+  res <- run_funnel(.cr_data("labels"), .cr_role_map(.cr_optionmap_5()),
+                    .cr_brands(), .cr_cfg())
+  expect_equal(res$meta$consideration$roles_used,
+               c("attitude.love", "attitude.prefer"))
+  expect_equal(res$meta$consideration$roles_dropped, "attitude.price")
+  expect_true(any(grepl("carries no price level",
+                        res$meta$consideration$notes)))
+  # A dropped default role is an operator note, not a degraded run.
+  expect_false(any(grepl("price", res$warnings %||% character(0))))
+})
+
+
+test_that("The Consider stage is labelled Consider, not Prefer", {
+  expect_equal(.FUNNEL_DEFAULT_LABELS$consideration, "Consider")
+})
