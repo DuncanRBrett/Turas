@@ -1791,8 +1791,8 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   border-radius: 8px; padding: 10px 14px; cursor: pointer;
 }
 .br-advanced-toggle:hover { background: #f1f5f9; }
-.br-advanced-toggle::after { content: " \25BE"; color: #94a3b8; }
-.br-advanced-toggle[aria-expanded="true"]::after { content: " \25B4"; }
+.br-advanced-toggle::after { content: " \\25BE"; color: #94a3b8; }
+.br-advanced-toggle[aria-expanded="true"]::after { content: " \\25B4"; }
 .br-advanced-body { margin-top: 10px; }
 .br-adv-item { margin-bottom: 8px; }
 .br-adv-toggle {
@@ -1801,8 +1801,8 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   border-radius: 8px; padding: 9px 14px; cursor: pointer;
 }
 .br-adv-toggle:hover { background: #f8fafc; }
-.br-adv-toggle::after { content: " \25BE"; color: #94a3b8; }
-.br-adv-toggle[aria-expanded="true"]::after { content: " \25B4"; }
+.br-adv-toggle::after { content: " \\25BE"; color: #94a3b8; }
+.br-adv-toggle[aria-expanded="true"]::after { content: " \\25B4"; }
 .br-adv-body { margin-top: 8px; }
 
 .br-overview-stub {
