@@ -46,6 +46,45 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 }
 
 
+#' Quote a value as a JavaScript string literal for an inline <script>
+#'
+#' HTML escaping is the wrong tool inside a script element: the parser does
+#' not decode entities there, so an escaped quote would reach the JS engine
+#' as the entity text. This emits a real JSON string literal instead, then
+#' writes every "<" as the \\u003c escape so no "</script" can form and end
+#' the element early. Same discipline as \code{.br_json_island()}.
+#'
+#' @param x Character scalar, or NULL.
+#' @return Character. A quoted JS string literal, including its quotes.
+#' @keywords internal
+.br_js_str <- function(x) {
+  if (is.null(x) || length(x) == 0L || is.na(x[1L])) return('""')
+  lit <- as.character(jsonlite::toJSON(as.character(x[1L]), auto_unbox = TRUE))
+  gsub("<", "\\u003c", lit, fixed = TRUE)
+}
+
+
+#' Reduce a config colour to something safe to drop into CSS
+#'
+#' \code{colour_focal} is operator-supplied and never validated by the config
+#' loader, so it reaches inline style attributes as typed. Anything that is
+#' not a recognisable colour token falls back to the default rather than
+#' being pasted into a declaration.
+#'
+#' @param x Character scalar, or NULL.
+#' @param default Character. Fallback colour.
+#' @return Character. A colour token.
+#' @keywords internal
+.br_colour <- function(x, default = "#1A5276") {
+  if (is.null(x) || length(x) == 0L || is.na(x[1L])) return(default)
+  v <- trimws(as.character(x[1L]))
+  ok <- grepl("^#[0-9A-Fa-f]{3,8}$", v) ||
+    grepl("^(rgb|rgba|hsl|hsla)\\([0-9.,%\\s/-]+\\)$", v, perl = TRUE) ||
+    grepl("^[A-Za-z]+$", v)
+  if (ok) v else default
+}
+
+
 # ==============================================================================
 # COMPONENT BUILDERS
 # ==============================================================================
@@ -857,7 +896,9 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
 #' @keywords internal
 build_br_portfolio_panel <- function(results, config) {
   focal        <- config$focal_brand %||% ""
-  brand_colour <- config$colour_focal %||% "#1A5276"
+  # Sanitised once here: this value lands in inline style declarations and in
+  # the brand-picker script below, and the config loader does not check it.
+  brand_colour <- .br_colour(config$colour_focal %||% "#1A5276")
 
   port_overview <- results$results$portfolio_overview
   port_data     <- results$results$portfolio
@@ -997,9 +1038,9 @@ build_br_portfolio_panel <- function(results, config) {
     parts <- c(parts, sprintf('
 <script>
 (function() {
-  var section = document.getElementById("section-%s");
+  var section = document.getElementById("section-" + %s);
   if (!section) return;
-  var brandColour = "%s";
+  var brandColour = %s;
   section.addEventListener("click", function(e) {
     var chip = e.target;
     if (!chip || !chip.hasAttribute("data-br-port-brand")) return;
@@ -1025,7 +1066,7 @@ build_br_portfolio_panel <- function(results, config) {
     });
   });
 })();
-</script>', section_id, brand_colour))
+</script>', .br_js_str(section_id), .br_js_str(brand_colour)))
   }
 
   parts <- c(parts, '</div>')  # element-section
