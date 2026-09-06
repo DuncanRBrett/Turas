@@ -338,6 +338,11 @@
         });
         handle.setHiddenChart(hidden);
       }
+      // Consumed. Leaving it would let a second call to
+      // brApplyAllComparisonSets resurrect a deviation the reader had since
+      // cleared with a header change. prepareForSave writes it again from
+      // live state at the next save, so nothing is lost.
+      w.mount.removeAttribute(SAVE_ATTR);
       refreshMount(w.mount);
     });
   }

@@ -197,6 +197,96 @@ DRIVER = """
     return out.sort();
   }
 
+  // --- the pin clause, on the two sites added in this pass ----------------
+  // Both handlers build their own title, so the only way to know the clause
+  // reaches a card is to make a card. TurasPins.getAll() is the store the
+  // Pinned Views tab renders from.
+  function lastPinTitle() {
+    if (typeof TurasPins === 'undefined' || !TurasPins.getAll) return null;
+    var all = TurasPins.getAll();
+    if (!all.length) return null;
+    return all[all.length - 1].title || '';
+  }
+
+  function pinFunnelRelChart(panel, tab) {
+    var host = panel.querySelector('.br-subpanel[data-leaf="fn-relationship"]');
+    if (!host) return;
+    var btn = host.querySelector('[data-fn-action="pindropdown"]');
+    if (!btn) { check(tab + '/relationship: a pin control exists', false); return; }
+    btn.click();
+    var drop = host.querySelector('.fn-pin-dropdown') ||
+               panel.querySelector('.fn-pin-dropdown');
+    if (!drop) { check(tab + '/relationship: the pin dropdown opens', false); return; }
+    check(tab + '/relationship: the pin dropdown opens', true);
+
+    // Chart alone: the card carries the chart, so the clause belongs on it.
+    var before = (TurasPins.getAll() || []).length;
+    var chartChk = drop.querySelector(
+      '.fn-pin-chk[data-fn-pin-sel="[data-fn-rel-chart-area]"]');
+    check(tab + '/relationship: the dropdown offers the chart', !!chartChk);
+    if (!chartChk) return;
+    chartChk.checked = true;
+    drop.querySelector('.fn-pin-save-btn').click();
+    var t1 = lastPinTitle();
+    check(tab + '/relationship: a pin of the chart is created',
+          (TurasPins.getAll() || []).length === before + 1, String(t1));
+    check(tab + '/relationship: the pin title carries the clause',
+          !!t1 && /chart shows \\d+ of \\d+ brands/.test(t1), String(t1));
+
+    // Table alone: nothing on that card deviates from anything, so the
+    // clause must not appear.
+    btn.click();
+    var drop2 = host.querySelector('.fn-pin-dropdown') ||
+                panel.querySelector('.fn-pin-dropdown');
+    if (!drop2) return;
+    var tblChk = drop2.querySelector(
+      '.fn-pin-chk[data-fn-pin-sel=".fn-rel-table-wrap"]');
+    if (!tblChk) return;
+    tblChk.checked = true;
+    drop2.querySelector('.fn-pin-save-btn').click();
+    var t2 = lastPinTitle();
+    check(tab + '/relationship: a table-only pin is not labelled as deviating',
+          !!t2 && !/chart shows/.test(t2), String(t2));
+  }
+
+  function pinMaMetricsChart(panel, tab) {
+    var host = panel.querySelector('.br-subpanel[data-leaf="ma-metrics"]');
+    if (!host) return;
+    var btn = host.querySelector('.ma-pin-dropdown-btn');
+    if (!btn) { check(tab + '/metrics: a pin control exists', false); return; }
+    btn.click();
+    var drop = host.querySelector('.ma-pin-dropdown') ||
+               panel.querySelector('.ma-pin-dropdown');
+    if (!drop) { check(tab + '/metrics: the pin dropdown opens', false); return; }
+    check(tab + '/metrics: the pin dropdown opens', true);
+
+    // Mental Space scatter and the brand metric table, ticked together. The
+    // metrics branch emits one card per element, so this makes two cards and
+    // only the chart card may carry the clause.
+    var before = (TurasPins.getAll() || []).length;
+    var sc = drop.querySelector('input[data-ma-pin-opt="scatter"]');
+    var tb = drop.querySelector('input[data-ma-pin-opt="brandtbl"]');
+    check(tab + '/metrics: the dropdown offers the scatter and the table',
+          !!sc && !!tb);
+    if (!sc || !tb) return;
+    sc.checked = true; tb.checked = true;
+    drop.querySelector('.ma-pin-confirm').click();
+    var made = (TurasPins.getAll() || []).slice(before);
+    check(tab + '/metrics: two cards are pinned', made.length === 2,
+          made.map(function (p) { return p.title; }).join(' | '));
+    var chartCard = null, tableCard = null;
+    made.forEach(function (p) {
+      if (/Mental Space/.test(p.title || '')) chartCard = p;
+      if (/Brand metrics table/.test(p.title || '')) tableCard = p;
+    });
+    check(tab + '/metrics: the chart card carries the clause',
+          !!chartCard && /chart shows \\d+ of \\d+ brands/.test(chartCard.title),
+          chartCard ? chartCard.title : 'no chart card');
+    check(tab + '/metrics: the table card is not labelled as deviating',
+          !!tableCard && !/chart shows/.test(tableCard.title),
+          tableCard ? tableCard.title : 'no table card');
+  }
+
   function runChartFocus(panel, tab) {
     // Scope first: only the leaves that genuinely have a table, a chart and
     // a chart-only visibility map behind them carry a mount.
@@ -424,6 +514,14 @@ DRIVER = """
               captured.indexOf('br-cf-trigger') < 0 &&
               captured.indexOf('br-cf-check') < 0);
       }
+
+      // The two pin paths added for the new sites, driven rather than read.
+      // Each one is a real click through the panel's own pin dropdown, and
+      // the card title is read back out of the TurasPins store, because the
+      // clause is appended inside those handlers and nowhere the state
+      // object would show it.
+      if (scope === 'relationship') pinFunnelRelChart(panel, tab);
+      if (scope === 'metrics')      pinMaMetricsChart(panel, tab);
 
       // The header is the source of truth: changing it clears the deviation.
       panel.querySelector('.br-cmp-mode[data-cmp-set="focal"]').click();

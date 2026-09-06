@@ -902,9 +902,11 @@ a reopened copy had **two** triggers. `buildMount` now adopts an existing
 trigger and its label. This was not in the brief; it is the census failing in
 every saved copy, and no census was ever run against one.
 
-The comparison popover serialised open with its checkboxes in whatever state
-the reader left them. `prepareForSave` removes it; it is rebuilt on the next
-open as it always was.
+The Chart brands popover, `.br-cf-pop`, serialised open with its checkboxes
+in whatever state the reader left them. `prepareForSave` removes it; it is
+rebuilt on the next open as it always was. The header's own popover,
+`.br-cmp-popover`, is untouched: its checkboxes are the comparison set and
+they are exactly what the mirror writes out.
 
 ### The related bind-flag defect, same root cause, fixed
 
@@ -1015,7 +1017,16 @@ fewer brands than a table they have swapped away from is the confusion the
 control exists to prevent, and it would be seven controls per category on a
 unified-mode selector. Duncan can reverse it.
 
-**Two pin paths wired.** The Headline Metrics pin adds the clause to the
+**Two pin paths wired, and driven in Chrome rather than read.** The harness
+clicks each panel's own pin dropdown, ticks a chart and a table, and reads
+the card titles back out of `TurasPins.getAll()`, because both handlers build
+their own title and no state object would show the clause. The relationship
+chart card comes out as `Brand Relationship, Dry Seasonings & Spices,
+Robertsons (chart shows 14 of 15 brands)` and the table-only card carries no
+clause; the Mental Space card carries the clause and the brand metrics table
+card pinned in the same click does not.
+
+The Headline Metrics pin adds the clause to the
 Mental Space and MMS cards only; the hero strip, the brand metrics table and
 the CEP ranking cannot deviate and must not be labelled as though they could.
 The funnel pin dropdown had two problems: it read its clause from the whole
@@ -1038,11 +1049,11 @@ and the two new mounts use the same classes.
 | Brand suite, before the first edit | FAIL 0, WARN 1, SKIP 2, PASS 2869 |
 | Brand suite, after, from the repo root | **FAIL 0, WARN 1, SKIP 2, PASS 2933**, 85.5 s |
 | `test_chart_focus.R` alone | 107 assertions, 0 failures |
-| `drive_destinations.py` | **321 checks, 0 failed**, no console error, against 279 before |
+| `drive_destinations.py` | **331 checks, 0 failed**, no console error, against 279 before |
 | `drive_two_categories.py` | **15 checks, 0 failed** |
 | `drive_save_roundtrip.py` | **112 checks, 0 failed** |
 | `reachability_check.py`, 3d787501 against this | **PASS**, data-subpanel 5 identical, data-section 29 identical, section ids 13 identical, island classes 8 identical, every parseable island numerically identical |
-| IPK fixture report | 3,946,207 bytes before, **3,959,697** after, 0.3 percent larger |
+| IPK fixture report | 3,946,207 bytes before, **3,960,006** after, 0.4 percent larger |
 
 **The two new sites read apart in the DOM, not trusted from the state
 object.** Brand Attitude: after dropping one brand the bars hold 14 codes and
@@ -1081,6 +1092,11 @@ visible beside their chart and 2 behind a Show chart toggle.
   this change adds nothing new to that gap. The Branded Reach bind-flag fix
   is therefore covered by the static scan only.
 - **`styler` was not run,** for the same reason as the previous two sessions.
+- **`restoreAll` consumes the attribute it reads.** Leaving it in place
+  would have let a second call to `brApplyAllComparisonSets` resurrect a
+  deviation the reader had since cleared with a header change. There is no
+  such second caller today, so this was a latent trap rather than a live bug;
+  it is one line and it is closed.
 - **The Mental Advantage and Demographics exclusions are asserted from the
   code, not from a browser.** The tests read `renderQuadrant`'s focal filter
   and the demographics card's two view hosts. Neither renders a control, so
