@@ -819,3 +819,282 @@ brands showing, drop one from the chart, check the note reads right, pin it
 and confirm the pin card says the chart is narrower than its table. Then the
 Fable pre-merge review, briefed as independent of this session. Not merged,
 not pushed.
+
+
+# Stage 2 follow-up, part three: Save, and the split everywhere, 6 September 2026
+
+Two rulings from Duncan. "The save issue must be fixed", and "the split
+capability must be everywhere". Both are done. No analytical change, no new
+number, nothing recomputed.
+
+Baseline executed before the first edit, in this worktree at 3d787501: brand
+suite **FAIL 0, WARN 1, SKIP 2, PASS 2869**, 99.4 s. It matches the brief.
+The tip's IPK fixture report was regenerated from a `git archive` of 3d787501,
+with the gitignored `.xlsx` fixtures copied in, and came to **3,946,207
+bytes**, the figure the previous session recorded. So the before-and-after
+diffs are against a reproduced baseline, not a remembered one.
+
+## Ruling 1, the save issue
+
+### What was actually lost, measured rather than assumed
+
+Two selections, both with the shape the lift's commentary mirror already
+solved. A checkbox's `.checked` and an option's `.selected` are properties;
+the content attributes are `defaultChecked` and `defaultSelected`, so
+`outerHTML` never saw either. The per-chart deviation was worse: it lived on
+a `BrandSelector` handle and never touched the DOM at all.
+
+The chart one was the dangerous half, and the harness measured it rather than
+taking the previous session's word. A report built from the code at 3d787501
+was driven in headless Chrome, three charts deviated, and the serialised
+document inspected: **8 deviation notes, unhidden, each saying the chart omits
+a brand, with 8 `data-chartfocus-clause` attributes and 0 deviations behind
+them.** That attribute is what a pin and a PNG title read. The first note in
+the file read, in full:
+
+> Chart shows 2 of the 3 brands in the table. Hidden from the chart: Ina
+> Paarman's Kitchen.
+
+with a chart showing all three.
+
+One honest qualification, because it changes how the defect behaves rather
+than whether it exists. In a browser with JavaScript running, the load-time
+`refreshMount` repaints every note from live state a tick after load, so the
+sentence disappears from the screen. What was durable is the file: its
+markup, its clause attributes, and anything that reads the file rather than
+the repainted page. The gate is written against the file for that reason.
+
+### What was built
+
+**One serialiser.** `_brSaveReport` no longer builds the string. It calls
+`_brSerialiseReport()`, which calls `_brSyncReportState()` and then reads
+`documentElement.outerHTML`. `_brSyncReportState()` is the commentary mirror
+plus `_brSyncSelectionState()`. One path, so the Save button and the QA round
+trip cannot drift apart, and a test asserts the ordering inside the
+serialiser rather than trusting the shape.
+
+**The selection mirror.** Every option inside `.br-controls` gets its
+`selected` attribute written or removed to match `.selected`, and every
+checkbox its `checked` and `disabled`. Scope is the category header's own
+controls, deliberately: a sweep over every select in the document would
+freeze each panel's hidden focal select, which the header re-drives on load
+anyway. Panel-local view state, base toggles, sort order, the demographics
+card's table-or-chart switch, is not mirrored and never was.
+
+**The chart deviation.** `BrandChartFocus.prepareForSave()` writes each
+mount's chart-only extras as `data-cf-saved`, and `restoreAll()` reads them
+back. Two details decided the shape.
+
+- The attribute is written **only** at save time, never by `refreshMount`.
+  A repaint that also wrote it could clear the value a restore was about to
+  read, which is a race nobody would find until a client did.
+- `restoreAll()` runs at the end of `brApplyAllComparisonSets()` and nowhere
+  else. Every published set resets a panel's chart-only set to its table set,
+  which is the control's own reset rule, so a restore that ran before the
+  load-time publish would be wiped by it. It reads every mount's attribute
+  first and applies second, because building a mount repaints it.
+
+**Two more defects, both shipped, both found while doing this.**
+
+The Chart brands trigger is built by JavaScript, so `outerHTML` carries it
+while the `__cfBuilt` property that guards the build does not. Every chart in
+a reopened copy had **two** triggers. `buildMount` now adopts an existing
+trigger and its label. This was not in the brief; it is the census failing in
+every saved copy, and no census was ever run against one.
+
+The comparison popover serialised open with its checkboxes in whatever state
+the reader left them. `prepareForSave` removes it; it is rebuilt on the next
+open as it always was.
+
+### The related bind-flag defect, same root cause, fixed
+
+`brand_wom_panel.js` and `brand_branded_reach_panel.js` guarded their binder
+with `dataset.womInit` and `dataset.brReachInit`, which serialise as `data-*`
+attributes, so a reopened copy skipped binding and the panel had no handlers.
+Same root cause as the two sites fixed earlier on the branch, different
+names, which is exactly why the guard test missed them: it matched `bound`
+only. Both are pre-existing on main. The scan now matches eleven words, and a
+second test feeds it the two lines it used to pass, so the widening cannot
+quietly regress.
+
+### The round trip, and how it is proved
+
+`modules/brand/tests/qa/drive_save_roundtrip.py`. There is no puppeteer or
+playwright, so it is two Chrome runs.
+
+Pass one injects a harness, moves the focal brand off the default, picks two
+comparators, deviates every chart that can deviate, records what is on
+screen, calls the report's own `_brSerialiseReport()` and asserts the
+returned string carries the mirrored attributes, then removes itself from the
+DOM. `--dump-dom` emits `document.documentElement.outerHTML`, which is the
+string `_brSaveReport()` blobs, so the dump is the saved copy.
+
+Pass two reopens that dump with pass one's record injected beside it and
+compares every value.
+
+Between the two, python checks the file itself: the number of notes claiming
+a deviation must equal the number of deviations saved, and the number of
+triggers must equal the number of mounts.
+
+**One trap worth recording**, because it is the same one the island gate hit
+earlier on this branch. The first version counted `data-cf-saved="` with a
+regex literal and got 10 for 8 deviations: the harness is inside the document
+it is searching, so it matched its own source. Both needles are now assembled
+at runtime.
+
+### Executed, with the numbers
+
+| Check | Result |
+|---|---|
+| `drive_save_roundtrip.py`, this commit | **112 checks, 0 failed**, no console error |
+| the same script on a report built at 3d787501 | **92 checks, 73 failed** |
+| of which the file gate | 8 notes claiming a deviation, **0** deviations saved |
+| of which the census | `exactly one Chart brands trigger -> 2` on all eight mounts |
+| `test_save_state_survives.R` | FAIL 0, PASS 36 |
+| `test_bound_flags_do_not_serialise.R` | FAIL 0, PASS 14 |
+
+## Ruling 2, the split everywhere
+
+Every panel that renders a chart alongside a table was walked, not only the
+two the brief named.
+
+| Leaf | Control | Why |
+|---|---|---|
+| fn-funnel | yes, before | `__fnState.chartBrands` |
+| fn-relationship, Brand Attitude | **yes, new** | selector moved to split mode |
+| ma-attributes, ma-ceps | yes, before | `__maState.chartVisible.<stim>` |
+| ma-metrics, Headline Metrics | **yes, new** | two charts, one chart-only set |
+| ma-advantage, Mental Advantage | **no** | its chart has no brand dimension |
+| cb-brands, cb-loyalty, cb-dist, cb-heaviness | yes, before | `__cbState.chart_visible.<scope>` |
+| wom | yes, before | `__womHiddenChart` |
+| demographics | **no** | the chart replaces the table, it does not sit beside it |
+| cb-context, cb-norms, cb-dop, cb-shopper | no | do not narrow at all, out of scope in the brief |
+| branded_reach, adhoc, audience_lens | no | no chart |
+
+Ten controls, eight emission sites.
+
+**Brand Attitude.** The previous session recorded a code comment saying the
+relationship view has no separate chart-only selection, and treated that as
+the reason not to. The comment described the state of the code, not a
+constraint: the view has a stacked-bar chart and a table, both keyed on
+`data-fn-brand`, so it has everything a split needs. `relHiddenBrandsChart`
+was added beside `relHiddenBrands`; `buildRelChart` and `updateRelHeadline`
+read the chart set, `applyRelBrandVis` and `exportRelTableExcel` keep the
+table set. The category average is one control over a table row and a chart
+series, so `__avg__` moves in both sets at once, and so does the focal brand
+on a focal change.
+
+One thing the previous session's "one-word change plus two more mounts"
+estimate missed. When a report is rendered without the Stage 2 split, one
+`.fn-panel` carries both the funnel and the relationship view, and the panel
+root already holds the funnel's handle on `__brChartSelector`. `ownerPanel`
+walks up and stops at the first element carrying that property, so the
+attitude handle is put on the relationship sub-tab div and each chart keeps
+its own set.
+
+**Headline Metrics.** `renderMAScatter` and `renderMABarChart` did read
+`getHidden()`, and the change is the one word the previous session predicted.
+The check that mattered first was `applyRemoteHiddenSet`: it fires
+`onChange(hiddenTable, "all")` and then, for a split panel,
+`onChange(hiddenChart, "chart")`, so the chart branch runs on every published
+set and the header still governs both charts. Without that the charts would
+have silently stopped following the header.
+
+**Mental Advantage is a genuine exclusion, and this is the one place the
+brief's lead was wrong.** `renderQuadrant` filters the block's cells to
+`c.brand_code === focal` and keys each bubble by stimulus. Its chart plots one
+brand. There is no brand-keyed chart to narrow, and `__maAdvHiddenBrands`
+governs matrix columns, which are a table. A test asserts both facts out of
+the JavaScript, so if that filter ever goes the exclusion fails loudly rather
+than outliving its reason.
+
+**Demographics is a judgement, reversible in one line.** Each card holds a
+`.demo-card-view-table` and a `.demo-card-view-chart` behind a per-card
+toggle, so the reader sees one or the other. A note saying the chart shows
+fewer brands than a table they have swapped away from is the confusion the
+control exists to prevent, and it would be seven controls per category on a
+unified-mode selector. Duncan can reverse it.
+
+**Two pin paths wired.** The Headline Metrics pin adds the clause to the
+Mental Space and MMS cards only; the hero strip, the brand metrics table and
+the CEP ranking cannot deviate and must not be labelled as though they could.
+The funnel pin dropdown had two problems: it read its clause from the whole
+panel, which in an unsplit render could label a funnel pin with the
+relationship note, and the relationship chart is an HTML area rather than an
+SVG so it reached the title check as a table and never got the clause. Both
+fixed. The Metrics PNG path needed nothing: `brExportPngFromEl` scopes to the
+sub-tab and goes through `captureFromRoot`, which already carries
+`chartDeviation`.
+
+**What did not change.** The Excel exporters walk `table` elements, the table
+never deviates, and the test asserting they read no chart DOM is untouched
+and passing. The print block still hides `.br-cf` and shows `.br-cf-note`,
+and the two new mounts use the same classes.
+
+### Executed, with the numbers
+
+| Check | Result |
+|---|---|
+| Brand suite, before the first edit | FAIL 0, WARN 1, SKIP 2, PASS 2869 |
+| Brand suite, after, from the repo root | **FAIL 0, WARN 1, SKIP 2, PASS 2933**, 85.5 s |
+| `test_chart_focus.R` alone | 107 assertions, 0 failures |
+| `drive_destinations.py` | **321 checks, 0 failed**, no console error, against 279 before |
+| `drive_two_categories.py` | **15 checks, 0 failed** |
+| `drive_save_roundtrip.py` | **112 checks, 0 failed** |
+| `reachability_check.py`, 3d787501 against this | **PASS**, data-subpanel 5 identical, data-section 29 identical, section ids 13 identical, island classes 8 identical, every parseable island numerically identical |
+| IPK fixture report | 3,946,207 bytes before, **3,959,697** after, 0.3 percent larger |
+
+**The two new sites read apart in the DOM, not trusted from the state
+object.** Brand Attitude: after dropping one brand the bars hold 14 codes and
+the table holds 15, and the dropped code is absent from the first and present
+in the second. Headline Metrics: the Mental Space chart goes from 15 bubbles
+to 14, the MMS bar chart loses its pair of bars, and the metrics table keeps
+all 15 rows.
+
+**The control census, on the fixture's one full-depth category.** Header
+focal selects 1 of 1 visible, header brand-set triggers 1 of 1 visible,
+per-panel focal selects 0 of 15 visible, per-panel brand filters 0 of 16
+visible, Chart brands controls 10 mounted, 10 built, one trigger each, 8
+visible beside their chart and 2 behind a Show chart toggle.
+
+## Known limits, stated rather than left to be discovered
+
+- **The lying note is durable in the file, not on the screen.** In a browser
+  with JavaScript running the load-time repaint clears the sentence a tick
+  after load. What was proved durable is the saved markup and the
+  `data-chartfocus-clause` attribute a pin reads. The gate checks the file
+  for that reason. This is a correction to the brief's framing, not a
+  disagreement with the fix.
+- **The round trip uses `--dump-dom` rather than the Save button.** The dump
+  is `document.documentElement.outerHTML`, which is the string
+  `_brSaveReport()` writes, and the harness calls the report's own
+  `_brSerialiseReport()` and asserts its output separately. The file picker
+  and the blob download are not exercised and cannot be from headless Chrome.
+- **Only the header's controls and the chart deviations are mirrored.** A
+  reopened copy does not restore a base toggle, a column sort, an emphasis
+  chip, a demographics card's view, or which destination the reader was on.
+  None of those was ever claimed to survive, and none of them has a note that
+  could disagree with it.
+- **Four elements still have never rendered through the shell with real panel
+  fragments.** Branded Reach, Ad Hoc, Audience Lens and Shopper Behaviour are
+  absent from the fixture. None of them carries a Chart brands control, so
+  this change adds nothing new to that gap. The Branded Reach bind-flag fix
+  is therefore covered by the static scan only.
+- **`styler` was not run,** for the same reason as the previous two sessions.
+- **The Mental Advantage and Demographics exclusions are asserted from the
+  code, not from a browser.** The tests read `renderQuadrant`'s focal filter
+  and the demographics card's two view hosts. Neither renders a control, so
+  there is nothing for a browser pass to drive.
+- **The Headline Metrics note sits above both charts, not inside either.** A
+  PNG of the Mental Space chart alone carries the clause on its title but not
+  the note in its body. That follows the Brand Attributes and CEPs precedent,
+  where the note is also outside the captured SVG. The cat-buying panels
+  differ because their capture root is the whole chart area.
+
+## What Duncan still owes
+
+A `launch_turas()` run on the real IPK project. Open Brand Attitude and
+Headline Metrics, drop a brand from each chart, check the note reads right,
+then save a copy, reopen it and confirm the header set, the chart deviations
+and the notes all came back. Then the Fable pre-merge review, briefed as
+independent of this session. Not merged, not pushed.
