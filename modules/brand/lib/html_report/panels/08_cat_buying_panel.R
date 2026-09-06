@@ -120,6 +120,15 @@ render_cat_buying_panel <- function(panel_data) {
                                       brand_labels, brand_colours,
                                       chip_default = chip_default))
 
+  # Panel-level KPI strip: category KPIs plus the focal brand's observed SCR,
+  # 100%-loyal share and light-buyer index, each with its Dirichlet-expected
+  # value as a sub-label. It sits outside every sub-tab on purpose: the chips
+  # are focal-brand values, the focal control is the picker immediately above,
+  # and the JS focal switcher re-hydrates [data-kpi] chips panel-wide, so
+  # keeping them out of a tab means they are live and readable whichever tab
+  # the reader is on.
+  parts <- c(parts, .cb_kpi_strip(dn, bh, cbf, rep, fcol, focal, t_months))
+
   # ----- Tab 1: Category Context (default) -----------------------------------
   # Shopper context chips (top channel + top pack size) live INSIDE the
   # existing Context KPI strip alongside Avg purchases / Avg brands bought
@@ -158,7 +167,18 @@ render_cat_buying_panel <- function(panel_data) {
              as.character(bh$brand_heaviness$BrandCode))
   } else setNames(integer(0), character(0))
 
-  # ----- Tab 3: Loyalty Segmentation -----------------------------------------
+  # ----- Tab 3: Dirichlet Norms ----------------------------------------------
+  # Double Jeopardy scatter, SCR bars and the Obs / Exp / delta norms table.
+  # Its own tab rather than an addition to Brand Summary: that tab already
+  # carries the observed per-brand table with a chart toggle of its own, and
+  # a 13-column norms table plus two charts underneath would crowd it. These
+  # three are the model diagnostics, so they read better together.
+  parts <- c(parts, '<div class="cb-subtab" data-cb-tab="norms" hidden>')
+  parts <- c(parts, .cb_norms_tab(dn, cbf, focal, fcol, cat_code,
+                                   brand_labels, t_months))
+  parts <- c(parts, '</div>')
+
+  # ----- Tab 4: Loyalty Segmentation -----------------------------------------
   loy_seg_codes  <- c("sole", "primary", "secondary", "nobuy")
   loy_seg_labels <- c("Sole buyer", "Primary (>50% SCR)", "Secondary (\u226450%)", "Not bought")
   loy_data       <- if (has_bh) bh$brand_loyalty_segments else NULL
@@ -186,7 +206,7 @@ render_cat_buying_panel <- function(panel_data) {
     refused_source = bh))
   parts <- c(parts, '</div>')
 
-  # ----- Tab 4: Purchase Distribution ----------------------------------------
+  # ----- Tab 5: Purchase Distribution ----------------------------------------
   default_dist <- c("Light (1\u00d7)", "Moderate (2\u00d7)",
                     "Regular (3\u20135\u00d7)", "Frequent (6+\u00d7)")
   dist_seg_labels <- if (!is.null(dist_labels) && length(dist_labels) == 4L)
@@ -216,7 +236,7 @@ render_cat_buying_panel <- function(panel_data) {
     refused_source = bh))
   parts <- c(parts, '</div>')
 
-  # ----- Tab 5: Buyer Heaviness ----------------------------------------------
+  # ----- Tab 6: Buyer Heaviness ----------------------------------------------
   # Ehrenberg-Bass Natural Monopoly Law diagnostic. The cut is on CATEGORY
   # tertiles (Heavy / Medium / Light category buyers — heaviness in the
   # whole category, not in this brand). Complements Purchase Distribution:
@@ -246,7 +266,7 @@ render_cat_buying_panel <- function(panel_data) {
     refused_source = bh))
   parts <- c(parts, '</div>')
 
-  # ----- Tab 6: Duplication of Purchase --------------------------------------
+  # ----- Tab 7: Duplication of Purchase --------------------------------------
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dop" hidden>')
   parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels,
                                  brand_buyers_n = brand_buyers_n_map,
@@ -254,7 +274,7 @@ render_cat_buying_panel <- function(panel_data) {
                                  t_months       = t_months))
   parts <- c(parts, '</div>')
 
-  # ----- Tab 7: Shopper Behaviour (optional) --------------------------------
+  # ----- Tab 8: Shopper Behaviour (optional) --------------------------------
   shopper_html <- if (exists("cb_shopper_tab_html", mode = "function"))
     cb_shopper_tab_html(panel_data) else ""
   if (nzchar(shopper_html)) {
@@ -276,6 +296,7 @@ render_cat_buying_panel <- function(panel_data) {
   tabs <- list(
     list(key = "context",   label = "Category Context"),
     list(key = "brands",    label = "Brand Summary"),
+    list(key = "norms",     label = "Dirichlet Norms"),
     list(key = "loyalty",   label = "Loyalty Segmentation"),
     list(key = "dist",      label = "Purchase Distribution"),
     list(key = "heaviness", label = "Buyer Heaviness"),
@@ -304,25 +325,11 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, '<div class="cb-section-title">Category Context</div>')
   parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">Category-level purchase frequency and brand repertoire distributions among category buyers.</p>')
 
-  # KPI strip: Avg purchases + Avg brands bought, then any caller-supplied
-  # extra chips (e.g. Shopper Behaviour summary chips) joined inline so
-  # all category-level KPIs sit on the same row.
-  kpi_chips <- character(0)
-  if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
-      !is.null(dn$category_metrics$mean_purchases)) {
-    mp <- sprintf("%.1f", dn$category_metrics$mean_purchases)
-    kpi_chips <- c(kpi_chips, sprintf(
-      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Avg purchases / category buyer</div></div>',
-      mp))
-  }
-  if (!is.null(rep) && !identical(rep$status, "REFUSED") &&
-      !is.null(rep$mean_repertoire) && !is.na(rep$mean_repertoire)) {
-    mr <- sprintf("%.1f", rep$mean_repertoire)
-    kpi_chips <- c(kpi_chips, sprintf(
-      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Avg brands bought / category buyer</div></div>',
-      mr))
-  }
-  strip_html <- paste(kpi_chips, collapse = "")
+  # Avg purchases and Avg brands bought moved to the panel-level KPI strip
+  # above the sub-tabs, where they sit beside the focal-brand chips and stay
+  # readable from every tab. Only caller-supplied extra chips (the Shopper
+  # Behaviour summary) remain tab-local.
+  strip_html <- ""
   if (nzchar(extra_chips)) strip_html <- paste0(strip_html, extra_chips)
   if (nzchar(strip_html)) {
     parts <- c(parts, sprintf(
@@ -412,6 +419,101 @@ render_cat_buying_panel <- function(panel_data) {
   callout_html <- if (exists("turas_callout", mode = "function"))
     turas_callout("brand", "cat_buying_brand_summary", collapsed = TRUE) else ""
   if (nzchar(callout_html)) parts <- c(parts, callout_html)
+
+  paste(parts, collapse = "\n")
+}
+
+
+#' Build the Dirichlet Norms sub-tab
+#'
+#' Double Jeopardy scatter (with an SCR / buy-rate y-axis toggle), the SCR
+#' bar chart, and the Obs / Exp / deviation norms table across Penetration,
+#' Buy rate, SCR and 100% Loyals.
+#'
+#' @param dn List. \code{run_dirichlet_norms()} result.
+#' @param cbf List or NULL. \code{cat_buying_frequency} result, used for the
+#'   norms-table reconciliation footer.
+#' @param focal Character or NULL. Focal brand code.
+#' @param fcol Character. Focal colour.
+#' @param cat_code Character. Category id, used for the toggle container id.
+#' @param brand_labels Named character vector or NULL.
+#' @param t_months Integer. Target timeframe in months.
+#'
+#' @return Character. HTML fragment.
+#' @keywords internal
+.cb_norms_tab <- function(dn, cbf, focal, fcol, cat_code, brand_labels,
+                           t_months) {
+  parts <- character(0)
+  parts <- c(parts, '<div class="cb-section-title">Dirichlet Norms</div>')
+  parts <- c(parts,
+    '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
+    'What the Dirichlet model expects each brand to achieve given its ',
+    'penetration, set beside what it actually achieved. Brands off the ',
+    'Double Jeopardy line are labelled. Deviations of 20% or more are shaded ',
+    'in the table.</p>')
+
+  has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
+  if (!has_dn) {
+    parts <- c(parts, .cb_refused_block(dn, "Dirichlet norms"))
+    return(paste(parts, collapse = "\n"))
+  }
+
+  # --- Charts: Double Jeopardy scatter beside the SCR bars ------------------
+  dj_id <- paste0("cb-dj-", cat_code)
+  scr_svg <- if (exists("cb_dj_scatter_svg", mode = "function"))
+    cb_dj_scatter_svg(dn$norms_table, dn$dj_curve, focal, fcol, "scr",
+                      brand_labels = brand_labels) else ""
+  w_svg <- if (exists("cb_dj_scatter_svg", mode = "function"))
+    cb_dj_scatter_svg(dn$norms_table, dn$dj_curve, focal, fcol, "w",
+                      brand_labels = brand_labels) else ""
+  bars_svg <- if (exists("cb_scr_bars_svg", mode = "function"))
+    cb_scr_bars_svg(dn$norms_table, focal_brand = focal, focal_colour = fcol,
+                    brand_labels = brand_labels) else ""
+
+  if (nzchar(scr_svg) || nzchar(bars_svg)) {
+    parts <- c(parts, '<div class="cb-norms-charts">')
+
+    parts <- c(parts, '<div class="cb-norms-chart-cell">')
+    if (nzchar(scr_svg)) {
+      parts <- c(parts,
+        '<div class="cb-norms-chart-title">Double Jeopardy</div>')
+      parts <- c(parts, sprintf(
+        '<div class="cb-toggle-bar">
+  <button type="button" class="cb-toggle-btn active" onclick="_cbDJToggle(\'%s\',\'scr\',this)">SCR</button>
+  <button type="button" class="cb-toggle-btn" onclick="_cbDJToggle(\'%s\',\'w\',this)">Buy rate</button>
+</div>', dj_id, dj_id))
+      parts <- c(parts, sprintf('<div class="cb-dj-container" id="%s">', dj_id))
+      parts <- c(parts, sprintf('<div data-dj-yaxis="scr">%s</div>', scr_svg))
+      parts <- c(parts, sprintf(
+        '<div data-dj-yaxis="w" style="display:none;">%s</div>', w_svg))
+      parts <- c(parts, '</div>')
+    }
+    parts <- c(parts, '</div>')
+
+    parts <- c(parts, '<div class="cb-norms-chart-cell">')
+    if (nzchar(bars_svg)) {
+      parts <- c(parts,
+        '<div class="cb-norms-chart-title">Share of category requirement</div>',
+        '<p style="font-size:11px;color:#94a3b8;margin:0 0 8px;">',
+        'Bars are observed SCR. The tick on each bar is the Dirichlet ',
+        'expectation, and the dotted line is the category mean.</p>')
+      parts <- c(parts, bars_svg)
+    }
+    parts <- c(parts, '</div>')
+
+    parts <- c(parts, '</div>')
+  }
+
+  # --- Norms table ----------------------------------------------------------
+  if (exists("cb_norms_table_html", mode = "function")) {
+    parts <- c(parts, cb_norms_table_html(
+      dn$norms_table,
+      focal_brand      = focal,
+      target_months    = t_months,
+      category_metrics = dn$category_metrics,
+      cat_buying_freq  = cbf,
+      brand_labels     = brand_labels))
+  }
 
   paste(parts, collapse = "\n")
 }
@@ -1612,16 +1714,21 @@ render_cat_buying_panel <- function(panel_data) {
 .cb_kpi_strip <- function(dn, bh, cbf, rep = NULL, fcol, focal, t_months) {
   chips <- character(0)
 
-  pct_b <- if (!is.null(cbf) && !identical(cbf$status, "REFUSED") &&
-                !is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
-    sprintf("%.0f%%", cbf$pct_buyers) else "\u2014"
-  n_asked <- if (!is.null(cbf) && is.finite(as.numeric(cbf$n_respondents %||% NA)))
-    as.integer(cbf$n_respondents) else NA_integer_
-  chips <- c(chips, sprintf(
-    '<div class="cb-kpi-chip" title="%s"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">%% Category buyers%s</div></div>',
-    "Weighted % of respondents asked the category frequency question whose answer is anything but never. Not the same base as the Loyalty table (% of category buyers) or the norms table (% of all category respondents).",
-    pct_b,
-    if (is.na(n_asked)) "" else sprintf(" <span class=\"cb-kpi-base\">of %s asked</span>", format(n_asked, big.mark = ","))))
+  # The category-buyer share needs the frequency question's Role to be set in
+  # the Options sheet. Where it is not, pct_buyers is NA and the chip would
+  # read as an empty placeholder, so it is left out rather than shown blank.
+  has_pct_b <- !is.null(cbf) && !identical(cbf$status, "REFUSED") &&
+    !is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers)
+  if (has_pct_b) {
+    pct_b <- sprintf("%.0f%%", cbf$pct_buyers)
+    n_asked <- if (is.finite(as.numeric(cbf$n_respondents %||% NA)))
+      as.integer(cbf$n_respondents) else NA_integer_
+    chips <- c(chips, sprintf(
+      '<div class="cb-kpi-chip" title="%s"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">%% Category buyers%s</div></div>',
+      "Weighted % of respondents asked the category frequency question whose answer is anything but never. Not the same base as the Loyalty table (% of category buyers) or the norms table (% of all category respondents).",
+      pct_b,
+      if (is.na(n_asked)) "" else sprintf(" <span class=\"cb-kpi-base\">of %s asked</span>", format(n_asked, big.mark = ","))))
+  }
 
   if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
       !is.null(dn$category_metrics$mean_purchases)) {
@@ -1647,7 +1754,7 @@ render_cat_buying_panel <- function(panel_data) {
       sprintf("exp %.0f%%", ms$focal_scr_exp) else ""
     chips <- c(chips, sprintf(
       '<div class="cb-kpi-chip green" data-kpi="scr"><div class="cb-kpi-val green" data-kpi-val>%s</div><div class="cb-kpi-label">Focal SCR <span data-kpi-sub>%s</span></div></div>',
-      scr_val, if (nzchar(scr_exp)) sprintf("(%s)", scr_exp) else ""))
+      scr_val, scr_exp))
 
     loy_val <- if (!is.null(ms$focal_loyal_obs) && !is.na(ms$focal_loyal_obs))
       sprintf("%.0f%%", ms$focal_loyal_obs) else "\u2014"
@@ -1655,14 +1762,14 @@ render_cat_buying_panel <- function(panel_data) {
       sprintf("exp %.0f%%", ms$focal_loyal_exp) else ""
     chips <- c(chips, sprintf(
       '<div class="cb-kpi-chip" data-kpi="loyal"><div class="cb-kpi-val" data-kpi-val>%s</div><div class="cb-kpi-label">Focal 100%%-loyal <span data-kpi-sub>%s</span></div></div>',
-      loy_val, if (nzchar(loy_exp)) sprintf("(%s)", loy_exp) else ""))
+      loy_val, loy_exp))
   }
 
   if (!is.null(bh) && !identical(bh$status, "REFUSED")) {
     nmi_val   <- bh$metrics_summary$focal_nmi %||% NA
     nmi_txt   <- if (!is.na(nmi_val)) sprintf("%.0f", nmi_val) else "\u2014"
     nmi_arrow <- if (!is.na(nmi_val)) {
-      if (nmi_val < 85) " \u2193" else if (nmi_val > 115) " \u2191" else " \u2192"
+      if (nmi_val < 85) "\u2193" else if (nmi_val > 115) "\u2191" else "\u2192"
     } else ""
     chips <- c(chips, sprintf(
       '<div class="cb-kpi-chip amber" data-kpi="nmi" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% × 100. Above 100 = mass / leader pattern (Natural Monopoly Law). Below 100 = niche / heavy-skewed base."><div class="cb-kpi-val amber" data-kpi-val>%s%s</div><div class="cb-kpi-label">Focal Light-buyer index (100 = mirrors cat)</div></div>',

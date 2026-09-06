@@ -52,6 +52,18 @@ paste0(
 }
 .cb-toggle-btn.active { background: #1a2744; color: #fff; border-color: #1a2744; }
 
+/* Dirichlet Norms tab: scatter beside the SCR bars, table underneath */
+.cb-norms-charts {
+  display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px;
+  align-items: start; margin: 0 0 8px;
+}
+@media (max-width: 720px) { .cb-norms-charts { grid-template-columns: 1fr; } }
+.cb-norms-chart-cell { min-width: 0; }
+.cb-norms-chart-cell svg { width: 100%; height: auto; display: block; }
+.cb-norms-chart-title {
+  font-size: 12px; font-weight: 600; color: #334155; margin: 0 0 6px;
+}
+
 /* Norms table */
 .cb-norms-wrap { overflow-x: auto; margin: 8px 0 20px; }
 .cb-norms-table { width: 100%; border-collapse: collapse; font-size: 12px; }

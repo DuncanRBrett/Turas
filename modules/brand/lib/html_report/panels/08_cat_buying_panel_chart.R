@@ -141,8 +141,12 @@ cb_dj_scatter_svg <- function(norms_table, dj_curve,
     is_focal <- !is.null(focal_brand) && brands[bi] == focal_brand
     col  <- if (is_focal) focal_colour else "#94a3b8"
     r    <- if (is_focal) 6 else 4
-    flag <- norms_table$DJ_Flag[bi]
-    show_label <- is_focal || (!is.na(flag) && flag != "on_line")
+    # DJ_Flag is optional: a norms table built without it must still render,
+    # and norms_table$DJ_Flag[bi] is then NULL, which "||" refuses.
+    flag <- if ("DJ_Flag" %in% names(norms_table))
+      as.character(norms_table$DJ_Flag[bi]) else NA_character_
+    show_label <- isTRUE(is_focal) ||
+      (length(flag) == 1L && !is.na(flag) && !identical(flag, "on_line"))
     lbl  <- .cb_brand_lbl(brands[bi], brand_labels)
 
     lines <- c(lines, sprintf(
@@ -635,8 +639,10 @@ cb_scr_bars_svg <- function(norms_table,
 
   bar_h   <- 20L
   gap     <- 7L
-  W       <- 280L
-  pad_l   <- 62L; pad_r <- 28L; pad_t <- 14L; pad_b <- 28L
+  # The label gutter (pad_l) has to hold a display brand label, not a code,
+  # so it is wide enough for about 14 characters at font-size 10.
+  W       <- 320L
+  pad_l   <- 92L; pad_r <- 28L; pad_t <- 14L; pad_b <- 28L
   total_h <- pad_t + n * (bar_h + gap) + pad_b
 
   max_scr <- max(c(scr_obs, scr_exp), na.rm = TRUE)
@@ -681,12 +687,17 @@ cb_scr_bars_svg <- function(norms_table,
 
     lines <- c(lines, sprintf('<g data-brand="%s">', .cb_esc(brands[bi])))
 
+    # Longer display labels used to run off the left edge of the viewBox and
+    # be clipped, so they are shortened to what the gutter holds, with the
+    # full name kept as the hover title.
+    lbl_short <- if (nchar(lbl) > 14L)
+      paste0(substr(lbl, 1L, 13L), "…") else lbl
     lines <- c(lines, sprintf(
-      '<text x="%d" y="%.1f" font-size="10" fill="%s" font-weight="%s" text-anchor="end">%s</text>',
+      '<text x="%d" y="%.1f" font-size="10" fill="%s" font-weight="%s" text-anchor="end">%s<title>%s</title></text>',
       pad_l - 3L, y0 + bar_h / 2 + 3.5,
       if (is_focal) focal_colour else "#475569",
       if (is_focal) "700" else "400",
-      .cb_esc(lbl)))
+      .cb_esc(lbl_short), .cb_esc(lbl)))
 
     if (!is.na(obs_val)) {
       bar_px <- to_px(obs_val) - pad_l

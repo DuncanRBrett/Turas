@@ -139,13 +139,18 @@ cb_norms_table_html <- function(norms_table,
   lines <- c(lines, '</tbody>')
 
   # Footer: §5.5 reconciliation note + limitations
-  m_brand  <- if (!is.null(category_metrics))
-    sprintf("%.1f", category_metrics$mean_purchases) else "?"
+  # "not available" rather than a bare question mark: the stated-frequency
+  # reconciliation needs a Role on the frequency question and is simply
+  # absent on studies that do not carry one.
+  m_brand  <- if (!is.null(category_metrics) &&
+                   !is.null(category_metrics$mean_purchases) &&
+                   !is.na(category_metrics$mean_purchases))
+    sprintf("%.1f", category_metrics$mean_purchases) else "not available"
   m_stated <- if (!is.null(cat_buying_freq) &&
                    !is.null(cat_buying_freq$mean_freq) &&
                    !is.na(cat_buying_freq$mean_freq)) {
     sprintf("%.1f", cat_buying_freq$mean_freq * target_months)
-  } else "?"
+  } else "not available"
 
   base_txt <- if (!is.null(category_metrics) &&
                   is.finite(as.numeric(category_metrics$n_respondents %||% NA))) {
@@ -157,7 +162,7 @@ cb_norms_table_html <- function(norms_table,
             target_months)
   } else ""
   footer_txt <- sprintf(
-    paste0("%sCategory mean purchases per buyer over the last %d months \u2014 ",
+    paste0("%sCategory mean purchases per buyer over the last %d months, ",
            "from per-brand purchase counts: %s; from the stated-frequency ",
            "scale: %s. Dirichlet uses the per-brand counts (direct ",
            "measurement). \u0394%% flags: \u2265\u00b120%% shaded. ",
